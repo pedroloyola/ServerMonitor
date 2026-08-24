@@ -63,11 +63,23 @@ public sealed class ServerCardViewModelTests
     }
 
     [Fact]
-    public void NonLinuxServer_DoesNotSupportMetricsAndIsNotPending()
+    public void MacOsServerWithNoSnapshot_IsWaitingForData()
     {
         var vm = CreateViewModel(
             new FakeServerMetricsStore(),
             TestData.LinuxServer() with { OperatingSystem = ServerOperatingSystem.MacOS });
+
+        Assert.True(vm.SupportsMetrics);
+        Assert.False(vm.HasMetrics);
+        Assert.True(vm.IsMetricsPending);
+    }
+
+    [Fact]
+    public void UnsupportedOsServer_DoesNotSupportMetricsAndIsNotPending()
+    {
+        var vm = CreateViewModel(
+            new FakeServerMetricsStore(),
+            TestData.LinuxServer() with { OperatingSystem = ServerOperatingSystem.Unknown });
 
         Assert.False(vm.SupportsMetrics);
         Assert.False(vm.IsMetricsPending);

@@ -98,8 +98,9 @@ public sealed class ServerCardViewModel : ObservableObject
 
     public ICommand RefreshMetricsCommand { get; }
 
-    /// <summary>Only Linux servers are ever collected; other configurations have no metrics story yet.</summary>
-    public bool SupportsMetrics => Server.OperatingSystem == ServerOperatingSystem.Linux;
+    /// <summary>Linux and macOS servers are collected through the same pipeline; other configurations have no metrics story yet.</summary>
+    public bool SupportsMetrics =>
+        Server.OperatingSystem is ServerOperatingSystem.Linux or ServerOperatingSystem.MacOS;
 
     public bool HasMetrics => _metrics is not null;
 

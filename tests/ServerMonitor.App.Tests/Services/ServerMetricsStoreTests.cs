@@ -87,11 +87,16 @@ public sealed class ServerMetricsStoreTests
         var first = store.RefreshAsync(server);
         var second = store.RefreshAsync(server);
 
+        // Both refreshes share the one in-flight Task regardless of scheduling.
         Assert.Same(first, second);
-        Assert.Equal(1, collector.CallCount);
 
         gate.SetResult(TestData.Success(TestData.Snapshot(server.Id, cpu: 5)));
         await Task.WhenAll(first, second);
+
+        // The collector runs behind the store's Task.Yield(), so CallCount is
+        // only reliable once the shared collection has completed. Single-flight
+        // means it was entered exactly once for the two overlapping calls.
+        Assert.Equal(1, collector.CallCount);
         Assert.True((await first).IsSuccess);
     }
 
@@ -109,6 +114,28 @@ public sealed class ServerMetricsStoreTests
         await store.RefreshAsync(server);
 
         Assert.Equal(2, collector.CallCount);
+    }
+
+    [Fact]
+    public async Task RefreshAsync_SynchronousCompletion_NeverStrandsInFlightAndKeepsCallingCollector()
+    {
+        // Regression for the single-flight strand: a synchronously-completing
+        // collector must not leave its finished Task cached in the in-flight map.
+        // If it did, every later refresh would return the first result forever and
+        // never re-invoke the collector. Each awaited refresh must run afresh.
+        var server = TestData.LinuxServer();
+        var collector = new FakeMetricsCollector();
+        var store = new ServerMetricsStore(collector);
+
+        for (var i = 1; i <= 5; i++)
+        {
+            collector.Result = TestData.Success(TestData.Snapshot(server.Id, cpu: i * 10));
+            var result = await store.RefreshAsync(server);
+
+            Assert.True(result.IsSuccess);
+            Assert.Equal(i, collector.CallCount);
+            Assert.Equal(i * 10d, store.GetLastSnapshot(server.Id)!.CpuUsagePercent);
+        }
     }
 
     [Fact]

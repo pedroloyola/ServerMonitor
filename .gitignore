@@ -8,6 +8,9 @@ artifacts/
 *.log
 .maestri/
 
+# Local-only, private strategic notes. Never versioned or pushed.
+.private/
+
 # Local user configuration must never be committed.
 config.json
 *.secrets.json

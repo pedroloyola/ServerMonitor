@@ -12,7 +12,7 @@ ServerMonitor.Collectors     ──→ ServerMonitor.Core
 
 `ServerMonitor.App` contém a composição por dependency injection, a shell WinUI 3, Views, ViewModels, diálogos, serviços estritamente relacionados com apresentação, recursos de localização e design tokens. A UI depende de contratos do Core e não acede diretamente à persistência, ao Credential Manager nem à biblioteca SSH.
 
-`ServerMonitor.Core` contém o modelo `Server`, o snapshot normalizado, validação, estados de conexão, identidades de host, contratos e os workflows de gestão de perfil. `Infrastructure` implementa persistência JSON não sensível, Windows Credential Manager, host-key trust, o adaptador SSH.NET e a porta remota Linux de comandos fechados. `Collectors` contém o collector Linux e parsers puros; conhece apenas a porta especializada da Infrastructure, nunca SSH.NET.
+`ServerMonitor.Core` contém o modelo `Server`, o snapshot normalizado, validação, estados de conexão, identidades de host, contratos e os workflows de gestão de perfil. `Infrastructure` implementa persistência JSON não sensível, Windows Credential Manager, host-key trust, o adaptador SSH.NET e as portas remotas Linux e macOS de comandos fechados. `Collectors` contém os collectors Linux e macOS, os parsers puros e o `MetricsCollectorRouter`; conhece apenas as portas especializadas da Infrastructure, nunca SSH.NET.
 
 ## Decisões do bootstrap
 
@@ -57,30 +57,35 @@ ViewModel → ISshConnectionService → probe sem credencial
 
 Detalhes de transporte, política criptográfica e credenciais constam das ADR-006 e ADR-007.
 
-## Pipeline manual de métricas Linux
+## Pipeline manual de métricas Linux e macOS
 
 ```text
 ServerFullCard → ServerCardViewModel → IServerMetricsCollector
                                       │
                                       ▼
-                            LinuxMetricsCollector
-                                      │
-                                      ▼
-                          ILinuxMetricsRemoteSource
-                                      │
+                            MetricsCollectorRouter
+                       (por Server.OperatingSystem;
+                        Auto resolvido via uname -s do M3)
+                          ┌───────────┴───────────┐
+                          ▼                       ▼
+                 LinuxMetricsCollector    MacOsMetricsCollector
+                          │                       │
+                          ▼                       ▼
+              ILinuxMetricsRemoteSource   IMacOsMetricsRemoteSource
+                          └───────────┬───────────┘
                                       ▼
                   trust probe → autenticação → sessão única
                                       │
                                       ▼
-                         catálogo Linux fixo → raw output
+                   catálogo Linux/macOS fixo → raw output
                                       │
                                       ▼
                       parsers puros → ServerMetricsSnapshot
 ```
 
-O refresh é iniciado apenas pelo utilizador e protegido por single-flight por `ServerId`. Snapshot, estado de refresh e último erro vivem num store transitório em memória; não são escritos em `servers.json`. A UI recebe apenas `IServerMetricsCollector` e nunca recebe um executor ou texto shell.
+O refresh é iniciado apenas pelo utilizador e protegido por single-flight por `ServerId`. Snapshot, estado de refresh e último erro vivem num store transitório em memória; não são escritos em `servers.json`. A UI recebe apenas `IServerMetricsCollector` (o router) e nunca recebe um executor ou texto shell; não conhece as diferenças entre Linux e macOS.
 
-Falhas individuais de parsing mantêm a métrica como `null`, distinguindo unknown de zero. Falhas de trust, autenticação, transporte, timeout ou cancelamento preservam o resultado SSH tipado e não devolvem snapshot. O catálogo e a estratégia de falha parcial constam da ADR-008 e de `docs/metrics.md`.
+Falhas individuais de parsing mantêm a métrica como `null`, distinguindo unknown de zero. Falhas de trust, autenticação, transporte, timeout ou cancelamento preservam o resultado SSH tipado e não devolvem snapshot. Os catálogos e a estratégia de falha parcial constam das ADR-008 (Linux) e ADR-010 (macOS) e de `docs/metrics.md`.
 
 ## Fronteira de apresentação compacta
 

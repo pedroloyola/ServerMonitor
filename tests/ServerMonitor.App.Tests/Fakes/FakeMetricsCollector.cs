@@ -15,14 +15,27 @@ internal sealed class FakeMetricsCollector : IServerMetricsCollector
 {
     private int _callCount;
     private TaskCompletionSource<ServerMetricsCollectionResult>? _gate;
+    private Func<Server, ServerMetricsCollectionResult>? _resultFactory;
+    private ServerMetricsCollectionResult? _result;
 
     public int CallCount => Volatile.Read(ref _callCount);
 
     public CancellationToken LastCancellationToken { get; private set; }
 
-    public Func<Server, ServerMetricsCollectionResult>? ResultFactory { get; set; }
+    // The store's Task.Yield() hops collection onto a thread-pool thread, so a
+    // Result configured on the test thread is read on another thread. Volatile
+    // access publishes the latest write across that boundary.
+    public Func<Server, ServerMetricsCollectionResult>? ResultFactory
+    {
+        get => Volatile.Read(ref _resultFactory);
+        set => Volatile.Write(ref _resultFactory, value);
+    }
 
-    public ServerMetricsCollectionResult? Result { get; set; }
+    public ServerMetricsCollectionResult? Result
+    {
+        get => Volatile.Read(ref _result);
+        set => Volatile.Write(ref _result, value);
+    }
 
     public TaskCompletionSource<ServerMetricsCollectionResult> Gate()
     {

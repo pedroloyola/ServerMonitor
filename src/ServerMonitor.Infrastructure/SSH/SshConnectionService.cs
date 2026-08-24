@@ -5,10 +5,12 @@ using ServerMonitor.Core.Interfaces;
 using ServerMonitor.Core.Models;
 using ServerMonitor.Core.Security;
 using ServerMonitor.Infrastructure.Collectors.Linux;
+using ServerMonitor.Infrastructure.Collectors.MacOS;
 
 namespace ServerMonitor.Infrastructure.SSH;
 
-public sealed class SshConnectionService : ISshConnectionService, ILinuxMetricsRemoteSource
+public sealed class SshConnectionService
+    : ISshConnectionService, ILinuxMetricsRemoteSource, IMacOsMetricsRemoteSource
 {
     private readonly IHostKeyTrustStore _hostKeyTrustStore;
     private readonly IServerCredentialStore _credentialStore;
@@ -79,7 +81,7 @@ public sealed class SshConnectionService : ISshConnectionService, ILinuxMetricsR
                 request,
                 SshSessionOperation.CollectLinuxMetrics,
                 cpuSampleInterval,
-                value => data = value,
+                session => data = session.LinuxMetrics,
                 cancellationToken)
             .ConfigureAwait(false);
 
@@ -90,11 +92,38 @@ public sealed class SshConnectionService : ISshConnectionService, ILinuxMetricsR
         };
     }
 
+    public async Task<MacOsMetricsRemoteResult> CollectAsync(
+        Server server,
+        TimeSpan timeout,
+        CancellationToken cancellationToken = default)
+    {
+        MacOsMetricsRawData? data = null;
+        var request = new SshConnectionRequest
+        {
+            Server = server,
+            Timeout = timeout
+        };
+
+        var connectionResult = await ExecuteAsync(
+                request,
+                SshSessionOperation.CollectMacOsMetrics,
+                TimeSpan.Zero,
+                session => data = session.MacOsMetrics,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        return new MacOsMetricsRemoteResult
+        {
+            ConnectionResult = connectionResult,
+            Data = data
+        };
+    }
+
     private async Task<SshConnectionResult> ExecuteAsync(
         SshConnectionRequest request,
         SshSessionOperation operation,
         TimeSpan cpuSampleInterval,
-        Action<LinuxMetricsRawData?>? captureLinuxMetrics,
+        Action<SshSessionResult>? captureSession,
         CancellationToken cancellationToken)
     {
         var stopwatch = Stopwatch.StartNew();
@@ -169,7 +198,7 @@ public sealed class SshConnectionService : ISshConnectionService, ILinuxMetricsR
                     linkedSource.Token)
                 .ConfigureAwait(false);
 
-            captureLinuxMetrics?.Invoke(sessionResult.LinuxMetrics);
+            captureSession?.Invoke(sessionResult);
 
             return Complete(
                 request.Server,
@@ -325,6 +354,9 @@ public sealed class SshConnectionService : ISshConnectionService, ILinuxMetricsR
                     SshSessionOperation.CollectLinuxMetrics => await session
                         .CollectLinuxMetricsAsync(verifier, cpuSampleInterval, cancellationToken)
                         .ConfigureAwait(false),
+                    SshSessionOperation.CollectMacOsMetrics => await session
+                        .CollectMacOsMetricsAsync(verifier, cancellationToken)
+                        .ConfigureAwait(false),
                     _ => Failure(SshConnectionErrorCode.Unexpected)
                 };
             }
@@ -446,6 +478,7 @@ public sealed class SshConnectionService : ISshConnectionService, ILinuxMetricsR
     {
         Connect,
         DetectOperatingSystem,
-        CollectLinuxMetrics
+        CollectLinuxMetrics,
+        CollectMacOsMetrics
     }
 }

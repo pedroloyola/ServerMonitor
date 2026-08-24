@@ -1,6 +1,6 @@
-# Métricas Linux — Milestone 4
+# Métricas Linux e macOS — Milestones 4 e 5
 
-O M4 implementa recolha exclusivamente manual para servidores configurados como Linux. Não existe polling, armazenamento histórico, gráficos, métricas macOS ou execução remota fornecida pelo utilizador.
+O M4 implementa recolha exclusivamente manual para servidores configurados como Linux; o M5 acrescenta macOS reutilizando o mesmo pipeline. Não existe polling, armazenamento histórico, gráficos ou execução remota fornecida pelo utilizador. Linux e macOS são apenas collectors diferentes a alimentar o mesmo `ServerMetricsSnapshot`; um `MetricsCollectorRouter` seleciona o collector por `Server.OperatingSystem` (resolvendo `Auto` via a deteção de host do M3) e é o único `IServerMetricsCollector` que a UI e o store consomem. Ver a secção macOS mais abaixo e a ADR-010.
 
 ## Pipeline
 
@@ -48,4 +48,19 @@ Falhas de trust, autenticação, transporte, timeout ou cancelamento encerram a 
 
 ## Apresentação
 
-O `ServerFullCard` mostra apenas valores disponíveis de CPU, RAM, disco, uptime e sistema operativo, com refresh manual e timestamp. Antes da primeira recolha apresenta “Aguardando dados”. Durante a recolha o comando fica indisponível e um estado discreto é anunciado por acessibilidade. O último snapshot válido é preservado se uma atualização posterior falhar.
+O `ServerFullCard` mostra apenas valores disponíveis de CPU, RAM, disco, uptime e sistema operativo, com refresh manual e timestamp. Antes da primeira recolha apresenta “Aguardando dados”. Durante a recolha o comando fica indisponível e um estado discreto é anunciado por acessibilidade. O último snapshot válido é preservado se uma atualização posterior falhar. A apresentação é idêntica para Linux e macOS: o card é agnóstico do OS de origem.
+
+## macOS — Milestone 5
+
+O macOS usa a userland BSD (sem GNU coreutils) e não expõe um contador cumulativo de ticks de CPU por CLI base equivalente a `/proc/stat`. O `MacOsMetricsCollector` encapsula estas diferenças e produz o mesmo `ServerMetricsSnapshot`.
+
+| Dado | Comando fixo | Regra principal |
+| --- | --- | --- |
+| CPU | `top -l 2 -n 0` | duas amostras auto-geradas por `top` (~1s); última linha `CPU usage:`, `user + sys`; sem `sleep` remoto |
+| Memória | `vm_stat` + `sysctl -n hw.memsize` | `used = (active + wired down + compressor) * pageSize`; total = `hw.memsize`; inactive/speculative/purgeable contam como disponíveis |
+| Disco raiz | `df -P -k /` | apenas `/`; BSD df sem `-B`; blocos de 1024 bytes convertidos para bytes; percentagem da coluna Capacity |
+| Uptime | `sysctl -n kern.boottime` | apenas o campo `sec` (epoch UTC); uptime derivado pelo `TimeProvider`, descartado se negativo |
+| Hostname | `hostname` | parser partilhado e agnóstico de OS |
+| Sistema | `sw_vers` | allowlist de `ProductName`, `ProductVersion`, `BuildVersion` |
+
+O tamanho da página é lido do cabeçalho do `vm_stat` e nunca assumido como 4096 (Apple Silicon usa 16384). As regras de falha parcial, segurança, limites e não-persistência são as mesmas do Linux. O catálogo e as decisões constam da ADR-010.

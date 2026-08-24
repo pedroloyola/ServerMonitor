@@ -3,6 +3,7 @@ using Renci.SshNet;
 using ServerMonitor.Core.Enums;
 using ServerMonitor.Core.Models;
 using ServerMonitor.Infrastructure.Collectors.Linux;
+using ServerMonitor.Infrastructure.Collectors.MacOS;
 
 namespace ServerMonitor.Infrastructure.SSH;
 
@@ -33,6 +34,11 @@ internal sealed class SshNetSession(
         TimeSpan cpuSampleInterval,
         CancellationToken cancellationToken) =>
         RunAsync(SessionOperation.CollectLinuxMetrics, hostKeyVerifier, cpuSampleInterval, cancellationToken);
+
+    public Task<SshSessionResult> CollectMacOsMetricsAsync(
+        Func<HostKeyIdentity, bool> hostKeyVerifier,
+        CancellationToken cancellationToken) =>
+        RunAsync(SessionOperation.CollectMacOsMetrics, hostKeyVerifier, TimeSpan.Zero, cancellationToken);
 
     public void Dispose()
     {
@@ -84,6 +90,7 @@ internal sealed class SshNetSession(
 
             var detectedOperatingSystem = ServerOperatingSystem.Unknown;
             LinuxMetricsRawData? linuxMetrics = null;
+            MacOsMetricsRawData? macOsMetrics = null;
             if (operation == SessionOperation.DetectOperatingSystem)
             {
                 var uname = await TryExecuteCommandAsync(
@@ -98,13 +105,19 @@ internal sealed class SshNetSession(
                 linuxMetrics = await CollectLinuxDataAsync(cpuSampleInterval, cancellationToken)
                     .ConfigureAwait(false);
             }
+            else if (operation == SessionOperation.CollectMacOsMetrics)
+            {
+                macOsMetrics = await CollectMacOsDataAsync(cancellationToken)
+                    .ConfigureAwait(false);
+            }
 
             return new SshSessionResult
             {
                 ErrorCode = SshConnectionErrorCode.None,
                 PresentedHostKey = presentedHostKey,
                 DetectedOperatingSystem = detectedOperatingSystem,
-                LinuxMetrics = linuxMetrics
+                LinuxMetrics = linuxMetrics,
+                MacOsMetrics = macOsMetrics
             };
         }
         catch (Exception exception)
@@ -190,6 +203,58 @@ internal sealed class SshNetSession(
         };
     }
 
+    private async Task<MacOsMetricsRawData> CollectMacOsDataAsync(CancellationToken cancellationToken)
+    {
+        // top -l 2 self-samples over ~1s; no external delay is required. All
+        // commands run in this single authenticated session.
+        var cpuTop = await TryExecuteCommandAsync(
+                MacOsMetricsCommandCatalog.CpuTop,
+                DefaultOutputLimit,
+                cancellationToken)
+            .ConfigureAwait(false);
+        var vmStat = await TryExecuteCommandAsync(
+                MacOsMetricsCommandCatalog.VmStat,
+                DefaultOutputLimit,
+                cancellationToken)
+            .ConfigureAwait(false);
+        var physicalMemory = await TryExecuteCommandAsync(
+                MacOsMetricsCommandCatalog.PhysicalMemory,
+                SmallOutputLimit,
+                cancellationToken)
+            .ConfigureAwait(false);
+        var rootFileSystem = await TryExecuteCommandAsync(
+                MacOsMetricsCommandCatalog.RootFileSystem,
+                DefaultOutputLimit,
+                cancellationToken)
+            .ConfigureAwait(false);
+        var bootTime = await TryExecuteCommandAsync(
+                MacOsMetricsCommandCatalog.BootTime,
+                SmallOutputLimit,
+                cancellationToken)
+            .ConfigureAwait(false);
+        var hostname = await TryExecuteCommandAsync(
+                MacOsMetricsCommandCatalog.Hostname,
+                SmallOutputLimit,
+                cancellationToken)
+            .ConfigureAwait(false);
+        var swVers = await TryExecuteCommandAsync(
+                MacOsMetricsCommandCatalog.SwVers,
+                SmallOutputLimit,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        return new MacOsMetricsRawData
+        {
+            CpuTop = cpuTop,
+            VmStat = vmStat,
+            PhysicalMemory = physicalMemory,
+            RootFileSystem = rootFileSystem,
+            BootTime = bootTime,
+            Hostname = hostname,
+            SwVers = swVers
+        };
+    }
+
     private async Task<string?> TryExecuteCommandAsync(
         string commandText,
         int outputLimit,
@@ -244,6 +309,7 @@ internal sealed class SshNetSession(
     {
         Connect,
         DetectOperatingSystem,
-        CollectLinuxMetrics
+        CollectLinuxMetrics,
+        CollectMacOsMetrics
     }
 }

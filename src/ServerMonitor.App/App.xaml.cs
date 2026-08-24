@@ -5,10 +5,13 @@ using Microsoft.UI.Xaml;
 using ServerMonitor.App.Services;
 using ServerMonitor.App.ViewModels;
 using ServerMonitor.App.Views;
+using ServerMonitor.Collectors;
 using ServerMonitor.Collectors.Linux;
+using ServerMonitor.Collectors.MacOS;
 using ServerMonitor.Core.Domain;
 using ServerMonitor.Core.Interfaces;
 using ServerMonitor.Infrastructure.Collectors.Linux;
+using ServerMonitor.Infrastructure.Collectors.MacOS;
 using ServerMonitor.Infrastructure.Persistence;
 using ServerMonitor.Infrastructure.Security;
 using ServerMonitor.Infrastructure.SSH;
@@ -50,7 +53,10 @@ public partial class App : Application
                 services.AddSingleton<SshConnectionService>();
                 services.AddSingleton<ISshConnectionService>(sp => sp.GetRequiredService<SshConnectionService>());
                 services.AddSingleton<ILinuxMetricsRemoteSource>(sp => sp.GetRequiredService<SshConnectionService>());
-                services.AddSingleton<IServerMetricsCollector, LinuxMetricsCollector>();
+                services.AddSingleton<IMacOsMetricsRemoteSource>(sp => sp.GetRequiredService<SshConnectionService>());
+                services.AddSingleton<LinuxMetricsCollector>();
+                services.AddSingleton<MacOsMetricsCollector>();
+                services.AddSingleton<IServerMetricsCollector, MetricsCollectorRouter>();
                 services.AddSingleton<IServerMetricsStore, ServerMetricsStore>();
 
                 services.AddSingleton<DashboardViewModel>();

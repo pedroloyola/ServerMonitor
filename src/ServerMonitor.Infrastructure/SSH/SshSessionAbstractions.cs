@@ -1,6 +1,7 @@
 using ServerMonitor.Core.Enums;
 using ServerMonitor.Core.Models;
 using ServerMonitor.Infrastructure.Collectors.Linux;
+using ServerMonitor.Infrastructure.Collectors.MacOS;
 
 namespace ServerMonitor.Infrastructure.SSH;
 
@@ -39,6 +40,10 @@ internal interface ISshSession : IDisposable
         Func<HostKeyIdentity, bool> hostKeyVerifier,
         TimeSpan cpuSampleInterval,
         CancellationToken cancellationToken);
+
+    Task<SshSessionResult> CollectMacOsMetricsAsync(
+        Func<HostKeyIdentity, bool> hostKeyVerifier,
+        CancellationToken cancellationToken);
 }
 
 internal sealed record SshSessionResult
@@ -50,6 +55,8 @@ internal sealed record SshSessionResult
     public ServerOperatingSystem DetectedOperatingSystem { get; init; } = ServerOperatingSystem.Unknown;
 
     public LinuxMetricsRawData? LinuxMetrics { get; init; }
+
+    public MacOsMetricsRawData? MacOsMetrics { get; init; }
 
     public string? ExceptionType { get; init; }
 
