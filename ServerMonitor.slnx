@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/ServerMonitor.App/ServerMonitor.App.csproj">
+      <Platform Project="x64" />
+    </Project>
+    <Project Path="src/ServerMonitor.Collectors/ServerMonitor.Collectors.csproj" />
+    <Project Path="src/ServerMonitor.Core/ServerMonitor.Core.csproj" />
+    <Project Path="src/ServerMonitor.Infrastructure/ServerMonitor.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/ServerMonitor.Collectors.Tests/ServerMonitor.Collectors.Tests.csproj" />
+    <Project Path="tests/ServerMonitor.Core.Tests/ServerMonitor.Core.Tests.csproj" />
+  </Folder>
+</Solution>

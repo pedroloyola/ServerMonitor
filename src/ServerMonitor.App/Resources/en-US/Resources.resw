@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:element name="root" msdata:IsDataSet="true"><xsd:complexType><xsd:choice maxOccurs="unbounded"><xsd:element name="data"><xsd:complexType><xsd:sequence><xsd:element name="value" type="xsd:string" minOccurs="0" /></xsd:sequence><xsd:attribute name="name" use="required" type="xsd:string" /><xsd:attribute name="type" type="xsd:string" /><xsd:attribute name="mimetype" type="xsd:string" /><xsd:attribute ref="xml:space" /></xsd:complexType></xsd:element><xsd:element name="resheader"><xsd:complexType><xsd:sequence><xsd:element name="value" type="xsd:string" minOccurs="0" /></xsd:sequence><xsd:attribute name="name" use="required" type="xsd:string" /></xsd:complexType></xsd:element></xsd:choice></xsd:complexType></xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader><resheader name="version"><value>2.0</value></resheader><resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader><resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
+  <data name="AppNameText.Text" xml:space="preserve"><value>Server Monitor</value></data>
+  <data name="MainWindow.Title" xml:space="preserve"><value>Server Monitor</value></data>
+  <data name="NavigationDashboardItem.Content" xml:space="preserve"><value>Servers</value></data>
+  <data name="NavigationSettingsItem.Content" xml:space="preserve"><value>Settings</value></data>
+  <data name="DashboardTitle.Text" xml:space="preserve"><value>Servers</value></data>
+  <data name="DashboardSubtitle.Text" xml:space="preserve"><value>Your simple, calm monitoring dashboard.</value></data>
+  <data name="DashboardAddButton.Content" xml:space="preserve"><value>Add server</value></data>
+  <data name="DashboardMilestoneNotice.Title" xml:space="preserve"><value>Add server</value></data>
+  <data name="DashboardMilestoneNotice.Message" xml:space="preserve"><value>The setup flow will be delivered in a later milestone. This shell does not create or persist servers.</value></data>
+  <data name="DashboardEmptyState.Title" xml:space="preserve"><value>No servers yet</value></data>
+  <data name="DashboardEmptyState.Description" xml:space="preserve"><value>Add your first server to start monitoring.</value></data>
+  <data name="DashboardEmptyState.ActionText" xml:space="preserve"><value>Add server</value></data>
+  <data name="SettingsTitle.Text" xml:space="preserve"><value>Settings</value></data>
+  <data name="SettingsSubtitle.Text" xml:space="preserve"><value>Customize appearance and language.</value></data>
+  <data name="SettingsAppearanceTitle.Text" xml:space="preserve"><value>Appearance</value></data>
+  <data name="SettingsAppearanceDescription.Text" xml:space="preserve"><value>Choose a theme or automatically follow Windows.</value></data>
+  <data name="SettingsThemePicker.Header" xml:space="preserve"><value>Theme</value></data>
+  <data name="ThemeSystemOption.Content" xml:space="preserve"><value>System</value></data>
+  <data name="ThemeLightOption.Content" xml:space="preserve"><value>Light</value></data>
+  <data name="ThemeDarkOption.Content" xml:space="preserve"><value>Dark</value></data>
+  <data name="SettingsLanguageTitle.Text" xml:space="preserve"><value>Language</value></data>
+  <data name="SettingsLanguageDescription.Text" xml:space="preserve"><value>Use the Windows language or select a supported option.</value></data>
+  <data name="SettingsLanguagePicker.Header" xml:space="preserve"><value>Interface language</value></data>
+  <data name="LanguageSystemOption.Content" xml:space="preserve"><value>Use system language</value></data>
+  <data name="LanguageBrazilianPortugueseOption.Content" xml:space="preserve"><value>Português (Brasil)</value></data>
+  <data name="LanguageEuropeanPortugueseOption.Content" xml:space="preserve"><value>Português (Portugal)</value></data>
+  <data name="LanguageEnglishOption.Content" xml:space="preserve"><value>English</value></data>
+  <data name="SettingsRestartNotice.Title" xml:space="preserve"><value>Language updated</value></data>
+  <data name="SettingsRestartNotice.Message" xml:space="preserve"><value>Restart the app to apply the language throughout the interface.</value></data>
+  <data name="SettingsMilestoneCaption.Text" xml:space="preserve"><value>Preferences apply to the shell. There is no server configuration or persistence in this milestone.</value></data>
+</root>

@@ -1,0 +1,76 @@
+<Page
+    x:Class="ServerMonitor.App.Views.SettingsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:ServerMonitor.App.Controls">
+    <ScrollViewer>
+        <StackPanel
+            Padding="{StaticResource PagePadding}"
+            Spacing="20">
+            <StackPanel Spacing="4">
+                <TextBlock
+                    x:Uid="SettingsTitle"
+                    Style="{StaticResource PageTitleTextStyle}" />
+                <TextBlock
+                    x:Uid="SettingsSubtitle"
+                    Foreground="{ThemeResource TextSecondaryBrush}" />
+            </StackPanel>
+
+            <controls:GlassCard>
+                <StackPanel Spacing="14">
+                    <StackPanel Spacing="4">
+                        <TextBlock
+                            x:Uid="SettingsAppearanceTitle"
+                            Style="{StaticResource SectionTitleTextStyle}" />
+                        <TextBlock
+                            x:Uid="SettingsAppearanceDescription"
+                            Foreground="{ThemeResource TextSecondaryBrush}"
+                            TextWrapping="Wrap" />
+                    </StackPanel>
+                    <ComboBox
+                        x:Uid="SettingsThemePicker"
+                        HorizontalAlignment="Stretch"
+                        SelectedIndex="{Binding SelectedThemeIndex, Mode=TwoWay}">
+                        <ComboBoxItem x:Uid="ThemeSystemOption" />
+                        <ComboBoxItem x:Uid="ThemeLightOption" />
+                        <ComboBoxItem x:Uid="ThemeDarkOption" />
+                    </ComboBox>
+                </StackPanel>
+            </controls:GlassCard>
+
+            <controls:GlassCard>
+                <StackPanel Spacing="14">
+                    <StackPanel Spacing="4">
+                        <TextBlock
+                            x:Uid="SettingsLanguageTitle"
+                            Style="{StaticResource SectionTitleTextStyle}" />
+                        <TextBlock
+                            x:Uid="SettingsLanguageDescription"
+                            Foreground="{ThemeResource TextSecondaryBrush}"
+                            TextWrapping="Wrap" />
+                    </StackPanel>
+                    <ComboBox
+                        x:Uid="SettingsLanguagePicker"
+                        HorizontalAlignment="Stretch"
+                        SelectedIndex="{Binding SelectedLanguageIndex, Mode=TwoWay}">
+                        <ComboBoxItem x:Uid="LanguageSystemOption" />
+                        <ComboBoxItem x:Uid="LanguageBrazilianPortugueseOption" />
+                        <ComboBoxItem x:Uid="LanguageEuropeanPortugueseOption" />
+                        <ComboBoxItem x:Uid="LanguageEnglishOption" />
+                    </ComboBox>
+                    <InfoBar
+                        x:Uid="SettingsRestartNotice"
+                        IsClosable="True"
+                        IsOpen="{Binding IsRestartNoticeOpen, Mode=TwoWay}"
+                        Severity="Informational" />
+                </StackPanel>
+            </controls:GlassCard>
+
+            <TextBlock
+                x:Uid="SettingsMilestoneCaption"
+                Foreground="{ThemeResource TextTertiaryBrush}"
+                FontSize="12"
+                TextWrapping="Wrap" />
+        </StackPanel>
+    </ScrollViewer>
+</Page>

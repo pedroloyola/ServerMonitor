@@ -1,0 +1,12 @@
+bin/
+obj/
+.vs/
+*.user
+*.suo
+TestResults/
+artifacts/
+*.log
+
+# Local user configuration must never be committed.
+config.json
+*.secrets.json

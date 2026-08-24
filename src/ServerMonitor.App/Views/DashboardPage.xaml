@@ -1,0 +1,48 @@
+<Page
+    x:Class="ServerMonitor.App.Views.DashboardPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:ServerMonitor.App.Controls">
+    <Grid Padding="{StaticResource PagePadding}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Grid Margin="0,0,0,24">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Spacing="4">
+                <TextBlock
+                    x:Uid="DashboardTitle"
+                    Style="{StaticResource PageTitleTextStyle}" />
+                <TextBlock
+                    x:Uid="DashboardSubtitle"
+                    Foreground="{ThemeResource TextSecondaryBrush}" />
+            </StackPanel>
+            <Button
+                x:Uid="DashboardAddButton"
+                Grid.Column="1"
+                VerticalAlignment="Center"
+                Command="{Binding AddServerCommand}"
+                Style="{StaticResource AccentPillButtonStyle}" />
+        </Grid>
+
+        <InfoBar
+            x:Uid="DashboardMilestoneNotice"
+            Grid.Row="1"
+            Margin="0,0,0,16"
+            IsClosable="True"
+            IsOpen="{Binding IsAddServerNoticeOpen, Mode=TwoWay}"
+            Severity="Informational" />
+
+        <controls:GlassCard Grid.Row="2">
+            <controls:EmptyStateControl
+                x:Uid="DashboardEmptyState"
+                ActionCommand="{Binding AddServerCommand}" />
+        </controls:GlassCard>
+    </Grid>
+</Page>
