@@ -5,18 +5,20 @@
   </xsd:schema>
   <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader><resheader name="version"><value>2.0</value></resheader><resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader><resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
   <data name="AppNameText.Text" xml:space="preserve"><value>Server Monitor</value></data>
-  <data name="MainWindow.Title" xml:space="preserve"><value>Server Monitor</value></data>
+  <data name="AppWindowTitle" xml:space="preserve"><value>Server Monitor</value></data>
   <data name="NavigationDashboardItem.Content" xml:space="preserve"><value>Servers</value></data>
   <data name="NavigationSettingsItem.Content" xml:space="preserve"><value>Settings</value></data>
   <data name="DashboardTitle.Text" xml:space="preserve"><value>Servers</value></data>
-  <data name="DashboardSubtitle.Text" xml:space="preserve"><value>Your simple, calm monitoring dashboard.</value></data>
+  <data name="DashboardSubtitle.Text" xml:space="preserve"><value>Your servers, organized simply.</value></data>
   <data name="DashboardAddButton.Content" xml:space="preserve"><value>Add server</value></data>
-  <data name="DashboardMilestoneNotice.Title" xml:space="preserve"><value>Add server</value></data>
-  <data name="DashboardMilestoneNotice.Message" xml:space="preserve"><value>The setup flow will be delivered in a later milestone. This shell does not create or persist servers.</value></data>
+  <data name="DashboardSettingsButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Open settings</value></data>
+  <data name="DashboardSettingsButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Settings</value></data>
   <data name="DashboardEmptyState.Title" xml:space="preserve"><value>No servers yet</value></data>
-  <data name="DashboardEmptyState.Description" xml:space="preserve"><value>Add your first server to start monitoring.</value></data>
+  <data name="DashboardEmptyState.Description" xml:space="preserve"><value>Add your first server to start organizing the dashboard.</value></data>
   <data name="DashboardEmptyState.ActionText" xml:space="preserve"><value>Add server</value></data>
   <data name="SettingsTitle.Text" xml:space="preserve"><value>Settings</value></data>
+  <data name="SettingsBackButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Back to servers</value></data>
+  <data name="SettingsBackButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Back</value></data>
   <data name="SettingsSubtitle.Text" xml:space="preserve"><value>Customize appearance and language.</value></data>
   <data name="SettingsAppearanceTitle.Text" xml:space="preserve"><value>Appearance</value></data>
   <data name="SettingsAppearanceDescription.Text" xml:space="preserve"><value>Choose a theme or automatically follow Windows.</value></data>
@@ -33,5 +35,47 @@
   <data name="LanguageEnglishOption.Content" xml:space="preserve"><value>English</value></data>
   <data name="SettingsRestartNotice.Title" xml:space="preserve"><value>Language updated</value></data>
   <data name="SettingsRestartNotice.Message" xml:space="preserve"><value>Restart the app to apply the language throughout the interface.</value></data>
-  <data name="SettingsMilestoneCaption.Text" xml:space="preserve"><value>Preferences apply to the shell. There is no server configuration or persistence in this milestone.</value></data>
+  <data name="SettingsMilestoneCaption.Text" xml:space="preserve"><value>Only non-sensitive server settings are stored locally. No connection is made.</value></data>
+  <data name="ServerOperationError.Title" xml:space="preserve"><value>The operation could not be completed</value></data>
+  <data name="ServerOperationError.Message" xml:space="preserve"><value>Try again. Your existing data remains safe.</value></data>
+  <data name="ServerCardEditMenuItem.Text" xml:space="preserve"><value>Edit</value></data>
+  <data name="ServerCardHideMenuItem.Text" xml:space="preserve"><value>Hide</value></data>
+  <data name="ServerCardRemoveMenuItem.Text" xml:space="preserve"><value>Remove</value></data>
+  <data name="ServerCardMoreButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>More options</value></data>
+  <data name="ServerCardMoreOptionsFor" xml:space="preserve"><value>More options for {0}</value></data>
+  <data name="ServerCardAutomationSummary" xml:space="preserve"><value>{0}, {1}, {2}, {3}</value></data>
+  <data name="ServerStatusNotConnected" xml:space="preserve"><value>Not connected yet</value></data>
+  <data name="OperatingSystemAuto" xml:space="preserve"><value>Automatic</value></data>
+  <data name="OperatingSystemLinux" xml:space="preserve"><value>Linux</value></data>
+  <data name="OperatingSystemMacOS" xml:space="preserve"><value>macOS</value></data>
+  <data name="OperatingSystemUnknown" xml:space="preserve"><value>Unknown</value></data>
+  <data name="ServerFormValidationError.Title" xml:space="preserve"><value>Review the details</value></data>
+  <data name="ServerFormValidationError.Message" xml:space="preserve"><value>Name, host, and username are required. The port must be between 1 and 65535.</value></data>
+  <data name="ServerFormNameField.Header" xml:space="preserve"><value>Name</value></data>
+  <data name="ServerFormNameField.PlaceholderText" xml:space="preserve"><value>e.g. Main server</value></data>
+  <data name="ServerFormHostField.Header" xml:space="preserve"><value>Host / IP</value></data>
+  <data name="ServerFormHostField.PlaceholderText" xml:space="preserve"><value>e.g. server.example.com</value></data>
+  <data name="ServerFormPortField.Header" xml:space="preserve"><value>Port</value></data>
+  <data name="ServerFormUsernameField.Header" xml:space="preserve"><value>Username</value></data>
+  <data name="ServerFormUsernameField.PlaceholderText" xml:space="preserve"><value>e.g. monitor</value></data>
+  <data name="ServerFormOperatingSystemField.Header" xml:space="preserve"><value>Operating system</value></data>
+  <data name="OperatingSystemAutoOption.Content" xml:space="preserve"><value>Automatic</value></data>
+  <data name="OperatingSystemLinuxOption.Content" xml:space="preserve"><value>Linux</value></data>
+  <data name="OperatingSystemMacOSOption.Content" xml:space="preserve"><value>macOS</value></data>
+  <data name="OperatingSystemUnknownOption.Content" xml:space="preserve"><value>Unknown</value></data>
+  <data name="AddServerDialog.Title" xml:space="preserve"><value>Add server</value></data>
+  <data name="AddServerDialog.PrimaryButtonText" xml:space="preserve"><value>Save</value></data>
+  <data name="AddServerDialog.CloseButtonText" xml:space="preserve"><value>Cancel</value></data>
+  <data name="EditServerDialog.Title" xml:space="preserve"><value>Edit server</value></data>
+  <data name="EditServerDialog.PrimaryButtonText" xml:space="preserve"><value>Save changes</value></data>
+  <data name="EditServerDialog.CloseButtonText" xml:space="preserve"><value>Cancel</value></data>
+  <data name="RemoveServerDialog.Title" xml:space="preserve"><value>Remove server?</value></data>
+  <data name="RemoveServerDialog.PrimaryButtonText" xml:space="preserve"><value>Remove</value></data>
+  <data name="RemoveServerDialog.CloseButtonText" xml:space="preserve"><value>Cancel</value></data>
+  <data name="RemoveServerDialogMessage.Text" xml:space="preserve"><value>This configuration will be permanently removed from this device:</value></data>
+  <data name="SettingsHiddenServersTitle.Text" xml:space="preserve"><value>Hidden servers</value></data>
+  <data name="SettingsHiddenServersDescription.Text" xml:space="preserve"><value>Hidden servers remain saved but do not appear on the main dashboard.</value></data>
+  <data name="SettingsHiddenServersEmpty.Text" xml:space="preserve"><value>No hidden servers.</value></data>
+  <data name="HiddenServerRestoreButton.Content" xml:space="preserve"><value>Restore</value></data>
+  <data name="HiddenServerRestoreFor" xml:space="preserve"><value>Restore {0}</value></data>
 </root>

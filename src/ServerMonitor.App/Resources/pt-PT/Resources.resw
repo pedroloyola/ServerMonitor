@@ -5,18 +5,20 @@
   </xsd:schema>
   <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader><resheader name="version"><value>2.0</value></resheader><resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader><resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
   <data name="AppNameText.Text" xml:space="preserve"><value>Server Monitor</value></data>
-  <data name="MainWindow.Title" xml:space="preserve"><value>Server Monitor</value></data>
+  <data name="AppWindowTitle" xml:space="preserve"><value>Server Monitor</value></data>
   <data name="NavigationDashboardItem.Content" xml:space="preserve"><value>Servidores</value></data>
   <data name="NavigationSettingsItem.Content" xml:space="preserve"><value>Definições</value></data>
   <data name="DashboardTitle.Text" xml:space="preserve"><value>Servidores</value></data>
-  <data name="DashboardSubtitle.Text" xml:space="preserve"><value>O seu painel de monitorização, simples e tranquilo.</value></data>
+  <data name="DashboardSubtitle.Text" xml:space="preserve"><value>Os seus servidores, organizados com simplicidade.</value></data>
   <data name="DashboardAddButton.Content" xml:space="preserve"><value>Adicionar servidor</value></data>
-  <data name="DashboardMilestoneNotice.Title" xml:space="preserve"><value>Adicionar servidor</value></data>
-  <data name="DashboardMilestoneNotice.Message" xml:space="preserve"><value>O fluxo de configuração será disponibilizado num marco posterior. Este shell não cria nem persiste servidores.</value></data>
+  <data name="DashboardSettingsButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Abrir definições</value></data>
+  <data name="DashboardSettingsButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Definições</value></data>
   <data name="DashboardEmptyState.Title" xml:space="preserve"><value>Ainda não existem servidores</value></data>
-  <data name="DashboardEmptyState.Description" xml:space="preserve"><value>Adicione o primeiro servidor para começar a monitorizar.</value></data>
+  <data name="DashboardEmptyState.Description" xml:space="preserve"><value>Adicione o primeiro servidor para começar a organizar o painel.</value></data>
   <data name="DashboardEmptyState.ActionText" xml:space="preserve"><value>Adicionar servidor</value></data>
   <data name="SettingsTitle.Text" xml:space="preserve"><value>Definições</value></data>
+  <data name="SettingsBackButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Voltar aos servidores</value></data>
+  <data name="SettingsBackButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Voltar</value></data>
   <data name="SettingsSubtitle.Text" xml:space="preserve"><value>Personalize o aspeto e o idioma.</value></data>
   <data name="SettingsAppearanceTitle.Text" xml:space="preserve"><value>Aspeto</value></data>
   <data name="SettingsAppearanceDescription.Text" xml:space="preserve"><value>Escolha um tema ou acompanhe automaticamente o Windows.</value></data>
@@ -33,5 +35,47 @@
   <data name="LanguageEnglishOption.Content" xml:space="preserve"><value>English</value></data>
   <data name="SettingsRestartNotice.Title" xml:space="preserve"><value>Idioma atualizado</value></data>
   <data name="SettingsRestartNotice.Message" xml:space="preserve"><value>Reinicie a aplicação para aplicar o idioma em toda a interface.</value></data>
-  <data name="SettingsMilestoneCaption.Text" xml:space="preserve"><value>As preferências aplicam-se ao shell. Não existe configuração ou persistência de servidores neste marco.</value></data>
+  <data name="SettingsMilestoneCaption.Text" xml:space="preserve"><value>Apenas configurações não sensíveis dos servidores são guardadas localmente. Não é estabelecida qualquer ligação.</value></data>
+  <data name="ServerOperationError.Title" xml:space="preserve"><value>Não foi possível concluir a operação</value></data>
+  <data name="ServerOperationError.Message" xml:space="preserve"><value>Tente novamente. Os dados existentes permanecem seguros.</value></data>
+  <data name="ServerCardEditMenuItem.Text" xml:space="preserve"><value>Editar</value></data>
+  <data name="ServerCardHideMenuItem.Text" xml:space="preserve"><value>Ocultar</value></data>
+  <data name="ServerCardRemoveMenuItem.Text" xml:space="preserve"><value>Remover</value></data>
+  <data name="ServerCardMoreButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Mais opções</value></data>
+  <data name="ServerCardMoreOptionsFor" xml:space="preserve"><value>Mais opções para {0}</value></data>
+  <data name="ServerCardAutomationSummary" xml:space="preserve"><value>{0}, {1}, {2}, {3}</value></data>
+  <data name="ServerStatusNotConnected" xml:space="preserve"><value>Ainda não ligado</value></data>
+  <data name="OperatingSystemAuto" xml:space="preserve"><value>Automático</value></data>
+  <data name="OperatingSystemLinux" xml:space="preserve"><value>Linux</value></data>
+  <data name="OperatingSystemMacOS" xml:space="preserve"><value>macOS</value></data>
+  <data name="OperatingSystemUnknown" xml:space="preserve"><value>Desconhecido</value></data>
+  <data name="ServerFormValidationError.Title" xml:space="preserve"><value>Reveja os dados</value></data>
+  <data name="ServerFormValidationError.Message" xml:space="preserve"><value>Nome, host e utilizador são obrigatórios. A porta deve estar entre 1 e 65535.</value></data>
+  <data name="ServerFormNameField.Header" xml:space="preserve"><value>Nome</value></data>
+  <data name="ServerFormNameField.PlaceholderText" xml:space="preserve"><value>Ex.: Servidor principal</value></data>
+  <data name="ServerFormHostField.Header" xml:space="preserve"><value>Host / IP</value></data>
+  <data name="ServerFormHostField.PlaceholderText" xml:space="preserve"><value>Ex.: server.example.com</value></data>
+  <data name="ServerFormPortField.Header" xml:space="preserve"><value>Porta</value></data>
+  <data name="ServerFormUsernameField.Header" xml:space="preserve"><value>Utilizador</value></data>
+  <data name="ServerFormUsernameField.PlaceholderText" xml:space="preserve"><value>Ex.: monitor</value></data>
+  <data name="ServerFormOperatingSystemField.Header" xml:space="preserve"><value>Sistema operativo</value></data>
+  <data name="OperatingSystemAutoOption.Content" xml:space="preserve"><value>Automático</value></data>
+  <data name="OperatingSystemLinuxOption.Content" xml:space="preserve"><value>Linux</value></data>
+  <data name="OperatingSystemMacOSOption.Content" xml:space="preserve"><value>macOS</value></data>
+  <data name="OperatingSystemUnknownOption.Content" xml:space="preserve"><value>Desconhecido</value></data>
+  <data name="AddServerDialog.Title" xml:space="preserve"><value>Adicionar servidor</value></data>
+  <data name="AddServerDialog.PrimaryButtonText" xml:space="preserve"><value>Guardar</value></data>
+  <data name="AddServerDialog.CloseButtonText" xml:space="preserve"><value>Cancelar</value></data>
+  <data name="EditServerDialog.Title" xml:space="preserve"><value>Editar servidor</value></data>
+  <data name="EditServerDialog.PrimaryButtonText" xml:space="preserve"><value>Guardar alterações</value></data>
+  <data name="EditServerDialog.CloseButtonText" xml:space="preserve"><value>Cancelar</value></data>
+  <data name="RemoveServerDialog.Title" xml:space="preserve"><value>Remover servidor?</value></data>
+  <data name="RemoveServerDialog.PrimaryButtonText" xml:space="preserve"><value>Remover</value></data>
+  <data name="RemoveServerDialog.CloseButtonText" xml:space="preserve"><value>Cancelar</value></data>
+  <data name="RemoveServerDialogMessage.Text" xml:space="preserve"><value>Esta configuração será removida permanentemente deste dispositivo:</value></data>
+  <data name="SettingsHiddenServersTitle.Text" xml:space="preserve"><value>Servidores ocultos</value></data>
+  <data name="SettingsHiddenServersDescription.Text" xml:space="preserve"><value>Os servidores ocultos continuam guardados, mas não aparecem no painel principal.</value></data>
+  <data name="SettingsHiddenServersEmpty.Text" xml:space="preserve"><value>Não existem servidores ocultos.</value></data>
+  <data name="HiddenServerRestoreButton.Content" xml:space="preserve"><value>Restaurar</value></data>
+  <data name="HiddenServerRestoreFor" xml:space="preserve"><value>Restaurar {0}</value></data>
 </root>

@@ -4,13 +4,32 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:controls="using:ServerMonitor.App.Controls">
     <Grid Padding="{StaticResource PagePadding}">
+        <VisualStateManager.VisualStateGroups>
+            <VisualStateGroup>
+                <VisualState x:Name="NarrowLayout" />
+                <VisualState x:Name="WideLayout">
+                    <VisualState.StateTriggers>
+                        <AdaptiveTrigger MinWindowWidth="700" />
+                    </VisualState.StateTriggers>
+                    <VisualState.Setters>
+                        <Setter Target="HeaderActions.(Grid.Row)" Value="0" />
+                        <Setter Target="HeaderActions.(Grid.Column)" Value="1" />
+                        <Setter Target="HeaderActions.Margin" Value="20,0,0,0" />
+                    </VisualState.Setters>
+                </VisualState>
+            </VisualStateGroup>
+        </VisualStateManager.VisualStateGroups>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <Grid Margin="0,0,0,24">
+        <Grid x:Name="HeaderGrid" Margin="0,4,0,28">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
@@ -18,31 +37,67 @@
             <StackPanel Spacing="4">
                 <TextBlock
                     x:Uid="DashboardTitle"
+                    AutomationProperties.HeadingLevel="Level1"
                     Style="{StaticResource PageTitleTextStyle}" />
                 <TextBlock
                     x:Uid="DashboardSubtitle"
                     Foreground="{ThemeResource TextSecondaryBrush}" />
             </StackPanel>
-            <Button
-                x:Uid="DashboardAddButton"
-                Grid.Column="1"
+            <StackPanel
+                x:Name="HeaderActions"
+                Grid.Row="1"
+                Margin="0,20,0,0"
+                HorizontalAlignment="Left"
                 VerticalAlignment="Center"
-                Command="{Binding AddServerCommand}"
-                Style="{StaticResource AccentPillButtonStyle}" />
+                Orientation="Horizontal"
+                Spacing="10">
+                <Button
+                    x:Uid="DashboardSettingsButton"
+                    Command="{Binding OpenSettingsCommand}"
+                    Style="{StaticResource SubtleIconButtonStyle}">
+                    <SymbolIcon Symbol="Setting" />
+                </Button>
+                <Button
+                    x:Uid="DashboardAddButton"
+                    Command="{Binding AddServerCommand}"
+                    Style="{StaticResource AccentPillButtonStyle}" />
+            </StackPanel>
         </Grid>
 
         <InfoBar
-            x:Uid="DashboardMilestoneNotice"
+            x:Uid="ServerOperationError"
             Grid.Row="1"
             Margin="0,0,0,16"
             IsClosable="True"
-            IsOpen="{Binding IsAddServerNoticeOpen, Mode=TwoWay}"
-            Severity="Informational" />
+            IsOpen="{Binding IsOperationErrorOpen, Mode=TwoWay}"
+            Severity="Error" />
 
-        <controls:GlassCard Grid.Row="2">
-            <controls:EmptyStateControl
-                x:Uid="DashboardEmptyState"
-                ActionCommand="{Binding AddServerCommand}" />
-        </controls:GlassCard>
+        <Grid
+            Grid.Row="2"
+            Height="320"
+            VerticalAlignment="Top"
+            Visibility="{Binding HasVisibleServers, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Invert}">
+            <controls:GlassCard
+                Height="320"
+                VerticalAlignment="Top">
+                <controls:EmptyStateControl
+                    x:Uid="DashboardEmptyState"
+                    Height="274"
+                    ActionCommand="{Binding AddServerCommand}" />
+            </controls:GlassCard>
+        </Grid>
+
+        <ScrollViewer
+            Grid.Row="2"
+            VerticalScrollBarVisibility="Auto"
+            Visibility="{Binding HasVisibleServers, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <ItemsControl ItemsSource="{Binding VisibleServers}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <controls:ServerFullCard />
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
     </Grid>
 </Page>

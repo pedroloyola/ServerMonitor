@@ -1,0 +1,37 @@
+<UserControl
+    x:Class="ServerMonitor.App.Controls.ServerFormControl"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <StackPanel MaxWidth="440" Spacing="14">
+        <InfoBar
+            x:Uid="ServerFormValidationError"
+            AutomationProperties.LiveSetting="Assertive"
+            IsClosable="False"
+            IsOpen="{Binding HasValidationErrors}"
+            Severity="Error" />
+        <TextBox
+            x:Name="NameField"
+            x:Uid="ServerFormNameField"
+            Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+        <TextBox
+            x:Uid="ServerFormHostField"
+            Text="{Binding Host, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+        <TextBox
+            x:Uid="ServerFormPortField"
+            InputScope="Number"
+            MaxLength="5"
+            Text="{Binding Port, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+        <TextBox
+            x:Uid="ServerFormUsernameField"
+            Text="{Binding Username, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+        <ComboBox
+            x:Uid="ServerFormOperatingSystemField"
+            HorizontalAlignment="Stretch"
+            SelectedIndex="{Binding SelectedOperatingSystemIndex, Mode=TwoWay}">
+            <ComboBoxItem x:Uid="OperatingSystemAutoOption" />
+            <ComboBoxItem x:Uid="OperatingSystemLinuxOption" />
+            <ComboBoxItem x:Uid="OperatingSystemMacOSOption" />
+            <ComboBoxItem x:Uid="OperatingSystemUnknownOption" />
+        </ComboBox>
+    </StackPanel>
+</UserControl>

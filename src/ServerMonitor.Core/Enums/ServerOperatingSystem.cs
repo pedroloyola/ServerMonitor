@@ -2,7 +2,8 @@ namespace ServerMonitor.Core.Enums;
 
 public enum ServerOperatingSystem
 {
-    Unknown,
+    Auto,
     Linux,
-    MacOS
+    MacOS,
+    Unknown,
 }

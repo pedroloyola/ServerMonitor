@@ -10,5 +10,6 @@
   <Folder Name="/tests/">
     <Project Path="tests/ServerMonitor.Collectors.Tests/ServerMonitor.Collectors.Tests.csproj" />
     <Project Path="tests/ServerMonitor.Core.Tests/ServerMonitor.Core.Tests.csproj" />
+    <Project Path="tests/ServerMonitor.Infrastructure.Tests/ServerMonitor.Infrastructure.Tests.csproj" />
   </Folder>
 </Solution>

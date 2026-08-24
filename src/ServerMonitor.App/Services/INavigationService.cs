@@ -7,4 +7,8 @@ public interface INavigationService
     void Initialize(Frame frame);
 
     void NavigateTo<TPage>() where TPage : Page;
+
+    void GoToDashboard();
+
+    void GoToSettings();
 }

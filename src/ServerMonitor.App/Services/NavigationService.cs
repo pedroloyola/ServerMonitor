@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml.Controls;
+using ServerMonitor.App.Views;
 
 namespace ServerMonitor.App.Services;
 
@@ -27,4 +28,8 @@ public sealed class NavigationService(
         _frame.Content = serviceProvider.GetRequiredService<TPage>();
         logger.LogInformation("Navigated to {Page}.", typeof(TPage).Name);
     }
+
+    public void GoToDashboard() => NavigateTo<DashboardPage>();
+
+    public void GoToSettings() => NavigateTo<SettingsPage>();
 }

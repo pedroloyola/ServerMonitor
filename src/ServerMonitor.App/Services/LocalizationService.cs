@@ -1,12 +1,15 @@
 using System.Globalization;
 using Microsoft.Extensions.Logging;
+using Microsoft.Windows.ApplicationModel.Resources;
+using Microsoft.Windows.Globalization;
 using ServerMonitor.Core.Domain;
-using Windows.Globalization;
 
 namespace ServerMonitor.App.Services;
 
 public sealed class LocalizationService(ILogger<LocalizationService> logger) : ILocalizationService
 {
+    private readonly Lazy<ResourceLoader> _resourceLoader = new(() => new ResourceLoader());
+
     public string? CurrentLanguageOverride =>
         string.IsNullOrWhiteSpace(ApplicationLanguages.PrimaryLanguageOverride)
             ? null
@@ -43,4 +46,6 @@ public sealed class LocalizationService(ILogger<LocalizationService> logger) : I
         ApplicationLanguages.PrimaryLanguageOverride = SupportedCultures.Resolve(languageTag);
         logger.LogInformation("UI language changed to {Language}; it will apply after restart.", languageTag);
     }
+
+    public string GetString(string resourceKey) => _resourceLoader.Value.GetString(resourceKey);
 }

@@ -4,17 +4,22 @@ Server Monitor é uma aplicação desktop WinUI 3 para Windows, concebida como u
 
 ## Estado atual
 
-O repositório contém apenas o **Milestone 1 (Bootstrap)**:
+O repositório contém o **Milestone 2.5 (Visual Foundation & Widget Readiness)** sobre a gestão manual de servidores do Milestone 2:
 
 - solution e separação inicial entre App, Core, Infrastructure e Collectors;
 - shell WinUI 3 com MVVM e dependency injection;
 - logging técnico;
 - localização `pt-BR`, `pt-PT` e `en-US`, com fallback `pt-BR`;
 - temas Light, Dark e System;
-- MainWindow, empty state, acesso a Configurações e botão Adicionar servidor;
-- tokens e controlos glass reutilizáveis.
+- MainWindow com title bar própria, empty state, acesso a Configurações e botão Adicionar servidor;
+- Desktop Acrylic com fallback acessível, tokens e controlos glass reutilizáveis;
+- adicionar, editar, ocultar, restaurar e remover servidores;
+- validação dos campos não sensíveis;
+- persistência JSON em `%LOCALAPPDATA%\ServerMonitor\servers.json`;
+- ServerCards sem métricas fictícias e com o estado “Ainda não conectado”.
+- apresentações `ServerFullCard` e `ServerCompactCard` sobre o mesmo estado; o modo compacto ainda não está exposto.
 
-Não existem ainda SSH, descoberta de rede, métricas, persistência de servidores, credenciais, notificações ou system tray.
+Não existem ainda SSH, teste de conexão, descoberta de rede, métricas, credenciais, notificações ou system tray.
 
 ## Requisitos
 

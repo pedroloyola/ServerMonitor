@@ -8,6 +8,15 @@ public sealed partial class DashboardPage : Page
     public DashboardPage(DashboardViewModel viewModel)
     {
         InitializeComponent();
-        DataContext = viewModel;
+        ViewModel = viewModel;
+        DataContext = ViewModel;
+        Loaded += OnLoaded;
+    }
+
+    public DashboardViewModel ViewModel { get; }
+
+    private async void OnLoaded(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    {
+        await ViewModel.LoadAsync();
     }
 }

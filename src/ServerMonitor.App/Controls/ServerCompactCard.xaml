@@ -1,0 +1,38 @@
+<UserControl
+    x:Class="ServerMonitor.App.Controls.ServerCompactCard"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:ServerMonitor.App.Controls">
+    <controls:GlassCard AutomationProperties.Name="{Binding AutomationSummary}">
+        <Grid ColumnSpacing="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Spacing="4">
+                <TextBlock
+                    FontWeight="SemiBold"
+                    Text="{Binding Name}"
+                    TextTrimming="CharacterEllipsis" />
+                <TextBlock
+                    Foreground="{ThemeResource TextSecondaryBrush}"
+                    FontSize="12"
+                    Text="{Binding Endpoint}"
+                    TextTrimming="CharacterEllipsis" />
+                <StackPanel Orientation="Horizontal" Spacing="7">
+                    <Border
+                        Width="6"
+                        Height="6"
+                        VerticalAlignment="Center"
+                        Background="{ThemeResource StatusUnknownBrush}"
+                        CornerRadius="3" />
+                    <TextBlock
+                        Foreground="{ThemeResource TextTertiaryBrush}"
+                        FontSize="11"
+                        Text="{Binding ConnectionStateDisplayName}" />
+                </StackPanel>
+            </StackPanel>
+            <controls:ServerActionsButton Grid.Column="1" />
+        </Grid>
+    </controls:GlassCard>
+</UserControl>

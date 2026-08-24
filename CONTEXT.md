@@ -99,9 +99,19 @@ Stack recomendada:
 
 Versão estável de referência do Windows App SDK à data deste documento:
 
-- **Windows App SDK 2.4.0**
+- **Windows App SDK 2.3.1**
 
 Não bloquear o projeto permanentemente nesta versão. Atualizações futuras devem ser avaliadas antes de atualizar dependências.
+
+---
+
+## 4.3 Ambiente disponível para agentes
+
+O desenvolvimento assistido pode utilizar o **Maestri** como ambiente de coordenação. Quando a tarefa beneficiar de especialização ou trabalho paralelo, o agente principal pode criar e coordenar subagentes, incluindo terminais **Claude Code**, desde que evite edições concorrentes não coordenadas nos mesmos ficheiros.
+
+O **Orca Computer Use** está disponível para QA visual de aplicações desktop. Alterações de UI relevantes devem ser verificadas na aplicação real, em temas claro e escuro e em dimensões representativas; a presença de uma API de material no código não substitui a inspeção do resultado renderizado.
+
+O agente principal continua responsável por integrar alterações, compilar a solução, executar os testes e confirmar os limites do milestone.
 
 ---
 
@@ -821,7 +831,7 @@ Nunca hardcodear os mesmos valores repetidamente em dezenas de componentes.
 
 # 26. Janela principal
 
-A aplicação deve comportar-se como uma pequena aplicação/widget.
+A aplicação standard deve comportar-se como uma pequena utility compacta.
 
 Características desejadas:
 
@@ -835,6 +845,24 @@ Características desejadas:
 - opção futura "Always on Top".
 
 Não implementar imediatamente um Widget Provider oficial do Windows.
+
+## 26.1 Estratégia futura de superfícies
+
+A evolução visual seguirá três etapas separadas:
+
+```text
+Standard App
+    │ reutiliza domínio, serviços e ViewModels de servidor
+    ▼
+Compact Widget Mode (in-process)
+    │ valida apresentação compacta sem criar um provider
+    ▼
+Windows Widget Provider (processo/integração oficial futura)
+```
+
+O modo compacto não deve duplicar domínio ou estado, nem fazer os ViewModels dependerem das dimensões da `MainWindow`. Um eventual Windows Widget Provider será uma superfície separada, com lifecycle, sincronização e packaging próprios, e não deve reutilizar diretamente controlos XAML ou ViewModels específicos da aplicação standard.
+
+A decisão detalhada está registada em `docs/decisions/ADR-005-standard-compact-widget-strategy.md`.
 
 ---
 
@@ -2517,4 +2545,3 @@ Consequências:
 - documentação deve ser suficiente para terceiros;
 - arquitetura deve permitir contribuições sem comprometer simplicidade;
 - assets visuais devem ser próprios ou licenciados adequadamente.
-

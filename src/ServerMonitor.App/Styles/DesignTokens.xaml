@@ -3,46 +3,67 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <ResourceDictionary.ThemeDictionaries>
         <ResourceDictionary x:Key="Dark">
-            <SolidColorBrush x:Key="AppBackgroundBrush" Color="#11141B" />
+            <SolidColorBrush x:Key="AppBackgroundBrush" Color="#171A20" />
+            <SolidColorBrush x:Key="TitleBarSurfaceBrush" Color="#18222933" />
             <AcrylicBrush
                 x:Key="GlassSurfaceBrush"
-                FallbackColor="#E0242933"
-                TintColor="#242933"
-                TintLuminosityOpacity="0.18"
-                TintOpacity="0.72" />
-            <SolidColorBrush x:Key="GlassBorderBrush" Color="#20FFFFFF" />
-            <SolidColorBrush x:Key="TextSecondaryBrush" Color="#B8FFFFFF" />
-            <SolidColorBrush x:Key="TextTertiaryBrush" Color="#7AFFFFFF" />
+                FallbackColor="#E6292D35"
+                TintColor="#252A32"
+                TintLuminosityOpacity="0.12"
+                TintOpacity="0.42" />
+            <SolidColorBrush x:Key="GlassBorderBrush" Color="#26FFFFFF" />
+            <SolidColorBrush x:Key="GlassHighlightBrush" Color="#2BFFFFFF" />
+            <SolidColorBrush x:Key="MutedSurfaceBrush" Color="#12FFFFFF" />
+            <SolidColorBrush x:Key="TextSecondaryBrush" Color="#C7FFFFFF" />
+            <SolidColorBrush x:Key="TextTertiaryBrush" Color="#A6FFFFFF" />
             <SolidColorBrush x:Key="AccentSoftBrush" Color="#293F7CFF" />
             <SolidColorBrush x:Key="AccentTextBrush" Color="#AFC8FF" />
         </ResourceDictionary>
         <ResourceDictionary x:Key="Light">
-            <SolidColorBrush x:Key="AppBackgroundBrush" Color="#EFF2F7" />
+            <SolidColorBrush x:Key="AppBackgroundBrush" Color="#EDF1F6" />
+            <SolidColorBrush x:Key="TitleBarSurfaceBrush" Color="#18FFFFFF" />
             <AcrylicBrush
                 x:Key="GlassSurfaceBrush"
-                FallbackColor="#E8FFFFFF"
-                TintColor="#FFFFFF"
-                TintLuminosityOpacity="0.76"
-                TintOpacity="0.68" />
-            <SolidColorBrush x:Key="GlassBorderBrush" Color="#1A27364A" />
-            <SolidColorBrush x:Key="TextSecondaryBrush" Color="#B01C2636" />
-            <SolidColorBrush x:Key="TextTertiaryBrush" Color="#801C2636" />
+                FallbackColor="#EDF8F9FC"
+                TintColor="#F8FAFD"
+                TintLuminosityOpacity="0.62"
+                TintOpacity="0.38" />
+            <SolidColorBrush x:Key="GlassBorderBrush" Color="#24223345" />
+            <SolidColorBrush x:Key="GlassHighlightBrush" Color="#A8FFFFFF" />
+            <SolidColorBrush x:Key="MutedSurfaceBrush" Color="#10233448" />
+            <SolidColorBrush x:Key="TextSecondaryBrush" Color="#586273" />
+            <SolidColorBrush x:Key="TextTertiaryBrush" Color="#687284" />
             <SolidColorBrush x:Key="AccentSoftBrush" Color="#254B75E8" />
             <SolidColorBrush x:Key="AccentTextBrush" Color="#2451B7" />
         </ResourceDictionary>
         <ResourceDictionary x:Key="Default">
-            <SolidColorBrush x:Key="AppBackgroundBrush" Color="#11141B" />
+            <SolidColorBrush x:Key="AppBackgroundBrush" Color="#171A20" />
+            <SolidColorBrush x:Key="TitleBarSurfaceBrush" Color="#18222933" />
             <AcrylicBrush
                 x:Key="GlassSurfaceBrush"
-                FallbackColor="#E0242933"
-                TintColor="#242933"
-                TintLuminosityOpacity="0.18"
-                TintOpacity="0.72" />
-            <SolidColorBrush x:Key="GlassBorderBrush" Color="#20FFFFFF" />
-            <SolidColorBrush x:Key="TextSecondaryBrush" Color="#B8FFFFFF" />
-            <SolidColorBrush x:Key="TextTertiaryBrush" Color="#7AFFFFFF" />
+                FallbackColor="#E6292D35"
+                TintColor="#252A32"
+                TintLuminosityOpacity="0.12"
+                TintOpacity="0.42" />
+            <SolidColorBrush x:Key="GlassBorderBrush" Color="#26FFFFFF" />
+            <SolidColorBrush x:Key="GlassHighlightBrush" Color="#2BFFFFFF" />
+            <SolidColorBrush x:Key="MutedSurfaceBrush" Color="#12FFFFFF" />
+            <SolidColorBrush x:Key="TextSecondaryBrush" Color="#C7FFFFFF" />
+            <SolidColorBrush x:Key="TextTertiaryBrush" Color="#A6FFFFFF" />
             <SolidColorBrush x:Key="AccentSoftBrush" Color="#293F7CFF" />
             <SolidColorBrush x:Key="AccentTextBrush" Color="#AFC8FF" />
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="HighContrast">
+            <StaticResource x:Key="AppBackgroundBrush" ResourceKey="SystemColorWindowBrush" />
+            <StaticResource x:Key="TitleBarSurfaceBrush" ResourceKey="SystemColorWindowBrush" />
+            <StaticResource x:Key="GlassSurfaceBrush" ResourceKey="SystemColorWindowBrush" />
+            <StaticResource x:Key="GlassBorderBrush" ResourceKey="SystemColorWindowTextBrush" />
+            <StaticResource x:Key="GlassHighlightBrush" ResourceKey="SystemColorWindowTextBrush" />
+            <StaticResource x:Key="MutedSurfaceBrush" ResourceKey="SystemColorWindowBrush" />
+            <StaticResource x:Key="TextSecondaryBrush" ResourceKey="SystemColorWindowTextBrush" />
+            <StaticResource x:Key="TextTertiaryBrush" ResourceKey="SystemColorWindowTextBrush" />
+            <StaticResource x:Key="AccentSoftBrush" ResourceKey="SystemColorHighlightBrush" />
+            <StaticResource x:Key="AccentTextBrush" ResourceKey="SystemColorHighlightTextBrush" />
         </ResourceDictionary>
     </ResourceDictionary.ThemeDictionaries>
 
@@ -58,17 +79,13 @@
     <x:Double x:Key="SpacingXL">24</x:Double>
     <x:Double x:Key="SpacingXXL">32</x:Double>
 
-    <Thickness x:Key="PagePadding">28</Thickness>
-    <Thickness x:Key="GlassCardPadding">24</Thickness>
+    <Thickness x:Key="PagePadding">32</Thickness>
+    <Thickness x:Key="GlassCardPadding">22</Thickness>
     <Thickness x:Key="GlassBorderThickness">1</Thickness>
-
-    <x:Double x:Key="GlassBackgroundOpacity">0.72</x:Double>
-    <x:Double x:Key="GlassBorderOpacity">0.12</x:Double>
-    <x:Double x:Key="GlassBlurStrength">30</x:Double>
-    <x:Double x:Key="GlassShadowOpacity">0.16</x:Double>
 
     <SolidColorBrush x:Key="StatusHealthyBrush" Color="#45C782" />
     <SolidColorBrush x:Key="StatusWarningBrush" Color="#E5A93D" />
     <SolidColorBrush x:Key="StatusCriticalBrush" Color="#EC6464" />
     <SolidColorBrush x:Key="StatusOfflineBrush" Color="#C56A70" />
+    <SolidColorBrush x:Key="StatusUnknownBrush" Color="#9AA5B8" />
 </ResourceDictionary>

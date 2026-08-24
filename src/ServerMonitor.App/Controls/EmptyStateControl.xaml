@@ -21,6 +21,7 @@
         <StackPanel Spacing="8">
             <TextBlock
                 HorizontalAlignment="Center"
+                AutomationProperties.HeadingLevel="Level2"
                 FontSize="24"
                 FontWeight="SemiBold"
                 Text="{x:Bind Title, Mode=OneWay}"

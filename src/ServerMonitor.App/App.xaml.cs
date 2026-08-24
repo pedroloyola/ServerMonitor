@@ -5,6 +5,9 @@ using Microsoft.UI.Xaml;
 using ServerMonitor.App.Services;
 using ServerMonitor.App.ViewModels;
 using ServerMonitor.App.Views;
+using ServerMonitor.Core.Domain;
+using ServerMonitor.Core.Interfaces;
+using ServerMonitor.Infrastructure.Persistence;
 
 namespace ServerMonitor.App;
 
@@ -14,7 +17,6 @@ public partial class App : Application
 
     public App()
     {
-        InitializeComponent();
         ServicesHost = Microsoft.Extensions.Hosting.Host
             .CreateDefaultBuilder()
             .ConfigureLogging(logging =>
@@ -28,31 +30,49 @@ public partial class App : Application
                 services.AddSingleton<ILocalizationService, LocalizationService>();
                 services.AddSingleton<IThemeService, ThemeService>();
                 services.AddSingleton<INavigationService, NavigationService>();
+                services.AddSingleton<IWindowContext, WindowContext>();
+                services.AddSingleton<IServerDialogService, ServerDialogService>();
 
-                services.AddTransient<MainWindowViewModel>();
-                services.AddTransient<DashboardViewModel>();
-                services.AddTransient<SettingsViewModel>();
-                services.AddTransient<DashboardPage>();
-                services.AddTransient<SettingsPage>();
+                services.AddSingleton(ServerStorageOptions.ForCurrentUser());
+                services.AddSingleton<IServerValidator, ServerValidator>();
+                services.AddSingleton<IServerRepository, JsonServerRepository>();
+                services.AddSingleton<IServerService, ServerService>();
+
+                services.AddSingleton<DashboardViewModel>();
+                services.AddSingleton<SettingsViewModel>();
+                services.AddSingleton<DashboardPage>();
+                services.AddSingleton<SettingsPage>();
                 services.AddTransient<MainWindow>();
             })
             .Build();
+
+        ServicesHost.Services
+            .GetRequiredService<ILocalizationService>()
+            .InitializeFromSystem();
+        InitializeComponent();
     }
 
     public static IHost ServicesHost { get; private set; } = null!;
 
     protected override async void OnLaunched(LaunchActivatedEventArgs args)
     {
-        await ServicesHost.StartAsync();
+        try
+        {
+            await ServicesHost.StartAsync();
 
-        var localization = ServicesHost.Services.GetRequiredService<ILocalizationService>();
-        localization.InitializeFromSystem();
+            _mainWindow = ServicesHost.Services.GetRequiredService<MainWindow>();
+            _mainWindow.Activate();
 
-        _mainWindow = ServicesHost.Services.GetRequiredService<MainWindow>();
-        _mainWindow.Activate();
-
-        ServicesHost.Services
-            .GetRequiredService<ILogger<App>>()
-            .LogInformation("Server Monitor shell started.");
+            ServicesHost.Services
+                .GetRequiredService<ILogger<App>>()
+                .LogInformation("Server Monitor shell started.");
+        }
+        catch (Exception exception)
+        {
+            ServicesHost.Services
+                .GetRequiredService<ILogger<App>>()
+                .LogCritical(exception, "Server Monitor could not start.");
+            Exit();
+        }
     }
 }

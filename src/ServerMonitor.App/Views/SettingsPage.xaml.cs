@@ -8,6 +8,13 @@ public sealed partial class SettingsPage : Page
     public SettingsPage(SettingsViewModel viewModel)
     {
         InitializeComponent();
-        DataContext = viewModel;
+        ViewModel = viewModel;
+        DataContext = ViewModel;
+        Loaded += OnLoaded;
     }
+
+    public SettingsViewModel ViewModel { get; }
+
+    private async void OnLoaded(object sender, Microsoft.UI.Xaml.RoutedEventArgs e) =>
+        await ViewModel.LoadAsync();
 }

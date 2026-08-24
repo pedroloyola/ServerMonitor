@@ -1,0 +1,16 @@
+<ContentDialog
+    x:Class="ServerMonitor.App.Views.EditServerDialog"
+    x:Uid="EditServerDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:ServerMonitor.App.Controls"
+    DefaultButton="Primary"
+    MaxWidth="520"
+    PrimaryButtonClick="OnPrimaryButtonClick">
+    <ContentDialog.Style>
+        <StaticResource ResourceKey="PremiumContentDialogStyle" />
+    </ContentDialog.Style>
+    <controls:ServerFormControl
+        x:Name="ServerForm"
+        DataContext="{x:Bind ViewModel, Mode=OneWay}" />
+</ContentDialog>
