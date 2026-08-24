@@ -1,4 +1,5 @@
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
 
 namespace ServerMonitor.App.Services;
 
@@ -8,5 +9,9 @@ public interface IWindowContext
 
     nint WindowHandle { get; }
 
-    void Attach(Window window, FrameworkElement rootElement);
+    ElementTheme ActualTheme { get; }
+
+    Panel? ModalHost { get; }
+
+    void Attach(Window window, FrameworkElement rootElement, Panel? modalHost = null);
 }

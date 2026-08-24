@@ -5,9 +5,9 @@
     <ScrollViewer
         x:Name="FormScrollViewer"
         x:Uid="ServerFormScrollViewer"
-        Height="500"
+        MaxHeight="540"
         VerticalScrollBarVisibility="Auto">
-        <StackPanel MaxWidth="460" Padding="0,0,8,0" Spacing="14">
+        <StackPanel MaxWidth="520" Padding="2,2,10,2" Spacing="10">
             <InfoBar
                 x:Uid="ServerFormValidationError"
                 AutomationProperties.LiveSetting="Assertive"
@@ -15,37 +15,63 @@
                 IsOpen="{Binding HasValidationErrors}"
                 Severity="Error" />
 
+            <!-- Server Name -->
             <TextBox
                 x:Name="NameField"
                 x:Uid="ServerFormNameField"
+                CornerRadius="{StaticResource RadiusSmall}"
                 IsEnabled="{Binding IsNotTestingConnection}"
                 Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-            <TextBox
-                x:Uid="ServerFormHostField"
-                IsEnabled="{Binding IsNotTestingConnection}"
-                Text="{Binding Host, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-            <TextBox
-                x:Uid="ServerFormPortField"
-                InputScope="Number"
-                IsEnabled="{Binding IsNotTestingConnection}"
-                MaxLength="5"
-                Text="{Binding Port, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-            <TextBox
-                x:Uid="ServerFormUsernameField"
-                IsEnabled="{Binding IsNotTestingConnection}"
-                Text="{Binding Username, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-            <ComboBox
-                x:Uid="ServerFormOperatingSystemField"
-                HorizontalAlignment="Stretch"
-                IsEnabled="{Binding IsNotTestingConnection}"
-                SelectedIndex="{Binding SelectedOperatingSystemIndex, Mode=TwoWay}">
-                <ComboBoxItem x:Uid="OperatingSystemAutoOption" />
-                <ComboBoxItem x:Uid="OperatingSystemLinuxOption" />
-                <ComboBoxItem x:Uid="OperatingSystemMacOSOption" />
-                <ComboBoxItem x:Uid="OperatingSystemUnknownOption" />
-            </ComboBox>
 
-            <Rectangle Height="1" Margin="0,4" Fill="{ThemeResource GlassBorderBrush}" />
+            <!-- Host & Port Side-by-Side -->
+            <Grid ColumnSpacing="10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="120" />
+                </Grid.ColumnDefinitions>
+                <TextBox
+                    x:Uid="ServerFormHostField"
+                    CornerRadius="{StaticResource RadiusSmall}"
+                    IsEnabled="{Binding IsNotTestingConnection}"
+                    Text="{Binding Host, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                <TextBox
+                    x:Uid="ServerFormPortField"
+                    Grid.Column="1"
+                    CornerRadius="{StaticResource RadiusSmall}"
+                    InputScope="Number"
+                    IsEnabled="{Binding IsNotTestingConnection}"
+                    MaxLength="5"
+                    Text="{Binding Port, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+            </Grid>
+
+            <!-- Username & OS Side-by-Side -->
+            <Grid ColumnSpacing="10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="200" />
+                </Grid.ColumnDefinitions>
+                <TextBox
+                    x:Uid="ServerFormUsernameField"
+                    CornerRadius="{StaticResource RadiusSmall}"
+                    IsEnabled="{Binding IsNotTestingConnection}"
+                    Text="{Binding Username, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                <ComboBox
+                    x:Uid="ServerFormOperatingSystemField"
+                    Grid.Column="1"
+                    HorizontalAlignment="Stretch"
+                    CornerRadius="{StaticResource RadiusSmall}"
+                    IsEnabled="{Binding IsNotTestingConnection}"
+                    SelectedIndex="{Binding SelectedOperatingSystemIndex, Mode=TwoWay}">
+                    <ComboBoxItem x:Uid="OperatingSystemAutoOption" />
+                    <ComboBoxItem x:Uid="OperatingSystemLinuxOption" />
+                    <ComboBoxItem x:Uid="OperatingSystemMacOSOption" />
+                    <ComboBoxItem x:Uid="OperatingSystemUnknownOption" />
+                </ComboBox>
+            </Grid>
+
+            <Border Height="1" Margin="0,4" Background="{ThemeResource GlassBorderBrush}" />
+
+            <!-- Authentication Section -->
             <TextBlock
                 x:Uid="ServerFormAuthenticationTitle"
                 AutomationProperties.HeadingLevel="Level2"
@@ -53,32 +79,46 @@
             <ComboBox
                 x:Uid="ServerFormAuthenticationMethodField"
                 HorizontalAlignment="Stretch"
+                CornerRadius="{StaticResource RadiusSmall}"
                 IsEnabled="{Binding IsNotTestingConnection}"
                 SelectedIndex="{Binding SelectedAuthenticationIndex, Mode=TwoWay}">
                 <ComboBoxItem x:Uid="AuthenticationSshKeyOption" />
                 <ComboBoxItem x:Uid="AuthenticationPasswordOption" />
             </ComboBox>
 
+            <!-- SSH Key Auth Fields -->
             <StackPanel
-                Spacing="10"
+                Spacing="8"
                 Visibility="{Binding IsPrivateKeyAuthentication, Converter={StaticResource BooleanToVisibilityConverter}}">
-                <TextBox
-                    x:Uid="ServerFormPrivateKeyPathField"
-                    IsReadOnly="True"
-                    Text="{Binding PrivateKeyPath}" />
-                <Button
-                    x:Uid="ServerFormChoosePrivateKeyButton"
-                    Click="OnChoosePrivateKeyClick"
-                    IsEnabled="{Binding IsNotTestingConnection}"
-                    Style="{StaticResource QuietPillButtonStyle}" />
+                <Grid ColumnSpacing="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBox
+                        x:Uid="ServerFormPrivateKeyPathField"
+                        CornerRadius="{StaticResource RadiusSmall}"
+                        IsReadOnly="True"
+                        Text="{Binding PrivateKeyPath}" />
+                    <Button
+                        x:Uid="ServerFormChoosePrivateKeyButton"
+                        Grid.Column="1"
+                        VerticalAlignment="Bottom"
+                        Margin="0,0,0,1"
+                        Click="OnChoosePrivateKeyClick"
+                        IsEnabled="{Binding IsNotTestingConnection}"
+                        Style="{StaticResource QuietPillButtonStyle}" />
+                </Grid>
                 <PasswordBox
                     x:Name="PassphraseField"
                     x:Uid="ServerFormPassphraseField"
+                    CornerRadius="{StaticResource RadiusSmall}"
                     IsEnabled="{Binding IsNotTestingConnection}"
                     PasswordRevealMode="Peek" />
                 <TextBlock
                     x:Uid="ServerFormSavedPassphraseHint"
                     Foreground="{ThemeResource TextSecondaryBrush}"
+                    FontSize="12"
                     TextWrapping="Wrap"
                     Visibility="{Binding HasSavedPassphrase, Converter={StaticResource BooleanToVisibilityConverter}}" />
                 <CheckBox
@@ -87,22 +127,26 @@
                     Visibility="{Binding HasSavedPassphrase, Converter={StaticResource BooleanToVisibilityConverter}}" />
             </StackPanel>
 
+            <!-- Password Auth Fields -->
             <StackPanel
                 Spacing="8"
                 Visibility="{Binding IsPasswordAuthentication, Converter={StaticResource BooleanToVisibilityConverter}}">
                 <PasswordBox
                     x:Name="PasswordField"
                     x:Uid="ServerFormPasswordField"
+                    CornerRadius="{StaticResource RadiusSmall}"
                     IsEnabled="{Binding IsNotTestingConnection}"
                     PasswordRevealMode="Peek" />
                 <TextBlock
                     x:Uid="ServerFormSavedPasswordHint"
                     Foreground="{ThemeResource TextSecondaryBrush}"
+                    FontSize="12"
                     TextWrapping="Wrap"
                     Visibility="{Binding HasSavedPassword, Converter={StaticResource BooleanToVisibilityConverter}}" />
             </StackPanel>
 
-            <StackPanel Orientation="Horizontal" Spacing="10">
+            <!-- Test Connection Row -->
+            <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,2,0,0">
                 <Button
                     x:Uid="ServerFormTestConnectionButton"
                     Click="OnTestConnectionClick"
@@ -114,8 +158,8 @@
                     Style="{StaticResource QuietPillButtonStyle}"
                     Visibility="{Binding IsTestingConnection, Converter={StaticResource BooleanToVisibilityConverter}}" />
                 <ProgressRing
-                    Width="20"
-                    Height="20"
+                    Width="18"
+                    Height="18"
                     IsActive="{Binding IsTestingConnection}"
                     Visibility="{Binding IsTestingConnection, Converter={StaticResource BooleanToVisibilityConverter}}" />
             </StackPanel>
@@ -127,32 +171,53 @@
                 IsOpen="{Binding HasConnectionStatus}"
                 Message="{Binding ConnectionStatusMessage}" />
 
+            <!-- Unknown Host Key Confirmation -->
             <Border
-                Padding="18"
+                Padding="16"
                 Background="{ThemeResource MutedSurfaceBrush}"
                 BorderBrush="{ThemeResource StatusWarningBrush}"
                 BorderThickness="1"
-                CornerRadius="{StaticResource RadiusLarge}"
+                CornerRadius="{StaticResource RadiusMedium}"
                 Visibility="{Binding HasUnknownHostKey, Converter={StaticResource BooleanToVisibilityConverter}}">
-                <StackPanel Spacing="10">
+                <StackPanel Spacing="8">
                     <TextBlock
                         x:Name="UnknownHostHeading"
                         x:Uid="HostKeyUnknownTitle"
                         AutomationProperties.HeadingLevel="Level2"
-                        FontSize="18"
+                        FontSize="15"
                         FontWeight="SemiBold" />
-                    <TextBlock x:Uid="HostKeyUnknownDescription" TextWrapping="Wrap" />
-                    <TextBlock x:Uid="HostKeyServerLabel" FontWeight="SemiBold" />
-                    <TextBlock Text="{Binding EndpointDisplay}" FontWeight="SemiBold" />
-                    <TextBlock x:Uid="HostKeyAlgorithmLabel" FontWeight="SemiBold" />
-                    <TextBlock Text="{Binding PresentedHostKeyAlgorithm}" />
-                    <TextBlock x:Uid="HostKeyFingerprintLabel" FontWeight="SemiBold" />
-                    <TextBlock
-                        FontFamily="Cascadia Mono"
-                        IsTextSelectionEnabled="True"
-                        Text="{Binding PresentedHostKeyFingerprint}"
-                        TextWrapping="WrapWholeWords" />
-                    <StackPanel Orientation="Horizontal" Spacing="10">
+                    <TextBlock x:Uid="HostKeyUnknownDescription" FontSize="12" Foreground="{ThemeResource TextSecondaryBrush}" TextWrapping="Wrap" />
+                    <Grid ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Spacing="2">
+                            <TextBlock x:Uid="HostKeyServerLabel" FontSize="11" Foreground="{ThemeResource TextTertiaryBrush}" FontWeight="Medium" />
+                            <TextBlock Text="{Binding EndpointDisplay}" FontWeight="SemiBold" FontSize="12" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Spacing="2">
+                            <TextBlock x:Uid="HostKeyAlgorithmLabel" FontSize="11" Foreground="{ThemeResource TextTertiaryBrush}" FontWeight="Medium" />
+                            <TextBlock Text="{Binding PresentedHostKeyAlgorithm}" FontSize="12" />
+                        </StackPanel>
+                    </Grid>
+                    <StackPanel Spacing="3">
+                        <TextBlock x:Uid="HostKeyFingerprintLabel" FontSize="11" Foreground="{ThemeResource TextTertiaryBrush}" FontWeight="Medium" />
+                        <Border
+                            Padding="10,7"
+                            Background="{ThemeResource MutedSurfaceBrush}"
+                            BorderBrush="{ThemeResource GlassBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="{StaticResource RadiusSmall}">
+                            <TextBlock
+                                FontFamily="Cascadia Code, Cascadia Mono, Consolas"
+                                FontSize="12"
+                                IsTextSelectionEnabled="True"
+                                Text="{Binding PresentedHostKeyFingerprint}"
+                                TextWrapping="WrapWholeWords" />
+                        </Border>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,4,0,0">
                         <Button
                             x:Uid="HostKeyTrustAndConnectButton"
                             Click="OnTrustAndConnectClick"
@@ -165,33 +230,55 @@
                 </StackPanel>
             </Border>
 
+            <!-- Host Key Mismatch Alert -->
             <Border
-                Padding="18"
+                Padding="16"
                 Background="{ThemeResource MutedSurfaceBrush}"
                 BorderBrush="{ThemeResource StatusCriticalBrush}"
                 BorderThickness="1"
-                CornerRadius="{StaticResource RadiusLarge}"
+                CornerRadius="{StaticResource RadiusMedium}"
                 Visibility="{Binding HasHostKeyMismatch, Converter={StaticResource BooleanToVisibilityConverter}}">
-                <StackPanel Spacing="10">
+                <StackPanel Spacing="8">
                     <TextBlock
                         x:Uid="HostKeyMismatchTitle"
                         AutomationProperties.HeadingLevel="Level2"
                         AutomationProperties.LiveSetting="Assertive"
-                        FontSize="18"
-                        FontWeight="SemiBold" />
-                    <TextBlock x:Uid="HostKeyMismatchDescription" TextWrapping="Wrap" />
-                    <TextBlock x:Uid="HostKeyKnownFingerprintLabel" FontWeight="SemiBold" />
-                    <TextBlock
-                        FontFamily="Cascadia Mono"
-                        IsTextSelectionEnabled="True"
-                        Text="{Binding TrustedHostKeyFingerprint}"
-                        TextWrapping="WrapWholeWords" />
-                    <TextBlock x:Uid="HostKeyReceivedFingerprintLabel" FontWeight="SemiBold" />
-                    <TextBlock
-                        FontFamily="Cascadia Mono"
-                        IsTextSelectionEnabled="True"
-                        Text="{Binding PresentedHostKeyFingerprint}"
-                        TextWrapping="WrapWholeWords" />
+                        FontSize="15"
+                        FontWeight="SemiBold"
+                        Foreground="{ThemeResource StatusCriticalBrush}" />
+                    <TextBlock x:Uid="HostKeyMismatchDescription" FontSize="12" Foreground="{ThemeResource TextSecondaryBrush}" TextWrapping="Wrap" />
+                    <StackPanel Spacing="3">
+                        <TextBlock x:Uid="HostKeyKnownFingerprintLabel" FontSize="11" Foreground="{ThemeResource TextTertiaryBrush}" FontWeight="Medium" />
+                        <Border
+                            Padding="10,7"
+                            Background="{ThemeResource MutedSurfaceBrush}"
+                            BorderBrush="{ThemeResource GlassBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="{StaticResource RadiusSmall}">
+                            <TextBlock
+                                FontFamily="Cascadia Code, Cascadia Mono, Consolas"
+                                FontSize="12"
+                                IsTextSelectionEnabled="True"
+                                Text="{Binding TrustedHostKeyFingerprint}"
+                                TextWrapping="WrapWholeWords" />
+                        </Border>
+                    </StackPanel>
+                    <StackPanel Spacing="3">
+                        <TextBlock x:Uid="HostKeyReceivedFingerprintLabel" FontSize="11" Foreground="{ThemeResource TextTertiaryBrush}" FontWeight="Medium" />
+                        <Border
+                            Padding="10,7"
+                            Background="{ThemeResource MutedSurfaceBrush}"
+                            BorderBrush="{ThemeResource GlassBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="{StaticResource RadiusSmall}">
+                            <TextBlock
+                                FontFamily="Cascadia Code, Cascadia Mono, Consolas"
+                                FontSize="12"
+                                IsTextSelectionEnabled="True"
+                                Text="{Binding PresentedHostKeyFingerprint}"
+                                TextWrapping="WrapWholeWords" />
+                        </Border>
+                    </StackPanel>
                 </StackPanel>
             </Border>
         </StackPanel>

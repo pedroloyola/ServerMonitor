@@ -5,30 +5,34 @@
     <StackPanel
         HorizontalAlignment="Center"
         VerticalAlignment="Center"
-        MaxWidth="420"
-        Spacing="16">
+        MaxWidth="380"
+        Spacing="14">
         <Border
-            Width="64"
-            Height="64"
+            Width="52"
+            Height="52"
             HorizontalAlignment="Center"
             Background="{ThemeResource AccentSoftBrush}"
-            CornerRadius="32">
+            BorderBrush="{ThemeResource GlassBorderBrush}"
+            BorderThickness="1"
+            CornerRadius="26">
             <FontIcon
-                FontSize="25"
+                FontSize="20"
                 Foreground="{ThemeResource AccentTextBrush}"
-                Glyph="&#xE8B7;" />
+                Glyph="&#xE968;" />
         </Border>
-        <StackPanel Spacing="8">
+        <StackPanel Spacing="6">
             <TextBlock
                 HorizontalAlignment="Center"
                 AutomationProperties.HeadingLevel="Level2"
-                FontSize="24"
+                FontFamily="Segoe UI Variable Display"
+                FontSize="20"
                 FontWeight="SemiBold"
                 Text="{x:Bind Title, Mode=OneWay}"
                 TextAlignment="Center"
                 TextWrapping="Wrap" />
             <TextBlock
                 HorizontalAlignment="Center"
+                FontSize="13"
                 Foreground="{ThemeResource TextSecondaryBrush}"
                 Text="{x:Bind Description, Mode=OneWay}"
                 TextAlignment="Center"
@@ -36,6 +40,7 @@
         </StackPanel>
         <Button
             HorizontalAlignment="Center"
+            Margin="0,4,0,0"
             Command="{x:Bind ActionCommand, Mode=OneWay}"
             Content="{x:Bind ActionText, Mode=OneWay}"
             Style="{StaticResource AccentPillButtonStyle}" />

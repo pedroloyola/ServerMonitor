@@ -47,5 +47,16 @@ public sealed class LocalizationService(ILogger<LocalizationService> logger) : I
         logger.LogInformation("UI language changed to {Language}; it will apply after restart.", languageTag);
     }
 
-    public string GetString(string resourceKey) => _resourceLoader.Value.GetString(resourceKey);
+    public string GetString(string resourceKey)
+    {
+        try
+        {
+            return _resourceLoader.Value.GetString(resourceKey);
+        }
+        catch
+        {
+            var slashKey = resourceKey.Replace('.', '/');
+            return _resourceLoader.Value.GetString(slashKey);
+        }
+    }
 }

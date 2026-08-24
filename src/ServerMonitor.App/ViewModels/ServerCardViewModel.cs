@@ -121,17 +121,29 @@ public sealed class ServerCardViewModel : ObservableObject
 
     public bool HasCpuUsage => CpuUsageDisplay is not null;
 
+    public double CpuUsageValue => _metrics?.CpuUsagePercent ?? 0;
+
+    public bool HasCpuPercent => _metrics?.CpuUsagePercent is not null;
+
     public string? MemoryUsageDisplay =>
         FormatPercent(_metrics?.MemoryUsagePercent) ??
         FormatBytesUsage(_metrics?.MemoryUsedBytes, _metrics?.MemoryTotalBytes);
 
     public bool HasMemoryUsage => MemoryUsageDisplay is not null;
 
+    public double MemoryUsageValue => _metrics?.MemoryUsagePercent ?? 0;
+
+    public bool HasMemoryPercent => _metrics?.MemoryUsagePercent is not null;
+
     public string? DiskUsageDisplay =>
         FormatPercent(_metrics?.DiskUsagePercent) ??
         FormatBytesUsage(_metrics?.DiskUsedBytes, _metrics?.DiskTotalBytes);
 
     public bool HasDiskUsage => DiskUsageDisplay is not null;
+
+    public double DiskUsageValue => _metrics?.DiskUsagePercent ?? 0;
+
+    public bool HasDiskPercent => _metrics?.DiskUsagePercent is not null;
 
     public string? UptimeDisplay => _metrics?.Uptime is { } uptime ? FormatUptime(uptime) : null;
 
@@ -214,10 +226,16 @@ public sealed class ServerCardViewModel : ObservableObject
         OnPropertyChanged(nameof(HasMetricsError));
         OnPropertyChanged(nameof(CpuUsageDisplay));
         OnPropertyChanged(nameof(HasCpuUsage));
+        OnPropertyChanged(nameof(CpuUsageValue));
+        OnPropertyChanged(nameof(HasCpuPercent));
         OnPropertyChanged(nameof(MemoryUsageDisplay));
         OnPropertyChanged(nameof(HasMemoryUsage));
+        OnPropertyChanged(nameof(MemoryUsageValue));
+        OnPropertyChanged(nameof(HasMemoryPercent));
         OnPropertyChanged(nameof(DiskUsageDisplay));
         OnPropertyChanged(nameof(HasDiskUsage));
+        OnPropertyChanged(nameof(DiskUsageValue));
+        OnPropertyChanged(nameof(HasDiskPercent));
         OnPropertyChanged(nameof(UptimeDisplay));
         OnPropertyChanged(nameof(HasUptime));
         OnPropertyChanged(nameof(DetectedOperatingSystemDisplay));

@@ -6,144 +6,181 @@
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel
             Padding="{StaticResource PagePadding}"
-            Spacing="24">
-            <Grid ColumnSpacing="14">
+            Spacing="20">
+            <!-- Header -->
+            <Grid ColumnSpacing="12">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
                 <Button
                     x:Uid="SettingsBackButton"
-                    VerticalAlignment="Top"
+                    VerticalAlignment="Center"
                     Command="{Binding BackCommand}"
                     Style="{StaticResource SubtleIconButtonStyle}">
                     <SymbolIcon Symbol="Back" />
                 </Button>
-                <StackPanel Grid.Column="1" Spacing="4">
-                <TextBlock
-                    x:Uid="SettingsTitle"
-                    AutomationProperties.HeadingLevel="Level1"
-                    Style="{StaticResource PageTitleTextStyle}" />
-                <TextBlock
-                    x:Uid="SettingsSubtitle"
-                    Foreground="{ThemeResource TextSecondaryBrush}" />
+                <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                    <TextBlock
+                        x:Uid="SettingsTitle"
+                        AutomationProperties.HeadingLevel="Level1"
+                        Style="{StaticResource PageTitleTextStyle}" />
+                    <TextBlock
+                        x:Uid="SettingsSubtitle"
+                        FontSize="13"
+                        Foreground="{ThemeResource TextSecondaryBrush}" />
                 </StackPanel>
             </Grid>
 
+            <!-- Main Glass Settings Card -->
             <controls:GlassCard>
-                <StackPanel Spacing="24">
-                    <StackPanel Spacing="4">
-                        <TextBlock
-                            x:Uid="SettingsAppearanceTitle"
-                            AutomationProperties.HeadingLevel="Level2"
-                            Style="{StaticResource SectionTitleTextStyle}" />
-                        <TextBlock
-                            x:Uid="SettingsAppearanceDescription"
-                            Foreground="{ThemeResource TextSecondaryBrush}"
-                            TextWrapping="Wrap" />
-                    </StackPanel>
-                    <ComboBox
-                        x:Uid="SettingsThemePicker"
-                        HorizontalAlignment="Stretch"
-                        MaxWidth="460"
-                        SelectedIndex="{Binding SelectedThemeIndex, Mode=TwoWay}">
-                        <ComboBoxItem x:Uid="ThemeSystemOption" />
-                        <ComboBoxItem x:Uid="ThemeLightOption" />
-                        <ComboBoxItem x:Uid="ThemeDarkOption" />
-                    </ComboBox>
-                    <Border Height="1" Background="{ThemeResource GlassBorderBrush}" />
-
-                    <StackPanel Spacing="14">
-                    <StackPanel Spacing="4">
-                        <TextBlock
-                            x:Uid="SettingsLanguageTitle"
-                            AutomationProperties.HeadingLevel="Level2"
-                            Style="{StaticResource SectionTitleTextStyle}" />
-                        <TextBlock
-                            x:Uid="SettingsLanguageDescription"
-                            Foreground="{ThemeResource TextSecondaryBrush}"
-                            TextWrapping="Wrap" />
-                    </StackPanel>
-                    <ComboBox
-                        x:Uid="SettingsLanguagePicker"
-                        HorizontalAlignment="Stretch"
-                        MaxWidth="460"
-                        SelectedIndex="{Binding SelectedLanguageIndex, Mode=TwoWay}">
-                        <ComboBoxItem x:Uid="LanguageSystemOption" />
-                        <ComboBoxItem x:Uid="LanguageBrazilianPortugueseOption" />
-                        <ComboBoxItem x:Uid="LanguageEuropeanPortugueseOption" />
-                        <ComboBoxItem x:Uid="LanguageEnglishOption" />
-                    </ComboBox>
-                    <InfoBar
-                        x:Uid="SettingsRestartNotice"
-                        IsClosable="True"
-                        IsOpen="{Binding IsRestartNoticeOpen, Mode=TwoWay}"
-                        Severity="Informational" />
+                <StackPanel Spacing="20">
+                    <!-- Appearance Section -->
+                    <StackPanel Spacing="10">
+                        <StackPanel Spacing="2">
+                            <TextBlock
+                                x:Uid="SettingsAppearanceTitle"
+                                AutomationProperties.HeadingLevel="Level2"
+                                Style="{StaticResource SectionTitleTextStyle}" />
+                            <TextBlock
+                                x:Uid="SettingsAppearanceDescription"
+                                FontSize="12"
+                                Foreground="{ThemeResource TextSecondaryBrush}"
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+                        <ComboBox
+                            x:Uid="SettingsThemePicker"
+                            HorizontalAlignment="Stretch"
+                            MaxWidth="400"
+                            CornerRadius="{StaticResource RadiusSmall}"
+                            SelectedIndex="{Binding SelectedThemeIndex, Mode=TwoWay}">
+                            <ComboBoxItem x:Uid="ThemeSystemOption" />
+                            <ComboBoxItem x:Uid="ThemeLightOption" />
+                            <ComboBoxItem x:Uid="ThemeDarkOption" />
+                        </ComboBox>
                     </StackPanel>
 
                     <Border Height="1" Background="{ThemeResource GlassBorderBrush}" />
 
-                    <StackPanel Spacing="14">
-                    <StackPanel Spacing="4">
-                        <TextBlock
-                            x:Uid="SettingsHiddenServersTitle"
-                            AutomationProperties.HeadingLevel="Level2"
-                            Style="{StaticResource SectionTitleTextStyle}" />
-                        <TextBlock
-                            x:Uid="SettingsHiddenServersDescription"
-                            Foreground="{ThemeResource TextSecondaryBrush}"
-                            TextWrapping="Wrap" />
+                    <!-- Language Section -->
+                    <StackPanel Spacing="10">
+                        <StackPanel Spacing="2">
+                            <TextBlock
+                                x:Uid="SettingsLanguageTitle"
+                                AutomationProperties.HeadingLevel="Level2"
+                                Style="{StaticResource SectionTitleTextStyle}" />
+                            <TextBlock
+                                x:Uid="SettingsLanguageDescription"
+                                FontSize="12"
+                                Foreground="{ThemeResource TextSecondaryBrush}"
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+                        <ComboBox
+                            x:Uid="SettingsLanguagePicker"
+                            HorizontalAlignment="Stretch"
+                            MaxWidth="400"
+                            CornerRadius="{StaticResource RadiusSmall}"
+                            SelectedIndex="{Binding SelectedLanguageIndex, Mode=TwoWay}">
+                            <ComboBoxItem x:Uid="LanguageSystemOption" />
+                            <ComboBoxItem x:Uid="LanguageBrazilianPortugueseOption" />
+                            <ComboBoxItem x:Uid="LanguageEuropeanPortugueseOption" />
+                            <ComboBoxItem x:Uid="LanguageEnglishOption" />
+                        </ComboBox>
+                        <InfoBar
+                            x:Uid="SettingsRestartNotice"
+                            IsClosable="True"
+                            IsOpen="{Binding IsRestartNoticeOpen, Mode=TwoWay}"
+                            Severity="Informational" />
                     </StackPanel>
 
-                    <InfoBar
-                        x:Uid="ServerOperationError"
-                        IsClosable="True"
-                        IsOpen="{Binding IsServerOperationErrorOpen, Mode=TwoWay}"
-                        Severity="Error" />
+                    <Border Height="1" Background="{ThemeResource GlassBorderBrush}" />
 
-                    <TextBlock
-                        x:Uid="SettingsHiddenServersEmpty"
-                        Foreground="{ThemeResource TextTertiaryBrush}"
-                        Visibility="{Binding HasHiddenServers, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Invert}" />
+                    <!-- Hidden Servers Section -->
+                    <StackPanel Spacing="10">
+                        <StackPanel Spacing="2">
+                            <TextBlock
+                                x:Uid="SettingsHiddenServersTitle"
+                                AutomationProperties.HeadingLevel="Level2"
+                                Style="{StaticResource SectionTitleTextStyle}" />
+                            <TextBlock
+                                x:Uid="SettingsHiddenServersDescription"
+                                FontSize="12"
+                                Foreground="{ThemeResource TextSecondaryBrush}"
+                                TextWrapping="Wrap" />
+                        </StackPanel>
 
-                    <ItemsControl
-                        ItemsSource="{Binding HiddenServers}"
-                        Visibility="{Binding HasHiddenServers, Converter={StaticResource BooleanToVisibilityConverter}}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <Grid Padding="0,10" ColumnSpacing="14">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Spacing="2">
-                                        <TextBlock FontWeight="SemiBold" Text="{Binding Name}" />
-                                        <TextBlock
-                                            Foreground="{ThemeResource TextSecondaryBrush}"
-                                            Text="{Binding OperatingSystemDisplayName}" />
-                                        <TextBlock
-                                            Foreground="{ThemeResource TextTertiaryBrush}"
-                                            FontSize="12"
-                                            Text="{Binding Endpoint}" />
-                                    </StackPanel>
-                                    <Button
-                                        x:Uid="HiddenServerRestoreButton"
-                                        Grid.Column="1"
-                                        VerticalAlignment="Center"
-                                        AutomationProperties.Name="{Binding RestoreAutomationName}"
-                                        Command="{Binding RestoreCommand}" />
-                                </Grid>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
+                        <InfoBar
+                            x:Uid="ServerOperationError"
+                            IsClosable="True"
+                            IsOpen="{Binding IsServerOperationErrorOpen, Mode=TwoWay}"
+                            Severity="Error" />
+
+                        <TextBlock
+                            x:Uid="SettingsHiddenServersEmpty"
+                            FontSize="12"
+                            Foreground="{ThemeResource TextTertiaryBrush}"
+                            Visibility="{Binding HasHiddenServers, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Invert}" />
+
+                        <ItemsControl
+                            ItemsSource="{Binding HiddenServers}"
+                            Visibility="{Binding HasHiddenServers, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border
+                                        Margin="0,0,0,8"
+                                        Padding="12,10"
+                                        Background="{ThemeResource MutedSurfaceBrush}"
+                                        BorderBrush="{ThemeResource GlassBorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="{StaticResource RadiusSmall}">
+                                        <Grid ColumnSpacing="12">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <TextBlock FontWeight="SemiBold" Text="{Binding Name}" VerticalAlignment="Center" />
+                                                    <Border
+                                                        Padding="6,2"
+                                                        Background="{ThemeResource MutedSurfaceBrush}"
+                                                        BorderBrush="{ThemeResource GlassBorderBrush}"
+                                                        BorderThickness="1"
+                                                        CornerRadius="{StaticResource RadiusSmall}"
+                                                        VerticalAlignment="Center">
+                                                        <TextBlock
+                                                            FontSize="10"
+                                                            Foreground="{ThemeResource TextSecondaryBrush}"
+                                                            Text="{Binding OperatingSystemDisplayName}" />
+                                                    </Border>
+                                                </StackPanel>
+                                                <TextBlock
+                                                    Foreground="{ThemeResource TextTertiaryBrush}"
+                                                    FontSize="12"
+                                                    Text="{Binding Endpoint}" />
+                                            </StackPanel>
+                                            <Button
+                                                x:Uid="HiddenServerRestoreButton"
+                                                Grid.Column="1"
+                                                VerticalAlignment="Center"
+                                                AutomationProperties.Name="{Binding RestoreAutomationName}"
+                                                Command="{Binding RestoreCommand}"
+                                                Style="{StaticResource QuietPillButtonStyle}" />
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
                     </StackPanel>
                 </StackPanel>
             </controls:GlassCard>
 
+            <!-- Bottom Caption -->
             <TextBlock
                 x:Uid="SettingsMilestoneCaption"
                 Foreground="{ThemeResource TextTertiaryBrush}"
-                FontSize="12"
+                FontSize="11"
+                TextAlignment="Center"
                 TextWrapping="Wrap" />
         </StackPanel>
     </ScrollViewer>

@@ -410,7 +410,38 @@ public sealed class ServerCardViewModelTests
         vm.RefreshMetricsCommand.Execute(null);
 
         Assert.Contains(nameof(vm.CpuUsageDisplay), changed);
+        Assert.Contains(nameof(vm.CpuUsageValue), changed);
+        Assert.Contains(nameof(vm.HasCpuPercent), changed);
         Assert.Contains(nameof(vm.IsRefreshingMetrics), changed);
+    }
+
+    [Fact]
+    public void MicroProgressBarValues_PreservePercentAndReportAvailability()
+    {
+        var server = TestData.LinuxServer();
+        var vmWithMetrics = CreateViewModel(new FakeServerMetricsStore
+        {
+            InitialSnapshot = TestData.Snapshot(server.Id, cpu: 25.5, memoryPercent: 60.0, diskPercent: 80.0)
+        }, server);
+
+        Assert.True(vmWithMetrics.HasCpuPercent);
+        Assert.Equal(25.5, vmWithMetrics.CpuUsageValue);
+        Assert.True(vmWithMetrics.HasMemoryPercent);
+        Assert.Equal(60.0, vmWithMetrics.MemoryUsageValue);
+        Assert.True(vmWithMetrics.HasDiskPercent);
+        Assert.Equal(80.0, vmWithMetrics.DiskUsageValue);
+
+        var vmNullMetrics = CreateViewModel(new FakeServerMetricsStore
+        {
+            InitialSnapshot = TestData.Snapshot(server.Id, cpu: null, memoryPercent: null, diskPercent: null)
+        }, server);
+
+        Assert.False(vmNullMetrics.HasCpuPercent);
+        Assert.Equal(0, vmNullMetrics.CpuUsageValue);
+        Assert.False(vmNullMetrics.HasMemoryPercent);
+        Assert.Equal(0, vmNullMetrics.MemoryUsageValue);
+        Assert.False(vmNullMetrics.HasDiskPercent);
+        Assert.Equal(0, vmNullMetrics.DiskUsageValue);
     }
 
     private sealed class PumpSynchronizationContext : SynchronizationContext

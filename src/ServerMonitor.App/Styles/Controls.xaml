@@ -5,48 +5,95 @@
     xmlns:converters="using:ServerMonitor.App.Converters">
     <converters:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
     <converters:ConnectionStateToBrushConverter x:Key="ConnectionStateToBrushConverter" />
+
     <Style x:Key="PageTitleTextStyle" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="Segoe UI Variable Display" />
-        <Setter Property="FontSize" Value="32" />
+        <Setter Property="FontSize" Value="28" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="TextWrapping" Value="Wrap" />
     </Style>
 
     <Style x:Key="SectionTitleTextStyle" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="Segoe UI Variable Text" />
-        <Setter Property="FontSize" Value="18" />
+        <Setter Property="FontSize" Value="15" />
         <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
 
     <Style x:Key="AccentPillButtonStyle" TargetType="Button">
-        <Setter Property="Background" Value="{ThemeResource AccentFillColorDefaultBrush}" />
-        <Setter Property="Foreground" Value="{ThemeResource TextOnAccentFillColorPrimaryBrush}" />
-        <Setter Property="MinHeight" Value="40" />
-        <Setter Property="CornerRadius" Value="20" />
+        <Setter Property="Background" Value="{ThemeResource BrandAccentBrush}" />
+        <Setter Property="Foreground" Value="White" />
+        <Setter Property="MinHeight" Value="36" />
+        <Setter Property="CornerRadius" Value="18" />
+        <Setter Property="FontSize" Value="13" />
         <Setter Property="FontWeight" Value="SemiBold" />
-        <Setter Property="Padding" Value="17,9" />
+        <Setter Property="Padding" Value="18,7" />
+        <Setter Property="BorderThickness" Value="0" />
+    </Style>
+
+    <Style x:Key="BrandPrimaryButtonStyle" TargetType="Button">
+        <Setter Property="Background" Value="{ThemeResource BrandAccentBrush}" />
+        <Setter Property="Foreground" Value="White" />
+        <Setter Property="MinHeight" Value="36" />
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusSmall}" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Padding" Value="18,7" />
+        <Setter Property="BorderThickness" Value="0" />
     </Style>
 
     <Style x:Key="SubtleIconButtonStyle" TargetType="Button">
-        <Setter Property="Width" Value="40" />
-        <Setter Property="Height" Value="40" />
+        <Setter Property="Width" Value="36" />
+        <Setter Property="Height" Value="36" />
         <Setter Property="Padding" Value="0" />
-        <Setter Property="CornerRadius" Value="20" />
+        <Setter Property="CornerRadius" Value="18" />
         <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
     </Style>
 
     <Style x:Key="QuietPillButtonStyle" TargetType="Button">
-        <Setter Property="MinHeight" Value="40" />
-        <Setter Property="Padding" Value="14,8" />
-        <Setter Property="CornerRadius" Value="20" />
+        <Setter Property="MinHeight" Value="36" />
+        <Setter Property="Padding" Value="14,7" />
+        <Setter Property="CornerRadius" Value="18" />
+        <Setter Property="FontSize" Value="13" />
         <Setter Property="Background" Value="{ThemeResource MutedSurfaceBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource GlassBorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
     </Style>
 
-    <Style x:Key="PremiumContentDialogStyle" TargetType="ContentDialog">
-        <Setter Property="CornerRadius" Value="{StaticResource RadiusXLarge}" />
+    <Style x:Key="ContentDialogPrimaryButtonStyle" TargetType="Button">
+        <Setter Property="Background" Value="{ThemeResource BrandAccentBrush}" />
+        <Setter Property="Foreground" Value="White" />
+        <Setter Property="MinHeight" Value="36" />
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusSmall}" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Padding" Value="18,7" />
+        <Setter Property="BorderThickness" Value="0" />
+    </Style>
+
+    <Style x:Key="ContentDialogCloseButtonStyle" TargetType="Button">
+        <Setter Property="Background" Value="{ThemeResource MutedSurfaceBrush}" />
+        <Setter Property="Foreground" Value="{ThemeResource TextSecondaryBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource GlassBorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="MinHeight" Value="36" />
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusSmall}" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="Padding" Value="18,7" />
+    </Style>
+
+    <Style x:Key="PremiumContentDialogStyle" TargetType="ContentDialog" BasedOn="{StaticResource DefaultContentDialogStyle}">
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusLarge}" />
         <Setter Property="Background" Value="{ThemeResource GlassSurfaceBrush}" />
         <Setter Property="BorderBrush" Value="{ThemeResource GlassBorderBrush}" />
         <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="VerticalAlignment" Value="Stretch" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="PrimaryButtonStyle" Value="{StaticResource ContentDialogPrimaryButtonStyle}" />
+        <Setter Property="CloseButtonStyle" Value="{StaticResource ContentDialogCloseButtonStyle}" />
+        <Setter Property="SecondaryButtonStyle" Value="{StaticResource ContentDialogCloseButtonStyle}" />
     </Style>
 
 </ResourceDictionary>
