@@ -5,12 +5,16 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:controls="using:ServerMonitor.App.Controls"
     DefaultButton="Primary"
-    MaxWidth="520"
+    HorizontalAlignment="Stretch"
+    VerticalAlignment="Stretch"
+    HorizontalContentAlignment="Center"
+    VerticalContentAlignment="Center"
+    Style="{StaticResource PremiumContentDialogStyle}"
     PrimaryButtonClick="OnPrimaryButtonClick">
-    <ContentDialog.Style>
-        <StaticResource ResourceKey="PremiumContentDialogStyle" />
-    </ContentDialog.Style>
     <controls:ServerFormControl
         x:Name="ServerForm"
+        HorizontalAlignment="Center"
+        MinWidth="480"
+        MaxWidth="540"
         DataContext="{x:Bind ViewModel, Mode=OneWay}" />
 </ContentDialog>

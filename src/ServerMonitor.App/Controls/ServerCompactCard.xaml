@@ -3,36 +3,68 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:controls="using:ServerMonitor.App.Controls">
-    <controls:GlassCard AutomationProperties.Name="{Binding AutomationSummary}">
-        <Grid ColumnSpacing="12">
+    <controls:GlassCard
+        Margin="0,0,0,8"
+        AutomationProperties.Name="{Binding AutomationSummary}">
+        <Grid ColumnSpacing="10">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
-            <StackPanel Spacing="4">
-                <TextBlock
-                    FontWeight="SemiBold"
-                    Text="{Binding Name}"
-                    TextTrimming="CharacterEllipsis" />
-                <TextBlock
-                    Foreground="{ThemeResource TextSecondaryBrush}"
-                    FontSize="12"
-                    Text="{Binding Endpoint}"
-                    TextTrimming="CharacterEllipsis" />
-                <StackPanel Orientation="Horizontal" Spacing="7">
+            <StackPanel Spacing="5">
+                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                     <Border
-                        Width="6"
-                        Height="6"
+                        Width="8"
+                        Height="8"
                         VerticalAlignment="Center"
                         Background="{Binding ConnectionState, Converter={StaticResource ConnectionStateToBrushConverter}}"
-                        CornerRadius="3" />
+                        CornerRadius="4" />
                     <TextBlock
-                        Foreground="{ThemeResource TextTertiaryBrush}"
-                        FontSize="11"
-                        Text="{Binding ConnectionStateDisplayName}" />
+                        FontFamily="Segoe UI Variable Display"
+                        FontSize="15"
+                        FontWeight="SemiBold"
+                        Text="{Binding Name}"
+                        TextTrimming="CharacterEllipsis"
+                        VerticalAlignment="Center" />
+                    <Border
+                        Padding="6,2"
+                        Background="{ThemeResource MutedSurfaceBrush}"
+                        BorderBrush="{ThemeResource GlassBorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="{StaticResource RadiusSmall}"
+                        VerticalAlignment="Center">
+                        <TextBlock
+                            FontSize="10"
+                            Foreground="{ThemeResource TextSecondaryBrush}"
+                            Text="{Binding OperatingSystemDisplayName}" />
+                    </Border>
                 </StackPanel>
+                <Grid ColumnSpacing="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                        <FontIcon
+                            AutomationProperties.AccessibilityView="Raw"
+                            FontSize="10"
+                            Foreground="{ThemeResource TextTertiaryBrush}"
+                            Glyph="&#xE968;" />
+                        <TextBlock
+                            FontSize="12"
+                            Foreground="{ThemeResource TextSecondaryBrush}"
+                            Text="{Binding Endpoint}"
+                            TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                    <TextBlock
+                        Grid.Column="1"
+                        VerticalAlignment="Center"
+                        FontSize="11"
+                        Foreground="{ThemeResource TextTertiaryBrush}"
+                        Text="{Binding ConnectionStateDisplayName}" />
+                </Grid>
             </StackPanel>
-            <controls:ServerActionsButton Grid.Column="1" />
+            <controls:ServerActionsButton Grid.Column="1" VerticalAlignment="Center" />
         </Grid>
     </controls:GlassCard>
 </UserControl>

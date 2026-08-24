@@ -4,53 +4,34 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:controls="using:ServerMonitor.App.Controls">
     <Grid Padding="{StaticResource PagePadding}">
-        <VisualStateManager.VisualStateGroups>
-            <VisualStateGroup>
-                <VisualState x:Name="NarrowLayout" />
-                <VisualState x:Name="WideLayout">
-                    <VisualState.StateTriggers>
-                        <AdaptiveTrigger MinWindowWidth="700" />
-                    </VisualState.StateTriggers>
-                    <VisualState.Setters>
-                        <Setter Target="HeaderActions.(Grid.Row)" Value="0" />
-                        <Setter Target="HeaderActions.(Grid.Column)" Value="1" />
-                        <Setter Target="HeaderActions.Margin" Value="20,0,0,0" />
-                    </VisualState.Setters>
-                </VisualState>
-            </VisualStateGroup>
-        </VisualStateManager.VisualStateGroups>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <Grid x:Name="HeaderGrid" Margin="0,4,0,28">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-            </Grid.RowDefinitions>
+        <!-- Header -->
+        <Grid x:Name="HeaderGrid" Margin="0,0,0,20">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
-            <StackPanel Spacing="4">
+            <StackPanel Spacing="2" VerticalAlignment="Center">
                 <TextBlock
                     x:Uid="DashboardTitle"
                     AutomationProperties.HeadingLevel="Level1"
                     Style="{StaticResource PageTitleTextStyle}" />
                 <TextBlock
                     x:Uid="DashboardSubtitle"
+                    FontSize="13"
                     Foreground="{ThemeResource TextSecondaryBrush}" />
             </StackPanel>
             <StackPanel
                 x:Name="HeaderActions"
-                Grid.Row="1"
-                Margin="0,20,0,0"
-                HorizontalAlignment="Left"
+                Grid.Column="1"
                 VerticalAlignment="Center"
                 Orientation="Horizontal"
-                Spacing="10">
+                Spacing="8">
                 <Button
                     x:Uid="DashboardSettingsButton"
                     Command="{Binding OpenSettingsCommand}"
@@ -64,31 +45,32 @@
             </StackPanel>
         </Grid>
 
+        <!-- Error InfoBar -->
         <InfoBar
             x:Uid="ServerOperationError"
             Grid.Row="1"
-            Margin="0,0,0,16"
+            Margin="0,0,0,12"
             IsClosable="True"
             IsOpen="{Binding IsOperationErrorOpen, Mode=TwoWay}"
             Severity="Error" />
 
+        <!-- Empty State Card -->
         <Grid
             Grid.Row="2"
-            Height="320"
+            Height="260"
             VerticalAlignment="Top"
             Visibility="{Binding HasVisibleServers, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Invert}">
-            <controls:GlassCard
-                Height="320"
-                VerticalAlignment="Top">
+            <controls:GlassCard Height="260" VerticalAlignment="Top">
                 <controls:EmptyStateControl
                     x:Uid="DashboardEmptyState"
-                    Height="274"
                     ActionCommand="{Binding AddServerCommand}" />
             </controls:GlassCard>
         </Grid>
 
+        <!-- Servers Scrollable List -->
         <ScrollViewer
             Grid.Row="2"
+            Padding="0,0,2,0"
             VerticalScrollBarVisibility="Auto"
             Visibility="{Binding HasVisibleServers, Converter={StaticResource BooleanToVisibilityConverter}}">
             <ItemsControl ItemsSource="{Binding VisibleServers}">
