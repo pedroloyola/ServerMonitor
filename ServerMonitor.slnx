@@ -8,6 +8,9 @@
     <Project Path="src/ServerMonitor.Infrastructure/ServerMonitor.Infrastructure.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/ServerMonitor.App.Tests/ServerMonitor.App.Tests.csproj">
+      <Platform Project="x64" />
+    </Project>
     <Project Path="tests/ServerMonitor.Collectors.Tests/ServerMonitor.Collectors.Tests.csproj" />
     <Project Path="tests/ServerMonitor.Core.Tests/ServerMonitor.Core.Tests.csproj" />
     <Project Path="tests/ServerMonitor.Infrastructure.Tests/ServerMonitor.Infrastructure.Tests.csproj" />

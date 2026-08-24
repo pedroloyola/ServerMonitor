@@ -4,10 +4,11 @@ using ServerMonitor.Core.Enums;
 using ServerMonitor.Core.Interfaces;
 using ServerMonitor.Core.Models;
 using ServerMonitor.Core.Security;
+using ServerMonitor.Infrastructure.Collectors.Linux;
 
 namespace ServerMonitor.Infrastructure.SSH;
 
-public sealed class SshConnectionService : ISshConnectionService
+public sealed class SshConnectionService : ISshConnectionService, ILinuxMetricsRemoteSource
 {
     private readonly IHostKeyTrustStore _hostKeyTrustStore;
     private readonly IServerCredentialStore _credentialStore;
@@ -22,7 +23,7 @@ public sealed class SshConnectionService : ISshConnectionService
     {
     }
 
-    public SshConnectionService(
+    internal SshConnectionService(
         IHostKeyTrustStore hostKeyTrustStore,
         IServerCredentialStore credentialStore,
         ILogger<SshConnectionService> logger,
@@ -37,21 +38,63 @@ public sealed class SshConnectionService : ISshConnectionService
     public Task<SshConnectionResult> ConnectAsync(
         SshConnectionRequest request,
         CancellationToken cancellationToken = default) =>
-        ExecuteAsync(request, detectOperatingSystem: false, cancellationToken);
+        ExecuteAsync(request, SshSessionOperation.Connect, TimeSpan.Zero, null, cancellationToken);
 
     public Task<SshConnectionResult> TestConnectionAsync(
         SshConnectionRequest request,
         CancellationToken cancellationToken = default) =>
-        ExecuteAsync(request, detectOperatingSystem: true, cancellationToken);
+        ExecuteAsync(request, SshSessionOperation.DetectOperatingSystem, TimeSpan.Zero, null, cancellationToken);
 
     public Task<SshConnectionResult> DetectOperatingSystemAsync(
         SshConnectionRequest request,
         CancellationToken cancellationToken = default) =>
-        ExecuteAsync(request, detectOperatingSystem: true, cancellationToken);
+        ExecuteAsync(request, SshSessionOperation.DetectOperatingSystem, TimeSpan.Zero, null, cancellationToken);
+
+    public async Task<LinuxMetricsRemoteResult> CollectAsync(
+        Server server,
+        TimeSpan cpuSampleInterval,
+        TimeSpan timeout,
+        CancellationToken cancellationToken = default)
+    {
+        LinuxMetricsRawData? data = null;
+        var request = new SshConnectionRequest
+        {
+            Server = server,
+            Timeout = timeout
+        };
+
+        if (cpuSampleInterval <= TimeSpan.Zero || cpuSampleInterval > TimeSpan.FromSeconds(5))
+        {
+            return new LinuxMetricsRemoteResult
+            {
+                ConnectionResult = Complete(
+                    server,
+                    SshConnectionErrorCode.InvalidConfiguration,
+                    TimeSpan.Zero,
+                    timeout)
+            };
+        }
+
+        var connectionResult = await ExecuteAsync(
+                request,
+                SshSessionOperation.CollectLinuxMetrics,
+                cpuSampleInterval,
+                value => data = value,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        return new LinuxMetricsRemoteResult
+        {
+            ConnectionResult = connectionResult,
+            Data = data
+        };
+    }
 
     private async Task<SshConnectionResult> ExecuteAsync(
         SshConnectionRequest request,
-        bool detectOperatingSystem,
+        SshSessionOperation operation,
+        TimeSpan cpuSampleInterval,
+        Action<LinuxMetricsRawData?>? captureLinuxMetrics,
         CancellationToken cancellationToken)
     {
         var stopwatch = Stopwatch.StartNew();
@@ -121,9 +164,12 @@ public sealed class SshConnectionService : ISshConnectionService
             var sessionResult = await ConnectAuthenticatedAsync(
                     request,
                     trustedHostKey!,
-                    detectOperatingSystem,
+                    operation,
+                    cpuSampleInterval,
                     linkedSource.Token)
                 .ConfigureAwait(false);
+
+            captureLinuxMetrics?.Invoke(sessionResult.LinuxMetrics);
 
             return Complete(
                 request.Server,
@@ -174,7 +220,8 @@ public sealed class SshConnectionService : ISshConnectionService
     private async Task<SshSessionResult> ConnectAuthenticatedAsync(
         SshConnectionRequest request,
         TrustedHostKey trustedHostKey,
-        bool detectOperatingSystem,
+        SshSessionOperation operation,
+        TimeSpan cpuSampleInterval,
         CancellationToken cancellationToken)
     {
         SecretValue? storedSecret = null;
@@ -266,15 +313,20 @@ public sealed class SshConnectionService : ISshConnectionService
 
             using (session)
             {
-                return detectOperatingSystem
-                    ? await session.DetectOperatingSystemAsync(
-                            identity => trustedHostKey.Identity.Matches(identity),
-                            cancellationToken)
-                        .ConfigureAwait(false)
-                    : await session.ConnectAsync(
-                            identity => trustedHostKey.Identity.Matches(identity),
-                            cancellationToken)
-                        .ConfigureAwait(false);
+                var verifier = (HostKeyIdentity identity) => trustedHostKey.Identity.Matches(identity);
+                return operation switch
+                {
+                    SshSessionOperation.Connect => await session
+                        .ConnectAsync(verifier, cancellationToken)
+                        .ConfigureAwait(false),
+                    SshSessionOperation.DetectOperatingSystem => await session
+                        .DetectOperatingSystemAsync(verifier, cancellationToken)
+                        .ConfigureAwait(false),
+                    SshSessionOperation.CollectLinuxMetrics => await session
+                        .CollectLinuxMetricsAsync(verifier, cpuSampleInterval, cancellationToken)
+                        .ConfigureAwait(false),
+                    _ => Failure(SshConnectionErrorCode.Unexpected)
+                };
             }
         }
         finally
@@ -389,4 +441,11 @@ public sealed class SshConnectionService : ISshConnectionService
         SshConnectionErrorCode.NetworkUnavailable => ServerConnectionState.Unreachable,
         _ => ServerConnectionState.Error
     };
+
+    private enum SshSessionOperation
+    {
+        Connect,
+        DetectOperatingSystem,
+        CollectLinuxMetrics
+    }
 }

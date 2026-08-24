@@ -5,8 +5,10 @@ using Microsoft.UI.Xaml;
 using ServerMonitor.App.Services;
 using ServerMonitor.App.ViewModels;
 using ServerMonitor.App.Views;
+using ServerMonitor.Collectors.Linux;
 using ServerMonitor.Core.Domain;
 using ServerMonitor.Core.Interfaces;
+using ServerMonitor.Infrastructure.Collectors.Linux;
 using ServerMonitor.Infrastructure.Persistence;
 using ServerMonitor.Infrastructure.Security;
 using ServerMonitor.Infrastructure.SSH;
@@ -45,7 +47,11 @@ public partial class App : Application
                 services.AddSingleton<IServerCredentialStore, WindowsCredentialStore>();
                 services.AddSingleton<IServerProfileService, ServerProfileService>();
                 services.AddSingleton<IHostKeyTrustStore, JsonHostKeyTrustStore>();
-                services.AddSingleton<ISshConnectionService, SshConnectionService>();
+                services.AddSingleton<SshConnectionService>();
+                services.AddSingleton<ISshConnectionService>(sp => sp.GetRequiredService<SshConnectionService>());
+                services.AddSingleton<ILinuxMetricsRemoteSource>(sp => sp.GetRequiredService<SshConnectionService>());
+                services.AddSingleton<IServerMetricsCollector, LinuxMetricsCollector>();
+                services.AddSingleton<IServerMetricsStore, ServerMetricsStore>();
 
                 services.AddSingleton<DashboardViewModel>();
                 services.AddSingleton<SettingsViewModel>();

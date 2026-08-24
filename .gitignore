@@ -6,6 +6,7 @@ obj/
 TestResults/
 artifacts/
 *.log
+.maestri/
 
 # Local user configuration must never be committed.
 config.json

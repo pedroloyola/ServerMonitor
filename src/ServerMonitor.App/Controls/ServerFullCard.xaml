@@ -10,6 +10,7 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
             <Grid ColumnSpacing="14">
@@ -66,6 +67,162 @@
                         Foreground="{ThemeResource TextTertiaryBrush}"
                         FontSize="12"
                         Text="{Binding ConnectionStateDisplayName}" />
+                </StackPanel>
+            </Grid>
+
+            <Grid
+                Grid.Row="2"
+                RowSpacing="10"
+                Visibility="{Binding SupportsMetrics, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <Grid ColumnSpacing="10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel
+                        Orientation="Horizontal"
+                        Spacing="8"
+                        Visibility="{Binding IsMetricsPending, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <TextBlock
+                            x:Uid="ServerMetricsWaitingForData"
+                            VerticalAlignment="Center"
+                            FontSize="12"
+                            Foreground="{ThemeResource TextTertiaryBrush}" />
+                    </StackPanel>
+                    <StackPanel
+                        Orientation="Horizontal"
+                        Spacing="8"
+                        Visibility="{Binding IsRefreshingMetrics, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <ProgressRing
+                            Width="14"
+                            Height="14"
+                            IsActive="{Binding IsRefreshingMetrics}" />
+                        <TextBlock
+                            x:Uid="ServerMetricsRefreshingLabel"
+                            VerticalAlignment="Center"
+                            AutomationProperties.LiveSetting="Polite"
+                            FontSize="12"
+                            Foreground="{ThemeResource TextTertiaryBrush}" />
+                    </StackPanel>
+                    <TextBlock
+                        VerticalAlignment="Center"
+                        AutomationProperties.LiveSetting="Polite"
+                        FontSize="12"
+                        Foreground="{ThemeResource StatusCriticalBrush}"
+                        Text="{Binding MetricsErrorDisplay}"
+                        TextWrapping="Wrap"
+                        Visibility="{Binding HasMetricsError, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    <Button
+                        Grid.Column="1"
+                        Width="40"
+                        Height="40"
+                        AutomationProperties.Name="{Binding RefreshMetricsAutomationName}"
+                        Command="{Binding RefreshMetricsCommand}"
+                        Style="{StaticResource SubtleIconButtonStyle}"
+                        ToolTipService.ToolTip="{Binding RefreshMetricsAutomationName}">
+                        <FontIcon FontSize="13" Glyph="&#xE72C;" />
+                    </Button>
+                </Grid>
+
+                <Grid
+                    Grid.Row="1"
+                    ColumnSpacing="10"
+                    Visibility="{Binding HasMetrics, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Border
+                        Padding="10,8"
+                        Background="{ThemeResource MutedSurfaceBrush}"
+                        CornerRadius="10"
+                        Visibility="{Binding HasCpuUsage, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <StackPanel Spacing="2">
+                            <TextBlock
+                                x:Uid="ServerMetricsCpuLabel"
+                                FontSize="11"
+                                Foreground="{ThemeResource TextTertiaryBrush}" />
+                            <TextBlock
+                                FontSize="14"
+                                FontWeight="SemiBold"
+                                Text="{Binding CpuUsageDisplay}"
+                                TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                    </Border>
+                    <Border
+                        Grid.Column="1"
+                        Padding="10,8"
+                        Background="{ThemeResource MutedSurfaceBrush}"
+                        CornerRadius="10"
+                        Visibility="{Binding HasMemoryUsage, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <StackPanel Spacing="2">
+                            <TextBlock
+                                x:Uid="ServerMetricsMemoryLabel"
+                                FontSize="11"
+                                Foreground="{ThemeResource TextTertiaryBrush}" />
+                            <TextBlock
+                                FontSize="14"
+                                FontWeight="SemiBold"
+                                Text="{Binding MemoryUsageDisplay}"
+                                TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                    </Border>
+                    <Border
+                        Grid.Column="2"
+                        Padding="10,8"
+                        Background="{ThemeResource MutedSurfaceBrush}"
+                        CornerRadius="10"
+                        Visibility="{Binding HasDiskUsage, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <StackPanel Spacing="2">
+                            <TextBlock
+                                x:Uid="ServerMetricsDiskLabel"
+                                FontSize="11"
+                                Foreground="{ThemeResource TextTertiaryBrush}" />
+                            <TextBlock
+                                FontSize="14"
+                                FontWeight="SemiBold"
+                                Text="{Binding DiskUsageDisplay}"
+                                TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <StackPanel
+                    Grid.Row="2"
+                    Spacing="4"
+                    Visibility="{Binding HasMetrics, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <StackPanel
+                        Orientation="Horizontal"
+                        Spacing="6"
+                        Visibility="{Binding HasUptime, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <TextBlock
+                            x:Uid="ServerMetricsUptimeLabel"
+                            FontSize="11"
+                            Foreground="{ThemeResource TextTertiaryBrush}" />
+                        <TextBlock
+                            FontSize="11"
+                            FontWeight="SemiBold"
+                            Foreground="{ThemeResource TextSecondaryBrush}"
+                            Text="{Binding UptimeDisplay}" />
+                    </StackPanel>
+                    <TextBlock
+                        FontSize="11"
+                        Foreground="{ThemeResource TextTertiaryBrush}"
+                        Text="{Binding DetectedOperatingSystemDisplay}"
+                        TextWrapping="Wrap"
+                        Visibility="{Binding HasDetectedOperatingSystem, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    <TextBlock
+                        FontSize="11"
+                        Foreground="{ThemeResource TextTertiaryBrush}"
+                        Text="{Binding MetricsTimestampDisplay}"
+                        TextWrapping="Wrap" />
                 </StackPanel>
             </Grid>
         </Grid>

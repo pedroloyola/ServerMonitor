@@ -3,6 +3,7 @@ using ServerMonitor.Core.Enums;
 using ServerMonitor.Core.Interfaces;
 using ServerMonitor.Core.Models;
 using ServerMonitor.Core.Security;
+using ServerMonitor.Infrastructure.Collectors.Linux;
 using ServerMonitor.Infrastructure.SSH;
 
 namespace ServerMonitor.Infrastructure.Tests.SSH;
@@ -272,6 +273,93 @@ public sealed class SshConnectionServiceTests
         Assert.DoesNotContain(".ssh", log, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task Linux_metrics_reuses_trust_then_credentials_and_one_authenticated_session()
+    {
+        var raw = new LinuxMetricsRawData
+        {
+            FirstCpuStat = "cpu 1 2 3 4",
+            SecondCpuStat = "cpu 2 3 4 5",
+            Hostname = "ubuntu"
+        };
+        var fixture = new Fixture
+        {
+            TrustedHostKey = Trusted(Identity(1))
+        };
+        fixture.Credentials.Secret = "password";
+        fixture.Factory.Enqueue(new FakeSession(Identity(1), SshConnectionErrorCode.AuthenticationFailed));
+        fixture.Factory.Enqueue(new FakeSession(Identity(1), SshConnectionErrorCode.None, linuxMetrics: raw));
+
+        var result = await fixture.Service.CollectAsync(
+            Request().Server with { OperatingSystem = ServerOperatingSystem.Linux },
+            TimeSpan.FromMilliseconds(500),
+            TimeSpan.FromSeconds(2));
+
+        Assert.True(result.IsSuccess);
+        Assert.Same(raw, result.Data);
+        Assert.True(fixture.Factory.LastSession!.CollectWasCalled);
+        Assert.Equal(new[] { "probe", "password" }, fixture.Factory.Calls);
+        Assert.Equal(1, fixture.Credentials.ReadCount);
+    }
+
+    [Fact]
+    public async Task Linux_metrics_with_no_remote_sources_is_not_marked_successful()
+    {
+        var fixture = new Fixture
+        {
+            TrustedHostKey = Trusted(Identity(1))
+        };
+        fixture.Credentials.Secret = "password";
+        fixture.Factory.Enqueue(new FakeSession(Identity(1), SshConnectionErrorCode.AuthenticationFailed));
+        fixture.Factory.Enqueue(new FakeSession(
+            Identity(1),
+            SshConnectionErrorCode.None,
+            linuxMetrics: new LinuxMetricsRawData()));
+
+        var result = await fixture.Service.CollectAsync(
+            Request().Server with { OperatingSystem = ServerOperatingSystem.Linux },
+            TimeSpan.FromMilliseconds(500),
+            TimeSpan.FromSeconds(2));
+
+        Assert.False(result.IsSuccess);
+        Assert.True(result.ConnectionResult.IsSuccess);
+        Assert.NotNull(result.Data);
+    }
+
+    [Fact]
+    public async Task Linux_metrics_unknown_host_never_loads_credentials_or_collects()
+    {
+        var fixture = new Fixture();
+        fixture.Factory.Enqueue(new FakeSession(Identity(1), SshConnectionErrorCode.HostKeyMismatch));
+
+        var result = await fixture.Service.CollectAsync(
+            Request().Server with { OperatingSystem = ServerOperatingSystem.Linux },
+            TimeSpan.FromMilliseconds(500),
+            TimeSpan.FromSeconds(2));
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(SshConnectionErrorCode.HostKeyUnknown, result.ConnectionResult.ErrorCode);
+        Assert.Null(result.Data);
+        Assert.Equal(0, fixture.Credentials.ReadCount);
+        Assert.Equal(0, fixture.Factory.AuthenticatedCount);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(5001)]
+    public async Task Linux_metrics_rejects_invalid_sample_interval(int milliseconds)
+    {
+        var fixture = new Fixture();
+
+        var result = await fixture.Service.CollectAsync(
+            Request().Server,
+            TimeSpan.FromMilliseconds(milliseconds),
+            TimeSpan.FromSeconds(2));
+
+        Assert.Equal(SshConnectionErrorCode.InvalidConfiguration, result.ConnectionResult.ErrorCode);
+        Assert.Empty(fixture.Factory.Calls);
+    }
+
     private static SshConnectionRequest Request(
         Func<Server, Server>? configure = null,
         TimeSpan? timeout = null)
@@ -437,11 +525,13 @@ public sealed class SshConnectionServiceTests
         public FakeSession(
             HostKeyIdentity? identity,
             SshConnectionErrorCode whenTrusted,
-            ServerOperatingSystem operatingSystem = ServerOperatingSystem.Unknown)
+            ServerOperatingSystem operatingSystem = ServerOperatingSystem.Unknown,
+            LinuxMetricsRawData? linuxMetrics = null)
         {
             _identity = identity;
             _whenTrusted = whenTrusted;
             _operatingSystem = operatingSystem;
+            LinuxMetrics = linuxMetrics;
         }
 
         private FakeSession(bool waitUntilCancelled)
@@ -450,6 +540,10 @@ public sealed class SshConnectionServiceTests
         }
 
         public bool DetectWasCalled { get; private set; }
+
+        public bool CollectWasCalled { get; private set; }
+
+        public LinuxMetricsRawData? LinuxMetrics { get; }
 
         public static FakeSession WaitUntilCancelled() => new(waitUntilCancelled: true);
 
@@ -463,6 +557,15 @@ public sealed class SshConnectionServiceTests
         {
             DetectWasCalled = true;
             return await RunAsync(hostKeyVerifier, cancellationToken);
+        }
+
+        public Task<SshSessionResult> CollectLinuxMetricsAsync(
+            Func<HostKeyIdentity, bool> hostKeyVerifier,
+            TimeSpan cpuSampleInterval,
+            CancellationToken cancellationToken)
+        {
+            CollectWasCalled = true;
+            return RunAsync(hostKeyVerifier, cancellationToken);
         }
 
         public void Dispose()
@@ -483,7 +586,8 @@ public sealed class SshConnectionServiceTests
             {
                 ErrorCode = trusted ? _whenTrusted : SshConnectionErrorCode.HostKeyMismatch,
                 PresentedHostKey = _identity,
-                DetectedOperatingSystem = _operatingSystem
+                DetectedOperatingSystem = _operatingSystem,
+                LinuxMetrics = LinuxMetrics
             };
         }
     }

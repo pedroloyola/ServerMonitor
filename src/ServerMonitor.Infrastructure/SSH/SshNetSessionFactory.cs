@@ -5,7 +5,7 @@ using System.Security.Cryptography;
 
 namespace ServerMonitor.Infrastructure.SSH;
 
-public sealed class SshNetSessionFactory : ISshSessionFactory
+internal sealed class SshNetSessionFactory : ISshSessionFactory
 {
     private const long MaximumPrivateKeySize = 1024 * 1024;
 

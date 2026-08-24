@@ -1,6 +1,8 @@
+using System.Text;
 using Renci.SshNet;
 using ServerMonitor.Core.Enums;
 using ServerMonitor.Core.Models;
+using ServerMonitor.Infrastructure.Collectors.Linux;
 
 namespace ServerMonitor.Infrastructure.SSH;
 
@@ -9,18 +11,28 @@ internal sealed class SshNetSession(
     Renci.SshNet.AuthenticationMethod authentication,
     IDisposable? authenticationResource) : ISshSession
 {
+    private const int DefaultOutputLimit = 256 * 1024;
+    private const int SmallOutputLimit = 16 * 1024;
+    private const int ErrorOutputLimit = 16 * 1024;
+    private static readonly UTF8Encoding StrictUtf8 = new(false, true);
     private readonly SshClient _client = new(connectionInfo);
     private bool _disposed;
 
     public Task<SshSessionResult> ConnectAsync(
         Func<HostKeyIdentity, bool> hostKeyVerifier,
         CancellationToken cancellationToken) =>
-        RunAsync(detectOperatingSystem: false, hostKeyVerifier, cancellationToken);
+        RunAsync(SessionOperation.Connect, hostKeyVerifier, TimeSpan.Zero, cancellationToken);
 
     public Task<SshSessionResult> DetectOperatingSystemAsync(
         Func<HostKeyIdentity, bool> hostKeyVerifier,
         CancellationToken cancellationToken) =>
-        RunAsync(detectOperatingSystem: true, hostKeyVerifier, cancellationToken);
+        RunAsync(SessionOperation.DetectOperatingSystem, hostKeyVerifier, TimeSpan.Zero, cancellationToken);
+
+    public Task<SshSessionResult> CollectLinuxMetricsAsync(
+        Func<HostKeyIdentity, bool> hostKeyVerifier,
+        TimeSpan cpuSampleInterval,
+        CancellationToken cancellationToken) =>
+        RunAsync(SessionOperation.CollectLinuxMetrics, hostKeyVerifier, cpuSampleInterval, cancellationToken);
 
     public void Dispose()
     {
@@ -36,8 +48,9 @@ internal sealed class SshNetSession(
     }
 
     private async Task<SshSessionResult> RunAsync(
-        bool detectOperatingSystem,
+        SessionOperation operation,
         Func<HostKeyIdentity, bool> hostKeyVerifier,
+        TimeSpan cpuSampleInterval,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(hostKeyVerifier);
@@ -70,19 +83,28 @@ internal sealed class SshNetSession(
             await _client.ConnectAsync(cancellationToken).ConfigureAwait(false);
 
             var detectedOperatingSystem = ServerOperatingSystem.Unknown;
-            if (detectOperatingSystem)
+            LinuxMetricsRawData? linuxMetrics = null;
+            if (operation == SessionOperation.DetectOperatingSystem)
             {
-                using var command = _client.CreateCommand("uname -s");
-                command.CommandTimeout = connectionInfo.Timeout;
-                await command.ExecuteAsync(cancellationToken).ConfigureAwait(false);
-                detectedOperatingSystem = SshOperatingSystemParser.ParseUname(command.Result);
+                var uname = await TryExecuteCommandAsync(
+                        "uname -s",
+                        SmallOutputLimit,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                detectedOperatingSystem = SshOperatingSystemParser.ParseUname(uname);
+            }
+            else if (operation == SessionOperation.CollectLinuxMetrics)
+            {
+                linuxMetrics = await CollectLinuxDataAsync(cpuSampleInterval, cancellationToken)
+                    .ConfigureAwait(false);
             }
 
             return new SshSessionResult
             {
                 ErrorCode = SshConnectionErrorCode.None,
                 PresentedHostKey = presentedHostKey,
-                DetectedOperatingSystem = detectedOperatingSystem
+                DetectedOperatingSystem = detectedOperatingSystem,
+                LinuxMetrics = linuxMetrics
             };
         }
         catch (Exception exception)
@@ -107,10 +129,121 @@ internal sealed class SshNetSession(
                 }
                 catch
                 {
-                    // The result of the completed operation must not be replaced by
-                    // a best-effort disconnect failure.
+                    // A best-effort disconnect must not replace the operation result.
                 }
             }
         }
+    }
+
+    private async Task<LinuxMetricsRawData> CollectLinuxDataAsync(
+        TimeSpan cpuSampleInterval,
+        CancellationToken cancellationToken)
+    {
+        var firstCpuStat = await TryExecuteCommandAsync(
+                LinuxMetricsCommandCatalog.CpuStat,
+                DefaultOutputLimit,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        await Task.Delay(cpuSampleInterval, cancellationToken).ConfigureAwait(false);
+
+        var secondCpuStat = await TryExecuteCommandAsync(
+                LinuxMetricsCommandCatalog.CpuStat,
+                DefaultOutputLimit,
+                cancellationToken)
+            .ConfigureAwait(false);
+        var memInfo = await TryExecuteCommandAsync(
+                LinuxMetricsCommandCatalog.MemInfo,
+                DefaultOutputLimit,
+                cancellationToken)
+            .ConfigureAwait(false);
+        var rootFileSystem = await TryExecuteCommandAsync(
+                LinuxMetricsCommandCatalog.RootFileSystem,
+                DefaultOutputLimit,
+                cancellationToken)
+            .ConfigureAwait(false);
+        var uptime = await TryExecuteCommandAsync(
+                LinuxMetricsCommandCatalog.Uptime,
+                SmallOutputLimit,
+                cancellationToken)
+            .ConfigureAwait(false);
+        var hostname = await TryExecuteCommandAsync(
+                LinuxMetricsCommandCatalog.Hostname,
+                SmallOutputLimit,
+                cancellationToken)
+            .ConfigureAwait(false);
+        var osRelease = await TryExecuteCommandAsync(
+                LinuxMetricsCommandCatalog.OsRelease,
+                DefaultOutputLimit,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        return new LinuxMetricsRawData
+        {
+            FirstCpuStat = firstCpuStat,
+            SecondCpuStat = secondCpuStat,
+            MemInfo = memInfo,
+            RootFileSystem = rootFileSystem,
+            Uptime = uptime,
+            Hostname = hostname,
+            OsRelease = osRelease
+        };
+    }
+
+    private async Task<string?> TryExecuteCommandAsync(
+        string commandText,
+        int outputLimit,
+        CancellationToken cancellationToken)
+    {
+        using var command = _client.CreateCommand(commandText);
+        command.CommandTimeout = connectionInfo.Timeout;
+        using var commandCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+
+        var executeTask = command.ExecuteAsync(commandCancellation.Token);
+        var outputTask = BoundedRemoteOutputReader.ReadAsync(
+            command.OutputStream,
+            outputLimit,
+            commandCancellation.Token);
+        var errorTask = BoundedRemoteOutputReader.ReadAsync(
+            command.ExtendedOutputStream,
+            ErrorOutputLimit,
+            commandCancellation.Token);
+
+        try
+        {
+            await Task.WhenAll(executeTask, outputTask, errorTask).ConfigureAwait(false);
+            if (command.ExitStatus != 0)
+            {
+                return null;
+            }
+
+            return StrictUtf8.GetString(await outputTask.ConfigureAwait(false));
+        }
+        catch (RemoteOutputLimitException)
+        {
+            commandCancellation.Cancel();
+            try
+            {
+                await Task.WhenAll(executeTask, outputTask, errorTask).ConfigureAwait(false);
+            }
+            catch
+            {
+                // Oversized output is an unavailable individual source. Do not
+                // expose the remote output or replace it with a fabricated zero.
+            }
+
+            return null;
+        }
+        catch (DecoderFallbackException)
+        {
+            return null;
+        }
+    }
+
+    private enum SessionOperation
+    {
+        Connect,
+        DetectOperatingSystem,
+        CollectLinuxMetrics
     }
 }

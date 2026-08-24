@@ -1,5 +1,6 @@
 using ServerMonitor.Core.Enums;
 using ServerMonitor.Core.Models;
+using ServerMonitor.Infrastructure.Collectors.Linux;
 
 namespace ServerMonitor.Infrastructure.SSH;
 
@@ -7,7 +8,7 @@ namespace ServerMonitor.Infrastructure.SSH;
 /// Creates single-use SSH sessions. This seam keeps SSH.NET types out of the
 /// application and enables deterministic orchestration tests without a server.
 /// </summary>
-public interface ISshSessionFactory
+internal interface ISshSessionFactory
 {
     ISshSession CreateHostKeyProbe(Server server, TimeSpan timeout);
 
@@ -24,7 +25,7 @@ public interface ISshSessionFactory
 /// Represents one connection attempt. It deliberately exposes no arbitrary
 /// command execution API.
 /// </summary>
-public interface ISshSession : IDisposable
+internal interface ISshSession : IDisposable
 {
     Task<SshSessionResult> ConnectAsync(
         Func<HostKeyIdentity, bool> hostKeyVerifier,
@@ -33,9 +34,14 @@ public interface ISshSession : IDisposable
     Task<SshSessionResult> DetectOperatingSystemAsync(
         Func<HostKeyIdentity, bool> hostKeyVerifier,
         CancellationToken cancellationToken);
+
+    Task<SshSessionResult> CollectLinuxMetricsAsync(
+        Func<HostKeyIdentity, bool> hostKeyVerifier,
+        TimeSpan cpuSampleInterval,
+        CancellationToken cancellationToken);
 }
 
-public sealed record SshSessionResult
+internal sealed record SshSessionResult
 {
     public required SshConnectionErrorCode ErrorCode { get; init; }
 
@@ -43,12 +49,14 @@ public sealed record SshSessionResult
 
     public ServerOperatingSystem DetectedOperatingSystem { get; init; } = ServerOperatingSystem.Unknown;
 
+    public LinuxMetricsRawData? LinuxMetrics { get; init; }
+
     public string? ExceptionType { get; init; }
 
     public bool IsSuccess => ErrorCode == SshConnectionErrorCode.None;
 }
 
-public sealed class SshPrivateKeyLoadException : Exception
+internal sealed class SshPrivateKeyLoadException : Exception
 {
     public SshPrivateKeyLoadException(Exception innerException)
         : base("The private key could not be loaded.", innerException)

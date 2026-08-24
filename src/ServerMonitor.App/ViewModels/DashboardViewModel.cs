@@ -13,6 +13,7 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
     private readonly IServerProfileService _serverProfileService;
     private readonly IServerDialogService _dialogService;
     private readonly IServerConnectionStateStore _connectionStateStore;
+    private readonly IServerMetricsStore _metricsStore;
     private readonly ILocalizationService _localizationService;
     private readonly ILogger<DashboardViewModel> _logger;
     private bool _hasVisibleServers;
@@ -23,6 +24,7 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         IServerProfileService serverProfileService,
         IServerDialogService dialogService,
         IServerConnectionStateStore connectionStateStore,
+        IServerMetricsStore metricsStore,
         INavigationService navigationService,
         ILocalizationService localizationService,
         ILogger<DashboardViewModel> logger)
@@ -31,6 +33,7 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         _serverProfileService = serverProfileService;
         _dialogService = dialogService;
         _connectionStateStore = connectionStateStore;
+        _metricsStore = metricsStore;
         _localizationService = localizationService;
         _logger = logger;
         _serverService.ServersChanged += OnServersChanged;
@@ -117,13 +120,17 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
             {
                 IsOperationErrorOpen = true;
             }
-            else if (editorResult.ConnectionResult is not null)
-            {
-                _connectionStateStore.Set(server.Id, editorResult.ConnectionResult);
-            }
             else
             {
-                _connectionStateStore.Remove(server.Id);
+                _metricsStore.Remove(server.Id);
+                if (editorResult.ConnectionResult is not null)
+                {
+                    _connectionStateStore.Set(server.Id, editorResult.ConnectionResult);
+                }
+                else
+                {
+                    _connectionStateStore.Remove(server.Id);
+                }
             }
         }
         catch (Exception exception)
@@ -163,6 +170,7 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
             else
             {
                 _connectionStateStore.Remove(server.Id);
+                _metricsStore.Remove(server.Id);
             }
         }
         catch (Exception exception)
@@ -180,6 +188,8 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
                 server,
                 _connectionStateStore.Get(server.Id),
                 _localizationService,
+                _metricsStore,
+                _connectionStateStore,
                 () => EditServerAsync(server),
                 () => HideServerAsync(server),
                 () => RemoveServerAsync(server)));
@@ -190,7 +200,11 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
 
     private async void OnServersChanged(object? sender, EventArgs args) => await LoadAsync();
 
-    private async void OnConnectionStateChanged(object? sender, Guid serverId) => await LoadAsync();
+    private void OnConnectionStateChanged(object? sender, Guid serverId)
+    {
+        var card = VisibleServers.FirstOrDefault(card => card.Server.Id == serverId);
+        card?.UpdateConnectionState(_connectionStateStore.Get(serverId));
+    }
 
     private void HandleError(Exception exception, string operation)
     {

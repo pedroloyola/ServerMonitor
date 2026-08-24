@@ -133,4 +133,17 @@
   <data name="ConnectionErrorProtocolError" xml:space="preserve"><value>The SSH handshake could not be completed securely.</value></data>
   <data name="ConnectionErrorCancelled" xml:space="preserve"><value>The test was cancelled.</value></data>
   <data name="ConnectionErrorUnexpected" xml:space="preserve"><value>The connection test failed unexpectedly.</value></data>
+  <data name="ServerMetricsWaitingForData.Text" xml:space="preserve"><value>Waiting for data</value></data>
+  <data name="ServerMetricsRefreshingLabel.Text" xml:space="preserve"><value>Refreshing…</value></data>
+  <data name="ServerMetricsRefreshFor" xml:space="preserve"><value>Refresh metrics for {0}</value></data>
+  <data name="ServerMetricsCpuLabel.Text" xml:space="preserve"><value>CPU</value></data>
+  <data name="ServerMetricsMemoryLabel.Text" xml:space="preserve"><value>Memory</value></data>
+  <data name="ServerMetricsDiskLabel.Text" xml:space="preserve"><value>Disk</value></data>
+  <data name="ServerMetricsUptimeLabel.Text" xml:space="preserve"><value>Uptime</value></data>
+  <data name="ServerMetricsDetectedOperatingSystemFormat" xml:space="preserve"><value>Detected OS: {0}</value></data>
+  <data name="ServerMetricsUpdatedAtFormat" xml:space="preserve"><value>Updated {0}</value></data>
+  <data name="ServerMetricsUptimeDaysHoursFormat" xml:space="preserve"><value>{0}d {1}h</value></data>
+  <data name="ServerMetricsUptimeHoursMinutesFormat" xml:space="preserve"><value>{0}h {1}m</value></data>
+  <data name="ServerMetricsUptimeMinutesFormat" xml:space="preserve"><value>{0}m</value></data>
+  <data name="ServerMetricsUpdateFailed" xml:space="preserve"><value>Metrics could not be refreshed.</value></data>
 </root>
