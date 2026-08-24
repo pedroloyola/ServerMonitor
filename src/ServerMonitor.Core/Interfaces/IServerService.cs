@@ -13,6 +13,11 @@ public interface IServerService
         ServerInput input,
         CancellationToken cancellationToken = default);
 
+    Task<ServerOperationResult> AddAsync(
+        Guid id,
+        ServerInput input,
+        CancellationToken cancellationToken = default);
+
     Task<ServerOperationResult> UpdateAsync(
         Guid id,
         ServerInput input,

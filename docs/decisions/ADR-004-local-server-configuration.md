@@ -14,6 +14,8 @@ A UI utiliza `IServerService`; apenas `JsonServerRepository`, na Infrastructure,
 
 ## Limites de segurança
 
-O documento armazena exclusivamente configuração não sensível. Passwords, chaves privadas, tokens, referências de credenciais e fingerprints não fazem parte do modelo nem da serialização.
+O documento armazena exclusivamente configuração não sensível. A partir do Milestone 3 inclui o método de autenticação, caminho opcional da private key e um `CredentialReferenceId` opaco. Passwords, passphrases, conteúdo de chaves, tokens e valores de credenciais nunca fazem parte do modelo ou serialização.
+
+Fingerprints confiadas são configuração de segurança não secreta, guardada separadamente em `%LOCALAPPDATA%\ServerMonitor\known-hosts.json`, conforme a ADR-006.
 
 Uma gravação utiliza ficheiro temporário e substituição após serialização completa. JSON inválido é ignorado com logging para impedir falhas no arranque.

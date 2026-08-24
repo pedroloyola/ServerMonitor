@@ -29,7 +29,7 @@ public sealed partial class MainWindow : Window
         Title = localizationService.GetString("AppWindowTitle");
 
         themeService.Attach(RootLayout);
-        windowContext.Attach(RootLayout);
+        windowContext.Attach(this, RootLayout);
         navigationService.Initialize(ContentFrame);
         ConfigureWindow();
         RootLayout.Loaded += OnRootLayoutLoaded;

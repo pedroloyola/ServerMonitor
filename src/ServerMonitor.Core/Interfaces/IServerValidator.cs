@@ -7,5 +7,7 @@ public interface IServerValidator
 {
     ServerValidationResult Validate(ServerInput input);
 
+    ServerValidationResult ValidateDraft(ServerInput input);
+
     ServerValidationResult Validate(Server server);
 }

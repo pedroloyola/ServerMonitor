@@ -59,7 +59,7 @@
                         Width="7"
                         Height="7"
                         VerticalAlignment="Center"
-                        Background="{ThemeResource StatusUnknownBrush}"
+                        Background="{Binding ConnectionState, Converter={StaticResource ConnectionStateToBrushConverter}}"
                         CornerRadius="4" />
                     <TextBlock
                         VerticalAlignment="Center"

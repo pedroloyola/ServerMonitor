@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Windows.Input;
 using ServerMonitor.App.Services;
+using ServerMonitor.Core.Enums;
 using ServerMonitor.Core.Models;
 
 namespace ServerMonitor.App.ViewModels;
@@ -9,6 +10,7 @@ public sealed class ServerCardViewModel
 {
     public ServerCardViewModel(
         Server server,
+        SshConnectionResult? connectionResult,
         ILocalizationService localizationService,
         Func<Task> edit,
         Func<Task> hide,
@@ -17,7 +19,8 @@ public sealed class ServerCardViewModel
         Server = server;
         OperatingSystemDisplayName = localizationService.GetString(
             $"OperatingSystem{server.OperatingSystem}");
-        ConnectionStateDisplayName = localizationService.GetString("ServerStatusNotConnected");
+        ConnectionState = connectionResult?.State ?? ServerConnectionState.NeverConnected;
+        ConnectionStateDisplayName = localizationService.GetString($"ConnectionState{ConnectionState}");
         MoreOptionsAutomationName = string.Format(
             CultureInfo.CurrentUICulture,
             localizationService.GetString("ServerCardMoreOptionsFor"),
@@ -47,6 +50,8 @@ public sealed class ServerCardViewModel
     public string OperatingSystemDisplayName { get; }
 
     public string ConnectionStateDisplayName { get; }
+
+    public ServerConnectionState ConnectionState { get; }
 
     public string MoreOptionsAutomationName { get; }
 

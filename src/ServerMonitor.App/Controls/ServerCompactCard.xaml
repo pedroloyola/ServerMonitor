@@ -24,7 +24,7 @@
                         Width="6"
                         Height="6"
                         VerticalAlignment="Center"
-                        Background="{ThemeResource StatusUnknownBrush}"
+                        Background="{Binding ConnectionState, Converter={StaticResource ConnectionStateToBrushConverter}}"
                         CornerRadius="3" />
                     <TextBlock
                         Foreground="{ThemeResource TextTertiaryBrush}"

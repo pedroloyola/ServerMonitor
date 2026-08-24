@@ -6,5 +6,7 @@ public interface IWindowContext
 {
     XamlRoot XamlRoot { get; }
 
-    void Attach(FrameworkElement rootElement);
+    nint WindowHandle { get; }
+
+    void Attach(Window window, FrameworkElement rootElement);
 }

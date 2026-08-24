@@ -6,6 +6,10 @@ public enum ServerValidationErrorCode
     HostRequired,
     PortOutOfRange,
     UsernameRequired,
+    AuthenticationMethodRequired,
+    PrivateKeyPathRequired,
+    CredentialReferenceRequired,
+    CredentialReferenceInvalid,
     ServerNotFound
 }
 

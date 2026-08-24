@@ -10,7 +10,9 @@ namespace ServerMonitor.App.ViewModels;
 public sealed class DashboardViewModel : ObservableObject, IDisposable
 {
     private readonly IServerService _serverService;
+    private readonly IServerProfileService _serverProfileService;
     private readonly IServerDialogService _dialogService;
+    private readonly IServerConnectionStateStore _connectionStateStore;
     private readonly ILocalizationService _localizationService;
     private readonly ILogger<DashboardViewModel> _logger;
     private bool _hasVisibleServers;
@@ -18,16 +20,21 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
 
     public DashboardViewModel(
         IServerService serverService,
+        IServerProfileService serverProfileService,
         IServerDialogService dialogService,
+        IServerConnectionStateStore connectionStateStore,
         INavigationService navigationService,
         ILocalizationService localizationService,
         ILogger<DashboardViewModel> logger)
     {
         _serverService = serverService;
+        _serverProfileService = serverProfileService;
         _dialogService = dialogService;
+        _connectionStateStore = connectionStateStore;
         _localizationService = localizationService;
         _logger = logger;
         _serverService.ServersChanged += OnServersChanged;
+        _connectionStateStore.StateChanged += OnConnectionStateChanged;
         AddServerCommand = new AsyncRelayCommand(AddServerAsync);
         OpenSettingsCommand = new RelayCommand(navigationService.GoToSettings);
     }
@@ -63,22 +70,30 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         }
     }
 
-    public void Dispose() => _serverService.ServersChanged -= OnServersChanged;
+    public void Dispose()
+    {
+        _serverService.ServersChanged -= OnServersChanged;
+        _connectionStateStore.StateChanged -= OnConnectionStateChanged;
+    }
 
     private async Task AddServerAsync()
     {
         try
         {
-            var input = await _dialogService.ShowEditorAsync(null);
-            if (input is null)
+            using var editorResult = await _dialogService.ShowEditorAsync(null);
+            if (editorResult is null)
             {
                 return;
             }
 
-            var result = await _serverService.AddAsync(input);
+            var result = await _serverProfileService.AddAsync(editorResult.Profile);
             if (!result.Succeeded)
             {
                 IsOperationErrorOpen = true;
+            }
+            else if (editorResult.ConnectionResult is not null)
+            {
+                _connectionStateStore.Set(result.Server!.Id, editorResult.ConnectionResult);
             }
         }
         catch (Exception exception)
@@ -91,16 +106,24 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
     {
         try
         {
-            var input = await _dialogService.ShowEditorAsync(server);
-            if (input is null)
+            using var editorResult = await _dialogService.ShowEditorAsync(server);
+            if (editorResult is null)
             {
                 return;
             }
 
-            var result = await _serverService.UpdateAsync(server.Id, input);
+            var result = await _serverProfileService.UpdateAsync(server, editorResult.Profile);
             if (!result.Succeeded)
             {
                 IsOperationErrorOpen = true;
+            }
+            else if (editorResult.ConnectionResult is not null)
+            {
+                _connectionStateStore.Set(server.Id, editorResult.ConnectionResult);
+            }
+            else
+            {
+                _connectionStateStore.Remove(server.Id);
             }
         }
         catch (Exception exception)
@@ -133,9 +156,13 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
                 return;
             }
 
-            if (!await _serverService.RemoveAsync(server.Id))
+            if (!await _serverProfileService.RemoveAsync(server))
             {
                 IsOperationErrorOpen = true;
+            }
+            else
+            {
+                _connectionStateStore.Remove(server.Id);
             }
         }
         catch (Exception exception)
@@ -151,6 +178,7 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         {
             VisibleServers.Add(new ServerCardViewModel(
                 server,
+                _connectionStateStore.Get(server.Id),
                 _localizationService,
                 () => EditServerAsync(server),
                 () => HideServerAsync(server),
@@ -162,9 +190,14 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
 
     private async void OnServersChanged(object? sender, EventArgs args) => await LoadAsync();
 
+    private async void OnConnectionStateChanged(object? sender, Guid serverId) => await LoadAsync();
+
     private void HandleError(Exception exception, string operation)
     {
-        _logger.LogError(exception, "Could not {Operation}.", operation);
+        _logger.LogError(
+            "Could not {Operation}. Exception type: {ExceptionType}.",
+            operation,
+            exception.GetType().Name);
         IsOperationErrorOpen = true;
     }
 }

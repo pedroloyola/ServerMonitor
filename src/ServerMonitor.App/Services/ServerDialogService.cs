@@ -8,23 +8,43 @@ namespace ServerMonitor.App.Services;
 
 public sealed class ServerDialogService(
     IWindowContext windowContext,
-    IServerValidator validator) : IServerDialogService
+    IServerValidator validator,
+    ISshConnectionService sshConnectionService,
+    IHostKeyTrustStore hostKeyTrustStore,
+    IServerConnectionStateStore connectionStateStore,
+    IPrivateKeyFilePicker privateKeyFilePicker,
+    ILocalizationService localizationService) : IServerDialogService
 {
-    public async Task<ServerInput?> ShowEditorAsync(Server? server)
+    public async Task<ServerEditorResult?> ShowEditorAsync(Server? server)
     {
-        var viewModel = new ServerEditorViewModel(validator, server);
+        var viewModel = new ServerEditorViewModel(
+            validator,
+            sshConnectionService,
+            hostKeyTrustStore,
+            connectionStateStore,
+            privateKeyFilePicker,
+            localizationService,
+            server);
         if (server is null)
         {
             var dialog = new AddServerDialog(viewModel) { XamlRoot = windowContext.XamlRoot };
-            return await dialog.ShowAsync() == ContentDialogResult.Primary
-                ? dialog.ResultInput
-                : null;
+            if (await dialog.ShowAsync() == ContentDialogResult.Primary)
+            {
+                return dialog.Result;
+            }
+
+            viewModel.Dispose();
+            return null;
         }
 
         var editDialog = new EditServerDialog(viewModel) { XamlRoot = windowContext.XamlRoot };
-        return await editDialog.ShowAsync() == ContentDialogResult.Primary
-            ? editDialog.ResultInput
-            : null;
+        if (await editDialog.ShowAsync() == ContentDialogResult.Primary)
+        {
+            return editDialog.Result;
+        }
+
+        viewModel.Dispose();
+        return null;
     }
 
     public async Task<bool> ConfirmRemoveAsync(Server server)

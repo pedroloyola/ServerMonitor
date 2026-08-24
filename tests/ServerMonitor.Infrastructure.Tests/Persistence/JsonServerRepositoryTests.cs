@@ -25,9 +25,12 @@ public sealed class JsonServerRepositoryTests : IDisposable
 
         Assert.Equal(server, restored);
         Assert.DoesNotContain("password", json, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("privateKey", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("passphrase", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("BEGIN OPENSSH PRIVATE KEY", json, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("token", json, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("credential", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("secret", json, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("privateKeyPath", json, StringComparison.Ordinal);
+        Assert.Contains("credentialReferenceId", json, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -68,6 +71,34 @@ public sealed class JsonServerRepositoryTests : IDisposable
         Assert.Empty(await repository.GetAllAsync());
     }
 
+    [Fact]
+    public async Task GetAllAsync_MigratesMilestone2ConfigurationAsNotConfigured()
+    {
+        var filePath = Path.Combine(_testDirectory, "servers.json");
+        Directory.CreateDirectory(_testDirectory);
+        await File.WriteAllTextAsync(filePath, """
+            [
+              {
+                "id": "de305d54-75b4-431b-adb2-eb6b9e546014",
+                "name": "Legacy server",
+                "host": "legacy.example.test",
+                "port": 22,
+                "username": "monitor",
+                "operatingSystem": 1,
+                "isHidden": false,
+                "createdAt": "2026-01-01T00:00:00+00:00"
+              }
+            ]
+            """);
+        using var repository = CreateRepository(filePath);
+
+        var server = Assert.Single(await repository.GetAllAsync());
+
+        Assert.Equal(AuthenticationMethod.NotConfigured, server.AuthenticationMethod);
+        Assert.Null(server.PrivateKeyPath);
+        Assert.Null(server.CredentialReferenceId);
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_testDirectory))
@@ -89,6 +120,9 @@ public sealed class JsonServerRepositoryTests : IDisposable
         Port = 22,
         Username = "monitor",
         OperatingSystem = ServerOperatingSystem.Linux,
+        AuthenticationMethod = AuthenticationMethod.SshKey,
+        PrivateKeyPath = Path.Combine(Path.GetTempPath(), "id_test"),
+        CredentialReferenceId = Guid.NewGuid(),
         IsHidden = false,
         CreatedAt = DateTimeOffset.UtcNow
     };

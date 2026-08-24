@@ -1,4 +1,4 @@
-# Arquitetura — Milestone 2.5
+# Arquitetura — Milestone 3
 
 ```text
 ServerMonitor.App  ──→ ServerMonitor.Core
@@ -9,9 +9,9 @@ ServerMonitor.Infrastructure ──→ ServerMonitor.Core
 ServerMonitor.Collectors     ──→ ServerMonitor.Core
 ```
 
-`ServerMonitor.App` contém a composição por dependency injection, a shell WinUI 3, Views, ViewModels, diálogos, serviços estritamente relacionados com apresentação, recursos de localização e design tokens. A UI depende de `IServerService` e não acede ao repositório nem ao sistema de ficheiros.
+`ServerMonitor.App` contém a composição por dependency injection, a shell WinUI 3, Views, ViewModels, diálogos, serviços estritamente relacionados com apresentação, recursos de localização e design tokens. A UI depende de contratos do Core e não acede diretamente à persistência, ao Credential Manager nem à biblioteca SSH.
 
-`ServerMonitor.Core` contém o modelo `Server`, validação, contratos e o serviço de gestão. `Infrastructure` implementa apenas a persistência JSON de configuração não sensível. `Collectors` continua sem implementação funcional.
+`ServerMonitor.Core` contém o modelo `Server`, validação, estados de conexão, identidades de host, contratos e os workflows de gestão de perfil. `Infrastructure` implementa persistência JSON não sensível, Windows Credential Manager, host-key trust e o adaptador SSH.NET. `Collectors` continua sem implementação funcional.
 
 ## Decisões do bootstrap
 
@@ -27,22 +27,34 @@ ServerMonitor.Collectors     ──→ ServerMonitor.Core
 
 `DesktopAcrylicKind.Thin` foi avaliado através de `DesktopAcrylicController`. Na combinação validada de Windows 11 e Windows App SDK 2.3.1, a ligação direta do controller causou uma falha nativa durante o arranque; por isso a implementação utiliza o `DesktopAcrylicBackdrop` suportado pela shell. `SystemBackdropElement` também não é aplicado a cada card: repetir backdrops de sistema em superfícies adjacentes aumentaria custo e sobreposição de materiais, enquanto o Acrylic interno já fornece a separação necessária.
 
-## Fluxo de gestão
+## Fluxo de configuração e segredos
 
 ```text
 View / ViewModel
       │
       ▼
-IServerService
-      │ valida, normaliza e gere operações
+IServerProfileService
+      │ coordena configuração e referência opaca
       ▼
-IServerRepository
+IServerService ──────────────→ %LOCALAPPDATA%\ServerMonitor\servers.json
       │
-      ▼
-%LOCALAPPDATA%\ServerMonitor\servers.json
+      └─ IServerCredentialStore → Windows Credential Manager
 ```
 
-O ficheiro contém apenas `Id`, `Name`, `Host`, `Port`, `Username`, `OperatingSystem`, `IsHidden` e `CreatedAt`. O modelo não possui campos para passwords, chaves, tokens ou credenciais.
+O ficheiro contém configuração não sensível: identidade lógica, endpoint, utilizador, OS, método de autenticação, caminho da chave privada e uma referência GUID opaca. Passwords, passphrases e conteúdo de chaves nunca são serializados.
+
+## Fluxo SSH seguro
+
+```text
+ViewModel → ISshConnectionService → probe sem credencial
+                                  ├─ host desconhecido → aprovação explícita
+                                  ├─ mismatch → bloqueio
+                                  └─ host confiado → autenticação → uname -s
+```
+
+`SSH.NET` fica encapsulado em `Infrastructure/SSH`. A primeira ligação não envia a credencial: captura a host key com autenticação `none`, apresenta a fingerprint SHA-256 e só repete a ligação autenticada após confiança explícita. A confiança fica separada em `%LOCALAPPDATA%\ServerMonitor\known-hosts.json`. Estados de conexão são transitórios, tipados e não implicam monitorização periódica.
+
+Detalhes de transporte, política criptográfica e credenciais constam das ADR-006 e ADR-007.
 
 ## Fronteira de apresentação compacta
 

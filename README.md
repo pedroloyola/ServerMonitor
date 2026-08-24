@@ -4,7 +4,7 @@ Server Monitor é uma aplicação desktop WinUI 3 para Windows, concebida como u
 
 ## Estado atual
 
-O repositório contém o **Milestone 2.5 (Visual Foundation & Widget Readiness)** sobre a gestão manual de servidores do Milestone 2:
+O repositório contém o **Milestone 3 (Secure SSH Connection Foundation)** sobre a base visual e a gestão manual dos milestones anteriores:
 
 - solution e separação inicial entre App, Core, Infrastructure e Collectors;
 - shell WinUI 3 com MVVM e dependency injection;
@@ -16,10 +16,16 @@ O repositório contém o **Milestone 2.5 (Visual Foundation & Widget Readiness)*
 - adicionar, editar, ocultar, restaurar e remover servidores;
 - validação dos campos não sensíveis;
 - persistência JSON em `%LOCALAPPDATA%\ServerMonitor\servers.json`;
-- ServerCards sem métricas fictícias e com o estado “Ainda não conectado”.
+- autenticação SSH por password ou chave privada, com passphrase opcional;
+- segredos protegidos pelo Windows Credential Manager;
+- teste explícito de conexão, timeout e cancelamento;
+- confiança de host key por fingerprint SHA-256, sem aceitação automática;
+- bloqueio de host-key mismatch;
+- deteção de Linux/macOS por `uname -s`;
+- ServerCards sem métricas fictícias e com estados de conexão transitórios;
 - apresentações `ServerFullCard` e `ServerCompactCard` sobre o mesmo estado; o modo compacto ainda não está exposto.
 
-Não existem ainda SSH, teste de conexão, descoberta de rede, métricas, credenciais, notificações ou system tray.
+Não existem ainda métricas, monitorização periódica, descoberta de rede, notificações ou system tray.
 
 ## Requisitos
 

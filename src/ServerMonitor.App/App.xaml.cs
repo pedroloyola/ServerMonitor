@@ -8,6 +8,8 @@ using ServerMonitor.App.Views;
 using ServerMonitor.Core.Domain;
 using ServerMonitor.Core.Interfaces;
 using ServerMonitor.Infrastructure.Persistence;
+using ServerMonitor.Infrastructure.Security;
+using ServerMonitor.Infrastructure.SSH;
 
 namespace ServerMonitor.App;
 
@@ -31,12 +33,19 @@ public partial class App : Application
                 services.AddSingleton<IThemeService, ThemeService>();
                 services.AddSingleton<INavigationService, NavigationService>();
                 services.AddSingleton<IWindowContext, WindowContext>();
+                services.AddSingleton<IPrivateKeyFilePicker, PrivateKeyFilePicker>();
+                services.AddSingleton<IServerConnectionStateStore, ServerConnectionStateStore>();
                 services.AddSingleton<IServerDialogService, ServerDialogService>();
 
                 services.AddSingleton(ServerStorageOptions.ForCurrentUser());
+                services.AddSingleton(HostKeyTrustStorageOptions.ForCurrentUser());
                 services.AddSingleton<IServerValidator, ServerValidator>();
                 services.AddSingleton<IServerRepository, JsonServerRepository>();
                 services.AddSingleton<IServerService, ServerService>();
+                services.AddSingleton<IServerCredentialStore, WindowsCredentialStore>();
+                services.AddSingleton<IServerProfileService, ServerProfileService>();
+                services.AddSingleton<IHostKeyTrustStore, JsonHostKeyTrustStore>();
+                services.AddSingleton<ISshConnectionService, SshConnectionService>();
 
                 services.AddSingleton<DashboardViewModel>();
                 services.AddSingleton<SettingsViewModel>();

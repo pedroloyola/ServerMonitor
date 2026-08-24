@@ -28,8 +28,19 @@ public sealed class ServerService(
 
     public async Task<ServerOperationResult> AddAsync(
         ServerInput input,
+        CancellationToken cancellationToken = default) =>
+        await AddAsync(Guid.NewGuid(), input, cancellationToken);
+
+    public async Task<ServerOperationResult> AddAsync(
+        Guid id,
+        ServerInput input,
         CancellationToken cancellationToken = default)
     {
+        if (id == Guid.Empty)
+        {
+            throw new ArgumentException("The server id cannot be empty.", nameof(id));
+        }
+
         var normalized = Normalize(input);
         var validation = validator.Validate(normalized);
         if (!validation.IsValid)
@@ -39,12 +50,15 @@ public sealed class ServerService(
 
         var server = new Server
         {
-            Id = Guid.NewGuid(),
+            Id = id,
             Name = normalized.Name,
             Host = normalized.Host,
             Port = normalized.Port,
             Username = normalized.Username,
             OperatingSystem = normalized.OperatingSystem,
+            AuthenticationMethod = normalized.AuthenticationMethod,
+            PrivateKeyPath = normalized.PrivateKeyPath,
+            CredentialReferenceId = normalized.CredentialReferenceId,
             IsHidden = false,
             CreatedAt = DateTimeOffset.UtcNow
         };
@@ -80,7 +94,10 @@ public sealed class ServerService(
                 Host = normalized.Host,
                 Port = normalized.Port,
                 Username = normalized.Username,
-                OperatingSystem = normalized.OperatingSystem
+                OperatingSystem = normalized.OperatingSystem,
+                AuthenticationMethod = normalized.AuthenticationMethod,
+                PrivateKeyPath = normalized.PrivateKeyPath,
+                CredentialReferenceId = normalized.CredentialReferenceId
             };
 
             var copy = servers.ToList();
@@ -179,7 +196,10 @@ public sealed class ServerService(
         {
             Name = (input.Name ?? string.Empty).Trim(),
             Host = (input.Host ?? string.Empty).Trim(),
-            Username = (input.Username ?? string.Empty).Trim()
+            Username = (input.Username ?? string.Empty).Trim(),
+            PrivateKeyPath = string.IsNullOrWhiteSpace(input.PrivateKeyPath)
+                ? null
+                : Path.GetFullPath(input.PrivateKeyPath.Trim())
         };
     }
 }

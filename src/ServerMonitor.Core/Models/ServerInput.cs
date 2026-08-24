@@ -13,4 +13,10 @@ public sealed record ServerInput
     public string Username { get; init; } = string.Empty;
 
     public ServerOperatingSystem OperatingSystem { get; init; } = ServerOperatingSystem.Auto;
+
+    public AuthenticationMethod AuthenticationMethod { get; init; } = AuthenticationMethod.NotConfigured;
+
+    public string? PrivateKeyPath { get; init; }
+
+    public Guid? CredentialReferenceId { get; init; }
 }

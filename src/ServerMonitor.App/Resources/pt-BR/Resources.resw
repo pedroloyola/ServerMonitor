@@ -40,7 +40,7 @@
   <data name="LanguageEnglishOption.Content" xml:space="preserve"><value>English</value></data>
   <data name="SettingsRestartNotice.Title" xml:space="preserve"><value>Idioma atualizado</value></data>
   <data name="SettingsRestartNotice.Message" xml:space="preserve"><value>Reinicie o aplicativo para aplicar o idioma em toda a interface.</value></data>
-  <data name="SettingsMilestoneCaption.Text" xml:space="preserve"><value>Apenas configurações não sensíveis dos servidores são armazenadas localmente. Nenhuma conexão é realizada.</value></data>
+  <data name="SettingsMilestoneCaption.Text" xml:space="preserve"><value>Apenas configurações não sensíveis são armazenadas localmente. Senhas e passphrases são protegidas pelo Gerenciador de Credenciais do Windows.</value></data>
   <data name="ServerOperationError.Title" xml:space="preserve"><value>Não foi possível concluir a operação</value></data>
   <data name="ServerOperationError.Message" xml:space="preserve"><value>Tente novamente. Seus dados existentes permanecem seguros.</value></data>
   <data name="ServerCardEditMenuItem.Text" xml:space="preserve"><value>Editar</value></data>
@@ -54,8 +54,9 @@
   <data name="OperatingSystemLinux" xml:space="preserve"><value>Linux</value></data>
   <data name="OperatingSystemMacOS" xml:space="preserve"><value>macOS</value></data>
   <data name="OperatingSystemUnknown" xml:space="preserve"><value>Desconhecido</value></data>
+  <data name="ServerFormScrollViewer.AutomationProperties.Name" xml:space="preserve"><value>Configuração do servidor</value></data>
   <data name="ServerFormValidationError.Title" xml:space="preserve"><value>Revise os dados</value></data>
-  <data name="ServerFormValidationError.Message" xml:space="preserve"><value>Nome, host e usuário são obrigatórios. A porta deve estar entre 1 e 65535.</value></data>
+  <data name="ServerFormValidationError.Message" xml:space="preserve"><value>Revise os campos obrigatórios, a porta e a configuração de autenticação SSH.</value></data>
   <data name="ServerFormNameField.Header" xml:space="preserve"><value>Nome</value></data>
   <data name="ServerFormNameField.PlaceholderText" xml:space="preserve"><value>Ex.: Servidor principal</value></data>
   <data name="ServerFormHostField.Header" xml:space="preserve"><value>Host / IP</value></data>
@@ -83,4 +84,58 @@
   <data name="SettingsHiddenServersEmpty.Text" xml:space="preserve"><value>Nenhum servidor oculto.</value></data>
   <data name="HiddenServerRestoreButton.Content" xml:space="preserve"><value>Restaurar</value></data>
   <data name="HiddenServerRestoreFor" xml:space="preserve"><value>Restaurar {0}</value></data>
+  <data name="ServerFormAuthenticationTitle.Text" xml:space="preserve"><value>Autenticação</value></data>
+  <data name="ServerFormAuthenticationMethodField.Header" xml:space="preserve"><value>Método de autenticação</value></data>
+  <data name="AuthenticationSshKeyOption.Content" xml:space="preserve"><value>Chave privada SSH (recomendado)</value></data>
+  <data name="AuthenticationPasswordOption.Content" xml:space="preserve"><value>Senha</value></data>
+  <data name="ServerFormPrivateKeyPathField.Header" xml:space="preserve"><value>Arquivo da chave privada</value></data>
+  <data name="ServerFormPrivateKeyPathField.PlaceholderText" xml:space="preserve"><value>Selecione id_ed25519, id_rsa ou outra chave compatível</value></data>
+  <data name="ServerFormChoosePrivateKeyButton.Content" xml:space="preserve"><value>Escolher arquivo…</value></data>
+  <data name="ServerFormPassphraseField.Header" xml:space="preserve"><value>Passphrase da chave (opcional)</value></data>
+  <data name="ServerFormPassphraseField.PlaceholderText" xml:space="preserve"><value>Não será salva no arquivo de configuração</value></data>
+  <data name="ServerFormSavedPassphraseHint.Text" xml:space="preserve"><value>Existe uma passphrase protegida no Gerenciador de Credenciais. Deixe vazio para mantê-la.</value></data>
+  <data name="ServerFormRemoveSavedPassphrase.Content" xml:space="preserve"><value>Remover a passphrase salva</value></data>
+  <data name="ServerFormPasswordField.Header" xml:space="preserve"><value>Senha SSH</value></data>
+  <data name="ServerFormPasswordField.PlaceholderText" xml:space="preserve"><value>Armazenada com segurança no Windows</value></data>
+  <data name="ServerFormSavedPasswordHint.Text" xml:space="preserve"><value>Existe uma senha protegida no Gerenciador de Credenciais. Digite apenas para substituí-la.</value></data>
+  <data name="ServerFormTestConnectionButton.Content" xml:space="preserve"><value>Testar conexão</value></data>
+  <data name="ServerFormCancelTestButton.Content" xml:space="preserve"><value>Cancelar teste</value></data>
+  <data name="ServerFormConnectionStatus.Title" xml:space="preserve"><value>Teste de conexão</value></data>
+  <data name="HostKeyUnknownTitle.Text" xml:space="preserve"><value>Confirmar identidade do servidor</value></data>
+  <data name="HostKeyUnknownDescription.Text" xml:space="preserve"><value>Esta host key ainda não é conhecida. Compare a fingerprint SHA-256 por um canal independente antes de confiar.</value></data>
+  <data name="HostKeyServerLabel.Text" xml:space="preserve"><value>Servidor</value></data>
+  <data name="HostKeyAlgorithmLabel.Text" xml:space="preserve"><value>Algoritmo</value></data>
+  <data name="HostKeyFingerprintLabel.Text" xml:space="preserve"><value>Fingerprint SHA-256</value></data>
+  <data name="HostKeyTrustAndConnectButton.Content" xml:space="preserve"><value>Confiar e conectar</value></data>
+  <data name="HostKeyCancelButton.Content" xml:space="preserve"><value>Cancelar</value></data>
+  <data name="HostKeyMismatchTitle.Text" xml:space="preserve"><value>A identidade deste servidor mudou</value></data>
+  <data name="HostKeyMismatchDescription.Text" xml:space="preserve"><value>A conexão foi bloqueada. Não continue até confirmar a alteração com o administrador do servidor.</value></data>
+  <data name="HostKeyKnownFingerprintLabel.Text" xml:space="preserve"><value>Fingerprint conhecida</value></data>
+  <data name="HostKeyReceivedFingerprintLabel.Text" xml:space="preserve"><value>Fingerprint recebida</value></data>
+  <data name="ConnectionStateNeverConnected" xml:space="preserve"><value>Ainda não testado</value></data>
+  <data name="ConnectionStateConnecting" xml:space="preserve"><value>Testando conexão…</value></data>
+  <data name="ConnectionStateConnected" xml:space="preserve"><value>Conexão verificada</value></data>
+  <data name="ConnectionStateAuthenticationFailed" xml:space="preserve"><value>Falha de autenticação</value></data>
+  <data name="ConnectionStateHostKeyUnknown" xml:space="preserve"><value>Confirmação de identidade necessária</value></data>
+  <data name="ConnectionStateHostKeyMismatch" xml:space="preserve"><value>Identidade do host alterada</value></data>
+  <data name="ConnectionStateTimedOut" xml:space="preserve"><value>Tempo limite excedido</value></data>
+  <data name="ConnectionStateUnreachable" xml:space="preserve"><value>Servidor inacessível</value></data>
+  <data name="ConnectionStateCancelled" xml:space="preserve"><value>Teste cancelado</value></data>
+  <data name="ConnectionStateError" xml:space="preserve"><value>Erro de conexão</value></data>
+  <data name="ConnectionErrorInvalidConfiguration" xml:space="preserve"><value>Revise a configuração SSH.</value></data>
+  <data name="ConnectionErrorCredentialNotConfigured" xml:space="preserve"><value>Configure uma senha ou passphrase válida.</value></data>
+  <data name="ConnectionErrorCredentialUnavailable" xml:space="preserve"><value>A credencial salva não está disponível. Digite-a novamente.</value></data>
+  <data name="ConnectionErrorPrivateKeyUnavailable" xml:space="preserve"><value>O arquivo da chave privada não foi encontrado.</value></data>
+  <data name="ConnectionErrorPrivateKeyInvalid" xml:space="preserve"><value>A chave privada ou a passphrase não é válida.</value></data>
+  <data name="ConnectionErrorAuthenticationFailed" xml:space="preserve"><value>O servidor recusou a autenticação.</value></data>
+  <data name="ConnectionErrorUnsupportedAlgorithm" xml:space="preserve"><value>O servidor oferece apenas algoritmos SSH não permitidos.</value></data>
+  <data name="ConnectionErrorDnsResolutionFailed" xml:space="preserve"><value>Não foi possível resolver o nome do servidor.</value></data>
+  <data name="ConnectionErrorConnectionRefused" xml:space="preserve"><value>O servidor recusou a conexão SSH.</value></data>
+  <data name="ConnectionErrorHostUnreachable" xml:space="preserve"><value>O servidor não está acessível pela rede.</value></data>
+  <data name="ConnectionErrorNetworkUnavailable" xml:space="preserve"><value>A rede não está disponível.</value></data>
+  <data name="ConnectionErrorConnectionTimedOut" xml:space="preserve"><value>A conexão excedeu o tempo limite.</value></data>
+  <data name="ConnectionErrorRemoteDisconnected" xml:space="preserve"><value>O servidor encerrou a conexão.</value></data>
+  <data name="ConnectionErrorProtocolError" xml:space="preserve"><value>O handshake SSH não pôde ser concluído com segurança.</value></data>
+  <data name="ConnectionErrorCancelled" xml:space="preserve"><value>O teste foi cancelado.</value></data>
+  <data name="ConnectionErrorUnexpected" xml:space="preserve"><value>O teste de conexão falhou inesperadamente.</value></data>
 </root>

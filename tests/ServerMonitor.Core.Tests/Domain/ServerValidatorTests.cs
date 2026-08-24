@@ -50,6 +50,8 @@ public sealed class ServerValidatorTests
         Host = "host.example.test",
         Port = 22,
         Username = "monitor",
-        OperatingSystem = ServerOperatingSystem.Auto
+        OperatingSystem = ServerOperatingSystem.Auto,
+        AuthenticationMethod = AuthenticationMethod.SshKey,
+        PrivateKeyPath = Path.Combine(Path.GetTempPath(), "id_test")
     };
 }

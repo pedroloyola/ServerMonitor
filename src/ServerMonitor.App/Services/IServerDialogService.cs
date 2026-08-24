@@ -1,10 +1,11 @@
 using ServerMonitor.Core.Models;
+using ServerMonitor.App.ViewModels;
 
 namespace ServerMonitor.App.Services;
 
 public interface IServerDialogService
 {
-    Task<ServerInput?> ShowEditorAsync(Server? server);
+    Task<ServerEditorResult?> ShowEditorAsync(Server? server);
 
     Task<bool> ConfirmRemoveAsync(Server server);
 }
