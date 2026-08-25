@@ -12,6 +12,9 @@ public sealed class ServerMonitoringStateStore : IServerMonitoringStateStore
     public ServerMonitoringState Get(Guid serverId) =>
         _states.TryGetValue(serverId, out var state) ? state : ServerMonitoringState.Initial(serverId);
 
+    public bool TryGet(Guid serverId, out ServerMonitoringState state) =>
+        _states.TryGetValue(serverId, out state!);
+
     public IReadOnlyCollection<ServerMonitoringState> GetAll() => _states.Values.ToArray();
 
     public void Set(ServerMonitoringState state)

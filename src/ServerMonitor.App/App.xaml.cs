@@ -46,6 +46,25 @@ public partial class App : Application
                     () => ServicesHost,
                     sp.GetRequiredService<ILogger<AppShutdownCoordinator>>()));
 
+                // M8 application-shell services. All Windows-specific behavior stays behind
+                // fakeable boundaries; alert policy observes M6 but never performs SSH itself.
+                services.AddSingleton(NotificationSettingsStorageOptions.ForCurrentUser());
+                services.AddSingleton<INotificationSettingsService, JsonNotificationSettingsService>();
+                services.AddSingleton<ApplicationWindowController>();
+                services.AddSingleton<IApplicationWindowController>(sp =>
+                    sp.GetRequiredService<ApplicationWindowController>());
+                services.AddSingleton<RefreshAllCoordinator>();
+                services.AddSingleton<IRefreshAllCoordinator>(sp =>
+                    sp.GetRequiredService<RefreshAllCoordinator>());
+                services.AddSingleton<ITrayIconAdapter, WinUIExTrayIconAdapter>();
+                services.AddSingleton<TrayService>();
+                services.AddSingleton<WindowsAppNotificationService>();
+                services.AddSingleton<IUserNotificationService>(sp =>
+                    sp.GetRequiredService<WindowsAppNotificationService>());
+                services.AddSingleton<ServerAlertCoordinator>();
+                services.AddSingleton<IServerAlertCoordinator>(sp =>
+                    sp.GetRequiredService<ServerAlertCoordinator>());
+
                 services.AddSingleton(ServerStorageOptions.ForCurrentUser());
                 services.AddSingleton(HostKeyTrustStorageOptions.ForCurrentUser());
                 services.AddSingleton<IServerValidator, ServerValidator>();
@@ -70,7 +89,8 @@ public partial class App : Application
 #if DEBUG
                 var qaHealth = Qa.QaHealthComposition.IsRequested();
                 var qaDiscovery = Qa.QaDiscoveryComposition.IsRequested();
-                var qaMode = qaHealth || qaDiscovery;
+                var qaNotifications = Qa.QaNotificationComposition.IsRequested();
+                var qaMode = qaHealth || qaDiscovery || qaNotifications;
 #else
                 const bool qaMode = false;
 #endif
@@ -83,7 +103,6 @@ public partial class App : Application
                         sp.GetRequiredService<IServerMonitoringStateStore>(),
                         sp.GetRequiredService<ILogger<MonitoringEngine>>()));
                     services.AddSingleton<IMonitoringEngine>(sp => sp.GetRequiredService<MonitoringEngine>());
-                    services.AddHostedService(sp => sp.GetRequiredService<MonitoringEngine>());
 
                     // Passive local network discovery (mDNS/DNS-SD, _ssh._tcp only). One instance
                     // backs the IServerDiscoveryService facade and the hosted-service lifecycle.
@@ -100,16 +119,41 @@ public partial class App : Application
                         sp.GetRequiredService<IIgnoredDeviceStore>(),
                         sp.GetRequiredService<ILogger<ServerDiscoveryService>>()));
                     services.AddSingleton<IServerDiscoveryService>(sp => sp.GetRequiredService<ServerDiscoveryService>());
-                    services.AddHostedService(sp => sp.GetRequiredService<ServerDiscoveryService>());
                 }
 #if DEBUG
                 else if (qaHealth)
                 {
                     Qa.QaHealthComposition.Apply(services);
                 }
+                else if (qaNotifications)
+                {
+                    Qa.QaNotificationComposition.Apply(services);
+                }
                 else
                 {
                     Qa.QaDiscoveryComposition.Apply(services);
+                }
+#endif
+
+                // Hosted-service order is deliberate. The alert observer is live before M6 can
+                // publish its first state; reverse shutdown stops M7/M6 before alert delivery and
+                // notification registration. Tray is stopped last, with an earlier UI-thread
+                // cleanup from MainWindow.Closed for the normal Exit path.
+                services.AddHostedService(sp => sp.GetRequiredService<TrayService>());
+                services.AddHostedService(sp => sp.GetRequiredService<WindowsAppNotificationService>());
+                services.AddHostedService(sp => sp.GetRequiredService<ServerAlertCoordinator>());
+                if (!qaMode)
+                {
+                    services.AddHostedService(sp => sp.GetRequiredService<MonitoringEngine>());
+                    services.AddHostedService(sp => sp.GetRequiredService<ServerDiscoveryService>());
+                }
+#if DEBUG
+                else if (qaNotifications)
+                {
+                    // Registered last so the real alert coordinator has already captured the
+                    // in-memory Healthy baseline before the deterministic sequence begins.
+                    services.AddHostedService(sp =>
+                        sp.GetRequiredService<Qa.QaNotificationSequenceService>());
                 }
 #endif
 
@@ -133,9 +177,11 @@ public partial class App : Application
     {
         try
         {
-            await ServicesHost.StartAsync();
-
+            // The tray hosted service is UI-thread-bound and the alert activation path must
+            // restore this exact window. Attach it before starting the host, but activate it
+            // only after every lifecycle participant has started successfully.
             _mainWindow = ServicesHost.Services.GetRequiredService<MainWindow>();
+            await ServicesHost.StartAsync();
             _mainWindow.Activate();
 
             ServicesHost.Services
@@ -147,6 +193,17 @@ public partial class App : Application
             ServicesHost.Services
                 .GetRequiredService<ILogger<App>>()
                 .LogCritical(exception, "Server Monitor could not start.");
+            try
+            {
+                ServicesHost.Services.GetRequiredService<TrayService>().PrepareForShutdown();
+                ServicesHost.Services.GetRequiredService<AppShutdownCoordinator>().Shutdown();
+            }
+            catch (Exception shutdownException)
+            {
+                ServicesHost.Services
+                    .GetRequiredService<ILogger<App>>()
+                    .LogError(shutdownException, "Server Monitor startup cleanup failed.");
+            }
             Exit();
         }
     }

@@ -13,6 +13,12 @@ public interface IServerMonitoringStateStore
 
     ServerMonitoringState Get(Guid serverId);
 
+    /// <summary>
+    /// Reads only an explicitly stored state. Unlike <see cref="Get"/>, removal events do
+    /// not become synthetic Unknown observations for transition consumers.
+    /// </summary>
+    bool TryGet(Guid serverId, out ServerMonitoringState state);
+
     IReadOnlyCollection<ServerMonitoringState> GetAll();
 
     void Set(ServerMonitoringState state);

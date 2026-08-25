@@ -1,4 +1,4 @@
-# Arquitetura — Milestone 7
+# Arquitetura — Milestone 8
 
 ```text
 ServerMonitor.App  ──→ ServerMonitor.Core
@@ -115,6 +115,30 @@ O browser `Tmds.MDns` está encapsulado em `Infrastructure` e observa apenas `_s
 Ignorar persiste apenas o hash SHA-256 da identidade provisória DNS-SD em `%LOCALAPPDATA%\ServerMonitor\ignored-devices.json`, separado de `servers.json` e do host-trust. A identidade mDNS serve somente para dedup/UX; após Adicionar, a host-key SSH continua a ser a identidade de confiança. Discovery nunca lê credenciais, inicia SSH, aceita host keys, grava fingerprints ou chama o motor M6. Um servidor guardado é monitorizado apenas pelo reconcile normal de `ServersChanged`.
 
 A descoberta está limitada ao segmento onde multicast é visível; não promete atravessar routers ou VPNs. Linux só aparece se publicar o serviço, por exemplo através de Avahi. Scanning ativo fica deferido para M7.1/futuro. Decisões, limites de input/flood e alternativas Windows constam da ADR-012.
+
+## Shell discreta e alertas locais (Milestone 8)
+
+```text
+AppWindow ──minimize──→ TrayService ──→ WinUIExTrayIconAdapter ──→ Shell_NotifyIcon
+   ▲                         │
+   └──── mesma janela ───────┼── Open / Settings / Exit
+                             └── Refresh All → IMonitoringEngine
+
+IServerMonitoringStateStore → ServerAlertCoordinator → IUserNotificationService
+              baseline + policy + cooldown             → AppNotificationManager
+```
+
+`TrayService` coordena apenas comandos da shell. Existe um único `TrayIcon`, com cleanup explícito e re-registo após `TaskbarCreated` fornecido pelo WinUIEx. Minimizar oculta a janela dos switchers sem recriar a `MainWindow`; Open restaura e ativa essa mesma instância. X/Alt+F4 e Exit seguem o `AppShutdownCoordinator` existente. Em shutdown, o tray é removido na UI thread antes de o host parar, e Discovery, Monitoring, alertas e notifications são drenados na ordem inversa de startup.
+
+`RefreshAllCoordinator` enumera somente servidores configurados — incluindo hidden — e chama `IMonitoringEngine.RefreshNowAsync`. Não executa SSH, não inclui discovery-only e não contorna o limite global nem o single-flight do M6. Chamadas globais simultâneas partilham o mesmo batch e uma falha não cancela os restantes servidores.
+
+`ServerAlertCoordinator` observa o store transitório do M6. A primeira observação por servidor estabelece baseline silencioso; estados repetidos e `Unknown` não notificam. Transições para Warning, Critical e Offline, e recuperações para online/Healthy, seguem a policy da ADR-013. Cooldown de cinco minutos é aplicado à mesma categoria por servidor através de `TimeProvider`, sem bloquear escalations para Critical ou Offline. Hidden não significa mute; discovery nunca produz alertas.
+
+`IUserNotificationService` isola a policy da API Windows. A implementação usa `AppNotificationManager`, regista antes de mostrar e remove o registo no shutdown. O build unpackaged/self-contained extrai do package Runtime 2.3.1 o resource DLL de versão idêntica exigido por `Register`; a ausência do payload falha o build, em vez de produzir uma app silenciosamente sem notificações. `IsSupported()`, falhas de registo e o estado do sistema são tratados como capability gates: processo elevado, indisponibilidade, Focus Assist/Do Not Disturb ou policy resultam em no-op/log, não em falha da monitorização. O conteúdo contém apenas título localizado e display name sanitizado — nunca endpoint, credenciais, fingerprint, paths ou erro SSH. Click, quando entregue pelo Windows, restaura a janela existente.
+
+`NotificationsEnabled` é persistido separadamente em `%LOCALAPPDATA%\ServerMonitor\notification-settings.json`, com `true` como default compatível. Desativar continua a avançar o baseline; reativar não reproduz estados passados.
+
+Decisões de dependency, lifetime, semântica de janela, anti-spam e limitações unpackaged constam da ADR-013.
 
 ## Fronteira de apresentação compacta
 

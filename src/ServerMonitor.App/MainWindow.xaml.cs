@@ -11,6 +11,8 @@ public sealed partial class MainWindow : Window
 {
     private readonly INavigationService _navigationService;
     private readonly AppShutdownCoordinator _shutdownCoordinator;
+    private readonly IApplicationWindowController _windowController;
+    private readonly TrayService _trayService;
     private readonly ILogger<MainWindow> _logger;
     private bool _isEnforcingMinimumSize;
 
@@ -22,17 +24,22 @@ public sealed partial class MainWindow : Window
         IThemeService themeService,
         IWindowContext windowContext,
         ILocalizationService localizationService,
+        IApplicationWindowController windowController,
+        TrayService trayService,
         AppShutdownCoordinator shutdownCoordinator,
         ILogger<MainWindow> logger)
     {
         InitializeComponent();
         _navigationService = navigationService;
+        _windowController = windowController;
+        _trayService = trayService;
         _shutdownCoordinator = shutdownCoordinator;
         _logger = logger;
         Title = localizationService.GetString("AppWindowTitle");
 
         themeService.Attach(RootLayout);
         windowContext.Attach(this, RootLayout, ModalOverlayHost);
+        windowController.Attach(this);
         navigationService.Initialize(ContentFrame);
         ConfigureWindow();
         RootLayout.Loaded += OnRootLayoutLoaded;
@@ -82,6 +89,14 @@ public sealed partial class MainWindow : Window
 
     private void OnAppWindowChanged(AppWindow sender, AppWindowChangedEventArgs args)
     {
+        if (args.DidPresenterChange &&
+            sender.Presenter is OverlappedPresenter presenter &&
+            presenter.State == OverlappedPresenterState.Minimized)
+        {
+            _trayService.HandleWindowMinimized();
+            return;
+        }
+
         if (!args.DidSizeChange || _isEnforcingMinimumSize)
         {
             return;
@@ -102,6 +117,10 @@ public sealed partial class MainWindow : Window
 
     private void OnWindowClosed(object sender, WindowEventArgs args)
     {
+        // WinUI's Closed event is synchronous. Remove the UI-thread-owned tray icon before
+        // the authoritative coordinator waits for hosted-service shutdown off-thread.
+        _windowController.BeginShutdown();
+        _trayService.PrepareForShutdown();
         AppWindow.Changed -= OnAppWindowChanged;
         RootLayout.ActualThemeChanged -= OnActualThemeChanged;
         Closed -= OnWindowClosed;

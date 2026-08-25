@@ -237,6 +237,56 @@ public sealed class MonitoringEngineTests
     }
 
     [Fact]
+    public async Task ManualRefresh_DuringScheduledCollection_JoinsItWithoutImmediateDuplicate()
+    {
+        var server = TestData.LinuxServer(refreshIntervalSeconds: 10);
+        var service = new FakeServerService();
+        service.Servers.Add(server);
+        var store = new ScriptedMetricsStore();
+        var state = new ServerMonitoringStateStore();
+        var time = new SignalingTimeProvider(TimeSpan.FromSeconds(10));
+        using var collecting = new SemaphoreSlim(0);
+        using var release = new SemaphoreSlim(0);
+        store.ResultFactory = (current, index) =>
+        {
+            if (index == 0)
+            {
+                collecting.Release();
+                release.Wait(TestTimeout);
+            }
+
+            return TestData.Success(TestData.Snapshot(current.Id, cpu: 5));
+        };
+        var options = new MonitoringOptions
+        {
+            InitialDelay = TimeSpan.Zero,
+            StartupStagger = TimeSpan.Zero,
+            AttentionInterval = TimeSpan.FromSeconds(10),
+            RetryDelays = []
+        };
+        await using var engine = new MonitoringEngine(
+            service, store, state, NullLogger<MonitoringEngine>.Instance, time, options);
+        await engine.StartMonitoringAsync();
+        Assert.True(await collecting.WaitAsync(TimeSpan.FromSeconds(10)));
+
+        // The scheduled cycle is already inside the collector. Manual refresh must join this
+        // single flight and must not leave its wake signal armed for a second immediate cycle.
+        var manual = engine.RefreshNowAsync(server.Id, TestTimeout);
+        release.Release();
+
+        Assert.True((await manual).IsSuccess);
+        await time.ExpectedDelayScheduled.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal(1, store.CallCount);
+
+        time.Advance(TimeSpan.FromSeconds(9));
+        Assert.Equal(1, store.CallCount);
+
+        time.Advance(TimeSpan.FromSeconds(1));
+        await WaitUntilAsync(() => store.CallCount == 2);
+        Assert.Equal(2, store.CallCount);
+    }
+
+    [Fact]
     public async Task LongClockJump_ProducesAtMostOneCatchUpCycle()
     {
         // Simulates system sleep/resume: the scheduler uses a single one-shot delay per cycle
@@ -266,6 +316,35 @@ public sealed class MonitoringEngineTests
         await h.Engine.StopMonitoringAsync();
 
         await h.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task StopDuringScheduledRefresh_CancelsAndDrainsCollection()
+    {
+        var server = TestData.LinuxServer();
+        var service = new FakeServerService();
+        service.Servers.Add(server);
+        var store = new CancellationAwareMetricsStore();
+        var engine = new MonitoringEngine(
+            service,
+            store,
+            new ServerMonitoringStateStore(),
+            NullLogger<MonitoringEngine>.Instance,
+            TimeProvider.System,
+            new MonitoringOptions
+            {
+                InitialDelay = TimeSpan.Zero,
+                StartupStagger = TimeSpan.Zero,
+                AttentionInterval = TimeSpan.FromHours(1),
+                RetryDelays = []
+            });
+        await using var lifetime = engine;
+        await engine.StartMonitoringAsync();
+        await store.Entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        await engine.StopMonitoringAsync().WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.True(store.Cancelled.Task.IsCompletedSuccessfully);
     }
 
     [Fact]
@@ -339,5 +418,67 @@ public sealed class MonitoringEngineTests
         FakeTimeProvider Time) : IAsyncDisposable
     {
         public ValueTask DisposeAsync() => Engine.DisposeAsync();
+    }
+
+    private sealed class SignalingTimeProvider(TimeSpan expectedDelay) : TimeProvider
+    {
+        private readonly FakeTimeProvider _inner = new();
+
+        public TaskCompletionSource ExpectedDelayScheduled { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public override DateTimeOffset GetUtcNow() => _inner.GetUtcNow();
+
+        public override TimeZoneInfo LocalTimeZone => _inner.LocalTimeZone;
+
+        public override long TimestampFrequency => _inner.TimestampFrequency;
+
+        public override long GetTimestamp() => _inner.GetTimestamp();
+
+        public override ITimer CreateTimer(
+            TimerCallback callback,
+            object? state,
+            TimeSpan dueTime,
+            TimeSpan period)
+        {
+            if (dueTime == expectedDelay)
+            {
+                ExpectedDelayScheduled.TrySetResult();
+            }
+
+            return _inner.CreateTimer(callback, state, dueTime, period);
+        }
+
+        public void Advance(TimeSpan delta) => _inner.Advance(delta);
+    }
+
+    private sealed class CancellationAwareMetricsStore : IServerMetricsStore
+    {
+        public TaskCompletionSource Entered { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource Cancelled { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public ServerMetricsSnapshot? GetLastSnapshot(Guid serverId) => null;
+
+        public async Task<ServerMetricsCollectionResult> RefreshAsync(
+            Server server,
+            CancellationToken cancellationToken = default)
+        {
+            Entered.TrySetResult();
+            try
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                throw new InvalidOperationException("The scheduled collection should be cancelled.");
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                Cancelled.TrySetResult();
+                throw;
+            }
+        }
+
+        public void Remove(Guid serverId) { }
     }
 }

@@ -21,6 +21,37 @@
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.0" />
     <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0" />
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.3.1" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.Runtime" Version="2.3.1" GeneratePathProperty="true" />
+    <PackageReference Include="WinUIEx" Version="2.9.3" />
+  </ItemGroup>
+
+  <!--
+    Windows App SDK 2.3.1's self-contained component payload omits the Insights
+    resource DLL required by AppNotificationManager.Register. Extract exactly the
+    matching redistributable from the already-resolved Runtime package so the
+    unpackaged application remains genuinely self-contained.
+  -->
+  <Target Name="StageWindowsAppRuntimeNotificationResource" BeforeTargets="CopyFilesToOutputDirectory">
+    <PropertyGroup>
+      <WindowsAppRuntimeMsix>$(PkgMicrosoft_WindowsAppSDK_Runtime)\tools\MSIX\win10-x64\Microsoft.WindowsAppRuntime.2.msix</WindowsAppRuntimeMsix>
+      <WindowsAppRuntimeNotificationStage>$(IntermediateOutputPath)WindowsAppRuntimeNotification\</WindowsAppRuntimeNotificationStage>
+    </PropertyGroup>
+    <Error Condition="!Exists('$(WindowsAppRuntimeMsix)')"
+           Text="The Windows App SDK Runtime payload required for local notifications was not found." />
+    <Unzip SourceFiles="$(WindowsAppRuntimeMsix)"
+           DestinationFolder="$(WindowsAppRuntimeNotificationStage)"
+           Include="Microsoft.WindowsAppRuntime.Insights.Resource.dll"
+           SkipUnchangedFiles="true" />
+    <Copy SourceFiles="$(WindowsAppRuntimeNotificationStage)Microsoft.WindowsAppRuntime.Insights.Resource.dll"
+          DestinationFolder="$(OutDir)"
+          SkipUnchangedFiles="true" />
+    <Error Condition="!Exists('$(OutDir)Microsoft.WindowsAppRuntime.Insights.Resource.dll')"
+           Text="The Windows App SDK notification resource was not staged into the application output." />
+  </Target>
+
+  <ItemGroup>
+    <Content Include="Assets\ServerMonitorTray.svg" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\ServerMonitorNotification.png" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <!-- QA visual health harness is Debug-only. It must never ship in a Release build. -->

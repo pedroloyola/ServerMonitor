@@ -31,6 +31,17 @@ internal sealed class FakeLocalizationService : ILocalizationService
             ["ServerMetricsStaleMinutesFormat"] = "Last updated {0} min ago",
             ["ServerMetricsStaleHoursFormat"] = "Last updated {0} h ago",
             ["ServerMetricsStaleDaysFormat"] = "Last updated {0} d ago",
+            ["NotificationServerFallbackName"] = "Server",
+            ["NotificationWarningTitle"] = "Attention",
+            ["NotificationWarningBodyFormat"] = "{0} entered a warning state.",
+            ["NotificationCriticalTitle"] = "Critical server",
+            ["NotificationCriticalBodyFormat"] = "{0} entered a critical state.",
+            ["NotificationOfflineTitle"] = "Server offline",
+            ["NotificationOfflineBodyFormat"] = "{0} is not responding.",
+            ["NotificationRecoveryTitle"] = "Server recovered",
+            ["NotificationRecoveryOnlineBodyFormat"] = "{0} is back online.",
+            ["NotificationHealthyTitle"] = "Server healthy",
+            ["NotificationHealthyBodyFormat"] = "{0} returned to a healthy state.",
         };
 
     public string? CurrentLanguageOverride => null;

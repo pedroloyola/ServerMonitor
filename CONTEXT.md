@@ -1166,7 +1166,7 @@ Comportamento esperado:
 
 ```text
 Left click
-→ abrir/ocultar aplicação
+→ abrir/restaurar aplicação
 
 Right click
 → Open
@@ -1175,31 +1175,28 @@ Right click
 → Exit
 ```
 
-Fechar a janela pode, por defeito, minimizar para tray em vez de terminar o processo.
-
-Isto deve ser configurável posteriormente.
+No M8, minimizar oculta a janela para o tray e mantém monitoring/discovery ativos. Fechar por X,
+Alt+F4 ou Exit encerra normalmente através do pipeline de shutdown existente. Close-to-tray e
+arranque com o Windows permanecem explicitamente fora do M8.
 
 ---
 
 # 39. Notificações
 
-MVP:
+O M8 notifica transições reais para Warning, Critical e Offline, bem como recuperação para
+online/Healthy. A primeira observação estabelece baseline silencioso, incluindo quando a app
+abre e o servidor já está degradado.
 
-notificar quando:
+Exemplo:
 
 ```text
 Server Online → Offline
 ```
 
-Opcionalmente:
-
-```text
-Server Offline → Online
-```
-
-Evitar repetir notificações em cada ciclo de polling.
-
-Implementar deduplicação baseada em mudança de estado.
+Estados repetidos não notificam. A mesma categoria por servidor usa cooldown de cinco minutos;
+Critical e Offline continuam a poder escalar imediatamente. Hidden continua a alertar e
+discovery nunca alerta. O conteúdo exclui endpoints, credenciais, trust e erros SSH. Existe um
+toggle global persistente; reativar não reproduz estados atuais ou históricos.
 
 ---
 

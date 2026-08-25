@@ -95,6 +95,35 @@
 
                     <Border Height="1" Background="{ThemeResource GlassBorderBrush}" />
 
+                    <!-- Health Notifications Section -->
+                    <StackPanel Spacing="10">
+                        <StackPanel Spacing="2">
+                            <TextBlock
+                                x:Uid="SettingsNotificationsTitle"
+                                AutomationProperties.HeadingLevel="Level2"
+                                Style="{StaticResource SectionTitleTextStyle}" />
+                            <TextBlock
+                                x:Uid="SettingsNotificationsDescription"
+                                FontSize="12"
+                                Foreground="{ThemeResource TextSecondaryBrush}"
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+
+                        <ToggleSwitch
+                            x:Uid="SettingsNotificationsToggle"
+                            HorizontalAlignment="Left"
+                            MinHeight="36"
+                            IsOn="{Binding NotificationsEnabled, Mode=TwoWay}" />
+
+                        <InfoBar
+                            x:Uid="SettingsNotificationsSaveError"
+                            IsClosable="True"
+                            IsOpen="{Binding IsNotificationSettingsErrorOpen, Mode=TwoWay}"
+                            Severity="Error" />
+                    </StackPanel>
+
+                    <Border Height="1" Background="{ThemeResource GlassBorderBrush}" />
+
                     <!-- Hidden Servers Section -->
                     <StackPanel Spacing="10">
                         <StackPanel Spacing="2">

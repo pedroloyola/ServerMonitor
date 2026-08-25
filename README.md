@@ -4,7 +4,7 @@ Server Monitor é uma aplicação desktop WinUI 3 para Windows, concebida como u
 
 ## Estado atual
 
-O repositório contém o **Milestone 7 (Network Discovery)**, construído sobre a fundação SSH segura do M3, os collectors Linux/macOS do M4 e o motor de monitorização automática do M6:
+O repositório contém o **Milestone 8 (System Tray + Notifications)**, construído sobre a fundação SSH segura do M3, os collectors Linux/macOS do M4, o motor de monitorização automática do M6 e a descoberta passiva do M7:
 
 - solution e separação inicial entre App, Core, Infrastructure e Collectors;
 - shell WinUI 3 com MVVM e dependency injection;
@@ -29,10 +29,17 @@ O repositório contém o **Milestone 7 (Network Discovery)**, construído sobre 
 - sugestões de rede separadas dos servidores configurados, com ações Adicionar e Ignorar;
 - persistência não sensível de dispositivos ignorados e reset nas Configurações;
 - Adicionar a partir da descoberta reutiliza integralmente o fluxo M3 de credenciais, teste, host-key probe e confiança explícita;
+- ícone único na área de notificação, com Abrir, Atualizar todos, Configurações e Sair;
+- minimizar oculta a janela e mantém monitoring/discovery ativos; fechar com X ou Alt+F4 encerra normalmente;
+- Refresh All inclui servidores configurados hidden e reutiliza os limites/single-flight do M6;
+- notificações locais por transições reais de saúde, sem alerta no primeiro estado observado;
+- deduplicação e cooldown de cinco minutos por servidor/categoria, sem bloquear escalations;
+- opção global persistente para notificações, ativa por omissão e sem replay ao reativar;
+- nomes apresentados nas notificações são limitados e sanitizados; endpoint, credenciais, trust e erros SSH não são incluídos;
 - ServerCards sem métricas fictícias e com estados de conexão e monitorização transitórios;
 - apresentações `ServerFullCard` e `ServerCompactCard` sobre o mesmo estado; o modo compacto ainda não está exposto.
 
-A descoberta mDNS é local ao segmento de rede visível. Linux pode necessitar de um anúncio compatível, como Avahi; VPNs e descoberta ativa de subnet não fazem parte do M7. Notificações, system tray e arranque com o Windows continuam fora do âmbito atual.
+A descoberta mDNS é local ao segmento de rede visível. Linux pode necessitar de um anúncio compatível, como Avahi; VPNs e descoberta ativa de subnet não fazem parte do M7. Discovery não gera notificações. A aplicação só permanece ativa enquanto o processo estiver em execução: arranque com o Windows, Windows Service e execução após Exit continuam fora do âmbito atual. O Windows pode bloquear ou silenciar banners através das suas definições, Focus Assist/Do Not Disturb ou políticas; isso degrada sem crashar a aplicação.
 
 ## Requisitos
 

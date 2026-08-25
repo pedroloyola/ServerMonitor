@@ -160,7 +160,6 @@ public sealed class MonitoringEngine : IMonitoringEngine, IHostedService, IAsync
         {
             // Route through the loop so the manual request and any concurrent scheduled
             // cycle converge on a single collection, and the interval restarts from now.
-            monitor.SignalWake();
             using var registration = cancellationToken.Register(
                 static state => ((TaskCompletionSource<ServerMetricsCollectionResult>)state!).TrySetCanceled(),
                 request);
@@ -221,15 +220,8 @@ public sealed class MonitoringEngine : IMonitoringEngine, IHostedService, IAsync
         {
             if (_monitors.TryGetValue(server.Id, out var existing))
             {
-                if (RequiresRecollection(existing.Server, server))
-                {
-                    existing.Server = server;
-                    existing.SignalWake(); // pick up new endpoint/auth/interval promptly
-                }
-                else
-                {
-                    existing.Server = server; // harmless changes (e.g. IsHidden) still tracked
-                }
+                var requiresRecollection = RequiresRecollection(existing.GetServer(), server);
+                existing.UpdateServer(server, requiresRecollection);
 
                 continue;
             }
@@ -262,8 +254,21 @@ public sealed class MonitoringEngine : IMonitoringEngine, IHostedService, IAsync
             await DelayOrWakeAsync(monitor, monitor.InitialDelay, token).ConfigureAwait(false);
             while (!token.IsCancellationRequested)
             {
-                var result = await CollectAndApplyAsync(monitor.Server, monitor, token).ConfigureAwait(false);
-                monitor.CompleteManual(result);
+                // BeginCollection atomically consumes the wake that selected this cycle and marks
+                // it in-flight. Manual requests arriving from this point until completion join
+                // this exact collection without leaving a stale wake for an immediate duplicate.
+                var server = monitor.BeginCollection();
+                try
+                {
+                    var result = await CollectAndApplyAsync(server, monitor, token).ConfigureAwait(false);
+                    monitor.CompleteCollection(result);
+                }
+                catch
+                {
+                    monitor.CompleteCollection(
+                        ServerMetricsCollectionResult.Failure(MetricsCollectionErrorCode.Cancelled));
+                    throw;
+                }
 
                 var interval = NextInterval(monitor);
                 await DelayOrWakeAsync(monitor, interval, token).ConfigureAwait(false);
@@ -277,18 +282,18 @@ public sealed class MonitoringEngine : IMonitoringEngine, IHostedService, IAsync
         {
             _logger.LogError(
                 "Monitoring loop for {ServerId} ended unexpectedly. Exception type: {Type}.",
-                monitor.Server.Id,
+                monitor.GetServer().Id,
                 exception.GetType().Name);
         }
         finally
         {
-            monitor.CompleteManual(ServerMetricsCollectionResult.Failure(MetricsCollectionErrorCode.Cancelled));
+            monitor.CompleteCollection(ServerMetricsCollectionResult.Failure(MetricsCollectionErrorCode.Cancelled));
         }
     }
 
     private TimeSpan NextInterval(ServerMonitor monitor)
     {
-        var interval = RefreshIntervalPolicy.ToInterval(monitor.Server.RefreshIntervalSeconds);
+        var interval = RefreshIntervalPolicy.ToInterval(monitor.GetServer().RefreshIntervalSeconds);
         return monitor.NonRetryableLast && _options.AttentionInterval > interval
             ? _options.AttentionInterval
             : interval;
@@ -449,13 +454,9 @@ public sealed class MonitoringEngine : IMonitoringEngine, IHostedService, IAsync
         var wakeTask = monitor.WakeTask;
         using var waitCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var delayTask = Task.Delay(delay, _timeProvider, waitCts.Token);
-        var completed = await Task.WhenAny(delayTask, wakeTask).ConfigureAwait(false);
+        await Task.WhenAny(delayTask, wakeTask).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
         waitCts.Cancel(); // stop the pending timer regardless of who won
-        if (completed == wakeTask)
-        {
-            monitor.ResetWake();
-        }
     }
 
     private static bool RequiresRecollection(Server current, Server updated) =>
@@ -486,6 +487,7 @@ public sealed class MonitoringEngine : IMonitoringEngine, IHostedService, IAsync
         private readonly object _sync = new();
         private readonly List<TaskCompletionSource<ServerMetricsCollectionResult>> _pending = [];
         private TaskCompletionSource<bool> _wake = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private bool _isCollecting;
 
         public required Server Server { get; set; }
 
@@ -502,21 +504,22 @@ public sealed class MonitoringEngine : IMonitoringEngine, IHostedService, IAsync
             get { lock (_sync) { return _wake.Task; } }
         }
 
-        public void SignalWake()
+        public Server GetServer()
         {
             lock (_sync)
             {
-                _wake.TrySetResult(true);
+                return Server;
             }
         }
 
-        public void ResetWake()
+        public void UpdateServer(Server server, bool signalWake)
         {
             lock (_sync)
             {
-                if (_wake.Task.IsCompleted)
+                Server = server;
+                if (signalWake)
                 {
-                    _wake = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                    _wake.TrySetResult(true);
                 }
             }
         }
@@ -526,21 +529,37 @@ public sealed class MonitoringEngine : IMonitoringEngine, IHostedService, IAsync
             lock (_sync)
             {
                 _pending.Add(request);
+                // A request made while a cycle is already collecting is satisfied by that
+                // single-flight result. Only an idle/waiting monitor needs to be awakened.
+                if (!_isCollecting)
+                {
+                    _wake.TrySetResult(true);
+                }
             }
         }
 
-        public void CompleteManual(ServerMetricsCollectionResult result)
+        public Server BeginCollection()
+        {
+            lock (_sync)
+            {
+                _isCollecting = true;
+                if (_wake.Task.IsCompleted)
+                {
+                    _wake = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                }
+
+                return Server;
+            }
+        }
+
+        public void CompleteCollection(ServerMetricsCollectionResult result)
         {
             TaskCompletionSource<ServerMetricsCollectionResult>[] pending;
             lock (_sync)
             {
-                if (_pending.Count == 0)
-                {
-                    return;
-                }
-
                 pending = [.. _pending];
                 _pending.Clear();
+                _isCollecting = false;
             }
 
             foreach (var request in pending)

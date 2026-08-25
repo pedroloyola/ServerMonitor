@@ -14,6 +14,7 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
     private readonly IThemeService _themeService;
     private readonly IServerService _serverService;
     private readonly IServerDiscoveryService _discoveryService;
+    private readonly INotificationSettingsService _notificationSettingsService;
     private readonly ILogger<SettingsViewModel> _logger;
     private int _selectedLanguageIndex;
     private int _selectedThemeIndex;
@@ -22,6 +23,8 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
     private bool _isServerOperationErrorOpen;
     private bool _isResetIgnoredSuccessOpen;
     private bool _isResetIgnoredErrorOpen;
+    private bool _notificationsEnabled;
+    private bool _isNotificationSettingsErrorOpen;
 
     public SettingsViewModel(
         IThemeService themeService,
@@ -29,17 +32,21 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
         INavigationService navigationService,
         IServerService serverService,
         IServerDiscoveryService discoveryService,
+        INotificationSettingsService notificationSettingsService,
         ILogger<SettingsViewModel> logger)
     {
         _themeService = themeService;
         _localizationService = localizationService;
         _serverService = serverService;
         _discoveryService = discoveryService;
+        _notificationSettingsService = notificationSettingsService;
         _logger = logger;
         _serverService.ServersChanged += OnServersChanged;
+        _notificationSettingsService.NotificationsEnabledChanged += OnNotificationsEnabledChanged;
         BackCommand = new RelayCommand(navigationService.GoToDashboard);
         ResetIgnoredCommand = new AsyncRelayCommand(ResetIgnoredAsync);
         _selectedThemeIndex = (int)themeService.Current;
+        _notificationsEnabled = notificationSettingsService.NotificationsEnabled;
         _selectedLanguageIndex = localizationService.CurrentLanguageOverride switch
         {
             "pt-BR" => 1,
@@ -120,6 +127,42 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
         set => SetProperty(ref _isResetIgnoredErrorOpen, value);
     }
 
+    /// <summary>Global switch for all server-health notifications.</summary>
+    public bool NotificationsEnabled
+    {
+        get => _notificationsEnabled;
+        set
+        {
+            if (_notificationsEnabled == value)
+            {
+                return;
+            }
+
+            try
+            {
+                _notificationSettingsService.SetNotificationsEnabled(value);
+                SetProperty(ref _notificationsEnabled, _notificationSettingsService.NotificationsEnabled);
+                IsNotificationSettingsErrorOpen = false;
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(
+                    "Could not persist notification settings. Exception type: {ExceptionType}.",
+                    exception.GetType().Name);
+                // The service commits its property only after the atomic replace. Re-notify the
+                // binding so the ToggleSwitch visibly returns to the last committed value.
+                OnPropertyChanged(nameof(NotificationsEnabled));
+                IsNotificationSettingsErrorOpen = true;
+            }
+        }
+    }
+
+    public bool IsNotificationSettingsErrorOpen
+    {
+        get => _isNotificationSettingsErrorOpen;
+        set => SetProperty(ref _isNotificationSettingsErrorOpen, value);
+    }
+
     public async Task LoadAsync()
     {
         try
@@ -133,7 +176,15 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
         }
     }
 
-    public void Dispose() => _serverService.ServersChanged -= OnServersChanged;
+    public void Dispose()
+    {
+        _serverService.ServersChanged -= OnServersChanged;
+        _notificationSettingsService.NotificationsEnabledChanged -= OnNotificationsEnabledChanged;
+    }
+
+    private void OnNotificationsEnabledChanged(object? sender, EventArgs args) =>
+        SetProperty(ref _notificationsEnabled, _notificationSettingsService.NotificationsEnabled,
+            nameof(NotificationsEnabled));
 
     private async Task ResetIgnoredAsync()
     {

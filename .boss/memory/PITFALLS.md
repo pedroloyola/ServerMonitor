@@ -45,3 +45,10 @@
 ## P-006 — Enfraquecer SSH por conveniência
 - **Observation:** tentação de auto-trust/prompt para simplificar fluxo.
 - **Fix/Learning:** fail-closed em host desconhecido/mismatch; sem auto-trust, sem prompt implícito. Segurança SSH é invariante; tradeoff exige aprovação humana.
+
+## P-009 — AppNotification `IsSupported` verdadeiro, mas `Register` falha no self-contained
+- **Observation:** o harness M8 executava transições corretamente, mas nenhum alerta Server Monitor aparecia no Notification Center; `AppNotificationManager.IsSupported()` devolvia `true`.
+- **Cause:** o output unpackaged/self-contained do Windows App SDK 2.3.1 omitia `Microsoft.WindowsAppRuntime.Insights.Resource.dll`. `Register()` falhava com `0x8007007E` apesar de o DLL redistributable existir no MSIX do próprio package Runtime resolvido.
+- **Fix:** referência explícita de versão idêntica a `Microsoft.WindowsAppSDK.Runtime` com path property; target MSBuild `Unzip` extrai apenas o resource DLL para o output e contém errors fail-fast se package/payload faltar.
+- **Validation:** sonda real passou de `Register`/`Show` com `Setting=Enabled`; o harness real entregou Warning, Critical, Offline e Recovery no Notification Center, e click restaurou a mesma janela/PID.
+- **Learning:** capability check, registo e entrega são gates distintos. Validar a API no binário self-contained real e auditar o payload, não apenas a superfície managed. [L-014, L-002]

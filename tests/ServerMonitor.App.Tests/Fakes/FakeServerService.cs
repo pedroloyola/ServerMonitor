@@ -16,8 +16,11 @@ internal sealed class FakeServerService : IServerService
 
     public List<Server> Servers { get; } = [];
 
+    public Func<CancellationToken, Task<IReadOnlyList<Server>>>? GetAllOverride { get; set; }
+
     public Task<IReadOnlyList<Server>> GetAllAsync(CancellationToken cancellationToken = default) =>
-        Task.FromResult<IReadOnlyList<Server>>(Servers.ToList());
+        GetAllOverride?.Invoke(cancellationToken)
+            ?? Task.FromResult<IReadOnlyList<Server>>(Servers.ToList());
 
     public void RaiseChanged() => ServersChanged?.Invoke(this, EventArgs.Empty);
 

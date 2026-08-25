@@ -175,4 +175,31 @@
   <data name="SettingsResetIgnoredSuccess.Message" xml:space="preserve"><value>Devices still present on the network will be suggested again.</value></data>
   <data name="SettingsResetIgnoredError.Title" xml:space="preserve"><value>Could not reset ignored devices</value></data>
   <data name="SettingsResetIgnoredError.Message" xml:space="preserve"><value>Try again in a moment.</value></data>
+  <data name="SettingsNotificationsTitle.Text" xml:space="preserve"><value>Notifications</value></data>
+  <data name="SettingsNotificationsDescription.Text" xml:space="preserve"><value>Receive Windows alerts when a monitored server's health changes.</value></data>
+  <data name="SettingsNotificationsToggle.Header" xml:space="preserve"><value>Health notifications</value></data>
+  <data name="SettingsNotificationsToggle.OnContent" xml:space="preserve"><value>On</value></data>
+  <data name="SettingsNotificationsToggle.OffContent" xml:space="preserve"><value>Off</value></data>
+  <data name="SettingsNotificationsToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Enable server health notifications</value></data>
+  <data name="SettingsNotificationsToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.HelpText" xml:space="preserve"><value>Controls all health-change alerts for monitored servers.</value></data>
+  <data name="SettingsNotificationsSaveError.Title" xml:space="preserve"><value>Could not save the preference</value></data>
+  <data name="SettingsNotificationsSaveError.Message" xml:space="preserve"><value>The previous notification setting was kept.</value></data>
+  <data name="TrayToolTip" xml:space="preserve"><value>Server Monitor</value></data>
+  <data name="TrayOpenMenuItem" xml:space="preserve"><value>Open Server Monitor</value></data>
+  <data name="TrayRefreshAllMenuItem" xml:space="preserve"><value>Refresh all</value></data>
+  <data name="TraySettingsMenuItem" xml:space="preserve"><value>Settings</value></data>
+  <data name="TrayExitMenuItem" xml:space="preserve"><value>Exit</value></data>
+  <data name="NotificationServerFallbackName" xml:space="preserve"><value>Server</value></data>
+  <data name="NotificationWarningTitle" xml:space="preserve"><value>Server needs attention</value></data>
+  <data name="NotificationWarningBodyFormat" xml:space="preserve"><value>{0} is in a warning state.</value></data>
+  <data name="NotificationCriticalTitle" xml:space="preserve"><value>Server is critical</value></data>
+  <data name="NotificationCriticalBodyFormat" xml:space="preserve"><value>{0} reached a critical state.</value></data>
+  <data name="NotificationOfflineTitle" xml:space="preserve"><value>Server offline</value></data>
+  <data name="NotificationOfflineBodyFormat" xml:space="preserve"><value>{0} stopped responding.</value></data>
+  <data name="NotificationRecoveryTitle" xml:space="preserve"><value>Server back online</value></data>
+  <data name="NotificationRecoveryOnlineBodyFormat" xml:space="preserve"><value>{0} is back online.</value></data>
+  <data name="NotificationHealthyTitle" xml:space="preserve"><value>Server healthy</value></data>
+  <data name="NotificationHealthyBodyFormat" xml:space="preserve"><value>{0} returned to a healthy state.</value></data>
+  <data name="NotificationPlatformUnavailableTitle" xml:space="preserve"><value>Notifications unavailable</value></data>
+  <data name="NotificationPlatformUnavailableMessage" xml:space="preserve"><value>Windows could not enable notifications. Check the system notification settings.</value></data>
 </root>

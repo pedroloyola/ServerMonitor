@@ -35,6 +35,17 @@ public sealed class ServerMonitoringStateStoreTests
         store.Set(state);
 
         Assert.Same(state, store.Get(id));
+        Assert.True(store.TryGet(id, out var explicitState));
+        Assert.Same(state, explicitState);
+    }
+
+    [Fact]
+    public void TryGet_UnknownServer_DoesNotCreateSyntheticState()
+    {
+        var store = new ServerMonitoringStateStore();
+
+        Assert.False(store.TryGet(Guid.NewGuid(), out _));
+        Assert.Empty(store.GetAll());
     }
 
     [Fact]
