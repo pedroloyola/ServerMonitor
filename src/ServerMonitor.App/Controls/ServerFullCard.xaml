@@ -27,7 +27,8 @@
                         Width="8"
                         Height="8"
                         VerticalAlignment="Center"
-                        Background="{Binding ConnectionState, Converter={StaticResource ConnectionStateToBrushConverter}}"
+                        AutomationProperties.Name="{Binding HealthDisplayName}"
+                        Background="{Binding Health, Converter={StaticResource HealthToBrushConverter}}"
                         CornerRadius="4" />
                     <TextBlock
                         FontFamily="Segoe UI Variable Display"
@@ -75,7 +76,7 @@
                     VerticalAlignment="Center"
                     FontSize="12"
                     Foreground="{ThemeResource TextTertiaryBrush}"
-                    Text="{Binding ConnectionStateDisplayName}" />
+                    Text="{Binding HealthDisplayName}" />
             </Grid>
 
             <!-- Metrics & Footer Section -->
@@ -275,7 +276,16 @@
                             FontSize="11"
                             Foreground="{ThemeResource TextTertiaryBrush}"
                             Text="{Binding MetricsTimestampDisplay}"
-                            TextTrimming="CharacterEllipsis" />
+                            TextTrimming="CharacterEllipsis"
+                            Visibility="{Binding HasStaleIndicator, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Invert}" />
+                        <!-- When the last reading is stale, show a discreet amber age instead of the timestamp. -->
+                        <TextBlock
+                            FontSize="11"
+                            AutomationProperties.LiveSetting="Polite"
+                            Foreground="{ThemeResource StatusWarningBrush}"
+                            Text="{Binding StaleAgeDisplay}"
+                            TextTrimming="CharacterEllipsis"
+                            Visibility="{Binding HasStaleIndicator, Converter={StaticResource BooleanToVisibilityConverter}}" />
                     </StackPanel>
 
                     <Button

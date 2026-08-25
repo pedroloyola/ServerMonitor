@@ -1,4 +1,5 @@
 using ServerMonitor.Core.Enums;
+using ServerMonitor.Core.Monitoring;
 
 namespace ServerMonitor.Core.Models;
 
@@ -23,6 +24,12 @@ public sealed record Server
     public Guid? CredentialReferenceId { get; init; }
 
     public bool IsHidden { get; init; }
+
+    /// <summary>
+    /// Automatic monitoring interval in seconds. Older <c>servers.json</c> entries omit
+    /// this and deserialize to the 30s default. Always normalized on write.
+    /// </summary>
+    public int RefreshIntervalSeconds { get; init; } = RefreshIntervalPolicy.DefaultSeconds;
 
     public DateTimeOffset CreatedAt { get; init; }
 }

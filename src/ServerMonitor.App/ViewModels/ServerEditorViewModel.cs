@@ -3,6 +3,7 @@ using ServerMonitor.App.Services;
 using ServerMonitor.Core.Enums;
 using ServerMonitor.Core.Interfaces;
 using ServerMonitor.Core.Models;
+using ServerMonitor.Core.Monitoring;
 using ServerMonitor.Core.Security;
 
 namespace ServerMonitor.App.ViewModels;
@@ -26,6 +27,7 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
     private string _privateKeyPath;
     private int _selectedOperatingSystemIndex;
     private int _selectedAuthenticationIndex;
+    private int _selectedRefreshIntervalIndex;
     private bool _removeSavedPassphrase;
     private bool _hasValidationErrors;
     private bool _isTestingConnection;
@@ -62,6 +64,8 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
         _privateKeyPath = server?.PrivateKeyPath ?? string.Empty;
         _selectedOperatingSystemIndex = (int)(server?.OperatingSystem ?? ServerOperatingSystem.Auto);
         _selectedAuthenticationIndex = server?.AuthenticationMethod == AuthenticationMethod.Password ? 1 : 0;
+        _selectedRefreshIntervalIndex = IndexOfInterval(
+            server?.RefreshIntervalSeconds ?? RefreshIntervalPolicy.DefaultSeconds);
     }
 
     public string Name { get => _name; set => SetEditorProperty(ref _name, value); }
@@ -102,6 +106,27 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
                 OnPropertyChanged(nameof(HasSavedPassphrase));
                 OnPropertyChanged(nameof(HasSavedPassword));
             }
+        }
+    }
+
+    /// <summary>
+    /// Index into <see cref="RefreshIntervalPolicy.SupportedSeconds"/> (10 s, 30 s, 1 min, 5 min).
+    /// Automatic monitoring only; it does not affect the connection test, so changing it does
+    /// not invalidate a verified connection.
+    /// </summary>
+    public int SelectedRefreshIntervalIndex
+    {
+        get => _selectedRefreshIntervalIndex;
+        set => SetProperty(ref _selectedRefreshIntervalIndex, value);
+    }
+
+    private int SelectedRefreshIntervalSeconds
+    {
+        get
+        {
+            var options = RefreshIntervalPolicy.SupportedSeconds;
+            var index = Math.Clamp(SelectedRefreshIntervalIndex, 0, options.Count - 1);
+            return options[index];
         }
     }
 
@@ -326,7 +351,8 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
             OperatingSystem = draft.OperatingSystem,
             AuthenticationMethod = draft.AuthenticationMethod,
             PrivateKeyPath = draft.PrivateKeyPath,
-            CredentialReferenceId = draft.CredentialReferenceId
+            CredentialReferenceId = draft.CredentialReferenceId,
+            RefreshIntervalSeconds = SelectedRefreshIntervalSeconds
         };
 
         CredentialChange credentialChange;
@@ -443,6 +469,22 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
             && existingContext == currentContext
                 ? _existingServer.CredentialReferenceId
                 : null;
+    }
+
+    private static int IndexOfInterval(int seconds)
+    {
+        var normalized = RefreshIntervalPolicy.Normalize(seconds);
+        var options = RefreshIntervalPolicy.SupportedSeconds;
+        for (var index = 0; index < options.Count; index++)
+        {
+            if (options[index] == normalized)
+            {
+                return index;
+            }
+        }
+
+        // Normalize always maps into the catalogue, so this is defensive only.
+        return options.Count > 1 ? 1 : 0;
     }
 
     private bool ShouldKeepExistingCredential(ServerInput configuration) =>

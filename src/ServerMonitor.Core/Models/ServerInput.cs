@@ -1,4 +1,5 @@
 using ServerMonitor.Core.Enums;
+using ServerMonitor.Core.Monitoring;
 
 namespace ServerMonitor.Core.Models;
 
@@ -19,4 +20,6 @@ public sealed record ServerInput
     public string? PrivateKeyPath { get; init; }
 
     public Guid? CredentialReferenceId { get; init; }
+
+    public int RefreshIntervalSeconds { get; init; } = RefreshIntervalPolicy.DefaultSeconds;
 }

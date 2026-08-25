@@ -59,6 +59,33 @@ public partial class App : Application
                 services.AddSingleton<IServerMetricsCollector, MetricsCollectorRouter>();
                 services.AddSingleton<IServerMetricsStore, ServerMetricsStore>();
 
+                // Automatic monitoring. One instance backs the IMonitoringEngine facade and
+                // the hosted-service lifecycle, so the app starts/stops a single engine.
+                // The Debug-only visual health QA harness (--qa-health) replaces the data plane
+                // with inert in-memory doubles instead, so no SSH/scheduling/persistence runs.
+#if DEBUG
+                var qaHealth = Qa.QaHealthComposition.IsRequested();
+#else
+                const bool qaHealth = false;
+#endif
+                if (!qaHealth)
+                {
+                    services.AddSingleton<IServerMonitoringStateStore, ServerMonitoringStateStore>();
+                    services.AddSingleton(sp => new MonitoringEngine(
+                        sp.GetRequiredService<IServerService>(),
+                        sp.GetRequiredService<IServerMetricsStore>(),
+                        sp.GetRequiredService<IServerMonitoringStateStore>(),
+                        sp.GetRequiredService<ILogger<MonitoringEngine>>()));
+                    services.AddSingleton<IMonitoringEngine>(sp => sp.GetRequiredService<MonitoringEngine>());
+                    services.AddHostedService(sp => sp.GetRequiredService<MonitoringEngine>());
+                }
+#if DEBUG
+                else
+                {
+                    Qa.QaHealthComposition.Apply(services);
+                }
+#endif
+
                 services.AddSingleton<DashboardViewModel>();
                 services.AddSingleton<SettingsViewModel>();
                 services.AddSingleton<DashboardPage>();

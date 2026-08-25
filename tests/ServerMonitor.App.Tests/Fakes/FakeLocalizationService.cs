@@ -24,6 +24,9 @@ internal sealed class FakeLocalizationService : ILocalizationService
             ["ServerMetricsDetectedOperatingSystemFormat"] = "OS: {0}",
             ["ServerMetricsUpdatedAtFormat"] = "Updated {0}",
             ["ServerMetricsUpdateFailed"] = "Metrics could not be refreshed.",
+            ["ServerMetricsStaleMinutesFormat"] = "Last updated {0} min ago",
+            ["ServerMetricsStaleHoursFormat"] = "Last updated {0} h ago",
+            ["ServerMetricsStaleDaysFormat"] = "Last updated {0} d ago",
         };
 
     public string? CurrentLanguageOverride => null;

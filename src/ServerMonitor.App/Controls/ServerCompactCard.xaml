@@ -17,7 +17,8 @@
                         Width="8"
                         Height="8"
                         VerticalAlignment="Center"
-                        Background="{Binding ConnectionState, Converter={StaticResource ConnectionStateToBrushConverter}}"
+                        AutomationProperties.Name="{Binding HealthDisplayName}"
+                        Background="{Binding Health, Converter={StaticResource HealthToBrushConverter}}"
                         CornerRadius="4" />
                     <TextBlock
                         FontFamily="Segoe UI Variable Display"
@@ -61,7 +62,7 @@
                         VerticalAlignment="Center"
                         FontSize="11"
                         Foreground="{ThemeResource TextTertiaryBrush}"
-                        Text="{Binding ConnectionStateDisplayName}" />
+                        Text="{Binding HealthDisplayName}" />
                 </Grid>
             </StackPanel>
             <controls:ServerActionsButton Grid.Column="1" VerticalAlignment="Center" />

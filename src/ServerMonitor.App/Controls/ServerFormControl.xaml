@@ -69,6 +69,19 @@
                 </ComboBox>
             </Grid>
 
+            <!-- Automatic monitoring interval -->
+            <ComboBox
+                x:Uid="ServerFormRefreshIntervalField"
+                HorizontalAlignment="Stretch"
+                CornerRadius="{StaticResource RadiusSmall}"
+                IsEnabled="{Binding IsNotTestingConnection}"
+                SelectedIndex="{Binding SelectedRefreshIntervalIndex, Mode=TwoWay}">
+                <ComboBoxItem x:Uid="RefreshInterval10sOption" />
+                <ComboBoxItem x:Uid="RefreshInterval30sOption" />
+                <ComboBoxItem x:Uid="RefreshInterval1minOption" />
+                <ComboBoxItem x:Uid="RefreshInterval5minOption" />
+            </ComboBox>
+
             <Border Height="1" Margin="0,4" Background="{ThemeResource GlassBorderBrush}" />
 
             <!-- Authentication Section -->

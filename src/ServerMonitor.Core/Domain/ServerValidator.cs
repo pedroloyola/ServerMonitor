@@ -22,7 +22,8 @@ public sealed class ServerValidator : IServerValidator
             OperatingSystem = server.OperatingSystem,
             AuthenticationMethod = server.AuthenticationMethod,
             PrivateKeyPath = server.PrivateKeyPath,
-            CredentialReferenceId = server.CredentialReferenceId
+            CredentialReferenceId = server.CredentialReferenceId,
+            RefreshIntervalSeconds = server.RefreshIntervalSeconds
         };
 
         return server.AuthenticationMethod == Enums.AuthenticationMethod.NotConfigured

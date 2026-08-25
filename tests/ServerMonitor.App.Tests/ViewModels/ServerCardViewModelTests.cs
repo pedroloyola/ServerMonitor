@@ -1,11 +1,19 @@
 using System.Globalization;
+using ServerMonitor.App.Services;
 using ServerMonitor.App.Tests.Fakes;
 using ServerMonitor.App.ViewModels;
 using ServerMonitor.Core.Enums;
 using ServerMonitor.Core.Models;
+using ServerMonitor.Core.Monitoring;
 
 namespace ServerMonitor.App.Tests.ViewModels;
 
+/// <summary>
+/// The card reads metric values from the metrics store and health/refresh/stale/error from the
+/// engine-owned <see cref="ServerMonitoringState"/>, pushed in via <see cref="ServerCardViewModel.ApplyMonitoringState"/>.
+/// A manual refresh is delegated to <see cref="IMonitoringEngine.RefreshNowAsync"/>. These tests
+/// drive those two paths directly, so they stay deterministic without any timer or scheduler.
+/// </summary>
 public sealed class ServerCardViewModelTests
 {
     private static readonly Func<Task> NoOp = () => Task.CompletedTask;
@@ -14,40 +22,42 @@ public sealed class ServerCardViewModelTests
         FakeServerMetricsStore store,
         Server? server = null,
         SshConnectionResult? connection = null,
-        FakeConnectionStateStore? connectionStore = null) =>
+        FakeConnectionStateStore? connectionStore = null,
+        IServerMonitoringStateStore? monitoringStore = null,
+        FakeMonitoringEngine? engine = null) =>
         new(
             server ?? TestData.LinuxServer(),
             connection,
             new FakeLocalizationService(),
             store,
             connectionStore ?? new FakeConnectionStateStore(),
+            monitoringStore ?? new ServerMonitoringStateStore(),
+            engine ?? new FakeMonitoringEngine(),
             NoOp,
             NoOp,
             NoOp);
 
-    // The refresh command is async void. Rather than poll (which races on the
-    // scheduler), drive it on a single-threaded pump: ConfigureAwait(true)
-    // continuations post here and RunUntilIdle drains them in order on the
-    // test thread, so state transitions are fully deterministic.
-    private static void WithPump(Action<PumpSynchronizationContext> body)
-    {
-        var previous = SynchronizationContext.Current;
-        var pump = new PumpSynchronizationContext();
-        SynchronizationContext.SetSynchronizationContext(pump);
-        try
-        {
-            body(pump);
-        }
-        finally
-        {
-            SynchronizationContext.SetSynchronizationContext(previous);
-        }
-    }
-
-    // Formatting is culture-sensitive by design (separators, digits). Pin the
-    // invariant culture so numeric assertions are deterministic while still
-    // exercising the real localization/formatting path.
     private static IDisposable InvariantCulture() => new CultureScope();
+
+    private static ServerMonitoringState State(
+        Guid serverId,
+        ServerHealth health = ServerHealth.Healthy,
+        bool isRefreshing = false,
+        bool isStale = false,
+        int consecutiveFailures = 0,
+        MetricsCollectionErrorCode? lastError = null,
+        DateTimeOffset? lastAttemptAt = null,
+        DateTimeOffset? lastSuccessAt = null) => new()
+    {
+        ServerId = serverId,
+        Health = health,
+        IsRefreshing = isRefreshing,
+        IsStale = isStale,
+        ConsecutiveFailures = consecutiveFailures,
+        LastError = lastError,
+        LastAttemptAt = lastAttemptAt,
+        LastSuccessAt = lastSuccessAt
+    };
 
     // --- Presentation states -------------------------------------------------
 
@@ -60,6 +70,7 @@ public sealed class ServerCardViewModelTests
         Assert.False(vm.HasMetrics);
         Assert.True(vm.IsMetricsPending);
         Assert.False(vm.HasMetricsError);
+        Assert.Equal(ServerHealth.Unknown, vm.Health);
     }
 
     [Fact]
@@ -86,6 +97,17 @@ public sealed class ServerCardViewModelTests
     }
 
     [Fact]
+    public void InitialHealth_IsReadFromMonitoringStore()
+    {
+        var server = TestData.LinuxServer();
+        var store = new ServerMonitoringStateStore();
+        store.Set(State(server.Id, ServerHealth.Warning));
+        var vm = CreateViewModel(new FakeServerMetricsStore(), server, monitoringStore: store);
+
+        Assert.Equal(ServerHealth.Warning, vm.Health);
+    }
+
+    [Fact]
     public void RefreshCommand_IsEnabledInitially()
     {
         var vm = CreateViewModel(new FakeServerMetricsStore());
@@ -93,100 +115,173 @@ public sealed class ServerCardViewModelTests
         Assert.True(vm.RefreshMetricsCommand.CanExecute(null));
     }
 
+    // --- Monitoring state application (auto refresh path) --------------------
+
     [Fact]
-    public void DuringRefresh_IsRefreshingAndCommandDisabled()
+    public void ApplyMonitoringState_UpdatesHealthAndDisplayName()
     {
         var server = TestData.LinuxServer();
-        var store = new FakeServerMetricsStore();
-        var gate = store.Gate();
-        var vm = CreateViewModel(store, server);
+        var vm = CreateViewModel(new FakeServerMetricsStore(), server);
 
-        WithPump(pump =>
-        {
-            vm.RefreshMetricsCommand.Execute(null);
+        vm.ApplyMonitoringState(State(server.Id, ServerHealth.Critical));
 
-            Assert.True(vm.IsRefreshingMetrics);
-            Assert.False(vm.IsMetricsPending);
-            Assert.False(vm.RefreshMetricsCommand.CanExecute(null));
-
-            gate.SetResult(TestData.Success(TestData.Snapshot(server.Id, cpu: 1)));
-            pump.RunUntilIdle();
-        });
-
-        Assert.False(vm.IsRefreshingMetrics);
+        Assert.Equal(ServerHealth.Critical, vm.Health);
+        Assert.Equal("ServerHealthCritical", vm.HealthDisplayName);
     }
 
     [Fact]
-    public void AfterSuccess_SnapshotAppliedAndCommandReenabled()
+    public void ApplyMonitoringState_RereadsSnapshotSoAutomaticCyclesSurfaceNewValues()
+    {
+        using var _ = InvariantCulture();
+        var server = TestData.LinuxServer();
+        var store = new FakeServerMetricsStore(); // ctor snapshot is null
+        var vm = CreateViewModel(store, server);
+        Assert.False(vm.HasMetrics);
+
+        // The engine stored a fresh snapshot; the state change makes the card re-read it.
+        store.InitialSnapshot = TestData.Snapshot(server.Id, cpu: 42);
+        vm.ApplyMonitoringState(State(server.Id, ServerHealth.Healthy));
+
+        Assert.True(vm.HasMetrics);
+        Assert.Equal("42%", vm.CpuUsageDisplay);
+    }
+
+    [Fact]
+    public void WhileRefreshing_IsRefreshingAndCommandDisabled()
+    {
+        var server = TestData.LinuxServer();
+        var vm = CreateViewModel(new FakeServerMetricsStore(), server);
+
+        vm.ApplyMonitoringState(State(server.Id, isRefreshing: true));
+
+        Assert.True(vm.IsRefreshingMetrics);
+        Assert.False(vm.IsMetricsPending);
+        Assert.False(vm.RefreshMetricsCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void ApplyMonitoringState_RaisesPropertyChangedForHealthAndMetricValues()
     {
         using var _ = InvariantCulture();
         var server = TestData.LinuxServer();
         var store = new FakeServerMetricsStore();
-        var gate = store.Gate();
         var vm = CreateViewModel(store, server);
+        var changed = new List<string?>();
+        vm.PropertyChanged += (_, args) => changed.Add(args.PropertyName);
 
-        WithPump(pump =>
-        {
-            vm.RefreshMetricsCommand.Execute(null);
-            gate.SetResult(TestData.Success(TestData.Snapshot(server.Id, cpu: 42)));
-            pump.RunUntilIdle();
-        });
+        store.InitialSnapshot = TestData.Snapshot(server.Id, cpu: 5);
+        vm.ApplyMonitoringState(State(server.Id, ServerHealth.Healthy));
 
-        Assert.True(vm.HasMetrics);
-        Assert.Equal("42%", vm.CpuUsageDisplay);
-        Assert.False(vm.HasMetricsError);
-        Assert.True(vm.RefreshMetricsCommand.CanExecute(null));
+        Assert.Contains(nameof(vm.Health), changed);
+        Assert.Contains(nameof(vm.CpuUsageDisplay), changed);
+        Assert.Contains(nameof(vm.IsRefreshingMetrics), changed);
+    }
+
+    // --- Stale / error surfacing --------------------------------------------
+
+    [Fact]
+    public void FailureWithExistingSnapshot_KeepsMetricsAndShowsStaleIndicator()
+    {
+        var server = TestData.LinuxServer();
+        var store = new FakeServerMetricsStore { InitialSnapshot = TestData.Snapshot(server.Id, cpu: 20) };
+        var vm = CreateViewModel(store, server);
+        var success = new DateTimeOffset(2026, 1, 1, 12, 0, 0, TimeSpan.Zero);
+
+        vm.ApplyMonitoringState(State(
+            server.Id,
+            health: ServerHealth.Offline,
+            isStale: true,
+            consecutiveFailures: 1,
+            lastError: MetricsCollectionErrorCode.TimedOut,
+            lastSuccessAt: success,
+            lastAttemptAt: success.AddMinutes(3)));
+
+        Assert.True(vm.HasMetrics); // stale metrics stay visible
+        Assert.True(vm.HasCpuUsage);
+        Assert.True(vm.IsStale);
+        Assert.True(vm.HasStaleIndicator);
+        Assert.Equal("Last updated 3 min ago", vm.StaleAgeDisplay);
+        Assert.False(vm.HasMetricsError); // no big error while a snapshot is shown
     }
 
     [Fact]
-    public void AfterError_ErrorShownAndCommandReenabled()
+    public void FailureWithNoSnapshot_SurfacesErrorNotStale()
     {
-        var store = new FakeServerMetricsStore();
-        var gate = store.Gate();
-        var vm = CreateViewModel(store);
+        var server = TestData.LinuxServer();
+        var vm = CreateViewModel(new FakeServerMetricsStore(), server);
 
-        WithPump(pump =>
-        {
-            vm.RefreshMetricsCommand.Execute(null);
-            gate.SetResult(TestData.Failure(MetricsCollectionErrorCode.ConnectionFailed));
-            pump.RunUntilIdle();
-        });
+        vm.ApplyMonitoringState(State(
+            server.Id,
+            health: ServerHealth.Offline,
+            consecutiveFailures: 2,
+            lastError: MetricsCollectionErrorCode.ConnectionFailed));
 
+        Assert.False(vm.HasMetrics);
         Assert.True(vm.HasMetricsError);
         Assert.False(string.IsNullOrWhiteSpace(vm.MetricsErrorDisplay));
-        Assert.True(vm.RefreshMetricsCommand.CanExecute(null));
+        Assert.False(vm.HasStaleIndicator);
     }
 
     [Fact]
-    public void Cancellation_SurfacesAsErrorAndReenablesCommand()
+    public void StaleAgeDisplay_UsesHoursBucketForLongGaps()
     {
+        var server = TestData.LinuxServer();
+        var store = new FakeServerMetricsStore { InitialSnapshot = TestData.Snapshot(server.Id, cpu: 20) };
+        var vm = CreateViewModel(store, server);
+        var success = new DateTimeOffset(2026, 1, 1, 12, 0, 0, TimeSpan.Zero);
+
+        vm.ApplyMonitoringState(State(
+            server.Id,
+            isStale: true,
+            lastSuccessAt: success,
+            lastAttemptAt: success.AddHours(2)));
+
+        Assert.Equal("Last updated 2 h ago", vm.StaleAgeDisplay);
+    }
+
+    // --- Manual refresh delegates to the engine ------------------------------
+
+    [Fact]
+    public void ManualRefresh_DelegatesToEngineAndAppliesResultingState()
+    {
+        var server = TestData.LinuxServer();
         var store = new FakeServerMetricsStore();
-        var gate = store.Gate();
-        var vm = CreateViewModel(store);
-
-        WithPump(pump =>
+        var monitoringStore = new ServerMonitoringStateStore();
+        var engine = new FakeMonitoringEngine
         {
-            vm.RefreshMetricsCommand.Execute(null);
-            gate.SetResult(TestData.Failure(MetricsCollectionErrorCode.Cancelled));
-            pump.RunUntilIdle();
-        });
+            OnRefresh = id =>
+            {
+                // Simulate the engine's cycle: store a snapshot and publish healthy state.
+                store.InitialSnapshot = TestData.Snapshot(id, cpu: 7);
+                monitoringStore.Set(State(id, ServerHealth.Healthy));
+                return TestData.Success(TestData.Snapshot(id, cpu: 7));
+            }
+        };
+        var vm = CreateViewModel(store, server, monitoringStore: monitoringStore, engine: engine);
 
-        Assert.True(vm.HasMetricsError);
-        Assert.True(vm.RefreshMetricsCommand.CanExecute(null));
+        vm.RefreshMetricsCommand.Execute(null);
+
+        Assert.Equal(1, engine.RefreshNowCount);
+        Assert.Equal(server.Id, engine.LastRefreshedServerId);
+        Assert.Equal(ServerHealth.Healthy, vm.Health);
+        Assert.True(vm.HasMetrics);
     }
 
     [Fact]
-    public void Refresh_ConnectionResult_UpdatesConnectionStateAndStore()
+    public void ManualRefresh_ConnectionResult_UpdatesConnectionStateAndStore()
     {
         var server = TestData.LinuxServer();
         var connectionStore = new FakeConnectionStateStore();
-        var store = new FakeServerMetricsStore
+        var engine = new FakeMonitoringEngine
         {
-            NextResult = TestData.Success(TestData.Snapshot(server.Id, cpu: 1))
+            OnRefresh = id => TestData.Success(TestData.Snapshot(id, cpu: 1))
         };
-        var vm = CreateViewModel(store, server, connectionStore: connectionStore);
+        var vm = CreateViewModel(
+            new FakeServerMetricsStore(),
+            server,
+            connectionStore: connectionStore,
+            engine: engine);
 
-        // A completed store result runs the command synchronously; no pump needed.
         vm.RefreshMetricsCommand.Execute(null);
 
         Assert.Equal(ServerConnectionState.Connected, vm.ConnectionState);
@@ -357,64 +452,6 @@ public sealed class ServerCardViewModelTests
         Assert.Contains("/", display);
     }
 
-    // --- Snapshot update & stale-data-after-failure --------------------------
-
-    [Fact]
-    public void Refresh_UpdatesDisplayedValuesFromNewSnapshot()
-    {
-        using var _ = InvariantCulture();
-        var server = TestData.LinuxServer();
-        var store = new FakeServerMetricsStore
-        {
-            InitialSnapshot = TestData.Snapshot(server.Id, cpu: 10),
-            NextResult = TestData.Success(TestData.Snapshot(server.Id, cpu: 55))
-        };
-        var vm = CreateViewModel(store, server);
-        Assert.Equal("10%", vm.CpuUsageDisplay);
-
-        vm.RefreshMetricsCommand.Execute(null);
-
-        Assert.Equal("55%", vm.CpuUsageDisplay);
-    }
-
-    [Fact]
-    public void FailureAfterExistingSnapshot_KeepsStaleMetricsAndSurfacesError()
-    {
-        var server = TestData.LinuxServer();
-        var store = new FakeServerMetricsStore
-        {
-            InitialSnapshot = TestData.Snapshot(server.Id, cpu: 20),
-            NextResult = TestData.Failure(MetricsCollectionErrorCode.TimedOut)
-        };
-        var vm = CreateViewModel(store, server);
-
-        vm.RefreshMetricsCommand.Execute(null);
-
-        Assert.True(vm.HasMetrics);
-        Assert.True(vm.HasCpuUsage);
-        Assert.True(vm.HasMetricsError);
-    }
-
-    [Fact]
-    public void Refresh_RaisesPropertyChangedForMetricValues()
-    {
-        var server = TestData.LinuxServer();
-        var store = new FakeServerMetricsStore
-        {
-            NextResult = TestData.Success(TestData.Snapshot(server.Id, cpu: 5))
-        };
-        var vm = CreateViewModel(store, server);
-        var changed = new List<string?>();
-        vm.PropertyChanged += (_, args) => changed.Add(args.PropertyName);
-
-        vm.RefreshMetricsCommand.Execute(null);
-
-        Assert.Contains(nameof(vm.CpuUsageDisplay), changed);
-        Assert.Contains(nameof(vm.CpuUsageValue), changed);
-        Assert.Contains(nameof(vm.HasCpuPercent), changed);
-        Assert.Contains(nameof(vm.IsRefreshingMetrics), changed);
-    }
-
     [Fact]
     public void MicroProgressBarValues_PreservePercentAndReportAvailability()
     {
@@ -442,24 +479,6 @@ public sealed class ServerCardViewModelTests
         Assert.Equal(0, vmNullMetrics.MemoryUsageValue);
         Assert.False(vmNullMetrics.HasDiskPercent);
         Assert.Equal(0, vmNullMetrics.DiskUsageValue);
-    }
-
-    private sealed class PumpSynchronizationContext : SynchronizationContext
-    {
-        private readonly Queue<(SendOrPostCallback Callback, object? State)> _queue = new();
-
-        public override void Post(SendOrPostCallback d, object? state) => _queue.Enqueue((d, state));
-
-        public override void Send(SendOrPostCallback d, object? state) => d(state);
-
-        public void RunUntilIdle()
-        {
-            while (_queue.Count > 0)
-            {
-                var (callback, state) = _queue.Dequeue();
-                callback(state);
-            }
-        }
     }
 
     private sealed class CultureScope : IDisposable

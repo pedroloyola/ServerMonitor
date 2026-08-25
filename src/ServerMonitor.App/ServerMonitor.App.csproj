@@ -23,6 +23,11 @@
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.3.1" />
   </ItemGroup>
 
+  <!-- QA visual health harness is Debug-only. It must never ship in a Release build. -->
+  <ItemGroup Condition="'$(Configuration)' != 'Debug'">
+    <Compile Remove="Qa\**\*.cs" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\ServerMonitor.Core\ServerMonitor.Core.csproj" />
     <ProjectReference Include="..\ServerMonitor.Infrastructure\ServerMonitor.Infrastructure.csproj" />

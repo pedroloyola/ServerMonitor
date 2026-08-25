@@ -118,6 +118,64 @@ public sealed class ServerEditorViewModelTests
     }
 
     [Fact]
+    public void NewServer_DefaultsToThirtySecondInterval()
+    {
+        var vm = new ServerEditorViewModel(
+            new ServerValidator(),
+            new FakeSshConnectionService(),
+            new FakeHostKeyTrustStore(),
+            new FakeConnectionStateStore(),
+            new FakePrivateKeyFilePicker(),
+            new FakeLocalizationService(),
+            null);
+
+        // Index 1 == 30 s in RefreshIntervalPolicy.SupportedSeconds ([10, 30, 60, 300]).
+        Assert.Equal(1, vm.SelectedRefreshIntervalIndex);
+    }
+
+    [Fact]
+    public void ExistingServer_LoadsRefreshIntervalIndex()
+    {
+        var server = TestData.LinuxServer() with { RefreshIntervalSeconds = 60 };
+        var vm = new ServerEditorViewModel(
+            new ServerValidator(),
+            new FakeSshConnectionService(),
+            new FakeHostKeyTrustStore(),
+            new FakeConnectionStateStore(),
+            new FakePrivateKeyFilePicker(),
+            new FakeLocalizationService(),
+            server);
+
+        Assert.Equal(2, vm.SelectedRefreshIntervalIndex); // 60 s -> index 2
+    }
+
+    [Fact]
+    public void TryCreateResult_PersistsSelectedRefreshInterval()
+    {
+        var vm = new ServerEditorViewModel(
+            new ServerValidator(),
+            new FakeSshConnectionService(),
+            new FakeHostKeyTrustStore(),
+            new FakeConnectionStateStore(),
+            new FakePrivateKeyFilePicker(),
+            new FakeLocalizationService(),
+            null)
+        {
+            Name = "Prod",
+            Host = "prod.example.com",
+            Port = "22",
+            Username = "admin",
+            PrivateKeyPath = "/path/to/id_ed25519",
+            SelectedRefreshIntervalIndex = 3 // 300 s
+        };
+
+        var ok = vm.TryCreateResult(out var result);
+
+        Assert.True(ok);
+        Assert.Equal(300, result!.Profile.Configuration.RefreshIntervalSeconds);
+    }
+
+    [Fact]
     public void TryCreateResult_InvalidData_ReturnsFalseAndSetsError()
     {
         var vm = new ServerEditorViewModel(

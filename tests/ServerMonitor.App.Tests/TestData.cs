@@ -5,15 +5,19 @@ namespace ServerMonitor.App.Tests;
 
 internal static class TestData
 {
-    public static Server LinuxServer(Guid? id = null) => new()
+    public static Server LinuxServer(
+        Guid? id = null,
+        ServerOperatingSystem os = ServerOperatingSystem.Linux,
+        int refreshIntervalSeconds = 30) => new()
     {
         Id = id ?? Guid.NewGuid(),
         Name = "web-01",
         Host = "10.0.0.5",
         Port = 22,
         Username = "deploy",
-        OperatingSystem = ServerOperatingSystem.Linux,
-        AuthenticationMethod = AuthenticationMethod.Password
+        OperatingSystem = os,
+        AuthenticationMethod = AuthenticationMethod.Password,
+        RefreshIntervalSeconds = refreshIntervalSeconds
     };
 
     public static SshConnectionResult Connected() => new()

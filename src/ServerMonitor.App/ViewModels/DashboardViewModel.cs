@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Windows.Input;
 using Microsoft.Extensions.Logging;
+using Microsoft.UI.Dispatching;
 using ServerMonitor.App.Services;
 using ServerMonitor.Core.Interfaces;
 using ServerMonitor.Core.Models;
@@ -14,8 +15,14 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
     private readonly IServerDialogService _dialogService;
     private readonly IServerConnectionStateStore _connectionStateStore;
     private readonly IServerMetricsStore _metricsStore;
+    private readonly IServerMonitoringStateStore _monitoringStateStore;
+    private readonly IMonitoringEngine _monitoringEngine;
     private readonly ILocalizationService _localizationService;
     private readonly ILogger<DashboardViewModel> _logger;
+    // Captured on the UI thread so engine state changes (raised on background loops) can be
+    // marshalled back before touching bound properties. Null in unit tests, where handlers run
+    // inline on the calling thread.
+    private readonly DispatcherQueue? _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
     private bool _hasVisibleServers;
     private bool _isOperationErrorOpen;
 
@@ -25,6 +32,8 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         IServerDialogService dialogService,
         IServerConnectionStateStore connectionStateStore,
         IServerMetricsStore metricsStore,
+        IServerMonitoringStateStore monitoringStateStore,
+        IMonitoringEngine monitoringEngine,
         INavigationService navigationService,
         ILocalizationService localizationService,
         ILogger<DashboardViewModel> logger)
@@ -34,10 +43,13 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         _dialogService = dialogService;
         _connectionStateStore = connectionStateStore;
         _metricsStore = metricsStore;
+        _monitoringStateStore = monitoringStateStore;
+        _monitoringEngine = monitoringEngine;
         _localizationService = localizationService;
         _logger = logger;
         _serverService.ServersChanged += OnServersChanged;
         _connectionStateStore.StateChanged += OnConnectionStateChanged;
+        _monitoringStateStore.StateChanged += OnMonitoringStateChanged;
         AddServerCommand = new AsyncRelayCommand(AddServerAsync);
         OpenSettingsCommand = new RelayCommand(navigationService.GoToSettings);
     }
@@ -77,6 +89,7 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
     {
         _serverService.ServersChanged -= OnServersChanged;
         _connectionStateStore.StateChanged -= OnConnectionStateChanged;
+        _monitoringStateStore.StateChanged -= OnMonitoringStateChanged;
     }
 
     private async Task AddServerAsync()
@@ -190,6 +203,8 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
                 _localizationService,
                 _metricsStore,
                 _connectionStateStore,
+                _monitoringStateStore,
+                _monitoringEngine,
                 () => EditServerAsync(server),
                 () => HideServerAsync(server),
                 () => RemoveServerAsync(server)));
@@ -204,6 +219,25 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
     {
         var card = VisibleServers.FirstOrDefault(card => card.Server.Id == serverId);
         card?.UpdateConnectionState(_connectionStateStore.Get(serverId));
+    }
+
+    // Raised by the engine on a background loop; marshal to the UI thread before touching the card.
+    private void OnMonitoringStateChanged(object? sender, Guid serverId)
+    {
+        if (_dispatcherQueue is null || _dispatcherQueue.HasThreadAccess)
+        {
+            ApplyMonitoringState(serverId);
+        }
+        else
+        {
+            _dispatcherQueue.TryEnqueue(() => ApplyMonitoringState(serverId));
+        }
+    }
+
+    private void ApplyMonitoringState(Guid serverId)
+    {
+        var card = VisibleServers.FirstOrDefault(card => card.Server.Id == serverId);
+        card?.ApplyMonitoringState(_monitoringStateStore.Get(serverId));
     }
 
     private void HandleError(Exception exception, string operation)

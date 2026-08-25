@@ -87,6 +87,10 @@ O refresh é iniciado apenas pelo utilizador e protegido por single-flight por `
 
 Falhas individuais de parsing mantêm a métrica como `null`, distinguindo unknown de zero. Falhas de trust, autenticação, transporte, timeout ou cancelamento preservam o resultado SSH tipado e não devolvem snapshot. Os catálogos e a estratégia de falha parcial constam das ADR-008 (Linux) e ADR-010 (macOS) e de `docs/metrics.md`.
 
+## Monitorização automática (Milestone 6)
+
+O `MonitoringEngine` (App, `IHostedService`) agenda uma recolha por servidor num loop `async` próprio, com limite global de concorrência, retries só para falhas transitórias e todo o tempo através de um `TimeProvider` injetável. Publica `ServerMonitoringState` (saúde, refresh em curso, stale, timestamps, último erro) no `IServerMonitoringStateStore` transitório. A UI observa esse estado (o card não tem timers) e o refresh manual é encaminhado por `IMonitoringEngine.RefreshNowAsync`, partilhando o single-flight do agendador e reiniciando o intervalo. A saúde usa `ServerHealth` + `MonitoringThresholds`, distinta do estado de conexão SSH. Detalhes de loop, sleep/resume, hidden, logging e política constam da ADR-011.
+
 ## Fronteira de apresentação compacta
 
 O Dashboard escolhe a apresentação visual no XAML. O domínio, `IServerService`, persistência e ViewModels não conhecem a largura da janela nem um modo de widget. Um futuro Compact Widget Mode poderá trocar a apresentação sem duplicar estado. Um eventual Windows Widget Provider será uma integração separada, conforme a ADR-005.

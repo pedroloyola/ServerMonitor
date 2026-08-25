@@ -1,5 +1,6 @@
 using ServerMonitor.Core.Interfaces;
 using ServerMonitor.Core.Models;
+using ServerMonitor.Core.Monitoring;
 
 namespace ServerMonitor.Core.Domain;
 
@@ -59,6 +60,7 @@ public sealed class ServerService(
             AuthenticationMethod = normalized.AuthenticationMethod,
             PrivateKeyPath = normalized.PrivateKeyPath,
             CredentialReferenceId = normalized.CredentialReferenceId,
+            RefreshIntervalSeconds = normalized.RefreshIntervalSeconds,
             IsHidden = false,
             CreatedAt = DateTimeOffset.UtcNow
         };
@@ -97,7 +99,8 @@ public sealed class ServerService(
                 OperatingSystem = normalized.OperatingSystem,
                 AuthenticationMethod = normalized.AuthenticationMethod,
                 PrivateKeyPath = normalized.PrivateKeyPath,
-                CredentialReferenceId = normalized.CredentialReferenceId
+                CredentialReferenceId = normalized.CredentialReferenceId,
+                RefreshIntervalSeconds = normalized.RefreshIntervalSeconds
             };
 
             var copy = servers.ToList();
@@ -199,7 +202,8 @@ public sealed class ServerService(
             Username = (input.Username ?? string.Empty).Trim(),
             PrivateKeyPath = string.IsNullOrWhiteSpace(input.PrivateKeyPath)
                 ? null
-                : Path.GetFullPath(input.PrivateKeyPath.Trim())
+                : Path.GetFullPath(input.PrivateKeyPath.Trim()),
+            RefreshIntervalSeconds = RefreshIntervalPolicy.Normalize(input.RefreshIntervalSeconds)
         };
     }
 }

@@ -5,6 +5,7 @@
     xmlns:converters="using:ServerMonitor.App.Converters">
     <converters:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
     <converters:ConnectionStateToBrushConverter x:Key="ConnectionStateToBrushConverter" />
+    <converters:HealthToBrushConverter x:Key="HealthToBrushConverter" />
 
     <Style x:Key="PageTitleTextStyle" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="Segoe UI Variable Display" />

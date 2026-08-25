@@ -69,6 +69,11 @@
   <data name="OperatingSystemLinuxOption.Content" xml:space="preserve"><value>Linux</value></data>
   <data name="OperatingSystemMacOSOption.Content" xml:space="preserve"><value>macOS</value></data>
   <data name="OperatingSystemUnknownOption.Content" xml:space="preserve"><value>Desconhecido</value></data>
+  <data name="ServerFormRefreshIntervalField.Header" xml:space="preserve"><value>Intervalo de atualização</value></data>
+  <data name="RefreshInterval10sOption.Content" xml:space="preserve"><value>10 segundos</value></data>
+  <data name="RefreshInterval30sOption.Content" xml:space="preserve"><value>30 segundos</value></data>
+  <data name="RefreshInterval1minOption.Content" xml:space="preserve"><value>1 minuto</value></data>
+  <data name="RefreshInterval5minOption.Content" xml:space="preserve"><value>5 minutos</value></data>
   <data name="AddServerDialog.Title" xml:space="preserve"><value>Adicionar servidor</value></data>
   <data name="AddServerDialog.PrimaryButtonText" xml:space="preserve"><value>Salvar</value></data>
   <data name="AddServerDialog.CloseButtonText" xml:space="preserve"><value>Cancelar</value></data>
@@ -151,4 +156,12 @@
   <data name="ServerMetricsUptimeHoursMinutesFormat" xml:space="preserve"><value>{0}h {1}m</value></data>
   <data name="ServerMetricsUptimeMinutesFormat" xml:space="preserve"><value>{0}m</value></data>
   <data name="ServerMetricsUpdateFailed" xml:space="preserve"><value>Não foi possível atualizar as métricas.</value></data>
+  <data name="ServerHealthHealthy" xml:space="preserve"><value>Saudável</value></data>
+  <data name="ServerHealthWarning" xml:space="preserve"><value>Atenção</value></data>
+  <data name="ServerHealthCritical" xml:space="preserve"><value>Crítico</value></data>
+  <data name="ServerHealthOffline" xml:space="preserve"><value>Offline</value></data>
+  <data name="ServerHealthUnknown" xml:space="preserve"><value>Sem dados</value></data>
+  <data name="ServerMetricsStaleMinutesFormat" xml:space="preserve"><value>Última atualização há {0} min</value></data>
+  <data name="ServerMetricsStaleHoursFormat" xml:space="preserve"><value>Última atualização há {0} h</value></data>
+  <data name="ServerMetricsStaleDaysFormat" xml:space="preserve"><value>Última atualização há {0} d</value></data>
 </root>
