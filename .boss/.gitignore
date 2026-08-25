@@ -1,0 +1,14 @@
+# Boss engineering orchestration — versioning policy
+#
+# VERSIONED (survive clones; other agents need them):
+#   BOSS.md, QUALITY_BAR.md, ROUTING.md, OWNERSHIP.md,
+#   team/, processes/, templates/, memory/
+#
+# LOCAL ONLY (run artefacts, screenshots, transient/ephemeral run state):
+reports/
+STATE.md
+JOURNAL.md
+METRICS.md
+
+# Never commit secrets. The Boss never stores passwords, tokens, SSH keys,
+# Credential Manager values or any secret material here (see BOSS.md §9).
