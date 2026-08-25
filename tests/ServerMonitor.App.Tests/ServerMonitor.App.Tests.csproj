@@ -26,4 +26,10 @@
     <ProjectReference Include="..\..\src\ServerMonitor.App\ServerMonitor.App.csproj" />
   </ItemGroup>
 
+  <!-- These tests exercise Debug-only QA composition and cannot be compiled when the
+       corresponding application harness is intentionally excluded from Release. -->
+  <ItemGroup Condition="'$(Configuration)' != 'Debug'">
+    <Compile Remove="Qa\**\*.cs" />
+  </ItemGroup>
+
 </Project>

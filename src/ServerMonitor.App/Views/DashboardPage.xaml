@@ -54,32 +54,80 @@
             IsOpen="{Binding IsOperationErrorOpen, Mode=TwoWay}"
             Severity="Error" />
 
-        <!-- Empty State Card -->
-        <Grid
-            Grid.Row="2"
-            Height="260"
-            VerticalAlignment="Top"
-            Visibility="{Binding HasVisibleServers, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Invert}">
-            <controls:GlassCard Height="260" VerticalAlignment="Top">
-                <controls:EmptyStateControl
-                    x:Uid="DashboardEmptyState"
-                    ActionCommand="{Binding AddServerCommand}" />
-            </controls:GlassCard>
-        </Grid>
-
-        <!-- Servers Scrollable List -->
+        <!-- Servers + Discovery share one scroll region, so the "Encontrados na rede" section
+             renders whether or not any server has been added yet. -->
         <ScrollViewer
             Grid.Row="2"
             Padding="0,0,2,0"
-            VerticalScrollBarVisibility="Auto"
-            Visibility="{Binding HasVisibleServers, Converter={StaticResource BooleanToVisibilityConverter}}">
-            <ItemsControl ItemsSource="{Binding VisibleServers}">
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <controls:ServerFullCard />
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
+            VerticalScrollBarVisibility="Auto">
+            <StackPanel Spacing="20">
+                <!-- Empty State Card (no configured servers yet) -->
+                <controls:GlassCard
+                    Height="260"
+                    VerticalAlignment="Top"
+                    Visibility="{Binding HasVisibleServers, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Invert}">
+                    <controls:EmptyStateControl
+                        x:Uid="DashboardEmptyState"
+                        ActionCommand="{Binding AddServerCommand}" />
+                </controls:GlassCard>
+
+                <!-- Configured Servers -->
+                <ItemsControl
+                    ItemsSource="{Binding VisibleServers}"
+                    Visibility="{Binding HasVisibleServers, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <controls:ServerFullCard />
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <!-- Encontrados na rede (passive discovery suggestions) -->
+                <StackPanel
+                    Spacing="10"
+                    Visibility="{Binding HasDiscoveredServers, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <StackPanel Spacing="2">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock
+                                x:Uid="DashboardDiscoveryTitle"
+                                AutomationProperties.HeadingLevel="Level2"
+                                Style="{StaticResource SectionTitleTextStyle}"
+                                VerticalAlignment="Center" />
+                            <!-- Visible count badge; the raw digit is hidden from assistive tech,
+                                 which reads the localized count sentence on the pill instead. -->
+                            <Border
+                                Padding="7,1"
+                                VerticalAlignment="Center"
+                                AutomationProperties.Name="{Binding DiscoveredCountAutomationName}"
+                                Background="{ThemeResource MutedSurfaceBrush}"
+                                BorderBrush="{ThemeResource GlassBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="{StaticResource RadiusSmall}">
+                                <TextBlock
+                                    AutomationProperties.AccessibilityView="Raw"
+                                    FontSize="11"
+                                    FontWeight="Medium"
+                                    Foreground="{ThemeResource TextSecondaryBrush}"
+                                    Text="{Binding DiscoveredCount}" />
+                            </Border>
+                        </StackPanel>
+                        <TextBlock
+                            x:Uid="DashboardDiscoveryDescription"
+                            FontSize="12"
+                            Foreground="{ThemeResource TextSecondaryBrush}"
+                            TextWrapping="Wrap" />
+                    </StackPanel>
+                    <ItemsControl
+                        AutomationProperties.LiveSetting="Polite"
+                        ItemsSource="{Binding DiscoveredServers}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <controls:DiscoveredServerCard />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </StackPanel>
         </ScrollViewer>
     </Grid>
 </Page>

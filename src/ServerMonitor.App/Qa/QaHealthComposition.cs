@@ -26,6 +26,10 @@ internal static class QaHealthComposition
         services.AddSingleton<IServerMetricsStore, QaMetricsStore>();
         services.AddSingleton<IMonitoringEngine, QaMonitoringEngine>();
 
+        // The dashboard depends on discovery too; register an inert, empty one so the health
+        // harness resolves without any real mDNS/SSH running and shows no suggestions.
+        services.AddSingleton<IServerDiscoveryService>(new QaDiscoveryService([]));
+
         var stateStore = new ServerMonitoringStateStore();
         foreach (var scenario in QaHealthCatalog.Scenarios)
         {

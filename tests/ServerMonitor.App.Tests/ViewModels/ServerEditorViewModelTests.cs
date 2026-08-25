@@ -14,36 +14,114 @@ public sealed class ServerEditorViewModelTests
     {
         public SshConnectionResult Result { get; set; } = TestData.Connected();
 
+        public int ConnectCount { get; private set; }
+
+        public int TestConnectionCount { get; private set; }
+
+        public int DetectOperatingSystemCount { get; private set; }
+
         public Task<SshConnectionResult> ConnectAsync(
             SshConnectionRequest request,
-            CancellationToken cancellationToken = default) => Task.FromResult(Result);
+            CancellationToken cancellationToken = default)
+        {
+            ConnectCount++;
+            return Task.FromResult(Result);
+        }
 
         public Task<SshConnectionResult> TestConnectionAsync(
             SshConnectionRequest request,
-            CancellationToken cancellationToken = default) => Task.FromResult(Result);
+            CancellationToken cancellationToken = default)
+        {
+            TestConnectionCount++;
+            return Task.FromResult(Result);
+        }
 
         public Task<SshConnectionResult> DetectOperatingSystemAsync(
             SshConnectionRequest request,
-            CancellationToken cancellationToken = default) => Task.FromResult(Result);
+            CancellationToken cancellationToken = default)
+        {
+            DetectOperatingSystemCount++;
+            return Task.FromResult(Result);
+        }
     }
 
     private sealed class FakeHostKeyTrustStore : IHostKeyTrustStore
     {
+        public int GetCount { get; private set; }
+
+        public int TrustCount { get; private set; }
+
+        public int RemoveCount { get; private set; }
+
         public Task<TrustedHostKey?> GetAsync(SshEndpoint endpoint, CancellationToken cancellationToken = default) =>
-            Task.FromResult<TrustedHostKey?>(null);
+            CountGet();
 
-        public Task TrustAsync(SshEndpoint endpoint, HostKeyIdentity identity, CancellationToken cancellationToken = default) =>
-            Task.CompletedTask;
+        public Task TrustAsync(SshEndpoint endpoint, HostKeyIdentity identity, CancellationToken cancellationToken = default)
+        {
+            TrustCount++;
+            return Task.CompletedTask;
+        }
 
-        public Task<bool> RemoveAsync(SshEndpoint endpoint, CancellationToken cancellationToken = default) =>
-            Task.FromResult(true);
+        public Task<bool> RemoveAsync(SshEndpoint endpoint, CancellationToken cancellationToken = default)
+        {
+            RemoveCount++;
+            return Task.FromResult(true);
+        }
+
+        private Task<TrustedHostKey?> CountGet()
+        {
+            GetCount++;
+            return Task.FromResult<TrustedHostKey?>(null);
+        }
     }
 
     private sealed class FakePrivateKeyFilePicker : IPrivateKeyFilePicker
     {
         public string? PickedPath { get; set; }
-        public Task<string?> PickAsync(CancellationToken cancellationToken = default) =>
-            Task.FromResult(PickedPath);
+
+        public int PickCount { get; private set; }
+
+        public Task<string?> PickAsync(CancellationToken cancellationToken = default)
+        {
+            PickCount++;
+            return Task.FromResult(PickedPath);
+        }
+    }
+
+    [Fact]
+    public void DiscoveryPrefill_SeedsOnlyNameHostPortAndPerformsNoPrivilegedAction()
+    {
+        var ssh = new FakeSshConnectionService();
+        var trust = new FakeHostKeyTrustStore();
+        var picker = new FakePrivateKeyFilePicker();
+        var vm = new ServerEditorViewModel(
+            new ServerValidator(),
+            ssh,
+            trust,
+            new FakeConnectionStateStore(),
+            picker,
+            new FakeLocalizationService(),
+            server: null,
+            prefill: new ServerDiscoveryPrefill
+            {
+                Name = "Example SSH",
+                Host = "example.local",
+                Port = 22
+            });
+
+        Assert.Equal("Example SSH", vm.Name);
+        Assert.Equal("example.local", vm.Host);
+        Assert.Equal("22", vm.Port);
+        Assert.Equal(string.Empty, vm.Username);
+        Assert.Equal(string.Empty, vm.PrivateKeyPath);
+        Assert.Equal((int)ServerOperatingSystem.Auto, vm.SelectedOperatingSystemIndex);
+        Assert.Equal(0, ssh.ConnectCount);
+        Assert.Equal(0, ssh.TestConnectionCount);
+        Assert.Equal(0, ssh.DetectOperatingSystemCount);
+        Assert.Equal(0, trust.GetCount);
+        Assert.Equal(0, trust.TrustCount);
+        Assert.Equal(0, trust.RemoveCount);
+        Assert.Equal(0, picker.PickCount);
     }
 
     [Fact]

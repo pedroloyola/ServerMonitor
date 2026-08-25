@@ -1,8 +1,10 @@
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.Windows.Input;
 using Microsoft.Extensions.Logging;
 using Microsoft.UI.Dispatching;
 using ServerMonitor.App.Services;
+using ServerMonitor.Core.Discovery;
 using ServerMonitor.Core.Interfaces;
 using ServerMonitor.Core.Models;
 
@@ -17,13 +19,19 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
     private readonly IServerMetricsStore _metricsStore;
     private readonly IServerMonitoringStateStore _monitoringStateStore;
     private readonly IMonitoringEngine _monitoringEngine;
+    private readonly IServerDiscoveryService _discoveryService;
     private readonly ILocalizationService _localizationService;
     private readonly ILogger<DashboardViewModel> _logger;
     // Captured on the UI thread so engine state changes (raised on background loops) can be
     // marshalled back before touching bound properties. Null in unit tests, where handlers run
     // inline on the calling thread.
     private readonly DispatcherQueue? _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
+    // Normalized "host|port" of every configured server (visible and hidden), so a suggestion
+    // already added is suppressed. This is a UX de-duplication only — never a trust decision.
+    private HashSet<string> _configuredEndpoints = new(StringComparer.Ordinal);
     private bool _hasVisibleServers;
+    private bool _hasDiscoveredServers;
+    private int _discoveredCount;
     private bool _isOperationErrorOpen;
 
     public DashboardViewModel(
@@ -34,6 +42,7 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         IServerMetricsStore metricsStore,
         IServerMonitoringStateStore monitoringStateStore,
         IMonitoringEngine monitoringEngine,
+        IServerDiscoveryService discoveryService,
         INavigationService navigationService,
         ILocalizationService localizationService,
         ILogger<DashboardViewModel> logger)
@@ -45,16 +54,20 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         _metricsStore = metricsStore;
         _monitoringStateStore = monitoringStateStore;
         _monitoringEngine = monitoringEngine;
+        _discoveryService = discoveryService;
         _localizationService = localizationService;
         _logger = logger;
         _serverService.ServersChanged += OnServersChanged;
         _connectionStateStore.StateChanged += OnConnectionStateChanged;
         _monitoringStateStore.StateChanged += OnMonitoringStateChanged;
+        _discoveryService.DiscoveredChanged += OnDiscoveredChanged;
         AddServerCommand = new AsyncRelayCommand(AddServerAsync);
         OpenSettingsCommand = new RelayCommand(navigationService.GoToSettings);
     }
 
     public ObservableCollection<ServerCardViewModel> VisibleServers { get; } = [];
+
+    public ObservableCollection<DiscoveredServerViewModel> DiscoveredServers { get; } = [];
 
     public ICommand AddServerCommand { get; }
 
@@ -65,6 +78,35 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         get => _hasVisibleServers;
         private set => SetProperty(ref _hasVisibleServers, value);
     }
+
+    public bool HasDiscoveredServers
+    {
+        get => _hasDiscoveredServers;
+        private set => SetProperty(ref _hasDiscoveredServers, value);
+    }
+
+    /// <summary>
+    /// Number of suggestions currently visible in the "Encontrados na rede" section — after
+    /// ignored identities and already-configured servers are filtered out. Kept in sync by
+    /// <see cref="RebuildDiscovered"/>, so it tracks Ignore, Reset and suppression changes.
+    /// </summary>
+    public int DiscoveredCount
+    {
+        get => _discoveredCount;
+        private set
+        {
+            if (SetProperty(ref _discoveredCount, value))
+            {
+                OnPropertyChanged(nameof(DiscoveredCountAutomationName));
+            }
+        }
+    }
+
+    /// <summary>Localized, screen-reader-friendly rendering of <see cref="DiscoveredCount"/>.</summary>
+    public string DiscoveredCountAutomationName => string.Format(
+        CultureInfo.CurrentUICulture,
+        _localizationService.GetString("DashboardDiscoveryCountName"),
+        DiscoveredCount);
 
     public bool IsOperationErrorOpen
     {
@@ -77,7 +119,10 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         try
         {
             var servers = await _serverService.GetAllAsync();
-            SetServers(servers.Where(server => !server.IsHidden));
+            var all = servers.ToList();
+            _configuredEndpoints = BuildConfiguredEndpoints(all);
+            SetServers(all.Where(server => !server.IsHidden));
+            RebuildDiscovered();
         }
         catch (Exception exception)
         {
@@ -90,6 +135,7 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         _serverService.ServersChanged -= OnServersChanged;
         _connectionStateStore.StateChanged -= OnConnectionStateChanged;
         _monitoringStateStore.StateChanged -= OnMonitoringStateChanged;
+        _discoveryService.DiscoveredChanged -= OnDiscoveredChanged;
     }
 
     private async Task AddServerAsync()
@@ -97,24 +143,56 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         try
         {
             using var editorResult = await _dialogService.ShowEditorAsync(null);
-            if (editorResult is null)
-            {
-                return;
-            }
-
-            var result = await _serverProfileService.AddAsync(editorResult.Profile);
-            if (!result.Succeeded)
-            {
-                IsOperationErrorOpen = true;
-            }
-            else if (editorResult.ConnectionResult is not null)
-            {
-                _connectionStateStore.Set(result.Server!.Id, editorResult.ConnectionResult);
-            }
+            await PersistEditorResultAsync(editorResult);
         }
         catch (Exception exception)
         {
             HandleError(exception, "add server");
+        }
+    }
+
+    private async Task AddDiscoveredAsync(DiscoveredServerViewModel discovered)
+    {
+        try
+        {
+            // Exactly the normal add flow, only pre-filled: cancel returns null and persists
+            // nothing; a successful save reaches monitoring solely through ServersChanged.
+            using var editorResult = await _dialogService.ShowEditorForDiscoveryAsync(discovered.ToPrefill());
+            await PersistEditorResultAsync(editorResult);
+        }
+        catch (Exception exception)
+        {
+            HandleError(exception, "add discovered server");
+        }
+    }
+
+    private async Task IgnoreDiscoveredAsync(DiscoveredServerViewModel discovered)
+    {
+        try
+        {
+            await _discoveryService.IgnoreAsync(discovered.Discovered.Identity);
+        }
+        catch (Exception exception)
+        {
+            HandleError(exception, "ignore discovered server");
+        }
+    }
+
+    private async Task PersistEditorResultAsync(ServerEditorResult? editorResult)
+    {
+        if (editorResult is null)
+        {
+            return;
+        }
+
+        var result = await _serverProfileService.AddAsync(editorResult.Profile);
+        if (!result.Succeeded)
+        {
+            IsOperationErrorOpen = true;
+        }
+        else if (editorResult.ConnectionResult is not null)
+        {
+            _connectionStateStore.Set(result.Server!.Id, editorResult.ConnectionResult);
         }
     }
 
@@ -211,6 +289,86 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         }
 
         HasVisibleServers = VisibleServers.Count > 0;
+    }
+
+    private void RebuildDiscovered()
+    {
+        DiscoveredServers.Clear();
+        // The service already excludes ignored identities; here we additionally hide any suggestion
+        // that maps to a server already configured (same normalized host/address + port).
+        foreach (var discovered in _discoveryService.GetDiscovered())
+        {
+            if (IsAlreadyConfigured(discovered))
+            {
+                continue;
+            }
+
+            DiscoveredServers.Add(new DiscoveredServerViewModel(
+                discovered,
+                _localizationService,
+                AddDiscoveredAsync,
+                IgnoreDiscoveredAsync));
+        }
+
+        DiscoveredCount = DiscoveredServers.Count;
+        HasDiscoveredServers = DiscoveredServers.Count > 0;
+    }
+
+    // Raised on the discovery service's background thread; marshal to the UI thread first.
+    private void OnDiscoveredChanged(object? sender, EventArgs args)
+    {
+        if (_dispatcherQueue is null || _dispatcherQueue.HasThreadAccess)
+        {
+            RebuildDiscovered();
+        }
+        else
+        {
+            _dispatcherQueue.TryEnqueue(RebuildDiscovered);
+        }
+    }
+
+    private bool IsAlreadyConfigured(DiscoveredService discovered)
+    {
+        if (_configuredEndpoints.Contains(EndpointKey(discovered.HostName, discovered.Port)))
+        {
+            return true;
+        }
+
+        foreach (var address in discovered.Addresses)
+        {
+            if (_configuredEndpoints.Contains(EndpointKey(address.ToString(), discovered.Port)))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static HashSet<string> BuildConfiguredEndpoints(IEnumerable<Server> servers)
+    {
+        var set = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var server in servers)
+        {
+            set.Add(EndpointKey(server.Host, server.Port));
+        }
+
+        return set;
+    }
+
+    // Case, trailing-dot and IPv6-bracket normalization only. Deliberately shallow: this is a
+    // display-level match to avoid suggesting something already added, never proof of identity.
+    private static string EndpointKey(string host, int port) => NormalizeHost(host) + "|" + port;
+
+    private static string NormalizeHost(string host)
+    {
+        var value = host.Trim();
+        if (value.Length >= 2 && value[0] == '[' && value[^1] == ']')
+        {
+            value = value[1..^1];
+        }
+
+        return value.TrimEnd('.').ToLowerInvariant();
     }
 
     private async void OnServersChanged(object? sender, EventArgs args) => await LoadAsync();

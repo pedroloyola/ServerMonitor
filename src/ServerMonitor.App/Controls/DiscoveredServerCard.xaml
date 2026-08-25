@@ -1,0 +1,78 @@
+<UserControl
+    x:Class="ServerMonitor.App.Controls.DiscoveredServerCard"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- Deliberately a secondary, non-glass row (muted surface) so discovered suggestions never
+         compete visually with configured server cards. Identity only: no OS, health or metrics. -->
+    <Border
+        Margin="0,0,0,8"
+        Padding="14,10"
+        AutomationProperties.Name="{Binding AutomationSummary}"
+        Background="{ThemeResource MutedSurfaceBrush}"
+        BorderBrush="{ThemeResource GlassBorderBrush}"
+        BorderThickness="1"
+        CornerRadius="{StaticResource RadiusMedium}">
+        <Grid ColumnSpacing="10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Spacing="3" VerticalAlignment="Center">
+                <TextBlock
+                    FontFamily="Segoe UI Variable Display"
+                    FontSize="15"
+                    FontWeight="SemiBold"
+                    Text="{Binding DisplayName}"
+                    TextTrimming="CharacterEllipsis" />
+                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <Border
+                        Padding="6,1"
+                        VerticalAlignment="Center"
+                        Background="{ThemeResource MutedSurfaceBrush}"
+                        BorderBrush="{ThemeResource GlassBorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="{StaticResource RadiusSmall}">
+                        <TextBlock
+                            x:Uid="DiscoveredServerProtocol"
+                            FontSize="10"
+                            FontWeight="Medium"
+                            Foreground="{ThemeResource TextSecondaryBrush}" />
+                    </Border>
+                    <TextBlock
+                        FontSize="12"
+                        Foreground="{ThemeResource TextSecondaryBrush}"
+                        Text="{Binding Endpoint}"
+                        TextTrimming="CharacterEllipsis"
+                        VerticalAlignment="Center" />
+                    <TextBlock
+                        x:Uid="DiscoveredServerState"
+                        FontSize="12"
+                        Foreground="{ThemeResource TextTertiaryBrush}"
+                        VerticalAlignment="Center" />
+                </StackPanel>
+            </StackPanel>
+
+            <StackPanel
+                Grid.Column="1"
+                Orientation="Horizontal"
+                Spacing="8"
+                VerticalAlignment="Center">
+                <Button
+                    x:Uid="DiscoveredServerAddButton"
+                    AutomationProperties.Name="{Binding AddAutomationName}"
+                    Command="{Binding AddCommand}"
+                    Style="{StaticResource QuietPillButtonStyle}" />
+                <Button
+                    Width="36"
+                    Height="36"
+                    AutomationProperties.Name="{Binding IgnoreAutomationName}"
+                    Command="{Binding IgnoreCommand}"
+                    Style="{StaticResource SubtleIconButtonStyle}"
+                    ToolTipService.ToolTip="{Binding IgnoreAutomationName}">
+                    <FontIcon FontSize="12" Glyph="&#xE711;" />
+                </Button>
+            </StackPanel>
+        </Grid>
+    </Border>
+</UserControl>

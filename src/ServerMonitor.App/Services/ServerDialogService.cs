@@ -17,7 +17,16 @@ public sealed class ServerDialogService(
     IPrivateKeyFilePicker privateKeyFilePicker,
     ILocalizationService localizationService) : IServerDialogService
 {
-    public async Task<ServerEditorResult?> ShowEditorAsync(Server? server)
+    public Task<ServerEditorResult?> ShowEditorAsync(Server? server) =>
+        ShowEditorCoreAsync(server, prefill: null, isEdit: server is not null);
+
+    public Task<ServerEditorResult?> ShowEditorForDiscoveryAsync(ServerDiscoveryPrefill prefill) =>
+        ShowEditorCoreAsync(server: null, prefill: prefill, isEdit: false);
+
+    private async Task<ServerEditorResult?> ShowEditorCoreAsync(
+        Server? server,
+        ServerDiscoveryPrefill? prefill,
+        bool isEdit)
     {
         var viewModel = new ServerEditorViewModel(
             validator,
@@ -26,7 +35,8 @@ public sealed class ServerDialogService(
             connectionStateStore,
             privateKeyFilePicker,
             localizationService,
-            server);
+            server,
+            prefill);
 
         try
         {
@@ -34,7 +44,7 @@ public sealed class ServerDialogService(
                 windowContext,
                 viewModel,
                 localizationService,
-                isEdit: server is not null);
+                isEdit);
         }
         finally
         {

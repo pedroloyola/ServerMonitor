@@ -10,6 +10,7 @@ namespace ServerMonitor.App;
 public sealed partial class MainWindow : Window
 {
     private readonly INavigationService _navigationService;
+    private readonly AppShutdownCoordinator _shutdownCoordinator;
     private readonly ILogger<MainWindow> _logger;
     private bool _isEnforcingMinimumSize;
 
@@ -21,10 +22,12 @@ public sealed partial class MainWindow : Window
         IThemeService themeService,
         IWindowContext windowContext,
         ILocalizationService localizationService,
+        AppShutdownCoordinator shutdownCoordinator,
         ILogger<MainWindow> logger)
     {
         InitializeComponent();
         _navigationService = navigationService;
+        _shutdownCoordinator = shutdownCoordinator;
         _logger = logger;
         Title = localizationService.GetString("AppWindowTitle");
 
@@ -102,5 +105,6 @@ public sealed partial class MainWindow : Window
         AppWindow.Changed -= OnAppWindowChanged;
         RootLayout.ActualThemeChanged -= OnActualThemeChanged;
         Closed -= OnWindowClosed;
+        _shutdownCoordinator.Shutdown();
     }
 }

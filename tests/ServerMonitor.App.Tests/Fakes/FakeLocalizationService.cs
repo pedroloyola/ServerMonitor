@@ -17,6 +17,10 @@ internal sealed class FakeLocalizationService : ILocalizationService
         {
             ["ServerCardMoreOptionsFor"] = "More options for {0}",
             ["ServerMetricsRefreshFor"] = "Refresh metrics for {0}",
+            ["DashboardDiscoveryCountName"] = "Devices found: {0}",
+            ["DiscoveredServerAddFor"] = "Add {0}",
+            ["DiscoveredServerIgnoreFor"] = "Ignore {0}",
+            ["DiscoveredServerAutomationSummary"] = "{0}, SSH, {1}, found on the network",
             ["ServerCardAutomationSummary"] = "{0} · {1} · {2} · {3}",
             ["ServerMetricsUptimeDaysHoursFormat"] = "{0}d {1}h",
             ["ServerMetricsUptimeHoursMinutesFormat"] = "{0}h {1}m",

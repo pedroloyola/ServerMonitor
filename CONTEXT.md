@@ -1674,7 +1674,6 @@ Um Mac descoberto pode aparecer inicialmente como:
 Encontrado na rede
 
 Mac Studio
-macOS
 192.168.1.42
 SSH
 
@@ -1682,7 +1681,7 @@ SSH
 [ Ignorar ]
 ```
 
-A descoberta não significa autenticação.
+A descoberta não significa autenticação e não permite inferir o sistema operativo. Antes de uma conexão real, o OS permanece `Auto`/desconhecido; a deteção Linux/macOS continua a pertencer ao fluxo SSH do M3.
 
 O utilizador continua a ter de fornecer ou selecionar credenciais válidas antes de o servidor passar a ser monitorizado.
 
@@ -1706,7 +1705,7 @@ A aplicação não deve exigir alterações no Ubuntu para funcionar.
 
 # 60. Descoberta de subnet
 
-A aplicação pode oferecer um segundo método:
+A aplicação pode oferecer futuramente um segundo método (M7.1 ou posterior):
 
 ```text
 Procurar dispositivos na rede
@@ -2424,22 +2423,22 @@ Sem tornar o MVP excessivamente abstrato.
 
 O MVP passa a incluir:
 
-- [ ] descoberta mDNS/Bonjour de serviços SSH na rede local;
-- [ ] apresentar dispositivos descobertos;
-- [ ] adicionar servidor descoberto;
-- [ ] adicionar servidor manualmente;
-- [ ] remover servidor;
-- [ ] ocultar servidor;
-- [ ] restaurar servidor oculto;
-- [ ] ignorar dispositivo descoberto;
-- [ ] deteção automática do idioma do sistema;
-- [ ] pt-BR como idioma de referência e fallback;
-- [ ] recursos preparados para localização;
-- [ ] Apple-style glassmorphism;
-- [ ] dark/light/system architecture;
-- [ ] preparação do repositório como projeto open-source.
+- [x] descoberta mDNS/Bonjour de serviços SSH na rede local;
+- [x] apresentar dispositivos descobertos;
+- [x] adicionar servidor descoberto;
+- [x] adicionar servidor manualmente;
+- [x] remover servidor;
+- [x] ocultar servidor;
+- [x] restaurar servidor oculto;
+- [x] ignorar dispositivo descoberto;
+- [x] deteção automática do idioma do sistema;
+- [x] pt-BR como idioma de referência e fallback;
+- [x] recursos preparados para localização;
+- [x] Apple-style glassmorphism;
+- [x] dark/light/system architecture;
+- [x] preparação do repositório como projeto open-source.
 
-A descoberta de subnet completa pode entrar em **V1.1** caso aumente demasiado o scope do MVP.
+A descoberta ativa de subnet está explicitamente deferida para **M7.1 / futuro** e não faz parte do M7 passivo.
 
 ---
 

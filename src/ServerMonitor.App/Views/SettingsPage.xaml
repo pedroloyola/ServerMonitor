@@ -172,6 +172,40 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
                     </StackPanel>
+
+                    <Border Height="1" Background="{ThemeResource GlassBorderBrush}" />
+
+                    <!-- Ignored Discoveries Section -->
+                    <StackPanel Spacing="10">
+                        <StackPanel Spacing="2">
+                            <TextBlock
+                                x:Uid="SettingsIgnoredDiscoveriesTitle"
+                                AutomationProperties.HeadingLevel="Level2"
+                                Style="{StaticResource SectionTitleTextStyle}" />
+                            <TextBlock
+                                x:Uid="SettingsIgnoredDiscoveriesDescription"
+                                FontSize="12"
+                                Foreground="{ThemeResource TextSecondaryBrush}"
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+
+                        <Button
+                            x:Uid="SettingsResetIgnoredButton"
+                            HorizontalAlignment="Left"
+                            Command="{Binding ResetIgnoredCommand}"
+                            Style="{StaticResource QuietPillButtonStyle}" />
+
+                        <InfoBar
+                            x:Uid="SettingsResetIgnoredSuccess"
+                            IsClosable="True"
+                            IsOpen="{Binding IsResetIgnoredSuccessOpen, Mode=TwoWay}"
+                            Severity="Success" />
+                        <InfoBar
+                            x:Uid="SettingsResetIgnoredError"
+                            IsClosable="True"
+                            IsOpen="{Binding IsResetIgnoredErrorOpen, Mode=TwoWay}"
+                            Severity="Error" />
+                    </StackPanel>
                 </StackPanel>
             </controls:GlassCard>
 

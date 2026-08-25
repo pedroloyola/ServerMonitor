@@ -13,26 +13,32 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
     private readonly ILocalizationService _localizationService;
     private readonly IThemeService _themeService;
     private readonly IServerService _serverService;
+    private readonly IServerDiscoveryService _discoveryService;
     private readonly ILogger<SettingsViewModel> _logger;
     private int _selectedLanguageIndex;
     private int _selectedThemeIndex;
     private bool _isRestartNoticeOpen;
     private bool _hasHiddenServers;
     private bool _isServerOperationErrorOpen;
+    private bool _isResetIgnoredSuccessOpen;
+    private bool _isResetIgnoredErrorOpen;
 
     public SettingsViewModel(
         IThemeService themeService,
         ILocalizationService localizationService,
         INavigationService navigationService,
         IServerService serverService,
+        IServerDiscoveryService discoveryService,
         ILogger<SettingsViewModel> logger)
     {
         _themeService = themeService;
         _localizationService = localizationService;
         _serverService = serverService;
+        _discoveryService = discoveryService;
         _logger = logger;
         _serverService.ServersChanged += OnServersChanged;
         BackCommand = new RelayCommand(navigationService.GoToDashboard);
+        ResetIgnoredCommand = new AsyncRelayCommand(ResetIgnoredAsync);
         _selectedThemeIndex = (int)themeService.Current;
         _selectedLanguageIndex = localizationService.CurrentLanguageOverride switch
         {
@@ -46,6 +52,8 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
     public ObservableCollection<HiddenServerItemViewModel> HiddenServers { get; } = [];
 
     public ICommand BackCommand { get; }
+
+    public ICommand ResetIgnoredCommand { get; }
 
     public int SelectedThemeIndex
     {
@@ -100,6 +108,18 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
         set => SetProperty(ref _isServerOperationErrorOpen, value);
     }
 
+    public bool IsResetIgnoredSuccessOpen
+    {
+        get => _isResetIgnoredSuccessOpen;
+        set => SetProperty(ref _isResetIgnoredSuccessOpen, value);
+    }
+
+    public bool IsResetIgnoredErrorOpen
+    {
+        get => _isResetIgnoredErrorOpen;
+        set => SetProperty(ref _isResetIgnoredErrorOpen, value);
+    }
+
     public async Task LoadAsync()
     {
         try
@@ -114,6 +134,24 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
     }
 
     public void Dispose() => _serverService.ServersChanged -= OnServersChanged;
+
+    private async Task ResetIgnoredAsync()
+    {
+        IsResetIgnoredSuccessOpen = false;
+        IsResetIgnoredErrorOpen = false;
+        try
+        {
+            await _discoveryService.ResetIgnoredAsync();
+            IsResetIgnoredSuccessOpen = true;
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(
+                "Could not reset ignored discoveries. Exception type: {ExceptionType}.",
+                exception.GetType().Name);
+            IsResetIgnoredErrorOpen = true;
+        }
+    }
 
     private async Task RestoreAsync(Server server)
     {

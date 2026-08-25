@@ -48,7 +48,8 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
         IServerConnectionStateStore connectionStateStore,
         IPrivateKeyFilePicker privateKeyFilePicker,
         ILocalizationService localizationService,
-        Server? server)
+        Server? server,
+        ServerDiscoveryPrefill? prefill = null)
     {
         _validator = validator;
         _sshConnectionService = sshConnectionService;
@@ -57,9 +58,12 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
         _privateKeyFilePicker = privateKeyFilePicker;
         _localizationService = localizationService;
         _existingServer = server;
-        _name = server?.Name ?? string.Empty;
-        _host = server?.Host ?? string.Empty;
-        _port = (server?.Port ?? 22).ToString(CultureInfo.InvariantCulture);
+        // Discovery prefill only seeds an add (server is null): name/host/port come from the
+        // suggestion, everything else keeps its blank add-mode default. It never turns an add into
+        // an edit (_existingServer stays null) and never touches auth, credentials or the OS guess.
+        _name = server?.Name ?? prefill?.Name ?? string.Empty;
+        _host = server?.Host ?? prefill?.Host ?? string.Empty;
+        _port = (server?.Port ?? prefill?.Port ?? 22).ToString(CultureInfo.InvariantCulture);
         _username = server?.Username ?? string.Empty;
         _privateKeyPath = server?.PrivateKeyPath ?? string.Empty;
         _selectedOperatingSystemIndex = (int)(server?.OperatingSystem ?? ServerOperatingSystem.Auto);

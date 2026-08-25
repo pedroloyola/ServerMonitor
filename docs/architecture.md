@@ -1,4 +1,4 @@
-# Arquitetura — Milestone 4
+# Arquitetura — Milestone 7
 
 ```text
 ServerMonitor.App  ──→ ServerMonitor.Core
@@ -90,6 +90,31 @@ Falhas individuais de parsing mantêm a métrica como `null`, distinguindo unkno
 ## Monitorização automática (Milestone 6)
 
 O `MonitoringEngine` (App, `IHostedService`) agenda uma recolha por servidor num loop `async` próprio, com limite global de concorrência, retries só para falhas transitórias e todo o tempo através de um `TimeProvider` injetável. Publica `ServerMonitoringState` (saúde, refresh em curso, stale, timestamps, último erro) no `IServerMonitoringStateStore` transitório. A UI observa esse estado (o card não tem timers) e o refresh manual é encaminhado por `IMonitoringEngine.RefreshNowAsync`, partilhando o single-flight do agendador e reiniciando o intervalo. A saúde usa `ServerHealth` + `MonitoringThresholds`, distinta do estado de conexão SSH. Detalhes de loop, sleep/resume, hidden, logging e política constam da ADR-011.
+
+## Descoberta passiva de rede (Milestone 7)
+
+```text
+_ssh._tcp.local. → TmdsMdnsServiceBrowser → IMdnsServiceBrowser
+                                                │ Found/Updated/Removed validados
+                                                ▼
+                                      ServerDiscoveryService
+                                  (runtime store + IHostedService)
+                                      │                 │
+                         ignored-devices.json       Dashboard
+                                      │                 │ Adicionar
+                                      └────────────┐    ▼
+                                               fluxo M3 existente
+                                      credenciais → probe → trust → save
+                                                               │
+                                                               ▼
+                                                     M6 via ServersChanged
+```
+
+O browser `Tmds.MDns` está encapsulado em `Infrastructure` e observa apenas `_ssh._tcp`. O contrato fakeável `IMdnsServiceBrowser` transporta observações já limitadas e validadas; o `ServerDiscoveryService` agrega anúncios do mesmo service instance entre NICs, preserva IPv4/IPv6, aplica grace/expiry com `TimeProvider` e coalesce notificações materiais. O store runtime é independente dos stores de métricas e monitoring.
+
+Ignorar persiste apenas o hash SHA-256 da identidade provisória DNS-SD em `%LOCALAPPDATA%\ServerMonitor\ignored-devices.json`, separado de `servers.json` e do host-trust. A identidade mDNS serve somente para dedup/UX; após Adicionar, a host-key SSH continua a ser a identidade de confiança. Discovery nunca lê credenciais, inicia SSH, aceita host keys, grava fingerprints ou chama o motor M6. Um servidor guardado é monitorizado apenas pelo reconcile normal de `ServersChanged`.
+
+A descoberta está limitada ao segmento onde multicast é visível; não promete atravessar routers ou VPNs. Linux só aparece se publicar o serviço, por exemplo através de Avahi. Scanning ativo fica deferido para M7.1/futuro. Decisões, limites de input/flood e alternativas Windows constam da ADR-012.
 
 ## Fronteira de apresentação compacta
 

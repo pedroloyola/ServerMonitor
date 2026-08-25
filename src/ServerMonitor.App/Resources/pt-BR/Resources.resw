@@ -164,4 +164,20 @@
   <data name="ServerMetricsStaleMinutesFormat" xml:space="preserve"><value>Última atualização há {0} min</value></data>
   <data name="ServerMetricsStaleHoursFormat" xml:space="preserve"><value>Última atualização há {0} h</value></data>
   <data name="ServerMetricsStaleDaysFormat" xml:space="preserve"><value>Última atualização há {0} d</value></data>
+  <data name="DashboardDiscoveryTitle.Text" xml:space="preserve"><value>Encontrados na rede</value></data>
+  <data name="DashboardDiscoveryDescription.Text" xml:space="preserve"><value>Dispositivos SSH que se anunciam na sua rede local. Adicione um para começar a monitorar.</value></data>
+  <data name="DashboardDiscoveryCountName" xml:space="preserve"><value>Dispositivos encontrados: {0}</value></data>
+  <data name="DiscoveredServerProtocol.Text" xml:space="preserve"><value>SSH</value></data>
+  <data name="DiscoveredServerState.Text" xml:space="preserve"><value>Encontrado na rede</value></data>
+  <data name="DiscoveredServerAddButton.Content" xml:space="preserve"><value>Adicionar</value></data>
+  <data name="DiscoveredServerAddFor" xml:space="preserve"><value>Adicionar {0}</value></data>
+  <data name="DiscoveredServerIgnoreFor" xml:space="preserve"><value>Ignorar {0}</value></data>
+  <data name="DiscoveredServerAutomationSummary" xml:space="preserve"><value>{0}, SSH, {1}, encontrado na rede</value></data>
+  <data name="SettingsIgnoredDiscoveriesTitle.Text" xml:space="preserve"><value>Dispositivos ignorados</value></data>
+  <data name="SettingsIgnoredDiscoveriesDescription.Text" xml:space="preserve"><value>Dispositivos ignorados ficam ocultos no painel. Redefina para que os que ainda estão presentes voltem a aparecer.</value></data>
+  <data name="SettingsResetIgnoredButton.Content" xml:space="preserve"><value>Redefinir dispositivos ignorados</value></data>
+  <data name="SettingsResetIgnoredSuccess.Title" xml:space="preserve"><value>Dispositivos ignorados redefinidos</value></data>
+  <data name="SettingsResetIgnoredSuccess.Message" xml:space="preserve"><value>Dispositivos ainda presentes na rede serão sugeridos novamente.</value></data>
+  <data name="SettingsResetIgnoredError.Title" xml:space="preserve"><value>Não foi possível redefinir os dispositivos ignorados</value></data>
+  <data name="SettingsResetIgnoredError.Message" xml:space="preserve"><value>Tente novamente em instantes.</value></data>
 </root>

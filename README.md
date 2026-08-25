@@ -4,7 +4,7 @@ Server Monitor é uma aplicação desktop WinUI 3 para Windows, concebida como u
 
 ## Estado atual
 
-O repositório contém o **Milestone 3 (Secure SSH Connection Foundation)** sobre a base visual e a gestão manual dos milestones anteriores:
+O repositório contém o **Milestone 7 (Network Discovery)**, construído sobre a fundação SSH segura do M3, os collectors Linux/macOS do M4 e o motor de monitorização automática do M6:
 
 - solution e separação inicial entre App, Core, Infrastructure e Collectors;
 - shell WinUI 3 com MVVM e dependency injection;
@@ -22,10 +22,17 @@ O repositório contém o **Milestone 3 (Secure SSH Connection Foundation)** sobr
 - confiança de host key por fingerprint SHA-256, sem aceitação automática;
 - bloqueio de host-key mismatch;
 - deteção de Linux/macOS por `uname -s`;
-- ServerCards sem métricas fictícias e com estados de conexão transitórios;
+- recolha e apresentação de métricas reais Linux/macOS;
+- monitorização automática com limites de concorrência, retries transitórios, estado de saúde e refresh manual;
+- descoberta local passiva de serviços SSH por mDNS/DNS-SD (`_ssh._tcp.local.`), sem scan de subnet ou portas;
+- deduplicação entre IPv4/IPv6 e interfaces, remoção com grace/expiry e limites contra floods;
+- sugestões de rede separadas dos servidores configurados, com ações Adicionar e Ignorar;
+- persistência não sensível de dispositivos ignorados e reset nas Configurações;
+- Adicionar a partir da descoberta reutiliza integralmente o fluxo M3 de credenciais, teste, host-key probe e confiança explícita;
+- ServerCards sem métricas fictícias e com estados de conexão e monitorização transitórios;
 - apresentações `ServerFullCard` e `ServerCompactCard` sobre o mesmo estado; o modo compacto ainda não está exposto.
 
-Não existem ainda métricas, monitorização periódica, descoberta de rede, notificações ou system tray.
+A descoberta mDNS é local ao segmento de rede visível. Linux pode necessitar de um anúncio compatível, como Avahi; VPNs e descoberta ativa de subnet não fazem parte do M7. Notificações, system tray e arranque com o Windows continuam fora do âmbito atual.
 
 ## Requisitos
 

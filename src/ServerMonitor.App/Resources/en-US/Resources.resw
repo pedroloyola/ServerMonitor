@@ -159,4 +159,20 @@
   <data name="ServerMetricsStaleMinutesFormat" xml:space="preserve"><value>Last updated {0} min ago</value></data>
   <data name="ServerMetricsStaleHoursFormat" xml:space="preserve"><value>Last updated {0} h ago</value></data>
   <data name="ServerMetricsStaleDaysFormat" xml:space="preserve"><value>Last updated {0} d ago</value></data>
+  <data name="DashboardDiscoveryTitle.Text" xml:space="preserve"><value>Found on the network</value></data>
+  <data name="DashboardDiscoveryDescription.Text" xml:space="preserve"><value>SSH devices announcing themselves on your local network. Add one to start monitoring it.</value></data>
+  <data name="DashboardDiscoveryCountName" xml:space="preserve"><value>Devices found: {0}</value></data>
+  <data name="DiscoveredServerProtocol.Text" xml:space="preserve"><value>SSH</value></data>
+  <data name="DiscoveredServerState.Text" xml:space="preserve"><value>Found on the network</value></data>
+  <data name="DiscoveredServerAddButton.Content" xml:space="preserve"><value>Add</value></data>
+  <data name="DiscoveredServerAddFor" xml:space="preserve"><value>Add {0}</value></data>
+  <data name="DiscoveredServerIgnoreFor" xml:space="preserve"><value>Ignore {0}</value></data>
+  <data name="DiscoveredServerAutomationSummary" xml:space="preserve"><value>{0}, SSH, {1}, found on the network</value></data>
+  <data name="SettingsIgnoredDiscoveriesTitle.Text" xml:space="preserve"><value>Ignored devices</value></data>
+  <data name="SettingsIgnoredDiscoveriesDescription.Text" xml:space="preserve"><value>Ignored devices stay hidden on the dashboard. Reset to let devices still present appear again.</value></data>
+  <data name="SettingsResetIgnoredButton.Content" xml:space="preserve"><value>Reset ignored devices</value></data>
+  <data name="SettingsResetIgnoredSuccess.Title" xml:space="preserve"><value>Ignored devices reset</value></data>
+  <data name="SettingsResetIgnoredSuccess.Message" xml:space="preserve"><value>Devices still present on the network will be suggested again.</value></data>
+  <data name="SettingsResetIgnoredError.Title" xml:space="preserve"><value>Could not reset ignored devices</value></data>
+  <data name="SettingsResetIgnoredError.Message" xml:space="preserve"><value>Try again in a moment.</value></data>
 </root>
