@@ -16,6 +16,7 @@ using ServerMonitor.Infrastructure.Discovery;
 using ServerMonitor.Infrastructure.Persistence;
 using ServerMonitor.Infrastructure.Security;
 using ServerMonitor.Infrastructure.SSH;
+using ServerMonitor.App.Windowing;
 
 namespace ServerMonitor.App;
 
@@ -53,6 +54,22 @@ public partial class App : Application
                 services.AddSingleton<ApplicationWindowController>();
                 services.AddSingleton<IApplicationWindowController>(sp =>
                     sp.GetRequiredService<ApplicationWindowController>());
+
+                // M9 compact widget mode. One window, two presentations. The placement store is the
+                // real JSON file by default; the --qa-compact harness overrides it further below to
+                // force Compact mode without touching the file. The adapter is the single native
+                // window boundary; the coordinator sequences every Standard ⇄ Compact transition.
+                services.AddSingleton(WindowPlacementStorageOptions.ForCurrentUser());
+                services.AddSingleton<JsonWindowPlacementStore>();
+                services.AddSingleton<IWindowPlacementStore>(sp =>
+                    sp.GetRequiredService<JsonWindowPlacementStore>());
+                services.AddSingleton<AppWindowPlacementAdapter>();
+                services.AddSingleton<IWindowPlacementAdapter>(sp =>
+                    sp.GetRequiredService<AppWindowPlacementAdapter>());
+                services.AddSingleton<WindowModeCoordinator>();
+                services.AddSingleton<IWindowModeCoordinator>(sp =>
+                    sp.GetRequiredService<WindowModeCoordinator>());
+                services.AddSingleton<WindowModeViewModel>();
                 services.AddSingleton<RefreshAllCoordinator>();
                 services.AddSingleton<IRefreshAllCoordinator>(sp =>
                     sp.GetRequiredService<RefreshAllCoordinator>());
@@ -90,7 +107,8 @@ public partial class App : Application
                 var qaHealth = Qa.QaHealthComposition.IsRequested();
                 var qaDiscovery = Qa.QaDiscoveryComposition.IsRequested();
                 var qaNotifications = Qa.QaNotificationComposition.IsRequested();
-                var qaMode = qaHealth || qaDiscovery || qaNotifications;
+                var qaCompact = Qa.QaCompactComposition.IsRequested();
+                var qaMode = qaHealth || qaDiscovery || qaNotifications || qaCompact;
 #else
                 const bool qaMode = false;
 #endif
@@ -128,6 +146,10 @@ public partial class App : Application
                 else if (qaNotifications)
                 {
                     Qa.QaNotificationComposition.Apply(services);
+                }
+                else if (qaCompact)
+                {
+                    Qa.QaCompactComposition.Apply(services);
                 }
                 else
                 {

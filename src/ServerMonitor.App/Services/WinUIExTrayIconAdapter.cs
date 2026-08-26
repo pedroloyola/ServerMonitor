@@ -24,6 +24,8 @@ public sealed class WinUIExTrayIconAdapter(
 
     public event EventHandler? RefreshAllRequested;
 
+    public event EventHandler? ToggleCompactRequested;
+
     public event EventHandler? SettingsRequested;
 
     public event EventHandler? ExitRequested;
@@ -143,6 +145,7 @@ public sealed class WinUIExTrayIconAdapter(
     {
         var menu = new MenuFlyout();
         menu.Items.Add(CreateMenuItem("TrayOpenMenuItem", OpenRequested));
+        menu.Items.Add(CreateMenuItem("TrayCompactModeMenuItem", ToggleCompactRequested));
         menu.Items.Add(CreateMenuItem("TrayRefreshAllMenuItem", RefreshAllRequested));
         menu.Items.Add(CreateMenuItem("TraySettingsMenuItem", SettingsRequested));
         menu.Items.Add(new MenuFlyoutSeparator());

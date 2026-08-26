@@ -38,6 +38,19 @@ public sealed class TrayServiceTests
     }
 
     [Fact]
+    public async Task ToggleCompact_FromTray_TogglesModeOnTheOneWindow()
+    {
+        var harness = new Harness();
+        await harness.Service.StartAsync(default);
+
+        harness.Icon.RaiseToggleCompact();
+
+        Assert.Equal(1, harness.Window.ToggleCompactCount);
+        // The tray never creates a second window; it only asks the controller to toggle the one.
+        Assert.Equal(0, harness.Window.RestoreCount);
+    }
+
+    [Fact]
     public async Task RepeatedExit_RequestsAuthoritativeWindowCloseOnce()
     {
         var harness = new Harness();
@@ -112,6 +125,7 @@ public sealed class TrayServiceTests
     {
         public event EventHandler? OpenRequested;
         public event EventHandler? RefreshAllRequested;
+        public event EventHandler? ToggleCompactRequested;
         public event EventHandler? SettingsRequested;
         public event EventHandler? ExitRequested;
 
@@ -128,6 +142,7 @@ public sealed class TrayServiceTests
         }
 
         public void RaiseOpen() => OpenRequested?.Invoke(this, EventArgs.Empty);
+        public void RaiseToggleCompact() => ToggleCompactRequested?.Invoke(this, EventArgs.Empty);
         public void RaiseRefreshAll() => RefreshAllRequested?.Invoke(this, EventArgs.Empty);
         public void RaiseSettings() => SettingsRequested?.Invoke(this, EventArgs.Empty);
         public void RaiseExit() => ExitRequested?.Invoke(this, EventArgs.Empty);
@@ -142,10 +157,13 @@ public sealed class TrayServiceTests
         public int CloseCount { get; private set; }
         public int BeginShutdownCount { get; private set; }
 
+        public int ToggleCompactCount { get; private set; }
+
         public void Attach(Window window) { }
         public void HideForMinimize() => HideCount++;
         public void RestoreAndActivate() => RestoreCount++;
         public void OpenSettings() => SettingsCount++;
+        public void ToggleCompactMode() => ToggleCompactCount++;
         public void RequestClose() => CloseCount++;
         public void BeginShutdown() => BeginShutdownCount++;
     }

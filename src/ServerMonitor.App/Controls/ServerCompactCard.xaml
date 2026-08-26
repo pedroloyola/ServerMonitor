@@ -1,17 +1,27 @@
 <UserControl
     x:Class="ServerMonitor.App.Controls.ServerCompactCard"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:controls="using:ServerMonitor.App.Controls">
-    <controls:GlassCard
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- Glanceable widget card. Reuses ServerCardViewModel unchanged; shows only health, name and
+         the three headline metrics. Endpoint, OS, uptime and actions are intentionally omitted.
+         Unknown metrics render as an em dash (never 0), preserving the unknown≠zero invariant.
+         A lighter bordered surface (not a nested GlassCard) avoids glass-on-glass on the small
+         glass window. -->
+    <Border
         Margin="0,0,0,8"
-        AutomationProperties.Name="{Binding AutomationSummary}">
-        <Grid ColumnSpacing="10">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
-            <StackPanel Spacing="5">
+        Padding="13,11"
+        AutomationProperties.Name="{Binding AutomationSummary}"
+        Background="{ThemeResource MutedSurfaceBrush}"
+        BorderBrush="{ThemeResource GlassBorderBrush}"
+        BorderThickness="1"
+        CornerRadius="{StaticResource RadiusMedium}">
+        <StackPanel Spacing="9">
+            <!-- Header: status dot + name + health label (health is conveyed by text, not colour alone) -->
+            <Grid ColumnSpacing="8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
                 <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                     <Border
                         Width="8"
@@ -22,50 +32,178 @@
                         CornerRadius="4" />
                     <TextBlock
                         FontFamily="Segoe UI Variable Display"
-                        FontSize="15"
+                        FontSize="14"
                         FontWeight="SemiBold"
                         Text="{Binding Name}"
                         TextTrimming="CharacterEllipsis"
                         VerticalAlignment="Center" />
-                    <Border
-                        Padding="6,2"
-                        Background="{ThemeResource MutedSurfaceBrush}"
-                        BorderBrush="{ThemeResource GlassBorderBrush}"
-                        BorderThickness="1"
-                        CornerRadius="{StaticResource RadiusSmall}"
-                        VerticalAlignment="Center">
-                        <TextBlock
-                            FontSize="10"
-                            Foreground="{ThemeResource TextSecondaryBrush}"
-                            Text="{Binding OperatingSystemDisplayName}" />
-                    </Border>
                 </StackPanel>
-                <Grid ColumnSpacing="12">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                        <FontIcon
-                            AutomationProperties.AccessibilityView="Raw"
-                            FontSize="10"
-                            Foreground="{ThemeResource TextTertiaryBrush}"
-                            Glyph="&#xE968;" />
-                        <TextBlock
-                            FontSize="12"
-                            Foreground="{ThemeResource TextSecondaryBrush}"
-                            Text="{Binding Endpoint}"
-                            TextTrimming="CharacterEllipsis" />
-                    </StackPanel>
+                <TextBlock
+                    Grid.Column="1"
+                    VerticalAlignment="Center"
+                    FontSize="11"
+                    Foreground="{ThemeResource TextTertiaryBrush}"
+                    Text="{Binding HealthDisplayName}" />
+            </Grid>
+
+            <!-- Metrics strip (CPU / RAM / Disk). Shown whenever a snapshot exists, including a
+                 retained offline snapshot; the discreet stale age below flags it as not current. -->
+            <Grid
+                ColumnSpacing="12"
+                Visibility="{Binding HasMetrics, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <!-- CPU -->
+                <StackPanel Spacing="4">
                     <TextBlock
-                        Grid.Column="1"
-                        VerticalAlignment="Center"
-                        FontSize="11"
+                        x:Uid="ServerMetricsCpuLabel"
+                        FontSize="9"
+                        FontWeight="Medium"
+                        Foreground="{ThemeResource TextTertiaryBrush}" />
+                    <TextBlock
+                        FontSize="14"
+                        FontWeight="SemiBold"
+                        Text="{Binding CpuUsageDisplay}"
+                        TextTrimming="CharacterEllipsis"
+                        Visibility="{Binding HasCpuPercent, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    <TextBlock
+                        FontSize="14"
+                        FontWeight="SemiBold"
                         Foreground="{ThemeResource TextTertiaryBrush}"
-                        Text="{Binding HealthDisplayName}" />
-                </Grid>
+                        Text="&#x2014;"
+                        Visibility="{Binding HasCpuPercent, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Invert}" />
+                    <ProgressBar
+                        Height="2"
+                        MinHeight="2"
+                        Background="{ThemeResource GlassBorderBrush}"
+                        CornerRadius="1"
+                        Foreground="{ThemeResource BrandAccentBrush}"
+                        Maximum="100"
+                        Value="{Binding CpuUsageValue}"
+                        Visibility="{Binding HasCpuPercent, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    <Border
+                        Height="2"
+                        Background="{ThemeResource GlassBorderBrush}"
+                        CornerRadius="1"
+                        Visibility="{Binding HasCpuPercent, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Invert}" />
+                </StackPanel>
+
+                <!-- RAM -->
+                <StackPanel Grid.Column="1" Spacing="4">
+                    <TextBlock
+                        x:Uid="ServerMetricsMemoryLabel"
+                        FontSize="9"
+                        FontWeight="Medium"
+                        Foreground="{ThemeResource TextTertiaryBrush}" />
+                    <TextBlock
+                        FontSize="14"
+                        FontWeight="SemiBold"
+                        Text="{Binding MemoryUsageDisplay}"
+                        TextTrimming="CharacterEllipsis"
+                        Visibility="{Binding HasMemoryPercent, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    <TextBlock
+                        FontSize="14"
+                        FontWeight="SemiBold"
+                        Foreground="{ThemeResource TextTertiaryBrush}"
+                        Text="&#x2014;"
+                        Visibility="{Binding HasMemoryPercent, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Invert}" />
+                    <ProgressBar
+                        Height="2"
+                        MinHeight="2"
+                        Background="{ThemeResource GlassBorderBrush}"
+                        CornerRadius="1"
+                        Foreground="{ThemeResource BrandAccentBrush}"
+                        Maximum="100"
+                        Value="{Binding MemoryUsageValue}"
+                        Visibility="{Binding HasMemoryPercent, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    <Border
+                        Height="2"
+                        Background="{ThemeResource GlassBorderBrush}"
+                        CornerRadius="1"
+                        Visibility="{Binding HasMemoryPercent, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Invert}" />
+                </StackPanel>
+
+                <!-- Disk -->
+                <StackPanel Grid.Column="2" Spacing="4">
+                    <TextBlock
+                        x:Uid="ServerMetricsDiskLabel"
+                        FontSize="9"
+                        FontWeight="Medium"
+                        Foreground="{ThemeResource TextTertiaryBrush}" />
+                    <TextBlock
+                        FontSize="14"
+                        FontWeight="SemiBold"
+                        Text="{Binding DiskUsageDisplay}"
+                        TextTrimming="CharacterEllipsis"
+                        Visibility="{Binding HasDiskPercent, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    <TextBlock
+                        FontSize="14"
+                        FontWeight="SemiBold"
+                        Foreground="{ThemeResource TextTertiaryBrush}"
+                        Text="&#x2014;"
+                        Visibility="{Binding HasDiskPercent, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Invert}" />
+                    <ProgressBar
+                        Height="2"
+                        MinHeight="2"
+                        Background="{ThemeResource GlassBorderBrush}"
+                        CornerRadius="1"
+                        Foreground="{ThemeResource BrandAccentBrush}"
+                        Maximum="100"
+                        Value="{Binding DiskUsageValue}"
+                        Visibility="{Binding HasDiskPercent, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    <Border
+                        Height="2"
+                        Background="{ThemeResource GlassBorderBrush}"
+                        CornerRadius="1"
+                        Visibility="{Binding HasDiskPercent, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Invert}" />
+                </StackPanel>
+            </Grid>
+
+            <!-- Status line when there is no snapshot yet (refreshing / offline-no-data / waiting). -->
+            <StackPanel
+                Orientation="Horizontal"
+                Spacing="8"
+                VerticalAlignment="Center"
+                Visibility="{Binding HasMetrics, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Invert}">
+                <ProgressRing
+                    Width="13"
+                    Height="13"
+                    IsActive="{Binding IsRefreshingMetrics}"
+                    Visibility="{Binding IsRefreshingMetrics, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                <TextBlock
+                    x:Uid="ServerMetricsRefreshingLabel"
+                    VerticalAlignment="Center"
+                    AutomationProperties.LiveSetting="Polite"
+                    FontSize="12"
+                    Foreground="{ThemeResource TextTertiaryBrush}"
+                    Visibility="{Binding IsRefreshingMetrics, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                <TextBlock
+                    x:Uid="CompactMetricsUnavailable"
+                    VerticalAlignment="Center"
+                    AutomationProperties.LiveSetting="Polite"
+                    FontSize="12"
+                    Foreground="{ThemeResource TextTertiaryBrush}"
+                    Visibility="{Binding HasMetricsError, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                <TextBlock
+                    x:Uid="ServerMetricsWaitingForData"
+                    VerticalAlignment="Center"
+                    FontSize="12"
+                    Foreground="{ThemeResource TextTertiaryBrush}"
+                    Visibility="{Binding IsMetricsPending, Converter={StaticResource BooleanToVisibilityConverter}}" />
             </StackPanel>
-            <controls:ServerActionsButton Grid.Column="1" VerticalAlignment="Center" />
-        </Grid>
-    </controls:GlassCard>
+
+            <!-- Discreet stale age; keeps a retained snapshot from reading as current. -->
+            <TextBlock
+                AutomationProperties.LiveSetting="Polite"
+                FontSize="10"
+                Foreground="{ThemeResource StatusWarningBrush}"
+                Text="{Binding StaleAgeDisplay}"
+                TextTrimming="CharacterEllipsis"
+                Visibility="{Binding HasStaleIndicator, Converter={StaticResource BooleanToVisibilityConverter}}" />
+        </StackPanel>
+    </Border>
 </UserControl>

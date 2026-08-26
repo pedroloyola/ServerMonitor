@@ -124,6 +124,35 @@
 
                     <Border Height="1" Background="{ThemeResource GlassBorderBrush}" />
 
+                    <!-- Compact Mode Section -->
+                    <StackPanel Spacing="10">
+                        <StackPanel Spacing="2">
+                            <TextBlock
+                                x:Uid="SettingsCompactTitle"
+                                AutomationProperties.HeadingLevel="Level2"
+                                Style="{StaticResource SectionTitleTextStyle}" />
+                            <TextBlock
+                                x:Uid="SettingsCompactDescription"
+                                FontSize="12"
+                                Foreground="{ThemeResource TextSecondaryBrush}"
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+
+                        <Button
+                            x:Uid="SettingsEnterCompactButton"
+                            HorizontalAlignment="Left"
+                            Command="{x:Bind WindowMode.EnterCompactCommand}"
+                            Style="{StaticResource QuietPillButtonStyle}" />
+
+                        <ToggleSwitch
+                            x:Uid="SettingsAlwaysOnTopToggle"
+                            HorizontalAlignment="Left"
+                            MinHeight="36"
+                            IsOn="{x:Bind WindowMode.CompactAlwaysOnTop, Mode=TwoWay}" />
+                    </StackPanel>
+
+                    <Border Height="1" Background="{ThemeResource GlassBorderBrush}" />
+
                     <!-- Hidden Servers Section -->
                     <StackPanel Spacing="10">
                         <StackPanel Spacing="2">

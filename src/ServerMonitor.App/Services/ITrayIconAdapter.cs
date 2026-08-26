@@ -10,6 +10,8 @@ public interface ITrayIconAdapter
 
     event EventHandler? RefreshAllRequested;
 
+    event EventHandler? ToggleCompactRequested;
+
     event EventHandler? SettingsRequested;
 
     event EventHandler? ExitRequested;

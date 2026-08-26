@@ -202,4 +202,21 @@
   <data name="NotificationHealthyBodyFormat" xml:space="preserve"><value>{0} voltou a um estado saudável.</value></data>
   <data name="NotificationPlatformUnavailableTitle" xml:space="preserve"><value>Notificações indisponíveis</value></data>
   <data name="NotificationPlatformUnavailableMessage" xml:space="preserve"><value>O Windows não permitiu ativar as notificações. Verifique as definições do sistema.</value></data>
+  <data name="TrayCompactModeMenuItem" xml:space="preserve"><value>Modo compacto</value></data>
+  <data name="DashboardCompactModeButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Modo compacto</value></data>
+  <data name="DashboardCompactModeButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Modo compacto</value></data>
+  <data name="CompactAlwaysOnTopToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Sempre no topo</value></data>
+  <data name="CompactAlwaysOnTopToggle.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Sempre no topo</value></data>
+  <data name="CompactExpandButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Expandir para a vista padrão</value></data>
+  <data name="CompactExpandButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Expandir</value></data>
+  <data name="CompactEmptyTitle.Text" xml:space="preserve"><value>Nenhum servidor configurado</value></data>
+  <data name="CompactEmptyAction.Content" xml:space="preserve"><value>Abrir o Server Monitor</value></data>
+  <data name="CompactMetricsUnavailable.Text" xml:space="preserve"><value>Offline</value></data>
+  <data name="SettingsCompactTitle.Text" xml:space="preserve"><value>Modo compacto</value></data>
+  <data name="SettingsCompactDescription.Text" xml:space="preserve"><value>Mostre um pequeno widget sempre disponível com o estado essencial dos seus servidores.</value></data>
+  <data name="SettingsEnterCompactButton.Content" xml:space="preserve"><value>Abrir o modo compacto</value></data>
+  <data name="SettingsAlwaysOnTopToggle.Header" xml:space="preserve"><value>Sempre no topo</value></data>
+  <data name="SettingsAlwaysOnTopToggle.OnContent" xml:space="preserve"><value>Ligado</value></data>
+  <data name="SettingsAlwaysOnTopToggle.OffContent" xml:space="preserve"><value>Desligado</value></data>
+  <data name="SettingsAlwaysOnTopToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Manter o widget compacto sempre no topo</value></data>
 </root>

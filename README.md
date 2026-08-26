@@ -4,7 +4,7 @@ Server Monitor é uma aplicação desktop WinUI 3 para Windows, concebida como u
 
 ## Estado atual
 
-O repositório contém o **Milestone 8 (System Tray + Notifications)**, construído sobre a fundação SSH segura do M3, os collectors Linux/macOS do M4, o motor de monitorização automática do M6 e a descoberta passiva do M7:
+O repositório contém o **Milestone 9 (Compact Widget Mode)**, construído sobre a fundação SSH segura do M3, os collectors Linux/macOS do M4, o motor de monitorização automática do M6, a descoberta passiva do M7 e o system tray + notificações do M8:
 
 - solution e separação inicial entre App, Core, Infrastructure e Collectors;
 - shell WinUI 3 com MVVM e dependency injection;
@@ -37,7 +37,11 @@ O repositório contém o **Milestone 8 (System Tray + Notifications)**, constru�
 - opção global persistente para notificações, ativa por omissão e sem replay ao reativar;
 - nomes apresentados nas notificações são limitados e sanitizados; endpoint, credenciais, trust e erros SSH não são incluídos;
 - ServerCards sem métricas fictícias e com estados de conexão e monitorização transitórios;
-- apresentações `ServerFullCard` e `ServerCompactCard` sobre o mesmo estado; o modo compacto ainda não está exposto.
+- modo compacto de widget in-process: a mesma janela alterna entre a apresentação Standard e um widget pequeno e glanceable (`ServerCompactCard`) com estado de saúde, CPU, RAM e disco, reutilizando os mesmos ViewModels e o estado ao vivo do M6;
+- entrada para o modo compacto no cabeçalho do dashboard, nas Configurações e no menu do tray; expandir de volta a Standard restaura tamanho/posição sem recriar estado;
+- opção "Sempre no topo" exclusiva do modo compacto, desligada por omissão e persistida;
+- placement por modo (mode, bounds e DPI de cada modo, always-on-top) persistido em `%LOCALAPPDATA%\ServerMonitor\window-placement.json`, com recuperação de monitor removido, bounds fora do ecrã, coordenadas negativas e mudança de DPI;
+- discovery não aparece no modo compacto, mas continua ativo em background.
 
 A descoberta mDNS é local ao segmento de rede visível. Linux pode necessitar de um anúncio compatível, como Avahi; VPNs e descoberta ativa de subnet não fazem parte do M7. Discovery não gera notificações. A aplicação só permanece ativa enquanto o processo estiver em execução: arranque com o Windows, Windows Service e execução após Exit continuam fora do âmbito atual. O Windows pode bloquear ou silenciar banners através das suas definições, Focus Assist/Do Not Disturb ou políticas; isso degrada sem crashar a aplicação.
 

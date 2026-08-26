@@ -207,6 +207,7 @@ public sealed class WindowsAppNotificationServiceTests : IDisposable
         public void HideForMinimize() { }
         public void RestoreAndActivate() => RestoreCount++;
         public void OpenSettings() { }
+        public void ToggleCompactMode() { }
         public void RequestClose() { }
         public void BeginShutdown() { }
     }

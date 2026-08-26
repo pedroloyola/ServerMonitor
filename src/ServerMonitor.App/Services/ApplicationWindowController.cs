@@ -2,12 +2,14 @@ using Microsoft.Extensions.Logging;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using ServerMonitor.App.Windowing;
 using WinUIEx;
 
 namespace ServerMonitor.App.Services;
 
 public sealed class ApplicationWindowController(
     INavigationService navigationService,
+    IWindowModeCoordinator modeCoordinator,
     ILogger<ApplicationWindowController> logger) : IApplicationWindowController
 {
     private readonly object _sync = new();
@@ -77,6 +79,24 @@ public sealed class ApplicationWindowController(
         _window.Activate();
         _window.SetForegroundWindow();
         navigationService.GoToSettings();
+    });
+
+    public void ToggleCompactMode() => RunOnUiThread(() =>
+    {
+        if (_window is null || _appWindow is null)
+        {
+            return;
+        }
+
+        // Toggling from the tray must also bring the window back from the tray first, then switch,
+        // so the mode change lands on a visible, activated window in a consistent state.
+        _appWindow.IsShownInSwitchers = true;
+        _appWindow.Show();
+        WindowManager.Get(_window).WindowState = WindowState.Normal;
+        _window.Activate();
+        _window.SetForegroundWindow();
+        modeCoordinator.Toggle();
+        logger.LogDebug("Toggled compact mode from the system tray.");
     });
 
     public void RequestClose() => RunOnUiThread(() => _window?.Close());

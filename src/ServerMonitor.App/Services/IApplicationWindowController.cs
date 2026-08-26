@@ -15,6 +15,9 @@ public interface IApplicationWindowController
 
     void OpenSettings();
 
+    /// <summary>Restores/activates the window and toggles between Standard and Compact presentation.</summary>
+    void ToggleCompactMode();
+
     void RequestClose();
 
     void BeginShutdown();

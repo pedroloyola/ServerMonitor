@@ -1,4 +1,4 @@
-# Arquitetura — Milestone 8
+# Arquitetura — Milestone 9
 
 ```text
 ServerMonitor.App  ──→ ServerMonitor.Core
@@ -140,6 +140,34 @@ IServerMonitoringStateStore → ServerAlertCoordinator → IUserNotificationServ
 
 Decisões de dependency, lifetime, semântica de janela, anti-spam e limitações unpackaged constam da ADR-013.
 
-## Fronteira de apresentação compacta
+## Modo compacto de widget (Milestone 9)
 
-O Dashboard escolhe a apresentação visual no XAML. O domínio, `IServerService`, persistência e ViewModels não conhecem a largura da janela nem um modo de widget. Um futuro Compact Widget Mode poderá trocar a apresentação sem duplicar estado. Um eventual Windows Widget Provider será uma integração separada, conforme a ADR-005.
+```text
+tray "Modo compacto" / dashboard / Settings / expand
+                    │
+                    ▼
+        IWindowModeCoordinator  ── ModeChanged ──→ MainWindow (troca de apresentação + drag region)
+         │ sequência determinística
+         ├─ IWindowPlacementAdapter  (AppWindow / OverlappedPresenter / DisplayArea / DPI)
+         ├─ WindowPlacementResolver  (clamp/recover: monitor removido, off-screen, DPI, coords negativas)
+         └─ IWindowPlacementStore    → %LOCALAPPDATA%\ServerMonitor\window-placement.json
+
+MonitoringEngine → State Store → DashboardViewModel.VisibleServers → ServerCompactCard (mesmo estado)
+```
+
+Existe uma única `MainWindow` com duas raízes de apresentação: `StandardRoot` (shell + `DashboardPage`)
+e `CompactRoot` (widget com `ServerCompactCard`). O Compact reutiliza `DashboardViewModel.VisibleServers`
+e `ServerCardViewModel` — os mesmos ViewModels e o estado ao vivo do M6 —, mostra apenas servidores
+configurados visíveis (hidden e discovered-only não aparecem) e nunca duplica processo, janela ou estado.
+Métricas desconhecidas continuam a render-se como ausentes, nunca como 0.
+
+O `WindowModeCoordinator` sequencia cada transição Standard ⇄ Compact de forma determinística (captura
+bounds do modo que sai → configura presenter → resolve+aplica bounds recuperados → aplica always-on-top →
+persiste → anuncia `ModeChanged`). Toda a chamada nativa fica atrás do `IWindowPlacementAdapter` fakeável,
+e o `WindowPlacementResolver` puro concentra a recuperação de placement (input não confiável) — o que torna
+mode-switching, persistência, multi-monitor e DPI cobertos por testes unitários. Always-on-top é exclusivo
+do Compact, via `OverlappedPresenter.IsAlwaysOnTop` (sem polling), e é removido ao voltar a Standard.
+
+O domínio, `IServerService`, persistência e ViewModels de servidor continuam a não conhecer a largura da
+janela nem o modo de widget. Um eventual Windows Widget Provider oficial será uma integração separada,
+reservada para o M13, conforme a ADR-005 e a ADR-014.

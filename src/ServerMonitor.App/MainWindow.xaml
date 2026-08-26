@@ -1,53 +1,173 @@
 <Window
     x:Class="ServerMonitor.App.MainWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:ServerMonitor.App.Controls">
     <Grid
         x:Name="RootLayout"
         Background="{ThemeResource WindowBackdropTintBrush}">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="52" />
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
 
-        <Grid
-            x:Name="AppTitleBar"
-            Grid.Row="0"
-            Padding="20,0,144,0"
-            Background="{ThemeResource TitleBarSurfaceBrush}">
-            <StackPanel
-                VerticalAlignment="Center"
-                Orientation="Horizontal"
-                Spacing="9">
-                <Border
-                    Width="22"
-                    Height="22"
-                    Background="{ThemeResource AccentSoftBrush}"
-                    CornerRadius="7">
-                    <FontIcon
-                        FontSize="11"
-                        Foreground="{ThemeResource AccentTextBrush}"
-                        Glyph="&#xE9D9;" />
-                </Border>
-                <TextBlock
-                    x:Uid="AppNameText"
+        <!-- ============================ STANDARD PRESENTATION ============================ -->
+        <Grid x:Name="StandardRoot">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="52" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <Grid
+                x:Name="AppTitleBar"
+                Grid.Row="0"
+                Padding="20,0,144,0"
+                Background="{ThemeResource TitleBarSurfaceBrush}">
+                <StackPanel
                     VerticalAlignment="Center"
-                    FontFamily="Segoe UI Variable Text"
-                    FontSize="13"
-                    FontWeight="SemiBold" />
-            </StackPanel>
+                    Orientation="Horizontal"
+                    Spacing="9">
+                    <Border
+                        Width="22"
+                        Height="22"
+                        Background="{ThemeResource AccentSoftBrush}"
+                        CornerRadius="7">
+                        <FontIcon
+                            FontSize="11"
+                            Foreground="{ThemeResource AccentTextBrush}"
+                            Glyph="&#xE9D9;" />
+                    </Border>
+                    <TextBlock
+                        x:Uid="AppNameText"
+                        VerticalAlignment="Center"
+                        FontFamily="Segoe UI Variable Text"
+                        FontSize="13"
+                        FontWeight="SemiBold" />
+                </StackPanel>
+            </Grid>
+
+            <Frame
+                x:Name="ContentFrame"
+                Grid.Row="1"
+                Background="Transparent" />
+
+            <!-- Full Window Overlay Modal Container -->
+            <Grid
+                x:Name="ModalOverlayHost"
+                Grid.Row="0"
+                Grid.RowSpan="2"
+                IsHitTestVisible="False" />
         </Grid>
 
-        <Frame
-            x:Name="ContentFrame"
-            Grid.Row="1"
-            Background="Transparent" />
+        <!-- ============================ COMPACT PRESENTATION ============================ -->
+        <!-- The same window; DataContext for the chrome/empty-state is the WindowModeViewModel and
+             for the server list the shared DashboardViewModel — both wired in code-behind. -->
+        <Grid x:Name="CompactRoot" Visibility="Collapsed">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="44" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
 
-        <!-- Full Window Overlay Modal Container -->
-        <Grid
-            x:Name="ModalOverlayHost"
-            Grid.Row="0"
-            Grid.RowSpan="2"
-            IsHitTestVisible="False" />
+            <!-- Compact title bar: col0 is the drag handle (SetTitleBar); col1 holds the custom
+                 controls (kept clickable, outside the drag region); col2 reserves exactly the native
+                 caption-button width, sized at runtime from AppWindow.TitleBar.RightInset (DPI-aware),
+                 so the custom controls never sit under Minimize/Maximize/Close. -->
+            <Grid
+                Grid.Row="0"
+                Background="{ThemeResource TitleBarSurfaceBrush}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition x:Name="CompactCaptionColumn" Width="96" />
+                </Grid.ColumnDefinitions>
+
+                <Grid
+                    x:Name="CompactDragRegion"
+                    Padding="14,0,0,0"
+                    Background="Transparent">
+                    <StackPanel
+                        VerticalAlignment="Center"
+                        Orientation="Horizontal"
+                        Spacing="9">
+                        <Border
+                            Width="20"
+                            Height="20"
+                            Background="{ThemeResource AccentSoftBrush}"
+                            CornerRadius="6">
+                            <FontIcon
+                                FontSize="10"
+                                Foreground="{ThemeResource AccentTextBrush}"
+                                Glyph="&#xE9D9;" />
+                        </Border>
+                        <TextBlock
+                            x:Uid="AppNameText"
+                            VerticalAlignment="Center"
+                            FontFamily="Segoe UI Variable Text"
+                            FontSize="12"
+                            FontWeight="SemiBold"
+                            TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                </Grid>
+
+                <StackPanel
+                    Grid.Column="1"
+                    Margin="2,0,4,0"
+                    VerticalAlignment="Center"
+                    Orientation="Horizontal"
+                    Spacing="2">
+                    <ToggleButton
+                        x:Name="AlwaysOnTopToggle"
+                        x:Uid="CompactAlwaysOnTopToggle"
+                        Width="30"
+                        Height="30"
+                        Padding="0"
+                        IsChecked="{Binding CompactAlwaysOnTop, Mode=TwoWay}"
+                        Style="{StaticResource CompactChromeToggleStyle}">
+                        <FontIcon FontSize="12" Glyph="&#xE718;" />
+                    </ToggleButton>
+                    <Button
+                        x:Uid="CompactExpandButton"
+                        Width="30"
+                        Height="30"
+                        Padding="0"
+                        Command="{Binding ExitCompactCommand}"
+                        Style="{StaticResource SubtleIconButtonStyle}">
+                        <FontIcon FontSize="12" Glyph="&#xE740;" />
+                    </Button>
+                </StackPanel>
+            </Grid>
+
+            <!-- Compact body: server list (bound to the shared DashboardViewModel) + empty state. -->
+            <Grid x:Name="CompactBody" Grid.Row="1" Padding="12,4,12,12">
+                <ScrollViewer
+                    Padding="0,0,2,0"
+                    VerticalScrollBarVisibility="Auto"
+                    Visibility="{Binding HasVisibleServers, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <ItemsControl AutomationProperties.LiveSetting="Polite" ItemsSource="{Binding VisibleServers}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <controls:ServerCompactCard />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+
+                <StackPanel
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    MaxWidth="280"
+                    Spacing="12"
+                    Visibility="{Binding HasVisibleServers, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Invert}">
+                    <TextBlock
+                        x:Uid="CompactEmptyTitle"
+                        HorizontalAlignment="Center"
+                        FontSize="14"
+                        FontWeight="SemiBold"
+                        TextAlignment="Center"
+                        TextWrapping="Wrap" />
+                    <Button
+                        x:Uid="CompactEmptyAction"
+                        HorizontalAlignment="Center"
+                        Command="{Binding ElementName=CompactRoot, Path=DataContext.ExitCompactCommand}"
+                        Style="{StaticResource QuietPillButtonStyle}" />
+                </StackPanel>
+            </Grid>
+        </Grid>
     </Grid>
 </Window>

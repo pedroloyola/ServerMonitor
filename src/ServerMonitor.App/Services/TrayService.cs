@@ -32,6 +32,7 @@ public sealed class TrayService(
 
             cancellationToken.ThrowIfCancellationRequested();
             trayIcon.OpenRequested += OnOpenRequested;
+            trayIcon.ToggleCompactRequested += OnToggleCompactRequested;
             trayIcon.RefreshAllRequested += OnRefreshAllRequested;
             trayIcon.SettingsRequested += OnSettingsRequested;
             trayIcon.ExitRequested += OnExitRequested;
@@ -123,6 +124,8 @@ public sealed class TrayService(
 
     private void OnOpenRequested(object? sender, EventArgs args) => windowController.RestoreAndActivate();
 
+    private void OnToggleCompactRequested(object? sender, EventArgs args) => windowController.ToggleCompactMode();
+
     private async void OnRefreshAllRequested(object? sender, EventArgs args)
     {
         try
@@ -163,6 +166,7 @@ public sealed class TrayService(
     private void UnsubscribeLocked()
     {
         trayIcon.OpenRequested -= OnOpenRequested;
+        trayIcon.ToggleCompactRequested -= OnToggleCompactRequested;
         trayIcon.RefreshAllRequested -= OnRefreshAllRequested;
         trayIcon.SettingsRequested -= OnSettingsRequested;
         trayIcon.ExitRequested -= OnExitRequested;
