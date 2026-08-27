@@ -42,6 +42,9 @@ internal sealed class FakeLocalizationService : ILocalizationService
             ["NotificationRecoveryOnlineBodyFormat"] = "{0} is back online.",
             ["NotificationHealthyTitle"] = "Server healthy",
             ["NotificationHealthyBodyFormat"] = "{0} returned to a healthy state.",
+            ["HistoryChartSummaryFormat"] = "{0}. {1}. Current {2}. Maximum {3}.",
+            ["HistoryChartSummaryOfflineSuffix"] = " Contains an offline period shown as a gap.",
+            ["HistoryValueUnknownAccessible"] = "Unknown",
         };
 
     public string? CurrentLanguageOverride => null;

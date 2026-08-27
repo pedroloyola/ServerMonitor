@@ -9,7 +9,9 @@ using ServerMonitor.Collectors;
 using ServerMonitor.Collectors.Linux;
 using ServerMonitor.Collectors.MacOS;
 using ServerMonitor.Core.Domain;
+using ServerMonitor.Core.History;
 using ServerMonitor.Core.Interfaces;
+using ServerMonitor.Core.Monitoring;
 using ServerMonitor.Infrastructure.Collectors.Linux;
 using ServerMonitor.Infrastructure.Collectors.MacOS;
 using ServerMonitor.Infrastructure.Discovery;
@@ -99,6 +101,12 @@ public partial class App : Application
                 services.AddSingleton<IServerMetricsCollector, MetricsCollectorRouter>();
                 services.AddSingleton<IServerMetricsStore, ServerMetricsStore>();
 
+                // M10 local history. Default: unavailable. The real stack (in the non-QA branch
+                // below) or a QA harness overrides this registration; every composition can resolve
+                // these so the History UI degrades to "unavailable" gracefully.
+                services.AddSingleton<IServerHistoryQueryService, NullServerHistoryQueryService>();
+                services.AddSingleton<IHistoryMaintenanceService, NullHistoryMaintenanceService>();
+
                 // Automatic monitoring. One instance backs the IMonitoringEngine facade and
                 // the hosted-service lifecycle, so the app starts/stops a single engine.
                 // The Debug-only QA harnesses (--qa-health, --qa-discovery) replace the data plane
@@ -108,18 +116,36 @@ public partial class App : Application
                 var qaDiscovery = Qa.QaDiscoveryComposition.IsRequested();
                 var qaNotifications = Qa.QaNotificationComposition.IsRequested();
                 var qaCompact = Qa.QaCompactComposition.IsRequested();
-                var qaMode = qaHealth || qaDiscovery || qaNotifications || qaCompact;
+                var qaHistory = Qa.QaHistoryComposition.IsRequested();
+                var qaMode = qaHealth || qaDiscovery || qaNotifications || qaCompact || qaHistory;
 #else
                 const bool qaMode = false;
 #endif
                 if (!qaMode)
                 {
+                    // M10 history stack: recorder (IMonitoringCycleObserver) → bounded channel →
+                    // single writer → SQLite. A database failure never blocks monitoring (ADR-015).
+                    services.AddSingleton(HistoryStorageOptions.ForCurrentUser());
+                    services.AddSingleton<SqliteServerHistoryStore>();
+                    services.AddSingleton<IServerHistoryStore>(sp => sp.GetRequiredService<SqliteServerHistoryStore>());
+                    services.AddSingleton<HistorySampleChannel>();
+                    services.AddSingleton<HistoryRecorder>();
+                    services.AddSingleton<IMonitoringCycleObserver>(sp => sp.GetRequiredService<HistoryRecorder>());
+                    services.AddSingleton<HistoryWriterService>();
+                    services.AddSingleton<IServerHistoryQueryService>(sp => new ServerHistoryQueryService(
+                        sp.GetRequiredService<IServerHistoryStore>(),
+                        sp.GetRequiredService<ILogger<ServerHistoryQueryService>>()));
+                    services.AddSingleton<IHistoryMaintenanceService, HistoryMaintenanceService>();
+
                     services.AddSingleton<IServerMonitoringStateStore, ServerMonitoringStateStore>();
                     services.AddSingleton(sp => new MonitoringEngine(
                         sp.GetRequiredService<IServerService>(),
                         sp.GetRequiredService<IServerMetricsStore>(),
                         sp.GetRequiredService<IServerMonitoringStateStore>(),
-                        sp.GetRequiredService<ILogger<MonitoringEngine>>()));
+                        sp.GetRequiredService<ILogger<MonitoringEngine>>(),
+                        timeProvider: null,
+                        options: null,
+                        cycleObserver: sp.GetRequiredService<IMonitoringCycleObserver>()));
                     services.AddSingleton<IMonitoringEngine>(sp => sp.GetRequiredService<MonitoringEngine>());
 
                     // Passive local network discovery (mDNS/DNS-SD, _ssh._tcp only). One instance
@@ -151,6 +177,10 @@ public partial class App : Application
                 {
                     Qa.QaCompactComposition.Apply(services);
                 }
+                else if (qaHistory)
+                {
+                    Qa.QaHistoryComposition.Apply(services);
+                }
                 else
                 {
                     Qa.QaDiscoveryComposition.Apply(services);
@@ -166,6 +196,9 @@ public partial class App : Application
                 services.AddHostedService(sp => sp.GetRequiredService<ServerAlertCoordinator>());
                 if (!qaMode)
                 {
+                    // Registered before the engine so, on reverse-order shutdown, the writer stops
+                    // AFTER the engine stops producing and can drain the last samples (ADR-015 §9).
+                    services.AddHostedService(sp => sp.GetRequiredService<HistoryWriterService>());
                     services.AddHostedService(sp => sp.GetRequiredService<MonitoringEngine>());
                     services.AddHostedService(sp => sp.GetRequiredService<ServerDiscoveryService>());
                 }
@@ -183,6 +216,9 @@ public partial class App : Application
                 services.AddSingleton<SettingsViewModel>();
                 services.AddSingleton<DashboardPage>();
                 services.AddSingleton<SettingsPage>();
+                // History is opened per-server, so a fresh page/VM each navigation (disposed on Unloaded).
+                services.AddTransient<HistoryViewModel>();
+                services.AddTransient<HistoryPage>();
                 services.AddTransient<MainWindow>();
             })
             .Build();

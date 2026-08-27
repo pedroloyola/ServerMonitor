@@ -252,6 +252,10 @@ public sealed class ServerDiscoveryService : IServerDiscoveryService, IHostedSer
             _removedHandler = null;
             notificationCts = _notificationCts;
             notificationTask = _notificationTask;
+            // The notification worker clears and disposes this CTS from a finally block guarded by
+            // the same lock. Cancel while still holding the lock so it cannot be disposed between
+            // taking the snapshot and requesting cancellation.
+            notificationCts?.Cancel();
             _tracked.Clear();
             _published.Clear();
             _materialChangeVersion = 0;
@@ -277,7 +281,6 @@ public sealed class ServerDiscoveryService : IServerDiscoveryService, IHostedSer
         _sweepLoop = Task.CompletedTask;
 
         sweepCts?.Cancel();
-        notificationCts?.Cancel();
         try
         {
             await Task.WhenAll(sweepLoop, notificationTask)
@@ -313,6 +316,7 @@ public sealed class ServerDiscoveryService : IServerDiscoveryService, IHostedSer
             _removedHandler = null;
             notificationCts = _notificationCts;
             notificationTask = _notificationTask;
+            notificationCts?.Cancel();
             _tracked.Clear();
             _published.Clear();
             _ignored = new HashSet<string>(StringComparer.Ordinal);
@@ -341,7 +345,6 @@ public sealed class ServerDiscoveryService : IServerDiscoveryService, IHostedSer
         }
 
         sweepCts?.Cancel();
-        notificationCts?.Cancel();
         try
         {
             await notificationTask.WaitAsync(_options.StopDrainTimeout, _timeProvider).ConfigureAwait(false);

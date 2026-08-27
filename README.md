@@ -4,7 +4,7 @@ Server Monitor é uma aplicação desktop WinUI 3 para Windows, concebida como u
 
 ## Estado atual
 
-O repositório contém o **Milestone 9 (Compact Widget Mode)**, construído sobre a fundação SSH segura do M3, os collectors Linux/macOS do M4, o motor de monitorização automática do M6, a descoberta passiva do M7 e o system tray + notificações do M8:
+O repositório contém o **Milestone 10 (Local History + Charts)**, construído sobre a fundação SSH segura do M3, os collectors Linux/macOS do M4, o motor de monitorização automática do M6, a descoberta passiva do M7, o system tray + notificações do M8 e o modo compacto do M9:
 
 - solution e separação inicial entre App, Core, Infrastructure e Collectors;
 - shell WinUI 3 com MVVM e dependency injection;
@@ -41,7 +41,17 @@ O repositório contém o **Milestone 9 (Compact Widget Mode)**, construído sobr
 - entrada para o modo compacto no cabeçalho do dashboard, nas Configurações e no menu do tray; expandir de volta a Standard restaura tamanho/posição sem recriar estado;
 - opção "Sempre no topo" exclusiva do modo compacto, desligada por omissão e persistida;
 - placement por modo (mode, bounds e DPI de cada modo, always-on-top) persistido em `%LOCALAPPDATA%\ServerMonitor\window-placement.json`, com recuperação de monitor removido, bounds fora do ecrã, coordenadas negativas e mudança de DPI;
-- discovery não aparece no modo compacto, mas continua ativo em background.
+- discovery não aparece no modo compacto, mas continua ativo em background;
+- histórico local de métricas (CPU, memória e disco) persistido em SQLite (`Microsoft.Data.Sqlite`) em `%LOCALAPPDATA%\ServerMonitor\history.db` — LOCAL-FIRST, sem conta, sync nem telemetria;
+- gravação como side-effect assíncrona e degradável: uma falha de base de dados (locked, corrupta, disco cheio) nunca interrompe a monitorização nem bloqueia o coletor SSH;
+- o histórico grava apenas o resultado do ciclo **fresco** (métrica `null` quando a recolha falha, nunca um valor stale reciclado); `unknown ≠ zero`;
+- amostragem de no máximo uma amostra a cada 30 s por servidor, retenção local de 30 dias (limpeza no arranque e diária) e apenas métricas na base de dados (nunca segredos, credenciais, host keys ou erros SSH);
+- página de Histórico por servidor (menu de ações → "Histórico") com gráficos de linha minimalistas CPU/Memória/Disco, eixo Y fixo 0–100%, marca `#1846E1`, e representação visual de descontinuidades (offline/sem dados) sem interpolar através de períodos sem medição;
+- seletor de intervalo 1 h / 6 h / 24 h / 7 dias / 30 dias com downsampling determinístico (limite de pontos) e cancelamento por geração — trocas rápidas de intervalo nunca deixam uma resposta antiga sobrepor a seleção atual;
+- estados de carregamento, sem dados e histórico indisponível; resumo acessível por gráfico;
+- ação "Limpar histórico" nas Configurações, com confirmação explícita, que remove apenas o histórico (servidores, credenciais, host keys, ignorados e definições ficam intactos);
+- quando uma base antiga ou corrompida fica indisponível, ação explícita "Repor histórico" recria apenas a base local após confirmação; nunca existe auto-delete;
+- o histórico só aparece no modo Standard; o modo compacto continua glanceable e sem gráficos.
 
 A descoberta mDNS é local ao segmento de rede visível. Linux pode necessitar de um anúncio compatível, como Avahi; VPNs e descoberta ativa de subnet não fazem parte do M7. Discovery não gera notificações. A aplicação só permanece ativa enquanto o processo estiver em execução: arranque com o Windows, Windows Service e execução após Exit continuam fora do âmbito atual. O Windows pode bloquear ou silenciar banners através das suas definições, Focus Assist/Do Not Disturb ou políticas; isso degrada sem crashar a aplicação.
 

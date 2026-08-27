@@ -20,6 +20,7 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
     private readonly IServerMonitoringStateStore _monitoringStateStore;
     private readonly IMonitoringEngine _monitoringEngine;
     private readonly IServerDiscoveryService _discoveryService;
+    private readonly INavigationService _navigationService;
     private readonly ILocalizationService _localizationService;
     private readonly ILogger<DashboardViewModel> _logger;
     // Captured on the UI thread so engine state changes (raised on background loops) can be
@@ -55,6 +56,7 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         _monitoringStateStore = monitoringStateStore;
         _monitoringEngine = monitoringEngine;
         _discoveryService = discoveryService;
+        _navigationService = navigationService;
         _localizationService = localizationService;
         _logger = logger;
         _serverService.ServersChanged += OnServersChanged;
@@ -285,7 +287,12 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
                 _monitoringEngine,
                 () => EditServerAsync(server),
                 () => HideServerAsync(server),
-                () => RemoveServerAsync(server)));
+                () => RemoveServerAsync(server),
+                () =>
+                {
+                    _navigationService.GoToHistory(server.Id, server.Name);
+                    return Task.CompletedTask;
+                }));
         }
 
         HasVisibleServers = VisibleServers.Count > 0;

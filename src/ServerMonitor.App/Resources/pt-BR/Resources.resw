@@ -224,4 +224,53 @@
   <data name="SettingsAlwaysOnTopToggle.OnContent" xml:space="preserve"><value>Ativado</value></data>
   <data name="SettingsAlwaysOnTopToggle.OffContent" xml:space="preserve"><value>Desativado</value></data>
   <data name="SettingsAlwaysOnTopToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Manter o widget compacto sempre no topo</value></data>
+  <!-- M10 Local History + Charts -->
+  <data name="ServerCardHistoryMenuItem.Text" xml:space="preserve"><value>Histórico</value></data>
+  <data name="HistoryBackButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Voltar aos servidores</value></data>
+  <data name="HistoryBackButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Voltar</value></data>
+  <data name="HistorySubtitle.Text" xml:space="preserve"><value>Histórico</value></data>
+  <data name="HistoryRangeSelector.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Intervalo de tempo</value></data>
+  <data name="HistoryRangeLastHour.Content" xml:space="preserve"><value>1 h</value></data>
+  <data name="HistoryRangeLast6Hours.Content" xml:space="preserve"><value>6 h</value></data>
+  <data name="HistoryRangeLast24Hours.Content" xml:space="preserve"><value>24 h</value></data>
+  <data name="HistoryRangeLast7Days.Content" xml:space="preserve"><value>7 d</value></data>
+  <data name="HistoryRangeLast30Days.Content" xml:space="preserve"><value>30 d</value></data>
+  <data name="HistoryLoading.Text" xml:space="preserve"><value>Carregando histórico…</value></data>
+  <data name="HistoryUnavailableTitle.Text" xml:space="preserve"><value>Histórico indisponível</value></data>
+  <data name="HistoryUnavailableDescription.Text" xml:space="preserve"><value>Não foi possível ler o histórico local agora. O monitoramento continua normalmente.</value></data>
+  <data name="HistoryEmptyTitle.Text" xml:space="preserve"><value>Ainda sem histórico</value></data>
+  <data name="HistoryEmptyDescription.Text" xml:space="preserve"><value>O histórico é coletado enquanto o servidor é monitorado. Volte após alguns minutos.</value></data>
+  <data name="HistoryMetricCpu" xml:space="preserve"><value>CPU</value></data>
+  <data name="HistoryMetricMemory" xml:space="preserve"><value>Memória</value></data>
+  <data name="HistoryMetricDisk" xml:space="preserve"><value>Disco</value></data>
+  <data name="HistoryValueUnknown" xml:space="preserve"><value>—</value></data>
+  <data name="HistoryValueUnknownAccessible" xml:space="preserve"><value>Desconhecido</value></data>
+  <data name="HistoryOfflineNoticeTitle.Text" xml:space="preserve"><value>Período offline</value></data>
+  <data name="HistoryOfflineNoticeDescription.Text" xml:space="preserve"><value>Este intervalo contém amostras de um período em que o servidor ficou offline. Os gráficos mostram esse período como uma lacuna.</value></data>
+  <data name="HistoryRangeNameLastHour" xml:space="preserve"><value>Última hora</value></data>
+  <data name="HistoryRangeNameLast6Hours" xml:space="preserve"><value>Últimas 6 horas</value></data>
+  <data name="HistoryRangeNameLast24Hours" xml:space="preserve"><value>Últimas 24 horas</value></data>
+  <data name="HistoryRangeNameLast7Days" xml:space="preserve"><value>Últimos 7 dias</value></data>
+  <data name="HistoryRangeNameLast30Days" xml:space="preserve"><value>Últimos 30 dias</value></data>
+  <data name="HistoryChartSummaryFormat" xml:space="preserve"><value>{0}. {1}. Atual {2}. Máximo {3}.</value></data>
+  <data name="HistoryChartSummaryOfflineSuffix" xml:space="preserve"><value> Contém um período offline apresentado como uma lacuna.</value></data>
+  <data name="SettingsHistoryTitle.Text" xml:space="preserve"><value>Histórico</value></data>
+  <data name="SettingsHistoryDescription.Text" xml:space="preserve"><value>O histórico de métricas é armazenado localmente por 30 dias. Nada sai do seu dispositivo.</value></data>
+  <data name="SettingsClearHistoryButton.Content" xml:space="preserve"><value>Limpar histórico</value></data>
+  <data name="SettingsHistoryClearedSuccess.Title" xml:space="preserve"><value>Histórico limpo</value></data>
+  <data name="SettingsHistoryClearedSuccess.Message" xml:space="preserve"><value>Todo o histórico local foi removido.</value></data>
+  <data name="SettingsHistoryClearError.Title" xml:space="preserve"><value>Não foi possível limpar o histórico</value></data>
+  <data name="SettingsHistoryClearError.Message" xml:space="preserve"><value>O histórico está indisponível agora. Tente novamente mais tarde.</value></data>
+  <data name="HistoryClearConfirmTitle" xml:space="preserve"><value>Limpar todo o histórico?</value></data>
+  <data name="HistoryClearConfirmMessage" xml:space="preserve"><value>Isto remove permanentemente todo o histórico de métricas armazenado. Servidores, credenciais e configurações não são afetados. Esta ação não pode ser desfeita.</value></data>
+  <data name="HistoryClearConfirmPrimary" xml:space="preserve"><value>Limpar histórico</value></data>
+  <data name="HistoryClearConfirmClose" xml:space="preserve"><value>Cancelar</value></data>
+  <data name="SettingsResetHistoryButton.Content" xml:space="preserve"><value>Repor histórico</value></data>
+  <data name="SettingsHistoryResetSuccess.Title" xml:space="preserve"><value>Histórico reposto</value></data>
+  <data name="SettingsHistoryResetSuccess.Message" xml:space="preserve"><value>A base local foi recriada e está pronta para novas amostras.</value></data>
+  <data name="SettingsHistoryResetError.Title" xml:space="preserve"><value>Não foi possível repor o histórico</value></data>
+  <data name="SettingsHistoryResetError.Message" xml:space="preserve"><value>A base local não pôde ser recriada. Tente novamente mais tarde.</value></data>
+  <data name="HistoryResetConfirmTitle" xml:space="preserve"><value>Repor a base de histórico?</value></data>
+  <data name="HistoryResetConfirmMessage" xml:space="preserve"><value>Isto remove a base de histórico indisponível e cria uma nova. Servidores, credenciais e configurações não são afetados. Esta ação não pode ser desfeita.</value></data>
+  <data name="HistoryResetConfirmPrimary" xml:space="preserve"><value>Repor histórico</value></data>
 </root>

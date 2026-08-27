@@ -53,6 +53,31 @@
 - **Fix:** iterar por índice — `var all = DisplayArea.FindAll(); for (i=0..all.Count) { var d = all[i]; }`. O indexer (`GetAt`) projeta cada elemento isoladamente e não dispara a QI genérica que falha.
 - **Learning:** ver [L-002]/[L-006]. Fronteiras nativas atrás de um fake ficam **não testadas** — só o arranque real da app as valida (NOT RUN ≠ PASS aplica-se a "compila+unit verdes"). Smoke launch real do binário é gate obrigatório para código WinRT novo. Preferir iteração por índice em coleções WinRT `IReadOnlyList<T>` de projeção genérica. [P-002, L-002, L-006]
 
+## P-011 — `Microsoft.Data.Sqlite` puxa payload nativo SQLite vulnerável (transitivo)
+- **Observation (M10):** adicionar `Microsoft.Data.Sqlite` 10.0.0 fez `dotnet build` avisar NU1903 —
+  `SQLitePCLRaw.lib.e_sqlite3` 2.1.11 tem advisory HIGH (GHSA-2m69-gcr7-jv3q, CVE do SQLite nativo).
+- **Cause:** o meta-package MDS 10.0.0 fixa transitivamente `SQLitePCLRaw.bundle_e_sqlite3` 2.1.11,
+  que embrulha um `e_sqlite3` nativo com CVE.
+- **Fix:** referência top-level explícita `SQLitePCLRaw.bundle_e_sqlite3` **2.1.13** (mesma linha 2.1.x
+  → compat API com MDS 10; sem risco do major bump 3.0.x). `dotnet list package --vulnerable
+  --include-transitive` passa a 0. THIRD-PARTY-NOTICES atualizado (SQLitePCLRaw Apache-2.0; SQLite public domain).
+- **Learning:** o scan de vulnerabilidades tem de correr **depois** de adicionar qualquer dependência
+  com payload nativo; um meta-package pode fixar um native transitivo vulnerável. Preferir override
+  minimal na mesma linha major antes de saltar de major. [L-014, §99, §113]
+
+## P-012 — Connection SQLite não disposta quando o pragma pós-open falha
+- **Observation (M10, teste `Reset_RecoversFromCorruption`):** com DB corrupta, o reset não recuperava —
+  `File.Delete` do ficheiro falhava (lock).
+- **Cause:** `OpenConfiguredAsync` fazia `OpenAsync` e depois executava pragmas; num ficheiro corrupto o
+  pragma lança **depois** do open bem-sucedido, e a `SqliteConnection` local (fora de `using`) nunca era
+  disposta → handle aberto no pool → lock do ficheiro → delete/reset bloqueado. Connection leak real em
+  **qualquer** caminho de falha, não só reset.
+- **Fix:** `try { open; pragmas; return; } catch { await connection.DisposeAsync(); throw; }`. No reset,
+  `SqliteConnection.ClearAllPools()` antes de apagar os ficheiros. Teste ficou verde.
+- **Learning:** recurso adquirido antes de um passo que pode lançar tem de ser libertado no caminho de
+  exceção **antes** de propagar; um teste de recuperação de corrupção (não só o happy path) revela o leak.
+  Fronteira nativa (file lock) só falha com ficheiro real — fake não a exercita. [P-010, L-016, §100]
+
 ## P-009 — AppNotification `IsSupported` verdadeiro, mas `Register` falha no self-contained
 - **Observation:** o harness M8 executava transições corretamente, mas nenhum alerta Server Monitor aparecia no Notification Center; `AppNotificationManager.IsSupported()` devolvia `true`.
 - **Cause:** o output unpackaged/self-contained do Windows App SDK 2.3.1 omitia `Microsoft.WindowsAppRuntime.Insights.Resource.dll`. `Register()` falhava com `0x8007007E` apesar de o DLL redistributable existir no MSIX do próprio package Runtime resolvido.

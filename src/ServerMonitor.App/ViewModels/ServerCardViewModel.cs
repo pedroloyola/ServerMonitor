@@ -38,7 +38,8 @@ public sealed class ServerCardViewModel : ObservableObject
         IMonitoringEngine monitoringEngine,
         Func<Task> edit,
         Func<Task> hide,
-        Func<Task> remove)
+        Func<Task> remove,
+        Func<Task>? viewHistory = null)
     {
         Server = server;
         _localizationService = localizationService;
@@ -73,6 +74,7 @@ public sealed class ServerCardViewModel : ObservableObject
         EditCommand = new AsyncRelayCommand(edit);
         HideCommand = new AsyncRelayCommand(hide);
         RemoveCommand = new AsyncRelayCommand(remove);
+        ViewHistoryCommand = new AsyncRelayCommand(viewHistory ?? (() => Task.CompletedTask));
         _refreshMetricsCommand = new AsyncRelayCommand(RefreshMetricsAsync, () => !IsRefreshingMetrics);
     }
 
@@ -111,6 +113,8 @@ public sealed class ServerCardViewModel : ObservableObject
     public ICommand HideCommand { get; }
 
     public ICommand RemoveCommand { get; }
+
+    public ICommand ViewHistoryCommand { get; }
 
     public ICommand RefreshMetricsCommand => _refreshMetricsCommand;
 

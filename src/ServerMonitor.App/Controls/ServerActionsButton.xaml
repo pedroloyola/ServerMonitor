@@ -11,6 +11,14 @@
         <Button.Flyout>
             <MenuFlyout Placement="BottomEdgeAlignedRight">
                 <MenuFlyoutItem
+                    x:Uid="ServerCardHistoryMenuItem"
+                    Command="{Binding ViewHistoryCommand}">
+                    <MenuFlyoutItem.Icon>
+                        <FontIcon Glyph="&#xE81C;" />
+                    </MenuFlyoutItem.Icon>
+                </MenuFlyoutItem>
+                <MenuFlyoutSeparator />
+                <MenuFlyoutItem
                     x:Uid="ServerCardEditMenuItem"
                     Command="{Binding EditCommand}">
                     <MenuFlyoutItem.Icon>

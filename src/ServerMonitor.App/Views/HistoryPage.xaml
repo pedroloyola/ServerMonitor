@@ -1,0 +1,203 @@
+<Page
+    x:Class="ServerMonitor.App.Views.HistoryPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:ServerMonitor.App.Controls">
+    <Grid Padding="{StaticResource PagePadding}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Header: back + server name + "Histórico" -->
+        <Grid ColumnSpacing="12" Margin="0,0,0,16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Button
+                x:Uid="HistoryBackButton"
+                VerticalAlignment="Center"
+                Command="{Binding BackCommand}"
+                Style="{StaticResource SubtleIconButtonStyle}">
+                <SymbolIcon Symbol="Back" />
+            </Button>
+            <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                <TextBlock
+                    AutomationProperties.HeadingLevel="Level1"
+                    Style="{StaticResource PageTitleTextStyle}"
+                    Text="{Binding Title}"
+                    TextTrimming="CharacterEllipsis" />
+                <TextBlock
+                    x:Uid="HistorySubtitle"
+                    FontSize="13"
+                    Foreground="{ThemeResource TextSecondaryBrush}" />
+            </StackPanel>
+        </Grid>
+
+        <!-- Range selector -->
+        <RadioButtons
+            x:Uid="HistoryRangeSelector"
+            Grid.Row="1"
+            Margin="0,0,0,16"
+            MaxColumns="5"
+            SelectedIndex="{Binding SelectedRangeIndex, Mode=TwoWay}">
+            <RadioButton x:Uid="HistoryRangeLastHour" MinWidth="0" />
+            <RadioButton x:Uid="HistoryRangeLast6Hours" MinWidth="0" />
+            <RadioButton x:Uid="HistoryRangeLast24Hours" MinWidth="0" />
+            <RadioButton x:Uid="HistoryRangeLast7Days" MinWidth="0" />
+            <RadioButton x:Uid="HistoryRangeLast30Days" MinWidth="0" />
+        </RadioButtons>
+
+        <ScrollViewer Grid.Row="2" Padding="0,0,2,0" VerticalScrollBarVisibility="Auto">
+            <Grid>
+                <!-- Loading -->
+                <StackPanel
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Top"
+                    Margin="0,48,0,0"
+                    Spacing="12"
+                    Visibility="{Binding ShowLoading, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <ProgressRing IsActive="{Binding ShowLoading}" Width="32" Height="32" />
+                    <TextBlock
+                        x:Uid="HistoryLoading"
+                        Foreground="{ThemeResource TextSecondaryBrush}"
+                        HorizontalAlignment="Center" />
+                </StackPanel>
+
+                <!-- Unavailable -->
+                <controls:GlassCard
+                    VerticalAlignment="Top"
+                    Visibility="{Binding ShowUnavailable, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <StackPanel Spacing="6">
+                        <TextBlock
+                            x:Uid="HistoryUnavailableTitle"
+                            Style="{StaticResource SectionTitleTextStyle}" />
+                        <TextBlock
+                            x:Uid="HistoryUnavailableDescription"
+                            FontSize="12"
+                            Foreground="{ThemeResource TextSecondaryBrush}"
+                            TextWrapping="Wrap" />
+                    </StackPanel>
+                </controls:GlassCard>
+
+                <!-- Empty -->
+                <controls:GlassCard
+                    VerticalAlignment="Top"
+                    Visibility="{Binding ShowEmpty, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <StackPanel Spacing="6">
+                        <TextBlock
+                            x:Uid="HistoryEmptyTitle"
+                            Style="{StaticResource SectionTitleTextStyle}" />
+                        <TextBlock
+                            x:Uid="HistoryEmptyDescription"
+                            FontSize="12"
+                            Foreground="{ThemeResource TextSecondaryBrush}"
+                            TextWrapping="Wrap" />
+                    </StackPanel>
+                </controls:GlassCard>
+
+                <!-- Charts -->
+                <StackPanel
+                    Spacing="16"
+                    Visibility="{Binding ShowCharts, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <controls:GlassCard
+                        Visibility="{Binding ShowOfflineNotice, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <StackPanel Spacing="4">
+                            <TextBlock
+                                x:Uid="HistoryOfflineNoticeTitle"
+                                Style="{StaticResource SectionTitleTextStyle}" />
+                            <TextBlock
+                                x:Uid="HistoryOfflineNoticeDescription"
+                                FontSize="12"
+                                Foreground="{ThemeResource TextSecondaryBrush}"
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+                    </controls:GlassCard>
+
+                    <!-- CPU -->
+                    <controls:GlassCard>
+                        <StackPanel Spacing="10">
+                            <Grid>
+                                <TextBlock
+                                    Style="{StaticResource SectionTitleTextStyle}"
+                                    Text="{Binding CpuTitle}"
+                                    VerticalAlignment="Center" />
+                                <TextBlock
+                                    HorizontalAlignment="Right"
+                                    FontSize="18"
+                                    FontWeight="SemiBold"
+                                    Foreground="{ThemeResource TextPrimaryBrush}"
+                                    Text="{Binding CpuCurrentDisplay}" />
+                            </Grid>
+                            <controls:HistoryChart
+                                Height="128"
+                                AutomationProperties.Name="{Binding CpuSummary}"
+                                Series="{Binding CpuSeries}"
+                                RangeStart="{Binding RangeStartUtc}"
+                                RangeEnd="{Binding RangeEndUtc}"
+                                LineBrush="{ThemeResource BrandAccentBrush}"
+                                FillBrush="{ThemeResource AccentSoftBrush}"
+                                GridLineBrush="{ThemeResource GlassBorderBrush}" />
+                        </StackPanel>
+                    </controls:GlassCard>
+
+                    <!-- Memory -->
+                    <controls:GlassCard>
+                        <StackPanel Spacing="10">
+                            <Grid>
+                                <TextBlock
+                                    Style="{StaticResource SectionTitleTextStyle}"
+                                    Text="{Binding MemoryTitle}"
+                                    VerticalAlignment="Center" />
+                                <TextBlock
+                                    HorizontalAlignment="Right"
+                                    FontSize="18"
+                                    FontWeight="SemiBold"
+                                    Foreground="{ThemeResource TextPrimaryBrush}"
+                                    Text="{Binding MemoryCurrentDisplay}" />
+                            </Grid>
+                            <controls:HistoryChart
+                                Height="128"
+                                AutomationProperties.Name="{Binding MemorySummary}"
+                                Series="{Binding MemorySeries}"
+                                RangeStart="{Binding RangeStartUtc}"
+                                RangeEnd="{Binding RangeEndUtc}"
+                                LineBrush="{ThemeResource BrandAccentBrush}"
+                                FillBrush="{ThemeResource AccentSoftBrush}"
+                                GridLineBrush="{ThemeResource GlassBorderBrush}" />
+                        </StackPanel>
+                    </controls:GlassCard>
+
+                    <!-- Disk -->
+                    <controls:GlassCard>
+                        <StackPanel Spacing="10">
+                            <Grid>
+                                <TextBlock
+                                    Style="{StaticResource SectionTitleTextStyle}"
+                                    Text="{Binding DiskTitle}"
+                                    VerticalAlignment="Center" />
+                                <TextBlock
+                                    HorizontalAlignment="Right"
+                                    FontSize="18"
+                                    FontWeight="SemiBold"
+                                    Foreground="{ThemeResource TextPrimaryBrush}"
+                                    Text="{Binding DiskCurrentDisplay}" />
+                            </Grid>
+                            <controls:HistoryChart
+                                Height="128"
+                                AutomationProperties.Name="{Binding DiskSummary}"
+                                Series="{Binding DiskSeries}"
+                                RangeStart="{Binding RangeStartUtc}"
+                                RangeEnd="{Binding RangeEndUtc}"
+                                LineBrush="{ThemeResource BrandAccentBrush}"
+                                FillBrush="{ThemeResource AccentSoftBrush}"
+                                GridLineBrush="{ThemeResource GlassBorderBrush}" />
+                        </StackPanel>
+                    </controls:GlassCard>
+                </StackPanel>
+            </Grid>
+        </ScrollViewer>
+    </Grid>
+</Page>

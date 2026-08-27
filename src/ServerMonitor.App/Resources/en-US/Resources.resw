@@ -219,4 +219,53 @@
   <data name="SettingsAlwaysOnTopToggle.OnContent" xml:space="preserve"><value>On</value></data>
   <data name="SettingsAlwaysOnTopToggle.OffContent" xml:space="preserve"><value>Off</value></data>
   <data name="SettingsAlwaysOnTopToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Keep the compact widget always on top</value></data>
+  <!-- M10 Local History + Charts -->
+  <data name="ServerCardHistoryMenuItem.Text" xml:space="preserve"><value>History</value></data>
+  <data name="HistoryBackButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Back to servers</value></data>
+  <data name="HistoryBackButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Back</value></data>
+  <data name="HistorySubtitle.Text" xml:space="preserve"><value>History</value></data>
+  <data name="HistoryRangeSelector.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Time range</value></data>
+  <data name="HistoryRangeLastHour.Content" xml:space="preserve"><value>1 h</value></data>
+  <data name="HistoryRangeLast6Hours.Content" xml:space="preserve"><value>6 h</value></data>
+  <data name="HistoryRangeLast24Hours.Content" xml:space="preserve"><value>24 h</value></data>
+  <data name="HistoryRangeLast7Days.Content" xml:space="preserve"><value>7 d</value></data>
+  <data name="HistoryRangeLast30Days.Content" xml:space="preserve"><value>30 d</value></data>
+  <data name="HistoryLoading.Text" xml:space="preserve"><value>Loading history…</value></data>
+  <data name="HistoryUnavailableTitle.Text" xml:space="preserve"><value>History unavailable</value></data>
+  <data name="HistoryUnavailableDescription.Text" xml:space="preserve"><value>Local history can't be read right now. Monitoring continues as usual.</value></data>
+  <data name="HistoryEmptyTitle.Text" xml:space="preserve"><value>No history yet</value></data>
+  <data name="HistoryEmptyDescription.Text" xml:space="preserve"><value>History is collected while this server is monitored. Check back after a few minutes.</value></data>
+  <data name="HistoryMetricCpu" xml:space="preserve"><value>CPU</value></data>
+  <data name="HistoryMetricMemory" xml:space="preserve"><value>Memory</value></data>
+  <data name="HistoryMetricDisk" xml:space="preserve"><value>Disk</value></data>
+  <data name="HistoryValueUnknown" xml:space="preserve"><value>—</value></data>
+  <data name="HistoryValueUnknownAccessible" xml:space="preserve"><value>Unknown</value></data>
+  <data name="HistoryOfflineNoticeTitle.Text" xml:space="preserve"><value>Offline period</value></data>
+  <data name="HistoryOfflineNoticeDescription.Text" xml:space="preserve"><value>This range contains samples from a period when the server was offline. The charts show it as a gap.</value></data>
+  <data name="HistoryRangeNameLastHour" xml:space="preserve"><value>Last hour</value></data>
+  <data name="HistoryRangeNameLast6Hours" xml:space="preserve"><value>Last 6 hours</value></data>
+  <data name="HistoryRangeNameLast24Hours" xml:space="preserve"><value>Last 24 hours</value></data>
+  <data name="HistoryRangeNameLast7Days" xml:space="preserve"><value>Last 7 days</value></data>
+  <data name="HistoryRangeNameLast30Days" xml:space="preserve"><value>Last 30 days</value></data>
+  <data name="HistoryChartSummaryFormat" xml:space="preserve"><value>{0}. {1}. Current {2}. Maximum {3}.</value></data>
+  <data name="HistoryChartSummaryOfflineSuffix" xml:space="preserve"><value> Contains an offline period shown as a gap.</value></data>
+  <data name="SettingsHistoryTitle.Text" xml:space="preserve"><value>History</value></data>
+  <data name="SettingsHistoryDescription.Text" xml:space="preserve"><value>Metric history is stored locally for 30 days. Nothing leaves your device.</value></data>
+  <data name="SettingsClearHistoryButton.Content" xml:space="preserve"><value>Clear history</value></data>
+  <data name="SettingsHistoryClearedSuccess.Title" xml:space="preserve"><value>History cleared</value></data>
+  <data name="SettingsHistoryClearedSuccess.Message" xml:space="preserve"><value>All local history was removed.</value></data>
+  <data name="SettingsHistoryClearError.Title" xml:space="preserve"><value>Couldn't clear history</value></data>
+  <data name="SettingsHistoryClearError.Message" xml:space="preserve"><value>History is unavailable right now. Try again later.</value></data>
+  <data name="HistoryClearConfirmTitle" xml:space="preserve"><value>Clear all history?</value></data>
+  <data name="HistoryClearConfirmMessage" xml:space="preserve"><value>This permanently removes all stored metric history. Servers, credentials and settings are not affected. This can't be undone.</value></data>
+  <data name="HistoryClearConfirmPrimary" xml:space="preserve"><value>Clear history</value></data>
+  <data name="HistoryClearConfirmClose" xml:space="preserve"><value>Cancel</value></data>
+  <data name="SettingsResetHistoryButton.Content" xml:space="preserve"><value>Reset history</value></data>
+  <data name="SettingsHistoryResetSuccess.Title" xml:space="preserve"><value>History reset</value></data>
+  <data name="SettingsHistoryResetSuccess.Message" xml:space="preserve"><value>The local database was recreated and is ready for new samples.</value></data>
+  <data name="SettingsHistoryResetError.Title" xml:space="preserve"><value>History could not be reset</value></data>
+  <data name="SettingsHistoryResetError.Message" xml:space="preserve"><value>The local database could not be recreated. Try again later.</value></data>
+  <data name="HistoryResetConfirmTitle" xml:space="preserve"><value>Reset the history database?</value></data>
+  <data name="HistoryResetConfirmMessage" xml:space="preserve"><value>This removes the unavailable history database and creates a new one. Servers, credentials, and settings are not affected. This action cannot be undone.</value></data>
+  <data name="HistoryResetConfirmPrimary" xml:space="preserve"><value>Reset history</value></data>
 </root>

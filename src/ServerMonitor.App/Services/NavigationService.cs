@@ -32,4 +32,19 @@ public sealed class NavigationService(
     public void GoToDashboard() => NavigateTo<DashboardPage>();
 
     public void GoToSettings() => NavigateTo<SettingsPage>();
+
+    public void GoToHistory(Guid serverId, string serverName)
+    {
+        if (_frame is null)
+        {
+            throw new InvalidOperationException("Navigation has not been initialized.");
+        }
+
+        // A fresh page per navigation so each visit starts clean and disposes on Unloaded — the
+        // target server is a runtime argument, so this cannot use the type-only NavigateTo cache.
+        var page = serviceProvider.GetRequiredService<HistoryPage>();
+        page.Load(serverId, serverName);
+        _frame.Content = page;
+        logger.LogInformation("Navigated to History for a server.");
+    }
 }

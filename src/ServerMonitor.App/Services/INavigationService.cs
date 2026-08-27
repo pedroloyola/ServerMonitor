@@ -11,4 +11,6 @@ public interface INavigationService
     void GoToDashboard();
 
     void GoToSettings();
+
+    void GoToHistory(Guid serverId, string serverName);
 }

@@ -15,6 +15,7 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
     private readonly IServerService _serverService;
     private readonly IServerDiscoveryService _discoveryService;
     private readonly INotificationSettingsService _notificationSettingsService;
+    private readonly IHistoryMaintenanceService _historyMaintenance;
     private readonly ILogger<SettingsViewModel> _logger;
     private int _selectedLanguageIndex;
     private int _selectedThemeIndex;
@@ -25,6 +26,11 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
     private bool _isResetIgnoredErrorOpen;
     private bool _notificationsEnabled;
     private bool _isNotificationSettingsErrorOpen;
+    private bool _isHistoryClearedOpen;
+    private bool _isHistoryClearErrorOpen;
+    private bool _isHistoryResetAvailable;
+    private bool _isHistoryResetOpen;
+    private bool _isHistoryResetErrorOpen;
 
     public SettingsViewModel(
         IThemeService themeService,
@@ -33,6 +39,7 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
         IServerService serverService,
         IServerDiscoveryService discoveryService,
         INotificationSettingsService notificationSettingsService,
+        IHistoryMaintenanceService historyMaintenance,
         ILogger<SettingsViewModel> logger)
     {
         _themeService = themeService;
@@ -40,11 +47,14 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
         _serverService = serverService;
         _discoveryService = discoveryService;
         _notificationSettingsService = notificationSettingsService;
+        _historyMaintenance = historyMaintenance;
         _logger = logger;
         _serverService.ServersChanged += OnServersChanged;
         _notificationSettingsService.NotificationsEnabledChanged += OnNotificationsEnabledChanged;
         BackCommand = new RelayCommand(navigationService.GoToDashboard);
         ResetIgnoredCommand = new AsyncRelayCommand(ResetIgnoredAsync);
+        ClearHistoryCommand = new AsyncRelayCommand(ClearHistoryAsync);
+        ResetHistoryCommand = new AsyncRelayCommand(ResetHistoryAsync);
         _selectedThemeIndex = (int)themeService.Current;
         _notificationsEnabled = notificationSettingsService.NotificationsEnabled;
         _selectedLanguageIndex = localizationService.CurrentLanguageOverride switch
@@ -61,6 +71,10 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
     public ICommand BackCommand { get; }
 
     public ICommand ResetIgnoredCommand { get; }
+
+    public ICommand ClearHistoryCommand { get; }
+
+    public ICommand ResetHistoryCommand { get; }
 
     public int SelectedThemeIndex
     {
@@ -163,8 +177,39 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
         set => SetProperty(ref _isNotificationSettingsErrorOpen, value);
     }
 
+    public bool IsHistoryClearedOpen
+    {
+        get => _isHistoryClearedOpen;
+        set => SetProperty(ref _isHistoryClearedOpen, value);
+    }
+
+    public bool IsHistoryClearErrorOpen
+    {
+        get => _isHistoryClearErrorOpen;
+        set => SetProperty(ref _isHistoryClearErrorOpen, value);
+    }
+
+    public bool IsHistoryResetAvailable
+    {
+        get => _isHistoryResetAvailable;
+        private set => SetProperty(ref _isHistoryResetAvailable, value);
+    }
+
+    public bool IsHistoryResetOpen
+    {
+        get => _isHistoryResetOpen;
+        set => SetProperty(ref _isHistoryResetOpen, value);
+    }
+
+    public bool IsHistoryResetErrorOpen
+    {
+        get => _isHistoryResetErrorOpen;
+        set => SetProperty(ref _isHistoryResetErrorOpen, value);
+    }
+
     public async Task LoadAsync()
     {
+        IsHistoryResetAvailable = !_historyMaintenance.IsAvailable;
         try
         {
             var servers = await _serverService.GetAllAsync();
@@ -201,6 +246,64 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
                 "Could not reset ignored discoveries. Exception type: {ExceptionType}.",
                 exception.GetType().Name);
             IsResetIgnoredErrorOpen = true;
+        }
+    }
+
+    private async Task ClearHistoryAsync()
+    {
+        IsHistoryClearedOpen = false;
+        IsHistoryClearErrorOpen = false;
+        try
+        {
+            var outcome = await _historyMaintenance.ClearHistoryWithConfirmationAsync();
+            switch (outcome)
+            {
+                case HistoryClearOutcome.Cleared:
+                    IsHistoryClearedOpen = true;
+                    break;
+                case HistoryClearOutcome.Unavailable:
+                    IsHistoryClearErrorOpen = true;
+                    IsHistoryResetAvailable = true;
+                    break;
+                // Cancelled: leave both closed.
+            }
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(
+                "Could not clear history. Exception type: {ExceptionType}.",
+                exception.GetType().Name);
+            IsHistoryClearErrorOpen = true;
+        }
+    }
+
+    private async Task ResetHistoryAsync()
+    {
+        IsHistoryResetOpen = false;
+        IsHistoryResetErrorOpen = false;
+        try
+        {
+            var outcome = await _historyMaintenance.ResetHistoryWithConfirmationAsync();
+            switch (outcome)
+            {
+                case HistoryResetOutcome.Reset:
+                    IsHistoryResetOpen = true;
+                    IsHistoryResetAvailable = false;
+                    IsHistoryClearErrorOpen = false;
+                    break;
+                case HistoryResetOutcome.Unavailable:
+                    IsHistoryResetErrorOpen = true;
+                    IsHistoryResetAvailable = true;
+                    break;
+            }
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(
+                "Could not reset history. Exception type: {ExceptionType}.",
+                exception.GetType().Name);
+            IsHistoryResetErrorOpen = true;
+            IsHistoryResetAvailable = true;
         }
     }
 

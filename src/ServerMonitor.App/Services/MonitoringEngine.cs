@@ -23,6 +23,7 @@ public sealed class MonitoringEngine : IMonitoringEngine, IHostedService, IAsync
     private readonly IServerService _serverService;
     private readonly IServerMetricsStore _metricsStore;
     private readonly IServerMonitoringStateStore _stateStore;
+    private readonly IMonitoringCycleObserver _cycleObserver;
     private readonly TimeProvider _timeProvider;
     private readonly MonitoringOptions _options;
     private readonly ILogger<MonitoringEngine> _logger;
@@ -40,11 +41,13 @@ public sealed class MonitoringEngine : IMonitoringEngine, IHostedService, IAsync
         IServerMonitoringStateStore stateStore,
         ILogger<MonitoringEngine> logger,
         TimeProvider? timeProvider = null,
-        MonitoringOptions? options = null)
+        MonitoringOptions? options = null,
+        IMonitoringCycleObserver? cycleObserver = null)
     {
         _serverService = serverService ?? throw new ArgumentNullException(nameof(serverService));
         _metricsStore = metricsStore ?? throw new ArgumentNullException(nameof(metricsStore));
         _stateStore = stateStore ?? throw new ArgumentNullException(nameof(stateStore));
+        _cycleObserver = cycleObserver ?? NullMonitoringCycleObserver.Instance;
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _timeProvider = timeProvider ?? TimeProvider.System;
         _options = options ?? MonitoringOptions.Default;
@@ -432,6 +435,26 @@ public sealed class MonitoringEngine : IMonitoringEngine, IHostedService, IAsync
                 server.Id,
                 previous.Health,
                 next.Health);
+        }
+
+        // Publish the fresh cycle as a non-blocking side effect (ADR-015 §2/§3). The snapshot is the
+        // fresh result's snapshot — null on any non-success — so history never records a stale value.
+        // The observer contract is non-throwing, but the engine stays robust to a faulty observer:
+        // history must never break monitoring.
+        try
+        {
+            _cycleObserver.OnCycleCompleted(new MonitoringCycleCompletion
+            {
+                ServerId = server.Id,
+                CapturedAtUtc = now,
+                Outcome = outcome,
+                Health = next.Health,
+                Snapshot = result.Snapshot
+            });
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError("History cycle observer threw. Exception type: {Type}.", exception.GetType().Name);
         }
     }
 

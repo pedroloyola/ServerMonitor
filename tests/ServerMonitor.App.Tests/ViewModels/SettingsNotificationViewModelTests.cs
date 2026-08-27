@@ -74,6 +74,7 @@ public sealed class SettingsNotificationViewModelTests
         new FakeServerService(),
         new EmptyDiscoveryService(),
         settings,
+        new NullHistoryMaintenanceService(),
         NullLogger<SettingsViewModel>.Instance);
 
     private sealed class FakeNotificationSettingsService(bool enabled) : INotificationSettingsService
@@ -134,6 +135,10 @@ public sealed class SettingsNotificationViewModelTests
         }
 
         public void GoToSettings()
+        {
+        }
+
+        public void GoToHistory(Guid serverId, string serverName)
         {
         }
     }

@@ -264,6 +264,57 @@
                             IsOpen="{Binding IsResetIgnoredErrorOpen, Mode=TwoWay}"
                             Severity="Error" />
                     </StackPanel>
+
+                    <Border Height="1" Background="{ThemeResource GlassBorderBrush}" />
+
+                    <!-- History Section -->
+                    <StackPanel Spacing="10">
+                        <StackPanel Spacing="2">
+                            <TextBlock
+                                x:Uid="SettingsHistoryTitle"
+                                AutomationProperties.HeadingLevel="Level2"
+                                Style="{StaticResource SectionTitleTextStyle}" />
+                            <TextBlock
+                                x:Uid="SettingsHistoryDescription"
+                                FontSize="12"
+                                Foreground="{ThemeResource TextSecondaryBrush}"
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+
+                        <Button
+                            x:Uid="SettingsClearHistoryButton"
+                            HorizontalAlignment="Left"
+                            Command="{Binding ClearHistoryCommand}"
+                            Style="{StaticResource QuietPillButtonStyle}" />
+
+                        <Button
+                            x:Uid="SettingsResetHistoryButton"
+                            HorizontalAlignment="Left"
+                            Command="{Binding ResetHistoryCommand}"
+                            Style="{StaticResource QuietPillButtonStyle}"
+                            Visibility="{Binding IsHistoryResetAvailable, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
+                        <InfoBar
+                            x:Uid="SettingsHistoryClearedSuccess"
+                            IsClosable="True"
+                            IsOpen="{Binding IsHistoryClearedOpen, Mode=TwoWay}"
+                            Severity="Success" />
+                        <InfoBar
+                            x:Uid="SettingsHistoryClearError"
+                            IsClosable="True"
+                            IsOpen="{Binding IsHistoryClearErrorOpen, Mode=TwoWay}"
+                            Severity="Error" />
+                        <InfoBar
+                            x:Uid="SettingsHistoryResetSuccess"
+                            IsClosable="True"
+                            IsOpen="{Binding IsHistoryResetOpen, Mode=TwoWay}"
+                            Severity="Success" />
+                        <InfoBar
+                            x:Uid="SettingsHistoryResetError"
+                            IsClosable="True"
+                            IsOpen="{Binding IsHistoryResetErrorOpen, Mode=TwoWay}"
+                            Severity="Error" />
+                    </StackPanel>
                 </StackPanel>
             </controls:GlassCard>
 
