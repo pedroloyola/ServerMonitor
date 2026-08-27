@@ -1,0 +1,5 @@
+{"ID":"good","Names":"/before","Image":"alpine","State":"running","Status":"Up"}
+{ this is not JSON
+[]
+{"ID":42,"Names":null,"Image":{},"State":"running","Status":"Up"}
+{"ID":"good2","Names":"/after","Image":"alpine","State":"exited","Status":"Exited (0)"}

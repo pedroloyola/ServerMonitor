@@ -64,3 +64,7 @@ O macOS usa a userland BSD (sem GNU coreutils) e não expõe um contador cumulat
 | Sistema | `sw_vers` | allowlist de `ProductName`, `ProductVersion`, `BuildVersion` |
 
 O tamanho da página é lido do cabeçalho do `vm_stat` e nunca assumido como 4096 (Apple Silicon usa 16384). As regras de falha parcial, segurança, limites e não-persistência são as mesmas do Linux. O catálogo e as decisões constam da ADR-010.
+
+## Workloads read-only — pipeline separado (Milestone 11)
+
+O M11 (Docker + serviços systemd/launchd read-only) **não** faz parte deste pipeline de métricas de host. É uma **segunda fonte** completamente separada: produz um `ServerWorkloadSnapshot` próprio (nunca infla o `ServerMetricsSnapshot`), com o seu próprio catálogo fixo, cadência e store in-memory. Reutiliza os mesmos princípios — catálogo fechado sem interpolação, sem `ExecuteCommandAsync(string)`, uma sessão SSH autenticada por passagem, output não confiável com limites de tamanho/linhas, decode UTF-8 estrito, `unknown ≠ zero` e não-persistência — mas acrescenta sanitização de control-chars/ANSI/bidi porque os campos são texto influenciável pelo lado remoto. Ver a secção "Observabilidade de workloads read-only" em [architecture.md](architecture.md) e a ADR-016.

@@ -5,6 +5,7 @@ using ServerMonitor.Core.Models;
 using ServerMonitor.Core.Security;
 using ServerMonitor.Infrastructure.Collectors.Linux;
 using ServerMonitor.Infrastructure.Collectors.MacOS;
+using ServerMonitor.Infrastructure.Collectors.Workloads;
 using ServerMonitor.Infrastructure.SSH;
 
 namespace ServerMonitor.Infrastructure.Tests.SSH;
@@ -428,6 +429,52 @@ public sealed class SshConnectionServiceTests
         Assert.Equal(0, fixture.Factory.AuthenticatedCount);
     }
 
+    [Fact]
+    public async Task Workloads_reuse_trust_then_credentials_and_one_authenticated_session()
+    {
+        var raw = new WorkloadRawData
+        {
+            DockerVersion = new RemoteCommandOutcome { WasExecuted = true, ExitStatus = 0, StandardOutput = "27.0.3" }
+        };
+        var fixture = new Fixture
+        {
+            TrustedHostKey = Trusted(Identity(1))
+        };
+        fixture.Credentials.Secret = "password";
+        fixture.Factory.Enqueue(new FakeSession(Identity(1), SshConnectionErrorCode.AuthenticationFailed));
+        fixture.Factory.Enqueue(new FakeSession(Identity(1), SshConnectionErrorCode.None, workloads: raw));
+
+        var result = await fixture.Service.CollectAsync(
+            Request().Server with { OperatingSystem = ServerOperatingSystem.Linux },
+            new WorkloadRemoteRequest { Timeout = TimeSpan.FromSeconds(2) });
+
+        Assert.True(result.ConnectionResult.IsSuccess);
+        Assert.Same(raw, result.Data);
+        Assert.True(fixture.Factory.LastSession!.CollectWorkloadsWasCalled);
+        Assert.Equal(
+            ServerOperatingSystem.Linux,
+            fixture.Factory.LastSession!.WorkloadPlan!.Value.OperatingSystem);
+        Assert.Equal(new[] { "probe", "password" }, fixture.Factory.Calls);
+        Assert.Equal(1, fixture.Credentials.ReadCount);
+    }
+
+    [Fact]
+    public async Task Workloads_unknown_host_never_loads_credentials_or_collects()
+    {
+        var fixture = new Fixture();
+        fixture.Factory.Enqueue(new FakeSession(Identity(1), SshConnectionErrorCode.HostKeyMismatch));
+
+        var result = await fixture.Service.CollectAsync(
+            Request().Server with { OperatingSystem = ServerOperatingSystem.Linux },
+            new WorkloadRemoteRequest { Timeout = TimeSpan.FromSeconds(2) });
+
+        Assert.False(result.ConnectionResult.IsSuccess);
+        Assert.Equal(SshConnectionErrorCode.HostKeyUnknown, result.ConnectionResult.ErrorCode);
+        Assert.Null(result.Data);
+        Assert.Equal(0, fixture.Credentials.ReadCount);
+        Assert.Equal(0, fixture.Factory.AuthenticatedCount);
+    }
+
     private static SshConnectionRequest Request(
         Func<Server, Server>? configure = null,
         TimeSpan? timeout = null)
@@ -595,13 +642,15 @@ public sealed class SshConnectionServiceTests
             SshConnectionErrorCode whenTrusted,
             ServerOperatingSystem operatingSystem = ServerOperatingSystem.Unknown,
             LinuxMetricsRawData? linuxMetrics = null,
-            MacOsMetricsRawData? macOsMetrics = null)
+            MacOsMetricsRawData? macOsMetrics = null,
+            WorkloadRawData? workloads = null)
         {
             _identity = identity;
             _whenTrusted = whenTrusted;
             _operatingSystem = operatingSystem;
             LinuxMetrics = linuxMetrics;
             MacOsMetrics = macOsMetrics;
+            Workloads = workloads;
         }
 
         private FakeSession(bool waitUntilCancelled)
@@ -615,9 +664,15 @@ public sealed class SshConnectionServiceTests
 
         public bool CollectMacOsWasCalled { get; private set; }
 
+        public bool CollectWorkloadsWasCalled { get; private set; }
+
+        public WorkloadCollectionPlan? WorkloadPlan { get; private set; }
+
         public LinuxMetricsRawData? LinuxMetrics { get; }
 
         public MacOsMetricsRawData? MacOsMetrics { get; }
+
+        public WorkloadRawData? Workloads { get; }
 
         public static FakeSession WaitUntilCancelled() => new(waitUntilCancelled: true);
 
@@ -650,6 +705,16 @@ public sealed class SshConnectionServiceTests
             return RunAsync(hostKeyVerifier, cancellationToken);
         }
 
+        public Task<SshSessionResult> CollectWorkloadsAsync(
+            Func<HostKeyIdentity, bool> hostKeyVerifier,
+            WorkloadCollectionPlan plan,
+            CancellationToken cancellationToken)
+        {
+            CollectWorkloadsWasCalled = true;
+            WorkloadPlan = plan;
+            return RunAsync(hostKeyVerifier, cancellationToken);
+        }
+
         public void Dispose()
         {
         }
@@ -670,7 +735,8 @@ public sealed class SshConnectionServiceTests
                 PresentedHostKey = _identity,
                 DetectedOperatingSystem = _operatingSystem,
                 LinuxMetrics = LinuxMetrics,
-                MacOsMetrics = MacOsMetrics
+                MacOsMetrics = MacOsMetrics,
+                Workloads = Workloads
             };
         }
     }

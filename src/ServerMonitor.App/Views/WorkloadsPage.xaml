@@ -1,0 +1,453 @@
+<Page
+    x:Class="ServerMonitor.App.Views.WorkloadsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:ServerMonitor.App.Controls"
+    xmlns:vm="using:ServerMonitor.App.ViewModels">
+
+    <Page.Resources>
+        <!-- The GLASS lives on the section list container, not per row (§46, H-01). -->
+        <Style x:Key="WorkloadListContainerStyle" TargetType="Border">
+            <Setter Property="Background" Value="{ThemeResource MutedSurfaceBrush}" />
+            <Setter Property="BorderBrush" Value="{ThemeResource GlassBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="{StaticResource RadiusMedium}" />
+        </Style>
+
+        <!-- Compact list row: a dense line with a hairline divider, never a heavy card (§46, H-01). -->
+        <Style x:Key="WorkloadRowStyle" TargetType="Border">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="{ThemeResource GlassBorderBrush}" />
+            <Setter Property="BorderThickness" Value="0,0,0,1" />
+            <Setter Property="Padding" Value="12,7" />
+        </Style>
+
+        <!-- Container row (§47): Name primary, Image secondary; State and Health carry weight+colour by
+             their own severity so a problem is never a smaller, quieter label than running (M-01). -->
+        <DataTemplate x:Key="ContainerRowTemplate" x:DataType="vm:ContainerRowViewModel">
+            <Border Style="{StaticResource WorkloadRowStyle}" AutomationProperties.Name="{x:Bind AutomationName}">
+                <Grid ColumnSpacing="10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Ellipse
+                        AutomationProperties.AccessibilityView="Raw"
+                        Style="{x:Bind Severity, Converter={StaticResource WorkloadSeverityToDotStyleConverter}}" />
+                    <StackPanel Grid.Column="1" Spacing="1">
+                        <TextBlock
+                            AutomationProperties.AccessibilityView="Raw"
+                            FontSize="14"
+                            FontWeight="SemiBold"
+                            Foreground="{ThemeResource TextPrimaryBrush}"
+                            Text="{x:Bind Name}"
+                            TextTrimming="CharacterEllipsis" />
+                        <TextBlock
+                            AutomationProperties.AccessibilityView="Raw"
+                            FontSize="12"
+                            Foreground="{ThemeResource TextSecondaryBrush}"
+                            Text="{x:Bind Image}"
+                            TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" Spacing="1">
+                        <TextBlock
+                            AutomationProperties.AccessibilityView="Raw"
+                            HorizontalAlignment="Right"
+                            FontSize="12"
+                            Style="{x:Bind StateSeverity, Converter={StaticResource WorkloadSeverityToTextStyleConverter}}"
+                            Text="{x:Bind StateText}" />
+                        <TextBlock
+                            AutomationProperties.AccessibilityView="Raw"
+                            HorizontalAlignment="Right"
+                            FontSize="12"
+                            Style="{x:Bind HealthSeverity, Converter={StaticResource WorkloadSeverityToTextStyleConverter}}"
+                            Text="{x:Bind HealthText}"
+                            Visibility="{x:Bind HasHealth, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </DataTemplate>
+
+        <!-- Service row (§48): Name primary, Description when useful, State (weighted by severity), startup. -->
+        <DataTemplate x:Key="ServiceRowTemplate" x:DataType="vm:ServiceRowViewModel">
+            <Border Style="{StaticResource WorkloadRowStyle}" AutomationProperties.Name="{x:Bind AutomationName}">
+                <Grid ColumnSpacing="10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Ellipse
+                        AutomationProperties.AccessibilityView="Raw"
+                        Style="{x:Bind Severity, Converter={StaticResource WorkloadSeverityToDotStyleConverter}}" />
+                    <StackPanel Grid.Column="1" Spacing="1">
+                        <TextBlock
+                            AutomationProperties.AccessibilityView="Raw"
+                            FontSize="14"
+                            FontWeight="SemiBold"
+                            Foreground="{ThemeResource TextPrimaryBrush}"
+                            Text="{x:Bind Name}"
+                            TextTrimming="CharacterEllipsis" />
+                        <TextBlock
+                            AutomationProperties.AccessibilityView="Raw"
+                            FontSize="12"
+                            Foreground="{ThemeResource TextSecondaryBrush}"
+                            Text="{x:Bind Description}"
+                            TextTrimming="CharacterEllipsis"
+                            Visibility="{x:Bind HasDescription, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" Spacing="1">
+                        <TextBlock
+                            AutomationProperties.AccessibilityView="Raw"
+                            HorizontalAlignment="Right"
+                            FontSize="13"
+                            Style="{x:Bind Severity, Converter={StaticResource WorkloadSeverityToTextStyleConverter}}"
+                            Text="{x:Bind StateText}" />
+                        <TextBlock
+                            AutomationProperties.AccessibilityView="Raw"
+                            HorizontalAlignment="Right"
+                            FontSize="11"
+                            Foreground="{ThemeResource TextTertiaryBrush}"
+                            Text="{x:Bind StartupText}"
+                            Visibility="{x:Bind HasStartup, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </DataTemplate>
+    </Page.Resources>
+
+    <Grid Padding="{StaticResource PagePadding}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Header: back + server name + "Workloads" + freshness + refresh -->
+        <Grid ColumnSpacing="12" Margin="0,0,0,16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Button
+                x:Uid="WorkloadsBackButton"
+                VerticalAlignment="Center"
+                Command="{Binding BackCommand}"
+                Style="{StaticResource SubtleIconButtonStyle}">
+                <SymbolIcon Symbol="Back" />
+            </Button>
+            <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                <TextBlock
+                    AutomationProperties.HeadingLevel="Level1"
+                    Style="{StaticResource PageTitleTextStyle}"
+                    Text="{Binding Title}"
+                    TextTrimming="CharacterEllipsis" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock
+                        x:Uid="WorkloadsSubtitle"
+                        FontSize="13"
+                        Foreground="{ThemeResource TextSecondaryBrush}"
+                        VerticalAlignment="Center" />
+                    <TextBlock
+                        FontSize="13"
+                        Foreground="{ThemeResource TextTertiaryBrush}"
+                        Text="{Binding UpdatedAgoDisplay}"
+                        VerticalAlignment="Center"
+                        Visibility="{Binding HasFreshness, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    <Border
+                        x:Uid="WorkloadStaleBadge"
+                        Padding="7,1"
+                        VerticalAlignment="Center"
+                        Background="{ThemeResource MutedSurfaceBrush}"
+                        BorderBrush="{ThemeResource GlassBorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="{StaticResource RadiusSmall}"
+                        Visibility="{Binding ShowStaleNotice, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <TextBlock
+                            x:Uid="WorkloadStaleBadgeText"
+                            FontSize="11"
+                            FontWeight="Medium"
+                            Foreground="{ThemeResource TextSecondaryBrush}" />
+                    </Border>
+                </StackPanel>
+            </StackPanel>
+            <Button
+                Grid.Column="2"
+                VerticalAlignment="Center"
+                AutomationProperties.Name="{Binding RefreshAutomationName}"
+                Command="{Binding RefreshCommand}"
+                Style="{StaticResource SubtleIconButtonStyle}"
+                ToolTipService.ToolTip="{Binding RefreshAutomationName}">
+                <Grid>
+                    <FontIcon
+                        FontSize="15"
+                        Glyph="&#xE72C;"
+                        Visibility="{Binding IsRefreshing, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Invert}" />
+                    <ProgressRing
+                        Width="18"
+                        Height="18"
+                        IsActive="{Binding IsRefreshing}"
+                        Visibility="{Binding IsRefreshing, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                </Grid>
+            </Button>
+        </Grid>
+
+        <ScrollViewer Grid.Row="1" Padding="0,0,2,0" VerticalScrollBarVisibility="Auto">
+            <StackPanel Spacing="20">
+
+                <!-- ================= Docker / Containers ================= -->
+                <StackPanel Spacing="10">
+                    <StackPanel Spacing="3">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock
+                                x:Uid="WorkloadDockerSectionTitle"
+                                AutomationProperties.HeadingLevel="Level2"
+                                Style="{StaticResource SectionTitleTextStyle}"
+                                VerticalAlignment="Center" />
+                            <Border
+                                Padding="7,1"
+                                VerticalAlignment="Center"
+                                AutomationProperties.Name="{Binding DockerFailureBadge}"
+                                Background="Transparent"
+                                BorderBrush="{ThemeResource StatusCriticalBrush}"
+                                BorderThickness="1"
+                                CornerRadius="{StaticResource RadiusSmall}"
+                                Visibility="{Binding DockerHasFailures, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <TextBlock
+                                    AutomationProperties.AccessibilityView="Raw"
+                                    FontSize="11"
+                                    FontWeight="SemiBold"
+                                    Foreground="{ThemeResource WorkloadStateTextCriticalBrush}"
+                                    Text="{Binding DockerFailureBadge}" />
+                            </Border>
+                        </StackPanel>
+                        <TextBlock
+                            FontSize="12"
+                            Foreground="{ThemeResource TextSecondaryBrush}"
+                            Text="{Binding DockerSummary}"
+                            TextWrapping="Wrap"
+                            Visibility="{Binding ShowDockerSummary, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    </StackPanel>
+
+                    <!-- Loading (bounded: only before the first collection, §44) -->
+                    <StackPanel
+                        Orientation="Horizontal"
+                        Spacing="10"
+                        Visibility="{Binding ShowDockerLoading, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <ProgressRing IsActive="{Binding ShowDockerLoading}" Width="18" Height="18" />
+                        <TextBlock
+                            x:Uid="WorkloadLoading"
+                            Foreground="{ThemeResource TextSecondaryBrush}"
+                            VerticalAlignment="Center" />
+                    </StackPanel>
+
+                    <!-- Message states — each with a distinct semantic icon + colour (M-02) -->
+                    <controls:GlassCard Visibility="{Binding ShowDockerNotInstalled, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <FontIcon Glyph="&#xE946;" FontSize="20" VerticalAlignment="Top" Foreground="{ThemeResource TextSecondaryBrush}" />
+                            <StackPanel Grid.Column="1" Spacing="6">
+                                <TextBlock x:Uid="WorkloadDockerNotInstalledTitle" Style="{StaticResource SectionTitleTextStyle}" />
+                                <TextBlock x:Uid="WorkloadDockerNotInstalledDescription" FontSize="12" Foreground="{ThemeResource TextSecondaryBrush}" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Grid>
+                    </controls:GlassCard>
+                    <controls:GlassCard Visibility="{Binding ShowDockerPermissionDenied, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <FontIcon Glyph="&#xE72E;" FontSize="20" VerticalAlignment="Top" Foreground="{ThemeResource WorkloadDotWarningBrush}" />
+                            <StackPanel Grid.Column="1" Spacing="6">
+                                <TextBlock x:Uid="WorkloadDockerPermissionTitle" Style="{StaticResource SectionTitleTextStyle}" />
+                                <TextBlock x:Uid="WorkloadDockerPermissionDescription" FontSize="12" Foreground="{ThemeResource TextSecondaryBrush}" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Grid>
+                    </controls:GlassCard>
+                    <controls:GlassCard Visibility="{Binding ShowDockerUnavailable, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <FontIcon Glyph="&#xE7BA;" FontSize="20" VerticalAlignment="Top" Foreground="{ThemeResource WorkloadDotWarningBrush}" />
+                            <StackPanel Grid.Column="1" Spacing="6">
+                                <TextBlock x:Uid="WorkloadDockerUnavailableTitle" Style="{StaticResource SectionTitleTextStyle}" />
+                                <TextBlock x:Uid="WorkloadDockerUnavailableDescription" FontSize="12" Foreground="{ThemeResource TextSecondaryBrush}" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Grid>
+                    </controls:GlassCard>
+                    <controls:GlassCard Visibility="{Binding ShowDockerError, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <FontIcon Glyph="&#xE783;" FontSize="20" VerticalAlignment="Top" Foreground="{ThemeResource StatusCriticalBrush}" />
+                            <StackPanel Grid.Column="1" Spacing="6">
+                                <TextBlock x:Uid="WorkloadDockerErrorTitle" Style="{StaticResource SectionTitleTextStyle}" />
+                                <TextBlock x:Uid="WorkloadDockerErrorDescription" FontSize="12" Foreground="{ThemeResource TextSecondaryBrush}" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Grid>
+                    </controls:GlassCard>
+                    <controls:GlassCard Visibility="{Binding ShowDockerEmpty, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <FontIcon Glyph="&#xE8FD;" FontSize="20" VerticalAlignment="Top" Foreground="{ThemeResource TextSecondaryBrush}" />
+                            <StackPanel Grid.Column="1" Spacing="6">
+                                <TextBlock x:Uid="WorkloadDockerEmptyTitle" Style="{StaticResource SectionTitleTextStyle}" />
+                                <TextBlock x:Uid="WorkloadDockerEmptyDescription" FontSize="12" Foreground="{ThemeResource TextSecondaryBrush}" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Grid>
+                    </controls:GlassCard>
+
+                    <!-- Container list + local search/filter (§46/§50/§51) -->
+                    <StackPanel
+                        Spacing="10"
+                        Visibility="{Binding ShowDockerContainers, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <TextBox
+                            x:Uid="WorkloadSearchContainers"
+                            Text="{Binding ContainerSearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <RadioButtons
+                            x:Uid="WorkloadContainerFilter"
+                            MaxColumns="3"
+                            SelectedIndex="{Binding ContainerFilterIndex, Mode=TwoWay}">
+                            <RadioButton x:Uid="WorkloadFilterAllContainers" MinWidth="0" />
+                            <RadioButton x:Uid="WorkloadFilterRunningContainers" MinWidth="0" />
+                            <RadioButton x:Uid="WorkloadFilterFailedContainers" MinWidth="0" />
+                        </RadioButtons>
+                        <TextBlock
+                            x:Uid="WorkloadNoResults"
+                            FontSize="12"
+                            Foreground="{ThemeResource TextSecondaryBrush}"
+                            Visibility="{Binding ShowDockerNoResults, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                        <Border Style="{StaticResource WorkloadListContainerStyle}">
+                            <ScrollViewer MaxHeight="300" VerticalScrollBarVisibility="Auto">
+                                <ItemsRepeater ItemsSource="{Binding Containers}" ItemTemplate="{StaticResource ContainerRowTemplate}" />
+                            </ScrollViewer>
+                        </Border>
+                        <TextBlock
+                            x:Uid="WorkloadTruncatedNotice"
+                            FontSize="11"
+                            Foreground="{ThemeResource TextTertiaryBrush}"
+                            TextWrapping="Wrap"
+                            Visibility="{Binding ShowDockerTruncatedNotice, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- ================= Services ================= -->
+                <StackPanel Spacing="10">
+                    <StackPanel Spacing="3">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock
+                                x:Uid="WorkloadServicesSectionTitle"
+                                AutomationProperties.HeadingLevel="Level2"
+                                Style="{StaticResource SectionTitleTextStyle}"
+                                VerticalAlignment="Center" />
+                            <Border
+                                Padding="7,1"
+                                VerticalAlignment="Center"
+                                AutomationProperties.Name="{Binding ServicesFailureBadge}"
+                                Background="Transparent"
+                                BorderBrush="{ThemeResource StatusCriticalBrush}"
+                                BorderThickness="1"
+                                CornerRadius="{StaticResource RadiusSmall}"
+                                Visibility="{Binding ServicesHasFailures, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <TextBlock
+                                    AutomationProperties.AccessibilityView="Raw"
+                                    FontSize="11"
+                                    FontWeight="SemiBold"
+                                    Foreground="{ThemeResource WorkloadStateTextCriticalBrush}"
+                                    Text="{Binding ServicesFailureBadge}" />
+                            </Border>
+                        </StackPanel>
+                        <TextBlock
+                            FontSize="12"
+                            Foreground="{ThemeResource TextSecondaryBrush}"
+                            Text="{Binding ServicesSummary}"
+                            TextWrapping="Wrap"
+                            Visibility="{Binding ShowServicesSummary, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    </StackPanel>
+
+                    <StackPanel
+                        Orientation="Horizontal"
+                        Spacing="10"
+                        Visibility="{Binding ShowServicesLoading, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <ProgressRing IsActive="{Binding ShowServicesLoading}" Width="18" Height="18" />
+                        <TextBlock
+                            x:Uid="WorkloadLoading"
+                            Foreground="{ThemeResource TextSecondaryBrush}"
+                            VerticalAlignment="Center" />
+                    </StackPanel>
+
+                    <controls:GlassCard Visibility="{Binding ShowServicesUnsupported, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <FontIcon Glyph="&#xE946;" FontSize="20" VerticalAlignment="Top" Foreground="{ThemeResource TextSecondaryBrush}" />
+                            <StackPanel Grid.Column="1" Spacing="6">
+                                <TextBlock x:Uid="WorkloadServicesUnsupportedTitle" Style="{StaticResource SectionTitleTextStyle}" />
+                                <TextBlock x:Uid="WorkloadServicesUnsupportedDescription" FontSize="12" Foreground="{ThemeResource TextSecondaryBrush}" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Grid>
+                    </controls:GlassCard>
+                    <controls:GlassCard Visibility="{Binding ShowServicesUnavailable, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <FontIcon Glyph="&#xE7BA;" FontSize="20" VerticalAlignment="Top" Foreground="{ThemeResource WorkloadDotWarningBrush}" />
+                            <StackPanel Grid.Column="1" Spacing="6">
+                                <TextBlock x:Uid="WorkloadServicesUnavailableTitle" Style="{StaticResource SectionTitleTextStyle}" />
+                                <TextBlock x:Uid="WorkloadServicesUnavailableDescription" FontSize="12" Foreground="{ThemeResource TextSecondaryBrush}" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Grid>
+                    </controls:GlassCard>
+                    <controls:GlassCard Visibility="{Binding ShowServicesError, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <FontIcon Glyph="&#xE783;" FontSize="20" VerticalAlignment="Top" Foreground="{ThemeResource StatusCriticalBrush}" />
+                            <StackPanel Grid.Column="1" Spacing="6">
+                                <TextBlock x:Uid="WorkloadServicesErrorTitle" Style="{StaticResource SectionTitleTextStyle}" />
+                                <TextBlock x:Uid="WorkloadServicesErrorDescription" FontSize="12" Foreground="{ThemeResource TextSecondaryBrush}" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Grid>
+                    </controls:GlassCard>
+                    <controls:GlassCard Visibility="{Binding ShowServicesEmpty, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <FontIcon Glyph="&#xE8FD;" FontSize="20" VerticalAlignment="Top" Foreground="{ThemeResource TextSecondaryBrush}" />
+                            <StackPanel Grid.Column="1" Spacing="6">
+                                <TextBlock x:Uid="WorkloadServicesEmptyTitle" Style="{StaticResource SectionTitleTextStyle}" />
+                                <TextBlock x:Uid="WorkloadServicesEmptyDescription" FontSize="12" Foreground="{ThemeResource TextSecondaryBrush}" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Grid>
+                    </controls:GlassCard>
+
+                    <StackPanel
+                        Spacing="10"
+                        Visibility="{Binding ShowServicesList, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <TextBox
+                            x:Uid="WorkloadSearchServices"
+                            Text="{Binding ServiceSearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <RadioButtons
+                            x:Uid="WorkloadServiceFilter"
+                            MaxColumns="3"
+                            SelectedIndex="{Binding ServiceFilterIndex, Mode=TwoWay}">
+                            <RadioButton x:Uid="WorkloadFilterAllServices" MinWidth="0" />
+                            <RadioButton x:Uid="WorkloadFilterRunningServices" MinWidth="0" />
+                            <RadioButton x:Uid="WorkloadFilterFailedServices" MinWidth="0" />
+                        </RadioButtons>
+                        <TextBlock
+                            x:Uid="WorkloadNoResults"
+                            FontSize="12"
+                            Foreground="{ThemeResource TextSecondaryBrush}"
+                            Visibility="{Binding ShowServicesNoResults, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                        <Border Style="{StaticResource WorkloadListContainerStyle}">
+                            <ScrollViewer MaxHeight="300" VerticalScrollBarVisibility="Auto">
+                                <ItemsRepeater ItemsSource="{Binding Services}" ItemTemplate="{StaticResource ServiceRowTemplate}" />
+                            </ScrollViewer>
+                        </Border>
+                        <TextBlock
+                            x:Uid="WorkloadTruncatedNotice"
+                            FontSize="11"
+                            Foreground="{ThemeResource TextTertiaryBrush}"
+                            TextWrapping="Wrap"
+                            Visibility="{Binding ShowServicesTruncatedNotice, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    </StackPanel>
+                </StackPanel>
+
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Page>

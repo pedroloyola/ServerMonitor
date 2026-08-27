@@ -13,4 +13,6 @@ public interface INavigationService
     void GoToSettings();
 
     void GoToHistory(Guid serverId, string serverName);
+
+    void GoToWorkloads(Guid serverId, string serverName);
 }

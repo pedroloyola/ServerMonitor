@@ -69,6 +69,15 @@
             <SolidColorBrush x:Key="StatusCriticalBrush" Color="#F87171" />
             <SolidColorBrush x:Key="StatusOfflineBrush" Color="#818CA0" />
             <SolidColorBrush x:Key="StatusUnknownBrush" Color="#64748B" />
+            <!-- Text-only semantic colours (AA on this theme's bg); dots/icons keep the vivid Status* brushes (H-03 AA). -->
+            <SolidColorBrush x:Key="WorkloadStateTextCriticalBrush" Color="#FB8B8B" />
+            <SolidColorBrush x:Key="WorkloadStateTextWarningBrush" Color="#FBBF24" />
+            <!-- Workload dot/graphic colours (non-text, target >=3:1); kept separate from shared Status* so
+                 the dashboard palette is untouched. Neutral stays muted by design (documented deviation). -->
+            <SolidColorBrush x:Key="WorkloadDotHealthyBrush" Color="#34D399" />
+            <SolidColorBrush x:Key="WorkloadDotWarningBrush" Color="#FBBF24" />
+            <SolidColorBrush x:Key="WorkloadDotCriticalBrush" Color="#F87171" />
+            <SolidColorBrush x:Key="WorkloadDotNeutralBrush" Color="#64748B" />
         </ResourceDictionary>
         <ResourceDictionary x:Key="Light">
             <!-- Backgrounds & Glass Layers -->
@@ -137,6 +146,15 @@
             <SolidColorBrush x:Key="StatusCriticalBrush" Color="#DC2626" />
             <SolidColorBrush x:Key="StatusOfflineBrush" Color="#64748B" />
             <SolidColorBrush x:Key="StatusUnknownBrush" Color="#94A3B8" />
+            <!-- Text-only semantic colours, darkened for AA >=4.5:1 on the light glass bg; dots/icons keep #DC2626/#D97706 (H-03 AA). -->
+            <SolidColorBrush x:Key="WorkloadStateTextCriticalBrush" Color="#991B1B" />
+            <SolidColorBrush x:Key="WorkloadStateTextWarningBrush" Color="#92400E" />
+            <!-- Workload dot/graphic colours (non-text, >=3:1 on the light bg): healthy/warning darkened
+                 from the vivid Status* so the dots clear AA; neutral stays muted (documented deviation). -->
+            <SolidColorBrush x:Key="WorkloadDotHealthyBrush" Color="#047857" />
+            <SolidColorBrush x:Key="WorkloadDotWarningBrush" Color="#B45309" />
+            <SolidColorBrush x:Key="WorkloadDotCriticalBrush" Color="#DC2626" />
+            <SolidColorBrush x:Key="WorkloadDotNeutralBrush" Color="#94A3B8" />
         </ResourceDictionary>
         <ResourceDictionary x:Key="Default">
             <SolidColorBrush x:Key="AppBackgroundBrush" Color="#111318" />
@@ -195,6 +213,15 @@
             <SolidColorBrush x:Key="StatusCriticalBrush" Color="#F87171" />
             <SolidColorBrush x:Key="StatusOfflineBrush" Color="#818CA0" />
             <SolidColorBrush x:Key="StatusUnknownBrush" Color="#64748B" />
+            <!-- Text-only semantic colours (AA on this theme's bg); dots/icons keep the vivid Status* brushes (H-03 AA). -->
+            <SolidColorBrush x:Key="WorkloadStateTextCriticalBrush" Color="#FB8B8B" />
+            <SolidColorBrush x:Key="WorkloadStateTextWarningBrush" Color="#FBBF24" />
+            <!-- Workload dot/graphic colours (non-text, target >=3:1); kept separate from shared Status* so
+                 the dashboard palette is untouched. Neutral stays muted by design (documented deviation). -->
+            <SolidColorBrush x:Key="WorkloadDotHealthyBrush" Color="#34D399" />
+            <SolidColorBrush x:Key="WorkloadDotWarningBrush" Color="#FBBF24" />
+            <SolidColorBrush x:Key="WorkloadDotCriticalBrush" Color="#F87171" />
+            <SolidColorBrush x:Key="WorkloadDotNeutralBrush" Color="#64748B" />
         </ResourceDictionary>
         <ResourceDictionary x:Key="HighContrast">
             <StaticResource x:Key="AppBackgroundBrush" ResourceKey="SystemColorWindowBrush" />
@@ -232,6 +259,12 @@
             <StaticResource x:Key="StatusCriticalBrush" ResourceKey="SystemColorHighlightBrush" />
             <StaticResource x:Key="StatusOfflineBrush" ResourceKey="SystemColorWindowTextBrush" />
             <StaticResource x:Key="StatusUnknownBrush" ResourceKey="SystemColorWindowTextBrush" />
+            <StaticResource x:Key="WorkloadStateTextCriticalBrush" ResourceKey="SystemColorWindowTextBrush" />
+            <StaticResource x:Key="WorkloadStateTextWarningBrush" ResourceKey="SystemColorWindowTextBrush" />
+            <StaticResource x:Key="WorkloadDotHealthyBrush" ResourceKey="SystemColorWindowTextBrush" />
+            <StaticResource x:Key="WorkloadDotWarningBrush" ResourceKey="SystemColorWindowTextBrush" />
+            <StaticResource x:Key="WorkloadDotCriticalBrush" ResourceKey="SystemColorWindowTextBrush" />
+            <StaticResource x:Key="WorkloadDotNeutralBrush" ResourceKey="SystemColorWindowTextBrush" />
         </ResourceDictionary>
     </ResourceDictionary.ThemeDictionaries>
 

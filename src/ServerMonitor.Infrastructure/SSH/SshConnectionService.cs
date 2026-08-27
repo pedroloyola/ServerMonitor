@@ -6,11 +6,12 @@ using ServerMonitor.Core.Models;
 using ServerMonitor.Core.Security;
 using ServerMonitor.Infrastructure.Collectors.Linux;
 using ServerMonitor.Infrastructure.Collectors.MacOS;
+using ServerMonitor.Infrastructure.Collectors.Workloads;
 
 namespace ServerMonitor.Infrastructure.SSH;
 
 public sealed class SshConnectionService
-    : ISshConnectionService, ILinuxMetricsRemoteSource, IMacOsMetricsRemoteSource
+    : ISshConnectionService, ILinuxMetricsRemoteSource, IMacOsMetricsRemoteSource, IWorkloadRemoteSource
 {
     private readonly IHostKeyTrustStore _hostKeyTrustStore;
     private readonly IServerCredentialStore _credentialStore;
@@ -40,17 +41,17 @@ public sealed class SshConnectionService
     public Task<SshConnectionResult> ConnectAsync(
         SshConnectionRequest request,
         CancellationToken cancellationToken = default) =>
-        ExecuteAsync(request, SshSessionOperation.Connect, TimeSpan.Zero, null, cancellationToken);
+        ExecuteAsync(request, SshSessionOperation.Connect, TimeSpan.Zero, null, default, cancellationToken);
 
     public Task<SshConnectionResult> TestConnectionAsync(
         SshConnectionRequest request,
         CancellationToken cancellationToken = default) =>
-        ExecuteAsync(request, SshSessionOperation.DetectOperatingSystem, TimeSpan.Zero, null, cancellationToken);
+        ExecuteAsync(request, SshSessionOperation.DetectOperatingSystem, TimeSpan.Zero, null, default, cancellationToken);
 
     public Task<SshConnectionResult> DetectOperatingSystemAsync(
         SshConnectionRequest request,
         CancellationToken cancellationToken = default) =>
-        ExecuteAsync(request, SshSessionOperation.DetectOperatingSystem, TimeSpan.Zero, null, cancellationToken);
+        ExecuteAsync(request, SshSessionOperation.DetectOperatingSystem, TimeSpan.Zero, null, default, cancellationToken);
 
     public async Task<LinuxMetricsRemoteResult> CollectAsync(
         Server server,
@@ -82,6 +83,7 @@ public sealed class SshConnectionService
                 SshSessionOperation.CollectLinuxMetrics,
                 cpuSampleInterval,
                 session => data = session.LinuxMetrics,
+                default,
                 cancellationToken)
             .ConfigureAwait(false);
 
@@ -109,10 +111,53 @@ public sealed class SshConnectionService
                 SshSessionOperation.CollectMacOsMetrics,
                 TimeSpan.Zero,
                 session => data = session.MacOsMetrics,
+                default,
                 cancellationToken)
             .ConfigureAwait(false);
 
         return new MacOsMetricsRemoteResult
+        {
+            ConnectionResult = connectionResult,
+            Data = data
+        };
+    }
+
+    public async Task<WorkloadRemoteResult> CollectAsync(
+        Server server,
+        WorkloadRemoteRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(server);
+        ArgumentNullException.ThrowIfNull(request);
+
+        WorkloadRawData? data = null;
+        var connectionRequest = new SshConnectionRequest
+        {
+            Server = server,
+            Timeout = request.Timeout
+        };
+
+        // Docker is probed independently of the OS (§69). The service manager commands are selected inside
+        // the session from the effective OS: the configured OS is passed through, and an Auto/Unknown
+        // server is resolved there via uname (no extra session). Mapping the OS to a ServiceManager stays
+        // in the Core policy.
+        var plan = new WorkloadCollectionPlan
+        {
+            IncludeDocker = request.IncludeDocker,
+            IncludeContainerStats = request.IncludeContainerStats,
+            OperatingSystem = server.OperatingSystem
+        };
+
+        var connectionResult = await ExecuteAsync(
+                connectionRequest,
+                SshSessionOperation.CollectWorkloads,
+                TimeSpan.Zero,
+                session => data = session.Workloads,
+                plan,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        return new WorkloadRemoteResult
         {
             ConnectionResult = connectionResult,
             Data = data
@@ -124,6 +169,7 @@ public sealed class SshConnectionService
         SshSessionOperation operation,
         TimeSpan cpuSampleInterval,
         Action<SshSessionResult>? captureSession,
+        WorkloadCollectionPlan workloadPlan,
         CancellationToken cancellationToken)
     {
         var stopwatch = Stopwatch.StartNew();
@@ -195,6 +241,7 @@ public sealed class SshConnectionService
                     trustedHostKey!,
                     operation,
                     cpuSampleInterval,
+                    workloadPlan,
                     linkedSource.Token)
                 .ConfigureAwait(false);
 
@@ -251,6 +298,7 @@ public sealed class SshConnectionService
         TrustedHostKey trustedHostKey,
         SshSessionOperation operation,
         TimeSpan cpuSampleInterval,
+        WorkloadCollectionPlan workloadPlan,
         CancellationToken cancellationToken)
     {
         SecretValue? storedSecret = null;
@@ -356,6 +404,9 @@ public sealed class SshConnectionService
                         .ConfigureAwait(false),
                     SshSessionOperation.CollectMacOsMetrics => await session
                         .CollectMacOsMetricsAsync(verifier, cancellationToken)
+                        .ConfigureAwait(false),
+                    SshSessionOperation.CollectWorkloads => await session
+                        .CollectWorkloadsAsync(verifier, workloadPlan, cancellationToken)
                         .ConfigureAwait(false),
                     _ => Failure(SshConnectionErrorCode.Unexpected)
                 };
@@ -479,6 +530,7 @@ public sealed class SshConnectionService
         Connect,
         DetectOperatingSystem,
         CollectLinuxMetrics,
-        CollectMacOsMetrics
+        CollectMacOsMetrics,
+        CollectWorkloads
     }
 }

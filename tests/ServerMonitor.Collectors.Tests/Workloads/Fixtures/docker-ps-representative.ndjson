@@ -1,0 +1,4 @@
+{"ID":"a111111111111111","Names":"/api","Image":"example/api:1.2","State":"running","Status":"Up 2 hours (healthy)","CreatedAt":"2026-08-27 07:30:00 +0000 UTC"}
+{"ID":"b222222222222222","Names":"/worker","Image":"example/worker:2.0","State":"running","Status":"Up 14 seconds (unhealthy)","CreatedAt":"2026-08-27 09:59:46 +0000 UTC"}
+{"ID":"c333333333333333","Names":"/job","Image":"example/job:latest","State":"exited","Status":"Exited (1) 4 minutes ago","CreatedAt":"2026-08-27 09:45:00 +0000 UTC"}
+{"ID":"d444444444444444","Names":"/paused","Image":"alpine:3.22","State":"paused","Status":"Up 3 minutes (Paused)","CreatedAt":"2026-08-27 09:57:00 +0000 UTC"}

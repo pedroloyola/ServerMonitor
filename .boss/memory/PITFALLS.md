@@ -84,3 +84,9 @@
 - **Fix:** referência explícita de versão idêntica a `Microsoft.WindowsAppSDK.Runtime` com path property; target MSBuild `Unzip` extrai apenas o resource DLL para o output e contém errors fail-fast se package/payload faltar.
 - **Validation:** sonda real passou de `Register`/`Show` com `Setting=Enabled`; o harness real entregou Warning, Critical, Offline e Recovery no Notification Center, e click restaurou a mesma janela/PID.
 - **Learning:** capability check, registo e entrega são gates distintos. Validar a API no binário self-contained real e auditar o payload, não apenas a superfície managed. [L-014, L-002]
+
+## P-013 — Agentes concorrentes num worktree partilhado contendem em locks de build-server (M11)
+- **Observation (M11, FULL ORCHESTRA):** múltiplos agentes (Cortex/Relay/Atlas) a compilar em paralelo no MESMO worktree viam erros transitórios de build — locks em ficheiros `obj/` e "ref-assemblies em falta" — não causados pelo código.
+- **Cause:** `dotnet build` mantém build-servers persistentes (VBCSCompiler/MSBuild node) que bloqueiam artefactos intermédios; dois builds simultâneos na mesma árvore disputam esses handles. Agrava com `Platforms=x64` (paths `bin/x64` vs `bin`) [ver P-008].
+- **Fix:** antes dos gates, `dotnet build-server shutdown` e/ou `--disable-build-servers`; idealmente serializar os builds de gate ou dar worktree próprio a trabalho verdadeiramente paralelo. Rebuild limpo `--no-incremental` do alvo exato antes de contar (P-008).
+- **Learning:** orquestração multi-agente num worktree único precisa de disciplina de build — o Boss coordena a serialização dos gates finais ou isola por worktree. Um erro de build transitório sob concorrência não é necessariamente regressão de código: confirmar reexecutando isolado. [P-008, L-011]

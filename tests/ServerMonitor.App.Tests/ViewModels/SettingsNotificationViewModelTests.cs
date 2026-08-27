@@ -141,6 +141,10 @@ public sealed class SettingsNotificationViewModelTests
         public void GoToHistory(Guid serverId, string serverName)
         {
         }
+
+        public void GoToWorkloads(Guid serverId, string serverName)
+        {
+        }
     }
 
     private sealed class EmptyDiscoveryService : IServerDiscoveryService

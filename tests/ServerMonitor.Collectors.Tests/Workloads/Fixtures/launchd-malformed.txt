@@ -1,0 +1,7 @@
+system = {
+	services = {
+		not-a-row
+		123	0
+		456	0	com.example.valid
+	}
+}

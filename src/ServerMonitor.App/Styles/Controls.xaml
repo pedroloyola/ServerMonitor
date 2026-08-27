@@ -6,6 +6,40 @@
     <converters:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
     <converters:ConnectionStateToBrushConverter x:Key="ConnectionStateToBrushConverter" />
     <converters:HealthToBrushConverter x:Key="HealthToBrushConverter" />
+    <converters:WorkloadSeverityToDotStyleConverter x:Key="WorkloadSeverityToDotStyleConverter" />
+    <converters:WorkloadSeverityToTextStyleConverter x:Key="WorkloadSeverityToTextStyleConverter" />
+
+    <!-- Theme-aware workload status colours (H-03): each Fill/Foreground is a {ThemeResource}, so the
+         semantic colour re-resolves for Light and Dark instead of freezing to one theme's variant. The
+         Status* brushes already ship AA-tuned Light+Dark variants in DesignTokens. -->
+    <Style x:Key="WorkloadDotNeutralStyle" TargetType="Ellipse">
+        <Setter Property="Width" Value="9" />
+        <Setter Property="Height" Value="9" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Fill" Value="{ThemeResource WorkloadDotNeutralBrush}" />
+    </Style>
+    <Style x:Key="WorkloadDotPositiveStyle" TargetType="Ellipse" BasedOn="{StaticResource WorkloadDotNeutralStyle}">
+        <Setter Property="Fill" Value="{ThemeResource WorkloadDotHealthyBrush}" />
+    </Style>
+    <Style x:Key="WorkloadDotWarningStyle" TargetType="Ellipse" BasedOn="{StaticResource WorkloadDotNeutralStyle}">
+        <Setter Property="Fill" Value="{ThemeResource WorkloadDotWarningBrush}" />
+    </Style>
+    <Style x:Key="WorkloadDotNegativeStyle" TargetType="Ellipse" BasedOn="{StaticResource WorkloadDotNeutralStyle}">
+        <Setter Property="Fill" Value="{ThemeResource WorkloadDotCriticalBrush}" />
+    </Style>
+
+    <Style x:Key="WorkloadStateTextNeutralStyle" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{ThemeResource TextPrimaryBrush}" />
+        <Setter Property="FontWeight" Value="Medium" />
+    </Style>
+    <Style x:Key="WorkloadStateTextWarningStyle" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{ThemeResource WorkloadStateTextWarningBrush}" />
+        <Setter Property="FontWeight" Value="Medium" />
+    </Style>
+    <Style x:Key="WorkloadStateTextNegativeStyle" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{ThemeResource WorkloadStateTextCriticalBrush}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
 
     <Style x:Key="PageTitleTextStyle" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="Segoe UI Variable Display" />

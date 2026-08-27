@@ -10,6 +10,8 @@ internal sealed class FakeNavigationService : INavigationService
 
     public Guid? LastHistoryServerId { get; private set; }
 
+    public Guid? LastWorkloadsServerId { get; private set; }
+
     public void Initialize(Frame frame)
     {
     }
@@ -25,4 +27,6 @@ internal sealed class FakeNavigationService : INavigationService
     }
 
     public void GoToHistory(Guid serverId, string serverName) => LastHistoryServerId = serverId;
+
+    public void GoToWorkloads(Guid serverId, string serverName) => LastWorkloadsServerId = serverId;
 }

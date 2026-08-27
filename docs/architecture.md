@@ -1,4 +1,4 @@
-# Arquitetura — Milestone 9
+# Arquitetura — Milestone 11
 
 ```text
 ServerMonitor.App  ──→ ServerMonitor.Core
@@ -171,3 +171,70 @@ do Compact, via `OverlappedPresenter.IsAlwaysOnTop` (sem polling), e é removido
 O domínio, `IServerService`, persistência e ViewModels de servidor continuam a não conhecer a largura da
 janela nem o modo de widget. Um eventual Windows Widget Provider oficial será uma integração separada,
 reservada para o M13, conforme a ADR-005 e a ADR-014.
+
+## Observabilidade de workloads read-only (Milestone 11)
+
+```text
+MonitoringEngine.ApplyCycleResult (ciclo fresco)
+        └────────→ IMonitoringCycleObserver  (= CompositeMonitoringCycleObserver)
+                        ├─ HistoryRecorder            (M10 — inalterado)
+                        └─ WorkloadCadenceObserver    (M11 — due 60s, non-blocking)
+                                 ↓ TryEnqueueScheduled (drop observável)
+                          bounded Channel<WorkloadRequest>
+                                 ↓  (single consumer)
+                   WorkloadCollectorService (IHostedService)
+                     · single-flight por servidor · limiter próprio (2)
+                     · coalesce Scheduled+Manual  · WorkloadFreshnessMerger
+                                 ↓ IWorkloadRemoteSource (catálogo fixo, 1 sessão SSH)
+                   docker version/ps · systemctl list-units/list-unit-files · launchctl print system
+                                 ↓ parsers puros + WorkloadTextSanitizer
+                          ServerWorkloadSnapshot (Docker + Serviços, Availability própria)
+                                 ↓
+                   IServerWorkloadStore (in-memory, transitório)  ── WorkloadChanged
+                                 ↓  (marshal p/ UI thread)
+                          Secção Docker/Serviços no detalhe do servidor (só Standard)
+
+IWorkloadRefreshCoordinator.RefreshNowAsync (manual / Refresh All) → WorkloadRequest{Manual} (bypassa throttle, coalesce)
+```
+
+O M11 acrescenta uma **segunda fonte read-only** — containers Docker e serviços geridos (systemd/launchd)
+— completamente separada do `ServerMetricsSnapshot`. É observabilidade pura: **OBSERVAR, NUNCA
+ADMINISTRAR**. O catálogo SSH é **fechado**, em constantes de código
+(`Docker/Systemd/LaunchdCommandCatalog`), sem qualquer interpolação de host/user/config/UI e sem nenhuma
+API `ExecuteCommandAsync(string)` pública, tal como os catálogos de métricas do M4/M5. Nenhum comando
+altera estado; não há sudo. A porta `IWorkloadRemoteSource` (Infrastructure) corre os comandos numa única
+sessão autenticada por passagem, e os `Collectors` mapeiam o output cru com parsers puros —
+`DockerWorkloadMapper`, `ServiceWorkloadMapper`, `WorkloadManagerPolicy` — sem tocar SSH.NET.
+
+A disponibilidade é **tipada** por servidor e Docker e serviços falham de forma independente
+(`DockerAvailability` / `WorkloadServiceAvailability`: `NotInstalled`/`PermissionDenied`/`Unavailable`/
+`Available`/`Error`, e `ServiceManager.Unsupported` para OS sem manager suportado). Docker é sondado
+**independentemente** do service manager (§69): um Linux sem systemd pode ter Docker. Um `permission
+denied` — utilizador SSH fora do grupo `docker`, polkit restrito, ou `launchctl print system` root-only —
+vira um estado `PermissionDenied`, **nunca** uma lista falsa nem uma escalada com sudo. Estado e health de
+container ficam em campos separados; `docker stats` (CPU/memória por container) fica fora do M11, com os
+campos `nullable` reservados.
+
+A cadência integra-se **de forma mínima**: o `CompositeMonitoringCycleObserver` acrescenta o
+`WorkloadCadenceObserver` ao lado do `HistoryRecorder`, isolando cada um num `try/catch` — o
+`MonitoringEngine` continua a ver um único observador e a engine thread não muda. Não há timer novo: o
+observador ride o sinal de ciclo do M6 com uma política pura de "due" a 60 s por servidor, faz um enqueue
+não-bloqueante e a recolha SSH corre no `WorkloadCollectorService` fora da engine thread, com limiter
+próprio (default 2) e **single-flight por servidor** (padrão `ServerMonitor` do M6; waiter inscrito sob o
+lock que limpa o in-flight). Refresh manual e Refresh All forçam e coalescem, ignorando o throttle. Uma
+falha de workloads nunca afeta a monitorização de host, e Docker e serviços isolam-se mutuamente.
+
+O store `IServerWorkloadStore` é **in-memory e transitório** (sem SQLite, sem JSON, sem
+`%LOCALAPPDATA%`), reconstruído a cada arranque e removido no reconcile de `ServersChanged`. A freshness é
+honesta (`WorkloadFreshnessMerger`): numa falha, as listas anteriores ficam *stale*, `CapturedAtUtc` não
+recua e `unknown ≠ zero`. O output remoto é tratado como **não confiável**: byte cap de transporte, count
+caps (≤ 512 containers / ≤ 2048 serviços) com flag `Truncated`, e `WorkloadTextSanitizer` (clamp a 256
+chars, strip de control-chars, sequências ANSI/CSI e overrides bidi/Trojan-Source). O store nunca contém
+segredos, credenciais, host keys, username nem erro SSH cru; o logging regista só `ServerId`/estado/
+contagem/duração.
+
+Os workloads têm secção própria no detalhe do servidor (apenas Standard Mode) e **não** alteram
+`ServerHealth`/`MonitoringThresholds`, **não** geram notificações, **não** entram no histórico do M10 e
+**não** aparecem no modo compacto. Ações remotas (restart de serviços/containers, gestão Docker) ficam
+explicitamente fora do M11 — são V3 do roadmap. Decisões, catálogo completo, tabelas de mapeamento e
+limites constam da ADR-016.

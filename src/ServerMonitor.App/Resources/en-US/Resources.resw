@@ -268,4 +268,80 @@
   <data name="HistoryResetConfirmTitle" xml:space="preserve"><value>Reset the history database?</value></data>
   <data name="HistoryResetConfirmMessage" xml:space="preserve"><value>This removes the unavailable history database and creates a new one. Servers, credentials, and settings are not affected. This action cannot be undone.</value></data>
   <data name="HistoryResetConfirmPrimary" xml:space="preserve"><value>Reset history</value></data>
+  <!-- M11 Workloads (Docker + Services), read-only -->
+  <data name="ServerCardWorkloadsMenuItem.Text" xml:space="preserve"><value>Workloads</value></data>
+  <data name="WorkloadsBackButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Back to servers</value></data>
+  <data name="WorkloadsBackButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Back</value></data>
+  <data name="WorkloadsSubtitle.Text" xml:space="preserve"><value>Workloads</value></data>
+  <data name="WorkloadStaleBadge.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>These workloads may be outdated</value></data>
+  <data name="WorkloadStaleBadgeText.Text" xml:space="preserve"><value>Outdated</value></data>
+  <data name="WorkloadRefreshButton" xml:space="preserve"><value>Refresh workloads</value></data>
+  <data name="WorkloadDockerSectionTitle.Text" xml:space="preserve"><value>Containers</value></data>
+  <data name="WorkloadServicesSectionTitle.Text" xml:space="preserve"><value>Services</value></data>
+  <data name="WorkloadLoading.Text" xml:space="preserve"><value>Loading workloads…</value></data>
+  <data name="WorkloadDockerNotInstalledTitle.Text" xml:space="preserve"><value>Docker not installed</value></data>
+  <data name="WorkloadDockerNotInstalledDescription.Text" xml:space="preserve"><value>Docker isn't available on this server. Only services are shown.</value></data>
+  <data name="WorkloadDockerPermissionTitle.Text" xml:space="preserve"><value>No permission to access Docker</value></data>
+  <data name="WorkloadDockerPermissionDescription.Text" xml:space="preserve"><value>This user can't reach the Docker daemon. Add it to the docker group to see containers.</value></data>
+  <data name="WorkloadDockerUnavailableTitle.Text" xml:space="preserve"><value>Docker unavailable</value></data>
+  <data name="WorkloadDockerUnavailableDescription.Text" xml:space="preserve"><value>Docker is installed but the daemon isn't responding right now.</value></data>
+  <data name="WorkloadDockerErrorTitle.Text" xml:space="preserve"><value>Couldn't read Docker</value></data>
+  <data name="WorkloadDockerErrorDescription.Text" xml:space="preserve"><value>Container status couldn't be read this time. Monitoring continues as usual.</value></data>
+  <data name="WorkloadDockerEmptyTitle.Text" xml:space="preserve"><value>No containers</value></data>
+  <data name="WorkloadDockerEmptyDescription.Text" xml:space="preserve"><value>Docker is running but there are no containers on this server.</value></data>
+  <data name="WorkloadServicesUnsupportedTitle.Text" xml:space="preserve"><value>Service manager not supported</value></data>
+  <data name="WorkloadServicesUnsupportedDescription.Text" xml:space="preserve"><value>No supported service manager was found on this server.</value></data>
+  <data name="WorkloadServicesUnavailableTitle.Text" xml:space="preserve"><value>Services unavailable</value></data>
+  <data name="WorkloadServicesUnavailableDescription.Text" xml:space="preserve"><value>The service manager couldn't be reached right now.</value></data>
+  <data name="WorkloadServicesErrorTitle.Text" xml:space="preserve"><value>Couldn't read services</value></data>
+  <data name="WorkloadServicesErrorDescription.Text" xml:space="preserve"><value>Service status couldn't be read this time. Monitoring continues as usual.</value></data>
+  <data name="WorkloadServicesEmptyTitle.Text" xml:space="preserve"><value>No services</value></data>
+  <data name="WorkloadServicesEmptyDescription.Text" xml:space="preserve"><value>No managed services were reported on this server.</value></data>
+  <data name="WorkloadSearchContainers.PlaceholderText" xml:space="preserve"><value>Search containers</value></data>
+  <data name="WorkloadSearchContainers.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Search containers</value></data>
+  <data name="WorkloadSearchServices.PlaceholderText" xml:space="preserve"><value>Search services</value></data>
+  <data name="WorkloadSearchServices.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Search services</value></data>
+  <data name="WorkloadContainerFilter.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Filter containers</value></data>
+  <data name="WorkloadServiceFilter.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Filter services</value></data>
+  <data name="WorkloadFilterAllContainers.Content" xml:space="preserve"><value>All</value></data>
+  <data name="WorkloadFilterRunningContainers.Content" xml:space="preserve"><value>Running</value></data>
+  <data name="WorkloadFilterFailedContainers.Content" xml:space="preserve"><value>Failed</value></data>
+  <data name="WorkloadFilterAllServices.Content" xml:space="preserve"><value>All</value></data>
+  <data name="WorkloadFilterRunningServices.Content" xml:space="preserve"><value>Running</value></data>
+  <data name="WorkloadFilterFailedServices.Content" xml:space="preserve"><value>Failed</value></data>
+  <data name="WorkloadNoResults.Text" xml:space="preserve"><value>No results</value></data>
+  <data name="WorkloadTruncatedNotice.Text" xml:space="preserve"><value>The list was capped; some items aren't shown.</value></data>
+  <data name="WorkloadUpdatedJustNow" xml:space="preserve"><value>Updated just now</value></data>
+  <data name="WorkloadUpdatedMinutesFormat" xml:space="preserve"><value>Updated {0} min ago</value></data>
+  <data name="WorkloadUpdatedHoursFormat" xml:space="preserve"><value>Updated {0} h ago</value></data>
+  <data name="WorkloadUpdatedDaysFormat" xml:space="preserve"><value>Updated {0} d ago</value></data>
+  <data name="WorkloadContainerStateUnknown" xml:space="preserve"><value>Unknown</value></data>
+  <data name="WorkloadContainerStateCreated" xml:space="preserve"><value>Created</value></data>
+  <data name="WorkloadContainerStateRunning" xml:space="preserve"><value>Running</value></data>
+  <data name="WorkloadContainerStateRestarting" xml:space="preserve"><value>Restarting</value></data>
+  <data name="WorkloadContainerStatePaused" xml:space="preserve"><value>Paused</value></data>
+  <data name="WorkloadContainerStateExited" xml:space="preserve"><value>Stopped</value></data>
+  <data name="WorkloadContainerStateDead" xml:space="preserve"><value>Failed</value></data>
+  <data name="WorkloadContainerStateRemoving" xml:space="preserve"><value>Removing</value></data>
+  <data name="WorkloadContainerHealthHealthy" xml:space="preserve"><value>Healthy</value></data>
+  <data name="WorkloadContainerHealthUnhealthy" xml:space="preserve"><value>Unhealthy</value></data>
+  <data name="WorkloadContainerHealthStarting" xml:space="preserve"><value>Starting</value></data>
+  <data name="WorkloadServiceStateUnknown" xml:space="preserve"><value>Unknown</value></data>
+  <data name="WorkloadServiceStateRunning" xml:space="preserve"><value>Running</value></data>
+  <data name="WorkloadServiceStateStopped" xml:space="preserve"><value>Stopped</value></data>
+  <data name="WorkloadServiceStateFailed" xml:space="preserve"><value>Failed</value></data>
+  <data name="WorkloadServiceStateStarting" xml:space="preserve"><value>Starting</value></data>
+  <data name="WorkloadServiceStateStopping" xml:space="preserve"><value>Stopping</value></data>
+  <data name="WorkloadServiceStartupEnabled" xml:space="preserve"><value>Starts at boot</value></data>
+  <data name="WorkloadServiceStartupDisabled" xml:space="preserve"><value>Disabled at boot</value></data>
+  <data name="WorkloadServiceStartupStatic" xml:space="preserve"><value>Static</value></data>
+  <data name="WorkloadServiceStartupMasked" xml:space="preserve"><value>Masked</value></data>
+  <data name="WorkloadContainerAccessibleFormat" xml:space="preserve"><value>{0}, container, {1}</value></data>
+  <data name="WorkloadContainerAccessibleWithHealthFormat" xml:space="preserve"><value>{0}, container, {1}, {2}</value></data>
+  <data name="WorkloadServiceAccessibleFormat" xml:space="preserve"><value>{0}, {1}</value></data>
+  <data name="WorkloadSummaryContainersFormat" xml:space="preserve"><value>{0} containers</value></data>
+  <data name="WorkloadSummaryRunningFormat" xml:space="preserve"><value>{0} running</value></data>
+  <data name="WorkloadSummaryFailedFormat" xml:space="preserve"><value>{0} failing</value></data>
+  <data name="WorkloadSummaryWarningFormat" xml:space="preserve"><value>{0} starting</value></data>
+  <data name="WorkloadSummaryStoppedFormat" xml:space="preserve"><value>{0} stopped</value></data>
 </root>

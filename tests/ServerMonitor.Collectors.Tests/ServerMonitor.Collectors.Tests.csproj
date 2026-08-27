@@ -22,4 +22,8 @@
     <ProjectReference Include="..\..\src\ServerMonitor.Collectors\ServerMonitor.Collectors.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include="Workloads\Fixtures\**\*" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

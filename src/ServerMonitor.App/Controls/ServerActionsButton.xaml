@@ -17,6 +17,13 @@
                         <FontIcon Glyph="&#xE81C;" />
                     </MenuFlyoutItem.Icon>
                 </MenuFlyoutItem>
+                <MenuFlyoutItem
+                    x:Uid="ServerCardWorkloadsMenuItem"
+                    Command="{Binding ViewWorkloadsCommand}">
+                    <MenuFlyoutItem.Icon>
+                        <FontIcon Glyph="&#xE8FD;" />
+                    </MenuFlyoutItem.Icon>
+                </MenuFlyoutItem>
                 <MenuFlyoutSeparator />
                 <MenuFlyoutItem
                     x:Uid="ServerCardEditMenuItem"

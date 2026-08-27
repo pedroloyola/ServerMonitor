@@ -1,0 +1,9 @@
+system = {
+	active count = 4
+	services = {
+		123	0	com.apple.sshd
+		-	-	com.example.stopped
+		-	78	com.example.failed
+		0	0	com.example.zero-pid
+	}
+}

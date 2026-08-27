@@ -47,4 +47,19 @@ public sealed class NavigationService(
         _frame.Content = page;
         logger.LogInformation("Navigated to History for a server.");
     }
+
+    public void GoToWorkloads(Guid serverId, string serverName)
+    {
+        if (_frame is null)
+        {
+            throw new InvalidOperationException("Navigation has not been initialized.");
+        }
+
+        // A fresh page per navigation so each visit starts clean and disposes on Unloaded — the
+        // target server is a runtime argument, so this cannot use the type-only NavigateTo cache.
+        var page = serviceProvider.GetRequiredService<WorkloadsPage>();
+        page.Load(serverId, serverName);
+        _frame.Content = page;
+        logger.LogInformation("Navigated to Workloads for a server.");
+    }
 }

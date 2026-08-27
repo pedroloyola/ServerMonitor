@@ -1,5 +1,6 @@
 using ServerMonitor.Infrastructure.Collectors.Linux;
 using ServerMonitor.Infrastructure.Collectors.MacOS;
+using ServerMonitor.Infrastructure.Collectors.Workloads;
 using ServerMonitor.Infrastructure.SSH;
 
 namespace ServerMonitor.Infrastructure.Tests.SSH;
@@ -34,6 +35,17 @@ public sealed class SshApiBoundaryTests
     public void MacOs_metrics_port_accepts_no_command_text()
     {
         var methods = typeof(IMacOsMetricsRemoteSource).GetMethods();
+
+        Assert.NotEmpty(methods);
+        Assert.All(
+            methods.SelectMany(method => method.GetParameters()),
+            parameter => Assert.NotEqual(typeof(string), parameter.ParameterType));
+    }
+
+    [Fact]
+    public void Workload_port_accepts_no_command_text()
+    {
+        var methods = typeof(IWorkloadRemoteSource).GetMethods();
 
         Assert.NotEmpty(methods);
         Assert.All(

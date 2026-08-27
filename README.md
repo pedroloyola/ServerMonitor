@@ -4,7 +4,7 @@ Server Monitor é uma aplicação desktop WinUI 3 para Windows, concebida como u
 
 ## Estado atual
 
-O repositório contém o **Milestone 10 (Local History + Charts)**, construído sobre a fundação SSH segura do M3, os collectors Linux/macOS do M4, o motor de monitorização automática do M6, a descoberta passiva do M7, o system tray + notificações do M8 e o modo compacto do M9:
+O repositório contém o **Milestone 11 (Docker + Serviços, READ-ONLY)**, construído sobre a fundação SSH segura do M3, os collectors Linux/macOS do M4, o motor de monitorização automática do M6, a descoberta passiva do M7, o system tray + notificações do M8, o modo compacto do M9 e o histórico local do M10:
 
 - solution e separação inicial entre App, Core, Infrastructure e Collectors;
 - shell WinUI 3 com MVVM e dependency injection;
@@ -51,7 +51,20 @@ O repositório contém o **Milestone 10 (Local History + Charts)**, construído 
 - estados de carregamento, sem dados e histórico indisponível; resumo acessível por gráfico;
 - ação "Limpar histórico" nas Configurações, com confirmação explícita, que remove apenas o histórico (servidores, credenciais, host keys, ignorados e definições ficam intactos);
 - quando uma base antiga ou corrompida fica indisponível, ação explícita "Repor histórico" recria apenas a base local após confirmação; nunca existe auto-delete;
-- o histórico só aparece no modo Standard; o modo compacto continua glanceable e sem gráficos.
+- o histórico só aparece no modo Standard; o modo compacto continua glanceable e sem gráficos;
+- observabilidade **read-only** de containers Docker e de serviços geridos (systemd no Linux, launchd no macOS) por servidor — OBSERVAR, NUNCA ADMINISTRAR: sem start/stop/restart/exec/rm, sem sudo, sem execução arbitrária de comandos;
+- catálogo SSH **fechado** de seis comandos de leitura, em constantes de código sem qualquer interpolação de host, utilizador, config ou UI: `docker version --format '{{.Server.Version}}'`, `docker ps -a --no-trunc --format '{{json .}}'`, `systemctl list-units --type=service` e `list-unit-files` (LC_ALL=C, `--plain --no-legend --no-pager`), e `launchctl print system` (só domínio system);
+- disponibilidade **tipada** por servidor — Docker e serviços falham de forma independente: `NotInstalled`, `PermissionDenied`, `Unavailable`, `Available`, `Error` (e `Unsupported` para OS sem service manager suportado); nunca uma lista falsa vazia;
+- Docker monitoriza-se **apenas se** o utilizador SSH já tiver acesso ao daemon (ex.: pertencer ao grupo `docker`); `permission denied` vira `PermissionDenied`, nunca uma escalada com sudo;
+- estado e health de container em campos separados (`.State` direto; health parseado do parentético de `.Status`, com `None` = sem healthcheck distinto de `Unknown`); CPU/memória por container ficam `null` (`docker stats` fora do M11);
+- serviços systemd com estado runtime (`ActiveState`/`SubState`) e enablement (enabled/disabled/static/masked); launchd expõe apenas estado do domínio system, com `Description`/enablement/sub-state `null` (sem portabilidade falsa);
+- `launchctl print system` pode exigir root em macOS moderno; sem sudo, esse caso é tipado como `PermissionDenied` (a validar no host real);
+- snapshot de workloads **só em memória**, separado do snapshot de métricas — sem SQLite, sem JSON, sem persistência; reconstruído a cada arranque e removido quando o servidor sai da configuração;
+- recolha sem timers novos: ride do sinal de ciclo do M6 (segundo observador, ao lado do histórico, isolado por composite), com política de "due" a cada 60 s por servidor e single-flight por servidor — os workloads nunca coletam mais depressa que o host nem que 60 s, e uma falha de workloads nunca afeta a monitorização de host;
+- refresh manual e Refresh All forçam e coalescem a recolha de workloads, ignorando o throttle; carry-over honesto de freshness (listas anteriores ficam *stale*, `unknown ≠ zero`, timestamps não recuam);
+- limites contra output hostil: ≤ 512 containers, ≤ 2048 serviços, ≤ 256 caracteres por campo (com flag `Truncated` observável), decode UTF-8 estrito e sanitização de control-chars, sequências ANSI/CSI e overrides bidi (Trojan-Source) sobre texto remoto não confiável;
+- o store de workloads nunca contém segredos, credenciais, host keys, username nem erros SSH crus; logging só regista `ServerId`/estado/contagem/duração;
+- os workloads têm secção própria no detalhe do servidor (Standard Mode) e **não** alteram o estado de saúde do host, **não** geram notificações, **não** entram no histórico e **não** aparecem no modo compacto; ações remotas (restart de serviços/containers) ficam explicitamente fora do M11.
 
 A descoberta mDNS é local ao segmento de rede visível. Linux pode necessitar de um anúncio compatível, como Avahi; VPNs e descoberta ativa de subnet não fazem parte do M7. Discovery não gera notificações. A aplicação só permanece ativa enquanto o processo estiver em execução: arranque com o Windows, Windows Service e execução após Exit continuam fora do âmbito atual. O Windows pode bloquear ou silenciar banners através das suas definições, Focus Assist/Do Not Disturb ou políticas; isso degrada sem crashar a aplicação.
 

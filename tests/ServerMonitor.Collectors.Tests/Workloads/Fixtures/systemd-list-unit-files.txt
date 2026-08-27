@@ -1,0 +1,10 @@
+ssh.service enabled enabled
+nginx.service disabled enabled
+apt-daily.service static -
+worker.service enabled-runtime -
+drain.service masked-runtime -
+reload.service indirect -
+generated.service generated -
+transient.service transient -
+alias.service alias -
+linked.service linked -

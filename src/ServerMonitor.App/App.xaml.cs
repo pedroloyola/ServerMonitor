@@ -8,12 +8,15 @@ using ServerMonitor.App.Views;
 using ServerMonitor.Collectors;
 using ServerMonitor.Collectors.Linux;
 using ServerMonitor.Collectors.MacOS;
+using ServerMonitor.Collectors.Workloads;
 using ServerMonitor.Core.Domain;
 using ServerMonitor.Core.History;
 using ServerMonitor.Core.Interfaces;
 using ServerMonitor.Core.Monitoring;
+using ServerMonitor.Core.Workloads;
 using ServerMonitor.Infrastructure.Collectors.Linux;
 using ServerMonitor.Infrastructure.Collectors.MacOS;
+using ServerMonitor.Infrastructure.Collectors.Workloads;
 using ServerMonitor.Infrastructure.Discovery;
 using ServerMonitor.Infrastructure.Persistence;
 using ServerMonitor.Infrastructure.Security;
@@ -96,6 +99,7 @@ public partial class App : Application
                 services.AddSingleton<ISshConnectionService>(sp => sp.GetRequiredService<SshConnectionService>());
                 services.AddSingleton<ILinuxMetricsRemoteSource>(sp => sp.GetRequiredService<SshConnectionService>());
                 services.AddSingleton<IMacOsMetricsRemoteSource>(sp => sp.GetRequiredService<SshConnectionService>());
+                services.AddSingleton<IWorkloadRemoteSource>(sp => sp.GetRequiredService<SshConnectionService>());
                 services.AddSingleton<LinuxMetricsCollector>();
                 services.AddSingleton<MacOsMetricsCollector>();
                 services.AddSingleton<IServerMetricsCollector, MetricsCollectorRouter>();
@@ -107,6 +111,12 @@ public partial class App : Application
                 services.AddSingleton<IServerHistoryQueryService, NullServerHistoryQueryService>();
                 services.AddSingleton<IHistoryMaintenanceService, NullHistoryMaintenanceService>();
 
+                // M11 workloads. Default: an empty store + inert refresh, so the Workloads UI resolves
+                // in every composition. The real collector service (non-QA branch) or the QA harness
+                // overrides the refresh coordinator (and pre-populates the store).
+                services.AddSingleton<IServerWorkloadStore, InMemoryServerWorkloadStore>();
+                services.AddSingleton<IWorkloadRefreshCoordinator, NullWorkloadRefreshCoordinator>();
+
                 // Automatic monitoring. One instance backs the IMonitoringEngine facade and
                 // the hosted-service lifecycle, so the app starts/stops a single engine.
                 // The Debug-only QA harnesses (--qa-health, --qa-discovery) replace the data plane
@@ -117,7 +127,8 @@ public partial class App : Application
                 var qaNotifications = Qa.QaNotificationComposition.IsRequested();
                 var qaCompact = Qa.QaCompactComposition.IsRequested();
                 var qaHistory = Qa.QaHistoryComposition.IsRequested();
-                var qaMode = qaHealth || qaDiscovery || qaNotifications || qaCompact || qaHistory;
+                var qaWorkloads = Qa.QaWorkloadsComposition.IsRequested();
+                var qaMode = qaHealth || qaDiscovery || qaNotifications || qaCompact || qaHistory || qaWorkloads;
 #else
                 const bool qaMode = false;
 #endif
@@ -130,12 +141,38 @@ public partial class App : Application
                     services.AddSingleton<IServerHistoryStore>(sp => sp.GetRequiredService<SqliteServerHistoryStore>());
                     services.AddSingleton<HistorySampleChannel>();
                     services.AddSingleton<HistoryRecorder>();
-                    services.AddSingleton<IMonitoringCycleObserver>(sp => sp.GetRequiredService<HistoryRecorder>());
                     services.AddSingleton<HistoryWriterService>();
                     services.AddSingleton<IServerHistoryQueryService>(sp => new ServerHistoryQueryService(
                         sp.GetRequiredService<IServerHistoryStore>(),
                         sp.GetRequiredService<ILogger<ServerHistoryQueryService>>()));
                     services.AddSingleton<IHistoryMaintenanceService, HistoryMaintenanceService>();
+
+                    // M11 read-only workloads (Docker + services). The cadence observer rides the same
+                    // cycle signal as history; the collector service runs SSH off the engine thread with
+                    // its own single-flight and concurrency limit. The real WorkloadCollector maps the
+                    // fixed read-only catalog (platform-infra) over the shared SSH session; a Debug
+                    // --qa-workloads run replaces it with a deterministic fake (registered later, wins).
+                    services.AddSingleton(WorkloadOptions.Default);
+                    services.AddSingleton<IWorkloadCollector>(sp =>
+                        new WorkloadCollector(sp.GetRequiredService<IWorkloadRemoteSource>()));
+                    services.AddSingleton<WorkloadRequestQueue>();
+                    services.AddSingleton(sp => new WorkloadCadencePolicy(
+                        sp.GetRequiredService<WorkloadOptions>().MinCadence));
+                    services.AddSingleton<WorkloadCadenceObserver>();
+                    services.AddSingleton<WorkloadCollectorService>();
+                    services.AddSingleton<IWorkloadRefreshCoordinator>(sp =>
+                        sp.GetRequiredService<WorkloadCollectorService>());
+
+                    // Fan-out: the engine sees a single observer; history (M10) and workloads (M11)
+                    // both ride the cycle, isolated from each other (§38). History is first so its
+                    // behavior is unchanged.
+                    services.AddSingleton<IMonitoringCycleObserver>(sp => new CompositeMonitoringCycleObserver(
+                        new IMonitoringCycleObserver[]
+                        {
+                            sp.GetRequiredService<HistoryRecorder>(),
+                            sp.GetRequiredService<WorkloadCadenceObserver>()
+                        },
+                        sp.GetRequiredService<ILogger<CompositeMonitoringCycleObserver>>()));
 
                     services.AddSingleton<IServerMonitoringStateStore, ServerMonitoringStateStore>();
                     services.AddSingleton(sp => new MonitoringEngine(
@@ -181,6 +218,10 @@ public partial class App : Application
                 {
                     Qa.QaHistoryComposition.Apply(services);
                 }
+                else if (qaWorkloads)
+                {
+                    Qa.QaWorkloadsComposition.Apply(services);
+                }
                 else
                 {
                     Qa.QaDiscoveryComposition.Apply(services);
@@ -199,6 +240,9 @@ public partial class App : Application
                     // Registered before the engine so, on reverse-order shutdown, the writer stops
                     // AFTER the engine stops producing and can drain the last samples (ADR-015 §9).
                     services.AddHostedService(sp => sp.GetRequiredService<HistoryWriterService>());
+                    // Before the engine so, on reverse-order shutdown, the workload collector stops
+                    // AFTER the engine stops producing cycle signals and can drain what remains (§38).
+                    services.AddHostedService(sp => sp.GetRequiredService<WorkloadCollectorService>());
                     services.AddHostedService(sp => sp.GetRequiredService<MonitoringEngine>());
                     services.AddHostedService(sp => sp.GetRequiredService<ServerDiscoveryService>());
                 }
@@ -219,6 +263,9 @@ public partial class App : Application
                 // History is opened per-server, so a fresh page/VM each navigation (disposed on Unloaded).
                 services.AddTransient<HistoryViewModel>();
                 services.AddTransient<HistoryPage>();
+                // Workloads (M11) mirror History: opened per-server, fresh page/VM each navigation.
+                services.AddTransient<WorkloadsViewModel>();
+                services.AddTransient<WorkloadsPage>();
                 services.AddTransient<MainWindow>();
             })
             .Build();

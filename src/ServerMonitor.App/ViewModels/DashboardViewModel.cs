@@ -292,6 +292,11 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
                 {
                     _navigationService.GoToHistory(server.Id, server.Name);
                     return Task.CompletedTask;
+                },
+                () =>
+                {
+                    _navigationService.GoToWorkloads(server.Id, server.Name);
+                    return Task.CompletedTask;
                 }));
         }
 
