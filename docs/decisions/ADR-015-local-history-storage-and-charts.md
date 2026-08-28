@@ -1,9 +1,9 @@
 # ADR-015 — Local History Storage + Charts (M10)
 
 Estado: **aceite**. Introduz histórico **local** de métricas e a sua visualização temporal.
-Princípio inalterável: **LOCAL-FIRST, CLOUD OPTIONAL** — o histórico local é funcionalidade
-Community/free. Esta ADR **não** introduz Cloud, contas, sync, dashboard web, base de dados
-externa nem qualquer item de M11+.
+Princípio inalterável: **LOCAL-FIRST** — o histórico é mantido apenas na máquina do utilizador.
+Esta ADR **não** introduz serviços remotos, contas, sincronização, dashboard web nem base de dados
+externa.
 
 ## Contexto
 

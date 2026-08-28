@@ -3,7 +3,7 @@
 Estado: **aceite**. O M12 **não** adiciona funcionalidades de monitorização. Transforma a aplicação
 unpackaged de desenvolvimento numa aplicação Windows **publicamente distribuível, instalável,
 atualizável e segura** através da Microsoft Store, sem depender da máquina de desenvolvimento. Constrói
-sobre toda a base M1–M11 e **não** inicia o M13 (Widget oficial), Pro/licensing, Cloud nem macOS desktop.
+sobre toda a base M1–M11 e **não** inicia o M13 (Widget oficial) nem o suporte a macOS desktop.
 
 ## Contexto
 

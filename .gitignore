@@ -29,3 +29,7 @@ config.json
 *.pfx
 *.p12
 *.snk
+
+# Internal Boss orchestration framework + agent-oriented dev context (not public)
+/.boss/
+/CONTEXT.md
