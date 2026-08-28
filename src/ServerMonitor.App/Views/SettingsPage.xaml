@@ -318,6 +318,38 @@
                 </StackPanel>
             </controls:GlassCard>
 
+            <!-- About -->
+            <controls:GlassCard>
+                <StackPanel Spacing="6">
+                    <TextBlock
+                        x:Uid="SettingsAboutTitle"
+                        AutomationProperties.HeadingLevel="Level2"
+                        Style="{StaticResource SectionTitleTextStyle}" />
+                    <TextBlock
+                        x:Uid="SettingsAboutAppName"
+                        FontSize="13" />
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <TextBlock
+                            x:Uid="SettingsAboutVersionLabel"
+                            FontSize="12"
+                            Foreground="{ThemeResource TextSecondaryBrush}" />
+                        <TextBlock
+                            FontSize="12"
+                            Foreground="{ThemeResource TextSecondaryBrush}"
+                            Text="{Binding AppVersion}" />
+                    </StackPanel>
+                    <TextBlock
+                        x:Uid="SettingsAboutLicense"
+                        FontSize="12"
+                        Foreground="{ThemeResource TextSecondaryBrush}"
+                        TextWrapping="Wrap" />
+                    <HyperlinkButton
+                        x:Uid="SettingsAboutGitHub"
+                        Padding="0"
+                        NavigateUri="https://github.com/pedroloyola/ServerMonitor" />
+                </StackPanel>
+            </controls:GlassCard>
+
             <!-- Bottom Caption -->
             <TextBlock
                 x:Uid="SettingsMilestoneCaption"

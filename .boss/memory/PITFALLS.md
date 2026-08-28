@@ -85,8 +85,41 @@
 - **Validation:** sonda real passou de `Register`/`Show` com `Setting=Enabled`; o harness real entregou Warning, Critical, Offline e Recovery no Notification Center, e click restaurou a mesma janela/PID.
 - **Learning:** capability check, registo e entrega são gates distintos. Validar a API no binário self-contained real e auditar o payload, não apenas a superfície managed. [L-014, L-002]
 
+## P-014 — Packaged MSIX quebra invariantes que o unpackaged escondia (M12)
+- **Observation (M12):** ao empacotar a app em MSIX single-project surgiram três riscos que o build
+  unpackaged nunca expôs: (a) a migração de credenciais on-read não era linearizável (Read a migrar podia
+  ser sobreposto por Write/Delete concorrente → clobber/ressurreição); (b) o `AppNotificationManager`
+  packaged exige extensões de manifesto (`windows.toastNotificationActivation` + `com` server + CLSID +
+  `Arguments="----AppNotificationActivated:"`) que o unpackaged regista programaticamente; (c) o workaround
+  P-009 do Insights.Resource.dll deixa de ser necessário no packaged framework-dependent.
+- **Cause:** invariantes de concorrência/ativação/deployment diferentes entre unpackaged self-contained e
+  packaged framework-dependent.
+- **Fix:** (a) `SemaphoreSlim(1,1)` a serializar Write/Read/Delete no `WindowsCredentialStore` — como a app
+  é single-instance (1 processo), um gate in-process lineariza tudo; verify-before-delete; falha sempre
+  não-destrutiva. Teste determinístico: bloquear a 1ª native write dentro do fake (hook) e chamar
+  `WriteAsync` **direto na thread do teste** (avança síncrono até `await _gate.WaitAsync`) → `IsCompleted==
+  false` prova o gate sem timing. (b) extensões de manifesto adicionadas + CLSID estável. (c) target do
+  workaround condicionado a `'$(Packaged)' != 'true'`.
+- **Learning:** um perfil de deployment novo (MSIX) precisa de re-auditar concorrência, ativação e payload
+  nativo — "passa unpackaged" não prova "correto packaged". O **runtime** packaged (notificação/ativação/
+  install) só se valida com smoke real; em Windows **Home** (sem Sandbox/Hyper-V/admin/dev-mode) isso é
+  blocker de ambiente honesto (NOT RUN ≠ PASS), não evitável. Single-project MSIX compila headless com
+  `dotnet build -p:Packaged=true`. [P-009, P-013, L-016, §27, §106]
+
 ## P-013 — Agentes concorrentes num worktree partilhado contendem em locks de build-server (M11)
 - **Observation (M11, FULL ORCHESTRA):** múltiplos agentes (Cortex/Relay/Atlas) a compilar em paralelo no MESMO worktree viam erros transitórios de build — locks em ficheiros `obj/` e "ref-assemblies em falta" — não causados pelo código.
 - **Cause:** `dotnet build` mantém build-servers persistentes (VBCSCompiler/MSBuild node) que bloqueiam artefactos intermédios; dois builds simultâneos na mesma árvore disputam esses handles. Agrava com `Platforms=x64` (paths `bin/x64` vs `bin`) [ver P-008].
 - **Fix:** antes dos gates, `dotnet build-server shutdown` e/ou `--disable-build-servers`; idealmente serializar os builds de gate ou dar worktree próprio a trabalho verdadeiramente paralelo. Rebuild limpo `--no-incremental` do alvo exato antes de contar (P-008).
 - **Learning:** orquestração multi-agente num worktree único precisa de disciplina de build — o Boss coordena a serialização dos gates finais ou isola por worktree. Um erro de build transitório sob concorrência não é necessariamente regressão de código: confirmar reexecutando isolado. [P-008, L-011]
+
+## P-015 — Exe stale ignora silenciosamente o flag `--qa-*` e mostra dados REAIS (W1)
+- **Observation (W1, screenshots do website):** lançado o exe Debug com `--qa-store-screenshot`, a janela abriu com os servidores reais já configurados (dados live via mDNS/SSH) em vez do catálogo sintético — o harness não aplicou. A captura foi feita antes de se notar.
+- **Cause:** o exe em `bin\x64\Debug\...` era de um build ANTERIOR à existência do harness (o build fresco do csproj saiu para `bin\Debug\...` — variante do P-008). Um binário que não conhece o flag não falha: arranca em modo normal, com dados reais.
+- **Fix:** capturas apagadas; rebuild + launch do path correto; verificação OBRIGATÓRIA pós-launch de que os dados são sintéticos (UIA dump à procura dos nomes do catálogo QA, ex.: "Home Server/10.0.0.20") ANTES de qualquer captura.
+- **Learning:** um flag de harness desconhecido é um no-op silencioso — o gate não é "a app abriu", é "a app abriu COM o catálogo sintético". Confirmar sempre o conteúdo antes de capturar/gravar. [P-008, L-002]
+
+## P-016 — Microsoft Store reserva o 4.º campo da versão (Revision) — tem de ser 0 (M12)
+- **Observation (M12, 2026-08-28):** o Partner Center REJEITOU o MSIX `1.0.0.1` antes da submissão: "não é permitido especificar no manifesto uma Versão com número de revisão diferente de zero". A estratégia de usar o 4.º campo (`1.0.0.1`) como "package revision" — deliberadamente escolhida para manter DisplayVersion=1.0.0 — é inválida para a Store.
+- **Cause:** a Microsoft Store reserva o 4.º componente `Major.Minor.Build.Revision` (Revision) para uso interno próprio; qualquer pacote submetido tem de ter **Revision = 0**.
+- **Fix:** uma atualização de Store incrementa **Major/Minor/Build** e mantém **Revision = 0**. `1.0.0.0 → 1.0.1.0 → 1.0.2.0` (NUNCA `1.0.0.1`/`1.0.0.2`). Aplicado: Package/Identity Version + FileVersion = `1.0.1.0`; AssemblyVersion mantido no baseline `1.0.0.0` (sem churn de binding); Product/InformationalVersion = `1.0.0`. Consequência: `AppVersionProvider.DisplayVersion` (=Major.Minor.Build do runtime) passa a mostrar **1.0.1** quando packaged (lê `Package.Current`) e **1.0.0** unpackaged — divergência documentada e aceite (Product 1.0.0 vs Store package 1.0.1.0). Verificar SEMPRE a Version no **manifesto EXTRAÍDO** do MSIX, não só no output do build.
+- **Learning:** separar 5 conceitos distintos — Package/Identity Version (Store, Revision=0), FileVersion, AssemblyVersion (binding), Product/Informational SemVer, e DisplayVersion (runtime). Não usar o 4.º campo como "revisão de pacote" em pacotes de Store. [L-021, §7 ADR-017]

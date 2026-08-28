@@ -75,6 +75,7 @@ public sealed class SettingsNotificationViewModelTests
         new EmptyDiscoveryService(),
         settings,
         new NullHistoryMaintenanceService(),
+        new AppVersionProvider(),
         NullLogger<SettingsViewModel>.Instance);
 
     private sealed class FakeNotificationSettingsService(bool enabled) : INotificationSettingsService

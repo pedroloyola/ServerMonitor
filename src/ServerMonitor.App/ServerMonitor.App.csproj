@@ -5,17 +5,87 @@
     <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
     <RootNamespace>ServerMonitor.App</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <ApplicationIcon />
+    <!-- M12 icon consistency: embed the official ServerAlyzer icon (multi-resolution .ico) as the
+         executable's Win32 icon. This drives the window/title-bar, Alt-Tab and Task Manager icon and
+         is the base the runtime AppWindow.SetIcon reinforces. Generated from assets/brand/Logo.svg. -->
+    <ApplicationIcon>Images\ServerAlyzer.ico</ApplicationIcon>
     <Platforms>x64</Platforms>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <UseWinUI>true</UseWinUI>
-    <WindowsPackageType>None</WindowsPackageType>
-    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
-    <SelfContained>true</SelfContained>
     <DefaultLanguage>pt-BR</DefaultLanguage>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <!-- M12/ADR-017 §6: use the custom Program.Main (Program.cs) so the single-instance
+         decision runs before any window/DI/tray/DB/engine is created. -->
+    <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
+    <!-- M12/ADR-017 §7 version mapping.
+         The Microsoft Store RESERVES the 4th version component (Revision): a submitted MSIX must have
+         Revision = 0 (Partner Center rejected 1.0.0.1). A Store update therefore bumps Major/Minor/
+         Build and keeps Revision 0 → the M12 icon-consistency fix ships as PACKAGE version 1.0.1.0
+         (both Package*.appxmanifest). Product/marketing SemVer stays 1.0.0 (first public RC). See
+         PITFALL P-016. Concept map:
+           Package/Identity Version : 1.0.1.0  (Store-valid; Revision 0)
+           FileVersion              : 1.0.1.0  (tracks the package build)
+           AssemblyVersion          : 1.0.0.0  (stable project baseline; unchanged for binding safety)
+           Product SemVer / Informational : 1.0.0
+         DisplayVersion (Settings/About) = Major.Minor.Build of the *running* version: 1.0.1 when
+         packaged (reads Package.Current), 1.0.0 unpackaged/dev (assembly fallback). NÃO criar tag
+         v1.0.0 sem aprovação humana. -->
+    <Version>1.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.1.0</FileVersion>
+    <InformationalVersion>1.0.0</InformationalVersion>
+    <!-- M12/ADR-017: one app, two deployment profiles. Default is the existing UNPACKAGED,
+         self-contained build (dev Debug + existing Release + every test/gate). Pass
+         -p:Packaged=true for the production single-project MSIX profile below. Domain logic
+         is identical; only the deployment profile differs. -->
+    <Packaged Condition="'$(Packaged)' == ''">false</Packaged>
   </PropertyGroup>
+
+  <!-- Unpackaged profile (default). Self-contained; keeps the P-009 notification-resource
+       workaround (staged by the target below). This is what dev and the existing Release use. -->
+  <PropertyGroup Condition="'$(Packaged)' != 'true'">
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <SelfContained>true</SelfContained>
+  </PropertyGroup>
+
+  <!-- Packaged profile (production single-project MSIX). Framework-dependent: the Store /
+       framework package provisions the Windows App Runtime, so the P-009 resource DLL is
+       already present and its workaround is NOT staged here (ADR-017 §3/§8). Signing is left
+       off in the build; a DEV certificate signs the .msix out-of-band for local sideload QA. -->
+  <PropertyGroup Condition="'$(Packaged)' == 'true'">
+    <WindowsPackageType>MSIX</WindowsPackageType>
+    <EnableMsixTooling>true</EnableMsixTooling>
+    <WindowsAppSDKSelfContained>false</WindowsAppSDKSelfContained>
+    <SelfContained>false</SelfContained>
+    <AppxPackage>true</AppxPackage>
+    <GenerateAppxPackageOnBuild>true</GenerateAppxPackageOnBuild>
+    <AppxBundle>Never</AppxBundle>
+    <AppxPackageSigningEnabled>false</AppxPackageSigningEnabled>
+    <AppxAutoIncrementPackageRevision>false</AppxAutoIncrementPackageRevision>
+    <!-- Support matrix = Windows 11 x64 (ADR-017). Keep the manifest's own TargetDeviceFamily
+         (MinVersion 10.0.22000.0) verbatim instead of regenerating it from the compile-time SDK
+         (TargetPlatformMinVersion). This lets the package floor be Windows 11 without retargeting
+         the TargetFramework (which would change the API surface). -->
+    <AppxAddDefaultTargetDeviceFamilyItem>false</AppxAddDefaultTargetDeviceFamilyItem>
+    <!-- Identity selection: production Store identity by default; the separate DEV identity
+         (Package.Dev.appxmanifest) only when -p:DevIdentity=true, so the DEV identity can never
+         leak into a production MSIX (ADR-017 §2). -->
+    <AppxManifestFile Condition="'$(DevIdentity)' == 'true'">Package.Dev.appxmanifest</AppxManifestFile>
+    <AppxManifestFile Condition="'$(AppxManifestFile)' == ''">Package.appxmanifest</AppxManifestFile>
+  </PropertyGroup>
+
+  <!-- Package manifest + visual assets are part of the app project only in the packaged
+       profile (single-project MSIX; no separate .wapproj). Exactly one manifest is included. -->
+  <ItemGroup Condition="'$(Packaged)' == 'true'">
+    <AppxManifest Remove="Package.appxmanifest" />
+    <AppxManifest Remove="Package.Dev.appxmanifest" />
+    <AppxManifest Include="$(AppxManifestFile)">
+      <SubType>Designer</SubType>
+    </AppxManifest>
+    <Content Include="Images\**" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.0" />
@@ -31,7 +101,8 @@
     matching redistributable from the already-resolved Runtime package so the
     unpackaged application remains genuinely self-contained.
   -->
-  <Target Name="StageWindowsAppRuntimeNotificationResource" BeforeTargets="CopyFilesToOutputDirectory">
+  <Target Name="StageWindowsAppRuntimeNotificationResource" BeforeTargets="CopyFilesToOutputDirectory"
+          Condition="'$(Packaged)' != 'true'">
     <PropertyGroup>
       <WindowsAppRuntimeMsix>$(PkgMicrosoft_WindowsAppSDK_Runtime)\tools\MSIX\win10-x64\Microsoft.WindowsAppRuntime.2.msix</WindowsAppRuntimeMsix>
       <WindowsAppRuntimeNotificationStage>$(IntermediateOutputPath)WindowsAppRuntimeNotification\</WindowsAppRuntimeNotificationStage>
@@ -50,8 +121,16 @@
   </Target>
 
   <ItemGroup>
-    <Content Include="Assets\ServerMonitorTray.svg" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Tray icon: purpose-built multi-resolution .ico (16/20/24/32/48) derived from the official
+         logo, replacing the runtime-rasterized SVG so the tray reads crisply at 16-24px and matches
+         the Store/taskbar identity (M12 icon consistency). WinUIEx TrayIcon auto-detects .ico. -->
+    <Content Include="Assets\ServerAlyzerTray.ico" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Assets\ServerMonitorNotification.png" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Window/title-bar/Alt-Tab icon file used by AppWindow.SetIcon at runtime. In the packaged
+         profile it is already carried by Images\** below; the unpackaged/dev build needs it copied
+         to the output so SetIcon can find it next to the executable. -->
+    <Content Include="Images\ServerAlyzer.ico" CopyToOutputDirectory="PreserveNewest"
+             Condition="'$(Packaged)' != 'true'" />
   </ItemGroup>
 
   <!-- QA visual health harness is Debug-only. It must never ship in a Release build. -->

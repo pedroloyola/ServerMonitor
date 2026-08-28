@@ -43,6 +43,7 @@ public partial class App : Application
             {
                 services.AddSingleton<ILocalizationService, LocalizationService>();
                 services.AddSingleton<IThemeService, ThemeService>();
+                services.AddSingleton<IAppVersionProvider, AppVersionProvider>();
                 services.AddSingleton<INavigationService, NavigationService>();
                 services.AddSingleton<IWindowContext, WindowContext>();
                 services.AddSingleton<IPrivateKeyFilePicker, PrivateKeyFilePicker>();
@@ -128,7 +129,8 @@ public partial class App : Application
                 var qaCompact = Qa.QaCompactComposition.IsRequested();
                 var qaHistory = Qa.QaHistoryComposition.IsRequested();
                 var qaWorkloads = Qa.QaWorkloadsComposition.IsRequested();
-                var qaMode = qaHealth || qaDiscovery || qaNotifications || qaCompact || qaHistory || qaWorkloads;
+                var qaScreenshot = Qa.QaStoreScreenshotComposition.IsRequested();
+                var qaMode = qaHealth || qaDiscovery || qaNotifications || qaCompact || qaHistory || qaWorkloads || qaScreenshot;
 #else
                 const bool qaMode = false;
 #endif
@@ -222,6 +224,10 @@ public partial class App : Application
                 {
                     Qa.QaWorkloadsComposition.Apply(services);
                 }
+                else if (qaScreenshot)
+                {
+                    Qa.QaStoreScreenshotComposition.Apply(services);
+                }
                 else
                 {
                     Qa.QaDiscoveryComposition.Apply(services);
@@ -277,6 +283,47 @@ public partial class App : Application
     }
 
     public static IHost ServicesHost { get; private set; } = null!;
+
+    /// <summary>
+    /// Invoked when a second launch (or a redirected notification activation) is forwarded to this,
+    /// the single primary instance (M12/ADR-017 §6). Restores and foregrounds the one authoritative
+    /// window in its current presentation (Standard / Compact / tray) — never creating another.
+    /// Marshals to the UI thread because the AppInstance.Activated event fires off it.
+    /// </summary>
+    public void HandleRedirectedActivation()
+    {
+        var window = _mainWindow;
+        if (window is null)
+        {
+            // Activation arrived before the shell finished starting; the launch itself will show it.
+            return;
+        }
+
+        var enqueued = window.DispatcherQueue.TryEnqueue(() =>
+        {
+            try
+            {
+                ServicesHost.Services
+                    .GetRequiredService<IApplicationWindowController>()
+                    .RestoreAndActivate();
+            }
+            catch (Exception exception)
+            {
+                ServicesHost.Services
+                    .GetRequiredService<ILogger<App>>()
+                    .LogError(exception, "Server Monitor could not restore the window on reactivation.");
+            }
+        });
+
+        if (!enqueued)
+        {
+            // The UI dispatcher is shutting down (the window is closing as this activation arrived).
+            // Nothing to restore; the reactivation is intentionally dropped.
+            ServicesHost.Services
+                .GetRequiredService<ILogger<App>>()
+                .LogWarning("Reactivation ignored: the UI dispatcher queue is shutting down.");
+        }
+    }
 
     protected override async void OnLaunched(LaunchActivatedEventArgs args)
     {

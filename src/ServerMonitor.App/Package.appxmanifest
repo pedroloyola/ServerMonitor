@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!--
+  ServerAlyzer — PRODUCTION package manifest (M12 / ADR-017).
+
+  IDENTITY IS THE OFFICIAL MICROSOFT STORE PRODUCTION IDENTITY (Partner Center, reserved for
+  "ServerAlyzer"). Store metadata: Package Family Name PedroLoy.ServerAlyzer_htb92ajfwgw1e,
+  Store ID 9N6ZBSBN1TD2. This is the default manifest for the packaged build (-p:Packaged=true).
+  For local sideload/QA use Package.Dev.appxmanifest (-p:DevIdentity=true), which carries a
+  clearly-separated DEV identity so the DEV identity never leaks into a production MSIX.
+
+  The public product name is "ServerAlyzer". Internal namespaces / the executable
+  (ServerMonitor.App.exe) and the data/credential storage identity remain "ServerMonitor" — an
+  implementation detail that is intentionally NOT renamed (ADR-017 §1/§5; branding != storage).
+
+  Runtime model: framework-dependent (the Windows App Runtime PackageDependency is injected by
+  the Windows App SDK build). Capabilities are minimal: runFullTrust only. NO broadFileSystemAccess.
+-->
+
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  xmlns:com="http://schemas.microsoft.com/appx/manifest/com/windows10"
+  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+  IgnorableNamespaces="uap rescap com desktop">
+
+  <Identity
+    Name="PedroLoy.ServerAlyzer"
+    Publisher="CN=32C0A056-FD57-422E-A59C-A8C26434951D"
+    Version="1.0.1.0"
+    ProcessorArchitecture="x64" />
+
+  <Properties>
+    <DisplayName>ServerAlyzer</DisplayName>
+    <PublisherDisplayName>Pedro Loy</PublisherDisplayName>
+    <Logo>Images\StoreLogo.png</Logo>
+  </Properties>
+
+  <Dependencies>
+    <!-- Support matrix: Windows 11 x64 (ADR-017; README / release notes / Store system
+         requirements). The package floor is Windows 11 21H2 (10.0.22000.0); Windows 10 is NOT a
+         supported or tested target and the package is not offered to it. MaxVersionTested is held
+         at the same Windows 11 baseline (no untested higher support is claimed). These verbatim
+         values are preserved because AppxAddDefaultTargetDeviceFamilyItem=false in the csproj stops
+         the build from regenerating TargetDeviceFamily from the compile-time SDK version. -->
+    <TargetDeviceFamily
+      Name="Windows.Desktop"
+      MinVersion="10.0.22000.0"
+      MaxVersionTested="10.0.22000.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="pt-BR" />
+    <Resource Language="pt-PT" />
+    <Resource Language="en-US" />
+  </Resources>
+
+  <Applications>
+    <Application
+      Id="ServerMonitor"
+      Executable="ServerMonitor.App.exe"
+      EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        DisplayName="ServerAlyzer"
+        Description="Painel local de monitorização de servidores Linux e macOS por SSH."
+        BackgroundColor="transparent"
+        Square150x150Logo="Images\Square150x150Logo.png"
+        Square44x44Logo="Images\Square44x44Logo.png">
+        <uap:DefaultTile>
+          <uap:ShowNameOnTiles>
+            <uap:ShowOn Tile="square150x150Logo" />
+          </uap:ShowNameOnTiles>
+        </uap:DefaultTile>
+        <uap:SplashScreen Image="Images\SplashScreen.png" BackgroundColor="transparent" />
+      </uap:VisualElements>
+      <!-- Packaged app notification activation (M8). AppNotificationManager routes toast/click
+           activation through this COM activator; the CLSID is stable and must not change (ADR-017
+           §M12-H-2). In the unpackaged/dev build the activator is registered programmatically
+           instead. -->
+      <Extensions>
+        <com:Extension Category="windows.comServer">
+          <com:ComServer>
+            <com:ExeServer Executable="ServerMonitor.App.exe" Arguments="----AppNotificationActivated:" DisplayName="ServerAlyzer">
+              <com:Class Id="4B2E9C7A-8F3D-4E1A-9B6C-2D5F7A1E3C48" />
+            </com:ExeServer>
+          </com:ComServer>
+        </com:Extension>
+        <desktop:Extension Category="windows.toastNotificationActivation">
+          <desktop:ToastNotificationActivation ToastActivatorCLSID="4B2E9C7A-8F3D-4E1A-9B6C-2D5F7A1E3C48" />
+        </desktop:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+
+</Package>

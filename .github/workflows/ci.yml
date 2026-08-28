@@ -1,0 +1,55 @@
+name: CI
+
+# Deterministic build + test + vulnerability scan for the Windows x64 app.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# Least privilege: CI only needs to read the repository. No write scopes, no secrets.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    runs-on: windows-latest
+    steps:
+      # First-party actions from the trusted `actions/` org. Pin to a commit SHA for
+      # stricter supply-chain hardening if required by policy.
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore ServerMonitor.slnx
+
+      # Fresh, non-incremental build to avoid stale-output pitfalls (P-008).
+      - name: Build (Debug)
+        run: dotnet build ServerMonitor.slnx -c Debug --no-restore --no-incremental --disable-build-servers
+
+      - name: Test
+        run: dotnet test ServerMonitor.slnx -c Debug --no-build --disable-build-servers
+
+      - name: Build (Release)
+        run: dotnet build ServerMonitor.slnx -c Release --no-incremental --disable-build-servers
+
+      - name: Vulnerability scan (fail on any vulnerable package)
+        shell: pwsh
+        run: |
+          $output = dotnet list ServerMonitor.slnx package --vulnerable --include-transitive 2>&1 | Out-String
+          Write-Host $output
+          if ($output -match 'has the following vulnerable packages') {
+            Write-Error 'Vulnerable packages detected.'
+            exit 1
+          }
+          Write-Host 'No vulnerable packages found.'

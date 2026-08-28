@@ -40,7 +40,7 @@ public sealed class WinUIExTrayIconAdapter(
         _dispatcherQueue = DispatcherQueue.GetForCurrentThread()
             ?? throw new InvalidOperationException("The tray icon must be initialized on the UI thread.");
 
-        var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "ServerMonitorTray.svg");
+        var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "ServerAlyzerTray.ico");
         if (!File.Exists(iconPath))
         {
             throw new FileNotFoundException("The Server Monitor tray icon asset is missing.", iconPath);

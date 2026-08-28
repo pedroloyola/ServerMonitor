@@ -14,3 +14,18 @@ artifacts/
 # Local user configuration must never be committed.
 config.json
 *.secrets.json
+
+# MSIX packaging output (M12) — build artifacts, never committed
+**/AppPackages/
+**/BundleArtifacts/
+*.msix
+*.msixbundle
+*.appx
+*.appxbundle
+*.appxupload
+*.appxsym
+
+# Signing artifacts — DEV certificates and any private keys must never be committed
+*.pfx
+*.p12
+*.snk

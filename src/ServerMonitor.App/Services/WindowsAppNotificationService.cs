@@ -11,7 +11,7 @@ namespace ServerMonitor.App.Services;
 /// </summary>
 public sealed class WindowsAppNotificationService : IUserNotificationService, IHostedService
 {
-    private const string ApplicationDisplayName = "Server Monitor";
+    private const string ApplicationDisplayName = "ServerAlyzer";
 
     private readonly IWindowsAppNotificationPlatform _platform;
     private readonly IApplicationWindowController _windowController;

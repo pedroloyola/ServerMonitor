@@ -40,6 +40,11 @@ public sealed class AppShutdownCoordinator
             return;
         }
 
+        // Release the single-instance key first so a launch that races this teardown becomes the
+        // new primary rather than redirecting into a process that is exiting (Atlas reliability
+        // review). No-op unless a key was actually registered (never in tests).
+        Program.ReleaseSingleInstanceKey();
+
         var host = _hostFactory();
         var cancellation = new CancellationTokenSource();
         var disposalDeferred = false;

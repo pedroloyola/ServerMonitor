@@ -41,7 +41,7 @@ public sealed class WindowsAppNotificationServiceTests : IDisposable
 
         Assert.Equal(1, platform.RegisterCount);
         Assert.True(platform.HandlerWasAttachedAtRegister);
-        Assert.Equal("Server Monitor", platform.DisplayName);
+        Assert.Equal("ServerAlyzer", platform.DisplayName);
         Assert.Equal(new Uri(_iconPath), platform.IconUri);
     }
 

@@ -1,6 +1,10 @@
 # ADR-007 — Segredos SSH no Windows Credential Manager
 
-Estado: **aceite e implementado no Milestone 3**.
+Estado: **aceite e implementado no Milestone 3**. **Atualizado pelo ADR-017 (M12):** o prefixo do target
+deixou de ser `pedroloyola.ServerMonitor:v1:ssh` e passou a ser o namespace neutro
+`ServerMonitor:v1:ssh`. A mudança é **backward-compatible e lossless** — credenciais escritas por versões
+M3–M11 sob o prefixo legado são lidas e **migradas** (escrita+verificação do novo target antes de remover
+o legado); nunca se perde uma credencial nem se volta a pedir a password. Ver ADR-017 §5.
 
 ## Decisão
 

@@ -40,9 +40,11 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
         IServerDiscoveryService discoveryService,
         INotificationSettingsService notificationSettingsService,
         IHistoryMaintenanceService historyMaintenance,
+        IAppVersionProvider appVersionProvider,
         ILogger<SettingsViewModel> logger)
     {
         _themeService = themeService;
+        AppVersion = appVersionProvider.DisplayVersion;
         _localizationService = localizationService;
         _serverService = serverService;
         _discoveryService = discoveryService;
@@ -65,6 +67,9 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
             _ => 0
         };
     }
+
+    /// <summary>Real product version for the About section (packaged identity or assembly fallback).</summary>
+    public string AppVersion { get; }
 
     public ObservableCollection<HiddenServerItemViewModel> HiddenServers { get; } = [];
 

@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!--
+  ServerAlyzer — DEV/QA package manifest (M12 / ADR-017).
+
+  DEV IDENTITY ONLY. Used for local sideload / QA (-p:Packaged=true -p:DevIdentity=true), signed
+  with a self-signed DEV certificate. This identity is deliberately separate from the production
+  Store identity in Package.appxmanifest so the DEV identity can never leak into a production MSIX.
+  The public display name still shows "ServerAlyzer (Dev)" so a sideloaded QA build is obvious.
+-->
+
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  xmlns:com="http://schemas.microsoft.com/appx/manifest/com/windows10"
+  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+  IgnorableNamespaces="uap rescap com desktop">
+
+  <Identity
+    Name="ServerAlyzer.Dev"
+    Publisher="CN=ServerAlyzer Dev, O=ServerAlyzer Dev, C=PT"
+    Version="1.0.1.0"
+    ProcessorArchitecture="x64" />
+
+  <Properties>
+    <DisplayName>ServerAlyzer (Dev)</DisplayName>
+    <PublisherDisplayName>ServerAlyzer (DEV)</PublisherDisplayName>
+    <Logo>Images\StoreLogo.png</Logo>
+  </Properties>
+
+  <Dependencies>
+    <!-- Same Windows 11 x64 floor as production (kept verbatim via
+         AppxAddDefaultTargetDeviceFamilyItem=false). -->
+    <TargetDeviceFamily
+      Name="Windows.Desktop"
+      MinVersion="10.0.22000.0"
+      MaxVersionTested="10.0.22000.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="pt-BR" />
+    <Resource Language="pt-PT" />
+    <Resource Language="en-US" />
+  </Resources>
+
+  <Applications>
+    <Application
+      Id="ServerMonitor"
+      Executable="ServerMonitor.App.exe"
+      EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        DisplayName="ServerAlyzer (Dev)"
+        Description="Painel local de monitorização de servidores Linux e macOS por SSH. (DEV build)"
+        BackgroundColor="transparent"
+        Square150x150Logo="Images\Square150x150Logo.png"
+        Square44x44Logo="Images\Square44x44Logo.png">
+        <uap:DefaultTile>
+          <uap:ShowNameOnTiles>
+            <uap:ShowOn Tile="square150x150Logo" />
+          </uap:ShowNameOnTiles>
+        </uap:DefaultTile>
+        <uap:SplashScreen Image="Images\SplashScreen.png" BackgroundColor="transparent" />
+      </uap:VisualElements>
+      <Extensions>
+        <com:Extension Category="windows.comServer">
+          <com:ComServer>
+            <com:ExeServer Executable="ServerMonitor.App.exe" Arguments="----AppNotificationActivated:" DisplayName="ServerAlyzer (Dev)">
+              <com:Class Id="4B2E9C7A-8F3D-4E1A-9B6C-2D5F7A1E3C48" />
+            </com:ExeServer>
+          </com:ComServer>
+        </com:Extension>
+        <desktop:Extension Category="windows.toastNotificationActivation">
+          <desktop:ToastNotificationActivation ToastActivatorCLSID="4B2E9C7A-8F3D-4E1A-9B6C-2D5F7A1E3C48" />
+        </desktop:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+
+</Package>

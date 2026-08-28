@@ -9,8 +9,8 @@
   <resheader name="version"><value>2.0</value></resheader>
   <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
   <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
-  <data name="AppNameText.Text" xml:space="preserve"><value>Server Monitor</value></data>
-  <data name="AppWindowTitle" xml:space="preserve"><value>Server Monitor</value></data>
+  <data name="AppNameText.Text" xml:space="preserve"><value>ServerAlyzer</value></data>
+  <data name="AppWindowTitle" xml:space="preserve"><value>ServerAlyzer</value></data>
   <data name="NavigationDashboardItem.Content" xml:space="preserve"><value>Servidores</value></data>
   <data name="NavigationSettingsItem.Content" xml:space="preserve"><value>Configurações</value></data>
   <data name="DashboardTitle.Text" xml:space="preserve"><value>Servidores</value></data>
@@ -41,6 +41,11 @@
   <data name="SettingsRestartNotice.Title" xml:space="preserve"><value>Idioma atualizado</value></data>
   <data name="SettingsRestartNotice.Message" xml:space="preserve"><value>Reinicie o aplicativo para aplicar o idioma em toda a interface.</value></data>
   <data name="SettingsMilestoneCaption.Text" xml:space="preserve"><value>Apenas configurações não sensíveis são armazenadas localmente. Senhas e passphrases são protegidas pelo Gerenciador de Credenciais do Windows.</value></data>
+  <data name="SettingsAboutTitle.Text" xml:space="preserve"><value>Sobre</value></data>
+  <data name="SettingsAboutAppName.Text" xml:space="preserve"><value>ServerAlyzer</value></data>
+  <data name="SettingsAboutVersionLabel.Text" xml:space="preserve"><value>Versão</value></data>
+  <data name="SettingsAboutLicense.Text" xml:space="preserve"><value>Código aberto · Licença MIT</value></data>
+  <data name="SettingsAboutGitHub.Content" xml:space="preserve"><value>Ver no GitHub</value></data>
   <data name="ServerOperationError.Title" xml:space="preserve"><value>Não foi possível concluir a operação</value></data>
   <data name="ServerOperationError.Message" xml:space="preserve"><value>Tente novamente. Seus dados existentes permanecem seguros.</value></data>
   <data name="ServerCardEditMenuItem.Text" xml:space="preserve"><value>Editar</value></data>
@@ -189,8 +194,8 @@
   <data name="SettingsNotificationsToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.HelpText" xml:space="preserve"><value>Controla todos os alertas de mudança de saúde dos servidores monitorados.</value></data>
   <data name="SettingsNotificationsSaveError.Title" xml:space="preserve"><value>Não foi possível salvar a preferência</value></data>
   <data name="SettingsNotificationsSaveError.Message" xml:space="preserve"><value>A configuração anterior de notificações foi mantida.</value></data>
-  <data name="TrayToolTip" xml:space="preserve"><value>Server Monitor</value></data>
-  <data name="TrayOpenMenuItem" xml:space="preserve"><value>Abrir Server Monitor</value></data>
+  <data name="TrayToolTip" xml:space="preserve"><value>ServerAlyzer</value></data>
+  <data name="TrayOpenMenuItem" xml:space="preserve"><value>Abrir ServerAlyzer</value></data>
   <data name="TrayRefreshAllMenuItem" xml:space="preserve"><value>Atualizar todos</value></data>
   <data name="TraySettingsMenuItem" xml:space="preserve"><value>Configurações</value></data>
   <data name="TrayExitMenuItem" xml:space="preserve"><value>Sair</value></data>
@@ -215,7 +220,7 @@
   <data name="CompactExpandButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Expandir para a visualização padrão</value></data>
   <data name="CompactExpandButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Expandir</value></data>
   <data name="CompactEmptyTitle.Text" xml:space="preserve"><value>Nenhum servidor configurado</value></data>
-  <data name="CompactEmptyAction.Content" xml:space="preserve"><value>Abrir o Server Monitor</value></data>
+  <data name="CompactEmptyAction.Content" xml:space="preserve"><value>Abrir o ServerAlyzer</value></data>
   <data name="CompactMetricsUnavailable.Text" xml:space="preserve"><value>Offline</value></data>
   <data name="SettingsCompactTitle.Text" xml:space="preserve"><value>Modo compacto</value></data>
   <data name="SettingsCompactDescription.Text" xml:space="preserve"><value>Exiba um widget pequeno e sempre disponível com o status essencial dos seus servidores.</value></data>

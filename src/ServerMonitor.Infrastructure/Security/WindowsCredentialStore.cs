@@ -6,7 +6,7 @@ using ServerMonitor.Core.Security;
 
 namespace ServerMonitor.Infrastructure.Security;
 
-public sealed class WindowsCredentialStore : IServerCredentialStore
+public sealed class WindowsCredentialStore : IServerCredentialStore, IDisposable
 {
     private static readonly Encoding StrictUtf8 = new UTF8Encoding(
         encoderShouldEmitUTF8Identifier: false,
@@ -20,6 +20,13 @@ public sealed class WindowsCredentialStore : IServerCredentialStore
 
     private readonly ICredentialManagerNative _native;
     private readonly bool _requireWindows;
+
+    // Serializes every credential operation so read-time migration is linearizable: a Read that
+    // migrates a legacy credential cannot interleave with a concurrent Write/Delete of the same
+    // reference (which would otherwise let stale data clobber a newer write or resurrect a deleted
+    // credential). The app is single-instance (ADR-017 §6), so one in-process gate fully serializes
+    // access to the per-user Credential Manager. Structural fix, no timing (QUALITY_BAR §6).
+    private readonly SemaphoreSlim _gate = new(1, 1);
 
     public WindowsCredentialStore()
         : this(new CredentialManagerNative(), requireWindows: true)
@@ -37,7 +44,7 @@ public sealed class WindowsCredentialStore : IServerCredentialStore
         _requireWindows = requireWindows;
     }
 
-    public Task WriteAsync(
+    public async Task WriteAsync(
         CredentialReference reference,
         SecretValue secret,
         CancellationToken cancellationToken = default)
@@ -46,7 +53,88 @@ public sealed class WindowsCredentialStore : IServerCredentialStore
         ArgumentNullException.ThrowIfNull(secret);
         EnsureSupportedPlatform();
 
-        var targetName = CredentialTargetName.Create(reference);
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            // New writes always land in the neutral namespace (ADR-017).
+            WriteTarget(CredentialTargetName.Create(reference), secret);
+
+            // Best-effort cleanup of any legacy credential for this reference so an update
+            // never leaves a stale personal-namespace secret behind. Non-destructive: the
+            // neutral target written above is authoritative regardless of the outcome here.
+            TryDeleteTargetSilently(CredentialTargetName.CreateLegacy(reference));
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    public async Task<SecretValue?> ReadAsync(
+        CredentialReference reference,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        EnsureSupportedPlatform();
+
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            // 1. Prefer the neutral namespace. When present it is authoritative; return it.
+            var neutral = ReadTarget(CredentialTargetName.Create(reference));
+            if (neutral is not null)
+            {
+                return neutral;
+            }
+
+            // 2. Fall back to the legacy namespace (pre-M12 credentials).
+            var legacy = ReadTarget(CredentialTargetName.CreateLegacy(reference));
+            if (legacy is null)
+            {
+                return null;
+            }
+
+            // 3. Migrate forward: write+verify the neutral target before removing legacy.
+            //    Any failure keeps legacy intact and still returns the working secret, so
+            //    authentication continues and the user is never re-prompted (ADR-017 §5).
+            //    Holding the gate across the whole migration makes it linearizable against
+            //    concurrent Write/Delete of the same reference.
+            TryMigrateToNeutral(reference, legacy);
+            return legacy;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    public async Task<bool> DeleteAsync(
+        CredentialReference reference,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        EnsureSupportedPlatform();
+
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            // Remove the neutral target (primary; hard errors surface) and best-effort the
+            // legacy one so a deleted server/credential never leaves an orphan behind (§13).
+            var deletedNeutral = DeleteTarget(CredentialTargetName.Create(reference));
+            var deletedLegacy = TryDeleteTargetSilently(CredentialTargetName.CreateLegacy(reference));
+
+            return deletedNeutral || deletedLegacy;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    public void Dispose() => _gate.Dispose();
+
+    private void WriteTarget(string targetName, SecretValue secret)
+    {
         using var encodedSecret = SensitiveByteBuffer.FromUtf8(secret.Reveal());
         if (encodedSecret.Length == 0)
         {
@@ -86,23 +174,15 @@ public sealed class WindowsCredentialStore : IServerCredentialStore
             ZeroAndFree(blobPointer, encodedSecret.Length);
             Marshal.FreeCoTaskMem(targetPointer);
         }
-
-        return Task.CompletedTask;
     }
 
-    public Task<SecretValue?> ReadAsync(
-        CredentialReference reference,
-        CancellationToken cancellationToken = default)
+    private SecretValue? ReadTarget(string targetName)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        EnsureSupportedPlatform();
-
-        var targetName = CredentialTargetName.Create(reference);
         if (!_native.Read(targetName, out var credentialPointer, out var errorCode))
         {
             if (errorCode == ErrorNotFound)
             {
-                return Task.FromResult<SecretValue?>(null);
+                return null;
             }
 
             throw new CredentialStoreException(CredentialStoreOperation.Read, errorCode);
@@ -130,7 +210,7 @@ public sealed class WindowsCredentialStore : IServerCredentialStore
                 try
                 {
                     StrictUtf8.GetChars(encodedSecret, characters);
-                    return Task.FromResult<SecretValue?>(new SecretValue(characters));
+                    return new SecretValue(characters);
                 }
                 finally
                 {
@@ -160,25 +240,61 @@ public sealed class WindowsCredentialStore : IServerCredentialStore
         }
     }
 
-    public Task<bool> DeleteAsync(
-        CredentialReference reference,
-        CancellationToken cancellationToken = default)
+    private bool DeleteTarget(string targetName)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        EnsureSupportedPlatform();
-
-        var targetName = CredentialTargetName.Create(reference);
         if (_native.Delete(targetName, out var errorCode))
         {
-            return Task.FromResult(true);
+            return true;
         }
 
         if (errorCode == ErrorNotFound)
         {
-            return Task.FromResult(false);
+            return false;
         }
 
         throw new CredentialStoreException(CredentialStoreOperation.Delete, errorCode);
+    }
+
+    private bool TryDeleteTargetSilently(string targetName)
+    {
+        try
+        {
+            return DeleteTarget(targetName);
+        }
+        catch (CredentialStoreException)
+        {
+            // Best-effort cleanup only; the authoritative target is unaffected.
+            return false;
+        }
+    }
+
+    // Writes the secret to the neutral target and verifies it read-backs identically
+    // before removing the legacy credential. Never throws: a failed migration leaves the
+    // legacy credential in place so the caller can still authenticate with it.
+    private void TryMigrateToNeutral(CredentialReference reference, SecretValue legacySecret)
+    {
+        try
+        {
+            var neutralTarget = CredentialTargetName.Create(reference);
+            WriteTarget(neutralTarget, legacySecret);
+
+            using var verification = ReadTarget(neutralTarget);
+            if (verification is null || !verification.Reveal().SequenceEqual(legacySecret.Reveal()))
+            {
+                // Neutral target not confirmed — keep the legacy credential authoritative.
+                return;
+            }
+
+            TryDeleteTargetSilently(CredentialTargetName.CreateLegacy(reference));
+        }
+        catch (CredentialStoreException)
+        {
+            // Migration is best-effort; legacy credential remains usable.
+        }
+        catch (ArgumentException)
+        {
+            // Defensive: legacy blob failed neutral-write validation. Keep legacy.
+        }
     }
 
     private void EnsureSupportedPlatform()

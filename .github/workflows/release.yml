@@ -1,0 +1,67 @@
+name: Release package
+
+# Builds the production MSIX from an exact tag/SHA and publishes it as a workflow
+# artifact with a SHA-256 checksum. Does NOT create a GitHub Release and does NOT
+# upload to the Microsoft Store (no Store secrets are used or required at this stage).
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Tag or commit SHA to package'
+        required: true
+
+# Least privilege: only read the repo. Artifacts are workflow artifacts, not a Release.
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout exact ref
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref || github.ref }}
+
+      - name: Setup .NET 10 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore ServerMonitor.slnx
+
+      # Fresh build + test before packaging (P-008/P-013).
+      - name: Build (Release)
+        run: dotnet build ServerMonitor.slnx -c Release --no-incremental --disable-build-servers
+
+      - name: Test
+        run: dotnet test ServerMonitor.slnx -c Release --no-build --disable-build-servers
+
+      - name: Build MSIX package (framework-dependent, x64)
+        run: >
+          dotnet build src/ServerMonitor.App/ServerMonitor.App.csproj
+          -c Release -p:Packaged=true --no-incremental --disable-build-servers
+
+      - name: Collect package + checksum
+        shell: pwsh
+        run: |
+          $msix = Get-ChildItem -Recurse -Filter '*.msix' -Path 'src/ServerMonitor.App/AppPackages' |
+            Where-Object { $_.FullName -notmatch '\\Dependencies\\' } |
+            Select-Object -First 1
+          if (-not $msix) { Write-Error 'No app MSIX produced.'; exit 1 }
+          New-Item -ItemType Directory -Force -Path 'artifacts' | Out-Null
+          Copy-Item $msix.FullName 'artifacts/'
+          $hash = (Get-FileHash $msix.FullName -Algorithm SHA256).Hash.ToLower()
+          "$hash  $($msix.Name)" | Out-File -Encoding ascii "artifacts/$($msix.Name).sha256"
+          Write-Host "SHA-256: $hash"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ServerMonitor-msix-x64
+          path: artifacts/
+          if-no-files-found: error

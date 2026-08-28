@@ -80,6 +80,8 @@ public sealed partial class MainWindow : Window
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(AppTitleBar);
 
+        ApplyWindowIcon();
+
         AppWindow.Changed += OnAppWindowChanged;
         AppWindow.TitleBar.ButtonBackgroundColor = Colors.Transparent;
         AppWindow.TitleBar.ButtonInactiveBackgroundColor = Colors.Transparent;
@@ -95,6 +97,26 @@ public sealed partial class MainWindow : Window
         {
             _logger.LogWarning(exception, "Desktop Acrylic is unavailable; the opaque fallback will be used.");
             RootLayout.Background = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["AppBackgroundBrush"];
+        }
+    }
+
+    /// <summary>
+    /// Sets the official ServerAlyzer icon on the window's title bar and Alt-Tab entry via
+    /// <see cref="AppWindow.SetIcon(string)"/> (no P/Invoke). This is the window-scoped counterpart
+    /// to the manifest visual assets that drive the taskbar and Start on a packaged run; together
+    /// they keep every Windows surface on the same brand identity (M12). A missing/locked icon file
+    /// must never prevent the window from opening, so failures are logged and swallowed.
+    /// </summary>
+    private void ApplyWindowIcon()
+    {
+        var iconPath = Path.Combine(AppContext.BaseDirectory, "Images", "ServerAlyzer.ico");
+        try
+        {
+            AppWindow.SetIcon(iconPath);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogWarning(exception, "Could not set the window icon from {IconPath}.", iconPath);
         }
     }
 
