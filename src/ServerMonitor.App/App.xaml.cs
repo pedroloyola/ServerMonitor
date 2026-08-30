@@ -22,6 +22,7 @@ using ServerMonitor.Infrastructure.Persistence;
 using ServerMonitor.Infrastructure.Security;
 using ServerMonitor.Infrastructure.SSH;
 using ServerMonitor.App.Windowing;
+using ServerMonitor.WidgetContract;
 
 namespace ServerMonitor.App;
 
@@ -165,14 +166,32 @@ public partial class App : Application
                     services.AddSingleton<IWorkloadRefreshCoordinator>(sp =>
                         sp.GetRequiredService<WorkloadCollectorService>());
 
-                    // Fan-out: the engine sees a single observer; history (M10) and workloads (M11)
-                    // both ride the cycle, isolated from each other (§38). History is first so its
-                    // behavior is unchanged.
+                    // M13 widget snapshot (ADR-018 Slice 1): the recorder rides the SAME cycle signal
+                    // (no new timer/worker, §14/§15), builds a sanitized fleet snapshot from the live
+                    // stores, and writes %LOCALAPPDATA%\ServerMonitor\widget-state.json atomically. It is
+                    // best-effort and failure-isolated: a write fault never touches monitoring (§16). The
+                    // out-of-process widget provider (later slices) reads this file; nothing here starts
+                    // COM/SSH/a second engine.
+                    services.AddSingleton(WidgetStateOptions.ForCurrentUser());
+                    services.AddSingleton<IWidgetStateWriter>(sp => new AtomicWidgetStateWriter(
+                        sp.GetRequiredService<WidgetStateOptions>(),
+                        sp.GetRequiredService<ILogger<AtomicWidgetStateWriter>>()));
+                    services.AddSingleton(sp => new WidgetSnapshotRecorder(
+                        sp.GetRequiredService<IServerService>(),
+                        sp.GetRequiredService<IServerMonitoringStateStore>(),
+                        sp.GetRequiredService<IServerMetricsStore>(),
+                        sp.GetRequiredService<IWidgetStateWriter>(),
+                        sp.GetRequiredService<ILogger<WidgetSnapshotRecorder>>()));
+
+                    // Fan-out: the engine sees a single observer; history (M10), workloads (M11), and the
+                    // M13 widget snapshot all ride the cycle, each isolated from the others (§38). History
+                    // is first so its behavior is unchanged; the widget recorder is last (pure consumer).
                     services.AddSingleton<IMonitoringCycleObserver>(sp => new CompositeMonitoringCycleObserver(
                         new IMonitoringCycleObserver[]
                         {
                             sp.GetRequiredService<HistoryRecorder>(),
-                            sp.GetRequiredService<WorkloadCadenceObserver>()
+                            sp.GetRequiredService<WorkloadCadenceObserver>(),
+                            sp.GetRequiredService<WidgetSnapshotRecorder>()
                         },
                         sp.GetRequiredService<ILogger<CompositeMonitoringCycleObserver>>()));
 

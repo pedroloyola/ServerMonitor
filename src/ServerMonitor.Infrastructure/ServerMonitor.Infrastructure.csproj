@@ -19,6 +19,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ServerMonitor.Core\ServerMonitor.Core.csproj" />
+    <ProjectReference Include="..\ServerMonitor.WidgetContract\ServerMonitor.WidgetContract.csproj" />
   </ItemGroup>
 
 </Project>
