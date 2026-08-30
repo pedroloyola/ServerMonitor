@@ -64,15 +64,22 @@
         <uap:SplashScreen Image="Images\SplashScreen.png" BackgroundColor="transparent" />
       </uap:VisualElements>
       <Extensions>
+        <!-- DEV-DISTINCT notification activator CLSID (206ACD0C-…), deliberately DIFFERENT from the
+             production 4B2E9C7A-… in Package.appxmanifest. A ToastActivatorCLSID must uniquely identify the
+             app (COM CLSIDs are globally unique), so the DEV and Store packages must not both register the
+             same GUID against different executables/identities — otherwise a side-by-side install can
+             conflict at registration or misroute a persisted notification click (M13 S4.5A, Atlas H-1).
+             The activator is manifest-driven (WinAppSDK reads it from the package manifest; no code
+             hardcodes the GUID), so a DEV-specific CLSID is self-consistent. Production GUID stays immutable. -->
         <com:Extension Category="windows.comServer">
           <com:ComServer>
             <com:ExeServer Executable="ServerMonitor.App.exe" Arguments="----AppNotificationActivated:" DisplayName="ServerAlyzer (Dev)">
-              <com:Class Id="4B2E9C7A-8F3D-4E1A-9B6C-2D5F7A1E3C48" />
+              <com:Class Id="206ACD0C-2FE0-4E41-8100-0B30B162276A" />
             </com:ExeServer>
           </com:ComServer>
         </com:Extension>
         <desktop:Extension Category="windows.toastNotificationActivation">
-          <desktop:ToastNotificationActivation ToastActivatorCLSID="4B2E9C7A-8F3D-4E1A-9B6C-2D5F7A1E3C48" />
+          <desktop:ToastNotificationActivation ToastActivatorCLSID="206ACD0C-2FE0-4E41-8100-0B30B162276A" />
         </desktop:Extension>
 
         <!-- M13 Slice 4 — widget deep-link activation (ADR-018). Registers the serveralyzer:// URI scheme
@@ -108,7 +115,7 @@
             <uap3:Properties>
               <WidgetProvider>
                 <ProviderIcons>
-                  <Icon Path="Images\Square44x44Logo.png" />
+                  <Icon Path="Public\ServerAlyzerWidgetIcon.png" />
                 </ProviderIcons>
                 <Activation>
                   <CreateInstance ClassId="78CFFBEF-7A95-4400-BB8B-A2376C6642C3" />
@@ -125,10 +132,10 @@
                     </Capabilities>
                     <ThemeResources>
                       <Icons>
-                        <Icon Path="Images\Square44x44Logo.png" />
+                        <Icon Path="Public\ServerAlyzerWidgetIcon.png" />
                       </Icons>
                       <Screenshots>
-                        <Screenshot Path="Images\Square150x150Logo.png" />
+                        <Screenshot Path="Public\ServerAlyzerWidgetScreenshot.png" />
                       </Screenshots>
                     </ThemeResources>
                   </Definition>

@@ -120,6 +120,67 @@
            Text="The Windows App SDK notification resource was not staged into the application output." />
   </Target>
 
+  <!--
+    M13 Slice 4.5A — bundle the out-of-process widget provider into the DEV widget QA package (ADR-018).
+    A single-project MSIX ships ONE app executable automatically; the provider is a SEPARATE COM ExeServer,
+    so its executable must be added to the package payload explicitly. Microsoft's documented multi-exe path
+    is a Windows Application Packaging Project (.wapproj), but the production Store package must remain a
+    single-project MSIX and immutable — so the DEV package adds the provider via supported Content inclusion.
+    The provider is published FRAMEWORK-DEPENDENT so the whole package shares the app's single Windows App
+    SDK 2.3.1 line: only the four provider-UNIQUE files (exe/dll/deps.json/runtimeconfig.json) are added at
+    the package root; every WinAppSDK/WinUI/Widgets-projection dll and both contract dlls are ALREADY shipped
+    by the app, so there is NO second (self-contained) runtime payload. DEV widget QA package only — the
+    production profile never runs this target.
+  -->
+  <Target Name="StageWidgetProviderForDevPackage" BeforeTargets="AssignTargetPaths"
+          Condition="'$(Packaged)' == 'true' and '$(DevIdentity)' == 'true'">
+    <PropertyGroup>
+      <WidgetProviderProject>$(MSBuildThisFileDirectory)..\ServerMonitor.WidgetProvider\ServerMonitor.WidgetProvider.csproj</WidgetProviderProject>
+      <!-- Stage OUTSIDE the app's obj/bin (in the gitignored repo-level artifacts/) so the SDK never
+           enumerates the provider output as a second set of publish files (NETSDK1152). Qualified by
+           Configuration AND RuntimeIdentifier so parallel Debug/Release (or multi-RID) package builds never
+           read/overwrite each other's stage (Atlas M-1). -->
+      <WidgetProviderPackageStage>$(MSBuildThisFileDirectory)..\..\artifacts\widget-provider-stage\$(Configuration)-$(RuntimeIdentifier)\</WidgetProviderPackageStage>
+    </PropertyGroup>
+    <!-- Clean the stage first: dotnet publish -o does NOT remove obsolete files, so a renamed/removed
+         provider output could otherwise leave a stale file that gets packaged (Atlas M-1). -->
+    <RemoveDir Directories="$(WidgetProviderPackageStage)" />
+    <!-- Framework-dependent publish (no self-contained WinAppSDK/.NET payload): shares the app's runtime. -->
+    <Exec Command="dotnet publish &quot;$(WidgetProviderProject)&quot; -c $(Configuration) -p:WindowsAppSDKSelfContained=false -p:SelfContained=false -p:WindowsPackageType=MSIX --disable-build-servers -o &quot;$(WidgetProviderPackageStage)&quot;" />
+    <!-- Validate ALL four provider-unique files are present before packaging, so a build can never silently
+         ship a partial/stale provider (Atlas M-1). -->
+    <Error Condition="!Exists('$(WidgetProviderPackageStage)ServerAlyzer.WidgetProvider.exe')"
+           Text="Widget provider staging incomplete: ServerAlyzer.WidgetProvider.exe missing." />
+    <Error Condition="!Exists('$(WidgetProviderPackageStage)ServerAlyzer.WidgetProvider.dll')"
+           Text="Widget provider staging incomplete: ServerAlyzer.WidgetProvider.dll missing." />
+    <Error Condition="!Exists('$(WidgetProviderPackageStage)ServerAlyzer.WidgetProvider.deps.json')"
+           Text="Widget provider staging incomplete: ServerAlyzer.WidgetProvider.deps.json missing." />
+    <Error Condition="!Exists('$(WidgetProviderPackageStage)ServerAlyzer.WidgetProvider.runtimeconfig.json')"
+           Text="Widget provider staging incomplete: ServerAlyzer.WidgetProvider.runtimeconfig.json missing." />
+    <!-- Explicit literal Link per file. Do NOT use %(Filename)%(Extension) here: inside a target ItemGroup
+         that batches over the whole @(Content) vector (README, icons, logos), producing a cartesian set of
+         wrong relative paths. KeepDuplicates=false because AssignTargetPaths fires in both build and publish
+         phases, so this hook runs more than once. -->
+    <ItemGroup>
+      <Content Include="$(WidgetProviderPackageStage)ServerAlyzer.WidgetProvider.exe"
+               Link="ServerAlyzer.WidgetProvider.exe" CopyToOutputDirectory="PreserveNewest" KeepDuplicates="false" />
+      <Content Include="$(WidgetProviderPackageStage)ServerAlyzer.WidgetProvider.dll"
+               Link="ServerAlyzer.WidgetProvider.dll" CopyToOutputDirectory="PreserveNewest" KeepDuplicates="false" />
+      <Content Include="$(WidgetProviderPackageStage)ServerAlyzer.WidgetProvider.deps.json"
+               Link="ServerAlyzer.WidgetProvider.deps.json" CopyToOutputDirectory="PreserveNewest" KeepDuplicates="false" />
+      <Content Include="$(WidgetProviderPackageStage)ServerAlyzer.WidgetProvider.runtimeconfig.json"
+               Link="ServerAlyzer.WidgetProvider.runtimeconfig.json" CopyToOutputDirectory="PreserveNewest" KeepDuplicates="false" />
+    </ItemGroup>
+  </Target>
+
+  <!-- Public folder declared by the widget AppExtension (PublicFolder="Public"): the host-facing widget
+       icon + screenshot the manifest points at. DEV widget QA package only. -->
+  <ItemGroup Condition="'$(Packaged)' == 'true' and '$(DevIdentity)' == 'true'">
+    <Content Include="Public\**" CopyToOutputDirectory="PreserveNewest">
+      <Link>Public\%(RecursiveDir)%(Filename)%(Extension)</Link>
+    </Content>
+  </ItemGroup>
+
   <ItemGroup>
     <!-- Tray icon: purpose-built multi-resolution .ico (16/20/24/32/48) derived from the official
          logo, replacing the runtime-rasterized SVG so the tray reads crisply at 16-24px and matches
