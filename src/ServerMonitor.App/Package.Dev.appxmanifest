@@ -75,6 +75,17 @@
           <desktop:ToastNotificationActivation ToastActivatorCLSID="4B2E9C7A-8F3D-4E1A-9B6C-2D5F7A1E3C48" />
         </desktop:Extension>
 
+        <!-- M13 Slice 4 — widget deep-link activation (ADR-018). Registers the serveralyzer:// URI scheme
+             so a widget click (provider -> Launcher.LaunchUriAsync) activates this app, converging on the
+             single UI instance via the M12 AppInstance model. The scheme is ServerAlyzer-specific to avoid
+             collision; no new capability. DEV manifest only; the production/Store manifest gets the same
+             fragment at the widget release slice. The activation URI is untrusted-on-read (strict parser). -->
+        <uap:Extension Category="windows.protocol">
+          <uap:Protocol Name="serveralyzer">
+            <uap:DisplayName>ServerAlyzer</uap:DisplayName>
+          </uap:Protocol>
+        </uap:Extension>
+
         <!-- M13 Slice 2 — out-of-process Windows Widget provider (ADR-018). DEV manifest only for local
              sideload/QA; the production Store manifest stays untouched until the widget release slice.
              CLSID 78CFFBEF-7A95-4400-BB8B-A2376C6642C3 is dedicated to the widget provider and distinct

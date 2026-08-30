@@ -98,6 +98,7 @@ public static class WidgetViewModelBuilder
         var metrics = $"{strings.Cpu} {cpu} · {strings.Memory} {mem} · {strings.Disk} {disk}";
 
         return new WidgetServerRow(
+            ServerId: server.Id,
             DisplayName: TruncateName(server.DisplayName, strings),
             Health: server.Health,
             HealthLabel: strings.HealthLabel(server.Health),

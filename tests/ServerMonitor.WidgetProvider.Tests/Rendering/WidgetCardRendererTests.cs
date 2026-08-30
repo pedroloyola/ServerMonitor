@@ -14,7 +14,7 @@ public sealed class WidgetCardRendererTests
 
     private static readonly HashSet<string> AllowedElements = new(StringComparer.Ordinal)
     {
-        "AdaptiveCard", "TextBlock", "ColumnSet", "Column", "Container"
+        "AdaptiveCard", "TextBlock", "ColumnSet", "Column", "Container", "Action.Execute"
     };
 
     private static WidgetServerState Server(string name, WidgetHealth health, Guid? id = null) => new()
@@ -184,12 +184,92 @@ public sealed class WidgetCardRendererTests
     }
 
     [Fact]
-    public void Card_does_not_leak_the_opaque_server_id()
+    public void Opaque_id_appears_only_in_action_data_never_as_visible_text()
     {
+        // The opaque id is the deep-link target in the row's Action.Execute data (§13) — allowed — but it
+        // must NEVER appear as a visible TextBlock (no id shown to the user).
         var id = Guid.NewGuid();
         var json = Render(Read(Server("Home", WidgetHealth.Healthy, id)), WidgetSizeHint.Large).TemplateJson;
-        Assert.DoesNotContain(id.ToString(), json);
-        Assert.DoesNotContain(id.ToString("N"), json);
+        using var doc = JsonDocument.Parse(json);
+
+        var texts = new List<string>();
+        CollectTexts(doc.RootElement, texts);
+        Assert.DoesNotContain(id.ToString("D"), texts);   // never rendered as visible text
+        Assert.True(ContainsActionServerId(doc.RootElement, id.ToString("D"))); // present in action data
+    }
+
+    private static void CollectTexts(JsonElement el, List<string> texts)
+    {
+        if (el.ValueKind == JsonValueKind.Object)
+        {
+            if (el.TryGetProperty("type", out var t) && t.GetString() == "TextBlock" &&
+                el.TryGetProperty("text", out var text) && text.ValueKind == JsonValueKind.String)
+            {
+                texts.Add(text.GetString() ?? string.Empty);
+            }
+
+            foreach (var p in el.EnumerateObject())
+            {
+                CollectTexts(p.Value, texts);
+            }
+        }
+        else if (el.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var i in el.EnumerateArray())
+            {
+                CollectTexts(i, texts);
+            }
+        }
+    }
+
+    private static bool ContainsActionServerId(JsonElement el, string id)
+    {
+        if (el.ValueKind == JsonValueKind.Object)
+        {
+            if (el.TryGetProperty("type", out var t) && t.GetString() == "Action.Execute" &&
+                el.TryGetProperty("data", out var data) && data.ValueKind == JsonValueKind.Object &&
+                data.TryGetProperty("serverId", out var sid) && sid.GetString() == id)
+            {
+                return true;
+            }
+
+            foreach (var p in el.EnumerateObject())
+            {
+                if (ContainsActionServerId(p.Value, id))
+                {
+                    return true;
+                }
+            }
+        }
+        else if (el.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var i in el.EnumerateArray())
+            {
+                if (ContainsActionServerId(i, id))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    [Fact]
+    public void Card_and_rows_carry_allowlisted_actions()
+    {
+        var id = Guid.NewGuid();
+        var json = Render(Read(Server("Home", WidgetHealth.Warning, id)), WidgetSizeHint.Medium).TemplateJson;
+        using var doc = JsonDocument.Parse(json);
+        var root = doc.RootElement;
+
+        // Card-level selectAction opens the dashboard.
+        Assert.True(root.TryGetProperty("selectAction", out var cardAction));
+        Assert.Equal("Action.Execute", cardAction.GetProperty("type").GetString());
+        Assert.Equal("openDashboard", cardAction.GetProperty("verb").GetString());
+
+        // A server row carries openServer with the opaque id.
+        Assert.True(ContainsActionServerId(root, id.ToString("D")));
     }
 
     [Fact]

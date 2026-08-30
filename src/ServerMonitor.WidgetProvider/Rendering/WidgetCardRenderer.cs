@@ -2,6 +2,7 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Unicode;
+using ServerMonitor.ActivationContract;
 using ServerMonitor.WidgetProvider.Hosting;
 
 namespace ServerMonitor.WidgetProvider.Rendering;
@@ -12,8 +13,9 @@ public sealed record WidgetCard(string TemplateJson, string DataJson);
 /// <summary>
 /// Renders a <see cref="WidgetViewModel"/> to an Adaptive Card (self-contained template, empty data —
 /// the card is small and re-rendered per update, §25). Uses ONLY widget-supported Adaptive Cards 1.5
-/// elements: <c>TextBlock</c>, <c>ColumnSet</c>/<c>Column</c>, <c>Container</c> (no images, progress bars,
-/// FactSets, or actions — the click/deep-link is Slice 4, §36). Health is always conveyed by a text
+/// elements: <c>TextBlock</c>, <c>ColumnSet</c>/<c>Column</c>, <c>Container</c> and whole-card/whole-row
+/// <c>Action.Execute</c> select actions (openDashboard / openServer, the read-only deep-links of Slice 4).
+/// No images, progress bars, FactSets, or visible buttons. Health is always conveyed by a text
 /// label AND a colour (never colour alone, §18); the brand accent is used only for the ServerAlyzer name,
 /// never for health (§4). Distinct layouts per size (§6): Small = summary, Medium/Large = server rows.
 /// </summary>
@@ -42,7 +44,10 @@ public static class WidgetCardRenderer
             ["$schema"] = "http://adaptivecards.io/schemas/adaptive-card.json",
             ["type"] = "AdaptiveCard",
             ["version"] = "1.5",
-            ["body"] = body
+            ["body"] = body,
+            // Tapping the card background (anything not a server row) opens the dashboard. The row's own
+            // selectAction (openServer) takes precedence when a row is tapped. Deep-link is Slice 4.
+            ["selectAction"] = Execute(ActivationVerbs.OpenDashboard, data: null)
         };
 
         return new WidgetCard(card.ToJsonString(SerializerOptions), "{}");
@@ -118,6 +123,10 @@ public static class WidgetCardRenderer
         {
             ["type"] = "Container",
             ["spacing"] = "Small",
+            // Tapping this row opens the dashboard focused on this server (opaque id only, §13).
+            ["selectAction"] = Execute(
+                ActivationVerbs.OpenServer,
+                new JsonObject { [ActivationVerbs.ServerIdDataKey] = row.ServerId.ToString("D") }),
             ["items"] = new JsonArray
             {
                 new JsonObject
@@ -139,6 +148,24 @@ public static class WidgetCardRenderer
 
     private static JsonObject Freshness(WidgetViewModel vm) =>
         Text(vm.FreshnessText, subtle: true, size: "Small", spacingNone: true);
+
+    // An allowlisted Adaptive Card Action.Execute. The Widgets host routes it to the provider's
+    // OnActionInvoked as a (verb, data) pair — it launches the app, never runs anything itself.
+    private static JsonObject Execute(string verb, JsonObject? data)
+    {
+        var action = new JsonObject
+        {
+            ["type"] = "Action.Execute",
+            ["verb"] = verb
+        };
+
+        if (data is not null)
+        {
+            action["data"] = data;
+        }
+
+        return action;
+    }
 
     private static JsonObject Column(string width, JsonObject item) => new()
     {

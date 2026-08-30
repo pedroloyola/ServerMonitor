@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.Windows.AppLifecycle;
+using ServerMonitor.ActivationContract;
 using ServerMonitor.App.Services;
 
 namespace ServerMonitor.App;
@@ -81,7 +82,10 @@ public static class Program
         var key = SingleInstancePolicy.ResolveInstanceKey(Environment.GetCommandLineArgs(), isDebugBuild);
         if (key is null)
         {
-            // Bypass: allow multiple instances (Debug QA harnesses only).
+            // Bypass: allow multiple instances (Debug QA harnesses only). Still funnel THIS launch's own
+            // cold activation intent so a serveralyzer:// Debug launch routes through the same hand-off.
+            _pendingActivation.Deliver(ProtocolActivationReader.TryGetIntent(
+                AppInstance.GetCurrent().GetActivatedEventArgs()));
             return false;
         }
 
@@ -90,9 +94,11 @@ public static class Program
 
         if (keyInstance.IsCurrent)
         {
-            // We are the primary instance. Remember the key so it can be released on shutdown,
-            // and handle future activations forwarded here.
+            // We are the primary instance. Remember the key so it can be released on shutdown. Deliver THIS
+            // launch's own cold intent BEFORE subscribing to redirects, so a later redirect (a newer user
+            // action) correctly supersedes it under the hand-off's latest-wins rule (§M-1).
             _registeredInstanceKey = key;
+            _pendingActivation.Deliver(ProtocolActivationReader.TryGetIntent(activationArgs));
             keyInstance.Activated += OnActivated;
             return false;
         }
@@ -101,11 +107,27 @@ public static class Program
         return true;
     }
 
+    // The single hand-off for activation intents across the App-construction boundary (§M-1/§M-2). The
+    // cold intent and every redirect are delivered here; the App attaches the router's Route once built.
+    private static readonly PendingActivation _pendingActivation = new();
+
+    /// <summary>
+    /// Attaches the activation consumer (the router's Route) once the App has built it, atomically flushing
+    /// the latest intent buffered before the App object existed.
+    /// </summary>
+    public static void AttachActivationConsumer(Action<ActivationIntent> consumer) =>
+        _pendingActivation.Attach(consumer);
+
     private static void OnActivated(object? sender, AppActivationArguments args)
     {
-        // A second launch (including a notification click, ExtendedActivationKind.AppNotification)
-        // was redirected here. Restore/foreground the one authoritative window in its current mode.
-        (Application.Current as App)?.HandleRedirectedActivation();
+        // A second launch (notification click, ExtendedActivationKind.AppNotification, or a
+        // serveralyzer:// protocol/widget deep-link) was redirected here. Funnel any deep-link intent
+        // through the single hand-off (buffered before the App exists, delivered straight to the router
+        // after) and, if the shell is already up, foreground the one authoritative window. Routing never
+        // reads Application.Current — it is set before the router is built, so it is not a readiness flag
+        // (§M-1). A non-deep-link activation carries a null intent and only restores the window.
+        _pendingActivation.Deliver(ProtocolActivationReader.TryGetIntent(args));
+        (Application.Current as App)?.RestoreOnRedirect();
     }
 
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]

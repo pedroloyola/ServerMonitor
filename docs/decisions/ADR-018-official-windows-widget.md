@@ -170,6 +170,60 @@ app (Slice 4).
   reliability **C0/H0/M0** (determinismo, sem estado mutável de tamanho, falha de render contida, sem
   timer). Runtime board = NOT_RUN; preview via Adaptive Cards designer (cards de teste válidos gerados).
 
+## Fase 1 — Slice 4 (interação do widget / ativação + deep-link da app)
+
+Torna o card clicável e converge a ação na **única** instância de UI do M12 — o widget nunca abre uma
+segunda janela nem uma segunda pilha. Estritamente **read-only**: nenhum comando, escrita ou ação de
+serviço; só navegação (Dashboard ou Dashboard com um servidor em foco).
+
+- **Mecanismo escolhido (§36):** `selectAction = Action.Execute` como metadados no card (sem botões
+  visíveis — o corpo renderizado fica byte-idêntico ao layout read-only da Slice 3). Card-root
+  `openDashboard`; cada `Container` de linha de servidor `openServer` com `data = { serverId }`. O
+  Adaptive Cards resolve o `selectAction` mais interno, portanto um toque numa linha dispara `openServer`
+  e **não** também o `openDashboard` do card (precedência, não regiões sobrepostas); tudo fora de uma linha
+  cai no `openDashboard`. Small/Empty/Unavailable = só ação de card.
+- **Contrato de deep-link (`serveralyzer://`):** assemblies-folha BCL-only (`ServerMonitor.ActivationContract`).
+  Gramática mínima: `serveralyzer://dashboard` e `serveralyzer://server/{guid}` (guid "D", exatamente 36
+  chars, `!= Empty`). `ActivationUri.TryParse` é **total e fail-closed**: rejeita scheme errado, host fora
+  do allowlist, segmento extra, QUALQUER query/fragment, userinfo/porta, slash codificado (`%2F`)/traversal
+  (usa `Segments` crus + `Guid.TryParseExact`) e `> 256` chars; nunca lança, nunca executa input. A URI é
+  construída SÓ a partir de um `ActivationIntent` (Kind + Guid) — o display name não tem lugar na gramática
+  nem na `data` da ação, logo um nome hostil não pode chegar à URI. O Id opaco aparece só no `selectAction
+  data`, nunca renderizado.
+- **Modelo de input não-confiável:** o verbo+data do clique e a URI resultante são não-confiáveis.
+  `WidgetActionHandler` faz allowlist do verbo, lê SÓ a chave `serverId` (ignora campos extra), e é
+  neutral-on-exception (um clique nunca falha o provider — corre dentro do `Guard` COM). O lado da app
+  **re-valida**: re-parseia a URI crua (`ProtocolActivationReader`) e resolve o guid contra o **próprio
+  store** (`PendingServerFocus.TryResolve` só devolve o id se `VisibleServers` o contém) — um guid
+  desconhecido/removido/adivinhado nunca resolve; no pior caso navega ao Dashboard e foca nada.
+- **Convergência AppInstance (§4/§M-1/§M-2):** um único ponto de convergência. `PendingActivation` é o
+  hand-off atómico através da fronteira de construção do `App` (o `Application.Current` é definido pelo ctor
+  base ANTES de o router existir, logo **não** é flag de prontidão fiável). O intent cold e cada redirect
+  são funilados por um só gate: entregue ao consumer se já ligado, ou bufferizado (latest-wins) até lá;
+  `Attach` liga o `ActivationRouter.Route` e faz flush atómico do latest. Tanto `PendingActivation` como
+  `ActivationRouter` usam o **mesmo padrão single-owner drain** (`_pending/_consumer|_ready/_draining` sob
+  um `_gate`, consumer/executor invocado FORA do lock): um só pipeline, uma só ordenação — o clique mais
+  recente ganha e nunca é ultrapassado na fronteira. `MarkReady` (em `OnLaunched`, após navegação pronta)
+  drena o latest, uma vez.
+- **Cold / warm:** cold launch (`serveralyzer://` que arranca o processo) e warm redirect (segundo launch
+  reencaminhado para a instância primária) partilham o mesmo pipeline. O cold intent é entregue ANTES de
+  subscrever `AppInstance.Activated`, para um redirect posterior (ação mais nova) o superar corretamente.
+- **Foco do servidor (§H/§11):** `DashboardViewModel` levanta `ServerFocusRequested`; a `DashboardPage`
+  (singleton, tal como o VM) mantém a subscrição por toda a vida da app (nunca dessubscreve em Unload) e
+  faz scroll do card via `StartBringIntoView`. Se o servidor ainda não está carregado o pedido fica
+  pendente e é reaplicado após o próximo load; um servidor removido simplesmente nunca resolve.
+- **Compact / tray:** a ativação restaura e traz para a frente a janela na sua apresentação atual
+  (Standard/Compact/tray) via `RestoreAndActivate` — nunca cria outra.
+- **Manifesto:** `uap:Extension Category="windows.protocol"` com `uap:Protocol Name="serveralyzer"`
+  (Package.Dev.appxmanifest, DEV-only); sem nova capability (`runFullTrust` inalterado).
+- **Reviews:** Prism visual **APROVADO** (sem regressão S3; targets de clique inequívocos; sem elementos
+  não suportados). Vigil security **C0/H0/M0/L0** (fronteira airtight, fail-closed, read-only, re-validação
+  independente no lado da app). Atlas reliability **C0/H0/M0/L0** após duas rondas de correção — fechou
+  H-1 (page singleton dessubscrita em Unload → foco+refresh mortos), M-1 (hand-off não atómico/ordenação na
+  fronteira de construção → single-owner drain), L-1 (executor/sink que lançam encravavam o drain →
+  isolamento + reset), L-2 (LoadAsync engole exceção → guard `IsOperationErrorOpen` nos testes de sucesso).
+  Runtime Windows Widgets board = **NOT_RUN** (Win11 Home, sem dev-mode/admin) — nunca contado como PASS.
+
 ## Modos de falha (leitura)
 
 Cache ausente → estado indisponível. `schemaVersion` desconhecido / conteúdo corrupto / sobredimensionado

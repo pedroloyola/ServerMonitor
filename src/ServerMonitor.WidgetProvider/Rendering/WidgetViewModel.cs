@@ -17,8 +17,13 @@ public enum WidgetDisplayState
     Unavailable
 }
 
-/// <summary>One server's render-ready row (Medium/Large). Carries only presentation strings + colours.</summary>
+/// <summary>
+/// One server's render-ready row (Medium/Large). Carries presentation strings + colours, plus the opaque
+/// <see cref="ServerId"/> used ONLY as the deep-link target in the row's action data (§13) — never
+/// rendered as visible text.
+/// </summary>
 public sealed record WidgetServerRow(
+    Guid ServerId,
     string DisplayName,
     WidgetHealth Health,
     string HealthLabel,

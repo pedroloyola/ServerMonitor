@@ -1,0 +1,16 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    M13 Slice 4 activation wire contract (ADR-018). A tiny, dependency-free leaf assembly: the strict
+    serveralyzer:// deep-link grammar and its parser/formatter, shared by the widget provider (which
+    FORMATS the URI and launches it) and the app (which PARSES an untrusted protocol activation). It has
+    NO Core/Infrastructure/App reference so the provider can reference it alongside WidgetContract without
+    breaking the provider's dependency boundary. Pure net10.0 (no Windows), fully testable.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

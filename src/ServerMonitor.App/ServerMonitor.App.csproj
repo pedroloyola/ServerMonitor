@@ -143,5 +143,6 @@
     <ProjectReference Include="..\ServerMonitor.Infrastructure\ServerMonitor.Infrastructure.csproj" />
     <ProjectReference Include="..\ServerMonitor.Collectors\ServerMonitor.Collectors.csproj" />
     <ProjectReference Include="..\ServerMonitor.WidgetContract\ServerMonitor.WidgetContract.csproj" />
+    <ProjectReference Include="..\ServerMonitor.ActivationContract\ServerMonitor.ActivationContract.csproj" />
   </ItemGroup>
 </Project>

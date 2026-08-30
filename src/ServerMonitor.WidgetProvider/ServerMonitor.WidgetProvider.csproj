@@ -32,6 +32,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ServerMonitor.WidgetContract\ServerMonitor.WidgetContract.csproj" />
+    <ProjectReference Include="..\ServerMonitor.ActivationContract\ServerMonitor.ActivationContract.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using Microsoft.Windows.Widgets;
 using Microsoft.Windows.Widgets.Providers;
+using ServerMonitor.WidgetProvider.Activation;
 using ServerMonitor.WidgetProvider.Diagnostics;
 using ServerMonitor.WidgetProvider.Hosting;
 
@@ -25,6 +26,7 @@ public sealed class WidgetProviderComAdapter : IWidgetProvider
 
     private readonly WidgetProviderCoordinator _coordinator;
     private readonly ComServerProcess _process;
+    private readonly WidgetActionHandler _actionHandler;
     private readonly IWidgetProviderLog _log;
 
     public WidgetProviderComAdapter(
@@ -35,6 +37,7 @@ public sealed class WidgetProviderComAdapter : IWidgetProvider
         _coordinator = coordinator ?? throw new ArgumentNullException(nameof(coordinator));
         _process = process ?? throw new ArgumentNullException(nameof(process));
         _log = log ?? NullWidgetProviderLog.Instance;
+        _actionHandler = new WidgetActionHandler(new ProtocolAppLauncher(), _log);
 
         // This live COM object keeps the server process alive; released in the finalizer when the host
         // drops its last reference (the correct COM lifetime barrier, not the widget registry).
@@ -72,9 +75,10 @@ public sealed class WidgetProviderComAdapter : IWidgetProvider
         Guard(nameof(Deactivate), () => { });
 
     public void OnActionInvoked(WidgetActionInvokedArgs actionInvokedArgs) =>
-        // Deep-link / click → app activation is a later slice (ADR-018 §44). Safe no-op for now so a
-        // click can never fault the provider.
-        Guard(nameof(OnActionInvoked), () => { });
+        // A click on the card/row: map the allowlisted verb + opaque id to a serveralyzer:// launch (§14).
+        // Fully contained — a click can never fault the provider.
+        Guard(nameof(OnActionInvoked), () =>
+            _actionHandler.Handle(actionInvokedArgs.Verb, actionInvokedArgs.Data));
 
     private static WidgetActivation Map(WidgetContext context) =>
         new(context.Id, context.DefinitionId, MapSize(context.Size), CustomState: null);
