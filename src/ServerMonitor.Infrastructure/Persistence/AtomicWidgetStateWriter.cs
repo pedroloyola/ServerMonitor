@@ -15,6 +15,10 @@ public sealed class AtomicWidgetStateWriter : IWidgetStateWriter
 {
     private const int WriteBufferSize = 4096;
 
+    /// <summary>Suffix of the backup ReplaceFile keeps the old snapshot in. Not a <c>.tmp</c>, so the
+    /// provider's orphan sweep never deletes it (it could be the only surviving good copy).</summary>
+    internal const string BackupSuffix = ".bak";
+
     private readonly WidgetStateOptions _options;
     private readonly ILogger<AtomicWidgetStateWriter> _logger;
 
@@ -38,9 +42,18 @@ public sealed class AtomicWidgetStateWriter : IWidgetStateWriter
         var bytes = WidgetStateSerializer.SerializeToUtf8Bytes(snapshot);
 
         // Unique temp name in the SAME directory (same volume) so the replace is a metadata-only atomic
-        // rename, never a cross-volume copy. A crashed prior run may leave a *.tmp behind; it is inert
-        // (the provider reads only widget-state.json) and is overwritten/cleaned by later writes.
-        var tempPath = Path.Combine(directory, $"widget-state.{Guid.NewGuid():N}.tmp");
+        // rename, never a cross-volume copy. The name follows the shared WidgetStateLocation pattern so
+        // the provider's orphan sweep can recognize and clean a temp left by a crashed prior run; it is
+        // otherwise inert (the provider reads only widget-state.json).
+        var tempPath = WidgetStateLocation.NewTempPath(directory);
+        var backupPath = path + BackupSuffix;
+
+        // Startup/pre-write recovery: a prior crash mid-replace can leave the destination missing but the
+        // old-good copy in the backup. Promote it BEFORE risking a new write, so a subsequent write
+        // failure can never leave us with no snapshot at all (Atlas/Vigil S2 M-2). Never delete the backup
+        // unconditionally here — it may be the only complete copy.
+        RecoverLastKnownGood(path, tempPath: string.Empty, backupPath);
+
         try
         {
             var stream = new FileStream(
@@ -60,32 +73,90 @@ public sealed class AtomicWidgetStateWriter : IWidgetStateWriter
             // so the existing last-known-good is preserved untouched.
             cancellationToken.ThrowIfCancellationRequested();
 
-            // Atomic replace on the same NTFS volume (MoveFileEx with MOVEFILE_REPLACE_EXISTING). Also
-            // handles the first write, where the destination does not yet exist, as a plain rename.
-            File.Move(tempPath, path, overwrite: true);
+            // Defense-in-depth (Vigil S2 L-2): never write THROUGH a reparse point we did not create —
+            // File.Replace would follow a symlink/junction to its target.
+            var destination = new FileInfo(path);
+            if (destination.Exists && destination.Attributes.HasFlag(FileAttributes.ReparsePoint))
+            {
+                throw new IOException("Widget snapshot destination is a reparse point.");
+            }
+
+            if (destination.Exists)
+            {
+                // ReplaceFile (File.Replace) succeeds even while the out-of-process provider holds the
+                // file open for reading with FileShare.Delete, which File.Move(overwrite) does not. We
+                // pass an explicit BACKUP so last-known-good is always recoverable: without it, a
+                // ReplaceFile partial failure (ERROR_UNABLE_TO_MOVE_REPLACEMENT) can leave the old
+                // destination gone and the new content stranded under the temp name — deleting the temp
+                // would then destroy the only complete copy (Atlas/Vigil S2 M-2, §13).
+                File.Replace(tempPath, path, backupPath); // failure is handled by the outer catch
+                TryDelete(backupPath); // success: the old copy is no longer needed
+            }
+            else
+            {
+                // First write: nothing to replace, so a plain rename is the atomic primitive.
+                File.Move(tempPath, path);
+            }
         }
         catch
         {
-            TryDeleteTemp(tempPath);
+            // Guarantee a complete snapshot still exists, then clean working files — but NEVER delete the
+            // backup while the destination is missing (it may be the only good copy, §13).
+            RecoverLastKnownGood(path, tempPath, backupPath);
+            TryDelete(tempPath);
+            if (File.Exists(path))
+            {
+                TryDelete(backupPath);
+            }
+
             throw;
         }
     }
 
-    private void TryDeleteTemp(string tempPath)
+    /// <summary>
+    /// After a failed ReplaceFile, guarantee a COMPLETE snapshot still exists at <paramref name="path"/>.
+    /// If the destination survived (a failure before any mutation) there is nothing to do. If it was
+    /// removed by a partial replace, restore the OLD good copy from the backup, or — failing that —
+    /// salvage the freshly-written temp (also a complete file). Best-effort; never throws.
+    /// </summary>
+    internal static void RecoverLastKnownGood(string path, string tempPath, string backupPath)
+    {
+        if (File.Exists(path))
+        {
+            return;
+        }
+
+        try
+        {
+            if (File.Exists(backupPath))
+            {
+                File.Move(backupPath, path);
+            }
+            else if (File.Exists(tempPath))
+            {
+                File.Move(tempPath, path);
+            }
+        }
+        catch
+        {
+            // Nothing more we can safely do; the next monitoring cycle rewrites the snapshot.
+        }
+    }
+
+    private void TryDelete(string filePath)
     {
         try
         {
-            if (File.Exists(tempPath))
+            if (File.Exists(filePath))
             {
-                File.Delete(tempPath);
+                File.Delete(filePath);
             }
         }
         catch (Exception exception)
         {
-            // Never surface temp-cleanup problems: the real write already failed and is being rethrown,
-            // and a stray temp file is inert. Log coarsely without the payload (§31).
+            // Never surface cleanup problems: a stray temp/backup is inert. Log coarsely (§31).
             _logger.LogDebug(
-                "Failed to remove widget snapshot temp file. Error: {Type}.",
+                "Failed to remove a widget snapshot working file. Error: {Type}.",
                 exception.GetType().Name);
         }
     }

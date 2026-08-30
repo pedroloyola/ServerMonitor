@@ -139,6 +139,95 @@ public sealed class AtomicWidgetStateWriterTests : IDisposable
     }
 
     [Fact]
+    public async Task Successful_write_leaves_no_backup_file()
+    {
+        var writer = NewWriter();
+        await writer.WriteAsync(Snapshot(WidgetHealth.Healthy, "First"), CancellationToken.None);
+        await writer.WriteAsync(Snapshot(WidgetHealth.Warning, "Second"), CancellationToken.None);
+
+        Assert.False(File.Exists(_path + ".bak"));
+    }
+
+    // ---- RecoverLastKnownGood (Atlas/Vigil S2 M-2): after a partial ReplaceFile failure, a complete
+    //      snapshot must always remain at the destination. ----
+
+    [Fact]
+    public void Recover_is_noop_when_destination_survived()
+    {
+        Directory.CreateDirectory(_directory);
+        File.WriteAllText(_path, "good");
+        var temp = Path.Combine(_directory, "t.tmp");
+        var backup = _path + ".bak";
+        File.WriteAllText(temp, "new");
+
+        AtomicWidgetStateWriter.RecoverLastKnownGood(_path, temp, backup);
+
+        Assert.Equal("good", File.ReadAllText(_path)); // untouched
+    }
+
+    [Fact]
+    public void Recover_restores_old_good_from_backup_when_destination_gone()
+    {
+        Directory.CreateDirectory(_directory);
+        var temp = Path.Combine(_directory, "t.tmp");
+        var backup = _path + ".bak";
+        File.WriteAllText(backup, "old-good");
+        File.WriteAllText(temp, "new");
+
+        AtomicWidgetStateWriter.RecoverLastKnownGood(_path, temp, backup); // dest missing
+
+        Assert.True(File.Exists(_path));
+        Assert.Equal("old-good", File.ReadAllText(_path)); // prefers the old good copy
+    }
+
+    [Fact]
+    public void Recover_salvages_temp_when_destination_and_backup_gone()
+    {
+        Directory.CreateDirectory(_directory);
+        var temp = Path.Combine(_directory, "t.tmp");
+        var backup = _path + ".bak";
+        File.WriteAllText(temp, "new-complete");
+
+        AtomicWidgetStateWriter.RecoverLastKnownGood(_path, temp, backup); // dest + backup missing
+
+        Assert.True(File.Exists(_path));
+        Assert.Equal("new-complete", File.ReadAllText(_path)); // salvages the complete new content
+    }
+
+    [Fact]
+    public async Task Orphaned_backup_is_promoted_before_the_next_write()
+    {
+        // Simulate a crash mid-replace: destination gone, old-good stranded in the backup. The next write
+        // must promote the backup first, so we always end with a complete snapshot (M-2).
+        Directory.CreateDirectory(_directory);
+        File.WriteAllBytes(_path + ".bak", WidgetStateSerializer.SerializeToUtf8Bytes(Snapshot(WidgetHealth.Healthy, "OldGood")));
+        Assert.False(File.Exists(_path));
+
+        await NewWriter().WriteAsync(Snapshot(WidgetHealth.Critical, "New"), CancellationToken.None);
+
+        var restored = WidgetStateSerializer.TryDeserialize(await File.ReadAllBytesAsync(_path));
+        Assert.NotNull(restored);
+        Assert.Equal("New", Assert.Single(restored!.Servers).DisplayName); // the fresh write won
+        Assert.False(File.Exists(_path + ".bak"));                          // backup cleaned on success
+    }
+
+    // NOTE: the reparse-point guard in AtomicWidgetStateWriter (refuse to write THROUGH a symlink/junction
+    // at the destination, Vigil S2 L-2) is intentionally NOT unit-tested here: creating a file symlink
+    // needs SeCreateSymbolicLink (dev-mode/admin), unavailable on this Windows Home box, and a silently
+    // self-passing test would violate NOT-RUN != PASS. It is verified by inspection and left for privileged QA.
+
+    [Fact]
+    public void Recover_does_not_throw_when_nothing_to_restore()
+    {
+        Directory.CreateDirectory(_directory);
+        var temp = Path.Combine(_directory, "t.tmp");
+        var backup = _path + ".bak";
+
+        AtomicWidgetStateWriter.RecoverLastKnownGood(_path, temp, backup); // all missing → no throw
+        Assert.False(File.Exists(_path));
+    }
+
+    [Fact]
     public async Task Repeated_writes_never_accumulate_temp_files()
     {
         var writer = NewWriter();

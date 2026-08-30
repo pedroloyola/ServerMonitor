@@ -88,6 +88,53 @@ Estabelece **apenas a fronteira de dados**. Sem alteração de manifesto/COM/pac
   input malformado; `WidgetStateValidator` valida versão de schema, intervalos de timestamp, contagem ≤
   `MaxServers` (100), id não-vazio, nome sanitizado, enums definidos e percentagens finitas em [0,100].
 
+## Fase 1 — Slice 2 (fundação do provider COM out-of-process)
+
+Estabelece o processo out-of-process que o host de Widgets ativa. Ainda **não** implementa o rendering
+final S/M/L nem a ativação/deep-link da app (slices seguintes).
+
+- **Projeto/executável:** `ServerMonitor.WidgetProvider` → `ServerAlyzer.WidgetProvider.exe`
+  (`net10.0-windows`, self-contained no dev/unpackaged). Referencia **apenas**
+  `ServerMonitor.WidgetContract` + o meta-package **Microsoft.WindowsAppSDK 2.3.1** (que resolve a
+  composição oficial, incl. `Microsoft.WindowsAppSDK.Widgets 2.0.5`, `...Runtime 2.3.1` — **uma única
+  linha de runtime**, decisão humana). **Não** referencia Core/Infrastructure/Collectors/App.
+- **CLSID dedicado:** `78CFFBEF-7A95-4400-BB8B-A2376C6642C3` (distinto do CLSID de notificações
+  `4B2E9C7A…`).
+- **Reader não-confiável:** `WidgetSnapshotReader` impõe o **cap de tamanho ANTES de ler** (256 KB,
+  `WidgetStateLocation.MaxFileBytes`), abre com `FileShare.ReadWrite|Delete` (não bloqueia o replace do
+  writer), desserializa e valida via WidgetContract, e devolve sempre um estado neutro
+  (Missing/Oversized/Corrupt/Invalid/IoError) — nunca lança.
+- **Limpeza de temps órfãos:** `WidgetOrphanTempCleaner` apaga só o padrão de temp do writer, top-level,
+  sem seguir reparse-points, best-effort, com exame limitado por varrimento.
+- **Frescura (runtime, não persistida):** fresh/stale/unavailable a partir de `generatedAtUtc` vs relógio;
+  limite de stale 90 s (≈3 ciclos). Stale ≠ unhealthy.
+- **Lifetime COM (protocolo oficial):** `ComServerProcess` usa
+  `CoAddRefServerProcess`/`CoReleaseServerProcess`/`CoSuspendClassObjects`. Cada objeto COM criado
+  incrementa a referência do processo; ao chegar a zero, o COM suspende novas ativações atomicamente e o
+  processo revoga (`CoRevokeClassObject`) e sai — o Windows relança na próxima ativação. O **registry de
+  widgets NÃO decide o lifetime**. `GetWidgetInfos` reidrata no arranque (bounded), antes de registar a
+  factory, com tombstones a impedir que um snapshot obsoleto ressuscite um widget eliminado.
+  Neutral-on-exception em toda a fronteira COM (`WidgetProviderComAdapter`); a class factory devolve
+  HRESULTs.
+- **Template dev temporário:** Adaptive Card 1.5 mínimo e neutro (overall health + contagem + frescura;
+  **sem nomes de servidores**), marcado "dev template" — o design final é uma slice posterior.
+- **Manifesto:** extensões `com:ExeServer` (provider + CLSID) + `uap3:AppExtension`
+  `com.microsoft.windows.widgets` (Activation `CreateInstance ClassId` + Definição small/medium/large)
+  adicionadas ao **`Package.Dev.appxmanifest`** (QA DEV/local). MinVersion mantém-se **10.0.22000.0**
+  (extensão inerte em 21H2, ativa em 22H2+). O manifesto de **produção/Store fica intocado** até à slice
+  de release do widget; o fragmento de produção é idêntico (documentado). Sem nova capability
+  (runFullTrust apenas). Sem submissão à Store.
+- **QA:** smoke launch local confirma que o exe arranca, regista e auto-sai após o idle grace (code 0),
+  exercitando o caminho `CoAddRefServerProcess`→`CoReleaseServerProcess`→0→`CoSuspendClassObjects`. A
+  ativação COM real no board de Widgets é **NOT_RUN** — exige instalação packaged (dev-mode/admin) num
+  board 22621.1413+; esta máquina é Windows 11 Home (build 26200/25H2 tem board, mas o install é gated).
+- **Residuais aceites (documentados, para a slice de runtime-QA):** (1) o object-ref do processo é
+  libertado num **finalizer** (não num hook determinístico do último `IUnknown::Release`), porque o COM
+  gerido não expõe esse hook sem um `ComWrappers` custom; o GC-reclaim no idle checkpoint limita o
+  zombie; o padrão documentado da Microsoft usa finalizer. (2) O drain do shutdown é **bounded** — uma
+  chamada `host.Update` síncrona genuinamente presa além do timeout pode completar após o revoke
+  (inofensivo, isolada por try/catch). Ambos exigem validação no board real (NOT_RUN aqui).
+
 ## Modos de falha (leitura)
 
 Cache ausente → estado indisponível. `schemaVersion` desconhecido / conteúdo corrupto / sobredimensionado

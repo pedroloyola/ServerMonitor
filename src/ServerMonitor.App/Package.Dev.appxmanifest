@@ -15,7 +15,8 @@
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
   xmlns:com="http://schemas.microsoft.com/appx/manifest/com/windows10"
   xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
-  IgnorableNamespaces="uap rescap com desktop">
+  xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3"
+  IgnorableNamespaces="uap rescap com desktop uap3">
 
   <Identity
     Name="ServerAlyzer.Dev"
@@ -73,6 +74,58 @@
         <desktop:Extension Category="windows.toastNotificationActivation">
           <desktop:ToastNotificationActivation ToastActivatorCLSID="4B2E9C7A-8F3D-4E1A-9B6C-2D5F7A1E3C48" />
         </desktop:Extension>
+
+        <!-- M13 Slice 2 — out-of-process Windows Widget provider (ADR-018). DEV manifest only for local
+             sideload/QA; the production Store manifest stays untouched until the widget release slice.
+             CLSID 78CFFBEF-7A95-4400-BB8B-A2376C6642C3 is dedicated to the widget provider and distinct
+             from the notification activator CLSID above. MinVersion stays 10.0.22000.0: on 21H2 the
+             AppExtension is inert (no Widgets host enumerates it), on 22H2+ the board activates the
+             provider via CreateInstance (Phase 0.5, Option A). Icons/screenshots reuse existing assets as
+             minimal placeholders; final art is a later slice. -->
+        <com:Extension Category="windows.comServer">
+          <com:ComServer>
+            <com:ExeServer Executable="ServerAlyzer.WidgetProvider.exe" DisplayName="ServerAlyzer Widget Provider (Dev)">
+              <com:Class Id="78CFFBEF-7A95-4400-BB8B-A2376C6642C3" />
+            </com:ExeServer>
+          </com:ComServer>
+        </com:Extension>
+        <uap3:Extension Category="windows.appExtension">
+          <uap3:AppExtension Name="com.microsoft.windows.widgets"
+                             Id="ServerAlyzerWidgetProvider"
+                             PublicFolder="Public"
+                             DisplayName="ServerAlyzer (Dev)">
+            <uap3:Properties>
+              <WidgetProvider>
+                <ProviderIcons>
+                  <Icon Path="Images\Square44x44Logo.png" />
+                </ProviderIcons>
+                <Activation>
+                  <CreateInstance ClassId="78CFFBEF-7A95-4400-BB8B-A2376C6642C3" />
+                </Activation>
+                <Definitions>
+                  <Definition Id="ServerAlyzer_Widget"
+                              DisplayName="ServerAlyzer"
+                              Description="Local server health at a glance."
+                              AllowMultiple="true">
+                    <Capabilities>
+                      <Capability><Size Name="small" /></Capability>
+                      <Capability><Size Name="medium" /></Capability>
+                      <Capability><Size Name="large" /></Capability>
+                    </Capabilities>
+                    <ThemeResources>
+                      <Icons>
+                        <Icon Path="Images\Square44x44Logo.png" />
+                      </Icons>
+                      <Screenshots>
+                        <Screenshot Path="Images\Square150x150Logo.png" />
+                      </Screenshots>
+                    </ThemeResources>
+                  </Definition>
+                </Definitions>
+              </WidgetProvider>
+            </uap3:Properties>
+          </uap3:AppExtension>
+        </uap3:Extension>
       </Extensions>
     </Application>
   </Applications>

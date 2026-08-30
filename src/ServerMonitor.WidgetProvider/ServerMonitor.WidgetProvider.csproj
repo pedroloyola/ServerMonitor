@@ -1,0 +1,41 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    M13 Slice 2 — out-of-process Windows Widget provider (ADR-018). Public executable:
+    ServerAlyzer.WidgetProvider.exe. It references ONLY ServerMonitor.WidgetContract plus the Windows
+    App SDK (the widget provider API lives in the resolved sub-package set of the 2.3.1 meta-package).
+    It MUST NOT reference Core/Infrastructure/Collectors/App — no SSH, no engine, no monitoring.
+    Unpackaged dev/test build is self-contained (mirrors the app's Debug); the packaged MSIX (later)
+    shares the single Windows App SDK 2.3.1 runtime line with the app.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <Platforms>x64</Platforms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Source-generated COM interop (GeneratedComInterface/Class) and LibraryImport emit unsafe code. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <UseWinUI>false</UseWinUI>
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <EnableMsixTooling>false</EnableMsixTooling>
+    <!-- COM server: the public name is ServerAlyzer.WidgetProvider.exe. -->
+    <AssemblyName>ServerAlyzer.WidgetProvider</AssemblyName>
+    <RootNamespace>ServerMonitor.WidgetProvider</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.3.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ServerMonitor.WidgetContract\ServerMonitor.WidgetContract.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="ServerMonitor.WidgetProvider.Tests" />
+  </ItemGroup>
+
+</Project>
