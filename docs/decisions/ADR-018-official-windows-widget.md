@@ -135,6 +135,41 @@ final S/M/L nem a ativação/deep-link da app (slices seguintes).
   chamada `host.Update` síncrona genuinamente presa além do timeout pode completar após o revoke
   (inofensivo, isolada por try/catch). Ambos exigem validação no board real (NOT_RUN aqui).
 
+## Fase 1 — Slice 3 (UI final do widget / rendering Adaptive Card)
+
+Constrói a experiência visual final para small/medium/large. Não implementa ainda ativação/deep-link da
+app (Slice 4).
+
+- **Pipeline (§24):** `WidgetSnapshot` → `WidgetViewModelBuilder` (puro) → `WidgetViewModel` →
+  `WidgetCardRenderer` → Adaptive Card 1.5 (template self-contained, data `{}`). Ordenação em
+  `WidgetOrdering`; localização em `WidgetStrings`.
+- **Tamanhos (§6):** layouts distintos. **Small** = resumo (overall + counts + freshness, sem linhas de
+  servidor). **Medium** = header + counts + freshness + até **3** servidores. **Large** = header + counts
+  + freshness + até **6** servidores. Overflow = **"+N more"** (localizado). A linha de counts aparece em
+  Medium E Large para nunca esconder uma severidade cortada pelo cap nem deixar o "hero" de estado ler
+  como "app offline".
+- **Ordenação (§10):** problemas primeiro — Offline > Critical > Warning > Unknown > Healthy — depois
+  DisplayName ordinal, depois Id opaco (tiebreak total, estável entre updates).
+- **Health (§4/§18/§39):** texto + cor, nunca só cor. AC semantic colours (host-themed light/dark, sem hex
+  fixo): Healthy=`good`, Warning=`warning`, Critical/Offline=`attention` (distinguidos pelo LABEL), Unknown/
+  neutral=`default`. Brand `#1846E1` = `accent` **só** no nome ServerAlyzer, nunca health.
+- **Frescura (§12/§23):** texto relativo derivado de `generatedAtUtc` no render ("Updated 4 min ago"),
+  distinto de health; stale nunca escala health. Sem timer novo — repinta no lifecycle existente.
+- **Métricas (§19/§20):** percentagem inteira arredondada; null = "—" (nunca 0%); clamp [0,100]. Linha de
+  métricas localizada (CPU/Memory/Disk).
+- **Estados (§13/§14):** Empty (snapshot válido, 0 servidores) distinto de Unavailable (sem snapshot);
+  ambos cards neutros válidos.
+- **Privacidade (§15):** só nome amigável sanitizado (truncado em fronteira de rune; vazio → label neutra
+  "Server"/"Servidor", nunca IP/host) + percents normalizados; Id opaco nunca renderizado.
+- **Localização (§16/§17):** en-US/pt-BR/pt-PT via `WidgetStrings` leve (sem resx/stack da App); cultura
+  de `CurrentUICulture`, default en; counts com concordância singular/plural. Segurança: card construído
+  com `JsonNode` + `JavaScriptEncoder.Create(UnicodeRanges.All)` (acentos legíveis, structural/HTML chars
+  escapados); formato de counts só recebe inteiros.
+- **Reviews:** Prism visual **APROVADO** (S/M/L, l10n, semântica, a11y — 4 Medium corrigidos: labels de
+  métrica localizados, "+N more", counts line no Medium, plural). Vigil security **C0/H0/M0/L0**. Atlas
+  reliability **C0/H0/M0** (determinismo, sem estado mutável de tamanho, falha de render contida, sem
+  timer). Runtime board = NOT_RUN; preview via Adaptive Cards designer (cards de teste válidos gerados).
+
 ## Modos de falha (leitura)
 
 Cache ausente → estado indisponível. `schemaVersion` desconhecido / conteúdo corrupto / sobredimensionado

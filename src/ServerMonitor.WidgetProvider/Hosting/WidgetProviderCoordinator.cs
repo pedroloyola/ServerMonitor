@@ -236,8 +236,10 @@ public sealed class WidgetProviderCoordinator
             }
 
             var read = _reader.Read();
-            var freshness = WidgetFreshness.Evaluate(read, _timeProvider.GetUtcNow(), _staleThreshold);
-            var card = WidgetTemplateBuilder.Build(read, freshness, widget.Size);
+            var now = _timeProvider.GetUtcNow();
+            var strings = WidgetStrings.Current();
+            var viewModel = WidgetViewModelBuilder.Build(read, widget.Size, now, strings, _staleThreshold);
+            var card = WidgetCardRenderer.Render(viewModel);
             _host.Update(widget.WidgetId, card.TemplateJson, card.DataJson);
         }
         catch (Exception exception)
