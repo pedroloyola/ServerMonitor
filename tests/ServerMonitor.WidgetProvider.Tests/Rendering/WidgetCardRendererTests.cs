@@ -17,14 +17,15 @@ public sealed class WidgetCardRendererTests
         "AdaptiveCard", "TextBlock", "ColumnSet", "Column", "Container", "Action.Execute"
     };
 
-    private static WidgetServerState Server(string name, WidgetHealth health, Guid? id = null) => new()
+    private static WidgetServerState Server(string name, WidgetHealth health, Guid? id = null,
+        double? cpu = 12, double? mem = 34, double? disk = 56) => new()
     {
         Id = id ?? Guid.NewGuid(),
         DisplayName = name,
         Health = health,
-        CpuUsagePercent = 12,
-        MemoryUsagePercent = 34,
-        DiskUsagePercent = 56,
+        CpuUsagePercent = cpu,
+        MemoryUsagePercent = mem,
+        DiskUsagePercent = disk,
         LastUpdatedUtc = Now
     };
 
@@ -357,32 +358,162 @@ public sealed class WidgetCardRendererTests
         Assert.Contains(En.Offline.ToUpperInvariant(), json);
     }
 
-    [Fact]
-    public void Meter_fill_is_magnitude_neutral_accent_not_health_coloured()
+    // ---- M13-QA-6: the meter is glyph runs with FOREGROUND colours, not styled container backgrounds ----
+
+    private const string TickFilled = "\u25AE";
+    private const string TickEmpty = "\u25AF";
+
+    private static bool IsTicks(string text, string glyph) =>
+        text.Length > 0 && text.All(c => c.ToString() == glyph);
+
+    // Every TextBlock made purely of tick glyphs, with its colour role and subtlety.
+    private static List<(string Text, string? Color, bool Subtle)> TickRuns(JsonElement el)
     {
-        // The meter fill is a magnitude-neutral "accent" Container style regardless of health; health lives
-        // only on the "● Health" chip. A critical server must NOT tint its meters red (Prism M2).
-        // For a Critical server the meter fill must still be the magnitude-neutral "accent" (the fleet bar
-        // legitimately uses health colours, but the per-metric meters must not). The healthy server below
-        // has NO health-coloured containers at all, so its meter fill is unambiguously accent.
-        var critical = Render(Read(Server("db", WidgetHealth.Critical)), WidgetSizeHint.Medium).TemplateJson;
-        using (var doc = JsonDocument.Parse(critical))
+        var runs = new List<(string, string?, bool)>();
+        Walk(el);
+        return runs;
+
+        void Walk(JsonElement e)
         {
-            var styles = new List<string>();
-            CollectContainerStyles(doc.RootElement, styles);
-            Assert.Contains("accent", styles); // meters still use accent even for a critical server
+            if (e.ValueKind == JsonValueKind.Object)
+            {
+                if (e.TryGetProperty("type", out var t) && t.GetString() == "TextBlock"
+                    && e.TryGetProperty("text", out var tx) && tx.GetString() is { Length: > 0 } text
+                    && (IsTicks(text, TickFilled) || IsTicks(text, TickEmpty)))
+                {
+                    var color = e.TryGetProperty("color", out var c) ? c.GetString() : null;
+                    var subtle = e.TryGetProperty("isSubtle", out var sub) && sub.GetBoolean();
+                    runs.Add((text, color, subtle));
+                }
+
+                foreach (var prop in e.EnumerateObject()) { Walk(prop.Value); }
+            }
+            else if (e.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in e.EnumerateArray()) { Walk(item); }
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(WidgetSizeHint.Medium)]
+    [InlineData(WidgetSizeHint.Large)]
+    public void Meter_uses_foreground_glyphs_not_container_background_styles(WidgetSizeHint size)
+    {
+        // The whole point of QA-6: container styles do not resolve usefully per theme in the host's light
+        // config, foreground colours do. If the meter ever returns to styled containers, this fails.
+        var root = AssertValidCard(Render(Read(Server("db", WidgetHealth.Healthy)), size).TemplateJson);
+
+        Assert.NotEmpty(TickRuns(root));
+
+        var styles = new List<string>();
+        CollectContainerStyles(root, styles);
+        Assert.DoesNotContain("accent", styles);
+        Assert.DoesNotContain("emphasis", styles);
+    }
+
+    [Fact]
+    public void Meter_fill_is_magnitude_neutral_not_health_coloured()
+    {
+        // A critical server must NOT tint its metric meters red: health lives only on the chip and on the
+        // fleet bar, which is health-coloured by design.
+        var root = AssertValidCard(Render(Read(Server("db", WidgetHealth.Critical)), WidgetSizeHint.Medium).TemplateJson);
+        var runs = TickRuns(root);
+
+        var filledMetric = runs.Where(r => IsTicks(r.Text, TickFilled) && r.Color == "accent").ToList();
+        Assert.Equal(3, filledMetric.Count);
+
+        // The only health-coloured tick run on the card is the fleet bar.
+        var healthColoured = runs.Where(r => r.Color is "attention" or "warning" or "good").ToList();
+        Assert.Single(healthColoured);
+        Assert.Equal("attention", healthColoured[0].Color);
+    }
+
+    [Fact]
+    public void Empty_track_is_outlined_and_subtle_so_it_does_not_rely_on_colour_alone()
+    {
+        var root = AssertValidCard(Render(Read(Server("db", WidgetHealth.Healthy, cpu: 30, mem: 30, disk: 30)),
+            WidgetSizeHint.Medium).TemplateJson);
+        var empty = TickRuns(root).Where(r => IsTicks(r.Text, TickEmpty)).ToList();
+
+        Assert.NotEmpty(empty);
+        foreach (var run in empty)
+        {
+            Assert.True(run.Subtle);   // muted...
+            Assert.Null(run.Color);    // ...in the default foreground, never a health or accent role
+        }
+    }
+
+    [Theory]
+    [InlineData(0, 0)]
+    [InlineData(1, 1)]     // any non-zero magnitude lights at least one tick
+    [InlineData(30, 3)]
+    [InlineData(55, 6)]    // ceil
+    [InlineData(100, 10)]
+    public void Filled_tick_count_tracks_magnitude(int percent, int expectedFilled)
+    {
+        var root = AssertValidCard(Render(Read(
+            Server("db", WidgetHealth.Healthy, cpu: percent, mem: percent, disk: percent)),
+            WidgetSizeHint.Medium).TemplateJson);
+
+        var runs = TickRuns(root);
+        var filled = runs.Where(r => r.Color == "accent").ToList();
+        var empty = runs.Where(r => IsTicks(r.Text, TickEmpty)).ToList();
+
+        if (expectedFilled == 0)
+        {
+            Assert.Empty(filled);
+        }
+        else
+        {
+            Assert.Equal(3, filled.Count);
+            Assert.All(filled, r => Assert.Equal(expectedFilled, r.Text.Length));
         }
 
-        var healthy = Render(Read(Server("ok", WidgetHealth.Healthy)), WidgetSizeHint.Medium).TemplateJson;
-        using (var doc = JsonDocument.Parse(healthy))
+        // Filled + empty always spans the whole track: the bar never shrinks.
+        if (expectedFilled < 10)
         {
-            var styles = new List<string>();
-            CollectContainerStyles(doc.RootElement, styles);
-            // A healthy fleet's only "coloured" container is the good fleet tick; meters are accent/emphasis.
-            Assert.DoesNotContain("attention", styles);
-            Assert.DoesNotContain("warning", styles);
-            Assert.Contains("accent", styles);
+            Assert.Equal(3, empty.Count);
+            Assert.All(empty, r => Assert.Equal(10 - expectedFilled, r.Text.Length));
         }
+    }
+
+    [Fact]
+    public void Unknown_metric_renders_an_all_empty_track_and_never_invents_zero()
+    {
+        var root = AssertValidCard(Render(Read(
+            Server("db", WidgetHealth.Healthy, cpu: null, mem: null, disk: null)),
+            WidgetSizeHint.Medium).TemplateJson);
+
+        var runs = TickRuns(root);
+        Assert.DoesNotContain(runs, r => r.Color == "accent");
+        Assert.Equal(3, runs.Count(r => IsTicks(r.Text, TickEmpty) && r.Text.Length == 10));
+        // And the number itself is the unknown placeholder, not "0".
+        Assert.Contains(En.MetricUnknown, AllTexts(root));
+    }
+
+    [Fact]
+    public void Fleet_bar_uses_health_foreground_colours_one_tick_per_server()
+    {
+        var root = AssertValidCard(Render(Read(
+            Server("a", WidgetHealth.Healthy),
+            Server("b", WidgetHealth.Healthy),
+            Server("c", WidgetHealth.Warning),
+            Server("d", WidgetHealth.Critical),
+            Server("e", WidgetHealth.Offline)), WidgetSizeHint.Small).TemplateJson);
+
+        // Small renders no server rows, so every tick run on this card belongs to the fleet bar.
+        var runs = TickRuns(root);
+        Assert.Equal(2, runs.Single(r => r.Color == "good").Text.Length);       // 2 healthy
+        Assert.Equal(1, runs.Single(r => r.Color == "warning").Text.Length);    // 1 warning
+        Assert.Equal(2, runs.Single(r => r.Color == "attention").Text.Length);  // critical + offline
+        Assert.Equal(5, runs.Sum(r => r.Text.Length));                          // one tick per server
+
+        var styles = new List<string>();
+        CollectContainerStyles(root, styles);
+        Assert.DoesNotContain("good", styles);
+        Assert.DoesNotContain("warning", styles);
+        Assert.DoesNotContain("attention", styles);
     }
 
     private static void CollectContainerStyles(JsonElement el, List<string> styles)

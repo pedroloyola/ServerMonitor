@@ -36,10 +36,21 @@ public static class WidgetCardRenderer
 
     private const string Dot = "●";           // status glyph
     private const int MeterSegments = 10;      // ticks per metric meter
-    private const string MeterHeight = "14px"; // meter tick height
-    private const string MeterGap = "2px";     // transparent gap between meter ticks (full-bleed comb)
-    private const string FleetHeight = "8px";  // fleet-bar tick height
-    private const string FleetGap = "4px";     // gap between fleet-bar ticks
+
+    // M13-QA-6. The meters used Container BACKGROUND styles ("accent" filled, "emphasis" empty). Container
+    // styles are the one part of the palette the host does not resolve usefully per theme: in its light
+    // config both land on near-white, measured at 1.16:1 filled-vs-empty and 1.25:1 filled-vs-background,
+    // so the instrument that carries magnitude read as an empty bar for every light-theme user. The fleet
+    // bar had the same failure for the same reason.
+    //
+    // Text FOREGROUND colours DO resolve per theme - that is why every label on this card stays legible in
+    // both. So the ticks are glyphs in a TextBlock now, buying correct per-theme contrast from the host
+    // instead of fighting it. Filled and empty differ by BOTH luminance and shape (solid vs outlined), so
+    // the distinction does not rest on colour alone and survives High Contrast.
+    private const string TickFilled = "▮";      // black vertical rectangle
+    private const string TickEmpty = "▯";       // white (outlined) vertical rectangle
+    private const string MeterSize = "Default";     // metric meter glyph size
+    private const string FleetSize = "Default";     // fleet-bar glyph size
 
     public static WidgetCard Render(WidgetViewModel vm)
     {
@@ -83,7 +94,7 @@ public static class WidgetCardRenderer
             NumberUnit(number, unit, "ExtraLarge", "Medium", vm.OverallHealthColor, unitSubtle: false),
             Text(vm.HeroLabel.ToUpperInvariant(), size: "Small", weight: "Bolder", color: vm.OverallHealthColor,
                 spacingNone: true),
-            FleetBar(vm, FleetHeight),
+            FleetBar(vm, FleetSize),
             Freshness(vm)
         };
     }
@@ -178,7 +189,7 @@ public static class WidgetCardRenderer
                 Column("stretch", new JsonArray
                 {
                     labelRow,
-                    FleetBar(vm, large ? "12px" : FleetHeight)
+                    FleetBar(vm, large ? "Medium" : FleetSize)
                 }, verticalAlignment: "Center", spacing: "Medium")
             }
         };
@@ -267,7 +278,7 @@ public static class WidgetCardRenderer
         var items = new JsonArray
         {
             NumberUnit(number, unit, "Large", "Small", color: null, unitSubtle: true),
-            Meter(fraction, large ? "16px" : MeterHeight),
+            Meter(fraction, large ? "Medium" : MeterSize),
             Text(label.ToUpperInvariant(), size: "Small", subtle: true, spacingNone: true)
         };
 
@@ -314,41 +325,57 @@ public static class WidgetCardRenderer
         };
     }
 
-    // Native segmented tick meter (the instrument): stretch tick columns interleaved with fixed-pixel gap
-    // columns so ticks run full-bleed (Prism). Magnitude is the FILLED-SEGMENT COUNT; fill = magnitude-neutral
-    // "accent" (never collides with health, which lives only on the chip). Empty track = "emphasis". Fill
-    // rule: ceil(pct/step), min 1 lit tick when pct > 0. Unknown (fraction < 0) = all-empty track (§19).
-    private static JsonObject Meter(double fraction, string height)
+    // The instrument. Magnitude is the FILLED-TICK COUNT; the fill stays magnitude-neutral (health lives
+    // only on the chip). Fill rule: ceil(pct/step), min 1 lit tick when pct > 0. Unknown (fraction < 0) =
+    // all-empty track (§19). See the TickFilled/TickEmpty note for why these are glyphs and not styled
+    // container backgrounds (M13-QA-6).
+    private static JsonObject Meter(double fraction, string size)
     {
         var filled = FilledSegments(fraction, MeterSegments);
-        var columns = new JsonArray();
-        for (var i = 0; i < MeterSegments; i++)
-        {
-            if (i > 0)
+        return GlyphBar(
+            new[]
             {
-                columns.Add(Gap(MeterGap));
-            }
-
-            columns.Add(TickColumn(i < filled ? "accent" : "emphasis", height));
-        }
-
-        return new JsonObject
-        {
-            ["type"] = "ColumnSet",
-            ["spacing"] = "Small",
-            ["columns"] = columns
-        };
+                (Repeat(TickFilled, filled), "accent", false),
+                (Repeat(TickEmpty, MeterSegments - filled), (string?)null, true)
+            },
+            size);
     }
 
-    // Fleet bar: one tick per server coloured by health (worst-first), separated by fixed-pixel gaps.
-    private static JsonObject FleetBar(WidgetViewModel vm, string height)
+    // Fleet bar: one tick per server, worst-first, in health FOREGROUND colours. The fleet bar IS
+    // health-coloured by design, unlike the metric meters - but it had the same light-theme failure for the
+    // same reason, so it moves to glyphs too. Unknown has no health colour and uses the subtle foreground.
+    private static JsonObject FleetBar(WidgetViewModel vm, string size) => GlyphBar(
+        new[]
+        {
+            (Repeat(TickFilled, vm.CriticalCount + vm.OfflineCount), "attention", false),
+            (Repeat(TickFilled, vm.WarningCount), "warning", false),
+            (Repeat(TickFilled, vm.UnknownCount), (string?)null, true),
+            (Repeat(TickFilled, vm.HealthyCount), "good", false)
+        },
+        size);
+
+    // A row of tick glyphs built from coloured runs. Each run is its own TextBlock in an auto column with
+    // no spacing, so the runs read as one continuous bar while each keeps its own foreground colour - which
+    // is the whole point: foreground colours are the part of the palette the host resolves correctly in
+    // both themes.
+    private static JsonObject GlyphBar(IEnumerable<(string Text, string? Color, bool Subtle)> runs, string size)
     {
         var columns = new JsonArray();
-        var index = 0;
-        AddFleet(columns, vm.CriticalCount + vm.OfflineCount, "attention", height, ref index);
-        AddFleet(columns, vm.WarningCount, "warning", height, ref index);
-        AddFleet(columns, vm.UnknownCount, "emphasis", height, ref index);
-        AddFleet(columns, vm.HealthyCount, "good", height, ref index);
+        foreach (var (text, color, subtle) in runs)
+        {
+            if (text.Length == 0)
+            {
+                continue;
+            }
+
+            columns.Add(Column("auto", new JsonArray
+            {
+                Text(text, size: size, weight: "Bolder", color: color, subtle: subtle, spacingNone: true)
+            }, spacingNone: true));
+        }
+
+        // Trailing stretch keeps the bar left-aligned in its cell.
+        columns.Add(Column("stretch", new JsonArray(), spacingNone: true));
 
         return new JsonObject
         {
@@ -356,21 +383,10 @@ public static class WidgetCardRenderer
             ["spacing"] = "Small",
             ["columns"] = columns
         };
-
-        static void AddFleet(JsonArray columns, int count, string style, string height, ref int index)
-        {
-            for (var n = 0; n < count; n++)
-            {
-                if (index > 0)
-                {
-                    columns.Add(Gap(FleetGap));
-                }
-
-                columns.Add(TickColumn(style, height));
-                index++;
-            }
-        }
     }
+
+    private static string Repeat(string glyph, int count) =>
+        count <= 0 ? string.Empty : string.Concat(Enumerable.Repeat(glyph, count));
 
     private static int FilledSegments(double fraction, int segments)
     {
@@ -388,32 +404,6 @@ public static class WidgetCardRenderer
         return Math.Clamp(filled, 0, segments);
     }
 
-    // A stretch column holding a styled, fixed-height container (one tick).
-    private static JsonObject TickColumn(string style, string height) => new()
-    {
-        ["type"] = "Column",
-        ["width"] = "stretch",
-        ["spacing"] = "None",
-        ["items"] = new JsonArray
-        {
-            new JsonObject
-            {
-                ["type"] = "Container",
-                ["style"] = style,
-                ["minHeight"] = height,
-                ["items"] = new JsonArray()
-            }
-        }
-    };
-
-    // A fixed-pixel transparent gap column between ticks.
-    private static JsonObject Gap(string width) => new()
-    {
-        ["type"] = "Column",
-        ["width"] = width,
-        ["spacing"] = "None",
-        ["items"] = new JsonArray()
-    };
 
     // "39%" -> ("39","%"); "—" (or any non-percent) -> (text,"") so unknown shows no unit (§19).
     private static (string Number, string Unit) SplitPercent(string text) =>
