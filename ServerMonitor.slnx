@@ -6,6 +6,11 @@
     <Project Path="src/ServerMonitor.Collectors/ServerMonitor.Collectors.csproj" />
     <Project Path="src/ServerMonitor.Core/ServerMonitor.Core.csproj" />
     <Project Path="src/ServerMonitor.Infrastructure/ServerMonitor.Infrastructure.csproj" />
+    <Project Path="src/ServerMonitor.ActivationContract/ServerMonitor.ActivationContract.csproj" />
+    <Project Path="src/ServerMonitor.WidgetContract/ServerMonitor.WidgetContract.csproj" />
+    <Project Path="src/ServerMonitor.WidgetProvider/ServerMonitor.WidgetProvider.csproj">
+      <Platform Project="x64" />
+    </Project>
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/ServerMonitor.App.Tests/ServerMonitor.App.Tests.csproj">
@@ -14,5 +19,10 @@
     <Project Path="tests/ServerMonitor.Collectors.Tests/ServerMonitor.Collectors.Tests.csproj" />
     <Project Path="tests/ServerMonitor.Core.Tests/ServerMonitor.Core.Tests.csproj" />
     <Project Path="tests/ServerMonitor.Infrastructure.Tests/ServerMonitor.Infrastructure.Tests.csproj" />
+    <Project Path="tests/ServerMonitor.ActivationContract.Tests/ServerMonitor.ActivationContract.Tests.csproj" />
+    <Project Path="tests/ServerMonitor.WidgetContract.Tests/ServerMonitor.WidgetContract.Tests.csproj" />
+    <Project Path="tests/ServerMonitor.WidgetProvider.Tests/ServerMonitor.WidgetProvider.Tests.csproj">
+      <Platform Project="x64" />
+    </Project>
   </Folder>
 </Solution>

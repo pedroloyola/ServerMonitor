@@ -30,6 +30,9 @@ public sealed class CompactServerSourceTests
 
         await vm.LoadAsync();
 
+        // LoadAsync swallows exceptions into IsOperationErrorOpen; assert the load actually succeeded so a
+        // partially-mutated VisibleServers can never false-pass a thrown-and-caught error path (L-2).
+        Assert.False(vm.IsOperationErrorOpen);
         var card = Assert.Single(vm.VisibleServers);
         Assert.Equal(visible.Id, card.Server.Id);
         Assert.True(vm.HasVisibleServers);
@@ -45,12 +48,14 @@ public sealed class CompactServerSourceTests
         var vm = CreateDashboard(service);
 
         await vm.LoadAsync();
+        Assert.False(vm.IsOperationErrorOpen);
         Assert.Empty(vm.VisibleServers);
 
         // Simulate a restore: the server is no longer hidden and the service reloads.
         service.Servers[0] = server with { IsHidden = false };
         await vm.LoadAsync();
 
+        Assert.False(vm.IsOperationErrorOpen);
         Assert.Single(vm.VisibleServers);
         Assert.True(vm.HasVisibleServers);
     }

@@ -79,6 +79,7 @@
 
                 <!-- Configured Servers -->
                 <ItemsControl
+                    x:Name="ServersItemsControl"
                     ItemsSource="{Binding VisibleServers}"
                     Visibility="{Binding HasVisibleServers, Converter={StaticResource BooleanToVisibilityConverter}}">
                     <ItemsControl.ItemTemplate>

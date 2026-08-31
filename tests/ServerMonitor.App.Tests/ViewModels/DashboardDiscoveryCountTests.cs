@@ -22,6 +22,9 @@ public sealed class DashboardDiscoveryCountTests
 
         await viewModel.LoadAsync();
 
+        // Guard against a false pass: LoadAsync swallows exceptions into IsOperationErrorOpen, so a broken
+        // load could leave DiscoveredCount at its default and still "match" a wrong expectation (L-2).
+        Assert.False(viewModel.IsOperationErrorOpen);
         Assert.Equal(2, viewModel.DiscoveredCount);
         Assert.Equal(2, viewModel.DiscoveredServers.Count);
         Assert.True(viewModel.HasDiscoveredServers);
@@ -50,6 +53,7 @@ public sealed class DashboardDiscoveryCountTests
 
         await viewModel.LoadAsync();
 
+        Assert.False(viewModel.IsOperationErrorOpen);
         Assert.Equal(1, viewModel.DiscoveredCount);
         Assert.Equal("Beta", Assert.Single(viewModel.DiscoveredServers).DisplayName);
         Assert.Equal("Devices found: 1", viewModel.DiscoveredCountAutomationName);

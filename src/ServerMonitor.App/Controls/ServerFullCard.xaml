@@ -3,6 +3,7 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:controls="using:ServerMonitor.App.Controls">
+    <Grid>
     <controls:GlassCard
         Margin="0,0,0,12"
         AutomationProperties.Name="{Binding AutomationSummary}">
@@ -302,4 +303,16 @@
             </Grid>
         </Grid>
     </controls:GlassCard>
+
+        <!-- QA-1: accent focus ring, pulsed by code-behind when this server is the widget deep-link target.
+             Non-hit-test overlay so it never intercepts input; opacity is animated from 0. -->
+        <Border
+            x:Name="FocusRing"
+            Margin="0,0,0,12"
+            BorderBrush="{ThemeResource BrandAccentBrush}"
+            BorderThickness="2"
+            CornerRadius="{StaticResource RadiusMedium}"
+            IsHitTestVisible="False"
+            Opacity="0" />
+    </Grid>
 </UserControl>

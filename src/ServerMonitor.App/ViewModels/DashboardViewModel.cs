@@ -69,6 +69,57 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
 
     public ObservableCollection<ServerCardViewModel> VisibleServers { get; } = [];
 
+    // Lazily created so the view model is robust to partial (constructor-bypassing) construction in the
+    // runtime-free contract tests, mirroring the nullable _dispatcherQueue seam above. In production this
+    // is realized on first access and then persists for the object's lifetime; PendingServerFocus starts
+    // empty, so lazy vs. eager construction is behaviorally identical.
+    private PendingServerFocus? _pendingFocus;
+    private PendingServerFocus PendingFocus => _pendingFocus ??= new();
+
+    /// <summary>
+    /// Raised when a widget deep-link asks to focus a specific server that is present in the list (§H).
+    /// The view scrolls the card into view. If the server is not (yet) loaded the request stays pending
+    /// and is retried after the next load; a removed server simply never resolves (safe fallback, §11).
+    /// </summary>
+    public event Action<ServerCardViewModel>? ServerFocusRequested;
+
+    /// <summary>Requests focus on a server by its opaque id (from a <c>serveralyzer://server/{id}</c> deep-link).</summary>
+    public void FocusServer(Guid serverId)
+    {
+        PendingFocus.Request(serverId);
+        TryApplyPendingFocus();
+    }
+
+    /// <summary>Clears any pending server focus (a dashboard deep-link supersedes an older server one, §M-3).</summary>
+    public void ClearServerFocus() => PendingFocus.Clear();
+
+    private void TryApplyPendingFocus()
+    {
+        if (!PendingFocus.HasPending)
+        {
+            return;
+        }
+
+        var currentIds = VisibleServers.Select(card => card.Server.Id).ToArray();
+        if (PendingFocus.TryResolve(currentIds) is { } id)
+        {
+            var card = VisibleServers.FirstOrDefault(card => card.Server.Id == id);
+            if (card is not null)
+            {
+                // QA-1: make the deep-link's "focus" VISIBLE — the card view pulses an accent ring so the
+                // user can see which server the widget selected, even when it is already on screen. Clearing
+                // the others keeps a single visible target.
+                foreach (var other in VisibleServers)
+                {
+                    other.IsFocusHighlighted = false;
+                }
+
+                card.IsFocusHighlighted = true;
+                ServerFocusRequested?.Invoke(card);
+            }
+        }
+    }
+
     public ObservableCollection<DiscoveredServerViewModel> DiscoveredServers { get; } = [];
 
     public ICommand AddServerCommand { get; }
@@ -301,6 +352,9 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         }
 
         HasVisibleServers = VisibleServers.Count > 0;
+
+        // A widget deep-link may have asked to focus a server before it was loaded — retry now (§18).
+        TryApplyPendingFocus();
     }
 
     private void RebuildDiscovered()

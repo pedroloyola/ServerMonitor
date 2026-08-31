@@ -15,12 +15,13 @@
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
   xmlns:com="http://schemas.microsoft.com/appx/manifest/com/windows10"
   xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
-  IgnorableNamespaces="uap rescap com desktop">
+  xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3"
+  IgnorableNamespaces="uap rescap com desktop uap3">
 
   <Identity
     Name="ServerAlyzer.Dev"
     Publisher="CN=ServerAlyzer Dev, O=ServerAlyzer Dev, C=PT"
-    Version="1.0.1.0"
+    Version="1.1.0.0"
     ProcessorArchitecture="x64" />
 
   <Properties>
@@ -63,16 +64,103 @@
         <uap:SplashScreen Image="Images\SplashScreen.png" BackgroundColor="transparent" />
       </uap:VisualElements>
       <Extensions>
+        <!-- DEV-DISTINCT notification activator CLSID (206ACD0C-…), deliberately DIFFERENT from the
+             production 4B2E9C7A-… in Package.appxmanifest. A ToastActivatorCLSID must uniquely identify the
+             app (COM CLSIDs are globally unique), so the DEV and Store packages must not both register the
+             same GUID against different executables/identities — otherwise a side-by-side install can
+             conflict at registration or misroute a persisted notification click (M13 S4.5A, Atlas H-1).
+             The activator is manifest-driven (WinAppSDK reads it from the package manifest; no code
+             hardcodes the GUID), so a DEV-specific CLSID is self-consistent. Production GUID stays immutable. -->
         <com:Extension Category="windows.comServer">
           <com:ComServer>
             <com:ExeServer Executable="ServerMonitor.App.exe" Arguments="----AppNotificationActivated:" DisplayName="ServerAlyzer (Dev)">
-              <com:Class Id="4B2E9C7A-8F3D-4E1A-9B6C-2D5F7A1E3C48" />
+              <com:Class Id="206ACD0C-2FE0-4E41-8100-0B30B162276A" />
             </com:ExeServer>
           </com:ComServer>
         </com:Extension>
         <desktop:Extension Category="windows.toastNotificationActivation">
-          <desktop:ToastNotificationActivation ToastActivatorCLSID="4B2E9C7A-8F3D-4E1A-9B6C-2D5F7A1E3C48" />
+          <desktop:ToastNotificationActivation ToastActivatorCLSID="206ACD0C-2FE0-4E41-8100-0B30B162276A" />
         </desktop:Extension>
+
+        <!-- M13 Slice 4 — widget deep-link activation (ADR-018). Registers the serveralyzer:// URI scheme
+             so a widget click (provider -> Launcher.LaunchUriAsync) activates this app, converging on the
+             single UI instance via the M12 AppInstance model. The scheme is ServerAlyzer-specific to avoid
+             collision; no new capability. DEV manifest only; the production/Store manifest gets the same
+             fragment at the widget release slice. The activation URI is untrusted-on-read (strict parser). -->
+        <uap:Extension Category="windows.protocol">
+          <uap:Protocol Name="serveralyzer">
+            <uap:DisplayName>ServerAlyzer</uap:DisplayName>
+          </uap:Protocol>
+        </uap:Extension>
+
+        <!-- M13 Slice 2 — out-of-process Windows Widget provider (ADR-018). DEV manifest only for local
+             sideload/QA; the production Store manifest stays untouched until the widget release slice.
+             CLSID 78CFFBEF-7A95-4400-BB8B-A2376C6642C3 is dedicated to the widget provider and distinct
+             from the notification activator CLSID above. MinVersion stays 10.0.22000.0: on 21H2 the
+             AppExtension is inert (no Widgets host enumerates it), on 22H2+ the board activates the
+             provider via CreateInstance (Phase 0.5, Option A). Icons/screenshots reuse existing assets as
+             minimal placeholders; final art is a later slice. -->
+        <com:Extension Category="windows.comServer">
+          <com:ComServer>
+            <com:ExeServer Executable="ServerAlyzer.WidgetProvider.exe" DisplayName="ServerAlyzer Widget Provider (Dev)">
+              <com:Class Id="78CFFBEF-7A95-4400-BB8B-A2376C6642C3" />
+            </com:ExeServer>
+          </com:ComServer>
+        </com:Extension>
+        <uap3:Extension Category="windows.appExtension">
+          <uap3:AppExtension Name="com.microsoft.windows.widgets"
+                             Id="ServerAlyzerWidgetProvider"
+                             PublicFolder="Public"
+                             DisplayName="ServerAlyzer (Dev)">
+            <uap3:Properties>
+              <WidgetProvider>
+                <ProviderIcons>
+                  <Icon Path="Public\ServerAlyzerWidgetIcon.png" />
+                </ProviderIcons>
+                <Activation>
+                  <CreateInstance ClassId="78CFFBEF-7A95-4400-BB8B-A2376C6642C3" />
+                </Activation>
+                <Definitions>
+                  <Definition Id="ServerAlyzer_Widget"
+                              DisplayName="ServerAlyzer"
+                              Description="Local server health at a glance."
+                              AllowMultiple="true">
+                    <Capabilities>
+                      <Capability><Size Name="small" /></Capability>
+                      <Capability><Size Name="medium" /></Capability>
+                      <Capability><Size Name="large" /></Capability>
+                    </Capabilities>
+                    <ThemeResources>
+                      <Icons>
+                        <Icon Path="Public\ServerAlyzerWidgetIcon.png" />
+                      </Icons>
+                      <!-- Required fallback, used when a theme-specific screenshot is absent. -->
+                      <Screenshots>
+                        <Screenshot Path="Public\ServerAlyzerWidgetScreenshot.png"
+                                    DisplayAltText="Widget do ServerAlyzer a mostrar a saúde e as métricas de dois servidores." />
+                      </Screenshots>
+                      <!-- The picker follows the system theme. Without these, a light-theme user sees a dark
+                           rectangle among light previews at the exact moment they decide whether to add the
+                           widget (Prism M3). Dark reuses the fallback; light has its own capture. -->
+                      <DarkMode>
+                        <Screenshots>
+                          <Screenshot Path="Public\ServerAlyzerWidgetScreenshot.png"
+                                      DisplayAltText="Widget do ServerAlyzer a mostrar a saúde e as métricas de dois servidores." />
+                        </Screenshots>
+                      </DarkMode>
+                      <LightMode>
+                        <Screenshots>
+                          <Screenshot Path="Public\ServerAlyzerWidgetScreenshotLight.png"
+                                      DisplayAltText="Widget do ServerAlyzer a mostrar a saúde e as métricas de dois servidores." />
+                        </Screenshots>
+                      </LightMode>
+                    </ThemeResources>
+                  </Definition>
+                </Definitions>
+              </WidgetProvider>
+            </uap3:Properties>
+          </uap3:AppExtension>
+        </uap3:Extension>
       </Extensions>
     </Application>
   </Applications>

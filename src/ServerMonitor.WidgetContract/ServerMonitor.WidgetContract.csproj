@@ -1,0 +1,16 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    M13 widget wire contract (ADR-018). A small, dependency-free leaf assembly: the persisted
+    widget-state.json schema, its validator, serializer, sanitizer, and health precedence. It
+    references NO Core/Infrastructure/Collectors, so the future out-of-process widget provider
+    (ServerAlyzer.WidgetProvider.exe) can reference it ALONE — no SSH, no engine (§26/§27).
+    Plain net10.0 (no Windows TFM): it is pure logic and must stay broadly consumable and testable.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

@@ -22,12 +22,18 @@ using ServerMonitor.Infrastructure.Persistence;
 using ServerMonitor.Infrastructure.Security;
 using ServerMonitor.Infrastructure.SSH;
 using ServerMonitor.App.Windowing;
+using ServerMonitor.WidgetContract;
+using ServerMonitor.ActivationContract;
 
 namespace ServerMonitor.App;
 
 public partial class App : Application
 {
     private Window? _mainWindow;
+
+    // Converges widget/protocol activation onto the single UI instance (ADR-018 §4). The executor runs
+    // the navigation on the UI thread; the router buffers an intent that arrives before the shell is ready.
+    private readonly ActivationRouter _activationRouter;
 
     public App()
     {
@@ -165,14 +171,32 @@ public partial class App : Application
                     services.AddSingleton<IWorkloadRefreshCoordinator>(sp =>
                         sp.GetRequiredService<WorkloadCollectorService>());
 
-                    // Fan-out: the engine sees a single observer; history (M10) and workloads (M11)
-                    // both ride the cycle, isolated from each other (§38). History is first so its
-                    // behavior is unchanged.
+                    // M13 widget snapshot (ADR-018 Slice 1): the recorder rides the SAME cycle signal
+                    // (no new timer/worker, §14/§15), builds a sanitized fleet snapshot from the live
+                    // stores, and writes %LOCALAPPDATA%\ServerMonitor\widget-state.json atomically. It is
+                    // best-effort and failure-isolated: a write fault never touches monitoring (§16). The
+                    // out-of-process widget provider (later slices) reads this file; nothing here starts
+                    // COM/SSH/a second engine.
+                    services.AddSingleton(WidgetStateOptions.ForCurrentUser());
+                    services.AddSingleton<IWidgetStateWriter>(sp => new AtomicWidgetStateWriter(
+                        sp.GetRequiredService<WidgetStateOptions>(),
+                        sp.GetRequiredService<ILogger<AtomicWidgetStateWriter>>()));
+                    services.AddSingleton(sp => new WidgetSnapshotRecorder(
+                        sp.GetRequiredService<IServerService>(),
+                        sp.GetRequiredService<IServerMonitoringStateStore>(),
+                        sp.GetRequiredService<IServerMetricsStore>(),
+                        sp.GetRequiredService<IWidgetStateWriter>(),
+                        sp.GetRequiredService<ILogger<WidgetSnapshotRecorder>>()));
+
+                    // Fan-out: the engine sees a single observer; history (M10), workloads (M11), and the
+                    // M13 widget snapshot all ride the cycle, each isolated from the others (§38). History
+                    // is first so its behavior is unchanged; the widget recorder is last (pure consumer).
                     services.AddSingleton<IMonitoringCycleObserver>(sp => new CompositeMonitoringCycleObserver(
                         new IMonitoringCycleObserver[]
                         {
                             sp.GetRequiredService<HistoryRecorder>(),
-                            sp.GetRequiredService<WorkloadCadenceObserver>()
+                            sp.GetRequiredService<WorkloadCadenceObserver>(),
+                            sp.GetRequiredService<WidgetSnapshotRecorder>()
                         },
                         sp.GetRequiredService<ILogger<CompositeMonitoringCycleObserver>>()));
 
@@ -279,23 +303,79 @@ public partial class App : Application
         ServicesHost.Services
             .GetRequiredService<ILocalizationService>()
             .InitializeFromSystem();
+        _activationRouter = new ActivationRouter(ExecuteActivationIntent);
+        // Attach the router to the single activation hand-off now that it exists: this atomically flushes
+        // the latest intent buffered before this App object was built (the cold launch, or a redirect that
+        // raced construction). The router buffers it internally until the shell signals ready (§M-1).
+        Program.AttachActivationConsumer(_activationRouter.Route);
         InitializeComponent();
+    }
+
+    /// <summary>
+    /// Runs one activation intent on the UI thread: navigate to the dashboard, and for an OpenServer
+    /// deep-link ask the dashboard to focus that server (best-effort; a removed server just shows the
+    /// dashboard, §11). All navigation converges here — the widget never opens a second UI (§6).
+    /// </summary>
+    private void ExecuteActivationIntent(ActivationIntent intent)
+    {
+        var window = _mainWindow;
+        if (window is null)
+        {
+            return; // shell not ready; the router only executes after MarkReady, so this is defensive
+        }
+
+        window.DispatcherQueue.TryEnqueue(() =>
+        {
+            try
+            {
+                // QA-2: a widget activation must SURFACE the Dashboard even if the app is in Compact mode.
+                // RestoreAndActivate preserves the current presentation, so a Compact window would stay
+                // Compact and never show the Dashboard/server. Force Standard first (Compact → Standard →
+                // Dashboard → focus). No-op when already Standard; single-instance invariants are unchanged.
+                var windowMode = ServicesHost.Services.GetRequiredService<IWindowModeCoordinator>();
+                if (windowMode.CurrentMode == WindowMode.Compact)
+                {
+                    windowMode.SwitchTo(WindowMode.Standard);
+                }
+
+                ServicesHost.Services.GetRequiredService<IApplicationWindowController>().RestoreAndActivate();
+                ServicesHost.Services.GetRequiredService<INavigationService>().GoToDashboard();
+
+                var dashboard = ServicesHost.Services.GetRequiredService<DashboardViewModel>();
+                if (intent.Kind == ActivationIntentKind.OpenServer && intent.ServerId is { } serverId)
+                {
+                    dashboard.FocusServer(serverId);
+                }
+                else
+                {
+                    // A dashboard intent supersedes an older, still-pending server-focus request (§M-3).
+                    dashboard.ClearServerFocus();
+                }
+            }
+            catch (Exception exception)
+            {
+                ServicesHost.Services.GetRequiredService<ILogger<App>>()
+                    .LogError(exception, "Server Monitor could not process a widget activation.");
+            }
+        });
     }
 
     public static IHost ServicesHost { get; private set; } = null!;
 
     /// <summary>
-    /// Invoked when a second launch (or a redirected notification activation) is forwarded to this,
-    /// the single primary instance (M12/ADR-017 §6). Restores and foregrounds the one authoritative
-    /// window in its current presentation (Standard / Compact / tray) — never creating another.
-    /// Marshals to the UI thread because the AppInstance.Activated event fires off it.
+    /// Invoked when a second launch (or a redirected notification activation) is forwarded to this, the
+    /// single primary instance (M12/ADR-017 §6). Restores and foregrounds the one authoritative window in
+    /// its current presentation (Standard / Compact / tray) — never creating another. Any deep-link intent
+    /// is routed separately through the activation hand-off (see <c>Program.OnActivated</c>), so this only
+    /// restores the window. Marshals to the UI thread because <c>AppInstance.Activated</c> fires off it.
     /// </summary>
-    public void HandleRedirectedActivation()
+    public void RestoreOnRedirect()
     {
         var window = _mainWindow;
         if (window is null)
         {
-            // Activation arrived before the shell finished starting; the launch itself will show it.
+            // Activation arrived before the shell finished starting; the launch itself will show it, and
+            // the router drains the buffered intent once ready.
             return;
         }
 
@@ -335,6 +415,12 @@ public partial class App : Application
             _mainWindow = ServicesHost.Services.GetRequiredService<MainWindow>();
             await ServicesHost.StartAsync();
             _mainWindow.Activate();
+
+            // The shell is ready: drain the single latest activation intent. Everything — this cold launch's
+            // own activation and every redirect that arrived during startup — has already been funneled
+            // through the one hand-off into the router, so exactly the most recent intent runs, once, with a
+            // single consistent ordering (§M-1). No cold re-read, no second claim.
+            _activationRouter.MarkReady();
 
             ServicesHost.Services
                 .GetRequiredService<ILogger<App>>()
