@@ -23,7 +23,8 @@
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
   xmlns:com="http://schemas.microsoft.com/appx/manifest/com/windows10"
   xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
-  IgnorableNamespaces="uap rescap com desktop">
+  xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3"
+  IgnorableNamespaces="uap rescap com desktop uap3">
 
   <Identity
     Name="PedroLoy.ServerAlyzer"
@@ -89,6 +90,77 @@
         <desktop:Extension Category="windows.toastNotificationActivation">
           <desktop:ToastNotificationActivation ToastActivatorCLSID="4B2E9C7A-8F3D-4E1A-9B6C-2D5F7A1E3C48" />
         </desktop:Extension>
+
+        <!-- M13 / ADR-018 - Windows 11 widget deep-link activation. Registers the serveralyzer:// URI
+             scheme so a widget click (provider -> Launcher.LaunchUriAsync) activates this app, converging
+             on the single UI instance through the M12 AppInstance model. The scheme is ServerAlyzer-
+             specific to avoid collision and adds no capability. The activation URI is treated as
+             untrusted on read (strict fail-closed parser) and the server id is re-validated against the
+             app's own store before anything is focused. -->
+        <uap:Extension Category="windows.protocol">
+          <uap:Protocol Name="serveralyzer">
+            <uap:DisplayName>ServerAlyzer</uap:DisplayName>
+          </uap:Protocol>
+        </uap:Extension>
+
+        <!-- M13 / ADR-018 - out-of-process Windows Widget provider. A SECOND, dedicated COM ExeServer:
+             ServerAlyzer.WidgetProvider.exe, distinct from the notification activator above in both
+             executable and CLSID. The provider reads only the sanitized widget snapshot; it never
+             references Core/Infrastructure/Collectors, so it holds no SSH, no engine and no credentials.
+             CLSID 78CFFBEF-... is FROZEN from this release on: changing it orphans pinned widgets. -->
+        <com:Extension Category="windows.comServer">
+          <com:ComServer>
+            <com:ExeServer Executable="ServerAlyzer.WidgetProvider.exe" DisplayName="ServerAlyzer Widget Provider">
+              <com:Class Id="78CFFBEF-7A95-4400-BB8B-A2376C6642C3" />
+            </com:ExeServer>
+          </com:ComServer>
+        </com:Extension>
+
+        <!-- Widget registration read by the Windows 11 Widgets board (ADR-018, Option A). MinVersion
+             stays 10.0.22000.0: declaring uap3:AppExtension is valid far below that floor and uap3:
+             Properties is opaque XML the OS does not consume - only a host app does. On Windows 11 21H2
+             no Widgets host enumerates it, so the extension is inert and the COM factory is never
+             activated; on 22H2+ (build 22621.1413+) the board enumerates it and the widget becomes
+             available. The feature gate is the host, not artificial code.
+             AppExtension Id and Definition Id are FROZEN from this release on, together with the CLSID
+             above: pinned widgets are keyed by package family name + AppExtension Id + Definition Id. -->
+        <uap3:Extension Category="windows.appExtension">
+          <uap3:AppExtension Name="com.microsoft.windows.widgets"
+                             Id="ServerAlyzerWidgetProvider"
+                             PublicFolder="Public"
+                             DisplayName="ServerAlyzer">
+            <uap3:Properties>
+              <WidgetProvider>
+                <ProviderIcons>
+                  <Icon Path="Public\ServerAlyzerWidgetIcon.png" />
+                </ProviderIcons>
+                <Activation>
+                  <CreateInstance ClassId="78CFFBEF-7A95-4400-BB8B-A2376C6642C3" />
+                </Activation>
+                <Definitions>
+                  <Definition Id="ServerAlyzer_Widget"
+                              DisplayName="ServerAlyzer"
+                              Description="A saúde e as métricas dos seus servidores, num relance."
+                              AllowMultiple="true">
+                    <Capabilities>
+                      <Capability><Size Name="small" /></Capability>
+                      <Capability><Size Name="medium" /></Capability>
+                      <Capability><Size Name="large" /></Capability>
+                    </Capabilities>
+                    <ThemeResources>
+                      <Icons>
+                        <Icon Path="Public\ServerAlyzerWidgetIcon.png" />
+                      </Icons>
+                      <Screenshots>
+                        <Screenshot Path="Public\ServerAlyzerWidgetScreenshot.png" />
+                      </Screenshots>
+                    </ThemeResources>
+                  </Definition>
+                </Definitions>
+              </WidgetProvider>
+            </uap3:Properties>
+          </uap3:AppExtension>
+        </uap3:Extension>
       </Extensions>
     </Application>
   </Applications>

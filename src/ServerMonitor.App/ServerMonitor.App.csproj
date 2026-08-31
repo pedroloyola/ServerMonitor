@@ -23,14 +23,19 @@
          Revision = 0 (Partner Center rejected 1.0.0.1). A Store update therefore bumps Major/Minor/
          Build and keeps Revision 0 → the M12 icon-consistency fix ships as PACKAGE version 1.0.1.0
          (both Package*.appxmanifest). Product/marketing SemVer stays 1.0.0 (first public RC). See
-         PITFALL P-016. Concept map:
-           Package/Identity Version : 1.0.1.0  (Store-valid; Revision 0)
-           FileVersion              : 1.0.1.0  (tracks the package build)
+         PITFALL P-016.
+
+         M13/ADR-018: the Windows 11 widget is a user-visible feature addition, so this is a MINOR bump,
+         not another build bump. 1.1.0.0 > 1.0.1.0, so the Store upgrade path from the shipped 1.0.1.0
+         stays valid, and product and package versions converge again (the 1.0.0-vs-1.0.1 divergence M12
+         had to accept is retired). Concept map:
+           Package/Identity Version : 1.1.0.0  (Store-valid; Revision 0)
+           FileVersion              : 1.1.0.0  (tracks the package build)
            AssemblyVersion          : 1.0.0.0  (stable project baseline; unchanged for binding safety)
-           Product SemVer / Informational : 1.0.0
-         DisplayVersion (Settings/About) = Major.Minor.Build of the *running* version: 1.0.1 when
-         packaged (reads Package.Current), 1.0.0 unpackaged/dev (assembly fallback). NÃO criar tag
-         v1.0.0 sem aprovação humana. -->
+           Product SemVer / Informational : 1.1.0
+         DisplayVersion (Settings/About) = Major.Minor.Build of the *running* version: 1.1.0 both
+         packaged (reads Package.Current) and unpackaged/dev (assembly fallback). NÃO criar tag
+         v1.1.0 sem aprovação humana. -->
     <Version>1.0.0</Version>
     <AssemblyVersion>1.0.0.0</AssemblyVersion>
     <FileVersion>1.0.1.0</FileVersion>
@@ -121,19 +126,22 @@
   </Target>
 
   <!--
-    M13 Slice 4.5A — bundle the out-of-process widget provider into the DEV widget QA package (ADR-018).
-    A single-project MSIX ships ONE app executable automatically; the provider is a SEPARATE COM ExeServer,
-    so its executable must be added to the package payload explicitly. Microsoft's documented multi-exe path
-    is a Windows Application Packaging Project (.wapproj), but the production Store package must remain a
-    single-project MSIX and immutable — so the DEV package adds the provider via supported Content inclusion.
+    M13 (ADR-018) — bundle the out-of-process widget provider into EVERY packaged build, DEV and production
+    alike. A single-project MSIX ships ONE app executable automatically; the provider is a SEPARATE COM
+    ExeServer, so its executable must be added to the package payload explicitly. Microsoft's documented
+    multi-exe path is a Windows Application Packaging Project (.wapproj), but this app is deliberately a
+    single-project MSIX — so the provider is added through supported Content inclusion instead.
     The provider is published FRAMEWORK-DEPENDENT so the whole package shares the app's single Windows App
     SDK 2.3.1 line: only the four provider-UNIQUE files (exe/dll/deps.json/runtimeconfig.json) are added at
     the package root; every WinAppSDK/WinUI/Widgets-projection dll and both contract dlls are ALREADY shipped
-    by the app, so there is NO second (self-contained) runtime payload. DEV widget QA package only — the
-    production profile never runs this target.
+    by the app, so there is NO second (self-contained) runtime payload. That is a BLOCKING release invariant
+    — audit it in the EXTRACTED package, never from this file alone.
+    DEV and production packages differ only in identity, notification-activator CLSID and display strings
+    (the two Package*.appxmanifest files); the widget payload is identical, so what board QA exercised is
+    exactly what the Store package ships.
   -->
-  <Target Name="StageWidgetProviderForDevPackage" BeforeTargets="AssignTargetPaths"
-          Condition="'$(Packaged)' == 'true' and '$(DevIdentity)' == 'true'">
+  <Target Name="StageWidgetProviderForPackage" BeforeTargets="AssignTargetPaths"
+          Condition="'$(Packaged)' == 'true'">
     <PropertyGroup>
       <WidgetProviderProject>$(MSBuildThisFileDirectory)..\ServerMonitor.WidgetProvider\ServerMonitor.WidgetProvider.csproj</WidgetProviderProject>
       <!-- Stage OUTSIDE the app's obj/bin (in the gitignored repo-level artifacts/) so the SDK never
@@ -174,8 +182,8 @@
   </Target>
 
   <!-- Public folder declared by the widget AppExtension (PublicFolder="Public"): the host-facing widget
-       icon + screenshot the manifest points at. DEV widget QA package only. -->
-  <ItemGroup Condition="'$(Packaged)' == 'true' and '$(DevIdentity)' == 'true'">
+       icon + screenshot the Widgets picker reads. Part of every packaged build, DEV and production. -->
+  <ItemGroup Condition="'$(Packaged)' == 'true'">
     <Content Include="Public\**" CopyToOutputDirectory="PreserveNewest">
       <Link>Public\%(RecursiveDir)%(Filename)%(Extension)</Link>
     </Content>
