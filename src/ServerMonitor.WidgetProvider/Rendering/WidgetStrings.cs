@@ -169,7 +169,7 @@ public sealed class WidgetStrings
         HealthyCountLabelOne = "{0} saudável",
         UnknownCountLabel = "{0} desconhecidos",
         UnknownCountLabelOne = "{0} desconhecido",
-        MoreCount = "{0} a mais",
+        MoreCount = "mais {0}",
         UpdatedJustNow = "Atualizado agora",
         UpdatedMinutesAgo = "Atualizado há {0} min",
         UpdatedHoursAgo = "Atualizado há {0} h",

@@ -19,7 +19,9 @@ public sealed record WidgetCard(string TemplateJson, string DataJson);
 /// <c>Container</c>) plus container <c>style</c> backgrounds (with fixed-pixel gap columns) for the meters —
 /// no images/HTML/SVG. <c>"header": null</c> lets the composition own the top region (that strip is not
 /// clickable, so the body carries the <c>selectAction</c> deep-links). Health is always a text label AND a
-/// colour (§18); the brand accent (#1846E1) is used ONLY for the fleet kicker (never for health, §4); the
+/// colour (§18); the accent role is used ONLY for the fleet kicker (never for health, §4) - and note that
+/// Adaptive Cards "accent" is an ENUM the host resolves to the SYSTEM accent, not our brand #1846E1, so the
+/// kicker is brand-positioned but not brand-coloured; the
 /// meter fill is magnitude-neutral accent (magnitude read by filled-tick COUNT). Layouts genuinely differ
 /// per size: Small = fleet verdict, Medium/Large = telemetry blocks.
 /// </summary>

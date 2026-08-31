@@ -343,10 +343,12 @@ public sealed class WidgetViewModelBuilderTests
             Assert.NotEqual("+3", vm.OverflowText);
             Assert.DoesNotContain("{0}", vm.OverflowText, StringComparison.Ordinal);
             // Each locale gets its own idiomatic phrasing, not a shared template with a swapped word.
+            // Both Portuguese variants say "mais 3". European Portuguese "3 a mais" would mean "3 too
+            // many", not "3 more" - the variants genuinely do not diverge here (Prism L2).
             Assert.Contains(culture switch
             {
                 "pt-BR" => "mais 3",
-                "pt-PT" => "3 a mais",
+                "pt-PT" => "mais 3",
                 _ => "3 more"
             }, vm.OverflowText, StringComparison.Ordinal);
         }
