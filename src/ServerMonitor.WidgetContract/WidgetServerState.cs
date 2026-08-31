@@ -36,6 +36,18 @@ public sealed record WidgetServerState
     /// <summary>Disk utilization 0–100, or <c>null</c> when unknown/unavailable (§19).</summary>
     public double? DiskUsagePercent { get; init; }
 
+    // Absolute memory/disk sizes in GiB (used + total), or null when unknown. These are low-sensitivity
+    // RESOURCE metrics — like the percentages above — shown only on the Large widget for richer detail
+    // ("3.1 / 8.0 GB"). They carry NO host/network/credential/OS information (§9 still holds).
+    public double? MemoryUsedGb { get; init; }
+    public double? MemoryTotalGb { get; init; }
+    public double? DiskUsedGb { get; init; }
+    public double? DiskTotalGb { get; init; }
+
+    /// <summary>Server uptime in seconds, or null when unknown — a benign resource metric shown under CPU
+    /// on the Large widget ("43d 18h"). No host/network/credential/OS information (§9 still holds).</summary>
+    public long? UptimeSeconds { get; init; }
+
     /// <summary>
     /// When this server's metrics were last successfully read (UTC), or <c>null</c> if never. The reader
     /// derives per-server freshness (fresh/stale) from this against its own clock (§22).

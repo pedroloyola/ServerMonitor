@@ -28,6 +28,13 @@ public sealed class WidgetContractSecurityTests
             nameof(WidgetServerState.CpuUsagePercent),
             nameof(WidgetServerState.MemoryUsagePercent),
             nameof(WidgetServerState.DiskUsagePercent),
+            // M13 redesign: absolute memory/disk sizes + uptime — low-sensitivity RESOURCE metrics shown
+            // on the Large widget. Deliberately allowed (NOT host/network/credential/OS — §9 still holds).
+            nameof(WidgetServerState.MemoryUsedGb),
+            nameof(WidgetServerState.MemoryTotalGb),
+            nameof(WidgetServerState.DiskUsedGb),
+            nameof(WidgetServerState.DiskTotalGb),
+            nameof(WidgetServerState.UptimeSeconds),
             nameof(WidgetServerState.LastUpdatedUtc)
         };
 
@@ -98,7 +105,8 @@ public sealed class WidgetContractSecurityTests
         {
             "schemaVersion", "generatedAtUtc", "overallHealth", "servers",
             "id", "displayName", "health", "cpuUsagePercent", "memoryUsagePercent",
-            "diskUsagePercent", "lastUpdatedUtc"
+            "diskUsagePercent", "memoryUsedGb", "memoryTotalGb", "diskUsedGb", "diskTotalGb",
+            "uptimeSeconds", "lastUpdatedUtc"
         };
 
         Assert.Equal(expected.OrderBy(k => k, StringComparer.OrdinalIgnoreCase),

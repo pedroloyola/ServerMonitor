@@ -1,4 +1,4 @@
-using ServerMonitor.WidgetContract;
+﻿using ServerMonitor.WidgetContract;
 using ServerMonitor.WidgetProvider.Hosting;
 using ServerMonitor.WidgetProvider.Reading;
 
@@ -31,7 +31,20 @@ public sealed record WidgetServerRow(
     string CpuText,
     string MemoryText,
     string DiskText,
-    string MetricsText);
+    string MetricsText)
+{
+    /// <summary>Meter fill fraction [0,1] for CPU/Memory/Disk; <c>-1</c> = unknown (render neutral/empty,
+    /// never a full or 0% bar). Powers the redesigned segmented meters; the %-text stays authoritative (§19).</summary>
+    public double CpuFraction { get; init; } = -1;
+    public double MemoryFraction { get; init; } = -1;
+    public double DiskFraction { get; init; } = -1;
+
+    /// <summary>Large-widget detail lines (empty when unknown): uptime under CPU, "used / total GB" under
+    /// Memory and Disk.</summary>
+    public string CpuDetail { get; init; } = string.Empty;
+    public string MemoryDetail { get; init; } = string.Empty;
+    public string DiskDetail { get; init; } = string.Empty;
+}
 
 /// <summary>
 /// The render-ready projection of the snapshot — the single place ordering, capping, metric formatting,
@@ -47,6 +60,23 @@ public sealed record WidgetViewModel
     public required WidgetHealth OverallHealth { get; init; }
     public required string OverallHealthLabel { get; init; }
     public required string OverallHealthColor { get; init; }
+
+    /// <summary>Redesign hero (metric-first): big fraction "healthy/total" (e.g. "2/2") + a short label
+    /// (e.g. "Saudáveis" when all healthy, else the overall health word). Colored by <see cref="OverallHealthColor"/>.</summary>
+    public string HeroValue { get; init; } = string.Empty;
+    public string HeroLabel { get; init; } = string.Empty;
+    public string FleetKicker { get; init; } = string.Empty;
+
+    // Localized category labels for the Large fleet-summary footer (plural "healthy", plus each severity).
+    public string HealthyLabel { get; init; } = string.Empty;
+    public string WarningLabel { get; init; } = string.Empty;
+    public string CriticalLabel { get; init; } = string.Empty;
+    public string OfflineLabel { get; init; } = string.Empty;
+
+    /// <summary>Localized metric labels for the redesigned meters (e.g. "CPU" / "Memória" / "Disco").</summary>
+    public string CpuLabel { get; init; } = string.Empty;
+    public string MemoryLabel { get; init; } = string.Empty;
+    public string DiskLabel { get; init; } = string.Empty;
 
     /// <summary>Short glanceable summary line (e.g. "All servers healthy").</summary>
     public required string PrimarySummary { get; init; }

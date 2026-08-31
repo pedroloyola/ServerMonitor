@@ -57,6 +57,11 @@ public static class WidgetSnapshotMapper
                 CpuUsagePercent = Normalize(metrics?.CpuUsagePercent),
                 MemoryUsagePercent = Normalize(metrics?.MemoryUsagePercent),
                 DiskUsagePercent = Normalize(metrics?.DiskUsagePercent),
+                MemoryUsedGb = Gib(metrics?.MemoryUsedBytes),
+                MemoryTotalGb = Gib(metrics?.MemoryTotalBytes),
+                DiskUsedGb = Gib(metrics?.DiskUsedBytes),
+                DiskTotalGb = Gib(metrics?.DiskTotalBytes),
+                UptimeSeconds = metrics?.Uptime is { } up && up > TimeSpan.Zero ? (long)up.TotalSeconds : null,
                 LastUpdatedUtc = state.LastSuccessAt
             });
         }
@@ -93,6 +98,10 @@ public static class WidgetSnapshotMapper
 
         return Math.Clamp(percent, 0d, 100d);
     }
+
+    // Bytes → GiB; null/negative stays null (unknown ≠ zero). A benign resource size, not sensitive.
+    private static double? Gib(long? bytes) =>
+        bytes is { } b && b >= 0 ? b / 1073741824d : null;
 
     private static IEnumerable<WidgetHealth> SelectHealth(List<WidgetServerState> servers)
     {

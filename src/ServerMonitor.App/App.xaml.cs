@@ -328,6 +328,16 @@ public partial class App : Application
         {
             try
             {
+                // QA-2: a widget activation must SURFACE the Dashboard even if the app is in Compact mode.
+                // RestoreAndActivate preserves the current presentation, so a Compact window would stay
+                // Compact and never show the Dashboard/server. Force Standard first (Compact → Standard →
+                // Dashboard → focus). No-op when already Standard; single-instance invariants are unchanged.
+                var windowMode = ServicesHost.Services.GetRequiredService<IWindowModeCoordinator>();
+                if (windowMode.CurrentMode == WindowMode.Compact)
+                {
+                    windowMode.SwitchTo(WindowMode.Standard);
+                }
+
                 ServicesHost.Services.GetRequiredService<IApplicationWindowController>().RestoreAndActivate();
                 ServicesHost.Services.GetRequiredService<INavigationService>().GoToDashboard();
 

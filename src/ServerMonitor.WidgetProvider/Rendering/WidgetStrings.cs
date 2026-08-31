@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using ServerMonitor.WidgetContract;
 
 namespace ServerMonitor.WidgetProvider.Rendering;
@@ -21,6 +21,8 @@ public sealed class WidgetStrings
 
     // Health labels (text, never colour-only — §18).
     public required string Healthy { get; init; }
+    public required string HealthyPlural { get; init; } // fleet hero label, e.g. "Saudáveis" / "Healthy"
+    public required string FleetKicker { get; init; }    // small caps accent kicker above the hero
     public required string Warning { get; init; }
     public required string Critical { get; init; }
     public required string Offline { get; init; }
@@ -92,6 +94,8 @@ public sealed class WidgetStrings
         Disk = "Disk",
         MetricUnknown = "—",
         Healthy = "Healthy",
+        HealthyPlural = "Healthy",
+        FleetKicker = "FLEET",
         Warning = "Warning",
         Critical = "Critical",
         Offline = "Offline",
@@ -121,6 +125,8 @@ public sealed class WidgetStrings
         Disk = "Disco",
         MetricUnknown = "—",
         Healthy = "Saudável",
+        HealthyPlural = "Saudáveis",
+        FleetKicker = "FROTA",
         Warning = "Alerta",
         Critical = "Crítico",
         Offline = "Offline",
@@ -150,6 +156,8 @@ public sealed class WidgetStrings
         Disk = "Disco",
         MetricUnknown = "—",
         Healthy = "Saudável",
+        HealthyPlural = "Saudáveis",
+        FleetKicker = "FROTA",
         Warning = "Alerta",
         Critical = "Crítico",
         Offline = "Offline",

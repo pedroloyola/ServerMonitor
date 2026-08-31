@@ -1,3 +1,4 @@
+﻿using System.Globalization;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -11,13 +12,16 @@ namespace ServerMonitor.WidgetProvider.Rendering;
 public sealed record WidgetCard(string TemplateJson, string DataJson);
 
 /// <summary>
-/// Renders a <see cref="WidgetViewModel"/> to an Adaptive Card (self-contained template, empty data —
-/// the card is small and re-rendered per update, §25). Uses ONLY widget-supported Adaptive Cards 1.5
-/// elements: <c>TextBlock</c>, <c>ColumnSet</c>/<c>Column</c>, <c>Container</c> and whole-card/whole-row
-/// <c>Action.Execute</c> select actions (openDashboard / openServer, the read-only deep-links of Slice 4).
-/// No images, progress bars, FactSets, or visible buttons. Health is always conveyed by a text
-/// label AND a colour (never colour alone, §18); the brand accent is used only for the ServerAlyzer name,
-/// never for health (§4). Distinct layouts per size (§6): Small = summary, Medium/Large = server rows.
+/// Renders a <see cref="WidgetViewModel"/> to an Adaptive Card 1.6 in the M13 "instrument panel" visual
+/// language (Fable design, refined against the real host): a caps accent kicker, an oversized numeric hero
+/// with a small trailing unit, and full-bleed segmented tick meters — colour used only for meaning, all
+/// top-aligned. Uses ONLY widget-supported elements (<c>TextBlock</c>, <c>ColumnSet</c>/<c>Column</c>,
+/// <c>Container</c>) plus container <c>style</c> backgrounds (with fixed-pixel gap columns) for the meters —
+/// no images/HTML/SVG. <c>"header": null</c> lets the composition own the top region (that strip is not
+/// clickable, so the body carries the <c>selectAction</c> deep-links). Health is always a text label AND a
+/// colour (§18); the brand accent (#1846E1) is used ONLY for the fleet kicker (never for health, §4); the
+/// meter fill is magnitude-neutral accent (magnitude read by filled-tick COUNT). Layouts genuinely differ
+/// per size: Small = fleet verdict, Medium/Large = telemetry blocks.
 /// </summary>
 public static class WidgetCardRenderer
 {
@@ -27,6 +31,13 @@ public static class WidgetCardRenderer
     {
         Encoder = JavaScriptEncoder.Create(UnicodeRanges.All)
     };
+
+    private const string Dot = "●";           // status glyph
+    private const int MeterSegments = 10;      // ticks per metric meter
+    private const string MeterHeight = "14px"; // meter tick height
+    private const string MeterGap = "2px";     // transparent gap between meter ticks (full-bleed comb)
+    private const string FleetHeight = "8px";  // fleet-bar tick height
+    private const string FleetGap = "4px";     // gap between fleet-bar ticks
 
     public static WidgetCard Render(WidgetViewModel vm)
     {
@@ -43,115 +54,399 @@ public static class WidgetCardRenderer
         {
             ["$schema"] = "http://adaptivecards.io/schemas/adaptive-card.json",
             ["type"] = "AdaptiveCard",
-            ["version"] = "1.5",
-            ["body"] = body,
-            // Tapping the card background (anything not a server row) opens the dashboard. The row's own
-            // selectAction (openServer) takes precedence when a row is tapped. Deep-link is Slice 4.
-            ["selectAction"] = Execute(ActivationVerbs.OpenDashboard, data: null)
+            ["version"] = "1.6",
+            // Our UX owns the top region (removes the host's duplicated brand header, Prism M1) and
+            // top-aligns the body (kills the empty band above content, Prism M2).
+            ["header"] = null,
+            ["verticalContentAlignment"] = "Top",
+            ["body"] = body
         };
+
+        // The whole card opens the Dashboard; server blocks override this with openServer.
+        if (vm.DisplayState != WidgetDisplayState.Unavailable)
+        {
+            card["selectAction"] = Execute(ActivationVerbs.OpenDashboard);
+        }
 
         return new WidgetCard(card.ToJsonString(SerializerOptions), "{}");
     }
 
-    private static JsonArray SmallBody(WidgetViewModel vm) => new()
+    // ---- Small: the fleet verdict. Kicker -> giant fraction -> label -> per-server fleet bar -> freshness.
+    private static JsonArray SmallBody(WidgetViewModel vm)
     {
-        Brand(vm),
-        Text(vm.PrimarySummary, size: "Large", weight: "Bolder", color: vm.OverallHealthColor, wrap: true),
-        Text(vm.CountsSummary, subtle: true, wrap: true, spacingNone: true),
-        Freshness(vm)
-    };
+        var (number, unit) = SplitFraction(vm.HeroValue);
+        return new JsonArray
+        {
+            Text(vm.FleetKicker, size: "Small", weight: "Bolder", color: "accent"),
+            NumberUnit(number, unit, "ExtraLarge", "Medium", vm.OverallHealthColor, unitSubtle: false),
+            Text(vm.HeroLabel.ToUpperInvariant(), size: "Small", weight: "Bolder", color: vm.OverallHealthColor,
+                spacingNone: true),
+            FleetBar(vm, FleetHeight),
+            Freshness(vm)
+        };
+    }
 
+    // ---- Medium / Large: hero header (kicker + freshness, then fraction + label + fleet bar) then blocks.
     private static JsonArray ListBody(WidgetViewModel vm)
     {
+        var large = vm.Size == WidgetSizeHint.Large;
         var body = new JsonArray
         {
-            HeaderRow(vm)
+            // Row 1: FROTA kicker (left) + freshness (right).
+            new JsonObject
+            {
+                ["type"] = "ColumnSet",
+                ["spacing"] = "None",
+                ["columns"] = new JsonArray
+                {
+                    Column("stretch", new JsonArray
+                    {
+                        Text(vm.FleetKicker, size: "Small", weight: "Bolder", color: "accent", spacingNone: true)
+                    }),
+                    Column("auto", new JsonArray { FreshnessRight(vm) }, verticalAlignment: "Bottom")
+                }
+            },
+            // Row 2: giant fraction + label + fleet bar (Large adds an overall-health chip + a taller gauge).
+            HeroLine(vm, large)
         };
-
-        // The counts line goes under the header on BOTH Medium and Large: the per-size row cap can hide a
-        // severity (e.g. an Unknown server past the cap), so the counts keep every severity visible and
-        // stop the worst-status hero from mis-reading as "the app is offline" instead of "1 of N" (§21,
-        // Prism S3 M3/M4).
-        if (vm.CountsSummary.Length > 0)
-        {
-            body.Add(Text(vm.CountsSummary, subtle: true, size: "Small", wrap: true, spacingNone: true));
-        }
-
-        body.Add(Freshness(vm));
 
         foreach (var row in vm.Rows)
         {
-            body.Add(ServerRow(row));
+            body.Add(ServerBlock(row, vm, large));
         }
 
         if (vm.OverflowText.Length > 0)
         {
-            body.Add(Text(vm.OverflowText, subtle: true, size: "Small"));
+            body.Add(Text(vm.OverflowText, size: "Small", weight: "Bolder", subtle: true, spacingNone: true));
+        }
+
+        // Large fills the bottom band with a non-interactive fleet-summary footer (Fable).
+        if (large)
+        {
+            body.Add(FleetSummary(vm));
         }
 
         return body;
     }
 
+    // Hero line: big fraction, then label (+ overall chip on Large) and the fleet gauge filling the rest.
+    private static JsonObject HeroLine(WidgetViewModel vm, bool large)
+    {
+        var (number, unit) = SplitFraction(vm.HeroValue);
+
+        JsonObject labelRow = large
+            ? new JsonObject
+            {
+                ["type"] = "ColumnSet",
+                ["spacing"] = "None",
+                ["columns"] = new JsonArray
+                {
+                    Column("stretch", new JsonArray
+                    {
+                        Text(vm.HeroLabel.ToUpperInvariant(), size: "Small", weight: "Bolder",
+                            color: vm.OverallHealthColor, spacingNone: true)
+                    }),
+                    Column("auto", new JsonArray
+                    {
+                        Text($"{Dot} {vm.OverallHealthLabel}", size: "Small", weight: "Bolder",
+                            color: vm.OverallHealthColor, spacingNone: true)
+                    }, verticalAlignment: "Bottom")
+                }
+            }
+            : Text(vm.HeroLabel.ToUpperInvariant(), size: "Small", weight: "Bolder", color: vm.OverallHealthColor,
+                spacingNone: true);
+
+        return new JsonObject
+        {
+            ["type"] = "ColumnSet",
+            ["spacing"] = "None",
+            ["columns"] = new JsonArray
+            {
+                Column("auto", new JsonArray
+                {
+                    Text(number, size: "ExtraLarge", weight: "Bolder", color: vm.OverallHealthColor, spacingNone: true)
+                }, spacingNone: true),
+                Column("auto", new JsonArray
+                {
+                    Text(unit, size: "Medium", weight: "Bolder", color: vm.OverallHealthColor, spacingNone: true)
+                }, verticalAlignment: "Bottom", spacingNone: true),
+                Column("stretch", new JsonArray
+                {
+                    labelRow,
+                    FleetBar(vm, large ? "12px" : FleetHeight)
+                }, verticalAlignment: "Center", spacing: "Medium")
+            }
+        };
+    }
+
+    // Large-only fleet-summary footer: four stat tiles from the health counts (only non-zero severities
+    // carry colour, so a calm fleet shows no alarm). Non-interactive; anchors the bottom band (Fable).
+    private static JsonObject FleetSummary(WidgetViewModel vm) => new()
+    {
+        ["type"] = "Container",
+        ["spacing"] = "Medium",
+        ["separator"] = true,
+        ["items"] = new JsonArray
+        {
+            new JsonObject
+            {
+                ["type"] = "ColumnSet",
+                ["spacing"] = "None",
+                ["columns"] = new JsonArray
+                {
+                    StatTile(vm.HealthyCount, vm.HealthyLabel, vm.HealthyCount > 0 ? "good" : null),
+                    StatTile(vm.WarningCount, vm.WarningLabel, vm.WarningCount > 0 ? "warning" : null),
+                    StatTile(vm.CriticalCount, vm.CriticalLabel, vm.CriticalCount > 0 ? "attention" : null),
+                    StatTile(vm.OfflineCount, vm.OfflineLabel, vm.OfflineCount > 0 ? "attention" : null)
+                }
+            }
+        }
+    };
+
+    private static JsonObject StatTile(int count, string label, string? color) => new()
+    {
+        ["type"] = "Column",
+        ["width"] = "stretch",
+        ["spacing"] = "None",
+        ["items"] = new JsonArray
+        {
+            Text(count.ToString(CultureInfo.InvariantCulture), size: "Medium", weight: "Bolder", color: color,
+                subtle: color is null, spacingNone: true),
+            Text(label.ToUpperInvariant(), size: "Small", subtle: true, spacingNone: true)
+        }
+    };
+
+    // A server telemetry block: name + "● Health" chip, then CPU/MEM/DISK number+unit with segmented meters.
+    private static JsonObject ServerBlock(WidgetServerRow row, WidgetViewModel vm, bool large) => new()
+    {
+        ["type"] = "Container",
+        ["spacing"] = "Medium",
+        ["separator"] = true,
+        ["selectAction"] = Execute(ActivationVerbs.OpenServer, row.ServerId),
+        ["items"] = new JsonArray
+        {
+            new JsonObject
+            {
+                ["type"] = "ColumnSet",
+                ["columns"] = new JsonArray
+                {
+                    Column("stretch", new JsonArray
+                    {
+                        Text(row.DisplayName, size: large ? "Medium" : "Default", weight: "Bolder", wrap: false)
+                    }),
+                    Column("auto", new JsonArray
+                    {
+                        Text($"{Dot} {row.HealthLabel}", size: "Small", weight: "Bolder", color: row.HealthColor)
+                    }, verticalAlignment: "Center")
+                }
+            },
+            new JsonObject
+            {
+                ["type"] = "ColumnSet",
+                ["spacing"] = "Small",
+                ["columns"] = new JsonArray
+                {
+                    MetricColumn(vm.CpuLabel, row.CpuText, row.CpuFraction, detail: large ? row.CpuDetail : string.Empty, large: large),
+                    MetricColumn(vm.MemoryLabel, row.MemoryText, row.MemoryFraction, detail: large ? row.MemoryDetail : string.Empty, large: large),
+                    MetricColumn(vm.DiskLabel, row.DiskText, row.DiskFraction, detail: large ? row.DiskDetail : string.Empty, large: large)
+                }
+            }
+        }
+    };
+
+    // One metric cell: big number + small trailing unit, a segmented meter, a small caps label, and — on
+    // Large — an absolute "used / total GB" detail line under the label (empty/omitted otherwise).
+    private static JsonObject MetricColumn(string label, string valueText, double fraction, string detail, bool large)
+    {
+        var (number, unit) = SplitPercent(valueText);
+        var items = new JsonArray
+        {
+            NumberUnit(number, unit, "Large", "Small", color: null, unitSubtle: true),
+            Meter(fraction, large ? "16px" : MeterHeight),
+            Text(label.ToUpperInvariant(), size: "Small", subtle: true, spacingNone: true)
+        };
+
+        if (detail.Length > 0)
+        {
+            items.Add(Text(detail, size: "Small", subtle: true, spacingNone: true));
+        }
+
+        return new JsonObject
+        {
+            ["type"] = "Column",
+            ["width"] = "stretch",
+            ["spacing"] = "None",
+            ["items"] = items
+        };
+    }
+
+    // Big number (auto) + small bottom-aligned unit (auto) on one baseline — the refs' "95 bpm" / "62 %".
+    private static JsonObject NumberUnit(string number, string unit, string numberSize, string unitSize,
+        string? color, bool unitSubtle)
+    {
+        var columns = new JsonArray
+        {
+            Column("auto", new JsonArray
+            {
+                Text(number, size: numberSize, weight: "Bolder", color: color, spacingNone: true)
+            }, spacingNone: true)
+        };
+
+        if (unit.Length > 0)
+        {
+            columns.Add(Column("auto", new JsonArray
+            {
+                Text(unit, size: unitSize, weight: unitSubtle ? null : "Bolder", color: color, subtle: unitSubtle,
+                    spacingNone: true)
+            }, verticalAlignment: "Bottom", spacingNone: true));
+        }
+
+        return new JsonObject
+        {
+            ["type"] = "ColumnSet",
+            ["spacing"] = "None",
+            ["columns"] = columns
+        };
+    }
+
+    // Native segmented tick meter (the instrument): stretch tick columns interleaved with fixed-pixel gap
+    // columns so ticks run full-bleed (Prism). Magnitude is the FILLED-SEGMENT COUNT; fill = magnitude-neutral
+    // "accent" (never collides with health, which lives only on the chip). Empty track = "emphasis". Fill
+    // rule: ceil(pct/step), min 1 lit tick when pct > 0. Unknown (fraction < 0) = all-empty track (§19).
+    private static JsonObject Meter(double fraction, string height)
+    {
+        var filled = FilledSegments(fraction, MeterSegments);
+        var columns = new JsonArray();
+        for (var i = 0; i < MeterSegments; i++)
+        {
+            if (i > 0)
+            {
+                columns.Add(Gap(MeterGap));
+            }
+
+            columns.Add(TickColumn(i < filled ? "accent" : "emphasis", height));
+        }
+
+        return new JsonObject
+        {
+            ["type"] = "ColumnSet",
+            ["spacing"] = "Small",
+            ["columns"] = columns
+        };
+    }
+
+    // Fleet bar: one tick per server coloured by health (worst-first), separated by fixed-pixel gaps.
+    private static JsonObject FleetBar(WidgetViewModel vm, string height)
+    {
+        var columns = new JsonArray();
+        var index = 0;
+        AddFleet(columns, vm.CriticalCount + vm.OfflineCount, "attention", height, ref index);
+        AddFleet(columns, vm.WarningCount, "warning", height, ref index);
+        AddFleet(columns, vm.UnknownCount, "emphasis", height, ref index);
+        AddFleet(columns, vm.HealthyCount, "good", height, ref index);
+
+        return new JsonObject
+        {
+            ["type"] = "ColumnSet",
+            ["spacing"] = "Small",
+            ["columns"] = columns
+        };
+
+        static void AddFleet(JsonArray columns, int count, string style, string height, ref int index)
+        {
+            for (var n = 0; n < count; n++)
+            {
+                if (index > 0)
+                {
+                    columns.Add(Gap(FleetGap));
+                }
+
+                columns.Add(TickColumn(style, height));
+                index++;
+            }
+        }
+    }
+
+    private static int FilledSegments(double fraction, int segments)
+    {
+        if (fraction < 0)
+        {
+            return 0;
+        }
+
+        var filled = (int)Math.Ceiling(fraction * segments);
+        if (filled == 0 && fraction > 0)
+        {
+            filled = 1;
+        }
+
+        return Math.Clamp(filled, 0, segments);
+    }
+
+    // A stretch column holding a styled, fixed-height container (one tick).
+    private static JsonObject TickColumn(string style, string height) => new()
+    {
+        ["type"] = "Column",
+        ["width"] = "stretch",
+        ["spacing"] = "None",
+        ["items"] = new JsonArray
+        {
+            new JsonObject
+            {
+                ["type"] = "Container",
+                ["style"] = style,
+                ["minHeight"] = height,
+                ["items"] = new JsonArray()
+            }
+        }
+    };
+
+    // A fixed-pixel transparent gap column between ticks.
+    private static JsonObject Gap(string width) => new()
+    {
+        ["type"] = "Column",
+        ["width"] = width,
+        ["spacing"] = "None",
+        ["items"] = new JsonArray()
+    };
+
+    // "39%" -> ("39","%"); "—" (or any non-percent) -> (text,"") so unknown shows no unit (§19).
+    private static (string Number, string Unit) SplitPercent(string text) =>
+        text.EndsWith('%') ? (text[..^1], "%") : (text, string.Empty);
+
+    // "2/2" -> ("2","/2").
+    private static (string Number, string Unit) SplitFraction(string text)
+    {
+        var slash = text.IndexOf('/');
+        return slash < 0 ? (text, string.Empty) : (text[..slash], text[slash..]);
+    }
+
     private static JsonArray EmptyBody(WidgetViewModel vm) => new()
     {
-        Brand(vm),
-        Text(vm.NoServersText, subtle: true, wrap: true),
+        Text(vm.FleetKicker, size: "Small", weight: "Bolder", color: "accent"),
+        Text(vm.NoServersText, weight: "Bolder", wrap: true, spacingNone: true),
         Freshness(vm)
     };
 
     private static JsonArray UnavailableBody(WidgetViewModel vm) => new()
     {
-        Brand(vm),
-        Text(vm.NoDataTitle, weight: "Bolder", wrap: true),
+        Text(vm.BrandName, weight: "Bolder", color: "accent"),
+        Text(vm.NoDataTitle, weight: "Bolder", wrap: true, spacingNone: true),
         Text(vm.NoDataBody, subtle: true, wrap: true, spacingNone: true)
     };
-
-    // Header: brand (accent) on the left, overall health label (coloured) on the right.
-    private static JsonObject HeaderRow(WidgetViewModel vm) => new()
-    {
-        ["type"] = "ColumnSet",
-        ["columns"] = new JsonArray
-        {
-            Column("stretch", Brand(vm)),
-            Column("auto", Text(vm.OverallHealthLabel, weight: "Bolder", color: vm.OverallHealthColor))
-        }
-    };
-
-    private static JsonObject ServerRow(WidgetServerRow row)
-    {
-        return new JsonObject
-        {
-            ["type"] = "Container",
-            ["spacing"] = "Small",
-            // Tapping this row opens the dashboard focused on this server (opaque id only, §13).
-            ["selectAction"] = Execute(
-                ActivationVerbs.OpenServer,
-                new JsonObject { [ActivationVerbs.ServerIdDataKey] = row.ServerId.ToString("D") }),
-            ["items"] = new JsonArray
-            {
-                new JsonObject
-                {
-                    ["type"] = "ColumnSet",
-                    ["columns"] = new JsonArray
-                    {
-                        Column("stretch", Text(row.DisplayName, weight: "Bolder", wrap: false)),
-                        Column("auto", Text(row.HealthLabel, color: row.HealthColor, weight: "Bolder"))
-                    }
-                },
-                Text(row.MetricsText, subtle: true, size: "Small", spacingNone: true, wrap: false)
-            }
-        };
-    }
-
-    private static JsonObject Brand(WidgetViewModel vm) =>
-        Text(vm.BrandName, weight: "Bolder", color: "accent");
 
     private static JsonObject Freshness(WidgetViewModel vm) =>
         Text(vm.FreshnessText, subtle: true, size: "Small", spacingNone: true);
 
-    // An allowlisted Adaptive Card Action.Execute. The Widgets host routes it to the provider's
-    // OnActionInvoked as a (verb, data) pair — it launches the app, never runs anything itself.
-    private static JsonObject Execute(string verb, JsonObject? data)
+    private static JsonObject FreshnessRight(WidgetViewModel vm)
+    {
+        var node = Freshness(vm);
+        node["horizontalAlignment"] = "Right";
+        return node;
+    }
+
+    // ---- Adaptive Card Action.Execute (verb + optional opaque serverId in data). ----
+    private static JsonObject Execute(string verb, Guid? serverId = null)
     {
         var action = new JsonObject
         {
@@ -159,21 +454,43 @@ public static class WidgetCardRenderer
             ["verb"] = verb
         };
 
-        if (data is not null)
+        if (serverId is { } id)
         {
-            action["data"] = data;
+            action["data"] = new JsonObject
+            {
+                [ActivationVerbs.ServerIdDataKey] = id.ToString("D", CultureInfo.InvariantCulture)
+            };
         }
 
         return action;
     }
 
-    private static JsonObject Column(string width, JsonObject item) => new()
+    private static JsonObject Column(string width, JsonArray items, string? verticalAlignment = null,
+        bool spacingNone = false, string? spacing = null)
     {
-        ["type"] = "Column",
-        ["width"] = width,
-        ["verticalContentAlignment"] = "Center",
-        ["items"] = new JsonArray { item }
-    };
+        var column = new JsonObject
+        {
+            ["type"] = "Column",
+            ["width"] = width,
+            ["items"] = items
+        };
+
+        if (verticalAlignment is not null)
+        {
+            column["verticalContentAlignment"] = verticalAlignment;
+        }
+
+        if (spacingNone)
+        {
+            column["spacing"] = "None";
+        }
+        else if (spacing is not null)
+        {
+            column["spacing"] = spacing;
+        }
+
+        return column;
+    }
 
     private static JsonObject Text(
         string text,

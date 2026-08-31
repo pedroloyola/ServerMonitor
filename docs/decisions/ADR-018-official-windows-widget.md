@@ -224,6 +224,54 @@ serviço; só navegação (Dashboard ou Dashboard com um servidor em foco).
   isolamento + reset), L-2 (LoadAsync engole exceção → guard `IsOperationErrorOpen` nos testes de sucesso).
   Runtime Windows Widgets board = **NOT_RUN** (Win11 Home, sem dev-mode/admin) — nunca contado como PASS.
 
+## Fase 1 — Redesign visual (instrument panel) + fix QA-1/QA-2
+
+Depois do REAL BOARD QA (Gate 4.5), o resultado visual textual/lista foi **rejeitado pelo humano**. O widget
+foi redesenhado (design do **Fable 5**, iterado no board real, **LOCKED pelo Prism**) para uma linguagem de
+painel de instrumentos, e os dois findings de fiabilidade da QA de board (QA-1/QA-2) foram corrigidos.
+
+- **Adaptive Cards 1.6 + `"header": null`:** a composição passa a ocupar a região de topo, eliminando o header
+  de marca duplicado do host (o host desenha sempre a sua tira do menu `⋯`, que é chrome inamovível). O topo
+  fica não-clicável, por isso o `selectAction` (openDashboard/openServer) vive no corpo clicável.
+- **Direção instrument-panel, layouts por tamanho (genuinamente distintos):** kicker em caps (accent), herói
+  numérico grande com split número+unidade ("39" + "%"), tudo top-aligned. **Small** = veredito da frota
+  (kicker → N/N → label → barra de frota → frescura, sem linhas). **Medium** = telemetria compacta (herói +
+  até 3 servidores). **Large** = o mais rico (herói + barra de frota 12px + até 6 servidores + rodapé de
+  resumo da frota SAUDÁVEIS/ALERTA/CRÍTICO/OFFLINE + overflow "+N").
+- **Meters segmentados nativos (magnitude-neutros):** ColumnSet de colunas `stretch` com `Container` de
+  `style` + `minHeight` (o host honra minHeight), separadas por colunas-gap de pixel fixo (full-bleed). A
+  **magnitude é a CONTAGEM de ticks preenchidos**; o preenchimento é `accent` (neutro), nunca a cor de saúde
+  — a **saúde vive SÓ no chip `● Saudável`** (provado neutro mesmo em servidor Critical/Warning). A barra de
+  frota SIM usa cores de saúde (mapa de saúde da frota).
+- **Extensão de contrato (GB/uptime):** `WidgetServerState` ganhou `MemoryUsedGb/MemoryTotalGb/DiskUsedGb/
+  DiskTotalGb` (double?) + `UptimeSeconds` (long?), mostrados **só no Large** (CPU→uptime, Mem/Disco→used/
+  total GB). São **métricas de recurso de baixa sensibilidade**, da mesma classe dos percentuais — **NÃO PII**
+  (§9 mantém-se). O `WidgetSnapshotMapper` popula-os a partir do `ServerMetricsSnapshot` mas **deliberadamente
+  não mapeia Hostname nem OperatingSystemName** (que a fonte tem); o `WidgetServerState` não tem campo para
+  eles → fuga impossível por construção. As duas allowlists de minimização (`WidgetContractSecurityTests`)
+  foram atualizadas para incluir só os campos de métrica + um teste do mapper prova que nem o hostname nem a
+  string de OS aparecem no JSON. **Vigil: C0/H0/M0** (1 Low informativo: capacidade/uptime é marginalmente
+  mais fingerprintable, mas não cruza a fronteira §9 — nota de privacidade de produto, não blocker).
+- **QA-1 (foco de servidor visível):** `openServer` resolvia o servidor certo e trazia a app para a frente,
+  mas o "foco" era só `StartBringIntoView` — invisível quando o card já está no ecrã. Agora o card faz um
+  **pulse de anel accent** (`ServerCardViewModel.IsFocusHighlighted` → `ServerFullCard` Storyboard), respeitando
+  reduced-motion, one-shot (re-focus re-dispara). **Lifecycle-safe** para a Dashboard singleton: subscrição
+  idempotente no `Loaded` (a página é reutilizada, o `DataContextChanged` não redispara) + consumo de um flag
+  já-true no `Loaded`. **Atlas: C0/H0/M0/L1** (após fechar um M1 de re-subscrição no reuse da página singleton).
+- **QA-2 (Compact):** uma ativação de widget em Compact ficava presa em Compact. Agora `ExecuteActivationIntent`
+  força **Compact → Standard** antes de restaurar/navegar, preservando as invariantes de instância única.
+- **Whitespace do Large — comportamento aceite (não bug):** a tira de topo é o chrome do menu `⋯` do host
+  (inamovível sem voltar ao header default do host, rejeitado); o espaço inferior é consequência legítima de
+  o layout suportar até 6 servidores com apenas 2 no ambiente real. **Decisão humana: aceitar** — não otimizar
+  para exatamente 2 servidores nem degradar a escalabilidade.
+- **Pitfall (UTF-8 BOM):** editar ficheiros de fonte com não-ASCII (acentos, `●`, `→`) via as tools de edição
+  remove o BOM; o csc passa a lê-los como Windows-1252 → mojibake no output renderizado (os testes ainda passam
+  porque os ficheiros de asserção são mal-lidos identicamente). Re-adicionar o BOM após editar.
+- **Reviews:** Prism **LOCK** (Small/Medium/Large aprovados, reference-quality, sem C/H; M2/M3 = polish
+  deferido). Vigil **C0/H0/M0** + 1 Low. Atlas **C0/H0/M0/L1**. Gates: Debug 1363/1363, Release verde,
+  diff-check limpo, vuln limpo. **Re-verificação real-board do redesign + QA-1 pulse + QA-2 = NOT_RUN**
+  (o provider no board é uma iteração anterior; um passe final de board é necessário e nunca contado como PASS).
+
 ## Modos de falha (leitura)
 
 Cache ausente → estado indisponível. `schemaVersion` desconhecido / conteúdo corrupto / sobredimensionado

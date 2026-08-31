@@ -45,6 +45,54 @@ public sealed class WidgetSnapshotMapperTests
         Func<Guid, ServerMetricsSnapshot?> metricsOf) =>
         WidgetSnapshotMapper.Map(servers, stateOf, metricsOf, Now);
 
+    [Fact]
+    public void Absolute_memory_disk_gb_and_uptime_are_mapped_but_host_os_never_leak()
+    {
+        const long gib = 1073741824;
+        var server = NewServer();
+        var metrics = new ServerMetricsSnapshot
+        {
+            ServerId = server.Id,
+            CollectedAt = Success,
+            CpuUsagePercent = 12,
+            MemoryUsedBytes = 3 * gib,
+            MemoryTotalBytes = 8 * gib,
+            MemoryUsagePercent = 37.5,
+            DiskUsedBytes = 50 * gib,
+            DiskTotalBytes = 200 * gib,
+            DiskUsagePercent = 25,
+            Uptime = TimeSpan.FromDays(43) + TimeSpan.FromHours(18),
+            Hostname = "prod-db-01.internal",           // must NOT reach the widget
+            OperatingSystemName = "Debian GNU/Linux 13"  // must NOT reach the widget
+        };
+
+        var snapshot = Map([server], _ => State(ServerHealth.Healthy, Success), _ => metrics);
+        var s = Assert.Single(snapshot.Servers);
+
+        Assert.Equal(3d, s.MemoryUsedGb);
+        Assert.Equal(8d, s.MemoryTotalGb);
+        Assert.Equal(50d, s.DiskUsedGb);
+        Assert.Equal(200d, s.DiskTotalGb);
+        Assert.Equal((long)metrics.Uptime.Value.TotalSeconds, s.UptimeSeconds);
+
+        // Privacy holds by construction (WidgetServerState has no such field): the serialized snapshot
+        // carries neither the hostname nor the OS string.
+        var json = WidgetStateSerializer.Serialize(snapshot);
+        Assert.DoesNotContain("prod-db-01", json);
+        Assert.DoesNotContain("Debian", json);
+    }
+
+    [Fact]
+    public void Unknown_metrics_leave_gb_and_uptime_null_not_zero()
+    {
+        var server = NewServer();
+        var snapshot = Map([server], _ => State(ServerHealth.Unknown, null), _ => null);
+        var s = Assert.Single(snapshot.Servers);
+        Assert.Null(s.MemoryUsedGb);
+        Assert.Null(s.DiskTotalGb);
+        Assert.Null(s.UptimeSeconds);
+    }
+
     [Theory]
     [InlineData(ServerHealth.Unknown, WidgetHealth.Unknown)]
     [InlineData(ServerHealth.Healthy, WidgetHealth.Healthy)]

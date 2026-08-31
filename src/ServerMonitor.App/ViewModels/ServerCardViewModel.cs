@@ -27,6 +27,7 @@ public sealed class ServerCardViewModel : ObservableObject
     private string _connectionStateDisplayName;
     private ServerMonitoringState _monitoringState;
     private ServerMetricsSnapshot? _metrics;
+    private bool _isFocusHighlighted;
 
     public ServerCardViewModel(
         Server server,
@@ -131,6 +132,17 @@ public sealed class ServerCardViewModel : ObservableObject
     public ServerHealth Health => _monitoringState.Health;
 
     public string HealthDisplayName => _localizationService.GetString($"ServerHealth{Health}");
+
+    /// <summary>
+    /// True while this card is the target of a widget "open server" deep-link (QA-1). The card view shows a
+    /// brief accent focus pulse so the user can see WHICH server the widget selected — the deep-link's
+    /// "focus" was previously invisible (bring-into-view is a no-op when the card is already on screen).
+    /// </summary>
+    public bool IsFocusHighlighted
+    {
+        get => _isFocusHighlighted;
+        set => SetProperty(ref _isFocusHighlighted, value);
+    }
 
     public bool IsRefreshingMetrics => _monitoringState.IsRefreshing;
 

@@ -106,6 +106,15 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
             var card = VisibleServers.FirstOrDefault(card => card.Server.Id == id);
             if (card is not null)
             {
+                // QA-1: make the deep-link's "focus" VISIBLE — the card view pulses an accent ring so the
+                // user can see which server the widget selected, even when it is already on screen. Clearing
+                // the others keeps a single visible target.
+                foreach (var other in VisibleServers)
+                {
+                    other.IsFocusHighlighted = false;
+                }
+
+                card.IsFocusHighlighted = true;
                 ServerFocusRequested?.Invoke(card);
             }
         }

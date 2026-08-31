@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using ServerMonitor.WidgetContract;
 using ServerMonitor.WidgetProvider.Hosting;
 using ServerMonitor.WidgetProvider.Reading;
@@ -60,6 +60,18 @@ public static class WidgetViewModelBuilder
             OverallHealth = snapshot.OverallHealth,
             OverallHealthLabel = strings.HealthLabel(snapshot.OverallHealth),
             OverallHealthColor = HealthColor(snapshot.OverallHealth),
+            HeroValue = $"{counts.Healthy}/{counts.Total}",
+            HeroLabel = counts.Healthy == counts.Total
+                ? strings.HealthyPlural
+                : strings.HealthLabel(snapshot.OverallHealth),
+            CpuLabel = strings.Cpu,
+            MemoryLabel = strings.Memory,
+            DiskLabel = strings.Disk,
+            FleetKicker = strings.FleetKicker,
+            HealthyLabel = strings.HealthyPlural,
+            WarningLabel = strings.Warning,
+            CriticalLabel = strings.Critical,
+            OfflineLabel = strings.Offline,
             PrimarySummary = PrimarySummary(snapshot.OverallHealth, counts, strings),
             CountsSummary = CountsSummary(counts, strings),
             Freshness = freshnessState,
@@ -106,8 +118,43 @@ public static class WidgetViewModelBuilder
             CpuText: cpu,
             MemoryText: mem,
             DiskText: disk,
-            MetricsText: metrics);
+            MetricsText: metrics)
+        {
+            CpuFraction = Fraction(server.CpuUsagePercent),
+            MemoryFraction = Fraction(server.MemoryUsagePercent),
+            DiskFraction = Fraction(server.DiskUsagePercent),
+            CpuDetail = FormatUptime(server.UptimeSeconds),
+            MemoryDetail = FormatGb(server.MemoryUsedGb, server.MemoryTotalGb),
+            DiskDetail = FormatGb(server.DiskUsedGb, server.DiskTotalGb)
+        };
     }
+
+    // "3.1 / 8 GB" using the UI culture's number format; empty when either value is unknown.
+    private static string FormatGb(double? used, double? total) =>
+        used is { } u && total is { } t && t > 0
+            ? string.Format(CultureInfo.CurrentUICulture, "{0:0.#} / {1:0.#} GB", u, t)
+            : string.Empty;
+
+    // Compact uptime "43d 18h" / "18h 30m" / "45m"; empty when unknown. Two most-significant units only.
+    private static string FormatUptime(long? seconds)
+    {
+        if (seconds is not { } s || s <= 0)
+        {
+            return string.Empty;
+        }
+
+        var t = TimeSpan.FromSeconds(s);
+        if (t.TotalDays >= 1)
+        {
+            return $"{(int)t.TotalDays}d {t.Hours}h";
+        }
+
+        return t.TotalHours >= 1 ? $"{(int)t.TotalHours}h {t.Minutes}m" : $"{t.Minutes}m";
+    }
+
+    // Meter fill fraction [0,1]; null stays -1 (unknown → neutral/empty meter, never full or 0%, §19).
+    private static double Fraction(double? value) =>
+        value is { } v ? Math.Clamp(v, 0d, 100d) / 100d : -1d;
 
     private static string TruncateName(string name, WidgetStrings strings)
     {

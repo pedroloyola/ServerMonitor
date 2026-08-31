@@ -45,7 +45,9 @@ public sealed class WidgetCardRendererTests
         using var doc = JsonDocument.Parse(templateJson); // throws on invalid JSON
         var root = doc.RootElement.Clone();
         Assert.Equal("AdaptiveCard", root.GetProperty("type").GetString());
-        Assert.Equal("1.5", root.GetProperty("version").GetString());
+        Assert.Equal("1.6", root.GetProperty("version").GetString());
+        // header:null — our composition owns the top region (no duplicated host brand strip).
+        Assert.True(root.TryGetProperty("header", out var header) && header.ValueKind == JsonValueKind.Null);
         AssertElementsSupported(root);
         return root;
     }
@@ -83,7 +85,7 @@ public sealed class WidgetCardRendererTests
         var card = Render(Read(Server("Home", WidgetHealth.Warning), Server("Db", WidgetHealth.Critical)), size);
         AssertValidCard(card.TemplateJson);
         Assert.Equal("{}", card.DataJson);
-        Assert.Contains("ServerAlyzer", card.TemplateJson);
+        Assert.Contains(En.FleetKicker, card.TemplateJson); // FROTA/FLEET kicker owns the top now
     }
 
     [Fact]
@@ -92,7 +94,7 @@ public sealed class WidgetCardRendererTests
         var json = Render(Read(Server("Home", WidgetHealth.Healthy)), WidgetSizeHint.Small).TemplateJson;
         AssertValidCard(json);
         Assert.DoesNotContain("Home", json);   // Small = summary only, no per-server rows
-        Assert.Contains("ServerAlyzer", json);
+        Assert.Contains(En.FleetKicker, json);
     }
 
     [Fact]
@@ -101,7 +103,7 @@ public sealed class WidgetCardRendererTests
         var medium = Render(Read(Server("WebServer", WidgetHealth.Warning)), WidgetSizeHint.Medium).TemplateJson;
         AssertValidCard(medium);
         Assert.Contains("WebServer", medium);
-        Assert.Contains("12%", medium); // CPU
+        Assert.Contains("12", medium); // CPU number (value/unit are split: "12" + "%")
         Assert.Contains("Warning", medium); // health label as text (§18)
     }
 
@@ -113,6 +115,101 @@ public sealed class WidgetCardRendererTests
         AssertValidCard(json);
         // 6 rows rendered, "14 more" affordance.
         Assert.Contains("14", json);
+    }
+
+    [Fact]
+    public void Large_shows_gb_and_uptime_detail_but_medium_does_not()
+    {
+        var server = new WidgetServerState
+        {
+            Id = Guid.NewGuid(),
+            DisplayName = "srv",
+            Health = WidgetHealth.Healthy,
+            CpuUsagePercent = 3,
+            MemoryUsagePercent = 39,
+            DiskUsagePercent = 3,
+            MemoryUsedGb = 3.2,
+            MemoryTotalGb = 8,
+            DiskUsedGb = 12,
+            DiskTotalGb = 460,
+            UptimeSeconds = 3600 * 24 * 43, // 43 days
+            LastUpdatedUtc = Now
+        };
+
+        var large = Render(Read(server), WidgetSizeHint.Large).TemplateJson;
+        AssertValidCard(large);
+        Assert.Contains("/ 8 GB", large);       // memory detail (culture-agnostic — total is integer 8)
+        Assert.Contains("43d", large);          // cpu column uptime detail
+
+        var medium = Render(Read(server), WidgetSizeHint.Medium).TemplateJson;
+        AssertValidCard(medium);
+        Assert.DoesNotContain("GB", medium);    // Medium stays compact — no GB/uptime detail
+        Assert.DoesNotContain("43d", medium);
+    }
+
+    [Fact]
+    public void Large_footer_summarizes_fleet_health_counts()
+    {
+        var json = Render(Read(
+            Server("a", WidgetHealth.Healthy), Server("b", WidgetHealth.Healthy),
+            Server("c", WidgetHealth.Critical)), WidgetSizeHint.Large).TemplateJson;
+        var root = AssertValidCard(json);
+        // Footer tiles carry the localized category labels; only the healthy count is present twice
+        // (hero + footer) — the footer proves the severity breakdown renders.
+        Assert.Contains(En.Critical.ToUpperInvariant(), json);
+        Assert.Contains(En.Offline.ToUpperInvariant(), json);
+    }
+
+    [Fact]
+    public void Meter_fill_is_magnitude_neutral_accent_not_health_coloured()
+    {
+        // The meter fill is a magnitude-neutral "accent" Container style regardless of health; health lives
+        // only on the "● Health" chip. A critical server must NOT tint its meters red (Prism M2).
+        // For a Critical server the meter fill must still be the magnitude-neutral "accent" (the fleet bar
+        // legitimately uses health colours, but the per-metric meters must not). The healthy server below
+        // has NO health-coloured containers at all, so its meter fill is unambiguously accent.
+        var critical = Render(Read(Server("db", WidgetHealth.Critical)), WidgetSizeHint.Medium).TemplateJson;
+        using (var doc = JsonDocument.Parse(critical))
+        {
+            var styles = new List<string>();
+            CollectContainerStyles(doc.RootElement, styles);
+            Assert.Contains("accent", styles); // meters still use accent even for a critical server
+        }
+
+        var healthy = Render(Read(Server("ok", WidgetHealth.Healthy)), WidgetSizeHint.Medium).TemplateJson;
+        using (var doc = JsonDocument.Parse(healthy))
+        {
+            var styles = new List<string>();
+            CollectContainerStyles(doc.RootElement, styles);
+            // A healthy fleet's only "coloured" container is the good fleet tick; meters are accent/emphasis.
+            Assert.DoesNotContain("attention", styles);
+            Assert.DoesNotContain("warning", styles);
+            Assert.Contains("accent", styles);
+        }
+    }
+
+    private static void CollectContainerStyles(JsonElement el, List<string> styles)
+    {
+        if (el.ValueKind == JsonValueKind.Object)
+        {
+            if (el.TryGetProperty("type", out var t) && t.GetString() == "Container" &&
+                el.TryGetProperty("style", out var s) && s.ValueKind == JsonValueKind.String)
+            {
+                styles.Add(s.GetString() ?? string.Empty);
+            }
+
+            foreach (var p in el.EnumerateObject())
+            {
+                CollectContainerStyles(p.Value, styles);
+            }
+        }
+        else if (el.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var i in el.EnumerateArray())
+            {
+                CollectContainerStyles(i, styles);
+            }
+        }
     }
 
     [Fact]
@@ -282,7 +379,7 @@ public sealed class WidgetCardRendererTests
         var healthColors = new List<string>();
         Collect(doc.RootElement, accentTexts, healthColors);
 
-        Assert.Contains("ServerAlyzer", accentTexts); // brand is the accent-coloured text
+        Assert.Contains(En.FleetKicker, accentTexts); // the FLEET kicker is the accent-coloured text
         Assert.DoesNotContain("accent", healthColors); // health labels never accent
     }
 

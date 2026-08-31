@@ -43,7 +43,7 @@ public sealed class WidgetCardPreviewTests
 
         using var doc = JsonDocument.Parse(card.TemplateJson); // asserts valid JSON
         Assert.Equal("AdaptiveCard", doc.RootElement.GetProperty("type").GetString());
-        Assert.Equal("1.5", doc.RootElement.GetProperty("version").GetString());
+        Assert.Equal("1.6", doc.RootElement.GetProperty("version").GetString());
 
         var dir = Path.Combine(Path.GetTempPath(), "sm-widget-preview");
         Directory.CreateDirectory(dir);
