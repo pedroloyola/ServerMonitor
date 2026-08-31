@@ -1,7 +1,16 @@
 # ADR-018 — Widget oficial do Windows (M13)
 
-Estado: **proposto**. O M13 integra o ServerAlyzer com o ecossistema oficial de **Widgets do Windows 11**
-(painel de Widgets), distinto do Modo Compacto (ADR-014, uma janela WinUI própria). Constrói sobre M1–M12
+Estado: **aceite** (2026-08-31). A arquitetura desta ADR está integralmente implementada no ramo
+`feature/m13-windows-widget` (5 commits), revista de forma independente com **C0/H0/M0** por segurança
+(Vigil), fiabilidade (Atlas) e visual (Prism), e **validada num host real de Widgets do Windows 11**
+(descoberta, ativação COM, render Small/Medium/Large em claro+escuro, atualização ao vivo, ativação
+cold/warm/rápida com instância única, isolamento de rede do provider com zero SSH, create/delete/
+re-create). O que falta é **integração de release** — fragmento de manifesto de produção, gating do
+payload, versão de pacote da Store e arte final do widget: trabalho de empacotamento, não de arquitetura
+(ver «Integração de release» no fim).
+
+O M13 integra o ServerAlyzer com o ecossistema oficial de **Widgets do Windows 11** (painel de
+Widgets), distinto do Modo Compacto (ADR-014, uma janela WinUI própria). Constrói sobre M1–M12
 e **não** adiciona monitorização nova nem inicia macOS desktop. Este documento é graduado a partir da
 investigação da Fase 0 e é atualizado à medida que cada slice da Fase 1 se prova em runtime/review.
 
@@ -288,10 +297,31 @@ fronteira COM.
 - ⚠️ Acrescenta um executável + CLSID COM + assets de widget ao pacote; a funcionalidade requer 22H2; QA
   de host real é provavelmente um passo humano/Store; os Adaptive Cards limitam a UI.
 
-## Em aberto (slices seguintes / humano)
+## Integração de release (o que falta para produção)
 
-Fundação do provider COM e manifesto (windows.comServer/uap3:AppExtension), CLSID dedicado, reader com
-limite de tamanho de ficheiro e limpeza de temps órfãos, `GetWidgetInfos` no arranque, serialização
-Create/Delete e barreira último-Delete/novo-Create, shutdown idempotente, contenção neutral-on-exception
-em toda a fronteira COM, rendering final S/M/L, ativação/deep-link da app, e a versão de pacote da Store
-para o release do widget (respeitando P-016, Revision=0).
+A arquitetura está fechada; o pacote de produção ainda **não** transporta o widget. O `Package.appxmanifest`
+de produção continua exatamente como em 1.0.1.0 e as duas hooks de packaging no `ServerMonitor.App.csproj`
+(staging do `ServerAlyzer.WidgetProvider.exe` e inclusão de `Public\**`) estão condicionadas a
+`DevIdentity == true`. O release do widget exige, num slice próprio e com aprovação humana:
+
+1. Portar para o manifesto de produção o `com:ExeServer` do provider (CLSID `78CFFBEF-…`, imutável), o
+   `uap3:AppExtension com.microsoft.windows.widgets` e o `uap:Extension windows.protocol` `serveralyzer`
+   — **mantendo** o CLSID de notificação de produção `4B2E9C7A-…` e o piso `MinVersion=10.0.22000.0`.
+   O CLSID DEV `206ACD0C-…` **nunca** entra no pacote de produção.
+2. Estender as duas hooks de packaging ao perfil de produção (`Packaged == true`), mantendo o provider
+   **framework-dependent** — uma única linha de runtime Windows App SDK 2.3.1 partilhada com a app.
+3. Substituir os *placeholders* de `Public\` por arte final: ícone do provider e **screenshot real do card**
+   (o atual é o logo, não o widget), e decidir se `DisplayName`/`Description` da definição passam a
+   `ms-resource:` (o pacote declara pt-BR/pt-PT/en-US).
+4. Subir a versão de pacote da Store respeitando **P-016 (Revision = 0)**.
+5. Congelar o `Id` da definição (`ServerAlyzer_Widget`) e o CLSID do provider: alterá-los depois de haver
+   widgets afixados órfão-os no board.
+
+## Em aberto
+
+Gates de runtime que continuam **NOT_RUN** e nunca são contados como PASS: rehidratação do provider após
+reinício natural, estados *unavailable*/*empty* no board (sem harness sintético seguro), frota de 6
+servidores com overflow em host real (só existem 2), servidor offline renderizado no board, e QA do
+pacote de **produção** instalado (a validação de board foi feita com um loose layout DEV registado, não
+com um MSIX de produção). Polish visual diferido por decisão humana: Prism M2/M3; o *whitespace* do Large
+foi aceite (chrome do menu `⋯` do host + headroom de escalabilidade até 6 servidores).
