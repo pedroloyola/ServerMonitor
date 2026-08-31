@@ -16,8 +16,8 @@ public sealed record WidgetCard(string TemplateJson, string DataJson);
 /// language (Fable design, refined against the real host): a caps accent kicker, an oversized numeric hero
 /// with a small trailing unit, and full-bleed segmented tick meters — colour used only for meaning, all
 /// top-aligned. Uses ONLY widget-supported elements (<c>TextBlock</c>, <c>ColumnSet</c>/<c>Column</c>,
-/// <c>Container</c>) plus container <c>style</c> backgrounds (with fixed-pixel gap columns) for the meters —
-/// no images/HTML/SVG. <c>"header": null</c> lets the composition own the top region (that strip is not
+/// <c>Container</c>) - the meters are TextBlock GLYPH runs, not styled container backgrounds, because only
+/// foreground colours resolve usefully per theme in the host's light config (M13-QA-6) - no images/HTML/SVG. <c>"header": null</c> lets the composition own the top region (that strip is not
 /// clickable, so the body carries the <c>selectAction</c> deep-links). Health is always a text label AND a
 /// colour (§18); the accent role is used ONLY for the fleet kicker (never for health, §4) - and note that
 /// Adaptive Cards "accent" is an ENUM the host resolves to the SYSTEM accent, not our brand #1846E1, so the
@@ -35,7 +35,19 @@ public static class WidgetCardRenderer
     };
 
     private const string Dot = "●";           // status glyph
-    private const int MeterSegments = 10;      // ticks per metric meter
+    // MEASURED on the real board, not chosen: a Default-size tick glyph has a ~13px advance and a metric
+    // column on the 300px-wide card is ~90px, so only ~6 ticks fit. The first glyph attempt declared 10 and
+    // the host silently clipped the rest, which is worse than the contrast bug it replaced - a truncated
+    // instrument answers confidently and wrongly (Prism). Five ticks need ~65px and leave real margin, and
+    // 20% per tick still reads as magnitude beside the exact percentage printed right above it.
+    // Changing this REQUIRES re-measuring on the board.
+    private const int MeterSegments = 5;       // ticks per metric meter - see note above
+
+    // The fleet bar draws one tick per server, so it is unbounded by nature. Same pitch, and it shares the
+    // hero row with the fraction and its label, so it gets a smaller budget. Above this the bar is omitted
+    // rather than truncated: the hero "N/N" and, on Large, the fleet-summary footer still state the whole
+    // truth, so nothing is hidden - only the glanceable form degrades, and it degrades honestly.
+    private const int MaxFleetTicks = 8;
 
     // M13-QA-6. The meters used Container BACKGROUND styles ("accent" filled, "emphasis" empty). Container
     // styles are the one part of the palette the host does not resolve usefully per theme: in its light
@@ -49,8 +61,8 @@ public static class WidgetCardRenderer
     // the distinction does not rest on colour alone and survives High Contrast.
     private const string TickFilled = "▮";      // black vertical rectangle
     private const string TickEmpty = "▯";       // white (outlined) vertical rectangle
-    private const string MeterSize = "Default";     // metric meter glyph size
-    private const string FleetSize = "Default";     // fleet-bar glyph size
+    // ONE size everywhere: pitch is then a single measured quantity rather than a per-size unknown.
+    private const string TickSize = "Default";
 
     public static WidgetCard Render(WidgetViewModel vm)
     {
@@ -88,15 +100,22 @@ public static class WidgetCardRenderer
     private static JsonArray SmallBody(WidgetViewModel vm)
     {
         var (number, unit) = SplitFraction(vm.HeroValue);
-        return new JsonArray
+        var body = new JsonArray
         {
             Text(vm.FleetKicker, size: "Small", weight: "Bolder", color: "accent"),
             NumberUnit(number, unit, "ExtraLarge", "Medium", vm.OverallHealthColor, unitSubtle: false),
             Text(vm.HeroLabel.ToUpperInvariant(), size: "Small", weight: "Bolder", color: vm.OverallHealthColor,
-                spacingNone: true),
-            FleetBar(vm, FleetSize),
-            Freshness(vm)
+                spacingNone: true)
         };
+
+        // Omitted above the tick budget - never added as a JSON null.
+        if (FleetBar(vm) is { } bar)
+        {
+            body.Add(bar);
+        }
+
+        body.Add(Freshness(vm));
+        return body;
     }
 
     // ---- Medium / Large: hero header (kicker + freshness, then fraction + label + fleet bar) then blocks.
@@ -186,13 +205,21 @@ public static class WidgetCardRenderer
                 {
                     Text(unit, size: "Medium", weight: "Bolder", color: vm.OverallHealthColor, spacingNone: true)
                 }, verticalAlignment: "Bottom", spacingNone: true),
-                Column("stretch", new JsonArray
-                {
-                    labelRow,
-                    FleetBar(vm, large ? "Medium" : FleetSize)
-                }, verticalAlignment: "Center", spacing: "Medium")
+                Column("stretch", HeroLabelColumn(vm, labelRow), verticalAlignment: "Center", spacing: "Medium")
             }
         };
+    }
+
+    // The hero's label column, plus the fleet bar when it fits within the tick budget.
+    private static JsonArray HeroLabelColumn(WidgetViewModel vm, JsonObject labelRow)
+    {
+        var items = new JsonArray { labelRow };
+        if (FleetBar(vm) is { } bar)
+        {
+            items.Add(bar);
+        }
+
+        return items;
     }
 
     // Large-only fleet-summary footer: four stat tiles from the health counts (only non-zero severities
@@ -278,7 +305,7 @@ public static class WidgetCardRenderer
         var items = new JsonArray
         {
             NumberUnit(number, unit, "Large", "Small", color: null, unitSubtle: true),
-            Meter(fraction, large ? "Medium" : MeterSize),
+            Meter(fraction),
             Text(label.ToUpperInvariant(), size: "Small", subtle: true, spacingNone: true)
         };
 
@@ -329,36 +356,44 @@ public static class WidgetCardRenderer
     // only on the chip). Fill rule: ceil(pct/step), min 1 lit tick when pct > 0. Unknown (fraction < 0) =
     // all-empty track (§19). See the TickFilled/TickEmpty note for why these are glyphs and not styled
     // container backgrounds (M13-QA-6).
-    private static JsonObject Meter(double fraction, string size)
+    // ONE TextBlock, not one column per colour run. Splitting the track across auto columns let the host
+    // squeeze each column and cut the glyphs with an ellipsis - the meter rendered as "▮▯ ▯..." on the real
+    // board. A single block lays out as ordinary text and cannot be split, so the whole track always draws.
+    // The cost is that the track carries ONE colour role, so filled and empty are told apart by SHAPE -
+    // solid vs outlined - which was already the primary differentiator and is the one that survives High
+    // Contrast and colour-vision deficiency.
+    private static JsonObject Meter(double fraction)
     {
         var filled = FilledSegments(fraction, MeterSegments);
-        return GlyphBar(
-            new[]
-            {
-                (Repeat(TickFilled, filled), "accent", false),
-                (Repeat(TickEmpty, MeterSegments - filled), (string?)null, true)
-            },
-            size);
+        var track = Repeat(TickFilled, filled) + Repeat(TickEmpty, MeterSegments - filled);
+        return Text(track, size: TickSize, weight: "Bolder", color: "accent", spacingNone: true);
     }
 
     // Fleet bar: one tick per server, worst-first, in health FOREGROUND colours. The fleet bar IS
     // health-coloured by design, unlike the metric meters - but it had the same light-theme failure for the
     // same reason, so it moves to glyphs too. Unknown has no health colour and uses the subtle foreground.
-    private static JsonObject FleetBar(WidgetViewModel vm, string size) => GlyphBar(
-        new[]
+    private static JsonObject? FleetBar(WidgetViewModel vm)
+    {
+        // Omit rather than truncate above the measured budget - a bar showing 8 of 20 servers would be a
+        // confident lie about the fleet. The hero fraction and the Large footer keep stating the totals.
+        if (vm.TotalServers > MaxFleetTicks)
+        {
+            return null;
+        }
+
+        return GlyphBar(new[]
         {
             (Repeat(TickFilled, vm.CriticalCount + vm.OfflineCount), "attention", false),
             (Repeat(TickFilled, vm.WarningCount), "warning", false),
             (Repeat(TickFilled, vm.UnknownCount), (string?)null, true),
             (Repeat(TickFilled, vm.HealthyCount), "good", false)
-        },
-        size);
+        });
+    }
 
-    // A row of tick glyphs built from coloured runs. Each run is its own TextBlock in an auto column with
-    // no spacing, so the runs read as one continuous bar while each keeps its own foreground colour - which
-    // is the whole point: foreground colours are the part of the palette the host resolves correctly in
-    // both themes.
-    private static JsonObject GlyphBar(IEnumerable<(string Text, string? Color, bool Subtle)> runs, string size)
+    // The fleet bar genuinely needs one colour per health, so it keeps coloured runs in adjacent auto
+    // columns. It can afford to: it is bounded to MaxFleetTicks and sits in the wide hero region, where the
+    // per-metric meters had only a third of the card. Verified on the real board at the bound.
+    private static JsonObject GlyphBar(IEnumerable<(string Text, string? Color, bool Subtle)> runs)
     {
         var columns = new JsonArray();
         foreach (var (text, color, subtle) in runs)
@@ -370,7 +405,7 @@ public static class WidgetCardRenderer
 
             columns.Add(Column("auto", new JsonArray
             {
-                Text(text, size: size, weight: "Bolder", color: color, subtle: subtle, spacingNone: true)
+                Text(text, size: TickSize, weight: "Bolder", color: color, subtle: subtle, spacingNone: true)
             }, spacingNone: true));
         }
 

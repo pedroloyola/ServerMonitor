@@ -358,13 +358,22 @@ public sealed class WidgetCardRendererTests
         Assert.Contains(En.Offline.ToUpperInvariant(), json);
     }
 
-    // ---- M13-QA-6: the meter is glyph runs with FOREGROUND colours, not styled container backgrounds ----
+    // ---- M13-QA-6: the meter is ONE TextBlock of glyphs in a FOREGROUND colour role, not styled
+    // container backgrounds and not per-run columns ----
 
     private const string TickFilled = "\u25AE";
     private const string TickEmpty = "\u25AF";
 
-    private static bool IsTicks(string text, string glyph) =>
-        text.Length > 0 && text.All(c => c.ToString() == glyph);
+    // Any TextBlock made only of tick glyphs, filled and empty mixed.
+    private static bool IsTrack(string text) =>
+        text.Length > 0 && text.All(c => c.ToString() == TickFilled || c.ToString() == TickEmpty);
+
+    private static int CountFilled(string track) => track.Count(c => c.ToString() == TickFilled);
+    private static int CountEmpty(string track) => track.Count(c => c.ToString() == TickEmpty);
+
+    // The per-metric meter tracks: one TextBlock each, mixed glyphs, in the accent role.
+    private static List<string> MeterTracks(JsonElement root) =>
+        TickRuns(root).Where(r => r.Color == "accent" && IsTrack(r.Text)).Select(r => r.Text).ToList();
 
     // Every TextBlock made purely of tick glyphs, with its colour role and subtlety.
     private static List<(string Text, string? Color, bool Subtle)> TickRuns(JsonElement el)
@@ -379,7 +388,7 @@ public sealed class WidgetCardRendererTests
             {
                 if (e.TryGetProperty("type", out var t) && t.GetString() == "TextBlock"
                     && e.TryGetProperty("text", out var tx) && tx.GetString() is { Length: > 0 } text
-                    && (IsTicks(text, TickFilled) || IsTicks(text, TickEmpty)))
+                    && IsTrack(text))
                 {
                     var color = e.TryGetProperty("color", out var c) ? c.GetString() : null;
                     var subtle = e.TryGetProperty("isSubtle", out var sub) && sub.GetBoolean();
@@ -418,63 +427,55 @@ public sealed class WidgetCardRendererTests
         // A critical server must NOT tint its metric meters red: health lives only on the chip and on the
         // fleet bar, which is health-coloured by design.
         var root = AssertValidCard(Render(Read(Server("db", WidgetHealth.Critical)), WidgetSizeHint.Medium).TemplateJson);
-        var runs = TickRuns(root);
 
-        var filledMetric = runs.Where(r => IsTicks(r.Text, TickFilled) && r.Color == "accent").ToList();
-        Assert.Equal(3, filledMetric.Count);
+        Assert.Equal(3, MeterTracks(root).Count);   // three metrics, all in the neutral accent role
 
         // The only health-coloured tick run on the card is the fleet bar.
-        var healthColoured = runs.Where(r => r.Color is "attention" or "warning" or "good").ToList();
+        var healthColoured = TickRuns(root).Where(r => r.Color is "attention" or "warning" or "good").ToList();
         Assert.Single(healthColoured);
         Assert.Equal("attention", healthColoured[0].Color);
     }
 
     [Fact]
-    public void Empty_track_is_outlined_and_subtle_so_it_does_not_rely_on_colour_alone()
+    public void Filled_and_empty_are_told_apart_by_shape_not_by_colour()
     {
-        var root = AssertValidCard(Render(Read(Server("db", WidgetHealth.Healthy, cpu: 30, mem: 30, disk: 30)),
+        // The track is ONE block in ONE colour role, so the states cannot rely on colour: a filled tick is
+        // a solid glyph and an empty one is outlined. That difference survives High Contrast and colour
+        // vision deficiency, and it is what makes a single-colour track legible.
+        var root = AssertValidCard(Render(Read(Server("db", WidgetHealth.Healthy, cpu: 60, mem: 60, disk: 60)),
             WidgetSizeHint.Medium).TemplateJson);
-        var empty = TickRuns(root).Where(r => IsTicks(r.Text, TickEmpty)).ToList();
 
-        Assert.NotEmpty(empty);
-        foreach (var run in empty)
+        var tracks = MeterTracks(root);
+        Assert.Equal(3, tracks.Count);
+        foreach (var track in tracks)
         {
-            Assert.True(run.Subtle);   // muted...
-            Assert.Null(run.Color);    // ...in the default foreground, never a health or accent role
+            Assert.Equal(3, CountFilled(track));
+            Assert.Equal(MeasuredMeterSegments - 3, CountEmpty(track));
+            Assert.NotEqual(TickFilled[0], TickEmpty[0]);   // the two states are different glyphs
         }
     }
 
     [Theory]
     [InlineData(0, 0)]
     [InlineData(1, 1)]     // any non-zero magnitude lights at least one tick
-    [InlineData(30, 3)]
-    [InlineData(55, 6)]    // ceil
-    [InlineData(100, 10)]
+    [InlineData(20, 1)]
+    [InlineData(30, 2)]    // ceil
+    [InlineData(60, 3)]
+    [InlineData(100, 5)]
     public void Filled_tick_count_tracks_magnitude(int percent, int expectedFilled)
     {
         var root = AssertValidCard(Render(Read(
             Server("db", WidgetHealth.Healthy, cpu: percent, mem: percent, disk: percent)),
             WidgetSizeHint.Medium).TemplateJson);
 
-        var runs = TickRuns(root);
-        var filled = runs.Where(r => r.Color == "accent").ToList();
-        var empty = runs.Where(r => IsTicks(r.Text, TickEmpty)).ToList();
-
-        if (expectedFilled == 0)
+        var tracks = MeterTracks(root);
+        Assert.Equal(3, tracks.Count);
+        foreach (var track in tracks)
         {
-            Assert.Empty(filled);
-        }
-        else
-        {
-            Assert.Equal(3, filled.Count);
-            Assert.All(filled, r => Assert.Equal(expectedFilled, r.Text.Length));
-        }
-
-        // Filled + empty always spans the whole track: the bar never shrinks.
-        if (expectedFilled < 10)
-        {
-            Assert.Equal(3, empty.Count);
-            Assert.All(empty, r => Assert.Equal(10 - expectedFilled, r.Text.Length));
+            Assert.Equal(expectedFilled, CountFilled(track));
+            Assert.Equal(MeasuredMeterSegments - expectedFilled, CountEmpty(track));
+            // The declared track is always drawn whole - never shortened, never truncated.
+            Assert.Equal(MeasuredMeterSegments, track.Length);
         }
     }
 
@@ -485,11 +486,87 @@ public sealed class WidgetCardRendererTests
             Server("db", WidgetHealth.Healthy, cpu: null, mem: null, disk: null)),
             WidgetSizeHint.Medium).TemplateJson);
 
-        var runs = TickRuns(root);
-        Assert.DoesNotContain(runs, r => r.Color == "accent");
-        Assert.Equal(3, runs.Count(r => IsTicks(r.Text, TickEmpty) && r.Text.Length == 10));
+        var tracks = MeterTracks(root);
+        Assert.Equal(3, tracks.Count);
+        // An unknown metric draws the full track with nothing lit - it never invents a zero-length bar.
+        Assert.All(tracks, t => Assert.Equal(MeasuredMeterSegments, t.Length));
+        Assert.All(tracks, t => Assert.Equal(0, CountFilled(t)));
         // And the number itself is the unknown placeholder, not "0".
         Assert.Contains(En.MetricUnknown, AllTexts(root));
+    }
+
+    // ---- M13-QA-6: INTEGRITY. A legible but truncated instrument is worse than an illegible one - it
+    // answers confidently and wrongly. These capacities were MEASURED on the real board and are written as
+    // literals on purpose. It took three attempts to get here: 10 glyph segments were clipped to about 6;
+    // 5 segments split across auto columns were cut with an ellipsis; only one TextBlock holding the whole
+    // track survives, because there is then nothing for the host to squeeze. Every earlier attempt passed
+    // its tests, because the tests checked string lengths rather than what the host draws. ----
+
+    public const int MeasuredMeterSegments = 5;   // fits a ~90px metric column at the measured ~13px pitch
+    public const int MeasuredMaxFleetTicks = 8;   // fits the hero row beside the fraction and its label
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(37)]
+    [InlineData(99)]
+    [InlineData(100)]
+    public void Meter_always_draws_every_segment_it_declares(int percent)
+    {
+        foreach (var size in new[] { WidgetSizeHint.Medium, WidgetSizeHint.Large })
+        {
+            var root = AssertValidCard(Render(Read(
+                Server("db", WidgetHealth.Healthy, cpu: percent, mem: percent, disk: percent)), size).TemplateJson);
+
+            // Per metric cell: filled + empty must total the declared track, exactly. Three metrics per row.
+            var tracks = MeterTracks(root);
+            var rows = ServerBlocks(root).Count;
+            Assert.Equal(3 * rows, tracks.Count);
+            Assert.All(tracks, t => Assert.Equal(MeasuredMeterSegments, t.Length));
+        }
+    }
+
+    [Fact]
+    public void Meter_segment_count_matches_the_capacity_measured_on_the_board()
+    {
+        // The production constant must equal what was measured, not the other way round.
+        var root = AssertValidCard(Render(Read(Server("db", WidgetHealth.Healthy, cpu: 0, mem: 0, disk: 0)),
+            WidgetSizeHint.Medium).TemplateJson);
+        var tracks = MeterTracks(root);
+        Assert.Equal(3, tracks.Count);
+        Assert.All(tracks, t => Assert.Equal(MeasuredMeterSegments, t.Length));
+        Assert.All(tracks, t => Assert.Equal(0, CountFilled(t)));
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(4)]
+    [InlineData(8)]
+    public void Fleet_bar_is_drawn_within_the_tick_budget(int servers)
+    {
+        var fleet = Enumerable.Range(0, servers).Select(i => Server($"s{i:D2}", WidgetHealth.Healthy)).ToArray();
+        var root = AssertValidCard(Render(Read(fleet), WidgetSizeHint.Small).TemplateJson);
+
+        // Small renders no rows, so every tick run belongs to the fleet bar.
+        Assert.Equal(servers, TickRuns(root).Sum(r => r.Text.Length));
+    }
+
+    [Theory]
+    [InlineData(9)]
+    [InlineData(40)]
+    public void Fleet_bar_is_omitted_rather_than_truncated_above_the_budget(int servers)
+    {
+        var fleet = Enumerable.Range(0, servers).Select(i => Server($"s{i:D2}", WidgetHealth.Healthy)).ToArray();
+        var json = Render(Read(fleet), WidgetSizeHint.Small).TemplateJson;
+        var root = AssertValidCard(json);
+
+        Assert.True(servers > MeasuredMaxFleetTicks);
+        // No partial bar - a bar showing 8 of 40 would be a confident lie about the fleet.
+        Assert.Empty(TickRuns(root));
+        // ...and no JSON null left where it used to be.
+        Assert.DoesNotContain("null", json.Replace("\"header\":null", string.Empty), StringComparison.Ordinal);
+        // The hero still states the whole truth.
+        Assert.Contains($"{servers}", AllTexts(root));
     }
 
     [Fact]
