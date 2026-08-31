@@ -14,11 +14,30 @@ namespace ServerMonitor.WidgetProvider.Rendering;
 /// </summary>
 public static class WidgetViewModelBuilder
 {
-    /// <summary>Max servers rendered per size. Small shows a summary only.</summary>
+    /// <summary>
+    /// Max servers rendered per size. Small shows a summary only.
+    /// <para>
+    /// These are HOST-CAPACITY limits measured on the real Windows Widgets board, not arbitrary caps: the
+    /// host gives each size a FIXED card height and silently clips whatever does not fit. Both values were
+    /// wrong before and had to be measured (M13-QA-4 Medium, M13-QA-5 Large / P-017):
+    /// </para>
+    /// <list type="bullet">
+    /// <item>Medium held 2 instrument-panel blocks, not 3. The third was clipped, and the "+N more" line
+    /// that follows the blocks was clipped with it.</item>
+    /// <item>Large held 3 blocks plus the fleet-summary footer, not 6. With 4-6 servers the old cap made
+    /// <c>overflow</c> zero, so no affordance was emitted at all and the extra servers AND the footer
+    /// disappeared with no indication whatsoever.</item>
+    /// </list>
+    /// <para>
+    /// Both failures were the same bug: a cap validated against the view model instead of against what the
+    /// host actually renders. Any change here MUST be re-verified on the real board with a fleet LARGER
+    /// than the cap; a green view-model test only proves the arithmetic, never that the content fits.
+    /// </para>
+    /// </summary>
     public static int MaxRowsFor(WidgetSizeHint size) => size switch
     {
-        WidgetSizeHint.Large => 6,
-        WidgetSizeHint.Medium => 3,
+        WidgetSizeHint.Large => 3,
+        WidgetSizeHint.Medium => 2,
         _ => 0
     };
 
@@ -50,6 +69,10 @@ public static class WidgetViewModelBuilder
         var ordered = WidgetOrdering.ForDisplay(snapshot.Servers);
         var maxRows = MaxRowsFor(size);
         var shown = ordered.Take(maxRows).Select(s => ToRow(s, strings)).ToArray();
+        // TRUTHFUL DEGRADATION INVARIANT (M13-QA-4 / QA-5): visible + overflow == total, always, and any
+        // size that renders rows must announce every server it does not render. A server can never vanish
+        // from the card without the user being told. Small is exempt by construction: it renders no rows at
+        // all and is honest about being a fleet verdict (N/N + gauge), so it hides nothing it implied.
         var overflow = Math.Max(0, snapshot.Servers.Count - maxRows);
 
         return new WidgetViewModel

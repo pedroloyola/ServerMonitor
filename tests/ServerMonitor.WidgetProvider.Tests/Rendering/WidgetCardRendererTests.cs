@@ -107,14 +107,202 @@ public sealed class WidgetCardRendererTests
         Assert.Contains("Warning", medium); // health label as text (§18)
     }
 
-    [Fact]
-    public void Large_caps_rows_and_shows_more()
+    // ---- M13-QA-4 / P-017: Medium capacity + truthful overflow + no dangling separator ----------
+
+    // Counts the server telemetry blocks in a card body: a Container that carries an openServer action.
+    private static List<JsonElement> ServerBlocks(JsonElement root) =>
+        root.GetProperty("body").EnumerateArray()
+            .Where(e => e.ValueKind == JsonValueKind.Object
+                        && e.TryGetProperty("type", out var t) && t.GetString() == "Container"
+                        && e.TryGetProperty("selectAction", out _))
+            .ToList();
+
+    private static IEnumerable<JsonElement> BodyItems(JsonElement root) =>
+        root.GetProperty("body").EnumerateArray();
+
+    // Every TextBlock "text" value in the card, JSON-decoded (the serializer escapes "+" as +).
+    private static IEnumerable<string> AllTexts(JsonElement element)
     {
-        var servers = Enumerable.Range(0, 20).Select(i => Server($"srv{i}", WidgetHealth.Healthy)).ToArray();
-        var json = Render(Read(servers), WidgetSizeHint.Large).TemplateJson;
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            if (element.TryGetProperty("type", out var t) && t.GetString() == "TextBlock"
+                && element.TryGetProperty("text", out var text) && text.GetString() is { } value)
+            {
+                yield return value;
+            }
+
+            foreach (var prop in element.EnumerateObject())
+            {
+                foreach (var found in AllTexts(prop.Value)) { yield return found; }
+            }
+        }
+        else if (element.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in element.EnumerateArray())
+            {
+                foreach (var found in AllTexts(item)) { yield return found; }
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(1, 1, 0)]
+    [InlineData(2, 2, 0)]
+    [InlineData(3, 2, 1)]
+    [InlineData(4, 2, 2)]
+    [InlineData(100, 2, 98)]
+    public void Medium_renders_two_blocks_and_announces_the_rest(int total, int expectedBlocks, int expectedOverflow)
+    {
+        var servers = Enumerable.Range(0, total)
+            .Select(i => Server($"srv{i:D3}", WidgetHealth.Healthy)).ToArray();
+        var json = Render(Read(servers), WidgetSizeHint.Medium).TemplateJson;
+        var root = AssertValidCard(json);
+
+        Assert.Equal(expectedBlocks, ServerBlocks(root).Count);
+
+        // Assert on PARSED text, never the raw JSON: the serializer escapes "+" as +.
+        var texts = AllTexts(root).ToList();
+        var overflowText = $"+{expectedOverflow} more";
+        if (expectedOverflow == 0)
+        {
+            Assert.DoesNotContain(texts, t => t.EndsWith(" more", StringComparison.Ordinal));
+        }
+        else
+        {
+            Assert.Contains(overflowText, texts);
+            // The overflow affordance is the LAST thing in the body, so it can never be pushed off the
+            // card by another block - that is precisely how servers used to vanish silently (P-017).
+            var last = BodyItems(root).Last();
+            Assert.Equal("TextBlock", last.GetProperty("type").GetString());
+            Assert.Equal(overflowText, last.GetProperty("text").GetString());
+        }
+    }
+
+    [Fact]
+    public void Medium_never_serializes_a_server_beyond_the_cap()
+    {
+        var json = Render(Read(
+            Server("alpha", WidgetHealth.Healthy),
+            Server("bravo", WidgetHealth.Healthy),
+            Server("charlie", WidgetHealth.Healthy)), WidgetSizeHint.Medium).TemplateJson;
+
         AssertValidCard(json);
-        // 6 rows rendered, "14 more" affordance.
-        Assert.Contains("14", json);
+        Assert.Contains("alpha", json, StringComparison.Ordinal);
+        Assert.Contains("bravo", json, StringComparison.Ordinal);
+        // The third server is not rendered at all - not its name, and not its opaque id.
+        Assert.DoesNotContain("charlie", json, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(WidgetSizeHint.Medium, 1)]
+    [InlineData(WidgetSizeHint.Medium, 2)]
+    [InlineData(WidgetSizeHint.Medium, 3)]
+    [InlineData(WidgetSizeHint.Medium, 10)]
+    [InlineData(WidgetSizeHint.Large, 3)]
+    [InlineData(WidgetSizeHint.Large, 6)]
+    [InlineData(WidgetSizeHint.Large, 20)]
+    public void No_dangling_separator_at_the_end_of_the_body(WidgetSizeHint size, int total)
+    {
+        var servers = Enumerable.Range(0, total)
+            .Select(i => Server($"srv{i:D3}", WidgetHealth.Healthy)).ToArray();
+        var root = AssertValidCard(Render(Read(servers), size).TemplateJson);
+
+        foreach (var item in BodyItems(root))
+        {
+            if (!item.TryGetProperty("separator", out var sep) || !sep.GetBoolean())
+            {
+                continue;
+            }
+
+            // A separator is a rule drawn ABOVE its own element, so the element that carries it must
+            // actually have content. A separator introducing nothing is the dangling line QA-4 showed.
+            Assert.True(item.TryGetProperty("items", out var items), "separator element has no items");
+            Assert.NotEqual(0, items.GetArrayLength());
+        }
+
+        // And the body itself never ends on an empty container.
+        var last = BodyItems(root).Last();
+        if (last.TryGetProperty("items", out var lastItems))
+        {
+            Assert.NotEqual(0, lastItems.GetArrayLength());
+        }
+    }
+
+    [Fact]
+    public void Medium_overflow_line_is_not_clickable_and_carries_no_server_action()
+    {
+        var servers = Enumerable.Range(0, 5).Select(i => Server($"srv{i}", WidgetHealth.Healthy)).ToArray();
+        var root = AssertValidCard(Render(Read(servers), WidgetSizeHint.Medium).TemplateJson);
+
+        var last = BodyItems(root).Last();
+        Assert.Equal("TextBlock", last.GetProperty("type").GetString());
+        // No per-element action: the overflow line falls through to the card's openDashboard, and can
+        // never carry an openServer verb for a server it does not identify.
+        Assert.False(last.TryGetProperty("selectAction", out _));
+    }
+
+    // M13-QA-5: Large holds three blocks plus the fleet-summary footer. The footer is NOT sacrificed to
+    // make room for the overflow line - both must survive, because both carry information the user needs.
+    [Theory]
+    [InlineData(1, 1, 0)]
+    [InlineData(2, 2, 0)]
+    [InlineData(3, 3, 0)]
+    [InlineData(4, 3, 1)]
+    [InlineData(6, 3, 3)]
+    [InlineData(7, 3, 4)]
+    [InlineData(100, 3, 97)]
+    public void Large_renders_three_blocks_announces_the_rest_and_keeps_the_footer(
+        int total, int expectedBlocks, int expectedOverflow)
+    {
+        var servers = Enumerable.Range(0, total)
+            .Select(i => Server($"srv{i:D3}", WidgetHealth.Healthy)).ToArray();
+        var root = AssertValidCard(Render(Read(servers), WidgetSizeHint.Large).TemplateJson);
+
+        Assert.Equal(expectedBlocks, ServerBlocks(root).Count);
+
+        var texts = AllTexts(root).ToList();
+        if (expectedOverflow == 0)
+        {
+            Assert.DoesNotContain(texts, t => t.EndsWith(" more", StringComparison.Ordinal));
+        }
+        else
+        {
+            Assert.Contains($"+{expectedOverflow} more", texts);
+        }
+
+        // The fleet-summary footer survives in every case: its four labels are always present.
+        foreach (var label in new[] { En.HealthyPlural, En.Warning, En.Critical, En.Offline })
+        {
+            Assert.Contains(label.ToUpperInvariant(), texts.Select(t => t.ToUpperInvariant()));
+        }
+    }
+
+    [Fact]
+    public void Large_never_serializes_a_server_beyond_the_cap()
+    {
+        var json = Render(Read(
+            Server("alpha", WidgetHealth.Healthy),
+            Server("bravo", WidgetHealth.Healthy),
+            Server("charlie", WidgetHealth.Healthy),
+            Server("delta", WidgetHealth.Healthy)), WidgetSizeHint.Large).TemplateJson;
+
+        AssertValidCard(json);
+        Assert.Contains("alpha", json, StringComparison.Ordinal);
+        Assert.Contains("bravo", json, StringComparison.Ordinal);
+        Assert.Contains("charlie", json, StringComparison.Ordinal);
+        Assert.DoesNotContain("delta", json, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Large_overflow_line_carries_no_server_action()
+    {
+        var servers = Enumerable.Range(0, 9).Select(i => Server($"srv{i}", WidgetHealth.Healthy)).ToArray();
+        var root = AssertValidCard(Render(Read(servers), WidgetSizeHint.Large).TemplateJson);
+
+        var overflow = BodyItems(root).Single(e =>
+            e.TryGetProperty("type", out var t) && t.GetString() == "TextBlock"
+            && e.TryGetProperty("text", out var x) && x.GetString() == "+6 more");
+        Assert.False(overflow.TryGetProperty("selectAction", out _));
     }
 
     [Fact]

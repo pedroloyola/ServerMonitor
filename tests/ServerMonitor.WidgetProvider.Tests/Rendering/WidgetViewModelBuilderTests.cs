@@ -137,8 +137,8 @@ public sealed class WidgetViewModelBuilderTests
 
     [Theory]
     [InlineData(WidgetSizeHint.Small, 0)]
-    [InlineData(WidgetSizeHint.Medium, 3)]
-    [InlineData(WidgetSizeHint.Large, 6)]
+    [InlineData(WidgetSizeHint.Medium, 2)]
+    [InlineData(WidgetSizeHint.Large, 3)]
     public void Rows_are_capped_per_size_with_overflow(WidgetSizeHint size, int maxRows)
     {
         var servers = Enumerable.Range(0, 100).Select(i => Server($"s{i}", WidgetHealth.Healthy)).ToArray();
@@ -150,6 +150,176 @@ public sealed class WidgetViewModelBuilderTests
         {
             Assert.Contains((100 - maxRows).ToString(CultureInfo.InvariantCulture), vm.OverflowText);
         }
+    }
+
+    // M13-QA-4 / P-017. Medium holds two server blocks; anything beyond that MUST be announced by the
+    // overflow affordance. The board clips whatever exceeds the fixed card height, so a cap that is too
+    // generous makes servers vanish silently - the exact opposite of the product's honest degradation.
+    [Theory]
+    [InlineData(1, 1, 0)]
+    [InlineData(2, 2, 0)]
+    [InlineData(3, 2, 1)]
+    [InlineData(4, 2, 2)]
+    [InlineData(100, 2, 98)]
+    public void Medium_shows_two_rows_and_accounts_for_every_other_server(
+        int total, int expectedRows, int expectedOverflow)
+    {
+        var servers = Enumerable.Range(0, total).Select(i => Server($"s{i:D3}", WidgetHealth.Healthy)).ToArray();
+        var vm = Build(Read(Now, servers), WidgetSizeHint.Medium);
+
+        Assert.Equal(expectedRows, vm.Rows.Count);
+        Assert.Equal(expectedOverflow, vm.OverflowCount);
+        Assert.Equal(total, vm.TotalServers);
+
+        // The truthful-UI invariant: nothing is ever dropped without being counted.
+        Assert.Equal(total, vm.Rows.Count + vm.OverflowCount);
+
+        if (expectedOverflow == 0)
+        {
+            Assert.Empty(vm.OverflowText);
+        }
+        else
+        {
+            Assert.Contains(expectedOverflow.ToString(CultureInfo.InvariantCulture), vm.OverflowText);
+        }
+    }
+
+    // M13-QA-5 / P-017. Large holds three blocks plus the fleet-summary footer - not six. The old cap made
+    // overflow zero for 4-6 servers, so nothing was announced and the extra servers AND the footer were
+    // clipped away in silence.
+    [Theory]
+    [InlineData(1, 1, 0)]
+    [InlineData(2, 2, 0)]
+    [InlineData(3, 3, 0)]
+    [InlineData(4, 3, 1)]
+    [InlineData(6, 3, 3)]
+    [InlineData(7, 3, 4)]
+    [InlineData(100, 3, 97)]
+    public void Large_shows_three_rows_and_accounts_for_every_other_server(
+        int total, int expectedRows, int expectedOverflow)
+    {
+        var servers = Enumerable.Range(0, total).Select(i => Server($"s{i:D3}", WidgetHealth.Healthy)).ToArray();
+        var vm = Build(Read(Now, servers), WidgetSizeHint.Large);
+
+        Assert.Equal(expectedRows, vm.Rows.Count);
+        Assert.Equal(expectedOverflow, vm.OverflowCount);
+        Assert.Equal(total, vm.TotalServers);
+        Assert.Equal(total, vm.Rows.Count + vm.OverflowCount);
+
+        if (expectedOverflow == 0)
+        {
+            Assert.Empty(vm.OverflowText);
+        }
+        else
+        {
+            Assert.Contains(expectedOverflow.ToString(CultureInfo.InvariantCulture), vm.OverflowText);
+        }
+    }
+
+    [Fact]
+    public void Large_with_no_servers_is_empty_not_overflowing()
+    {
+        var vm = Build(Read(Now), WidgetSizeHint.Large);
+
+        Assert.Equal(WidgetDisplayState.Empty, vm.DisplayState);
+        Assert.Empty(vm.Rows);
+        Assert.Equal(0, vm.OverflowCount);
+        Assert.Empty(vm.OverflowText);
+    }
+
+    [Fact]
+    public void Large_keeps_severity_ordering_when_capped()
+    {
+        var vm = Build(Read(Now,
+            Server("healthy-a", WidgetHealth.Healthy),
+            Server("healthy-b", WidgetHealth.Healthy),
+            Server("warning", WidgetHealth.Warning),
+            Server("critical", WidgetHealth.Critical),
+            Server("offline", WidgetHealth.Offline)), WidgetSizeHint.Large);
+
+        Assert.Equal(3, vm.Rows.Count);
+        Assert.Equal(2, vm.OverflowCount);
+        Assert.Equal(new[] { "offline", "critical", "warning" }, vm.Rows.Select(r => r.DisplayName).ToArray());
+    }
+
+    // ---- The shared invariant. This is the guard that stops QA-4/QA-5 recurring per size. ----
+    //
+    // For every size that renders server rows, a fleet larger than what is shown MUST be announced. The
+    // two shipped defects were independent instances of exactly this rule being broken, so it is asserted
+    // once, across every size and a wide range of fleet sizes, rather than per size.
+    [Theory]
+    [InlineData(WidgetSizeHint.Medium)]
+    [InlineData(WidgetSizeHint.Large)]
+    public void Sizes_that_render_rows_never_hide_a_server_silently(WidgetSizeHint size)
+    {
+        foreach (var total in new[] { 0, 1, 2, 3, 4, 5, 6, 7, 12, 100 })
+        {
+            var servers = Enumerable.Range(0, total)
+                .Select(i => Server($"s{i:D3}", WidgetHealth.Healthy)).ToArray();
+            var vm = Build(Read(Now, servers), size);
+
+            // Nothing is ever unaccounted for.
+            Assert.Equal(total, vm.Rows.Count + vm.OverflowCount);
+            // Never render more than the measured host capacity.
+            Assert.True(vm.Rows.Count <= WidgetViewModelBuilder.MaxRowsFor(size),
+                $"{size} rendered {vm.Rows.Count} rows, above its host capacity");
+            // And the headline invariant: hidden servers are always announced.
+            if (total > vm.Rows.Count)
+            {
+                Assert.True(vm.OverflowText.Length > 0,
+                    $"{size} with {total} servers showed {vm.Rows.Count} rows and announced nothing");
+            }
+            else
+            {
+                Assert.Empty(vm.OverflowText);
+            }
+        }
+    }
+
+    [Fact]
+    public void Medium_with_no_servers_is_empty_not_overflowing()
+    {
+        var vm = Build(Read(Now), WidgetSizeHint.Medium);
+
+        Assert.Equal(WidgetDisplayState.Empty, vm.DisplayState);
+        Assert.Empty(vm.Rows);
+        Assert.Equal(0, vm.OverflowCount);
+        Assert.Empty(vm.OverflowText);
+    }
+
+    [Fact]
+    public void Medium_overflow_is_localized()
+    {
+        var servers = Enumerable.Range(0, 5).Select(i => Server($"s{i}", WidgetHealth.Healthy)).ToArray();
+        var read = Read(Now, servers);
+
+        foreach (var culture in new[] { "en-US", "pt-BR", "pt-PT" })
+        {
+            var strings = WidgetStrings.ForCulture(CultureInfo.GetCultureInfo(culture));
+            var vm = WidgetViewModelBuilder.Build(read, WidgetSizeHint.Medium, Now, strings);
+
+            Assert.Equal(2, vm.Rows.Count);
+            Assert.Equal(3, vm.OverflowCount);
+            // Localized, and never a bare number: the user must be able to read it as "more servers".
+            Assert.Contains("3", vm.OverflowText);
+            Assert.NotEqual("+3", vm.OverflowText);
+            Assert.DoesNotContain("{0}", vm.OverflowText, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void Medium_keeps_severity_ordering_when_capped()
+    {
+        // Two problems plus healthy noise: the problems must be the two that survive the cap.
+        var vm = Build(Read(Now,
+            Server("healthy-a", WidgetHealth.Healthy),
+            Server("healthy-b", WidgetHealth.Healthy),
+            Server("critical", WidgetHealth.Critical),
+            Server("offline", WidgetHealth.Offline)), WidgetSizeHint.Medium);
+
+        Assert.Equal(2, vm.Rows.Count);
+        Assert.Equal(2, vm.OverflowCount);
+        Assert.Equal(new[] { "offline", "critical" }, vm.Rows.Select(r => r.DisplayName).ToArray());
     }
 
     [Fact]
