@@ -5,9 +5,9 @@ Estado: **aceite** (2026-08-31). A arquitetura desta ADR está integralmente imp
 (Vigil), fiabilidade (Atlas) e visual (Prism), e **validada num host real de Widgets do Windows 11**
 (descoberta, ativação COM, render Small/Medium/Large em claro+escuro, atualização ao vivo, ativação
 cold/warm/rápida com instância única, isolamento de rede do provider com zero SSH, create/delete/
-re-create). O que falta é **integração de release** — fragmento de manifesto de produção, gating do
-payload, versão de pacote da Store e arte final do widget: trabalho de empacotamento, não de arquitetura
-(ver «Integração de release» no fim).
+re-create). O pacote de produção (1.1.0.0) já transporta o widget e foi auditado extraído; o que falta é
+ambiente — arte final do picker e QA do pacote de produção instalado (ver «Integração de release» e «Em
+aberto» no fim).
 
 O M13 integra o ServerAlyzer com o ecossistema oficial de **Widgets do Windows 11** (painel de
 Widgets), distinto do Modo Compacto (ADR-014, uma janela WinUI própria). Constrói sobre M1–M12
@@ -297,31 +297,54 @@ fronteira COM.
 - ⚠️ Acrescenta um executável + CLSID COM + assets de widget ao pacote; a funcionalidade requer 22H2; QA
   de host real é provavelmente um passo humano/Store; os Adaptive Cards limitam a UI.
 
-## Integração de release (o que falta para produção)
+## Integração de release (produção) — FEITA
 
-A arquitetura está fechada; o pacote de produção ainda **não** transporta o widget. O `Package.appxmanifest`
-de produção continua exatamente como em 1.0.1.0 e as duas hooks de packaging no `ServerMonitor.App.csproj`
-(staging do `ServerAlyzer.WidgetProvider.exe` e inclusão de `Public\**`) estão condicionadas a
-`DevIdentity == true`. O release do widget exige, num slice próprio e com aprovação humana:
+O pacote de produção passa a transportar o widget. `Package.appxmanifest` recebeu, idênticos ao que foi
+validado no board com o pacote DEV: o `com:ExeServer` do provider (CLSID `78CFFBEF-…`), o
+`uap3:AppExtension com.microsoft.windows.widgets` com `PublicFolder="Public"` e a definição
+`ServerAlyzer_Widget` (small/medium/large), e o `uap:Extension windows.protocol` `serveralyzer`. O CLSID
+de notificação de produção `4B2E9C7A-…` fica intacto e o CLSID DEV `206ACD0C-…` **nunca** entra no
+pacote de produção (auditado no manifesto EXTRAÍDO: zero ocorrências). O piso
+`TargetDeviceFamily MinVersion=10.0.22000.0` **não** subiu — o gate continua a ser o host (Opção A).
 
-1. Portar para o manifesto de produção o `com:ExeServer` do provider (CLSID `78CFFBEF-…`, imutável), o
-   `uap3:AppExtension com.microsoft.windows.widgets` e o `uap:Extension windows.protocol` `serveralyzer`
-   — **mantendo** o CLSID de notificação de produção `4B2E9C7A-…` e o piso `MinVersion=10.0.22000.0`.
-   O CLSID DEV `206ACD0C-…` **nunca** entra no pacote de produção.
-2. Estender as duas hooks de packaging ao perfil de produção (`Packaged == true`), mantendo o provider
-   **framework-dependent** — uma única linha de runtime Windows App SDK 2.3.1 partilhada com a app.
-3. Substituir os *placeholders* de `Public\` por arte final: ícone do provider e **screenshot real do card**
-   (o atual é o logo, não o widget), e decidir se `DisplayName`/`Description` da definição passam a
-   `ms-resource:` (o pacote declara pt-BR/pt-PT/en-US).
-4. Subir a versão de pacote da Store respeitando **P-016 (Revision = 0)**.
-5. Congelar o `Id` da definição (`ServerAlyzer_Widget`) e o CLSID do provider: alterá-los depois de haver
-   widgets afixados órfão-os no board.
+As duas hooks de packaging no `ServerMonitor.App.csproj` deixaram de depender de `DevIdentity`: passam a
+correr em qualquer build com `Packaged == true`. DEV e produção partilham o mesmo payload de widget e
+diferem apenas em identidade, CLSID de notificação e strings de apresentação — logo o que o board
+exercitou é o que a Store leva.
+
+**Uma só linha de runtime (invariante bloqueante).** Verificado no pacote EXTRAÍDO, não no csproj: o
+manifesto declara `PackageDependency Microsoft.WindowsAppRuntime.2 MinVersion 2.3.1.0`; app e provider
+têm `runtimeconfig.json` idênticos (`Microsoft.NETCore.App 10.0.0`, framework-dependent); existe um
+único `Microsoft.Windows.Widgets.Projection.dll` na raiz e nenhuma pasta de runtime duplicada. O pacote
+cresce ~158 KB face a 1.0.1.0 — exatamente os quatro ficheiros únicos do provider mais os assets do
+widget, sem segundo payload self-contained.
+
+**Identificadores congelados a partir desta release** (mudá-los órfão widgets afixados): CLSID do
+provider `78CFFBEF-7A95-4400-BB8B-A2376C6642C3`, `AppExtension Id="ServerAlyzerWidgetProvider"`,
+`Definition Id="ServerAlyzer_Widget"`.
+
+**Versão.** Produto **1.1.0**, pacote da Store **1.1.0.0** (P-016: revisão = 0). `AssemblyVersion`
+mantém-se em 1.0.0.0 por estabilidade de binding. Produto e pacote voltam a convergir.
 
 ## Em aberto
 
-Gates de runtime que continuam **NOT_RUN** e nunca são contados como PASS: rehidratação do provider após
-reinício natural, estados *unavailable*/*empty* no board (sem harness sintético seguro), frota de 6
-servidores com overflow em host real (só existem 2), servidor offline renderizado no board, e QA do
-pacote de **produção** instalado (a validação de board foi feita com um loose layout DEV registado, não
-com um MSIX de produção). Polish visual diferido por decisão humana: Prism M2/M3; o *whitespace* do Large
-foi aceite (chrome do menu `⋯` do host + headroom de escalabilidade até 6 servidores).
+**Asset do widget picker.** `Public\ServerAlyzerWidgetScreenshot.png` é ainda o logo da app. O elemento
+`Screenshot` é **obrigatório** e **visível ao utilizador** (diálogo *Adicionar widgets*), e a especificação
+pede uma captura do tamanho **médio**, **300×304 px**, com cantos arredondados transparentes. Tem de ser
+substituído por uma captura real com dados sintéticos antes de submeter. `DarkMode`/`LightMode` e as
+variantes por locale são opcionais e ficam em aberto.
+
+**QA do pacote de produção instalado.** Bloqueio de ambiente, não de arquitetura: a máquina tem a
+1.0.1.0 instalada **pela Store** e o Windows recusa substituí-la por um registo local
+(`0x80073CFB` — «the current user has already installed a packaged version of this app»); assinar o MSIX
+com a identidade de publisher da Store exigiria confiar um certificado em `LocalMachine`, o que pede
+elevação. Em aberto, portanto: primeira aparição do widget a partir do pacote de produção, QA de
+ativação sobre produção e o teste de upgrade real 1.0.1.0 → 1.1.0.0. A via honesta é o próprio canal da
+Store, ou uma máquina com elevação.
+
+Restantes gates de runtime **NOT_RUN**, nunca contados como PASS: rehidratação do provider após reinício
+natural, estados *unavailable*/*empty* no board (sem harness sintético seguro), frota de 6 servidores com
+overflow em host real (só existem 2), servidor offline renderizado no board, Windows 11 21H2 real (a
+máquina é 26200) e instalação em máquina limpa. Polish visual diferido por decisão humana: Prism M2/M3;
+o *whitespace* do Large foi aceite (chrome do menu `⋯` do host + headroom de escalabilidade até 6
+servidores).

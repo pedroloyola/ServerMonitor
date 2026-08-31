@@ -3,6 +3,27 @@
 Todas as alterações relevantes deste projeto são documentadas aqui. O formato inspira-se em
 [Keep a Changelog](https://keepachangelog.com/) e o versionamento segue [SemVer](https://semver.org/).
 
+## [1.1.0] — 2026-08-31
+
+Integração com os **Widgets do Windows 11**. A app continua local-first, sem conta e sem telemetria.
+
+- **Widget oficial do Windows 11.** O ServerAlyzer passa a aparecer no painel de Widgets (Win + W), em
+  três tamanhos — **pequeno**, **médio** e **grande** — com o veredito da frota, métricas por servidor
+  (CPU, memória, disco), memória e disco em GB usados/totais, uptime e um resumo da frota.
+- **Sempre honesto sobre a frescura dos dados.** Com a app fechada o widget mostra a última leitura
+  conhecida e indica há quanto tempo foi feita, em vez de fingir dados atuais.
+- **Clicar navega.** Clicar no cartão abre o painel; clicar numa linha abre o painel com esse servidor
+  em destaque. A app abre sempre em modo normal e mantém-se numa única instância — sem segunda janela,
+  segundo ícone na área de notificação ou segunda ligação aos servidores.
+- **O widget não liga a nada.** Corre num processo separado que lê apenas um resumo local já
+  sanitizado: identificadores opacos, nomes, estado de saúde e métricas. Sem SSH, sem rede, sem acesso
+  a credenciais, e sem endereços, utilizadores ou chaves de host.
+- Requer **Windows 11 22H2** ou mais recente para o widget. Em Windows 11 21H2 a aplicação instala e
+  funciona normalmente; apenas o widget não é oferecido.
+
+> **Nota de versão.** Produto e pacote convergem nesta versão: produto **1.1.0**, pacote da Store
+> **1.1.0.0**. A Store reserva o quarto campo da versão (revisão), que se mantém a zero.
+
 ## [1.0.0] — 2026-08-28
 
 Primeira versão estável pública. Foco em **empacotamento e distribuição**, sem novas funcionalidades de

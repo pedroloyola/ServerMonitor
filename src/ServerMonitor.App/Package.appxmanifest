@@ -29,7 +29,7 @@
   <Identity
     Name="PedroLoy.ServerAlyzer"
     Publisher="CN=32C0A056-FD57-422E-A59C-A8C26434951D"
-    Version="1.0.1.0"
+    Version="1.1.0.0"
     ProcessorArchitecture="x64" />
 
   <Properties>

@@ -36,10 +36,10 @@
          DisplayVersion (Settings/About) = Major.Minor.Build of the *running* version: 1.1.0 both
          packaged (reads Package.Current) and unpackaged/dev (assembly fallback). NÃO criar tag
          v1.1.0 sem aprovação humana. -->
-    <Version>1.0.0</Version>
+    <Version>1.1.0</Version>
     <AssemblyVersion>1.0.0.0</AssemblyVersion>
-    <FileVersion>1.0.1.0</FileVersion>
-    <InformationalVersion>1.0.0</InformationalVersion>
+    <FileVersion>1.1.0.0</FileVersion>
+    <InformationalVersion>1.1.0</InformationalVersion>
     <!-- M12/ADR-017: one app, two deployment profiles. Default is the existing UNPACKAGED,
          self-contained build (dev Debug + existing Release + every test/gate). Pass
          -p:Packaged=true for the production single-project MSIX profile below. Domain logic

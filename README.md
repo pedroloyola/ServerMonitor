@@ -7,7 +7,8 @@ e serviços do sistema — através de ligações **SSH diretas** a partir do te
 É **local-first**: não requer conta, não envia dados para nenhum servidor da ServerAlyzer e não faz
 telemetria. A monitorização acontece diretamente entre o teu computador e os servidores que configuras.
 
-> Estado: a preparar a primeira versão pública (1.0.0 release candidate). Ver [Instalação](#instalação).
+> Estado: versão **1.1.0**, que acrescenta o widget oficial do Windows 11. Ver
+> [Instalação](#instalação) e o [changelog](CHANGELOG.md).
 
 ## O que faz
 
@@ -17,7 +18,8 @@ telemetria. A monitorização acontece diretamente entre o teu computador e os s
 - Observa, em modo **só-leitura**, containers **Docker** e serviços **systemd** (Linux) / **launchd** (macOS).
 - Descobre servidores SSH na rede local (mDNS/DNS-SD), sem varrer portas ou subnets.
 - Vive na **área de notificação** (tray) e emite notificações locais em transições reais de saúde.
-- Tem um **modo compacto** (widget) sempre-visível, além da apresentação normal.
+- Tem um **modo compacto** sempre-visível, além da apresentação normal.
+- Integra-se com o painel de **Widgets do Windows 11** (Win + W), em três tamanhos.
 
 ## Funcionalidades
 
@@ -30,7 +32,8 @@ telemetria. A monitorização acontece diretamente entre o teu computador e os s
 | Workloads | Docker + serviços em modo **só-leitura** (sem start/stop/restart/exec). |
 | Descoberta | Passiva, `_ssh._tcp.local.`, com ignorar/repor. |
 | Tray & notificações | Um ícone, minimizar-para-tray, alertas locais com cooldown. |
-| Modo compacto | Widget glanceable sempre-no-topo, mesma janela. |
+| Modo compacto | Apresentação reduzida sempre-no-topo, na mesma janela. |
+| Widget do Windows | Cartão no painel de Widgets do Windows 11 (pequeno/médio/grande), só-leitura, com frescura explícita. Requer Windows 11 22H2+. |
 | Idiomas | pt-BR (padrão), pt-PT, en-US. |
 | Temas | Claro, Escuro, Sistema. |
 
@@ -54,6 +57,8 @@ automaticamente. O link será publicado aqui quando a app estiver disponível.
 ## Sistemas suportados
 
 - **Windows 11 x64** (aplicação).
+- **Windows 11 22H2 (build 22621) ou mais recente** para o widget no painel de Widgets. Em 21H2 a
+  aplicação instala e funciona normalmente — apenas o widget não é oferecido pelo sistema.
 - Servidores monitorizados: **Linux** (com `systemd` para serviços) e **macOS** (com `launchd`),
   acessíveis por SSH a partir do teu PC.
 
@@ -65,6 +70,18 @@ automaticamente. O link será publicado aqui quando a app estiver disponível.
    confirmação explícita antes de confiar. Um fingerprint diferente no futuro **bloqueia** a ligação.
 4. A chave privada nunca é copiada — apenas o **caminho** que escolheres é guardado; o ficheiro
    permanece protegido pelas ACLs do sistema.
+
+## Widget do Windows
+
+No Windows 11 22H2 ou mais recente, abre o painel de Widgets com **Win + W**, escolhe **Adicionar
+widgets** e seleciona o **ServerAlyzer**. O cartão existe em três tamanhos e mostra o estado da frota,
+as métricas de cada servidor e há quanto tempo os dados foram lidos.
+
+- Clicar no cartão abre o painel; clicar numa linha abre o painel com esse servidor em destaque.
+- Com a aplicação fechada o widget mostra a última leitura conhecida, sempre datada.
+- O widget corre num processo próprio que **não** faz SSH nem acede a credenciais: lê apenas um resumo
+  local já sanitizado (identificador opaco, nome, saúde e métricas), sem endereços, utilizadores ou
+  chaves de host.
 
 ## Modelo de segurança
 
@@ -83,6 +100,8 @@ dados ficam na tua máquina:
 - `%LOCALAPPDATA%\ServerMonitor\history.db` — histórico de métricas (SQLite).
 - Windows Credential Manager — segredos SSH.
 - Ficheiros locais separados — dispositivos ignorados, confiança de host keys, preferências de janela.
+- `%LOCALAPPDATA%\ServerMonitor\widget-state.json` — resumo sanitizado que alimenta o widget do
+  Windows (sem endereços, utilizadores nem segredos).
 
 ## Compilar a partir do código
 

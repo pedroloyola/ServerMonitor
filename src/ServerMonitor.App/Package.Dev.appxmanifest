@@ -21,7 +21,7 @@
   <Identity
     Name="ServerAlyzer.Dev"
     Publisher="CN=ServerAlyzer Dev, O=ServerAlyzer Dev, C=PT"
-    Version="1.0.1.0"
+    Version="1.1.0.0"
     ProcessorArchitecture="x64" />
 
   <Properties>
