@@ -69,11 +69,15 @@ public static class WidgetViewModelBuilder
         var ordered = WidgetOrdering.ForDisplay(snapshot.Servers);
         var maxRows = MaxRowsFor(size);
         var shown = ordered.Take(maxRows).Select(s => ToRow(s, strings)).ToArray();
-        // TRUTHFUL DEGRADATION INVARIANT (M13-QA-4 / QA-5): visible + overflow == total, always, and any
-        // size that renders rows must announce every server it does not render. A server can never vanish
-        // from the card without the user being told. Small is exempt by construction: it renders no rows at
-        // all and is honest about being a fleet verdict (N/N + gauge), so it hides nothing it implied.
-        var overflow = Math.Max(0, snapshot.Servers.Count - maxRows);
+        // TRUTHFUL DEGRADATION INVARIANT (M13-QA-4 / QA-5): for a size that renders rows, visible + overflow
+        // == total, and every server not rendered is announced. A server can never vanish from the card
+        // without the user being told.
+        //
+        // Small is exempt by construction rather than by omission: it renders no rows at all, so it never
+        // implies a list, and its hero already states the full fleet as "healthy/total" with one gauge tick
+        // per server. Its overflow is therefore zero, not "everything" - carrying a phantom "+N" that
+        // SmallBody never draws would be a trap for the next person to touch it (Prism L3).
+        var overflow = maxRows == 0 ? 0 : Math.Max(0, snapshot.Servers.Count - maxRows);
 
         return new WidgetViewModel
         {

@@ -135,8 +135,9 @@ public sealed class WidgetViewModelBuilderTests
         Assert.Equal(name, Assert.Single(vm.Rows).DisplayName);
     }
 
+    // Small is deliberately absent: it renders no rows and therefore carries no overflow at all - see
+    // Small_states_the_whole_fleet_and_carries_no_overflow for its own contract (Prism L3).
     [Theory]
-    [InlineData(WidgetSizeHint.Small, 0)]
     [InlineData(WidgetSizeHint.Medium, 2)]
     [InlineData(WidgetSizeHint.Large, 3)]
     public void Rows_are_capped_per_size_with_overflow(WidgetSizeHint size, int maxRows)
@@ -244,14 +245,30 @@ public sealed class WidgetViewModelBuilderTests
 
     // ---- The shared invariant. This is the guard that stops QA-4/QA-5 recurring per size. ----
     //
-    // For every size that renders server rows, a fleet larger than what is shown MUST be announced. The
-    // two shipped defects were independent instances of exactly this rule being broken, so it is asserted
-    // once, across every size and a wide range of fleet sizes, rather than per size.
-    [Theory]
-    [InlineData(WidgetSizeHint.Medium)]
-    [InlineData(WidgetSizeHint.Large)]
-    public void Sizes_that_render_rows_never_hide_a_server_silently(WidgetSizeHint size)
+    // MEASURED capacities, deliberately written out as literals rather than read from MaxRowsFor. Asserting
+    // against the production constant would be circular: raising Medium back to 3 or Large back to 6 would
+    // move the expectation with the code and the test would still pass, which is exactly how both defects
+    // shipped with a green suite in the first place (Atlas M1). These numbers came from the real Windows
+    // Widgets board and may only be changed by re-measuring there.
+    public const int MeasuredMediumCapacity = 2;
+    public const int MeasuredLargeCapacity = 3;
+
+    public static TheoryData<WidgetSizeHint, int> RowRenderingSizes() => new()
     {
+        { WidgetSizeHint.Medium, MeasuredMediumCapacity },
+        { WidgetSizeHint.Large, MeasuredLargeCapacity },
+    };
+
+    // For every size that renders server rows, a fleet larger than what is shown MUST be announced. The two
+    // shipped defects were independent instances of this one rule being broken, so it is asserted once,
+    // across both sizes and a wide range of fleet sizes, rather than per size.
+    [Theory]
+    [MemberData(nameof(RowRenderingSizes))]
+    public void Sizes_that_render_rows_never_hide_a_server_silently(WidgetSizeHint size, int measuredCapacity)
+    {
+        // The production constant must equal what was measured on the host - not the other way round.
+        Assert.Equal(measuredCapacity, WidgetViewModelBuilder.MaxRowsFor(size));
+
         foreach (var total in new[] { 0, 1, 2, 3, 4, 5, 6, 7, 12, 100 })
         {
             var servers = Enumerable.Range(0, total)
@@ -260,9 +277,10 @@ public sealed class WidgetViewModelBuilderTests
 
             // Nothing is ever unaccounted for.
             Assert.Equal(total, vm.Rows.Count + vm.OverflowCount);
-            // Never render more than the measured host capacity.
-            Assert.True(vm.Rows.Count <= WidgetViewModelBuilder.MaxRowsFor(size),
-                $"{size} rendered {vm.Rows.Count} rows, above its host capacity");
+            // Never render more than the capacity measured on the real board.
+            Assert.True(vm.Rows.Count <= measuredCapacity,
+                $"{size} rendered {vm.Rows.Count} rows, above its measured host capacity of {measuredCapacity}");
+            Assert.Equal(Math.Min(total, measuredCapacity), vm.Rows.Count);
             // And the headline invariant: hidden servers are always announced.
             if (total > vm.Rows.Count)
             {
@@ -274,6 +292,25 @@ public sealed class WidgetViewModelBuilderTests
                 Assert.Empty(vm.OverflowText);
             }
         }
+    }
+
+    // Small is exempt from the overflow rule, and this pins WHY: it renders no rows, so it never implies a
+    // list, and its hero states the whole fleet. It must not carry a phantom overflow it never draws.
+    [Theory]
+    [InlineData(1)]
+    [InlineData(5)]
+    [InlineData(100)]
+    public void Small_states_the_whole_fleet_and_carries_no_overflow(int total)
+    {
+        var servers = Enumerable.Range(0, total).Select(i => Server($"s{i:D3}", WidgetHealth.Healthy)).ToArray();
+        var vm = Build(Read(Now, servers), WidgetSizeHint.Small);
+
+        Assert.Empty(vm.Rows);
+        Assert.Equal(0, vm.OverflowCount);
+        Assert.Empty(vm.OverflowText);
+        // The honesty comes from the hero: it names the full fleet size.
+        Assert.Equal(total, vm.TotalServers);
+        Assert.Equal($"{total}/{total}", vm.HeroValue);
     }
 
     [Fact]
@@ -302,8 +339,16 @@ public sealed class WidgetViewModelBuilderTests
             Assert.Equal(3, vm.OverflowCount);
             // Localized, and never a bare number: the user must be able to read it as "more servers".
             Assert.Contains("3", vm.OverflowText);
+            Assert.NotEqual("3", vm.OverflowText);
             Assert.NotEqual("+3", vm.OverflowText);
             Assert.DoesNotContain("{0}", vm.OverflowText, StringComparison.Ordinal);
+            // Each locale gets its own idiomatic phrasing, not a shared template with a swapped word.
+            Assert.Contains(culture switch
+            {
+                "pt-BR" => "mais 3",
+                "pt-PT" => "3 a mais",
+                _ => "3 more"
+            }, vm.OverflowText, StringComparison.Ordinal);
         }
     }
 

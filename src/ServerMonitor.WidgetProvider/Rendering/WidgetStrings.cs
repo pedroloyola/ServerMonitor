@@ -36,7 +36,7 @@ public sealed class WidgetStrings
     public required string HealthyCountLabelOne { get; init; }
     public required string UnknownCountLabel { get; init; }   // plural: "{0} unknown"
     public required string UnknownCountLabelOne { get; init; }
-    public required string MoreCount { get; init; }           // "+{0} more"
+    public required string MoreCount { get; init; }           // "{0} more" / "mais {0}"
 
     /// <summary>Picks the singular or plural form for a count.</summary>
     public static string Plural(int count, string one, string many) =>
@@ -107,7 +107,7 @@ public sealed class WidgetStrings
         HealthyCountLabelOne = "{0} healthy",
         UnknownCountLabel = "{0} unknown",
         UnknownCountLabelOne = "{0} unknown",
-        MoreCount = "+{0} more",
+        MoreCount = "{0} more",
         UpdatedJustNow = "Updated just now",
         UpdatedMinutesAgo = "Updated {0} min ago",
         UpdatedHoursAgo = "Updated {0} hr ago",
@@ -138,7 +138,7 @@ public sealed class WidgetStrings
         HealthyCountLabelOne = "{0} saudável",
         UnknownCountLabel = "{0} desconhecidos",
         UnknownCountLabelOne = "{0} desconhecido",
-        MoreCount = "+{0} mais",
+        MoreCount = "mais {0}",
         UpdatedJustNow = "Atualizado agora",
         UpdatedMinutesAgo = "Atualizado há {0} min",
         UpdatedHoursAgo = "Atualizado há {0} h",
@@ -169,7 +169,7 @@ public sealed class WidgetStrings
         HealthyCountLabelOne = "{0} saudável",
         UnknownCountLabel = "{0} desconhecidos",
         UnknownCountLabelOne = "{0} desconhecido",
-        MoreCount = "+{0} mais",
+        MoreCount = "{0} a mais",
         UpdatedJustNow = "Atualizado agora",
         UpdatedMinutesAgo = "Atualizado há {0} min",
         UpdatedHoursAgo = "Atualizado há {0} h",

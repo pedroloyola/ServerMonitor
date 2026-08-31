@@ -120,7 +120,7 @@ public sealed class WidgetCardRendererTests
     private static IEnumerable<JsonElement> BodyItems(JsonElement root) =>
         root.GetProperty("body").EnumerateArray();
 
-    // Every TextBlock "text" value in the card, JSON-decoded (the serializer escapes "+" as +).
+    // Every TextBlock "text" value in the card, JSON-decoded.
     private static IEnumerable<string> AllTexts(JsonElement element)
     {
         if (element.ValueKind == JsonValueKind.Object)
@@ -160,9 +160,8 @@ public sealed class WidgetCardRendererTests
 
         Assert.Equal(expectedBlocks, ServerBlocks(root).Count);
 
-        // Assert on PARSED text, never the raw JSON: the serializer escapes "+" as +.
         var texts = AllTexts(root).ToList();
-        var overflowText = $"+{expectedOverflow} more";
+        var overflowText = $"{expectedOverflow} more";
         if (expectedOverflow == 0)
         {
             Assert.DoesNotContain(texts, t => t.EndsWith(" more", StringComparison.Ordinal));
@@ -181,16 +180,20 @@ public sealed class WidgetCardRendererTests
     [Fact]
     public void Medium_never_serializes_a_server_beyond_the_cap()
     {
+        // Fixed ids so the assertion can actually check that the capped server's opaque id is absent too,
+        // not just its name (Vigil L-1: the comment used to promise more than the assertion delivered).
+        var hidden = Guid.Parse("11111111-2222-3333-4444-555555555555");
         var json = Render(Read(
             Server("alpha", WidgetHealth.Healthy),
             Server("bravo", WidgetHealth.Healthy),
-            Server("charlie", WidgetHealth.Healthy)), WidgetSizeHint.Medium).TemplateJson;
+            Server("charlie", WidgetHealth.Healthy, hidden)), WidgetSizeHint.Medium).TemplateJson;
 
         AssertValidCard(json);
         Assert.Contains("alpha", json, StringComparison.Ordinal);
         Assert.Contains("bravo", json, StringComparison.Ordinal);
         // The third server is not rendered at all - not its name, and not its opaque id.
         Assert.DoesNotContain("charlie", json, StringComparison.Ordinal);
+        Assert.DoesNotContain(hidden.ToString("D"), json, StringComparison.OrdinalIgnoreCase);
     }
 
     [Theory]
@@ -228,17 +231,23 @@ public sealed class WidgetCardRendererTests
         }
     }
 
-    [Fact]
-    public void Medium_overflow_line_is_not_clickable_and_carries_no_server_action()
+    [Theory]
+    [InlineData(WidgetSizeHint.Medium)]
+    [InlineData(WidgetSizeHint.Large)]
+    public void Overflow_line_is_not_clickable_and_carries_no_server_action(WidgetSizeHint size)
     {
-        var servers = Enumerable.Range(0, 5).Select(i => Server($"srv{i}", WidgetHealth.Healthy)).ToArray();
-        var root = AssertValidCard(Render(Read(servers), WidgetSizeHint.Medium).TemplateJson);
+        var servers = Enumerable.Range(0, 12).Select(i => Server($"srv{i:D2}", WidgetHealth.Healthy)).ToArray();
+        var root = AssertValidCard(Render(Read(servers), size).TemplateJson);
 
-        var last = BodyItems(root).Last();
-        Assert.Equal("TextBlock", last.GetProperty("type").GetString());
+        var overflow = BodyItems(root).Single(e =>
+            e.TryGetProperty("type", out var t) && t.GetString() == "TextBlock"
+            && e.TryGetProperty("text", out var x) && (x.GetString() ?? string.Empty).EndsWith(" more", StringComparison.Ordinal));
+
         // No per-element action: the overflow line falls through to the card's openDashboard, and can
         // never carry an openServer verb for a server it does not identify.
-        Assert.False(last.TryGetProperty("selectAction", out _));
+        Assert.False(overflow.TryGetProperty("selectAction", out _));
+        // And it must be legible, not de-emphasised - it is the only signal that servers are hidden.
+        Assert.False(overflow.TryGetProperty("isSubtle", out var subtle) && subtle.GetBoolean());
     }
 
     // M13-QA-5: Large holds three blocks plus the fleet-summary footer. The footer is NOT sacrificed to
@@ -267,7 +276,7 @@ public sealed class WidgetCardRendererTests
         }
         else
         {
-            Assert.Contains($"+{expectedOverflow} more", texts);
+            Assert.Contains($"{expectedOverflow} more", texts);
         }
 
         // The fleet-summary footer survives in every case: its four labels are always present.
@@ -301,7 +310,7 @@ public sealed class WidgetCardRendererTests
 
         var overflow = BodyItems(root).Single(e =>
             e.TryGetProperty("type", out var t) && t.GetString() == "TextBlock"
-            && e.TryGetProperty("text", out var x) && x.GetString() == "+6 more");
+            && e.TryGetProperty("text", out var x) && x.GetString() == "6 more");
         Assert.False(overflow.TryGetProperty("selectAction", out _));
     }
 

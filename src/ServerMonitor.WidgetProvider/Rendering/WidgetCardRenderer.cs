@@ -117,7 +117,10 @@ public static class WidgetCardRenderer
 
         if (vm.OverflowText.Length > 0)
         {
-            body.Add(Text(vm.OverflowText, size: "Small", weight: "Bolder", subtle: true, spacingNone: true));
+            // NOT subtle (Prism M1): this line is the only thing telling the user that servers exist which
+            // the card is not showing. De-emphasising the one affordance that carries that fact works
+            // against the very honesty the cap fix restored.
+            body.Add(Text(vm.OverflowText, size: "Small", weight: "Bolder", spacingNone: true));
         }
 
         // Large fills the bottom band with a non-interactive fleet-summary footer (Fable).

@@ -134,9 +134,26 @@
                       <Icons>
                         <Icon Path="Public\ServerAlyzerWidgetIcon.png" />
                       </Icons>
+                      <!-- Required fallback, used when a theme-specific screenshot is absent. -->
                       <Screenshots>
-                        <Screenshot Path="Public\ServerAlyzerWidgetScreenshot.png" />
+                        <Screenshot Path="Public\ServerAlyzerWidgetScreenshot.png"
+                                    DisplayAltText="Widget do ServerAlyzer a mostrar a saúde e as métricas de dois servidores." />
                       </Screenshots>
+                      <!-- The picker follows the system theme. Without these, a light-theme user sees a dark
+                           rectangle among light previews at the exact moment they decide whether to add the
+                           widget (Prism M3). Dark reuses the fallback; light has its own capture. -->
+                      <DarkMode>
+                        <Screenshots>
+                          <Screenshot Path="Public\ServerAlyzerWidgetScreenshot.png"
+                                      DisplayAltText="Widget do ServerAlyzer a mostrar a saúde e as métricas de dois servidores." />
+                        </Screenshots>
+                      </DarkMode>
+                      <LightMode>
+                        <Screenshots>
+                          <Screenshot Path="Public\ServerAlyzerWidgetScreenshotLight.png"
+                                      DisplayAltText="Widget do ServerAlyzer a mostrar a saúde e as métricas de dois servidores." />
+                        </Screenshots>
+                      </LightMode>
                     </ThemeResources>
                   </Definition>
                 </Definitions>
