@@ -46,7 +46,9 @@ internal static partial class Program
     [MTAThread]
     private static int Main()
     {
-        var log = ConsoleWidgetProviderLog.Instance;
+        // Invisible sinks only (Trace + ETW). Nothing this process logs may reach a console: it is a
+        // GUI-subsystem COM server and must stay windowless on the user's desktop (M13-QA-7).
+        var log = EtwWidgetProviderLog.Instance;
 
         // Best-effort startup hygiene (Vigil L2): remove temp files a crashed writer may have left.
         new WidgetOrphanTempCleaner(log: log).Sweep();
