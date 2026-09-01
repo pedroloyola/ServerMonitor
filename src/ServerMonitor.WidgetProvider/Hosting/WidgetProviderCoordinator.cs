@@ -1,3 +1,4 @@
+using ServerMonitor.WidgetContract;
 using ServerMonitor.WidgetProvider.Diagnostics;
 using ServerMonitor.WidgetProvider.Reading;
 using ServerMonitor.WidgetProvider.Rendering;
@@ -33,6 +34,25 @@ public sealed class WidgetProviderCoordinator
     private readonly object _gate = new();
     private readonly Dictionary<string, WidgetActivation> _widgets = new(StringComparer.Ordinal);
     private readonly HashSet<string> _tombstones = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Widgets the host has shown interest in receiving updates for — the ones worth repainting on our
+    /// own initiative. Deliberately separate from <see cref="_widgets"/>: a widget stays REGISTERED across
+    /// a Deactivate (it still exists, it is just not being viewed) but stops driving the repaint pump, so
+    /// the provider goes idle once the board is closed.
+    /// </summary>
+    private readonly HashSet<string> _onScreen = new(StringComparer.Ordinal);
+
+    private readonly IWidgetRefreshPump? _pump;
+
+    /// <summary>
+    /// Serializes pump transitions, held ACROSS the decision so two concurrent callbacks can never settle
+    /// on a stale answer (one reads 0 and is about to disarm, another reads 1 and arms, then the first
+    /// disarms a pump that must be running). Lock order is always <c>_pumpGate</c> then <see cref="_gate"/>;
+    /// nothing takes them the other way round.
+    /// </summary>
+    private readonly object _pumpGate = new();
+
     private bool _rehydrated;
     private volatile bool _shuttingDown;
     private int _inFlightUpdates;
@@ -42,18 +62,64 @@ public sealed class WidgetProviderCoordinator
     /// prove the wait was entered without a wall-clock assertion.</summary>
     internal Action? DrainWaitEnteredForTesting { get; set; }
 
+    /// <param name="pumpFactory">
+    /// Builds the repaint pump from the refresh callback it must drive. Optional so the coordinator can be
+    /// constructed without one for tests of pure callback handling; production always supplies it — see
+    /// <see cref="CreateWithFileSystemPump"/>.
+    /// </param>
     public WidgetProviderCoordinator(
         IWidgetHost host,
         WidgetSnapshotReader? reader = null,
         TimeProvider? timeProvider = null,
         TimeSpan? staleThreshold = null,
-        IWidgetProviderLog? log = null)
+        IWidgetProviderLog? log = null,
+        Func<Action, IWidgetRefreshPump>? pumpFactory = null)
     {
         _host = host ?? throw new ArgumentNullException(nameof(host));
         _reader = reader ?? new WidgetSnapshotReader();
         _timeProvider = timeProvider ?? TimeProvider.System;
         _staleThreshold = staleThreshold ?? WidgetFreshness.DefaultStaleThreshold;
         _log = log ?? NullWidgetProviderLog.Instance;
+
+        // Only a delegate is handed over here; the pump calls nothing back until it is armed.
+        _pump = pumpFactory?.Invoke(RefreshAll);
+    }
+
+    /// <summary>
+    /// THE production composition (M13 QA-9): a coordinator wired to a repaint pump that watches the same
+    /// snapshot file the reader reads. Both are built from one path so the watched directory and the read
+    /// file can never drift apart.
+    /// <para>
+    /// This is the runtime caller of <see cref="RefreshAll"/> that the provider was missing: the Widgets
+    /// host is not an update pump, so without it a widget on an open board never repaints, however fresh
+    /// <c>widget-state.json</c> becomes. The pump reads that one file — it opens no SSH, does not talk to
+    /// the app, and asks the monitoring engine for nothing (ADR-018 §6/§14).
+    /// </para>
+    /// </summary>
+    public static WidgetProviderCoordinator CreateWithFileSystemPump(
+        IWidgetHost host,
+        string? snapshotPath = null,
+        TimeProvider? timeProvider = null,
+        IWidgetProviderLog? log = null,
+        TimeSpan? debounce = null,
+        TimeSpan? backstopInterval = null)
+    {
+        var path = snapshotPath ?? WidgetStateLocation.ForCurrentUser();
+        var reader = new WidgetSnapshotReader(path, timeProvider: timeProvider, log: log);
+
+        return new WidgetProviderCoordinator(
+            host,
+            reader,
+            timeProvider,
+            staleThreshold: null,
+            log: log,
+            pumpFactory: refresh => new WidgetSnapshotChangeWatcher(
+                refresh,
+                new FileSystemSnapshotChangeSource(path, log),
+                timeProvider,
+                debounce,
+                backstopInterval,
+                log));
     }
 
     /// <summary>
@@ -74,6 +140,24 @@ public sealed class WidgetProviderCoordinator
     public void Shutdown()
     {
         _shuttingDown = true;
+
+        // Deterministic teardown BEFORE the drain: stop the pump so neither a timer nor a filesystem
+        // callback can start a new repaint while we unwind (§30). Disposal is idempotent and contained.
+        if (_pump is not null)
+        {
+            lock (_pumpGate)
+            {
+                try
+                {
+                    _pump.Disarm();
+                    _pump.Dispose();
+                }
+                catch (Exception exception)
+                {
+                    _log.Warn($"Widget repaint pump teardown failed. Error: {exception.GetType().Name}.");
+                }
+            }
+        }
 
         if (Volatile.Read(ref _inFlightUpdates) == 0)
         {
@@ -102,6 +186,21 @@ public sealed class WidgetProviderCoordinator
     /// On startup, ask the host which widgets already exist and repaint each (§12). A widget already
     /// tombstoned by a Delete is skipped so a stale snapshot cannot resurrect it (H-2). Rehydration runs
     /// once; afterwards tombstones are dropped. Contains any host exception.
+    /// <para>
+    /// <b>POLICY: recovered widgets count as on screen, so rehydration arms the repaint pump.</b> The
+    /// Windows App SDK exposes NO activation state on <c>WidgetInfo</c>/<c>WidgetContext</c>, and nothing
+    /// in the widget-provider contract promises an <c>Activate</c> after a provider is relaunched with the
+    /// board already open — the documentation only says <c>Activate</c>/<c>Deactivate</c> mark transitions
+    /// of host interest, and that a widget is already active after <c>CreateWidget</c>. So the provider
+    /// cannot ask, and cannot assume. The two ways to be wrong are not symmetric: assuming NOT active
+    /// silently reproduces the QA-9 defect (a visible widget that never repaints, with no signal that
+    /// anything is wrong), while assuming active costs at most one file re-read per snapshot commit for as
+    /// long as the host keeps this process alive — and the host releases the provider, which then exits on
+    /// its idle grace, once it stops caring. This class therefore takes the fail-safe direction and lets
+    /// the normal state machine correct it: the host's first <c>Deactivate</c> (or the widget's deletion)
+    /// disarms the pump as usual. Flipping the policy is one line — do not add the id to
+    /// <see cref="_onScreen"/> here — and both behaviors are covered by tests.
+    /// </para>
     /// </summary>
     public void RehydrateFromHost()
     {
@@ -143,6 +242,9 @@ public sealed class WidgetProviderCoordinator
                 }
 
                 _widgets[widget.WidgetId] = widget;
+
+                // POLICY (see remarks on RehydrateFromHost): a recovered widget counts as on screen.
+                _onScreen.Add(widget.WidgetId);
                 toPaint.Add(widget);
             }
 
@@ -150,13 +252,23 @@ public sealed class WidgetProviderCoordinator
             _tombstones.Clear();
         }
 
+        SyncPump();
+
         foreach (var widget in toPaint)
         {
             PushUpdate(widget);
         }
     }
 
-    /// <summary>A widget was created/activated/context-changed: register and repaint it.</summary>
+    /// <summary>
+    /// A widget was created/activated/context-changed: register it, mark it on screen, repaint it.
+    /// <para>
+    /// All three callbacks mean the host wants content for this widget. <c>CreateWidget</c> is included
+    /// deliberately: per the Windows App SDK documentation, "when a widget is first created, as indicated
+    /// by a call to CreateWidget, it is in the active state" — the host does NOT follow it with an
+    /// <c>Activate</c>, so treating create as an activation is required, not merely convenient.
+    /// </para>
+    /// </summary>
     public void OnWidgetActivated(WidgetActivation widget)
     {
         if (string.IsNullOrEmpty(widget.WidgetId))
@@ -168,13 +280,36 @@ public sealed class WidgetProviderCoordinator
         {
             _tombstones.Remove(widget.WidgetId); // it is alive again
             _widgets[widget.WidgetId] = widget;
+            _onScreen.Add(widget.WidgetId);
         }
 
+        SyncPump(); // the first on-screen widget starts the pump; already armed is a no-op
         PushUpdate(widget);
     }
 
     /// <summary>The widget's context changed (e.g. resized): update the stored size and repaint.</summary>
     public void OnWidgetContextChanged(WidgetActivation widget) => OnWidgetActivated(widget);
+
+    /// <summary>
+    /// The host is no longer requesting content for this widget (the board closed, or it scrolled out of
+    /// view). The widget still EXISTS, so the registry is intentionally left alone — but it stops counting
+    /// towards the repaint pump, and when the last one goes the pump disarms and the provider does no
+    /// periodic work at all.
+    /// </summary>
+    public void OnWidgetDeactivated(string? widgetId)
+    {
+        if (string.IsNullOrEmpty(widgetId))
+        {
+            return;
+        }
+
+        lock (_gate)
+        {
+            _onScreen.Remove(widgetId);
+        }
+
+        SyncPump();
+    }
 
     /// <summary>A widget was deleted: drop it from the registry (serialized with all other mutations).</summary>
     public void OnWidgetDeleted(string? widgetId)
@@ -187,12 +322,61 @@ public sealed class WidgetProviderCoordinator
         lock (_gate)
         {
             _widgets.Remove(widgetId);
+            _onScreen.Remove(widgetId);
 
             // Until the one-shot rehydration has run, remember deletions so a stale GetWidgetInfos
             // snapshot cannot re-add this id (H-2). Bounded to the startup window.
             if (!_rehydrated)
             {
                 _tombstones.Add(widgetId);
+            }
+        }
+
+        SyncPump();
+    }
+
+    /// <summary>Number of widgets currently on screen (the pump runs exactly while this is above zero).</summary>
+    public int OnScreenWidgetCount
+    {
+        get { lock (_gate) { return _onScreen.Count; } }
+    }
+
+    /// <summary>
+    /// Arms the pump exactly while at least one widget is on screen. Called after every membership change;
+    /// Arm and Disarm are both idempotent, so it is the transition that matters, not the count. The whole
+    /// decision is taken under <see cref="_pumpGate"/> so concurrent callbacks cannot settle on a stale
+    /// answer, and the pump is never touched while <see cref="_gate"/> is held.
+    /// </summary>
+    private void SyncPump()
+    {
+        if (_pump is null)
+        {
+            return;
+        }
+
+        lock (_pumpGate)
+        {
+            bool shouldRun;
+            lock (_gate)
+            {
+                shouldRun = !_shuttingDown && _onScreen.Count > 0;
+            }
+
+            try
+            {
+                if (shouldRun)
+                {
+                    _pump.Arm();
+                }
+                else
+                {
+                    _pump.Disarm();
+                }
+            }
+            catch (Exception exception)
+            {
+                // The pump must never be able to break widget handling or reach the COM boundary (§16).
+                _log.Warn($"Widget repaint pump state change failed. Error: {exception.GetType().Name}.");
             }
         }
     }
