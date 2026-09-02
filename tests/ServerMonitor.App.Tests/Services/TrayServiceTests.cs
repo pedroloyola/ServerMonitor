@@ -120,10 +120,15 @@ public sealed class TrayServiceTests
 
         public BackgroundDegradationNotice Degradation { get; } = new();
 
+        /// <summary>Order of the two user-visible effects of a degradation.</summary>
+        public List<string> Order { get; } = new();
+
         public FakeTimeProvider Clock { get; } = new(new DateTimeOffset(2026, 9, 2, 12, 0, 0, TimeSpan.Zero));
 
         public Harness(int maxIconAttempts = 1)
         {
+            Degradation.Changed += (_, _) => Order.Add("degraded");
+            Window.Restored += () => Order.Add("restore");
             Service = new TrayService(
                 Icon,
                 Window,
@@ -191,6 +196,12 @@ public sealed class TrayServiceTests
         Assert.False(harness.Service.CanEnterBackground);
         Assert.Equal(1, harness.Window.RestoreCount);
         Assert.Equal(0, harness.Lifecycle.ExitRequests);
+
+        // §13: surfacing a window nobody asked for is only acceptable WITH the explanation, and the
+        // notice must be raised BEFORE the window appears so the InfoBar is already open when the user
+        // looks at it.
+        Assert.True(harness.Degradation.IsDegraded);
+        Assert.Equal(["degraded", "restore"], harness.Order);
     }
 
     /// <summary>
@@ -306,7 +317,13 @@ public sealed class TrayServiceTests
 
         public int OpenBackgroundSettingsCount { get; private set; }
         public void HideForMinimize() => HideCount++;
-        public void RestoreAndActivate() => RestoreCount++;
+        public event Action? Restored;
+
+        public void RestoreAndActivate()
+        {
+            RestoreCount++;
+            Restored?.Invoke();
+        }
         public void OpenSettings() => SettingsCount++;
         public void ToggleCompactMode() => ToggleCompactCount++;
         public void RequestClose() => CloseCount++;
