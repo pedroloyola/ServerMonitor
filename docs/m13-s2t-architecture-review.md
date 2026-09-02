@@ -1,234 +1,291 @@
-# M13 S2-T — ARCHITECTURE REVIEW
+# M13 S2-T — ARCHITECTURE REVIEW (revisão 2)
 
 **Autor:** Relay (platform-infra), implementer da S2-T / dono do Windows Shell.
-**Branch:** `agent/m13-s2t-tray`, base `221eda4`. **Esta volta é DESENHO. Não há implementação.**
-**Reviewers:** Atlas (fiabilidade/races) · Prism (UX tray/flyout/degradação) · Vigil (segurança/fronteira).
+**Branch:** `agent/m13-s2t-tray`, base `221eda4`. **Esta volta continua a ser DESENHO. Sem implementação.**
+**Revisão 2** responde a: Atlas DEVOLVIDO (3 ALTA + 1 MÉDIA) · Prism PASS COM RESSALVAS (1 ALTA) ·
+Vigil PASS COM CONDIÇÕES (CV-1 a CV-6, duas bloqueantes).
 
-> **Evidência de partida, registada com precisão.** Entrega de `TaskbarCreated` em janela top-level
-> escondida **foreground: PROVADA**; **headless: PROVADA**, com sonda `HWND_BROADCAST`;
-> **`TaskbarCreated` originado pelo Explorer real em headless: `NOT_OBSERVED`**. O último **não** é
-> promovido a PASS a partir do broadcast sintético — está na matriz O. **O Explorer não é reiniciado
-> nesta volta.**
+> **Evidência de partida.** `TaskbarCreated` em janela top-level escondida: **foreground PROVADA**,
+> **headless PROVADA** com sonda `HWND_BROADCAST`. **Originado pelo Explorer real em headless:
+> `NOT_OBSERVED`** — não promovido a partir do broadcast sintético. **O Explorer não é reiniciado.**
 
 ---
 
 ## A — Fronteira de posse nativa
 
-**Possuímos** (novo, em `src/ServerMonitor.App/Shell/Tray/`): a classe de janela, o HWND, o
-`Shell_NotifyIconW`, o encaminhamento da mensagem de callback, o ciclo de vida do ícone, o
-`TaskbarCreated` e a máquina de estados de retry.
+Possuímos, em `src/ServerMonitor.App/Shell/Tray/`: classe de janela, HWND, `Shell_NotifyIconW`,
+encaminhamento de callback, ciclo de vida do ícone, `TaskbarCreated`, retry, e a raiz XAML mínima que
+hospeda o menu.
 
-**Não possuímos e não tocamos:** o resto do WinUIEx. `WindowManager`, `WindowState` e
-`SetForegroundWindow()` continuam a ser usados pelo `ApplicationWindowController` e ficam
-**inalterados**. **Não há fork.** O que sai do caminho crítico é exclusivamente o `WinUIEx.TrayIcon`,
-porque é dono do HWND e do encaminhamento de callbacks e não expõe nenhum dos dois (verificado por
-reflexão: superfície pública = `Selected`, `ContextMenu`, `LeftDoubleClick`, `RightDoubleClick`,
-`IsVisible`, `Tooltip`, `TrayIconId`, `SetIcon`, `Dispose` — **sem HWND**).
+**Sem fork.** Sai do caminho crítico apenas o `WinUIEx.TrayIcon`, porque é dono do HWND e do
+encaminhamento e não expõe nenhum dos dois (superfície pública verificada por reflexão: `Selected`,
+`ContextMenu`, `LeftDoubleClick`, `RightDoubleClick`, `IsVisible`, `Tooltip`, `TrayIconId`, `SetIcon`,
+`Dispose` — sem HWND). O resto do WinUIEx (`WindowManager`, `SetForegroundWindow`) continua a ser
+usado pelo `ApplicationWindowController` e fica intacto.
 
-**Custo assumido explicitamente:** ao deixar de usar o `WinUIEx.TrayIcon` perdemos três serviços que
-ele nos prestava — carregamento de ícone com consciência de DPI, re-registo em `TaskbarCreated`, e
-hosting do `MenuFlyout`. Os três passam a ser nossos. O terceiro é o de maior risco (secção H).
-
-## B — Desenho do HWND / classe de janela
+## B — HWND, classe de janela, e **modelo de thread** *(Atlas ALTA-3)*
 
 | Decisão | Valor | Porquê |
 |---|---|---|
-| Classe | `ServerAlyzer.TrayHost`, registada uma vez; `ERROR_CLASS_ALREADY_EXISTS` tolerado | idempotência sob re-entrada |
-| Parent | `IntPtr.Zero` (top-level) | **NUNCA `HWND_MESSAGE`**: *"a message-only window … does not receive broadcast messages"* |
-| Estilo | `WS_OVERLAPPED`, **nunca** `ShowWindow` | invisível sem ser message-only |
-| Estilo estendido | **`WS_EX_TOOLWINDOW`** | *"To prevent the window button from being placed on the taskbar, create the unowned window with the WS_EX_TOOLWINDOW extended style"* |
+| Parent | `IntPtr.Zero` (top-level) | **nunca `HWND_MESSAGE`** — message-only não recebe broadcasts |
+| Estilo | `WS_OVERLAPPED`, nunca `ShowWindow` | invisível sem ser message-only |
+| Estilo estendido | `WS_EX_TOOLWINDOW` | forma documentada de não ter botão na barra de tarefas |
 | Dono | nenhum | broadcasts vão a top-level não-possuídas |
-| Tamanho | 0×0 | não é mostrada |
 
-> **Medição exigida na implementação, não assumida:** a minha sonda que recebeu o broadcast **não**
-> tinha `WS_EX_TOOLWINDOW`. Antes de fechar B, medir que o `TaskbarCreated` continua a chegar **com**
-> esse estilo. Se não chegar, `WS_EX_TOOLWINDOW` cai e o "sem botão na barra de tarefas" passa a
-> depender da invisibilidade, que a S-1(A) já mediu suficiente para a janela 0×0 do WinUIEx.
+### Modelo de thread — definido
 
-**Thread do HWND — decisão com risco declarado.** Proponho criar o HWND **na thread de UI**, e não
-numa thread de pump dedicada. Razão: o flyout é XAML e tem afinidade de thread; um HWND na thread de
-UI elimina marshalling no caminho do menu e é a topologia que a S-1(A) mediu a funcionar (o HWND do
-WinUIEx está na thread de UI). **O que NÃO está medido:** recebi o broadcast numa thread dedicada,
-não na thread de UI. Por isso: **gate de implementação** — medir `TaskbarCreated` num HWND da thread
-de UI, em headless. Se falhar, o desenho de recurso, já medido a funcionar, é thread de pump
-dedicada em background + `DispatcherQueue.TryEnqueue` para tudo o que toque XAML.
+- **O HWND é criado na thread de UI do XAML.** A sua `WndProc` corre nessa thread.
+- **Não criamos bomba de mensagens nenhuma.** A bomba é a que a `DispatcherQueue` do XAML já corre.
+  Não há thread nova, não há `GetMessage` nosso, não há pump que possa ficar órfão.
+- **Não pode bloquear o arranque.** `EstablishAsync` corre na thread de UI mas **nunca a bloqueia**:
+  os atrasos entre tentativas são `await` sobre `TimeProvider`, nunca `Thread.Sleep` nem `.Wait()`.
+  O limite total (≤ ~1,25 s, secção F) é um limite de *latência até decisão*, não de bloqueio. A S2
+  **não pode** esperar sincronamente por ele.
+- **Interação com o watchdog:** o watchdog da S2 é infraestrutura de tempo de vida de processo, em
+  thread própria de background, deliberadamente independente da thread de UI. **Nenhum código de tray
+  está no caminho do watchdog.** Se a thread de UI encravar, o estabelecimento do tray fica parado —
+  e o watchdog dispara na mesma. Esta é a razão de não pôr o watchdog nesta thread.
+- **Interação com a drenagem do `StopAsync`:** `ReleaseAsync` (`NIM_DELETE`) tem afinidade à thread de
+  UI e obedece à ordenação da S2 §14 — o ícone só sai depois de o Exit estar comprometido. Se a
+  dispatcher já estiver a encerrar e rejeitar o enqueue, `ReleaseAsync` **falha depressa e não
+  bloqueia a drenagem**; o ícone órfão resultante é o caso já coberto por CV-3 / S6.
+- **Reentrância:** a `WndProc` pode reentrar enquanto o flyout está aberto. **Nenhum lock é mantido
+  através de um `ShowAt`**, e o estado de re-registo é um sinalizador simples mutado só nesta thread,
+  o que elimina corrida sem precisar de lock.
+
+> **Gates de medição, não assunções.** Medi o broadcast (i) **sem** `WS_EX_TOOLWINDOW` e (ii) numa
+> **thread dedicada**. A proposta usa o estilo **e** a thread de UI. Antes de fechar B, medir
+> `TaskbarCreated` num HWND da thread de UI **com** `WS_EX_TOOLWINDOW`, em headless. Se falhar, o
+> recurso é a topologia já medida: thread de pump dedicada + `DispatcherQueue.TryEnqueue` para XAML.
 
 ## C — Contrato `Shell_NotifyIcon`
 
-`NOTIFYICONDATAW` nossa: `cbSize`, `hWnd` (nosso), `uID` = 1 (estável, igual ao atual),
-`uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP`, `uCallbackMessage = WM_APP + n`, `hIcon`, `szTip`.
-
-Sequência de registo, **com o BOOL verificado em cada passo**:
+`NOTIFYICONDATAW` nossa: `cbSize`, `hWnd` nosso, `uID = 1`, `uFlags = NIF_MESSAGE|NIF_ICON|NIF_TIP`,
+`uCallbackMessage = WM_APP + n`, `hIcon`, `szTip`.
 
 ```
-NIM_ADD        → BOOL. false ⇒ tentativa falhada.
-NIM_SETVERSION → BOOL, uVersion = NOTIFYICON_VERSION_4.
-                 Doc: "NIM_SETVERSION must be called every time a notification area icon is added".
-                 Doc: devolve false "if the requested version is not supported".
+NIM_ADD        → BOOL verificado. false ⇒ tentativa falhada.
+NIM_SETVERSION → BOOL verificado, uVersion = NOTIFYICON_VERSION_4.
+                 false ⇒ NIM_DELETE e tentativa falhada. NUNCA degradar em silêncio para v3.
 ```
 
-**Versão 4 é requisito, não preferência:** dá `wParam = MAKEWPARAM(x,y)` com o ponto de âncora, que é
-o que precisamos para posicionar o flyout, e `lParam = MAKELPARAM(evento, uID)`. Medi esta codificação
-a funcionar contra o WinUIEx na S-1(A) (injeção de `WM_CONTEXTMENU` com codificação v4). Se
-`NIM_SETVERSION` devolver `false`, o contrato de que dependemos não existe: `NIM_DELETE` + tratar como
-tentativa falhada. **Não** degradar silenciosamente para v3.
+v4 é requisito: dá a âncora em `wParam` (`MAKEWPARAM(x,y)`) e `MAKELPARAM(evento, uID)` em `lParam` —
+codificação que medi a funcionar na S-1(A). Limpeza: `NIM_DELETE` na saída verdadeira e antes de cada
+re-registo.
 
-Limpeza: `NIM_DELETE` na saída verdadeira e antes de cada re-registo.
+### Ícone com DPI *(Prism)*
 
-## D — Encaminhamento de callback
+`LoadIconMetric(LIM_SMALL)`, ou `LoadImageW` dimensionado por
+`GetSystemMetricsForDpi(SM_CXSMICON, GetDpiForWindow(hwnd))`. **Nunca 16×16 fixo** — borrado a 150%,
+o caso mais comum em portáteis; a app é PerMonitorV2 e o `.ico` tem 16/20/24/32/48 a 32 bpp.
+No handler de `TaskbarCreated` (que também dispara em mudança de DPI): recarregar o `HICON`, fazer
+`NIM_MODIFY`, e **libertar o `HICON` antigo DEPOIS do `NIM_MODIFY`, nunca antes**. 250% (40×40) não
+existe no `.ico`; o shell escala do 48 — aceite, não bloqueia.
 
-WndProc nosso, na thread do HWND. Trabalho mínimo no WndProc: descodificar evento + âncora, e
-despachar. Mapa:
+## D — Encaminhamento de callback e **modelo de confiança da `WndProc`** *(Vigil CV-1, bloqueante)*
 
-| Evento v4 (lParam low word) | Ação |
-|---|---|
-| `NIN_SELECT` / `NIN_KEYSELECT` | `OpenRequested` |
-| `WM_CONTEXTMENU` | mostrar o flyout na âncora `wParam` |
-| `WM_LBUTTONDBLCLK` | `OpenRequested` (paridade com hoje) |
-| `TaskbarCreated` (registada) | secção E |
+**Default-deny.** Tudo o que não corresponder exatamente ao contrato vai a `DefWindowProcW` sem efeito.
 
-Tudo o que toca XAML passa pela `DispatcherQueue` da UI se o HWND ficar numa thread dedicada; se
-ficar na thread de UI (proposta), corre direto. **Esta é a parte que o documento manda desenhar e
-testar explicitamente: não se assume que o comportamento do WinUIEx sobrevive.** Testes em K.
+1. A mensagem tem de ser **o nosso `uCallbackMessage`** registado. Qualquer outro id → ignorado.
+2. `lParam` low word validado contra a **lista fechada** de eventos v4:
+   `NIN_SELECT`, `NIN_KEYSELECT`, `WM_CONTEXTMENU`, `WM_LBUTTONDBLCLK`. Tudo o resto → descartado.
+3. `lParam` high word tem de ser **`uID == 1`**. Diferente → descartado.
+4. `wParam` é **coordenadas não confiáveis**: usado **só** como âncora do flyout, **nunca** como
+   índice, offset, dimensão ou tamanho de buffer, e **saneado** contra a área de trabalho do monitor
+   antes de qualquer uso.
+5. **Nenhuma mensagem transporta ponteiro e nada é desreferenciado.** Não há dados de estrutura
+   vindos da mensagem.
 
-## E — Ciclo de vida do `TaskbarCreated`
+Mapa (após validação): `NIN_SELECT`/`NIN_KEYSELECT` → `OpenRequested`; `WM_CONTEXTMENU` → flyout na
+âncora; `WM_LBUTTONDBLCLK` → `OpenRequested` (paridade com hoje).
 
-`RegisterWindowMessageW("TaskbarCreated")` uma vez, id guardado (**nunca hardcoded** — medi `0xC073`
-nesta sessão, mas o id é atribuído em runtime).
+**Teclado** *(Prism MÉDIA)*: `WM_CONTEXTMENU` chega por `Shift+F10`/tecla Menu com âncora válida em
+v4; o flyout tem de **receber foco de teclado** para navegar as 5 entradas **sem a janela auxiliar ser
+ativada**. Item de medição.
+
+## E — Ciclo de vida do `TaskbarCreated`, **coalescido e limitado** *(Vigil CV-2, bloqueante · Atlas ALTA-1 e ALTA-2)*
+
+**Premissa de ameaça, explícita:** `TaskbarCreated` é **input não autenticado**. Qualquer processo
+local pode fazer `PostMessage(HWND_BROADCAST, RegisterWindowMessage("TaskbarCreated"))` — **foi
+exatamente assim que produzi a medição de entrega desta sub-fatia**. Portanto a mensagem **nunca**
+pode, por si só, comandar uma transição de sessão da S2.
+
+### O que "por provar" significa, e por quanto tempo *(Atlas ALTA-1)*
+
+`Unproven` é **estado interno da S2-T e não é observável pela S2**. Ao receber a mensagem, o estado
+público **mantém-se `Available`** enquanto o re-registo está em voo. A duração é limitada pelo mesmo
+orçamento da secção F (≤ ~1,25 s) mais o debounce. Só há transição pública quando uma tentativa
+**observa** falha real do `NIM_ADD`. Consequência deliberada: um broadcast forjado não consegue pôr a
+S2 em estado degradado.
+
+### Ordenação e sobreposição *(Atlas ALTA-2)*
+
+**Não existe ordenação garantida entre broadcasts, e o desenho não depende de nenhuma.** O
+coalescing torna a ordenação irrelevante:
 
 ```
-recebido → afordância passa a POR PROVAR (não é Lost ainda, não é Available)
-         → NIM_DELETE best-effort (resultado ignorado: o ícone pode já não existir)
-         → NIM_ADD + NIM_SETVERSION com resultado verificado
-         → sucesso ⇒ Available   |   budget esgotado ⇒ Lost
+mensagem recebida
+  → debounce 250 ms (dentro da janela, colapsa no sinalizador pendente)
+  → se já houver re-registo EM VOO: marcar "pendente" e regressar. NUNCA iniciar um segundo.
+  → senão, e se o teto o permitir: um passo de re-registo
+        NIM_DELETE best-effort (resultado ignorado) → NIM_ADD + NIM_SETVERSION verificados
+  → ao terminar: se "pendente", correr no máximo mais UM passo
 ```
 
-**Duas armadilhas tratadas por desenho:** (i) *"On Windows 10, the taskbar also broadcasts this message
-when the DPI of the primary display changes"* — logo `TaskbarCreated` **não** significa "o Explorer
-morreu"; o handler tem de ser idempotente e **não** pode emitir `Lost` só por ter recebido a mensagem;
-(ii) o `NIM_DELETE` antes do `NIM_ADD` mais o `uID` estável impedem ícone duplicado.
+Como a `WndProc` e o sinalizador vivem os dois na thread de UI, não há corrida e mensagens
+sobrepostas colapsam em, no máximo, um passo adicional.
 
-## F — Máquina de estados de retry, com números justificados
-
-**A Microsoft não publica números** para `Shell_NotifyIcon` — verifiquei as páginas `Shell_NotifyIconW`
-e `The Taskbar`: não há enumeração de causas de falha nem orientação de retry. Portanto os números
-**não vêm da documentação** e não vou fingir que vêm. Vêm de dois limites nossos, e digo-o.
+### Teto e reposição de orçamento
 
 | Parâmetro | Valor | Justificação |
 |---|---|---|
-| Tentativas | **3** (inicial + 2) | absorve falha transitória sem virar poller |
-| Atrasos | **250 ms**, depois **1000 ms** | crescente, sem busy spin |
-| Orçamento total | **≤ ~1,25 s** | (i) uma ordem de grandeza abaixo do deadline de 10 s do watchdog da S2, para **nunca** poder interagir com o shutdown; (ii) o arranque `--background` tem de chegar a estado **decidido** em ~1 s, porque até lá há monitorização sem afordância de saída provada — o invariante que a S2 consome |
+| Debounce | **250 ms** | mesma escala do primeiro retry; colapsa rajadas |
+| Em voo | **1** | elimina re-entrada e ícones duplicados por construção |
+| Teto | **5 passos por 60 s** (janela deslizante) | muito acima do ritmo legítimo (reinício do Explorer + mudanças de DPI), baixo o suficiente para limitar uma inundação forjada |
+| Reposição | **um re-registo bem-sucedido repõe o contador** | um reinício legítimo do Explorer nunca esgota o orçamento; só falhas repetidas o consomem |
 
-**Derivação de princípio, essa sim documentada:** a resposta oficial a "a barra de tarefas ainda não
-está lá" **não é um ciclo de retry, é o `TaskbarCreated`**. Logo o retry existe só para falha
-transitória e o caminho durável é o broadcast. Esgotado o budget: **`Lost`/`Unavailable` e parar** —
-sem ciclo de recuperação permanente escondido. Só um `TaskbarCreated` posterior volta a tentar.
-Cancelável por `CancellationToken`; determinístico por `TimeProvider`. **Atlas revê os números.**
+Teto excedido → **parar de re-registar**. **Não emitir `Lost`.** `Lost` só é produzido por falha
+**observada** do shell, nunca pela chegada de uma mensagem — vale para o caso DPI **e para o caso
+adversarial**. Números são escolha de engenharia limitada pelos nossos orçamentos, não valores
+documentados; **Atlas revê**.
+
+## F — Retry, com a derivação explícita *(Atlas MÉDIA)*
+
+**A Microsoft não publica números** para `Shell_NotifyIcon`: verifiquei `Shell_NotifyIconW` e
+`The Taskbar` — não há enumeração de causas de falha nem orientação de retry. A derivação é nossa e
+tem três passos:
+
+1. **Limite superior duro.** O deadline global do watchdog da S2 é 10 s. Para o tray **nunca** poder
+   interagir com o shutdown, o seu orçamento fica uma ordem de grandeza abaixo: **≤ ~1,25 s**.
+2. **Limite inferior funcional.** O arranque `--background` tem de chegar a estado **decidido** em
+   ~1 s, porque até lá existe monitorização sem afordância de saída provada — precisamente o
+   invariante que a S2 consome. Isto exclui um único disparo sem retry.
+3. **Forma.** Como a resposta documentada a "shell não pronta" é o `TaskbarCreated` e não um poller,
+   o retry só tem de absorver falha **transitória**: **3 tentativas** (inicial + 2), atrasos
+   crescentes **250 ms** e **1000 ms** = ~1,25 s, dentro de (1) e a satisfazer (2).
+
+Cancelável por `CancellationToken`, determinístico por `TimeProvider`, sem busy spin. Esgotado o
+orçamento: parar. Sem ciclo de recuperação permanente escondido. Só um `TaskbarCreated` posterior
+reabre tentativas, sujeito ao teto de E.
 
 ## G — Contrato de afordância para a S2
 
 ```csharp
-public enum TrayAffordanceState { Unavailable, Available, Lost }
+public enum TrayAffordanceState
+{
+    Unavailable = 0,   // CV-4: ordinal 0 é o valor seguro
+    Available   = 1,
+    Lost        = 2
+}
 
 public interface ITrayAffordance
 {
     TrayAffordanceState State { get; }
     event EventHandler<TrayAffordanceChangedEventArgs> StateChanged;   // na dispatcher de UI
     Task<TrayAffordanceState> EstablishAsync(CancellationToken cancellationToken);
-    Task ReleaseAsync(CancellationToken cancellationToken);            // NIM_DELETE na saída verdadeira
+    Task ReleaseAsync(CancellationToken cancellationToken);
 }
 ```
 
-- **Invariante central:** o **único** caminho de código que atribui `Available` é o que leu `true` do
-  `NIM_ADD` **e** do `NIM_SETVERSION` através da fronteira nativa. Sem outro produtor de `Available`.
-- **Sem estado `Unknown`** — o objetivo é proibir inferência, e um `Unknown` convidaria a tratá-lo
-  como bom.
-- **`Unavailable` ≠ `Lost`:** nunca estabelecido nesta sessão vs. estabelecido e depois perdido. A S2
-  precisa da diferença para a mensagem ao utilizador. `EstablishAsync` devolve o desfecho para o
-  arranque poder decidir sem esperar por evento.
-- A S2-T **não materializa UI** e não decide política de sessão: emite estado. A materialização de
-  Definições > Segundo plano e a InfoBar são da S2.
+- **Invariante central:** o **único** caminho que atribui `Available` é o que leu `true` do `NIM_ADD`
+  **e** do `NIM_SETVERSION` pela fronteira nativa. **Não existe segundo produtor de `Available`**
+  (fixado por teste, CV-4).
+- **Sem `Unknown`** — convidaria a ser tratado como bom. `Unproven` é interno e nunca sai (secção E).
+- `Unavailable` (nunca estabelecido nesta sessão) ≠ `Lost` (estabelecido e depois perdido): a S2
+  precisa da diferença para a mensagem.
+- **CV-5:** `szTip` e `hIcon` são **estáticos** — string localizada da aplicação e recurso do pacote.
+  **Nenhum nome de servidor, endereço, contagem ou valor de snapshot atravessa o caminho do shell.**
+  Fixado por teste.
+- A S2-T **emite estado e não materializa UI**.
 
-## H — Hosting do flyout — a decisão de maior risco, com alternativa para o Prism
+## H — Hosting do flyout — **OPÇÃO A FECHADA**
 
-Ao possuir o HWND, o hosting do menu passa a ser nosso. Três opções:
+**Janela XAML mínima, nunca ativada.** Decisão do Prism, aceite pelo humano. Razões registadas:
 
-1. **`XamlRoot` da `MainWindow`** — **inviável em headless**: a S-1(A) mediu que `RootLayout.Loaded`
-   só dispara na primeira exibição, logo não há `XamlRoot` num processo nunca ativado.
-2. **Janela XAML mínima nossa, nunca ativada, a hospedar o `MenuFlyout`** — é o que o WinUIEx faz. A
-   S-1(A) mediu o resultado: janela `WinUIDesktopWin32WindowClass` 0×0 **visível** enquanto o flyout
-   está aberto, **sem botão na barra de tarefas** (medido na taskbar real), **sem roubo de foco**
-   (foreground manteve-se noutro PID), flyout renderizado com as 5 entradas num processo nunca
-   ativado. Preserva a UX do Prism tal como está.
-3. **Menu nativo `TrackPopupMenuEx`** — sem qualquer janela XAML auxiliar, é o padrão documentado para
-   tray (o `NIM_SETFOCUS` existe precisamente para este fluxo). Elimina por construção o risco de
-   janela auxiliar visível. **Custo:** perde estilo/tema XAML e a redação visual do Prism; exige o
-   `SetForegroundWindow` clássico antes do menu, o que colide com "sem roubo de foco" e teria de ser
-   medido.
+1. **Decisiva:** um `TrackPopupMenuEx` seria **claro mesmo em modo escuro** — o Windows 11 só escurece
+   menus Win32 para apps que usem **APIs não documentadas do uxtheme** (`SetPreferredAppMode`,
+   `FlushMenuThemes`), e depender de ordinais não suportados é **inaceitável para submissão à Store**.
+2. A opção nativa exigiria `SetForegroundWindow` no nosso HWND — **exatamente o roubo de foco que a
+   S-1(A) mediu ausente**.
+3. No Windows 11 o próprio shell usa flyouts WinUI na tray.
 
-**Recomendo a opção 2** como caminho primário, por preservar exatamente o que a S-1(A) já mediu e por
-manter a UX aprovada. **Mas ponho a opção 3 explicitamente ao Prism e ao Atlas**, porque é a única
-que remove a janela auxiliar por desenho em vez de por medição repetida. **Não decido isto sozinho.**
+**Custo aceite:** a janela auxiliar existe, e a sua invisibilidade prova-se **por medição** (item I da
+matriz O), não por construção. A S-1(A) já mediu esse comportamento na janela equivalente do WinUIEx:
+0×0, sem botão na barra de tarefas, sem roubo de foco, flyout com as 5 entradas num processo nunca
+ativado.
+
+### Tema — ressalva ALTA do Prism, e um achado que a agrava
+
+O tema é aplicado **por raiz** (`ThemeService.cs:33`, `_rootElement.RequestedTheme = …`), não à
+`Application`. A janela do flyout tem raiz própria e, em headless, **não existe raiz da MainWindow** —
+`ThemeService.Attach` só é chamado em `MainWindow.xaml.cs:54`.
+
+**Correção:** `IThemeService` passa a **multi-raiz** (`Attach`/`Detach`, aplicando a todas as raízes
+registadas); a raiz do host do flyout regista-se e recebe `RequestedTheme` **do mesmo serviço**, pelo
+que flyout e Dashboard nunca divergem.
+
+> **Achado que tenho de reportar em vez de contornar:** o Prism pede que o `ThemeService` resolva *a
+> preferência persistida* sem `MainWindow`. **Essa preferência não é persistida em lado nenhum.**
+> `ThemeService.Current` é memória pura, semeado a `System`, e só é mutado pelo `SettingsViewModel`
+> (`:103`); não existe camada de persistência de definições em `Infrastructure/Persistence`. Ou seja,
+> hoje **ninguém** consegue honrar "preferência persistida", e a escolha do utilizador perde-se a cada
+> arranque. A S2-T fecha a **divergência** (mesma `Current` nas duas raízes), que é o defeito que o
+> Prism identificou; a **persistência** é lacuna pré-existente, fora do âmbito da S2-T, e fica para o
+> humano encaminhar.
+
+### Menu — divergência a resolver, não a escolher por mim
+
+Prism diz "ordem e etiquetas **inalteradas**" e lista *Abrir · Atualizar todos · Modo compacto ·
+Definições · sep · Sair*. O **código atual** (`WinUIExTrayIconAdapter.OnContextMenu`) e a **captura da
+S-1(A)** mostram *Abrir · Modo compacto · Atualizar todos · Definições · sep · Sair* — "Modo compacto"
+e "Atualizar todos" trocados. Como a instrução é **não redesenhar**, mantenho a ordem do código e da
+medição, e **peço ao Prism que confirme** qual das duas é a pretendida.
 
 ## I — Sinalização de degradação
 
-S2-T emite; S2 age. Esgotado o budget no arranque `--background` → `Unavailable` → a S2 **nunca**
-permanece headless, materializa Definições > Segundo plano com a InfoBar já no primeiro frame,
-sessão `FOREGROUND` degradada, X/Alt-F4 = saída verdadeira nessa sessão, `BackgroundMonitoringEnabled`
-**inalterado**. `Lost` já em `BACKGROUND` → o mesmo caminho. **A S2-T nunca volta a background
-automaticamente**: só um `TaskbarCreated` reabre uma tentativa, e a decisão de sair da sessão
-degradada é da S2, que a decisão do humano fixa como "não oscilar nessa sessão".
+S2-T emite, S2 age. `Unavailable` no arranque `--background` → a S2 nunca permanece headless,
+materializa Definições > Segundo plano com InfoBar no primeiro frame visível, sessão `FOREGROUND`
+degradada, X/Alt-F4 = saída verdadeira nessa sessão, `BackgroundMonitoringEnabled` **inalterado**.
+`Lost` já em `BACKGROUND` → mesmo caminho. A S2-T **nunca** regressa a background automaticamente.
 
 ## J — Migração para fora do `WinUIEx.TrayIcon`
 
 1. `ITrayIconAdapter` mantém os cinco eventos e ganha a superfície de `ITrayAffordance`.
-2. Novo `ShellTrayIconAdapter` (nosso) substitui `WinUIExTrayIconAdapter`; este é **removido**, com os
-   seus testes.
-3. `TrayService` deixa de inferir sucesso de `Start()` e passa a consumir `EstablishAsync`. O
-   `DegradeWithoutTrayIcon()` existente passa a ser acionado pelo estado, não por exceção.
-4. WinUIEx **continua** como dependência para `WindowManager`/extensões de janela. Sem fork, sem
-   remoção do pacote.
-5. **Trabalho novo que o WinUIEx fazia por nós:** carregar o `.ico` com consciência de DPI
-   (`LoadIconMetric`/`LoadImageW`) e libertar o `HICON`. Não é acessório — um ícone errado a 150% de
-   escala é regressão visível. Prism revê.
+2. `ShellTrayIconAdapter` (nosso) substitui o `WinUIExTrayIconAdapter`, que é removido com os testes.
+3. `TrayService` deixa de inferir sucesso de `Start()` e passa a consumir `EstablishAsync`;
+   `DegradeWithoutTrayIcon()` passa a ser acionado por estado, não por exceção.
+4. WinUIEx continua como dependência para `WindowManager`/extensões de janela. Sem fork, sem remoção.
+5. Trabalho novo assumido: ícone com DPI e libertação do `HICON` (secção C), e a raiz XAML do host.
 
-## K — Testes e as seis contra-provas por mutação
+## K — Testes e contra-provas por mutação
 
-**Seam no limite nativo, não na máquina de estados:** `INativeTrayRegistration { bool Add(); bool SetVersion(); bool Delete(); }`.
+Seam no **limite nativo**: `INativeTrayRegistration { bool Add(); bool SetVersion(); bool Delete(); }`.
 O duplo devolve booleanos; **a máquina de estados sob teste é a de produção**. Tempo por
 `FakeTimeProvider`.
 
 | # | Mutação na produção | Teste que TEM de falhar |
 |---|---|---|
-| 1 | `NIM_ADD` falhado tratado como sucesso — **é a regressão que existe hoje** | `Add=false` ⇒ estado nunca chega a `Available`; degradação emitida |
-| 2 | `NIM_ADD` bem-sucedido tratado como falha | `Add=true` ⇒ `Available` exatamente uma vez; sem degradação espúria |
-| 3 | re-registo em `TaskbarCreated` removido | após a mensagem, `Add` é reinvocado e `Available` é reemitido |
+| 1 | `NIM_ADD` falhado tratado como sucesso — **é a regressão de hoje** | `Add=false` ⇒ nunca `Available`; degradação emitida |
+| 2 | `NIM_ADD` bem-sucedido tratado como falha | `Add=true` ⇒ `Available` exatamente uma vez |
+| 3 | re-registo em `TaskbarCreated` removido | após a mensagem, `Add` reinvocado e `Available` reemitido |
 | 4 | esgotamento de retries a permanecer em `BACKGROUND` | 3 falhas ⇒ `Unavailable` e o consumidor sai de background |
-| 5 | encaminhamento de callback removido | callback v4 sintético ⇒ `OpenRequested`/flyout pedidos exatamente uma vez |
-| 6 | sinal `Lost` suprimido | perda após `Available` ⇒ `Lost` observado pelo consumidor |
+| 5 | encaminhamento de callback removido | callback v4 válido ⇒ `OpenRequested`/flyout exatamente uma vez |
+| 6 | sinal `Lost` suprimido | perda após `Available` ⇒ `Lost` observado |
+| **7** | **validação da mensagem removida** *(CV-6)* | **mensagem forjada com `uCallbackMessage` errado e `uID ≠ 1` é ignorada** |
 
-Mais: retry exatamente 3 tentativas e não 4; atrasos exatos sob tempo falso; cancelamento a
-interromper entre tentativas; `TaskbarCreated` idempotente (duas mensagens ⇒ sem ícone duplicado, sem
-`Lost` espúrio); `ReleaseAsync` chama `NIM_DELETE` exatamente uma vez. **Nada provado só com fakes** —
-as mutações são contra a classe de produção.
+Mais: `Unavailable` no ordinal 0 e ausência de segundo produtor de `Available` (CV-4); `szTip`/`hIcon`
+estáticos (CV-5); exatamente 3 tentativas e não 4; atrasos exatos sob tempo falso; cancelamento entre
+tentativas; **debounce, um-em-voo, teto por janela, e reposição do orçamento por sucesso** (CV-2);
+`TaskbarCreated` idempotente sem ícone duplicado e **sem `Lost` espúrio**; `ReleaseAsync` chama
+`NIM_DELETE` exatamente uma vez.
 
-## L — Veredicto Atlas — **PENDENTE**
+## L / M / N — veredictos **PENDENTES**
 
-Perguntas que lhe ponho: os números de F (3 tentativas, 250 ms/1000 ms, ≤1,25 s) e a justificação;
-a decisão de thread do HWND em B e o gate de medição associado; a idempotência do `TaskbarCreated`
-incluindo o caso DPI; se o seam de K está no sítio certo para as seis mutações morderem.
-
-## M — Veredicto Prism — **PENDENTE**
-
-Perguntas: opção 2 vs opção 3 na secção H; o custo de UX da opção 3; o carregamento de ícone com DPI
-em J; a redação da degradação de I.
-
-## N — Veredicto Vigil — **PENDENTE**
-
-Perguntas: a fronteira nativa nova não alarga superfície de ataque (sem conteúdo dinâmico em
-`szTip`/`hIcon`, sem dados de snapshot no caminho do shell); o WndProc não confia em `wParam`/`lParam`
-sem validar; o `HICON` é libertado; nenhum estado sensível atravessa a fronteira.
+**Atlas:** modelo de thread (B), `Unproven` interno e limitado (E), coalescing/ordenação (E), teto e
+reposição de orçamento, derivação dos números (F).
+**Prism:** divergência de ordem do menu (H), multi-raiz de tema e o achado de não-persistência (H),
+foco de teclado sem ativar a janela auxiliar (D).
+**Vigil:** CV-1 a CV-6 tal como redigidos acima; confirmação de que `Lost` é inalcançável por mensagem.
 
 ## O — Matriz de QA de plataforma real — tudo `NOT_RUN`
 
@@ -236,15 +293,26 @@ sem validar; o `HICON` é libertado; nenhum estado sensível atravessa a frontei
 |---|---|---|
 | A | registo inicial no shell real | `NOT_RUN` |
 | B | tray headless real | `NOT_RUN` |
-| C | menu/flyout | `NOT_RUN` |
-| D | reinício real do Explorer em `FOREGROUND` | `NOT_RUN` — **exige autorização humana** |
-| E | reinício real em `BACKGROUND`/headless | `NOT_RUN` — **exige autorização humana** |
+| C | menu/flyout, incluindo teclado e tema correto | `NOT_RUN` |
+| D | reinício real do Explorer em `FOREGROUND` | `NOT_RUN` — **autorização humana** |
+| E | reinício real em `BACKGROUND`/headless | `NOT_RUN` — **autorização humana** |
 | F | `TaskbarCreated` entregue **pelo próprio Explorer** | `NOT_RUN` (hoje `NOT_OBSERVED`) |
 | G | restauro bem-sucedido do ícone | `NOT_RUN` |
 | H | sem ícone duplicado | `NOT_RUN` |
 | I | sem janela auxiliar visível nem botão na barra de tarefas | `NOT_RUN` |
 | J | degradação por falha de registo forçada | `NOT_RUN` |
 | K | sem consola / sem WER | `NOT_RUN` |
+| **L** | **`FORCED-TERMINATION TRAY CLEANUP`** *(novo, S6)* | `NOT_RUN` |
 
-**O Explorer não é reiniciado nesta volta.** Quando existir build com forma de produção da S2-T, peço
-autorização humana explícita para D/E/F como checkpoint dedicado.
+**L, critérios:** após `TerminateProcess` pelo watchdog — nenhum ícone **permanentemente** órfão;
+renderização obsoleta transitória aceitável **só** se removida naturalmente pelo Windows ao detetar o
+HWND dono morto; o ícone obsoleto **não pode continuar interativo**; o lançamento seguinte cria
+**exatamente um** ícone; sem duplicados; tray funcional após reinício; sem consola/WER.
+**Não se exige `NIM_DELETE` do processo morto. Órfão persistente = FAIL.**
+
+**CV-3, comportamento sob `TerminateProcess`:** não há `NIM_DELETE`; o órfão transitório é esperado;
+**não há fuga de handle** — o kernel reclama os handles USER/GDI (o `HICON`, o HWND e a classe de
+janela) na morte do processo; e como o `uID` é estável e o HWND antigo está morto, o lançamento
+seguinte produz exatamente um ícone.
+
+**O Explorer não é reiniciado nesta volta.**
