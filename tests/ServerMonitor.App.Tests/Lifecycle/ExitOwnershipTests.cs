@@ -17,6 +17,7 @@ namespace ServerMonitor.App.Tests.Lifecycle;
 /// both of the things that could break the invariant: a concurrent acquisition attempt, and an activation.
 /// </para>
 /// </summary>
+[Collection(ThreadBlockingTests.Name)]
 public sealed class ExitOwnershipTests
 {
     /// <summary>

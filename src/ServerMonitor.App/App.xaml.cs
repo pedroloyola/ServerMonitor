@@ -83,13 +83,20 @@ public partial class App : Application
                 services.AddSingleton<IBackgroundMonitoringSettingsService, JsonBackgroundMonitoringSettingsService>();
                 services.AddSingleton<IBackgroundNoticePresenter, BackgroundNoticePresenter>();
                 services.AddSingleton<IBackgroundDegradationNotice, BackgroundDegradationNotice>();
+
+                // M13 S2-T: physical tray reliability is S2-T's, and S2 consumes the positively
+                // established state. Until S2-T lands, the pending source reports Unavailable, so an
+                // interim build degrades to a foreground session with true-exit semantics — fail closed,
+                // never the inference this seam exists to remove.
+                services.AddSingleton<ITrayAffordanceSource, PendingTrayAffordanceSource>();
+                services.AddSingleton<TrayAffordanceLifecycle>();
                 services.AddSingleton<OrphanTemporaryCleaner>();
                 services.AddSingleton(sp => new WindowCloseCoordinator(
                     sp.GetRequiredService<IAppLifecycleController>(),
                     sp.GetRequiredService<IBackgroundMonitoringSettingsService>(),
                     sp.GetRequiredService<IApplicationWindowController>(),
                     sp.GetRequiredService<IBackgroundNoticePresenter>(),
-                    () => sp.GetRequiredService<TrayService>().CanEnterBackground,
+                    () => sp.GetRequiredService<TrayAffordanceLifecycle>().CanEnterBackground,
                     sp.GetRequiredService<ILogger<WindowCloseCoordinator>>()));
 
                 // M8 application-shell services. All Windows-specific behavior stays behind

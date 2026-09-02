@@ -117,8 +117,21 @@
                             MinHeight="36"
                             IsOn="{Binding BackgroundMonitoringEnabled, Mode=TwoWay}" />
 
-                        <!-- Only visible when this session has no notification-area icon. The window is
-                             surfaced without the user asking in that case, so it must say why. -->
+                        <!-- STATE, not event: a short caption that survives closing the InfoBar, so the
+                             answer is still there when the user comes back asking why X quits the app.
+                             The toggle above stays enabled and keeps the persisted value: the preference
+                             did not change, it just has no effect this session. -->
+                        <TextBlock
+                            x:Uid="SettingsBackgroundDegradedCaption"
+                            AutomationProperties.LiveSetting="Polite"
+                            FontSize="12"
+                            Foreground="{ThemeResource TextSecondaryBrush}"
+                            TextWrapping="Wrap"
+                            Visibility="{Binding IsBackgroundDegraded, Mode=OneWay}" />
+
+                        <!-- EVENT: the same closable warning for both moments — the icon failing at
+                             startup and the icon being lost later. The user needs the same understanding
+                             and the same action in both, so there is one text, not two. -->
                         <InfoBar
                             x:Uid="BackgroundDegradedNotice"
                             IsClosable="True"
