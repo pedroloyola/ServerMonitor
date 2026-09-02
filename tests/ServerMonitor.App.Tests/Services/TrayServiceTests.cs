@@ -128,7 +128,7 @@ public sealed class TrayServiceTests
         public Harness(int maxIconAttempts = 1)
         {
             Degradation.Changed += (_, _) => Order.Add("degraded");
-            Window.Restored += () => Order.Add("restore");
+            Window.BackgroundSettingsOpened += () => Order.Add("settings");
             Service = new TrayService(
                 Icon,
                 Window,
@@ -194,14 +194,14 @@ public sealed class TrayServiceTests
         Assert.True(harness.Service.ExitAffordanceDegraded);
         // No icon means BACKGROUND is no longer a legitimate state: the close button must exit instead.
         Assert.False(harness.Service.CanEnterBackground);
-        Assert.Equal(1, harness.Window.RestoreCount);
         Assert.Equal(0, harness.Lifecycle.ExitRequests);
 
-        // §13: surfacing a window nobody asked for is only acceptable WITH the explanation, and the
-        // notice must be raised BEFORE the window appears so the InfoBar is already open when the user
-        // looks at it.
+        // Approved UX: the window opens DIRECTLY on Settings > Background, never via the Dashboard, and
+        // the notice is raised first so the InfoBar is present in the first visible frame.
+        Assert.Equal(1, harness.Window.OpenBackgroundSettingsCount);
+        Assert.Equal(0, harness.Window.RestoreCount);
         Assert.True(harness.Degradation.IsDegraded);
-        Assert.Equal(["degraded", "restore"], harness.Order);
+        Assert.Equal(["degraded", "settings"], harness.Order);
     }
 
     /// <summary>
@@ -305,7 +305,7 @@ public sealed class TrayServiceTests
 
         public void Attach(Window window) { }
 
-        public bool IsMaterialized => CanMaterialize && RestoreCount > 0;
+        public bool IsMaterialized => CanMaterialize && (RestoreCount > 0 || OpenBackgroundSettingsCount > 0);
 
         public void AttachWindowFactory(Func<Window> factory) { }
 
@@ -313,17 +313,17 @@ public sealed class TrayServiceTests
 
         public int HideToBackgroundCount { get; private set; }
 
-        public void OpenBackgroundSettings() => OpenBackgroundSettingsCount++;
+        public void OpenBackgroundSettings()
+        {
+            OpenBackgroundSettingsCount++;
+            BackgroundSettingsOpened?.Invoke();
+        }
 
         public int OpenBackgroundSettingsCount { get; private set; }
         public void HideForMinimize() => HideCount++;
-        public event Action? Restored;
+        public void RestoreAndActivate() => RestoreCount++;
 
-        public void RestoreAndActivate()
-        {
-            RestoreCount++;
-            Restored?.Invoke();
-        }
+        public event Action? BackgroundSettingsOpened;
         public void OpenSettings() => SettingsCount++;
         public void ToggleCompactMode() => ToggleCompactCount++;
         public void RequestClose() => CloseCount++;

@@ -147,6 +147,57 @@ public sealed class SettingsNotificationViewModelTests
         Assert.True(viewModel.IsBackgroundDegradedNoticeOpen);
     }
 
+    /// <summary>
+    /// TWO surfaces, not one: the InfoBar is the EVENT and can be dismissed, the caption is the STATE and
+    /// must survive that dismissal — otherwise the user who closes the bar and comes back later asking
+    /// "why does X quit the app?" finds no answer (scope control §1).
+    /// </summary>
+    [Fact]
+    public void The_state_caption_survives_the_info_bar_being_dismissed()
+    {
+        var degradation = new BackgroundDegradationNotice();
+        var viewModel = CreateWithDegradation(degradation);
+        Assert.Equal(Visibility.Collapsed, viewModel.IsBackgroundDegraded);
+
+        degradation.Raise();
+        Assert.Equal(Visibility.Visible, viewModel.IsBackgroundDegraded);
+        Assert.True(viewModel.IsBackgroundDegradedNoticeOpen);
+
+        viewModel.IsBackgroundDegradedNoticeOpen = false; // the user closes the InfoBar
+
+        Assert.Equal(
+            Visibility.Visible,
+            viewModel.IsBackgroundDegraded);
+    }
+
+    /// <summary>
+    /// A degraded session does NOT rewrite the preference: the toggle keeps the persisted value and stays
+    /// usable, because nothing about the user's choice changed — only this session cannot honour it.
+    /// </summary>
+    [Fact]
+    public void A_degraded_session_leaves_the_persisted_preference_alone()
+    {
+        var degradation = new BackgroundDegradationNotice();
+        var background = new FakeBackgroundMonitoringSettingsService(enabled: true);
+        var viewModel = new SettingsViewModel(
+            new FakeThemeService(),
+            new FakeLocalizationService(),
+            new FakeNavigationService(),
+            new FakeServerService(),
+            new EmptyDiscoveryService(),
+            new FakeNotificationSettingsService(true),
+            background,
+            degradation,
+            new NullHistoryMaintenanceService(),
+            new AppVersionProvider(),
+            NullLogger<SettingsViewModel>.Instance);
+
+        degradation.Raise();
+
+        Assert.True(background.BackgroundMonitoringEnabled);
+        Assert.True(viewModel.BackgroundMonitoringEnabled);
+    }
+
     private static SettingsViewModel CreateWithNavigation(FakeNavigationService navigation) => new(
         new FakeThemeService(),
         new FakeLocalizationService(),

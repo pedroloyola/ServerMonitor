@@ -184,6 +184,13 @@ public sealed class BackgroundNoticeTests
         new Dictionary<string, string> { ["kind"] = "BackgroundCloseNotice", ["action"] = "OpenDashboard" },
         new Dictionary<string, string> { ["kind"] = "BackgroundCloseNotice", ["action"] = "None" },
         new Dictionary<string, string> { ["serverId"] = "11111111-1111-1111-1111-111111111111" },
+        // Vigil CI-1's specific concern: Enum.TryParse accepts an enum's NUMERIC representation, so a
+        // payload of "1"/"2" would have resolved to a real action. The exact allowlist rejects it.
+        new Dictionary<string, string> { ["kind"] = "0", ["action"] = "1" },
+        new Dictionary<string, string> { ["kind"] = "ServerHealth", ["action"] = "1" },
+        new Dictionary<string, string> { ["kind"] = "1", ["action"] = "OpenDashboard" },
+        // ...and comma-separated combinations, which Enum.TryParse also accepts for any enum.
+        new Dictionary<string, string> { ["kind"] = "ServerHealth", ["action"] = "OpenDashboard, None" },
         new Dictionary<string, string> { ["kind"] = "ServerHealth", ["action"] = "OpenDashboard; DROP" }
     };
 }

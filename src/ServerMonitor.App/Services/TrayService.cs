@@ -125,12 +125,13 @@ public sealed class TrayService(
             ExitAffordanceDegraded = true;
         }
 
-        // Surfacing a window the user did not ask for is only acceptable WITH an explanation (Prism,
-        // §13): the notice is raised before the window appears, so the InfoBar in Settings > Background
-        // is already open when they look at it. It states plainly that closing now quits, and that their
-        // saved preference was not touched.
+        // Approved UX (scope control §2): raise the notice FIRST, then open the window DIRECTLY on
+        // Settings > Background — never RestoreAndActivate, which would show the Dashboard on the way
+        // there. The InfoBar is therefore already present in the first visible frame, and the window
+        // itself is the explanation. No toast here: the window is the primary surface, a toast would
+        // compete with it and may be disabled at the OS level.
         degradationNotice.Raise();
-        windowController.RestoreAndActivate();
+        windowController.OpenBackgroundSettings();
 
         if (!windowController.IsMaterialized)
         {

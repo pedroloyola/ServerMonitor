@@ -172,8 +172,20 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
         set => SetProperty(ref _isBackgroundDegradedNoticeOpen, value);
     }
 
-    private void OnBackgroundDegradationChanged(object? sender, EventArgs args) =>
+    /// <summary>
+    /// The persistent half of the degradation UX: visible for as long as the session is degraded, even
+    /// after the InfoBar is dismissed. Bound to Visibility, so it is simply absent otherwise.
+    /// </summary>
+    public Microsoft.UI.Xaml.Visibility IsBackgroundDegraded =>
+        _backgroundDegradationNotice.IsDegraded
+            ? Microsoft.UI.Xaml.Visibility.Visible
+            : Microsoft.UI.Xaml.Visibility.Collapsed;
+
+    private void OnBackgroundDegradationChanged(object? sender, EventArgs args)
+    {
         IsBackgroundDegradedNoticeOpen = _backgroundDegradationNotice.IsDegraded;
+        OnPropertyChanged(nameof(IsBackgroundDegraded));
+    }
 
     /// <summary>
     /// True when this navigation was asked to land on the Background section — the activation of the
