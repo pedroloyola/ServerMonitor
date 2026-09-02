@@ -43,12 +43,23 @@ TransitionResult Transition(TrayEvent e, long monotonicNow);
 ```
 1. se o estado for Releasing/Released  → só eventos terminalmente legais prosseguem  (D)
 2. se o evento trouxer geração ≠ geração atual → DESCARTAR                            (obsolescência)
+   ⚠ RESSALVA CV-19, normativa: os eventos de CONCLUSÃO DE EFEITO capazes de ter criado
+     uma afordância de shell — AddCompleted, SetVersionCompleted — NUNCA são descartados
+     por geração obsoleta. São encaminhados para RECONCILIAÇÃO (§5.2). O passo 2 mantém-se
+     para todos os outros eventos.
 3. se houver episódio ativo e monotonicNow ≥ deadline → TERMINALIZAR como Lost AQUI,
    nesta execução, ANTES de processar o evento                                        (A)
 4. só então despachar o evento
 ```
 
 O passo 3 é o que torna a garantia do deadline **uma propriedade da função e não de um temporizador**.
+
+> **CV-19 — porque a ressalva do passo 2 é obrigatória e não cosmética.** Um `AddCompleted` tardio traz
+> **sempre** a geração antiga, porque o `Releasing` mudou a geração terminal. Lido à letra, o passo 2
+> descartá-lo-ia **antes** de a reconciliação da §5.2 acontecer — que é exatamente o defeito que a §5.2
+> existe para impedir, e um implementer que siga o preâmbulo literalmente escreve o ícone órfão. **O
+> passo 2 não é removido**: continua a ser carga estrutural para todos os outros eventos e tem mutação
+> própria.
 
 ### Fontes de evento
 
@@ -140,34 +151,62 @@ pelo invariante causal abaixo. Satisfazê-la à letra exigiria que o `Release` e
 nativo, **o que reintroduziria o defeito de timer/deadlock provado na revisão 6**. O gate **não** volta
 a ser acoplado ao ciclo de vida.
 
-### 5.1 Emissão — garantia estrita, imposta pelo TIPO
+### 5.1 Emissão — capacidade **opaca e não fabricável**
 
 > **Uma vez comprometido `Releasing`, a `Transition` NUNCA emite um efeito `Add` novo.**
 
-Isto **não é uma convenção que cada ramo tem de respeitar**: é **imposto pelo tipo**, e por isso
-impossível de violar sem alterar a estrutura.
+**A revisão anterior não cumpria isto.** `EpisodeToken` e `AddIcon.For` eram `internal`: qualquer código
+do assembly podia fabricar token e efeito **sem passar pela `Transition`**. Esse `Add` não entrava no
+contador `pending`, a máquina podia atingir `Released` com a guarda satisfeita, e o `Add` posterior
+deixava um ícone real. **O token não era o mecanismo — era a convenção de ninguém o construir.**
+
+**Mecanismo corrigido: os efeitos são tipos `private` aninhados na máquina, e o exterior só vê
+comportamento.**
 
 ```csharp
-// Só existe enquanto houver episódio ativo. Releasing/Released põem _episode a null.
-internal readonly record struct EpisodeToken(long Generation, long Deadline);
-
-internal abstract record ShellEffect
+internal interface IShellEffect                      // o que o executor vê. Não constrói nada.
 {
-    // O construtor de AddIcon é privado; a ÚNICA via de construção exige um EpisodeToken.
-    internal sealed record AddIcon : ShellEffect
-    {
-        private AddIcon(EpisodeToken token) { … }
-        internal static AddIcon For(EpisodeToken token) => new(token);
-    }
-    internal sealed record DeleteIcon : ShellEffect;          // não exige token: compensar é sempre legal
-    internal sealed record FailSafeExitRequested : ShellEffect;
+    long Generation { get; }
+    long Sequence { get; }
+    bool MayCreateAffordance { get; }                // alimenta o contador `pending` (§6.4)
+    ShellOpResult Execute(INativeTrayRegistration native);
+}
+
+internal sealed class TrayStateMachine
+{
+    // Tipos PRIVADOS ANINHADOS: não são nomeáveis fora desta classe, logo não são declaráveis
+    // nem construíveis fora dela. Não há factory internal, não há token a circular.
+    private sealed record AddIcon(long Generation, long Sequence) : IShellEffect { … }
+    private sealed record DeleteIcon(long Generation, long Sequence) : IShellEffect { … }
+    private sealed record FailSafeExitRequested(long Generation, long Sequence) : IShellEffect { … }
+
+    // Únicos call sites de `new AddIcon(...)` em todo o programa: os ramos de emissão da Transition,
+    // que o passo 1 do preâmbulo torna inalcançáveis em Releasing/Released.
 }
 ```
 
-**Não é possível construir um `AddIcon` sem um `EpisodeToken`, e não é possível obter um `EpisodeToken`
-em `Releasing`/`Released`**, porque nesses estados `_episode` é `null` e não há outro produtor do token.
-A garantia de emissão é, portanto, verificável por inspeção do tipo — não por revisão de cada ramo.
-`DeleteIcon` **não** exige token de propósito: compensar tem de continuar legal em estado terminal.
+**Porque não há via de fabricação, verificável só pela superfície do tipo:**
+
+1. `AddIcon` é `private` numa classe `sealed` ⇒ **o nome não existe fora dela**. Nenhum outro ficheiro
+   pode declarar a variável, quanto mais construir o valor. O compilador impõe-o.
+2. **Não existe factory, `internal static`, token, nem qualquer outro produtor exportado.** O
+   `EpisodeToken` **desaparece como mecanismo** — era uma capacidade a circular, e uma capacidade que
+   circula é uma capacidade que se fabrica. O aninhamento privado torna-o desnecessário.
+3. O executor recebe `IShellEffect` e **só chama `Execute`**; não tem construtor a que chegar, e o
+   interface não expõe nenhum.
+4. Dentro da máquina, os únicos `new AddIcon(...)` estão nos ramos de emissão, e o **passo 1 do
+   preâmbulo** torna esses ramos inalcançáveis em estado terminal.
+
+Um leitor conclui, **só da superfície do tipo**, que não existe produtor de efeitos de afordância fora
+da `Transition`.
+
+> **Limite honesto:** reflexão consegue construir qualquer coisa. Está fora da fronteira de confiança
+> pela mesma razão do ponto 7 da CV-1 — um processo capaz de usar reflexão sobre o nosso assembly já
+> tem controlo total, e a S2-T não lhe cria capacidade nova.
+
+**`DeleteIcon` continua a não exigir token** — decisão mantida: compensar tem de ser sempre legal em
+estado terminal. O aninhamento privado dá a não-fabricação **sem** reintroduzir uma restrição de
+capacidade sobre a compensação.
 
 ### 5.2 Conclusão — o que pode acontecer fisicamente depois
 
@@ -230,7 +269,8 @@ bool ShouldDeliver(Delivery d) => d.Generation == CurrentGeneration && d.Class.I
 | Classe de entrega | Em `Releasing`/`Released` |
 |---|---|
 | semântica de sessão (`Available`, `Recovering`, `Lost` degradável) | **SUPRIMIDA** — não pode dizer à S2 para degradar nem para confiar numa afordância |
-| dirigida ao terminal (`Releasing`, `Released`, `FailSafeExitRequested`) | **ENTREGUE** — é precisamente para isto que existem |
+| dirigida ao terminal (`Releasing`, `Released`) | **ENTREGUE** — é precisamente para isto que existem |
+| **pedido fail-safe de saída** | **NÃO É UMA ENTREGA** — invocação direta do sink, §6.4; nunca passa por esta classificação |
 | notificação CV-17/CV-18 | entregue **uma vez**, fire-and-forget, nunca aguardada |
 
 ### 6.4 Limpeza, `Released`, e escalada fail-safe **sem reentrância**
@@ -274,36 +314,83 @@ CleanupCompleted(false) → Transition → Releasing MANTÉM-SE terminal
                         → watchdog de 10 s mantém-se autoritativo
 ```
 
-**Sem autoridade de release recursiva dentro do tray.** Duas propriedades tornam a reentrância
-inofensiva mesmo que o caminho exterior volte a passar pelo tray:
+#### O consumo é DIRETO e LIMITADO — não é uma entrega enfileirada
 
-1. `FailSafeExitRequested` é **um efeito entregue**, nunca uma chamada síncrona feita de dentro da
-   `Transition` nem do caminho de limpeza;
-2. **`ReleaseAsync` em `Releasing`/`Released` é um no-op que retorna imediatamente** — logo o
-   `ExitSequence.RemoveTrayIcon()` do caminho autoritativo da S2 **não pode bloquear** à espera do tray.
+**Correção a um defeito real da versão anterior:** dizer apenas *"é um efeito entregue"* trocava a
+reentrância por uma **entrega**, e a entrega herdava o problema noutra forma. Se ficasse enfileirada, o
+`RequestExit` não corria, e **o watchdog de 10 s só é armado dentro do `RequestExit`** — ou seja, antes
+disso **não há rede nenhuma** e o processo podia ficar vivo em `Releasing` indefinidamente.
+
+**Mecanismo:** o pedido fail-safe **não é uma entrega**. É a **invocação síncrona e direta de um sink
+registado**, executada pelo executor de efeitos **imediatamente após a libertação do lock, na própria
+thread que correu a `Transition`**.
+
+```csharp
+// Injetado na construção. Null ⇒ ArgumentNullException na construção, nunca um drop silencioso.
+internal sealed class TrayStateMachine(Action requestAuthoritativeExit, …);
+
+// No executor, fora do lock, ANTES de qualquer outro efeito da mesma transição:
+if (effects.HasFailSafeExit) { _failSafeOnce.RunOnce(requestAuthoritativeExit); }
+```
+
+**Porque não pode ficar pendente:**
+
+1. **Fora do lock, sem fila, sem dispatcher, sem UI.** Não passa pelo mecanismo de entrega da §6.3, logo
+   não pode ser classificado, adiado, coalescido nem suprimido.
+2. **É o primeiro efeito executado** da transição que o produziu, portanto nada da própria S2-T se lhe
+   pode interpor.
+3. **Não depende de a thread de UI estar viva** — corre na thread da fonte de evento que terminalizou,
+   que pode ser a do worker nativo ou a do temporizador.
+4. **Sink obrigatório na construção.** Ausência é erro de construção, não uma condição de runtime que
+   se descubra tarde.
+5. **`RunOnce`** garante no máximo uma invocação, e uma exceção do sink não impede o resto da limpeza —
+   mas também não é engolida silenciosamente: é registada.
+6. Assim que o sink corre, o `RequestExit` da S2 arma o watchdog de 10 s logo após o seu CAS para
+   `Exiting`. **A partir daí existe rede; antes, o único que garante progresso é este consumo direto.**
+
+> **Só a NOTIFICAÇÃO (CV-17/CV-18) é fire-and-forget. O pedido de saída não é.**
+
+**Sem autoridade de release recursiva dentro do tray**, e a reentrância continua inofensiva porque
+**`ReleaseAsync` em `Releasing`/`Released` é um no-op que retorna imediatamente** — logo o
+`ExitSequence.RemoveTrayIcon()` do caminho autoritativo da S2 **não pode bloquear** à espera do tray.
 
 **`CleanupVerified = false` nunca autoriza continuação em background ou degradada** (CV-16). A S2 nunca
 observa `Lost` com limpeza não verificada.
 
 ### 6.5 CV-17 / CV-18 — a notificação informativa antes da saída fail-safe
 
-**Uma** tentativa, emitida como efeito com o Exit verdadeiro **já comprometido**, e **nunca aguardada**.
+#### Condição de emissão *(Prism)*
 
-**Slot, não texto.** O desenho define as chaves; **o Prism escreve e localiza pt-BR / pt-PT / en-US, e
-eu não invento redação.**
+> A notificação **só é emitida quando a chamada fail-safe ao `RequestExit` VENCE a transição para
+> `Exiting`.**
 
-| Chave | Conceito (redação final do Prism) |
-|---|---|
-| `TrayFailSafeExitNotificationTitle` | *"ServerAlyzer was closed"* |
-| `TrayFailSafeExitNotificationBody` | *"We couldn't safely restore the notification-area icon. Open ServerAlyzer again to continue monitoring."* |
+Se o utilizador **já tinha pedido Sair** — pelo menu do tray, ou por X com o segundo plano desligado —
+e a compensação falhar **durante essa saída**, **não há notificação**: o desfecho é exatamente o que
+ele pediu, e *"abra o ServerAlyzer novamente para continuar"* **contradiria a sua própria ação**. Como
+o `RequestExit` já é one-shot por CAS (`TryTransitionToExiting`), isto é uma **condição sobre o
+resultado desse CAS no caminho existente**, e **não** um mecanismo novo: emite-se a notificação apenas
+no ramo em que o nosso pedido foi o que ganhou.
 
-**CV-18 — contrato da ação, normativo.** Tipo de ação **literal e fechado**, **zero parâmetros**,
-**sem payload arbitrário** — nada do episódio, do shell ou da frota atravessa a notificação.
-Expiração **curta**; **fire-and-forget**; **sem** dados de servidor/frota; **sem** terminologia técnica
-de Shell/`NIM`; **não modal**. **A falha da notificação é ignorada e NUNCA pode atrasar nem impedir o
-Exit verdadeiro.** Um **clique tardio**, já com o processo morto, produz **apenas** o comportamento de
-lançamento que já está na allowlist — **sem capacidade especial e sem laço**: não reabre o episódio,
-não reentra no tray, não transporta estado.
+#### Conteúdo
+
+**Strings FINAIS já escritas pelo Prism** em `.boss/tmp/m13-s2-strings.md`, chaves
+`TrayFailSafeExitNotificationTitle` e `TrayFailSafeExitNotificationBody`, em **pt-BR / pt-PT / en-US**.
+**Referência, não cópia — não invento redação.** Instaladas nos `.resw` reais; sem strings de UI
+hardcoded.
+
+**Expiração:** **30 minutos**, valor **sugerido pelo Prism** por ainda cobrir quem regressa ao ecrã
+alguns minutos depois, sem ficar indefinidamente no Centro de Notificações. Registado como sugestão
+dele, não como número meu.
+
+#### CV-18 — contrato da ação, normativo *(FECHADA)*
+
+Tipo de ação **literal e fechado**, **zero parâmetros**, **sem payload arbitrário** — nada do episódio,
+do shell ou da frota atravessa a notificação. **Fire-and-forget**; **não modal**; **sem** dados de
+servidor/frota; **sem** terminologia técnica de Shell/`NIM`. **A falha da notificação é ignorada e
+NUNCA pode atrasar nem impedir o Exit verdadeiro** — é o único efeito desta secção que é
+fire-and-forget, ao contrário do pedido de saída (§6.4). Um **clique tardio**, já com o processo morto,
+produz **apenas** o comportamento de lançamento que já está na allowlist — **sem capacidade especial e
+sem laço**: não reabre o episódio, não reentra no tray, não transporta estado.
 
 ## 7 — Independência A / B, por tipo *(G)*
 
@@ -349,7 +436,9 @@ histórico de B. **Rejeição por B ⇒ sem episódio, sem deadline, sem `Lost`.
 | CV-15 | integridade do documento normativo | §8 | **ATIVA** — este mapa é o cumprimento |
 | CV-16 | `CleanupVerified` fail-closed | §6 | **ATIVA** |
 | CV-17 | notificação informativa antes da saída fail-safe | §6.5 | **ATIVA** — slot definido, redação do Prism |
-| CV-18 | contrato fechado da ação da notificação fail-safe | §6.5 | **ATIVA** |
+| CV-18 | contrato fechado da ação da notificação fail-safe | §6.5 | **ATIVA · FECHADA** |
+| CV-19 | ressalva do passo 2 para eventos de conclusão de efeito | §1 (preâmbulo) | **ATIVA** |
+| CI-1b | *(dívida do lado da S2)* grafias numéricas de enum em payloads hostis do contrato de ativação | §6.5 | **REFERENCIADA, não herdada em silêncio.** A ação `FailSafeExit` é acrescentada a esse mesmo contrato, logo a CI-1b **aplica-se-lhe**: vocabulário genuinamente fechado por `switch`/allowlist exata, e grafia numérica ou desconhecida ⇒ **fail closed**. A dívida continua a ser da S2; fica aqui registada porque a S2-T alarga o contrato. |
 | — | regra literal *"nenhum `NIM_ADD` pode executar depois do `Release`"* | §5 | **`SUPERSEDED BY` o invariante normativo do `Release` (§5.1 emissão + §5.2 conclusão compensada).** Justificação: satisfazê-la à letra obrigaria o `Release` a esperar pelo gate de I/O nativo, reacoplando ciclo de vida e I/O e reintroduzindo o defeito de timer/deadlock provado na revisão 6. O invariante substituto é **causalmente mais forte**: proíbe a *emissão* pelo tipo e obriga a *compensação* da conclusão tardia, o que a regra literal não fazia. |
 
 ## 9 — `WndProc`: confiança e default-deny *(CV-1 · CV-6b · CV-9)*
@@ -421,7 +510,7 @@ mundo dentro de uma chamada nativa não prova nada disto.**
 | Teste | Prova |
 |---|---|
 | T1 | estacionado em `Add`, avançar o tempo além do prazo; ao libertar com `ok:true`, a reentrada terminaliza `Lost` **na própria execução** e **não publica `Available`** |
-| T2 | `Release` durante: `Available` · debounce pendente · `Recovering` · atraso de retry · **chamada nativa em voo** · limpeza em curso ⇒ **`Releasing` vence em todos** |
+| T2 | `Release` durante: `Available` · debounce pendente · `Recovering` · atraso de retry · **chamada nativa em voo** · limpeza em curso ⇒ **`Releasing` vence em todos**. **Reforço obrigatório:** não basta observar que o estado é `Releasing` — o teste **CONTA os efeitos `Add` emitidos após o `Release` e exige ZERO**. Sem essa contagem, a M1 passa mutada. |
 | T3 | admissão: entre `TryBeginEpisode` devolver `true` e o estado ser `Recovering` **não existe estado observável** |
 | T4 | rejeição por B ⇒ sem episódio, sem deadline, sem `Lost`; sucesso-sempre adversarial converge para supressão |
 | T5 | `Delete` falha 3× ⇒ `Releasing` + CV-17 + **efeito `FailSafeExitRequested`**, e **não** sessão degradada |
@@ -429,8 +518,10 @@ mundo dentro de uma chamada nativa não prova nada disto.**
 | T7 | temporizador atrasado: a **primeira** reentrada posterior terminaliza — a segurança não depende da promptidão |
 | **T8** | **`Add` PENDENTE ainda não iniciado** — efeito emitido e ainda não entregue ao worker quando o `Release` é comprometido: o efeito é **cancelado antes de tocar no shell**, não há `Add`, e a reconciliação pendente resolve-se sem `Delete` |
 | **T9** | **notificação de UI obsoleta** — entrega enfileirada em `Recovering`, atrasada, e entregue já em `Releasing`: é **suprimida** por classe de sessão, enquanto uma entrega dirigida ao terminal na mesma fila **é entregue** |
-| **T10** | **reentrância completa do `RequestExit`** — `CleanupCompleted(false)` ⇒ `FailSafeExitRequested` ⇒ a S2 corre o `ExitSequence` real, cujo `RemoveTrayIcon()` chama `ReleaseAsync` de volta: **retorna imediatamente como no-op**, o `ExitSequence` completa, e **nada fica à espera do watchdog** |
-| **T11** | `Add` tardio pré-`Release` conclui com `ok:true` ⇒ **`Delete` compensatório emitido** e `Released` **inalcançável** até esse `Delete` verificar |
+| **T10** | **reentrância completa do `RequestExit`, atravessando o caminho real** — `CleanupCompleted(false)` ⇒ o executor **invoca o sink registado** (§6.4), **não** o teste a chamar `RequestExit` diretamente ⇒ a S2 corre o `ExitSequence` **real**, cujo `RemoveTrayIcon()` chama `ReleaseAsync` de volta: **retorna imediatamente como no-op**, o `ExitSequence` completa, e **nada fica à espera do watchdog**. O teste **só conta se atravessar a invocação real do sink**. |
+| **T11** | `Add` tardio pré-`Release` conclui com `ok:true` ⇒ **`Delete` compensatório emitido** e `Released` **inalcançável** até esse `Delete` verificar. **Reforço obrigatório, as duas asserções:** (i) o **estado** nunca é `Available`; (ii) **nenhuma entrega** de `Available` é produzida. Sem as duas, a M2 passa mutada. |
+
+| **T12** | **o pedido fail-safe não pode ficar pendente** — com o despachante de UI **parado** e a fila de entregas **bloqueada**, `CleanupCompleted(false)` ⇒ o sink é invocado **na mesma pilha**, fora do lock, antes de qualquer outro efeito |
 
 ### Plano de mutação — obrigatório, **uma mutação de cada vez**
 
@@ -440,8 +531,8 @@ evidência acompanha a entrega do código (CV-12).**
 
 | # | Mutação (isolada) | Invariante violado | Teste determinístico que TEM de falhar |
 |---|---|---|---|
-| **M1** | permitir que a `Transition` emita `Add` durante `Releasing` | §5.1 — emissão imposta pelo tipo | **T2** (variante "`Release` com retry pendente") e **T8** |
-| **M2** | um `Add` tardio pré-`Release` bem-sucedido publica `Available` | §5.2 — conclusão é obsoleta | **T11**, e **T1** para a variante por deadline |
+| **M1** | permitir que a `Transition` emita `Add` durante `Releasing` | §5.1 — emissão não fabricável | **T2** pela **contagem de zero `Add`**, e **T8** |
+| **M2** | um `Add` tardio pré-`Release` bem-sucedido publica `Available` | §5.2 — conclusão é obsoleta | **T11** pelas **duas** asserções (estado **e** entregas), e **T1** para a variante por deadline |
 | **M3** | um `Add` tardio **não** recebe `Delete` compensatório | §5.2 + §6.4 — `Released` exige reconciliação | **T11** e **T5** |
 | **M4** | remover a revalidação em tempo de entrega das notificações | §6.3 — validade no enqueue não basta | **T9** |
 
@@ -449,7 +540,11 @@ evidência acompanha a entrega do código (CV-12).**
 · `TryBeginEpisode` movido para fora da transição · `Available` publicado sem revalidar o prazo · gate
 adquirido dentro do domínio de decisão · `Transition` chamada de dentro do domínio · efeitos a mutar
 estado · ordem de sequência removida · `CleanupCompleted(false)` a permanecer em `Lost` ·
-**`FailSafeExitRequested` substituído por chamada síncrona a `RequestExit`** (deve falhar **T10**) ·
+**sink fail-safe convertido em entrega enfileirada** (deve falhar **T12**) ·
+**`AddIcon`/`DeleteIcon` promovidos de `private` aninhado a `internal`** (deve falhar a asserção de
+arquitetura que proíbe produtores de efeito fora da máquina) ·
+**ressalva CV-19 removida do passo 2**, voltando a descartar `AddCompleted` obsoleto por geração
+(deve falhar **T11**) ·
 **guarda `pending == 0` removida da transição para `Released`** (deve falhar **T11**) · default-deny
 removido em `Lost`/`Unverified` · cada validação da CV-6b isoladamente · `NIM_DELETE == false` ignorado
 · B reposto por sucesso.
@@ -461,10 +556,11 @@ removido em `Lost`/`Unverified` · cada validação da CV-6b isoladamente · `NI
 | | Pergunta | Resposta | Porquê, estruturalmente |
 |---|---|---|---|
 | 1 | Admissão e invalidação são **uma** operação linearizável? | **SIM** | §3 — `TryBeginEpisode`, geração, timestamp, deadline e `Recovering` são o mesmo corpo, sob o mesmo domínio, sem nada entre eles |
+| — | *(por que a 1 e a 3 passam a SIM e a 5 perde a ressalva)* | — | a ressalva anterior era **a fabricação de efeitos fora da `Transition`** (§5.1). Com os efeitos como tipos `private` aninhados, **não existe nome nem produtor exportado**, logo nenhum caminho contorna a autoridade — e as respostas deixam de depender de convenção |
 | 2 | Existe **exatamente uma** autoridade? | **SIM** | `Transition` é a única escritora de estado; efeitos nunca mutam estado; o gate não decide |
 | 3 | `Release` é **estruturalmente** absorvente? | **SIM**, com a distinção clarificada | passo 1 do preâmbulo ∀ chamada; δ(`Releasing`,x)=`Releasing` ∀x. **Sem `Add` NOVO** depois de `Releasing` — imposto pelo tipo (§5.1); um `Add` pré-existente só pode completar **como trabalho obsoleto e compensado** (§5.2) |
 | 4 | Algo **depois do deadline** pode publicar `Available`? | **NÃO** | passo 3 do preâmbulo terminaliza **antes** de o evento ser olhado; o ramo que publica `Available` é inalcançável em estado terminal |
-| 5 | Algum resultado obsoleto pode **contornar** a função? | **NÃO** | resultados não publicam: **reentram** por `Transition`, e o passo 2 descarta geração obsoleta |
+| 5 | Algum resultado obsoleto pode **contornar** a função? | **NÃO**, sem ressalva | resultados não publicam: **reentram** por `Transition`. O passo 2 descarta geração obsoleta **exceto** conclusões de efeito, que são **reconciliadas** (CV-19). E **nenhum efeito é fabricável fora da máquina** (§5.1), pelo que já não existe a via que antes gerava a ressalva |
 
 ## 14 — Matriz de plataforma real
 
