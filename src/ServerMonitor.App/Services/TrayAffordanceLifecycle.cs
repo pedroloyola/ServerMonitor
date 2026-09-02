@@ -83,6 +83,15 @@ public sealed class TrayAffordanceLifecycle
 
     private void Apply(TrayAffordanceState state)
     {
+        if (state == TrayAffordanceState.Recovering)
+        {
+            // HOLD. The previous proof is already invalid, so background is not legitimate; but an
+            // unauthenticated TaskbarCreated broadcast must not be able to degrade the session either.
+            // Only Lost degrades, and Lost is bounded by the recovery deadline (M13 S2-T).
+            _logger.LogDebug("The tray affordance is revalidating; holding without degrading.");
+            return;
+        }
+
         if (state == TrayAffordanceState.Available)
         {
             lock (_sync)

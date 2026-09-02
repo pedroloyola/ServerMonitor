@@ -22,6 +22,14 @@ public enum TrayAffordanceState
     Available,
 
     /// <summary>
+    /// A bounded recovery episode is running: the previous proof is already invalid, so this is NOT
+    /// Available, but an unauthenticated <c>TaskbarCreated</c> broadcast must not degrade the session
+    /// either, so it is not <see cref="Lost"/>. S2 HOLDS here — it neither degrades nor treats the tray
+    /// as usable — for at most the bounded recovery deadline (M13 S2-T).
+    /// </summary>
+    Recovering,
+
+    /// <summary>
     /// An affordance that WAS established is gone — Explorer restarted and re-registration failed within
     /// its budget. Treated exactly like <see cref="Unavailable"/> for the close semantics, but reported
     /// separately because it can happen mid-session while the window is already hidden.

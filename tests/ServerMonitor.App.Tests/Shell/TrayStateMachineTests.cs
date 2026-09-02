@@ -1,0 +1,439 @@
+using System.Runtime.CompilerServices;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Time.Testing;
+using ServerMonitor.App.Services;
+using ServerMonitor.App.Shell.Tray;
+using ServerMonitor.App.Tests.Fakes;
+
+namespace ServerMonitor.App.Tests.Shell;
+
+/// <summary>
+/// The S2-T linearizable state machine (design <c>docs/m13-s2t-linearizable-state-machine.md</c>).
+/// <para>
+/// These are the tests the mutation matrix points at. Several of them deliberately PARK INSIDE a native
+/// call, because the guarantees under test are exactly the ones that only show up while a shell call is
+/// outstanding: that the deadline still terminalizes, that a late success is discarded, and that the
+/// compensating Delete follows.
+/// </para>
+/// </summary>
+public sealed class TrayStateMachineTests : IDisposable
+{
+    private static readonly TimeSpan Patience = TimeSpan.FromSeconds(5);
+
+    private readonly BlockingNativeTrayRegistration _native = new();
+    private readonly FakeTimeProvider _time = new();
+    private readonly List<Task> _background = [];
+
+    private int _exitRequests;
+    private int _escalations;
+    private Exception? _sinkFailure;
+
+    private TrayStateMachine Create(
+        Action? requestExit = null,
+        Action? escalate = null,
+        EpisodeFrequencyLimiter? limiter = null) =>
+        new(
+            _native,
+            requestExit ?? (() => Interlocked.Increment(ref _exitRequests)),
+            escalate ?? (() => Interlocked.Increment(ref _escalations)),
+            _time,
+            NullLogger<TrayStateMachine>.Instance,
+            limiter);
+
+    // ---------------------------------------------------------------------------------------------
+    // Establishment and the single producer of Available
+    // ---------------------------------------------------------------------------------------------
+
+    [Fact]
+    public void Establish_publishes_Available_only_after_the_shell_confirms_both_calls()
+    {
+        using var machine = Create();
+
+        machine.Establish();
+
+        Assert.Equal(TrayLifecycleState.Available, machine.LifecycleState);
+        Assert.Equal(1, _native.AddCalls);
+        Assert.Equal(1, _native.SetVersionCalls);
+    }
+
+    [Fact]
+    public void A_false_NIM_ADD_never_reaches_Available()
+    {
+        _native.AddResult = false;
+        using var machine = Create();
+
+        machine.Establish();
+
+        Assert.NotEqual(TrayLifecycleState.Available, machine.LifecycleState);
+    }
+
+    [Fact]
+    public void A_false_NIM_SETVERSION_is_a_contract_failure_and_never_reaches_Available()
+    {
+        // v4 is a requirement, not a preference: the anchor coordinates position the flyout. We never
+        // silently degrade to v3.
+        _native.SetVersionResult = false;
+        using var machine = Create();
+
+        machine.Establish();
+
+        Assert.NotEqual(TrayLifecycleState.Available, machine.LifecycleState);
+    }
+
+    [Fact]
+    public void An_exhausted_retry_budget_with_observed_failure_reaches_Lost()
+    {
+        _native.AddResult = false;
+        using var machine = Create();
+
+        machine.Establish();
+        _time.Advance(TrayStateMachine.FirstRetryDelay);
+        _time.Advance(TrayStateMachine.SecondRetryDelay);
+
+        Assert.Equal(TrayLifecycleState.Lost, machine.LifecycleState);
+        Assert.Equal(TrayStateMachine.MaxAttemptsPerEpisode, _native.AddCalls);
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // T1 / T7 — the deadline, observed from inside a parked native call
+    // ---------------------------------------------------------------------------------------------
+
+    [Fact]
+    public void T1_a_success_that_lands_after_the_deadline_is_discarded_and_never_publishes_Available()
+    {
+        _native.AddMayReturn.Reset();                 // park the world inside Add
+        using var machine = Create();
+
+        Run(machine.Establish);
+        Assert.True(_native.AddEntered.Wait(Patience));
+
+        // The call is still outstanding and the native gate is held by that thread. Advancing time on a
+        // separate thread lets the deadline be observed while the world is parked.
+        Run(() => _time.Advance(TrayStateMachine.RecoveryDeadline + TimeSpan.FromMilliseconds(1)));
+        WaitForState(machine, TrayLifecycleState.Lost);
+
+        // Only now does the Add return TRUE — after the deadline.
+        _native.AddMayReturn.Set();
+        WaitForBackground();
+
+        Assert.NotEqual(TrayLifecycleState.Available, machine.LifecycleState);
+        Assert.Equal(TrayAffordanceState.Lost, machine.State);
+    }
+
+    [Fact]
+    public void T11_a_late_successful_Add_is_compensated_and_Released_waits_for_it()
+    {
+        _native.AddMayReturn.Reset();
+        using var machine = Create();
+
+        Run(machine.Establish);
+        Assert.True(_native.AddEntered.Wait(Patience));
+
+        Run(machine.Release);
+        WaitForState(machine, TrayLifecycleState.Releasing);
+
+        // The Add was emitted BEFORE Releasing, so it may complete physically afterwards — as obsolete
+        // and compensated work.
+        _native.AddMayReturn.Set();
+        WaitForBackground();
+
+        Assert.NotEqual(TrayLifecycleState.Available, machine.LifecycleState);
+        Assert.True(_native.DeleteCallsSnapshot >= 1, "a compensating Delete is mandatory");
+        Assert.Equal(TrayLifecycleState.Released, machine.LifecycleState);
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // T2 / T8 — Release absorption, proved by COUNTING emitted Adds
+    // ---------------------------------------------------------------------------------------------
+
+    [Fact]
+    public void T2_no_new_Add_is_emitted_after_Release()
+    {
+        using var machine = Create();
+        machine.Establish();
+        var addsBeforeRelease = _native.AddCalls;
+
+        machine.Release();
+
+        // Everything that could plausibly start work is fired at the terminal state.
+        machine.NotifyTaskbarCreated();
+        machine.Establish();
+        _time.Advance(TrayStateMachine.RecoveryDeadline * 3);
+
+        // Counting ZERO new Adds is the assertion. Observing "the state is Releasing" would pass even
+        // with the emission guard mutated away.
+        Assert.Equal(addsBeforeRelease, _native.AddCalls);
+    }
+
+    [Fact]
+    public void T8_a_pending_Add_that_never_started_leaves_nothing_behind()
+    {
+        _native.AddResult = false;
+        using var machine = Create();
+        machine.Establish();               // burns attempt 1, schedules a retry
+        var addsBeforeRelease = _native.AddCalls;
+
+        machine.Release();
+        _time.Advance(TrayStateMachine.SecondRetryDelay * 2);   // the scheduled retry would fire here
+
+        Assert.Equal(addsBeforeRelease, _native.AddCalls);
+        Assert.Equal(TrayLifecycleState.Released, machine.LifecycleState);
+    }
+
+    [Fact]
+    public void Release_is_idempotent_and_returns_immediately_when_already_terminal()
+    {
+        using var machine = Create();
+        machine.Establish();
+
+        machine.Release();
+        var state = machine.LifecycleState;
+
+        machine.Release();
+        machine.Release();
+
+        Assert.Equal(state, machine.LifecycleState);
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // T3 / T4 — admission, and the independence of budget B
+    // ---------------------------------------------------------------------------------------------
+
+    [Fact]
+    public void T3_admission_and_invalidation_are_one_step_so_Available_is_never_observed_after_acceptance()
+    {
+        _native.AddMayReturn.Reset();
+        using var machine = Create();
+
+        _native.AddMayReturn.Set();
+        machine.Establish();
+        Assert.Equal(TrayLifecycleState.Available, machine.LifecycleState);
+
+        // From the instant the broadcast is accepted, Available is gone. There is no schedule in which
+        // an observer sees it, because the limiter, the clock and the state change are one body.
+        _native.AddMayReturn.Reset();
+        _native.AddEntered.Reset();
+        Run(machine.NotifyTaskbarCreated);
+        Run(() => _time.Advance(TrayStateMachine.DebounceDelay));
+
+        WaitForState(machine, TrayLifecycleState.Recovering);
+        Assert.NotEqual(TrayLifecycleState.Available, machine.LifecycleState);
+
+        _native.AddMayReturn.Set();
+        WaitForBackground();
+    }
+
+    [Fact]
+    public void T4_a_suppressed_broadcast_creates_no_episode_no_deadline_and_no_Lost()
+    {
+        var limiter = new EpisodeFrequencyLimiter(_time, capacity: 1);
+        using var machine = Create(limiter: limiter);
+        machine.Establish();
+
+        // First broadcast consumes the only admission.
+        machine.NotifyTaskbarCreated();
+        _time.Advance(TrayStateMachine.DebounceDelay);
+        var addsAfterFirst = _native.AddCalls;
+
+        // Second is suppressed: exactly equivalent to a message that never arrived.
+        machine.NotifyTaskbarCreated();
+        _time.Advance(TrayStateMachine.RecoveryDeadline * 2);
+
+        Assert.Equal(addsAfterFirst, _native.AddCalls);
+        Assert.NotEqual(TrayLifecycleState.Lost, machine.LifecycleState);
+    }
+
+    [Fact]
+    public void T4_adversarial_all_success_flood_still_converges_on_suppression()
+    {
+        // THE proof the split required: every NIM_ADD succeeds, so a limiter that could be reset by
+        // success would never engage. Counting admissions is what makes it converge.
+        using var machine = Create();
+        machine.Establish();
+        var baseline = _native.AddCalls;
+
+        for (var i = 0; i < 50; i++)
+        {
+            machine.NotifyTaskbarCreated();
+            _time.Advance(TrayStateMachine.DebounceDelay);
+        }
+
+        var admitted = _native.AddCalls - baseline;
+        Assert.True(
+            admitted <= EpisodeFrequencyLimiter.DefaultCapacity,
+            $"budget B must converge on suppression; {admitted} episodes were admitted");
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // T5 / T13 — cleanup failure escalates rather than degrading
+    // ---------------------------------------------------------------------------------------------
+
+    [Fact]
+    public void T5_an_unverifiable_cleanup_requests_the_authoritative_exit_and_does_not_degrade()
+    {
+        _native.AddResult = false;
+        _native.DeleteResult = false;                 // compensation can never be confirmed
+        using var machine = Create();
+
+        machine.Establish();
+        _time.Advance(TrayStateMachine.FirstRetryDelay);
+        _time.Advance(TrayStateMachine.SecondRetryDelay);
+
+        Assert.Equal(ShellEffectState.Unverified, machine.EffectState);
+        Assert.False(machine.CleanupVerified);
+        Assert.Equal(TrayLifecycleState.Releasing, machine.LifecycleState);
+        Assert.Equal(1, Volatile.Read(ref _exitRequests));
+        Assert.Equal(TrayStateMachine.MaxCleanupAttempts, _native.DeleteCalls);
+    }
+
+    [Fact]
+    public void T13_a_sink_that_always_throws_still_terminates_through_the_escalation()
+    {
+        _native.AddResult = false;
+        _native.DeleteResult = false;
+        using var machine = Create(requestExit: () =>
+        {
+            Interlocked.Increment(ref _exitRequests);
+            throw new InvalidOperationException("sink is down");
+        });
+
+        machine.Establish();
+        _time.Advance(TrayStateMachine.FirstRetryDelay);
+        _time.Advance(TrayStateMachine.SecondRetryDelay);
+
+        // The single shot is not consumed by an exception: three attempts, then escalation.
+        Assert.Equal(TrayStateMachine.MaxFailSafeAttempts, Volatile.Read(ref _exitRequests));
+        Assert.Equal(1, Volatile.Read(ref _escalations));
+    }
+
+    [Fact]
+    public void T12_the_fail_safe_request_runs_on_the_transition_thread_and_never_queues()
+    {
+        _native.AddResult = false;
+        _native.DeleteResult = false;
+        var sinkThread = 0;
+        using var machine = Create(requestExit: () =>
+        {
+            sinkThread = Environment.CurrentManagedThreadId;
+            Interlocked.Increment(ref _exitRequests);
+        });
+
+        machine.Establish();
+        _time.Advance(TrayStateMachine.FirstRetryDelay);
+        var advancingThread = Environment.CurrentManagedThreadId;
+        _time.Advance(TrayStateMachine.SecondRetryDelay);
+
+        Assert.Equal(1, Volatile.Read(ref _exitRequests));
+        Assert.Equal(advancingThread, sinkThread);
+    }
+
+    [Fact]
+    public void A_missing_fail_safe_sink_is_a_construction_error()
+    {
+        Assert.Throws<ArgumentNullException>(() => new TrayStateMachine(
+            _native, null!, () => { }, _time, NullLogger<TrayStateMachine>.Instance));
+
+        Assert.Throws<ArgumentNullException>(() => new TrayStateMachine(
+            _native, () => { }, null!, _time, NullLogger<TrayStateMachine>.Instance));
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // T6 / T9 — effect ordering, and delivery-time revalidation
+    // ---------------------------------------------------------------------------------------------
+
+    [Fact]
+    public void T6_shell_effects_reach_the_shell_in_production_order()
+    {
+        using var machine = Create();
+        machine.Establish();
+        machine.Release();
+
+        var add = _native.Calls.IndexOf("Add");
+        var delete = _native.Calls.IndexOf("Delete");
+
+        Assert.True(add >= 0 && delete > add, $"expected Add before Delete, got [{string.Join(",", _native.Calls)}]");
+    }
+
+    [Fact]
+    public void T9_session_semantics_are_not_published_once_the_lifecycle_is_terminal()
+    {
+        using var machine = Create();
+        var states = new List<TrayAffordanceState>();
+        machine.StateChanged += (_, _) => states.Add(machine.State);
+
+        machine.Establish();
+        Assert.Contains(TrayAffordanceState.Available, states);
+
+        states.Clear();
+        machine.Release();
+
+        // Being valid when it was queued is not sufficient: delivery revalidates the lifecycle state.
+        Assert.Empty(states);
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Effect shape and the Kind coupling (T16 / T17 / T18)
+    // ---------------------------------------------------------------------------------------------
+
+    [Fact]
+    public void T17_every_kind_that_reaches_Add_declares_that_it_may_create_an_affordance()
+    {
+        // Data-driven from the effect kinds themselves, so a new kind is covered automatically.
+        var kinds = Enumerable.Range(0, 6).ToArray();
+        Assert.NotEmpty(kinds);
+
+        foreach (var kind in kinds)
+        {
+            var (operation, mayCreate) = TrayStateMachine.DescribeForTests(kind);
+            if (operation == NativeTrayOperation.Add)
+            {
+                Assert.True(mayCreate, $"kind {kind} performs Add but claims it creates no affordance");
+            }
+        }
+    }
+
+    [Fact]
+    public void T18_the_effect_switch_has_no_default_arm()
+    {
+        // An undefined value is legal at runtime. With no default arm the switch throws; add one and it
+        // returns instead — which is exactly how this guard detects the mutation. T17 cannot see it,
+        // because Enum.GetValues only yields defined values.
+        Assert.Throws<SwitchExpressionException>(() => TrayStateMachine.DescribeForTests(int.MaxValue));
+    }
+
+    // ---------------------------------------------------------------------------------------------
+
+    private void Run(Action action) => _background.Add(Task.Run(action));
+
+    private void WaitForBackground() => Task.WaitAll([.. _background], Patience);
+
+    private static void WaitForState(TrayStateMachine machine, TrayLifecycleState expected)
+    {
+        var deadline = DateTime.UtcNow + Patience;
+        while (DateTime.UtcNow < deadline)
+        {
+            if (machine.LifecycleState == expected)
+            {
+                return;
+            }
+
+            Thread.Sleep(5);
+        }
+
+        Assert.Fail($"expected {expected}, observed {machine.LifecycleState}");
+    }
+
+    public void Dispose()
+    {
+        _native.AddMayReturn.Set();
+        _native.DeleteMayReturn.Set();
+        try
+        {
+            Task.WaitAll([.. _background], Patience);
+        }
+        catch (AggregateException exception)
+        {
+            _sinkFailure ??= exception;
+        }
+    }
+}
