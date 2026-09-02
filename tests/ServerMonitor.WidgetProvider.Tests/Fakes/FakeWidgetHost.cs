@@ -49,7 +49,14 @@ internal sealed class FakeWidgetHost : IWidgetHost
         }
 
         Updates.Add((widgetId, templateJson, dataJson));
+        Updated?.Invoke(widgetId, templateJson, dataJson);
     }
+
+    /// <summary>
+    /// Invoked after each recorded update, so a test driving the REAL pump over a real filesystem can wait
+    /// on an event instead of sleeping for a guessed duration.
+    /// </summary>
+    public Action<string, string, string>? Updated { get; set; }
 
     public int UpdateCountFor(string widgetId) => Updates.Count(u => u.WidgetId == widgetId);
 }

@@ -103,7 +103,16 @@ internal static partial class Program
         new WidgetOrphanTempCleaner(log: log).Sweep();
 
         var host = new WidgetManagerHost();
-        var coordinator = new WidgetProviderCoordinator(host, log: log);
+
+        // THE repaint pump's production wiring (M13 QA-9). The Widgets host is not an update pump: it
+        // calls Create/Activate/ContextChanged and then goes quiet, so without this a widget the user is
+        // looking at on an open board never repaints, however fresh widget-state.json becomes. The
+        // coordinator arms the pump while widgets are on screen and disarms it on the last Deactivate; the
+        // pump watches the snapshot DIRECTORY (the file is replaced by rename, never written in place),
+        // coalesces each atomic commit into one repaint, and carries a 60 s backstop re-read for events
+        // the OS drops. It reads the same file the provider already reads — no SSH, no engine, no extra
+        // monitoring cycle.
+        var coordinator = WidgetProviderCoordinator.CreateWithFileSystemPump(host, log: log);
         var process = new ComServerProcess();
 
         // Bootstrap reference: hold the process alive across startup so the serve loop's idle exit can be
