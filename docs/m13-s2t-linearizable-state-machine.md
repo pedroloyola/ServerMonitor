@@ -241,6 +241,11 @@ internal sealed class TrayStateMachine
 <WarningsAsErrors>$(WarningsAsErrors);CS8509</WarningsAsErrors>
 ```
 
+> **Por aplicar.** Esta escalada é **normativa mas ainda não está na árvore** — nenhum `.csproj`,
+> `.props` ou `.targets` tem `WarningsAsErrors` hoje. Logo a garantia desta secção **ainda não é
+> verdadeira no repositório** e a sua prova não pode ser corrida. É **item de entrega da CV-12**:
+> ver §12.1.
+
 **`CS8524` é coberto por decisão explícita de NÃO o escalar, e a razão importa.** O `CS8524` é o
 diagnóstico do valor de enum **não nomeado** — dispara quando o `switch` cobre todos os valores
 nomeados mas não os não nomeados. **Escalá-lo a erro obrigaria a acrescentar exatamente o ramo
@@ -322,10 +327,32 @@ O **T14** entra como **guarda de regressão** — e, na metade que o compilador 
 >    | `TrayStateMachine+EffectExecutor._native`, campo | **único detentor** |
 >
 >    Qualquer membro do assembly que nomeie o tipo e **não esteja nesta lista** faz o teste falhar.
->    **Campos gerados pelo compilador são excluídos** (`[CompilerGenerated]`): o `EffectExecutor` usa
->    construtor primário, e se algum corpo de método passar a referenciar `native` em vez de `_native`
->    o compilador emite um **segundo campo de suporte** — o teste falharia por razão **alheia à
->    segurança**;
+>
+>    **Campos gerados pelo compilador são INSPECIONADOS, não excluídos.** A redação da ronda anterior
+>    — *"o T14b tem de ignorar campos `[CompilerGenerated]`"* — **abria uma via real e é substituída**:
+>    uma **closure**, uma **auto-property** ou a **captura do parâmetro** pode **reter a capacidade num
+>    campo gerado** e escapar à allowlist. Isso **não é ruído alheio à segurança — é retenção
+>    adicional**, exatamente o que o T14b existe para detetar.
+>
+>    *É o meu próprio argumento aplicado contra mim: uma exclusão por **categoria** é uma negação
+>    disfarçada, e as negações não ficam desatualizadas ruidosamente. A allowlist por identidade fica.*
+>
+>    **Âmbito da varredura:** **todos os tipos do assembly**, incluindo tipos gerados
+>    (`<>c__DisplayClass…` de closures) e tipos aninhados; **todos os campos**, gerados incluídos;
+>    match pelo **tipo da capacidade**. Falha para qualquer campo fora da tabela de identidades.
+>
+>    **Campos gerados no baseline: ZERO do tipo da capacidade.** O construtor primário do
+>    `EffectExecutor` só usa `native` no inicializador de `_native`, e nesse caso o compilador **não
+>    emite campo de captura** — o parâmetro é consumido no construtor. Os únicos campos gerados nestes
+>    tipos são os *backing fields* posicionais do `readonly record struct Effect`, de tipo `EffectKind`
+>    e `long`, que **não correspondem ao tipo da capacidade** e por isso nem entram na comparação.
+>    **A tabela acima não precisa hoje de nenhuma entrada gerada.**
+>
+>    **Se algum dia aparecer um campo gerado legítimo** — por exemplo, um corpo de método a referenciar
+>    `native` em vez de `_native`, que faz o compilador emitir `<native>P` — o teste **falha**, e a
+>    resolução correta é **nomear a sua identidade concreta na tabela, por decisão de review**, não
+>    voltar a excluí-lo por ser gerado. **A preocupação do Vigil fica satisfeita pela identidade, não
+>    pela categoria;**
 > 3. **ausência de registo no contentor** — nenhum `ServiceDescriptor` do composition root tem
 >    `INativeTrayRegistration` como `ServiceType` nem como `ImplementationType`. **Isto NÃO é
 >    metadata:** o teste **constrói a `IServiceCollection` realmente produzida pelo composition root** e
@@ -622,7 +649,7 @@ histórico de B. **Rejeição por B ⇒ sem episódio, sem deadline, sem `Lost`.
 | CV-9 | reentrância com flyout aberto | §9 | ATIVA · fechada |
 | CV-10 | acoplamento limitador ↔ custo de UI | §11 | ATIVA · fechada |
 | CV-11 | residual de admissão suprimida | §11 | ATIVA · LOW aceite, redação corrigida |
-| CV-12 | evidência de mutação na entrega | §12 | **ABERTA** — fecha na entrega. **Transporta as precisões vinculativas do Vigil sobre a CV-20** (redação de teste, não de desenho), por opção dele de não abrir outra condição sobre o mesmo invariante |
+| CV-12 | evidência de mutação na entrega | §12, §12.1 | **ABERTA** — fecha na entrega. Transporta as precisões vinculativas do Vigil sobre a CV-20, **e agora também a aplicação da escalada do `CS8509` ao `.csproj` mais a prova diferencial C1/C2**, que hoje não é facto do repositório (§12.1) |
 | CV-13 · CV-14 | *(fechadas pelo Vigil na revisão 6)* | — | ATIVA · fechadas |
 | CV-15 | integridade do documento normativo | §8 | **ATIVA** — este mapa é o cumprimento |
 | CV-16 | `CleanupVerified` fail-closed | §6 | **ATIVA** |
@@ -716,7 +743,7 @@ mundo dentro de uma chamada nativa não prova nada disto.**
 
 | **T12** | **o pedido fail-safe não pode ficar pendente** — com o despachante de UI **parado** e a fila de entregas **bloqueada**, `CleanupCompleted(false)` ⇒ o sink é invocado **na mesma pilha**, fora do lock, antes de qualquer outro efeito |
 | **T13** | **sink que lança sempre** ⇒ 3 tentativas, **escalada** pelo sink de terminação da S2, e o processo **termina dentro do envelope**; `Releasing` nunca fica sem mecanismo de progresso *(CV-21)* |
-| **T14** | **arquitetura, sobre METADATA REAL e não texto** — três asserções: **(a)** `Effect`, `EffectKind` e `EffectExecutor` não são visíveis fora de `TrayStateMachine`; **(b)** allowlist fixada **por IDENTIDADE de metadata e não por contagem** — os três membros nomeados na §5.1 e mais nenhum; **campos `[CompilerGenerated]` excluídos**, para o construtor primário do executor não fazer o teste falhar por razão alheia à segurança; **(c)** sobre a **`IServiceCollection` REALMENTE PRODUZIDA pelo composition root** — nenhum `ServiceDescriptor` com `INativeTrayRegistration` como `ServiceType` ou `ImplementationType`. **Metadata para (a) e (b); coleção real para (c).** **Passa no baseline** — antes desta correção não passaria *(CV-20)* |
+| **T14** | **arquitetura, sobre METADATA REAL e não texto** — três asserções: **(a)** `Effect`, `EffectKind` e `EffectExecutor` não são visíveis fora de `TrayStateMachine`; **(b)** allowlist fixada **por IDENTIDADE de metadata e não por contagem** — os três membros nomeados na §5.1 e mais nenhum; **campos gerados pelo compilador são INSPECIONADOS e não excluídos** — a varredura cobre todos os tipos do assembly, incluindo display classes de closures, e todos os campos; no baseline **não existe nenhum campo gerado do tipo da capacidade**, e um que apareça tem de ser **allowlistado por identidade concreta**, nunca por categoria; **(c)** sobre a **`IServiceCollection` REALMENTE PRODUZIDA pelo composition root** — nenhum `ServiceDescriptor` com `INativeTrayRegistration` como `ServiceType` ou `ImplementationType`. **Metadata para (a) e (b); coleção real para (c).** **Passa no baseline** — antes desta correção não passaria *(CV-20)* |
 | **T15** | **efeito estrangeiro** — alimentar o executor com um efeito de origem externa: sob o desenho **não compila** (dado passivo privado, sem comportamento a redefinir); com a **visibilidade alargada**, compila e **falha**. Referente: a **mutação de visibilidade**, e só ela *(CV-20)* |
 | **T16** | **forma do `Effect` e derivação por `Kind`** — sobre metadata: `Effect` **não tem membro `MayCreateAffordance`**, e a afordância é obtida de uma **função estática de `Kind`** na mesma expressão que escolhe a operação nativa. Referente: a mutação **função → campo**, isoladamente *(CV-20)* |
 | **T18** | **ausência de ramo `default`** — `Describe((EffectKind)int.MaxValue)`, invocado por reflexão, tem de lançar `SwitchExpressionException`. Com um `default` acrescentado devolve um tuplo em vez de lançar e o teste **falha**. É esta a guarda da metade estrutural — **o T17 não a prova** *(achado do Atlas)* |
@@ -750,9 +777,7 @@ tornar representável a mentira da CV-20; deve falhar **T16**, **isoladamente**)
 **ramo `default` acrescentado ao `switch` de `Describe`** (deve falhar **T18** — **não o T17**, que
 passaria verde porque `Enum.GetValues` só devolve valores definidos e o `default` nunca é exercitado) ·
 **`Kind` novo mapeado para `Add` com `MayCreateAffordance = false`** (deve falhar **T17**) ·
-**`CS8509` retirado de `WarningsAsErrors`** e um `EffectKind` novo acrescentado sem braço próprio
-(deve **compilar**, quando o baseline **não compila** — é a prova de que a configuração sustenta a
-garantia) ·
+**escalada do `CS8509` — PROVA DIFERENCIAL DE DUAS COMPILAÇÕES, não mutação conjunta** (ver §12.1) ·
 **`RunOnce` a marcar à entrada em vez de após retorno normal** (deve falhar **T13**) ·
 **limite de 3 tentativas do sink removido** (deve falhar **T13** por não terminar) ·
 **`AddIcon`/`DeleteIcon` promovidos de `private` aninhado a `internal`** (deve falhar a asserção de
@@ -764,6 +789,38 @@ removido em `Lost`/`Unverified` · cada validação da CV-6b isoladamente · `NI
 · B reposto por sucesso.
 
 **Cada uma TEM de falhar testes. Nada entregue só com suite verde.**
+
+### 12.1 Prova diferencial da escalada do `CS8509`
+
+Como **mutação conjunta única** — mudar a fonte **e** a configuração de uma vez — **não isola a causa**:
+um build que falha não distingue se falhou por o `Kind` estar por descrever ou por outra razão da
+configuração. É a mesma regra da §10 do `BOSS.md` que já invoquei para recusar a mutação combinada no
+T15/T16, aplicada agora à **minha própria** mutação de configuração.
+
+**Duas compilações nomeadas, com a MESMA fonte, diferindo APENAS na configuração:**
+
+| | Fonte | Configuração | Resultado exigido | O que estabelece |
+|---|---|---|---|---|
+| **C1** | `EffectKind` novo **sem braço próprio** no `Describe` | `CS8509` **em** `WarningsAsErrors` | **NÃO COMPILA** (`CS8509` como erro) | a condição *"`Kind` por descrever"* **é detetada** |
+| **C2** | **a mesma fonte de C1**, byte a byte | `CS8509` **removido** de `WarningsAsErrors` | **COMPILA** (fica aviso) | a deteção é **causada pela configuração**, e não por outra coisa |
+
+**C1 sozinha** provaria só que algo falha. **C2 sozinha** provaria só que algo compila. **O par isola a
+causa**: a única variável entre as duas é a propriedade do `.csproj`.
+
+Registar as duas no formato da §10 do `BOSS.md`: baseline → mutação → invariante violado → saída de
+compilação com os códigos de diagnóstico → restauro provado → baseline PASS.
+
+> ### ⚠️ A escalada do `CS8509` é ITEM DE ENTREGA, não facto do repositório
+> **Verificado hoje:** não existe `WarningsAsErrors` em nenhum `.csproj`, `.props` ou `.targets`, nem
+> `Directory.Build.props`. A escalada está especificada **normativamente** na §5.1.1 e **não aplicada à
+> árvore** — coerente com a regra "sem implementação" destas rondas, mas com duas consequências que
+> ficam escritas em vez de assumidas:
+>
+> 1. a garantia *"acrescentar um `Kind` sem braço é erro de compilação"* **ainda NÃO é verdadeira** no
+>    repositório;
+> 2. **a prova diferencial C1/C2 não pode ser corrida hoje.**
+>
+> Ambas passam a **item de entrega da CV-12**, a aplicar com o código, e **não** a facto estabelecido.
 
 ## 13 — As cinco perguntas do Atlas
 
