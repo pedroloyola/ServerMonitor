@@ -1,5 +1,14 @@
 # M13 S2-T — ROOT STATE MACHINE REDESIGN
 
+> ## ⚠️ HISTÓRICO — SUBSTITUÍDO
+> O modelo de **actor FIFO** deste ficheiro foi **rejeitado**: separava a admissão do evento da
+> transição de estado, e foi assim que o intervalo de `Available` falso voltou. O desenho vigente é
+> **`docs/m13-s2t-linearizable-state-machine.md`**.
+>
+> **Nada aqui revoga uma condição CV** — a autoridade sobre o estado das condições é o **mapa CV** do
+> documento vigente, e o ficheiro de condições do Vigil (CV-15).
+
+
 **Autor:** Relay (platform-infra), implementer da S2-T / dono do Windows Shell.
 **Branch:** `agent/m13-s2t-tray`, base `221eda4`. **DESENHO. Sem implementação.**
 **Substitui** `docs/m13-s2t-architecture-review.md` como desenho normativo. Esse fica como histórico
