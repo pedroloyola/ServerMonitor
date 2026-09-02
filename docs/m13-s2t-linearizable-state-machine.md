@@ -124,50 +124,116 @@ geração, **não** preserva `Available`.
 | `Recovering` | falha nativa com orçamento A esgotado | `Lost` | compensar |
 | `Recovering` | **deadline expirado** (preâmbulo) | `Lost` | compensar |
 | `Lost` | `CleanupCompleted(verified: true)` | `Lost` | notificar a S2 ⇒ UX degradada aprovada |
-| `Lost` | `CleanupCompleted(verified: false)` | **`Releasing`** | CV-17 + `RequestExit` (§6) |
+| `Lost` | `CleanupCompleted(verified: false)` | **`Releasing`** | CV-17 + **`FailSafeExitRequested`** (§6.4) |
 | **qualquer** | `Release` | **`Releasing`** | compensar |
-| `Releasing` | limpeza terminal concluída | `Released` | — |
+| `Releasing` | `AddCompleted`/`SetVersionCompleted` obsoletos | `Releasing` | **`DeleteIcon` compensatório** (§5.2) |
+| `Releasing` | `CleanupCompleted(verified: true)` **e** nenhuma reconciliação pendente | **`Released`** | — |
+| `Releasing` | `CleanupCompleted(verified: false)` | `Releasing` | **`FailSafeExitRequested`** (§6.4) |
 
 **`Lost` tem duas causas legítimas:** esgotamento do orçamento A com falha nativa **observada**, e
 expiração do deadline. **Supressão por B não produz `Lost`** — sem episódio não há causa terminal.
 
-## 5 — `Release` absorvente, estruturalmente *(D)*
+## 5 — `Release` absorvente: **emissão** vs **conclusão** *(D · decisão OPÇÃO A)*
 
-Para **todo** estado: `X + Release → Releasing`. E para **toda** entrada `x`:
-**δ(`Releasing`, x) = `Releasing`**, δ(`Released`, x) = `Released`, com a única exceção interna
-`Releasing → Released` quando a limpeza terminal acaba.
+A regra literal anterior — *"nenhum `NIM_ADD` pode executar depois do `Release`"* — **está substituída**
+pelo invariante causal abaixo. Satisfazê-la à letra exigiria que o `Release` esperasse pelo gate de I/O
+nativo, **o que reintroduziria o defeito de timer/deadlock provado na revisão 6**. O gate **não** volta
+a ser acoplado ao ciclo de vida.
 
-**A absorção não é uma regra que cada ramo tem de lembrar-se de respeitar:** está no **passo 1 do
-preâmbulo**, que é comum a todas as chamadas. Uma vez em `Releasing`: sem `Available` · sem
-`Recovering` · nenhum `Lost` o supera · sem `NIM_ADD` · sem ressurreição por retry · sem flyout ·
-nenhum callback muta o ciclo de vida · nenhuma continuação obsoleta publica estado.
+### 5.1 Emissão — garantia estrita, imposta pelo TIPO
 
-**A razão de ser estrutural:** *todo* resultado assíncrono ou nativo **reentra na mesma função** e por
-isso observa `Releasing`. **Não existe segunda autoridade** para ele contornar.
+> **Uma vez comprometido `Releasing`, a `Transition` NUNCA emite um efeito `Add` novo.**
 
-## 6 — Efeitos, gate de I/O, e a saída fail-safe
+Isto **não é uma convenção que cada ramo tem de respeitar**: é **imposto pelo tipo**, e por isso
+impossível de violar sem alterar a estrutura.
 
-### Efeitos
+```csharp
+// Só existe enquanto houver episódio ativo. Releasing/Released põem _episode a null.
+internal readonly record struct EpisodeToken(long Generation, long Deadline);
 
-Um efeito **nunca** muta estado. Os efeitos de uma transição são executados **depois** de libertar o
-domínio de decisão, e cada um carrega a **geração** e o **número de sequência** da transição que o
-produziu.
+internal abstract record ShellEffect
+{
+    // O construtor de AddIcon é privado; a ÚNICA via de construção exige um EpisodeToken.
+    internal sealed record AddIcon : ShellEffect
+    {
+        private AddIcon(EpisodeToken token) { … }
+        internal static AddIcon For(EpisodeToken token) => new(token);
+    }
+    internal sealed record DeleteIcon : ShellEffect;          // não exige token: compensar é sempre legal
+    internal sealed record FailSafeExitRequested : ShellEffect;
+}
+```
 
-> **Regra que evita a inversão de ordem:** os efeitos que tocam o shell são executados **pela ordem de
-> sequência em que foram produzidos**, serializados pelo gate. Sem isto, um `Add` e um `Delete`
-> produzidos por transições consecutivas poderiam chegar ao shell trocados.
+**Não é possível construir um `AddIcon` sem um `EpisodeToken`, e não é possível obter um `EpisodeToken`
+em `Releasing`/`Released`**, porque nesses estados `_episode` é `null` e não há outro produtor do token.
+A garantia de emissão é, portanto, verificável por inspeção do tipo — não por revisão de cada ramo.
+`DeleteIcon` **não** exige token de propósito: compensar tem de continuar legal em estado terminal.
 
-**É proibido chamar `Transition` a partir de dentro do domínio de decisão.** Os efeitos correm fora, e
-os seus resultados reentram como eventos novos. Mutação de teste correspondente na secção 7.
+### 5.2 Conclusão — o que pode acontecer fisicamente depois
 
-### Gate
+Um `Add` **legitimamente emitido e linearizado ANTES** de `Releasing` **pode completar fisicamente
+depois**. Esse resultado é **trabalho obsoleto e compensado**:
+
+- reentra na **mesma** `Transition`;
+- observa `Releasing` / geração obsoleta;
+- **não publica `Available`** · **não reabre recuperação** · **não muta o ciclo de vida para fora de
+  `Releasing`**;
+- **se pode ter recriado o ícone no shell ⇒ `Delete` compensatório é OBRIGATÓRIO.**
+
+> **O passo 1 do preâmbulo deixa de significar "ignorar".** Em estado terminal, `AddCompleted` e
+> `SetVersionCompleted` **não são descartados em silêncio: são RECONCILIADOS.** Descartá-los seria
+> exatamente o defeito — o resultado é obsoleto para o *ciclo de vida*, mas não para o *shell*.
+
+### 5.3 Absorção, tal como se mantém
+
+`Releasing` **+** `TaskbarCreated` · `AddCompleted` · `SetVersionCompleted` · `Retry` · `Deadline` ·
+`Lost` · callback · continuação de notificação ⇒ **nunca** volta a `Available` nem a `Recovering`.
+δ(`Releasing`, x) = `Releasing` ∀x, salvo a transição interna para `Released` da §6.
+**Nenhum resultado obsoleto contorna a `Transition`.**
+
+## 6 — Efeitos, gate de I/O, entrega de notificações, e a saída fail-safe
+
+### 6.1 Efeitos
+
+Um efeito **nunca** muta estado. Os efeitos de uma transição correm **depois** de libertar o domínio de
+decisão, e cada um carrega a **geração** e o **número de sequência** da transição que o produziu.
+
+> **Ordem:** os efeitos que tocam o shell são executados **pela ordem de sequência em que foram
+> produzidos**, serializados pelo gate. Sem isto, um `Add` e um `Delete` de transições consecutivas
+> poderiam chegar ao shell trocados.
+
+**É proibido chamar `Transition` de dentro do domínio de decisão.** Os efeitos correm fora e os seus
+resultados reentram como eventos novos.
+
+### 6.2 Gate
 
 `_nativeGate` serializa **exclusivamente** I/O nativo do shell. **Não decide** admissão, `Available`,
 `Recovering`, `Lost`, `Releasing`, nem terminalidade da limpeza. **Nunca é adquirido dentro do domínio
-de decisão**, logo uma chamada nativa bloqueada **não pode bloquear uma transição** — que era o defeito
-da revisão 6.
+de decisão, e o `Release` nunca espera por ele** — é isso que impede o defeito de timer/deadlock da
+revisão 6.
 
-### Limpeza e escalada fail-safe
+### 6.3 Entrega de notificações — revalidação **no momento da entrega** *(§7 da decisão)*
+
+> **Um evento ser válido quando foi enfileirado NÃO É SUFICIENTE.**
+
+Toda entrega enfileirada ou atrasada — `StateChanged` para a S2, notificações de UI, a notificação
+CV-17/CV-18 — **revalida geração e estado de ciclo de vida no instante da ENTREGA**, e não apenas no
+instante em que foi enfileirada.
+
+```csharp
+// Avaliado NA ENTREGA, contra o estado atómico atual. Não é um snapshot capturado no enqueue.
+bool ShouldDeliver(Delivery d) => d.Generation == CurrentGeneration && d.Class.IsLegalIn(CurrentState);
+```
+
+**Classificação, porque "suprimir" não é uniforme:**
+
+| Classe de entrega | Em `Releasing`/`Released` |
+|---|---|
+| semântica de sessão (`Available`, `Recovering`, `Lost` degradável) | **SUPRIMIDA** — não pode dizer à S2 para degradar nem para confiar numa afordância |
+| dirigida ao terminal (`Releasing`, `Released`, `FailSafeExitRequested`) | **ENTREGUE** — é precisamente para isto que existem |
+| notificação CV-17/CV-18 | entregue **uma vez**, fire-and-forget, nunca aguardada |
+
+### 6.4 Limpeza, `Released`, e escalada fail-safe **sem reentrância**
 
 Efeito registado como `NotIssued` / `MayExist` / `Deleted` / `Unverified`, com **`MayExist` marcado
 antes de emitir o `NIM_ADD`** — direção de erro deliberada: marcar depois deixaria uma interrupção
@@ -175,31 +241,69 @@ convencer-nos de que não há efeito quando há; marcar antes custa, no pior cas
 redundante. Política limitada: até **3** `NIM_DELETE` consecutivos, sem esperas (custo medido: mediana
 0,36 ms, máx 0,74 ms ⇒ pior caso ≈2 ms).
 
+#### `Released` exige compensação positivamente resolvida
+
+> **`Released` NÃO significa "o `ReleaseAsync` retornou".** Significa: nenhum efeito de shell novo pode
+> ser emitido · nenhum efeito obsoleto pode publicar estado de ciclo de vida · **todo** efeito em voo
+> conhecido capaz de deixar uma afordância de tray foi **reconciliado** · e a compensação exigida
+> **completou positivamente** — **ou** a terminação do processo já está a ser **irreversivelmente
+> imposta** pelo caminho fail-safe/watchdog.
+
+Estruturalmente, `Releasing` mantém um **contador de reconciliações pendentes**, incrementado ao emitir
+qualquer efeito capaz de criar afordância e decrementado quando o seu resultado reentra e é
+reconciliado. **A transição `Releasing → Released` é guardada por `pending == 0 && effect ∈ {Deleted,
+NotIssued}`.** Enquanto houver um `Add` em voo, `Released` é **inalcançável** — não por disciplina, mas
+porque a guarda o proíbe.
+
+#### Falha de limpeza: efeito, não chamada
+
+**NÃO** se implementa a cadeia que se auto-bloqueia:
+
 ```
-Lost + verified = true   → permanece Lost → S2 entra na sessão FOREGROUND degradada aprovada
-Lost + verified = false  → Releasing → CV-17 (uma tentativa) → RequestExit autoritativo da S2
-                         → shutdown gracioso → watchdog de 10 s já armado
-                         → TerminateProcess só como escalada terminal do watchdog
+CleanupCompleted(false) → RequestExit → ExitSequence.RemoveTrayIcon() → ReleaseAsync
+→ reentra na mesma maquinaria de release → bloqueia até o watchdog matar o processo   ✗
 ```
 
-**Sem segundo mecanismo de kill específico do tray.** **`CleanupVerified = false` nunca autoriza
-continuação em background ou degradada** (CV-16). **A S2 nunca observa `Lost` com limpeza não
-verificada** — é isso que impede a UX contraditória que o Prism assinalou.
+Substituída por:
 
-### CV-17 — notificação informativa antes da saída fail-safe
+```
+CleanupCompleted(false) → Transition → Releasing MANTÉM-SE terminal
+                        → emite o efeito FailSafeExitRequested
+                        → o ciclo de vida EXTERIOR da S2 consome o efeito
+                        → inicia o Exit verdadeiro autoritativo (RequestExit)
+                        → watchdog de 10 s mantém-se autoritativo
+```
 
-**Uma** tentativa, antes do shutdown terminal. **Slot, não texto:** o desenho define as chaves de
-recurso; **o Prism escreve e localiza pt-BR / pt-PT / en-US, e eu não invento redação.**
+**Sem autoridade de release recursiva dentro do tray.** Duas propriedades tornam a reentrância
+inofensiva mesmo que o caminho exterior volte a passar pelo tray:
 
-| Chave | Conceito (a redação final é do Prism) |
+1. `FailSafeExitRequested` é **um efeito entregue**, nunca uma chamada síncrona feita de dentro da
+   `Transition` nem do caminho de limpeza;
+2. **`ReleaseAsync` em `Releasing`/`Released` é um no-op que retorna imediatamente** — logo o
+   `ExitSequence.RemoveTrayIcon()` do caminho autoritativo da S2 **não pode bloquear** à espera do tray.
+
+**`CleanupVerified = false` nunca autoriza continuação em background ou degradada** (CV-16). A S2 nunca
+observa `Lost` com limpeza não verificada.
+
+### 6.5 CV-17 / CV-18 — a notificação informativa antes da saída fail-safe
+
+**Uma** tentativa, emitida como efeito com o Exit verdadeiro **já comprometido**, e **nunca aguardada**.
+
+**Slot, não texto.** O desenho define as chaves; **o Prism escreve e localiza pt-BR / pt-PT / en-US, e
+eu não invento redação.**
+
+| Chave | Conceito (redação final do Prism) |
 |---|---|
 | `TrayFailSafeExitNotificationTitle` | *"ServerAlyzer was closed"* |
 | `TrayFailSafeExitNotificationBody` | *"We couldn't safely restore the notification-area icon. Open ServerAlyzer again to continue monitoring."* |
 
-Requisitos, normativos: informativa · **sem** dados de servidor/frota · **sem** terminologia técnica de
-Shell/`NIM` · **não modal** · **não pode atrasar nem impedir** a saída verdadeira · **a falha da
-notificação é ignorada** e a saída prossegue na mesma. Implementação: emitida como efeito, com o
-`RequestExit` **já comprometido**, e nunca aguardada.
+**CV-18 — contrato da ação, normativo.** Tipo de ação **literal e fechado**, **zero parâmetros**,
+**sem payload arbitrário** — nada do episódio, do shell ou da frota atravessa a notificação.
+Expiração **curta**; **fire-and-forget**; **sem** dados de servidor/frota; **sem** terminologia técnica
+de Shell/`NIM`; **não modal**. **A falha da notificação é ignorada e NUNCA pode atrasar nem impedir o
+Exit verdadeiro.** Um **clique tardio**, já com o processo morto, produz **apenas** o comportamento de
+lançamento que já está na allowlist — **sem capacidade especial e sem laço**: não reabre o episódio,
+não reentra no tray, não transporta estado.
 
 ## 7 — Independência A / B, por tipo *(G)*
 
@@ -244,7 +348,9 @@ histórico de B. **Rejeição por B ⇒ sem episódio, sem deadline, sem `Lost`.
 | CV-13 · CV-14 | *(fechadas pelo Vigil na revisão 6)* | — | ATIVA · fechadas |
 | CV-15 | integridade do documento normativo | §8 | **ATIVA** — este mapa é o cumprimento |
 | CV-16 | `CleanupVerified` fail-closed | §6 | **ATIVA** |
-| CV-17 | notificação informativa antes da saída fail-safe | §6 | **ATIVA** — slot definido, redação do Prism |
+| CV-17 | notificação informativa antes da saída fail-safe | §6.5 | **ATIVA** — slot definido, redação do Prism |
+| CV-18 | contrato fechado da ação da notificação fail-safe | §6.5 | **ATIVA** |
+| — | regra literal *"nenhum `NIM_ADD` pode executar depois do `Release`"* | §5 | **`SUPERSEDED BY` o invariante normativo do `Release` (§5.1 emissão + §5.2 conclusão compensada).** Justificação: satisfazê-la à letra obrigaria o `Release` a esperar pelo gate de I/O nativo, reacoplando ciclo de vida e I/O e reintroduzindo o defeito de timer/deadlock provado na revisão 6. O invariante substituto é **causalmente mais forte**: proíbe a *emissão* pelo tipo e obriga a *compensação* da conclusão tardia, o que a regra literal não fazia. |
 
 ## 9 — `WndProc`: confiança e default-deny *(CV-1 · CV-6b · CV-9)*
 
@@ -303,29 +409,52 @@ Explorer cair nessa janela, a mensagem verdadeira não é admitida e publica-se 
 já ter controlo sobre a sessão do utilizador** — só atrasa a deteção de uma perda já ocorrida. Item
 **Q** da matriz.
 
-## 12 — Testes e mutações *(CV-12)*
+## 12 — Testes e plano de mutação *(CV-12)*
 
 **Harness.** O duplo de `INativeTrayRegistration` **bloqueia dentro de `Add`, `SetVersion` e `Delete`**
-sob controlo do teste; tempo por `FakeTimeProvider`. **Um teste que não consiga parar o mundo dentro de
-uma chamada nativa não prova nada disto.**
+sob controlo do teste; tempo por `FakeTimeProvider`; entregas conduzidas por um despachante
+determinístico que permite **atrasar uma entrega já enfileirada**. **Um teste que não consiga parar o
+mundo dentro de uma chamada nativa não prova nada disto.**
+
+### Casos determinísticos
 
 | Teste | Prova |
 |---|---|
 | T1 | estacionado em `Add`, avançar o tempo além do prazo; ao libertar com `ok:true`, a reentrada terminaliza `Lost` **na própria execução** e **não publica `Available`** |
 | T2 | `Release` durante: `Available` · debounce pendente · `Recovering` · atraso de retry · **chamada nativa em voo** · limpeza em curso ⇒ **`Releasing` vence em todos** |
-| T3 | admissão: entre `TryBeginEpisode` devolver `true` e o estado ser `Recovering` **não existe estado observável** — asserido por um observador que corre entre transições |
-| T4 | rejeição por B ⇒ **sem episódio, sem deadline, sem `Lost`**; sucesso-sempre adversarial converge para supressão |
-| T5 | `Delete` falha 3× ⇒ **`Releasing` + CV-17 + `RequestExit`**, e **não** sessão degradada |
+| T3 | admissão: entre `TryBeginEpisode` devolver `true` e o estado ser `Recovering` **não existe estado observável** |
+| T4 | rejeição por B ⇒ sem episódio, sem deadline, sem `Lost`; sucesso-sempre adversarial converge para supressão |
+| T5 | `Delete` falha 3× ⇒ `Releasing` + CV-17 + **efeito `FailSafeExitRequested`**, e **não** sessão degradada |
 | T6 | efeitos de `Add`/`Delete` de transições consecutivas chegam ao shell **pela ordem de sequência** |
-| T7 | temporizador atrasado: nenhuma execução ocorre ao prazo, e a **primeira** reentrada posterior terminaliza — a segurança não depende da promptidão |
+| T7 | temporizador atrasado: a **primeira** reentrada posterior terminaliza — a segurança não depende da promptidão |
+| **T8** | **`Add` PENDENTE ainda não iniciado** — efeito emitido e ainda não entregue ao worker quando o `Release` é comprometido: o efeito é **cancelado antes de tocar no shell**, não há `Add`, e a reconciliação pendente resolve-se sem `Delete` |
+| **T9** | **notificação de UI obsoleta** — entrega enfileirada em `Recovering`, atrasada, e entregue já em `Releasing`: é **suprimida** por classe de sessão, enquanto uma entrega dirigida ao terminal na mesma fila **é entregue** |
+| **T10** | **reentrância completa do `RequestExit`** — `CleanupCompleted(false)` ⇒ `FailSafeExitRequested` ⇒ a S2 corre o `ExitSequence` real, cujo `RemoveTrayIcon()` chama `ReleaseAsync` de volta: **retorna imediatamente como no-op**, o `ExitSequence` completa, e **nada fica à espera do watchdog** |
+| **T11** | `Add` tardio pré-`Release` conclui com `ok:true` ⇒ **`Delete` compensatório emitido** e `Released` **inalcançável** até esse `Delete` verificar |
 
-**Mutações** (contra a classe de produção): passo 1 do preâmbulo removido (absorção) · passo 2 removido
-(geração) · **passo 3 removido (deadline)** · `TryBeginEpisode` movido para fora da transição ·
-`Available` publicado sem revalidar o prazo · gate adquirido dentro do domínio de decisão · `Transition`
-chamada de dentro do domínio · efeitos a mutar estado diretamente · ordem de sequência dos efeitos
-removida · `CleanupCompleted(false)` a permanecer em `Lost` · default-deny removido em
-`Lost`/`Unverified` · cada validação da CV-6b isoladamente · `NIM_DELETE == false` ignorado ·
-B reposto por sucesso. **Cada uma TEM de falhar testes. Nada entregue só com suite verde.**
+### Plano de mutação — obrigatório, **uma mutação de cada vez**
+
+Formato exigido na entrega (§10 do `BOSS.md`): **baseline → mutação → invariante violado → testes que
+falham com contagens → restauro provado → baseline PASS**. **Nesta volta declara-se o plano; a
+evidência acompanha a entrega do código (CV-12).**
+
+| # | Mutação (isolada) | Invariante violado | Teste determinístico que TEM de falhar |
+|---|---|---|---|
+| **M1** | permitir que a `Transition` emita `Add` durante `Releasing` | §5.1 — emissão imposta pelo tipo | **T2** (variante "`Release` com retry pendente") e **T8** |
+| **M2** | um `Add` tardio pré-`Release` bem-sucedido publica `Available` | §5.2 — conclusão é obsoleta | **T11**, e **T1** para a variante por deadline |
+| **M3** | um `Add` tardio **não** recebe `Delete` compensatório | §5.2 + §6.4 — `Released` exige reconciliação | **T11** e **T5** |
+| **M4** | remover a revalidação em tempo de entrega das notificações | §6.3 — validade no enqueue não basta | **T9** |
+
+**Mutações herdadas, mantidas:** passo 1 do preâmbulo removido · passo 2 removido · **passo 3 removido**
+· `TryBeginEpisode` movido para fora da transição · `Available` publicado sem revalidar o prazo · gate
+adquirido dentro do domínio de decisão · `Transition` chamada de dentro do domínio · efeitos a mutar
+estado · ordem de sequência removida · `CleanupCompleted(false)` a permanecer em `Lost` ·
+**`FailSafeExitRequested` substituído por chamada síncrona a `RequestExit`** (deve falhar **T10**) ·
+**guarda `pending == 0` removida da transição para `Released`** (deve falhar **T11**) · default-deny
+removido em `Lost`/`Unverified` · cada validação da CV-6b isoladamente · `NIM_DELETE == false` ignorado
+· B reposto por sucesso.
+
+**Cada uma TEM de falhar testes. Nada entregue só com suite verde.**
 
 ## 13 — As cinco perguntas do Atlas
 
@@ -333,7 +462,7 @@ B reposto por sucesso. **Cada uma TEM de falhar testes. Nada entregue só com su
 |---|---|---|---|
 | 1 | Admissão e invalidação são **uma** operação linearizável? | **SIM** | §3 — `TryBeginEpisode`, geração, timestamp, deadline e `Recovering` são o mesmo corpo, sob o mesmo domínio, sem nada entre eles |
 | 2 | Existe **exatamente uma** autoridade? | **SIM** | `Transition` é a única escritora de estado; efeitos nunca mutam estado; o gate não decide |
-| 3 | `Release` é **estruturalmente** absorvente? | **SIM** | passo 1 do preâmbulo, comum a todas as chamadas; δ(`Releasing`,x)=`Releasing` ∀x |
+| 3 | `Release` é **estruturalmente** absorvente? | **SIM**, com a distinção clarificada | passo 1 do preâmbulo ∀ chamada; δ(`Releasing`,x)=`Releasing` ∀x. **Sem `Add` NOVO** depois de `Releasing` — imposto pelo tipo (§5.1); um `Add` pré-existente só pode completar **como trabalho obsoleto e compensado** (§5.2) |
 | 4 | Algo **depois do deadline** pode publicar `Available`? | **NÃO** | passo 3 do preâmbulo terminaliza **antes** de o evento ser olhado; o ramo que publica `Available` é inalcançável em estado terminal |
 | 5 | Algum resultado obsoleto pode **contornar** a função? | **NÃO** | resultados não publicam: **reentram** por `Transition`, e o passo 2 descarta geração obsoleta |
 
