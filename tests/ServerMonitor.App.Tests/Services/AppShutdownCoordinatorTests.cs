@@ -5,6 +5,7 @@ using System.Diagnostics;
 
 namespace ServerMonitor.App.Tests.Services;
 
+[Collection(ThreadBlockingTests.Name)]
 public sealed class AppShutdownCoordinatorTests
 {
     [Fact]
@@ -108,13 +109,17 @@ public sealed class AppShutdownCoordinatorTests
 
         public Task StartAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 
-        public async Task StopAsync(CancellationToken cancellationToken = default)
+        public Task StopAsync(CancellationToken cancellationToken = default)
         {
             Interlocked.Increment(ref _stopCount);
             StopStarted.Set();
-            // Deliberately ignore cancellation to exercise the coordinator's hard time bound.
-            await _release.Task.ConfigureAwait(false);
+            // Deliberately ignore cancellation to exercise the coordinator's hard time bound, and wait
+            // SYNCHRONOUSLY on the thread the coordinator already parked here: an async continuation
+            // would need a second pool thread, and these barrier tests are precisely the ones that make
+            // the pool scarce.
+            _release.Task.GetAwaiter().GetResult();
             StopCompleted.Set();
+            return Task.CompletedTask;
         }
 
         public void ReleaseStop() => _release.TrySetResult();

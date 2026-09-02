@@ -118,24 +118,18 @@ public sealed class TrayServiceTests
 
         public FakeAppLifecycleController Lifecycle { get; } = new();
 
-        public BackgroundDegradationNotice Degradation { get; } = new();
 
-        /// <summary>Order of the two user-visible effects of a degradation.</summary>
-        public List<string> Order { get; } = new();
 
         public FakeTimeProvider Clock { get; } = new(new DateTimeOffset(2026, 9, 2, 12, 0, 0, TimeSpan.Zero));
 
         public Harness(int maxIconAttempts = 1)
         {
-            Degradation.Changed += (_, _) => Order.Add("degraded");
-            Window.BackgroundSettingsOpened += () => Order.Add("settings");
             Service = new TrayService(
                 Icon,
                 Window,
                 Refresh,
                 Alert,
                 Lifecycle,
-                Degradation,
                 NullLogger<TrayService>.Instance,
                 Clock,
                 maxIconAttempts,
@@ -143,12 +137,13 @@ public sealed class TrayServiceTests
         }
     }
 
-    // ---------------------------------------------------------------- M13 S2 §K: the only way out
+    // ------------------------------------------------- M13 S2-T: the icon object is not the affordance
 
     /// <summary>
-    /// Vigil C2. The icon used to be fatal: a failure rethrew out of StartAsync and killed the app. In
-    /// headless that is a process with no monitoring at all; continuing silently would be a process the
-    /// user cannot stop. Neither is acceptable, so startup survives and the app degrades instead.
+    /// Vigil C2 lives on: a failing icon must not abort startup. What CHANGED with the S2-T split is that
+    /// this class no longer decides whether an affordance exists — the icon object being constructed
+    /// never proved the shell holds the icon, and that inference is gone. The consequences of not having
+    /// an affordance are proved in TrayAffordanceLifecycleTests.
     /// </summary>
     [Fact]
     public async Task A_failing_tray_icon_does_not_abort_startup()
@@ -159,6 +154,7 @@ public sealed class TrayServiceTests
         var thrown = await Record.ExceptionAsync(() => harness.Service.StartAsync(default));
 
         Assert.Null(thrown);
+        Assert.False(harness.Service.IconObjectCreated);
     }
 
     [Fact]
@@ -180,56 +176,20 @@ public sealed class TrayServiceTests
     }
 
     /// <summary>
-    /// With no icon and a window available, the app surfaces the window and closing it becomes a true
-    /// exit for the session — there is always at least one way out.
+    /// Creating the object is reported as exactly that — diagnostic, never an affordance signal. The
+    /// difference is the whole point of the split: only S2-T can say the shell holds the icon.
     /// </summary>
     [Fact]
-    public async Task Without_an_icon_the_app_falls_back_to_a_visible_window()
-    {
-        var harness = new Harness();
-        harness.Icon.ThrowOnStart = true;
-
-        await harness.Service.StartAsync(default);
-
-        Assert.True(harness.Service.ExitAffordanceDegraded);
-        // No icon means BACKGROUND is no longer a legitimate state: the close button must exit instead.
-        Assert.False(harness.Service.CanEnterBackground);
-        Assert.Equal(0, harness.Lifecycle.ExitRequests);
-
-        // Approved UX: the window opens DIRECTLY on Settings > Background, never via the Dashboard, and
-        // the notice is raised first so the InfoBar is present in the first visible frame.
-        Assert.Equal(1, harness.Window.OpenBackgroundSettingsCount);
-        Assert.Equal(0, harness.Window.RestoreCount);
-        Assert.True(harness.Degradation.IsDegraded);
-        Assert.Equal(["degraded", "settings"], harness.Order);
-    }
-
-    /// <summary>
-    /// With no icon and no window either — a headless process whose UI cannot be materialized — the app
-    /// exits rather than monitoring where the user has no way to stop it (the A12 zombie by another route).
-    /// </summary>
-    [Fact]
-    public async Task Without_an_icon_and_without_a_window_the_app_exits()
-    {
-        var harness = new Harness();
-        harness.Icon.ThrowOnStart = true;
-        harness.Window.CanMaterialize = false;
-
-        await harness.Service.StartAsync(default);
-
-        Assert.Equal(1, harness.Lifecycle.ExitRequests);
-        Assert.Equal(ExitReason.NoExitAffordance, Assert.Single(harness.Lifecycle.ExitReasons));
-    }
-
-    [Fact]
-    public async Task A_healthy_icon_is_a_usable_exit_affordance()
+    public async Task A_created_icon_object_is_diagnostic_only()
     {
         var harness = new Harness();
 
         await harness.Service.StartAsync(default);
 
-        Assert.True(harness.Service.CanEnterBackground);
-        Assert.False(harness.Service.ExitAffordanceDegraded);
+        Assert.True(harness.Service.IconObjectCreated);
+        Assert.DoesNotContain(
+            typeof(TrayService).GetProperties(),
+            property => property.Name is "CanEnterBackground" or "ExitAffordanceDegraded");
     }
 
     /// <summary>Vigil C3: the icon is removed by the committed exit, and only then.</summary>
@@ -244,7 +204,7 @@ public sealed class TrayServiceTests
         harness.Service.RemoveIconForExit();
 
         Assert.Equal(1, harness.Icon.StopCount);
-        Assert.False(harness.Service.CanEnterBackground);
+        Assert.False(harness.Service.IconObjectCreated);
     }
 
     private sealed class FakeTrayIcon : ITrayIconAdapter

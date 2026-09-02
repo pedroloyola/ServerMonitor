@@ -8,13 +8,12 @@ namespace ServerMonitor.App.Services;
 /// or owns host shutdown: "Sair do ServerAlyzer" delegates to the one authoritative
 /// <see cref="IAppLifecycleController.RequestExit"/>.
 /// <para>
-/// <b>The icon is the only way out of BACKGROUND</b> (M13 S2 §K; Vigil C2). In headless there is no
-/// window either, so a process whose icon failed to appear would be monitoring with no user-reachable
-/// stop — the A12 zombie by another route. Icon creation is therefore no longer fatal to startup, is
-/// retried a bounded number of times on the injected clock, and, if it still cannot be created, the app
-/// DEGRADES deterministically rather than continuing silently: it asks for a visible window and makes
-/// closing it a true exit for this session, and if not even that is possible it exits. The user's
-/// persisted preference is never rewritten by this — the degradation is per session.
+/// <b>It no longer decides whether a tray affordance exists.</b> It used to answer that from its own
+/// <c>_started</c> flag, set after the library call returned — and the library discards the BOOL from
+/// <c>Shell_NotifyIcon(NIM_ADD)</c>, so the flag proved nothing and a silent registration failure left a
+/// headless process monitoring with no way out. Physical tray reliability moved to S2-T; this class asks
+/// <see cref="TrayAffordanceLifecycle"/>, which consumes the positively established state, and otherwise
+/// limits itself to wiring menu commands to services.
 /// </para>
 /// </summary>
 public sealed class TrayService(
@@ -23,7 +22,6 @@ public sealed class TrayService(
     IRefreshAllCoordinator refreshAllCoordinator,
     IServerAlertCoordinator alertCoordinator,
     IAppLifecycleController lifecycleController,
-    IBackgroundDegradationNotice degradationNotice,
     ILogger<TrayService> logger,
     TimeProvider? timeProvider = null,
     int maxIconAttempts = TrayService.DefaultMaxIconAttempts,
@@ -43,18 +41,10 @@ public sealed class TrayService(
     private Task? _stopTask;
 
     /// <summary>
-    /// True when the icon could not be created and the app fell back to a visible window. While set, the
-    /// close button means a true exit, because the tray is not there to get back to.
+    /// Whether the icon object was created. Diagnostic ONLY: it is deliberately not the affordance
+    /// signal, because a created object does not prove the shell holds the icon (M13 S2-T contract).
     /// </summary>
-    public bool ExitAffordanceDegraded { get; private set; }
-
-    /// <summary>
-    /// True only while the notification-area icon is up. It is the precondition for BACKGROUND: hiding
-    /// the window is only safe while the icon can bring it back and offer "Sair do ServerAlyzer". When it
-    /// is false the close button means a true exit instead (§K) — the app is never left running with no
-    /// way for the user to stop it.
-    /// </summary>
-    public bool CanEnterBackground
+    public bool IconObjectCreated
     {
         get { lock (_sync) { return _started; } }
     }
@@ -107,43 +97,12 @@ public sealed class TrayService(
             }
         }
 
-        DegradeWithoutTrayIcon();
+        // Whether an affordance exists is not this class's answer to give: TrayAffordanceLifecycle
+        // consumes the S2-T state and decides. Exhausting the attempts here only means the icon object
+        // could not be constructed, which is reported, not interpreted.
+        logger.LogWarning("The notification-area icon object could not be created.");
     }
 
-    /// <summary>
-    /// No icon after every attempt. BACKGROUND is only a legitimate state while a true exit is reachable,
-    /// so the app stops pretending it is: it asks for a visible window, whose close button now means a
-    /// true exit, and if no window can be materialized at all it exits rather than monitoring
-    /// unstoppably (M13 S2 §K).
-    /// </summary>
-    private void DegradeWithoutTrayIcon()
-    {
-        lock (_sync)
-        {
-            UnsubscribeLocked();
-            _started = false;
-            ExitAffordanceDegraded = true;
-        }
-
-        // Approved UX (scope control §2): raise the notice FIRST, then open the window DIRECTLY on
-        // Settings > Background — never RestoreAndActivate, which would show the Dashboard on the way
-        // there. The InfoBar is therefore already present in the first visible frame, and the window
-        // itself is the explanation. No toast here: the window is the primary surface, a toast would
-        // compete with it and may be disabled at the OS level.
-        degradationNotice.Raise();
-        windowController.OpenBackgroundSettings();
-
-        if (!windowController.IsMaterialized)
-        {
-            logger.LogError(
-                "No notification-area icon and no window: exiting rather than monitoring with no way to stop.");
-            lifecycleController.RequestExit(ExitReason.NoExitAffordance);
-            return;
-        }
-
-        logger.LogWarning(
-            "Running without a notification-area icon; closing the window now exits for this session.");
-    }
 
     /// <summary>
     /// Removes the icon during a committed true exit (Vigil C3). Called from the exit sequence AFTER the
