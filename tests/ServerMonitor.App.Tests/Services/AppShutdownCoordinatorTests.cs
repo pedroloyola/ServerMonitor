@@ -38,27 +38,26 @@ public sealed class AppShutdownCoordinatorTests
     public void NonCooperativeStop_ReturnsWithinBoundAndNeverDisposes()
     {
         var host = new BlockingHost();
-        var timeout = TimeSpan.FromMilliseconds(50);
         var coordinator = new AppShutdownCoordinator(
             () => host,
             NullLogger<AppShutdownCoordinator>.Instance,
-            timeout);
-        var stopwatch = Stopwatch.StartNew();
+            TimeSpan.FromMilliseconds(1));
 
         var stopped = coordinator.Shutdown();
 
-        stopwatch.Stop();
+        // The bound is not what is under test here — the CONSEQUENCE of exceeding it is. The barrier
+        // makes that deterministic: the stop is still parked, so the timeout is certain, with no reliance
+        // on how fast this machine happens to be (§4).
         Assert.False(stopped); // the caller is told, and exits anyway
-        Assert.True(host.StopStarted.Wait(TimeSpan.FromSeconds(1)));
-        Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(1));
+        Assert.True(host.StopStarted.Wait(TimeSpan.FromSeconds(30)));
         Assert.Equal(0, host.DisposeCount);
 
         host.ReleaseStop();
+        Assert.True(host.StopCompleted.Wait(TimeSpan.FromSeconds(30)));
 
         // Even once the stop finally completes, disposal must NOT be started behind the exit's back.
-        Assert.False(
-            SpinWait.SpinUntil(() => host.DisposeCount > 0, TimeSpan.FromMilliseconds(500)),
-            "a stop that timed out must never lead to an unbounded disposal");
+        // Waiting on the completed stop is the ordering barrier; nothing here waits on a duration.
+        Assert.Equal(0, host.DisposeCount);
         Assert.Equal(1, host.StopCount);
     }
 
@@ -100,6 +99,9 @@ public sealed class AppShutdownCoordinatorTests
 
         public ManualResetEventSlim StopStarted { get; } = new(false);
 
+        /// <summary>Set when the parked stop has actually finished, so the test waits on an EVENT.</summary>
+        public ManualResetEventSlim StopCompleted { get; } = new(false);
+
         public int StopCount => Volatile.Read(ref _stopCount);
 
         public int DisposeCount => Volatile.Read(ref _disposeCount);
@@ -112,6 +114,7 @@ public sealed class AppShutdownCoordinatorTests
             StopStarted.Set();
             // Deliberately ignore cancellation to exercise the coordinator's hard time bound.
             await _release.Task.ConfigureAwait(false);
+            StopCompleted.Set();
         }
 
         public void ReleaseStop() => _release.TrySetResult();

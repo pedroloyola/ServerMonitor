@@ -1,4 +1,4 @@
-﻿<Page
+<Page
     x:Class="ServerMonitor.App.Views.SettingsPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -116,6 +116,14 @@
                             HorizontalAlignment="Left"
                             MinHeight="36"
                             IsOn="{Binding BackgroundMonitoringEnabled, Mode=TwoWay}" />
+
+                        <!-- Only visible when this session has no notification-area icon. The window is
+                             surfaced without the user asking in that case, so it must say why. -->
+                        <InfoBar
+                            x:Uid="BackgroundDegradedNotice"
+                            IsClosable="True"
+                            IsOpen="{Binding IsBackgroundDegradedNoticeOpen, Mode=TwoWay}"
+                            Severity="Warning" />
                     </StackPanel>
 
                     <Border Height="1" Background="{ThemeResource GlassBorderBrush}" />

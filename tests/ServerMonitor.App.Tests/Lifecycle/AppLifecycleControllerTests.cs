@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using ServerMonitor.App.Services;
+using ServerMonitor.App.Tests.Fakes;
 
 namespace ServerMonitor.App.Tests.Lifecycle;
 
@@ -51,29 +52,6 @@ public sealed class AppLifecycleControllerTests
         }
     }
 
-    private sealed class RecordingWatchdog : ITerminationWatchdog
-    {
-        public int ArmCount { get; private set; }
-
-        public int DisarmCount { get; private set; }
-
-        public TimeSpan? Deadline { get; private set; }
-
-        public Action? OnDeadline { get; private set; }
-
-        public void Arm(TimeSpan deadline, Action onDeadlineReached)
-        {
-            ArmCount++;
-            Deadline = deadline;
-            OnDeadline = onDeadlineReached;
-        }
-
-        public void Disarm() => DisarmCount++;
-
-        /// <summary>Fires the deadline exactly as the real background thread would.</summary>
-        public void FireDeadline() => OnDeadline?.Invoke();
-    }
-
     private sealed class RecordingTerminator : IProcessTerminator
     {
         public List<int> Terminations { get; } = new();
@@ -81,11 +59,17 @@ public sealed class AppLifecycleControllerTests
         public void Terminate(int exitCode) => Terminations.Add(exitCode);
     }
 
+    /// <summary>
+    /// The PRODUCTION watchdog, with only its waiting made deterministic (BOSS.md §10): these tests claim
+    /// things about the watchdog, so the watchdog must be the real one.
+    /// </summary>
     private sealed class Harness
     {
         public RecordingExitSequence Sequence { get; } = new();
 
-        public RecordingWatchdog Watchdog { get; } = new();
+        public ManualWatchdogScheduler Scheduler { get; } = new();
+
+        public TerminationWatchdog Watchdog { get; }
 
         public RecordingTerminator Terminator { get; } = new();
 
@@ -95,6 +79,7 @@ public sealed class AppLifecycleControllerTests
 
         public Harness(LaunchMode launchMode = LaunchMode.Foreground, TimeSpan? deadline = null)
         {
+            Watchdog = new TerminationWatchdog(Scheduler, NullLogger<TerminationWatchdog>.Instance);
             Controller = new AppLifecycleController(
                 () => Sequence,
                 () => ApplicationExits++,
@@ -104,6 +89,9 @@ public sealed class AppLifecycleControllerTests
                 launchMode,
                 deadline);
         }
+
+        /// <summary>What elapsed time does, through the real watchdog.</summary>
+        public void ElapseDeadline() => Scheduler.ElapseAll();
     }
 
     // ---------------------------------------------------------------- states
@@ -181,7 +169,7 @@ public sealed class AppLifecycleControllerTests
 
         Assert.Equal(1, h.ApplicationExits);
         Assert.Equal(4, h.Sequence.Steps.Count); // one pass, four steps
-        Assert.Equal(1, h.Watchdog.ArmCount);
+        Assert.Equal(1, h.Scheduler.ScheduleCount);
     }
 
     /// <summary>
@@ -218,7 +206,7 @@ public sealed class AppLifecycleControllerTests
         var controller = new AppLifecycleController(
             () => throw new InvalidOperationException("no sequence"),
             () => exits++,
-            new RecordingWatchdog(),
+            new TerminationWatchdog(new ManualWatchdogScheduler(), NullLogger<TerminationWatchdog>.Instance),
             new RecordingTerminator(),
             NullLogger<AppLifecycleController>.Instance);
 
@@ -262,13 +250,20 @@ public sealed class AppLifecycleControllerTests
 
         h.Controller.EnterBackground();
         h.Controller.EnterForeground();
-        Assert.Equal(0, h.Watchdog.ArmCount); // never armed outside Exiting
+        Assert.False(h.Watchdog.IsArmed); // never armed outside Exiting
+        Assert.Equal(0, h.Scheduler.ScheduleCount);
+
+        // And the pre-exit lifecycle never invokes the terminator, whatever elapses.
+        h.ElapseDeadline();
+        Assert.Empty(h.Terminator.Terminations);
 
         h.Controller.RequestExit(ExitReason.TrayExit);
         h.Controller.RequestExit(ExitReason.TrayExit);
 
-        Assert.Equal(1, h.Watchdog.ArmCount);
-        Assert.Equal(AppLifecycleController.DefaultTerminationDeadline, h.Watchdog.Deadline);
+        Assert.True(h.Watchdog.IsArmed);
+        Assert.Equal(
+            [AppLifecycleController.DefaultTerminationDeadline],
+            h.Scheduler.ScheduledDelays);
     }
 
     [Fact]
@@ -285,31 +280,40 @@ public sealed class AppLifecycleControllerTests
         var h = new Harness(deadline: TimeSpan.FromSeconds(10));
 
         h.Controller.RequestExit(ExitReason.TrayExit);
-        h.Watchdog.FireDeadline();
+        h.ElapseDeadline();
 
         Assert.Equal([ProcessTerminator.WatchdogExitCode], h.Terminator.Terminations);
         Assert.NotEqual(0, ProcessTerminator.WatchdogExitCode);
     }
 
     /// <summary>
-    /// The watchdog is deliberately NOT disarmed after Application.Exit(): a process that fails to die
-    /// after being asked is exactly what it is there to end.
+    /// The watchdog is deliberately still armed after a COMPLETE, successful exit: StopAsync finished,
+    /// the host was disposed and Application.Exit() returned — and if the process is nevertheless still
+    /// alive at the deadline, it is terminated. This is the property the returned review found missing.
     /// </summary>
     [Fact]
-    public void The_watchdog_is_not_disarmed_by_the_exit()
+    public void A_completed_exit_does_not_disarm_the_watchdog()
     {
         var h = new Harness();
+        h.Sequence.HostStops = true;
 
         h.Controller.RequestExit(ExitReason.TrayExit);
 
-        Assert.Equal(0, h.Watchdog.DisarmCount);
+        Assert.Equal(1, h.ApplicationExits);   // the graceful path ran to the end
+        Assert.True(h.Watchdog.IsArmed);       // and the escalation is still standing
+        Assert.Empty(h.Terminator.Terminations);
+
+        h.ElapseDeadline();                    // the process did not actually die
+
+        Assert.Equal([ProcessTerminator.WatchdogExitCode], h.Terminator.Terminations);
     }
 
     /// <summary>Even if Application.Exit() itself throws, the watchdog still owns the ending.</summary>
     [Fact]
     public void An_exit_that_throws_leaves_the_watchdog_in_charge()
     {
-        var watchdog = new RecordingWatchdog();
+        var scheduler = new ManualWatchdogScheduler();
+        var watchdog = new TerminationWatchdog(scheduler, NullLogger<TerminationWatchdog>.Instance);
         var terminator = new RecordingTerminator();
         var controller = new AppLifecycleController(
             () => new RecordingExitSequence(),
@@ -319,9 +323,9 @@ public sealed class AppLifecycleControllerTests
             NullLogger<AppLifecycleController>.Instance);
 
         controller.RequestExit(ExitReason.TrayExit);
-        watchdog.FireDeadline();
+        scheduler.ElapseAll();
 
-        Assert.Equal(1, watchdog.ArmCount);
+        Assert.Equal(1, scheduler.ScheduleCount);
         Assert.Single(terminator.Terminations);
     }
 
@@ -330,9 +334,25 @@ public sealed class AppLifecycleControllerTests
         Assert.Throws<ArgumentOutOfRangeException>(() => new AppLifecycleController(
             () => new RecordingExitSequence(),
             () => { },
-            new RecordingWatchdog(),
+            new TerminationWatchdog(new ManualWatchdogScheduler(), NullLogger<TerminationWatchdog>.Instance),
             new RecordingTerminator(),
             NullLogger<AppLifecycleController>.Instance,
             LaunchMode.Foreground,
             TimeSpan.Zero));
+
+    /// <summary>
+    /// §14: the tray icon is only removed once the exit is committed AND the escalation is standing, so
+    /// the app either finishes gracefully or is terminated — never a dead icon with no guarantee behind it.
+    /// </summary>
+    [Fact]
+    public void The_watchdog_is_armed_before_the_tray_icon_is_removed()
+    {
+        var h = new Harness();
+        var armedWhenIconRemoved = false;
+        h.Sequence.OnRemoveTrayIcon = () => armedWhenIconRemoved = h.Watchdog.IsArmed;
+
+        h.Controller.RequestExit(ExitReason.TrayExit);
+
+        Assert.True(armedWhenIconRemoved);
+    }
 }

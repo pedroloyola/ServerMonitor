@@ -230,10 +230,15 @@ public sealed class WindowsAppNotificationServiceTests : IDisposable
 
         service.ShowBackgroundNotice("title", "body");
         Assert.True(platform.LastExpiresOnReboot);
+        // §12: an explicit lifetime, not just "until reboot" - a machine that never reboots must not keep
+        // a one-off educational toast in the Notification Centre forever.
+        Assert.Equal(WindowsAppNotificationService.BackgroundNoticeLifetime, platform.LastExpiresAfter);
+        Assert.True(platform.LastExpiresAfter > TimeSpan.Zero);
         Assert.Equal(NotificationActivationContract.ForBackgroundCloseNotice(), platform.LastArguments);
 
         await service.ShowAsync(Notification());
         Assert.False(platform.LastExpiresOnReboot);
+        Assert.Null(platform.LastExpiresAfter); // health alerts keep the platform default
         Assert.Equal(NotificationActivationContract.ForServerHealth(), platform.LastArguments);
     }
 
@@ -311,17 +316,21 @@ public sealed class WindowsAppNotificationServiceTests : IDisposable
 
         public bool LastExpiresOnReboot { get; private set; }
 
+        public TimeSpan? LastExpiresAfter { get; private set; }
+
         public void Show(
             string title,
             string body,
             IReadOnlyDictionary<string, string> arguments,
-            bool expiresOnReboot)
+            bool expiresOnReboot,
+            TimeSpan? expiresAfter)
         {
             ShowCount++;
             Title = title;
             Body = body;
             LastArguments = arguments;
             LastExpiresOnReboot = expiresOnReboot;
+            LastExpiresAfter = expiresAfter;
         }
 
         /// <summary>Raises an activation carrying the health contract, which is what these tests exercise.</summary>

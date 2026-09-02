@@ -118,6 +118,8 @@ public sealed class TrayServiceTests
 
         public FakeAppLifecycleController Lifecycle { get; } = new();
 
+        public BackgroundDegradationNotice Degradation { get; } = new();
+
         public FakeTimeProvider Clock { get; } = new(new DateTimeOffset(2026, 9, 2, 12, 0, 0, TimeSpan.Zero));
 
         public Harness(int maxIconAttempts = 1)
@@ -128,6 +130,7 @@ public sealed class TrayServiceTests
                 Refresh,
                 Alert,
                 Lifecycle,
+                Degradation,
                 NullLogger<TrayService>.Instance,
                 Clock,
                 maxIconAttempts,

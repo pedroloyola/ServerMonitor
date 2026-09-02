@@ -13,6 +13,14 @@ public sealed class WindowsAppNotificationService : IUserNotificationService, IH
 {
     private const string ApplicationDisplayName = "ServerAlyzer";
 
+    /// <summary>
+    /// How long the single background notice stays available (M13 S2 §12). ExpiresOnReboot alone is not
+    /// enough: a machine that is never rebooted would keep an educational one-off in the Notification
+    /// Centre indefinitely. It explains a transition that already happened, so it is deliberately
+    /// short-lived. Prism reviews the exact duration.
+    /// </summary>
+    internal static readonly TimeSpan BackgroundNoticeLifetime = TimeSpan.FromMinutes(10);
+
     private readonly IWindowsAppNotificationPlatform _platform;
     private readonly IApplicationWindowController _windowController;
     private readonly IAppLifecycleController _lifecycleController;
@@ -162,7 +170,8 @@ public sealed class WindowsAppNotificationService : IUserNotificationService, IH
                     notification.Title,
                     notification.Body,
                     NotificationActivationContract.ForServerHealth(),
-                    expiresOnReboot: false);
+                    expiresOnReboot: false,
+                    expiresAfter: null);
                 _logger.LogDebug(
                     "Windows app notification sent for {ServerId} ({Category}).",
                     notification.ServerId,
@@ -249,7 +258,8 @@ public sealed class WindowsAppNotificationService : IUserNotificationService, IH
                     title,
                     body,
                     NotificationActivationContract.ForBackgroundCloseNotice(),
-                    expiresOnReboot: true);
+                    expiresOnReboot: true,
+                    expiresAfter: BackgroundNoticeLifetime);
             }
             catch (Exception exception)
             {
@@ -289,7 +299,8 @@ internal interface IWindowsAppNotificationPlatform
         string title,
         string body,
         IReadOnlyDictionary<string, string> arguments,
-        bool expiresOnReboot);
+        bool expiresOnReboot,
+        TimeSpan? expiresAfter);
 }
 
 internal sealed class WindowsAppNotificationPlatform : IWindowsAppNotificationPlatform
@@ -369,7 +380,8 @@ internal sealed class WindowsAppNotificationPlatform : IWindowsAppNotificationPl
         string title,
         string body,
         IReadOnlyDictionary<string, string> arguments,
-        bool expiresOnReboot)
+        bool expiresOnReboot,
+        TimeSpan? expiresAfter)
     {
         var builder = new AppNotificationBuilder()
             .AddText(title)
@@ -384,6 +396,13 @@ internal sealed class WindowsAppNotificationPlatform : IWindowsAppNotificationPl
 
         var notification = builder.BuildNotification();
         notification.ExpiresOnReboot = expiresOnReboot;
+        if (expiresAfter is { } lifetime)
+        {
+            // Explicit wall-clock expiry, not just "until reboot": Windows removes it from the
+            // Notification Centre on its own once this passes.
+            notification.Expiration = DateTimeOffset.Now + lifetime;
+        }
+
         GetRegisteredManager().Show(notification);
     }
 

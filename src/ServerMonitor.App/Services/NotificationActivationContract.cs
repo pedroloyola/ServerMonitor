@@ -64,18 +64,19 @@ public static class NotificationActivationContract
     {
         if (arguments is null
             || !arguments.TryGetValue(KindKey, out var rawKind)
-            || !arguments.TryGetValue(ActionKey, out var rawAction)
-            || !Enum.TryParse<NotificationKind>(rawKind, ignoreCase: false, out var kind)
-            || !Enum.TryParse<NotificationAction>(rawAction, ignoreCase: false, out var action))
+            || !arguments.TryGetValue(ActionKey, out var rawAction))
         {
             return NotificationAction.None;
         }
 
-        return (kind, action) switch
+        // Vigil CI-1: an EXACT allowlist of the two pairs this app produces, matched ordinally on the
+        // literal wire strings. Enum.TryParse was too lax for a contract that claims a closed vocabulary:
+        // it accepts an enum's NUMERIC representation ("0", "1"), accepts comma-separated combinations,
+        // and would silently absorb any member added later. Nothing outside these two rows resolves.
+        return (rawKind, rawAction) switch
         {
-            (NotificationKind.ServerHealth, NotificationAction.OpenDashboard) => NotificationAction.OpenDashboard,
-            (NotificationKind.BackgroundCloseNotice, NotificationAction.OpenBackgroundSettings) =>
-                NotificationAction.OpenBackgroundSettings,
+            ("ServerHealth", "OpenDashboard") => NotificationAction.OpenDashboard,
+            ("BackgroundCloseNotice", "OpenBackgroundSettings") => NotificationAction.OpenBackgroundSettings,
             _ => NotificationAction.None
         };
     }

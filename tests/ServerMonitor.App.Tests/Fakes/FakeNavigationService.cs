@@ -37,9 +37,9 @@ internal sealed class FakeNavigationService : INavigationService
         return true;
     }
 
-    public void GoToSettings()
-    {
-    }
+    public int SettingsCount { get; private set; }
+
+    public void GoToSettings() => SettingsCount++;
 
     public void GoToHistory(Guid serverId, string serverName) => LastHistoryServerId = serverId;
 

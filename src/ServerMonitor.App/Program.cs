@@ -26,6 +26,22 @@ public static class Program
     /// </summary>
     public static LaunchMode LaunchMode { get; private set; } = LaunchMode.Foreground;
 
+    /// <summary>
+    /// PROCESS-scoped termination watchdog (M13 S2 §F.3, corrected). It is created here, before the
+    /// <c>IHost</c> exists, and is deliberately NOT owned by it: the first implementation registered it
+    /// as a container-created singleton inside the very host the exit stops and disposes, so
+    /// <c>host.Dispose()</c> disposed the watchdog and an <c>Application.Exit()</c> that failed to end
+    /// the process left NO escalation — an indefinite zombie still holding the AppInstance key. The
+    /// class no longer implements <see cref="IDisposable"/> and has no disarm, so nothing but the death
+    /// of the process can make it inert.
+    /// </summary>
+    public static ITerminationWatchdog TerminationWatchdog { get; } = new TerminationWatchdog(
+        new DedicatedThreadWatchdogScheduler(),
+        Microsoft.Extensions.Logging.Abstractions.NullLogger<TerminationWatchdog>.Instance);
+
+    /// <summary>Process-scoped too, for the same reason: the terminal action must outlive the host.</summary>
+    public static IProcessTerminator ProcessTerminator { get; } = new ProcessTerminator();
+
     // OWNERSHIP (M13 S2 §F.2). There is deliberately NO method to release the single-instance key while
     // this process is alive. Releasing it early used to be the recommendation, so that a launch racing
     // the teardown became the new primary instead of redirecting into a dying process — but

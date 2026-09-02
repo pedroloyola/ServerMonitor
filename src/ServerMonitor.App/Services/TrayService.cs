@@ -23,6 +23,7 @@ public sealed class TrayService(
     IRefreshAllCoordinator refreshAllCoordinator,
     IServerAlertCoordinator alertCoordinator,
     IAppLifecycleController lifecycleController,
+    IBackgroundDegradationNotice degradationNotice,
     ILogger<TrayService> logger,
     TimeProvider? timeProvider = null,
     int maxIconAttempts = TrayService.DefaultMaxIconAttempts,
@@ -124,6 +125,11 @@ public sealed class TrayService(
             ExitAffordanceDegraded = true;
         }
 
+        // Surfacing a window the user did not ask for is only acceptable WITH an explanation (Prism,
+        // §13): the notice is raised before the window appears, so the InfoBar in Settings > Background
+        // is already open when they look at it. It states plainly that closing now quits, and that their
+        // saved preference was not touched.
+        degradationNotice.Raise();
         windowController.RestoreAndActivate();
 
         if (!windowController.IsMaterialized)

@@ -43,10 +43,9 @@ public static class ProtocolActivationReader
         try
         {
             if (args?.Kind == ExtendedActivationKind.Launch &&
-                args.Data is ILaunchActivatedEventArgs launchArgs &&
-                LaunchModePolicy.ResolveFromCommandLine(launchArgs.Arguments) == LaunchMode.Background)
+                args.Data is ILaunchActivatedEventArgs launchArgs)
             {
-                return ActivationOrigin.BackgroundLaunch;
+                return ActivationOriginPolicy.FromLaunchCommandLine(launchArgs.Arguments);
             }
         }
         catch

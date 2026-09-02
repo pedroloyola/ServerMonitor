@@ -1,8 +1,8 @@
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Time.Testing;
 using ServerMonitor.ActivationContract;
 using ServerMonitor.App.Services;
+using ServerMonitor.App.Tests.Fakes;
 
 namespace ServerMonitor.App.Tests.Lifecycle;
 
@@ -92,15 +92,6 @@ public sealed class ExitOwnershipTests
         }
     }
 
-    private sealed class CountingWatchdog : ITerminationWatchdog
-    {
-        public Action? OnDeadline { get; private set; }
-
-        public void Arm(TimeSpan deadline, Action onDeadlineReached) => OnDeadline = onDeadlineReached;
-
-        public void Disarm() { }
-    }
-
     private sealed class CountingTerminator : IProcessTerminator
     {
         public int Count { get; private set; }
@@ -124,7 +115,7 @@ public sealed class ExitOwnershipTests
         var controller = new AppLifecycleController(
             () => new OwnershipExitSequence(ownership, host),
             () => exits++,
-            new CountingWatchdog(),
+            new TerminationWatchdog(new ManualWatchdogScheduler(), NullLogger<TerminationWatchdog>.Instance),
             terminator,
             NullLogger<AppLifecycleController>.Instance);
 
@@ -174,15 +165,14 @@ public sealed class ExitOwnershipTests
     [Fact]
     public async Task A_drain_that_outlives_the_deadline_is_terminated()
     {
-        var clock = new FakeTimeProvider(new DateTimeOffset(2026, 9, 2, 12, 0, 0, TimeSpan.Zero));
         var host = new BarrierHost();
         var terminator = new CountingTerminator();
-        var watchdog = new FakeClockWatchdog(clock);
+        var scheduler = new ManualWatchdogScheduler();
 
         var controller = new AppLifecycleController(
             () => new OwnershipExitSequence(new SingleInstanceOwnership(), host),
             () => { },
-            watchdog,
+            new TerminationWatchdog(scheduler, NullLogger<TerminationWatchdog>.Instance),
             terminator,
             NullLogger<AppLifecycleController>.Instance,
             LaunchMode.Foreground,
@@ -191,31 +181,15 @@ public sealed class ExitOwnershipTests
         var exiting = Task.Run(() => controller.RequestExit(ExitReason.TrayExit));
         Assert.True(host.StopEntered.Wait(TimeSpan.FromSeconds(30)), "the drain never started");
 
+        // The real watchdog asked for exactly the configured deadline, once, and has not fired yet.
+        Assert.Equal([TimeSpan.FromSeconds(10)], scheduler.ScheduledDelays);
         Assert.Equal(0, terminator.Count);
-        clock.Advance(TimeSpan.FromSeconds(9));
-        Assert.Equal(0, terminator.Count);   // not a millisecond early
-        clock.Advance(TimeSpan.FromSeconds(1));
-        Assert.Equal(1, terminator.Count);   // and not a millisecond late
+
+        scheduler.ElapseAll();               // T+10s, still draining
+        Assert.Equal(1, terminator.Count);   // terminated exactly once
 
         host.Release();
         await exiting.WaitAsync(TimeSpan.FromSeconds(30));
     }
 
-    /// <summary>The watchdog contract on an injected clock: armed once, never restarted, fires once.</summary>
-    private sealed class FakeClockWatchdog(FakeTimeProvider clock) : ITerminationWatchdog
-    {
-        private ITimer? _timer;
-
-        public void Arm(TimeSpan deadline, Action onDeadlineReached)
-        {
-            if (_timer is not null)
-            {
-                return; // monotonic and non-restartable
-            }
-
-            _timer = clock.CreateTimer(_ => onDeadlineReached(), null, deadline, Timeout.InfiniteTimeSpan);
-        }
-
-        public void Disarm() => _timer?.Dispose();
-    }
 }

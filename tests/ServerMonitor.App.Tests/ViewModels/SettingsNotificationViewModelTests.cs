@@ -67,6 +67,112 @@ public sealed class SettingsNotificationViewModelTests
         Assert.Equal(0, settings.SubscriberCount);
     }
 
+    // ------------------------------------------------------ M13 S2 §11: the notice reaches the section
+
+    /// <summary>
+    /// The returned review found ConsumeBackgroundSettingsFocus() with ZERO callers — the same class of
+    /// defect as RefreshAll having none: the method existed, the tests were green, and the navigation the
+    /// human decided on never happened. This fails if the consumption is removed again.
+    /// </summary>
+    [Fact]
+    public void A_requested_background_focus_is_consumed_when_settings_is_navigated_to()
+    {
+        var navigation = new FakeNavigationService();
+        var viewModel = CreateWithNavigation(navigation);
+        navigation.RequestBackgroundSettingsFocus();
+
+        viewModel.NotifyNavigatedTo();
+
+        Assert.True(viewModel.IsBackgroundSectionRequested);
+        Assert.Equal(0, navigation.BackgroundSettingsFocusRequests); // consumed, not merely read
+    }
+
+    [Fact]
+    public void An_ordinary_navigation_does_not_focus_the_background_section()
+    {
+        var navigation = new FakeNavigationService();
+        var viewModel = CreateWithNavigation(navigation);
+
+        viewModel.NotifyNavigatedTo();
+
+        Assert.False(viewModel.IsBackgroundSectionRequested);
+    }
+
+    /// <summary>One request, one focus: later visits to Settings must not scroll on their own.</summary>
+    [Fact]
+    public void The_background_focus_request_is_spent_by_the_first_navigation()
+    {
+        var navigation = new FakeNavigationService();
+        var viewModel = CreateWithNavigation(navigation);
+        navigation.RequestBackgroundSettingsFocus();
+
+        viewModel.NotifyNavigatedTo();
+        Assert.True(viewModel.IsBackgroundSectionRequested);
+
+        viewModel.NotifyNavigatedTo();
+        Assert.False(viewModel.IsBackgroundSectionRequested);
+    }
+
+    /// <summary>
+    /// Both halves of the path the notice's activation takes: the producer navigates to Settings and
+    /// records the request, the consumer picks it up. Only the XAML bring-into-view is left, and that is
+    /// NOT_RUN pending a real window.
+    /// </summary>
+    [Fact]
+    public void The_request_and_the_consumption_are_two_halves_of_one_path()
+    {
+        var navigation = new FakeNavigationService();
+        var viewModel = CreateWithNavigation(navigation);
+
+        // exactly what ApplicationWindowController.OpenBackgroundSettings does before showing the window
+        navigation.GoToSettings();
+        navigation.RequestBackgroundSettingsFocus();
+
+        viewModel.NotifyNavigatedTo();
+
+        Assert.Equal(1, navigation.SettingsCount);
+        Assert.True(viewModel.IsBackgroundSectionRequested);
+    }
+
+    /// <summary>§13: the degradation notice is visible in Settings the moment the tray reports it.</summary>
+    [Fact]
+    public void The_degradation_notice_opens_the_settings_info_bar()
+    {
+        var degradation = new BackgroundDegradationNotice();
+        var viewModel = CreateWithDegradation(degradation);
+        Assert.False(viewModel.IsBackgroundDegradedNoticeOpen);
+
+        degradation.Raise();
+
+        Assert.True(viewModel.IsBackgroundDegradedNoticeOpen);
+    }
+
+    private static SettingsViewModel CreateWithNavigation(FakeNavigationService navigation) => new(
+        new FakeThemeService(),
+        new FakeLocalizationService(),
+        navigation,
+        new FakeServerService(),
+        new EmptyDiscoveryService(),
+        new FakeNotificationSettingsService(true),
+        new FakeBackgroundMonitoringSettingsService(),
+        new BackgroundDegradationNotice(),
+        new NullHistoryMaintenanceService(),
+        new AppVersionProvider(),
+        NullLogger<SettingsViewModel>.Instance);
+
+    private static SettingsViewModel CreateWithDegradation(IBackgroundDegradationNotice degradation) => new(
+        new FakeThemeService(),
+        new FakeLocalizationService(),
+        new FakeNavigationService(),
+        new FakeServerService(),
+        new EmptyDiscoveryService(),
+        new FakeNotificationSettingsService(true),
+        new FakeBackgroundMonitoringSettingsService(),
+        degradation,
+        new NullHistoryMaintenanceService(),
+        new AppVersionProvider(),
+        NullLogger<SettingsViewModel>.Instance);
+
     private static SettingsViewModel Create(
         INotificationSettingsService settings,
         IBackgroundMonitoringSettingsService? background = null) => new(
@@ -77,6 +183,7 @@ public sealed class SettingsNotificationViewModelTests
         new EmptyDiscoveryService(),
         settings,
         background ?? new FakeBackgroundMonitoringSettingsService(),
+        new BackgroundDegradationNotice(),
         new NullHistoryMaintenanceService(),
         new AppVersionProvider(),
         NullLogger<SettingsViewModel>.Instance);
@@ -130,6 +237,8 @@ public sealed class SettingsNotificationViewModelTests
 
     private sealed class FakeNavigationService : INavigationService
     {
+        public int SettingsCount { get; private set; }
+
         public void Initialize(Frame frame) => throw new NotSupportedException();
 
         public void NavigateTo<TPage>() where TPage : Page => throw new NotSupportedException();
@@ -153,9 +262,7 @@ public sealed class SettingsNotificationViewModelTests
             return true;
         }
 
-        public void GoToSettings()
-        {
-        }
+        public void GoToSettings() => SettingsCount++;
 
         public void GoToHistory(Guid serverId, string serverName)
         {

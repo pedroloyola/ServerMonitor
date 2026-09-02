@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
     <xsd:element name="root" msdata:IsDataSet="true">
@@ -354,12 +354,15 @@
   <data name="WorkloadSummaryFailedFormat" xml:space="preserve"><value>{0} com falha</value></data>
   <data name="WorkloadSummaryWarningFormat" xml:space="preserve"><value>{0} a iniciar</value></data>
   <data name="WorkloadSummaryStoppedFormat" xml:space="preserve"><value>{0} parados</value></data>
-  <data name="SettingsBackgroundTitle" xml:space="preserve"><value>Segundo plano</value></data>
-  <data name="SettingsBackgroundDescription" xml:space="preserve"><value>Com esta opção ligada, fechar a janela não encerra o ServerAlyzer: o monitoramento continua e o ícone na área de notificação permanece disponível. Para sair de verdade, use "Sair do ServerAlyzer" nesse ícone. O Windows pode manter o ícone nos ícones ocultos.</value></data>
+  <data name="BackgroundNoticeTitle" xml:space="preserve"><value>O ServerAlyzer continua monitorando</value></data>
+  <data name="BackgroundNoticeBody" xml:space="preserve"><value>A janela foi fechada, mas o monitoramento e o widget continuam ativos. Para sair de vez, use "Sair do ServerAlyzer" no ícone da área de notificação da barra de tarefas — ele pode estar nos ícones ocultos (^). Você pode mudar isso em Configurações.</value></data>
+  <data name="SettingsBackgroundTitle.Text" xml:space="preserve"><value>Segundo plano</value></data>
+  <data name="SettingsBackgroundDescription.Text" xml:space="preserve"><value>Fechar a janela mantém o ServerAlyzer monitorando e o widget atualizado. Para encerrar, use "Sair do ServerAlyzer" no ícone da área de notificação — ele pode estar nos ícones ocultos (^).</value></data>
   <data name="SettingsBackgroundToggle.Header" xml:space="preserve"><value>Continuar em segundo plano ao fechar a janela</value></data>
-  <data name="SettingsBackgroundToggle.OnContent" xml:space="preserve"><value>Ligado</value></data>
-  <data name="SettingsBackgroundToggle.OffContent" xml:space="preserve"><value>Desligado</value></data>
-  <data name="SettingsBackgroundToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.HelpText" xml:space="preserve"><value>Com esta opção ligada, fechar a janela não encerra o ServerAlyzer: o monitoramento continua e o ícone na área de notificação permanece disponível. Para sair de verdade, use "Sair do ServerAlyzer" nesse ícone. O Windows pode manter o ícone nos ícones ocultos.</value></data>
-  <data name="BackgroundNoticeTitle" xml:space="preserve"><value>O ServerAlyzer continua em execução</value></data>
-  <data name="BackgroundNoticeBody" xml:space="preserve"><value>O monitoramento continua em segundo plano. Use o ícone na área de notificação para abrir novamente ou para sair; o Windows pode manter esse ícone nos ícones ocultos.</value></data>
+  <data name="SettingsBackgroundToggle.OnContent" xml:space="preserve"><value>Ativado</value></data>
+  <data name="SettingsBackgroundToggle.OffContent" xml:space="preserve"><value>Desativado</value></data>
+  <data name="SettingsBackgroundToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Continuar em segundo plano ao fechar a janela</value></data>
+  <data name="SettingsBackgroundToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.HelpText" xml:space="preserve"><value>Quando desativado, fechar a janela encerra o ServerAlyzer e para o monitoramento e o widget.</value></data>
+  <data name="BackgroundDegradedNotice.Title" xml:space="preserve"><value>Ícone da área de notificação indisponível</value></data>
+  <data name="BackgroundDegradedNotice.Message" xml:space="preserve"><value>Nesta sessão, fechar a janela encerra o ServerAlyzer. Sua preferência de segundo plano não foi alterada.</value></data>
 </root>

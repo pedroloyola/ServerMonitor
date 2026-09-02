@@ -64,8 +64,13 @@ public partial class App : Application
                 // and a watchdog that guarantees the process really ends. The exit sequence is resolved
                 // lazily by the controller because the tray and the notification service depend on the
                 // controller in turn.
-                services.AddSingleton<ITerminationWatchdog, TerminationWatchdog>();
-                services.AddSingleton<IProcessTerminator, ProcessTerminator>();
+                // Registered as EXISTING INSTANCES owned by the process, never as container-created
+                // singletons: the container must not be able to own, dispose or otherwise end the
+                // watchdog, because the host it lives in is the very thing the watchdog guards against
+                // (M13 S2 §F.3). Neither type implements IDisposable, so the container cannot dispose
+                // them even by mistake.
+                services.AddSingleton(Program.TerminationWatchdog);
+                services.AddSingleton(Program.ProcessTerminator);
                 services.AddSingleton<IExitSequence, ExitSequence>();
                 services.AddSingleton<IAppLifecycleController>(sp => new AppLifecycleController(
                     sp.GetRequiredService<IExitSequence>,
@@ -77,6 +82,7 @@ public partial class App : Application
                 services.AddSingleton(BackgroundSettingsStorageOptions.ForCurrentUser());
                 services.AddSingleton<IBackgroundMonitoringSettingsService, JsonBackgroundMonitoringSettingsService>();
                 services.AddSingleton<IBackgroundNoticePresenter, BackgroundNoticePresenter>();
+                services.AddSingleton<IBackgroundDegradationNotice, BackgroundDegradationNotice>();
                 services.AddSingleton<OrphanTemporaryCleaner>();
                 services.AddSingleton(sp => new WindowCloseCoordinator(
                     sp.GetRequiredService<IAppLifecycleController>(),
