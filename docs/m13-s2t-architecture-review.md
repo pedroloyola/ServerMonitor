@@ -1,5 +1,14 @@
 # M13 S2-T — ARCHITECTURE REVIEW 7 (ordem entre deadline, gate e compensação)
 
+> ## ⚠️ HISTÓRICO — SUBSTITUÍDO
+> Este ficheiro é o registo das revisões 1–7 e **já não é o desenho normativo**. O desenho vigente é
+> **`docs/m13-s2t-root-state-machine-redesign.md`**.
+>
+> **Nada aqui revoga uma condição CV.** Se uma condição parecer ausente do desenho novo, a leitura
+> correta é o **mapa CV** da secção 9 desse documento, e o ficheiro de condições do Vigil — nunca
+> inferir revogação a partir de redação removida (CV-15).
+
+
 **Autor:** Relay (platform-infra), implementer da S2-T / dono do Windows Shell.
 **Branch:** `agent/m13-s2t-tray`, base `221eda4`. **DESENHO. Sem implementação.**
 
