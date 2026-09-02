@@ -183,10 +183,16 @@ internal sealed class TrayStateMachine
 
     private readonly record struct Effect(EffectKind Kind, long Generation, long Sequence);
 
-    // (2) A afordância é DERIVADA do Kind, não um campo independente.
-    //     Não existe forma de declarar "não cria afordância" e mesmo assim pedir um Add:
-    //     a mentira que a CV-20 descrevia deixa de ser representável.
-    private static bool MayCreateAffordance(EffectKind kind) => kind is EffectKind.AddIcon;
+    // (2) A operação nativa e a afordância vêm da MESMA fonte, num switch EXAUSTIVO
+    //     SEM ramo default: um Kind novo é ERRO DE COMPILAÇÃO, não um `false` silencioso.
+    //     Os dois valores não podem discordar porque não vivem em sítios diferentes.
+    private static (NativeOp Op, bool MayCreateAffordance) Describe(EffectKind kind) => kind switch
+    {
+        EffectKind.AddIcon      => (NativeOp.Add,    true),
+        EffectKind.DeleteIcon   => (NativeOp.Delete, false),
+        EffectKind.FailSafeExit => (NativeOp.None,   false),
+        // sem `_ =>` de propósito (CS8509 tratado como erro)
+    };
 
     // (3) EXECUTOR privado aninhado: o ÚNICO tipo que RETÉM a capacidade nativa.
     private sealed class EffectExecutor(INativeTrayRegistration native)
@@ -208,13 +214,26 @@ internal sealed class TrayStateMachine
 
 1. **`Effect` é um `record struct` `private` aninhado ⇒ não é nomeável, declarável nem construível fora**
    da classe. Não há interface implementável: **um efeito não tem comportamento para alguém redefinir.**
-2. **`MayCreateAffordance` é função pura de `Kind`.** A sequência exata da CV-20 — *declarar
-   `MayCreateAffordance = false` e chamar `native.Add` dentro do `Execute`* — **deixa de ser
-   representável**: não há `Execute`, e o sinalizador não é armazenável em desacordo com a operação.
+2. **`MayCreateAffordance` é derivada de `Kind`, na mesma expressão que escolhe a operação nativa.** A
+   sequência exata da CV-20 — *declarar `MayCreateAffordance = false` e chamar `native.Add` dentro do
+   `Execute`* — **deixa de ser representável**: não há `Execute`, e o sinalizador não é armazenável em
+   desacordo com a operação.
+   **Pin do Vigil, adotado:** o acoplamento `Kind → (operação, afordância)` vivia em **dois sítios**, e
+   um **`Kind` novo podia recriar a mentira por omissão**. Passa a viver num **switch exaustivo sem
+   ramo `default`**, pelo que acrescentar um `Kind` sem o descrever é **erro de compilação** — e não um
+   `false` por omissão. O **T17** fecha a outra metade, iterando `Enum.GetValues<EffectKind>()`.
+   *Fecho-a agora e não na quarta volta: é a mesma classe de defeito das anteriores — a garantia a
+   depender de alguém se lembrar.*
 3. **`EffectExecutor` é `private` aninhado e é o único tipo com um campo `INativeTrayRegistration`.**
-4. **A capacidade atravessa a fronteira exatamente uma vez**, no parâmetro do construtor da máquina,
-   que a encaminha **sem a reter**. É o mínimo possível: a capacidade tem de entrar uma vez, e o
-   seam para testes tem de continuar a existir.
+4. **A capacidade atravessa a fronteira exatamente uma vez**, mas isso custa **dois parâmetros de
+   construtor** — o da máquina, que a encaminha **sem a reter**, e o do executor, que a retém. **Um
+   único campo detentor.** É o mínimo honesto: a capacidade tem de entrar uma vez, tem de ser
+   encaminhada uma vez, e o seam para testes tem de continuar a existir.
+
+   > **Correção de contagem, e é a terceira vez.** Escrevi "a única outra ocorrência" quando são duas.
+   > As três afirmações de unicidade que fiz nesta fatia foram **mais fortes do que o desenho aguenta**.
+   > Por isso a allowlist do T14b passa a ser **enumerada explicitamente** em vez de descrita por
+   > exclusão — uma lista fechada não pode ficar desatualizada em silêncio, uma negação pode.
 5. Os únicos `new Effect(EffectKind.AddIcon, …)` estão nos ramos de emissão da `Transition`, que o
    **passo 1 do preâmbulo** torna inalcançáveis em `Releasing`/`Released`.
 
@@ -235,12 +254,26 @@ O **T14** entra como **guarda de regressão** — e, na metade que o compilador 
 >
 > 1. `Effect`, `EffectKind` e `EffectExecutor` **não são visíveis** fora de `TrayStateMachine`;
 > 2. **exatamente um tipo retém a capacidade** — `TrayStateMachine+EffectExecutor` é o único com um
->    campo de tipo `INativeTrayRegistration`, e a **única outra ocorrência** em qualquer assinatura do
->    assembly é o construtor da máquina que a encaminha;
+>    campo de tipo `INativeTrayRegistration`. A allowlist de assinaturas é **enumerada, não descrita
+>    por exclusão**: **exatamente DOIS parâmetros de construtor** — `TrayStateMachine..ctor` e
+>    `TrayStateMachine+EffectExecutor..ctor` — **e UM ÚNICO CAMPO DETENTOR**, o do executor. Qualquer
+>    outra assinatura no assembly que nomeie o tipo faz o teste falhar;
 > 3. **ausência de registo no contentor** — nenhum `ServiceDescriptor` do composition root tem
->    `INativeTrayRegistration` como `ServiceType` nem como `ImplementationType`.
+>    `INativeTrayRegistration` como `ServiceType` nem como `ImplementationType`. **Isto NÃO é
+>    metadata:** o teste **constrói a `IServiceCollection` realmente produzida pelo composition root** e
+>    inspeciona os `ServiceDescriptor` que dela saem. Varrer tipos ou texto **não serve** — só a
+>    coleção real deteta a mutação de registo.
 >
 > **Com esta correção o T14 passa no baseline.** Antes não passaria, e era esse o achado.
+
+> **Escolha explícita no ponto 3: asserção própria, NÃO mutação combinada.** O T15 tinha perdido o
+> referente — a mutação *"`MayCreateAffordance` passa a campo"* **não o pode falhar**, porque com os
+> tipos privados o efeito estrangeiro continua a não compilar. Podia declarar uma **mutação
+> combinada**, mas a regra da §10 do `BOSS.md` é que **uma prova conjuntiva passa com metade da
+> condição implementada** — e isso já me custou uma volta na CV-6b. Por isso **separo**: o **T15** fica
+> com um só referente (a mutação de visibilidade) e nasce o **T16** com asserção própria sobre a forma
+> do `Effect` e a derivação por `Kind`. **Cada mutação continua isolada e cada teste tem um referente
+> único.**
 
 > **Sobre falsificabilidade, registado porque foi arbitrado:** uma mutação que **não compila**
 > representa uma garantia **estrutural mais forte**, não uma fuga à falsificação. **T14 + T15 são prova
@@ -521,14 +554,14 @@ histórico de B. **Rejeição por B ⇒ sem episódio, sem deadline, sem `Lost`.
 | CV-9 | reentrância com flyout aberto | §9 | ATIVA · fechada |
 | CV-10 | acoplamento limitador ↔ custo de UI | §11 | ATIVA · fechada |
 | CV-11 | residual de admissão suprimida | §11 | ATIVA · LOW aceite, redação corrigida |
-| CV-12 | evidência de mutação na entrega | §12 | **ABERTA** — fecha na entrega |
+| CV-12 | evidência de mutação na entrega | §12 | **ABERTA** — fecha na entrega. **Transporta as precisões vinculativas do Vigil sobre a CV-20** (redação de teste, não de desenho), por opção dele de não abrir outra condição sobre o mesmo invariante |
 | CV-13 · CV-14 | *(fechadas pelo Vigil na revisão 6)* | — | ATIVA · fechadas |
 | CV-15 | integridade do documento normativo | §8 | **ATIVA** — este mapa é o cumprimento |
 | CV-16 | `CleanupVerified` fail-closed | §6 | **ATIVA** |
 | CV-17 | notificação informativa antes da saída fail-safe | §6.5 | **ATIVA** — slot definido, redação do Prism |
 | CV-18 | contrato fechado da ação da notificação fail-safe | §6.5 | **ATIVA · FECHADA** |
 | CV-19 | ressalva do passo 2 para eventos de conclusão de efeito | §1 (preâmbulo) | **ATIVA** |
-| CV-20 | canal de efeitos fechado: efeitos como dados passivos, executor detentor único | §5.1 | **ATIVA** — metade externa **fechada pelo Vigil**; contradição interna do "detentor único" **corrigida nesta volta**; metade não imposta pelo compilador (registo no contentor) guardada pelo **T14c** |
+| CV-20 | canal de efeitos fechado: efeitos como dados passivos, executor detentor único | §5.1 | **FECHADA do lado do desenho (Vigil).** Mecanismo estável; esta volta corrigiu a **declaração de prova** (T14b enumerado, T14c sobre a coleção real, T15/T16 com referentes separados, T17 pelo pin do acoplamento). Precisões vinculativas transportadas pela **CV-12** |
 | CV-21 | uma exceção do sink não consome o único disparo | §6.4.1 | **ATIVA · EM ARBITRAGEM** — ver a nota da §6.4.1; **não reescrita nesta volta** |
 | CI-1b | *(dívida do lado da S2)* grafias numéricas de enum em payloads hostis do contrato de ativação | §6.5 | **REFERENCIADA, não herdada em silêncio.** A ação `FailSafeExit` é acrescentada a esse mesmo contrato, logo a CI-1b **aplica-se-lhe**: vocabulário genuinamente fechado por `switch`/allowlist exata, e grafia numérica ou desconhecida ⇒ **fail closed**. A dívida continua a ser da S2; fica aqui registada porque a S2-T alarga o contrato. |
 | — | regra literal *"nenhum `NIM_ADD` pode executar depois do `Release`"* | §5 | **`SUPERSEDED BY` o invariante normativo do `Release` (§5.1 emissão + §5.2 conclusão compensada).** Justificação: satisfazê-la à letra obrigaria o `Release` a esperar pelo gate de I/O nativo, reacoplando ciclo de vida e I/O e reintroduzindo o defeito de timer/deadlock provado na revisão 6. O invariante substituto é **causalmente mais forte**: proíbe a *emissão* pelo tipo e obriga a *compensação* da conclusão tardia, o que a regra literal não fazia. |
@@ -615,8 +648,10 @@ mundo dentro de uma chamada nativa não prova nada disto.**
 
 | **T12** | **o pedido fail-safe não pode ficar pendente** — com o despachante de UI **parado** e a fila de entregas **bloqueada**, `CleanupCompleted(false)` ⇒ o sink é invocado **na mesma pilha**, fora do lock, antes de qualquer outro efeito |
 | **T13** | **sink que lança sempre** ⇒ 3 tentativas, **escalada** pelo sink de terminação da S2, e o processo **termina dentro do envelope**; `Releasing` nunca fica sem mecanismo de progresso *(CV-21)* |
-| **T14** | **arquitetura, sobre METADATA REAL e não texto** — três asserções: **(a)** `Effect`, `EffectKind` e `EffectExecutor` não são visíveis fora de `TrayStateMachine`; **(b)** `TrayStateMachine+EffectExecutor` é o **único** tipo com um campo `INativeTrayRegistration`, e a única outra ocorrência em qualquer assinatura do assembly é o construtor da máquina que a encaminha; **(c)** **nenhum `ServiceDescriptor`** do composition root tem `INativeTrayRegistration` como `ServiceType` ou `ImplementationType`. **Passa no baseline** — antes desta correção não passaria *(CV-20)* |
-| **T15** | **efeito estrangeiro** — alimentar o executor com um efeito de origem externa que cria afordância sem incrementar `pending`: sob o desenho **não compila** (o efeito é dado passivo privado, sem comportamento a redefinir); com a visibilidade alargada, compila e **falha** *(CV-20)* |
+| **T14** | **arquitetura, sobre METADATA REAL e não texto** — três asserções: **(a)** `Effect`, `EffectKind` e `EffectExecutor` não são visíveis fora de `TrayStateMachine`; **(b)** allowlist **enumerada**: exatamente **dois** parâmetros de construtor (`TrayStateMachine..ctor` e `TrayStateMachine+EffectExecutor..ctor`) e **um único campo detentor** (o do executor) — qualquer outra assinatura que nomeie o tipo falha; **(c)** sobre a **`IServiceCollection` REALMENTE PRODUZIDA pelo composition root** — nenhum `ServiceDescriptor` com `INativeTrayRegistration` como `ServiceType` ou `ImplementationType`. **Metadata para (a) e (b); coleção real para (c).** **Passa no baseline** — antes desta correção não passaria *(CV-20)* |
+| **T15** | **efeito estrangeiro** — alimentar o executor com um efeito de origem externa: sob o desenho **não compila** (dado passivo privado, sem comportamento a redefinir); com a **visibilidade alargada**, compila e **falha**. Referente: a **mutação de visibilidade**, e só ela *(CV-20)* |
+| **T16** | **forma do `Effect` e derivação por `Kind`** — sobre metadata: `Effect` **não tem membro `MayCreateAffordance`**, e a afordância é obtida de uma **função estática de `Kind`** na mesma expressão que escolhe a operação nativa. Referente: a mutação **função → campo**, isoladamente *(CV-20)* |
+| **T17** | **exaustividade do acoplamento** — iterando `Enum.GetValues<EffectKind>()` (com `Assert.NotEmpty` como pré-condição): **todo `Kind` cuja operação é `Add` tem `MayCreateAffordance == true`**, e todo `Kind` está descrito. Um `Kind` novo é coberto automaticamente *(pin do Vigil)* |
 
 ### Plano de mutação — obrigatório, **uma mutação de cada vez**
 
@@ -642,7 +677,9 @@ passa a compilar e falha — é a forma falsificável da mutação que o Atlas p
 **`INativeTrayRegistration` registado no contentor** (deve falhar **T14c** — é a metade que o
 compilador não impõe) ·
 **`MayCreateAffordance` convertido de função de `Kind` em campo independente do efeito** (volta a
-tornar representável a mentira da CV-20; deve falhar **T15**) ·
+tornar representável a mentira da CV-20; deve falhar **T16**, **isoladamente**) ·
+**ramo `default` acrescentado ao `switch` de `Describe`**, ou um `Kind` novo mapeado para `Add` com
+`MayCreateAffordance = false` (deve falhar **T17**) ·
 **`RunOnce` a marcar à entrada em vez de após retorno normal** (deve falhar **T13**) ·
 **limite de 3 tentativas do sink removido** (deve falhar **T13** por não terminar) ·
 **`AddIcon`/`DeleteIcon` promovidos de `private` aninhado a `internal`** (deve falhar a asserção de
