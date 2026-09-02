@@ -1,4 +1,4 @@
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.Marshalling;
 using ServerMonitor.WidgetProvider.Com;
 using ServerMonitor.WidgetProvider.Diagnostics;
@@ -43,13 +43,62 @@ internal static partial class Program
     [LibraryImport("ole32.dll")]
     private static partial int CoRevokeClassObject(uint dwRegister);
 
+    /// <summary>Returned when a fatal exception carries no usable failure HRESULT of its own.</summary>
+    private const int EFail = unchecked((int)0x80004005);
+
     [MTAThread]
     private static int Main()
     {
         // Invisible sinks only (Trace + ETW). Nothing this process logs may reach a console: it is a
         // GUI-subsystem COM server and must stay windowless on the user's desktop (M13-QA-7).
-        var log = EtwWidgetProviderLog.Instance;
+        return RunGuarded(() => EtwWidgetProviderLog.Instance, Serve);
+    }
 
+    /// <summary>
+    /// Last-resort barrier around the whole entry point (M13-QA-7). A GUI-subsystem process has no
+    /// console, so an exception that escapes Main does not print a stack trace — it ends the process
+    /// through Windows Error Reporting, and the WER dialog would be the ONE remaining way this provider
+    /// can put pixels on the user's desktop during a board activation. Catching here converts that into a
+    /// silent failure HRESULT plus an invisible log line. It changes no COM lifetime semantics: the whole
+    /// serve loop, including its finally (Shutdown / CoRevokeClassObject / Marshal.Release), runs to
+    /// completion inside <paramref name="body"/> before this catch is ever reached, and a registration
+    /// failure still returns its own HRESULT through the normal path rather than being swallowed here.
+    /// </summary>
+    internal static int RunGuarded(Func<IWidgetProviderLog> logFactory, Func<IWidgetProviderLog, int> body)
+    {
+        // Resolved inside the guard: even building the log must not be able to reach WER.
+        IWidgetProviderLog? log = null;
+        try
+        {
+            log = logFactory();
+            return body(log);
+        }
+        catch (Exception exception)
+        {
+            try
+            {
+                // Operation + exception type only, never the payload (ADR-018 §31).
+                (log ?? NullWidgetProviderLog.Instance).Warn(
+                    $"Widget provider terminated on an unhandled {exception.GetType().Name}.");
+            }
+            catch
+            {
+                // Diagnostics must never be the reason the process still dies by WER (§16).
+            }
+
+            return FailureHResult(exception);
+        }
+    }
+
+    /// <summary>Maps a fatal exception onto an HRESULT the COM SCM sees as a failure, never a success.</summary>
+    internal static int FailureHResult(Exception exception)
+    {
+        var hr = Marshal.GetHRForException(exception);
+        return hr < 0 ? hr : EFail;
+    }
+
+    private static int Serve(IWidgetProviderLog log)
+    {
         // Best-effort startup hygiene (Vigil L2): remove temp files a crashed writer may have left.
         new WidgetOrphanTempCleaner(log: log).Sweep();
 
