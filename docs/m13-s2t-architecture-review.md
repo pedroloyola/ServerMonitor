@@ -1,10 +1,11 @@
-# M13 S2-T — ARCHITECTURE REVIEW 3
+# M13 S2-T — ARCHITECTURE REVIEW 4
 
 **Autor:** Relay (platform-infra), implementer da S2-T / dono do Windows Shell.
 **Branch:** `agent/m13-s2t-tray`, base `221eda4`. **Continua a ser DESENHO. Sem implementação.**
-**Revisão 3** responde a: Atlas DEVOLVIDO (3 bloqueantes + 2 médias) · Vigil PASS COM CONDIÇÕES
-(CV-2b, CV-6b bloqueantes; CV-7, CV-8, CV-9) · Prism PASS.
-**Sem novo split** — tudo abaixo é concorrência e máquina de estados dentro da fronteira já aprovada.
+**Revisão 4** aplica a decisão de temporização do humano
+(`TRAY RECOVERY GLOBAL MONOTONIC DEADLINE = 1500 ms`) e regista o resultado dos gates CV-7 e CV-8,
+que foram **medidos** e passaram. Mantém tudo o que a revisão 3 fechou para Atlas, Vigil e Prism.
+**Sem novo split.** **Sem implementação — a review formal de arquitetura é o portão de temporização.**
 
 > **Conflito entre textos, resolvido à vista e não em silêncio.** O requisito §2 do humano manda **não
 > continuar a publicar `Available`** durante debounce/retries. As condições do Vigil, §3.3, dizem o
@@ -133,22 +134,67 @@ máximo mais um** episódio, ele próprio sujeito ao gate de B. **Não existe or
 broadcasts e o desenho não depende de nenhuma** — o coalescing torna a ordem irrelevante. O
 sinalizador pendente é por geração e é limpo no `Release`.
 
-## E — Deadline de recuperação: orçamento programado ≠ limite duro *(§6)*
+## E — `TRAY RECOVERY GLOBAL MONOTONIC DEADLINE` = **1500 ms** *(§6 · decisão do humano)*
 
-Distinção explícita, porque a revisão 2 confundiu as duas coisas:
+Distinção que a revisão 2 confundia, agora com o valor aprovado e fundamentado por medição:
 
-- **Orçamento programado de atrasos** = 250 ms + 1000 ms = **1250 ms**. É a soma dos `await`, e **não
-  é** um limite superior de nada, porque ignora o custo das chamadas síncronas ao shell.
-- **Deadline monotónico de recuperação** = o limite duro real. Capturado **uma vez** no início do
-  episódio com `TimeProvider.GetTimestamp()`, **nunca reiniciado**. Proposta: **2000 ms**.
+- **Orçamento programado de atrasos** = 250 ms + 1000 ms = **~1250 ms**. É apenas a soma dos `await`.
+  **Não é limite superior de nada**, porque ignora o custo das chamadas síncronas ao shell.
+- **Deadline monotónico global de recuperação** = **1500 ms**. É o limite duro real: ~1250 ms de
+  atrasos programados **+ ~250 ms de folga de execução e agendamento**. Capturado **uma vez** no
+  início do episódio com `TimeProvider.GetTimestamp()`.
+
+> **Os 250 ms de folga são decisão nossa, não garantia de plataforma do Windows.** O Windows não
+> promete tempo nenhum para o `Shell_NotifyIcon`. A folga foi dimensionada a partir do custo nativo
+> **medido** nos gates: `COLD NIM_ADD` ~10,06 ms · `STEADY` mediana ~3,16 / máx ~4,36 ms · `CHURN`
+> p95 ~4,44 / máx ~4,61 ms. O desenho anterior tinha 750 ms de margem — substancialmente
+> sobredimensionada face ao que as chamadas custam de facto.
+
+### Significado semântico — é uma decisão de segurança e ciclo de vida, não uma otimização
+
+Os 1500 ms **são uma decisão de segurança/ciclo de vida do ServerAlyzer**. Significam:
+
+```
+afordância positiva NÃO reestabelecida antes do deadline monotónico global
+  → a recuperação FALHA
+  → publicar Lost
+  → a S2 degrada para FOREGROUND → Definições > Segundo plano → InfoBar Warning
+  → semântica de saída verdadeira no resto da sessão
+```
+
+### O deadline NUNCA é estendido — quatro proibições explícitas
+
+**O deadline pertence a UM episódio de recuperação, é monotónico e não é reiniciável.** A aplicação
+**nunca** o pode estender por nenhuma destas razões:
+
+1. **um `NIM_ADD` ter tido sucesso** — um sucesso parcial dentro do episódio não compra tempo;
+2. **ter chegado outro `TaskbarCreated`** — mensagem nova não prolonga o episódio em curso;
+3. **o orçamento de retry (A) ter sido reposto** — repor A é sobre episódios **futuros**, nunca sobre
+   o tempo restante deste;
+4. **o debounce ter reiniciado** — o debounce coalesce mensagens, não desloca o relógio do episódio.
 
 **É imposto, não prometido:** antes de **cada tentativa** e antes de **cada atraso**, o episódio
-verifica o tempo restante; se não chegar para a operação seguinte, abandona sem a iniciar. O deadline
-também é o que limita publicamente o `Recovering` da secção B.
+verifica o tempo monotónico restante; se não chegar para a operação seguinte, **abandona sem a
+iniciar**. O deadline é também o que limita publicamente o intervalo `Recovering` da secção B — é ele
+que torna o "curto e estritamente limitado" um número verificável em vez de uma intenção.
 
-> Os 2000 ms são 1250 ms de atrasos mais folga para até três chamadas síncronas ao shell. **A folga é
-> provisória e depende da medição da CV-8** — se `NIM_ADD` puder bloquear materialmente, o número
-> muda, ou a chamada sai da thread de UI e a folga encolhe. **Não fixo o valor antes dessa medição.**
+### Os dois limites continuam independentes — não confundir
+
+O **deadline de recuperação (1500 ms)** e a **janela de frequência adversarial (orçamento B)** são
+coisas diferentes e não se tocam. O deadline limita *quanto tempo um episódio pode durar*; a janela
+limita *quantos episódios podem começar*. **Um sucesso pode afetar um orçamento futuro de retry de
+falhas (A), mas NÃO PODE apagar o histórico de frequência (B)** — e, como a secção C mostra, nem
+sequer tem forma de o comunicar.
+
+### Nota de desenho para quem fizer o QA de reinício real do Explorer
+
+Quando existir implementação com forma de produção, o QA real medirá se 1500 ms é operacionalmente
+adequado. **Se a recuperação real do Explorer exceder ocasionalmente os 1500 ms, isso NÃO justifica
+estender em silêncio a incerteza de `BACKGROUND`.** A avaliação correta começa por afinar o
+**calendário de retries** — por exemplo a distribuição dos atrasos dentro do mesmo orçamento —
+**preservando um contrato de recuperação estritamente limitado**. Alargar o deadline é a última
+opção, nunca a primeira, e nunca em silêncio: aumenta a janela em que a app monitoriza sem afordância
+de saída provada, que é exatamente o risco que esta sub-fatia existe para fechar.
 
 ## F — Geração terminal e ordenação do `Release` *(§3 · §4)*
 
@@ -198,19 +244,43 @@ sem chegar ao `RequestExit` sem clique real.
 
 **CV-2/CV-2b** — fechadas pela secção C, mais o **teste adversarial de sucesso-sempre** (secção I).
 
-**CV-7 — gate de medição do modelo de thread.** Medir `TaskbarCreated` num HWND **da thread de UI**
-**com** `WS_EX_TOOLWINDOW`, em headless. **Se o gate falhar** e a topologia passar a thread de pump
-dedicada + `TryEnqueue`, **a CV-1 é reavaliada nessa topologia** e o sinalizador de "em voo" deixa de
-estar protegido por afinidade de thread e passa a exigir sincronização explícita. **Não herdo a
-aprovação da CV-1 para uma topologia diferente daquela em que foi dada.**
+**CV-7 — gate de medição do modelo de thread: MEDIDO, PASSA.** `TaskbarCreated` (id `0xC073`) foi
+recebido num HWND **criado na thread de UI**, **com `WS_EX_TOOLWINDOW`**, top-level, sem dono, nunca
+mostrado, num processo empacotado **headless** (`MainWindowHandle = 0` durante toda a medição).
+**Consequência: a topologia da secção B mantém-se, e a CV-1 NÃO precisa de ser reavaliada noutra
+topologia** — o caminho de recurso (thread de pump dedicada + `TryEnqueue`) fica por usar, e o
+sinalizador de "em voo" continua protegido por afinidade de thread.
 
-**CV-8 — `Shell_NotifyIcon` síncrono na thread de UI.** Medição obrigatória antes de fechar o desenho:
-custo e pior caso de `NIM_ADD`/`NIM_DELETE` na thread de UI, incluindo com o shell ocupado (arranque,
-e logo após reinício do Explorer — **este último requer a autorização humana do checkpoint; até lá
-mede-se o que é mensurável sem reiniciar o Explorer**). Se o bloqueio for observável, a chamada nativa
-**sai da thread de UI**: executa numa thread de fundo e devolve só o `bool`, mantendo a `WndProc` onde
-estiver. **O desenho já está preparado para essa troca:** `INativeTrayRegistration` é o único ponto de
-contacto, e passar a sua implementação para background **não toca na máquina de estados**.
+> **Honestidade sobre o emissor:** o broadcast foi o `PostMessage(HWND_BROADCAST, …)` desta sessão,
+> **não o Explorer**. O que fica provado é a **entrega** nesta topologia, que era a metade em dúvida.
+> O `TaskbarCreated` originado pelo Explorer real continua `NOT_RUN` (item F da secção N).
+
+**CV-8 — `Shell_NotifyIcon` síncrono na thread de UI: MEDIDO, aceitável.** Custos na thread de UI:
+
+| Cenário | `NIM_ADD` | `NIM_DELETE` |
+|---|---|---|
+| COLD (1.ª chamada do processo) | **10,06 ms** | — |
+| STEADY (n=20) | mediana 3,16 · máx 4,36 ms | mediana 0,38 · máx 0,67 ms |
+| CHURN (n=100, sem pausa) | mediana 3,11 · p95 4,44 · máx **4,61 ms** | máx 0,74 ms |
+
+Limiar declarado: um frame a 60 Hz = **16,7 ms**. A pior chamada isolada (10,06 ms, fria) fica abaixo
+de um frame; em regime o máximo é 4,6 ms. **O redesenho condicional NÃO é acionado: a chamada nativa
+permanece na thread de UI.**
+
+> **Mas o limitador de frequência MANTÉM-SE, e a medição é a razão.** 100 ciclos add+delete
+> consumiram **≈372 ms** de thread de UI (~3,7 ms por ciclo). Churn sustentado **consome tempo
+> significativo da thread que desenha a aplicação**. É o debounce mais o orçamento B que tornam isto
+> inofensivo — com debounce de 250 ms o teto é ~4 episódios/s ≈ 15 ms/s (~1,5% da UI), e com B
+> (5 episódios/60 s) ≈ 0,03%. **O custo bruto por si só não seria seguro; são os limites do desenho
+> que o tornam seguro.**
+>
+> **Pior caso ainda por medir:** o shell a reiniciar. Exige a autorização de reinício do Explorer e
+> mantém-se `NOT_RUN`. O COLD de 10,06 ms é o pior observável sem essa autorização.
+
+**Nota sobre o `FindWindowW`.** Durante a medição, `FindWindowW` pelo nome de classe a partir de outro
+processo devolveu `0`, mas `EnumWindows` encontrou a janela sem dificuldade. **Isto não é — e não pode
+ser tratado como — propriedade de segurança.** Não determinei a causa, a obscuridade nunca foi o
+controlo, e o modelo de ameaça do ponto 7 da CV-1 mantém-se válido pela via da enumeração.
 
 **CV-9 — reentrância com flyout aberto.** Guarda `_flyoutOpen` na thread de UI: com o flyout aberto,
 **toda** `WM_CONTEXTMENU` adicional é descartada por default-deny — não empilha segundo flyout, não
@@ -272,19 +342,29 @@ FAIL**; o ícone obsoleto **não pode continuar interativo**; o lançamento segu
 um** ícone utilizável; sem duplicados; tray funcional após reinício; sem consola/WER.
 **Não se exige `NIM_DELETE` do processo morto.**
 
-## K / L / M — veredictos
+## K / L / M — veredictos, e o portão de temporização
 
-**K — Atlas: PENDENTE.** Pontos que lhe ponho: os números de A (3 / 250 / 1000) e de B (5 / 60 s); os
-2000 ms do deadline e a sua dependência da medição CV-8; a ordem das guardas em C e o trade-off de um
-reinício legítimo suprimido; a propriedade de geração em F/G.
+**Esta review formal É o portão de temporização.** O humano dispensou pré-review separada do Atlas.
 
-**L — Prism: PASS registado.** Ordem do menu **fechada e preservada exatamente**: Abrir o ServerAlyzer
-· Modo compacto · Atualizar todos · Definições · Sair do ServerAlyzer. A substituição do backend
-**não redesenha o menu**. Tema multi-raiz dentro do processo **em âmbito**; persistência entre
-arranques **fora de âmbito** (THEME-1 no backlog, não é critério de aceitação).
+**K — Atlas: PENDENTE.** As quatro decisões explícitas que lhe são pedidas:
+1. **1500 ms é internamente consistente com o calendário de retries?** (~1250 ms de atrasos + ~250 ms
+   de folga, contra o custo nativo medido em H.)
+2. **O deadline é mesmo monotónico e não reiniciável?** (as quatro proibições da secção E.)
+3. **A recuperação NÃO pode excedê-lo por via da lógica de agendamento/retry?** (verificação do tempo
+   restante antes de cada tentativa **e** de cada atraso.)
+4. **O `Release` continua a dominar a recuperação em CADA `await`?** (secções F e G.)
+Mais, herdado: os números de A (3 / 250 / 1000) e de B (5 / 60 s); a ordem das guardas em C e o
+trade-off de um reinício legítimo suprimido.
 
-**M — Vigil: PENDENTE.** Uma pergunta concreta: confirmar que publicar `Recovering` em vez de
-`Available` durante o re-registo **não** enfraquece a propriedade da CV-2 — o meu argumento é que não,
+**L — Prism: PASS registado; revê apenas as consequências visíveis da janela de recuperação mais
+curta.** Ordem do menu **fechada e preservada exatamente**: Abrir o ServerAlyzer · Modo compacto ·
+Atualizar todos · Definições · Sair do ServerAlyzer — a substituição do backend **não redesenha o
+menu**. Tema multi-raiz dentro do processo **em âmbito**; persistência entre arranques **fora de
+âmbito** (THEME-1 no backlog, não é critério de aceitação).
+
+**M — Vigil: PENDENTE.** Duas coisas: (i) revalidar o **caso adversarial de sucesso-sempre** contra o
+limitador de frequência independente (mutação 1 da secção I); (ii) confirmar que publicar `Recovering`
+em vez de `Available` durante o re-registo **não** enfraquece a CV-2 — o meu argumento é que não,
 porque quem degrada a S2 é `Lost` e `Recovering` não degrada nada.
 
 ## N — `NOT_RUN` restantes (QA de plataforma real)
@@ -303,8 +383,9 @@ porque quem degrada a S2 é `Lost` e `Recovering` não degrada nada.
 | J | degradação por falha de registo forçada | `NOT_RUN` |
 | K | sem consola / sem WER | `NOT_RUN` |
 | L | `FORCED-TERMINATION TRAY CLEANUP` (janela de 120 s da secção J) | `NOT_RUN` |
-| **M** | **CV-7** — `TaskbarCreated` em HWND da thread de UI com `WS_EX_TOOLWINDOW`, headless | `NOT_RUN` — **gate de desenho** |
-| **N** | **CV-8** — custo/pior caso de `NIM_ADD`/`NIM_DELETE` na thread de UI | `NOT_RUN` — **gate de desenho** |
+| **M** | **CV-7** — `TaskbarCreated` em HWND da thread de UI com `WS_EX_TOOLWINDOW`, headless | **MEDIDO · PASSA** (emissor sintético; ver H) |
+| **N** | **CV-8** — custo de `NIM_ADD`/`NIM_DELETE` na thread de UI | **MEDIDO · aceitável** (ver H) |
+| O | **CV-8 pior caso com o shell a reiniciar** | `NOT_RUN` — **autorização humana** |
 
-**M e N são gates do desenho, não da entrega:** condicionam a topologia de thread e o número do
-deadline. **O Explorer não é reiniciado nesta volta.**
+**M e N eram gates do desenho e estão fechados por medição** — fixaram a topologia de thread e
+fundamentaram os 1500 ms. **Tudo o resto continua `NOT_RUN`, e o Explorer não é reiniciado.**
