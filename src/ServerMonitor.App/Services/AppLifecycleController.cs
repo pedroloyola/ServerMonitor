@@ -119,7 +119,17 @@ public sealed class AppLifecycleController : IAppLifecycleController
 
         try
         {
-            var exitSequence = _exitSequenceFactory();
+            // Even building the sequence must not be able to throw at the caller: RequestExit is invoked
+            // from a window event handler and from the tray, and an exception there would both surface as
+            // a crash and skip the steps. A sequence that cannot be built means an exit with no cleanup,
+            // which is still an exit.
+            IExitSequence? exitSequence = null;
+            RunStep("BuildExitSequence", () => exitSequence = _exitSequenceFactory());
+            if (exitSequence is null)
+            {
+                return;
+            }
+
             RunStep(nameof(IExitSequence.StopAcceptingForegroundWork), exitSequence.StopAcceptingForegroundWork);
             RunStep(nameof(IExitSequence.RemoveTrayIcon), exitSequence.RemoveTrayIcon);
             RunStep(nameof(IExitSequence.HideUserInterface), exitSequence.HideUserInterface);

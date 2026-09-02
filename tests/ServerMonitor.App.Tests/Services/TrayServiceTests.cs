@@ -135,6 +135,104 @@ public sealed class TrayServiceTests
         }
     }
 
+    // ---------------------------------------------------------------- M13 S2 §K: the only way out
+
+    /// <summary>
+    /// Vigil C2. The icon used to be fatal: a failure rethrew out of StartAsync and killed the app. In
+    /// headless that is a process with no monitoring at all; continuing silently would be a process the
+    /// user cannot stop. Neither is acceptable, so startup survives and the app degrades instead.
+    /// </summary>
+    [Fact]
+    public async Task A_failing_tray_icon_does_not_abort_startup()
+    {
+        var harness = new Harness();
+        harness.Icon.ThrowOnStart = true;
+
+        var thrown = await Record.ExceptionAsync(() => harness.Service.StartAsync(default));
+
+        Assert.Null(thrown);
+    }
+
+    [Fact]
+    public async Task A_failing_tray_icon_is_retried_before_giving_up()
+    {
+        var harness = new Harness(maxIconAttempts: 3);
+        harness.Icon.ThrowOnStart = true;
+
+        var start = harness.Service.StartAsync(default);
+        // The retry delay is on the injected clock, so the wait is deterministic rather than timed.
+        while (!start.IsCompleted)
+        {
+            harness.Clock.Advance(TimeSpan.FromSeconds(1));
+            await Task.Yield();
+        }
+
+        await start;
+        Assert.Equal(3, harness.Icon.StartAttempts);
+    }
+
+    /// <summary>
+    /// With no icon and a window available, the app surfaces the window and closing it becomes a true
+    /// exit for the session — there is always at least one way out.
+    /// </summary>
+    [Fact]
+    public async Task Without_an_icon_the_app_falls_back_to_a_visible_window()
+    {
+        var harness = new Harness();
+        harness.Icon.ThrowOnStart = true;
+
+        await harness.Service.StartAsync(default);
+
+        Assert.True(harness.Service.ExitAffordanceDegraded);
+        // No icon means BACKGROUND is no longer a legitimate state: the close button must exit instead.
+        Assert.False(harness.Service.CanEnterBackground);
+        Assert.Equal(1, harness.Window.RestoreCount);
+        Assert.Equal(0, harness.Lifecycle.ExitRequests);
+    }
+
+    /// <summary>
+    /// With no icon and no window either — a headless process whose UI cannot be materialized — the app
+    /// exits rather than monitoring where the user has no way to stop it (the A12 zombie by another route).
+    /// </summary>
+    [Fact]
+    public async Task Without_an_icon_and_without_a_window_the_app_exits()
+    {
+        var harness = new Harness();
+        harness.Icon.ThrowOnStart = true;
+        harness.Window.CanMaterialize = false;
+
+        await harness.Service.StartAsync(default);
+
+        Assert.Equal(1, harness.Lifecycle.ExitRequests);
+        Assert.Equal(ExitReason.NoExitAffordance, Assert.Single(harness.Lifecycle.ExitReasons));
+    }
+
+    [Fact]
+    public async Task A_healthy_icon_is_a_usable_exit_affordance()
+    {
+        var harness = new Harness();
+
+        await harness.Service.StartAsync(default);
+
+        Assert.True(harness.Service.CanEnterBackground);
+        Assert.False(harness.Service.ExitAffordanceDegraded);
+    }
+
+    /// <summary>Vigil C3: the icon is removed by the committed exit, and only then.</summary>
+    [Fact]
+    public async Task The_icon_is_removed_only_by_the_committed_exit()
+    {
+        var harness = new Harness();
+        await harness.Service.StartAsync(default);
+        Assert.Equal(0, harness.Icon.StopCount);
+
+        harness.Service.RemoveIconForExit();
+        harness.Service.RemoveIconForExit();
+
+        Assert.Equal(1, harness.Icon.StopCount);
+        Assert.False(harness.Service.CanEnterBackground);
+    }
+
     private sealed class FakeTrayIcon : ITrayIconAdapter
     {
         public event EventHandler? OpenRequested;
@@ -144,10 +242,25 @@ public sealed class TrayServiceTests
         public event EventHandler? ExitRequested;
 
         public int StartCount { get; private set; }
+        public int StartAttempts { get; private set; }
         public int SynchronousStopCount { get; private set; }
         public int AsyncStopCount { get; private set; }
 
-        public void Start() => StartCount++;
+        /// <summary>Shell_NotifyIcon failing, which is what §K is about.</summary>
+        public bool ThrowOnStart { get; set; }
+
+        public int StopCount => SynchronousStopCount;
+
+        public void Start()
+        {
+            StartAttempts++;
+            if (ThrowOnStart)
+            {
+                throw new InvalidOperationException("the notification area is unavailable");
+            }
+
+            StartCount++;
+        }
         public void StopSynchronously() => SynchronousStopCount++;
         public Task StopAsync(CancellationToken cancellationToken = default)
         {
@@ -167,6 +280,9 @@ public sealed class TrayServiceTests
         public bool IsAttached => true;
         public int HideCount { get; private set; }
         public int RestoreCount { get; private set; }
+
+        /// <summary>False models a headless process whose window cannot be created at all.</summary>
+        public bool CanMaterialize { get; set; } = true;
         public int SettingsCount { get; private set; }
         public int CloseCount { get; private set; }
         public int BeginShutdownCount { get; private set; }
@@ -175,7 +291,7 @@ public sealed class TrayServiceTests
 
         public void Attach(Window window) { }
 
-        public bool IsMaterialized => true;
+        public bool IsMaterialized => CanMaterialize && RestoreCount > 0;
 
         public void AttachWindowFactory(Func<Window> factory) { }
 

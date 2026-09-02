@@ -47,10 +47,15 @@ public sealed class TrayService(
     /// </summary>
     public bool ExitAffordanceDegraded { get; private set; }
 
-    /// <summary>True while there is a usable way for the user to reach a true exit.</summary>
-    public bool HasExitAffordance
+    /// <summary>
+    /// True only while the notification-area icon is up. It is the precondition for BACKGROUND: hiding
+    /// the window is only safe while the icon can bring it back and offer "Sair do ServerAlyzer". When it
+    /// is false the close button means a true exit instead (§K) — the app is never left running with no
+    /// way for the user to stop it.
+    /// </summary>
+    public bool CanEnterBackground
     {
-        get { lock (_sync) { return _started || ExitAffordanceDegraded; } }
+        get { lock (_sync) { return _started; } }
     }
 
     public async Task StartAsync(CancellationToken cancellationToken)

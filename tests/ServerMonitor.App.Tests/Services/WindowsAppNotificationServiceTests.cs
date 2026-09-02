@@ -134,6 +134,122 @@ public sealed class WindowsAppNotificationServiceTests : IDisposable
         Assert.Equal(1, platform.UnregisterCount);
     }
 
+    // ---------------------------------------------------------------- M13 S2: typed activation routing
+
+    /// <summary>
+    /// THE rule the human called out: the background notice must not reopen the Dashboard by accident.
+    /// Before S2 it would have, because the platform adapter discarded the activation arguments and the
+    /// service restored the window for ANY click.
+    /// </summary>
+    [Fact]
+    public async Task The_background_notice_opens_settings_and_never_the_dashboard()
+    {
+        var platform = new FakePlatform();
+        var window = new FakeWindowController();
+        var service = Create(platform, window);
+        await service.StartAsync(default);
+
+        platform.RaiseInvoked(NotificationActivationContract.ForBackgroundCloseNotice());
+
+        Assert.Equal(1, window.OpenBackgroundSettingsCount);
+        Assert.Equal(0, window.RestoreCount);
+    }
+
+    [Fact]
+    public async Task A_health_notification_still_opens_the_dashboard_but_explicitly()
+    {
+        var platform = new FakePlatform();
+        var window = new FakeWindowController();
+        var service = Create(platform, window);
+        await service.StartAsync(default);
+
+        platform.RaiseInvoked(NotificationActivationContract.ForServerHealth());
+
+        Assert.Equal(1, window.RestoreCount);
+        Assert.Equal(0, window.OpenBackgroundSettingsCount);
+    }
+
+    /// <summary>Fail closed: an unrecognized payload does nothing, rather than defaulting to a restore.</summary>
+    [Theory]
+    [InlineData(null)]
+    [InlineData("empty")]
+    [InlineData("unknown-kind")]
+    [InlineData("mismatched")]
+    public async Task An_unrecognized_activation_does_nothing(string? shape)
+    {
+        var platform = new FakePlatform();
+        var window = new FakeWindowController();
+        var service = Create(platform, window);
+        await service.StartAsync(default);
+
+        var arguments = shape switch
+        {
+            "empty" => new Dictionary<string, string>(),
+            "unknown-kind" => new Dictionary<string, string> { ["kind"] = "Nope", ["action"] = "OpenDashboard" },
+            "mismatched" => new Dictionary<string, string>
+            {
+                ["kind"] = "BackgroundCloseNotice",
+                ["action"] = "OpenDashboard"
+            },
+            _ => null
+        };
+
+        platform.RaiseInvoked(arguments);
+
+        Assert.Equal(0, window.RestoreCount);
+        Assert.Equal(0, window.OpenBackgroundSettingsCount);
+    }
+
+    /// <summary>EXIT WINS: an activation during the drain materializes nothing.</summary>
+    [Fact]
+    public async Task An_activation_while_exiting_is_discarded()
+    {
+        var platform = new FakePlatform();
+        var window = new FakeWindowController();
+        var service = Create(
+            platform, window, new FakeAppLifecycleController(AppLifecycleState.Exiting));
+        await service.StartAsync(default);
+
+        platform.RaiseInvoked(NotificationActivationContract.ForServerHealth());
+        platform.RaiseInvoked(NotificationActivationContract.ForBackgroundCloseNotice());
+
+        Assert.Equal(0, window.RestoreCount);
+        Assert.Equal(0, window.OpenBackgroundSettingsCount);
+    }
+
+    /// <summary>
+    /// The notice is short-lived and does not persist in the Notification Centre, unlike a health alert
+    /// (Prism): it explains a transition that has already happened.
+    /// </summary>
+    [Fact]
+    public async Task The_notice_is_short_lived_and_health_alerts_are_not()
+    {
+        var platform = new FakePlatform();
+        var service = Create(platform, new FakeWindowController());
+        await service.StartAsync(default);
+
+        service.ShowBackgroundNotice("title", "body");
+        Assert.True(platform.LastExpiresOnReboot);
+        Assert.Equal(NotificationActivationContract.ForBackgroundCloseNotice(), platform.LastArguments);
+
+        await service.ShowAsync(Notification());
+        Assert.False(platform.LastExpiresOnReboot);
+        Assert.Equal(NotificationActivationContract.ForServerHealth(), platform.LastArguments);
+    }
+
+    [Fact]
+    public async Task The_notice_is_not_shown_after_shutdown_begins()
+    {
+        var platform = new FakePlatform();
+        var service = Create(platform, new FakeWindowController());
+        await service.StartAsync(default);
+        service.BeginShutdown();
+
+        service.ShowBackgroundNotice("title", "body");
+
+        Assert.Equal(0, platform.ShowCount);
+    }
+
     private WindowsAppNotificationService Create(
         IWindowsAppNotificationPlatform platform,
         IApplicationWindowController window,

@@ -15,6 +15,7 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
     private readonly IServerService _serverService;
     private readonly IServerDiscoveryService _discoveryService;
     private readonly INotificationSettingsService _notificationSettingsService;
+    private readonly IBackgroundMonitoringSettingsService _backgroundSettingsService;
     private readonly IHistoryMaintenanceService _historyMaintenance;
     private readonly ILogger<SettingsViewModel> _logger;
     private int _selectedLanguageIndex;
@@ -39,6 +40,7 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
         IServerService serverService,
         IServerDiscoveryService discoveryService,
         INotificationSettingsService notificationSettingsService,
+        IBackgroundMonitoringSettingsService backgroundSettingsService,
         IHistoryMaintenanceService historyMaintenance,
         IAppVersionProvider appVersionProvider,
         ILogger<SettingsViewModel> logger)
@@ -49,6 +51,8 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
         _serverService = serverService;
         _discoveryService = discoveryService;
         _notificationSettingsService = notificationSettingsService;
+        _backgroundSettingsService = backgroundSettingsService;
+        _backgroundMonitoringEnabled = backgroundSettingsService.BackgroundMonitoringEnabled;
         _historyMaintenance = historyMaintenance;
         _logger = logger;
         _serverService.ServersChanged += OnServersChanged;
@@ -144,6 +148,42 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
     {
         get => _isResetIgnoredErrorOpen;
         set => SetProperty(ref _isResetIgnoredErrorOpen, value);
+    }
+
+    private bool _backgroundMonitoringEnabled;
+
+    /// <summary>
+    /// Whether closing the window keeps ServerAlyzer monitoring in the background (M13 S2). This is the
+    /// durable half of the explanation: the one-time toast may never arrive — notifications can be off —
+    /// so this section, its description and its HelpText are what the user can always come back to.
+    /// </summary>
+    public bool BackgroundMonitoringEnabled
+    {
+        get => _backgroundMonitoringEnabled;
+        set
+        {
+            if (_backgroundMonitoringEnabled == value)
+            {
+                return;
+            }
+
+            try
+            {
+                _backgroundSettingsService.SetBackgroundMonitoringEnabled(value);
+                SetProperty(
+                    ref _backgroundMonitoringEnabled,
+                    _backgroundSettingsService.BackgroundMonitoringEnabled);
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(
+                    "Could not persist the background setting. Exception type: {ExceptionType}.",
+                    exception.GetType().Name);
+                // The service commits its property only after the atomic replace, so re-notify to make
+                // the toggle visibly return to the last committed value.
+                OnPropertyChanged(nameof(BackgroundMonitoringEnabled));
+            }
+        }
     }
 
     /// <summary>Global switch for all server-health notifications.</summary>

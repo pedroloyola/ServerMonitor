@@ -176,4 +176,94 @@ public sealed class ActivationDispatchTests
         Assert.Throws<ArgumentNullException>(() => new ActivationDispatch(null!, () => { }));
         Assert.Throws<ArgumentNullException>(() => new ActivationDispatch(_ => { }, null!));
     }
+
+    // ---------------------------------------------------------------- M13 S2: origin and EXIT WINS
+
+    /// <summary>
+    /// Atlas MÉDIA-3, the complete matrix (M13 S2 §H.2). Every row is a real combination the app can
+    /// receive, and the column that matters is how many times the window is surfaced.
+    /// </summary>
+    [Theory]
+    // a deep link always executes, and the intent path is what surfaces the window (exactly one restore)
+    [InlineData("dashboard", ActivationOrigin.UserActivation, 1, 1)]
+    [InlineData("server", ActivationOrigin.UserActivation, 1, 1)]
+    [InlineData("dashboard", ActivationOrigin.BackgroundLaunch, 1, 1)]
+    // a plain launch by a person surfaces the window; there is no intent path to do it
+    [InlineData(null, ActivationOrigin.UserActivation, 0, 1)]
+    // a second --background launch must surface NOTHING: it is not a request to look at the app
+    [InlineData(null, ActivationOrigin.BackgroundLaunch, 0, 0)]
+    public void The_activation_matrix_surfaces_the_window_exactly_when_asked(
+        string? intentKind, ActivationOrigin origin, int expectedExecutions, int expectedRestores)
+    {
+        var h = new Harness();
+        var intent = intentKind switch
+        {
+            "dashboard" => ActivationIntent.Dashboard,
+            "server" => Server(),
+            _ => null
+        };
+
+        h.Dispatch.Dispatch(intent, origin);
+
+        Assert.Equal(expectedExecutions, h.Executed.Count);
+        Assert.Equal(expectedRestores, h.Restores.Total);
+    }
+
+    /// <summary>
+    /// A background launch that somehow also carries a protocol intent: the explicit user action wins.
+    /// Decided here rather than left ambiguous.
+    /// </summary>
+    [Fact]
+    public void A_background_launch_carrying_a_deep_link_still_executes_the_deep_link()
+    {
+        var h = new Harness();
+
+        h.Dispatch.Dispatch(ActivationIntent.Dashboard, ActivationOrigin.BackgroundLaunch);
+
+        Assert.Single(h.Executed);
+        Assert.Equal(1, h.Restores.Total);
+    }
+
+    /// <summary>EXIT WINS: nothing at all is served once the process has committed to exiting.</summary>
+    [Theory]
+    [InlineData("dashboard", ActivationOrigin.UserActivation)]
+    [InlineData("server", ActivationOrigin.UserActivation)]
+    [InlineData(null, ActivationOrigin.UserActivation)]
+    [InlineData(null, ActivationOrigin.BackgroundLaunch)]
+    public void While_exiting_every_activation_is_discarded(string? intentKind, ActivationOrigin origin)
+    {
+        var exiting = true;
+        var restores = new RestoreCounter();
+        var executed = new List<ActivationIntent>();
+        var router = new ActivationRouter(intent =>
+        {
+            restores.ByIntent();
+            executed.Add(intent);
+        });
+        var pending = new PendingActivation();
+        pending.Attach(router.Route);
+        router.MarkReady();
+        var dispatch = new ActivationDispatch(
+            intent => pending.Deliver(intent),
+            restores.ByRedirect,
+            () => exiting);
+
+        var intent = intentKind switch
+        {
+            "dashboard" => ActivationIntent.Dashboard,
+            "server" => Server(),
+            _ => (ActivationIntent?)null
+        };
+
+        dispatch.Dispatch(intent, origin);
+
+        Assert.Empty(executed);
+        Assert.Equal(0, restores.Total);
+
+        // And once the exit is not in progress, the same activation is served normally.
+        exiting = false;
+        dispatch.Dispatch(intent, origin);
+        var expectedRestores = intent is not null || origin == ActivationOrigin.UserActivation ? 1 : 0;
+        Assert.Equal(expectedRestores, restores.Total);
+    }
 }

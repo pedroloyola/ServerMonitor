@@ -1,4 +1,4 @@
-<Page
+﻿<Page
     x:Class="ServerMonitor.App.Views.SettingsPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -91,6 +91,31 @@
                             IsClosable="True"
                             IsOpen="{Binding IsRestartNoticeOpen, Mode=TwoWay}"
                             Severity="Informational" />
+                    </StackPanel>
+
+                    <Border Height="1" Background="{ThemeResource GlassBorderBrush}" />
+
+                    <!-- Background Section. The durable explanation of the background lifecycle: the
+                         one-time toast is a courtesy that may never arrive (notifications can be off),
+                         so this is what the user can always come back to (M13 S2 D.1). -->
+                    <StackPanel x:Name="BackgroundSection" Spacing="10">
+                        <StackPanel Spacing="2">
+                            <TextBlock
+                                x:Uid="SettingsBackgroundTitle"
+                                AutomationProperties.HeadingLevel="Level2"
+                                Style="{StaticResource SectionTitleTextStyle}" />
+                            <TextBlock
+                                x:Uid="SettingsBackgroundDescription"
+                                FontSize="12"
+                                Foreground="{ThemeResource TextSecondaryBrush}"
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+
+                        <ToggleSwitch
+                            x:Uid="SettingsBackgroundToggle"
+                            HorizontalAlignment="Left"
+                            MinHeight="36"
+                            IsOn="{Binding BackgroundMonitoringEnabled, Mode=TwoWay}" />
                     </StackPanel>
 
                     <Border Height="1" Background="{ThemeResource GlassBorderBrush}" />

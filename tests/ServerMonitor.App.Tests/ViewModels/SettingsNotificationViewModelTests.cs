@@ -67,13 +67,16 @@ public sealed class SettingsNotificationViewModelTests
         Assert.Equal(0, settings.SubscriberCount);
     }
 
-    private static SettingsViewModel Create(INotificationSettingsService settings) => new(
+    private static SettingsViewModel Create(
+        INotificationSettingsService settings,
+        IBackgroundMonitoringSettingsService? background = null) => new(
         new FakeThemeService(),
         new FakeLocalizationService(),
         new FakeNavigationService(),
         new FakeServerService(),
         new EmptyDiscoveryService(),
         settings,
+        background ?? new FakeBackgroundMonitoringSettingsService(),
         new NullHistoryMaintenanceService(),
         new AppVersionProvider(),
         NullLogger<SettingsViewModel>.Instance);

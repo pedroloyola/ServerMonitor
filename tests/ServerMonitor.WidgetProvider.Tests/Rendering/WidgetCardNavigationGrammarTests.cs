@@ -140,20 +140,42 @@ public sealed class WidgetCardNavigationGrammarTests
     private static string[] Keys(JsonElement element) =>
         element.EnumerateObject().Select(p => p.Name).OrderBy(n => n, StringComparer.Ordinal).ToArray();
 
-    public static TheoryData<WidgetSizeHint> AllSizes => new()
+    /// <summary>
+    /// Derived from the enum, not hand-listed (Vigil): a new <see cref="WidgetSizeHint"/> is covered the
+    /// moment it exists, instead of silently falling outside the suite.
+    /// </summary>
+    public static TheoryData<WidgetSizeHint> AllSizes
     {
-        WidgetSizeHint.Small, WidgetSizeHint.Medium, WidgetSizeHint.Large, WidgetSizeHint.Unknown
-    };
+        get
+        {
+            var data = new TheoryData<WidgetSizeHint>();
+            foreach (var size in Enum.GetValues<WidgetSizeHint>())
+            {
+                data.Add(size);
+            }
+
+            return data;
+        }
+    }
 
     /// <summary>Every state and size the card can be rendered in, with the actions each must produce.</summary>
-    public static TheoryData<WidgetSizeHint, int> SizesAndServerActionCounts => new()
+    /// <summary>
+    /// Also derived from the enum, so a new size cannot be added without deciding how many server actions
+    /// it emits: the row count comes from the production policy itself.
+    /// </summary>
+    public static TheoryData<WidgetSizeHint, int> SizesAndServerActionCounts
     {
-        // Small and Unknown show no server rows (MaxRowsFor), so only the card-level dashboard action.
-        { WidgetSizeHint.Small, 0 },
-        { WidgetSizeHint.Unknown, 0 },
-        { WidgetSizeHint.Medium, 2 },
-        { WidgetSizeHint.Large, 3 }
-    };
+        get
+        {
+            var data = new TheoryData<WidgetSizeHint, int>();
+            foreach (var size in Enum.GetValues<WidgetSizeHint>())
+            {
+                data.Add(size, Math.Min(WidgetViewModelBuilder.MaxRowsFor(size), 3));
+            }
+
+            return data;
+        }
+    }
 
     // ---------------------------------------------------------------- no OpenUrl, anywhere, ever
 
@@ -250,6 +272,10 @@ public sealed class WidgetCardNavigationGrammarTests
     public void No_snapshot_text_reaches_any_action(WidgetSizeHint size)
     {
         var actions = ActionsOf(Available(HostileServer(Guid.NewGuid()), HostileServer(Guid.NewGuid())), size);
+
+        // Positive precondition (Vigil): without it this passes vacuously on a card that emits no
+        // actions at all, which is exactly the failure mode this suite replaced.
+        Assert.NotEmpty(actions.All);
 
         foreach (var action in actions.All)
         {

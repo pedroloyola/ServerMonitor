@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <root>
   <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
     <xsd:element name="root" msdata:IsDataSet="true"><xsd:complexType><xsd:choice maxOccurs="unbounded"><xsd:element name="data"><xsd:complexType><xsd:sequence><xsd:element name="value" type="xsd:string" minOccurs="0" /></xsd:sequence><xsd:attribute name="name" use="required" type="xsd:string" /><xsd:attribute name="type" type="xsd:string" /><xsd:attribute name="mimetype" type="xsd:string" /><xsd:attribute ref="xml:space" /></xsd:complexType></xsd:element><xsd:element name="resheader"><xsd:complexType><xsd:sequence><xsd:element name="value" type="xsd:string" minOccurs="0" /></xsd:sequence><xsd:attribute name="name" use="required" type="xsd:string" /></xsd:complexType></xsd:element></xsd:choice></xsd:complexType></xsd:element>
@@ -193,7 +193,7 @@
   <data name="TrayOpenMenuItem" xml:space="preserve"><value>Open ServerAlyzer</value></data>
   <data name="TrayRefreshAllMenuItem" xml:space="preserve"><value>Refresh all</value></data>
   <data name="TraySettingsMenuItem" xml:space="preserve"><value>Settings</value></data>
-  <data name="TrayExitMenuItem" xml:space="preserve"><value>Exit</value></data>
+  <data name="TrayExitMenuItem" xml:space="preserve"><value>Exit ServerAlyzer</value></data>
   <data name="NotificationServerFallbackName" xml:space="preserve"><value>Server</value></data>
   <data name="NotificationWarningTitle" xml:space="preserve"><value>Server needs attention</value></data>
   <data name="NotificationWarningBodyFormat" xml:space="preserve"><value>{0} is in a warning state.</value></data>
@@ -349,4 +349,12 @@
   <data name="WorkloadSummaryFailedFormat" xml:space="preserve"><value>{0} failing</value></data>
   <data name="WorkloadSummaryWarningFormat" xml:space="preserve"><value>{0} starting</value></data>
   <data name="WorkloadSummaryStoppedFormat" xml:space="preserve"><value>{0} stopped</value></data>
+  <data name="SettingsBackgroundTitle" xml:space="preserve"><value>Background</value></data>
+  <data name="SettingsBackgroundDescription" xml:space="preserve"><value>Closing the window does not quit ServerAlyzer while this is on: monitoring keeps running and the notification-area icon stays available. To quit for real, use "Exit ServerAlyzer" on that icon. Windows may keep the icon under the hidden icons arrow.</value></data>
+  <data name="SettingsBackgroundToggle.Header" xml:space="preserve"><value>Keep running in the background when the window is closed</value></data>
+  <data name="SettingsBackgroundToggle.OnContent" xml:space="preserve"><value>On</value></data>
+  <data name="SettingsBackgroundToggle.OffContent" xml:space="preserve"><value>Off</value></data>
+  <data name="SettingsBackgroundToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.HelpText" xml:space="preserve"><value>When this is on, closing the window does not quit ServerAlyzer: monitoring keeps running and the notification-area icon stays available. To quit for real, use "Exit ServerAlyzer" on that icon. Windows may keep the icon under the hidden icons arrow.</value></data>
+  <data name="BackgroundNoticeTitle" xml:space="preserve"><value>ServerAlyzer is still running</value></data>
+  <data name="BackgroundNoticeBody" xml:space="preserve"><value>Monitoring continues in the background. Use the notification-area icon to open it again or to exit; Windows may keep that icon under the hidden icons arrow.</value></data>
 </root>
