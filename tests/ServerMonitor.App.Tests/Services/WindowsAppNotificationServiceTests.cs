@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.UI.Xaml;
 using Microsoft.Windows.AppNotifications;
 using ServerMonitor.App.Services;
+using ServerMonitor.App.Tests.Fakes;
 using ServerMonitor.Core.Alerts;
 
 namespace ServerMonitor.App.Tests.Services;
@@ -135,9 +136,11 @@ public sealed class WindowsAppNotificationServiceTests : IDisposable
 
     private WindowsAppNotificationService Create(
         IWindowsAppNotificationPlatform platform,
-        IApplicationWindowController window) => new(
+        IApplicationWindowController window,
+        IAppLifecycleController? lifecycle = null) => new(
             platform,
             window,
+            lifecycle ?? new FakeAppLifecycleController(),
             NullLogger<WindowsAppNotificationService>.Instance,
             _iconPath);
 
@@ -157,9 +160,9 @@ public sealed class WindowsAppNotificationServiceTests : IDisposable
 
     private sealed class FakePlatform : IWindowsAppNotificationPlatform
     {
-        private EventHandler? _invoked;
+        private EventHandler<NotificationActivationEventArgs>? _invoked;
 
-        public event EventHandler? Invoked
+        public event EventHandler<NotificationActivationEventArgs>? Invoked
         {
             add { _invoked += value; }
             remove { _invoked -= value; }
@@ -188,14 +191,29 @@ public sealed class WindowsAppNotificationServiceTests : IDisposable
 
         public void Unregister() => UnregisterCount++;
 
-        public void Show(string title, string body)
+        public IReadOnlyDictionary<string, string>? LastArguments { get; private set; }
+
+        public bool LastExpiresOnReboot { get; private set; }
+
+        public void Show(
+            string title,
+            string body,
+            IReadOnlyDictionary<string, string> arguments,
+            bool expiresOnReboot)
         {
             ShowCount++;
             Title = title;
             Body = body;
+            LastArguments = arguments;
+            LastExpiresOnReboot = expiresOnReboot;
         }
 
-        public void RaiseInvoked() => _invoked?.Invoke(this, EventArgs.Empty);
+        /// <summary>Raises an activation carrying the health contract, which is what these tests exercise.</summary>
+        public void RaiseInvoked() =>
+            RaiseInvoked(NotificationActivationContract.ForServerHealth());
+
+        public void RaiseInvoked(IReadOnlyDictionary<string, string>? arguments) =>
+            _invoked?.Invoke(this, new NotificationActivationEventArgs(arguments));
     }
 
     private sealed class FakeWindowController : IApplicationWindowController
@@ -204,6 +222,18 @@ public sealed class WindowsAppNotificationServiceTests : IDisposable
         public int RestoreCount { get; private set; }
 
         public void Attach(Window window) { }
+
+        public bool IsMaterialized => true;
+
+        public void AttachWindowFactory(Func<Window> factory) { }
+
+        public void HideToBackground() => HideToBackgroundCount++;
+
+        public int HideToBackgroundCount { get; private set; }
+
+        public void OpenBackgroundSettings() => OpenBackgroundSettingsCount++;
+
+        public int OpenBackgroundSettingsCount { get; private set; }
         public void HideForMinimize() { }
         public void RestoreAndActivate() => RestoreCount++;
         public void OpenSettings() { }

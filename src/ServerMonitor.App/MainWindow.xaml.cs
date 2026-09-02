@@ -13,7 +13,7 @@ namespace ServerMonitor.App;
 public sealed partial class MainWindow : Window
 {
     private readonly INavigationService _navigationService;
-    private readonly AppShutdownCoordinator _shutdownCoordinator;
+    private readonly WindowCloseCoordinator _closeCoordinator;
     private readonly IApplicationWindowController _windowController;
     private readonly AppWindowPlacementAdapter _placementAdapter;
     private readonly IWindowModeCoordinator _modeCoordinator;
@@ -37,7 +37,7 @@ public sealed partial class MainWindow : Window
         WindowModeViewModel windowModeViewModel,
         DashboardViewModel dashboardViewModel,
         TrayService trayService,
-        AppShutdownCoordinator shutdownCoordinator,
+        WindowCloseCoordinator closeCoordinator,
         ILogger<MainWindow> logger)
     {
         InitializeComponent();
@@ -47,7 +47,7 @@ public sealed partial class MainWindow : Window
         _modeCoordinator = modeCoordinator;
         _dashboardViewModel = dashboardViewModel;
         _trayService = trayService;
-        _shutdownCoordinator = shutdownCoordinator;
+        _closeCoordinator = closeCoordinator;
         _logger = logger;
         Title = localizationService.GetString("AppWindowTitle");
 
@@ -86,6 +86,7 @@ public sealed partial class MainWindow : Window
         AppWindow.TitleBar.ButtonBackgroundColor = Colors.Transparent;
         AppWindow.TitleBar.ButtonInactiveBackgroundColor = Colors.Transparent;
         RootLayout.ActualThemeChanged += OnActualThemeChanged;
+        AppWindow.Closing += OnAppWindowClosing;
         Closed += OnWindowClosed;
         UpdateCaptionButtonColors();
 
@@ -259,11 +260,34 @@ public sealed partial class MainWindow : Window
         _modeCoordinator.PersistCurrentBounds();
     }
 
+    /// <summary>
+    /// The close button and Alt-F4 (M13 S2 §D). The window is never destroyed by the platform's own
+    /// decision: the coordinator either cancels the close and hides the Dashboard (background monitoring
+    /// on), or cancels it and routes into the one authoritative exit. The only close allowed through is
+    /// the one <c>Application.Exit()</c> performs itself while already exiting.
+    /// </summary>
+    private void OnAppWindowClosing(AppWindow sender, AppWindowClosingEventArgs args)
+    {
+        try
+        {
+            args.Cancel = _closeCoordinator.HandleCloseRequest();
+        }
+        catch (Exception exception)
+        {
+            // A failure here must not trap the user in a window that cannot be closed.
+            _logger.LogError(exception, "The window close decision failed; allowing the close.");
+            args.Cancel = false;
+        }
+    }
+
+    /// <summary>
+    /// Local window cleanup ONLY (M13 S2 §E). It used to stop the monitoring host from here, which made a
+    /// window event define process shutdown semantics; that now belongs exclusively to
+    /// <see cref="IAppLifecycleController.RequestExit"/>, and this handler only ever runs as a
+    /// CONSEQUENCE of it.
+    /// </summary>
     private void OnWindowClosed(object sender, WindowEventArgs args)
     {
-        // WinUI's Closed event is synchronous. Persist the final placement, then remove the
-        // UI-thread-owned tray icon before the authoritative coordinator waits for hosted-service
-        // shutdown off-thread.
         _persistTimer.Stop();
         _persistTimer.Tick -= OnPersistTimerTick;
         _modeCoordinator.PersistCurrentBounds();
@@ -273,11 +297,9 @@ public sealed partial class MainWindow : Window
             xamlRoot.Changed -= OnXamlRootChanged;
         }
 
-        _windowController.BeginShutdown();
-        _trayService.PrepareForShutdown();
         AppWindow.Changed -= OnAppWindowChanged;
+        AppWindow.Closing -= OnAppWindowClosing;
         RootLayout.ActualThemeChanged -= OnActualThemeChanged;
         Closed -= OnWindowClosed;
-        _shutdownCoordinator.Shutdown();
     }
 }

@@ -20,37 +20,30 @@ public static class Program
 {
     private static IntPtr _redirectEventHandle = IntPtr.Zero;
 
-    // The single-instance key registered by the primary instance (null when bypassed for Debug QA).
-    // Released on shutdown so a launch that races the primary's exit becomes the new primary instead
-    // of redirecting into a process that is tearing down (M-1/shutdown race, Atlas reliability review).
-    private static string? _registeredInstanceKey;
-
     /// <summary>
-    /// Releases the single-instance registration so a subsequent launch can take over cleanly during
-    /// shutdown. Best-effort and idempotent; the OS releases the key on process exit regardless.
+    /// How this process was launched. Read once, before anything is built, and used by the lifecycle
+    /// controller to decide the initial state and by the first-close notice to stay silent (M13 S2 §B.2).
     /// </summary>
-    public static void ReleaseSingleInstanceKey()
-    {
-        var key = Interlocked.Exchange(ref _registeredInstanceKey, null);
-        if (key is null)
-        {
-            return;
-        }
+    public static LaunchMode LaunchMode { get; private set; } = LaunchMode.Foreground;
 
-        try
-        {
-            AppInstance.GetCurrent().UnregisterKey();
-        }
-        catch
-        {
-            // Best-effort: process exit releases the key anyway.
-        }
-    }
+    // OWNERSHIP (M13 S2 §F.2). There is deliberately NO method to release the single-instance key while
+    // this process is alive. Releasing it early used to be the recommendation, so that a launch racing
+    // the teardown became the new primary instead of redirecting into a dying process — but
+    // UnregisterKey and Exit are separate calls with no atomic combination in the AppInstance API, so
+    // that left an interval in which this process was alive and unowned, and a launch inside it became a
+    // SECOND primary with a second monitoring host writing the same snapshot. Ordering can only shrink
+    // that interval, never close it. Letting process termination release the registration removes it by
+    // construction: termination is atomic from the OS's side. The accepted residual is that while this
+    // process dies it stays the redirect target and discards what arrives (EXIT WINS), bounded by the
+    // termination watchdog.
 
     [STAThread]
     private static int Main(string[] args)
     {
         WinRT.ComWrappersSupport.InitializeComWrappers();
+
+        // Strict, two-valued, and read before anything else exists (Vigil C4).
+        LaunchMode = LaunchModePolicy.Resolve(args);
 
         if (ShouldRedirectToExistingInstance())
         {
@@ -93,10 +86,10 @@ public static class Program
 
         if (keyInstance.IsCurrent)
         {
-            // We are the primary instance. Remember the key so it can be released on shutdown. Deliver THIS
-            // launch's own cold intent BEFORE subscribing to redirects, so a later redirect (a newer user
-            // action) correctly supersedes it under the hand-off's latest-wins rule (§M-1).
-            _registeredInstanceKey = key;
+            // We are the primary instance, and we keep the key for the whole life of the process (see the
+            // ownership note above). Deliver THIS launch's own cold intent BEFORE subscribing to
+            // redirects, so a later redirect (a newer user action) correctly supersedes it under the
+            // hand-off's latest-wins rule (§M-1).
             _pendingActivation.Deliver(ProtocolActivationReader.TryGetIntent(activationArgs));
             keyInstance.Activated += OnActivated;
             return false;
@@ -125,7 +118,9 @@ public static class Program
     /// constructor is still wiring the router (§M-1).
     /// </summary>
     private static void OnActivated(object? sender, AppActivationArguments args) =>
-        _activationDispatch.Dispatch(ProtocolActivationReader.TryGetIntent(args));
+        _activationDispatch.Dispatch(
+            ProtocolActivationReader.TryGetIntent(args),
+            ProtocolActivationReader.ClassifyOrigin(args));
 
     /// <summary>
     /// The redirect step: deliver the intent, and restore the window only when nothing else will. Built
@@ -133,7 +128,8 @@ public static class Program
     /// </summary>
     private static readonly ActivationDispatch _activationDispatch = new(
         intent => _pendingActivation.Deliver(intent),
-        () => (Application.Current as App)?.RestoreOnRedirect());
+        () => (Application.Current as App)?.RestoreOnRedirect(),
+        () => (Application.Current as App)?.IsExiting == true);
 
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
     private static extern IntPtr CreateEvent(

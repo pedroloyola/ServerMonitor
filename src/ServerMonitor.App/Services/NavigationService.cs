@@ -33,6 +33,14 @@ public sealed class NavigationService(
 
     public void GoToSettings() => NavigateTo<SettingsPage>();
 
+    private int _backgroundSettingsFocusRequested;
+
+    public void RequestBackgroundSettingsFocus() =>
+        Interlocked.Exchange(ref _backgroundSettingsFocusRequested, 1);
+
+    public bool ConsumeBackgroundSettingsFocus() =>
+        Interlocked.Exchange(ref _backgroundSettingsFocusRequested, 0) == 1;
+
     public void GoToHistory(Guid serverId, string serverName)
     {
         if (_frame is null)

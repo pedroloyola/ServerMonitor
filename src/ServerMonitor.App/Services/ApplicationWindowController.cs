@@ -16,11 +16,28 @@ public sealed class ApplicationWindowController(
     private Window? _window;
     private AppWindow? _appWindow;
     private DispatcherQueue? _dispatcherQueue;
+    private Func<Window>? _windowFactory;
     private int _shutdownStarted;
 
     public bool IsAttached
     {
         get { lock (_sync) { return _window is not null; } }
+    }
+
+    public bool IsMaterialized => IsAttached;
+
+    /// <summary>
+    /// A headless launch has no window and no UI dispatcher of its own to enqueue onto, so the factory
+    /// is stored with the dispatcher that owns it: whoever registers the factory is on the UI thread.
+    /// </summary>
+    public void AttachWindowFactory(Func<Window> factory)
+    {
+        ArgumentNullException.ThrowIfNull(factory);
+        lock (_sync)
+        {
+            _windowFactory = factory;
+            _dispatcherQueue ??= DispatcherQueue.GetForCurrentThread();
+        }
     }
 
     public void Attach(Window window)
@@ -51,49 +68,127 @@ public sealed class ApplicationWindowController(
         logger.LogDebug("Main window hidden after minimize.");
     });
 
-    public void RestoreAndActivate() => RunOnUiThread(() =>
+    /// <summary>
+    /// The BACKGROUND transition. Identical window mechanics to the minimize path; a headless process
+    /// with no window is already in the target state, so this is a no-op there rather than an error.
+    /// </summary>
+    public void HideToBackground() => RunOnUiThread(() =>
     {
-        if (_window is null || _appWindow is null)
+        if (_appWindow is null)
         {
             return;
         }
 
-        _appWindow.IsShownInSwitchers = true;
+        _appWindow.IsShownInSwitchers = false;
+        _appWindow.Hide();
+        logger.LogDebug("Main window hidden to background.");
+    });
+
+    public void RestoreAndActivate() => RunOnUiThread(() =>
+    {
+        if (!TryMaterialize())
+        {
+            return;
+        }
+
+        _appWindow!.IsShownInSwitchers = true;
         _appWindow.Show();
-        WindowManager.Get(_window).WindowState = WindowState.Normal;
-        _window.Activate();
+        WindowManager.Get(_window!).WindowState = WindowState.Normal;
+        _window!.Activate();
         _window.SetForegroundWindow();
         logger.LogDebug("Main window restored from the system tray.");
     });
 
     public void OpenSettings() => RunOnUiThread(() =>
     {
-        if (_window is null || _appWindow is null)
+        if (!TryMaterialize())
         {
             return;
         }
 
-        _appWindow.IsShownInSwitchers = true;
+        _appWindow!.IsShownInSwitchers = true;
         _appWindow.Show();
-        WindowManager.Get(_window).WindowState = WindowState.Normal;
-        _window.Activate();
+        WindowManager.Get(_window!).WindowState = WindowState.Normal;
+        _window!.Activate();
         _window.SetForegroundWindow();
         navigationService.GoToSettings();
     });
 
+    /// <summary>
+    /// The background notice's activation target. Order is deliberate and is the whole point: materialize
+    /// if needed, NAVIGATE while the window is still hidden, and only then show and activate. Showing
+    /// first and navigating after (what <see cref="OpenSettings"/> does, safely, because it is invoked
+    /// from an already-visible window) would present the Dashboard for a frame — and this notice exists
+    /// precisely because the user just asked for the Dashboard to go away.
+    /// </summary>
+    public void OpenBackgroundSettings() => RunOnUiThread(() =>
+    {
+        if (!TryMaterialize())
+        {
+            return;
+        }
+
+        navigationService.GoToSettings();
+        navigationService.RequestBackgroundSettingsFocus();
+
+        _appWindow!.IsShownInSwitchers = true;
+        _appWindow.Show();
+        WindowManager.Get(_window!).WindowState = WindowState.Normal;
+        _window!.Activate();
+        _window.SetForegroundWindow();
+        logger.LogDebug("Opened Settings on the background section from a notification.");
+    });
+
+    /// <summary>
+    /// Ensures a window exists, creating it from the registered factory on first use. Returns false only
+    /// when there is neither a window nor a way to make one, which is the pre-shell startup window.
+    /// Must be called on the UI thread (every caller runs inside <see cref="RunOnUiThread"/>).
+    /// </summary>
+    private bool TryMaterialize()
+    {
+        if (_window is not null && _appWindow is not null)
+        {
+            return true;
+        }
+
+        Func<Window>? factory;
+        lock (_sync)
+        {
+            factory = _windowFactory;
+        }
+
+        if (factory is null)
+        {
+            logger.LogDebug("Window command ignored because no window exists and none can be created.");
+            return false;
+        }
+
+        try
+        {
+            Attach(factory());
+            logger.LogInformation("Main window materialized on demand.");
+            return _window is not null && _appWindow is not null;
+        }
+        catch (Exception exception)
+        {
+            logger.LogError(exception, "The main window could not be materialized.");
+            return false;
+        }
+    }
+
     public void ToggleCompactMode() => RunOnUiThread(() =>
     {
-        if (_window is null || _appWindow is null)
+        if (!TryMaterialize())
         {
             return;
         }
 
         // Toggling from the tray must also bring the window back from the tray first, then switch,
         // so the mode change lands on a visible, activated window in a consistent state.
-        _appWindow.IsShownInSwitchers = true;
+        _appWindow!.IsShownInSwitchers = true;
         _appWindow.Show();
-        WindowManager.Get(_window).WindowState = WindowState.Normal;
-        _window.Activate();
+        WindowManager.Get(_window!).WindowState = WindowState.Normal;
+        _window!.Activate();
         _window.SetForegroundWindow();
         modeCoordinator.Toggle();
         logger.LogDebug("Toggled compact mode from the system tray.");

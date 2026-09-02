@@ -1,6 +1,8 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.UI.Xaml;
+using Microsoft.Extensions.Time.Testing;
 using ServerMonitor.App.Services;
+using ServerMonitor.App.Tests.Fakes;
 
 namespace ServerMonitor.App.Tests.Services;
 
@@ -51,7 +53,7 @@ public sealed class TrayServiceTests
     }
 
     [Fact]
-    public async Task RepeatedExit_RequestsAuthoritativeWindowCloseOnce()
+    public async Task RepeatedExit_RequestsTheAuthoritativeExitOnce()
     {
         var harness = new Harness();
         await harness.Service.StartAsync(default);
@@ -59,7 +61,11 @@ public sealed class TrayServiceTests
         harness.Icon.RaiseExit();
         harness.Icon.RaiseExit();
 
-        Assert.Equal(1, harness.Window.CloseCount);
+        // "Sair do ServerAlyzer" no longer closes the window and rides Window.Closed (M13 S2 §C): it
+        // calls the one authoritative exit, which is what makes the headless exit possible at all.
+        Assert.Equal(1, harness.Lifecycle.ExitRequests);
+        Assert.Equal(ExitReason.TrayExit, Assert.Single(harness.Lifecycle.ExitReasons));
+        Assert.Equal(0, harness.Window.CloseCount);
     }
 
     [Fact]
@@ -110,14 +116,22 @@ public sealed class TrayServiceTests
 
         public TrayService Service { get; }
 
-        public Harness()
+        public FakeAppLifecycleController Lifecycle { get; } = new();
+
+        public FakeTimeProvider Clock { get; } = new(new DateTimeOffset(2026, 9, 2, 12, 0, 0, TimeSpan.Zero));
+
+        public Harness(int maxIconAttempts = 1)
         {
             Service = new TrayService(
                 Icon,
                 Window,
                 Refresh,
                 Alert,
-                NullLogger<TrayService>.Instance);
+                Lifecycle,
+                NullLogger<TrayService>.Instance,
+                Clock,
+                maxIconAttempts,
+                TimeSpan.FromSeconds(1));
         }
     }
 
@@ -160,6 +174,18 @@ public sealed class TrayServiceTests
         public int ToggleCompactCount { get; private set; }
 
         public void Attach(Window window) { }
+
+        public bool IsMaterialized => true;
+
+        public void AttachWindowFactory(Func<Window> factory) { }
+
+        public void HideToBackground() => HideToBackgroundCount++;
+
+        public int HideToBackgroundCount { get; private set; }
+
+        public void OpenBackgroundSettings() => OpenBackgroundSettingsCount++;
+
+        public int OpenBackgroundSettingsCount { get; private set; }
         public void HideForMinimize() => HideCount++;
         public void RestoreAndActivate() => RestoreCount++;
         public void OpenSettings() => SettingsCount++;

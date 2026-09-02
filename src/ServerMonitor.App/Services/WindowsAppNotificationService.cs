@@ -15,6 +15,7 @@ public sealed class WindowsAppNotificationService : IUserNotificationService, IH
 
     private readonly IWindowsAppNotificationPlatform _platform;
     private readonly IApplicationWindowController _windowController;
+    private readonly IAppLifecycleController _lifecycleController;
     private readonly ILogger<WindowsAppNotificationService> _logger;
     private readonly string _notificationIconPath;
     private readonly object _sync = new();
@@ -24,10 +25,12 @@ public sealed class WindowsAppNotificationService : IUserNotificationService, IH
 
     public WindowsAppNotificationService(
         IApplicationWindowController windowController,
+        IAppLifecycleController lifecycleController,
         ILogger<WindowsAppNotificationService> logger)
         : this(
             new WindowsAppNotificationPlatform(),
             windowController,
+            lifecycleController,
             logger,
             Path.Combine(AppContext.BaseDirectory, "Assets", "ServerMonitorNotification.png"))
     {
@@ -36,11 +39,13 @@ public sealed class WindowsAppNotificationService : IUserNotificationService, IH
     internal WindowsAppNotificationService(
         IWindowsAppNotificationPlatform platform,
         IApplicationWindowController windowController,
+        IAppLifecycleController lifecycleController,
         ILogger<WindowsAppNotificationService> logger,
         string notificationIconPath)
     {
         _platform = platform ?? throw new ArgumentNullException(nameof(platform));
         _windowController = windowController ?? throw new ArgumentNullException(nameof(windowController));
+        _lifecycleController = lifecycleController ?? throw new ArgumentNullException(nameof(lifecycleController));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _notificationIconPath = string.IsNullOrWhiteSpace(notificationIconPath)
             ? throw new ArgumentException("A notification icon path is required.", nameof(notificationIconPath))
@@ -153,7 +158,11 @@ public sealed class WindowsAppNotificationService : IUserNotificationService, IH
                     return Task.CompletedTask;
                 }
 
-                _platform.Show(notification.Title, notification.Body);
+                _platform.Show(
+                    notification.Title,
+                    notification.Body,
+                    NotificationActivationContract.ForServerHealth(),
+                    expiresOnReboot: false);
                 _logger.LogDebug(
                     "Windows app notification sent for {ServerId} ({Category}).",
                     notification.ServerId,
@@ -171,7 +180,17 @@ public sealed class WindowsAppNotificationService : IUserNotificationService, IH
         return Task.CompletedTask;
     }
 
-    private void OnNotificationInvoked(object? sender, EventArgs args)
+    /// <summary>
+    /// Routes a notification click through the closed activation contract (M13 S2 §D.1).
+    /// <para>
+    /// It used to call <see cref="IApplicationWindowController.RestoreAndActivate"/> for ANY click,
+    /// because the platform adapter threw the activation arguments away. That default is exactly what the
+    /// background notice must not inherit: a toast saying "still running in the background" cannot undo
+    /// the hide the user just asked for. Routing is now explicit and fails closed — an unknown, missing
+    /// or mismatched kind/action does nothing at all.
+    /// </para>
+    /// </summary>
+    private void OnNotificationInvoked(object? sender, NotificationActivationEventArgs args)
     {
         lock (_sync)
         {
@@ -181,7 +200,62 @@ public sealed class WindowsAppNotificationService : IUserNotificationService, IH
             }
         }
 
-        _windowController.RestoreAndActivate();
+        // EXIT WINS: an activation that arrives while the process is exiting is discarded — no UI is
+        // materialized and the shutdown is not cancelled.
+        if (_lifecycleController.IsExiting)
+        {
+            _logger.LogDebug("A notification activation arrived while exiting and was discarded.");
+            return;
+        }
+
+        switch (NotificationActivationContract.ResolveAction(args.Arguments))
+        {
+            case NotificationAction.OpenDashboard:
+                _windowController.RestoreAndActivate();
+                break;
+
+            case NotificationAction.OpenBackgroundSettings:
+                _windowController.OpenBackgroundSettings();
+                break;
+
+            default:
+                _logger.LogDebug("A notification activation carried no recognized action and was ignored.");
+                break;
+        }
+    }
+
+    /// <summary>
+    /// The one-time background notice. Short-lived and not kept in the Notification Centre: it explains a
+    /// transition that has already happened, so it must not accumulate there.
+    /// </summary>
+    public void ShowBackgroundNotice(string title, string body)
+    {
+        lock (_sync)
+        {
+            if (!_registered || !_accepting || _stopping)
+            {
+                return;
+            }
+
+            try
+            {
+                if (_platform.Setting != AppNotificationSetting.Enabled)
+                {
+                    _logger.LogDebug("Windows suppressed the background notice because its OS setting is disabled.");
+                    return;
+                }
+
+                _platform.Show(
+                    title,
+                    body,
+                    NotificationActivationContract.ForBackgroundCloseNotice(),
+                    expiresOnReboot: true);
+            }
+            catch (Exception exception)
+            {
+                _logger.LogWarning(exception, "Windows could not display the background notice.");
+            }
+        }
     }
 
     public void BeginShutdown()
@@ -193,9 +267,15 @@ public sealed class WindowsAppNotificationService : IUserNotificationService, IH
     }
 }
 
+/// <summary>Carries the notification's own activation arguments instead of throwing them away.</summary>
+internal sealed class NotificationActivationEventArgs(IReadOnlyDictionary<string, string>? arguments) : EventArgs
+{
+    public IReadOnlyDictionary<string, string>? Arguments { get; } = arguments;
+}
+
 internal interface IWindowsAppNotificationPlatform
 {
-    event EventHandler? Invoked;
+    event EventHandler<NotificationActivationEventArgs>? Invoked;
 
     bool IsSupported();
 
@@ -205,7 +285,11 @@ internal interface IWindowsAppNotificationPlatform
 
     void Unregister();
 
-    void Show(string title, string body);
+    void Show(
+        string title,
+        string body,
+        IReadOnlyDictionary<string, string> arguments,
+        bool expiresOnReboot);
 }
 
 internal sealed class WindowsAppNotificationPlatform : IWindowsAppNotificationPlatform
@@ -228,7 +312,7 @@ internal sealed class WindowsAppNotificationPlatform : IWindowsAppNotificationPl
         _managerFactory = managerFactory ?? throw new ArgumentNullException(nameof(managerFactory));
     }
 
-    public event EventHandler? Invoked;
+    public event EventHandler<NotificationActivationEventArgs>? Invoked;
 
     public AppNotificationSetting Setting => GetRegisteredManager().Setting;
 
@@ -281,12 +365,25 @@ internal sealed class WindowsAppNotificationPlatform : IWindowsAppNotificationPl
         }
     }
 
-    public void Show(string title, string body)
+    public void Show(
+        string title,
+        string body,
+        IReadOnlyDictionary<string, string> arguments,
+        bool expiresOnReboot)
     {
-        var notification = new AppNotificationBuilder()
+        var builder = new AppNotificationBuilder()
             .AddText(title)
-            .AddText(body)
-            .BuildNotification();
+            .AddText(body);
+
+        // The closed contract, and nothing else: two keys with enum-valued strings. No server id, host,
+        // address, display name, count, snapshot value or free text is ever added here.
+        foreach (var argument in arguments)
+        {
+            builder = builder.AddArgument(argument.Key, argument.Value);
+        }
+
+        var notification = builder.BuildNotification();
+        notification.ExpiresOnReboot = expiresOnReboot;
         GetRegisteredManager().Show(notification);
     }
 
@@ -296,5 +393,24 @@ internal sealed class WindowsAppNotificationPlatform : IWindowsAppNotificationPl
 
     private void OnNotificationInvoked(
         AppNotificationManager sender,
-        AppNotificationActivatedEventArgs args) => Invoked?.Invoke(this, EventArgs.Empty);
+        AppNotificationActivatedEventArgs args) =>
+        Invoked?.Invoke(this, new NotificationActivationEventArgs(ReadArguments(args)));
+
+    /// <summary>
+    /// Copies the activation arguments out of the WinRT event. Nothing is interpreted here — the closed
+    /// contract does the interpreting, and fails closed on anything it does not recognize.
+    /// </summary>
+    private static IReadOnlyDictionary<string, string>? ReadArguments(AppNotificationActivatedEventArgs args)
+    {
+        try
+        {
+            return args.Arguments is { } arguments
+                ? new Dictionary<string, string>(arguments, StringComparer.Ordinal)
+                : null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
 }

@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using ServerMonitor.App.Services;
 using ServerMonitor.App.ViewModels;
@@ -58,6 +59,32 @@ public partial class App : Application
                 services.AddSingleton(sp => new AppShutdownCoordinator(
                     () => ServicesHost,
                     sp.GetRequiredService<ILogger<AppShutdownCoordinator>>()));
+
+                // M13 S2 lifecycle. ONE authoritative exit, one owner of FOREGROUND/BACKGROUND/EXITING,
+                // and a watchdog that guarantees the process really ends. The exit sequence is resolved
+                // lazily by the controller because the tray and the notification service depend on the
+                // controller in turn.
+                services.AddSingleton<ITerminationWatchdog, TerminationWatchdog>();
+                services.AddSingleton<IProcessTerminator, ProcessTerminator>();
+                services.AddSingleton<IExitSequence, ExitSequence>();
+                services.AddSingleton<IAppLifecycleController>(sp => new AppLifecycleController(
+                    sp.GetRequiredService<IExitSequence>,
+                    ExitApplication,
+                    sp.GetRequiredService<ITerminationWatchdog>(),
+                    sp.GetRequiredService<IProcessTerminator>(),
+                    sp.GetRequiredService<ILogger<AppLifecycleController>>(),
+                    Program.LaunchMode));
+                services.AddSingleton(BackgroundSettingsStorageOptions.ForCurrentUser());
+                services.AddSingleton<IBackgroundMonitoringSettingsService, JsonBackgroundMonitoringSettingsService>();
+                services.AddSingleton<IBackgroundNoticePresenter, BackgroundNoticePresenter>();
+                services.AddSingleton<OrphanTemporaryCleaner>();
+                services.AddSingleton(sp => new WindowCloseCoordinator(
+                    sp.GetRequiredService<IAppLifecycleController>(),
+                    sp.GetRequiredService<IBackgroundMonitoringSettingsService>(),
+                    sp.GetRequiredService<IApplicationWindowController>(),
+                    sp.GetRequiredService<IBackgroundNoticePresenter>(),
+                    () => sp.GetRequiredService<TrayService>().HasExitAffordance,
+                    sp.GetRequiredService<ILogger<WindowCloseCoordinator>>()));
 
                 // M8 application-shell services. All Windows-specific behavior stays behind
                 // fakeable boundaries; alert policy observes M6 but never performs SSH itself.
@@ -308,6 +335,13 @@ public partial class App : Application
         // the latest intent buffered before this App object was built (the cold launch, or a redirect that
         // raced construction). The router buffers it internally until the shell signals ready (§M-1).
         Program.AttachActivationConsumer(_activationRouter.Route);
+
+        // M13 S2 requirement 1. The process no longer ends because the last window closed, which is what
+        // lets the Dashboard be hidden while monitoring continues (QA-8). It lands ONLY together with the
+        // full exit path: on its own it produces the measured zombie — a live process with a stopped
+        // engine, no tray and a frozen snapshot. Every true exit now reaches Application.Exit() exactly
+        // once, and a termination watchdog backs it up.
+        DispatcherShutdownMode = DispatcherShutdownMode.OnExplicitShutdown;
         InitializeComponent();
     }
 
@@ -318,13 +352,15 @@ public partial class App : Application
     /// </summary>
     private void ExecuteActivationIntent(ActivationIntent intent)
     {
-        var window = _mainWindow;
-        if (window is null)
+        // A headless process has no window yet, so "no window" can no longer mean "drop the intent":
+        // RestoreAndActivate materializes one below. What is still needed is a dispatcher to run on.
+        var dispatcher = _mainWindow?.DispatcherQueue ?? _uiDispatcherQueue;
+        if (dispatcher is null)
         {
             return; // shell not ready; the router only executes after MarkReady, so this is defensive
         }
 
-        window.DispatcherQueue.TryEnqueue(() =>
+        dispatcher.TryEnqueue(() =>
         {
             try
             {
@@ -363,6 +399,43 @@ public partial class App : Application
     public static IHost ServicesHost { get; private set; } = null!;
 
     /// <summary>
+    /// True once the process has committed to a true exit. Read by the activation gate in
+    /// <c>Program</c>: EXIT WINS, so an activation that arrives during the drain is discarded rather than
+    /// materializing UI or cancelling the shutdown.
+    /// </summary>
+    public bool IsExiting =>
+        ServicesHost is not null
+        && ServicesHost.Services.GetService<IAppLifecycleController>() is { IsExiting: true };
+
+    /// <summary>
+    /// The one call that ends the dispatcher. With <c>DispatcherShutdownMode.OnExplicitShutdown</c>
+    /// nothing else terminates the process, which is exactly why hiding the window is now safe — and why
+    /// every true-exit path must reach here. Marshalled to the UI thread, because a tray or watchdog
+    /// caller may not be on it.
+    /// </summary>
+    private static void ExitApplication()
+    {
+        if (Current is not App app)
+        {
+            return;
+        }
+
+        var dispatcher = app._mainWindow?.DispatcherQueue ?? _uiDispatcherQueue;
+        if (dispatcher is null || dispatcher.HasThreadAccess)
+        {
+            app.Exit();
+            return;
+        }
+
+        if (!dispatcher.TryEnqueue(app.Exit))
+        {
+            app.Exit();
+        }
+    }
+
+    private static DispatcherQueue? _uiDispatcherQueue;
+
+    /// <summary>
     /// Invoked when a second launch (or a redirected notification activation) is forwarded to this, the
     /// single primary instance (M12/ADR-017 §6). Restores and foregrounds the one authoritative window in
     /// its current presentation (Standard / Compact / tray) — never creating another. Any deep-link intent
@@ -371,15 +444,15 @@ public partial class App : Application
     /// </summary>
     public void RestoreOnRedirect()
     {
-        var window = _mainWindow;
-        if (window is null)
+        // Headless has no window; the controller materializes one. Only a missing dispatcher (the shell
+        // has not started at all) means there is nothing to do yet.
+        var dispatcher = _mainWindow?.DispatcherQueue ?? _uiDispatcherQueue;
+        if (dispatcher is null)
         {
-            // Activation arrived before the shell finished starting; the launch itself will show it, and
-            // the router drains the buffered intent once ready.
             return;
         }
 
-        var enqueued = window.DispatcherQueue.TryEnqueue(() =>
+        var enqueued = dispatcher.TryEnqueue(() =>
         {
             try
             {
@@ -409,12 +482,40 @@ public partial class App : Application
     {
         try
         {
-            // The tray hosted service is UI-thread-bound and the alert activation path must
-            // restore this exact window. Attach it before starting the host, but activate it
-            // only after every lifecycle participant has started successfully.
-            _mainWindow = ServicesHost.Services.GetRequiredService<MainWindow>();
+            _uiDispatcherQueue = DispatcherQueue.GetForCurrentThread();
+
+            // A watchdog termination can only ever orphan one known temporary; clean exactly that one
+            // (Vigil C10) before anything reads or writes the trust store.
+            ServicesHost.Services.GetRequiredService<OrphanTemporaryCleaner>().CleanKnownHostTemporary(
+                ServicesHost.Services.GetRequiredService<HostKeyTrustStorageOptions>().FilePath);
+
+            // Headless (--background) starts monitoring and the tray but creates NO window: a
+            // never-activated background process IS the BACKGROUND state. A later legitimate activation
+            // materializes the Dashboard through this factory (M13 S2 §B.2).
+            var windowController = ServicesHost.Services.GetRequiredService<ApplicationWindowController>();
+            windowController.AttachWindowFactory(() => ServicesHost.Services.GetRequiredService<MainWindow>());
+
+            var startsHeadless = Program.LaunchMode == LaunchMode.Background;
+            if (!startsHeadless)
+            {
+                // The tray hosted service is UI-thread-bound and the alert activation path must
+                // restore this exact window. Attach it before starting the host, but activate it
+                // only after every lifecycle participant has started successfully.
+                _mainWindow = ServicesHost.Services.GetRequiredService<MainWindow>();
+            }
+
             await ServicesHost.StartAsync();
-            _mainWindow.Activate();
+
+            if (!startsHeadless)
+            {
+                _mainWindow!.Activate();
+            }
+            else
+            {
+                ServicesHost.Services
+                    .GetRequiredService<ILogger<App>>()
+                    .LogInformation("Server Monitor started in background mode; no window was created.");
+            }
 
             // The shell is ready: drain the single latest activation intent. Everything — this cold launch's
             // own activation and every redirect that arrived during startup — has already been funneled
@@ -433,16 +534,18 @@ public partial class App : Application
                 .LogCritical(exception, "Server Monitor could not start.");
             try
             {
-                ServicesHost.Services.GetRequiredService<TrayService>().PrepareForShutdown();
-                ServicesHost.Services.GetRequiredService<AppShutdownCoordinator>().Shutdown();
+                // The same authoritative exit as every other path: one drain, one Exit, one watchdog.
+                ServicesHost.Services
+                    .GetRequiredService<IAppLifecycleController>()
+                    .RequestExit(ExitReason.StartupFailure);
             }
             catch (Exception shutdownException)
             {
                 ServicesHost.Services
                     .GetRequiredService<ILogger<App>>()
                     .LogError(shutdownException, "Server Monitor startup cleanup failed.");
+                Exit();
             }
-            Exit();
         }
     }
 }

@@ -135,6 +135,21 @@ public sealed class SettingsNotificationViewModelTests
         {
         }
 
+        public void RequestBackgroundSettingsFocus() => BackgroundSettingsFocusRequests++;
+
+        public int BackgroundSettingsFocusRequests { get; private set; }
+
+        public bool ConsumeBackgroundSettingsFocus()
+        {
+            if (BackgroundSettingsFocusRequests == 0)
+            {
+                return false;
+            }
+
+            BackgroundSettingsFocusRequests--;
+            return true;
+        }
+
         public void GoToSettings()
         {
         }
