@@ -81,44 +81,7 @@ public sealed class WidgetProviderComAdapter : IWidgetProvider
         // A click on the card/row: map the allowlisted verb + opaque id to a serveralyzer:// launch (§14).
         // Fully contained — a click can never fault the provider.
         Guard(nameof(OnActionInvoked), () =>
-        {
-            SpikeRecordActionInvoked(actionInvokedArgs.Verb);
-            _actionHandler.Handle(actionInvokedArgs.Verb, actionInvokedArgs.Data);
-        });
-
-    /// <summary>
-    /// M13-QA-10 SPIKE — DO NOT MERGE. Board measurement point 4 ("does the provider's OnActionInvoked
-    /// fire?") cannot be answered from outside the process: the production log writes only to ETW and
-    /// OutputDebugString, which are invisible without a session or a debugger attached. So this spike
-    /// build appends one line per invocation next to the snapshot, and the human reads that file.
-    /// <para>
-    /// It records only a timestamp and WHICH allowlisted verb matched — never the raw verb, never the
-    /// action data, never a server id — so it adds no payload to disk. Failure is swallowed: a broken
-    /// probe must not change what the spike measures.
-    /// </para>
-    /// </summary>
-    private static void SpikeRecordActionInvoked(string? verb)
-    {
-        try
-        {
-            var matched = verb switch
-            {
-                ServerMonitor.ActivationContract.ActivationVerbs.OpenDashboard => "openDashboard",
-                ServerMonitor.ActivationContract.ActivationVerbs.OpenServer => "openServer",
-                _ => "<unrecognized>"
-            };
-
-            File.AppendAllText(
-                Path.Combine(
-                    ServerMonitor.WidgetContract.WidgetStateLocation.DirectoryForCurrentUser(),
-                    "qa10-spike-actions.log"),
-                $"[{DateTimeOffset.Now:HH:mm:ss.fff}] OnActionInvoked verb={matched}{Environment.NewLine}");
-        }
-        catch
-        {
-            // Spike instrumentation only.
-        }
-    }
+            _actionHandler.Handle(actionInvokedArgs.Verb, actionInvokedArgs.Data));
 
     private static WidgetActivation Map(WidgetContext context) =>
         new(context.Id, context.DefinitionId, MapSize(context.Size), CustomState: null);

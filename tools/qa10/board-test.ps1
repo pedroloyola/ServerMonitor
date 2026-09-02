@@ -92,11 +92,6 @@ $boardEverVisible = $false
 $boardVisibleAtEnd = $false
 $appPid0 = (Get-Process -Name ServerMonitor.App -ErrorAction SilentlyContinue | Sort-Object StartTime | Select-Object -First 1)
 
-# Evidencia do ponto 4 (o OnActionInvoked do provider disparou?). So o pacote da SPIKE escreve este
-# ficheiro; com o pacote de producao instalado ele simplesmente nao existe e a seccao fica vazia.
-$spikeLog = Join-Path $env:LOCALAPPDATA 'ServerMonitor\qa10-spike-actions.log'
-$spikeLinesBefore = if (Test-Path $spikeLog) { (Get-Content $spikeLog).Count } else { 0 }
-
 Log "=== M13-QA-10  tag=$Tag  duracao=${Seconds}s  (READ-ONLY: so observa) ==="
 Log "FAZ AGORA A ACAO DO CASO (Win+W e clicar o widget). Nao toques em mais nada ate ao fim."
 
@@ -144,18 +139,6 @@ Log "RESUMO 1 - o ServerAlyzer chegou a ser a janela de FOREGROUND?  $(if ($appE
 Log "RESUMO 2 - a janela do board (WindowsDashboard) ficou VISIVEL no fim? $(if ($boardVisibleAtEnd) { 'SIM' } elseif ($boardEverVisible) { 'NAO (abriu e fechou)' } else { 'nunca a vi aberta' })"
 Log "RESUMO 3 - processos ServerMonitor.App vistos: $($appPidsSeen -join ', ') (o inicial era $(if ($appPid0) { $appPid0.Id } else { 'nenhum' }))"
 Log "RESUMO 4 - PIDs que tiveram foreground, por ordem: $($fgPidsSeen -join ' -> ')"
-
-$spikeAdded = @()
-if (Test-Path $spikeLog) {
-    $all = @(Get-Content $spikeLog)
-    if ($all.Count -gt $spikeLinesBefore) { $spikeAdded = $all[$spikeLinesBefore..($all.Count - 1)] }
-}
-if ($spikeAdded.Count -gt 0) {
-    Log "RESUMO 5 - o provider recebeu $($spikeAdded.Count) OnActionInvoked durante esta medicao:"
-    foreach ($l in $spikeAdded) { Log "          $l" }
-} else {
-    Log "RESUMO 5 - o provider NAO recebeu nenhum OnActionInvoked (ou este pacote nao e o da spike)"
-}
 
 Log "NOTA - o veredicto de 'o board saiu da frente' e TEU, a olho. Os PIDs acima nao chegam para o decidir."
 
