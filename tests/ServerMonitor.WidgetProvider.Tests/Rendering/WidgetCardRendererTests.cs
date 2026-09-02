@@ -14,7 +14,9 @@ public sealed class WidgetCardRendererTests
 
     private static readonly HashSet<string> AllowedElements = new(StringComparer.Ordinal)
     {
-        "AdaptiveCard", "TextBlock", "ColumnSet", "Column", "Container", "Action.Execute"
+        "AdaptiveCard", "TextBlock", "ColumnSet", "Column", "Container", "Action.Execute",
+        // M13-QA-10 SPIKE — DO NOT MERGE: the one card-level action under test is an Action.OpenUrl.
+        "Action.OpenUrl"
     };
 
     private static WidgetServerState Server(string name, WidgetHealth health, Guid? id = null,
@@ -766,9 +768,13 @@ public sealed class WidgetCardRendererTests
         var root = doc.RootElement;
 
         // Card-level selectAction opens the dashboard.
+        // M13-QA-10 SPIKE — DO NOT MERGE: in this build that one action is Action.OpenUrl carrying the
+        // allowlisted dashboard URI. The assertion still pins the URI to exactly the trusted grammar, so
+        // a spike cannot smuggle a different URL into the card. Dropping the spike commit restores the
+        // production expectation (Action.Execute + verb openDashboard).
         Assert.True(root.TryGetProperty("selectAction", out var cardAction));
-        Assert.Equal("Action.Execute", cardAction.GetProperty("type").GetString());
-        Assert.Equal("openDashboard", cardAction.GetProperty("verb").GetString());
+        Assert.Equal("Action.OpenUrl", cardAction.GetProperty("type").GetString());
+        Assert.Equal("serveralyzer://dashboard", cardAction.GetProperty("url").GetString());
 
         // A server row carries openServer with the opaque id.
         Assert.True(ContainsActionServerId(root, id.ToString("D")));

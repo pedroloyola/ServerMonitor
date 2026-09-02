@@ -90,7 +90,17 @@ public static class WidgetCardRenderer
         // The whole card opens the Dashboard; server blocks override this with openServer.
         if (vm.DisplayState != WidgetDisplayState.Unavailable)
         {
-            card["selectAction"] = Execute(ActivationVerbs.OpenDashboard);
+            // ===================== M13-QA-10 SPIKE — DO NOT MERGE =====================
+            // THE one changed action. Production is Execute(ActivationVerbs.OpenDashboard), one line
+            // below and still used by every server row: this spike swaps ONLY the card-level action to
+            // Action.OpenUrl so the board is measured deciding what to do with a URL it owns, instead of
+            // calling our COM provider and having the provider launch. Everything else is unchanged, so
+            // one board session compares both paths in the SAME widget: click the body = OpenUrl,
+            // click a server row = Execute.
+            card["selectAction"] = SpikeOpenUrlDashboard();
+            // Production (restored by dropping this spike commit):
+            // card["selectAction"] = Execute(ActivationVerbs.OpenDashboard);
+            // =========================================================================
         }
 
         return new WidgetCard(card.ToJsonString(SerializerOptions), "{}");
@@ -474,6 +484,24 @@ public static class WidgetCardRenderer
         node["horizontalAlignment"] = "Right";
         return node;
     }
+
+    /// <summary>
+    /// M13-QA-10 SPIKE — DO NOT MERGE. The single <c>Action.OpenUrl</c> under test.
+    /// <para>
+    /// The URL is built by <see cref="ActivationUri.Format"/> from a constant intent, so it is produced
+    /// exclusively by trusted renderer code and can only ever be <c>serveralyzer://dashboard</c>: no
+    /// snapshot value, hostname, address, credential or free text can reach it, and the grammar is
+    /// unchanged. What DOES change is who launches: with <c>Action.Execute</c> the provider validates the
+    /// verb and then launches the allowlisted URI, whereas here the URI travels inside the card JSON and
+    /// the host launches it directly. The app-side <c>ActivationContract</c> re-validates every URI it
+    /// receives regardless, and remains the authority.
+    /// </para>
+    /// </summary>
+    private static JsonObject SpikeOpenUrlDashboard() => new()
+    {
+        ["type"] = "Action.OpenUrl",
+        ["url"] = ActivationUri.Format(ActivationIntent.Dashboard)
+    };
 
     // ---- Adaptive Card Action.Execute (verb + optional opaque serverId in data). ----
     private static JsonObject Execute(string verb, Guid? serverId = null)

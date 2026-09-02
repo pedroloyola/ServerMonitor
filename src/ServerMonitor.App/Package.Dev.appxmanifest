@@ -121,8 +121,11 @@
                   <CreateInstance ClassId="78CFFBEF-7A95-4400-BB8B-A2376C6642C3" />
                 </Activation>
                 <Definitions>
+                  <!-- M13-QA-10 SPIKE - DO NOT MERGE: the production package is installed side by
+                       side, so the picker would otherwise show two identical "ServerAlyzer" widgets and
+                       the human could pin the wrong one. -->
                   <Definition Id="ServerAlyzer_Widget"
-                              DisplayName="ServerAlyzer"
+                              DisplayName="ServerAlyzer QA10 SPIKE"
                               Description="Local server health at a glance."
                               AllowMultiple="true">
                     <Capabilities>
