@@ -19,6 +19,67 @@ public sealed class TerminationWatchdogTests
     private static TerminationWatchdog Create(ManualWatchdogScheduler scheduler) =>
         new(scheduler, NullLogger<TerminationWatchdog>.Instance);
 
+    // ---------------------------------------------------------------- the REAL scheduler's thread
+
+    /// <summary>
+    /// <b>IsBackground is part of the correctness contract, not an implementation detail</b> (tray
+    /// corrections §10). A foreground watchdog thread keeps the process alive after the UI and the host
+    /// are gone, turning the termination guarantee into the source of another zombie — and the mutation
+    /// IsBackground=false previously passed all 34 tests, so the guarantee was unprotected.
+    /// <para>
+    /// This exercises the PRODUCTION thread-creation path: the real
+    /// <see cref="DedicatedThreadWatchdogScheduler"/> schedules a real callback, and the callback reports
+    /// the properties of the thread it actually ran on.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void The_real_scheduler_runs_on_a_background_thread_that_is_not_the_thread_pool()
+    {
+        var scheduler = new DedicatedThreadWatchdogScheduler();
+        using var fired = new ManualResetEventSlim(false);
+        var isBackground = false;
+        var isThreadPool = true;
+        var threadName = string.Empty;
+
+        scheduler.ScheduleOnce(TimeSpan.FromMilliseconds(1), () =>
+        {
+            isBackground = Thread.CurrentThread.IsBackground;
+            isThreadPool = Thread.CurrentThread.IsThreadPoolThread;
+            threadName = Thread.CurrentThread.Name ?? string.Empty;
+            fired.Set();
+        });
+
+        Assert.True(fired.Wait(TimeSpan.FromSeconds(30)), "the watchdog callback never ran");
+        Assert.True(
+            isBackground,
+            "the watchdog thread must be a background thread: a foreground one keeps the process alive "
+            + "after the UI and the host are gone, which is the zombie this class exists to prevent");
+        Assert.False(isThreadPool, "the watchdog must not run on the pool a wedged shutdown can starve");
+        Assert.Contains("watchdog", threadName, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// The same property through the whole production path — watchdog + real scheduler — so the contract
+    /// holds for how the app actually arms it, not only for a directly constructed scheduler.
+    /// </summary>
+    [Fact]
+    public void A_production_watchdog_arms_onto_a_background_thread()
+    {
+        var watchdog = new TerminationWatchdog(
+            new DedicatedThreadWatchdogScheduler(), NullLogger<TerminationWatchdog>.Instance);
+        using var fired = new ManualResetEventSlim(false);
+        var isBackground = false;
+
+        watchdog.Arm(TimeSpan.FromMilliseconds(1), () =>
+        {
+            isBackground = Thread.CurrentThread.IsBackground;
+            fired.Set();
+        });
+
+        Assert.True(fired.Wait(TimeSpan.FromSeconds(30)), "the armed watchdog never fired");
+        Assert.True(isBackground);
+    }
+
     [Fact]
     public void A_new_watchdog_is_not_armed_and_schedules_nothing()
     {
