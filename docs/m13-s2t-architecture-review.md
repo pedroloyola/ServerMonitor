@@ -1,51 +1,161 @@
-# M13 S2-T — ARCHITECTURE REVIEW 4
+# M13 S2-T — ARCHITECTURE REVIEW 5 (invariante de raiz)
 
 **Autor:** Relay (platform-infra), implementer da S2-T / dono do Windows Shell.
-**Branch:** `agent/m13-s2t-tray`, base `221eda4`. **Continua a ser DESENHO. Sem implementação.**
-**Revisão 4** aplica a decisão de temporização do humano
-(`TRAY RECOVERY GLOBAL MONOTONIC DEADLINE = 1500 ms`) e regista o resultado dos gates CV-7 e CV-8,
-que foram **medidos** e passaram. Mantém tudo o que a revisão 3 fechou para Atlas, Vigil e Prism.
-**Sem novo split.** **Sem implementação — a review formal de arquitetura é o portão de temporização.**
-
-> **Conflito entre textos, resolvido à vista e não em silêncio.** O requisito §2 do humano manda **não
-> continuar a publicar `Available`** durante debounce/retries. As condições do Vigil, §3.3, dizem o
-> contrário: *"o estado público continua `Available` enquanto um re-registo está em voo"*. Pela regra
-> de precedência, o texto do humano vence, e adoto `Recovering` **público**. **A propriedade de
-> segurança do Vigil fica intacta**: quem degrada a sessão da S2 é `Lost`, e `Lost` continua a nascer
-> só de falha observada — `Recovering` **não** degrada nada. Peço ao Vigil que confirme que a sua
-> preocupação (input não autenticado a comandar transição de sessão) continua fechada nesta forma.
+**Branch:** `agent/m13-s2t-tray`, base `221eda4`. **DESENHO. Sem implementação.**
+**Revisão 5** não ajusta temporização. Reescreve a máquina de estados para que o intervalo de
+`Available` sem prova **não possa existir por construção**.
 
 ---
 
-## A — Máquina de estados interna final
+## 0 — O INVARIANTE DE RAIZ
+
+> **R1.** Entre a **aceitação** de um `TaskbarCreated` e a publicação de `Recovering` **não existe
+> nenhuma fronteira em que o controlo saia do bloco**: nenhum `await`, nenhum `TryEnqueue`, nenhum
+> temporizador, nenhuma aquisição de lock, nenhuma chamada nativa. A admissão, a transição de estado e
+> a captura do relógio são **um único bloco síncrono na `WndProc`, na thread de UI**.
+>
+> **R2.** `Available` só é publicado por **um** caminho: o que leu `true` de `NIM_ADD` **e** de
+> `NIM_SETVERSION`, **e** revalidou o deadline **depois** dessas chamadas.
+>
+> **Corolário (é isto que o Atlas deve verificar):** para qualquer mensagem aceite no instante `t`,
+> não existe **nenhum** escalonamento do dispatcher que produza `State == Available` para um instante
+> `> t` antes do fim do episódio. Não é um intervalo pequeno — **não há instante nenhum**, porque
+> entre `t` e a transição não há ponto onde o controlo possa ser suspenso.
+
+As três revisões anteriores estreitaram o intervalo. Esta remove o ponto de suspensão que o criava.
+
+---
+
+## 1 — Contradição que herdei, e como a resolvo *(§3 do texto autoritativo)*
+
+O desenho anterior exigia `Lost` na expiração do deadline **e** proibia `Lost` sem falha nativa
+observada. Eram duas regras corretas de revisores diferentes, e colidiam. Resolução adotada:
+
+**`Lost` tem exatamente DUAS causas terminais legítimas:**
+
+| Causa | Origem |
+|---|---|
+| **A** — falha nativa **observada** de `NIM_ADD`/`NIM_SETVERSION` com esgotamento do orçamento de retry | o shell recusou |
+| **B** — **expiração do deadline monotónico global do episódio** | o tempo acabou sem prova positiva |
+
+**Deadline expirado emite `Lost` mesmo que a última chamada nativa não tenha devolvido falha.**
+
+A regra do Vigil — *"o esgotamento do limite de frequência não emite `Lost`"* — **mantém-se verdadeira
+e não é generalizada** para "só falha nativa emite `Lost`".
+
+## 2 — Um problema na §4 que reporto em vez de transcrever
+
+A §4 diz que, se o rate limiting impedir trabalho nativo imediato, se permanece em `Recovering`, o
+deadline continua, e a expiração produz `Lost`. **Lida à letra, essa frase reabre a CV-2 numa forma
+nova:** um processo local qualquer faz broadcast → episódio admitido → o limitador esfomeia o trabalho
+nativo → o deadline expira → **`Lost` → a S2 degrada a sessão**. Ou seja, **input não autenticado
+voltaria a comandar a transição de sessão**, que é precisamente o que a CV-2 existe para impedir. É a
+mesma classe de colisão que a §3 já reconheceu ter acontecido uma vez.
+
+**Resolução estrutural, e é a única leitura que satisfaz Atlas e Vigil ao mesmo tempo:**
+
+> **O limitador de frequência governa a ADMISSÃO de episódios novos. NUNCA esfomeia um episódio já
+> admitido.**
+
+- Mensagem que o limitador **suprime** → **não é aceite** → não há admissão, não há `Recovering`, não
+  há relógio, não há `Lost`. É **exatamente equivalente a uma mensagem que nunca chegou** — a resposta
+  correta para input não autenticado, e mantém intacta a invariante do Vigil.
+- Mensagem **aceite** → o episódio tem **garantido** o seu trabalho nativo dentro dos 1500 ms. O
+  limitador não volta a intervir dentro dele. **A situação de esfomeamento da §4 não pode ocorrer.**
+- Logo `Lost` só é alcançável a partir de um episódio **admitido**, e a admissão está limitada pelo
+  teto. Um atacante dentro do teto força no máximo 5 episódios/60 s que, contra um shell saudável,
+  sucedem em ~3 ms e restauram `Available` muito antes do deadline. **`Lost` continua a exigir uma
+  perda real.**
+
+E a exigência da §4 que **não** é enfraquecida: *"nunca pode permitir que a prova `Available` antiga
+sobreviva a um broadcast recém-aceite"* — satisfeita por R1, porque a aceitação e a saída de
+`Available` são o mesmo bloco síncrono.
+
+## 3 — Ciclo de vida do episódio
+
+Um **episódio** é a única unidade de recuperação. **Todo** estabelecimento de disponibilidade positiva
+é um episódio — o de arranque (`EstablishAsync`) e o desencadeado por broadcast usam **o mesmo
+árbitro**, para não existir um segundo caminho onde um `Available` falso se possa esconder.
 
 ```
-        Establish()                     NIM_ADD+SETVERSION = true
-Unavailable ─────────────► Recovering ──────────────────────────► Available
-     ▲                        │  ▲                                    │
-     │                        │  │  TaskbarCreated aceite             │
-     │  budget A esgotado     │  └────────────────────────────────────┘
-     │  com falha observada   │
-     │                        ▼
-     └──────────────────── Lost            (qualquer estado) ──Release──► Releasing (terminal)
+ADMISSÃO (bloco síncrono único na WndProc — R1)
+  ├─ pré-condição: State == Available            (só se invalida uma prova que existe)
+  ├─ EpisodeFrequencyLimiter.TryBeginEpisode(now) → false ⇒ NÃO ACEITE, retorna, nada muda
+  └─ true ⇒ ATOMICAMENTE, sem qualquer await no meio:
+        episodeId  := ++_generation
+        start      := TimeProvider.GetTimestamp()
+        deadline   := start + 1500 ms
+        State      := Recovering            ◄── Available deixa de ser publicado AQUI
+     ...só depois disto o controlo sai do bloco.
+
+EPISÓDIO (dentro de Recovering, dentro do deadline)
+  debounce 250 ms → tentativas do orçamento A → cada uma com revalidação (secção 5)
+  desfecho: Available (prova positiva)  |  Lost causa A  |  Lost causa B
 ```
 
-- **`Unavailable`** — nunca estabelecido nesta sessão.
-- **`Recovering`** — a afordância **não está positivamente provada**; há um episódio limitado em
-  curso. **Não reclama `Available`. Não degrada a S2.**
-- **`Available`** — só depois de `NIM_ADD` **e** `NIM_SETVERSION` terem devolvido `true` pela
-  fronteira nativa. **Produtor único.**
-- **`Lost`** — **exclusivamente** de falha **observada** de `NIM_ADD`/`NIM_SETVERSION` que esgote o
-  orçamento A. Nunca de uma mensagem, nunca de supressão por orçamento B, nunca de expiração de
-  deadline sem falha observada.
-- **`Releasing`** — terminal, absorvente. Nada sai daqui.
+**Pré-condições de admissão, exaustivas.** Admite-se **só** a partir de `Available`. De `Recovering`
+coalesce-se no episódio em curso; de `Unavailable`, `Lost` e `Releasing` **não há admissão** — em
+`Lost` a sessão já está degradada e o desenho aprovado proíbe oscilar de volta, e só uma transição de
+ciclo de vida revista em separado pode abrir uma nova sessão de tray.
 
-## B — Contrato público de afordância para a S2
+## 4 — O debounce, redefinido
+
+O debounce de 250 ms fica **DENTRO** do `Recovering` e **DENTRO** dos 1500 ms, e serve **apenas** para
+coalescer mensagens adicionais. Explicitamente, **não**:
+
+- atrasa a entrada em `Recovering`;
+- atrasa o início do deadline;
+- preserva `Available`;
+- reinicia o `startTimestamp`;
+- estende o deadline;
+- cria geração nova.
+
+Broadcasts adicionais durante o episódio **juntam-se ao episódio existente**. A incerteza nominal é
+**1500 ms e não 1750 ms**, porque o relógio arranca na admissão e não depois do debounce.
+
+## 5 — Árbitro monotónico não reiniciável *(§5 · §6 · §7)*
+
+O deadline pertence a **um** árbitro de episódio, monotónico e não reiniciável. **Não pode depender
+apenas** de verificações antes dos `await`, de aritmética de atrasos, nem do momento em que o
+dispatcher decide retomar.
+
+```csharp
+// Falha se a geração mudou, se há release/terminal, ou se o deadline passou.
+bool StillValid(long episodeId);
+```
+
+- **Depois de CADA fronteira assíncrona:** revalidar geração → estado terminal/release → deadline.
+- **Depois de CADA chamada nativa síncrona ao shell:** **reler o tempo monotónico e revalidar o
+  deadline ANTES de interpretar o sucesso como `Available`.** Uma chamada síncrona pode atravessar o
+  prazo mesmo tendo começado dentro dele.
+- `NIM_ADD` **só** pode ser invocado a partir de um caminho que chamou `StillValid` imediatamente
+  antes, **sem qualquer `await` entre a verificação e a chamada**.
+
+### A race que isto existe para matar
+
+```
+t0        NIM_ADD começa          (dentro do deadline)
+t0+Δ      deadline expira
+t0+Δ+ε    NIM_ADD devolve TRUE    (depois do deadline)
+```
+
+**O sucesso é descartado como obsoleto.** Nunca vira `Available`. O desfecho terminal do episódio
+mantém-se **`Lost` por expiração**. Idêntico para `NIM_SETVERSION`. É R2 a operar: a revalidação do
+deadline acontece **depois** da chamada e **antes** da interpretação do resultado.
+
+### Terminalidade da expiração
+
+Comprometido o episódio a `Lost` por expiração: nenhum retry continua · nenhuma continuação de
+debounce atrasada corre registo · **nenhum resultado nativo bem-sucedido ressuscita `Available`** ·
+`TaskbarCreated` posteriores **não reabrem o mesmo episódio**. `Release`/`EXITING` continua a dominar
+o `Lost` e toda continuação de recuperação.
+
+## 6 — Contrato público para a S2
 
 ```csharp
 public enum TrayAffordanceState
 {
-    Unavailable = 0,   // CV-4: ordinal 0 é o valor seguro de qualquer campo/mock por inicializar
+    Unavailable = 0,   // ordinal 0 é o valor seguro de qualquer campo ou mock por inicializar
     Available   = 1,
     Recovering  = 2,
     Lost        = 3
@@ -60,35 +170,25 @@ public interface ITrayAffordance
 }
 ```
 
-Como a S2 consome, normativo:
-
 | Estado | A S2 faz |
 |---|---|
-| `Available` | `BACKGROUND` é legítimo |
-| `Recovering` | **segura**: não degrada, e **não** trata como disponível para decisões novas. Tolerado **apenas** durante o deadline de recuperação da secção E |
-| `Lost` | degradação **obrigatória**: Definições → Segundo plano · InfoBar Warning · sessão `FOREGROUND` degradada · saída verdadeira no resto da sessão |
+| `Available` | `BACKGROUND` legítimo |
+| `Recovering` | **segura**; não degrada e não trata como disponível. Limitado pelo deadline de 1500 ms |
+| `Lost` | degradação **obrigatória** (Definições → Segundo plano · InfoBar Warning · `FOREGROUND` degradado · saída verdadeira no resto da sessão) |
 | `Unavailable` | no arranque `--background`, degradação obrigatória; nunca permanecer headless |
 
-**Invariante revisto, tal como mandado:** `BACKGROUND` tolera **apenas** um intervalo de revalidação
-curto e estritamente limitado, durante o qual o tray **não é representado como `Available`**. Não
-reestabelecido dentro do contrato limitado → `Lost` → degradação.
+`szTip`/`hIcon` estáticos; nenhum dado de snapshot atravessa o caminho do shell. **Posse terminal
+única:** só `ReleaseAsync`; qualquer `NIM_DELETE` síncrono é detalhe interno dela.
 
-**CV-5 mantém-se:** `szTip`/`hIcon` estáticos; nenhum dado de snapshot atravessa o caminho do shell.
+## 7 — Os dois orçamentos, independentes
 
-## C — Os dois orçamentos, estruturalmente independentes *(§1 · CV-2b)*
+**A — retry de falhas, dentro de um episódio.** 3 tentativas (inicial + 2), atrasos 250 ms e 1000 ms
+(~1250 ms programados), sob o deadline de 1500 ms. Um sucesso **pode** repô-lo para um episódio
+futuro. Esgotado com falha observada → `Lost` causa A.
 
-### Orçamento A — retry de falhas, **dentro** de um episódio
-
-3 tentativas (inicial + 2), atrasos 250 ms e 1000 ms, cancelável, determinístico sob `TimeProvider`.
-**Um sucesso pode repô-lo** para um episódio futuro — um reinício legítimo do Explorer não pode
-consumir o direito a recuperar de uma falha futura. Esgotado com falha observada → `Lost`.
-
-### Orçamento B — frequência de **episódios iniciados**
-
-Janela deslizante **monotónica**, a contar **episódios iniciados, independentemente do desfecho**.
-Proposta: **5 episódios por 60 s**. **Nada além da passagem do tempo o repõe.**
-
-### A independência é estrutural, não uma regra que alguém tem de lembrar
+**B — frequência de episódios admitidos por broadcast.** Janela deslizante monotónica, 5 por 60 s,
+a contar admissões independentemente do desfecho. **Nada além da passagem do tempo o repõe.** Não
+conta o episódio de arranque, que não é desencadeado por input externo.
 
 ```csharp
 // Não conhece sucesso, falha, nem número de tentativas. Não existe API para lho dizer.
@@ -98,282 +198,110 @@ internal sealed class EpisodeFrequencyLimiter
 }
 ```
 
-**O limitador não pode ser reposto por sucesso porque nada no programa lhe consegue comunicar um
-sucesso.** Não há `Reset()`, não há `OnSuccess()`, não há campo partilhado. Contadores separados,
-tipos separados, **nenhum caminho em que o desfecho de A escreva em B** — verificável por inspeção da
-superfície do tipo, não por disciplina.
+**Não pode ser reposto por sucesso porque nada no programa lhe consegue comunicar um sucesso.** Sem
+`Reset()`, sem `OnSuccess()`, sem campo partilhado. **Nenhum caminho em que o desfecho de A escreva em
+B** — verificável por inspeção da superfície do tipo. **Exceder B não emite `Lost`**: a mensagem
+simplesmente não é aceite.
 
-### Ordem das guardas, e porque o gate de frequência vem **antes** de invalidar
+**Deadline (1500 ms) e janela de frequência são coisas distintas:** o primeiro limita *quanto dura um
+episódio*, a segunda *quantos episódios começam*. O sucesso pode afetar A; **não pode apagar o
+histórico de B**.
 
-```
-TaskbarCreated
-  → debounce (250 ms; rajadas colapsam num sinalizador pendente)
-  → se episódio EM VOO: marcar pendente, sair. Nunca um segundo em paralelo.
-  → EpisodeFrequencyLimiter.TryBeginEpisode(now)
-        false → a mensagem NÃO TEM EFEITO NENHUM: não invalida o registo, não publica Recovering,
-                não emite Lost. Fica-se no estado atual.
-        true  → publicar Recovering → correr o episódio com o orçamento A e o deadline de E
-```
+> **Temporização, para o registo e sem reabrir:** 1500 ms = ~1250 ms de atrasos programados + ~250 ms
+> de folga de execução/agendamento. **A folga é decisão nossa, não garantia de plataforma do Windows.**
 
-**Porque é esta a ordem, e não a inversa.** Se invalidássemos primeiro e só depois consultássemos B,
-uma supressão deixaria a máquina presa em `Recovering` sem forma de sair: não houve falha observada,
-logo `Lost` é proibido, e voltar a `Available` seria publicar disponibilidade não provada. Com o gate
-antes, **uma mensagem suprimida é exatamente equivalente a uma mensagem que nunca chegou** — o que é a
-resposta correta para input não autenticado, e torna *"exceder B não emite `Lost`"* verdadeiro por
-construção em vez de por regra.
+## 8 — Condições do Vigil
 
-**Trade-off assumido:** se um reinício legítimo do Explorer for suprimido por B, ficamos com
-`Available` sobre um ícone morto até a janela deslizar. É por isso que o teto de B é generoso face ao
-ritmo legítimo plausível (reinício do Explorer + mudanças de DPI). **Números são de engenharia, não
-documentados; Atlas é o dono da revisão.**
+**CV-1, sete pontos.** Default-deny · identidade da mensagem (o nosso `uCallbackMessage` ou o
+`TaskbarCreated` registado; o id é seletor, nunca prova de origem) · `lParam` low word na lista fechada
+`NIN_SELECT`/`NIN_KEYSELECT`/`WM_CONTEXTMENU`/`WM_LBUTTONDBLCLK` · `lParam` high word `uID == 1` ·
+`wParam` é coordenada não confiável, **só** âncora, nunca índice/offset/dimensão, **saneada** — âncora
+fora de todos os monitores ⇒ **DESCARTAR** · nenhuma mensagem transporta ou desreferencia ponteiro ·
+teto de impacto de uma forja = incómodo de UI, sem chegar ao `RequestExit` sem clique real.
 
-## D — Debounce e coalescing
+**CV-6b — validação não conjuntiva.** Quatro casos independentes, todos os campos não relacionados
+válidos. **B e C são obrigatórios**; um teste só conjuntivo não é suficiente, e a mutação de **qualquer
+uma** das validações tem de falhar testes.
 
-Debounce de 250 ms; **um episódio em voo**; mensagem durante um episódio marca pendente e origina **no
-máximo mais um** episódio, ele próprio sujeito ao gate de B. **Não existe ordenação garantida entre
-broadcasts e o desenho não depende de nenhuma** — o coalescing torna a ordem irrelevante. O
-sinalizador pendente é por geração e é limpo no `Release`.
+| | callback | `uID` | resultado |
+|---|---|---|---|
+| A | válido | válido | **aceite** |
+| **B** | inválido | válido | **ignorado** |
+| **C** | válido | inválido | **ignorado** |
+| D | inválido | inválido | ignorado |
 
-## E — `TRAY RECOVERY GLOBAL MONOTONIC DEADLINE` = **1500 ms** *(§6 · decisão do humano)*
+**CV-7 — medido, passa.** `TaskbarCreated` recebido num HWND **da thread de UI**, com
+`WS_EX_TOOLWINDOW`, top-level, sem dono, nunca mostrado, em processo empacotado **headless**. A
+topologia mantém-se e a CV-1 conserva a aprovação na topologia em que foi dada. **Emissor: o
+`PostMessage(HWND_BROADCAST, …)` desta sessão, não o Explorer** — o originado pelo Explorer continua
+`NOT_RUN`.
 
-Distinção que a revisão 2 confundia, agora com o valor aprovado e fundamentado por medição:
-
-- **Orçamento programado de atrasos** = 250 ms + 1000 ms = **~1250 ms**. É apenas a soma dos `await`.
-  **Não é limite superior de nada**, porque ignora o custo das chamadas síncronas ao shell.
-- **Deadline monotónico global de recuperação** = **1500 ms**. É o limite duro real: ~1250 ms de
-  atrasos programados **+ ~250 ms de folga de execução e agendamento**. Capturado **uma vez** no
-  início do episódio com `TimeProvider.GetTimestamp()`.
-
-> **Os 250 ms de folga são decisão nossa, não garantia de plataforma do Windows.** O Windows não
-> promete tempo nenhum para o `Shell_NotifyIcon`. A folga foi dimensionada a partir do custo nativo
-> **medido** nos gates: `COLD NIM_ADD` ~10,06 ms · `STEADY` mediana ~3,16 / máx ~4,36 ms · `CHURN`
-> p95 ~4,44 / máx ~4,61 ms. O desenho anterior tinha 750 ms de margem — substancialmente
-> sobredimensionada face ao que as chamadas custam de facto.
-
-### Significado semântico — é uma decisão de segurança e ciclo de vida, não uma otimização
-
-Os 1500 ms **são uma decisão de segurança/ciclo de vida do ServerAlyzer**. Significam:
-
-```
-afordância positiva NÃO reestabelecida antes do deadline monotónico global
-  → a recuperação FALHA
-  → publicar Lost
-  → a S2 degrada para FOREGROUND → Definições > Segundo plano → InfoBar Warning
-  → semântica de saída verdadeira no resto da sessão
-```
-
-### O deadline NUNCA é estendido — quatro proibições explícitas
-
-**O deadline pertence a UM episódio de recuperação, é monotónico e não é reiniciável.** A aplicação
-**nunca** o pode estender por nenhuma destas razões:
-
-1. **um `NIM_ADD` ter tido sucesso** — um sucesso parcial dentro do episódio não compra tempo;
-2. **ter chegado outro `TaskbarCreated`** — mensagem nova não prolonga o episódio em curso;
-3. **o orçamento de retry (A) ter sido reposto** — repor A é sobre episódios **futuros**, nunca sobre
-   o tempo restante deste;
-4. **o debounce ter reiniciado** — o debounce coalesce mensagens, não desloca o relógio do episódio.
-
-**É imposto, não prometido:** antes de **cada tentativa** e antes de **cada atraso**, o episódio
-verifica o tempo monotónico restante; se não chegar para a operação seguinte, **abandona sem a
-iniciar**. O deadline é também o que limita publicamente o intervalo `Recovering` da secção B — é ele
-que torna o "curto e estritamente limitado" um número verificável em vez de uma intenção.
-
-### Os dois limites continuam independentes — não confundir
-
-O **deadline de recuperação (1500 ms)** e a **janela de frequência adversarial (orçamento B)** são
-coisas diferentes e não se tocam. O deadline limita *quanto tempo um episódio pode durar*; a janela
-limita *quantos episódios podem começar*. **Um sucesso pode afetar um orçamento futuro de retry de
-falhas (A), mas NÃO PODE apagar o histórico de frequência (B)** — e, como a secção C mostra, nem
-sequer tem forma de o comunicar.
-
-### Nota de desenho para quem fizer o QA de reinício real do Explorer
-
-Quando existir implementação com forma de produção, o QA real medirá se 1500 ms é operacionalmente
-adequado. **Se a recuperação real do Explorer exceder ocasionalmente os 1500 ms, isso NÃO justifica
-estender em silêncio a incerteza de `BACKGROUND`.** A avaliação correta começa por afinar o
-**calendário de retries** — por exemplo a distribuição dos atrasos dentro do mesmo orçamento —
-**preservando um contrato de recuperação estritamente limitado**. Alargar o deadline é a última
-opção, nunca a primeira, e nunca em silêncio: aumenta a janela em que a app monitoriza sem afordância
-de saída provada, que é exatamente o risco que esta sub-fatia existe para fechar.
-
-## F — Geração terminal e ordenação do `Release` *(§3 · §4)*
-
-**Posse terminal única.** A superfície pública tem **uma** operação terminal: `ReleaseAsync`. **Não
-existe `RemoveTrayIcon` público.** Qualquer helper síncrono de `NIM_DELETE` é detalhe interno dessa
-operação. **Um dono, um estado terminal, uma sequência de limpeza.**
-
-```
-ReleaseAsync (idempotente)
-  1. Interlocked.Increment(_generation)      // invalida toda continuação em voo
-  2. estado := Releasing                     // absorvente
-  3. cancelar o CTS do episódio
-  4. NIM_DELETE (interno, uma vez)
-```
-
-**Propriedade exigida:** começado o `Release`, **nenhuma continuação de geração antiga pode recriar o
-ícone**. Após `Releasing`: um `TaskbarCreated` **não** inicia recuperação; callbacks **não** reabrem o
-flyout; **nenhum** `Available`/`Lost` é publicado.
-
-## G — Barreiras de continuação assíncrona
-
-Regra de código, verificável por inspeção e por mutação:
-
-```csharp
-if (!StillCurrent(myGeneration)) return;    // geração · cancelamento · estado terminal
-```
-
-- Chamado **depois de cada `await`**, sem exceção.
-- **`NIM_ADD` só pode ser invocado a partir de um caminho que chamou `StillCurrent` imediatamente
-  antes, sem qualquer `await` entre a verificação e a chamada.**
-- Teste de barreira determinística da §5: suspender antes do `NIM_ADD` seguinte → `Release` → retomar
-  → a continuação observa geração obsoleta → **sem `NIM_ADD`, sem ressurreição**.
-
-## H — Tratamento completo das condições do Vigil
-
-**CV-1 (referência normativa, sete pontos).** Default-deny · identidade da mensagem (nosso
-`uCallbackMessage` ou o `TaskbarCreated` registado; o id é seletor, nunca prova de origem) · `lParam`
-low word na lista fechada `NIN_SELECT`/`NIN_KEYSELECT`/`WM_CONTEXTMENU`/`WM_LBUTTONDBLCLK` · `lParam`
-high word `uID == 1` · `wParam` é coordenada não confiável, só âncora, nunca índice/offset/dimensão ·
-nenhuma mensagem transporta ou desreferencia ponteiro · teto de impacto de uma forja = incómodo de UI,
-sem chegar ao `RequestExit` sem clique real.
-
-> **Escolha explícita no ponto 5, que a CV-1 deixa ao implementer: DESCARTAR.** Uma âncora fora de
-> todas as áreas de trabalho de monitor faz a mensagem ser descartada, não corrigida. Razão: um ponto
-> fora de qualquer monitor não tem origem legítima possível, e descartar é fail-closed e trivialmente
-> testável. Asserido pelo caso 4 da CV-6b.
-
-**CV-2/CV-2b** — fechadas pela secção C, mais o **teste adversarial de sucesso-sempre** (secção I).
-
-**CV-7 — gate de medição do modelo de thread: MEDIDO, PASSA.** `TaskbarCreated` (id `0xC073`) foi
-recebido num HWND **criado na thread de UI**, **com `WS_EX_TOOLWINDOW`**, top-level, sem dono, nunca
-mostrado, num processo empacotado **headless** (`MainWindowHandle = 0` durante toda a medição).
-**Consequência: a topologia da secção B mantém-se, e a CV-1 NÃO precisa de ser reavaliada noutra
-topologia** — o caminho de recurso (thread de pump dedicada + `TryEnqueue`) fica por usar, e o
-sinalizador de "em voo" continua protegido por afinidade de thread.
-
-> **Honestidade sobre o emissor:** o broadcast foi o `PostMessage(HWND_BROADCAST, …)` desta sessão,
-> **não o Explorer**. O que fica provado é a **entrega** nesta topologia, que era a metade em dúvida.
-> O `TaskbarCreated` originado pelo Explorer real continua `NOT_RUN` (item F da secção N).
-
-**CV-8 — `Shell_NotifyIcon` síncrono na thread de UI: MEDIDO, aceitável.** Custos na thread de UI:
-
-| Cenário | `NIM_ADD` | `NIM_DELETE` |
-|---|---|---|
-| COLD (1.ª chamada do processo) | **10,06 ms** | — |
-| STEADY (n=20) | mediana 3,16 · máx 4,36 ms | mediana 0,38 · máx 0,67 ms |
-| CHURN (n=100, sem pausa) | mediana 3,11 · p95 4,44 · máx **4,61 ms** | máx 0,74 ms |
-
-Limiar declarado: um frame a 60 Hz = **16,7 ms**. A pior chamada isolada (10,06 ms, fria) fica abaixo
-de um frame; em regime o máximo é 4,6 ms. **O redesenho condicional NÃO é acionado: a chamada nativa
-permanece na thread de UI.**
-
-> **Mas o limitador de frequência MANTÉM-SE, e a medição é a razão.** 100 ciclos add+delete
-> consumiram **≈372 ms** de thread de UI (~3,7 ms por ciclo). Churn sustentado **consome tempo
-> significativo da thread que desenha a aplicação**. É o debounce mais o orçamento B que tornam isto
-> inofensivo — com debounce de 250 ms o teto é ~4 episódios/s ≈ 15 ms/s (~1,5% da UI), e com B
-> (5 episódios/60 s) ≈ 0,03%. **O custo bruto por si só não seria seguro; são os limites do desenho
-> que o tornam seguro.**
->
-> **Pior caso ainda por medir:** o shell a reiniciar. Exige a autorização de reinício do Explorer e
-> mantém-se `NOT_RUN`. O COLD de 10,06 ms é o pior observável sem essa autorização.
-
-**Nota sobre o `FindWindowW`.** Durante a medição, `FindWindowW` pelo nome de classe a partir de outro
-processo devolveu `0`, mas `EnumWindows` encontrou a janela sem dificuldade. **Isto não é — e não pode
-ser tratado como — propriedade de segurança.** Não determinei a causa, a obscuridade nunca foi o
-controlo, e o modelo de ameaça do ponto 7 da CV-1 mantém-se válido pela via da enumeração.
+**CV-8 — medido; a chamada fica na thread de UI.** Frio ~10,06 ms; steady/churn máx < 4,7 ms; limiar
+declarado de um frame a 60 Hz = 16,7 ms. **Estas medições não são garantia de desempenho do Windows.**
+**O limitador de frequência mantém-se**, porque 100 ciclos add+delete custaram ≈372 ms de thread de UI:
+o custo bruto por si só não seria seguro; são os limites do desenho que o tornam seguro. **Pior caso
+com o shell a reiniciar continua `NOT_RUN`.** A troca condicional continua barata se algum dia for
+precisa: `INativeTrayRegistration` é o único ponto de contacto e não toca na máquina de estados.
 
 **CV-9 — reentrância com flyout aberto.** Guarda `_flyoutOpen` na thread de UI: com o flyout aberto,
-**toda** `WM_CONTEXTMENU` adicional é descartada por default-deny — não empilha segundo flyout, não
-reposiciona o aberto, e não escreve no sinalizador de "em voo" nem no estado de episódio (caminhos
-disjuntos por desenho). A janela auxiliar é escondida no `Closed` do flyout, e isso é asserido.
+`WM_CONTEXTMENU` adicional ou forjada é descartada por default-deny — **sem segundo flyout, sem
+reposicionamento, sem mutação do estado de episódio, sem alteração de visibilidade da janela
+auxiliar**. A janela auxiliar é escondida no `Closed` do flyout, e isso é asserido.
 
-## I — Plano de evidência de mutação *(§11 · CV-6b)*
+## 9 — Evidência de mutação
 
-Seam no limite nativo (`INativeTrayRegistration { bool Add(); bool SetVersion(); bool Delete(); }`);
-**máquina de estados sob teste é a de produção**; tempo por `TimeProvider` monotónico determinístico.
-
-### Os seis exigidos antes da próxima review
+Seam no limite nativo (`INativeTrayRegistration`); **máquina de estados sob teste é a de produção**;
+tempo monotónico determinístico por `TimeProvider`.
 
 | # | Mutação na produção | Teste que TEM de falhar |
 |---|---|---|
-| 1 | **um sucesso repõe/limpa a janela de frequência de `TaskbarCreated`** | **adversarial: `Add` sempre `true`, broadcasts em ciclo ⇒ B converge para supressão** |
-| 2 | `Available` continua publicado durante `Recovering` | após `TaskbarCreated` aceite, o estado publicado é `Recovering`, nunca `Available` |
-| 3 | verificação de geração pós-`await` removida | continuação obsoleta após `Release` **não** chama `NIM_ADD`; sem ressurreição |
-| 4 | esgotamento de retries a permanecer em `BACKGROUND` | 3 falhas observadas ⇒ `Lost` e o consumidor sai de background |
-| 5 | recuperação de `TaskbarCreated` removida | mensagem aceite ⇒ `Add` reinvocado e `Available` reemitido |
-| 6 | encaminhamento de callback removido | callback v4 válido ⇒ `OpenRequested`/flyout exatamente uma vez |
+| 1 | um sucesso repõe/limpa a janela de frequência | **adversarial de sucesso-sempre**: `Add` sempre `true`, broadcasts em ciclo ⇒ B converge para supressão |
+| 2 | `Recovering` publicado **depois** do debounce em vez de na admissão | **R1**: não existe instante entre a aceitação e `Recovering` com `Available` publicado |
+| 3 | verificação de deadline **pós-chamada nativa** removida | **§6**: `NIM_ADD` que devolve `true` depois do deadline **não** publica `Available`; desfecho fica `Lost`. Idem `NIM_SETVERSION` |
+| 4 | expiração do deadline não produz `Lost` | deadline expirado ⇒ `Lost` mesmo sem falha nativa |
+| 5 | verificação de geração pós-`await` removida | continuação obsoleta após `Release` não chama `NIM_ADD` |
+| 6 | recuperação de `TaskbarCreated` removida | mensagem aceite ⇒ `Add` reinvocado e `Available` reemitido |
+| 7 | encaminhamento de callback removido | callback v4 válido ⇒ `OpenRequested`/flyout exatamente uma vez |
+| 8 | esgotamento de retries permanece em `BACKGROUND` | falhas observadas ⇒ `Lost` e o consumidor sai de background |
+| 9 | **cada uma** das validações da CV-6b, individualmente | os casos B e C falham isoladamente |
 
-> A mutação 1 é a que fecha o buraco real: **exercitar só o caminho de falha deixaria por cobrir
-> exatamente o defeito que existia**, porque com `Add` sempre a falhar o teto engatava por acidente.
+Mais: `Unavailable` no ordinal 0 · produtor único de `Available` · `szTip`/`hIcon` estáticos ·
+exatamente 3 tentativas · admissão impossível a partir de `Lost`/`Releasing`/`Unavailable` ·
+`Release` idempotente · nenhum evento publicado após o release terminal · `NIM_DELETE` exatamente uma
+vez. **Nada entregue só com suite verde.**
 
-### CV-6b — quatro casos **independentes**, não uma conjunção
+## 10 — `FORCED-TERMINATION TRAY CLEANUP` (S6)
 
-Cada caso tem **todos os outros campos válidos**, para isolar um único filtro; e **cada um tem de
-falhar** se a validação correspondente for removida da classe de produção:
+**`EMPIRICAL QA ACCEPTANCE WINDOW` = 120 s, fixada aqui, antes da corrida.** O Windows não documenta
+prazo de limpeza; a janela é empírica e fixada a priori para não poder ser escolhida retroativamente.
+Procedimento: `TerminateProcess` pelo watchdog → 120 s sem interação → **uma** passagem do rato sobre a
+área de notificação → registar. Órfão transitório aceitável; **órfão persistente = FAIL**; obsoleto não
+interativo; lançamento seguinte cria **exatamente um** ícone; sem duplicados; sem consola/WER. **Não se
+exige `NIM_DELETE` do processo morto** — o kernel reclama os handles USER/GDI na morte do processo.
 
-1. id de mensagem errado · evento válido · `uID == 1` → ignorado.
-2. `uID ≠ 1` · id correto · evento válido → ignorado.
-3. evento fora da lista fechada (v3, ou fora de gama) · id correto · `uID == 1` → ignorado.
-4. `wParam` fora de qualquer monitor · tudo o resto válido → **descartado** (escolha da secção H).
+## 11 — Veredictos
 
-### Restantes
+**Atlas — PENDENTE.** O pedido é direto: **verificar R1 e R2 da secção 0**, e o corolário de que não
+existe escalonamento do dispatcher que produza `Available` entre a aceitação e o fim do episódio. Mais:
+a resolução da §4 que proponho na secção 2; a terminalidade da expiração; a revalidação pós-chamada
+nativa. **Se encontrares outro intervalo pré-episódio ou de `Available` falso, devolve como falha de
+raiz da máquina de estados — não como número a ajustar.**
 
-`Unavailable` no ordinal 0 · produtor único de `Available` · `szTip`/`hIcon` estáticos · exatamente 3
-tentativas e não 4 · deadline monotónico verificado **antes de cada tentativa e de cada atraso** ·
-`Release` idempotente · `TaskbarCreated` após `Releasing` não inicia recuperação · nenhum evento
-publicado após o release terminal · CV-9 com flyout aberto · `NIM_DELETE` exatamente uma vez.
+**Prism — PASS registado.** Menu preservado exatamente: Abrir o ServerAlyzer · Modo compacto ·
+Atualizar todos · Definições · Sair do ServerAlyzer. Tema multi-raiz dentro do processo em âmbito;
+persistência entre arranques fora de âmbito (THEME-1).
 
-**Nada entregue só com suite verde.** A evidência de mutação acompanha a entrega.
+**Vigil — PENDENTE.** Duas perguntas: (i) a secção 2 — concorda que o limitador tem de governar a
+admissão e nunca esfomear um episódio admitido, e que a leitura literal da §4 reabriria a CV-2? (ii) o
+adversarial de sucesso-sempre continua a convergir para supressão nesta máquina de estados?
 
-## J — Critério de observação do `FORCED-TERMINATION TRAY CLEANUP` *(§8)*
-
-**Fixado aqui, antes da corrida humana. Não será escolhido retroativamente.**
-
-> **`EMPIRICAL QA ACCEPTANCE WINDOW` = 120 segundos.** Não é garantia de plataforma: **o Windows não
-> documenta prazo de limpeza de ícones órfãos**, e por isso a janela é rotulada como empírica e é
-> fixada a priori precisamente para não poder ser ajustada depois de se observar o resultado.
-
-Procedimento, por esta ordem: `TerminateProcess` pelo watchdog → observar a área de notificação
-durante **120 s sem qualquer interação** → depois **uma única passagem do rato** sobre a área de
-notificação (gesto clássico que leva o shell a reclamar ícones cujo HWND dono morreu) → registar.
-
-Critérios: renderização obsoleta transitória **aceitável**; **órfão persistente para além da janela =
-FAIL**; o ícone obsoleto **não pode continuar interativo**; o lançamento seguinte cria **exatamente
-um** ícone utilizável; sem duplicados; tray funcional após reinício; sem consola/WER.
-**Não se exige `NIM_DELETE` do processo morto.**
-
-## K / L / M — veredictos, e o portão de temporização
-
-**Esta review formal É o portão de temporização.** O humano dispensou pré-review separada do Atlas.
-
-**K — Atlas: PENDENTE.** As quatro decisões explícitas que lhe são pedidas:
-1. **1500 ms é internamente consistente com o calendário de retries?** (~1250 ms de atrasos + ~250 ms
-   de folga, contra o custo nativo medido em H.)
-2. **O deadline é mesmo monotónico e não reiniciável?** (as quatro proibições da secção E.)
-3. **A recuperação NÃO pode excedê-lo por via da lógica de agendamento/retry?** (verificação do tempo
-   restante antes de cada tentativa **e** de cada atraso.)
-4. **O `Release` continua a dominar a recuperação em CADA `await`?** (secções F e G.)
-Mais, herdado: os números de A (3 / 250 / 1000) e de B (5 / 60 s); a ordem das guardas em C e o
-trade-off de um reinício legítimo suprimido.
-
-**L — Prism: PASS registado; revê apenas as consequências visíveis da janela de recuperação mais
-curta.** Ordem do menu **fechada e preservada exatamente**: Abrir o ServerAlyzer · Modo compacto ·
-Atualizar todos · Definições · Sair do ServerAlyzer — a substituição do backend **não redesenha o
-menu**. Tema multi-raiz dentro do processo **em âmbito**; persistência entre arranques **fora de
-âmbito** (THEME-1 no backlog, não é critério de aceitação).
-
-**M — Vigil: PENDENTE.** Duas coisas: (i) revalidar o **caso adversarial de sucesso-sempre** contra o
-limitador de frequência independente (mutação 1 da secção I); (ii) confirmar que publicar `Recovering`
-em vez de `Available` durante o re-registo **não** enfraquece a CV-2 — o meu argumento é que não,
-porque quem degrada a S2 é `Lost` e `Recovering` não degrada nada.
-
-## N — `NOT_RUN` restantes (QA de plataforma real)
+## 12 — `NOT_RUN` de plataforma real
 
 | | Caso | Estado |
 |---|---|---|
 | A | registo inicial no shell real | `NOT_RUN` |
 | B | tray headless real | `NOT_RUN` |
-| C | menu/flyout: teclado, tema, e **CV-9 com o menu aberto** | `NOT_RUN` |
+| C | menu/flyout: teclado, tema, CV-9 com o menu aberto | `NOT_RUN` |
 | D | reinício real do Explorer em `FOREGROUND` | `NOT_RUN` — **autorização humana** |
 | E | reinício real em `BACKGROUND`/headless | `NOT_RUN` — **autorização humana** |
 | F | `TaskbarCreated` entregue **pelo próprio Explorer** | `NOT_RUN` — não promovível do broadcast sintético |
@@ -382,10 +310,16 @@ porque quem degrada a S2 é `Lost` e `Recovering` não degrada nada.
 | I | sem janela auxiliar visível nem botão na barra de tarefas | `NOT_RUN` |
 | J | degradação por falha de registo forçada | `NOT_RUN` |
 | K | sem consola / sem WER | `NOT_RUN` |
-| L | `FORCED-TERMINATION TRAY CLEANUP` (janela de 120 s da secção J) | `NOT_RUN` |
-| **M** | **CV-7** — `TaskbarCreated` em HWND da thread de UI com `WS_EX_TOOLWINDOW`, headless | **MEDIDO · PASSA** (emissor sintético; ver H) |
-| **N** | **CV-8** — custo de `NIM_ADD`/`NIM_DELETE` na thread de UI | **MEDIDO · aceitável** (ver H) |
-| O | **CV-8 pior caso com o shell a reiniciar** | `NOT_RUN` — **autorização humana** |
+| L | `FORCED-TERMINATION TRAY CLEANUP` (secção 10) | `NOT_RUN` |
+| M | CV-7 — entrega na topologia do desenho | **MEDIDO · PASSA** (emissor sintético) |
+| N | CV-8 — custo nativo na thread de UI | **MEDIDO · aceitável** |
+| O | CV-8 pior caso com o shell a reiniciar | `NOT_RUN` — **autorização humana** |
+| **P** | **1500 ms é operacionalmente adequado num reinício real** | `NOT_RUN` — **autorização humana** |
 
-**M e N eram gates do desenho e estão fechados por medição** — fixaram a topologia de thread e
-fundamentaram os 1500 ms. **Tudo o resto continua `NOT_RUN`, e o Explorer não é reiniciado.**
+**Nota de desenho para quem correr o item P.** Se a recuperação real exceder ocasionalmente os
+1500 ms, isso **não justifica estender em silêncio a incerteza de `BACKGROUND`**. Avaliar primeiro a
+afinação do **calendário de retries dentro do mesmo orçamento**, preservando um contrato estritamente
+limitado. Alargar o deadline é a última opção e nunca em silêncio: aumenta a janela em que a app
+monitoriza sem afordância de saída provada, que é o risco que esta sub-fatia existe para fechar.
+
+**O Explorer não é reiniciado nesta volta.**
