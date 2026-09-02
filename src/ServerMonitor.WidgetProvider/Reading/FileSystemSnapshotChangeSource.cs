@@ -177,6 +177,28 @@ public sealed class FileSystemSnapshotChangeSource : ISnapshotChangeSource
     }
 
     /// <summary>
+    /// Test seams: drive the REAL event handlers with the argument shapes Windows produces, so the name
+    /// filter can be proved exhaustively — including that unrelated files in the same directory raise
+    /// nothing — without waiting on the OS to NOT do something, which is unprovable in bounded time.
+    /// The handlers themselves are exercised end to end against the real filesystem by the positive tests.
+    /// </summary>
+    internal void SimulateFileEventForTesting(WatcherChangeTypes change, string name) =>
+        OnFileEvent(this, new FileSystemEventArgs(change, _directory, name));
+
+    /// <inheritdoc cref="SimulateFileEventForTesting"/>
+    internal void SimulateRenameForTesting(string newName, string oldName) =>
+        OnRenamed(this, new RenamedEventArgs(WatcherChangeTypes.Renamed, _directory, newName, oldName));
+
+    /// <summary>
+    /// Test seam: drives the REAL <see cref="OnError"/> handler, so the fault path (mark faulted, signal a
+    /// re-read, let the caller's backstop re-establish the watch) can be proved deterministically. The OS
+    /// only raises that event on an internal-buffer overflow, which cannot be provoked on demand without a
+    /// timing-dependent flood.
+    /// </summary>
+    internal void SimulateWatcherErrorForTesting(Exception error) =>
+        OnError(this, new ErrorEventArgs(error));
+
+    /// <summary>
     /// The OS buffer overflowed (or the watch broke): events were LOST and we cannot know whether the
     /// snapshot was among them, so signal unconditionally. Mark faulted rather than disposing here — this
     /// runs on the watcher's own callback thread.

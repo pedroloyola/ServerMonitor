@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Time.Testing;
 using ServerMonitor.WidgetProvider.Hosting;
 using ServerMonitor.WidgetProvider.Reading;
 using ServerMonitor.WidgetProvider.Tests.Fakes;
@@ -298,5 +299,162 @@ public sealed class WidgetProviderCoordinatorPumpTests
         // The last transition wins deterministically: an empty on-screen set means a stopped pump.
         Assert.Equal(0, coordinator.OnScreenWidgetCount);
         Assert.False(pump.IsArmed);
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // The REAL pump, in the loop, on a controllable change source and a fake clock. This is where the
+    // "and then nothing repaints" claims live: driving the source directly makes them deterministic,
+    // whereas the same claim over a real filesystem can only ever be "nothing arrived within N seconds",
+    // which passes by accident on a slow machine and misses whatever arrives late.
+    // ---------------------------------------------------------------------------------------------
+
+    private static readonly TimeSpan Debounce = TimeSpan.FromMilliseconds(500);
+    private static readonly TimeSpan Backstop = TimeSpan.FromSeconds(60);
+
+    private static (WidgetProviderCoordinator Coordinator, FakeSnapshotChangeSource Source, FakeTimeProvider Clock)
+        NewCoordinatorWithRealPump(FakeWidgetHost host)
+    {
+        var source = new FakeSnapshotChangeSource();
+        var clock = new FakeTimeProvider(new DateTimeOffset(2026, 9, 1, 12, 0, 0, TimeSpan.Zero));
+        var coordinator = new WidgetProviderCoordinator(
+            host,
+            NowhereReader(),
+            clock,
+            pumpFactory: refresh => new WidgetSnapshotChangeWatcher(refresh, source, clock, Debounce, Backstop));
+
+        return (coordinator, source, clock);
+    }
+
+    /// <summary>
+    /// One atomic commit legitimately produces several filesystem events. Exactly one repaint must reach
+    /// the host — counted after the window has provably closed, not the instant the first paint is seen.
+    /// </summary>
+    [Fact]
+    public void A_burst_of_snapshot_signals_repaints_each_widget_exactly_once()
+    {
+        var host = new FakeWidgetHost();
+        var (coordinator, source, clock) = NewCoordinatorWithRealPump(host);
+        try
+        {
+            coordinator.OnWidgetActivated(Widget("a"));
+            Assert.Equal(1, host.UpdateCountFor("a")); // the host callback's own paint
+
+            source.RaiseBurst(8); // temp created, renamed onto the destination, backup renamed, deleted...
+            clock.Advance(Debounce);
+
+            Assert.Equal(2, host.UpdateCountFor("a"));
+        }
+        finally
+        {
+            coordinator.Shutdown();
+        }
+    }
+
+    /// <summary>
+    /// With the board closed the provider is silent AND idle: the change source is stopped, so nothing is
+    /// even read, and neither a stray signal nor any number of backstop intervals paints anything.
+    /// </summary>
+    [Fact]
+    public void After_the_last_deactivate_no_signal_and_no_backstop_repaints_again()
+    {
+        var host = new FakeWidgetHost();
+        var (coordinator, source, clock) = NewCoordinatorWithRealPump(host);
+        try
+        {
+            coordinator.OnWidgetActivated(Widget("a"));
+            coordinator.OnWidgetDeactivated("a");
+            var painted = host.UpdateCountFor("a");
+
+            Assert.False(source.IsWatching);
+            Assert.Equal(1, source.StopCount);
+
+            source.RaiseBurst(5);
+            clock.Advance(Debounce * 4);
+            clock.Advance(Backstop * 3);
+
+            Assert.Equal(painted, host.UpdateCountFor("a"));
+            Assert.Equal(0, coordinator.OnScreenWidgetCount);
+        }
+        finally
+        {
+            coordinator.Shutdown();
+        }
+    }
+
+    /// <summary>Reopening the board resumes the pump on the same source.</summary>
+    [Fact]
+    public void Reopening_the_board_resumes_repainting_on_the_same_source()
+    {
+        var host = new FakeWidgetHost();
+        var (coordinator, source, clock) = NewCoordinatorWithRealPump(host);
+        try
+        {
+            coordinator.OnWidgetActivated(Widget("a"));
+            coordinator.OnWidgetDeactivated("a");
+            coordinator.OnWidgetActivated(Widget("a"));
+            var painted = host.UpdateCountFor("a");
+
+            Assert.True(source.IsWatching);
+            source.Raise();
+            clock.Advance(Debounce);
+
+            Assert.Equal(painted + 1, host.UpdateCountFor("a"));
+        }
+        finally
+        {
+            coordinator.Shutdown();
+        }
+    }
+
+    /// <summary>
+    /// After <see cref="WidgetProviderCoordinator.Shutdown"/> the source is disposed and unhooked, and
+    /// nothing the clock or a stray signal can deliver reaches the host.
+    /// </summary>
+    [Fact]
+    public void After_shutdown_no_signal_and_no_timer_can_repaint()
+    {
+        var host = new FakeWidgetHost();
+        var (coordinator, source, clock) = NewCoordinatorWithRealPump(host);
+        coordinator.OnWidgetActivated(Widget("a"));
+        var painted = host.UpdateCountFor("a");
+
+        coordinator.Shutdown();
+
+        Assert.Equal(1, source.DisposeCount);
+        Assert.False(source.HasSubscribers);
+        Assert.False(source.IsWatching);
+
+        source.RaiseBurst(5);
+        clock.Advance(Debounce * 4);
+        clock.Advance(Backstop * 3);
+
+        Assert.Equal(painted, host.UpdateCountFor("a"));
+    }
+
+    /// <summary>
+    /// The rehydration policy, end to end through the real pump: a provider relaunched with widgets
+    /// already pinned repaints them on the next snapshot commit, with no <c>Activate</c> from the host.
+    /// </summary>
+    [Fact]
+    public void A_rehydrated_widget_repaints_on_the_next_snapshot_signal()
+    {
+        var host = new FakeWidgetHost();
+        host.Existing.Add(Widget("a"));
+        var (coordinator, source, clock) = NewCoordinatorWithRealPump(host);
+        try
+        {
+            coordinator.RehydrateFromHost();
+            Assert.Equal(1, host.UpdateCountFor("a"));
+            Assert.True(source.IsWatching);
+
+            source.Raise();
+            clock.Advance(Debounce);
+
+            Assert.Equal(2, host.UpdateCountFor("a"));
+        }
+        finally
+        {
+            coordinator.Shutdown();
+        }
     }
 }

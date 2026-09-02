@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using ServerMonitor.WidgetContract;
 using ServerMonitor.WidgetProvider.Reading;
 using Xunit.Abstractions;
@@ -15,9 +16,6 @@ public sealed class FileSystemSnapshotChangeSourceTests : IDisposable
 {
     /// <summary>Generous: the OS delivers watcher events asynchronously and we never poll for them.</summary>
     private static readonly TimeSpan SignalTimeout = TimeSpan.FromSeconds(20);
-
-    /// <summary>Budget for "must NOT fire" checks. Cannot flake: a wrong name simply never signals.</summary>
-    private static readonly TimeSpan SilenceBudget = TimeSpan.FromSeconds(2);
 
     private readonly ITestOutputHelper _output;
     private readonly string _dir;
@@ -146,35 +144,149 @@ public sealed class FileSystemSnapshotChangeSourceTests : IDisposable
         Assert.True(advanced.Wait(SignalTimeout), $"only {signals} signals arrived for 5 commits");
     }
 
-    [Fact]
-    public void Unrelated_files_in_the_same_directory_never_signal()
+    /// <summary>
+    /// The name filter, driven through the REAL handlers with the argument shapes Windows produces. This
+    /// is deterministic where a "write noise and hope nothing arrives within N seconds" test is not: a
+    /// silence budget cannot tell "correctly ignored" apart from "not delivered yet".
+    /// </summary>
+    [Theory]
+    [InlineData(WatcherChangeTypes.Created, "unrelated.txt", false)]
+    [InlineData(WatcherChangeTypes.Changed, "servers.json", false)]
+    [InlineData(WatcherChangeTypes.Deleted, "widget-state.a1b2.tmp", false)]
+    [InlineData(WatcherChangeTypes.Changed, "widget-state.json.bak", false)]
+    [InlineData(WatcherChangeTypes.Created, "widget-state.json", true)]
+    [InlineData(WatcherChangeTypes.Changed, "widget-state.json", true)]
+    [InlineData(WatcherChangeTypes.Deleted, "widget-state.json", true)]
+    [InlineData(WatcherChangeTypes.Changed, "WIDGET-STATE.JSON", true)]
+    public void Only_the_snapshot_file_name_signals(WatcherChangeTypes change, string name, bool expected)
     {
-        using var signalled = new ManualResetEventSlim(false);
+        var signals = 0;
         using var source = new FileSystemSnapshotChangeSource(_path);
-        source.Changed += () => signalled.Set();
-        source.Start();
+        source.Changed += () => Interlocked.Increment(ref signals);
 
-        File.WriteAllText(Path.Combine(_dir, "unrelated.txt"), "noise");
-        File.WriteAllText(Path.Combine(_dir, "servers.json"), "noise");
-        File.Delete(Path.Combine(_dir, "unrelated.txt"));
+        source.SimulateFileEventForTesting(change, name);
 
-        Assert.False(signalled.Wait(SilenceBudget), "an unrelated file raised a snapshot signal");
+        Assert.Equal(expected ? 1 : 0, signals);
     }
 
+    /// <summary>
+    /// A commit renames the temp ONTO the destination and the destination to the backup, so the snapshot
+    /// appears as the new name in one event and as the OLD name in the other. Both must signal; a rename
+    /// touching neither must not.
+    /// </summary>
+    [Theory]
+    [InlineData("widget-state.json", "widget-state.a1b2.tmp", true)]
+    [InlineData("widget-state.json.bak", "widget-state.json", true)]
+    [InlineData("servers.json", "servers.old.json", false)]
+    public void A_rename_signals_when_either_side_is_the_snapshot(string name, string oldName, bool expected)
+    {
+        var signals = 0;
+        using var source = new FileSystemSnapshotChangeSource(_path);
+        source.Changed += () => Interlocked.Increment(ref signals);
+
+        source.SimulateRenameForTesting(name, oldName);
+
+        Assert.Equal(expected ? 1 : 0, signals);
+    }
+
+    /// <summary>
+    /// A stopped source signals nothing, proved by ORDER rather than by a silence budget: every signal
+    /// re-reads the file and records what it saw, and generation 2 — committed while stopped — must never
+    /// appear, even though the test goes on to observe generation 3 through the restarted watch. A late
+    /// event from the stopped period would have been recorded before that one.
+    /// </summary>
     [Fact]
-    public void A_stopped_source_stops_signalling()
+    public void A_stopped_source_signals_nothing_and_a_restart_resumes()
+    {
+        FirstWrite("{\"generation\":1}");
+
+        var seen = new ConcurrentBag<string>();
+        using var sawThird = new ManualResetEventSlim(false);
+        using var source = new FileSystemSnapshotChangeSource(_path);
+        source.Changed += () =>
+        {
+            var content = ReadSnapshot();
+            seen.Add(content);
+            if (content.Contains("\"generation\":3", StringComparison.Ordinal))
+            {
+                sawThird.Set();
+            }
+        };
+
+        source.Start();
+        source.Stop();
+        AtomicReplace("{\"generation\":2}"); // committed while stopped: must stay invisible
+
+        source.Start();
+        AtomicReplace("{\"generation\":3}");
+
+        Assert.True(sawThird.Wait(SignalTimeout), "the restarted source never signalled");
+        Assert.DoesNotContain(seen, content => content.Contains("\"generation\":2", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// The lost-event path: <see cref="FileSystemWatcher.Error"/> (an internal-buffer overflow) means
+    /// events were dropped, so the source must report itself no longer watching AND signal one
+    /// unconditional re-read — that pair is what lets the pump's backstop re-establish the watch.
+    /// </summary>
+    [Fact]
+    public void A_watcher_error_marks_the_source_faulted_and_signals_a_reread()
+    {
+        var signals = 0;
+        using var source = new FileSystemSnapshotChangeSource(_path);
+        source.Changed += () => Interlocked.Increment(ref signals);
+        source.Start();
+        Assert.True(source.IsWatching);
+
+        source.SimulateWatcherErrorForTesting(new InternalBufferOverflowException("buffer overflow"));
+
+        Assert.Equal(1, signals);
+        Assert.False(source.IsWatching);
+    }
+
+    /// <summary>A faulted watch is replaced by the next Start, and really delivers again afterwards.</summary>
+    [Fact]
+    public void A_faulted_watch_is_reestablished_by_a_later_start()
     {
         FirstWrite("{\"generation\":1}");
 
         using var signalled = new ManualResetEventSlim(false);
         using var source = new FileSystemSnapshotChangeSource(_path);
-        source.Changed += () => signalled.Set();
         source.Start();
-        source.Stop();
+        source.SimulateWatcherErrorForTesting(new InternalBufferOverflowException("buffer overflow"));
+        Assert.False(source.IsWatching);
+
+        source.Changed += () => signalled.Set();
+        source.Start(); // what the pump's backstop does on its next tick
+        Assert.True(source.IsWatching);
 
         AtomicReplace("{\"generation\":2}");
 
-        Assert.False(signalled.Wait(SilenceBudget), "a stopped source still signalled");
+        Assert.True(signalled.Wait(SignalTimeout), "the re-established watch delivered nothing");
+    }
+
+    /// <summary>
+    /// Reads the destination the way the provider does. The commit is a rename, so the file can be
+    /// momentarily unavailable; that is a retry, not a failure.
+    /// </summary>
+    private string ReadSnapshot()
+    {
+        for (var attempt = 0; attempt < 50; attempt++)
+        {
+            try
+            {
+                using var stream = new FileStream(
+                    _path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+                using var reader = new StreamReader(stream);
+                return reader.ReadToEnd();
+            }
+            catch (IOException)
+            {
+                // The destination is being replaced right now; try again.
+            }
+        }
+
+        return string.Empty;
     }
 
     [Fact]

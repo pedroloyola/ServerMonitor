@@ -12,16 +12,21 @@ namespace ServerMonitor.WidgetProvider.Tests;
 /// <b>real snapshot mutation on disk → real OS watcher callback → real debounce → RefreshAll → host.Update
 /// carrying the NEW values.</b>
 /// </para>
+/// Everything here is a POSITIVE boundary test: it waits for something to happen. Claims of the shape
+/// "and then nothing happens" live in <see cref="WidgetProviderCoordinatorPumpTests"/>, driven by a
+/// controllable change source on a fake clock, because no bounded wall-clock wait can distinguish "the
+/// pump is correctly silent" from "the event has not arrived yet".
+/// <para>
 /// It builds the coordinator through <see cref="WidgetProviderCoordinator.CreateWithFileSystemPump"/> —
 /// the exact composition <c>Program.Main</c> uses — and commits with the writer's own primitives (a
 /// uniquely-named temp in the same directory, then <c>File.Replace</c>, or <c>File.Move</c> for the first
 /// write). Only the Windows Widgets host itself is faked. Waits are event-driven with a generous timeout;
 /// there are no fixed sleeps.
+/// </para>
 /// </summary>
 public sealed class WidgetRepaintIntegrationTests : IDisposable
 {
     private static readonly TimeSpan UpdateTimeout = TimeSpan.FromSeconds(20);
-    private static readonly TimeSpan SilenceBudget = TimeSpan.FromSeconds(2);
 
     /// <summary>Short enough to keep the test quick, long enough to still coalesce one commit's burst.</summary>
     private static readonly TimeSpan Debounce = TimeSpan.FromMilliseconds(250);
@@ -173,65 +178,6 @@ public sealed class WidgetRepaintIntegrationTests : IDisposable
     }
 
     [Fact]
-    public void One_atomic_commit_produces_one_logical_repaint_not_one_per_filesystem_event()
-    {
-        FirstWrite(cpu: 1);
-        var host = new FakeWidgetHost();
-        using var repainted = new ManualResetEventSlim(false);
-        var coordinator = NewCoordinator(host);
-        try
-        {
-            coordinator.OnWidgetActivated(Widget("a"));
-            var baseline = host.UpdateCountFor("a");
-            host.Updated = (_, card, _) =>
-            {
-                if (card.Contains(CpuMarker(77), StringComparison.Ordinal))
-                {
-                    repainted.Set();
-                }
-            };
-
-            AtomicReplace(cpu: 77);
-            Assert.True(repainted.Wait(UpdateTimeout), "the commit never reached the widget");
-
-            // A single commit emits several filesystem events (temp created, temp renamed onto the
-            // destination, destination renamed to the backup, backup deleted). The debounce window must
-            // collapse them: a couple of paints at most, never one per event.
-            var painted = host.UpdateCountFor("a") - baseline;
-            Assert.InRange(painted, 1, 2);
-        }
-        finally
-        {
-            coordinator.Shutdown();
-        }
-    }
-
-    [Fact]
-    public void After_the_last_deactivate_a_snapshot_replace_no_longer_repaints()
-    {
-        FirstWrite(cpu: 1);
-        var host = new FakeWidgetHost();
-        using var repainted = new ManualResetEventSlim(false);
-        var coordinator = NewCoordinator(host);
-        try
-        {
-            coordinator.OnWidgetActivated(Widget("a"));
-            coordinator.OnWidgetDeactivated("a");
-            host.Updated = (_, _, _) => repainted.Set();
-
-            AtomicReplace(cpu: 77);
-
-            // Zero cost with the board closed: the watcher is torn down, so nothing is even read.
-            Assert.False(repainted.Wait(SilenceBudget), "the pump kept repainting an off-screen widget");
-            Assert.Equal(0, coordinator.OnScreenWidgetCount);
-        }
-        finally
-        {
-            coordinator.Shutdown();
-        }
-    }
-
-    [Fact]
     public void Reopening_the_board_resumes_repainting()
     {
         FirstWrite(cpu: 1);
@@ -321,20 +267,25 @@ public sealed class WidgetRepaintIntegrationTests : IDisposable
         }
     }
 
+    /// <summary>
+    /// Shutdown on the real composition: the pump is torn down and the process can exit. The negative
+    /// half — that a later commit paints NOTHING — is proved deterministically in
+    /// <c>WidgetProviderCoordinatorPumpTests</c>, where the change source is driven by the test instead
+    /// of being waited on.
+    /// </summary>
     [Fact]
-    public void Shutdown_tears_the_pump_down_so_later_commits_paint_nothing()
+    public void Shutdown_tears_the_pump_down_and_a_later_commit_is_harmless()
     {
         FirstWrite(cpu: 1);
         var host = new FakeWidgetHost();
-        using var repainted = new ManualResetEventSlim(false);
         var coordinator = NewCoordinator(host);
         coordinator.OnWidgetActivated(Widget("a"));
+        var painted = host.UpdateCountFor("a");
 
         coordinator.Shutdown();
-        host.Updated = (_, _, _) => repainted.Set();
-
         AtomicReplace(cpu: 77);
+        coordinator.Shutdown(); // idempotent, and still safe after a commit
 
-        Assert.False(repainted.Wait(SilenceBudget), "a repaint survived provider shutdown");
+        Assert.Equal(painted, host.UpdateCountFor("a"));
     }
 }
