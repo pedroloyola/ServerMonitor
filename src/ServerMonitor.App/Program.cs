@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -118,17 +117,23 @@ public static class Program
     public static void AttachActivationConsumer(Action<ActivationIntent> consumer) =>
         _pendingActivation.Attach(consumer);
 
-    private static void OnActivated(object? sender, AppActivationArguments args)
-    {
-        // A second launch (notification click, ExtendedActivationKind.AppNotification, or a
-        // serveralyzer:// protocol/widget deep-link) was redirected here. Funnel any deep-link intent
-        // through the single hand-off (buffered before the App exists, delivered straight to the router
-        // after) and, if the shell is already up, foreground the one authoritative window. Routing never
-        // reads Application.Current — it is set before the router is built, so it is not a readiness flag
-        // (§M-1). A non-deep-link activation carries a null intent and only restores the window.
-        _pendingActivation.Deliver(ProtocolActivationReader.TryGetIntent(args));
-        (Application.Current as App)?.RestoreOnRedirect();
-    }
+    /// <summary>
+    /// One redirected activation (a notification click, an <c>ExtendedActivationKind.AppNotification</c>,
+    /// or a <c>serveralyzer://</c> protocol/widget deep-link) — dispatched so that it produces EXACTLY ONE
+    /// restore of the window (M13-QA-10 defensive fix B); see <see cref="ActivationDispatch"/>. Routing
+    /// never reads <c>Application.Current</c> as a readiness flag: it is set while the derived App
+    /// constructor is still wiring the router (§M-1).
+    /// </summary>
+    private static void OnActivated(object? sender, AppActivationArguments args) =>
+        _activationDispatch.Dispatch(ProtocolActivationReader.TryGetIntent(args));
+
+    /// <summary>
+    /// The redirect step: deliver the intent, and restore the window only when nothing else will. Built
+    /// from the two fields above; the lambdas read them at call time, so declaration order is irrelevant.
+    /// </summary>
+    private static readonly ActivationDispatch _activationDispatch = new(
+        intent => _pendingActivation.Deliver(intent),
+        () => (Application.Current as App)?.RestoreOnRedirect());
 
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
     private static extern IntPtr CreateEvent(
@@ -141,11 +146,26 @@ public static class Program
     private static extern uint CoWaitForMultipleObjects(
         uint dwFlags, uint dwMilliseconds, ulong nHandles, IntPtr[] pHandles, out uint dwIndex);
 
-    [DllImport("user32.dll")]
-    private static extern bool SetForegroundWindow(IntPtr hWnd);
-
-    // Redirects on another thread and uses a non-blocking wait so the STA message pump stays
-    // responsive, then brings the running instance's window to the foreground (Microsoft pattern).
+    /// <summary>
+    /// Redirects on another thread and uses a non-blocking wait so the STA message pump stays responsive.
+    /// <para>
+    /// It deliberately does NOT try to foreground the running instance itself (M13-QA-10 defensive fix A).
+    /// It used to call <c>SetForegroundWindow(Process.GetProcessById(pid).MainWindowHandle)</c>, and that
+    /// handle is a guess taken from OUTSIDE the target process: measured on the shipping build, the app
+    /// has more than one top-level window of the same class, so the property returns the first VISIBLE
+    /// unowned one — which is <c>IntPtr.Zero</c> whenever the window is minimized to the tray, and would
+    /// be the hidden 1440x789 <c>TOPMOST</c> WinUIEx helper window if that one ever became visible first.
+    /// Either way this process cannot know which HWND is authoritative; the primary can, because it owns
+    /// the <c>MainWindow</c>/<c>AppWindow</c>, and it already surfaces itself through
+    /// <see cref="Services.IApplicationWindowController.RestoreAndActivate"/> using that window's own
+    /// handle. Removing the guess loses nothing: <c>RedirectActivationToAsync</c> is what carries the
+    /// activation (and the foreground right) across, and the primary was measured coming to the
+    /// foreground with this call skipped entirely — from a launcher with no foreground rights, with the
+    /// window hidden in the tray, on a machine with the foreground lock fully engaged.
+    /// </para>
+    /// This is activation hygiene, NOT the QA-10 fix: a widget click is covered by the board, which is a
+    /// <c>WS_EX_TOPMOST</c> window, and no amount of foreground work on our side changes that.
+    /// </summary>
     private static void RedirectActivationTo(AppActivationArguments args, AppInstance keyInstance)
     {
         _redirectEventHandle = CreateEvent(IntPtr.Zero, true, false, null);
@@ -169,22 +189,7 @@ public static class Program
         _ = CoWaitForMultipleObjects(
             CWMO_DEFAULT, INFINITE, 1, [_redirectEventHandle], out _);
 
-        try
-        {
-            using var process = Process.GetProcessById((int)keyInstance.ProcessId);
-            var mainWindowHandle = process.MainWindowHandle;
-            if (mainWindowHandle != IntPtr.Zero)
-            {
-                SetForegroundWindow(mainWindowHandle);
-            }
-        }
-        catch (ArgumentException)
-        {
-            // The target instance exited between redirect and foreground; nothing to activate.
-        }
-        catch (InvalidOperationException)
-        {
-            // Same as above — the process object is no longer associated with a running process.
-        }
+        // Nothing else to do here. Surfacing the window is the PRIMARY instance's job, from the one
+        // authoritative handle it owns (see the remarks above); this process only forwards and exits.
     }
 }
