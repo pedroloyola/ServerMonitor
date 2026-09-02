@@ -160,53 +160,78 @@ do assembly podia fabricar token e efeito **sem passar pela `Transition`**. Esse
 contador `pending`, a máquina podia atingir `Released` com a guarda satisfeita, e o `Add` posterior
 deixava um ícone real. **O token não era o mecanismo — era a convenção de ninguém o construir.**
 
-**Mecanismo corrigido: os efeitos são tipos `private` aninhados na máquina, e o exterior só vê
-comportamento.**
+**Reincidência corrigida (CV-20).** A versão anterior fechou o **produtor concreto** e deixou o
+**contrato aberto** — a mesma classe de erro do `EpisodeToken`, uma camada acima. Com `IShellEffect`
+`internal` e implementável, qualquer tipo do assembly podia implementá-lo, declarar
+`MayCreateAffordance = false`, chamar `native.Add` dentro do seu `Execute`, e **ser executado pelo nosso
+executor**: sem passar pela `Transition`, sem incrementar `pending`, com `Released` alcançável e ícone
+vivo. **Esta via não usa reflexão** e não estava coberta pelo recorte aceite.
+
+**Mecanismo: o canal inteiro passa a privado. O contrato, o executor e a capacidade nativa.**
 
 ```csharp
-internal interface IShellEffect                      // o que o executor vê. Não constrói nada.
-{
-    long Generation { get; }
-    long Sequence { get; }
-    bool MayCreateAffordance { get; }                // alimenta o contador `pending` (§6.4)
-    ShellOpResult Execute(INativeTrayRegistration native);
-}
-
 internal sealed class TrayStateMachine
 {
-    // Tipos PRIVADOS ANINHADOS: não são nomeáveis fora desta classe, logo não são declaráveis
-    // nem construíveis fora dela. Não há factory internal, não há token a circular.
-    private sealed record AddIcon(long Generation, long Sequence) : IShellEffect { … }
-    private sealed record DeleteIcon(long Generation, long Sequence) : IShellEffect { … }
-    private sealed record FailSafeExitRequested(long Generation, long Sequence) : IShellEffect { … }
+    // (1) CONTRATO privado aninhado ⇒ o nome não existe fora desta classe,
+    //     logo NENHUM tipo do assembly o pode implementar.
+    private interface IEffect
+    {
+        long Generation { get; }
+        long Sequence { get; }
+        bool MayCreateAffordance { get; }            // alimenta o contador `pending` (§6.4)
+        ShellOpResult Execute(INativeTrayRegistration native);
+    }
 
-    // Únicos call sites de `new AddIcon(...)` em todo o programa: os ramos de emissão da Transition,
-    // que o passo 1 do preâmbulo torna inalcançáveis em Releasing/Released.
+    // (2) EFEITOS privados aninhados: não nomeáveis, não declaráveis, não construíveis fora.
+    private sealed record AddIcon(long Generation, long Sequence) : IEffect { … }
+    private sealed record DeleteIcon(long Generation, long Sequence) : IEffect { … }
+    private sealed record FailSafeExit(long Generation, long Sequence) : IEffect { … }
+
+    // (3) EXECUTOR privado aninhado, e ÚNICO detentor da capacidade nativa.
+    private sealed class EffectExecutor(INativeTrayRegistration native) { … }
+    private readonly INativeTrayRegistration _native;   // nenhum outro tipo o recebe
+
+    // (4) Para fora só sai um Action opaco, entregue ao serializador de I/O.
+    //     Quem o agenda não o pode inspecionar nem construir um equivalente,
+    //     porque não detém a capacidade nativa.
+    private readonly Action<Action> _postToGate;
 }
 ```
 
-**Porque não há via de fabricação, verificável só pela superfície do tipo:**
+**Porque não sobra via — e o que fica deliberadamente de fora do argumento:**
 
-1. `AddIcon` é `private` numa classe `sealed` ⇒ **o nome não existe fora dela**. Nenhum outro ficheiro
-   pode declarar a variável, quanto mais construir o valor. O compilador impõe-o.
-2. **Não existe factory, `internal static`, token, nem qualquer outro produtor exportado.** O
-   `EpisodeToken` **desaparece como mecanismo** — era uma capacidade a circular, e uma capacidade que
-   circula é uma capacidade que se fabrica. O aninhamento privado torna-o desnecessário.
-3. O executor recebe `IShellEffect` e **só chama `Execute`**; não tem construtor a que chegar, e o
-   interface não expõe nenhum.
-4. Dentro da máquina, os únicos `new AddIcon(...)` estão nos ramos de emissão, e o **passo 1 do
-   preâmbulo** torna esses ramos inalcançáveis em estado terminal.
+1. **`IEffect` é `private` aninhado ⇒ não é implementável fora.** O nome não existe fora da classe; um
+   tipo do assembly não o pode declarar como base. Fecha exatamente a sequência do Atlas e do Vigil.
+2. **O executor é `private` aninhado e é o único consumidor de `IEffect`.** Não há ponto de entrada
+   externo por onde alimentar um efeito estrangeiro.
+3. **O executor é o único detentor de `INativeTrayRegistration`.** Nenhum outro tipo o recebe como
+   dependência, e ele não é registado no contentor. **A capacidade de tocar no shell não circula.**
+4. **O que sai para fora é um `Action` opaco.** O serializador de I/O invoca-o; não o pode inspecionar,
+   não pode construir um equivalente com efeito, e não detém a capacidade nativa.
+5. Dentro da máquina, os únicos `new AddIcon(...)` estão nos ramos de emissão, que o **passo 1 do
+   preâmbulo** torna inalcançáveis em `Releasing`/`Released`.
 
-Um leitor conclui, **só da superfície do tipo**, que não existe produtor de efeitos de afordância fora
-da `Transition`.
+> **Fronteira honesta, e é diferente do buraco que se fechou.** Código do assembly que faça P/Invoke a
+> `Shell_NotifyIcon` por sua conta **não está a contornar a autoridade** — está a ser um programa
+> diferente a escrever no shell, e nenhum sistema de tipos nosso o impede. O defeito da CV-20 era
+> outro: **a nossa própria maquinaria servir de veículo** a um efeito de origem não provada. Isso deixa
+> de ser possível. É a mesma fronteira do recorte da reflexão, e não a alarga.
 
-> **Limite honesto:** reflexão consegue construir qualquer coisa. Está fora da fronteira de confiança
-> pela mesma razão do ponto 7 da CV-1 — um processo capaz de usar reflexão sobre o nosso assembly já
-> tem controlo total, e a S2-T não lhe cria capacidade nova.
+**Escolhi a variante ESTRUTURAL, não a normativa.** A garantia é do **compilador**, não de um teste.
+Como um `private` pode ser alargado por descuido numa alteração futura, acrescenta-se um **teste de
+arquitetura** como guarda de regressão — não como fonte da garantia: ele afirma que os tipos de efeito
+e o executor não são visíveis fora de `TrayStateMachine`, e que **`INativeTrayRegistration` tem
+exatamente um tipo a referenciá-lo**.
+
+> **Mutação pedida pelo Atlas — *"implementação externa de `IShellEffect` aceite pelo executor"*.** Sob
+> este desenho essa mutação **não compila**, e é esse o resultado mais forte possível. A mutação
+> falsificável correspondente é portanto a que a torna possível: **alargar `IEffect`/executor de
+> `private` a `internal`** ⇒ o **teste de arquitetura falha**; e só então o teste de efeito estrangeiro
+> (afordância criada sem incrementar `pending`, `Released` alcançável) passa a compilar e **falha**
+> também. Registam-se as duas.
 
 **`DeleteIcon` continua a não exigir token** — decisão mantida: compensar tem de ser sempre legal em
-estado terminal. O aninhamento privado dá a não-fabricação **sem** reintroduzir uma restrição de
-capacidade sobre a compensação.
+estado terminal.
 
 ### 5.2 Conclusão — o que pode acontecer fisicamente depois
 
@@ -343,8 +368,42 @@ if (effects.HasFailSafeExit) { _failSafeOnce.RunOnce(requestAuthoritativeExit); 
    que pode ser a do worker nativo ou a do temporizador.
 4. **Sink obrigatório na construção.** Ausência é erro de construção, não uma condição de runtime que
    se descubra tarde.
-5. **`RunOnce`** garante no máximo uma invocação, e uma exceção do sink não impede o resto da limpeza —
-   mas também não é engolida silenciosamente: é registada.
+5. **`RunOnce` marca como executado APÓS retorno normal do sink — não à entrada (CV-21).** Ver 6.4.1.
+
+#### 6.4.1 CV-21 — uma exceção do sink não pode consumir o único disparo
+
+**Achado do Vigil.** Na versão anterior, se o **próprio sink lançasse**, a exceção era registada e o
+`RunOnce` **já tinha consumido o único disparo**: o `RequestExit` podia não ter chegado a armar o
+watchdog, e ficava-se em `Releasing` **sem rede e sem segunda tentativa** — exatamente o estado que
+esta revisão eliminou para o caso enfileirado, a persistir para o caso excecional.
+
+**Variante escolhida: (a) marcar só após sucesso, COM limite — mais a escalada da (b) quando o limite
+esgota.** Só a (a) deixaria um sink que lança sempre a gerar tentativas sem fim; só a (b) desperdiçaria
+uma falha transitória. As duas juntas fecham os dois lados.
+
+```
+tentativa := 1..3            // imediatas, sem espera: já estamos em Releasing e a corrida é por uma rede
+  invocar o sink
+  retorno normal  ⇒ RunOnce marca como executado. FIM.
+  exceção         ⇒ registar; NÃO marcar; tentar de novo
+esgotadas as 3   ⇒ ESCALAR: invocar o sink de terminação injetado pela S2
+```
+
+**O que impede tentativas sem fim:** o limite **fixo de 3**, contado no próprio episódio terminal, sem
+temporizador e sem espera. Um sink que lança sempre custa três chamadas e escala; não há laço.
+
+**A escalada não é um mecanismo de kill novo do tray.** É um segundo sink **injetado pela S2**, ligado
+ao passo terminal que a S2 já possui — o mesmo que o seu `RequestExit` executa no `finally`. A S2-T
+**invoca**; não decide como se morre.
+
+> **Facto mitigante, lido no código e não assumido.** No `AppLifecycleController.RequestExit`, o
+> `_watchdog.Arm(...)` é a **primeira** ação depois do CAS `TryTransitionToExiting()`, antes de sequer
+> se construir a `ExitSequence`. Logo, um sink que lance **depois** do CAS já deixou a rede armada; a
+> janela de exposição real é apenas entre a entrada no sink e esse CAS. A escalada existe para essa
+> janela e para o caso de o sink lançar antes de lá chegar.
+
+**Teste exigido:** sink que **lança sempre** ⇒ o processo **termina na mesma dentro do envelope** —
+três tentativas, escalada, terminação. E `Releasing` **nunca** fica sem mecanismo de progresso.
 6. Assim que o sink corre, o `RequestExit` da S2 arma o watchdog de 10 s logo após o seu CAS para
    `Exiting`. **A partir daí existe rede; antes, o único que garante progresso é este consumo direto.**
 
@@ -438,6 +497,8 @@ histórico de B. **Rejeição por B ⇒ sem episódio, sem deadline, sem `Lost`.
 | CV-17 | notificação informativa antes da saída fail-safe | §6.5 | **ATIVA** — slot definido, redação do Prism |
 | CV-18 | contrato fechado da ação da notificação fail-safe | §6.5 | **ATIVA · FECHADA** |
 | CV-19 | ressalva do passo 2 para eventos de conclusão de efeito | §1 (preâmbulo) | **ATIVA** |
+| CV-20 | canal de efeitos fechado: contrato, executor e capacidade nativa privados | §5.1 | **ATIVA** — variante **estrutural** (compilador), com teste de arquitetura como guarda de regressão |
+| CV-21 | uma exceção do sink não consome o único disparo | §6.4.1 | **ATIVA** — marcar só após sucesso, 3 tentativas, depois escalada |
 | CI-1b | *(dívida do lado da S2)* grafias numéricas de enum em payloads hostis do contrato de ativação | §6.5 | **REFERENCIADA, não herdada em silêncio.** A ação `FailSafeExit` é acrescentada a esse mesmo contrato, logo a CI-1b **aplica-se-lhe**: vocabulário genuinamente fechado por `switch`/allowlist exata, e grafia numérica ou desconhecida ⇒ **fail closed**. A dívida continua a ser da S2; fica aqui registada porque a S2-T alarga o contrato. |
 | — | regra literal *"nenhum `NIM_ADD` pode executar depois do `Release`"* | §5 | **`SUPERSEDED BY` o invariante normativo do `Release` (§5.1 emissão + §5.2 conclusão compensada).** Justificação: satisfazê-la à letra obrigaria o `Release` a esperar pelo gate de I/O nativo, reacoplando ciclo de vida e I/O e reintroduzindo o defeito de timer/deadlock provado na revisão 6. O invariante substituto é **causalmente mais forte**: proíbe a *emissão* pelo tipo e obriga a *compensação* da conclusão tardia, o que a regra literal não fazia. |
 
@@ -522,6 +583,9 @@ mundo dentro de uma chamada nativa não prova nada disto.**
 | **T11** | `Add` tardio pré-`Release` conclui com `ok:true` ⇒ **`Delete` compensatório emitido** e `Released` **inalcançável** até esse `Delete` verificar. **Reforço obrigatório, as duas asserções:** (i) o **estado** nunca é `Available`; (ii) **nenhuma entrega** de `Available` é produzida. Sem as duas, a M2 passa mutada. |
 
 | **T12** | **o pedido fail-safe não pode ficar pendente** — com o despachante de UI **parado** e a fila de entregas **bloqueada**, `CleanupCompleted(false)` ⇒ o sink é invocado **na mesma pilha**, fora do lock, antes de qualquer outro efeito |
+| **T13** | **sink que lança sempre** ⇒ 3 tentativas, **escalada** pelo sink de terminação da S2, e o processo **termina dentro do envelope**; `Releasing` nunca fica sem mecanismo de progresso *(CV-21)* |
+| **T14** | **arquitetura** — os tipos de efeito e o executor **não são visíveis** fora de `TrayStateMachine`, e `INativeTrayRegistration` tem **exatamente um** tipo a referenciá-lo *(CV-20, guarda de regressão)* |
+| **T15** | **efeito estrangeiro** — alimentar o executor com uma implementação externa que cria afordância sem incrementar `pending`: sob o desenho **não compila**; com a visibilidade alargada, compila e **falha** *(CV-20)* |
 
 ### Plano de mutação — obrigatório, **uma mutação de cada vez**
 
@@ -541,6 +605,11 @@ evidência acompanha a entrega do código (CV-12).**
 adquirido dentro do domínio de decisão · `Transition` chamada de dentro do domínio · efeitos a mutar
 estado · ordem de sequência removida · `CleanupCompleted(false)` a permanecer em `Lost` ·
 **sink fail-safe convertido em entrega enfileirada** (deve falhar **T12**) ·
+**`IEffect`/executor alargados de `private` a `internal`** (deve falhar **T14**, e só então **T15**
+passa a compilar e falha — é a forma falsificável da mutação que o Atlas pediu) ·
+**`INativeTrayRegistration` injetado noutro tipo além do executor** (deve falhar **T14**) ·
+**`RunOnce` a marcar à entrada em vez de após retorno normal** (deve falhar **T13**) ·
+**limite de 3 tentativas do sink removido** (deve falhar **T13** por não terminar) ·
 **`AddIcon`/`DeleteIcon` promovidos de `private` aninhado a `internal`** (deve falhar a asserção de
 arquitetura que proíbe produtores de efeito fora da máquina) ·
 **ressalva CV-19 removida do passo 2**, voltando a descartar `AddCompleted` obsoleto por geração
@@ -556,11 +625,11 @@ removido em `Lost`/`Unverified` · cada validação da CV-6b isoladamente · `NI
 | | Pergunta | Resposta | Porquê, estruturalmente |
 |---|---|---|---|
 | 1 | Admissão e invalidação são **uma** operação linearizável? | **SIM** | §3 — `TryBeginEpisode`, geração, timestamp, deadline e `Recovering` são o mesmo corpo, sob o mesmo domínio, sem nada entre eles |
-| — | *(por que a 1 e a 3 passam a SIM e a 5 perde a ressalva)* | — | a ressalva anterior era **a fabricação de efeitos fora da `Transition`** (§5.1). Com os efeitos como tipos `private` aninhados, **não existe nome nem produtor exportado**, logo nenhum caminho contorna a autoridade — e as respostas deixam de depender de convenção |
+| — | *(por que a 3 e a 5 ficam SIM sem ressalva)* | — | a ressalva que restava era o **contrato aberto**: `IShellEffect` `internal` deixava um tipo do assembly implementá-lo e ser executado pela nossa maquinaria, sem `Transition` e sem `pending` (CV-20). Fechado o canal — **contrato, executor e capacidade nativa privados** (§5.1) — deixa de existir a via, e a garantia passa a ser do **compilador**. O que fica de fora é P/Invoke próprio, que não contorna a autoridade: é outro programa a escrever no shell, a mesma fronteira do recorte da reflexão |
 | 2 | Existe **exatamente uma** autoridade? | **SIM** | `Transition` é a única escritora de estado; efeitos nunca mutam estado; o gate não decide |
 | 3 | `Release` é **estruturalmente** absorvente? | **SIM**, com a distinção clarificada | passo 1 do preâmbulo ∀ chamada; δ(`Releasing`,x)=`Releasing` ∀x. **Sem `Add` NOVO** depois de `Releasing` — imposto pelo tipo (§5.1); um `Add` pré-existente só pode completar **como trabalho obsoleto e compensado** (§5.2) |
 | 4 | Algo **depois do deadline** pode publicar `Available`? | **NÃO** | passo 3 do preâmbulo terminaliza **antes** de o evento ser olhado; o ramo que publica `Available` é inalcançável em estado terminal |
-| 5 | Algum resultado obsoleto pode **contornar** a função? | **NÃO**, sem ressalva | resultados não publicam: **reentram** por `Transition`. O passo 2 descarta geração obsoleta **exceto** conclusões de efeito, que são **reconciliadas** (CV-19). E **nenhum efeito é fabricável fora da máquina** (§5.1), pelo que já não existe a via que antes gerava a ressalva |
+| 5 | Algum resultado obsoleto pode **contornar** a função? | **NÃO**, sem ressalva | resultados não publicam: **reentram** por `Transition`. O passo 2 descarta geração obsoleta **exceto** conclusões de efeito, que são **reconciliadas** (CV-19). E **nenhum efeito é fabricável nem implementável fora da máquina**, nem existe entrada no executor para um efeito estrangeiro (§5.1, CV-20) |
 
 ## 14 — Matriz de plataforma real
 
