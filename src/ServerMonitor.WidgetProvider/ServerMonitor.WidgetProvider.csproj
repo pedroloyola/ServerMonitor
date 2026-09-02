@@ -9,7 +9,20 @@
     shares the single Windows App SDK 2.3.1 runtime line with the app.
   -->
   <PropertyGroup>
-    <OutputType>Exe</OutputType>
+    <!--
+      WinExe, NOT Exe (M13-QA-7). OutputType=Exe stamps IMAGE_SUBSYSTEM_WINDOWS_CUI (3) into the PE
+      header. COM activates an ExeServer with CreateProcess from a parent that has no console and
+      without CREATE_NO_WINDOW, so for a CUI image Windows ALLOCATES AND SHOWS a console window,
+      unconditionally, whether or not the process ever writes to it. That is the visible terminal QA
+      saw on the Widgets board. WinExe stamps IMAGE_SUBSYSTEM_WINDOWS_GUI (2), and a GUI-subsystem
+      process that creates no window shows nothing at all. This project has no XAML/WinUI (UseWinUI
+      stays false); here WinExe changes only the PE subsystem, not the hosting model.
+      The invariant is ENFORCED, not documented: ServerMonitor.App.csproj fails the packaged build if
+      the STAGED provider's subsystem byte is not 2, and WidgetProviderConsoleVisibilityTests asserts it on
+      the ordinary build output. A smoke launch started from a terminal INHERITS that terminal's
+      console and therefore cannot observe this defect; never accept it as evidence.
+    -->
+    <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <Platforms>x64</Platforms>
