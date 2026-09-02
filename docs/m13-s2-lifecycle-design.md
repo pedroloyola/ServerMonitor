@@ -6,6 +6,12 @@
 Bloqueia o **M13-QA-8**: *o widget deixa de atualizar quando a app é fechada*. Todos os caminhos abaixo
 foram lidos do código desta base, com ficheiro e linha; nada aqui vem de memória.
 
+> **Documento autoritativo de âmbito:** `.boss/tmp/m13-s2-scope-decision.md` (humano, 2026-09-02). Em
+> caso de divergência, prevalece esse texto. Esta revisão do desenho incorpora-o: **opção (a) com
+> fronteira estrita** (runtime headless mínimo dentro da S2, fontes de arranque continuam na S4),
+> **EXIT WINS** na ativação durante `EXITING`, regra de ordenação final chave→`Exit`, e as restrições do
+> aviso de primeiro fecho.
+
 ---
 
 ## A. Os caminhos de shutdown que existem HOJE
@@ -83,14 +89,16 @@ só o X seguir o mesmo caminho e o processo saber terminar sem depender da janel
   redirect, nem para transferir a posse da chave. A posse termina por `UnregisterKey()` ou por saída do
   processo — mais nada. Todo o desenho de F assenta nisto.
 - `IsAlwaysOnTop` **é usado legitimamente** (`AppWindowPlacementAdapter.cs:138-143`) a mando da definição
-  de utilizador `CompactAlwaysOnTop` do modo Compact. A cobertura O não pode proibir a API; tem de proibir
-  que um caminho de **ativação/ciclo de vida** lhe toque.
+  de utilizador `CompactAlwaysOnTop` do modo Compact. A cobertura O **não pode proibir a API**; tem de
+  provar que os caminhos de navegação/ciclo de vida **não mutam** o estado topmost (aceite pelo humano).
 - **Não existe hoje modo headless nesta base**: zero ocorrências de `--background`/`headless` em `src/`.
-  Ver secção J (decisão de âmbito para o humano).
+  Por decisão de âmbito, **a S2 produz esse runtime mínimo** — secção B.2.
 
 ---
 
 ## B. A nova máquina de estados
+
+### B.1 Os três estados
 
 Um único enum autoritativo, propriedade de um novo serviço `IAppLifecycleController`:
 
@@ -98,10 +106,11 @@ Um único enum autoritativo, propriedade de um novo serviço `IAppLifecycleContr
                     ┌──────────────── RestoreAndActivate ◄───────────┐
                     ▼                                                │
    [FOREGROUND]  ──── X/Alt-F4 com background LIGADO ──►  [BACKGROUND]
-   janela visível                                        janela oculta
-   host a correr        ◄── ativação/tray Abrir ──        tray presente
-   snapshot vivo                                          host a correr
-        │                                                 snapshot vivo
+   Dashboard visível                                   Dashboard oculto
+   host a correr        ◄── ativação/tray Abrir ──      OU nunca criado
+   snapshot vivo                                        tray presente
+        │                                               host a correr
+        │                                               snapshot vivo
         │                                                       │
         └──────── RequestExit ◄─────────────────────────────────┘
                        │   (X com background DESLIGADO, tray Sair,
@@ -111,9 +120,40 @@ Um único enum autoritativo, propriedade de um novo serviço `IAppLifecycleContr
                   sem UI nova, sem ativação servida, host a parar
 ```
 
-`EXITING` é **terminal e one-shot**: entra-se uma vez, nunca se sai. `HEADLESS` não é um quarto estado —
-é `BACKGROUND` cujo `MainWindow` ainda não foi materializado; toda a lógica de estado é a mesma e a
-materialização tardia é um detalhe de `RestoreAndActivate`.
+`EXITING` é **terminal e one-shot**: entra-se uma vez, nunca se sai. **`HEADLESS` não é um quarto
+estado** — é `BACKGROUND` cujo `MainWindow` ainda não foi materializado. Um processo `--background` nunca
+ativado *é* um `BACKGROUND` legítimo; é por isso que o runtime headless pertence a esta fatia.
+
+### B.2 Runtime headless — o que a S2 inclui, e o que NÃO inclui
+
+Fronteira estrita, tal como decidida. **A S2 fornece o ALVO headless seguro; a S4 decide as FONTES que o
+podem arrancar.**
+
+| DENTRO da S2 (mínimo primitivo) | FORA (S4 ou proibido) |
+|---|---|
+| reconhecimento **estrito** de `--background` (token exato, sem gramática livre, sem valores) | manifesto `windows.startupTask` |
+| estado inicial do ciclo de vida = `BACKGROUND` | `StartupTask.RequestEnableAsync` |
+| construir e arrancar o host de monitorização normalmente | UI de definições de arranque |
+| criar o tray normalmente | orquestração de logon (F1) |
+| **NÃO** ativar/criar o Dashboard no arranque background | lançamento de irmão pelo provider (F2) — PASSIVO é NO-GO, USER-ACTION por resolver |
+| ativação legítima posterior **materializa** o Dashboard | `SiblingLaunchSpike`, `SpikeProbe` |
+| **mesma** semântica de `AppInstance` | marcadores de arm em `%LOCALAPPDATA%` |
+| `RequestExit` funciona **sem Dashboard materializado** | instrumentação de job object |
+| — | política de arranque de processo pelo provider · política de reboot/logon |
+
+A spike da S-1 é **evidência medida e referência**, não fonte de código: reauditar e produzir. **Nenhum
+`SpikeProbe` nem marcador de diagnóstico entra em produção.** Sem diálogo escondido de credencial ou de
+confiança em modo background.
+
+**Onde vive o reconhecimento.** Uma política pura ao lado da que já existe
+(`SingleInstancePolicy.ResolveInstanceKey`, `SingleInstancePolicy.cs:18`), testável sem WinRT:
+`LaunchModePolicy.Resolve(args) → Foreground | Background`, com correspondência **exata** e
+case-insensitive de `--background`; qualquer outra coisa é `Foreground`. Sem prefixos, sem `=valor`, sem
+alias. É esta a superfície que o Vigil audita.
+
+**Consequência no arranque** (`App.OnLaunched`, `App.xaml.cs:408-427`): em `Background` não se resolve nem
+ativa o `MainWindow`; o host arranca na mesma e o router é marcado `ready` na mesma. A materialização
+tardia passa a ser responsabilidade de `RestoreAndActivate` (secção H).
 
 ---
 
@@ -124,19 +164,24 @@ acima e **único** dono de `RequestExit`. Fica em `Services/`, testável sem run
 
 ```
 RequestExit(reason)                         // one-shot, idempotente, thread-safe
-  1. se já EXITING → devolve (cobertura E)
-  2. marca EXITING     → a partir daqui nenhuma ativação é servida e nenhum Closing cancela
-  3. UI-thread, best-effort: esconde a janela (parece fechada já) + tray silencioso
-  4. off-UI: host.StopAsync com bound  (o AppShutdownCoordinator atual, menos o passo da chave)
-  5. liberta a posse de instância única  (ver F)
-  6. Application.Current.Exit()  exatamente UMA vez
+  1. transição atómica para EXITING, uma só vez  → se já EXITING, devolve (cobertura E)
+  2. deixa de aceitar/materializar trabalho de ciclo de vida de foreground
+  3. esconde a UI conforme apropriado (tolera não haver janela)
+  4. MANTÉM a chave do AppInstance registada
+  5. StopAsync ordenado com a política limitada existente (5 s)
+  6. só depois da drenagem: UnregisterKey
+  7. Application.Current.Exit()  exatamente UMA vez
 ```
 
 Chamadores legítimos, **os únicos três**: `AppWindow.Closing` com background desligado · tray "Sair" ·
 caminho de falha de arranque. Ninguém mais fecha a app.
 
-`AppShutdownCoordinator` mantém-se como está para os passos 4/5 (é bom código, já é one-shot e bounded),
+`AppShutdownCoordinator` mantém-se como está para os passos 5/6 (é bom código, já é one-shot e bounded),
 mas **perde a chamada `ReleaseSingleInstanceKey` da linha 46**, que passa a ser ordenada pelo controller.
+
+**Regra dura de ordenação (decisão do humano):** entre o passo 6 e o passo 7 **não pode haver `await` nem
+trabalho significativo**. Se a implementação vier a exigir algum, é tecnicamente obrigatório justificá-lo
+e submetê-lo a revisão explícita — não passa em silêncio.
 
 ---
 
@@ -150,7 +195,7 @@ OnClosing(args):
    se estado == EXITING          → args.Cancel = false   // é o Exit() a fechar a janela: deixa
    senão se background LIGADO    → args.Cancel = true
                                    HideToBackground()    // IsShownInSwitchers=false + AppWindow.Hide()
-                                   aviso de primeira vez (uma só vez, ver req. 8)
+                                   NotifyFirstBackgroundClose()   // slot do Prism, ver D.1
    senão                         → args.Cancel = true    // não deixamos a plataforma destruir
                                    RequestExit(UserClosedWindow)
 ```
@@ -163,6 +208,25 @@ Três consequências deliberadas:
    que fecha o QA-8**.
 3. Com background desligado o utilizador vê a janela desaparecer imediatamente (passo 3 de `RequestExit`)
    enquanto a drenagem corre, em vez de ficar 5 s com a janela na frente.
+
+### D.1 Aviso de primeiro fecho — restrições, com o conteúdo deixado ao Prism
+
+Mostrado no **primeiro** X/Alt-F4 do utilizador que transite `FOREGROUND → BACKGROUND`. O desenho fixa
+apenas as propriedades técnicas:
+
+- **não modal** — não bloqueia a janela nem o utilizador;
+- **não atrasa nem cancela** a transição: esconder acontece de qualquer maneira, o aviso é notificação de
+  um facto consumado, nunca uma confirmação;
+- **sem nag**: uma vez e nunca mais, persistido pela abstração de preferência/estado já existente (mesma
+  forma do `INotificationSettingsService`/`JsonNotificationSettingsService`, ficheiro próprio);
+- **nunca é mostrado a um processo que arrancou com `--background`** — o controller regista
+  `StartedInBackground` no arranque e o aviso é suprimido nesse caso, porque não houve transição de
+  utilizador nenhuma;
+- **redação e apresentação são do Prism.** O desenho deixa o slot (`NotifyFirstBackgroundClose`) e não
+  inventa texto nem escolhe superfície.
+
+`BackgroundMonitoringEnabled` — **default LIGADO**, persistido pelo mesmo padrão; a etiqueta em Definições
+é do Prism.
 
 ---
 
@@ -186,37 +250,54 @@ persistência de bounds e o `unsubscribe`; **saem** `_windowController.BeginShut
 primário independente" — obtém-se exatamente por uma coisa: MANTER a chave registada durante toda a
 drenagem.** Não é uma questão de ordenar chamadas: é a posse ser a única barreira que a plataforma dá.
 
-Ordem proposta em `RequestExit`:
-
 | # | Passo | Porquê aqui |
 |---|---|---|
-| 1 | marca `EXITING` | a partir daqui `OnActivated` não serve ativações e o `Closing` não cancela |
-| 2 | esconde janela + tray silencioso | resposta imediata ao utilizador; nada disto liberta a chave |
-| 3 | `host.StopAsync` bounded (5 s) | **a chave continua registada** — um lançamento concorrente redireciona e sai, sem motor |
-| 4 | `UnregisterKey()` | ponto terminal: host já parado, nada de nosso a escrever o snapshot |
-| 5 | `Application.Current.Exit()` | uma só vez |
+| 1 | transição atómica para `EXITING` | a partir daqui `OnActivated` não serve ativações e o `Closing` não cancela |
+| 2 | para de aceitar/materializar trabalho de foreground | nada de Dashboard novo, nada de reinício de host |
+| 3 | esconde a UI (tolera não existir janela) | resposta imediata ao utilizador; nada disto liberta a chave |
+| 4-5 | **chave mantida** + `StopAsync` bounded (5 s) | um lançamento concorrente redireciona e sai, sem motor |
+| 6 | `UnregisterKey()` | ponto terminal: host já parado, nada de nosso a escrever o snapshot |
+| 7 | `Application.Current.Exit()` | uma só vez, **sem `await` nem trabalho entre 6 e 7** |
 
-**Resíduo assumido e a reportar (não decido):** entre 1 e 4, um clique no widget/atalho redireciona para
-este processo, que já não serve ativações — **o clique perde-se** (janela ≤ 5 s). Hoje perde-se de forma
-igual *e* ainda arranca um segundo motor, por isso isto é estritamente melhor. Se o humano quiser
-recuperar o clique, a API oferece `AppInstance.Restart(args)` — relançar-se a si próprio no ponto
-terminal. **É decisão de produto** (um clique durante o fecho reabrir a app pode surpreender) e por isso
-fica **fora** deste desenho até haver decisão.
+O passo 6 podia ser omitido (a saída do processo liberta a chave). Mantém-se explícito porque encurta a
+janela entre "host parado" e "processo desaparecido" e porque torna a ordem legível no código em vez de
+depender do SO.
 
-Nota adicional derivada: o passo 4 podia ser omitido (a saída do processo liberta a chave). Proponho
-mantê-lo explícito porque encurta a janela entre "host parado" e "processo desaparecido", e porque torna a
-ordem legível no código em vez de depender do SO.
+### F.1 Ativação durante `EXITING` — **EXIT WINS** (decisão de produto, documentada)
+
+Semântica fixada, e é deliberadamente uma perda aceite:
+
+- o processo secundário **continua a redirecionar** — não se torna primário independente;
+- o primário reconhece `EXITING` e **não serve a ativação**: sem materialização de Dashboard, sem
+  reinício do host, sem segundo motor;
+- **a ativação pode ser descartada**;
+- a saída verdadeira completa-se;
+- depois de o processo antigo ter saído de facto, um lançamento posterior do utilizador arranca
+  normalmente.
+
+**`AppInstance.Restart` NÃO é usado.** Perder um clique durante a drenagem de ≤ 5 s é preferível a violar
+um Sair explícito do utilizador relançando a aplicação. Esta é a regra, não um resíduo por resolver.
 
 ---
 
 ## G. Como fecha o A12 (Sair explícito a partir de headless)
 
+Critério de aceitação obrigatório:
+
+```
+processo background nunca ativado → menu do tray → Sair → RequestExit
+→ host de monitorização drena → processo termina → SEM ZOMBIE
+```
+
 Hoje é impossível: sem janela não há `Closed`, e sem `Closed` não há `Shutdown()` nem fim de dispatcher.
-Com o desenho: tray "Sair" → `RequestExit` → passo 2 tolera `_window == null` (o
+Com o desenho: tray "Sair" → `RequestExit` → o passo 3 tolera `_window == null` (o
 `ApplicationWindowController` já ignora comandos sem janela anexada, `ApplicationWindowController.cs:119-123`)
-→ passos 3-5 correm iguais → `Application.Current.Exit()` termina o dispatcher → o processo sai.
-**Nenhum passo do `RequestExit` depende da existência de uma janela** — é essa a propriedade que fecha o
-A12 e que também impede o zombie do requisito 1: `OnExplicitShutdown` só entra acompanhado deste caminho.
+→ passos 4-7 correm iguais → `Application.Current.Exit()` termina o dispatcher → o processo sai.
+**Nenhum passo do `RequestExit` depende da existência de uma janela.** Como o runtime headless passa a ser
+de produção (B.2), **o A12 fecha em código de produção nesta fatia** e deixa de ser um `NOT_RUN` artificial.
+
+É também por isto que o requisito 1 se cumpre: `OnExplicitShutdown` **só** aterra acompanhado deste
+caminho completo — sozinho produziria o zombie medido na S-1.
 
 ---
 
@@ -225,50 +306,88 @@ A12 e que também impede o zombie do requisito 1: `OnExplicitShutdown` só entra
 - **Escondido → ativação** (widget, protocolo, notificação): `OnActivated` → `ActivationDispatch` (já
   existe, `8472cf0`) → **exatamente um** `RestoreAndActivate` → `IsShownInSwitchers = true` +
   `AppWindow.Show()` + `Activate()`. Mesmo processo, mesma janela, sem segundo host.
-- **Headless → ativação**: idêntico, exceto que `RestoreAndActivate` materializa primeiro o `MainWindow`
-  (criação tardia). O contador de "um restore por ativação lógica" tem de continuar a valer com
-  materialização pelo meio — é a ressalva do Atlas sobre o `8472cf0` (ver I/P).
-- **EXITING → ativação**: recusada (nem restaura, nem executa intent).
+- **Headless → ativação**: idêntico, exceto que a janela ainda não existe. `RestoreAndActivate`
+  **materializa** o `MainWindow` e só depois mostra/ativa. Duas implicações que a implementação tem de
+  respeitar: (i) o contador de "um restore por ativação lógica" continua a valer **com** materialização
+  pelo meio; (ii) `App.ExecuteActivationIntent` (`App.xaml.cs:319-324`) hoje **desiste** quando
+  `_mainWindow is null` — em headless isso descartaria o intent, por isso passa a materializar em vez de
+  desistir.
+- **EXITING → ativação**: descartada, por EXIT WINS (F.1).
+- **Segundo lançamento `--background` com um primário vivo**: redireciona como qualquer outro, mas **não
+  pode restaurar a UI** do primário — seria um arranque automático a trazer o Dashboard à frente sem o
+  utilizador pedir. O `ActivationDispatch` passa a distinguir "ativação de utilizador" de "lançamento
+  background": só a primeira restaura quando não há intent. (Buraco encontrado ao rever o desenho contra a
+  decisão de âmbito; sem isto, a S4 herdaria um surgimento de janela indesejado.)
 - **Cold-primary**: não passa pelo `ActivationDispatch` — o intent frio é entregue em
   `Program.ShouldRedirectToExistingInstance` (`Program.cs:100`) e executado no `MarkReady`. É a segunda
   metade da ressalva do Atlas e precisa de cobertura própria.
 
 ---
 
-## I. Plano de testes mapeado a A–P
+## I. Plano de testes
 
-Determinístico = xUnit sem runtime de UI, contra os serviços reais (o `AppLifecycleController`, o
-`AppShutdownCoordinator`, o `ActivationDispatch`, com fakes de janela/tray/host que **contam** operações).
+Determinístico = xUnit sem runtime de UI, contra os serviços reais (`AppLifecycleController`,
+`AppShutdownCoordinator`, `ActivationDispatch`, `LaunchModePolicy`), com fakes de janela/tray/host/posse
+que **contam** operações. Com o headless a ser de produção, os itens que na versão anterior deste desenho
+eram "spike-only" passam a testes de produção.
+
+### I.1 Coberturas A–P do Atlas
 
 | | Cobertura | Como | Tipo |
 |---|---|---|---|
-| A | X em foreground, background LIGADO | política de `Closing` → cancela + esconde; host **não** para; contador de snapshot continua | determinístico |
+| A | X em foreground, background LIGADO | política de `Closing` → cancela + esconde; host **não** para; ciclos continuam | determinístico |
 | B | X em foreground, background DESLIGADO | política de `Closing` → `RequestExit`; host para; `Exit` 1× | determinístico |
 | C | Sair do tray em foreground | `TrayService` → `RequestExit` (deixa de usar `RequestClose`) | determinístico |
-| D | Sair do tray em headless | `RequestExit` com janela nula → mesma sequência | determinístico (real: NOT_RUN, ver J) |
-| E | Sair repetido | N chamadas concorrentes → `Exit` exatamente 1× | determinístico |
-| F | escondido → ativação → mesmo processo | `ActivationDispatch` + controller: 1 restore, 0 novos hosts | determinístico |
-| G | headless → ativação → Dashboard materializa | fake de janela que só existe após materializar; 1 restore | determinístico + QA humano |
-| H | ativação cold-primary | cobre o buraco do Atlas: caminho `PendingActivation`→`MarkReady`, 1 restore | determinístico (novo) |
-| I | ativação secundária redirecionada | já coberto por `ActivationDispatchTests`, estendido | determinístico |
-| J | lançamento redirecionado **durante a drenagem** | fake de `AppInstance` (a posse é um seam) — enquanto `EXITING`, `FindOrRegisterForKey` não cede posse e nenhum host novo arranca | determinístico |
-| K | sem segundo motor | contador de arranques de host no fake; J e C garantem 1 | determinístico |
-| L | snapshot continua após esconder | o observer do ciclo continua a receber ciclos depois de `HideToBackground` | determinístico |
+| D | Sair do tray em headless | `RequestExit` sem janela materializada → mesma sequência, `Exit` 1× | determinístico **de produção** + QA humano |
+| E | Sair repetido/concorrente | N chamadas → `Exit` exatamente 1× | determinístico |
+| F | escondido → ativação → mesmo processo | 1 restore, 0 hosts novos | determinístico |
+| G | headless → ativação → Dashboard materializa | fake de janela criada sob procura; 1 restore, materialização exatamente 1× | determinístico **de produção** + QA humano |
+| H | ativação cold-primary | `PendingActivation`→`MarkReady`, 1 restore (fecha buraco do Atlas) | determinístico (novo) |
+| I | ativação secundária redirecionada | `ActivationDispatchTests` estendido | determinístico |
+| J | lançamento redirecionado **durante a drenagem** | seam de posse: em `EXITING` a chave continua possuída, o secundário redireciona, 0 hosts novos, ativação descartada | determinístico |
+| K | sem segundo motor | contador de arranques de host; J e C garantem 1 | determinístico |
+| L | snapshot continua após esconder | o observer continua a receber ciclos depois de `HideToBackground` | determinístico |
 | M | snapshot só para no Sair verdadeiro | o observer para depois de `RequestExit` e não antes | determinístico |
-| N | sem zombie após Sair verdadeiro | ordem observável: host parado **antes** de `Exit`, e `Exit` chamado sempre que o host parou | determinístico + QA humano (processo real) |
-| O | sem TOPMOST/`IsAlwaysOnTop` | estende `ActivationForegroundBoundaryTests`: nenhum ficheiro de ativação/ciclo de vida toca `IsAlwaysOnTop`; o único escritor continua a ser o adapter de placement a mando do Compact | determinístico (fecha ressalva do Atlas) |
-| P | um `RestoreAndActivate` por ativação lógica | estende `ActivationDispatchTests` com estado real hidden/headless e com o cold-primary | determinístico (fecha ressalva do Atlas) |
+| N | sem zombie após Sair verdadeiro | ordem observável: host parado **antes** de `Exit`; `Exit` sempre que o host parou | determinístico + QA humano (processo real) |
+| O | topmost não é mutado por navegação/ciclo de vida | ver I.3 | determinístico |
+| P | um `RestoreAndActivate` por ativação lógica | hidden, headless-com-materialização e cold-primary | determinístico |
 
-**Ressalvas herdadas fechadas aqui:** O e P (Atlas). E, no `WidgetCardNavigationGrammarTests` (Vigil): a
-`TheoryData` de tamanhos passa a derivar de `Enum.GetValues<WidgetSizeHint>()` e o
-`No_snapshot_text_reaches_any_action` ganha `Assert.NotEmpty` antes de iterar.
+### I.2 Itens de produção acrescentados pela decisão de âmbito
 
-**Seams necessários** (nenhum altera comportamento de produção):
-1. `IAppLifecycleController` + estado observável;
-2. um seam fino sobre a posse de instância única (hoje `Program.ReleaseSingleInstanceKey`, estático) para
-   J poder observar posse sem `AppInstance` real;
-3. `IApplicationWindowController` ganha `HideToBackground()` (o `HideForMinimize` renomeado/partilhado) e
-   tolerância a janela nula já existente.
+arranque headless inicial (`LaunchModePolicy` estrita: `--background` reconhecido, tudo o resto não) ·
+headless não cria Dashboard nem entrada na barra de tarefas · monitorização a correr em headless · tray
+existe em headless · **Sair do tray headless termina o processo** · ativação headless materializa o
+Dashboard · mesmo PID / um motor · ativação escondida restaura · cold-primary · **ativação durante
+`EXITING` ignorada em segurança** · **chave do `AppInstance` possuída durante toda a drenagem** · saída
+verdadeira sem zombie · esconder mantém o snapshot a avançar · exatamente um `RestoreAndActivate` ·
+**segundo lançamento `--background` não restaura a UI do primário** (H).
+
+### I.3 Dívida de review herdada, fechada nesta fatia
+
+**Atlas — topmost (O).** Não se proíbe a API. Estende-se o `ActivationForegroundBoundaryTests` para provar
+que **nenhum ficheiro de navegação/ativação/ciclo de vida** referencia `IsAlwaysOnTop`/`SetAlwaysOnTop`, e
+acrescenta-se um teste comportamental: percorrer `RestoreAndActivate`, `HideToBackground` e `RequestExit`
+contra um fake de placement que **regista mutações de topmost** e exigir **zero** mutações, enquanto um
+teste de controlo confirma que o `WindowModeCoordinator` em Compact **continua** a mutá-lo (o
+comportamento legítimo não pode partir).
+
+**Atlas — hidden/headless e cold-primary (P/H).** O contador de `RestoreAndActivate` passa a modelar
+estado real: `Hidden`, `Headless` (janela inexistente até materializar) e o caminho cold-primary, que não
+passa pelo `ActivationDispatch`.
+
+**Vigil — `WidgetCardNavigationGrammarTests`.** A `TheoryData` de tamanhos passa a derivar de
+`Enum.GetValues<WidgetSizeHint>()`, para que um `WidgetSizeHint` novo não fique por percorrer em silêncio;
+e `No_snapshot_text_reaches_any_action` ganha uma pré-condição positiva (`Assert.NotEmpty` sobre as ações
+recolhidas) para não poder passar sobre um conjunto vazio.
+
+### I.4 Seams necessários (nenhum altera comportamento de produção)
+
+1. `IAppLifecycleController` — estado observável e `RequestExit`;
+2. seam fino sobre a posse de instância única (hoje `Program.ReleaseSingleInstanceKey`, estático) para J
+   poder observar posse sem `AppInstance` real;
+3. `IApplicationWindowController` ganha `HideToBackground()` (partilhado com o `HideForMinimize` atual) e
+   materialização tardia da janela;
+4. `LaunchModePolicy` pura (sem WinRT), como a `SingleInstancePolicy` já é.
 
 ---
 
@@ -278,26 +397,38 @@ Marcado como tal, e **`NOT_RUN` não vira `PASS`**:
 
 1. **Interceção real do `AppWindow.Closing`** — nenhum teste headless prova que o WinUI respeita o
    `Cancel`. A política é testável; o comportamento da plataforma não.
-2. **Ausência real de zombie** (N) — só se prova com o processo real: X com background ligado → processo
-   vivo, tray presente, `widget-state.json` a mudar; tray Sair → processo desaparece do Gestor de Tarefas.
-3. **Materialização tardia do Dashboard** (G) — precisa de janela real.
-4. **Aviso de primeira vez** (req. 8) — texto e forma são do Prism; só QA humano confirma que aparece uma
-   vez e nunca mais.
-5. **Primeiro arranque com `OnExplicitShutdown`** — o requisito 1 exige medir que o zombie da S-1 não
-   volta, com o caminho completo montado.
+2. **Ausência real de zombie** (N) — X com background ligado → processo vivo, tray presente,
+   `widget-state.json` a mudar; tray Sair → processo desaparece do Gestor de Tarefas.
+3. **A12 no processo real** — `--background` nunca ativado → tray Sair → processo termina.
+4. **Materialização tardia do Dashboard** (G) — precisa de janela real.
+5. **Aviso de primeiro fecho** — que aparece uma vez, não é modal, não atrasa o esconder, e **não aparece**
+   num processo arrancado com `--background`.
+6. **Primeiro arranque com `OnExplicitShutdown`** já com o caminho completo montado (requisito 1).
 
-### Decisões que reporto em vez de tomar
+### Decisões já tomadas pelo humano (fecham o que eu tinha reportado)
 
-1. **Âmbito do headless.** Não existe código headless nesta base (A.8). Os requisitos 9/10 e as coberturas
-   D/G/A12 pressupõem-no. **A S2 implementa o arranque headless, ou apenas o ciclo de vida em que a S-1
-   assentará?** O desenho acima é válido nos dois casos (nenhum passo do `RequestExit` depende de janela),
-   mas o plano de testes muda: sem headless nesta fatia, D e G ficam determinísticos-com-fake e o A12 só
-   fecha quando a S-1 aterrar.
-2. **Clique perdido durante a drenagem** (F): aceitar o resíduo, ou usar `AppInstance.Restart`? Produto.
-3. **Onde vive o aviso de primeira vez** (diálogo na janela ao esconder pela primeira vez, proposta minha)
-   e o texto: Prism.
-4. **`BackgroundMonitoringEnabled`** segue o padrão já existente de definição booleana persistida
-   (`INotificationSettingsService` + `JsonNotificationSettingsService` + toggle em `SettingsViewModel`),
-   ficheiro próprio, **default LIGADO**. Confirmo o padrão; a redação da etiqueta é do Prism.
+1. **Âmbito headless:** opção (a) com fronteira estrita — runtime mínimo na S2, fontes na S4 (B.2).
+2. **Ativação durante `EXITING`:** EXIT WINS, sem `AppInstance.Restart` (F.1).
+3. **Ordenação:** sem `await` nem trabalho significativo entre `UnregisterKey` e `Exit` (C).
+4. **Aviso de primeiro fecho:** não modal, sem nag, não atrasa nem cancela, persistido pela abstração
+   existente, nunca em processos `--background` (D.1).
+5. **Topmost:** não se proíbe a API; prova-se ausência de mutação (I.3).
+
+### Único ponto ainda por decidir (do Prism, não meu)
+
+Redação e superfície do aviso de primeiro fecho, e a etiqueta de `BackgroundMonitoringEnabled` em
+Definições. O desenho deixa o slot e não inventa texto.
+
+---
+
+## Perguntas explícitas aos revisores
+
+- **Atlas:** manter a posse do `AppInstance` durante o `StopAsync` fecha mesmo a janela de duplo primário,
+  incluindo a ativação durante `EXITING` (F.1) e o segundo lançamento `--background` (H)?
+- **Prism:** as semânticas `FOREGROUND`/`BACKGROUND`/`EXITING`, o aviso de primeiro fecho e a
+  materialização headless são coerentes para o utilizador?
+- **Vigil:** o `--background` estrito continua um modo de lançamento interno fixo (B.2), sem superfície de
+  argumento arbitrário controlado pelo utilizador, sem prompt de credencial escondido e sem alargamento da
+  fronteira de confiança?
 
 **Não implementei nada.** Paro aqui para revisão de Atlas, Prism e Vigil.
