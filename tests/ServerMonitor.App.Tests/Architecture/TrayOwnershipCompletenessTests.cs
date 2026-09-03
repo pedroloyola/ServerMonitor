@@ -1,5 +1,8 @@
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.UI.Xaml;
+using ServerMonitor.Core.Enums;
 using ServerMonitor.App;
 using ServerMonitor.App.Services;
 using ServerMonitor.App.Shell.Tray;
@@ -93,9 +96,9 @@ public sealed class TrayOwnershipCompletenessTests
     {
         var services = RealComposition();
 
-        Assert.Single(services.Where(d => d.ServiceType == typeof(ITrayIconAdapter)));
-        Assert.Single(services.Where(d => d.ServiceType == typeof(ITrayAffordanceSource)));
-        Assert.Single(services.Where(d => d.ServiceType == typeof(OwnedTrayIconAdapter)));
+        Assert.Single(services, d => d.ServiceType == typeof(ITrayIconAdapter));
+        Assert.Single(services, d => d.ServiceType == typeof(ITrayAffordanceSource));
+        Assert.Single(services, d => d.ServiceType == typeof(OwnedTrayIconAdapter));
     }
 
     /// <summary>
@@ -131,7 +134,50 @@ public sealed class TrayOwnershipCompletenessTests
         Assert.Contains(services, d => d.ServiceType == typeof(ITrayAffordanceSource));
     }
 
+    [Fact]
+    public void The_owner_reports_no_affordance_until_a_registration_has_actually_succeeded()
+    {
+        // Fail-closed at the only moment it is free to be wrong: before Start() there is no machine and
+        // therefore no proof of anything. Reporting Available here would let the window hide on a process
+        // that never registered an icon — the A12 zombie this whole contract exists to prevent.
+        var adapter = new OwnedTrayIconAdapter(
+            new UnusedThemeService(),
+            new UnusedLocalizationService(),
+            () => FakeLifecycle.Instance,
+            new UnusedProcessTerminator(),
+            NullLoggerFactory.Instance);
+
+        Assert.Equal(TrayAffordanceState.Unavailable, adapter.State);
+    }
+
     // ------------------------------------------------------------------
+
+    private sealed class UnusedThemeService : IThemeService
+    {
+        public AppThemePreference Current => AppThemePreference.System;
+
+        public void Attach(FrameworkElement rootElement) => throw new NotSupportedException();
+
+        public void Detach(FrameworkElement rootElement) => throw new NotSupportedException();
+
+        public void Apply(AppThemePreference preference) => throw new NotSupportedException();
+    }
+
+    private sealed class UnusedLocalizationService : ILocalizationService
+    {
+        public string? CurrentLanguageOverride => null;
+
+        public string GetString(string resourceKey) => throw new NotSupportedException();
+
+        public void InitializeFromSystem() => throw new NotSupportedException();
+
+        public void SetLanguage(string? languageTag) => throw new NotSupportedException();
+    }
+
+    private sealed class UnusedProcessTerminator : IProcessTerminator
+    {
+        public void Terminate(int exitCode) => throw new NotSupportedException();
+    }
 
     private static Type[] Implementations(Type contract) =>
         [.. AppAssembly

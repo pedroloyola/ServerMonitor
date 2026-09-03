@@ -62,6 +62,36 @@ public sealed class ThemeRootSetTests
     }
 
     [Fact]
+    public void Applying_visits_every_root_and_not_just_the_most_recent_one()
+    {
+        // The direct killer for "apply to the last root only", which is the shape the single-field
+        // service had and the shape a well-meaning simplification would restore.
+        var set = new ThemeRootSet();
+        var dashboard = new object();
+        var flyout = new object();
+        set.Add(dashboard);
+        set.Add(flyout);
+
+        var visited = new List<object>();
+        set.ForEach(visited.Add);
+
+        Assert.Equal(2, visited.Count);
+        Assert.Contains(dashboard, visited);
+        Assert.Contains(flyout, visited);
+    }
+
+    [Fact]
+    public void Applying_over_an_empty_set_visits_nothing_and_does_not_throw()
+    {
+        var set = new ThemeRootSet();
+        var visited = 0;
+
+        set.ForEach(_ => visited++);
+
+        Assert.Equal(0, visited);
+    }
+
+    [Fact]
     public void The_snapshot_is_a_copy_so_iterating_it_cannot_be_disturbed_by_a_new_window()
     {
         var set = new ThemeRootSet();

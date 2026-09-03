@@ -61,4 +61,23 @@ internal sealed class ThemeRootSet
             return [.. _roots];
         }
     }
+
+    /// <summary>
+    /// Applies something to EVERY root.
+    /// <para>
+    /// The iteration lives here rather than in <see cref="ThemeService"/> for the same reason the set
+    /// does: in the service it walks <c>FrameworkElement</c>s and no test can reach it, so "every root"
+    /// would be an assertion nobody makes. Here it takes a delegate, and a mutation that visits only the
+    /// most recent root fails a test.
+    /// </para>
+    /// </summary>
+    internal void ForEach(Action<object> apply)
+    {
+        ArgumentNullException.ThrowIfNull(apply);
+
+        foreach (var root in Snapshot())
+        {
+            apply(root);
+        }
+    }
 }

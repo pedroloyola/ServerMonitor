@@ -52,11 +52,8 @@ public sealed class ThemeService(ILogger<ThemeService> logger) : IThemeService
     {
         Current = preference;
 
-        // EVERY root, not the most recent one.
-        foreach (var root in _roots.Snapshot())
-        {
-            ApplyTo((FrameworkElement)root);
-        }
+        // EVERY root, not the most recent one. ThemeRootSet owns the iteration so that claim is testable.
+        _roots.ForEach(root => ApplyTo((FrameworkElement)root));
 
         logger.LogInformation("Application theme changed to {Theme}.", preference);
     }
