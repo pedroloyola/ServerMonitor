@@ -15,10 +15,12 @@ MUTATIONS = [
  # M46, M48 and M50 were retired: the code they anchored on was reshaped by the readiness, the single
  # delivery critical section and the marshaller contract. The same properties are now attacked by M53,
  # M55 and M56 in mutate_round11.py, against the code as it stands.
- ("M49", "a decision taken before the deadline may be delivered as Available after it", [
-   (MACHINE,
-    "                if (ProjectState(_state) == TrayAffordanceState.Available\n                    && outcome.Deadline != 0",
-    "                if (false && ProjectState(_state) == TrayAffordanceState.Available\n                    && outcome.Deadline != 0")]),
+ # M49 RETIRED, and the reason matters more than the retirement. It survived round 6's re-run: the
+ # per-subscriber revalidation had been ADDED IN FRONT of the check M49 disables, so one rule lived in two
+ # places and each copy covered for the other. Neither mutation could fail a test on its own. The fix was
+ # not to re-form the mutation to disable both copies -- that would only have restored the evidence while
+ # leaving the duplication -- but to delete the copy: the rule is now stated ONCE, before every handler
+ # including the first, and M78 (deadline) and M79 (Release) attack it there.
 
  ("M51", "the DPI update goes straight to the shell, outside the gate", [
    (MACHINE,

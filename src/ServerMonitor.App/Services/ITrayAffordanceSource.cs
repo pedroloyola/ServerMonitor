@@ -70,7 +70,8 @@ public interface ITrayAffordanceSource
     /// <remarks>
     /// <b>For observing, never for authorising.</b> A caller that reads this and acts on it afterwards has
     /// a value that was true once; between the read and the act the affordance can be lost, and the act
-    /// goes ahead anyway. To ACT on the affordance, use <see cref="TryEnterBackground"/>.
+    /// goes ahead anyway. To ACT on the affordance, use <see cref="EnterBackground"/>, which is the only
+    /// path that authorises anything and which revalidates for itself.
     /// </remarks>
     TrayAffordanceState State { get; }
 
@@ -88,8 +89,14 @@ public interface ITrayAffordanceSource
     /// So the RIGHT crosses the boundary, not the answer: the caller hands over what it wants done, and it
     /// is performed under the same lock that decided it was permitted. There is no interval to lose.
     /// </para>
+    /// <para>
+    /// <b>And it returns NOTHING.</b> Returning a boolean was the same capability in a new shape: called
+    /// with an empty action it hands back a bare "you are permitted", which the caller keeps and acts on
+    /// later — precisely the defect the delegate was supposed to remove. A caller that needs to know what
+    /// happened learns it from inside its own action, where the answer is a record of a completed act and
+    /// not a right to perform one.
+    /// </para>
     /// </remarks>
     /// <param name="enterBackground">Run only if the affordance is established. Must not block.</param>
-    /// <returns>True when it was permitted and <paramref name="enterBackground"/> ran.</returns>
-    bool TryEnterBackground(Action enterBackground);
+    void EnterBackground(Action enterBackground);
 }

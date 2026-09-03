@@ -32,17 +32,16 @@ MUTATIONS = [
     "            if (true)\n            {\n                if (outcome.Publish)\n                {\n                    PublishIfCurrent(outcome);\n                }\n            }\n\n            {")]),
 
  ("M69", "a subscriber exception is allowed to escape into the machine", [
+   # Re-anchored in round 6: the single Invoke became a per-subscriber loop, so the anchor names the
+   # catch that now closes over the loop.
    (MACHINE,
-    "                try\n                {\n                    StateChanged?.Invoke(this, EventArgs.Empty);\n                }\n                catch (Exception exception)",
-    "                try\n                {\n                    StateChanged?.Invoke(this, EventArgs.Empty);\n                }\n                catch (Exception exception) when (false)")]),
+    "                catch (Exception exception)\n                {\n                    // TWO PROPERTIES, TWO TREATMENTS.",
+    "                catch (Exception exception) when (false)\n                {\n                    // TWO PROPERTIES, TWO TREATMENTS.")]),
 
- ("M70", "the delivery-time deadline check moves back BEFORE the probe", [
-   (MACHINE,
-    "                AtInvocationForTests?.Invoke();\n\n                // Immediately before the event goes out",
-    "                if (ProjectState(_state) == TrayAffordanceState.Available\n                    && outcome.Deadline != 0\n                    && _time.GetTimestamp() >= outcome.Deadline)\n                {\n                    return;\n                }\n\n                AtInvocationForTests?.Invoke();\n\n                // MOVED"),
-   (MACHINE,
-    "                if (ProjectState(_state) == TrayAffordanceState.Available\n                    && outcome.Deadline != 0\n                    && _time.GetTimestamp() >= outcome.Deadline)\n                {\n                    _logger.LogWarning(",
-    "                if (false)\n                {\n                    _logger.LogWarning(")]),
+ # M70 RETIRED for the same reason as M49, and it is the same defect seen from the other side: M70 moved
+ # the check EARLIER, and by round 6 that no longer weakened anything, because the copy in front of each
+ # handler still enforced it. Both mutations were measuring a duplicate. The duplicate is gone; M78 and
+ # M79 attack the single remaining statement of the rule.
 ]
 
 

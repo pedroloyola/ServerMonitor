@@ -403,16 +403,18 @@ public sealed class TrayStateMachineTests : IDisposable
 
             releaser.Start();
 
-            // POSITIVE observation of the block, the same correction the DPI test needed: signalling
-            // before attempting the lock proves only that the thread started, and deciding the race by
-            // 200 ms of silence decides it by the scheduler. A thread waiting on a monitor reports
-            // WaitSleepJoin; one that got through would be Stopped.
-            var deadline = DateTime.UtcNow + Patience;
-            while (DateTime.UtcNow < deadline
-                   && (releaser.ThreadState & System.Threading.ThreadState.WaitSleepJoin) == 0
-                   && releaser.IsAlive)
+            // POSITIVE observation of the block, and NO WALL CLOCK anywhere. Signalling before attempting
+            // the lock proves only that the thread started; deciding by an elapsed interval decides by the
+            // scheduler; and spinning on DateTime.UtcNow is the same wall clock wearing a loop. A thread
+            // blocked on a monitor reports WaitSleepJoin, and SpinWait bounds the wait by ITERATIONS
+            // rather than by time — a count is a fact about this run, not about how busy the machine is.
+            var spin = new SpinWait();
+            var observations = 0;
+            while (observations++ < 100_000
+                   && releaser.IsAlive
+                   && (releaser.ThreadState & System.Threading.ThreadState.WaitSleepJoin) == 0)
             {
-                Thread.Yield();
+                spin.SpinOnce();
             }
 
             Assert.True(
@@ -488,9 +490,10 @@ public sealed class TrayStateMachineTests : IDisposable
         machine.Establish();
 
         var ran = 0;
-        var granted = machine.TryEnterBackground(() => ran++);
+        machine.EnterBackground(() => ran++);
 
-        Assert.True(granted, "an established affordance must permit background");
+        // Nothing comes back: the only evidence is that the act ran, which is a record of what happened
+        // and not a permission to do it later.
         Assert.Equal(1, ran);
     }
 
@@ -503,10 +506,101 @@ public sealed class TrayStateMachineTests : IDisposable
         machine.Establish();
 
         var ran = 0;
-        var granted = machine.TryEnterBackground(() => ran++);
+        machine.EnterBackground(() => ran++);
 
-        Assert.False(granted);
         Assert.Equal(0, ran);
+    }
+
+    /// <summary>
+    /// A multicast delivery is re-decided in front of EACH subscriber: the state can die between the
+    /// first and the second.
+    /// </summary>
+    /// <remarks>
+    /// Validating once and then serving N handlers means the second one is served on the strength of a
+    /// judgement made before the first one ran. Here the first handler pushes the clock past the deadline;
+    /// the second must not be told the affordance is usable.
+    /// </remarks>
+    [Fact]
+    public void A_multicast_delivery_is_revalidated_in_front_of_every_subscriber()
+    {
+        var deferred = new List<Action>();
+        var secondSaw = new List<TrayAffordanceState>();
+
+        using var machine = new TrayStateMachine(
+            _native,
+            () => Interlocked.Increment(ref _exitRequests),
+            () => Interlocked.Increment(ref _escalations),
+            _time,
+            NullLogger<TrayStateMachine>.Instance,
+            limiter: null,
+            marshalToUi: continuation =>
+            {
+                deferred.Add(continuation);
+                return true;
+            });
+
+        machine.Establish();
+        machine.NotifyTaskbarCreated();
+        _time.Advance(TrayStateMachine.DebounceDelay);
+
+        var pushed = false;
+
+        // FIRST subscriber: moves the clock past the bound while the multicast is in progress.
+        machine.StateChanged += (_, _) =>
+        {
+            if (pushed)
+            {
+                return;
+            }
+
+            pushed = true;
+            _time.Advance(TrayStateMachine.RecoveryDeadline);
+        };
+
+        // SECOND subscriber: must not be served on a judgement made before the first one ran.
+        machine.StateChanged += (_, _) => secondSaw.Add(machine.State);
+
+        for (var index = 0; index < deferred.Count; index++)
+        {
+            deferred[index]();
+        }
+
+        Assert.True(pushed, "the first subscriber never ran");
+        Assert.DoesNotContain(TrayAffordanceState.Available, secondSaw);
+    }
+
+    /// <summary>
+    /// A subscriber that releases stops the multicast for the ones after it.
+    /// </summary>
+    /// <remarks>
+    /// The other half of the same rule, and it needed its own test: it is not only the clock that can
+    /// invalidate a delivery half way through. Release dominates, and a handler that has not run yet must
+    /// not be told about an affordance the process has already given up.
+    /// </remarks>
+    [Fact]
+    public void A_subscriber_that_releases_stops_the_multicast_for_the_ones_after_it()
+    {
+        using var machine = Create();
+        var secondRan = 0;
+        var released = false;
+
+        machine.StateChanged += (_, _) =>
+        {
+            if (released)
+            {
+                return;
+            }
+
+            released = true;
+            machine.Release();
+        };
+
+        machine.StateChanged += (_, _) => secondRan++;
+
+        machine.Establish();
+
+        Assert.True(released, "the first subscriber never ran");
+        Assert.Equal(0, secondRan);
     }
 
     /// <summary>
@@ -797,12 +891,14 @@ public sealed class TrayStateMachineTests : IDisposable
         // POSITIVE observation of exclusion, not silence: wait until the thread is actually BLOCKED.
         // A thread waiting on a monitor reports WaitSleepJoin; one that sailed through would be Stopped.
         // Asserting "nothing happened for 150 ms" asserted something about the scheduler.
-        var deadline = DateTime.UtcNow + Patience;
-        while (DateTime.UtcNow < deadline
-               && (foreign.ThreadState & System.Threading.ThreadState.WaitSleepJoin) == 0
-               && foreign.IsAlive)
+        // Bounded by ITERATIONS, not by the wall clock — the same bar the delivery test had to meet.
+        var spin = new SpinWait();
+        var observations = 0;
+        while (observations++ < 100_000
+               && foreign.IsAlive
+               && (foreign.ThreadState & System.Threading.ThreadState.WaitSleepJoin) == 0)
         {
-            Thread.Yield();
+            spin.SpinOnce();
         }
 
         Assert.True(

@@ -392,15 +392,14 @@ public sealed class TrayOwnershipCompletenessTests
         /// established, and it runs INSIDE the determination so a test can invalidate the affordance from
         /// within and see that the act was still refused.
         /// </summary>
-        public bool TryEnterBackground(Action enterBackground)
+        public void EnterBackground(Action enterBackground)
         {
             if (State != TrayAffordanceState.Available)
             {
-                return false;
+                return;
             }
 
             enterBackground();
-            return true;
         }
     }
 

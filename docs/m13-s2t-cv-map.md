@@ -464,6 +464,102 @@ observar o bloqueio positivamente (`WaitSleepJoin`), como o outro.
 
 ---
 
+## 11. Sexta ronda — o quinto anel: o valor DEVOLVIDO
+
+### 11.1 Segunda retratação da mesma propriedade
+
+Escrevi, na ronda 5: «há um teste que afirma que **nenhuma permissão legível sobrevive**.»
+
+**É falso, e é a segunda vez seguida que declaro esta propriedade e ela é falsificada.** O método continuava
+a devolver `bool`: chamado com `() => {}`, o caller fica com um `true` nu, invalida a afordância e age
+depois. Isso **é** o `CanEnterBackground`, com outra grafia.
+
+E o teste que escrevi procurava a permissão **pelo nome antigo**. Encontrava a ausência de
+`CanEnterBackground` e dava-se por satisfeito, quando a capacidade tinha mudado de forma, não desaparecido.
+
+**A regra que eu próprio escrevi na §10.1 — «antes de declarar, ir ver» — aplica-se a isto e eu não a
+apliquei:** procurar por **retornos**, não por nomes. O teste passou a enumerar a superfície **por tipo de
+retorno**, e não é vazio: apanha o `IsDegradedForSession`, que fica declarado como aceite e argumentado.
+
+### 11.2 A pergunta que passa a fazer parte de cada correção: **o que pode ser guardado?**
+
+| Superfície | Pode ser guardado? |
+|---|---|
+| `EnterBackground(Action)` | **Nada.** Devolve `void`. O caller entrega o que quer feito |
+| o que o caller regista dentro da sua própria ação | Regista que o acto **aconteceu**. Não é reproduzível: não se transforma em esconder uma janela desprotegida mais tarde |
+| `State` | Um valor, sim — mas não autoriza nada: o único caminho que autoriza é o commit, e o commit revalida por si |
+| `IsDegradedForSession` | Um facto da sessão. Não se converte em esconder nada |
+
+**É o quarto sítio na fatia com esta forma** — `EpisodeToken` internal, `IShellEffect` internal, o bool
+destacável, e agora o bool **devolvido**. A regra fica com a metade que lhe faltava: *um valor que se pode
+guardar é uma capacidade que circula — e **um valor devolvido é um valor que se pode guardar**.*
+
+Mutação **M76** (uma permissão legível volta ao lado do commit) — morta pelo teste por tipo de retorno.
+
+**Nota sobre a mutação que não corre:** repor o `bool` **na interface** não compila, porque todos os
+duplos de teste implementam `void`. O compilador recusa a forma, o que é mais forte do que um teste a
+falhar — mas **não é um resultado de mutação e não é contado como morte**. A M76 que corre é a que compila.
+
+### 11.3 Revalidação por subscriber
+
+Uma entrega multicast validava **uma vez** e servia N handlers: o segundo era servido com base num
+julgamento feito antes de o primeiro correr. O probe do Atlas: o primeiro subscriber avança o relógio para
+lá do prazo e o segundo ainda observa `Available`.
+
+A entrega é agora **re-decidida à frente de cada handler**, com leitura fresca do relógio, e pára assim que
+deixa de ser entregável. Mutações **M77** (validar uma vez), **M78** (ignorar o prazo) e **M79** (ignorar um
+`Release`) — as três mortas, e a M79 precisou do seu próprio teste porque não é só o relógio que invalida
+uma entrega a meio.
+
+### 11.4 TEST-DET-R2, terceira volta: sem relógio de parede
+
+Continuava a depender de `DateTime.UtcNow`. Passou a limitar-se por **iterações** (`SpinWait`), não por
+tempo: uma contagem é um facto sobre esta corrida, não sobre quão ocupada está a máquina. A mesma correção
+foi aplicada ao teste de DPI, que tinha a forma idêntica — desta vez nos **dois** sítios.
+
+### 11.6 A matriz apanhou uma regra em dois sítios — criada pela correção acima
+
+A re-corrida completa das 80 mutações depois da ronda 6 deu **duas ressurreições**, `M49` e `M70`, ambas
+sobre a entrega, e a causa não foi uma reescrita de testes: foi a **correção da §11.3**. A revalidação por
+subscriber ficou **à frente** da verificação de prazo que já lá estava, e a partir daí a mesma regra vivia
+em dois sítios com **cada cópia a cobrir a outra** — desligar uma não mudava comportamento nenhum, por isso
+nenhuma das duas mutações conseguia falhar um teste.
+
+**Não** foram re-formadas para desligarem as duas cópias. Era o reflexo (foi o que se fez com a M43 e com a
+M70 em rondas anteriores) e teria reposto a evidência **deixando a duplicação lá**: verde outra vez, a
+esconder o defeito que o produziu. A cópia foi **apagada**. As duas verificações pré-multicast
+(`Releasing`/`Released` e o prazo) desapareceram; `IsStillDeliverable` é o único sítio onde a entrega é
+decidida, aplicado à frente de **cada** handler incluindo o primeiro.
+
+A propriedade não se perdeu com as mutações retiradas, e isto foi **verificado, não assumido** — os testes
+que matam as novas são os testes das propriedades antigas:
+
+| Retirada | Propriedade | Mata agora | Teste |
+|---|---|---|---|
+| M49 | uma decisão anterior ao prazo não é entregue como `Available` depois dele | **M78** | `A_decision_taken_before_the_deadline_is_not_delivered_as_Available_after_it` |
+| M70 | o prazo é lido **na invocação** | **M78** | `The_deadline_is_re_read_at_the_invocation_and_not_before_it` |
+| early-return de `Release` | `Release` domina a entrega | **M79** | `T9_session_semantics_are_not_published_once_the_lifecycle_is_terminal` |
+
+**A doutrina, na sua forma mais literal — e violada a corrigir uma violação dela:** *uma propriedade
+defendida duas vezes tem de ser provada duas vezes*; e quando a segunda defesa é a **mesma** regra e não
+uma regra diferente, não há nada a provar — **há uma cópia a apagar**.
+
+Quatro âncoras partiram por mudança legítima de forma (`bool` → `void`, um `Invoke` → um ciclo): M69, M71,
+M72 e M73, re-ancoradas e todas mortas. A M73 na forma nova passa uma ação **vazia** ao commit e esconde
+por fora — é o bloqueante da ronda 6 escrito contra uma API `void`, e é agora a mutação mais afiada da
+fatia.
+
+### 11.5 O que continua sem cobertura
+
+- `State` continua legível. Não autoriza nada hoje, e o commit revalida — mas não tenho um teste de
+  arquitetura que proíba um futuro consumidor de gatilhar uma ação nele. É o mesmo gatilho da §9.
+- O acto do commit corre sob o lock da decisão; um acto que bloqueie prende a máquina. Continua sem
+  asserção — e o mesmo vale para um subscriber que não lance mas fique bloqueado: prende a entrega.
+- Nenhuma mutação move o `IsStillDeliverable` para **dentro** do `try` do handler, o que mudaria o
+  tratamento de uma falha dele.
+
+---
+
 ## 4. Retratação — uma afirmação minha que era falsa
 
 Na entrega da ligação escrevi, sobre `App.xaml.cs`:
@@ -534,6 +630,9 @@ python tools/mutations/mutate_round9.py M41
 
 # Ronda Atlas/Vigil: ordem, entrega, topologia, DPI, cobertura (M46–M52)
 python tools/mutations/mutate_round10.py M46
+
+# Sexta ronda: o quinto anel — capacidade não devolvida e entrega por subscriber (M76–M79)
+python tools/mutations/mutate_round14.py M76
 
 # Quinta ronda: o quarto anel — commit linearizável e entrega crítica (M71–M75)
 python tools/mutations/mutate_round13.py M71

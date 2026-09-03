@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""M13 S2-T mutation runner, round 5: the fourth ring (M71-M75)."""
+"""M13 S2-T mutation runner, round 6: the fifth ring (M76-M79)."""
 import io, subprocess, sys, os, json, re
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 SRC = os.path.join(ROOT, "src", "ServerMonitor.App")
 MACHINE = os.path.join(SRC, "Shell", "Tray", "TrayStateMachine.cs")
+CONTRACT = os.path.join(SRC, "Services", "ITrayAffordanceSource.cs")
 LIFECYCLE = os.path.join(SRC, "Services", "TrayAffordanceLifecycle.cs")
-COORDINATOR = os.path.join(SRC, "Services", "WindowCloseCoordinator.cs")
+ADAPTER = os.path.join(SRC, "Shell", "Tray", "OwnedTrayIconAdapter.cs")
 
 DOTNET = os.path.expanduser("~/.dotnet/dotnet.exe")
 TESTS = os.path.join(ROOT, "tests", "ServerMonitor.App.Tests", "ServerMonitor.App.Tests.csproj")
@@ -14,37 +15,30 @@ FILTER = ("FullyQualifiedName~Tray|FullyQualifiedName~Theme|FullyQualifiedName~F
           "|FullyQualifiedName~FailSafe|FullyQualifiedName~WindowClose")
 
 MUTATIONS = [
- ("M71", "the commit hands back a permission instead of performing the act", [
-   # Re-anchored in round 6: the commit returns void, so the mutation can no longer hand a bool back. It
-   # keeps the property it always attacked -- the decision and the act must be the same step -- by
-   # deciding and then NOT performing, which is what a caller-performed act degenerates to.
-   (MACHINE,
-    "            enterBackground();\n        }\n    }",
-    "        }\n    }")]),
-
- ("M72", "the session gate is dropped from the commit", [
-   # Re-anchored in round 6: the early-out returns void.
+  # M76 keeps its original form as a NOTE, not as a run: adding the return type back to the interface
+ # does not compile, because every test double implements void. That is a stronger outcome than a failing
+ # test — the compiler refuses the shape — but it is not a mutation result, so it is not counted as a kill.
+ # M76 below is the mutation that CAN compile: a readable permission comes back beside the commit, which
+ # is exactly how the defect was reintroduced last time (the name went, the value stayed).
+ ("M76", "a readable permission returns beside the commit", [
    (LIFECYCLE,
-    "            if (_degradedForSession)\n            {\n                return;\n            }\n\n            // The session gate is ours",
-    "            if (false)\n            {\n                return;\n            }\n\n            // The session gate is ours")]),
+    "    public void EnterBackground(Action enterBackground)",
+    "    public bool CanEnterBackground\n    {\n        get { lock (_sync) { return !_degradedForSession; } }\n    }\n\n    public void EnterBackground(Action enterBackground)")]),
 
- ("M73", "the coordinator goes back to gating on a value it read", [
-   # Re-anchored in round 6, and this is now the sharpest mutation in the slice: it hands the commit an
-   # EMPTY action and hides on its own afterwards. That is precisely the defect the round-6 blocker
-   # described -- the caller keeping a decision and acting on it later -- expressed against a void API.
-   (COORDINATOR,
-    "            enterBackground(() =>\n            {\n                windowController.HideToBackground();\n                hidden = true;\n            });",
-    "            enterBackground(() => { });\n            windowController.HideToBackground();\n            hidden = true;")]),
-
- ("M74", "an unacknowledged loss is swallowed like any other subscriber failure", [
+ ("M77", "the multicast delivery is validated once instead of per subscriber", [
    (MACHINE,
-    "                    if (delivered is TrayAffordanceState.Lost or TrayAffordanceState.Unavailable)",
-    "                    if (false && delivered is TrayAffordanceState.Lost or TrayAffordanceState.Unavailable)")]),
+    "                    foreach (var handler in StateChanged?.GetInvocationList() ?? [])\n                    {\n                        if (!IsStillDeliverable(outcome))",
+    "                    foreach (var handler in StateChanged?.GetInvocationList() ?? [])\n                    {\n                        if (false)")]),
 
- ("M75", "every subscriber failure escalates, so a noisy observer can end the process", [
+ ("M78", "the per-subscriber revalidation ignores the deadline", [
    (MACHINE,
-    "                    if (delivered is TrayAffordanceState.Lost or TrayAffordanceState.Unavailable)",
-    "                    if (true || delivered is TrayAffordanceState.Lost or TrayAffordanceState.Unavailable)")]),
+    "        return ProjectState(_state) != TrayAffordanceState.Available\n               || outcome.Deadline == 0\n               || _time.GetTimestamp() < outcome.Deadline;",
+    "        return true;")]),
+
+ ("M79", "the per-subscriber revalidation ignores a Release", [
+   (MACHINE,
+    "        if (_state is TrayLifecycleState.Releasing or TrayLifecycleState.Released)\n        {\n            return false;\n        }\n\n        return ProjectState(_state) != TrayAffordanceState.Available",
+    "        if (false)\n        {\n            return false;\n        }\n\n        return ProjectState(_state) != TrayAffordanceState.Available")]),
 ]
 
 
@@ -99,6 +93,6 @@ for mid, desc, edits in MUTATIONS:
     for n in names:
         print(f"      {n}", flush=True)
 
-io.open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "mutation-results-round13.json"),
+io.open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "mutation-results-round14.json"),
         "w", encoding="utf-8").write(json.dumps(results, indent=2))
 print("DONE")

@@ -88,19 +88,18 @@ public sealed class WindowCloseCoordinatorTests
                 Notice,
                 enterBackground =>
                 {
-                    // The commit runs the act itself, so the harness models the real contract rather
-                    // than a permission the coordinator could keep. The markers make the ORDER visible:
-                    // the hide has to happen BETWEEN them, because a coordinator that hides after the
-                    // commit has an interval again, and an interval is the whole defect.
+                    // The commit runs the act itself and returns NOTHING, so the harness models the real
+                    // contract rather than a permission the coordinator could keep. The markers make the
+                    // ORDER visible: the hide has to happen BETWEEN them, because a coordinator that
+                    // hides after the commit has an interval again, and an interval is the whole defect.
                     if (!HasExitAffordance)
                     {
-                        return false;
+                        return;
                     }
 
                     Window.Calls.Add("commit:enter");
                     enterBackground();
                     Window.Calls.Add("commit:leave");
-                    return true;
                 },
                 NullLogger<WindowCloseCoordinator>.Instance);
         }
@@ -216,11 +215,7 @@ public sealed class WindowCloseCoordinatorTests
             h.Settings,
             new OrderRecordingWindowController(order),
             new ThrowingNoticePresenter(order),
-            enterBackground =>
-            {
-                enterBackground();
-                return true;
-            },
+            enterBackground => enterBackground(),
             NullLogger<WindowCloseCoordinator>.Instance);
 
         var thrown = Record.Exception(() => coordinator.HandleCloseRequest());

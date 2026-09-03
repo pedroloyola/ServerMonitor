@@ -24,7 +24,7 @@ public sealed class WindowCloseCoordinator(
     IBackgroundMonitoringSettingsService backgroundSettings,
     IApplicationWindowController windowController,
     IBackgroundNoticePresenter noticePresenter,
-    Func<Action, bool> tryEnterBackground,
+    Action<Action> enterBackground,
     ILogger<WindowCloseCoordinator> logger)
 {
     /// <summary>
@@ -38,10 +38,21 @@ public sealed class WindowCloseCoordinator(
             return false; // this is Application.Exit() closing the window: let it
         }
 
-        // The hide is handed over, not gated. Asking "may I?" and hiding afterwards left an interval in
-        // which the affordance could be lost while the window went away regardless.
-        if (backgroundSettings.BackgroundMonitoringEnabled
-            && tryEnterBackground(windowController.HideToBackground))
+        // The hide is handed over, not gated, and NOTHING comes back: what this records is that the hide
+        // HAPPENED, which cannot be replayed into hiding an unprotected window later. Asking "may I?" —
+        // whether as a property or as a return value — left an interval in which the affordance could be
+        // lost while the window went away regardless.
+        var hidden = false;
+        if (backgroundSettings.BackgroundMonitoringEnabled)
+        {
+            enterBackground(() =>
+            {
+                windowController.HideToBackground();
+                hidden = true;
+            });
+        }
+
+        if (hidden)
         {
             lifecycleController.EnterBackground();
             logger.LogInformation("Window closed to background; monitoring continues.");

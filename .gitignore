@@ -35,3 +35,7 @@ config.json
 /CONTEXT.md
 mutation-results*.json
 TestResults/
+
+# Python bytecode from the mutation runners in tools/
+__pycache__/
+*.pyc

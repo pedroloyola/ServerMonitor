@@ -5,7 +5,7 @@ namespace ServerMonitor.App.Services;
 /// <summary>
 /// What the S2-T affordance states MEAN for the lifecycle (M13 S2-T split: S2 owns the semantics).
 /// <para>
-/// One request is made of it — <see cref="TryEnterBackground"/> — and one decision is made by it:
+/// One request is made of it — <see cref="EnterBackground"/> — and one decision is made by it:
 /// when the affordance is not established, the session degrades. Both halves are the S2 side of the
 /// contract; neither touches the shell.
 /// </para>
@@ -55,12 +55,13 @@ public sealed class TrayAffordanceLifecycle
     /// AND the session has not degraded.
     /// </summary>
     /// <remarks>
-    /// <b>There is deliberately no readable <c>CanEnterBackground</c> any more.</b> It was a boolean the
-    /// caller read and acted on afterwards, and a probe that invalidated the affordance in between still
-    /// hid the window — leaving a process alive, invisible and with no way out. Removing the property is
-    /// the point: a permission that cannot be detached from the act cannot go stale between them.
+    /// <b>Nothing here hands back a permission — not a property, and not a return value.</b> The property
+    /// went first, and a <c>bool</c> return took its place: called with an empty action it produced a bare
+    /// "you are permitted" that the caller could keep and act on later, which is the same capability in a
+    /// new shape. A caller that needs to know what happened finds out from inside its own action, where
+    /// what it learns is that the act was DONE, not that it MAY be done.
     /// </remarks>
-    public bool TryEnterBackground(Action enterBackground)
+    public void EnterBackground(Action enterBackground)
     {
         ArgumentNullException.ThrowIfNull(enterBackground);
 
@@ -68,12 +69,12 @@ public sealed class TrayAffordanceLifecycle
         {
             if (_degradedForSession)
             {
-                return false;
+                return;
             }
 
             // The session gate is ours; the affordance gate is the source's, and it runs the act under
             // its own lock so the two cannot come apart.
-            return _source.TryEnterBackground(enterBackground);
+            _source.EnterBackground(enterBackground);
         }
     }
 

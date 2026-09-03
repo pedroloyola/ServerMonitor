@@ -480,7 +480,7 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
     /// The determination and the act are ONE step. Handing out a boolean and letting the caller act on it
     /// later is what left a window in which the affordance could be lost between the answer and the hide.
     /// </remarks>
-    public bool TryEnterBackground(Action enterBackground)
+    public void EnterBackground(Action enterBackground)
     {
         ArgumentNullException.ThrowIfNull(enterBackground);
 
@@ -488,11 +488,10 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
         {
             if (Project(_state, _time.GetTimestamp()) != TrayAffordanceState.Available)
             {
-                return false;
+                return;
             }
 
             enterBackground();
-            return true;
         }
     }
 
@@ -1207,6 +1206,33 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
     /// rather than silently producing a live icon nobody asked for.
     /// </remarks>
     /// <summary>
+    /// Whether the notification may still go out, judged NOW. Called before every handler.
+    /// </summary>
+    /// <remarks>
+    /// <b>The only place these two rules live.</b> They used to be checked once before the multicast AND
+    /// again in front of each handler, which is one rule in two places — the shape this design keeps
+    /// having to correct — and it showed up exactly as it always does: two mutations survived because each
+    /// copy covered for the other. Applied here, before EVERY handler including the first, there is one
+    /// statement of the rule and nothing to keep in step with it.
+    /// <para>
+    /// Release dominates, and a decision taken before the deadline may not be delivered as Available after
+    /// it: "the state was deliverable when the multicast started" says nothing about the moment the third
+    /// subscriber runs.
+    /// </para>
+    /// </remarks>
+    private bool IsStillDeliverable(Outcome outcome)
+    {
+        if (_state is TrayLifecycleState.Releasing or TrayLifecycleState.Released)
+        {
+            return false;
+        }
+
+        return ProjectState(_state) != TrayAffordanceState.Available
+               || outcome.Deadline == 0
+               || _time.GetTimestamp() < outcome.Deadline;
+    }
+
+    /// <summary>
     /// Reads and clears a fail-safe request raised outside a transition. Under the lock, like every other
     /// read of that flag.
     /// </summary>
@@ -1486,35 +1512,32 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
                 // happened after the last check — which is precisely where the defect was.
                 BeforeDeliveryForTests?.Invoke();
 
-                if (_state is TrayLifecycleState.Releasing or TrayLifecycleState.Released)
-                {
-                    // Release dominates. Checked here rather than at decision time, because the Release
-                    // may have won AFTER this delivery was decided.
-                    return;
-                }
-
                 _deliveredSequence = token;
                 var delivered = Project(_state, _time.GetTimestamp());
 
                 AtInvocationForTests?.Invoke();
 
-                // Immediately before the event goes out, and inside the same critical section. The
-                // projection governs what a READER sees; this governs whether the EVENT is delivered at
-                // all, and they are two different observables. Checking earlier left the clock free to
-                // move in between — which is exactly what was measured.
-                if (ProjectState(_state) == TrayAffordanceState.Available
-                    && outcome.Deadline != 0
-                    && _time.GetTimestamp() >= outcome.Deadline)
-                {
-                    _logger.LogWarning(
-                        "An Available notification was decided before the deadline and reached delivery "
-                        + "after it; dropped.");
-                    return;
-                }
-
                 try
                 {
-                    StateChanged?.Invoke(this, EventArgs.Empty);
+                    // PER SUBSCRIBER, not per notification.
+                    //
+                    // A multicast invocation validates once and then serves N handlers, and the state can
+                    // die between the first and the second: a handler that advances the clock past the
+                    // deadline leaves the next one observing an affordance that is already gone. The
+                    // delivery is therefore re-decided in front of each handler, with a fresh reading of
+                    // the clock, and stops the moment it is no longer deliverable.
+                    foreach (var handler in StateChanged?.GetInvocationList() ?? [])
+                    {
+                        if (!IsStillDeliverable(outcome))
+                        {
+                            _logger.LogWarning(
+                                "The notification is no longer deliverable; this subscriber and the "
+                                + "remaining ones are not notified.");
+                            break;
+                        }
+
+                        ((EventHandler)handler)(this, EventArgs.Empty);
+                    }
                 }
                 catch (Exception exception)
                 {

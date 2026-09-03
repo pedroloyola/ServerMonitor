@@ -1,3 +1,4 @@
+using System.Reflection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.UI.Xaml;
 using ServerMonitor.App.Services;
@@ -38,16 +39,15 @@ public sealed class TrayAffordanceLifecycleTests
         /// </summary>
         public Action? InvalidateDuringCommit { get; set; }
 
-        public bool TryEnterBackground(Action enterBackground)
+        public void EnterBackground(Action enterBackground)
         {
             if (_state != TrayAffordanceState.Available)
             {
-                return false;
+                return;
             }
 
             InvalidateDuringCommit?.Invoke();
             enterBackground();
-            return true;
         }
     }
 
@@ -80,6 +80,17 @@ public sealed class TrayAffordanceLifecycleTests
         public void RequestClose() { }
 
         public void BeginShutdown() { }
+    }
+
+    /// <summary>
+    /// Whether the commit performed the act. Observed from INSIDE the action, because nothing comes back:
+    /// what a caller may learn is that the act was done, never that it may be done.
+    /// </summary>
+    private static bool EnteredBackground(Harness harness)
+    {
+        var entered = false;
+        harness.Subject.EnterBackground(() => entered = true);
+        return entered;
     }
 
     private sealed class Harness
@@ -115,7 +126,7 @@ public sealed class TrayAffordanceLifecycleTests
     {
         var h = new Harness(TrayAffordanceState.Available);
 
-        Assert.True(h.Subject.TryEnterBackground(() => { }));
+        Assert.True(EnteredBackground(h), "an established affordance must permit background");
     }
 
     [Theory]
@@ -125,7 +136,7 @@ public sealed class TrayAffordanceLifecycleTests
     {
         var h = new Harness(state);
 
-        Assert.False(h.Subject.TryEnterBackground(() => { }));
+        Assert.False(EnteredBackground(h), "background must be refused");
     }
 
     // ---------------------------------------------------------------- degradation
@@ -146,7 +157,7 @@ public sealed class TrayAffordanceLifecycleTests
         Assert.True(h.Notice.IsDegraded);
         Assert.Equal(["OpenBackgroundSettings"], h.Window.Calls);
         Assert.Equal(0, h.Lifecycle.ExitRequests);
-        Assert.False(h.Subject.TryEnterBackground(() => { }));
+        Assert.False(EnteredBackground(h), "background must be refused");
     }
 
     /// <summary>The Dashboard must never be shown on the way: that is what OpenBackgroundSettings buys.</summary>
@@ -185,12 +196,12 @@ public sealed class TrayAffordanceLifecycleTests
     {
         var h = new Harness(TrayAffordanceState.Available);
         h.Subject.Evaluate();
-        Assert.True(h.Subject.TryEnterBackground(() => { }));
+        Assert.True(EnteredBackground(h), "an established affordance must permit background");
 
         h.Source.Report(TrayAffordanceState.Lost);
 
         Assert.True(h.Subject.IsDegradedForSession);
-        Assert.False(h.Subject.TryEnterBackground(() => { }));
+        Assert.False(EnteredBackground(h), "background must be refused");
         Assert.True(h.Notice.IsDegraded);
         Assert.Equal(["OpenBackgroundSettings"], h.Window.Calls);
     }
@@ -211,7 +222,7 @@ public sealed class TrayAffordanceLifecycleTests
         h.Source.Report(TrayAffordanceState.Available);
 
         Assert.True(h.Subject.IsDegradedForSession);
-        Assert.False(h.Subject.TryEnterBackground(() => { }));
+        Assert.False(EnteredBackground(h), "background must be refused");
     }
 
     [Fact]
@@ -275,7 +286,7 @@ public sealed class TrayAffordanceLifecycleTests
         // before the act. With a detachable boolean the act went ahead anyway.
         h.Source.InvalidateDuringCommit = () => h.Source.Report(TrayAffordanceState.Lost);
 
-        h.Subject.TryEnterBackground(() => hidden++);
+        h.Subject.EnterBackground(() => hidden++);
 
         // Whether it ran or not, what must never happen is running WITHOUT the affordance. The commit
         // either refuses, or performs the act under the determination that granted it.
@@ -297,15 +308,38 @@ public sealed class TrayAffordanceLifecycleTests
     /// that a value which could be held had to become a right that is exercised.
     /// </remarks>
     [Fact]
-    public void No_readable_permission_survives_for_a_caller_to_hold()
+    public void Nothing_on_the_affordance_surface_hands_back_a_permission()
     {
-        var members = typeof(TrayAffordanceLifecycle)
-            .GetMembers()
-            .Select(member => member.Name)
-            .ToArray();
+        // BY RETURN TYPE, not by name. The previous version of this test looked for the old NAME and
+        // therefore passed over `bool TryEnterBackground(Action)` — which, called with an empty action,
+        // hands back a bare "you are permitted" for the caller to keep. That is the same capability in a
+        // new shape, and it is the fourth time in this slice that a value which could be held had to stop
+        // being returned at all.
+        var offenders = new List<string>();
 
-        Assert.DoesNotContain("CanEnterBackground", members);
-        Assert.Contains("TryEnterBackground", members);
+        foreach (var type in new[] { typeof(TrayAffordanceLifecycle), typeof(ITrayAffordanceSource) })
+        {
+            foreach (var method in type.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly))
+            {
+                // Property getters are counted through the property itself, not twice.
+                if (method.ReturnType == typeof(bool) && !method.IsSpecialName)
+                {
+                    offenders.Add($"{type.Name}.{method.Name}");
+                }
+            }
+
+            foreach (var property in type.GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly))
+            {
+                if (property.PropertyType == typeof(bool))
+                {
+                    offenders.Add($"{type.Name}.{property.Name}");
+                }
+            }
+        }
+
+        // IsDegradedForSession reports a session fact that authorises nothing: it cannot be turned back
+        // into hiding a window, and the only path that authorises anything revalidates for itself.
+        Assert.Equal(["TrayAffordanceLifecycle.IsDegradedForSession"], offenders);
     }
 
     // ---------------------------------------------------------------- the contract itself
@@ -352,12 +386,12 @@ public sealed class TrayAffordanceLifecycleTests
     public void Recovering_holds_without_degrading_and_without_allowing_background()
     {
         var h = new Harness(TrayAffordanceState.Available);
-        Assert.True(h.Subject.TryEnterBackground(() => { }));
+        Assert.True(EnteredBackground(h), "an established affordance must permit background");
 
         h.Source.Report(TrayAffordanceState.Recovering);
 
         Assert.False(h.Subject.IsDegradedForSession);
-        Assert.False(h.Subject.TryEnterBackground(() => { }));
+        Assert.False(EnteredBackground(h), "background must be refused");
         Assert.DoesNotContain("OpenBackgroundSettings", h.Window.Calls);
     }
 }
