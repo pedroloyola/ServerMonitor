@@ -9,15 +9,10 @@ public interface IApplicationWindowController
 
     void Attach(Window window);
 
-    void HideForMinimize();
-
-    /// <summary>
-    /// Hides the Dashboard for the BACKGROUND state (M13 S2). Same window operation as
-    /// <see cref="HideForMinimize"/>, separate name because the two callers mean different things: one is
-    /// the minimize button, the other is the close button under background monitoring, and only the
-    /// latter may show the first-close notice. Tolerates there being no window at all (headless).
-    /// </summary>
-    void HideToBackground();
+    // NEITHER HideToBackground() NOR HideForMinimize() IS HERE. It is the one window operation that the tray
+    // affordance guards, so leaving it on the contract every consumer holds made the guard advisory: the
+    // act stayed reachable whatever the state machine decided. It lives on IWindowHideCapability, which
+    // is not registered in the container and has exactly two enumerated holders. See that file.
 
     /// <summary>
     /// Registers how to create the main window on demand. Headless launches start with no window at all,

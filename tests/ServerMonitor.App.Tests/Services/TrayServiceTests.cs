@@ -33,7 +33,10 @@ public sealed class TrayServiceTests
         harness.Icon.RaiseRefreshAll();
         await harness.Refresh.Called.Task.WaitAsync(TimeSpan.FromSeconds(2));
 
-        Assert.Equal(1, harness.Window.HideCount);
+        // The minimize hide is ASKED FOR, not done: since round 9 it goes through the same guard as the
+        // close hide, because the two were identical window mechanics and only one of them was guarded.
+        Assert.Equal([TrayGuardedOperation.HideForMinimize], harness.Requested);
+        Assert.Equal(0, harness.Window.HideCount);
         Assert.Equal(1, harness.Window.RestoreCount);
         Assert.Equal(1, harness.Window.SettingsCount);
         Assert.Equal(1, harness.Refresh.RefreshCount);
@@ -122,11 +125,18 @@ public sealed class TrayServiceTests
 
         public FakeTimeProvider Clock { get; } = new(new DateTimeOffset(2026, 9, 2, 12, 0, 0, TimeSpan.Zero));
 
+        /// <summary>
+        /// What the service ASKED for. Since round 9 the minimize hide is a guarded operation, so this
+        /// records a request rather than the window recording a hide it was told to do.
+        /// </summary>
+        public List<TrayGuardedOperation> Requested { get; } = new();
+
         public Harness(int maxIconAttempts = 1)
         {
             Service = new TrayService(
                 Icon,
                 Window,
+                Requested.Add,
                 Refresh,
                 Alert,
                 Lifecycle,

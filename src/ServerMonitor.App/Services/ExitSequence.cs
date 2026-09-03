@@ -19,6 +19,7 @@ public sealed class ExitSequence(
     IRefreshAllCoordinator refreshAllCoordinator,
     TrayService trayService,
     ApplicationWindowController windowController,
+    IWindowHideCapability hideCapability,
     AppShutdownCoordinator shutdownCoordinator,
     ILogger<ExitSequence> logger) : IExitSequence
 {
@@ -36,7 +37,7 @@ public sealed class ExitSequence(
     {
         // Hide BEFORE the controller stops accepting commands, otherwise the hide itself is dropped.
         // Tolerates there being no window at all: that is the headless exit (A12).
-        windowController.HideToBackground();
+        hideCapability.HideToBackground();
         windowController.BeginShutdown();
     }
 

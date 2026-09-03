@@ -19,6 +19,19 @@ public enum TrayGuardedOperation
 {
     /// <summary>Hide the window and continue monitoring in the background.</summary>
     EnterBackground = 0,
+
+    /// <summary>
+    /// Hide the window on minimize — which is the SAME window mechanics as background entry, and was the
+    /// second door.
+    /// </summary>
+    /// <remarks>
+    /// <c>HideForMinimize</c> and <c>HideToBackground</c> differed by a log line: both set
+    /// <c>IsShownInSwitchers = false</c> and called <c>Hide()</c>. Guarding one and leaving the other on
+    /// the general contract closed the door by name and left it open by effect, and the minimize caller
+    /// was guarded only by "the service is started" — so a user who minimized after a failed registration
+    /// got a hidden window with no tray icon, which is the A12 zombie by a third route.
+    /// </remarks>
+    HideForMinimize = 1,
 }
 
 /// <summary>
@@ -40,6 +53,18 @@ public interface ITrayGuardedOperations
     /// <summary>Performed only while the affordance holds and the session has not degraded.</summary>
     void EnterBackground();
 
-    /// <summary>Performed instead when it does not. There is no third outcome and no silent one.</summary>
-    void FallBackToExit();
+    /// <summary>Hides on minimize, under the same guard and for the same reason.</summary>
+    void HideForMinimize();
+
+    /// <summary>
+    /// Performed instead when the guard refuses. There is no third outcome and no silent one — but WHAT
+    /// the refusal does depends on the operation, which is why it takes one.
+    /// </summary>
+    /// <remarks>
+    /// Refusing a background entry has to close the window, because the user asked for the window to go
+    /// away and it did not. Refusing a MINIMIZE must not: the user asked to minimize, and quitting the
+    /// application because the tray is unavailable would be a far worse answer than leaving the window
+    /// where it is. One refusal shape for both would have got one of them wrong.
+    /// </remarks>
+    void Refuse(TrayGuardedOperation operation);
 }

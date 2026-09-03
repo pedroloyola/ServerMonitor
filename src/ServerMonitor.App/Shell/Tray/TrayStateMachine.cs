@@ -546,7 +546,7 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
 
             if (Project(_state, _time.GetTimestamp()) != TrayAffordanceState.Available)
             {
-                operations.FallBackToExit();
+                operations.Refuse(operation);
                 return;
             }
 
@@ -554,6 +554,9 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
             {
                 case TrayGuardedOperation.EnterBackground:
                     operations.EnterBackground();
+                    break;
+                case TrayGuardedOperation.HideForMinimize:
+                    operations.HideForMinimize();
                     break;
                 default:
                     // A new operation must be given a home here deliberately. Falling through to the

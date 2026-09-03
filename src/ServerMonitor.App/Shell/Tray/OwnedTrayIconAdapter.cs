@@ -113,7 +113,7 @@ internal sealed class OwnedTrayIconAdapter : ITrayIconAdapter, ITrayAffordanceSo
             // Before initialization there is no machine and therefore no proof of anything, and a silent
             // no-op here would leave the window neither hidden nor closed. Fail to the same fallback the
             // machine uses, so the outcome is identical whichever side answers.
-            operations?.FallBackToExit();
+            operations?.Refuse(operation);
             return;
         }
 

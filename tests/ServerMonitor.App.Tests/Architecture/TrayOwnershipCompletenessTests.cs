@@ -124,6 +124,74 @@ public sealed class TrayOwnershipCompletenessTests
         Assert.Empty(offenders);
     }
 
+    // ------------------------------------------------------------------ CV-20 again, for the DOOR
+
+    /// <summary>
+    /// <c>ATLAS-O1-DIRECT-HIDE</c>, the seventh ring: the hide capability has exactly TWO holders, and
+    /// they are enumerated here by type.
+    /// </summary>
+    /// <remarks>
+    /// Six rings removed six ways of obtaining the permission and every one of them left
+    /// <c>HideToBackground()</c> on the window contract, which every consumer holds — so the act stayed
+    /// reachable and the guard was advisory. Measured holders of that contract before this change:
+    /// MainWindow, TrayService, WindowsAppNotificationService, and two resolutions in the composition
+    /// root, none of which has any business hiding a window.
+    /// <para>
+    /// This is the cure CV-20 already proved for <c>INativeTrayRegistration</c>, applied to the door
+    /// instead of the ticket: off the general contract, out of the container, restricted by type, and
+    /// enumerated. <c>ExitSequence</c> is a legitimate holder — it is the authorised exit path — so it is
+    /// listed rather than broken.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void The_hide_capability_has_exactly_two_holders()
+    {
+        var holders = typeof(App).Assembly
+            .GetTypes()
+            .Where(t => t != typeof(WindowHideCapability))
+            .Where(t => t.GetConstructors(
+                            BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+                         .SelectMany(c => c.GetParameters())
+                         .Any(p => p.ParameterType == typeof(IWindowHideCapability))
+                     || t.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+                         .Any(f => f.FieldType == typeof(IWindowHideCapability)))
+            .Select(t => t.Name)
+            .OrderBy(n => n)
+            .ToArray();
+
+        Assert.Equal([nameof(ExitSequence), nameof(TrayAffordanceLifecycle)], holders);
+    }
+
+    /// <summary>The capability is never in the container — the same assertion CV-20 makes, for the door.</summary>
+    [Fact]
+    public void The_hide_capability_is_never_registered_in_the_container()
+    {
+        var services = RealComposition();
+
+        var offenders = services
+            .Where(d => d.ServiceType == typeof(IWindowHideCapability)
+                        || d.ImplementationType == typeof(WindowHideCapability))
+            .Select(d => d.ServiceType.FullName!)
+            .ToArray();
+
+        Assert.Empty(offenders);
+    }
+
+    /// <summary>
+    /// And the general window contract does not carry it, which is what made every holder above a holder.
+    /// </summary>
+    [Fact]
+    public void The_general_window_contract_cannot_hide_to_background()
+    {
+        var offenders = typeof(IApplicationWindowController)
+            .GetMethods()
+            .Where(m => m.Name.StartsWith("Hide", StringComparison.Ordinal))
+            .Select(m => m.Name)
+            .ToArray();
+
+        Assert.Empty(offenders);
+    }
+
     [Fact]
     public void T14c_is_not_vacuous_because_the_composition_really_ran()
     {
@@ -442,11 +510,24 @@ public sealed class TrayOwnershipCompletenessTests
         {
             if (State != TrayAffordanceState.Available)
             {
-                _operations?.FallBackToExit();
+                _operations?.Refuse(operation);
                 return;
             }
 
-            _operations?.EnterBackground();
+            // DISPATCHES ON THE OPERATION, like the real machine. It used to call EnterBackground()
+            // whatever was asked, which made a minimize test pass by performing a background entry -- a
+            // fake that answers the wrong question is a permanent mutation applied to the environment.
+            switch (operation)
+            {
+                case TrayGuardedOperation.EnterBackground:
+                    _operations?.EnterBackground();
+                    break;
+                case TrayGuardedOperation.HideForMinimize:
+                    _operations?.HideForMinimize();
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(operation), operation, null);
+            }
         }
     }
 
@@ -587,7 +668,11 @@ public sealed class TrayOwnershipCompletenessTests
         {
         }
 
-        public void FallBackToExit()
+        public void HideForMinimize()
+        {
+        }
+
+        public void Refuse(TrayGuardedOperation operation)
         {
         }
     }

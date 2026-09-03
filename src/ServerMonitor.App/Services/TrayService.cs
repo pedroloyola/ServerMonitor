@@ -19,6 +19,7 @@ namespace ServerMonitor.App.Services;
 public sealed class TrayService(
     ITrayIconAdapter trayIcon,
     IApplicationWindowController windowController,
+    Action<TrayGuardedOperation> perform,
     IRefreshAllCoordinator refreshAllCoordinator,
     IServerAlertCoordinator alertCoordinator,
     IAppLifecycleController lifecycleController,
@@ -196,7 +197,10 @@ public sealed class TrayService(
             }
         }
 
-        windowController.HideForMinimize();
+        // ASKS; it does not hide. This used to call the window controller directly, guarded only by
+        // "the service is started" -- so minimizing after a failed registration hid the window with no
+        // tray icon to bring it back.
+        perform(TrayGuardedOperation.HideForMinimize);
     }
 
     private void OnOpenRequested(object? sender, EventArgs args) => windowController.RestoreAndActivate();

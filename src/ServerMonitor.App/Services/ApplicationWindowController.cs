@@ -7,6 +7,23 @@ using WinUIEx;
 
 namespace ServerMonitor.App.Services;
 
+/// <summary>
+/// The only implementation of <see cref="IWindowHideCapability"/>, and deliberately a SEPARATE object from
+/// the window controller.
+/// </summary>
+/// <remarks>
+/// If the controller implemented the capability itself, every holder of the controller could reach it with
+/// a cast, and the whole point is that holding the window contract must not be enough. Nothing on the
+/// controller returns one of these, so the only way to have one is to be handed it by the composition
+/// root — which hands it to exactly two consumers.
+/// </remarks>
+internal sealed class WindowHideCapability(ApplicationWindowController controller) : IWindowHideCapability
+{
+    public void HideToBackground() => controller.HideToBackgroundCore();
+
+    public void HideForMinimize() => controller.HideForMinimizeCore();
+}
+
 public sealed class ApplicationWindowController(
     INavigationService navigationService,
     IWindowModeCoordinator modeCoordinator,
@@ -56,7 +73,7 @@ public sealed class ApplicationWindowController(
         }
     }
 
-    public void HideForMinimize() => RunOnUiThread(() =>
+    internal void HideForMinimizeCore() => RunOnUiThread(() =>
     {
         if (_appWindow is null)
         {
@@ -72,7 +89,7 @@ public sealed class ApplicationWindowController(
     /// The BACKGROUND transition. Identical window mechanics to the minimize path; a headless process
     /// with no window is already in the target state, so this is a no-op there rather than an error.
     /// </summary>
-    public void HideToBackground() => RunOnUiThread(() =>
+    internal void HideToBackgroundCore() => RunOnUiThread(() =>
     {
         if (_appWindow is null)
         {

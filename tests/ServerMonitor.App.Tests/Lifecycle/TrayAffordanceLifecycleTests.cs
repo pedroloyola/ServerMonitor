@@ -105,7 +105,7 @@ public sealed class TrayAffordanceLifecycleTests
         {
             if (_state != TrayAffordanceState.Available)
             {
-                _operations?.FallBackToExit();
+                _operations?.Refuse(operation);
                 return;
             }
 
@@ -115,11 +115,24 @@ public sealed class TrayAffordanceLifecycleTests
 
             if (_state != TrayAffordanceState.Available)
             {
-                _operations?.FallBackToExit();
+                _operations?.Refuse(operation);
                 return;
             }
 
-            _operations?.EnterBackground();
+            // DISPATCHES ON THE OPERATION, like the real machine. It used to call EnterBackground()
+            // whatever was asked, which made a minimize test pass by performing a background entry -- a
+            // fake that answers the wrong question is a permanent mutation applied to the environment.
+            switch (operation)
+            {
+                case TrayGuardedOperation.EnterBackground:
+                    _operations?.EnterBackground();
+                    break;
+                case TrayGuardedOperation.HideForMinimize:
+                    _operations?.HideForMinimize();
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(operation), operation, null);
+            }
         }
     }
 
@@ -189,6 +202,17 @@ public sealed class TrayAffordanceLifecycleTests
         }
     }
 
+    /// <summary>
+    /// The hide CAPABILITY, which is no longer a member of the window contract. It records into the same
+    /// trace as the controller so the ordering assertions still read as one sequence.
+    /// </summary>
+    private sealed class RecordingHideCapability(RecordingWindowController window) : IWindowHideCapability
+    {
+        public void HideToBackground() => window.Calls.Add("HideToBackground");
+
+        public void HideForMinimize() => window.Calls.Add("HideForMinimize");
+    }
+
     private sealed class Harness
     {
         public FakeAffordanceSource Source { get; }
@@ -213,7 +237,7 @@ public sealed class TrayAffordanceLifecycleTests
             Lifecycle = new FakeAppLifecycleController(lifecycleState);
             Notice.Changed += (_, _) => Order.Add("notice");
             Subject = new TrayAffordanceLifecycle(
-                Source, Window, Notice, Lifecycle, Presenter,
+                Source, Window, new RecordingHideCapability(Window), Notice, Lifecycle, Presenter,
                 NullLogger<TrayAffordanceLifecycle>.Instance);
         }
     }
@@ -447,6 +471,45 @@ public sealed class TrayAffordanceLifecycleTests
         // IsDegradedForSession reports a session fact that authorises nothing: it cannot be turned back
         // into hiding a window, and the only path that authorises anything revalidates for itself.
         Assert.Equal(["TrayAffordanceLifecycle.IsDegradedForSession"], offenders);
+    }
+
+    /// <summary>
+    /// THE SECOND DOOR: minimize is guarded by the same affordance, because it is the same act.
+    /// </summary>
+    /// <remarks>
+    /// <c>HideForMinimize</c> and <c>HideToBackground</c> were identical window mechanics — both set
+    /// <c>IsShownInSwitchers = false</c> and called <c>Hide()</c>, differing by a log line — and only one
+    /// of them was guarded. The minimize caller checked nothing but "the service is started", so
+    /// minimizing after a failed registration hid the window with no tray icon to bring it back. Closing
+    /// the door by name closed it for one name.
+    /// </remarks>
+    [Fact]
+    public void A_minimize_with_no_affordance_does_not_hide_the_window()
+    {
+        var h = new Harness(TrayAffordanceState.Lost);
+        h.Subject.Evaluate();
+        var exitsBefore = h.Lifecycle.ExitRequests;
+
+        h.Subject.Perform(TrayGuardedOperation.HideForMinimize);
+
+        Assert.DoesNotContain("HideForMinimize", h.Window.Calls);
+
+        // AND IT MUST NOT EXIT. This is the asymmetry that makes the refusal take the operation: the user
+        // asked to minimize, and quitting the application because the tray is unavailable would be a far
+        // worse answer than leaving the window where it is.
+        Assert.Equal(exitsBefore, h.Lifecycle.ExitRequests);
+    }
+
+    /// <summary>And with an affordance it hides, so the guard is not simply refusing everything.</summary>
+    [Fact]
+    public void A_minimize_with_an_affordance_hides_the_window()
+    {
+        var h = new Harness(TrayAffordanceState.Available);
+
+        h.Subject.Perform(TrayGuardedOperation.HideForMinimize);
+
+        Assert.Contains("HideForMinimize", h.Window.Calls);
+        Assert.Equal(0, h.Lifecycle.ExitRequests);
     }
 
     /// <summary>

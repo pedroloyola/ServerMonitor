@@ -347,7 +347,15 @@ public partial class App : Application
         // them even by mistake.
         services.AddSingleton(Program.TerminationWatchdog);
         services.AddSingleton(Program.ProcessTerminator);
-        services.AddSingleton<IExitSequence, ExitSequence>();
+        services.AddSingleton<IExitSequence>(sp => new ExitSequence(
+            sp.GetRequiredService<IUserNotificationService>(),
+            sp.GetRequiredService<IServerAlertCoordinator>(),
+            sp.GetRequiredService<IRefreshAllCoordinator>(),
+            sp.GetRequiredService<TrayService>(),
+            sp.GetRequiredService<ApplicationWindowController>(),
+            new WindowHideCapability(sp.GetRequiredService<ApplicationWindowController>()),
+            sp.GetRequiredService<AppShutdownCoordinator>(),
+            sp.GetRequiredService<ILogger<ExitSequence>>()));
         // CV-17. The notice hangs off the exit path's EXISTING CAS: the controller calls this only on the
         // branch that won the transition to Exiting, so an exit the user asked for never produces it.
         services.AddSingleton(sp => new FailSafeExitNotice(
@@ -383,7 +391,14 @@ public partial class App : Application
             sp.GetRequiredService<Shell.Tray.OwnedTrayIconAdapter>());
         services.AddSingleton<ITrayIconAdapter>(sp =>
             sp.GetRequiredService<Shell.Tray.OwnedTrayIconAdapter>());
-        services.AddSingleton<TrayAffordanceLifecycle>();
+        services.AddSingleton(sp => new TrayAffordanceLifecycle(
+            sp.GetRequiredService<ITrayAffordanceSource>(),
+            sp.GetRequiredService<IApplicationWindowController>(),
+            new WindowHideCapability(sp.GetRequiredService<ApplicationWindowController>()),
+            sp.GetRequiredService<IBackgroundDegradationNotice>(),
+            sp.GetRequiredService<IAppLifecycleController>(),
+            sp.GetRequiredService<IBackgroundNoticePresenter>(),
+            sp.GetRequiredService<ILogger<TrayAffordanceLifecycle>>()));
         services.AddSingleton<OrphanTemporaryCleaner>();
         services.AddSingleton(sp => new WindowCloseCoordinator(
             sp.GetRequiredService<IAppLifecycleController>(),
@@ -398,6 +413,12 @@ public partial class App : Application
         services.AddSingleton<ApplicationWindowController>();
         services.AddSingleton<IApplicationWindowController>(sp =>
             sp.GetRequiredService<ApplicationWindowController>());
+
+        // THE HIDE CAPABILITY IS NEVER REGISTERED. Putting it in the container would hand it to every
+        // consumer that asks, which is exactly the state this replaces — see IWindowHideCapability. It is
+        // constructed here and passed BY TYPE to the two holders the design intends: the guarded
+        // operation (TrayAffordanceLifecycle) and the authorised exit path (ExitSequence). An
+        // architecture test enumerates them and fails if a third appears.
 
         // M9 compact widget mode. One window, two presentations. The placement store is the
         // real JSON file by default; the --qa-compact harness overrides it further below to
@@ -417,7 +438,16 @@ public partial class App : Application
         services.AddSingleton<RefreshAllCoordinator>();
         services.AddSingleton<IRefreshAllCoordinator>(sp =>
             sp.GetRequiredService<RefreshAllCoordinator>());
-        services.AddSingleton<TrayService>();
+        services.AddSingleton(sp => new TrayService(
+            sp.GetRequiredService<ITrayIconAdapter>(),
+            sp.GetRequiredService<IApplicationWindowController>(),
+            // The minimize hide goes through the SAME guard as the close hide; TrayService asks and does
+            // not hold the capability.
+            operation => sp.GetRequiredService<TrayAffordanceLifecycle>().Perform(operation),
+            sp.GetRequiredService<IRefreshAllCoordinator>(),
+            sp.GetRequiredService<IServerAlertCoordinator>(),
+            sp.GetRequiredService<IAppLifecycleController>(),
+            sp.GetRequiredService<ILogger<TrayService>>()));
         services.AddSingleton<WindowsAppNotificationService>();
         services.AddSingleton<IUserNotificationService>(sp =>
             sp.GetRequiredService<WindowsAppNotificationService>());

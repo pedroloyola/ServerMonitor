@@ -27,6 +27,7 @@ public sealed class TrayAffordanceLifecycle : ITrayLossConsumer, ITrayGuardedOpe
 {
     private readonly ITrayAffordanceSource _source;
     private readonly IApplicationWindowController _windowController;
+    private readonly IWindowHideCapability _hideCapability;
     private readonly IBackgroundDegradationNotice _degradationNotice;
     private readonly IAppLifecycleController _lifecycleController;
     private readonly IBackgroundNoticePresenter _noticePresenter;
@@ -38,6 +39,7 @@ public sealed class TrayAffordanceLifecycle : ITrayLossConsumer, ITrayGuardedOpe
     public TrayAffordanceLifecycle(
         ITrayAffordanceSource source,
         IApplicationWindowController windowController,
+        IWindowHideCapability hideCapability,
         IBackgroundDegradationNotice degradationNotice,
         IAppLifecycleController lifecycleController,
         IBackgroundNoticePresenter noticePresenter,
@@ -45,6 +47,7 @@ public sealed class TrayAffordanceLifecycle : ITrayLossConsumer, ITrayGuardedOpe
     {
         _source = source ?? throw new ArgumentNullException(nameof(source));
         _windowController = windowController ?? throw new ArgumentNullException(nameof(windowController));
+        _hideCapability = hideCapability ?? throw new ArgumentNullException(nameof(hideCapability));
         _degradationNotice = degradationNotice ?? throw new ArgumentNullException(nameof(degradationNotice));
         _lifecycleController = lifecycleController ?? throw new ArgumentNullException(nameof(lifecycleController));
         _noticePresenter = noticePresenter ?? throw new ArgumentNullException(nameof(noticePresenter));
@@ -77,7 +80,7 @@ public sealed class TrayAffordanceLifecycle : ITrayLossConsumer, ITrayGuardedOpe
             {
                 // Our gate refused, so OUR fallback runs. Silence here would leave the window neither
                 // hidden nor closed, which is the A12 zombie by a quieter door.
-                ((ITrayGuardedOperations)this).FallBackToExit();
+                ((ITrayGuardedOperations)this).Refuse(operation);
                 return;
             }
 
@@ -93,7 +96,7 @@ public sealed class TrayAffordanceLifecycle : ITrayLossConsumer, ITrayGuardedOpe
     /// </summary>
     void ITrayGuardedOperations.EnterBackground()
     {
-        _windowController.HideToBackground();
+        _hideCapability.HideToBackground();
         _lifecycleController.EnterBackground();
         _logger.LogInformation("Window closed to background; monitoring continues.");
 
@@ -101,11 +104,33 @@ public sealed class TrayAffordanceLifecycle : ITrayLossConsumer, ITrayGuardedOpe
         _noticePresenter.TryShowOnce();
     }
 
-    /// <summary>The other outcome, and there is no third one.</summary>
-    void ITrayGuardedOperations.FallBackToExit()
+    /// <summary>The minimize hide, under the same guard.</summary>
+    void ITrayGuardedOperations.HideForMinimize() => _hideCapability.HideForMinimize();
+
+    /// <summary>
+    /// The other outcome, and there is no third one — but it depends on WHICH operation was refused.
+    /// </summary>
+    void ITrayGuardedOperations.Refuse(TrayGuardedOperation operation)
     {
-        _logger.LogInformation("Window closed with no background state available; exiting.");
-        _lifecycleController.RequestExit(ExitReason.UserClosedWindow);
+        switch (operation)
+        {
+            case TrayGuardedOperation.EnterBackground:
+                // The user asked for the window to go away and it did not, so the app closes instead of
+                // sitting there having ignored them.
+                _logger.LogInformation("Window closed with no background state available; exiting.");
+                _lifecycleController.RequestExit(ExitReason.UserClosedWindow);
+                break;
+
+            case TrayGuardedOperation.HideForMinimize:
+                // Emphatically NOT an exit. The user asked to minimize; with no tray to restore from, the
+                // window simply stays where it is, which is the outcome that keeps the app reachable.
+                _logger.LogInformation(
+                    "Minimize did not hide the window: there is no tray affordance to restore it from.");
+                break;
+
+            default:
+                throw new ArgumentOutOfRangeException(nameof(operation), operation, null);
+        }
     }
 
     /// <summary>True once this session has given up on the tray. One-way.</summary>

@@ -30,6 +30,7 @@ public sealed class TrayStateMachineTests : IDisposable
     private Exception? _sinkFailure;
 
     private int _backgroundEntries;
+    private int _minimizeHides;
     private int _fallbacks;
     private int _lossAcknowledgements;
 
@@ -37,11 +38,16 @@ public sealed class TrayStateMachineTests : IDisposable
     /// The concrete operations the machine OWNS. Not a delegate the test hands in per call: since round 8
     /// the machine holds these and invokes them itself, so a caller has nowhere to put its own code.
     /// </summary>
-    private sealed class RecordingOperations(Action onEnter, Action onFallback) : ITrayGuardedOperations
+    private sealed class RecordingOperations(
+        Action onEnter,
+        Action onRefuse,
+        Action? onMinimize = null) : ITrayGuardedOperations
     {
         public void EnterBackground() => onEnter();
 
-        public void FallBackToExit() => onFallback();
+        public void HideForMinimize() => (onMinimize ?? onEnter)();
+
+        public void Refuse(TrayGuardedOperation operation) => onRefuse();
     }
     private Exception? _lossConsumerFailure;
 
@@ -75,7 +81,8 @@ public sealed class TrayStateMachineTests : IDisposable
         // that are about that absence ask for it explicitly.
         machine.SetGuardedOperations(operations ?? new RecordingOperations(
             () => Interlocked.Increment(ref _backgroundEntries),
-            () => Interlocked.Increment(ref _fallbacks)));
+            () => Interlocked.Increment(ref _fallbacks),
+            () => Interlocked.Increment(ref _minimizeHides)));
 
         if (withLossConsumer)
         {
@@ -599,6 +606,29 @@ public sealed class TrayStateMachineTests : IDisposable
 
         Assert.Equal(0, Volatile.Read(ref _backgroundEntries));
         Assert.Equal(1, Volatile.Read(ref _fallbacks));
+    }
+
+    /// <summary>
+    /// THE SECOND DOOR, at the machine: a minimize request performs the MINIMIZE hide, not the background
+    /// one.
+    /// </summary>
+    /// <remarks>
+    /// Written because the mutation for it survived. The lifecycle-level minimize tests run against the
+    /// fake source and never reach this switch, so mapping one operation onto the other changed nothing
+    /// they could see — the two operations differ in what the refusal does, so confusing them here would
+    /// make a refused minimize close the application.
+    /// </remarks>
+    [Fact]
+    public void A_minimize_request_performs_the_minimize_hide_and_not_the_background_one()
+    {
+        using var machine = Create();
+        machine.Establish();
+
+        machine.Perform(TrayGuardedOperation.HideForMinimize);
+
+        Assert.Equal(1, Volatile.Read(ref _minimizeHides));
+        Assert.Equal(0, Volatile.Read(ref _backgroundEntries));
+        Assert.Equal(0, Volatile.Read(ref _fallbacks));
     }
 
     /// <summary>
