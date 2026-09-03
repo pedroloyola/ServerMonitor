@@ -152,7 +152,6 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
     private long _deadlineTimestamp;
     private int _attemptsUsed;
     private int _cleanupAttempts;
-    private bool _debouncePending;
     private ShellEffectState _effect = ShellEffectState.NotIssued;
     private int _reconciliationPending;
     private bool _failSafeCompleted;
@@ -202,6 +201,16 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
     internal ShellEffectState EffectState
     {
         get { lock (_decision) { return _effect; } }
+    }
+
+    /// <summary>
+    /// Whether the single fail-safe shot has been consumed. Exposed so a mutation that marks it on
+    /// ENTRY instead of after a normal return is observable: with an always-throwing sink this must
+    /// stay false, or an exception has silently eaten the only progress mechanism Releasing has.
+    /// </summary>
+    internal bool FailSafeCompleted
+    {
+        get { lock (_decision) { return _failSafeCompleted; } }
     }
 
     /// <summary>True when a Lost episode could not positively verify its cleanup.</summary>
@@ -292,7 +301,9 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
                 // "exceeding B never emits Lost" true by construction.
                 if (_state == TrayLifecycleState.Recovering)
                 {
-                    _debouncePending = true;
+                    // Additional broadcasts JOIN the existing episode. They do not move the clock, do
+                    // not create a generation and do not consume budget B — exactly one episode is in
+                    // flight, which is also what keeps the CV-8 UI cost inside the approved envelope.
                     break;
                 }
 
@@ -313,7 +324,6 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
                 break;
 
             case TrayEventKind.DebounceElapsed:
-                _debouncePending = false;
                 if (_state == TrayLifecycleState.Recovering && _attemptsUsed == 0)
                 {
                     Attempt();
@@ -379,7 +389,6 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
     {
         _state = TrayLifecycleState.Releasing;
         _episodeActive = false;
-        _debouncePending = false;
         _generation++;
 
         if (_effect == ShellEffectState.MayExist)
@@ -430,20 +439,6 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
             _effect = ShellEffectState.MayExist;
             _state = TrayLifecycleState.Available;
             _episodeActive = false;
-
-            // A broadcast that arrived during the episode coalesced into a single pending flag and
-            // produces AT MOST ONE further episode, itself subject to the admission limiter — which is
-            // what bounds the chain.
-            if (_debouncePending)
-            {
-                _debouncePending = false;
-                if (_limiter.TryBeginEpisode(_time.GetTimestamp()))
-                {
-                    BeginEpisode(_time.GetTimestamp());
-                    Emit(EffectKind.ScheduleDeadline, RecoveryDeadline);
-                    Emit(EffectKind.ScheduleDebounce, DebounceDelay);
-                }
-            }
 
             return;
         }

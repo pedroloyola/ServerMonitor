@@ -118,6 +118,18 @@ public sealed class TrayStateMachineTests : IDisposable
 
         Assert.NotEqual(TrayLifecycleState.Available, machine.LifecycleState);
         Assert.Equal(TrayAffordanceState.Lost, machine.State);
+
+        // The result is obsolete for the LIFECYCLE but not for the SHELL: it may have created the icon,
+        // so a compensating Delete is mandatory and must follow the Add that produced it. Asserting only
+        // "some Delete happened" is insufficient — the Lost path emits one of its own, so a mutation
+        // that drops the reconciliation would survive.
+        // Ordering alone does NOT discriminate here: the Lost path emits a Delete of its own, and the
+        // native gate makes it land after the parked Add returns anyway. The reconciliation is a SECOND,
+        // separate compensation, so the count is what distinguishes it.
+        Assert.True(
+            _native.DeleteCallsSnapshot >= 2,
+            "the Lost path compensates once, and the late success must be compensated separately; "
+                + $"sequence was [{string.Join(",", _native.Calls)}]");
     }
 
     [Fact]
@@ -304,6 +316,10 @@ public sealed class TrayStateMachineTests : IDisposable
         // The single shot is not consumed by an exception: three attempts, then escalation.
         Assert.Equal(TrayStateMachine.MaxFailSafeAttempts, Volatile.Read(ref _exitRequests));
         Assert.Equal(1, Volatile.Read(ref _escalations));
+
+        // And the latch is still OPEN. Marking on entry would leave Releasing with the only progress
+        // mechanism silently spent, which is the state this design removed for the queued case.
+        Assert.False(machine.FailSafeCompleted, "an exception must not consume the single fail-safe shot");
     }
 
     [Fact]
@@ -399,6 +415,71 @@ public sealed class TrayStateMachineTests : IDisposable
         // returns instead — which is exactly how this guard detects the mutation. T17 cannot see it,
         // because Enum.GetValues only yields defined values.
         Assert.Throws<SwitchExpressionException>(() => TrayStateMachine.DescribeForTests(int.MaxValue));
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // CV-13 / CV-14 — what budget B may and may not do
+    // ---------------------------------------------------------------------------------------------
+
+    [Fact]
+    public void CV13_forged_broadcasts_alone_cannot_produce_Lost_by_either_terminal_cause()
+    {
+        // Only an ADMITTED episode gets a deadline, and only an episode with a deadline can expire. A
+        // suppressed message must not start, prolong, restart or keep a deadline alive — otherwise
+        // unauthenticated input commands the session transition CV-2 exists to forbid.
+        var limiter = new EpisodeFrequencyLimiter(_time, capacity: 1);
+        using var machine = Create(limiter: limiter);
+        machine.Establish();
+        machine.NotifyTaskbarCreated();                       // consumes the only admission
+        _time.Advance(TrayStateMachine.DebounceDelay);
+        Assert.Equal(TrayLifecycleState.Available, machine.LifecycleState);
+
+        for (var i = 0; i < 20; i++)
+        {
+            machine.NotifyTaskbarCreated();                   // all suppressed
+            _time.Advance(TrayStateMachine.RecoveryDeadline * 2);
+        }
+
+        Assert.NotEqual(TrayLifecycleState.Lost, machine.LifecycleState);
+        Assert.Equal(TrayLifecycleState.Available, machine.LifecycleState);
+    }
+
+    [Fact]
+    public void CV14_an_admitted_episode_spends_its_whole_retry_budget_regardless_of_B()
+    {
+        // B counts episodes STARTED and then stops participating. If it could gate the retries of A it
+        // would decide A's outcome by starvation — the coupling CV-2b forbids, entering through the
+        // back door.
+        var exhausted = new EpisodeFrequencyLimiter(_time, capacity: 1);
+        Assert.True(exhausted.TryBeginEpisode(_time.GetTimestamp()));   // B is now exhausted
+        Assert.False(exhausted.TryBeginEpisode(_time.GetTimestamp()));
+
+        _native.AddResult = false;
+        using var machine = Create(limiter: exhausted);
+
+        machine.Establish();
+        _time.Advance(TrayStateMachine.FirstRetryDelay);
+        _time.Advance(TrayStateMachine.SecondRetryDelay);
+
+        Assert.Equal(TrayStateMachine.MaxAttemptsPerEpisode, _native.AddCalls);
+    }
+
+    [Fact]
+    public void CV14_the_frequency_limiter_exposes_exactly_one_entry_point()
+    {
+        // The cheapest inspection there is, and the one the condition asks to be written down: if the
+        // limiter ever grows a second method, the independence has stopped being structural.
+        var declared = typeof(EpisodeFrequencyLimiter)
+            .GetMethods(System.Reflection.BindingFlags.Instance
+                | System.Reflection.BindingFlags.Public
+                | System.Reflection.BindingFlags.NonPublic
+                | System.Reflection.BindingFlags.DeclaredOnly)
+            .Where(m => !m.IsSpecialName)
+            .Select(m => m.Name)
+            .ToArray();
+
+        Assert.NotEmpty(declared);
+        Assert.Equal(["TryBeginEpisode"], declared);
     }
 
     // ---------------------------------------------------------------------------------------------

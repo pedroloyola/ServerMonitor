@@ -252,9 +252,42 @@ public sealed class TrayAffordanceLifecycleTests
         Assert.Equal(TrayAffordanceState.Unavailable, source.State);
     }
 
+    /// <summary>
+    /// The contract is a closed, deliberate set, and this pins it so a state cannot be added casually.
+    /// <para>
+    /// It grew from three to four when S2-T landed: <c>Recovering</c> is the bounded window in which the
+    /// previous proof is already invalid — so the tray is NOT Available — while an unauthenticated
+    /// <c>TaskbarCreated</c> broadcast must not be able to degrade the session either, so it is not
+    /// <c>Lost</c>. Projecting it onto either neighbour would reintroduce exactly one of the two defects
+    /// the split exists to remove.
+    /// </para>
+    /// </summary>
     [Fact]
-    public void The_affordance_contract_has_exactly_the_three_agreed_states() =>
+    public void The_affordance_contract_has_exactly_the_four_agreed_states() =>
         Assert.Equal(
-            [TrayAffordanceState.Unavailable, TrayAffordanceState.Available, TrayAffordanceState.Lost],
+            [
+                TrayAffordanceState.Unavailable,
+                TrayAffordanceState.Available,
+                TrayAffordanceState.Recovering,
+                TrayAffordanceState.Lost
+            ],
             Enum.GetValues<TrayAffordanceState>());
+
+    /// <summary>
+    /// Recovering HOLDS. It must not degrade the session — an unauthenticated broadcast would otherwise
+    /// command the session transition CV-2 exists to prevent — and it must not be treated as usable
+    /// either, because the previous proof is already invalid.
+    /// </summary>
+    [Fact]
+    public void Recovering_holds_without_degrading_and_without_allowing_background()
+    {
+        var h = new Harness(TrayAffordanceState.Available);
+        Assert.True(h.Subject.CanEnterBackground);
+
+        h.Source.Report(TrayAffordanceState.Recovering);
+
+        Assert.False(h.Subject.IsDegradedForSession);
+        Assert.False(h.Subject.CanEnterBackground);
+        Assert.DoesNotContain("OpenBackgroundSettings", h.Window.Calls);
+    }
 }
