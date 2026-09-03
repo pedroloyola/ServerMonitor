@@ -21,6 +21,17 @@ public sealed class WindowsAppNotificationService : IUserNotificationService, IH
     /// </summary>
     internal static readonly TimeSpan BackgroundNoticeLifetime = TimeSpan.FromMinutes(10);
 
+    /// <summary>
+    /// How long the fail-safe exit notice stays available (CV-17; 30 minutes, Prism's value).
+    /// <para>
+    /// Shorter than the background notice because it is even more perishable: it reports that the app
+    /// closed itself a moment ago. Found in the Notification Centre hours later it would be a puzzle
+    /// about a process that is long gone, and the user would have no way to tell whether it still
+    /// applied.
+    /// </para>
+    /// </summary>
+    internal static readonly TimeSpan FailSafeExitNoticeLifetime = TimeSpan.FromMinutes(30);
+
     private readonly IWindowsAppNotificationPlatform _platform;
     private readonly IApplicationWindowController _windowController;
     private readonly IAppLifecycleController _lifecycleController;
@@ -264,6 +275,45 @@ public sealed class WindowsAppNotificationService : IUserNotificationService, IH
             catch (Exception exception)
             {
                 _logger.LogWarning(exception, "Windows could not display the background notice.");
+            }
+        }
+    }
+
+    /// <summary>
+    /// The fail-safe exit notice. Raised from the committed exit path, so it deliberately does NOT
+    /// consult <c>_accepting</c>: that flag exists to refuse new foreground work once shutdown starts,
+    /// and refusing this one would mean the notice could only ever be shown before the exit it is about.
+    /// Registration and the OS setting are still respected — a notice Windows would drop is not sent.
+    /// </summary>
+    public void ShowFailSafeExitNotice(string title, string body)
+    {
+        lock (_sync)
+        {
+            if (!_registered)
+            {
+                return;
+            }
+
+            try
+            {
+                if (_platform.Setting != AppNotificationSetting.Enabled)
+                {
+                    _logger.LogDebug("Windows suppressed the fail-safe exit notice because its OS setting is disabled.");
+                    return;
+                }
+
+                _platform.Show(
+                    title,
+                    body,
+                    NotificationActivationContract.ForFailSafeExit(),
+                    expiresOnReboot: true,
+                    expiresAfter: FailSafeExitNoticeLifetime);
+            }
+            catch (Exception exception)
+            {
+                // Never rethrown: this runs inside a committed exit, and a notice that cannot be shown
+                // must not change what the process does next.
+                _logger.LogWarning(exception, "Windows could not display the fail-safe exit notice.");
             }
         }
     }

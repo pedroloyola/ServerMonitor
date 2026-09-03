@@ -311,13 +311,21 @@ public partial class App : Application
         services.AddSingleton(Program.TerminationWatchdog);
         services.AddSingleton(Program.ProcessTerminator);
         services.AddSingleton<IExitSequence, ExitSequence>();
+        // CV-17. The notice hangs off the exit path's EXISTING CAS: the controller calls this only on the
+        // branch that won the transition to Exiting, so an exit the user asked for never produces it.
+        services.AddSingleton(sp => new FailSafeExitNotice(
+            sp.GetRequiredService<IUserNotificationService>,
+            sp.GetRequiredService<ILocalizationService>(),
+            sp.GetRequiredService<ILogger<FailSafeExitNotice>>()));
         services.AddSingleton<IAppLifecycleController>(sp => new AppLifecycleController(
             sp.GetRequiredService<IExitSequence>,
             ExitApplication,
             sp.GetRequiredService<ITerminationWatchdog>(),
             sp.GetRequiredService<IProcessTerminator>(),
             sp.GetRequiredService<ILogger<AppLifecycleController>>(),
-            Program.LaunchMode));
+            Program.LaunchMode,
+            terminationDeadline: null,
+            onExitCommitted: sp.GetRequiredService<FailSafeExitNotice>().OnExitCommitted));
         services.AddSingleton(BackgroundSettingsStorageOptions.ForCurrentUser());
         services.AddSingleton<IBackgroundMonitoringSettingsService, JsonBackgroundMonitoringSettingsService>();
         services.AddSingleton<IBackgroundNoticePresenter, BackgroundNoticePresenter>();

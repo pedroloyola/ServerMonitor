@@ -194,6 +194,8 @@
   <data name="SettingsNotificationsToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.HelpText" xml:space="preserve"><value>Controla todos os alertas de mudança de saúde dos servidores monitorados.</value></data>
   <data name="SettingsNotificationsSaveError.Title" xml:space="preserve"><value>Não foi possível salvar a preferência</value></data>
   <data name="SettingsNotificationsSaveError.Message" xml:space="preserve"><value>A configuração anterior de notificações foi mantida.</value></data>
+  <data name="TrayFailSafeExitNotificationTitle" xml:space="preserve"><value>O ServerAlyzer foi encerrado</value></data>
+  <data name="TrayFailSafeExitNotificationBody" xml:space="preserve"><value>Não foi possível restaurar com segurança o ícone da área de notificação da barra de tarefas, então o ServerAlyzer se encerrou. Abra o ServerAlyzer novamente para continuar o monitoramento.</value></data>
   <data name="TrayToolTip" xml:space="preserve"><value>ServerAlyzer</value></data>
   <data name="TrayOpenMenuItem" xml:space="preserve"><value>Abrir ServerAlyzer</value></data>
   <data name="TrayRefreshAllMenuItem" xml:space="preserve"><value>Atualizar todos</value></data>

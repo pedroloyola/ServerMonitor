@@ -7,7 +7,13 @@ public enum NotificationKind
     ServerHealth,
 
     /// <summary>The single first-close notice explaining background monitoring (M13 S2 §D.1).</summary>
-    BackgroundCloseNotice
+    BackgroundCloseNotice,
+
+    /// <summary>
+    /// The informational notice that the app closed itself because the notification-area icon could not
+    /// be safely removed (M13 S2-T, CV-17/CV-18).
+    /// </summary>
+    FailSafeExit
 }
 
 /// <summary>What clicking a notification does. A closed set, and the ONLY routing vocabulary.</summary>
@@ -56,6 +62,18 @@ public static class NotificationActivationContract
         Build(NotificationKind.BackgroundCloseNotice, NotificationAction.OpenBackgroundSettings);
 
     /// <summary>
+    /// The arguments the fail-safe exit notice carries (CV-18).
+    /// <para>
+    /// It reuses <see cref="NotificationAction.OpenDashboard"/> — the launch already on the allowlist —
+    /// rather than introducing an action of its own. A late click, minutes after the process ended,
+    /// starts the app on the Dashboard and nothing else: no capability, no reason code, no resumption of
+    /// whatever failed, no loop back into the path that produced the notice.
+    /// </para>
+    /// </summary>
+    public static IReadOnlyDictionary<string, string> ForFailSafeExit() =>
+        Build(NotificationKind.FailSafeExit, NotificationAction.OpenDashboard);
+
+    /// <summary>
     /// Resolves an activation payload to an action, rejecting anything that is not exactly one of the
     /// pairs this app produces. The kind/action pairing is verified too: a valid action under the wrong
     /// kind is not a valid activation.
@@ -69,7 +87,7 @@ public static class NotificationActivationContract
             return NotificationAction.None;
         }
 
-        // Vigil CI-1: an EXACT allowlist of the two pairs this app produces, matched ordinally on the
+        // Vigil CI-1: an EXACT allowlist of the pairs this app produces, matched ordinally on the
         // literal wire strings. Enum.TryParse was too lax for a contract that claims a closed vocabulary:
         // it accepts an enum's NUMERIC representation ("0", "1"), accepts comma-separated combinations,
         // and would silently absorb any member added later. Nothing outside these two rows resolves.
@@ -77,6 +95,9 @@ public static class NotificationActivationContract
         {
             ("ServerHealth", "OpenDashboard") => NotificationAction.OpenDashboard,
             ("BackgroundCloseNotice", "OpenBackgroundSettings") => NotificationAction.OpenBackgroundSettings,
+            // CV-18 is ONE ROW, not a new capability. FailSafeExit is a kind of its own paired with an
+            // action that already existed, so the vocabulary grew by a pair and by nothing else.
+            ("FailSafeExit", "OpenDashboard") => NotificationAction.OpenDashboard,
             _ => NotificationAction.None
         };
     }

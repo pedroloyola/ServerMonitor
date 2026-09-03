@@ -63,6 +63,7 @@ public sealed class AppLifecycleController : IAppLifecycleController
     private readonly ITerminationWatchdog _watchdog;
     private readonly IProcessTerminator _terminator;
     private readonly TimeSpan _terminationDeadline;
+    private readonly Action<ExitReason>? _onExitCommitted;
     private readonly ILogger<AppLifecycleController> _logger;
 
     private int _state;
@@ -75,13 +76,15 @@ public sealed class AppLifecycleController : IAppLifecycleController
         IProcessTerminator terminator,
         ILogger<AppLifecycleController> logger,
         LaunchMode launchMode = LaunchMode.Foreground,
-        TimeSpan? terminationDeadline = null)
+        TimeSpan? terminationDeadline = null,
+        Action<ExitReason>? onExitCommitted = null)
     {
         _exitSequenceFactory = exitSequenceFactory ?? throw new ArgumentNullException(nameof(exitSequenceFactory));
         _exitApplication = exitApplication ?? throw new ArgumentNullException(nameof(exitApplication));
         _watchdog = watchdog ?? throw new ArgumentNullException(nameof(watchdog));
         _terminator = terminator ?? throw new ArgumentNullException(nameof(terminator));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _onExitCommitted = onExitCommitted;
         _terminationDeadline = terminationDeadline ?? DefaultTerminationDeadline;
         if (_terminationDeadline <= TimeSpan.Zero)
         {
@@ -111,6 +114,16 @@ public sealed class AppLifecycleController : IAppLifecycleController
         }
 
         _logger.LogInformation("True exit requested ({Reason}).", reason);
+
+        // The ONLY place the exit is known to be ours (Prism, CV-17). TryTransitionToExiting is the CAS
+        // that already existed; this observes its result rather than adding a second one, and it is
+        // reached exclusively on the winning branch. A call that LOST returned above, so an exit the user
+        // asked for — Sair, or X with background off — never produces a notice telling them to open the
+        // app again to keep monitoring, which would contradict what they just did.
+        //
+        // It runs BEFORE StopAcceptingForegroundWork, because that step is what closes the notification
+        // service to new work, and AFTER nothing else, so no shutdown step can delay it.
+        RunStep(nameof(_onExitCommitted), () => _onExitCommitted?.Invoke(reason));
 
         // Armed only after the transition succeeded, so it can never fire outside Exiting, and never
         // restarted, so nothing can push the deadline out. It is intentionally NOT disarmed below: a

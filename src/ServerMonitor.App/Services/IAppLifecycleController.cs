@@ -30,7 +30,14 @@ public enum ExitReason
     /// No usable exit affordance exists (the tray icon could not be created and no window can be shown),
     /// so a monitoring process the user cannot stop must not continue (§K).
     /// </summary>
-    NoExitAffordance
+    NoExitAffordance,
+
+    /// <summary>
+    /// The notification-area icon could not be positively removed, so the process must not continue —
+    /// normally or degraded — while it may still be holding an affordance whose removal cannot be
+    /// established (M13 S2-T, CV-16). This is the ONLY reason that raises the fail-safe exit notice.
+    /// </summary>
+    TrayCleanupUnverified
 }
 
 /// <summary>

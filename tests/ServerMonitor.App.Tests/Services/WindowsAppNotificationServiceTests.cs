@@ -242,6 +242,65 @@ public sealed class WindowsAppNotificationServiceTests : IDisposable
         Assert.Equal(NotificationActivationContract.ForServerHealth(), platform.LastArguments);
     }
 
+    /// <summary>
+    /// CV-17. The fail-safe notice actually reaches the platform carrying its own closed pair and its own
+    /// short lifetime — asserted at the boundary, not on the constant, because a constant nobody passes
+    /// is a value with no behaviour.
+    /// </summary>
+    [Fact]
+    public async Task The_fail_safe_notice_carries_its_own_pair_and_expires_soon()
+    {
+        var platform = new FakePlatform();
+        var service = Create(platform, new FakeWindowController());
+        await service.StartAsync(default);
+
+        service.ShowFailSafeExitNotice("title", "body");
+
+        Assert.Equal(1, platform.ShowCount);
+        Assert.True(platform.LastExpiresOnReboot);
+        Assert.Equal(WindowsAppNotificationService.FailSafeExitNoticeLifetime, platform.LastExpiresAfter);
+        Assert.NotNull(platform.LastExpiresAfter);
+        Assert.True(platform.LastExpiresAfter <= TimeSpan.FromHours(1));
+
+        // Shorter than the background notice: it reports something that happened a moment ago.
+        Assert.True(
+            WindowsAppNotificationService.FailSafeExitNoticeLifetime
+            > WindowsAppNotificationService.BackgroundNoticeLifetime,
+            "the fail-safe notice is longer than the first-close notice by design, but still short");
+
+        Assert.Equal(NotificationActivationContract.ForFailSafeExit(), platform.LastArguments);
+    }
+
+    /// <summary>
+    /// The fail-safe notice is raised from a committed exit, so unlike the background notice it must NOT
+    /// be refused once shutdown begins — refusing it would mean it could only ever appear before the exit
+    /// it is about, which is never.
+    /// </summary>
+    [Fact]
+    public async Task The_fail_safe_notice_is_still_shown_after_shutdown_begins()
+    {
+        var platform = new FakePlatform();
+        var service = Create(platform, new FakeWindowController());
+        await service.StartAsync(default);
+        service.BeginShutdown();
+
+        service.ShowFailSafeExitNotice("title", "body");
+
+        Assert.Equal(1, platform.ShowCount);
+    }
+
+    [Fact]
+    public async Task The_fail_safe_notice_is_suppressed_when_Windows_notifications_are_disabled()
+    {
+        var platform = new FakePlatform { Setting = AppNotificationSetting.DisabledForApplication };
+        var service = Create(platform, new FakeWindowController());
+        await service.StartAsync(default);
+
+        service.ShowFailSafeExitNotice("title", "body");
+
+        Assert.Equal(0, platform.ShowCount);
+    }
+
     [Fact]
     public async Task The_notice_is_not_shown_after_shutdown_begins()
     {

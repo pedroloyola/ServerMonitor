@@ -15,4 +15,15 @@ public interface IUserNotificationService
     /// Notification Centre.
     /// </summary>
     void ShowBackgroundNotice(string title, string body) { }
+
+    /// <summary>
+    /// Shows the fail-safe exit notice (CV-17). Separate for the same reason as the background notice:
+    /// it carries its own closed activation pair, and it is even shorter-lived.
+    /// <para>
+    /// <b>Fire and forget.</b> It returns nothing and is never awaited, because it is called from the
+    /// committed exit path: the exit does not depend on it, does not wait for delivery, and does not
+    /// learn whether the user ever saw it.
+    /// </para>
+    /// </summary>
+    void ShowFailSafeExitNotice(string title, string body) { }
 }

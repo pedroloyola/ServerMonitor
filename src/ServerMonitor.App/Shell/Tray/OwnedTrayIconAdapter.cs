@@ -395,7 +395,11 @@ internal sealed class OwnedTrayIconAdapter : ITrayIconAdapter, ITrayAffordanceSo
     /// so it asks for the ONE authoritative exit rather than inventing a tray-specific way out.
     /// </summary>
     private void RequestAuthoritativeExit() =>
-        _lifecycleController().RequestExit(ExitReason.NoExitAffordance);
+        // TrayCleanupUnverified, not NoExitAffordance: the two are different situations that happen to
+        // end the same way. NoExitAffordance is "there is no way out at all"; this is "the icon may
+        // still be there and we cannot prove it is gone". Only this one raises the CV-17 notice, and
+        // only when this call is the one that commits the exit.
+        _lifecycleController().RequestExit(ExitReason.TrayCleanupUnverified);
 
     /// <summary>
     /// Last resort, after the authoritative exit has been asked for and has not ended the process. This

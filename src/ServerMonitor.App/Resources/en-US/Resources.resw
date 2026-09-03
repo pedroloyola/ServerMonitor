@@ -189,6 +189,8 @@
   <data name="SettingsNotificationsToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.HelpText" xml:space="preserve"><value>Controls all health-change alerts for monitored servers.</value></data>
   <data name="SettingsNotificationsSaveError.Title" xml:space="preserve"><value>Could not save the preference</value></data>
   <data name="SettingsNotificationsSaveError.Message" xml:space="preserve"><value>The previous notification setting was kept.</value></data>
+  <data name="TrayFailSafeExitNotificationTitle" xml:space="preserve"><value>ServerAlyzer was closed</value></data>
+  <data name="TrayFailSafeExitNotificationBody" xml:space="preserve"><value>The taskbar notification-area icon couldn't be safely restored, so ServerAlyzer closed. Open ServerAlyzer again to continue monitoring.</value></data>
   <data name="TrayToolTip" xml:space="preserve"><value>ServerAlyzer</value></data>
   <data name="TrayOpenMenuItem" xml:space="preserve"><value>Open ServerAlyzer</value></data>
   <data name="TrayRefreshAllMenuItem" xml:space="preserve"><value>Refresh all</value></data>
