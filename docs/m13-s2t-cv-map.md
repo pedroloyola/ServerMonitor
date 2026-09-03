@@ -11,7 +11,7 @@ uma condição. Uma condição só sai marcada `SUPERSEDED BY <regra>`, com just
 
 **Base de medição:** worktree `ServerMonitor-m13-s2t`, ramo `agent/m13-s2t-tray`.
 Baseline dos testes filtrados por `Tray`: **68 passam, 0 falham**.
-Gates completos: **Debug 1763/1763**, **Release 1728/1728**. A diferença de 35 vem de um
+Gates completos na árvore entregue (`f4c214c`): **Debug 1769/1769**, **Release 1734/1734**. A diferença de 35 vem de um
 `ItemGroup Condition="'$(Configuration)' != 'Debug'"` no projeto de testes que remove `Qa\**\*.cs` —
 condição pré-existente, não introduzida por esta entrega.
 
