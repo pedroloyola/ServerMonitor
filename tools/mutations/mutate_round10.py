@@ -17,13 +17,13 @@ MUTATIONS = [
  # M55 and M56 in mutate_round11.py, against the code as it stands.
  ("M49", "a decision taken before the deadline may be delivered as Available after it", [
    (MACHINE,
-    "                if (Project(_state) == TrayAffordanceState.Available\n                    && outcome.Deadline != 0\n                    && _time.GetTimestamp() >= outcome.Deadline)",
-    "                if (false && Project(_state) == TrayAffordanceState.Available\n                    && outcome.Deadline != 0\n                    && _time.GetTimestamp() >= outcome.Deadline)")]),
+    "                if (ProjectState(_state) == TrayAffordanceState.Available\n                    && outcome.Deadline != 0",
+    "                if (false && ProjectState(_state) == TrayAffordanceState.Available\n                    && outcome.Deadline != 0")]),
 
  ("M51", "the DPI update goes straight to the shell, outside the gate", [
    (MACHINE,
-    "        lock (_nativeGate)\n        {\n            shellCall();\n        }",
-    "        shellCall();")]),
+    "        ArgumentNullException.ThrowIfNull(shellCall);\n\n        lock (_nativeGate)\n        {\n            shellCall();\n        }",
+    "        ArgumentNullException.ThrowIfNull(shellCall);\n\n        shellCall();")]),
 
  ("M52", "a new effect kind is added and the coverage test does not notice", [
    (MACHINE,

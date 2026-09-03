@@ -10,8 +10,8 @@ uma condição. Uma condição só sai marcada `SUPERSEDED BY <regra>`, com just
 `docs/m13-s2t-linearizable-state-machine.md` (desenho) · `.boss/BOSS.md` §9 e §10.
 
 **Base de medição:** worktree `ServerMonitor-m13-s2t`, ramo `agent/m13-s2t-tray`.
-Baseline dos testes filtrados por `Tray|Theme|Flyout|FailSafe`: **143 passam, 0 falham**, em **10 corridas seguidas** com resultado idêntico.
-Gates completos na árvore entregue: **Debug 1847/1847**, **Release 1812/1812**, zero abortos. A diferença de 35 vem de um
+Baseline dos testes filtrados por `Tray|Theme|Flyout|FailSafe`: **148 passam, 0 falham**, em **10 corridas seguidas** com resultado idêntico e zero abortos.
+Gates completos na árvore entregue: **Debug 1852/1852**, **Release 1817/1817**, zero abortos. A diferença de 35 vem de um
 `ItemGroup Condition="'$(Configuration)' != 'Debug'"` no projeto de testes que remove `Qa\**\*.cs` —
 condição pré-existente, não introduzida por esta entrega.
 
@@ -28,12 +28,12 @@ condição pré-existente, não introduzida por esta entrega.
 | **CV-5** | `szTip`/`hIcon` estáticos | `NativeTrayRegistration` — resolvidos **uma vez** no construtor | `NativeTrayRegistrationTests` (6) | M23 morta | **FECHADA** na parte decidível |
 | **CV-6** | mensagem forjada ignorada | — | — | — | `SUPERSEDED BY` **CV-6b** |
 | **CV-6b** | quatro casos independentes de validação | `TrayCallbackContract.TryDecode` | quatro `[Fact]` A/B/C/D, cada um variando **um** campo | M15, M16 mortas | **FECHADA** |
-| **CV-7** | topologia de thread | `TrayHostWindow` · **`TrayStateMachine.Schedule` marshala para a thread de UI** | `A_scheduled_recovery_attempt_is_marshalled_before_it_touches_the_shell` | **M50** | **CORRIGIDA.** O código divergia: os retries corriam no threadpool. Ver §5 |
-| **CV-8** | custo nativo síncrono na thread de UI | idem | idem | **M50** | **MEDIDA · aceitável** — e agora **na topologia em que foi medida**: `NIM_ADD` mediana 3,16 ms / máx 4,36 ms, `NIM_DELETE` mediana 0,36 ms, contra 16,7 ms por frame a 60 Hz |
+| **CV-7** | topologia de thread | `TrayHostWindow` · `Schedule` marshala para a thread de UI · uma recusa **terminaliza** o episódio | `A_scheduled_recovery_attempt_is_marshalled...` · `A_refused_continuation_terminalizes...` | **M56**, **M66**, **M67** | **FECHADA.** Ver §5.3 e §8 |
+| **CV-8** | custo nativo síncrono na thread de UI | idem | idem | **M56** | **MEDIDA · aceitável** na topologia em que foi medida: `NIM_ADD` mediana 3,16 ms / máx 4,36 ms, `NIM_DELETE` mediana 0,36 ms, contra 16,7 ms por frame a 60 Hz |
 | **CV-9** | reentrância com flyout aberto | `Shell/Tray/FlyoutReentrancyGate.cs` · `OwnedTrayIconAdapter.ShowFlyout` | `FlyoutReentrancyGateTests` (6) | M26, M27 | **FECHADA** na decisão; a ativação da janela auxiliar é medida humana (matriz P, passo 5) |
 | **CV-10** | acoplamento limitador ↔ custo de UI | `EpisodeFrequencyLimiter.DefaultCapacity = 5 / 60 s` | `T4` | M8 morta | **FECHADA** |
 | **CV-11** | residual de admissão suprimida (LOW, aceite) | ordem das guardas em `Transition` | `T4` | — | **FECHADA · residual escrito** |
-| **CV-12** | evidência de mutação na entrega | — | matriz da secção 3 | **65 entradas · 63 corridas** | **FECHADA com duas limitações declaradas** (M24, M25) |
+| **CV-12** | evidência de mutação na entrega | — | matriz da secção 3 | **71 entradas · 69 corridas** | **FECHADA com duas limitações declaradas** (M24, M25) |
 | **CV-13** | só um episódio ADMITIDO por B pode expirar | `BeginEpisode`, só depois de `TryBeginEpisode` | `CV13` | M14 morta | **FECHADA** |
 | **CV-14** | B não limita tentativas dentro de um episódio | `EpisodeFrequencyLimiter` com **um** método | `CV14` ×2 (inclui teste de arquitetura por reflexão) | M8 morta | **FECHADA** |
 | **CV-15** | integridade do documento normativo | — | este ficheiro | — | **ATIVA · este mapa é o cumprimento.** Ver a **retratação** na secção 4 |
@@ -175,7 +175,10 @@ as medições de custo da CV-8 foram feitas na thread de UI.
 
 Não era uma decisão a tomar: era o documento a afirmar uma coisa e o código a fazer outra — o defeito que
 esta fatia tem andado a corrigir. O código passou a marshalar as continuações para a thread de UI.
-Mutação **M50**.
+
+**A M50 já não existe** — foi retirada quando o contrato do marshaller mudou, e a evidência reproduzível é
+a **M56**. As linhas CV-7/CV-8 acima diziam «M50 morta» enquanto o runner já não a continha: era, com
+todas as letras, o defeito que a CV-15 existe para impedir, cometido por mim neste mesmo mapa.
 
 ### 5.4 Entrega: Release domina e o prazo é respeitado (ATLAS-R2)
 
@@ -313,6 +316,91 @@ remover a compensação do `Add` tardio (**M62**) — mais duas minhas (**M63**,
 
 ---
 
+## 8. Quarta ronda — as três propriedades como invariantes, não como verificações
+
+O Atlas chamou ao terceiro achado «o terceiro anel do padrão vizinho», e a instrução foi: enunciar cada
+propriedade como **invariante global** e dizer como a imponho **estruturalmente**, em vez de acrescentar
+mais uma verificação. Se a resposta fosse «mais uma verificação», haveria um quarto anel.
+
+### 8.1 A raiz comum dos três anéis
+
+Os três bloqueantes desta ronda são a mesma coisa dita três vezes:
+
+> **Uma obrigação cumprida apenas no caminho de sucesso não está cumprida.**
+
+- o relógio era verificado **antes** da invocação e continuava a andar durante ela;
+- o `TryEnqueue=false` deixou de correr inline mas **descartava** o trabalho, e um episódio admitido
+  ficava sem forma de acabar;
+- os efeitos só ficavam executáveis **depois** de `PublishIfCurrent` regressar, e código externo entre os
+  dois podia impedir a libertação para sempre.
+
+Em cada caso a obrigação estava escrita como um **passo sequencial** que outra coisa — uma exceção, uma
+recusa, ou a passagem do tempo — podia saltar. A correção não é vigiar melhor cada passo; é fazer com que
+a obrigação **não possa ser saltada**.
+
+### 8.2 O1 — nenhum observador vê `Available` num episódio fora do prazo
+
+**Imposição:** o prazo passou para **dentro da projeção**, a única função por onde passam todos os
+leitores (`State`, `CanEnterBackground`, o subscriber) e a decisão de publicar. Deixa de ser um portão que
+alguém tem de atravessar e passa a fazer parte **do que o valor significa** — não há um segundo sítio,
+porque não é imposto, é calculado.
+
+Duas observáveis distintas, duas expressões da mesma regra, e é por isso que continuam a existir dois
+pontos: a **projeção** governa o que um leitor vê; a **entrega** governa se o evento sai. O segundo foi
+movido para imediatamente antes da invocação, sem nada pelo meio que possa mexer no relógio.
+
+Uma consequência que tive de corrigir: usar a projeção com relógio para decidir **se houve mudança**
+silenciava a notificação de uma transição real para `Lost` sempre que a projeção já lá tinha chegado
+sozinha. Houve-ou-não-houve transição é uma pergunta sobre o ciclo de vida, não sobre o relógio: passou a
+usar `ProjectState`. Mutações **M65** e **M70**.
+
+### 8.3 O2 — um episódio admitido acaba, corra ou não alguma continuação
+
+**Imposição, em duas camadas independentes.** A projeção (8.2) faz com que, passado o limite, nenhum
+leitor possa ver senão `Lost` — sem depender de timer nenhum. E a recusa passou a ser **um evento**:
+`TrayEventKind.ContinuationRefused`, com o seu próprio ramo, que termina o episódio.
+
+Não a encaminhei pelo `DeadlineObserved`: no momento da recusa o prazo **ainda não passou**, e usar o
+prazo seria dizer uma coisa falsa para obter o efeito certo. A recusa é outro facto — a **M67** existe
+exatamente para provar que encaminhá-la pelo prazo não funciona.
+
+**Residual declarado:** a terminalização corre na thread do timer, que é o único desvio à topologia de UI.
+É limitado a este caso — o dispatcher só recusa enquanto encerra, ou seja quando a thread para onde se
+marshalaria já não existe — e a ordenação é segura em qualquer thread, que é o que o trabalho de sequência
+e prontidão comprou. Mutações **M66** e **M67**.
+
+### 8.4 O3 — todo o efeito emitido torna-se executável
+
+**Imposição, em duas camadas.** A libertação passou para um **`finally`**, portanto nenhum caminho de
+saída do `Execute` a salta; e a máquina **isola** as exceções do subscriber, como a fronteira da `WndProc`
+faz desde a CV-1 — código externo tem direito a falhar, não a prender uma compensação.
+
+Como são duas camadas, são **duas provas**: um teste ataca a isolação, outro dispara uma falha de um ponto
+que a isolação não cobre, para que só o `finally` a possa salvar. Foi a lição da M37/M37b e voltou a
+aplicar-se aqui — a **M68** sobreviveu à primeira passagem exatamente por a outra camada a tapar.
+Mutações **M68** e **M69**.
+
+### 8.5 O que continua sem cobertura
+
+- A terminalização por recusa corre fora da thread de UI. É deliberado e está declarado acima; não tenho
+  teste que prove que essa thread é aceitável — prova-se que o episódio acaba, não onde.
+- A projeção é avaliada com o relógio a cada leitura; um leitor que guarde o valor e aja mais tarde
+  reintroduz a janela. Nenhum leitor o faz hoje, e não tenho asserção que o proíba. É o mesmo gatilho que
+  o Vigil registou para o `Cleanup` — ver §9.
+
+## 9. Gatilho registado pelo Vigil — não é dívida
+
+Sobre `MayExist` ser reportado como `Unverified` enquanto a limpeza está em curso, o Vigil não abriu
+condição, «por um risco sem leitor», e deixou o gatilho escrito:
+
+> Se algum código de produção passar a **ler `Cleanup` e agir**, precisa de um teste de arquitetura que
+> proíba a leitura fora de estado resolvido, ou de um valor `Pending` explícito.
+
+Fica aqui como **gatilho**, não como dívida: hoje `Cleanup` só é lido por testes e pelo `CleanupVerified`,
+que é usado para diagnóstico. O primeiro consumidor de produção reabre a questão.
+
+---
+
 ## 4. Retratação — uma afirmação minha que era falsa
 
 Na entrega da ligação escrevi, sobre `App.xaml.cs`:
@@ -344,7 +432,7 @@ entre cada uma. Filtro: `FullyQualifiedName~Tray` (M1–M25) e
 e `FullyQualifiedName~FailSafe|FullyQualifiedName~WindowsAppNotification|FullyQualifiedName~Notification`
 (M36–M40). Baselines **95** e **82**, ambas 0 falhas.
 
-**65 entradas · 63 corridas · 61 mortas · 2 sobrevivem.**
+**71 entradas · 69 corridas · 67 mortas · 2 sobrevivem.**
 
 Duas não correm, com razão escrita: **M4** ficou `SUPERSEDED BY M55` e **M21** `SUPERSEDED BY M34`,
 porque o código que atacavam foi reescrito e a propriedade passou para a mutação nova. A **M47** foi
@@ -383,6 +471,9 @@ python tools/mutations/mutate_round9.py M41
 
 # Ronda Atlas/Vigil: ordem, entrega, topologia, DPI, cobertura (M46–M52)
 python tools/mutations/mutate_round10.py M46
+
+# Quarta ronda: os três invariantes — projeção com relógio, recusa, libertação (M65–M70)
+python tools/mutations/mutate_round12.py M65
 
 # Terceira ronda: prontidão, secção crítica da entrega, fallback, roteamento (M53–M58)
 python tools/mutations/mutate_round11.py M53

@@ -30,8 +30,8 @@ MUTATIONS = [
 
  ("M42", "the lifecycle learns of the loss only after the shell I/O", [
    (MACHINE,
-    "            if (outcome.Publish)\n            {\n                PublishIfCurrent(outcome);\n            }\n\n            // Only NOW may this transition's effects run.",
-    "            ReleaseEmittedEffects(outcome);\n\n            if (outcome.Publish)\n            {\n                PublishIfCurrent(outcome);\n            }\n\n            // Only NOW may this transition's effects run.")]),
+    "            try\n            {\n                if (outcome.Publish)",
+    "            ReleaseEmittedEffects(outcome);\n            DrainEffects();\n            try\n            {\n                if (outcome.Publish)")]),
 
  ("M43", "a redundant delete for an already removed icon is treated as a failure", [
    (MACHINE,

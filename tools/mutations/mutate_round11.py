@@ -24,13 +24,13 @@ MUTATIONS = [
 
  ("M55", "the check and the invocation stop being one critical section", [
    (MACHINE,
-    "                _deliveredSequence = token;\n\n                AtInvocationForTests?.Invoke();\n                StateChanged?.Invoke(this, EventArgs.Empty);\n            }\n        }",
-    "                _deliveredSequence = token;\n            }\n\n            AtInvocationForTests?.Invoke();\n            StateChanged?.Invoke(this, EventArgs.Empty);\n        }")]),
+    "                _deliveredSequence = token;\n\n                AtInvocationForTests?.Invoke();",
+    "                _deliveredSequence = token;\n            }\n            lock (new object())\n            {\n                AtInvocationForTests?.Invoke();")]),
 
  ("M56", "a refused continuation runs inline on the timer thread", [
    (MACHINE,
-    "                if (!_marshalToUi(callback))\n                {\n                    _logger.LogWarning(",
-    "                if (!_marshalToUi(callback))\n                {\n                    callback();\n                    _logger.LogWarning(")]),
+    "                if (_marshalToUi(callback))\n                {\n                    return;\n                }",
+    "                if (_marshalToUi(callback))\n                {\n                    return;\n                }\n\n                callback();")]),
 
  ("M57", "the adapter refusal falls back to running inline", [
    (ADAPTER,

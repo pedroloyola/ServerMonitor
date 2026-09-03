@@ -14,6 +14,13 @@ internal enum TrayEventKind
     AddCompleted,
     DeadlineObserved,
     CleanupCompleted,
+
+    /// <summary>
+    /// A scheduled continuation will never run: the UI dispatcher refused it. The episode can make no
+    /// further progress on its own, so it ends here rather than waiting for a deadline nobody will
+    /// deliver.
+    /// </summary>
+    ContinuationRefused,
     Release
 }
 
@@ -462,7 +469,7 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
     /// <inheritdoc />
     public TrayAffordanceState State
     {
-        get { lock (_decision) { return Project(_state); } }
+        get { lock (_decision) { return Project(_state, _time.GetTimestamp()); } }
     }
 
     /// <summary>The internal state. Diagnostics and tests only.</summary>
@@ -677,6 +684,14 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
 
             case TrayEventKind.DeadlineObserved:
                 // Step 3 already handled expiry. Nothing else to do.
+                break;
+
+            case TrayEventKind.ContinuationRefused:
+                // Not a deadline: the bound has NOT passed, and waiting for it would be waiting for a
+                // timer whose continuation the dispatcher has just told us it will not run. The episode
+                // is over because it can no longer progress, which is a different fact and gets its own
+                // event rather than being smuggled through the deadline path.
+                EnterLost("a scheduled continuation was refused by the UI dispatcher");
                 break;
 
             case TrayEventKind.CleanupCompleted:
@@ -993,7 +1008,13 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
     private Outcome Result(TrayLifecycleState before)
     {
         var after = _state;
-        var publish = Project(before) != Project(after);
+        var now = _time.GetTimestamp();
+
+        // ProjectState, not Project: a transition happened or it did not, and that is independent of what
+        // the clock has since made of it. Using the clock-aware projection here meant a real transition
+        // into Lost produced no notification whenever the projection had already reached Lost on its own,
+        // so the lifecycle was never told to degrade.
+        var publish = ProjectState(before) != ProjectState(after);
         var failSafe = _failSafeRequested;
         _failSafeRequested = false;
 
@@ -1007,10 +1028,10 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
         _emittedFrom = 0;
         _emittedTo = 0;
 
-        return new Outcome(failSafe, publish, Project(after), _deadlineTimestamp, from, to);
+        return new Outcome(failSafe, publish, Project(after, now), _deadlineTimestamp, from, to);
     }
 
-    private static TrayAffordanceState Project(TrayLifecycleState state) => state switch
+    private static TrayAffordanceState ProjectState(TrayLifecycleState state) => state switch
     {
         TrayLifecycleState.Unavailable => TrayAffordanceState.Unavailable,
         TrayLifecycleState.Available => TrayAffordanceState.Available,
@@ -1020,6 +1041,38 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
         TrayLifecycleState.Released => TrayAffordanceState.Lost,
         _ => TrayAffordanceState.Unavailable
     };
+
+    /// <summary>
+    /// THE projection: what the affordance is, evaluated against the clock at this instant.
+    /// </summary>
+    /// <remarks>
+    /// <b>The deadline lives here, and only here.</b> It used to be checked at the delivery site, which
+    /// made it a gate someone had to pass rather than part of what the value MEANS — and there was always
+    /// another way past: the clock kept moving between the check and the invocation, and every other
+    /// reader (<c>CanEnterBackground</c>, a subscriber reading <see cref="State"/>) never went through the
+    /// check at all. Evaluating it inside the projection removes the notion of a bypass: there is no
+    /// second place to enforce it, because it is not enforced, it is computed.
+    /// </remarks>
+    /// <param name="monotonicNow">The reading of the clock this answer is for.</param>
+    private TrayAffordanceState Project(TrayLifecycleState state, long monotonicNow)
+    {
+        var projected = ProjectState(state);
+
+        // The bound belongs to the EPISODE: while one is live and overdue, nothing it might have
+        // established can be reported as usable. A recovery that concluded — successfully, inside the
+        // bound — ends the episode, and with it the bound; its proof does not expire.
+        if (_episodeActive
+            && monotonicNow >= _deadlineTimestamp
+            && projected is TrayAffordanceState.Available or TrayAffordanceState.Recovering)
+        {
+            // Past the bound, an unproven affordance is Lost. This is also what keeps an episode whose
+            // continuations were never delivered from sitting in Recovering for ever: the terminal
+            // projection is a fact about time, not something a timer has to deliver.
+            return TrayAffordanceState.Lost;
+        }
+
+        return projected;
+    }
 
     // ---------------------------------------------------------------------------------------------
     // Effect execution: outside the decision domain.
@@ -1054,16 +1107,26 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
 
         try
         {
-            if (outcome.Publish)
+            try
             {
-                PublishIfCurrent(outcome);
+                if (outcome.Publish)
+                {
+                    PublishIfCurrent(outcome);
+                }
             }
-
-            // Only NOW may this transition's effects run. Queued in order at decision time so nothing can
-            // overtake them, released here so nothing — including a drainer that was already running on
-            // another thread — can reach the shell on this transition's behalf before it has said what
-            // happened.
-            ReleaseEmittedEffects(outcome);
+            finally
+            {
+                // Only NOW may this transition's effects run — queued in order at decision time so
+                // nothing can overtake them, released here so no drainer reaches the shell on this
+                // transition's behalf before it has said what happened.
+                //
+                // In a FINALLY, because the release is an OBLIGATION and an obligation discharged only on
+                // the success path is not discharged. A subscriber that threw on Lost used to leave the
+                // mandatory compensating Delete unrunnable for ever: external code could permanently
+                // prevent the removal of our own icon, which is the one thing Option A promised could
+                // never happen.
+                ReleaseEmittedEffects(outcome);
+            }
 
             if (!nested)
             {
@@ -1232,17 +1295,36 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
     /// runs and it absorbs every outstanding episode. Dropping is therefore bounded, and it is logged.
     /// </para>
     /// </remarks>
-    private void Schedule(TimeSpan delay, Action callback)
+    private void Schedule(TimeSpan delay, Action callback) => Schedule(delay, callback, _generation);
+
+    private void Schedule(TimeSpan delay, Action callback, long generation)
     {
         var timer = _time.CreateTimer(
             _ =>
             {
-                if (!_marshalToUi(callback))
+                if (_marshalToUi(callback))
                 {
-                    _logger.LogWarning(
-                        "The UI dispatcher refused a scheduled tray continuation; it is dropped rather "
-                        + "than run on the timer thread.");
+                    return;
                 }
+
+                // REFUSAL IS AN EVENT, NOT SILENCE.
+                //
+                // Dropping the continuation swapped a topology defect for a progress defect, which is
+                // worse: the machine stayed alive in Recovering with no affordance, degrading nothing and
+                // terminalizing nothing. The projection already makes every READER see Lost past the
+                // bound, so nothing can be told the affordance is usable — but the compensating Delete
+                // still has to be issued, and only a transition issues it.
+                //
+                // So the refusal terminalizes the episode. It runs on the timer's thread, which is the
+                // one departure from the UI topology and it is bounded to this case: the dispatcher only
+                // refuses while it is shutting down, so the thread it would have marshalled to no longer
+                // exists. Ordering is safe there regardless — that is what the sequence and readiness
+                // work bought.
+                _logger.LogWarning(
+                    "The UI dispatcher refused a scheduled tray continuation; terminalizing the episode "
+                    + "instead of abandoning it.");
+
+                Dispatch(new TrayEvent(TrayEventKind.ContinuationRefused, generation, ShellOutcome.NotPerformed));
             },
             null,
             delay,
@@ -1362,21 +1444,35 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
                     return;
                 }
 
-                if (Project(_state) == TrayAffordanceState.Available
-                    && outcome.Deadline != 0
-                    && _time.GetTimestamp() >= outcome.Deadline)
-                {
-                    // The deadline passed between the decision and this moment. Publishing Available now
-                    // would be exactly the late success the whole deadline exists to refuse.
-                    _logger.LogWarning(
-                        "An Available notification was decided before the deadline and reached delivery after it; dropped.");
-                    return;
-                }
-
                 _deliveredSequence = token;
 
                 AtInvocationForTests?.Invoke();
-                StateChanged?.Invoke(this, EventArgs.Empty);
+
+                // Immediately before the event goes out, and inside the same critical section. The
+                // projection governs what a READER sees; this governs whether the EVENT is delivered at
+                // all, and they are two different observables. Checking earlier left the clock free to
+                // move in between — which is exactly what was measured.
+                if (ProjectState(_state) == TrayAffordanceState.Available
+                    && outcome.Deadline != 0
+                    && _time.GetTimestamp() >= outcome.Deadline)
+                {
+                    _logger.LogWarning(
+                        "An Available notification was decided before the deadline and reached delivery "
+                        + "after it; dropped.");
+                    return;
+                }
+
+                try
+                {
+                    StateChanged?.Invoke(this, EventArgs.Empty);
+                }
+                catch (Exception exception)
+                {
+                    // The machine never lets foreign code decide whether its own bookkeeping completes.
+                    // A subscriber is entitled to fail; it is not entitled to strand a compensation, and
+                    // the WndProc boundary has isolated callbacks for the same reason since CV-1.
+                    _logger.LogError(exception, "A tray affordance subscriber threw; the notification is dropped.");
+                }
             }
         }
     }

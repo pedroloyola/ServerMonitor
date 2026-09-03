@@ -395,14 +395,23 @@ public sealed class TrayStateMachineTests : IDisposable
 
             probed = true;
 
+            using var releaserStarted = new ManualResetEventSlim(false);
             var releaser = new Thread(() =>
             {
+                releaserStarted.Set();
                 machine.Release();
                 releaseFinished.Set();
             });
 
             releaser.Start();
-            releaseFinished.Wait(TimeSpan.FromSeconds(2));
+
+            // BARRIER, not a negative wait. The thread has certainly entered Release, so the only reason
+            // it cannot have changed the state is that it is blocked on the lock this delivery holds.
+            // Waiting two seconds and observing nothing proved nothing about where the thread got to.
+            Assert.True(releaserStarted.Wait(Patience), "the releasing thread never started");
+            Assert.False(
+                releaseFinished.Wait(TimeSpan.FromMilliseconds(200)),
+                "the release completed while the delivery held the lock");
 
             stateAtInvocation = machine.LifecycleState;
         };
@@ -416,6 +425,202 @@ public sealed class TrayStateMachineTests : IDisposable
         // The release is allowed to finish afterwards; the point is only that it could not land INSIDE
         // the delivery.
         Assert.True(releaseFinished.Wait(Patience), "the release never completed");
+    }
+
+    /// <summary>
+    /// O1. The clock is part of what the affordance IS, so no reader can be told it is usable while an
+    /// episode is overdue — whichever path they came in by.
+    /// </summary>
+    /// <remarks>
+    /// The deadline used to be a gate at the delivery site, and there was always another way past it: the
+    /// clock kept moving between the check and the invocation, and no other reader went through the check
+    /// at all. It is now evaluated inside the projection, which is the one function every reader and the
+    /// publication both go through.
+    /// </remarks>
+    [Fact]
+    public void An_overdue_episode_reads_as_Lost_from_every_path_without_any_event_being_delivered()
+    {
+        var deferred = new List<Action>();
+
+        using var machine = new TrayStateMachine(
+            _native,
+            () => Interlocked.Increment(ref _exitRequests),
+            () => Interlocked.Increment(ref _escalations),
+            _time,
+            NullLogger<TrayStateMachine>.Instance,
+            limiter: null,
+            marshalToUi: continuation =>
+            {
+                deferred.Add(continuation);
+                return true;
+            });
+
+        machine.Establish();
+        machine.NotifyTaskbarCreated();
+        Assert.Equal(TrayAffordanceState.Recovering, machine.State);
+
+        // Nothing is delivered: the continuations are queued and never run. Only time passes.
+        _time.Advance(TrayStateMachine.RecoveryDeadline);
+
+        Assert.Equal(TrayAffordanceState.Lost, machine.State);
+        Assert.Equal(TrayLifecycleState.Recovering, machine.LifecycleState);
+    }
+
+    /// <summary>
+    /// O3, the OTHER layer: the release survives a failure that the subscriber guard does not catch.
+    /// </summary>
+    /// <remarks>
+    /// The obligation is defended twice — the machine isolates subscriber exceptions, and the release
+    /// sits in a <c>finally</c> — and a property defended twice has to be proven twice, or a mutation
+    /// removing either layer stays green because the other still holds. This drives a failure from a
+    /// point the isolation does not cover, so only the <c>finally</c> can save the compensation.
+    /// </remarks>
+    [Fact]
+    public void The_effect_release_survives_a_failure_the_subscriber_guard_does_not_catch()
+    {
+        using var machine = Create();
+        machine.Establish();
+
+        var deletesBefore = _native.DeleteCallsSnapshot;
+        machine.AtInvocationForTests = () => throw new InvalidOperationException("delivery exploded");
+
+        _native.AddResult = false;
+        try
+        {
+            machine.NotifyTaskbarCreated();
+            _time.Advance(TrayStateMachine.DebounceDelay);
+            _time.Advance(TrayStateMachine.FirstRetryDelay);
+            _time.Advance(TrayStateMachine.SecondRetryDelay);
+        }
+        catch (InvalidOperationException)
+        {
+            // The failure is deliberate and is allowed to reach the caller; what it may NOT do is leave
+            // the machine holding an icon it can never remove.
+        }
+
+        machine.AtInvocationForTests = null;
+
+        // Nudge the machine so any queued work can drain, then check the obligation was discharged.
+        machine.Release();
+
+        Assert.True(
+            _native.DeleteCallsSnapshot > deletesBefore,
+            "a failure during delivery must not strand the compensating delete");
+    }
+
+    /// <summary>
+    /// O1, at the event: the deadline is re-read immediately before the notification goes out, with
+    /// nothing in between that could move the clock.
+    /// </summary>
+    /// <remarks>
+    /// The probe stands exactly where the gap used to be. Checking earlier — even a few statements
+    /// earlier — leaves the clock free to move in between, which is what was measured; the assertion
+    /// therefore has to drive the clock from that precise point.
+    /// </remarks>
+    [Fact]
+    public void The_deadline_is_re_read_at_the_invocation_and_not_before_it()
+    {
+        var deferred = new List<Action>();
+        var delivered = new List<TrayAffordanceState>();
+
+        using var machine = new TrayStateMachine(
+            _native,
+            () => Interlocked.Increment(ref _exitRequests),
+            () => Interlocked.Increment(ref _escalations),
+            _time,
+            NullLogger<TrayStateMachine>.Instance,
+            limiter: null,
+            marshalToUi: continuation =>
+            {
+                deferred.Add(continuation);
+                return true;
+            });
+
+        machine.Establish();
+        machine.StateChanged += (_, _) => delivered.Add(machine.State);
+        machine.NotifyTaskbarCreated();
+
+        _time.Advance(TrayStateMachine.DebounceDelay);
+
+        var pushed = false;
+        machine.AtInvocationForTests = () =>
+        {
+            if (pushed)
+            {
+                return;
+            }
+
+            pushed = true;
+            _time.Advance(TrayStateMachine.RecoveryDeadline);
+        };
+
+        for (var index = 0; index < deferred.Count; index++)
+        {
+            deferred[index]();
+        }
+
+        Assert.True(pushed, "the invocation probe never ran");
+        Assert.DoesNotContain(TrayAffordanceState.Available, delivered);
+    }
+
+    /// <summary>
+    /// O2. A continuation the UI thread refuses TERMINALIZES the episode; it is not abandoned.
+    /// </summary>
+    /// <remarks>
+    /// The first fix stopped running refused work inline, which removed a topology defect and introduced
+    /// a worse one: the machine stayed alive in Recovering, with no affordance, degrading nothing and
+    /// terminalizing nothing. Dropping the work is not neutral — an admitted episode has to end.
+    /// </remarks>
+    [Fact]
+    public void A_refused_continuation_terminalizes_the_episode_instead_of_abandoning_it()
+    {
+        using var machine = new TrayStateMachine(
+            _native,
+            () => Interlocked.Increment(ref _exitRequests),
+            () => Interlocked.Increment(ref _escalations),
+            _time,
+            NullLogger<TrayStateMachine>.Instance,
+            limiter: null,
+            marshalToUi: _ => false);
+
+        machine.Establish();
+        machine.NotifyTaskbarCreated();
+
+        // The debounce timer fires and the dispatcher refuses it.
+        _time.Advance(TrayStateMachine.DebounceDelay);
+
+        Assert.Equal(TrayAffordanceState.Lost, machine.State);
+        Assert.NotEqual(TrayLifecycleState.Recovering, machine.LifecycleState);
+    }
+
+    /// <summary>
+    /// O3. A subscriber that throws cannot strand the mandatory compensation.
+    /// </summary>
+    /// <remarks>
+    /// Releasing the effects was a statement after the publication, so external code between the two
+    /// could prevent it for ever — and the effect it stranded was the Delete that removes our own icon.
+    /// An obligation discharged only on the success path is not discharged.
+    /// </remarks>
+    [Fact]
+    public void A_subscriber_that_throws_cannot_block_the_compensating_delete()
+    {
+        using var machine = Create();
+        machine.Establish();
+
+        machine.StateChanged += (_, _) => throw new InvalidOperationException("subscriber is hostile");
+
+        var deletesBefore = _native.DeleteCallsSnapshot;
+
+        _native.AddResult = false;
+        machine.NotifyTaskbarCreated();
+        _time.Advance(TrayStateMachine.DebounceDelay);
+        _time.Advance(TrayStateMachine.FirstRetryDelay);
+        _time.Advance(TrayStateMachine.SecondRetryDelay);
+
+        // The icon from Establish exists, so losing the affordance MUST compensate for it.
+        Assert.True(
+            _native.DeleteCallsSnapshot > deletesBefore,
+            "a hostile subscriber must not be able to prevent the removal of our own icon");
     }
 
     /// <summary>
@@ -476,18 +681,39 @@ public sealed class TrayStateMachineTests : IDisposable
         Run(machine.Establish);
         Assert.True(_native.AddEntered.Wait(Patience), "the Add never started");
 
-        Run(() => machine.InvokeUnderShellGate(() =>
+        using var foreignQueued = new ManualResetEventSlim(false);
+        var foreign = new Thread(() =>
         {
-            foreignStarted.Set();
-            _native.Calls.Add("Dpi");
-        }));
+            foreignQueued.Set();
+            machine.InvokeUnderShellGate(() =>
+            {
+                foreignStarted.Set();
+                _native.Calls.Add("Dpi");
+            });
+        });
 
-        Assert.False(
-            foreignStarted.Wait(TimeSpan.FromMilliseconds(150)),
-            "the DPI update ran while a shell call was in flight");
+        foreign.Start();
+        Assert.True(foreignQueued.Wait(Patience), "the DPI update was never requested");
+
+        // POSITIVE observation of exclusion, not silence: wait until the thread is actually BLOCKED.
+        // A thread waiting on a monitor reports WaitSleepJoin; one that sailed through would be Stopped.
+        // Asserting "nothing happened for 150 ms" asserted something about the scheduler.
+        var deadline = DateTime.UtcNow + Patience;
+        while (DateTime.UtcNow < deadline
+               && (foreign.ThreadState & System.Threading.ThreadState.WaitSleepJoin) == 0
+               && foreign.IsAlive)
+        {
+            Thread.Yield();
+        }
+
+        Assert.True(
+            (foreign.ThreadState & System.Threading.ThreadState.WaitSleepJoin) != 0,
+            $"the DPI update did not block on the gate; thread was {foreign.ThreadState}");
+        Assert.False(foreignStarted.IsSet, "the DPI update ran while a shell call was in flight");
 
         _native.AddMayReturn.Set();
         WaitForBackground();
+        foreign.Join(Patience);
 
         Assert.True(foreignStarted.Wait(Patience), "the DPI update never ran");
         var add = _native.Calls.IndexOf("Add");
