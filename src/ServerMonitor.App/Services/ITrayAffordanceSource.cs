@@ -67,5 +67,29 @@ public interface ITrayAffordanceSource
     event EventHandler? StateChanged;
 
     /// <summary>The current, positively established state. Never optimistic.</summary>
+    /// <remarks>
+    /// <b>For observing, never for authorising.</b> A caller that reads this and acts on it afterwards has
+    /// a value that was true once; between the read and the act the affordance can be lost, and the act
+    /// goes ahead anyway. To ACT on the affordance, use <see cref="TryEnterBackground"/>.
+    /// </remarks>
     TrayAffordanceState State { get; }
+
+    /// <summary>
+    /// Enters background — ATOMICALLY with establishing that it is allowed.
+    /// </summary>
+    /// <remarks>
+    /// <b>Why a delegate and not a boolean.</b> The permission used to be read as a <c>bool</c> and acted
+    /// on a moment later, and a probe that invalidated the affordance in that gap still hid the window:
+    /// the process was left alive, invisible and with no way out, which is the A12 defect reached by a
+    /// third door. A permission that can be held is a capability that circulates, and a capability that
+    /// circulates is one that can be fabricated — the same correction this slice already made for the
+    /// episode token and for the effect channel.
+    /// <para>
+    /// So the RIGHT crosses the boundary, not the answer: the caller hands over what it wants done, and it
+    /// is performed under the same lock that decided it was permitted. There is no interval to lose.
+    /// </para>
+    /// </remarks>
+    /// <param name="enterBackground">Run only if the affordance is established. Must not block.</param>
+    /// <returns>True when it was permitted and <paramref name="enterBackground"/> ran.</returns>
+    bool TryEnterBackground(Action enterBackground);
 }

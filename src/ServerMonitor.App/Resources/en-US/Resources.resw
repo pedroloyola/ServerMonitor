@@ -362,5 +362,5 @@
   <data name="SettingsBackgroundToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.HelpText" xml:space="preserve"><value>When off, closing the window quits ServerAlyzer and stops monitoring and the widget.</value></data>
   <data name="BackgroundDegradedNotice.Title" xml:space="preserve"><value>Background unavailable in this session</value></data>
   <data name="BackgroundDegradedNotice.Message" xml:space="preserve"><value>ServerAlyzer opened this window because it could not place or keep its icon in the taskbar notification area. Without that icon there is no way to reopen or quit the app from the background, so closing this window now quits ServerAlyzer. Your preference was not changed: open ServerAlyzer again later to try again.</value></data>
-  <data name="SettingsBackgroundDegradedCaption.Text" xml:space="preserve"><value>Unavailable in this session: the notification-area icon could not be created. Closing the window quits ServerAlyzer. Your preference was kept and will be used the next time you open the app.</value></data>
+  <data name="SettingsBackgroundDegradedCaption.Text" xml:space="preserve"><value>Unavailable in this session: the notification-area icon could not be created or kept. Closing the window quits ServerAlyzer. Your preference was kept and will be used the next time you open the app.</value></data>
 </root>

@@ -31,6 +31,24 @@ public sealed class TrayAffordanceLifecycleTests
             _state = state;
             StateChanged?.Invoke(this, EventArgs.Empty);
         }
+
+        /// <summary>
+        /// Runs while the caller is inside the determination, so a test can invalidate the affordance
+        /// from within the act and confirm the two cannot come apart.
+        /// </summary>
+        public Action? InvalidateDuringCommit { get; set; }
+
+        public bool TryEnterBackground(Action enterBackground)
+        {
+            if (_state != TrayAffordanceState.Available)
+            {
+                return false;
+            }
+
+            InvalidateDuringCommit?.Invoke();
+            enterBackground();
+            return true;
+        }
     }
 
     private sealed class RecordingWindowController : IApplicationWindowController
@@ -97,7 +115,7 @@ public sealed class TrayAffordanceLifecycleTests
     {
         var h = new Harness(TrayAffordanceState.Available);
 
-        Assert.True(h.Subject.CanEnterBackground);
+        Assert.True(h.Subject.TryEnterBackground(() => { }));
     }
 
     [Theory]
@@ -107,7 +125,7 @@ public sealed class TrayAffordanceLifecycleTests
     {
         var h = new Harness(state);
 
-        Assert.False(h.Subject.CanEnterBackground);
+        Assert.False(h.Subject.TryEnterBackground(() => { }));
     }
 
     // ---------------------------------------------------------------- degradation
@@ -128,7 +146,7 @@ public sealed class TrayAffordanceLifecycleTests
         Assert.True(h.Notice.IsDegraded);
         Assert.Equal(["OpenBackgroundSettings"], h.Window.Calls);
         Assert.Equal(0, h.Lifecycle.ExitRequests);
-        Assert.False(h.Subject.CanEnterBackground);
+        Assert.False(h.Subject.TryEnterBackground(() => { }));
     }
 
     /// <summary>The Dashboard must never be shown on the way: that is what OpenBackgroundSettings buys.</summary>
@@ -167,12 +185,12 @@ public sealed class TrayAffordanceLifecycleTests
     {
         var h = new Harness(TrayAffordanceState.Available);
         h.Subject.Evaluate();
-        Assert.True(h.Subject.CanEnterBackground);
+        Assert.True(h.Subject.TryEnterBackground(() => { }));
 
         h.Source.Report(TrayAffordanceState.Lost);
 
         Assert.True(h.Subject.IsDegradedForSession);
-        Assert.False(h.Subject.CanEnterBackground);
+        Assert.False(h.Subject.TryEnterBackground(() => { }));
         Assert.True(h.Notice.IsDegraded);
         Assert.Equal(["OpenBackgroundSettings"], h.Window.Calls);
     }
@@ -193,7 +211,7 @@ public sealed class TrayAffordanceLifecycleTests
         h.Source.Report(TrayAffordanceState.Available);
 
         Assert.True(h.Subject.IsDegradedForSession);
-        Assert.False(h.Subject.CanEnterBackground);
+        Assert.False(h.Subject.TryEnterBackground(() => { }));
     }
 
     [Fact]
@@ -236,6 +254,58 @@ public sealed class TrayAffordanceLifecycleTests
 
         Assert.Empty(h.Window.Calls);
         Assert.Equal(0, h.Lifecycle.ExitRequests);
+    }
+
+    /// <summary>
+    /// The affordance cannot be lost between being granted and being used, because there is no interval:
+    /// the act runs inside the determination.
+    /// </summary>
+    /// <remarks>
+    /// This was real, not hypothetical. <c>WindowCloseCoordinator</c> read a boolean and hid the window
+    /// afterwards, and a probe that invalidated the affordance in between still hid it — a process left
+    /// alive, invisible, with no way out. I had written that no reader did this; I had not looked.
+    /// </remarks>
+    [Fact]
+    public void The_affordance_cannot_be_lost_between_the_grant_and_the_act()
+    {
+        var h = new Harness(TrayAffordanceState.Available);
+        var hidden = 0;
+
+        // The affordance disappears at the worst possible moment: after permission is established and
+        // before the act. With a detachable boolean the act went ahead anyway.
+        h.Source.InvalidateDuringCommit = () => h.Source.Report(TrayAffordanceState.Lost);
+
+        h.Subject.TryEnterBackground(() => hidden++);
+
+        // Whether it ran or not, what must never happen is running WITHOUT the affordance. The commit
+        // either refuses, or performs the act under the determination that granted it.
+        if (hidden > 0)
+        {
+            Assert.Equal(TrayAffordanceState.Lost, h.Source.State);
+        }
+
+        // And the session is degraded by the loss, whichever way that went.
+        Assert.True(h.Subject.IsDegradedForSession);
+    }
+
+    /// <summary>
+    /// There is no readable permission left to detach: the type exposes a commit and nothing else.
+    /// </summary>
+    /// <remarks>
+    /// The correction is the removal, not an extra guard. Keeping a readable <c>CanEnterBackground</c>
+    /// beside the commit would leave the old defect one call away — this is the third time in this slice
+    /// that a value which could be held had to become a right that is exercised.
+    /// </remarks>
+    [Fact]
+    public void No_readable_permission_survives_for_a_caller_to_hold()
+    {
+        var members = typeof(TrayAffordanceLifecycle)
+            .GetMembers()
+            .Select(member => member.Name)
+            .ToArray();
+
+        Assert.DoesNotContain("CanEnterBackground", members);
+        Assert.Contains("TryEnterBackground", members);
     }
 
     // ---------------------------------------------------------------- the contract itself
@@ -282,12 +352,12 @@ public sealed class TrayAffordanceLifecycleTests
     public void Recovering_holds_without_degrading_and_without_allowing_background()
     {
         var h = new Harness(TrayAffordanceState.Available);
-        Assert.True(h.Subject.CanEnterBackground);
+        Assert.True(h.Subject.TryEnterBackground(() => { }));
 
         h.Source.Report(TrayAffordanceState.Recovering);
 
         Assert.False(h.Subject.IsDegradedForSession);
-        Assert.False(h.Subject.CanEnterBackground);
+        Assert.False(h.Subject.TryEnterBackground(() => { }));
         Assert.DoesNotContain("OpenBackgroundSettings", h.Window.Calls);
     }
 }

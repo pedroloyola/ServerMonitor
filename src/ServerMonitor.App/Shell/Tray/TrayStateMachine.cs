@@ -472,6 +472,30 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
         get { lock (_decision) { return Project(_state, _time.GetTimestamp()); } }
     }
 
+    /// <summary>
+    /// Runs <paramref name="enterBackground"/> only while the affordance is established, under the same
+    /// lock that establishes it.
+    /// </summary>
+    /// <remarks>
+    /// The determination and the act are ONE step. Handing out a boolean and letting the caller act on it
+    /// later is what left a window in which the affordance could be lost between the answer and the hide.
+    /// </remarks>
+    public bool TryEnterBackground(Action enterBackground)
+    {
+        ArgumentNullException.ThrowIfNull(enterBackground);
+
+        lock (_decision)
+        {
+            if (Project(_state, _time.GetTimestamp()) != TrayAffordanceState.Available)
+            {
+                return false;
+            }
+
+            enterBackground();
+            return true;
+        }
+    }
+
     /// <summary>The internal state. Diagnostics and tests only.</summary>
     internal TrayLifecycleState LifecycleState
     {
@@ -1128,6 +1152,13 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
                 ReleaseEmittedEffects(outcome);
             }
 
+            // A fail-safe raised DURING the publication — an unacknowledged loss — is run here, outside
+            // the decision lock and before the drain, on the same terms as one raised by a transition.
+            if (TakeFailSafeRequest())
+            {
+                RunFailSafeExit();
+            }
+
             if (!nested)
             {
                 DrainEffects();
@@ -1175,6 +1206,24 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
     /// could reach the shell first. The sequence is now both respected and CHECKED: a violation throws
     /// rather than silently producing a live icon nobody asked for.
     /// </remarks>
+    /// <summary>
+    /// Reads and clears a fail-safe request raised outside a transition. Under the lock, like every other
+    /// read of that flag.
+    /// </summary>
+    private bool TakeFailSafeRequest()
+    {
+        lock (_decision)
+        {
+            if (!_failSafeRequested)
+            {
+                return false;
+            }
+
+            _failSafeRequested = false;
+            return true;
+        }
+    }
+
     private void ReleaseEmittedEffects(Outcome outcome)
     {
         if (outcome.EmittedTo == 0)
@@ -1445,6 +1494,7 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
                 }
 
                 _deliveredSequence = token;
+                var delivered = Project(_state, _time.GetTimestamp());
 
                 AtInvocationForTests?.Invoke();
 
@@ -1468,10 +1518,28 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
                 }
                 catch (Exception exception)
                 {
-                    // The machine never lets foreign code decide whether its own bookkeeping completes.
-                    // A subscriber is entitled to fail; it is not entitled to strand a compensation, and
-                    // the WndProc boundary has isolated callbacks for the same reason since CV-1.
+                    // TWO PROPERTIES, TWO TREATMENTS.
+                    //
+                    // The machine never lets foreign code decide whether its own bookkeeping completes —
+                    // that is why the release sits in a finally and why this catch exists at all, and the
+                    // WndProc boundary has isolated callbacks for the same reason since CV-1.
+                    //
+                    // But the queue and the DELIVERY are not the same obligation, and the first fix made
+                    // the catch protect both. The consumer of a LOSS is not one subscriber among several:
+                    // it is what degrades the session or ends the process. If it failed, nobody has acted
+                    // on the loss, and we cannot tell a failure to degrade from a degradation that
+                    // happened — so the process may not be left alive with no affordance.
+                    //
+                    // An unacknowledged loss is an unverified cleanup by another name, and it takes the
+                    // same answer: the authoritative exit.
                     _logger.LogError(exception, "A tray affordance subscriber threw; the notification is dropped.");
+
+                    if (delivered is TrayAffordanceState.Lost or TrayAffordanceState.Unavailable)
+                    {
+                        _logger.LogError(
+                            "The loss of the tray affordance was not acknowledged; requesting the authoritative exit.");
+                        _failSafeRequested = true;
+                    }
                 }
             }
         }

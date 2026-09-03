@@ -24,7 +24,7 @@ public sealed class WindowCloseCoordinator(
     IBackgroundMonitoringSettingsService backgroundSettings,
     IApplicationWindowController windowController,
     IBackgroundNoticePresenter noticePresenter,
-    Func<bool> hasExitAffordance,
+    Func<Action, bool> tryEnterBackground,
     ILogger<WindowCloseCoordinator> logger)
 {
     /// <summary>
@@ -38,9 +38,11 @@ public sealed class WindowCloseCoordinator(
             return false; // this is Application.Exit() closing the window: let it
         }
 
-        if (backgroundSettings.BackgroundMonitoringEnabled && hasExitAffordance())
+        // The hide is handed over, not gated. Asking "may I?" and hiding afterwards left an interval in
+        // which the affordance could be lost while the window went away regardless.
+        if (backgroundSettings.BackgroundMonitoringEnabled
+            && tryEnterBackground(windowController.HideToBackground))
         {
-            windowController.HideToBackground();
             lifecycleController.EnterBackground();
             logger.LogInformation("Window closed to background; monitoring continues.");
 

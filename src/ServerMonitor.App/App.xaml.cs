@@ -390,7 +390,7 @@ public partial class App : Application
             sp.GetRequiredService<IBackgroundMonitoringSettingsService>(),
             sp.GetRequiredService<IApplicationWindowController>(),
             sp.GetRequiredService<IBackgroundNoticePresenter>(),
-            () => sp.GetRequiredService<TrayAffordanceLifecycle>().CanEnterBackground,
+            enterBackground => sp.GetRequiredService<TrayAffordanceLifecycle>().TryEnterBackground(enterBackground),
             sp.GetRequiredService<ILogger<WindowCloseCoordinator>>()));
 
         // M8 application-shell services. All Windows-specific behavior stays behind

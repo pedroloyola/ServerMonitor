@@ -28,7 +28,14 @@ public sealed class WindowCloseCoordinatorTests
 
         public void HideForMinimize() { }
 
-        public void HideToBackground() => HideToBackgroundCount++;
+        /// <summary>Ordered trace, so a test can assert WHERE the hide happened, not only that it did.</summary>
+        public List<string> Calls { get; } = [];
+
+        public void HideToBackground()
+        {
+            HideToBackgroundCount++;
+            Calls.Add("hide");
+        }
 
         public void RestoreAndActivate() => RestoreCount++;
 
@@ -79,9 +86,47 @@ public sealed class WindowCloseCoordinatorTests
                 Settings,
                 Window,
                 Notice,
-                () => HasExitAffordance,
+                enterBackground =>
+                {
+                    // The commit runs the act itself, so the harness models the real contract rather
+                    // than a permission the coordinator could keep. The markers make the ORDER visible:
+                    // the hide has to happen BETWEEN them, because a coordinator that hides after the
+                    // commit has an interval again, and an interval is the whole defect.
+                    if (!HasExitAffordance)
+                    {
+                        return false;
+                    }
+
+                    Window.Calls.Add("commit:enter");
+                    enterBackground();
+                    Window.Calls.Add("commit:leave");
+                    return true;
+                },
                 NullLogger<WindowCloseCoordinator>.Instance);
         }
+    }
+
+    /// <summary>
+    /// The hide happens INSIDE the commit, not after it.
+    /// </summary>
+    /// <remarks>
+    /// Asserting only that the window was hidden cannot tell the two apart: a coordinator that asks
+    /// permission and hides afterwards hides it too, and that is exactly the sequence that left the
+    /// process alive, invisible and with no way out when the affordance was lost in between.
+    /// </remarks>
+    [Fact]
+    public void The_hide_happens_inside_the_commit_and_not_after_it()
+    {
+        var h = new Harness(backgroundEnabled: true) { HasExitAffordance = true };
+
+        h.Coordinator.HandleCloseRequest();
+
+        var entered = h.Window.Calls.IndexOf("commit:enter");
+        var hidden = h.Window.Calls.IndexOf("hide");
+        var left = h.Window.Calls.IndexOf("commit:leave");
+
+        Assert.True(entered >= 0 && left > entered, $"[{string.Join(", ", h.Window.Calls)}]");
+        Assert.InRange(hidden, entered + 1, left - 1);
     }
 
     /// <summary>A: X with background monitoring ON. Hide, keep everything running, never exit.</summary>
@@ -171,7 +216,11 @@ public sealed class WindowCloseCoordinatorTests
             h.Settings,
             new OrderRecordingWindowController(order),
             new ThrowingNoticePresenter(order),
-            () => true,
+            enterBackground =>
+            {
+                enterBackground();
+                return true;
+            },
             NullLogger<WindowCloseCoordinator>.Instance);
 
         var thrown = Record.Exception(() => coordinator.HandleCloseRequest());

@@ -10,8 +10,8 @@ uma condição. Uma condição só sai marcada `SUPERSEDED BY <regra>`, com just
 `docs/m13-s2t-linearizable-state-machine.md` (desenho) · `.boss/BOSS.md` §9 e §10.
 
 **Base de medição:** worktree `ServerMonitor-m13-s2t`, ramo `agent/m13-s2t-tray`.
-Baseline dos testes filtrados por `Tray|Theme|Flyout|FailSafe`: **148 passam, 0 falham**, em **10 corridas seguidas** com resultado idêntico e zero abortos.
-Gates completos na árvore entregue: **Debug 1852/1852**, **Release 1817/1817**, zero abortos. A diferença de 35 vem de um
+Baseline dos testes filtrados por `Tray|Theme|Flyout|FailSafe|WindowClose`: **161 passam, 0 falham**, em **10 corridas seguidas** com resultado idêntico e zero abortos.
+Gates completos na árvore entregue: **Debug 1859/1859**, **Release 1824/1824**, zero abortos. A diferença de 35 vem de um
 `ItemGroup Condition="'$(Configuration)' != 'Debug'"` no projeto de testes que remove `Qa\**\*.cs` —
 condição pré-existente, não introduzida por esta entrega.
 
@@ -33,7 +33,7 @@ condição pré-existente, não introduzida por esta entrega.
 | **CV-9** | reentrância com flyout aberto | `Shell/Tray/FlyoutReentrancyGate.cs` · `OwnedTrayIconAdapter.ShowFlyout` | `FlyoutReentrancyGateTests` (6) | M26, M27 | **FECHADA** na decisão; a ativação da janela auxiliar é medida humana (matriz P, passo 5) |
 | **CV-10** | acoplamento limitador ↔ custo de UI | `EpisodeFrequencyLimiter.DefaultCapacity = 5 / 60 s` | `T4` | M8 morta | **FECHADA** |
 | **CV-11** | residual de admissão suprimida (LOW, aceite) | ordem das guardas em `Transition` | `T4` | — | **FECHADA · residual escrito** |
-| **CV-12** | evidência de mutação na entrega | — | matriz da secção 3 | **71 entradas · 69 corridas** | **FECHADA com duas limitações declaradas** (M24, M25) |
+| **CV-12** | evidência de mutação na entrega | — | matriz da secção 3 | **76 entradas · 74 corridas** | **FECHADA com duas limitações declaradas** (M24, M25) |
 | **CV-13** | só um episódio ADMITIDO por B pode expirar | `BeginEpisode`, só depois de `TryBeginEpisode` | `CV13` | M14 morta | **FECHADA** |
 | **CV-14** | B não limita tentativas dentro de um episódio | `EpisodeFrequencyLimiter` com **um** método | `CV14` ×2 (inclui teste de arquitetura por reflexão) | M8 morta | **FECHADA** |
 | **CV-15** | integridade do documento normativo | — | este ficheiro | — | **ATIVA · este mapa é o cumprimento.** Ver a **retratação** na secção 4 |
@@ -401,6 +401,69 @@ que é usado para diagnóstico. O primeiro consumidor de produção reabre a que
 
 ---
 
+## 10. Quinta ronda — o quarto anel, e uma declaração minha que era falsa
+
+### 10.1 Retratação: «nenhum leitor o faz hoje»
+
+Escrevi, na secção «o que não mato» da ronda 4:
+
+> «um leitor que guarde a projeção e aja mais tarde reintroduz a janela — **nenhum o faz hoje**.»
+
+**É falso.** O `WindowCloseCoordinator` lia `hasExitAffordance()` e só depois escondia a janela; um probe
+que invalidava a afordância nesse intervalo escondeu-a à mesma. Em produto: o utilizador carrega no X, o
+coordenador confirma que há saída, a afordância perde-se, e a janela desaparece — processo vivo,
+invisível, sem afordância. **É o A12 por uma terceira porta.**
+
+A secção «o que não mato» só vale se for **verificada**. Declarei como hipotético um caminho que existia no
+código, à distância de um `grep`. A regra que fica: antes de escrever «nenhum leitor faz isto», ir ver.
+
+### 10.2 O1, agora imposto por construção
+
+**Invariante:** *o direito de esconder a janela não pode existir separado do acto de a esconder.*
+
+**Imposição:** o booleano legível **desapareceu**. `TrayAffordanceLifecycle.CanEnterBackground` não existe;
+existe `TryEnterBackground(Action)`, e o `TrayStateMachine` executa o acto **sob o mesmo lock** que decide
+que é permitido. O caller entrega o que quer feito; não recebe uma resposta para usar depois.
+
+É a **terceira vez** nesta fatia que a mesma correção é precisa — o token de episódio, o canal de efeitos,
+e agora isto. O padrão é sempre o mesmo: *um valor que se pode guardar é uma capacidade que circula, e uma
+capacidade que circula é uma que se fabrica.* A cura é sempre a mesma: o direito atravessa a fronteira
+como delegado, executado por quem o concede.
+
+Mutações **M71** (o commit devolve permissão em vez de executar), **M72** (o portão de sessão desaparece) e
+**M73** (o coordenador volta a esconder depois de perguntar). Todas mortas — e a M71 e a M73 sobreviveram à
+primeira passagem porque os meus testes exercitavam **duplos**, não o commit real nem a ordem.
+
+### 10.3 O3, a outra metade: a entrega crítica
+
+**Invariante:** *uma perda de afordância que ninguém confirmou ter tratado não deixa o processo vivo.*
+
+O `catch` que protege a **fila** de efeitos estava a proteger também a **entrega**. São duas obrigações
+diferentes e precisavam de dois tratamentos: o consumidor de uma perda não é mais um subscriber — é o que
+degrada a sessão ou termina o processo. Se falhou, ninguém agiu sobre a perda.
+
+**Imposição:** uma falha na entrega de `Lost`/`Unavailable` levanta o pedido de saída autoritativa. Uma
+perda não confirmada é uma limpeza não verificada com outro nome, e leva a mesma resposta. Uma falha numa
+notificação **não** degradante continua isolada, porque escalar em todas faria de qualquer observador
+defeituoso um botão de sair — a **M75** existe para provar essa metade.
+
+Mutações **M74** e **M75**.
+
+### 10.4 TEST-DET-R2: a mesma correção que eu já tinha feito noutro sítio
+
+A barreira sinalizava **antes** de tentar o lock e decidia a corrida por 200 ms de ausência. É exatamente
+o defeito que eu próprio declarei na M51 do teste de DPI e corrigi lá — e não apliquei aqui. Passou a
+observar o bloqueio positivamente (`WaitSleepJoin`), como o outro.
+
+### 10.5 O que continua sem cobertura
+
+- O commit corre o acto **sob o lock da decisão**. Um acto que bloqueie prende a máquina; nenhum dos actos
+  de hoje bloqueia, e o contrato diz «must not block», mas não tenho asserção que o imponha.
+- A escalada por perda não confirmada usa o mesmo sink da CV-16. Se um dia houver **dois** motivos
+  distintos para escalar que precisem de tratamento diferente, isto volta a ser um sítio só.
+
+---
+
 ## 4. Retratação — uma afirmação minha que era falsa
 
 Na entrega da ligação escrevi, sobre `App.xaml.cs`:
@@ -432,7 +495,7 @@ entre cada uma. Filtro: `FullyQualifiedName~Tray` (M1–M25) e
 e `FullyQualifiedName~FailSafe|FullyQualifiedName~WindowsAppNotification|FullyQualifiedName~Notification`
 (M36–M40). Baselines **95** e **82**, ambas 0 falhas.
 
-**71 entradas · 69 corridas · 67 mortas · 2 sobrevivem.**
+**76 entradas · 74 corridas · 72 mortas · 2 sobrevivem.**
 
 Duas não correm, com razão escrita: **M4** ficou `SUPERSEDED BY M55` e **M21** `SUPERSEDED BY M34`,
 porque o código que atacavam foi reescrito e a propriedade passou para a mutação nova. A **M47** foi
@@ -471,6 +534,9 @@ python tools/mutations/mutate_round9.py M41
 
 # Ronda Atlas/Vigil: ordem, entrega, topologia, DPI, cobertura (M46–M52)
 python tools/mutations/mutate_round10.py M46
+
+# Quinta ronda: o quarto anel — commit linearizável e entrega crítica (M71–M75)
+python tools/mutations/mutate_round13.py M71
 
 # Quarta ronda: os três invariantes — projeção com relógio, recusa, libertação (M65–M70)
 python tools/mutations/mutate_round12.py M65
@@ -523,7 +589,7 @@ python tools/mutations/cs8509_differential.py
 | M47 | — | — | — | **RETIRADA por mim** (§5.2) |
 | M48 | `Release` deixa de dominar na entrega | dominância do Release | 2 | **morta** |
 | M49 | uma decisão pré-prazo pode ser entregue como `Available` | invariante de raiz | 1 | **morta** |
-| M50 | os retries correm onde o timer dispara | CV-7/CV-8, topologia | 2 | **morta** |
+| M50 | — | — | — | **RETIRADA**: o contrato do marshaller mudou; a evidência é a **M56** |
 | M51 | a atualização de DPI vai direta à shell | serialização das chamadas nativas | 1 | **morta** |
 | M52 | um `EffectKind` novo passa despercebido ao teste de cobertura | CV-12/T17 | 1 | **morta** |
 | M26 | a porta CV-9 admite todos os pedidos | um só flyout de cada vez | 4 | **morta** |

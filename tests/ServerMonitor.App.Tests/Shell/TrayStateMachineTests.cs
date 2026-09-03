@@ -395,23 +395,29 @@ public sealed class TrayStateMachineTests : IDisposable
 
             probed = true;
 
-            using var releaserStarted = new ManualResetEventSlim(false);
             var releaser = new Thread(() =>
             {
-                releaserStarted.Set();
                 machine.Release();
                 releaseFinished.Set();
             });
 
             releaser.Start();
 
-            // BARRIER, not a negative wait. The thread has certainly entered Release, so the only reason
-            // it cannot have changed the state is that it is blocked on the lock this delivery holds.
-            // Waiting two seconds and observing nothing proved nothing about where the thread got to.
-            Assert.True(releaserStarted.Wait(Patience), "the releasing thread never started");
-            Assert.False(
-                releaseFinished.Wait(TimeSpan.FromMilliseconds(200)),
-                "the release completed while the delivery held the lock");
+            // POSITIVE observation of the block, the same correction the DPI test needed: signalling
+            // before attempting the lock proves only that the thread started, and deciding the race by
+            // 200 ms of silence decides it by the scheduler. A thread waiting on a monitor reports
+            // WaitSleepJoin; one that got through would be Stopped.
+            var deadline = DateTime.UtcNow + Patience;
+            while (DateTime.UtcNow < deadline
+                   && (releaser.ThreadState & System.Threading.ThreadState.WaitSleepJoin) == 0
+                   && releaser.IsAlive)
+            {
+                Thread.Yield();
+            }
+
+            Assert.True(
+                (releaser.ThreadState & System.Threading.ThreadState.WaitSleepJoin) != 0,
+                $"the release did not block on the delivery's lock; thread was {releaser.ThreadState}");
 
             stateAtInvocation = machine.LifecycleState;
         };
@@ -464,6 +470,99 @@ public sealed class TrayStateMachineTests : IDisposable
 
         Assert.Equal(TrayAffordanceState.Lost, machine.State);
         Assert.Equal(TrayLifecycleState.Recovering, machine.LifecycleState);
+    }
+
+    /// <summary>
+    /// The commit PERFORMS the act; it does not answer a question and leave the caller to act.
+    /// </summary>
+    /// <remarks>
+    /// The whole correction is that there is no interval between the determination and the act. A commit
+    /// that returned <c>true</c> and left the caller to do the work would be the old detachable boolean
+    /// wearing a new signature — and my first tests for this exercised a FAKE source, so a mutation of
+    /// the real one went unnoticed.
+    /// </remarks>
+    [Fact]
+    public void The_commit_performs_the_act_while_the_affordance_holds()
+    {
+        using var machine = Create();
+        machine.Establish();
+
+        var ran = 0;
+        var granted = machine.TryEnterBackground(() => ran++);
+
+        Assert.True(granted, "an established affordance must permit background");
+        Assert.Equal(1, ran);
+    }
+
+    /// <summary>Without an established affordance the act does not run at all.</summary>
+    [Fact]
+    public void The_commit_refuses_and_runs_nothing_when_there_is_no_affordance()
+    {
+        _native.AddResult = false;
+        using var machine = Create();
+        machine.Establish();
+
+        var ran = 0;
+        var granted = machine.TryEnterBackground(() => ran++);
+
+        Assert.False(granted);
+        Assert.Equal(0, ran);
+    }
+
+    /// <summary>
+    /// A loss nobody acknowledged ends the process. Isolating the subscriber protects the QUEUE; it must
+    /// not also swallow the failure of the consumer that was supposed to act on the loss.
+    /// </summary>
+    /// <remarks>
+    /// The consumer of a loss is not one subscriber among several: it is what degrades the session or
+    /// ends the process. If it threw, nothing materialised a window and nothing asked for an exit, while
+    /// the machine sat in Lost — alive, with no affordance. That is the same situation as an unverifiable
+    /// cleanup and it takes the same answer.
+    /// </remarks>
+    [Fact]
+    public void A_loss_that_no_subscriber_acknowledged_requests_the_authoritative_exit()
+    {
+        using var machine = Create();
+        machine.Establish();
+
+        machine.StateChanged += (_, _) =>
+        {
+            if (machine.State is TrayAffordanceState.Lost or TrayAffordanceState.Unavailable)
+            {
+                throw new InvalidOperationException("the degradation path is broken");
+            }
+        };
+
+        _native.AddResult = false;
+        machine.NotifyTaskbarCreated();
+        _time.Advance(TrayStateMachine.DebounceDelay);
+        _time.Advance(TrayStateMachine.FirstRetryDelay);
+        _time.Advance(TrayStateMachine.SecondRetryDelay);
+
+        Assert.True(
+            Volatile.Read(ref _exitRequests) > 0,
+            "a loss that nobody acted on must not leave the process alive without an affordance");
+    }
+
+    /// <summary>
+    /// A subscriber failing on a NON-degrading notification is still just a subscriber: it is isolated,
+    /// and it does not end the process.
+    /// </summary>
+    /// <remarks>
+    /// The pair matters. Escalating on every subscriber exception would make any faulty observer able to
+    /// quit the app, which trades one defect for a louder one.
+    /// </remarks>
+    [Fact]
+    public void A_subscriber_failing_on_a_non_degrading_notification_does_not_end_the_process()
+    {
+        using var machine = Create();
+
+        machine.StateChanged += (_, _) => throw new InvalidOperationException("noisy observer");
+
+        machine.Establish();
+
+        Assert.Equal(TrayAffordanceState.Available, machine.State);
+        Assert.Equal(0, Volatile.Read(ref _exitRequests));
     }
 
     /// <summary>

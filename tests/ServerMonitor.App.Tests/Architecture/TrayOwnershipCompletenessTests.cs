@@ -386,6 +386,22 @@ public sealed class TrayOwnershipCompletenessTests
             State = state;
             StateChanged?.Invoke(this, EventArgs.Empty);
         }
+
+        /// <summary>
+        /// The commit, faked the way the real one behaves: the act runs only while the affordance is
+        /// established, and it runs INSIDE the determination so a test can invalidate the affordance from
+        /// within and see that the act was still refused.
+        /// </summary>
+        public bool TryEnterBackground(Action enterBackground)
+        {
+            if (State != TrayAffordanceState.Available)
+            {
+                return false;
+            }
+
+            enterBackground();
+            return true;
+        }
     }
 
     private sealed class FakeDegradationNotice : IBackgroundDegradationNotice

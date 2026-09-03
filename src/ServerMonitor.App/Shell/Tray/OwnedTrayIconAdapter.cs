@@ -92,6 +92,23 @@ internal sealed class OwnedTrayIconAdapter : ITrayIconAdapter, ITrayAffordanceSo
         }
     }
 
+    /// <summary>
+    /// Forwards the commit to the machine. Before <see cref="Start"/> there is no machine and therefore no
+    /// affordance, so it refuses — the same fail-closed answer <see cref="State"/> gives.
+    /// </summary>
+    public bool TryEnterBackground(Action enterBackground)
+    {
+        ArgumentNullException.ThrowIfNull(enterBackground);
+
+        TrayStateMachine? machine;
+        lock (_sync)
+        {
+            machine = _machine;
+        }
+
+        return machine is not null && machine.TryEnterBackground(enterBackground);
+    }
+
     public void Start()
     {
         lock (_sync)

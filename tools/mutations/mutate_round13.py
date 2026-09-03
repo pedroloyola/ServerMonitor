@@ -1,46 +1,43 @@
 #!/usr/bin/env python3
-"""M13 S2-T mutation runner, round 3 of the Atlas/Vigil corrections (M53-M58)."""
+"""M13 S2-T mutation runner, round 5: the fourth ring (M71-M75)."""
 import io, subprocess, sys, os, json, re
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 SRC = os.path.join(ROOT, "src", "ServerMonitor.App")
 MACHINE = os.path.join(SRC, "Shell", "Tray", "TrayStateMachine.cs")
-ADAPTER = os.path.join(SRC, "Shell", "Tray", "OwnedTrayIconAdapter.cs")
+LIFECYCLE = os.path.join(SRC, "Services", "TrayAffordanceLifecycle.cs")
+COORDINATOR = os.path.join(SRC, "Services", "WindowCloseCoordinator.cs")
 
 DOTNET = os.path.expanduser("~/.dotnet/dotnet.exe")
 TESTS = os.path.join(ROOT, "tests", "ServerMonitor.App.Tests", "ServerMonitor.App.Tests.csproj")
-FILTER = "FullyQualifiedName~Tray|FullyQualifiedName~Theme|FullyQualifiedName~Flyout|FullyQualifiedName~FailSafe"
+FILTER = ("FullyQualifiedName~Tray|FullyQualifiedName~Theme|FullyQualifiedName~Flyout"
+          "|FullyQualifiedName~FailSafe|FullyQualifiedName~WindowClose")
 
 MUTATIONS = [
- ("M53", "effects are runnable before their transition publishes", [
+ ("M71", "the commit hands back a permission instead of performing the act", [
    (MACHINE,
-    "        var effect = new Effect(kind, _generation, ++_sequence, delay);\n        _emittedFrom = _emittedFrom == 0 ? effect.Sequence : _emittedFrom;\n        _emittedTo = effect.Sequence;\n        _pending.Add(new PendingEffect(effect, Ready: false));",
-    "        var effect = new Effect(kind, _generation, ++_sequence, delay);\n        _emittedFrom = _emittedFrom == 0 ? effect.Sequence : _emittedFrom;\n        _emittedTo = effect.Sequence;\n        _pending.Add(new PendingEffect(effect, Ready: true));")]),
+    "            if (Project(_state, _time.GetTimestamp()) != TrayAffordanceState.Available)\n            {\n                return false;\n            }\n\n            enterBackground();\n            return true;",
+    "            var permitted = Project(_state, _time.GetTimestamp()) == TrayAffordanceState.Available;\n            if (!permitted)\n            {\n                return false;\n            }\n\n            return true;")]),
 
- ("M54", "the drain SKIPS an unready effect instead of stopping at it", [
+ ("M72", "the session gate is dropped from the commit", [
+   (LIFECYCLE,
+    "            if (_degradedForSession)\n            {\n                return false;\n            }\n\n            // The session gate is ours",
+    "            if (false)\n            {\n                return false;\n            }\n\n            // The session gate is ours")]),
+
+ ("M73", "the coordinator goes back to gating on a value it read", [
+   (COORDINATOR,
+    "        if (backgroundSettings.BackgroundMonitoringEnabled\n            && tryEnterBackground(windowController.HideToBackground))\n        {\n            lifecycleController.EnterBackground();",
+    "        if (backgroundSettings.BackgroundMonitoringEnabled\n            && tryEnterBackground(() => { }))\n        {\n            windowController.HideToBackground();\n            lifecycleController.EnterBackground();")]),
+
+ ("M74", "an unacknowledged loss is swallowed like any other subscriber failure", [
    (MACHINE,
-    "                    var head = _pending[0];\n                    if (!head.Ready)\n                    {",
-    "                    var head = _pending.FirstOrDefault(candidate => candidate.Ready);\n                    if (head.Effect.Sequence == 0)\n                    {")]),
+    "                    if (delivered is TrayAffordanceState.Lost or TrayAffordanceState.Unavailable)",
+    "                    if (false && delivered is TrayAffordanceState.Lost or TrayAffordanceState.Unavailable)")]),
 
- ("M55", "the delivery stops holding the decision lock, so the check and the invocation come apart", [
+ ("M75", "every subscriber failure escalates, so a noisy observer can end the process", [
    (MACHINE,
-    "            // the lock is re-entrant and the nesting guard stops it draining underneath us.\n            lock (_decision)",
-    "            // MUTATED: no longer the decision lock.\n            lock (new object())")]),
-
- ("M56", "a refused continuation runs inline on the timer thread", [
-   (MACHINE,
-    "                if (_marshalToUi(callback))\n                {\n                    return;\n                }",
-    "                if (_marshalToUi(callback))\n                {\n                    return;\n                }\n\n                callback();")]),
-
- ("M57", "the adapter refusal falls back to running inline", [
-   (ADAPTER,
-    "        return dispatcher.TryEnqueue(() => continuation());",
-    "        if (dispatcher.TryEnqueue(() => continuation()))\n        {\n            return true;\n        }\n\n        continuation();\n        return true;")]),
-
- ("M58", "the DPI update bypasses the router and goes straight to the shell", [
-   (ADAPTER,
-    "        RouteShellUpdate(machine, () => registration.UpdateForDpi(dpi));",
-    "        _ = machine;\n        registration.UpdateForDpi(dpi);")]),
+    "                    if (delivered is TrayAffordanceState.Lost or TrayAffordanceState.Unavailable)",
+    "                    if (true || delivered is TrayAffordanceState.Lost or TrayAffordanceState.Unavailable)")]),
 ]
 
 
@@ -95,6 +92,6 @@ for mid, desc, edits in MUTATIONS:
     for n in names:
         print(f"      {n}", flush=True)
 
-io.open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "mutation-results-round11.json"),
+io.open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "mutation-results-round13.json"),
         "w", encoding="utf-8").write(json.dumps(results, indent=2))
 print("DONE")
