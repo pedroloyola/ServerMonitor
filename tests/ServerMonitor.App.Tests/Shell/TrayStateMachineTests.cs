@@ -41,6 +41,369 @@ public sealed class TrayStateMachineTests : IDisposable
             limiter);
 
     // ---------------------------------------------------------------------------------------------
+    // Ordering under concurrent drainers, and delivery-time validation
+    // ---------------------------------------------------------------------------------------------
+
+    /// <summary>
+    /// A Delete decided while an Add is in flight reaches the shell AFTER it, with two threads.
+    /// </summary>
+    /// <remarks>
+    /// The queue used to be dequeued OUTSIDE the gate, so two drainers could take A and B and then race
+    /// for it — a later Delete could execute before its Add, leaving the icon alive and destroying the
+    /// compensation invariant. <c>Effect.Sequence</c> existed and was never read.
+    /// <para>
+    /// Deterministic: the Add is parked inside the shell, and the releasing thread is known to be past
+    /// its publication before the assertion runs, so "the Delete has not happened yet" is observed at a
+    /// point fixed by signals rather than by a timeout.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void A_delete_decided_during_an_in_flight_add_still_reaches_the_shell_after_it()
+    {
+        using var machine = Create();
+        using var releasing = new ManualResetEventSlim(false);
+
+        _native.AddMayReturn.Reset();
+        Run(machine.Establish);
+        Assert.True(_native.AddEntered.Wait(Patience), "the Add never started");
+
+        machine.LifecycleChangedForTests += (_, _) =>
+        {
+            if (machine.LifecycleState == TrayLifecycleState.Releasing)
+            {
+                releasing.Set();
+            }
+        };
+        Run(machine.Release);
+
+        // The releasing thread is past its transition — it decided, emitted its Delete, and is now in
+        // commit/drain waiting for the gate the parked Add holds. Fixed by a signal, not by a timeout.
+        Assert.True(releasing.Wait(Patience), "the release never transitioned");
+        Assert.DoesNotContain("Delete", _native.Calls);
+
+        _native.AddMayReturn.Set();
+        WaitForBackground();
+
+        var add = _native.Calls.IndexOf("Add");
+        var delete = _native.Calls.IndexOf("Delete");
+        Assert.True(add >= 0 && delete > add, $"order was [{string.Join(", ", _native.Calls)}]");
+    }
+
+    /// <summary>
+    /// Two threads committing while the shell gate is held must not be able to invert the order in which
+    /// their effects reach the shell.
+    /// </summary>
+    /// <remarks>
+    /// This is the race Atlas measured. The queue used to be dequeued OUTSIDE the gate, so two drainers
+    /// could take A and B and then race for it, and a later DELETE could execute before its ADD, leaving
+    /// the icon alive. <c>Effect.Sequence</c> existed and was never read.
+    /// <para>
+    /// It is a REPEATED test rather than a probe, and that is a deliberate trade. Reproducing the
+    /// interleaving needs both threads to sit between dequeue and gate at the same time, which no fixed
+    /// seam can pin without changing the very structure under test — a probe placed inside the gate and a
+    /// probe placed outside it are not the same probe. Holding the gate from the test while both threads
+    /// commit puts them there, and the machine's own sequence check turns any inversion into an
+    /// exception. The test is therefore ASYMMETRIC: it can only fail when the ordering is actually
+    /// broken.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void Concurrent_drainers_never_invert_the_effect_order()
+    {
+        const int iterations = 200;
+
+        for (var iteration = 0; iteration < iterations; iteration++)
+        {
+            var native = new BlockingNativeTrayRegistration();
+            using var machine = new TrayStateMachine(
+                native,
+                () => { },
+                () => { },
+                _time,
+                NullLogger<TrayStateMachine>.Instance);
+
+            using var gateHeld = new ManualResetEventSlim(false);
+            using var mayRelease = new ManualResetEventSlim(false);
+
+            // Hold the shell gate so both worker threads pile up behind it with effects committed.
+            var holder = Task.Run(() => machine.InvokeUnderShellGate(() =>
+            {
+                gateHeld.Set();
+                mayRelease.Wait(Patience);
+            }));
+
+            Assert.True(gateHeld.Wait(Patience), "the gate was never taken");
+
+            var establish = Task.Run(machine.Establish);
+            var release = Task.Run(machine.Release);
+
+            mayRelease.Set();
+
+            // An inversion surfaces as the machine's own ordering check throwing, which arrives here.
+            Task.WaitAll([holder, establish, release], Patience);
+
+            var add = native.Calls.IndexOf("Add");
+            if (add >= 0)
+            {
+                var delete = native.Calls.IndexOf("Delete");
+                Assert.True(
+                    delete < 0 || delete > add,
+                    $"iteration {iteration}: [{string.Join(", ", native.Calls)}]");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Release dominates AT DELIVERY: a notification decided before it is not delivered after it.
+    /// </summary>
+    /// <remarks>
+    /// The publication used to release the decision lock between validating the state and invoking the
+    /// handler. With a barrier parked in that gap, a Release won and the delivery still went out.
+    /// <para>
+    /// Driven through the probe rather than with threads: the window is a specific point inside the
+    /// publication, and entering it on purpose is both exact and repeatable, where a second thread would
+    /// only sometimes arrive there.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void A_notification_decided_before_a_release_is_not_delivered_after_it()
+    {
+        using var machine = Create();
+        var delivered = 0;
+
+        machine.StateChanged += (_, _) => delivered++;
+
+        var released = false;
+        machine.BeforeDeliveryForTests = () =>
+        {
+            if (released)
+            {
+                return;
+            }
+
+            released = true;
+            machine.Release();
+        };
+
+        machine.Establish();
+
+        Assert.True(released, "the delivery probe never ran");
+        Assert.Equal(TrayLifecycleState.Released, machine.LifecycleState);
+        Assert.Equal(0, delivered);
+    }
+
+    /// <summary>
+    /// Nothing after the deadline publishes Available — asserted on the DELIVERY, which is the half that
+    /// was open. This is the root invariant eight rounds of design were spent on.
+    /// </summary>
+    /// <remarks>
+    /// The decision half was already covered: the preamble terminalizes before the event is examined, so
+    /// a late success never DECIDES Available. What was not covered is a decision taken legitimately
+    /// before the deadline and delivered after it — the publication released the decision lock between
+    /// validating and invoking, and in that gap the deadline can pass.
+    /// <para>
+    /// Built deterministically, because the window has to be entered on purpose: scheduled continuations
+    /// are queued instead of run, so the deadline TIMER firing does not terminalize anything, and the
+    /// clock is pushed past the deadline from inside the publication itself. The machine is therefore in
+    /// the exact state that matters — still Available, episode still live, clock already past the
+    /// deadline — at the moment the delivery decides whether to go out.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void A_decision_taken_before_the_deadline_is_not_delivered_as_Available_after_it()
+    {
+        var deferred = new List<Action>();
+        var delivered = new List<TrayAffordanceState>();
+
+        using var machine = new TrayStateMachine(
+            _native,
+            () => Interlocked.Increment(ref _exitRequests),
+            () => Interlocked.Increment(ref _escalations),
+            _time,
+            NullLogger<TrayStateMachine>.Instance,
+            limiter: null,
+            marshalToUi: deferred.Add);
+
+        machine.Establish();
+        machine.StateChanged += (_, _) => delivered.Add(machine.State);
+
+        machine.NotifyTaskbarCreated();
+        Assert.Equal(TrayLifecycleState.Recovering, machine.LifecycleState);
+
+        // Fire the debounce timer; its continuation is queued, not run.
+        _time.Advance(TrayStateMachine.DebounceDelay);
+
+        var pushedTheClock = false;
+        machine.BeforeDeliveryForTests = () =>
+        {
+            if (pushedTheClock)
+            {
+                return;
+            }
+
+            pushedTheClock = true;
+
+            // The deadline passes between the decision and this delivery. The deadline timer fires too,
+            // but its continuation only queues, so nothing has terminalized: the machine is still
+            // Available with a live episode.
+            _time.Advance(TrayStateMachine.RecoveryDeadline);
+        };
+
+        // Run the debounce continuation: it attempts, the shell succeeds, and Available is DECIDED.
+        RunDeferred(deferred);
+
+        Assert.True(pushedTheClock, "the delivery probe never ran");
+        Assert.DoesNotContain(TrayAffordanceState.Available, delivered);
+    }
+
+    private static void RunDeferred(List<Action> deferred)
+    {
+        for (var index = 0; index < deferred.Count; index++)
+        {
+            deferred[index]();
+        }
+    }
+
+    /// <summary>
+    /// CV-7/CV-8: the recovery shell call happens on the UI thread, like every other shell call in this
+    /// machine and like the design, the CV map and the frequency limiter all assert.
+    /// </summary>
+    /// <remarks>
+    /// The retry is started by a timer, which fires on the thread pool. Running the continuation there
+    /// would have put <c>NIM_ADD</c> on a different thread from the one CV-8's cost measurements were
+    /// taken on — a document asserting one topology while the code ran another.
+    /// </remarks>
+    [Fact]
+    public void A_scheduled_recovery_attempt_is_marshalled_before_it_touches_the_shell()
+    {
+        var marshalled = 0;
+        var shellCallsOutsideTheMarshaller = 0;
+        var insideMarshaller = false;
+
+        using var machine = new TrayStateMachine(
+            _native,
+            () => Interlocked.Increment(ref _exitRequests),
+            () => Interlocked.Increment(ref _escalations),
+            _time,
+            NullLogger<TrayStateMachine>.Instance,
+            limiter: null,
+            marshalToUi: continuation =>
+            {
+                Interlocked.Increment(ref marshalled);
+                insideMarshaller = true;
+                try
+                {
+                    continuation();
+                }
+                finally
+                {
+                    insideMarshaller = false;
+                }
+            });
+
+        machine.Establish();
+        _native.AddResult = false;
+
+        var addsBefore = _native.AddCalls;
+        _native.Calls.Clear();
+        machine.NotifyTaskbarCreated();
+        _time.Advance(TrayStateMachine.DebounceDelay);
+
+        // The debounce continuation is the first scheduled hop; the retries are the next ones.
+        _time.Advance(TrayStateMachine.FirstRetryDelay);
+
+        Assert.True(marshalled > 0, "no scheduled continuation went through the UI marshaller");
+        Assert.True(_native.AddCalls > addsBefore, "the recovery never reached the shell");
+        Assert.Equal(0, shellCallsOutsideTheMarshaller);
+        Assert.False(insideMarshaller);
+    }
+
+    /// <summary>
+    /// A shell call the machine does not own — the DPI icon update — is serialized against the ones it
+    /// does.
+    /// </summary>
+    /// <remarks>
+    /// It replaces and destroys an <c>HICON</c> and issues <c>NIM_MODIFY</c>, and was issued from the
+    /// adapter outside this gate, so it could overlap a recovery <c>NIM_ADD</c>: two unsynchronized
+    /// callers on one icon, one of them freeing a handle the other may still be using.
+    /// </remarks>
+    [Fact]
+    public void A_foreign_shell_call_waits_for_the_machines_own_shell_call()
+    {
+        using var machine = Create();
+        using var foreignStarted = new ManualResetEventSlim(false);
+
+        _native.AddMayReturn.Reset();
+        Run(machine.Establish);
+        Assert.True(_native.AddEntered.Wait(Patience), "the Add never started");
+
+        Run(() => machine.InvokeUnderShellGate(() =>
+        {
+            foreignStarted.Set();
+            _native.Calls.Add("Dpi");
+        }));
+
+        Assert.False(
+            foreignStarted.Wait(TimeSpan.FromMilliseconds(150)),
+            "the DPI update ran while a shell call was in flight");
+
+        _native.AddMayReturn.Set();
+        WaitForBackground();
+
+        Assert.True(foreignStarted.Wait(Patience), "the DPI update never ran");
+        var add = _native.Calls.IndexOf("Add");
+        var dpi = _native.Calls.IndexOf("Dpi");
+        Assert.True(add >= 0 && dpi > add, $"order was [{string.Join(", ", _native.Calls)}]");
+    }
+
+    /// <summary>
+    /// CV-19, PROVEN rather than argued: a stale <c>AddCompleted</c> in a non-terminal state is
+    /// reconciled, not discarded.
+    /// </summary>
+    /// <remarks>
+    /// The machine cannot reach this state on its own — every generation bump except the episode start
+    /// also enters a terminal state, and step 1 of the preamble short-circuits there — so the state is
+    /// BUILT. That was the whole objection: a guard whose removal changes nothing is a guard a refactor
+    /// deletes with everything still green.
+    /// <para>
+    /// Entirely single-threaded. Scheduled continuations are queued instead of run, so the episode stays
+    /// exactly where it is put: live, non-terminal, on a new generation, with no shell call outstanding.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void CV19_a_stale_add_completion_in_a_live_episode_is_reconciled_and_compensated()
+    {
+        var deferred = new List<Action>();
+
+        using var machine = new TrayStateMachine(
+            _native,
+            () => Interlocked.Increment(ref _exitRequests),
+            () => Interlocked.Increment(ref _escalations),
+            _time,
+            NullLogger<TrayStateMachine>.Instance,
+            limiter: null,
+            marshalToUi: deferred.Add);
+
+        machine.Establish();
+        var staleGeneration = machine.GenerationForTests;
+
+        machine.NotifyTaskbarCreated();
+        Assert.Equal(TrayLifecycleState.Recovering, machine.LifecycleState);
+        Assert.NotEqual(staleGeneration, machine.GenerationForTests);
+
+        var deletesBefore = _native.DeleteCallsSnapshot;
+
+        // An Add from the PREVIOUS generation reports success while the current episode is still live and
+        // non-terminal. Discarding it by generation leaves an icon nobody will ever remove.
+        machine.InjectForTests(TrayEventKind.AddCompleted, staleGeneration, true);
+
+        Assert.True(
+            _native.DeleteCallsSnapshot > deletesBefore,
+            $"the stale completion produced no compensating delete; calls were "
+                + $"[{string.Join(", ", _native.Calls)}]");
+    }
+
+    // ---------------------------------------------------------------------------------------------
     // The lifecycle learns BEFORE the shell I/O runs
     // ---------------------------------------------------------------------------------------------
 
@@ -545,8 +908,10 @@ public sealed class TrayStateMachineTests : IDisposable
     [Fact]
     public void T17_every_kind_that_reaches_Add_declares_that_it_may_create_an_affordance()
     {
-        // Data-driven from the effect kinds themselves, so a new kind is covered automatically.
-        var kinds = Enumerable.Range(0, 6).ToArray();
+        // From the ENUM, not from a hard-coded range. The range said "all kinds are covered
+        // automatically" and was not: a seventh kind described as Add/false compiled and passed, in the
+        // one test that existed to make a new kind impossible to forget.
+        var kinds = TrayStateMachine.EffectKindsForTests();
         Assert.NotEmpty(kinds);
 
         foreach (var kind in kinds)
@@ -639,20 +1004,46 @@ public sealed class TrayStateMachineTests : IDisposable
 
     private void WaitForBackground() => Task.WaitAll([.. _background], Patience);
 
+    /// <summary>
+    /// Waits for a state by SIGNAL, not by polling a wall clock.
+    /// </summary>
+    /// <remarks>
+    /// It used to spin on <c>DateTime.UtcNow</c> with a <c>Thread.Sleep(5)</c>, which decides races by
+    /// how busy the machine running the tests is. The state machine already raises <c>StateChanged</c>
+    /// on every transition, so the signal exists; the timeout stays only as a failure deadline, never as
+    /// the thing being measured.
+    /// </remarks>
     private static void WaitForState(TrayStateMachine machine, TrayLifecycleState expected)
     {
-        var deadline = DateTime.UtcNow + Patience;
-        while (DateTime.UtcNow < deadline)
+        using var reached = new ManualResetEventSlim(false);
+
+        void OnChanged(object? sender, EventArgs args)
         {
+            if (machine.LifecycleState == expected)
+            {
+                reached.Set();
+            }
+        }
+
+        // The LIFECYCLE signal, not the product notification: StateChanged is suppressed for terminal
+        // transitions, so waiting on it could never observe Releasing at all.
+        machine.LifecycleChangedForTests += OnChanged;
+        try
+        {
+            // Checked after subscribing, so a transition that already happened is not missed.
             if (machine.LifecycleState == expected)
             {
                 return;
             }
 
-            Thread.Sleep(5);
+            Assert.True(
+                reached.Wait(Patience),
+                $"expected {expected}, observed {machine.LifecycleState}");
         }
-
-        Assert.Fail($"expected {expected}, observed {machine.LifecycleState}");
+        finally
+        {
+            machine.LifecycleChangedForTests -= OnChanged;
+        }
     }
 
     public void Dispose()

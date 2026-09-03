@@ -10,8 +10,8 @@ uma condição. Uma condição só sai marcada `SUPERSEDED BY <regra>`, com just
 `docs/m13-s2t-linearizable-state-machine.md` (desenho) · `.boss/BOSS.md` §9 e §10.
 
 **Base de medição:** worktree `ServerMonitor-m13-s2t`, ramo `agent/m13-s2t-tray`.
-Baseline dos testes filtrados por `Tray|Theme|Flyout`: **95 passam, 0 falham**.
-Gates completos na árvore entregue: **Debug 1827/1827**, **Release 1792/1792**. A diferença de 35 vem de um
+Baseline dos testes filtrados por `Tray|Theme|Flyout|FailSafe`: **130 passam, 0 falham**.
+Gates completos na árvore entregue: **Debug 1834/1834**, **Release 1799/1799**. A diferença de 35 vem de um
 `ItemGroup Condition="'$(Configuration)' != 'Debug'"` no projeto de testes que remove `Qa\**\*.cs` —
 condição pré-existente, não introduzida por esta entrega.
 
@@ -28,19 +28,19 @@ condição pré-existente, não introduzida por esta entrega.
 | **CV-5** | `szTip`/`hIcon` estáticos | `NativeTrayRegistration` — resolvidos **uma vez** no construtor | `NativeTrayRegistrationTests` (6) | M23 morta | **FECHADA** na parte decidível |
 | **CV-6** | mensagem forjada ignorada | — | — | — | `SUPERSEDED BY` **CV-6b** |
 | **CV-6b** | quatro casos independentes de validação | `TrayCallbackContract.TryDecode` | quatro `[Fact]` A/B/C/D, cada um variando **um** campo | M15, M16 mortas | **FECHADA** |
-| **CV-7** | topologia de thread | `TrayHostWindow` (janela criada na thread de UI) | — | — | **MEDIDA · PASSA** (S-1(A), emissor sintético) |
-| **CV-8** | custo nativo síncrono na thread de UI | idem | — | — | **MEDIDA · aceitável**: `NIM_ADD` mediana 3,16 ms / máx 4,36 ms, `NIM_DELETE` mediana 0,36 ms, contra 16,7 ms por frame a 60 Hz, dentro do envelope de B |
+| **CV-7** | topologia de thread | `TrayHostWindow` · **`TrayStateMachine.Schedule` marshala para a thread de UI** | `A_scheduled_recovery_attempt_is_marshalled_before_it_touches_the_shell` | **M50** | **CORRIGIDA.** O código divergia: os retries corriam no threadpool. Ver §5 |
+| **CV-8** | custo nativo síncrono na thread de UI | idem | idem | **M50** | **MEDIDA · aceitável** — e agora **na topologia em que foi medida**: `NIM_ADD` mediana 3,16 ms / máx 4,36 ms, `NIM_DELETE` mediana 0,36 ms, contra 16,7 ms por frame a 60 Hz |
 | **CV-9** | reentrância com flyout aberto | `Shell/Tray/FlyoutReentrancyGate.cs` · `OwnedTrayIconAdapter.ShowFlyout` | `FlyoutReentrancyGateTests` (6) | M26, M27 | **FECHADA** na decisão; a ativação da janela auxiliar é medida humana (matriz P, passo 5) |
 | **CV-10** | acoplamento limitador ↔ custo de UI | `EpisodeFrequencyLimiter.DefaultCapacity = 5 / 60 s` | `T4` | M8 morta | **FECHADA** |
 | **CV-11** | residual de admissão suprimida (LOW, aceite) | ordem das guardas em `Transition` | `T4` | — | **FECHADA · residual escrito** |
-| **CV-12** | evidência de mutação na entrega | — | matriz da secção 3 | **49 mutações corridas** | **FECHADA com limitações declaradas** (M13, M24, M25) |
+| **CV-12** | evidência de mutação na entrega | — | matriz da secção 3 | **48 mutações corridas** | **FECHADA com duas limitações declaradas** (M24, M25) |
 | **CV-13** | só um episódio ADMITIDO por B pode expirar | `BeginEpisode`, só depois de `TryBeginEpisode` | `CV13` | M14 morta | **FECHADA** |
 | **CV-14** | B não limita tentativas dentro de um episódio | `EpisodeFrequencyLimiter` com **um** método | `CV14` ×2 (inclui teste de arquitetura por reflexão) | M8 morta | **FECHADA** |
 | **CV-15** | integridade do documento normativo | — | este ficheiro | — | **ATIVA · este mapa é o cumprimento.** Ver a **retratação** na secção 4 |
-| **CV-16** | `CleanupVerified` fail-closed | `HandleCleanupCompleted` · `NativeTrayRegistration.Delete` devolve o BOOL real | `T5` | M10 morta | **FECHADA** |
+| **CV-16** | `CleanupVerified` fail-closed | `HandleCleanupCompleted` · `NativeTrayRegistration.Delete` devolve o BOOL real | `T5` | M10, **M44** | **FECHADA** · interação com a Questão D registada em `.boss/tmp/m13-s2t-open-question-d.md` |
 | **CV-17** | notificação informativa antes da saída fail-safe | `Services/FailSafeExitNotice.cs` · `WindowsAppNotificationService.ShowFailSafeExitNotice` (30 min) · gancho no CAS de `AppLifecycleController` | `FailSafeExitNoticeTests` (16) · `WindowsAppNotificationServiceTests` (3) | M36, M37, M37b, M39, M39b, M40 | **FECHADA** |
 | **CV-18** | contrato fechado da ação da notificação | `NotificationActivationContract` — **uma linha**: `("FailSafeExit", "OpenDashboard")` | quatro casos independentes + tabela de 9 pares | M38, M38b | **FECHADA** |
-| **CV-19** | ressalva do passo 2 para conclusões de efeito | `Transition`, passo 2 | `T11` | **M13 SOBREVIVE** | **IMPLEMENTADA, NÃO PROVADA** — ver 3.1 |
+| **CV-19** | ressalva do passo 2 para conclusões de efeito | `Transition`, passo 2 | `T11` · **`CV19_a_stale_add_completion_in_a_live_episode_is_reconciled_and_compensated`** | **M13** | **FECHADA.** O estado é construído por teste; ver §3.1 |
 | **CV-20** | canal de efeitos fechado por construção | tipos `private` aninhados em `TrayStateMachine`; capacidade retida só por `EffectExecutor._native` | `TrayCapabilityBoundaryTests` (T14a/b) · `TrayOwnershipCompletenessTests` (T14c) | M11, M19, M20, M22, **M34** | **FECHADA · a imprecisão do T14c foi corrigida** |
 | **CV-21** | exceção do sink não consome o único disparo | **NÃO IMPLEMENTADA AQUI** | — | — | **com o Cortex** (`ServerMonitor-m13-s2`) |
 | **CI-1b** | grafias numéricas de enum em payloads hostis | a ação `FailSafeExit` entra no mesmo `switch` de pares literais e **herda** o fail-closed | tabela de 9 pares, inclui `("FailSafeExit", "1")` e `("2", "1")` | M38b | **HERDADA · não agravada.** A dívida da S2 continua a ser da S2 |
@@ -135,6 +135,77 @@ da CV-16.
 comportamento de **hoje** para que a decisão seja visível no momento em que mudar. Não é um endosso.
 
 
+## 5. Ordenação de efeitos, entrega e topologia de threads — ronda de correção
+
+### 5.1 A sequência passou a ser respeitada (ATLAS-R1)
+
+`DrainEffects` desenfileirava **fora** do `_nativeGate` e só depois o adquiria, portanto dois drenadores
+podiam tirar A e B e correr para o gate — um DELETE posterior chegava à shell antes do ADD que compensa,
+deixando o ícone vivo. O `Effect.Sequence` existia e **nunca era lido**: a pior forma que uma garantia
+pode ter, escrita e não imposta.
+
+Agora o gate é tomado à volta de todo o ciclo, o desenfileiramento incluído, e a sequência é **verificada**
+— uma inversão lança em vez de produzir silenciosamente um ícone que ninguém pediu. Mutação **M46**,
+morta pelo `Concurrent_drainers_never_invert_the_effect_order`.
+
+### 5.2 Uma correção minha que tive de retirar
+
+Tentei também garantir que os efeitos de uma transição nunca chegassem à shell antes da **publicação**
+dessa transição: os efeitos ficavam em estágio e só eram comprometidos depois de publicar.
+
+**Não sobreviveu ao primeiro teste.** Comprometer depois de publicar faz a ordem de compromisso divergir
+da ordem de decisão entre threads: um Delete decidido em segundo lugar podia ser comprometido primeiro e
+correr antes do Add que compensa — exatamente a inversão que estava a corrigir, reintroduzida pela
+correção. A verificação de sequência apanhou-o na primeira corrida.
+
+As duas propriedades não podem valer as duas com dois drenadores. Fica a que, ao ser violada, **corrompe
+estado** em vez de atrasar uma notificação: um Delete invertido deixa um ícone vivo que ninguém removerá.
+
+**Residual declarado:** com dois drenadores, um drenador já a correr pode executar o efeito de uma
+transição antes de essa transição publicar. Depois da correção de topologia (5.3) o despacho e a drenagem
+acontecem todos na thread de UI, portanto em produção não há um segundo drenador — mas o residual é
+escrito, não presumido.
+
+### 5.3 A topologia de threads passou a ser a que o desenho afirma (CV-8/CV-15-THREAD)
+
+Os retries eram disparados por `TimeProvider.CreateTimer` e a continuação corria **onde o timer dispara**
+— o threadpool. O `NIM_ADD` de recuperação corria assim fora da thread de UI, enquanto o desenho, as
+linhas CV-7/CV-8 deste mapa e a própria justificação do `EpisodeFrequencyLimiter` afirmam o contrário, e
+as medições de custo da CV-8 foram feitas na thread de UI.
+
+Não era uma decisão a tomar: era o documento a afirmar uma coisa e o código a fazer outra — o defeito que
+esta fatia tem andado a corrigir. O código passou a marshalar as continuações para a thread de UI.
+Mutação **M50**.
+
+### 5.4 Entrega: Release domina e o prazo é respeitado (ATLAS-R2)
+
+A publicação largava o lock de decisão **entre** validar e invocar. Nessa janela um Release podia vencer
+e a entrega sair à mesma, e — a que interessa — uma decisão tomada antes do prazo podia ser entregue como
+`Available` **depois** dele, que é o invariante de raiz de oito voltas de desenho.
+
+Fechado com três coisas: as entregas são serializadas entre si; cada uma leva um token monotónico, para
+que uma que perdeu a corrida seja descartada em vez de aterrar depois de uma mais recente; e o estado é
+revalidado **dentro** dessa serialização, contra os estados terminais e contra o prazo **da decisão** —
+não contra o campo, que uma recuperação bem-sucedida já limpou.
+
+Mutações **M48** e **M49**. A janela é entrada de propósito através de um probe de teste: uma guarda sobre
+uma janela onde nenhum teste consegue entrar é uma guarda que nada falsifica, e esta fatia já enviou duas
+dessas.
+
+### 5.5 A atualização de DPI passou a ser serializada (ATLAS-R3)
+
+`UpdateForDpi` troca e destrói um `HICON` e emite `NIM_MODIFY`, e era chamada do adaptador **fora** do
+gate, podendo sobrepor-se a um `NIM_ADD` de recuperação: dois chamadores não sincronizados sobre um ícone,
+um deles a libertar um handle que o outro pode estar a usar. Passa agora pelo mesmo gate, por delegado —
+a capacidade continua onde a CV-20 a pôs. Mutação **M51**.
+
+**Torna a M24 matável?** **Não.** Verifiquei. A M24 é a ordem *dentro* do `NativeTrayRegistration.UpdateForDpi`
+— libertar o `HICON` antes do `NIM_MODIFY` em vez de depois — e continua a só ser observável num desktop
+real. A serialização remove a sobreposição **entre** chamadores; não torna observável a ordem dentro de
+uma delas. A **M25** não tem qualquer relação com o gate. Ambas continuam `NOT_RUN`.
+
+---
+
 ## 4. Retratação — uma afirmação minha que era falsa
 
 Na entrega da ligação escrevi, sobre `App.xaml.cs`:
@@ -166,8 +237,15 @@ entre cada uma. Filtro: `FullyQualifiedName~Tray` (M1–M25) e
 e `FullyQualifiedName~FailSafe|FullyQualifiedName~WindowsAppNotification|FullyQualifiedName~Notification`
 (M36–M40). Baselines **95** e **82**, ambas 0 falhas.
 
-**50 entradas · 49 corridas (a M21 está `SUPERSEDED`) · 46 mortas · 3 sobrevivem**, e cada uma das três é
-uma limitação declarada, não uma alegação.
+**51 entradas · 48 corridas · 46 mortas · 2 sobrevivem.**
+
+Três não correm e cada uma tem razão escrita: **M4** e **M21** ficam `SUPERSEDED` — as suas âncoras
+desapareceram quando o código que atacavam foi reescrito, e o que verificavam passou para a **M48** e a
+**M34** respetivamente; a **M47** foi **retirada por mim**, porque o desenho que ela mutava foi revertido
+(§5.2).
+
+As duas sobreviventes — **M24** e **M25** — continuam limitações declaradas, não alegações. A **M13**
+deixou de ser uma delas: está morta (§3.1).
 
 ### Reprodução
 
@@ -188,6 +266,9 @@ python mutate_notice.py M36      # ou qualquer subconjunto de M36..M40
 # Ronda de correções: arranque, ordem de publicação, ordinais (M41–M45)
 python mutate_round9.py M41      # ou qualquer subconjunto de M41..M45
 
+# Ronda Atlas/Vigil: ordem, entrega, topologia, DPI, cobertura (M46–M52)
+python mutate_round10.py M46     # ou qualquer subconjunto de M46..M52
+
 # Prova diferencial da escalada CS8509
 python cs8509_differential.py
 
@@ -204,7 +285,7 @@ python cs8509_differential.py
 | M1 | `Transition` pode emitir `Add` durante `Releasing` | dominância do Release | 3 | **morta** |
 | M2 | um `Add` tardio anterior ao Release publica `Available` | `Available` = provadamente disponível | 1 | **morta** |
 | M3 | um `Add` tardio não recebe `Delete` compensatório | conclusão compensada | 1 | **morta** |
-| M4 | revalidação na entrega das notificações removida | Release domina as continuações | 1 | **morta** |
+| M4 | revalidação na entrega das notificações removida | Release domina as continuações | — | `SUPERSEDED BY` **M48** (âncora reescrita) |
 | M5 | um `Shell_NotifyIcon` falso é tratado como sucesso | a razão de ser da slice | 7 | **morta** |
 | M6 | um `Shell_NotifyIcon` verdadeiro é tratado como falha | idem, direção oposta | 6 | **morta** |
 | M7 | recuperação por `TaskbarCreated` removida | recuperação após reinício do Explorer | 1 | **morta** |
@@ -213,7 +294,7 @@ python cs8509_differential.py
 | M10 | uma limpeza não verificável pode continuar a viver | CV-16 fail-closed | 1 | **morta** |
 | M11 | acrescenta-se um braço `default` ao switch de efeitos | exaustividade do switch | 1 | **morta** |
 | M12 | o RunOnce do fail-safe marca à entrada em vez de após retorno normal | uma exceção não consome o único disparo | 1 | **morta** |
-| M13 | a ressalva CV-19 é removida | reconciliação de conclusões obsoletas | **0** | **SOBREVIVE — 3.1** |
+| M13 | a ressalva CV-19 é removida | reconciliação de conclusões obsoletas | 1 | **morta** — ver 3.1 |
 | M14 | o passo de prazo do preâmbulo é removido | terminalização pelo prazo | 1 | **morta** |
 | M15 | a verificação da identidade da mensagem é removida | CV-6b caso B | 1 | **morta** |
 | M16 | a verificação do `uID` é removida | CV-6b caso C | 1 | **morta** |
@@ -226,6 +307,13 @@ python cs8509_differential.py
 | M23 | o tooltip deixa de ser ajustado ao buffer `szTip` | CV-5 | 1 | **morta** |
 | M24 | o `HICON` antigo é libertado **antes** de `NIM_MODIFY` | regra DPI do Prism | **0** | **SOBREVIVE — 3.3** |
 | M25 | a janela hospedeira passa a `HWND_MESSAGE` | entrega de `TaskbarCreated` | **0** | **SOBREVIVE — 3.3** |
+| M46 | o desenfileiramento volta para fora do gate | ordem sob drenagem concorrente | 1 | **morta** |
+| M47 | — | — | — | **RETIRADA por mim** (§5.2) |
+| M48 | `Release` deixa de dominar na entrega | dominância do Release | 2 | **morta** |
+| M49 | uma decisão pré-prazo pode ser entregue como `Available` | invariante de raiz | 1 | **morta** |
+| M50 | os retries correm onde o timer dispara | CV-7/CV-8, topologia | 2 | **morta** |
+| M51 | a atualização de DPI vai direta à shell | serialização das chamadas nativas | 1 | **morta** |
+| M52 | um `EffectKind` novo passa despercebido ao teste de cobertura | CV-12/T17 | 1 | **morta** |
 | M26 | a porta CV-9 admite todos os pedidos | um só flyout de cada vez | 4 | **morta** |
 | M27 | `Close` deixa de ser idempotente e dá um slot extra | CV-9 sob dupla notificação de fecho | 1 | **morta** |
 | M28 | a ordem do menu põe `Sair` em primeiro | ordem fixada pelo produto | 4 | **morta** |
@@ -252,24 +340,21 @@ python cs8509_differential.py
 | M44 | a regra do delete redundante engole uma falha **genuína** | CV-16 continua fail-closed | 4 | **morta** |
 | M45 | os ordinais da afordância são deslocados | valores fixados, não só a ordem | 2 | **morta** |
 
-### 3.1 M13 sobrevive: a ressalva CV-19 está implementada mas **não provada**
+### 3.1 M13: a ressalva CV-19 está agora **PROVADA**
 
-A ressalva existe no código — `&& trayEvent.Kind != TrayEventKind.AddCompleted`, no passo 2 do preâmbulo
-— e é exigida pela CV-19. Removê-la não faz falhar nenhum teste.
+Durante duas entregas a M13 sobreviveu, e eu argumentei que o estado protegido era inalcançável: o passo
+1 do preâmbulo faz curto-circuito antes do passo 2, e todos os incrementos de geração exceto o de
+`BeginEpisode` entram também num estado terminal.
 
-**A ligação em DI não a torna alcançável** — verifiquei em vez de assumir. Há três incrementos de geração
-em `TrayStateMachine`: dois entram em `Releasing` (terminal, cortado pelo passo 1 do preâmbulo) e o
-terceiro é o `BeginEpisode`, cujos eventos já levam a geração nova. A ligação não acrescenta nenhuma
-fonte de incremento.
+**O argumento estava certo e era insuficiente.** A exigência era explícita: o passo 2 mantém-se **com
+mutação própria**, e uma mutação que não mata não cumpre obrigação de prova nenhuma. A razão é a doutrina
+desta fatia inteira: *uma guarda cuja remoção não muda nada pode ser apagada por um refactor sem que nada
+falhe.*
 
-A causa não é um teste em falta que eu possa escrever: **o estado que a ressalva protege é hoje
-inalcançável**. O passo 1 do preâmbulo (terminal) faz curto-circuito antes do passo 2, e todos os
-incrementos de geração exceto o de `BeginEpisode` entram também num estado terminal. Um `AddCompleted`
-obsoleto, com geração diferente, num estado **não terminal**, não tem caminho de execução.
-
-Registo o que é: a ressalva fica como defesa em profundidade contra uma futura fonte de incremento de
-geração, e **não é reclamada como provada**. Não a removo, porque é uma condição normativa; e não afirmo
-cobertura que não tenho.
+O estado passou a ser **construído**. `InjectForTests` injeta um evento com uma geração escolhida, pela
+mesma `Dispatch` que todos os eventos reais usam, e o
+`CV19_a_stale_add_completion_in_a_live_episode_is_reconciled_and_compensated` põe um `AddCompleted` da
+geração **anterior** num episódio vivo e não terminal, e afirma que a compensação sai. **M13 morta.**
 
 ### 3.2 Prova diferencial da escalada `CS8509`
 

@@ -124,7 +124,9 @@ internal sealed class OwnedTrayIconAdapter : ITrayIconAdapter, ITrayAffordanceSo
                 RequestAuthoritativeExit,
                 EscalateTermination,
                 _timeProvider,
-                _loggerFactory.CreateLogger<TrayStateMachine>());
+                _loggerFactory.CreateLogger<TrayStateMachine>(),
+                limiter: null,
+                marshalToUi: RunOnUiThread);
 
             hostWindow.CallbackReceived += OnCallbackReceived;
             hostWindow.TaskbarCreated += OnTaskbarCreated;
@@ -300,15 +302,61 @@ internal sealed class OwnedTrayIconAdapter : ITrayIconAdapter, ITrayAffordanceSo
         machine?.NotifyTaskbarCreated();
     }
 
+    /// <summary>
+    /// Re-renders the icon for a new DPI, SERIALIZED against the machine's own shell calls.
+    /// </summary>
+    /// <remarks>
+    /// It replaces and destroys an <c>HICON</c> and issues <c>NIM_MODIFY</c>. Called directly, it could
+    /// overlap a recovery <c>NIM_ADD</c> — two unsynchronized callers on one icon, one of them freeing a
+    /// handle the other may still be using. Routing it through the machine's gate makes the DPI update
+    /// and the recovery mutually exclusive without giving anyone a second way to reach the capability.
+    /// </remarks>
     private void OnDpiChanged(object? sender, uint dpi)
     {
         NativeTrayRegistration? registration;
+        TrayStateMachine? machine;
         lock (_sync)
         {
             registration = _registration;
+            machine = _machine;
         }
 
-        registration?.UpdateForDpi(dpi);
+        if (registration is null)
+        {
+            return;
+        }
+
+        if (machine is null)
+        {
+            registration.UpdateForDpi(dpi);
+            return;
+        }
+
+        machine.InvokeUnderShellGate(() => registration.UpdateForDpi(dpi));
+    }
+
+    /// <summary>
+    /// Runs a scheduled continuation on the UI thread, restoring the thread topology the design and
+    /// CV-7/CV-8 assume: every <c>Shell_NotifyIcon</c> call happens on the UI thread, including the ones
+    /// a retry timer starts. If the dispatcher will not take it — shutting down — it runs inline rather
+    /// than being dropped, because a dropped continuation strands an episode whose deadline nobody would
+    /// then observe.
+    /// </summary>
+    private void RunOnUiThread(Action continuation)
+    {
+        var dispatcher = _dispatcherQueue;
+
+        if (dispatcher is null || dispatcher.HasThreadAccess)
+        {
+            continuation();
+            return;
+        }
+
+        if (!dispatcher.TryEnqueue(() => continuation()))
+        {
+            _logger.LogDebug("The UI dispatcher refused a tray continuation; running it inline.");
+            continuation();
+        }
     }
 
     private void OnMachineStateChanged(object? sender, EventArgs args) =>
