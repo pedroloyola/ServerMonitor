@@ -66,6 +66,19 @@ public interface ITrayAffordanceSource
     /// <summary>Raised whenever <see cref="State"/> changes.</summary>
     event EventHandler? StateChanged;
 
+    /// <summary>
+    /// Registers the ONE consumer whose handling of a loss is authoritative. Single assignment: a second
+    /// registration throws, so this can never become a second multicast list.
+    /// </summary>
+    /// <remarks>
+    /// Separate from <see cref="StateChanged"/> on purpose. A loss has exactly one consumer and ending the
+    /// process is its consequence, so it may not travel with the observers: while it did, an observer that
+    /// threw after the loss was already handled still forced a fail-safe exit. Single assignment also stops
+    /// the inverse abuse — a late caller registering ITSELF as the authoritative consumer and absorbing
+    /// every loss silently, which would suppress the fail-safe instead of triggering it.
+    /// </remarks>
+    void SetLossConsumer(ITrayLossConsumer consumer);
+
     /// <summary>The current, positively established state. Never optimistic.</summary>
     /// <remarks>
     /// <b>For observing, never for authorising.</b> A caller that reads this and acts on it afterwards has

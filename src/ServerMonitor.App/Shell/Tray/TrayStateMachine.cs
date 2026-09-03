@@ -217,6 +217,12 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
     internal event EventHandler? LifecycleChangedForTests;
 
     /// <summary>
+    /// The one authoritative loss consumer. A FIELD and not an event, because that is the whole point:
+    /// there is exactly one, and it cannot be added to. See <see cref="ITrayLossConsumer"/>.
+    /// </summary>
+    private ITrayLossConsumer? _lossConsumer;
+
+    /// <summary>
     /// Runs inside <see cref="PublishIfCurrent"/>, between taking the delivery token and revalidating.
     /// </summary>
     /// <remarks>
@@ -224,6 +230,31 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
     /// found. A guard on a window that no test can enter is a guard nothing falsifies, and this slice has
     /// twice shipped one of those; this is the probe that stops the third.
     /// </remarks>
+    /// <summary>
+    /// Fires immediately before the decision lock is taken, which is the REAL point of contention for
+    /// every event source. A test that needs to prove serialization can signal positively from here that
+    /// a second thread has arrived at that point, instead of polling an aggregate thread state and
+    /// guessing from a wall clock that it must have blocked by now.
+    /// </summary>
+    internal Action? BeforeDecisionLockForTests;
+
+    /// <summary>
+    /// The same thing as <see cref="BeforeDecisionLockForTests"/> for the SHELL gate, which is the other
+    /// point where a foreign thread contends with this machine.
+    /// </summary>
+    internal Action? BeforeShellGateForTests;
+
+    private int _shellGateWaiters;
+
+    /// <summary>
+    /// How many threads are queued on the shell gate right now. Test seam, and the reason it exists:
+    /// <c>ThreadState.WaitSleepJoin</c> says a thread is parked SOMEWHERE and identifies no monitor, so a
+    /// test built on it cannot distinguish this gate from any other wait — and a seam placed BEFORE the
+    /// lock proves only that the thread reached that statement. This is positive, it names the monitor,
+    /// and it is observable from outside.
+    /// </summary>
+    internal int ShellGateWaitersForTests => Volatile.Read(ref _shellGateWaiters);
+
     internal Action? BeforeDeliveryForTests;
 
     /// <summary>
@@ -575,6 +606,29 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
     /// <summary>The single public terminal operation. Idempotent; a no-op once terminal.</summary>
     public void Release() => Dispatch(new TrayEvent(TrayEventKind.Release, 0, ShellOutcome.NotPerformed));
 
+    /// <summary>
+    /// Registers the one authoritative loss consumer. Single assignment, and deliberately NOT an event:
+    /// see <see cref="ITrayLossConsumer"/> for why a loss cannot travel with the observers.
+    /// </summary>
+    public void SetLossConsumer(ITrayLossConsumer consumer)
+    {
+        ArgumentNullException.ThrowIfNull(consumer);
+
+        lock (_decision)
+        {
+            if (_lossConsumer is not null)
+            {
+                // Not a list, and not replaceable. Allowing a second registration would recreate the
+                // multicast this exists to escape, and would let a latecomer displace the real consumer
+                // and absorb losses that must escalate.
+                throw new InvalidOperationException(
+                    "The authoritative loss consumer is already registered; there is exactly one.");
+            }
+
+            _lossConsumer = consumer;
+        }
+    }
+
     // ---------------------------------------------------------------------------------------------
     // Dispatch: decide under the lock, execute outside it.
     // ---------------------------------------------------------------------------------------------
@@ -582,6 +636,7 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
     private void Dispatch(TrayEvent trayEvent)
     {
         Outcome outcome;
+        BeforeDecisionLockForTests?.Invoke();
         lock (_decision)
         {
             outcome = Transition(trayEvent, _time.GetTimestamp());
@@ -1190,9 +1245,22 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
     {
         ArgumentNullException.ThrowIfNull(shellCall);
 
-        lock (_nativeGate)
+        BeforeShellGateForTests?.Invoke();
+
+        Interlocked.Increment(ref _shellGateWaiters);
+        try
         {
-            shellCall();
+            lock (_nativeGate)
+            {
+                Interlocked.Decrement(ref _shellGateWaiters);
+                shellCall();
+            }
+        }
+        catch
+        {
+            // The counter must not leak if the acquisition itself is interrupted; a decrement already
+            // done inside the lock is not undone here, because the throw can only come from shellCall.
+            throw;
         }
     }
 
@@ -1517,51 +1585,76 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
 
                 AtInvocationForTests?.Invoke();
 
-                try
+                // THE AUTHORITATIVE CONSUMER IS NOT A SUBSCRIBER, and this is where that stops being
+                // a claim in a document.
+                //
+                // Treating it differently INSIDE the multicast was half a mechanism. The catch could see
+                // only the state it had delivered, never which handler threw, so both halves were wrong
+                // at once: an observer that threw AFTER the loss had been handled correctly still ended
+                // the process — a defective observer was a quit button — and a consumer that had never
+                // run at all was indistinguishable from one that had.
+                //
+                // So the critical consumption happens FIRST, on its own boundary, with an explicit
+                // confirmation: returning normally is the confirmation, and only its failure or its
+                // ABSENCE escalates. An unacknowledged loss is an unverified cleanup by another name, and
+                // it takes the same answer: the authoritative exit.
+                if (delivered is TrayAffordanceState.Lost or TrayAffordanceState.Unavailable
+                    && IsStillDeliverable(outcome))
                 {
-                    // PER SUBSCRIBER, not per notification.
-                    //
-                    // A multicast invocation validates once and then serves N handlers, and the state can
-                    // die between the first and the second: a handler that advances the clock past the
-                    // deadline leaves the next one observing an affordance that is already gone. The
-                    // delivery is therefore re-decided in front of each handler, with a fresh reading of
-                    // the clock, and stops the moment it is no longer deliverable.
-                    foreach (var handler in StateChanged?.GetInvocationList() ?? [])
+                    var acknowledged = false;
+                    try
                     {
-                        if (!IsStillDeliverable(outcome))
+                        if (_lossConsumer is { } consumer)
                         {
-                            _logger.LogWarning(
-                                "The notification is no longer deliverable; this subscriber and the "
-                                + "remaining ones are not notified.");
-                            break;
+                            consumer.AcknowledgeLoss(delivered);
+                            acknowledged = true;
                         }
-
-                        ((EventHandler)handler)(this, EventArgs.Empty);
                     }
-                }
-                catch (Exception exception)
-                {
-                    // TWO PROPERTIES, TWO TREATMENTS.
-                    //
-                    // The machine never lets foreign code decide whether its own bookkeeping completes —
-                    // that is why the release sits in a finally and why this catch exists at all, and the
-                    // WndProc boundary has isolated callbacks for the same reason since CV-1.
-                    //
-                    // But the queue and the DELIVERY are not the same obligation, and the first fix made
-                    // the catch protect both. The consumer of a LOSS is not one subscriber among several:
-                    // it is what degrades the session or ends the process. If it failed, nobody has acted
-                    // on the loss, and we cannot tell a failure to degrade from a degradation that
-                    // happened — so the process may not be left alive with no affordance.
-                    //
-                    // An unacknowledged loss is an unverified cleanup by another name, and it takes the
-                    // same answer: the authoritative exit.
-                    _logger.LogError(exception, "A tray affordance subscriber threw; the notification is dropped.");
+                    catch (Exception exception)
+                    {
+                        _logger.LogError(
+                            exception, "The authoritative loss consumer threw; the loss is unacknowledged.");
+                    }
 
-                    if (delivered is TrayAffordanceState.Lost or TrayAffordanceState.Unavailable)
+                    if (!acknowledged)
                     {
                         _logger.LogError(
                             "The loss of the tray affordance was not acknowledged; requesting the authoritative exit.");
                         _failSafeRequested = true;
+                    }
+                }
+
+                // OBSERVERS. Re-decided in front of each one, and isolated INDIVIDUALLY.
+                //
+                // Per subscriber, because a multicast that validates once then serves N handlers judges
+                // the last on a reading taken before the first ran: a handler that advances the clock past
+                // the deadline used to leave the next observing an affordance already gone. Isolated
+                // individually, because one observer throwing is neither a reason to end the process nor a
+                // reason to skip the observers behind it — a single catch around the whole loop made one
+                // failure silence everybody after it.
+                foreach (var handler in StateChanged?.GetInvocationList() ?? [])
+                {
+                    if (!IsStillDeliverable(outcome))
+                    {
+                        _logger.LogWarning(
+                            "The notification is no longer deliverable; this observer and the "
+                            + "remaining ones are not notified.");
+                        break;
+                    }
+
+                    try
+                    {
+                        ((EventHandler)handler)(this, EventArgs.Empty);
+                    }
+                    catch (Exception exception)
+                    {
+                        // The machine never lets foreign code decide whether its own bookkeeping
+                        // completes; the WndProc boundary has isolated callbacks for the same reason
+                        // since CV-1. What is NOT here any more is an escalation: this handler is an
+                        // observer, and an observer cannot end the process.
+                        _logger.LogError(
+                            exception,
+                            "A tray affordance observer threw; the observers after it are still notified.");
                     }
                 }
             }

@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""M13 S2-T mutation runner, round 5: the fourth ring (M71-M75)."""
+"""M13 S2-T mutation runner, round 7: the authoritative consumer leaves the multicast (M80-M85)."""
 import io, subprocess, sys, os, json, re
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 SRC = os.path.join(ROOT, "src", "ServerMonitor.App")
 MACHINE = os.path.join(SRC, "Shell", "Tray", "TrayStateMachine.cs")
+CONTRACT = os.path.join(SRC, "Services", "ITrayAffordanceSource.cs")
 LIFECYCLE = os.path.join(SRC, "Services", "TrayAffordanceLifecycle.cs")
-COORDINATOR = os.path.join(SRC, "Services", "WindowCloseCoordinator.cs")
+ADAPTER = os.path.join(SRC, "Shell", "Tray", "OwnedTrayIconAdapter.cs")
 
 DOTNET = os.path.expanduser("~/.dotnet/dotnet.exe")
 TESTS = os.path.join(ROOT, "tests", "ServerMonitor.App.Tests", "ServerMonitor.App.Tests.csproj")
@@ -14,48 +15,55 @@ FILTER = ("FullyQualifiedName~Tray|FullyQualifiedName~Theme|FullyQualifiedName~F
           "|FullyQualifiedName~FailSafe|FullyQualifiedName~WindowClose")
 
 MUTATIONS = [
- ("M71", "the commit hands back a permission instead of performing the act", [
-   # Re-anchored in round 6: the commit returns void, so the mutation can no longer hand a bool back. It
-   # keeps the property it always attacked -- the decision and the act must be the same step -- by
-   # deciding and then NOT performing, which is what a caller-performed act degenerates to.
+ # The whole point of O3: the critical consumption is a DIFFERENT boundary, not different treatment on
+ # the same one. Each of these puts one piece of that back.
+ ("M80", "the authoritative consumption is skipped entirely", [
    (MACHINE,
-    "            enterBackground();\n        }\n    }",
-    "        }\n    }")]),
+    "                        if (_lossConsumer is { } consumer)\n                        {\n                            consumer.AcknowledgeLoss(delivered);\n                            acknowledged = true;\n                        }",
+    "                        acknowledged = true;")]),
 
- ("M72", "the session gate is dropped from the commit", [
-   # Re-anchored in round 6: the early-out returns void.
+ ("M81", "the consumer is called but its confirmation is not required", [
+   (MACHINE,
+    "                    var acknowledged = false;\n                    try\n                    {\n                        if (_lossConsumer is { } consumer)\n                        {\n                            consumer.AcknowledgeLoss(delivered);\n                            acknowledged = true;\n                        }\n                    }",
+    "                    var acknowledged = true;\n                    try\n                    {\n                        if (_lossConsumer is { } consumer)\n                        {\n                            consumer.AcknowledgeLoss(delivered);\n                        }\n                    }")]),
+
+ ("M82", "the authoritative consumer slot accepts a second registration", [
+   (MACHINE,
+    "            if (_lossConsumer is not null)\n            {",
+    "            if (false)\n            {")]),
+
+ ("M83", "the observers are not isolated, so the first failure takes the loop with it", [
+   (MACHINE,
+    "                    try"
+    + chr(10) + "                    {"
+    + chr(10) + "                        ((EventHandler)handler)(this, EventArgs.Empty);"
+    + chr(10) + "                    }"
+    + chr(10) + "                    catch (Exception exception)"
+    + chr(10) + "                    {",
+    "                    if (true)"
+    + chr(10) + "                    {"
+    + chr(10) + "                        ((EventHandler)handler)(this, EventArgs.Empty);"
+    + chr(10) + "                    }"
+    + chr(10) + "                    if (false)"
+    + chr(10) + "                    {"
+    + chr(10) + "                        Exception exception = null!;")]),
+
+ ("M84", "the observer channel degrades the session too, putting the consumer back among the observers", [
    (LIFECYCLE,
-    "            if (_degradedForSession)\n            {\n                return;\n            }\n\n            // The session gate is ours",
-    "            if (false)\n            {\n                return;\n            }\n\n            // The session gate is ours")]),
+    "        var state = _source.State;\n        if (state is TrayAffordanceState.Lost or TrayAffordanceState.Unavailable)\n        {\n            return;\n        }\n\n        Apply(state);",
+    "        Apply(_source.State);")]),
 
- ("M73", "the coordinator goes back to gating on a value it read", [
-   # Re-anchored in round 6, and this is now the sharpest mutation in the slice: it hands the commit an
-   # EMPTY action and hides on its own afterwards. That is precisely the defect the round-6 blocker
-   # described -- the caller keeping a decision and acting on it later -- expressed against a void API.
-   (COORDINATOR,
-    "            enterBackground(() =>\n            {\n                windowController.HideToBackground();\n                hidden = true;\n            });",
-    "            enterBackground(() => { });\n            windowController.HideToBackground();\n            hidden = true;")]),
+ ("M85", "the authoritative duty is implemented publicly instead of explicitly", [
+   (LIFECYCLE,
+    "    void ITrayLossConsumer.AcknowledgeLoss(TrayAffordanceState state) => Degrade(state);",
+    "    public void AcknowledgeLoss(TrayAffordanceState state) => Degrade(state);")]),
 
- # Re-anchored in round 7. The property is unchanged -- a loss nobody acted on must not leave the
- # process alive -- but it is no longer decided inside a catch around the multicast: it is decided by the
- # authoritative consumer's own confirmation, so that is where the mutation now bites.
- ("M74", "an unacknowledged loss is swallowed instead of escalating", [
-   (MACHINE,
-    "                    if (!acknowledged)",
-    "                    if (false)")]),
-
- # Re-anchored in round 7, and this is ATLAS-O3-OVERESCALATION written as a mutation: it puts the
- # escalation back into the OBSERVER catch, where a defective bystander becomes a quit button. In round 6
- # this mutation could only widen a condition inside a shared catch; now the two channels are separate,
- # so it has to reintroduce the coupling explicitly -- which is the honest form of it.
- # Re-anchored in round 7, and this is ATLAS-O3-OVERESCALATION written as a mutation: it puts the
- # escalation back into the OBSERVER catch, where a defective bystander becomes a quit button. In round 6
- # it could only widen a condition inside a shared catch; now that the two channels are separate it has
- # to reintroduce the coupling explicitly, which is the honest form of it.
- ("M75", "an observer failure escalates, so a noisy bystander can end the process", [
-   (MACHINE,
-    "                    catch (Exception exception)\n                    {\n                        // The machine never lets foreign code decide",
-    "                    catch (Exception exception)\n                    {\n                        _failSafeRequested = true;\n                        // The machine never lets foreign code decide")]),
+ # The inverse abuse of the same seam, and the reason single assignment is not merely tidy: a latecomer
+ # registers ITSELF and absorbs every loss, suppressing the fail-safe instead of triggering it.
+ ("M86", "the adapter lets a latecomer displace the authoritative consumer", [
+   (ADAPTER,
+    "            if (_lossConsumer is not null)\n            {\n                throw new InvalidOperationException(\n                    \"The authoritative loss consumer is already registered; there is exactly one.\");\n            }\n\n            _lossConsumer = consumer;",
+    "            _lossConsumer = consumer;")]),
 ]
 
 
@@ -141,6 +149,6 @@ for mid, desc, edits in MUTATIONS:
     for n in names:
         print(f"      {n}", flush=True)
 
-io.open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "mutation-results-round13.json"),
+io.open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "mutation-results-round15.json"),
         "w", encoding="utf-8").write(json.dumps(results, indent=2))
 print("DONE")

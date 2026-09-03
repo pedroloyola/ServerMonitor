@@ -74,27 +74,56 @@ def test():
     out = r.stdout + r.stderr
     if "error CS" in out:
         return ("BUILD-FAIL", 0, 0, out)
+    # A STALE RUN MUST NOT BE READABLE AS A SURVIVAL -- see the README. A mutation never changes which
+    # tests exist, so the Total is invariant; if it moves, the build did not land and "failed=0" means
+    # nothing.
+    total = None
+    mt = re.search(r"Total:\s+(\d+)", out)
+    if mt:
+        total = int(mt.group(1))
+
     m = re.search(r"Failed:\s+(\d+),\s+Passed:\s+(\d+)", out)
     if m:
-        return ("RAN", int(m.group(1)), int(m.group(2)), out)
+        return (_verdict("RAN", total), int(m.group(1)), int(m.group(2)), out)
     if "Build succeeded" not in out and "Passed!" not in out:
         return ("BUILD-FAIL", 0, 0, out)
     return ("UNKNOWN", 0, 0, out)
 
+
+BASELINE_TOTAL = None
+
+
+def _verdict(status, total):
+    if BASELINE_TOTAL is not None and total is not None and total != BASELINE_TOTAL:
+        return f"STALE-ASSEMBLY(total={total} expected={BASELINE_TOTAL})"
+    return status
+
+
 results = []
 which = sys.argv[1:] if len(sys.argv) > 1 else [m[0] for m in MUTATIONS]
+
+_b_status, _b_failed, _b_passed, _b_out = test()
+_bm = re.search(r"Total:\s+(\d+)", _b_out)
+BASELINE_TOTAL = int(_bm.group(1)) if _bm else None
+print(f"baseline: status={_b_status} failed={_b_failed} total={BASELINE_TOTAL}", flush=True)
+if _b_failed:
+    print("BASELINE IS NOT GREEN -- every row below is meaningless until it is", flush=True)
 
 for mid, desc, path, old, new in MUTATIONS:
     if mid not in which:
         continue
+    # Byte-exact restore -- see the README. Restoring through a text write with newline="\n" rewrote CRLF
+    # sources as LF and left the tree dirty after every run.
+    original_bytes = open(path, "rb").read()
     src = io.open(path, encoding="utf-8-sig").read()
     if old not in src:
         results.append({"id": mid, "desc": desc, "status": "ANCHOR-NOT-FOUND"})
         print(f"{mid}: ANCHOR NOT FOUND", flush=True)
         continue
-    io.open(path, "w", encoding="utf-8", newline="\n").write(src.replace(old, new, 1))
+    eol = "\r\n" if b"\r\n" in original_bytes else "\n"
+    io.open(path, "w", encoding="utf-8", newline=eol).write(src.replace(old, new, 1))
     status, failed, passed, out = test()
-    io.open(path, "w", encoding="utf-8", newline="\n").write(src)
+    open(path, "wb").write(original_bytes)
     results.append({"id": mid, "desc": desc, "status": status, "failed": failed, "passed": passed})
     print(f"{mid}: {status} failed={failed} passed={passed}  -- {desc}", flush=True)
 

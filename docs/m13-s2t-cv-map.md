@@ -560,6 +560,87 @@ fatia.
 
 ---
 
+## 12. Sétima ronda — o consumidor autoritativo sai do multicast, e um padrão meu
+
+### 12.1 O que pode ser guardado por quem chama? **Nada, e desta vez por outra razão**
+
+| Superfície nova | Pode ser guardado? |
+|---|---|
+| `SetLossConsumer(ITrayLossConsumer)` | Nada. `void`, e o slot é de atribuição única |
+| `ITrayLossConsumer.AcknowledgeLoss(state)` | Nada. `void` — e é o **inverso** de uma capacidade: impõe um dever a quem a implementa em vez de dar direitos a quem a tem |
+| o consumidor guardado pela máquina | é dela, e o slot não é uma lista |
+| `AcknowledgeLoss` na classe consumidora | **não existe** na superfície pública: implementação explícita, só o portador da interface o pode chamar |
+| `ShellGateWaitersForTests` | `internal`, e é um facto observável, não uma autorização |
+
+**Não há sexto anel nesta ronda**, e a razão é estrutural: a direção do fluxo inverteu-se. As quatro
+correções anteriores tiraram **permissões** de circulação; esta introduz um **dever**, que não é
+acumulável. O risco desta forma é o simétrico — um recém-chegado registar-se a si próprio, absorver as
+perdas em silêncio e **suprimir** o fail-safe — e está fechado pela atribuição única, com uma mutação de
+cada lado (M82 na máquina, M86 no adaptador).
+
+### 12.2 ATLAS-O3: o mecanismo estava a meio, e eu tinha escrito qual era a outra metade
+
+Escrevi na ronda 5 que «escalar em todas faria de qualquer observador defeituoso um botão de sair» — e
+implementei **tratamento diferente dentro do mesmo multicast**, que é meia coisa. O `catch` envolvia a
+invocação inteira e conhecia só o estado entregue, nunca **qual** handler falhou. As duas metades ficavam
+erradas ao mesmo tempo: um observador que lançasse depois de a perda estar tratada acabava o processo, e
+um consumidor que nunca correu era indistinguível de um que correu.
+
+`ITrayLossConsumer` é a fronteira: a perda vai primeiro, direta, ao consumidor único, com confirmação
+explícita; só a falha ou a **ausência** dela escala; os observadores ficam no evento, isolados um a um, e
+não podem acabar o processo. Mutações **M80–M86**, todas mortas.
+
+Um teste antigo passava tanto para uma falha de observador como para uma do consumidor: **não distinguia
+os dois**, que é a condição inteira. Reescrito no sítio, com o nome corrigido.
+
+### 12.3 ATLAS-O1: fechado, e um desvio deliberado ao critério, medido
+
+Corri os dois probes do Atlas como testes temporários e li os números antes de escrever a conclusão:
+`EnterBackground` devolve `System.Void` (probe 2), e o segundo subscriber observa `Lost` com o ato recusado
+(probe 1). Ambos viraram testes permanentes.
+
+**O desvio, declarado:** o critério dizia «nenhuma invocação posterior ao deadline pode observar ou usar
+`Available`». Medi o caso simétrico — `Add` com êxito, episódio fechado, relógio a andar 60 s — e dá
+`Available` com o ato a correr. Está certo: o prazo limita uma **recuperação em curso**, não a validade do
+ícone; à letra, a app deixaria de confiar no seu próprio ícone registado ao fim de 1,5 s, que é o
+M13-QA-8 outra vez. A regra aplica-se ao **episódio**, não ao relógio, e as duas metades têm teste.
+
+### 12.4 O padrão: **uma reescrita para tornar um teste determinístico pode torná-lo mais fraco**
+
+Terceira vez nesta fatia (M51 na ronda 4, M71/M73 na ronda 5, M51 agora). E ao ir ver o registo descobri
+que a `M51` **nunca aparece morta por ninguém** em nenhum JSON: o teste de DPI nunca foi assassino de coisa
+alguma.
+
+A forma é sempre a mesma: tiro a dependência de temporização, a suite fica verde, e leio o verde como
+confirmação. **O verde prova que o teste ainda passa; não prova que ele ainda consegue falhar.** A versão
+da ronda 7 afirmava um negativo logo a seguir à chegada, por isso apagar o gate não falhava nada.
+
+A correção, nas palavras do Atlas: **uma seam que identifica o MONITOR, não a THREAD.**
+`ShellGateWaitersForTests` conta as threads em fila no `_nativeGate`. Decide os dois sentidos — com o gate
+chega a um e fica; sem o gate nunca chega — e o `Patience` do `SpinUntil` é só limite de falha.
+
+**Passa a fazer parte da checklist de entrega:** não «corri a matriz», mas **«re-corri pelo nome as
+mutações dos testes que reescrevi e vi-as morrer»**. O mapa teste→mutação foi extraído dos JSON, não
+adivinhado: M55, M51, M74, M75, M83, M43 — todas mortas depois das reescritas.
+
+### 12.5 O instrumento, corrigido duas vezes
+
+- **Uma corrida obsoleta não é legível como sobrevivência.** O `Total` é invariante sob mutação; se se
+  mexe, o build não aterrou. Os 12 runners medem o baseline antes de tocar em nada e marcam
+  `STALE-ASSEMBLY`.
+- **O restauro é byte-exato.** Escrever o original de volta com `newline="\n"` reescrevia fontes CRLF como
+  LF e sujava a árvore a cada corrida.
+
+### 12.6 O que continua sem cobertura
+
+- Um observador que **não lance** mas bloqueie indefinidamente prende a entrega e a máquina. Sem asserção.
+- Nenhuma mutação move o `IsStillDeliverable` para dentro do `try` do handler.
+- O ato do commit corre sob o lock da decisão; um ato que bloqueie prende a máquina. Continua sem asserção.
+- A seam de chegada ao lock da decisão prova a chegada à instrução, não que o `Monitor.Enter` foi
+  executado; é por isso que a asserção desse teste é sobre **exclusão** e não sobre bloqueio.
+
+---
+
 ## 4. Retratação — uma afirmação minha que era falsa
 
 Na entrega da ligação escrevi, sobre `App.xaml.cs`:

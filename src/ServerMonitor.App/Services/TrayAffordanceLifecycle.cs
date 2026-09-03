@@ -23,7 +23,7 @@ namespace ServerMonitor.App.Services;
 /// the user cannot stop is the A12 zombie by another name.
 /// </para>
 /// </summary>
-public sealed class TrayAffordanceLifecycle
+public sealed class TrayAffordanceLifecycle : ITrayLossConsumer
 {
     private readonly ITrayAffordanceSource _source;
     private readonly IApplicationWindowController _windowController;
@@ -47,7 +47,11 @@ public sealed class TrayAffordanceLifecycle
         _lifecycleController = lifecycleController ?? throw new ArgumentNullException(nameof(lifecycleController));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
+        // TWO CHANNELS, AND THE DIFFERENCE IS THE POINT. The observations arrive on the event; the
+        // LOSS arrives directly, because acting on it is what degrades the session or ends the process
+        // and it must be distinguishable from a bystander that happened to throw.
         _source.StateChanged += OnAffordanceStateChanged;
+        _source.SetLossConsumer(this);
     }
 
     /// <summary>
@@ -91,7 +95,28 @@ public sealed class TrayAffordanceLifecycle
     /// </summary>
     public void Evaluate() => Apply(_source.State);
 
-    private void OnAffordanceStateChanged(object? sender, EventArgs args) => Apply(_source.State);
+    /// <summary>
+    /// The authoritative consumption of a loss. Explicit implementation, so it is not on this class's
+    /// public surface: only the holder of <see cref="ITrayLossConsumer"/> — the state machine — can invoke
+    /// it, and no other caller can force a degradation by calling it directly.
+    /// </summary>
+    void ITrayLossConsumer.AcknowledgeLoss(TrayAffordanceState state) => Degrade(state);
+
+    /// <summary>
+    /// OBSERVATIONS ONLY. A loss arriving here is ignored on purpose: it is consumed authoritatively
+    /// through <see cref="ITrayLossConsumer"/>, and handling it in both places would degrade twice and
+    /// put the critical consumer back among the observers.
+    /// </summary>
+    private void OnAffordanceStateChanged(object? sender, EventArgs args)
+    {
+        var state = _source.State;
+        if (state is TrayAffordanceState.Lost or TrayAffordanceState.Unavailable)
+        {
+            return;
+        }
+
+        Apply(state);
+    }
 
     private void Apply(TrayAffordanceState state)
     {

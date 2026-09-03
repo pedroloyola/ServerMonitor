@@ -59,3 +59,32 @@ Round 6 turned a `bool` return into `void` and one `Invoke` into a loop, which b
 them is a matrix that proves nothing. Re-anchor against the code as it stands and keep the property the
 mutation was always attacking, even when the new form looks different: `M71` used to hand a permission
 back; with a `void` commit it decides and then does not perform, which is the same defect.
+
+## Rewriting a test to make it deterministic can make it WEAKER
+
+This has now happened three times in this slice — M51 in round 4, M71/M73 in round 5, and M51 again in
+round 7 — always the same way: a test is rewritten to remove a timing dependency, the suite stays green,
+and a mutation that the test used to kill quietly comes back to life. Green proves the test still passes.
+It proves nothing about whether the test can still FAIL.
+
+Round 7's instance is the clearest. The DPI test proved exclusion by watching for
+`ThreadState.WaitSleepJoin`. That was replaced with an arrival seam and an immediate negative assertion —
+deterministic, no clock, and unable to fail: with the gate deleted the foreign call simply had not run
+*yet* when the assertion executed, so `M51` (which deletes the gate) passed.
+
+**So the delivery checklist is not "I ran the matrix". It is: for every test I rewrote, I re-ran the
+mutations that test was killing, by name, and watched them die again.** Running the whole matrix catches
+it too, but only if you read the rows for the tests you touched instead of the summary count.
+
+The fix that worked, in Atlas's words: **a seam that identifies the MONITOR, not the THREAD.**
+`ShellGateWaitersForTests` counts threads queued on `_nativeGate` itself. `ThreadState` says a thread is
+parked somewhere and names nothing; a seam placed before the lock proves only that the thread reached that
+statement. A waiter count on the specific monitor is positive, structural, and decides both directions:
+with the gate present it reaches one and stays there, and with the gate deleted it can never reach one.
+
+## Runners restore byte-exactly
+
+Restoring a mutated file through a text write with `newline="\n"` rewrote CRLF sources as LF, so every run
+left files modified in git with "LF will be replaced by CRLF". The measuring instrument was dirtying the
+tree it measured. Originals are now kept as raw bytes and written back unchanged, and the mutated write
+reuses whatever line ending the file already had.

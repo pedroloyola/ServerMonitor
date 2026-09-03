@@ -37,6 +37,7 @@ internal sealed class OwnedTrayIconAdapter : ITrayIconAdapter, ITrayAffordanceSo
     private NativeTrayRegistration? _registration;
     private TrayStateMachine? _machine;
     private TrayFlyoutWindow? _flyout;
+    private ITrayLossConsumer? _lossConsumer;
     private bool _disposed;
 
     public event EventHandler? OpenRequested;
@@ -149,6 +150,15 @@ internal sealed class OwnedTrayIconAdapter : ITrayIconAdapter, ITrayAffordanceSo
             hostWindow.TaskbarCreated += OnTaskbarCreated;
             hostWindow.DpiChanged += OnDpiChanged;
             machine.StateChanged += OnMachineStateChanged;
+
+            // The consumer is registered on the SOURCE at composition time and the machine is not built
+            // until initialization, so it is held and handed over here. It is forwarded rather than
+            // re-raised: re-raising it through the adapter would put it back in a multicast, which is the
+            // whole defect.
+            if (_lossConsumer is { } pendingConsumer)
+            {
+                machine.SetLossConsumer(pendingConsumer);
+            }
 
             lock (_sync)
             {
@@ -408,6 +418,31 @@ internal sealed class OwnedTrayIconAdapter : ITrayIconAdapter, ITrayAffordanceSo
 
     private void OnMachineStateChanged(object? sender, EventArgs args) =>
         StateChanged?.Invoke(this, EventArgs.Empty);
+
+    /// <summary>
+    /// Hands the one authoritative loss consumer to the machine — directly, never through
+    /// <see cref="StateChanged"/>. Single assignment on both sides.
+    /// </summary>
+    public void SetLossConsumer(ITrayLossConsumer consumer)
+    {
+        ArgumentNullException.ThrowIfNull(consumer);
+
+        TrayStateMachine? machine;
+        lock (_sync)
+        {
+            if (_lossConsumer is not null)
+            {
+                throw new InvalidOperationException(
+                    "The authoritative loss consumer is already registered; there is exactly one.");
+            }
+
+            _lossConsumer = consumer;
+            machine = _machine;
+        }
+
+        // Registered after initialization: hand it over now rather than waiting for a restart.
+        machine?.SetLossConsumer(consumer);
+    }
 
     // ------------------------------------------------------------------ flyout
 

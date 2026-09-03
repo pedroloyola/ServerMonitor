@@ -27,7 +27,47 @@ public sealed class TrayAffordanceLifecycleTests
 
         public TrayAffordanceState State => _state;
 
+        /// <summary>
+        /// THE SAME TWO CHANNELS AS PRODUCTION. A fake that delivered a loss on the observer event would
+        /// be a permanent mutation applied to the environment instead of the code: every degradation test
+        /// would keep passing while the real machine had stopped using that channel. So the loss goes to
+        /// the registered consumer, exactly as the machine does it, and single assignment is enforced
+        /// here too.
+        /// </summary>
+        private ITrayLossConsumer? _lossConsumer;
+
+        public void SetLossConsumer(ITrayLossConsumer consumer)
+        {
+            if (_lossConsumer is not null)
+            {
+                throw new InvalidOperationException(
+                    "The authoritative loss consumer is already registered; there is exactly one.");
+            }
+
+            _lossConsumer = consumer;
+        }
+
+        /// <summary>The consumer the subject registered, for tests that drive the critical channel.</summary>
+        public ITrayLossConsumer? RegisteredLossConsumer => _lossConsumer;
+
         public void Report(TrayAffordanceState state)
+        {
+            _state = state;
+
+            if (state is TrayAffordanceState.Lost or TrayAffordanceState.Unavailable)
+            {
+                _lossConsumer?.AcknowledgeLoss(state);
+                return;
+            }
+
+            StateChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        /// <summary>
+        /// Reports a loss on the OBSERVER channel, which production no longer uses for losses. A test uses
+        /// it to prove the observer path cannot degrade the session on its own.
+        /// </summary>
+        public void ReportLossOnObserverChannel(TrayAffordanceState state)
         {
             _state = state;
             StateChanged?.Invoke(this, EventArgs.Empty);
@@ -317,7 +357,12 @@ public sealed class TrayAffordanceLifecycleTests
         // being returned at all.
         var offenders = new List<string>();
 
-        foreach (var type in new[] { typeof(TrayAffordanceLifecycle), typeof(ITrayAffordanceSource) })
+        foreach (var type in new[]
+                 {
+                     typeof(TrayAffordanceLifecycle),
+                     typeof(ITrayAffordanceSource),
+                     typeof(ITrayLossConsumer),
+                 })
         {
             foreach (var method in type.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly))
             {
@@ -340,6 +385,76 @@ public sealed class TrayAffordanceLifecycleTests
         // IsDegradedForSession reports a session fact that authorises nothing: it cannot be turned back
         // into hiding a window, and the only path that authorises anything revalidates for itself.
         Assert.Equal(["TrayAffordanceLifecycle.IsDegradedForSession"], offenders);
+    }
+
+    /// <summary>
+    /// O3, the containment half: the authoritative duty is NOT reachable from the consumer's own public
+    /// surface, so nobody but the holder of the interface can force a degradation.
+    /// </summary>
+    /// <remarks>
+    /// A duty is the inverse of a capability — it grants its holder nothing — but a PUBLIC
+    /// <c>AcknowledgeLoss</c> on the class would have been a different capability in the same slot: any
+    /// caller could degrade the session by asserting a loss that never happened. Explicit implementation
+    /// keeps it off the class and leaves the state machine, which was handed the interface, as the only
+    /// possible caller.
+    /// </remarks>
+    [Fact]
+    public void The_authoritative_loss_duty_is_not_reachable_from_the_consumers_public_surface()
+    {
+        Assert.Null(typeof(TrayAffordanceLifecycle).GetMethod(
+            nameof(ITrayLossConsumer.AcknowledgeLoss),
+            BindingFlags.Public | BindingFlags.Instance));
+
+        // And it IS implemented — an unimplemented interface would make the assertion above pass for
+        // entirely the wrong reason.
+        Assert.True(typeof(ITrayLossConsumer).IsAssignableFrom(typeof(TrayAffordanceLifecycle)));
+    }
+
+    /// <summary>
+    /// O3: the observer channel cannot degrade the session by itself. A loss arriving there is ignored on
+    /// purpose — it is consumed authoritatively elsewhere, and acting on both would degrade twice and put
+    /// the critical consumer back among the observers.
+    /// </summary>
+    [Fact]
+    public void A_loss_on_the_observer_channel_does_not_degrade_the_session()
+    {
+        var h = new Harness(TrayAffordanceState.Available);
+
+        h.Source.ReportLossOnObserverChannel(TrayAffordanceState.Lost);
+
+        Assert.False(h.Subject.IsDegradedForSession);
+        Assert.False(h.Notice.IsDegraded);
+        Assert.Empty(h.Window.Calls);
+        Assert.Equal(0, h.Lifecycle.ExitRequests);
+    }
+
+    /// <summary>O3: and the authoritative channel DOES degrade, so the pair is proven, not assumed.</summary>
+    [Fact]
+    public void A_loss_on_the_authoritative_channel_degrades_the_session()
+    {
+        var h = new Harness(TrayAffordanceState.Available);
+
+        Assert.NotNull(h.Source.RegisteredLossConsumer);
+        h.Source.RegisteredLossConsumer!.AcknowledgeLoss(TrayAffordanceState.Lost);
+
+        Assert.True(h.Subject.IsDegradedForSession);
+        Assert.True(h.Notice.IsDegraded);
+        Assert.Equal(["OpenBackgroundSettings"], h.Window.Calls);
+    }
+
+    /// <summary>
+    /// O3: the consumer registers itself, and the slot cannot be taken twice. Without single assignment a
+    /// latecomer could register ITSELF as the authoritative consumer and absorb every loss silently —
+    /// suppressing the fail-safe rather than triggering it, which is the inverse abuse of the same seam.
+    /// </summary>
+    [Fact]
+    public void The_authoritative_consumer_slot_cannot_be_taken_twice()
+    {
+        var h = new Harness(TrayAffordanceState.Available);
+
+        Assert.NotNull(h.Source.RegisteredLossConsumer);
+        Assert.Throws<InvalidOperationException>(
+            () => h.Source.SetLossConsumer(h.Source.RegisteredLossConsumer!));
     }
 
     // ---------------------------------------------------------------- the contract itself

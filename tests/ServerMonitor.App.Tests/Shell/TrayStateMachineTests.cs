@@ -28,17 +28,51 @@ public sealed class TrayStateMachineTests : IDisposable
     private int _escalations;
     private Exception? _sinkFailure;
 
+    private int _lossAcknowledgements;
+    private Exception? _lossConsumerFailure;
+
+    /// <summary>
+    /// The authoritative loss consumer, which is NOT a subscriber. Recording, so a test can prove the loss
+    /// was actually consumed rather than merely that nothing threw.
+    /// </summary>
+    private sealed class RecordingLossConsumer(Action<TrayAffordanceState> onLoss) : ITrayLossConsumer
+    {
+        public void AcknowledgeLoss(TrayAffordanceState state) => onLoss(state);
+    }
+
     private TrayStateMachine Create(
         Action? requestExit = null,
         Action? escalate = null,
-        EpisodeFrequencyLimiter? limiter = null) =>
-        new(
+        EpisodeFrequencyLimiter? limiter = null,
+        bool withLossConsumer = true)
+    {
+        var machine = new TrayStateMachine(
             _native,
             requestExit ?? (() => Interlocked.Increment(ref _exitRequests)),
             escalate ?? (() => Interlocked.Increment(ref _escalations)),
             _time,
             NullLogger<TrayStateMachine>.Instance,
             limiter);
+
+        // PRODUCTION ALWAYS HAS ONE, so the default here is one. Since round 7 a loss with no
+        // authoritative consumer fails closed and asks for the exit, because "nobody was registered" and
+        // "the consumer ran and did nothing" are the same observation from the machine's side. The tests
+        // that are about that absence ask for it explicitly.
+        if (withLossConsumer)
+        {
+            machine.SetLossConsumer(new RecordingLossConsumer(_ =>
+            {
+                Interlocked.Increment(ref _lossAcknowledgements);
+
+                if (_lossConsumerFailure is { } failure)
+                {
+                    throw failure;
+                }
+            }));
+        }
+
+        return machine;
+    }
 
     // ---------------------------------------------------------------------------------------------
     // Ordering under concurrent drainers, and delivery-time validation
@@ -373,9 +407,24 @@ public sealed class TrayStateMachineTests : IDisposable
     /// so a Release could win in the gap and the notification still went out. Moving the check earlier
     /// only moved the gap — the fix is that the check and the invocation are one critical section.
     /// <para>
-    /// Asymmetric by construction, not by timing: while the fix holds, the other thread CANNOT make
-    /// progress, so no wait is long enough to see it change the state; without the fix it changes it
-    /// immediately. The wait exists to bound the test, not to decide the race.
+    /// <b>Nothing here is decided by time or by a thread's aggregate state — third pass, and this is what
+    /// the earlier two got wrong.</b> A negative wait of 200 ms concluded the race from SILENCE. Replacing
+    /// it with <c>ThreadState.WaitSleepJoin</c> polling was positive but still inferential: that flag says
+    /// the thread is parked SOMEWHERE, never which monitor, and the loop around it was bounded first by
+    /// <c>DateTime.UtcNow</c> and then by a spin count, which is a budget either way.
+    /// </para>
+    /// <para>
+    /// So the test stops trying to observe BLOCKING and asserts EXCLUSION, which is the actual property.
+    /// <c>BeforeDecisionLockForTests</c> is a seam at the real point of contention — the statement before
+    /// <c>lock (_decision)</c> — so the release's arrival there is signalled POSITIVELY by the machine
+    /// itself. And <c>LifecycleChangedForTests</c> fires inside that lock, so if the release ever did get
+    /// in while the delivery was inside, the overlap is COUNTED rather than inferred. Every wait is a
+    /// <c>ManualResetEventSlim</c> whose timeout only fails the test; no timeout decides an ordering.
+    /// </para>
+    /// <para>
+    /// Declared residual: the seam proves arrival at the statement before the lock, not that
+    /// <c>Monitor.Enter</c> has been reached. That gap is why the assertion is about exclusion and not
+    /// about blocking — an overlap would be recorded whenever it happened, early or late.
     /// </para>
     /// </remarks>
     [Fact]
@@ -383,8 +432,31 @@ public sealed class TrayStateMachineTests : IDisposable
     {
         using var machine = Create();
         using var releaseFinished = new ManualResetEventSlim(false);
+        using var arrivedAtDecisionLock = new ManualResetEventSlim(false);
         var stateAtInvocation = TrayLifecycleState.Unavailable;
         var probed = false;
+        var releaserThreadId = 0;
+        var insideDelivery = 0;
+        var overlaps = 0;
+
+        machine.BeforeDecisionLockForTests = () =>
+        {
+            if (Environment.CurrentManagedThreadId == Volatile.Read(ref releaserThreadId))
+            {
+                arrivedAtDecisionLock.Set();
+            }
+        };
+
+        machine.LifecycleChangedForTests += (_, _) =>
+        {
+            // Fires INSIDE the decision lock. If the releasing thread ever transitions while the delivery
+            // is inside its critical section, that is the defect, and it is counted here.
+            if (Volatile.Read(ref insideDelivery) == 1
+                && Environment.CurrentManagedThreadId == Volatile.Read(ref releaserThreadId))
+            {
+                Interlocked.Increment(ref overlaps);
+            }
+        };
 
         machine.AtInvocationForTests = () =>
         {
@@ -397,31 +469,22 @@ public sealed class TrayStateMachineTests : IDisposable
 
             var releaser = new Thread(() =>
             {
+                Volatile.Write(ref releaserThreadId, Environment.CurrentManagedThreadId);
                 machine.Release();
                 releaseFinished.Set();
             });
 
+            Volatile.Write(ref insideDelivery, 1);
             releaser.Start();
 
-            // POSITIVE observation of the block, and NO WALL CLOCK anywhere. Signalling before attempting
-            // the lock proves only that the thread started; deciding by an elapsed interval decides by the
-            // scheduler; and spinning on DateTime.UtcNow is the same wall clock wearing a loop. A thread
-            // blocked on a monitor reports WaitSleepJoin, and SpinWait bounds the wait by ITERATIONS
-            // rather than by time — a count is a fact about this run, not about how busy the machine is.
-            var spin = new SpinWait();
-            var observations = 0;
-            while (observations++ < 100_000
-                   && releaser.IsAlive
-                   && (releaser.ThreadState & System.Threading.ThreadState.WaitSleepJoin) == 0)
-            {
-                spin.SpinOnce();
-            }
-
+            // POSITIVE arrival at the real contention point, signalled by the machine, with no clock and
+            // no thread-state guessing. The timeout only fails the test.
             Assert.True(
-                (releaser.ThreadState & System.Threading.ThreadState.WaitSleepJoin) != 0,
-                $"the release did not block on the delivery's lock; thread was {releaser.ThreadState}");
+                arrivedAtDecisionLock.Wait(Patience),
+                "the release never reached the decision lock");
 
             stateAtInvocation = machine.LifecycleState;
+            Volatile.Write(ref insideDelivery, 0);
         };
 
         machine.Establish();
@@ -433,6 +496,7 @@ public sealed class TrayStateMachineTests : IDisposable
         // The release is allowed to finish afterwards; the point is only that it could not land INSIDE
         // the delivery.
         Assert.True(releaseFinished.Wait(Patience), "the release never completed");
+        Assert.Equal(0, Volatile.Read(ref overlaps));
     }
 
     /// <summary>
@@ -604,28 +668,30 @@ public sealed class TrayStateMachineTests : IDisposable
     }
 
     /// <summary>
-    /// A loss nobody acknowledged ends the process. Isolating the subscriber protects the QUEUE; it must
-    /// not also swallow the failure of the consumer that was supposed to act on the loss.
+    /// A loss the authoritative consumer did not acknowledge ends the process. Isolating an observer
+    /// protects the QUEUE; it must not also swallow the failure of the one consumer that was supposed to
+    /// act on the loss.
     /// </summary>
     /// <remarks>
     /// The consumer of a loss is not one subscriber among several: it is what degrades the session or
     /// ends the process. If it threw, nothing materialised a window and nothing asked for an exit, while
     /// the machine sat in Lost — alive, with no affordance. That is the same situation as an unverifiable
     /// cleanup and it takes the same answer.
+    /// <para>
+    /// <b>Round 7 rewrote the body, not the property.</b> It used to make a SUBSCRIBER throw, because at
+    /// the time the consumer WAS a subscriber — and that is precisely the conflation
+    /// <c>ATLAS-O3-OVERESCALATION</c> named: with both on one event, this test passed for an observer
+    /// failure just as readily, so it could not tell the two apart. The channel is now separate, so the
+    /// failure is driven where it belongs. Its old name said "subscriber" and had to go with it.
+    /// </para>
     /// </remarks>
     [Fact]
-    public void A_loss_that_no_subscriber_acknowledged_requests_the_authoritative_exit()
+    public void A_loss_the_authoritative_consumer_did_not_acknowledge_requests_the_authoritative_exit()
     {
+        _lossConsumerFailure = new InvalidOperationException("the degradation path is broken");
+
         using var machine = Create();
         machine.Establish();
-
-        machine.StateChanged += (_, _) =>
-        {
-            if (machine.State is TrayAffordanceState.Lost or TrayAffordanceState.Unavailable)
-            {
-                throw new InvalidOperationException("the degradation path is broken");
-            }
-        };
 
         _native.AddResult = false;
         machine.NotifyTaskbarCreated();
@@ -633,6 +699,7 @@ public sealed class TrayStateMachineTests : IDisposable
         _time.Advance(TrayStateMachine.FirstRetryDelay);
         _time.Advance(TrayStateMachine.SecondRetryDelay);
 
+        Assert.True(Volatile.Read(ref _lossAcknowledgements) > 0, "the consumer was never reached");
         Assert.True(
             Volatile.Read(ref _exitRequests) > 0,
             "a loss that nobody acted on must not leave the process alive without an affordance");
@@ -874,10 +941,20 @@ public sealed class TrayStateMachineTests : IDisposable
         Run(machine.Establish);
         Assert.True(_native.AddEntered.Wait(Patience), "the Add never started");
 
-        using var foreignQueued = new ManualResetEventSlim(false);
+        using var arrivedAtGate = new ManualResetEventSlim(false);
+        var foreignThreadId = 0;
+
+        machine.BeforeShellGateForTests = () =>
+        {
+            if (Environment.CurrentManagedThreadId == Volatile.Read(ref foreignThreadId))
+            {
+                arrivedAtGate.Set();
+            }
+        };
+
         var foreign = new Thread(() =>
         {
-            foreignQueued.Set();
+            Volatile.Write(ref foreignThreadId, Environment.CurrentManagedThreadId);
             machine.InvokeUnderShellGate(() =>
             {
                 foreignStarted.Set();
@@ -886,24 +963,21 @@ public sealed class TrayStateMachineTests : IDisposable
         });
 
         foreign.Start();
-        Assert.True(foreignQueued.Wait(Patience), "the DPI update was never requested");
 
-        // POSITIVE observation of exclusion, not silence: wait until the thread is actually BLOCKED.
-        // A thread waiting on a monitor reports WaitSleepJoin; one that sailed through would be Stopped.
-        // Asserting "nothing happened for 150 ms" asserted something about the scheduler.
-        // Bounded by ITERATIONS, not by the wall clock — the same bar the delivery test had to meet.
-        var spin = new SpinWait();
-        var observations = 0;
-        while (observations++ < 100_000
-               && foreign.IsAlive
-               && (foreign.ThreadState & System.Threading.ThreadState.WaitSleepJoin) == 0)
-        {
-            spin.SpinOnce();
-        }
+        // POSITIVE, AND IT NAMES THE MONITOR. Arrival at the gate is signalled by the machine, and then
+        // the test waits until the foreign thread is actually QUEUED ON THIS GATE — a counter the machine
+        // keeps, not an aggregate thread state that says "parked somewhere" and names nothing.
+        //
+        // This matters because the previous version of this test COULD NOT FAIL: it asserted a negative
+        // immediately after arrival, so deleting the gate altogether still passed, and the mutation that
+        // does exactly that (M51) survived. The spin below is a failure bound only — under the correct
+        // code the count reaches one and stays there until the Add is released, and without the gate it
+        // never reaches one at all, so both directions are decided by the counter and not by timing.
+        Assert.True(arrivedAtGate.Wait(Patience), "the DPI update never reached the shell gate");
 
         Assert.True(
-            (foreign.ThreadState & System.Threading.ThreadState.WaitSleepJoin) != 0,
-            $"the DPI update did not block on the gate; thread was {foreign.ThreadState}");
+            SpinWait.SpinUntil(() => machine.ShellGateWaitersForTests == 1, Patience),
+            "the DPI update never queued on the shell gate");
         Assert.False(foreignStarted.IsSet, "the DPI update ran while a shell call was in flight");
 
         _native.AddMayReturn.Set();
@@ -1048,6 +1122,157 @@ public sealed class TrayStateMachineTests : IDisposable
         Assert.Equal(0, Volatile.Read(ref _exitRequests));
         Assert.Equal(0, Volatile.Read(ref _escalations));
         Assert.True(machine.CleanupVerified);
+    }
+
+    /// <summary>
+    /// <c>ATLAS-O1-TOCTOU</c> probe 1, kept as a standing test: the first subscriber outlives the
+    /// affordance by moving the clock past the episode's deadline, and the second must be able neither to
+    /// observe it nor to USE it.
+    /// </summary>
+    /// <remarks>
+    /// Atlas measured <c>Available</c> and the act executing. Two things had to change for that to become
+    /// impossible rather than unlikely: the delivery is re-decided in front of every handler, and the act
+    /// itself is performed inside the same lock that decides it, so there is no interval to lose.
+    /// </remarks>
+    [Fact]
+    public void A_second_subscriber_can_neither_observe_nor_use_an_affordance_the_first_one_outlived()
+    {
+        using var machine = Create();
+        machine.Establish();
+
+        var observedBySecond = TrayAffordanceState.Available;
+        var secondRan = false;
+        var actRan = false;
+
+        machine.StateChanged += (_, _) => _time.Advance(TrayStateMachine.RecoveryDeadline * 4);
+        machine.StateChanged += (_, _) =>
+        {
+            secondRan = true;
+            observedBySecond = machine.State;
+            machine.EnterBackground(() => actRan = true);
+        };
+
+        machine.NotifyTaskbarCreated();
+        _time.Advance(TrayStateMachine.DebounceDelay);
+
+        Assert.NotEqual(TrayAffordanceState.Available, observedBySecond);
+        Assert.False(actRan, "the act ran on an affordance whose episode had already timed out");
+        Assert.False(
+            secondRan && observedBySecond == TrayAffordanceState.Available,
+            "the second subscriber observed an affordance the deadline had taken away");
+    }
+
+    /// <summary>
+    /// The OTHER half of the same question, and a deliberate departure from the closure criterion as it
+    /// was worded: an affordance that was actually ESTABLISHED does not expire when the recovery deadline
+    /// passes, because there is no recovery to bound any more.
+    /// </summary>
+    /// <remarks>
+    /// The criterion said no invocation after the deadline may observe or use <c>Available</c>. Read
+    /// literally that would refuse to hide the window to a tray icon that demonstrably exists — the
+    /// deadline is a safety bound on a recovery IN FLIGHT, not a lease on a working icon, and an app that
+    /// stopped trusting its own registered icon after 1.5 seconds would be the M13-QA-8 defect again.
+    /// So the rule is applied to the episode, not to the clock: while an episode is open, crossing the
+    /// deadline terminalizes it (the test above); once an <c>Add</c> has succeeded and the episode is
+    /// closed, time alone changes nothing. Both halves are measured rather than argued.
+    /// </remarks>
+    [Fact]
+    public void An_established_affordance_does_not_expire_when_the_recovery_deadline_passes()
+    {
+        using var machine = Create();
+        machine.Establish();
+
+        _time.Advance(TrayStateMachine.RecoveryDeadline * 40);
+
+        var actRan = false;
+        machine.EnterBackground(() => actRan = true);
+
+        Assert.Equal(TrayAffordanceState.Available, machine.State);
+        Assert.True(actRan, "an icon that exists must still be usable after the recovery deadline");
+    }
+
+    /// <summary>
+    /// O3. THE DEFECT ATLAS PROBED: the authoritative consumer handles the loss correctly, a LATER
+    /// observer throws, and the process is asked to exit anyway. A defective bystander was a quit button.
+    /// </summary>
+    /// <remarks>
+    /// The old mechanism was half of one: the consumer had different TREATMENT inside the multicast, but
+    /// the catch wrapped the whole invocation and knew only the delivered state — never which handler had
+    /// thrown, nor whether the loss had already been dealt with. Distinguishing them requires the
+    /// consumer to be off the event, which is what <see cref="ITrayLossConsumer"/> is.
+    /// </remarks>
+    [Fact]
+    public void An_observer_that_throws_after_the_loss_was_consumed_does_not_end_the_process()
+    {
+        using var machine = Create();
+        machine.Establish();
+
+        machine.StateChanged += (_, _) => throw new InvalidOperationException("a defective observer");
+
+        _native.AddResult = false;
+        machine.NotifyTaskbarCreated();
+
+        _time.Advance(TrayStateMachine.DebounceDelay);
+        _time.Advance(TrayStateMachine.FirstRetryDelay);
+        _time.Advance(TrayStateMachine.SecondRetryDelay);
+
+        Assert.True(Volatile.Read(ref _lossAcknowledgements) > 0, "the loss was never consumed");
+        Assert.Equal(0, Volatile.Read(ref _exitRequests));
+        Assert.Equal(0, Volatile.Read(ref _escalations));
+    }
+
+    /// <summary>
+    /// O3, the other half of the isolation: one throwing observer does not silence the observers behind
+    /// it. A single catch around the whole loop made the first failure swallow everybody after it.
+    /// </summary>
+    [Fact]
+    public void An_observer_that_throws_does_not_silence_the_observers_after_it()
+    {
+        using var machine = Create();
+        var second = 0;
+
+        machine.StateChanged += (_, _) => throw new InvalidOperationException("the first observer");
+        machine.StateChanged += (_, _) => Interlocked.Increment(ref second);
+
+        machine.Establish();
+
+        Assert.True(Volatile.Read(ref second) > 0, "the observer behind the failing one was not notified");
+    }
+
+    /// <summary>
+    /// O3, the ABSENCE half. No authoritative consumer means nobody acted on the loss, which is
+    /// indistinguishable from one that failed to — so it fails closed.
+    /// </summary>
+    [Fact]
+    public void A_loss_with_no_authoritative_consumer_requests_the_authoritative_exit()
+    {
+        using var machine = Create(withLossConsumer: false);
+        machine.Establish();
+
+        _native.AddResult = false;
+        machine.NotifyTaskbarCreated();
+
+        _time.Advance(TrayStateMachine.DebounceDelay);
+        _time.Advance(TrayStateMachine.FirstRetryDelay);
+        _time.Advance(TrayStateMachine.SecondRetryDelay);
+
+        Assert.True(
+            Volatile.Read(ref _exitRequests) > 0,
+            "a loss nobody is registered to consume must not leave the process running");
+    }
+
+    /// <summary>
+    /// O3: single assignment. Without it the channel becomes a list again — and worse, a latecomer could
+    /// register ITSELF as the authoritative consumer and absorb every loss silently, suppressing the
+    /// fail-safe rather than triggering it.
+    /// </summary>
+    [Fact]
+    public void The_authoritative_loss_consumer_cannot_be_registered_twice()
+    {
+        using var machine = Create();
+
+        Assert.Throws<InvalidOperationException>(
+            () => machine.SetLossConsumer(new RecordingLossConsumer(_ => { })));
     }
 
     /// <summary>

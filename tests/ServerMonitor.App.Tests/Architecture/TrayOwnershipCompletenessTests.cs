@@ -381,9 +381,36 @@ public sealed class TrayOwnershipCompletenessTests
 
         public TrayAffordanceState State { get; private set; } = initial;
 
+        /// <summary>
+        /// THE SAME TWO CHANNELS AS PRODUCTION. A fake that delivered a loss on the observer event would
+        /// be a permanent mutation applied to the environment instead of the code: every degradation test
+        /// would keep passing while the real machine had stopped using that channel. So the loss goes to
+        /// the registered consumer, exactly as the machine does it, and single assignment is enforced
+        /// here too.
+        /// </summary>
+        private ITrayLossConsumer? _lossConsumer;
+
+        public void SetLossConsumer(ITrayLossConsumer consumer)
+        {
+            if (_lossConsumer is not null)
+            {
+                throw new InvalidOperationException(
+                    "The authoritative loss consumer is already registered; there is exactly one.");
+            }
+
+            _lossConsumer = consumer;
+        }
+
         public void Publish(TrayAffordanceState state)
         {
             State = state;
+
+            if (state is TrayAffordanceState.Lost or TrayAffordanceState.Unavailable)
+            {
+                _lossConsumer?.AcknowledgeLoss(state);
+                return;
+            }
+
             StateChanged?.Invoke(this, EventArgs.Empty);
         }
 
@@ -479,6 +506,42 @@ public sealed class TrayOwnershipCompletenessTests
             NullLoggerFactory.Instance);
 
         Assert.Equal(TrayAffordanceState.Unavailable, adapter.State);
+    }
+
+    /// <summary>
+    /// The OWNER's own single-assignment guard, on the owner and not on a double.
+    /// </summary>
+    /// <remarks>
+    /// This test exists because its absence was measured: the mutation that lets a latecomer displace the
+    /// authoritative loss consumer SURVIVED, while a test named for exactly that property passed. That
+    /// test was driving the fake source, whose guard is a copy — so it proved the copy and nothing about
+    /// the owner. A guard that only a test double enforces is not a guard, and it is the same lesson the
+    /// honest-delete fake taught earlier in this slice.
+    /// <para>
+    /// Displacement is the INVERSE abuse of the seam: instead of failing to consume a loss, a latecomer
+    /// consumes every loss silently and suppresses the fail-safe that should have fired.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void The_owner_refuses_a_second_authoritative_loss_consumer()
+    {
+        var adapter = new OwnedTrayIconAdapter(
+            new UnusedThemeService(),
+            new UnusedLocalizationService(),
+            () => FakeLifecycle.Instance,
+            new UnusedProcessTerminator(),
+            NullLoggerFactory.Instance);
+
+        adapter.SetLossConsumer(new NoopLossConsumer());
+
+        Assert.Throws<InvalidOperationException>(() => adapter.SetLossConsumer(new NoopLossConsumer()));
+    }
+
+    private sealed class NoopLossConsumer : ITrayLossConsumer
+    {
+        public void AcknowledgeLoss(TrayAffordanceState state)
+        {
+        }
     }
 
     // ------------------------------------------------------------------
