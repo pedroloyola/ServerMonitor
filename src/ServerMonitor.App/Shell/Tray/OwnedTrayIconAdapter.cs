@@ -38,6 +38,7 @@ internal sealed class OwnedTrayIconAdapter : ITrayIconAdapter, ITrayAffordanceSo
     private TrayStateMachine? _machine;
     private TrayFlyoutWindow? _flyout;
     private ITrayLossConsumer? _lossConsumer;
+    private ITrayGuardedOperations? _operations;
     private bool _disposed;
 
     public event EventHandler? OpenRequested;
@@ -97,17 +98,26 @@ internal sealed class OwnedTrayIconAdapter : ITrayIconAdapter, ITrayAffordanceSo
     /// Forwards the commit to the machine. Before <see cref="Start"/> there is no machine and therefore no
     /// affordance, so it refuses — the same fail-closed answer <see cref="State"/> gives.
     /// </summary>
-    public void EnterBackground(Action enterBackground)
+    public void Perform(TrayGuardedOperation operation)
     {
-        ArgumentNullException.ThrowIfNull(enterBackground);
-
         TrayStateMachine? machine;
+        ITrayGuardedOperations? operations;
         lock (_sync)
         {
             machine = _machine;
+            operations = _operations;
         }
 
-        machine?.EnterBackground(enterBackground);
+        if (machine is null)
+        {
+            // Before initialization there is no machine and therefore no proof of anything, and a silent
+            // no-op here would leave the window neither hidden nor closed. Fail to the same fallback the
+            // machine uses, so the outcome is identical whichever side answers.
+            operations?.FallBackToExit();
+            return;
+        }
+
+        machine.Perform(operation);
     }
 
     public void Start()
@@ -158,6 +168,11 @@ internal sealed class OwnedTrayIconAdapter : ITrayIconAdapter, ITrayAffordanceSo
             if (_lossConsumer is { } pendingConsumer)
             {
                 machine.SetLossConsumer(pendingConsumer);
+            }
+
+            if (_operations is { } pendingOperations)
+            {
+                machine.SetGuardedOperations(pendingOperations);
             }
 
             lock (_sync)
@@ -423,6 +438,27 @@ internal sealed class OwnedTrayIconAdapter : ITrayIconAdapter, ITrayAffordanceSo
     /// Hands the one authoritative loss consumer to the machine — directly, never through
     /// <see cref="StateChanged"/>. Single assignment on both sides.
     /// </summary>
+    /// <summary>Hands the concrete guarded operations to the machine. Single assignment on both sides.</summary>
+    public void SetGuardedOperations(ITrayGuardedOperations operations)
+    {
+        ArgumentNullException.ThrowIfNull(operations);
+
+        TrayStateMachine? machine;
+        lock (_sync)
+        {
+            if (_operations is not null)
+            {
+                throw new InvalidOperationException(
+                    "The guarded operations are already registered; there is exactly one set.");
+            }
+
+            _operations = operations;
+            machine = _machine;
+        }
+
+        machine?.SetGuardedOperations(operations);
+    }
+
     public void SetLossConsumer(ITrayLossConsumer consumer)
     {
         ArgumentNullException.ThrowIfNull(consumer);

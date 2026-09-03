@@ -73,6 +73,9 @@ public sealed class WindowCloseCoordinatorTests
 
         public bool HasExitAffordance { get; set; } = true;
 
+        /// <summary>The operations the coordinator asked for, as values. It supplies no code.</summary>
+        public List<TrayGuardedOperation> Performed { get; } = new();
+
         public WindowCloseCoordinator Coordinator { get; }
 
         public Harness(
@@ -84,48 +87,68 @@ public sealed class WindowCloseCoordinatorTests
             Coordinator = new WindowCloseCoordinator(
                 Lifecycle,
                 Settings,
-                Window,
-                Notice,
-                enterBackground =>
+                operation =>
                 {
-                    // The commit runs the act itself and returns NOTHING, so the harness models the real
-                    // contract rather than a permission the coordinator could keep. The markers make the
-                    // ORDER visible: the hide has to happen BETWEEN them, because a coordinator that
-                    // hides after the commit has an interval again, and an interval is the whole defect.
+                    // THE HARNESS IS NOW THE PERFORMER, because the coordinator no longer is. It receives
+                    // a VALUE naming the operation and performs it, or performs the fallback -- exactly
+                    // the two outcomes the machine chooses between, with no third and no silent one.
+                    Performed.Add(operation);
+
                     if (!HasExitAffordance)
                     {
+                        Lifecycle.RequestExit(ExitReason.UserClosedWindow);
                         return;
                     }
 
-                    Window.Calls.Add("commit:enter");
-                    enterBackground();
-                    Window.Calls.Add("commit:leave");
+                    Window.HideToBackground();
+                    Lifecycle.EnterBackground();
+                    Notice.TryShowOnce();
                 },
                 NullLogger<WindowCloseCoordinator>.Instance);
         }
     }
 
     /// <summary>
-    /// The hide happens INSIDE the commit, not after it.
+    /// O1, SIXTH RING: this coordinator CANNOT hide a window, whatever it learns.
     /// </summary>
     /// <remarks>
-    /// Asserting only that the window was hidden cannot tell the two apart: a coordinator that asks
-    /// permission and hides afterwards hides it too, and that is exactly the sequence that left the
-    /// process alive, invisible and with no way out when the affordance was lost in between.
+    /// The previous version of this test proved the hide happened inside the commit — which mattered
+    /// while the coordinator still did the hiding. It does not any more, and that is a stronger place to
+    /// be: five corrections in this slice removed a way of OBTAINING the permission and left the ACTION
+    /// reachable, so knowing the affordance held was always enough to use it later. The action is now
+    /// unreachable from here, so there is nothing to learn and nothing to replay.
+    /// <para>
+    /// The one delegate it does hold carries a VALUE in and returns nothing, so it is a request and not a
+    /// place for this class to run code inside the authorisation.
+    /// </para>
     /// </remarks>
     [Fact]
-    public void The_hide_happens_inside_the_commit_and_not_after_it()
+    public void The_coordinator_cannot_hide_a_window_at_all()
+    {
+        var parameters = typeof(WindowCloseCoordinator).GetConstructors().Single().GetParameters();
+
+        Assert.DoesNotContain(parameters, p => p.ParameterType == typeof(IApplicationWindowController));
+        Assert.DoesNotContain(parameters, p => p.ParameterType == typeof(IBackgroundNoticePresenter));
+
+        var perform = Assert.Single(
+            parameters.Where(p => typeof(Delegate).IsAssignableFrom(p.ParameterType)));
+        var invoke = perform.ParameterType.GetMethod("Invoke")!;
+
+        Assert.Equal(typeof(void), invoke.ReturnType);
+        Assert.Equal(
+            typeof(TrayGuardedOperation),
+            Assert.Single(invoke.GetParameters()).ParameterType);
+    }
+
+    /// <summary>The request names the operation as a value, and the coordinator supplies no code.</summary>
+    [Fact]
+    public void The_close_asks_for_the_background_operation_by_name()
     {
         var h = new Harness(backgroundEnabled: true) { HasExitAffordance = true };
 
         h.Coordinator.HandleCloseRequest();
 
-        var entered = h.Window.Calls.IndexOf("commit:enter");
-        var hidden = h.Window.Calls.IndexOf("hide");
-        var left = h.Window.Calls.IndexOf("commit:leave");
-
-        Assert.True(entered >= 0 && left > entered, $"[{string.Join(", ", h.Window.Calls)}]");
-        Assert.InRange(hidden, entered + 1, left - 1);
+        Assert.Equal([TrayGuardedOperation.EnterBackground], h.Performed);
     }
 
     /// <summary>A: X with background monitoring ON. Hide, keep everything running, never exit.</summary>
@@ -204,25 +227,11 @@ public sealed class WindowCloseCoordinatorTests
     /// <summary>
     /// The hide is never delayed or cancelled by the notice: the window is already hidden by the time the
     /// presenter runs, and a presenter that throws cannot change that.
+    /// <para>
+    /// MOVED to <c>TrayAffordanceLifecycleTests</c> in round 8, with the operation itself. It is asserted
+    /// where the hide now happens; leaving a copy here would test the harness rather than the code.
+    /// </para>
     /// </summary>
-    [Fact]
-    public void The_notice_cannot_delay_or_cancel_the_hide()
-    {
-        var h = new Harness(backgroundEnabled: true);
-        var order = new List<string>();
-        var coordinator = new WindowCloseCoordinator(
-            h.Lifecycle,
-            h.Settings,
-            new OrderRecordingWindowController(order),
-            new ThrowingNoticePresenter(order),
-            enterBackground => enterBackground(),
-            NullLogger<WindowCloseCoordinator>.Instance);
-
-        var thrown = Record.Exception(() => coordinator.HandleCloseRequest());
-
-        Assert.NotNull(thrown); // the throw escapes to the window handler, which contains it
-        Assert.Equal(["hide", "notice"], order); // and the hide already happened first
-    }
 
     private sealed class OrderRecordingWindowController(List<string> order) : IApplicationWindowController
     {

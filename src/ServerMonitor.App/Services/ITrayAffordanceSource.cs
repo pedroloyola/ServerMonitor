@@ -83,13 +83,13 @@ public interface ITrayAffordanceSource
     /// <remarks>
     /// <b>For observing, never for authorising.</b> A caller that reads this and acts on it afterwards has
     /// a value that was true once; between the read and the act the affordance can be lost, and the act
-    /// goes ahead anyway. To ACT on the affordance, use <see cref="EnterBackground"/>, which is the only
-    /// path that authorises anything and which revalidates for itself.
+    /// goes ahead anyway. To ACT on the affordance, use <see cref="Perform"/>, which is the only path that
+    /// authorises anything and which revalidates for itself.
     /// </remarks>
     TrayAffordanceState State { get; }
 
     /// <summary>
-    /// Enters background — ATOMICALLY with establishing that it is allowed.
+    /// Performs a guarded operation — ATOMICALLY with establishing that it is allowed.
     /// </summary>
     /// <remarks>
     /// <b>Why a delegate and not a boolean.</b> The permission used to be read as a <c>bool</c> and acted
@@ -110,6 +110,20 @@ public interface ITrayAffordanceSource
     /// not a right to perform one.
     /// </para>
     /// </remarks>
-    /// <param name="enterBackground">Run only if the affordance is established. Must not block.</param>
-    void EnterBackground(Action enterBackground);
+    /// <para>
+    /// <b>And it takes a VALUE, not a delegate — sixth and last correction of the same defect.</b> Even
+    /// returning nothing, an arbitrary <c>Action</c> lets the caller run its own code inside the
+    /// authorisation: <c>EnterBackground(() =&gt; permission = true)</c> captures the fact that the
+    /// affordance held, and the caller acts on it after it is gone. The machine therefore OWNS the
+    /// concrete operation and invokes it itself; the caller NAMES one and supplies nothing.
+    /// </para>
+    /// </remarks>
+    /// <param name="operation">Which guarded operation to perform.</param>
+    void Perform(TrayGuardedOperation operation);
+
+    /// <summary>
+    /// Registers the concrete operations the machine owns. Single assignment: a second registration
+    /// throws, so the slot cannot become a list and a latecomer cannot displace the real one.
+    /// </summary>
+    void SetGuardedOperations(ITrayGuardedOperations operations);
 }

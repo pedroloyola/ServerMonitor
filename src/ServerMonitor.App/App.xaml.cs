@@ -388,9 +388,7 @@ public partial class App : Application
         services.AddSingleton(sp => new WindowCloseCoordinator(
             sp.GetRequiredService<IAppLifecycleController>(),
             sp.GetRequiredService<IBackgroundMonitoringSettingsService>(),
-            sp.GetRequiredService<IApplicationWindowController>(),
-            sp.GetRequiredService<IBackgroundNoticePresenter>(),
-            enterBackground => sp.GetRequiredService<TrayAffordanceLifecycle>().EnterBackground(enterBackground),
+            operation => sp.GetRequiredService<TrayAffordanceLifecycle>().Perform(operation),
             sp.GetRequiredService<ILogger<WindowCloseCoordinator>>()));
 
         // M8 application-shell services. All Windows-specific behavior stays behind

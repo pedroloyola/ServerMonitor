@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using System.Reflection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using ServerMonitor.App.Services;
@@ -28,7 +29,20 @@ public sealed class TrayStateMachineTests : IDisposable
     private int _escalations;
     private Exception? _sinkFailure;
 
+    private int _backgroundEntries;
+    private int _fallbacks;
     private int _lossAcknowledgements;
+
+    /// <summary>
+    /// The concrete operations the machine OWNS. Not a delegate the test hands in per call: since round 8
+    /// the machine holds these and invokes them itself, so a caller has nowhere to put its own code.
+    /// </summary>
+    private sealed class RecordingOperations(Action onEnter, Action onFallback) : ITrayGuardedOperations
+    {
+        public void EnterBackground() => onEnter();
+
+        public void FallBackToExit() => onFallback();
+    }
     private Exception? _lossConsumerFailure;
 
     /// <summary>
@@ -44,7 +58,8 @@ public sealed class TrayStateMachineTests : IDisposable
         Action? requestExit = null,
         Action? escalate = null,
         EpisodeFrequencyLimiter? limiter = null,
-        bool withLossConsumer = true)
+        bool withLossConsumer = true,
+        ITrayGuardedOperations? operations = null)
     {
         var machine = new TrayStateMachine(
             _native,
@@ -58,6 +73,10 @@ public sealed class TrayStateMachineTests : IDisposable
         // authoritative consumer fails closed and asks for the exit, because "nobody was registered" and
         // "the consumer ran and did nothing" are the same observation from the machine's side. The tests
         // that are about that absence ask for it explicitly.
+        machine.SetGuardedOperations(operations ?? new RecordingOperations(
+            () => Interlocked.Increment(ref _backgroundEntries),
+            () => Interlocked.Increment(ref _fallbacks)));
+
         if (withLossConsumer)
         {
             machine.SetLossConsumer(new RecordingLossConsumer(_ =>
@@ -553,26 +572,146 @@ public sealed class TrayStateMachineTests : IDisposable
         using var machine = Create();
         machine.Establish();
 
-        var ran = 0;
-        machine.EnterBackground(() => ran++);
+        machine.Perform(TrayGuardedOperation.EnterBackground);
 
-        // Nothing comes back: the only evidence is that the act ran, which is a record of what happened
-        // and not a permission to do it later.
-        Assert.Equal(1, ran);
+        // Nothing comes back and nothing went in but a VALUE: the only evidence is that the machine's own
+        // operation ran, which is a record of what happened and not a permission to do it later.
+        Assert.Equal(1, Volatile.Read(ref _backgroundEntries));
+        Assert.Equal(0, Volatile.Read(ref _fallbacks));
     }
 
-    /// <summary>Without an established affordance the act does not run at all.</summary>
+    /// <summary>
+    /// Without an established affordance the guarded operation does not run — and the FALLBACK does.
+    /// </summary>
+    /// <remarks>
+    /// Silence was the old behaviour and it was wrong in a way nothing caught: the window would be
+    /// neither hidden nor closed, which is the A12 zombie reached quietly. There are two outcomes and no
+    /// third.
+    /// </remarks>
     [Fact]
-    public void The_commit_refuses_and_runs_nothing_when_there_is_no_affordance()
+    public void The_commit_refuses_the_operation_and_falls_back_when_there_is_no_affordance()
     {
         _native.AddResult = false;
         using var machine = Create();
         machine.Establish();
 
-        var ran = 0;
-        machine.EnterBackground(() => ran++);
+        machine.Perform(TrayGuardedOperation.EnterBackground);
 
-        Assert.Equal(0, ran);
+        Assert.Equal(0, Volatile.Read(ref _backgroundEntries));
+        Assert.Equal(1, Volatile.Read(ref _fallbacks));
+    }
+
+    /// <summary>
+    /// O1, SIXTH RING: the operations slot is single assignment, so the machine's own operation cannot be
+    /// displaced by a latecomer.
+    /// </summary>
+    /// <remarks>
+    /// The inverse abuse of the seam, and the reason it matters here more than for the loss consumer:
+    /// whoever holds this slot IS the authorised action. A second registration would let a caller install
+    /// its own code as the thing the machine performs under its lock — which is the delegate, restored by
+    /// the back door.
+    /// </remarks>
+    [Fact]
+    public void The_guarded_operations_slot_cannot_be_taken_twice()
+    {
+        using var machine = Create();
+
+        Assert.Throws<InvalidOperationException>(
+            () => machine.SetGuardedOperations(new RecordingOperations(() => { }, () => { })));
+    }
+
+    /// <summary>
+    /// O1, SIXTH RING: the guarded operation runs INSIDE the decision lock, not after it.
+    /// </summary>
+    /// <remarks>
+    /// Deciding and then performing outside the lock rebuilds the interval this whole ring exists to
+    /// remove: the affordance can die between the two and the act goes ahead regardless. Proved with the
+    /// seam that names the monitor — while the operation runs, a second thread dispatching an event is
+    /// QUEUED on the decision lock — rather than by inferring from a thread state that says only that
+    /// something is parked somewhere. The timeout is a failure bound; it decides no ordering.
+    /// </remarks>
+    [Fact]
+    public void The_guarded_operation_runs_inside_the_decision_lock()
+    {
+        var queuedWhileInside = false;
+        var stateWhileInside = TrayLifecycleState.Unavailable;
+        using var releaseFinished = new ManualResetEventSlim(false);
+        TrayStateMachine? subject = null;
+
+        using var machine = Create(operations: new RecordingOperations(
+            () =>
+            {
+                var target = subject!;
+                var releaser = new Thread(() =>
+                {
+                    target.Release();
+                    releaseFinished.Set();
+                });
+
+                releaser.Start();
+
+                queuedWhileInside = SpinWait.SpinUntil(
+                    () => target.DecisionWaitersForTests >= 1, Patience);
+                stateWhileInside = target.LifecycleState;
+            },
+            () => { }));
+
+        subject = machine;
+        machine.Establish();
+        machine.Perform(TrayGuardedOperation.EnterBackground);
+
+        Assert.True(queuedWhileInside, "the other thread was not queued on the decision lock");
+        Assert.NotEqual(TrayLifecycleState.Releasing, stateWhileInside);
+        Assert.NotEqual(TrayLifecycleState.Released, stateWhileInside);
+        Assert.True(releaseFinished.Wait(Patience), "the release never completed");
+    }
+
+    /// <summary>
+    /// O1, SIXTH RING: the surface accepts a VALUE, so there is nowhere for a caller to put its own code.
+    /// </summary>
+    /// <remarks>
+    /// Five corrections removed five shapes of the same capability — a fabricable token, an implementable
+    /// channel, a readable property, a returned bool — and the fifth left an arbitrary <c>Action</c>,
+    /// which is a place for the caller's code to run INSIDE the authorisation:
+    /// <c>EnterBackground(() =&gt; permission = true)</c> captures that the affordance held and replays it
+    /// after it is gone. Each fix removed a way of OBTAINING the right and left the next, because the
+    /// caller kept executing inside the authorisation.
+    /// <para>
+    /// This is checked by PARAMETER TYPE for the same reason the permission sweep is checked by return
+    /// type: searching for the retired NAME is what let the previous shape through twice.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void Nothing_on_the_affordance_surface_accepts_a_delegate()
+    {
+        var offenders = new List<string>();
+
+        foreach (var type in new[] { typeof(ITrayAffordanceSource), typeof(TrayStateMachine) })
+        {
+            foreach (var method in type.GetMethods(
+                         BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly))
+            {
+                // Event accessors are excluded, and the reason is not convenience. add_/remove_ hand the
+                // machine a handler to be NOTIFIED with, and notification is not authorisation: the
+                // handler is invoked with no rights attached, and it cannot perform a guarded operation
+                // because performing one needs the operations the machine holds and it has none. What is
+                // swept here is the surface that AUTHORISES, and an event does not.
+                if (method.IsSpecialName)
+                {
+                    continue;
+                }
+
+                foreach (var parameter in method.GetParameters())
+                {
+                    if (typeof(Delegate).IsAssignableFrom(parameter.ParameterType))
+                    {
+                        offenders.Add($"{type.Name}.{method.Name}({parameter.ParameterType.Name})");
+                    }
+                }
+            }
+        }
+
+        Assert.Empty(offenders);
     }
 
     /// <summary>
@@ -1143,13 +1282,16 @@ public sealed class TrayStateMachineTests : IDisposable
         var observedBySecond = TrayAffordanceState.Available;
         var secondRan = false;
         var actRan = false;
+        var entriesBefore = 0;
 
         machine.StateChanged += (_, _) => _time.Advance(TrayStateMachine.RecoveryDeadline * 4);
         machine.StateChanged += (_, _) =>
         {
             secondRan = true;
             observedBySecond = machine.State;
-            machine.EnterBackground(() => actRan = true);
+            entriesBefore = Volatile.Read(ref _backgroundEntries);
+            machine.Perform(TrayGuardedOperation.EnterBackground);
+            actRan = Volatile.Read(ref _backgroundEntries) > entriesBefore;
         };
 
         machine.NotifyTaskbarCreated();
@@ -1184,11 +1326,11 @@ public sealed class TrayStateMachineTests : IDisposable
 
         _time.Advance(TrayStateMachine.RecoveryDeadline * 40);
 
-        var actRan = false;
-        machine.EnterBackground(() => actRan = true);
+        machine.Perform(TrayGuardedOperation.EnterBackground);
 
         Assert.Equal(TrayAffordanceState.Available, machine.State);
-        Assert.True(actRan, "an icon that exists must still be usable after the recovery deadline");
+        Assert.Equal(1, Volatile.Read(ref _backgroundEntries));
+        Assert.Equal(0, Volatile.Read(ref _fallbacks));
     }
 
     /// <summary>

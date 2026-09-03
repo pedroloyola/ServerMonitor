@@ -11,7 +11,7 @@ uma condição. Uma condição só sai marcada `SUPERSEDED BY <regra>`, com just
 
 **Base de medição:** worktree `ServerMonitor-m13-s2t`, ramo `agent/m13-s2t-tray`.
 Baseline dos testes filtrados por `Tray|Theme|Flyout|FailSafe|WindowClose`: **161 passam, 0 falham**, em **10 corridas seguidas** com resultado idêntico e zero abortos.
-Gates completos na árvore entregue: **Debug 1859/1859**, **Release 1824/1824**, zero abortos. A diferença de 35 vem de um
+Gates completos na árvore entregue: **Debug 1879/1879**, **Release 1844/1844**, zero abortos. A diferença de 35 vem de um
 `ItemGroup Condition="'$(Configuration)' != 'Debug'"` no projeto de testes que remove `Qa\**\*.cs` —
 condição pré-existente, não introduzida por esta entrega.
 
@@ -33,7 +33,7 @@ condição pré-existente, não introduzida por esta entrega.
 | **CV-9** | reentrância com flyout aberto | `Shell/Tray/FlyoutReentrancyGate.cs` · `OwnedTrayIconAdapter.ShowFlyout` | `FlyoutReentrancyGateTests` (6) | M26, M27 | **FECHADA** na decisão; a ativação da janela auxiliar é medida humana (matriz P, passo 5) |
 | **CV-10** | acoplamento limitador ↔ custo de UI | `EpisodeFrequencyLimiter.DefaultCapacity = 5 / 60 s` | `T4` | M8 morta | **FECHADA** |
 | **CV-11** | residual de admissão suprimida (LOW, aceite) | ordem das guardas em `Transition` | `T4` | — | **FECHADA · residual escrito** |
-| **CV-12** | evidência de mutação na entrega | — | matriz da secção 3 | **76 entradas · 74 corridas** | **FECHADA com duas limitações declaradas** (M24, M25) |
+| **CV-12** | evidência de mutação na entrega | — | matriz da secção 3 | **89 definidas · 89 corridas · 87 mortas** | **FECHADA com duas limitações declaradas** (M24, M25) |
 | **CV-13** | só um episódio ADMITIDO por B pode expirar | `BeginEpisode`, só depois de `TryBeginEpisode` | `CV13` | M14 morta | **FECHADA** |
 | **CV-14** | B não limita tentativas dentro de um episódio | `EpisodeFrequencyLimiter` com **um** método | `CV14` ×2 (inclui teste de arquitetura por reflexão) | M8 morta | **FECHADA** |
 | **CV-15** | integridade do documento normativo | — | este ficheiro | — | **ATIVA · este mapa é o cumprimento.** Ver a **retratação** na secção 4 |
@@ -641,6 +641,83 @@ adivinhado: M55, M51, M74, M75, M83, M43 — todas mortas depois das reescritas.
 
 ---
 
+## 13. Oitava ronda — o instrumento media a meu favor, e o sexto anel
+
+### 13.1 O bloqueante: `TEST-MUT-P008-FAIL-CLOSED`
+
+Escrevi na ronda 7 que «uma mutação nunca muda que testes existem, logo o `Total` é invariante; se ele se
+mexe, o build não aterrou». A primeira metade é verdadeira e **a conclusão é inválida**: um assembly
+obsoleto tem exatamente o mesmo número de testes, portanto um `Total` **igual** é o que se observa tanto
+quando o build aterrou como quando não aterrou. Construí um detetor que confirma e quase nunca contradiz —
+**o critério de deteção media a meu favor**, que é o defeito que ele existia para apanhar, uma camada
+acima. Por baixo, os runners nunca liam o `returncode` e só `error CS` contava como falha de build, por
+isso um `MSB3021` passava e media-se o assembly **anterior**.
+
+O fecho, nos termos do Atlas: build **separado** com `--no-incremental` cujo **exit code** é o veredicto;
+teste com `--no-build`; verificação cruzada entre o exit code e o sumário; e `require_ran` a **abortar**
+com exit não-zero para um baseline não-RAN, um baseline não-verde, ou qualquer linha não-RAN. O `Total`
+fica como sinal secundário e está anotado no código como insuficiente.
+
+**Provado por reprodução do ataque, não por afirmação:** com a DLL bloqueada por um handle exclusivo, o
+runner dá `baseline: status=BUILD-FAIL`, `ABORTING: baseline did not run`, **exit 2**. Antes: `UNKNOWN`,
+exit 0, e a matriz seguia em frente.
+
+Efeito imediato e verificável: na passagem final, `mutate_round14.py` **abortou com exit 5** numa âncora
+partida em vez de imprimir uma matriz curta que parecia completa. Foi corrigida e a passagem completada.
+
+### 13.2 M4 e M21 apagadas, e porquê isso é parte do fecho
+
+Só podiam imprimir `ANCHOR NOT FOUND`. Enquanto existissem, uma âncora genuinamente partida era
+indistinguível delas — e por isso `ANCHOR NOT FOUND` tinha de ser tolerado. Apagadas (M4→M55, M21→M34),
+uma âncora que não encontra passa a **abortar**.
+
+### 13.3 O sexto anel: a acção, não o bilhete
+
+`TrayGuardedOperation` é um **enum** — um valor não captura nada. A máquina possui `ITrayGuardedOperations`
+(registada uma vez, atribuição única) e invoca-a **dentro do lock que decide**. O chamador nomeia; não
+fornece. E o `WindowCloseCoordinator` perdeu o `IApplicationWindowController` e o apresentador.
+
+> **Todos os cinco anéis anteriores removeram o BILHETE e deixaram a PORTA.**
+
+Token, interface, propriedade, retorno, delegado — e em todos eles `HideToBackground()` continuou
+alcançável a partir do chamador. Enquanto a acção estiver alcançável, saber que a afordância era válida
+basta para a usar depois.
+
+> **O coordenador nunca precisou do desfecho; CAPTUROU-O PORQUE A API LHO OFERECIA.**
+
+Os dois ramos não-saída devolvem `true`; só o ramo `IsExiting` devolve `false`, decidido sem a afordância.
+O fluxo nunca dependeu do resultado. **É a lição geral desta fatia: uma API que oferece um valor cria um
+consumidor que não precisava dele.**
+
+Verificação estrutural por **parâmetro** (irmã do varrimento por tipo de retorno): nada na superfície
+aceita um delegado. Os acessores de evento estão excluídos com argumento — `add_`/`remove_` entregam um
+handler para ser NOTIFICADO, e notificação não é autorização: o handler não consegue executar uma operação
+guardada porque isso exige as operações que a máquina detém.
+
+Mutações **M87–M94**. Três sobreviveram à primeira passagem e eram buracos reais: **M90**, **M91** (os dois
+slots de operações aceitavam segunda inscrição) e **M93** — a sessão degradada recusava **em silêncio**, ou
+seja o utilizador fecha, a janela não é escondida e nada a fecha. Três testes escritos, as três mortas.
+
+**M72 RETIRADA** (não re-ancorada): virou a mesma edição que a M92. Herança verificada — quem mata a M92 é
+`A_recovered_affordance_does_not_undo_the_degradation_for_this_session`, o teste que matava a M72. Terceira
+aplicação desta regra em vez do reflexo de re-ancorar.
+
+### 13.4 O livro-razão, reconciliado com os runners
+
+| | |
+|---|---|
+| Definidas | **89** |
+| Corridas | **89** |
+| **Mortas** | **87** |
+| Sobreviventes | **2** — `M24`, `M25`, declaradas, só visíveis num desktop real |
+| `ANCHOR NOT FOUND` | **0** — as duas permanentes foram apagadas, e uma âncora partida aborta |
+| Baselines | **13/13** RAN e verdes |
+
+**Nenhuma mutação anteriormente declarada morta sobreviveu**, nem na passagem antes dos patches nem na
+passagem sobre o código entregue.
+
+---
+
 ## 4. Retratação — uma afirmação minha que era falsa
 
 Na entrega da ligação escrevi, sobre `App.xaml.cs`:
@@ -672,7 +749,9 @@ entre cada uma. Filtro: `FullyQualifiedName~Tray` (M1–M25) e
 e `FullyQualifiedName~FailSafe|FullyQualifiedName~WindowsAppNotification|FullyQualifiedName~Notification`
 (M36–M40). Baselines **95** e **82**, ambas 0 falhas.
 
-**76 entradas · 74 corridas · 72 mortas · 2 sobrevivem.**
+**89 definidas · 89 corridas · 87 mortas · 2 sobrevivem.** (Ronda 8: contagem medida com o
+instrumento corrigido — ver §13. As contagens anteriores deste ficheiro, 76/74/72, descreviam um estado
+que já não existia e foram apanhadas pelo Atlas.)
 
 Duas não correm, com razão escrita: **M4** ficou `SUPERSEDED BY M55` e **M21** `SUPERSEDED BY M34`,
 porque o código que atacavam foi reescrito e a propriedade passou para a mutação nova. A **M47** foi

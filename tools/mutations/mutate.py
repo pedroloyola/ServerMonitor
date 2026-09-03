@@ -7,6 +7,9 @@ MACHINE = os.path.join(ROOT, "src", "ServerMonitor.App", "Shell", "Tray", "TrayS
 CONTRACT = os.path.join(ROOT, "src", "ServerMonitor.App", "Shell", "Tray", "TrayCallbackContract.cs")
 LIMITER = os.path.join(ROOT, "src", "ServerMonitor.App", "Shell", "Tray", "EpisodeFrequencyLimiter.cs")
 DOTNET = os.path.expanduser("~/.dotnet/dotnet.exe")
+
+# This runner predates the shared FILTER constant; it always used this one inline.
+FILTER = "FullyQualifiedName~Tray"
 TESTS = os.path.join(ROOT, "tests", "ServerMonitor.App.Tests", "ServerMonitor.App.Tests.csproj")
 
 MUTATIONS = [
@@ -19,9 +22,9 @@ MUTATIONS = [
  ("M3", "a late Add receives no compensating Delete", MACHINE,
   "        if (trayEvent.MayHaveCreatedAnEffect)\n        {\n            _effect = ShellEffectState.MayExist;\n            _shellMayHoldAnIcon = true;\n            _cleanupAttempts = 0;\n            Emit(EffectKind.DeleteIcon, TimeSpan.Zero);\n        }",
   "        if (trayEvent.MayHaveCreatedAnEffect)\n        {\n            _effect = ShellEffectState.Deleted;\n        }"),
- ("M4", "delivery-time revalidation of notifications removed", MACHINE,
-  "            if (_state is TrayLifecycleState.Releasing or TrayLifecycleState.Released)\n            {\n                return;\n            }\n        }\n\n        StateChanged?.Invoke(this, EventArgs.Empty);",
-  "            if (false)\n            {\n                return;\n            }\n        }\n\n        StateChanged?.Invoke(this, EventArgs.Empty);"),
+ # M4 DELETED, not left to print ANCHOR NOT FOUND. Superseded by M55 (mutate_round11.py), which
+ # attacks delivery-time revalidation against the code as it stands. A row that can only ever fail to
+ # anchor is not a measurement, and tolerating it forces the runner to tolerate every broken anchor.
  ("M5", "a false Shell_NotifyIcon result is treated as success", MACHINE,
   "                    if (!_native.Add())",
   "                    if (!_native.Add() && false)"),
@@ -69,45 +72,94 @@ MUTATIONS = [
 def run(cmd):
     return subprocess.run(cmd, shell=True, capture_output=True, text=True, cwd=ROOT)
 
+def build():
+    """A SEPARATE build whose EXIT CODE is the verdict.
+
+    The previous version ran `dotnet test` and inspected only the text for "error CS". That let every
+    MSBuild failure through -- MSB3021 from a locked test DLL above all -- and the runner then measured
+    the PREVIOUS assembly while reporting a clean row. The Total check that was supposed to catch it does
+    not: a stale assembly has the SAME test count, so an equal Total is normal under mutation and proves
+    nothing about which bytes were loaded. That criterion measured in my favour, which is the same defect
+    it was written to catch, one layer up.
+
+    --no-incremental so a mutation cannot be skipped as "up to date"; the return code, not the log, is
+    what decides.
+    """
+    r = subprocess.run(
+        f'"{DOTNET}" build "{TESTS}" -c Debug -p:Platform=x64 --no-incremental',
+        shell=True, capture_output=True, text=True, cwd=ROOT)
+    return r.returncode, r.stdout + r.stderr
+
+
 def test():
-    r = run(f'"{DOTNET}" test "{TESTS}" -c Debug -p:Platform=x64 --filter "FullyQualifiedName~Tray" 2>&1')
-    out = r.stdout + r.stderr
-    if "error CS" in out:
+    code, out = build()
+    if code != 0:
         return ("BUILD-FAIL", 0, 0, out)
-    # A STALE RUN MUST NOT BE READABLE AS A SURVIVAL -- see the README. A mutation never changes which
-    # tests exist, so the Total is invariant; if it moves, the build did not land and "failed=0" means
-    # nothing.
+
+    r = subprocess.run(
+        f'"{DOTNET}" test "{TESTS}" -c Debug -p:Platform=x64 --no-build --filter "{FILTER}" '
+        f'--blame-hang --blame-hang-timeout 90s',
+        shell=True, capture_output=True, text=True, cwd=ROOT)
+    out += r.stdout + r.stderr
+
+    if "error CS" in out or "error MSB" in out:
+        return ("BUILD-FAIL", 0, 0, out)
+    if "Aborted" in out or "crashed" in out:
+        return ("ABORTED", 0, 0, out)
+
     total = None
     mt = re.search(r"Total:\s+(\d+)", out)
     if mt:
         total = int(mt.group(1))
 
     m = re.search(r"Failed:\s+(\d+),\s+Passed:\s+(\d+)", out)
-    if m:
-        return (_verdict("RAN", total), int(m.group(1)), int(m.group(2)), out)
-    if "Build succeeded" not in out and "Passed!" not in out:
-        return ("BUILD-FAIL", 0, 0, out)
-    return ("UNKNOWN", 0, 0, out)
+    if not m:
+        return ("UNKNOWN", 0, 0, out)
+
+    failed, passed = int(m.group(1)), int(m.group(2))
+
+    # The runner's exit code and the summary have to agree. `dotnet test` exits non-zero when tests fail,
+    # which is EXPECTED for a killed mutation -- so the check is consistency, not success: a zero-failure
+    # summary alongside a non-zero exit means something happened that the summary does not describe.
+    if (failed > 0) != (r.returncode != 0):
+        return (f"EXIT-MISMATCH(failed={failed} exit={r.returncode})", failed, passed, out)
+
+    return (_verdict("RAN", total), failed, passed, out)
 
 
 BASELINE_TOTAL = None
 
 
 def _verdict(status, total):
+    # Kept as a SECONDARY signal only. It cannot detect a stale assembly (same tests, same Total); what
+    # detects that is the build's exit code above.
     if BASELINE_TOTAL is not None and total is not None and total != BASELINE_TOTAL:
-        return f"STALE-ASSEMBLY(total={total} expected={BASELINE_TOTAL})"
+        return f"TOTAL-MOVED(total={total} expected={BASELINE_TOTAL})"
     return status
+
+
+def require_ran(mid, status, failed=None):
+    """FAIL CLOSED. A row that did not run is not a result, and a matrix that keeps going after one is a
+    matrix that looks green and measured nothing. Anything but RAN stops the runner with a non-zero exit.
+    """
+    if not status.startswith("RAN"):
+        print(f"ABORTING: {mid} did not run -- {status}", flush=True)
+        sys.exit(2)
+    if failed is not None and failed:
+        print(f"ABORTING: {mid} baseline is not green (failed={failed})", flush=True)
+        sys.exit(3)
 
 
 results = []
 which = sys.argv[1:] if len(sys.argv) > 1 else [m[0] for m in MUTATIONS]
 
+# The unmutated baseline, measured before anything is touched. It must RUN and it must be green, or every
+# row below it is meaningless -- so it aborts rather than printing a warning nobody reads.
 _b_status, _b_failed, _b_passed, _b_out = test()
 _bm = re.search(r"Total:\s+(\d+)", _b_out)
 BASELINE_TOTAL = int(_bm.group(1)) if _bm else None
 print(f"baseline: status={_b_status} failed={_b_failed} total={BASELINE_TOTAL}", flush=True)
-if _b_failed:
-    print("BASELINE IS NOT GREEN -- every row below is meaningless until it is", flush=True)
+require_ran("baseline", _b_status, _b_failed)
 
 for mid, desc, path, old, new in MUTATIONS:
     if mid not in which:
@@ -119,13 +171,14 @@ for mid, desc, path, old, new in MUTATIONS:
     if old not in src:
         results.append({"id": mid, "desc": desc, "status": "ANCHOR-NOT-FOUND"})
         print(f"{mid}: ANCHOR NOT FOUND", flush=True)
-        continue
+        sys.exit(5)
     eol = "\r\n" if b"\r\n" in original_bytes else "\n"
     io.open(path, "w", encoding="utf-8", newline=eol).write(src.replace(old, new, 1))
     status, failed, passed, out = test()
     open(path, "wb").write(original_bytes)
     results.append({"id": mid, "desc": desc, "status": status, "failed": failed, "passed": passed})
     print(f"{mid}: {status} failed={failed} passed={passed}  -- {desc}", flush=True)
+    require_ran(mid, status)
 
 io.open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "mutation-results.json"), "w", encoding="utf-8").write(json.dumps(results, indent=2))
 print("DONE")

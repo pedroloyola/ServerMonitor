@@ -23,12 +23,13 @@ namespace ServerMonitor.App.Services;
 /// the user cannot stop is the A12 zombie by another name.
 /// </para>
 /// </summary>
-public sealed class TrayAffordanceLifecycle : ITrayLossConsumer
+public sealed class TrayAffordanceLifecycle : ITrayLossConsumer, ITrayGuardedOperations
 {
     private readonly ITrayAffordanceSource _source;
     private readonly IApplicationWindowController _windowController;
     private readonly IBackgroundDegradationNotice _degradationNotice;
     private readonly IAppLifecycleController _lifecycleController;
+    private readonly IBackgroundNoticePresenter _noticePresenter;
     private readonly ILogger<TrayAffordanceLifecycle> _logger;
     private readonly object _sync = new();
 
@@ -39,12 +40,14 @@ public sealed class TrayAffordanceLifecycle : ITrayLossConsumer
         IApplicationWindowController windowController,
         IBackgroundDegradationNotice degradationNotice,
         IAppLifecycleController lifecycleController,
+        IBackgroundNoticePresenter noticePresenter,
         ILogger<TrayAffordanceLifecycle> logger)
     {
         _source = source ?? throw new ArgumentNullException(nameof(source));
         _windowController = windowController ?? throw new ArgumentNullException(nameof(windowController));
         _degradationNotice = degradationNotice ?? throw new ArgumentNullException(nameof(degradationNotice));
         _lifecycleController = lifecycleController ?? throw new ArgumentNullException(nameof(lifecycleController));
+        _noticePresenter = noticePresenter ?? throw new ArgumentNullException(nameof(noticePresenter));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         // TWO CHANNELS, AND THE DIFFERENCE IS THE POINT. The observations arrive on the event; the
@@ -52,6 +55,7 @@ public sealed class TrayAffordanceLifecycle : ITrayLossConsumer
         // and it must be distinguishable from a bystander that happened to throw.
         _source.StateChanged += OnAffordanceStateChanged;
         _source.SetLossConsumer(this);
+        _source.SetGuardedOperations(this);
     }
 
     /// <summary>
@@ -65,21 +69,43 @@ public sealed class TrayAffordanceLifecycle : ITrayLossConsumer
     /// new shape. A caller that needs to know what happened finds out from inside its own action, where
     /// what it learns is that the act was DONE, not that it MAY be done.
     /// </remarks>
-    public void EnterBackground(Action enterBackground)
+    public void Perform(TrayGuardedOperation operation)
     {
-        ArgumentNullException.ThrowIfNull(enterBackground);
-
         lock (_sync)
         {
             if (_degradedForSession)
             {
+                // Our gate refused, so OUR fallback runs. Silence here would leave the window neither
+                // hidden nor closed, which is the A12 zombie by a quieter door.
+                ((ITrayGuardedOperations)this).FallBackToExit();
                 return;
             }
 
-            // The session gate is ours; the affordance gate is the source's, and it runs the act under
-            // its own lock so the two cannot come apart.
-            _source.EnterBackground(enterBackground);
+            // The session gate is ours; the affordance gate is the source's, and the source performs the
+            // operation under its own lock, so the two cannot come apart.
+            _source.Perform(operation);
         }
+    }
+
+    /// <summary>
+    /// The concrete background entry. Explicit implementation: it is not on this class's public surface,
+    /// so the only caller is whoever was handed the interface — the state machine.
+    /// </summary>
+    void ITrayGuardedOperations.EnterBackground()
+    {
+        _windowController.HideToBackground();
+        _lifecycleController.EnterBackground();
+        _logger.LogInformation("Window closed to background; monitoring continues.");
+
+        // Never blocks or delays the hide: the hide already happened, and this only reports it.
+        _noticePresenter.TryShowOnce();
+    }
+
+    /// <summary>The other outcome, and there is no third one.</summary>
+    void ITrayGuardedOperations.FallBackToExit()
+    {
+        _logger.LogInformation("Window closed with no background state available; exiting.");
+        _lifecycleController.RequestExit(ExitReason.UserClosedWindow);
     }
 
     /// <summary>True once this session has given up on the tray. One-way.</summary>

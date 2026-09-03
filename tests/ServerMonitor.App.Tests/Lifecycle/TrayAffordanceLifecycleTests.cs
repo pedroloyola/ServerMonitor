@@ -79,15 +79,47 @@ public sealed class TrayAffordanceLifecycleTests
         /// </summary>
         public Action? InvalidateDuringCommit { get; set; }
 
-        public void EnterBackground(Action enterBackground)
+        /// <summary>
+        /// THE SAME SHAPE AS PRODUCTION, INCLUDING THE FALLBACK. A fake that merely did nothing when the
+        /// affordance was absent would hide the defect this ring exists to prevent: an outcome where the
+        /// window is neither hidden nor closed. It also takes a VALUE, not a delegate, so a test cannot
+        /// smuggle in a capture that production would refuse.
+        /// </summary>
+        private ITrayGuardedOperations? _operations;
+
+        public void SetGuardedOperations(ITrayGuardedOperations operations)
+        {
+            if (_operations is not null)
+            {
+                throw new InvalidOperationException(
+                    "The guarded operations are already registered; there is exactly one set.");
+            }
+
+            _operations = operations;
+        }
+
+        /// <summary>The operations the subject registered, for tests that drive them directly.</summary>
+        public ITrayGuardedOperations? RegisteredOperations => _operations;
+
+        public void Perform(TrayGuardedOperation operation)
         {
             if (_state != TrayAffordanceState.Available)
             {
+                _operations?.FallBackToExit();
                 return;
             }
 
+            // Runs while the caller is inside the determination, so a test can invalidate the affordance
+            // from within and confirm the decision and the act cannot come apart.
             InvalidateDuringCommit?.Invoke();
-            enterBackground();
+
+            if (_state != TrayAffordanceState.Available)
+            {
+                _operations?.FallBackToExit();
+                return;
+            }
+
+            _operations?.EnterBackground();
         }
     }
 
@@ -128,9 +160,33 @@ public sealed class TrayAffordanceLifecycleTests
     /// </summary>
     private static bool EnteredBackground(Harness harness)
     {
-        var entered = false;
-        harness.Subject.EnterBackground(() => entered = true);
-        return entered;
+        // ASKS, and does not supply. The window controller is what records whether the hide actually
+        // happened, which is a fact about the world rather than a value the caller was handed.
+        var before = harness.Window.Calls.Count(c => c == "HideToBackground");
+        harness.Subject.Perform(TrayGuardedOperation.EnterBackground);
+        return harness.Window.Calls.Count(c => c == "HideToBackground") > before;
+    }
+
+    /// <summary>
+    /// The notice presenter, which can be made to throw so a test can prove the hide survives it.
+    /// </summary>
+    private sealed class RecordingNoticePresenter : IBackgroundNoticePresenter
+    {
+        public int Attempts { get; private set; }
+
+        public bool Throws { get; set; }
+
+        public bool TryShowOnce()
+        {
+            Attempts++;
+
+            if (Throws)
+            {
+                throw new InvalidOperationException("the presenter is down");
+            }
+
+            return true;
+        }
     }
 
     private sealed class Harness
@@ -145,6 +201,8 @@ public sealed class TrayAffordanceLifecycleTests
 
         public List<string> Order { get; } = new();
 
+        public RecordingNoticePresenter Presenter { get; } = new();
+
         public TrayAffordanceLifecycle Subject { get; }
 
         public Harness(
@@ -155,7 +213,8 @@ public sealed class TrayAffordanceLifecycleTests
             Lifecycle = new FakeAppLifecycleController(lifecycleState);
             Notice.Changed += (_, _) => Order.Add("notice");
             Subject = new TrayAffordanceLifecycle(
-                Source, Window, Notice, Lifecycle, NullLogger<TrayAffordanceLifecycle>.Instance);
+                Source, Window, Notice, Lifecycle, Presenter,
+                NullLogger<TrayAffordanceLifecycle>.Instance);
         }
     }
 
@@ -243,7 +302,11 @@ public sealed class TrayAffordanceLifecycleTests
         Assert.True(h.Subject.IsDegradedForSession);
         Assert.False(EnteredBackground(h), "background must be refused");
         Assert.True(h.Notice.IsDegraded);
-        Assert.Equal(["OpenBackgroundSettings"], h.Window.Calls);
+
+        // The hide is really recorded now: since round 8 the operation is the machine's own and the
+        // lifecycle performs it against the real window controller, where before the test handed in a
+        // lambda that set a flag and never touched it. A more faithful harness, and a longer trace.
+        Assert.Equal(["HideToBackground", "OpenBackgroundSettings"], h.Window.Calls);
     }
 
     /// <summary>
@@ -320,13 +383,12 @@ public sealed class TrayAffordanceLifecycleTests
     public void The_affordance_cannot_be_lost_between_the_grant_and_the_act()
     {
         var h = new Harness(TrayAffordanceState.Available);
-        var hidden = 0;
-
         // The affordance disappears at the worst possible moment: after permission is established and
         // before the act. With a detachable boolean the act went ahead anyway.
         h.Source.InvalidateDuringCommit = () => h.Source.Report(TrayAffordanceState.Lost);
 
-        h.Subject.EnterBackground(() => hidden++);
+        h.Subject.Perform(TrayGuardedOperation.EnterBackground);
+        var hidden = h.Window.Calls.Count(c => c == "HideToBackground");
 
         // Whether it ran or not, what must never happen is running WITHOUT the affordance. The commit
         // either refuses, or performs the act under the determination that granted it.
@@ -385,6 +447,102 @@ public sealed class TrayAffordanceLifecycleTests
         // IsDegradedForSession reports a session fact that authorises nothing: it cannot be turned back
         // into hiding a window, and the only path that authorises anything revalidates for itself.
         Assert.Equal(["TrayAffordanceLifecycle.IsDegradedForSession"], offenders);
+    }
+
+    /// <summary>
+    /// A degraded session refuses the operation AND falls back — it does not go quiet.
+    /// </summary>
+    /// <remarks>
+    /// Written because the mutation for it survived. Silence on this path is the same defect as silence
+    /// on the machine's: the user pressed the close button, the window is not hidden, and nothing closes
+    /// it either — a process left running with no window and no tray, which is the A12 zombie reached
+    /// through the politest door in the codebase. Two outcomes, no third, on BOTH gates.
+    /// </remarks>
+    [Fact]
+    public void A_degraded_session_refuses_the_operation_and_still_falls_back()
+    {
+        var h = new Harness(TrayAffordanceState.Lost);
+        h.Subject.Evaluate();
+        Assert.True(h.Subject.IsDegradedForSession);
+
+        var exitsBefore = h.Lifecycle.ExitRequests;
+        h.Subject.Perform(TrayGuardedOperation.EnterBackground);
+
+        Assert.DoesNotContain("HideToBackground", h.Window.Calls);
+        Assert.True(
+            h.Lifecycle.ExitRequests > exitsBefore,
+            "a refused operation must still close the window, not leave it in limbo");
+    }
+
+    /// <summary>
+    /// MOVED HERE IN ROUND 8, with the operation itself: the notice never delays or cancels the hide.
+    /// </summary>
+    /// <remarks>
+    /// The window is already hidden by the time the presenter runs, and a presenter that throws cannot
+    /// change that. It used to be asserted on the coordinator, which no longer performs the hide — an
+    /// assertion left there would have been testing the harness.
+    /// </remarks>
+    [Fact]
+    public void The_notice_cannot_delay_or_cancel_the_hide()
+    {
+        var h = new Harness(TrayAffordanceState.Available);
+        h.Presenter.Throws = true;
+
+        var thrown = Record.Exception(() => h.Subject.Perform(TrayGuardedOperation.EnterBackground));
+
+        Assert.NotNull(thrown);                                   // it escapes to the window handler
+        Assert.Contains("HideToBackground", h.Window.Calls);                  // and the hide already happened
+        Assert.True(
+            h.Window.Calls.IndexOf("HideToBackground") >= 0 && h.Presenter.Attempts == 1,
+            "the hide must precede the notice");
+    }
+
+    /// <summary>
+    /// O1, SIXTH RING: nothing on this surface accepts a delegate, so there is nowhere for a caller to
+    /// put its own code inside the authorisation.
+    /// </summary>
+    /// <remarks>
+    /// Checked by PARAMETER TYPE, for the same reason the permission sweep is checked by return type:
+    /// twice in this slice a sweep that searched for the retired NAME passed over the same capability
+    /// wearing a new shape.
+    /// </remarks>
+    [Fact]
+    public void Nothing_on_the_affordance_surface_accepts_a_delegate()
+    {
+        var offenders = new List<string>();
+
+        foreach (var type in new[]
+                 {
+                     typeof(TrayAffordanceLifecycle),
+                     typeof(ITrayAffordanceSource),
+                     typeof(ITrayGuardedOperations),
+                     typeof(ITrayLossConsumer),
+                 })
+        {
+            foreach (var method in type.GetMethods(
+                         BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly))
+            {
+                // Event accessors are excluded, and the reason is not convenience. add_/remove_ hand the
+                // machine a handler to be NOTIFIED with, and notification is not authorisation: the
+                // handler is invoked with no rights attached, and it cannot perform a guarded operation
+                // because performing one needs the operations the machine holds and it has none. What is
+                // swept here is the surface that AUTHORISES, and an event does not.
+                if (method.IsSpecialName)
+                {
+                    continue;
+                }
+
+                foreach (var parameter in method.GetParameters())
+                {
+                    if (typeof(Delegate).IsAssignableFrom(parameter.ParameterType))
+                    {
+                        offenders.Add($"{type.Name}.{method.Name}({parameter.ParameterType.Name})");
+                    }
+                }
+            }
+        }
+
+        Assert.Empty(offenders);
     }
 
     /// <summary>

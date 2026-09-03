@@ -22,9 +22,7 @@ namespace ServerMonitor.App.Services;
 public sealed class WindowCloseCoordinator(
     IAppLifecycleController lifecycleController,
     IBackgroundMonitoringSettingsService backgroundSettings,
-    IApplicationWindowController windowController,
-    IBackgroundNoticePresenter noticePresenter,
-    Action<Action> enterBackground,
+    Action<TrayGuardedOperation> perform,
     ILogger<WindowCloseCoordinator> logger)
 {
     /// <summary>
@@ -38,34 +36,26 @@ public sealed class WindowCloseCoordinator(
             return false; // this is Application.Exit() closing the window: let it
         }
 
-        // The hide is handed over, not gated, and NOTHING comes back: what this records is that the hide
-        // HAPPENED, which cannot be replayed into hiding an unprotected window later. Asking "may I?" —
-        // whether as a property or as a return value — left an interval in which the affordance could be
-        // lost while the window went away regardless.
-        var hidden = false;
-        if (backgroundSettings.BackgroundMonitoringEnabled)
+        // NOTHING IS HANDED OVER AND NOTHING COMES BACK — not a boolean, and no longer a delegate
+        // either. This method used to pass an Action, which is a place for the caller's own code to run
+        // inside the authorisation and record that it held; the recorded fact then outlives it. The
+        // operation is named as a VALUE and performed by its owner.
+        //
+        // This coordinator could not act on the answer even if it had one: it no longer holds the window
+        // controller, so hiding the window is not reachable from here at all. Every earlier correction
+        // took away the ticket and left the door.
+        //
+        // And it does not need the answer: BOTH outcomes below cancel the close. Only the exiting branch
+        // above returns false, and that is decided without the affordance.
+        if (!backgroundSettings.BackgroundMonitoringEnabled)
         {
-            enterBackground(() =>
-            {
-                windowController.HideToBackground();
-                hidden = true;
-            });
-        }
-
-        if (hidden)
-        {
-            lifecycleController.EnterBackground();
-            logger.LogInformation("Window closed to background; monitoring continues.");
-
-            // Never blocks or delays the hide: the hide already happened, and this only reports it.
-            noticePresenter.TryShowOnce();
+            // Nothing to do with the affordance: the user turned background monitoring off.
+            logger.LogInformation("Window closed with background monitoring disabled; exiting.");
+            lifecycleController.RequestExit(ExitReason.UserClosedWindow);
             return true;
         }
 
-        // Either the user turned background monitoring off, or there is no usable way back to the app
-        // (no tray icon), in which case staying resident would mean monitoring the user cannot stop.
-        logger.LogInformation("Window closed with no background state available; exiting.");
-        lifecycleController.RequestExit(ExitReason.UserClosedWindow);
+        perform(TrayGuardedOperation.EnterBackground);
         return true;
     }
 }

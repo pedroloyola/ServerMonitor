@@ -223,6 +223,12 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
     private ITrayLossConsumer? _lossConsumer;
 
     /// <summary>
+    /// The concrete operations this machine may perform. A field, not a delegate parameter: the caller
+    /// names an operation and never supplies one.
+    /// </summary>
+    private ITrayGuardedOperations? _operations;
+
+    /// <summary>
     /// Runs inside <see cref="PublishIfCurrent"/>, between taking the delivery token and revalidating.
     /// </summary>
     /// <remarks>
@@ -254,6 +260,16 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
     /// and it is observable from outside.
     /// </summary>
     internal int ShellGateWaitersForTests => Volatile.Read(ref _shellGateWaiters);
+
+    private int _decisionWaiters;
+
+    /// <summary>
+    /// How many threads are queued on the DECISION lock right now — the same seam as
+    /// <see cref="ShellGateWaitersForTests"/>, on the other monitor, and for the same reason: a test that
+    /// needs to prove work happens INSIDE this lock has to be able to name the lock, not guess from a
+    /// thread's aggregate state.
+    /// </summary>
+    internal int DecisionWaitersForTests => Volatile.Read(ref _decisionWaiters);
 
     internal Action? BeforeDeliveryForTests;
 
@@ -511,18 +527,56 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
     /// The determination and the act are ONE step. Handing out a boolean and letting the caller act on it
     /// later is what left a window in which the affordance could be lost between the answer and the hide.
     /// </remarks>
-    public void EnterBackground(Action enterBackground)
+    /// <summary>
+    /// Performs one of the operations this machine OWNS, atomically with deciding that it may be.
+    /// </summary>
+    /// <remarks>
+    /// No delegate crosses this boundary. The caller names an operation; the concrete work belongs to
+    /// <see cref="ITrayGuardedOperations"/>, which was registered at composition time and is invoked here,
+    /// inside the decision lock. And there is no silent outcome: if the affordance does not hold, the
+    /// fallback runs, because doing nothing would leave the window neither hidden nor closed.
+    /// </remarks>
+    public void Perform(TrayGuardedOperation operation)
     {
-        ArgumentNullException.ThrowIfNull(enterBackground);
-
         lock (_decision)
         {
+            var operations = _operations
+                ?? throw new InvalidOperationException(
+                    "No guarded operations are registered; the machine has nothing it may perform.");
+
             if (Project(_state, _time.GetTimestamp()) != TrayAffordanceState.Available)
             {
+                operations.FallBackToExit();
                 return;
             }
 
-            enterBackground();
+            switch (operation)
+            {
+                case TrayGuardedOperation.EnterBackground:
+                    operations.EnterBackground();
+                    break;
+                default:
+                    // A new operation must be given a home here deliberately. Falling through to the
+                    // background one would authorise something nobody reviewed.
+                    throw new ArgumentOutOfRangeException(nameof(operation), operation, null);
+            }
+        }
+    }
+
+    /// <summary>Registers the concrete operations. Single assignment; see <see cref="Perform"/>.</summary>
+    public void SetGuardedOperations(ITrayGuardedOperations operations)
+    {
+        ArgumentNullException.ThrowIfNull(operations);
+
+        lock (_decision)
+        {
+            if (_operations is not null)
+            {
+                throw new InvalidOperationException(
+                    "The guarded operations are already registered; there is exactly one set.");
+            }
+
+            _operations = operations;
         }
     }
 
@@ -637,8 +691,10 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
     {
         Outcome outcome;
         BeforeDecisionLockForTests?.Invoke();
+        Interlocked.Increment(ref _decisionWaiters);
         lock (_decision)
         {
+            Interlocked.Decrement(ref _decisionWaiters);
             outcome = Transition(trayEvent, _time.GetTimestamp());
         }
 

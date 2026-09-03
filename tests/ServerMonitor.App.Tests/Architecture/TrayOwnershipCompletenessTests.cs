@@ -419,14 +419,34 @@ public sealed class TrayOwnershipCompletenessTests
         /// established, and it runs INSIDE the determination so a test can invalidate the affordance from
         /// within and see that the act was still refused.
         /// </summary>
-        public void EnterBackground(Action enterBackground)
+        /// <summary>
+        /// THE SAME SHAPE AS PRODUCTION, INCLUDING THE FALLBACK. A fake that merely did nothing when the
+        /// affordance was absent would hide the defect this ring exists to prevent: an outcome where the
+        /// window is neither hidden nor closed. It also takes a VALUE, not a delegate, so a test cannot
+        /// smuggle in a capture that production would refuse.
+        /// </summary>
+        private ITrayGuardedOperations? _operations;
+
+        public void SetGuardedOperations(ITrayGuardedOperations operations)
+        {
+            if (_operations is not null)
+            {
+                throw new InvalidOperationException(
+                    "The guarded operations are already registered; there is exactly one set.");
+            }
+
+            _operations = operations;
+        }
+
+        public void Perform(TrayGuardedOperation operation)
         {
             if (State != TrayAffordanceState.Available)
             {
+                _operations?.FallBackToExit();
                 return;
             }
 
-            enterBackground();
+            _operations?.EnterBackground();
         }
     }
 
@@ -535,6 +555,41 @@ public sealed class TrayOwnershipCompletenessTests
         adapter.SetLossConsumer(new NoopLossConsumer());
 
         Assert.Throws<InvalidOperationException>(() => adapter.SetLossConsumer(new NoopLossConsumer()));
+    }
+
+    /// <summary>
+    /// The owner's single-assignment guard for the GUARDED OPERATIONS, on the owner and not on a double.
+    /// </summary>
+    /// <remarks>
+    /// Written because the mutation for it survived: the equivalent test for the loss consumer proved the
+    /// owner, and there was no such test for this slot at all. Whoever holds this slot is the authorised
+    /// action, so displacing it is how a caller would reinstall its own code as the thing the machine
+    /// performs under its lock.
+    /// </remarks>
+    [Fact]
+    public void The_owner_refuses_a_second_set_of_guarded_operations()
+    {
+        var adapter = new OwnedTrayIconAdapter(
+            new UnusedThemeService(),
+            new UnusedLocalizationService(),
+            () => FakeLifecycle.Instance,
+            new UnusedProcessTerminator(),
+            NullLoggerFactory.Instance);
+
+        adapter.SetGuardedOperations(new NoopOperations());
+
+        Assert.Throws<InvalidOperationException>(() => adapter.SetGuardedOperations(new NoopOperations()));
+    }
+
+    private sealed class NoopOperations : ITrayGuardedOperations
+    {
+        public void EnterBackground()
+        {
+        }
+
+        public void FallBackToExit()
+        {
+        }
     }
 
     private sealed class NoopLossConsumer : ITrayLossConsumer
