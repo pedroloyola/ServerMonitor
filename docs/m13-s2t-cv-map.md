@@ -206,6 +206,52 @@ uma delas. A **M25** não tem qualquer relação com o gate. Ambas continuam `NO
 
 ---
 
+## 6. Terceira ronda de correções — o vizinho de cada correção
+
+O Atlas identificou um padrão em três rondas seguidas: **a correção fecha o caso apontado e deixa o
+vizinho aberto**. Está certo, e as três correções da ronda anterior falharam todas do mesmo modo.
+
+| Correção anterior | O vizinho que ficou aberto | Fechado agora por |
+|---|---|---|
+| ordem entre efeitos pelo gate e pela sequência | um drenador **já a correr** executava o efeito de outra transição antes de essa transição publicar | prontidão: os efeitos entram na fila em ordem no momento da decisão e só ficam **executáveis** depois de a sua transição publicar; o drenador **para** no primeiro não pronto, não salta |
+| revalidação na entrega | a revalidação estava **antes** da invocação, e a janela entre elas continuava aberta | a verificação e a invocação são **uma só secção crítica**; a seam de teste passou para o ponto da invocação |
+| marshalling para a thread de UI | o ramo de **fallback** executava inline na thread do timer | a continuação recusada é **largada** e registada; correr inline anulava a garantia que o caminho principal estabelece |
+
+### 6.1 O que a minha asserção nova NÃO mata — escrito antes de ser perguntado
+
+- **Prontidão (M53/M54):** provo que um drenador que chega durante a publicação não executa nada, e que
+  **para** em vez de saltar. Não provo com **duas threads reais**: o drenador do teste é o mesmo fio, e o
+  estado da fila que ele observa é o mesmo que outra thread veria. Uma mutação que quebrasse apenas a
+  visibilidade entre threads — sem mudar a lógica de prontidão — não seria morta por este teste.
+- **Secção crítica (M55):** provo que outra thread não consegue mudar o estado entre a última verificação
+  e a invocação, com uma espera limitada de 2 s. É assimétrico — com a correção a outra thread **não pode**
+  progredir, portanto nenhuma espera a veria — mas se alguém tornar o lock não exclusivo de uma forma que
+  ainda bloqueie durante 2 s, o teste passaria.
+- **Topologia (M56/M57):** provo que a máquina larga uma continuação recusada, e que o adaptador **não
+  tem** ramo de fallback. O segundo é uma asserção sobre a **fonte**: tomar o ramo falso exige um
+  `DispatcherQueue` real a encerrar, que nenhum teste produz.
+- **Roteamento de DPI (M58):** provo que o handler chama o router e que o router usa o gate. Que o
+  `OnDpiChanged` seja ligado ao evento certo do `TrayHostWindow` continua sem teste — exige uma janela
+  real.
+
+### 6.2 Duas armadilhas de ferramenta que me custaram esta ronda, e que ficam escritas
+
+Descobri as duas a investigar uma queda de 709 para 678 testes que eu próprio provoquei:
+
+1. **Nunca embrulhar `dotnet test` num `timeout` externo.** Matar o processo pai deixa o test host órfão,
+   o órfão mantém um lock sobre `ServerMonitor.App.Tests.dll`, o build seguinte falha a cópia com
+   `MSB3021` — e as corridas seguintes executam **silenciosamente o assembly antigo**. Usar
+   `--blame-hang-timeout`.
+2. **Uma linha verde `Passed!` não significa que a corrida terminou.** Uma corrida abortada imprime
+   `Test host process crashed` **e** uma linha `Passed!` com o que tiver acabado antes. O procedimento de
+   gates passa a procurar `Aborted` e erros de build, não só a contagem.
+
+Isto explica também o que o Vigil viu: contagens diferentes entre corridas e falhas intermitentes,
+incluindo a prova da CV-19. O teste probabilístico de 200 tentativas foi substituído por um determinístico
+(§6), e a suite da fatia correu **10 vezes seguidas** com resultado idêntico e zero abortos.
+
+---
+
 ## 4. Retratação — uma afirmação minha que era falsa
 
 Na entrega da ligação escrevi, sobre `App.xaml.cs`:
@@ -249,28 +295,35 @@ deixou de ser uma delas: está morta (§3.1).
 
 ### Reprodução
 
+**Os scripts estão na árvore**, em `tools/mutations/`, com um README. Antes estavam num diretório de
+scratch e este mapa apontava para ficheiros que ninguém conseguia abrir — que é a CV-15 ao contrário: um
+documento que invoca evidência inalcançável não é evidência.
+
 ```
 # Núcleo da máquina e contrato do callback (M1–M18)
-cd <scratchpad>
-python mutate.py M1              # ou qualquer subconjunto de M1..M18
+# a partir da raiz do repositório
+python tools/mutations/mutate.py M1
 
 # CV-20 e fronteira nativa (M19–M25)
-python mutate_t14.py M19         # ou qualquer subconjunto de M19..M25
+python tools/mutations/mutate_t14.py M19
 
 # Ligação em DI, flyout, CV-9 e tema (M26–M35)
-python mutate_wiring.py M26      # ou qualquer subconjunto de M26..M35
+python tools/mutations/mutate_wiring.py M26
 
 # Notificação de saída fail-safe, CV-17/CV-18 (M36–M40)
-python mutate_notice.py M36      # ou qualquer subconjunto de M36..M40
+python tools/mutations/mutate_notice.py M36
 
 # Ronda de correções: arranque, ordem de publicação, ordinais (M41–M45)
-python mutate_round9.py M41      # ou qualquer subconjunto de M41..M45
+python tools/mutations/mutate_round9.py M41
 
 # Ronda Atlas/Vigil: ordem, entrega, topologia, DPI, cobertura (M46–M52)
-python mutate_round10.py M46     # ou qualquer subconjunto de M46..M52
+python tools/mutations/mutate_round10.py M46
+
+# Terceira ronda: prontidão, secção crítica da entrega, fallback, roteamento (M53–M58)
+python tools/mutations/mutate_round11.py M53
 
 # Prova diferencial da escalada CS8509
-python cs8509_differential.py
+python tools/mutations/cs8509_differential.py
 
 # Cada corrida aplica a mutação, executa
 #   ~/.dotnet/dotnet.exe test tests/ServerMonitor.App.Tests/ServerMonitor.App.Tests.csproj \

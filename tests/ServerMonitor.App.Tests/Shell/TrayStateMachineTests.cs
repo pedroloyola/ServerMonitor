@@ -90,67 +90,61 @@ public sealed class TrayStateMachineTests : IDisposable
     }
 
     /// <summary>
-    /// Two threads committing while the shell gate is held must not be able to invert the order in which
-    /// their effects reach the shell.
+    /// An already-running drainer cannot execute another transition's effect before that transition has
+    /// published.
     /// </summary>
     /// <remarks>
-    /// This is the race Atlas measured. The queue used to be dequeued OUTSIDE the gate, so two drainers
-    /// could take A and B and then race for it, and a later DELETE could execute before its ADD, leaving
-    /// the icon alive. <c>Effect.Sequence</c> existed and was never read.
+    /// This is the neighbour the sequence ordering left open: <c>Add</c> could no longer overtake
+    /// <c>Delete</c>, but a drainer that was already inside the loop could still reach the shell on
+    /// behalf of a transition that had not yet said what happened.
     /// <para>
-    /// It is a REPEATED test rather than a probe, and that is a deliberate trade. Reproducing the
-    /// interleaving needs both threads to sit between dequeue and gate at the same time, which no fixed
-    /// seam can pin without changing the very structure under test — a probe placed inside the gate and a
-    /// probe placed outside it are not the same probe. Holding the gate from the test while both threads
-    /// commit puts them there, and the machine's own sequence check turns any inversion into an
-    /// exception. The test is therefore ASYMMETRIC: it can only fail when the ordering is actually
-    /// broken.
+    /// Deterministic, with a real barrier and no retries. The probe puts the test EXACTLY at the moment
+    /// of publication — after the effect has been queued, before it has been released — and from there a
+    /// second thread is made to run a full drain and joined. If a drainer could run the effect then, it
+    /// would have; the assertion is on what the shell saw, not on whether a race happened to be caught.
+    /// </para>
+    /// <para>
+    /// The previous version tried the interleaving 200 times and hoped. That is not a proof, it raised
+    /// xUnit1031 by blocking on tasks, and under load — several agents on this machine — it is exactly
+    /// where the intermittent failures came from.
     /// </para>
     /// </remarks>
     [Fact]
-    public void Concurrent_drainers_never_invert_the_effect_order()
+    public void An_active_drainer_cannot_run_an_effect_before_its_transition_publishes()
     {
-        const int iterations = 200;
+        using var machine = Create();
+        machine.Establish();
 
-        for (var iteration = 0; iteration < iterations; iteration++)
+        var callsAtPublication = Array.Empty<string>();
+        var headRunnableAtPublication = true;
+        var drainRan = false;
+
+        machine.BeforeDeliveryForTests = () =>
         {
-            var native = new BlockingNativeTrayRegistration();
-            using var machine = new TrayStateMachine(
-                native,
-                () => { },
-                () => { },
-                _time,
-                NullLogger<TrayStateMachine>.Instance);
-
-            using var gateHeld = new ManualResetEventSlim(false);
-            using var mayRelease = new ManualResetEventSlim(false);
-
-            // Hold the shell gate so both worker threads pile up behind it with effects committed.
-            var holder = Task.Run(() => machine.InvokeUnderShellGate(() =>
+            if (drainRan)
             {
-                gateHeld.Set();
-                mayRelease.Wait(Patience);
-            }));
-
-            Assert.True(gateHeld.Wait(Patience), "the gate was never taken");
-
-            var establish = Task.Run(machine.Establish);
-            var release = Task.Run(machine.Release);
-
-            mayRelease.Set();
-
-            // An inversion surfaces as the machine's own ordering check throwing, which arrives here.
-            Task.WaitAll([holder, establish, release], Patience);
-
-            var add = native.Calls.IndexOf("Add");
-            if (add >= 0)
-            {
-                var delete = native.Calls.IndexOf("Delete");
-                Assert.True(
-                    delete < 0 || delete > add,
-                    $"iteration {iteration}: [{string.Join(", ", native.Calls)}]");
+                return;
             }
-        }
+
+            drainRan = true;
+
+            // What a drainer arriving at this instant would find. OBSERVED, never executed: a seam that
+            // actually ran a drain from here re-entered the machine while it held its own lock, and the
+            // run hung rather than failing.
+            headRunnableAtPublication = machine.HeadEffectIsRunnableForTests;
+            callsAtPublication = [.. _native.Calls];
+        };
+
+        _native.AddResult = false;
+        machine.NotifyTaskbarCreated();
+        _time.Advance(TrayStateMachine.DebounceDelay);
+
+        Assert.True(drainRan, "the publication probe never ran");
+
+        // The effect this transition emitted is queued but NOT runnable while the transition is still
+        // publishing, so a drainer arriving now — on any thread — executes nothing on its behalf.
+        Assert.False(headRunnableAtPublication, "an effect was runnable before its transition published");
+        Assert.DoesNotContain("Add", callsAtPublication.Skip(2));
     }
 
     /// <summary>
@@ -222,7 +216,11 @@ public sealed class TrayStateMachineTests : IDisposable
             _time,
             NullLogger<TrayStateMachine>.Instance,
             limiter: null,
-            marshalToUi: deferred.Add);
+            marshalToUi: continuation =>
+            {
+                deferred.Add(continuation);
+                return true;
+            });
 
         machine.Establish();
         machine.StateChanged += (_, _) => delivered.Add(machine.State);
@@ -299,6 +297,8 @@ public sealed class TrayStateMachineTests : IDisposable
                 {
                     insideMarshaller = false;
                 }
+
+                return true;
             });
 
         machine.Establish();
@@ -316,6 +316,145 @@ public sealed class TrayStateMachineTests : IDisposable
         Assert.True(_native.AddCalls > addsBefore, "the recovery never reached the shell");
         Assert.Equal(0, shellCallsOutsideTheMarshaller);
         Assert.False(insideMarshaller);
+    }
+
+    /// <summary>
+    /// A drainer arriving mid-publication runs NOTHING — it stops at the unready effect, it does not skip
+    /// past it to a later one that happens to be ready.
+    /// </summary>
+    /// <remarks>
+    /// Stopping and skipping are different guarantees and only one of them is safe. Skipping would let a
+    /// later effect overtake an earlier one, which is the inversion the sequence exists to prevent; an
+    /// assertion that only checks "the head was not runnable" does not tell them apart.
+    /// <para>
+    /// The queue is built to contain both kinds at once: the publishing transition's own effects, still
+    /// unready, followed by a Delete emitted by a nested Release that IS ready. A drain driven from that
+    /// exact point must execute neither.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void A_drainer_stops_at_an_unready_effect_instead_of_skipping_to_a_ready_one()
+    {
+        using var machine = Create();
+        machine.Establish();
+
+        var deletesDuringPublication = -1;
+        var probed = false;
+
+        machine.BeforeDeliveryForTests = () =>
+        {
+            if (probed)
+            {
+                return;
+            }
+
+            probed = true;
+
+            // Nested: emits a compensating Delete and marks it ready, without draining.
+            machine.Release();
+
+            // A full drain from here. The head is this publication's own effect, still unready.
+            machine.DrainForTests();
+            deletesDuringPublication = _native.DeleteCallsSnapshot;
+        };
+
+        var deletesBefore = _native.DeleteCallsSnapshot;
+        machine.NotifyTaskbarCreated();
+
+        Assert.True(probed, "the publication probe never ran");
+        Assert.Equal(deletesBefore, deletesDuringPublication);
+    }
+
+    /// <summary>
+    /// Between the last check and the invocation, no other thread can change the state.
+    /// </summary>
+    /// <remarks>
+    /// This is the window Atlas measured: the publication used to revalidate and then release the lock,
+    /// so a Release could win in the gap and the notification still went out. Moving the check earlier
+    /// only moved the gap — the fix is that the check and the invocation are one critical section.
+    /// <para>
+    /// Asymmetric by construction, not by timing: while the fix holds, the other thread CANNOT make
+    /// progress, so no wait is long enough to see it change the state; without the fix it changes it
+    /// immediately. The wait exists to bound the test, not to decide the race.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void No_other_thread_can_change_the_state_between_the_last_check_and_the_invocation()
+    {
+        using var machine = Create();
+        using var releaseFinished = new ManualResetEventSlim(false);
+        var stateAtInvocation = TrayLifecycleState.Unavailable;
+        var probed = false;
+
+        machine.AtInvocationForTests = () =>
+        {
+            if (probed)
+            {
+                return;
+            }
+
+            probed = true;
+
+            var releaser = new Thread(() =>
+            {
+                machine.Release();
+                releaseFinished.Set();
+            });
+
+            releaser.Start();
+            releaseFinished.Wait(TimeSpan.FromSeconds(2));
+
+            stateAtInvocation = machine.LifecycleState;
+        };
+
+        machine.Establish();
+
+        Assert.True(probed, "the invocation probe never ran");
+        Assert.NotEqual(TrayLifecycleState.Releasing, stateAtInvocation);
+        Assert.NotEqual(TrayLifecycleState.Released, stateAtInvocation);
+
+        // The release is allowed to finish afterwards; the point is only that it could not land INSIDE
+        // the delivery.
+        Assert.True(releaseFinished.Wait(Patience), "the release never completed");
+    }
+
+    /// <summary>
+    /// A continuation the UI thread will not take is DROPPED, never run on the timer's thread.
+    /// </summary>
+    /// <remarks>
+    /// The first version fell back to running inline, which cancelled the guarantee the main path
+    /// establishes: the topology held only when the dispatcher was healthy, and a continuation on the
+    /// timer thread is exactly the second drainer the ordering work exists to exclude.
+    /// </remarks>
+    [Fact]
+    public void A_refused_continuation_never_runs_off_the_UI_thread()
+    {
+        var refused = 0;
+
+        using var machine = new TrayStateMachine(
+            _native,
+            () => Interlocked.Increment(ref _exitRequests),
+            () => Interlocked.Increment(ref _escalations),
+            _time,
+            NullLogger<TrayStateMachine>.Instance,
+            limiter: null,
+            marshalToUi: _ =>
+            {
+                Interlocked.Increment(ref refused);
+                return false;
+            });
+
+        machine.Establish();
+        var addsBefore = _native.AddCallsSnapshot;
+
+        machine.NotifyTaskbarCreated();
+        _time.Advance(TrayStateMachine.DebounceDelay);
+        _time.Advance(TrayStateMachine.FirstRetryDelay);
+        _time.Advance(TrayStateMachine.SecondRetryDelay);
+        _time.Advance(TrayStateMachine.RecoveryDeadline);
+
+        Assert.True(refused > 0, "no continuation was offered to the UI thread");
+        Assert.Equal(addsBefore, _native.AddCallsSnapshot);
     }
 
     /// <summary>
@@ -382,7 +521,11 @@ public sealed class TrayStateMachineTests : IDisposable
             _time,
             NullLogger<TrayStateMachine>.Instance,
             limiter: null,
-            marshalToUi: deferred.Add);
+            marshalToUi: continuation =>
+            {
+                deferred.Add(continuation);
+                return true;
+            });
 
         machine.Establish();
         var staleGeneration = machine.GenerationForTests;

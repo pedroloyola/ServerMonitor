@@ -1,0 +1,126 @@
+[
+  {
+    "id": "M1",
+    "desc": "Transition may emit Add during Releasing",
+    "status": "RAN",
+    "failed": 4,
+    "passed": 100
+  },
+  {
+    "id": "M2",
+    "desc": "a late pre-Release Add success publishes Available",
+    "status": "RAN",
+    "failed": 2,
+    "passed": 102
+  },
+  {
+    "id": "M3",
+    "desc": "a late Add receives no compensating Delete",
+    "status": "RAN",
+    "failed": 2,
+    "passed": 102
+  },
+  {
+    "id": "M4",
+    "desc": "delivery-time revalidation of notifications removed",
+    "status": "ANCHOR-NOT-FOUND"
+  },
+  {
+    "id": "M5",
+    "desc": "a false Shell_NotifyIcon result is treated as success",
+    "status": "RAN",
+    "failed": 10,
+    "passed": 94
+  },
+  {
+    "id": "M6",
+    "desc": "a successful Shell_NotifyIcon result is treated as failure",
+    "status": "RAN",
+    "failed": 10,
+    "passed": 94
+  },
+  {
+    "id": "M7",
+    "desc": "TaskbarCreated recovery removed",
+    "status": "RAN",
+    "failed": 8,
+    "passed": 96
+  },
+  {
+    "id": "M8",
+    "desc": "a successful recovery resets the frequency history",
+    "status": "RAN",
+    "failed": 1,
+    "passed": 103
+  },
+  {
+    "id": "M9",
+    "desc": "Available retained after an admitted TaskbarCreated",
+    "status": "RAN",
+    "failed": 8,
+    "passed": 96
+  },
+  {
+    "id": "M10",
+    "desc": "an unverifiable cleanup is allowed to keep living",
+    "status": "RAN",
+    "failed": 2,
+    "passed": 102
+  },
+  {
+    "id": "M11",
+    "desc": "a default arm is added to the effect switch",
+    "status": "RAN",
+    "failed": 1,
+    "passed": 103
+  },
+  {
+    "id": "M12",
+    "desc": "the fail-safe RunOnce marks on entry instead of after a normal return",
+    "status": "RAN",
+    "failed": 1,
+    "passed": 103
+  },
+  {
+    "id": "M13",
+    "desc": "the CV-19 carve-out is removed so stale AddCompleted is discarded",
+    "status": "RAN",
+    "failed": 1,
+    "passed": 103
+  },
+  {
+    "id": "M14",
+    "desc": "the deadline preamble step is removed",
+    "status": "RAN",
+    "failed": 1,
+    "passed": 103
+  },
+  {
+    "id": "M15",
+    "desc": "the message-identity check is removed",
+    "status": "RAN",
+    "failed": 1,
+    "passed": 103
+  },
+  {
+    "id": "M16",
+    "desc": "the icon-id check is removed",
+    "status": "RAN",
+    "failed": 1,
+    "passed": 103
+  },
+  {
+    "id": "M17",
+    "desc": "the closed v4 event list is opened",
+    "status": "RAN",
+    "failed": 2,
+    "passed": 102
+  },
+  {
+    "id": "M18",
+    "desc": "the anchor sanitisation is removed",
+    "status": "RAN",
+    "failed": 1,
+    "passed": 103
+  }
+]

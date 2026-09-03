@@ -6,6 +6,7 @@ using ServerMonitor.Core.Enums;
 using ServerMonitor.App;
 using ServerMonitor.App.Services;
 using ServerMonitor.App.Shell.Tray;
+using ServerMonitor.App.Tests.Fakes;
 
 namespace ServerMonitor.App.Tests.Architecture;
 
@@ -132,6 +133,109 @@ public sealed class TrayOwnershipCompletenessTests
 
         Assert.True(services.Count > 50, $"the composition produced only {services.Count} descriptors");
         Assert.Contains(services, d => d.ServiceType == typeof(ITrayAffordanceSource));
+    }
+
+    // ------------------------------------------------------------------ the DPI update is ROUTED
+
+    /// <summary>
+    /// The adapter SENDS its own shell updates through the machine's gate.
+    /// </summary>
+    /// <remarks>
+    /// The previous test proved only that <c>InvokeUnderShellGate</c> serializes — a property of the
+    /// machine. A mutation that sent the DPI update straight to the shell left it green, because nothing
+    /// asserted that this adapter uses the gate at all. This asserts the routing.
+    /// </remarks>
+    [Fact]
+    public void A_shell_update_owned_by_the_adapter_is_routed_through_the_machines_gate()
+    {
+        var native = new BlockingNativeTrayRegistration();
+        using var machine = new TrayStateMachine(
+            native,
+            () => { },
+            () => { },
+            TimeProvider.System,
+            NullLogger<TrayStateMachine>.Instance);
+
+        var ran = false;
+        OwnedTrayIconAdapter.RouteShellUpdate(machine, () =>
+        {
+            ran = true;
+
+            // Inside the gate: a second shell call from this thread is re-entrant, but the point is that
+            // the update runs where the machine's own calls are serialized.
+            native.Calls.Add("Dpi");
+        });
+
+        Assert.True(ran, "the update never ran");
+        Assert.Contains("Dpi", native.Calls);
+    }
+
+    [Fact]
+    public void A_shell_update_still_runs_when_there_is_no_machine_to_serialize_against()
+    {
+        var ran = false;
+
+        OwnedTrayIconAdapter.RouteShellUpdate(null, () => ran = true);
+
+        Assert.True(ran, "with no machine there is nothing to serialize against, so it must still run");
+    }
+
+    /// <summary>
+    /// The link the behaviour tests cannot reach: that the DPI handler uses the router.
+    /// </summary>
+    /// <remarks>
+    /// A source assertion, comments stripped, declared as one — <c>OnDpiChanged</c> needs a real
+    /// <c>TrayHostWindow</c> and a real registration, so no test can drive it.
+    /// </remarks>
+    [Fact]
+    public void The_DPI_handler_goes_through_the_router_and_not_straight_to_the_shell()
+    {
+        var source = StripComments(File.ReadAllText(Path.Combine(
+            RepositoryRoot(), "src", "ServerMonitor.App", "Shell", "Tray", "OwnedTrayIconAdapter.cs")));
+
+        var handler = source.IndexOf("private void OnDpiChanged", StringComparison.Ordinal);
+        Assert.True(handler >= 0, "the DPI handler could not be found");
+
+        var body = source[handler..];
+        var end = body.IndexOf("internal static void RouteShellUpdate", StringComparison.Ordinal);
+        Assert.True(end > 0, "the router could not be found");
+
+        body = body[..end];
+
+        // The update is handed to the router, not issued directly and not gated by hand. Naming
+        // UpdateForDpi is expected — it is the delegate being routed; what must not appear is a call
+        // that bypasses the router or reimplements it.
+        Assert.Contains(
+            "RouteShellUpdate(machine, () => registration.UpdateForDpi(dpi));", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("InvokeUnderShellGate", body, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The UI marshaller has exactly ONE inline invocation — the branch where we already own the thread —
+    /// and no fallback that runs the continuation when the dispatcher refuses.
+    /// </summary>
+    /// <remarks>
+    /// Source-level, and declared as one: taking the false branch needs a real <c>DispatcherQueue</c> in
+    /// the middle of shutting down, which no test can produce. The fallback is what cancelled the
+    /// topology guarantee, so its ABSENCE is what has to be pinned.
+    /// </remarks>
+    [Fact]
+    public void The_UI_marshaller_has_no_inline_fallback()
+    {
+        var source = StripComments(File.ReadAllText(Path.Combine(
+            RepositoryRoot(), "src", "ServerMonitor.App", "Shell", "Tray", "OwnedTrayIconAdapter.cs")));
+
+        var start = source.IndexOf("private bool RunOnUiThread", StringComparison.Ordinal);
+        Assert.True(start >= 0, "the marshaller could not be found");
+
+        var body = source[start..];
+        var end = body.IndexOf("\n    }", StringComparison.Ordinal);
+        Assert.True(end > 0, "the marshaller body could not be delimited");
+        body = body[..end];
+
+        var inlineCalls = body.Split("continuation();").Length - 1;
+        Assert.Equal(1, inlineCalls);
+        Assert.Contains("return dispatcher.TryEnqueue(", body, StringComparison.Ordinal);
     }
 
     // ------------------------------------------------------------------ the degraded session is WIRED

@@ -326,37 +326,67 @@ internal sealed class OwnedTrayIconAdapter : ITrayIconAdapter, ITrayAffordanceSo
             return;
         }
 
-        if (machine is null)
-        {
-            registration.UpdateForDpi(dpi);
-            return;
-        }
-
-        machine.InvokeUnderShellGate(() => registration.UpdateForDpi(dpi));
+        RouteShellUpdate(machine, () => registration.UpdateForDpi(dpi));
     }
 
     /// <summary>
-    /// Runs a scheduled continuation on the UI thread, restoring the thread topology the design and
-    /// CV-7/CV-8 assume: every <c>Shell_NotifyIcon</c> call happens on the UI thread, including the ones
-    /// a retry timer starts. If the dispatcher will not take it — shutting down — it runs inline rather
-    /// than being dropped, because a dropped continuation strands an episode whose deadline nobody would
-    /// then observe.
+    /// Sends a shell update that this adapter owns through the machine's gate, so it is serialized
+    /// against the machine's own <c>NIM_ADD</c> and <c>NIM_DELETE</c>.
     /// </summary>
-    private void RunOnUiThread(Action continuation)
+    /// <remarks>
+    /// Extracted so the ROUTING is testable and not just the gate. A test that only proved
+    /// <c>InvokeUnderShellGate</c> serializes proved a property of the machine, not that this adapter
+    /// uses it — and a mutation that sent the DPI update straight to the shell left that test green.
+    /// </remarks>
+    internal static void RouteShellUpdate(TrayStateMachine? machine, Action update)
     {
-        var dispatcher = _dispatcherQueue;
+        ArgumentNullException.ThrowIfNull(update);
 
-        if (dispatcher is null || dispatcher.HasThreadAccess)
+        if (machine is null)
         {
-            continuation();
+            // No machine means nothing else is touching the icon: there is no one to serialize against.
+            update();
             return;
         }
 
-        if (!dispatcher.TryEnqueue(() => continuation()))
+        machine.InvokeUnderShellGate(update);
+    }
+
+    /// <summary>
+    /// Hands a scheduled continuation to the UI thread, and reports whether it will run there.
+    /// </summary>
+    /// <remarks>
+    /// This is the whole of CV-7/CV-8's topology guarantee: every <c>Shell_NotifyIcon</c> call happens on
+    /// the UI thread, including the ones a retry timer starts, which is the thread CV-8's cost figures
+    /// were measured on.
+    /// <para>
+    /// It returns <c>false</c> instead of falling back to running inline. The inline fallback was the
+    /// first version and it cancelled the guarantee the main path establishes: it executed on the timer's
+    /// own thread, so the topology held only when nothing went wrong, and a continuation there is exactly
+    /// the second drainer the ordering work exists to exclude. The caller drops and logs.
+    /// </para>
+    /// <para>
+    /// Running inline when we ALREADY have thread access is not a fallback — it is the UI thread.
+    /// </para>
+    /// </remarks>
+    private bool RunOnUiThread(Action continuation)
+    {
+        var dispatcher = _dispatcherQueue;
+
+        if (dispatcher is null)
         {
-            _logger.LogDebug("The UI dispatcher refused a tray continuation; running it inline.");
-            continuation();
+            // Start() resolves it before anything can be scheduled, so this is unreachable in practice;
+            // refusing is the fail-closed answer rather than guessing which thread we are on.
+            return false;
         }
+
+        if (dispatcher.HasThreadAccess)
+        {
+            continuation();
+            return true;
+        }
+
+        return dispatcher.TryEnqueue(() => continuation());
     }
 
     private void OnMachineStateChanged(object? sender, EventArgs args) =>

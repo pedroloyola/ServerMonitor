@@ -97,6 +97,25 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
     private readonly record struct Effect(EffectKind Kind, long Generation, long Sequence, TimeSpan Delay);
 
     /// <summary>
+    /// A queued effect and whether it may run yet.
+    /// <para>
+    /// Ordering the effects by sequence fixed one half: a Delete can no longer overtake the Add it
+    /// compensates. It left the neighbour open — an ALREADY RUNNING drainer could still pick up an effect
+    /// emitted by another transition and reach the shell before THAT transition published its state
+    /// change. Staging the effects and committing them after the publication was the first attempt and
+    /// had to be withdrawn: it made commit order diverge from decision order, reintroducing the very
+    /// inversion being fixed.
+    /// </para>
+    /// <para>
+    /// Readiness solves both at once. Effects are queued in sequence order at decision time, so the order
+    /// is never in question, and they are marked runnable only after their own transition has published.
+    /// A drainer STOPS at the first effect that is not ready rather than skipping it, because skipping is
+    /// what would reorder.
+    /// </para>
+    /// </summary>
+    private readonly record struct PendingEffect(Effect Effect, bool Ready);
+
+    /// <summary>
     /// The operation and the affordance flag come from ONE expression, in an exhaustive switch with no
     /// default arm: a new kind is a compile error rather than a silent <c>false</c>, and the two values
     /// cannot disagree because they do not live in separate places.
@@ -147,6 +166,17 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
     /// </remarks>
     internal Action? BeforeDeliveryForTests;
 
+    /// <summary>
+    /// Runs immediately before <c>StateChanged</c> is invoked, after every check has passed.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="BeforeDeliveryForTests"/> sits before the checks and therefore cannot observe the one
+    /// window that mattered: between the LAST check and the invocation. A mutation that moved the
+    /// invocation back outside the lock survived precisely because no probe could stand there. This one
+    /// can.
+    /// </remarks>
+    internal Action? AtInvocationForTests;
+
     /// <summary>The generation the machine is currently on. Test seam; see <see cref="InjectForTests"/>.</summary>
     internal long GenerationForTests
     {
@@ -173,6 +203,37 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
     internal void InjectForTests(TrayEventKind kind, long generation, bool success) =>
         Dispatch(new TrayEvent(kind, generation, success));
 
+    /// <summary>
+    /// Whether the effect at the head of the queue may run right now. Test seam, read-only.
+    /// </summary>
+    /// <remarks>
+    /// This replaces a seam that RAN a drain from inside the publication. That version re-entered the
+    /// machine while it held the decision lock, recursed through effect completions, and overflowed the
+    /// stack — which killed the test host, and <c>dotnet test</c> printed a green "Passed!" line for the
+    /// seven tests that had finished before the crash. Observing the queue answers the same question
+    /// without executing anything: a drainer arriving at this instant would find exactly this.
+    /// </remarks>
+    /// <summary>
+    /// Runs a drain from wherever the test stands, as a second drainer would. Test seam.
+    /// </summary>
+    /// <remarks>
+    /// Re-entrant by design: the drain takes the shell gate and then the decision lock, both of which a
+    /// probe already holding the decision lock re-enters on its own thread. That is what lets a test ask
+    /// "what would a drainer do RIGHT NOW" at a point that cannot otherwise be reached.
+    /// </remarks>
+    internal void DrainForTests() => DrainEffects();
+
+    internal bool HeadEffectIsRunnableForTests
+    {
+        get
+        {
+            lock (_decision)
+            {
+                return _pending.Count > 0 && _pending[0].Ready;
+            }
+        }
+    }
+
     internal static int[] EffectKindsForTests() =>
         [.. Enum.GetValues<EffectKind>().Select(kind => (int)kind)];
 
@@ -198,9 +259,10 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
     private readonly Action _requestAuthoritativeExit;
 
     /// <summary>
-    /// Runs a scheduled continuation on the UI thread. See <see cref="Schedule"/>.
+    /// Hands a scheduled continuation to the UI thread. Returns false when it will not run there.
+    /// See <see cref="Schedule"/>.
     /// </summary>
-    private readonly Action<Action> _marshalToUi;
+    private readonly Func<Action, bool> _marshalToUi;
     private readonly Action _escalateTermination;
     private readonly ILogger _logger;
 
@@ -209,8 +271,8 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
     private readonly object _deliveryGate = new();
 
     /// <summary>
-    /// Queued effects, sorted by sequence because they are appended under the decision lock, and drained
-    /// by one thread at a time.
+    /// Queued effects, sorted by sequence because they are appended under the decision lock, drained by
+    /// one thread at a time, and NOT EXECUTABLE until the transition that produced them has published.
     /// <para>
     /// It was a <c>Queue</c> drained by whoever arrived, and the dequeue happened OUTSIDE the gate, so
     /// two drainers could take A then B and let B reach the shell first. <see cref="Effect.Sequence"/>
@@ -219,7 +281,7 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
     /// ADD, which leaves the icon alive and destroys the compensation invariant.
     /// </para>
     /// </summary>
-    private readonly List<Effect> _pending = [];
+    private readonly List<PendingEffect> _pending = [];
 
     private readonly List<ITimer> _timers = [];
 
@@ -255,6 +317,11 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
     /// <summary>Sequence of the last effect handed to the shell. Only ever moves forward.</summary>
     private long _lastExecutedSequence;
 
+    /// <summary>Sequence range emitted by the transition in progress. Only touched under the lock.</summary>
+    private long _emittedFrom;
+
+    private long _emittedTo;
+
     /// <summary>Monotonic delivery token, so an older notification can never land after a newer one.</summary>
     private long _publishSequence;
 
@@ -268,7 +335,7 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
         TimeProvider timeProvider,
         ILogger<TrayStateMachine> logger,
         EpisodeFrequencyLimiter? limiter = null,
-        Action<Action>? marshalToUi = null)
+        Func<Action, bool>? marshalToUi = null)
     {
         ArgumentNullException.ThrowIfNull(native);
 
@@ -282,9 +349,13 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _limiter = limiter ?? new EpisodeFrequencyLimiter(_time);
 
-        // Default: run inline. That is right for a caller that already owns the thread — every test, and
-        // the establishment path itself. Production passes the UI dispatcher; see Schedule.
-        _marshalToUi = marshalToUi ?? (continuation => continuation());
+        // Default: run inline and report success. That is right for a caller that already owns the
+        // thread — every test, and the establishment path itself. Production passes the UI dispatcher.
+        _marshalToUi = marshalToUi ?? (continuation =>
+        {
+            continuation();
+            return true;
+        });
 
         // The capability is forwarded, never retained by this class.
         _executor = new EffectExecutor(native);
@@ -365,7 +436,8 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
     /// gone by then.
     /// </param>
     private readonly record struct Outcome(
-        bool FailSafeExit, bool Publish, TrayAffordanceState State, long Deadline);
+        bool FailSafeExit, bool Publish, TrayAffordanceState State, long Deadline,
+        long EmittedFrom, long EmittedTo);
 
     /// <summary>
     /// THE transition function. Called with <see cref="_decision"/> held; performs no I/O of any kind.
@@ -707,8 +779,13 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
     /// will remove. The residual is recorded in the CV map.
     /// </para>
     /// </remarks>
-    private void Emit(EffectKind kind, TimeSpan delay) =>
-        _pending.Add(new Effect(kind, _generation, ++_sequence, delay));
+    private void Emit(EffectKind kind, TimeSpan delay)
+    {
+        var effect = new Effect(kind, _generation, ++_sequence, delay);
+        _emittedFrom = _emittedFrom == 0 ? effect.Sequence : _emittedFrom;
+        _emittedTo = effect.Sequence;
+        _pending.Add(new PendingEffect(effect, Ready: false));
+    }
 
     private Outcome Result(TrayLifecycleState before)
     {
@@ -722,7 +799,12 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
             LifecycleChangedForTests?.Invoke(this, EventArgs.Empty);
         }
 
-        return new Outcome(failSafe, publish, Project(after), _deadlineTimestamp);
+        var from = _emittedFrom;
+        var to = _emittedTo;
+        _emittedFrom = 0;
+        _emittedTo = 0;
+
+        return new Outcome(failSafe, publish, Project(after), _deadlineTimestamp, from, to);
     }
 
     private static TrayAffordanceState Project(TrayLifecycleState state) => state switch
@@ -774,6 +856,12 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
                 PublishIfCurrent(outcome);
             }
 
+            // Only NOW may this transition's effects run. Queued in order at decision time so nothing can
+            // overtake them, released here so nothing — including a drainer that was already running on
+            // another thread — can reach the shell on this transition's behalf before it has said what
+            // happened.
+            ReleaseEmittedEffects(outcome);
+
             if (!nested)
             {
                 DrainEffects();
@@ -821,6 +909,27 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
     /// could reach the shell first. The sequence is now both respected and CHECKED: a violation throws
     /// rather than silently producing a live icon nobody asked for.
     /// </remarks>
+    private void ReleaseEmittedEffects(Outcome outcome)
+    {
+        if (outcome.EmittedTo == 0)
+        {
+            return;
+        }
+
+        lock (_decision)
+        {
+            for (var index = 0; index < _pending.Count; index++)
+            {
+                var pending = _pending[index];
+                if (pending.Effect.Sequence >= outcome.EmittedFrom
+                    && pending.Effect.Sequence <= outcome.EmittedTo)
+                {
+                    _pending[index] = pending with { Ready = true };
+                }
+            }
+        }
+    }
+
     private void DrainEffects()
     {
         lock (_nativeGate)
@@ -835,7 +944,16 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
                         return;
                     }
 
-                    effect = _pending[0];
+                    var head = _pending[0];
+                    if (!head.Ready)
+                    {
+                        // STOP, do not skip: skipping would let a later effect overtake this one, which
+                        // is the inversion the sequence exists to prevent. The transition that owns this
+                        // effect drains it once it has published.
+                        return;
+                    }
+
+                    effect = head.Effect;
                     _pending.RemoveAt(0);
 
                     if (effect.Sequence <= _lastExecutedSequence)
@@ -900,13 +1018,32 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
     /// the code ran another is the defect this slice has been correcting all along, so the code moves to
     /// match the approved design rather than the design being quietly restated.
     /// <para>
-    /// If the dispatcher refuses the work — it is shutting down — the continuation runs inline. Dropping
-    /// it would strand an episode with a deadline nobody will observe.
+    /// If the dispatcher refuses the work the continuation is DROPPED, not run inline. Running it inline
+    /// was the first version and it undid the guarantee it was there to make: the fallback executed on
+    /// the timer's own thread, so the topology held only on the happy path — and a continuation running
+    /// there is a second drainer, which is the thing the ordering work exists to exclude. A guarantee
+    /// that holds only when nothing goes wrong is not a guarantee.
+    /// </para>
+    /// <para>
+    /// The dispatcher refuses only while it is shutting down, and at that point <c>Release</c> is what
+    /// runs and it absorbs every outstanding episode. Dropping is therefore bounded, and it is logged.
     /// </para>
     /// </remarks>
     private void Schedule(TimeSpan delay, Action callback)
     {
-        var timer = _time.CreateTimer(_ => _marshalToUi(callback), null, delay, Timeout.InfiniteTimeSpan);
+        var timer = _time.CreateTimer(
+            _ =>
+            {
+                if (!_marshalToUi(callback))
+                {
+                    _logger.LogWarning(
+                        "The UI dispatcher refused a scheduled tray continuation; it is dropped rather "
+                        + "than run on the timer thread.");
+                }
+            },
+            null,
+            delay,
+            Timeout.InfiniteTimeSpan);
         lock (_decision)
         {
             _timers.Add(timer);
@@ -991,22 +1128,34 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
             token = ++_publishSequence;
         }
 
-        BeforeDeliveryForTests?.Invoke();
-
         lock (_deliveryGate)
         {
-            if (token <= Volatile.Read(ref _deliveredSequence))
-            {
-                // A newer delivery already went out. This one is stale by construction.
-                return;
-            }
-
+            // The check and the invocation are now ONE critical section. Revalidating and then releasing
+            // the lock left a window between the last check and StateChanged: a Release could still win
+            // in it, and the deadline could still expire, and both were reproduced with a probe placed at
+            // that exact point. Moving the check earlier only moved the window; the fix is that there is
+            // no gap left to move it into.
+            //
+            // Holding the decision lock across a subscriber callback is safe HERE and nowhere else in
+            // this machine: every dispatch and every drain runs on the UI thread (see Schedule), so there
+            // is no second thread to block, and a subscriber that re-enters is on this very thread, where
+            // the lock is re-entrant and the nesting guard stops it draining underneath us.
             lock (_decision)
             {
+                if (token <= _deliveredSequence)
+                {
+                    // A newer delivery already went out. This one is stale by construction.
+                    return;
+                }
+
+                // The probe belongs AT the point of delivery. Earlier, it could not observe anything that
+                // happened after the last check — which is precisely where the defect was.
+                BeforeDeliveryForTests?.Invoke();
+
                 if (_state is TrayLifecycleState.Releasing or TrayLifecycleState.Released)
                 {
-                    // Release dominates. Suppressed here rather than at decision time, because the
-                    // Release may have won AFTER this delivery was decided.
+                    // Release dominates. Checked here rather than at decision time, because the Release
+                    // may have won AFTER this delivery was decided.
                     return;
                 }
 
@@ -1022,9 +1171,10 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
                 }
 
                 _deliveredSequence = token;
-            }
 
-            StateChanged?.Invoke(this, EventArgs.Empty);
+                AtInvocationForTests?.Invoke();
+                StateChanged?.Invoke(this, EventArgs.Empty);
+            }
         }
     }
 

@@ -1,0 +1,115 @@
+[
+  {
+    "id": "M26",
+    "desc": "the CV-9 gate admits every request",
+    "status": "RAN",
+    "failed": 4,
+    "passed": 115,
+    "tests": [
+      "ServerMonitor.App.Tests.Shell.FlyoutReentrancyGateTests.A_flood_of_requests_yields_exactly_one_open",
+      "ServerMonitor.App.Tests.Shell.FlyoutReentrancyGateTests.A_second_request_while_one_is_open_is_refused",
+      "ServerMonitor.App.Tests.Shell.FlyoutReentrancyGateTests.Closing_twice_does_not_release_a_second_slot",
+      "ServerMonitor.App.Tests.Shell.FlyoutReentrancyGateTests.Concurrent_requests_still_yield_exactly_one_open"
+    ]
+  },
+  {
+    "id": "M27",
+    "desc": "Close stops being idempotent, so a second one hands out an extra slot",
+    "status": "RAN",
+    "failed": 1,
+    "passed": 118,
+    "tests": [
+      "ServerMonitor.App.Tests.Shell.FlyoutReentrancyGateTests.Closing_twice_does_not_release_a_second_slot"
+    ]
+  },
+  {
+    "id": "M28",
+    "desc": "the menu order puts Exit first",
+    "status": "RAN",
+    "failed": 4,
+    "passed": 115,
+    "tests": [
+      "ServerMonitor.App.Tests.Shell.TrayFlyoutMenuTests.Each_command_resolves_the_key_the_previous_adapter_used",
+      "ServerMonitor.App.Tests.Shell.TrayFlyoutMenuTests.Every_command_is_in_the_menu_exactly_once",
+      "ServerMonitor.App.Tests.Shell.TrayFlyoutMenuTests.Every_resource_key_is_distinct",
+      "ServerMonitor.App.Tests.Shell.TrayFlyoutMenuTests.The_menu_order_is_exactly_the_agreed_one"
+    ]
+  },
+  {
+    "id": "M29",
+    "desc": "a menu item is dropped from the order",
+    "status": "RAN",
+    "failed": 3,
+    "passed": 116,
+    "tests": [
+      "ServerMonitor.App.Tests.Shell.TrayFlyoutMenuTests.Each_command_resolves_the_key_the_previous_adapter_used",
+      "ServerMonitor.App.Tests.Shell.TrayFlyoutMenuTests.Every_command_is_in_the_menu_exactly_once",
+      "ServerMonitor.App.Tests.Shell.TrayFlyoutMenuTests.The_menu_order_is_exactly_the_agreed_one"
+    ]
+  },
+  {
+    "id": "M30",
+    "desc": "a menu item resolves the wrong resource key",
+    "status": "RAN",
+    "failed": 2,
+    "passed": 117,
+    "tests": [
+      "ServerMonitor.App.Tests.Shell.TrayFlyoutMenuTests.Each_command_resolves_the_key_the_previous_adapter_used",
+      "ServerMonitor.App.Tests.Shell.TrayFlyoutMenuTests.Every_menu_key_and_the_tooltip_exist_in_every_localization"
+    ]
+  },
+  {
+    "id": "M31",
+    "desc": "attaching a theme root REPLACES the previous one",
+    "status": "RAN",
+    "failed": 4,
+    "passed": 115,
+    "tests": [
+      "ServerMonitor.App.Tests.Services.ThemeRootSetTests.A_second_root_is_added_and_does_not_replace_the_first",
+      "ServerMonitor.App.Tests.Services.ThemeRootSetTests.Applying_visits_every_root_and_not_just_the_most_recent_one",
+      "ServerMonitor.App.Tests.Services.ThemeRootSetTests.Detaching_removes_exactly_that_root_and_leaves_the_others",
+      "ServerMonitor.App.Tests.Services.ThemeRootSetTests.The_snapshot_is_a_copy_so_iterating_it_cannot_be_disturbed_by_a_new_window"
+    ]
+  },
+  {
+    "id": "M32",
+    "desc": "the theme is applied only to the most recent root",
+    "status": "RAN",
+    "failed": 1,
+    "passed": 118,
+    "tests": [
+      "ServerMonitor.App.Tests.Services.ThemeRootSetTests.Applying_visits_every_root_and_not_just_the_most_recent_one"
+    ]
+  },
+  {
+    "id": "M33",
+    "desc": "the affordance source is a SECOND instance rather than the icon owner",
+    "status": "RAN",
+    "failed": 1,
+    "passed": 118,
+    "tests": [
+      "ServerMonitor.App.Tests.Architecture.TrayOwnershipCompletenessTests.The_container_resolves_both_tray_roles_to_the_same_single_instance"
+    ]
+  },
+  {
+    "id": "M34",
+    "desc": "the capability is registered in the container (T14c over real descriptors)",
+    "status": "RAN",
+    "failed": 2,
+    "passed": 117,
+    "tests": [
+      "ServerMonitor.App.Tests.Architecture.TrayCapabilityBoundaryTests.T14b_only_the_allowlisted_members_name_the_capability_at_all",
+      "ServerMonitor.App.Tests.Architecture.TrayOwnershipCompletenessTests.T14c_the_capability_is_never_registered_in_the_container"
+    ]
+  },
+  {
+    "id": "M35",
+    "desc": "the adapter reports Available before anything is registered",
+    "status": "RAN",
+    "failed": 1,
+    "passed": 118,
+    "tests": [
+      "ServerMonitor.App.Tests.Architecture.TrayOwnershipCompletenessTests.The_owner_reports_no_affordance_until_a_registration_has_actually_succeeded"
+    ]
+  }
+]
