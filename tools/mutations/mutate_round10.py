@@ -12,28 +12,13 @@ TESTS = os.path.join(ROOT, "tests", "ServerMonitor.App.Tests", "ServerMonitor.Ap
 FILTER = "FullyQualifiedName~Tray|FullyQualifiedName~Theme|FullyQualifiedName~Flyout|FullyQualifiedName~FailSafe"
 
 MUTATIONS = [
- ("M46", "the dequeue moves back outside the gate, so two drainers can invert the order", [
-   (MACHINE,
-    "        lock (_nativeGate)\n        {\n            while (true)\n            {\n                Effect effect;\n                lock (_decision)\n                {\n                    if (_pending.Count == 0)\n                    {\n                        return;\n                    }\n\n                    effect = _pending[0];\n                    _pending.RemoveAt(0);",
-    "        {\n            while (true)\n            {\n                Effect effect;\n                lock (_decision)\n                {\n                    if (_pending.Count == 0)\n                    {\n                        return;\n                    }\n\n                    effect = _pending[0];\n                    _pending.RemoveAt(0);"),
-   (MACHINE,
-    "        // The gate is already held by DrainEffects, which owns it for the whole drain.\n        var ok = _executor.Run(operation);",
-    "        bool ok;\n        lock (_nativeGate)\n        {\n            ok = _executor.Run(operation);\n        }")]),
-
- ("M48", "Release no longer dominates at delivery time", [
-   (MACHINE,
-    "                if (_state is TrayLifecycleState.Releasing or TrayLifecycleState.Released)\n                {\n                    // Release dominates. Suppressed here rather than at decision time, because the\n                    // Release may have won AFTER this delivery was decided.\n                    return;\n                }",
-    "                if (false)\n                {\n                    return;\n                }")]),
-
+ # M46, M48 and M50 were retired: the code they anchored on was reshaped by the readiness, the single
+ # delivery critical section and the marshaller contract. The same properties are now attacked by M53,
+ # M55 and M56 in mutate_round11.py, against the code as it stands.
  ("M49", "a decision taken before the deadline may be delivered as Available after it", [
    (MACHINE,
     "                if (Project(_state) == TrayAffordanceState.Available\n                    && outcome.Deadline != 0\n                    && _time.GetTimestamp() >= outcome.Deadline)",
     "                if (false && Project(_state) == TrayAffordanceState.Available\n                    && outcome.Deadline != 0\n                    && _time.GetTimestamp() >= outcome.Deadline)")]),
-
- ("M50", "scheduled recovery attempts run wherever the timer fires", [
-   (MACHINE,
-    "        var timer = _time.CreateTimer(_ => _marshalToUi(callback), null, delay, Timeout.InfiniteTimeSpan);",
-    "        var timer = _time.CreateTimer(_ => callback(), null, delay, Timeout.InfiniteTimeSpan);")]),
 
  ("M51", "the DPI update goes straight to the shell, outside the gate", [
    (MACHINE,

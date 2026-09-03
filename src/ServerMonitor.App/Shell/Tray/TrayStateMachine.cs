@@ -18,7 +18,22 @@ internal enum TrayEventKind
 }
 
 /// <summary>An event carrying its generation, so the preamble can judge obsolescence.</summary>
-internal readonly record struct TrayEvent(TrayEventKind Kind, long Generation, bool Success);
+/// <param name="Outcome">
+/// What the shell did, for events that report a shell operation. Kept as the TYPED outcome rather than a
+/// boolean, because the lifecycle needs to distinguish an add that never created anything from one that
+/// created an icon and then failed — those decide whether removal is required at all.
+/// </param>
+internal readonly record struct TrayEvent(TrayEventKind Kind, long Generation, ShellOutcome Outcome)
+{
+    /// <summary>Whether the operation reported success. Convenience for the paths that only need that.</summary>
+    internal bool Success => Outcome == ShellOutcome.Succeeded;
+
+    /// <summary>
+    /// Whether the shell may be holding an icon because of the operation this event reports. False only
+    /// when the add itself was refused, which is the case that makes cleanup unnecessary.
+    /// </summary>
+    internal bool MayHaveCreatedAnEffect => Outcome is ShellOutcome.Succeeded or ShellOutcome.FailedWithPossibleEffect;
+}
 
 /// <summary>What the shell may still be holding because of us.</summary>
 internal enum ShellEffectState
@@ -33,7 +48,45 @@ internal enum ShellEffectState
     Deleted = 2,
 
     /// <summary>Delete kept returning false while we knew an effect might exist. Fail-safe territory.</summary>
-    Unverified = 3
+    Unverified = 3,
+
+    /// <summary>
+    /// Every add was observed to fail at <c>NIM_ADD</c> itself, and nothing is in flight that could still
+    /// create an icon. There is nothing to remove, and there never was.
+    /// </summary>
+    NeverCreated = 4
+}
+
+/// <summary>
+/// What became of the obligation to remove our icon from the shell.
+/// </summary>
+/// <remarks>
+/// The model was binary — cleanup verified, or not — and that could not express the difference the human
+/// decision names: cleanup that <b>was needed and could not be verified</b> is not the same as cleanup
+/// that <b>was never needed because no icon was ever created</b>. Collapsing them made a machine whose
+/// <c>NIM_ADD</c> always fails exit rather than degrade, because a <c>NIM_DELETE</c> for an icon that
+/// never existed returns false and was read as a failure.
+/// <para>
+/// <b>This is a refinement of CV-16, not a relaxation.</b> <see cref="Unverified"/> is only ever reachable
+/// when removal was REQUIRED, and it still authorises nothing: it goes to the fail-safe exit.
+/// <see cref="NotRequired"/> is not a cleanup failure and must never be mapped to one.
+/// </para>
+/// </remarks>
+internal enum CleanupDisposition
+{
+    /// <summary>
+    /// No icon was ever created and none can still appear, so there is nothing to remove. NOT a failure.
+    /// </summary>
+    NotRequired = 0,
+
+    /// <summary>Removal was required and the shell confirmed it. The session may continue degraded.</summary>
+    Verified = 1,
+
+    /// <summary>
+    /// Removal was REQUIRED and could not be established within its budget. CV-16 applies: the process
+    /// may not continue, degraded or otherwise.
+    /// </summary>
+    Unverified = 2
 }
 
 /// <summary>
@@ -201,7 +254,10 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
     /// </para>
     /// </remarks>
     internal void InjectForTests(TrayEventKind kind, long generation, bool success) =>
-        Dispatch(new TrayEvent(kind, generation, success));
+        Dispatch(new TrayEvent(
+            kind,
+            generation,
+            success ? ShellOutcome.Succeeded : ShellOutcome.FailedWithoutEffect));
 
     /// <summary>
     /// Whether the effect at the head of the queue may run right now. Test seam, read-only.
@@ -242,13 +298,42 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
     {
         private readonly INativeTrayRegistration _native = native;
 
-        internal bool Run(NativeTrayOperation operation) => operation switch
+        /// <summary>
+        /// Performs the operation and reports what the SHELL did, keeping the two native calls of an add
+        /// distinguishable.
+        /// </summary>
+        /// <remarks>
+        /// It used to return <c>Add() &amp;&amp; SetVersion()</c>. That single boolean is where the
+        /// information was lost: a false could mean the icon was never created or that it was created and
+        /// only the version call failed, and the lifecycle needs to tell those apart to know whether
+        /// removal is required at all.
+        /// </remarks>
+        internal ShellOutcome Run(NativeTrayOperation operation)
         {
-            NativeTrayOperation.Add => _native.Add() && _native.SetVersion(),
-            NativeTrayOperation.Delete => _native.Delete(),
-            NativeTrayOperation.None => true,
-            _ => throw new ArgumentOutOfRangeException(nameof(operation), operation, null)
-        };
+            switch (operation)
+            {
+                case NativeTrayOperation.Add:
+                    if (!_native.Add())
+                    {
+                        // NIM_ADD itself refused: the shell is not holding an icon because of this call.
+                        return ShellOutcome.FailedWithoutEffect;
+                    }
+
+                    return _native.SetVersion()
+                        ? ShellOutcome.Succeeded
+                        // The icon EXISTS and only the version call failed. Removing it is mandatory.
+                        : ShellOutcome.FailedWithPossibleEffect;
+
+                case NativeTrayOperation.Delete:
+                    return _native.Delete() ? ShellOutcome.Succeeded : ShellOutcome.FailedWithoutEffect;
+
+                case NativeTrayOperation.None:
+                    return ShellOutcome.NotPerformed;
+
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(operation), operation, null);
+            }
+        }
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -311,6 +396,16 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
     private int _cleanupAttempts;
     private ShellEffectState _effect = ShellEffectState.NotIssued;
     private int _reconciliationPending;
+
+    /// <summary>
+    /// Whether any add has ever been observed to leave something behind — it succeeded, or it failed at a
+    /// point where the icon may already exist.
+    /// </summary>
+    /// <remarks>
+    /// Once true, a later add that is refused outright cannot downgrade the obligation: the earlier icon
+    /// may still be there. It is cleared only by a positively verified removal.
+    /// </remarks>
+    private bool _shellMayHoldAnIcon;
     private bool _failSafeCompleted;
     private bool _failSafeRequested;
 
@@ -395,17 +490,60 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
     /// <summary>True when a Lost episode could not positively verify its cleanup.</summary>
     internal bool CleanupVerified
     {
-        get { lock (_decision) { return _effect is ShellEffectState.Deleted or ShellEffectState.NotIssued; } }
+        get
+        {
+            // Kept as the shorthand the existing callers use: "nothing of ours is outstanding". It is now
+            // derived from the disposition rather than being the model, because a boolean cannot say WHY.
+            var disposition = Cleanup;
+            return disposition is CleanupDisposition.Verified or CleanupDisposition.NotRequired;
+        }
+    }
+
+    /// <summary>
+    /// What became of the obligation to remove our icon.
+    /// </summary>
+    /// <remarks>
+    /// <b>NotRequired is not a cleanup failure.</b> It is reported when no icon was ever created and none
+    /// can still appear, which is the ordinary outcome of a machine whose <c>NIM_ADD</c> is refused — and
+    /// mapping it onto a failure is what made that machine exit instead of degrading.
+    /// <para>
+    /// <b>CV-16 is refined, not relaxed.</b> <see cref="CleanupDisposition.Unverified"/> is only reachable
+    /// from <c>MayExist</c>, that is, only when removal really was required, and it still authorises
+    /// nothing.
+    /// </para>
+    /// </remarks>
+    internal CleanupDisposition Cleanup
+    {
+        get
+        {
+            lock (_decision)
+            {
+                return _effect switch
+                {
+                    ShellEffectState.NotIssued => CleanupDisposition.NotRequired,
+                    ShellEffectState.NeverCreated => CleanupDisposition.NotRequired,
+                    ShellEffectState.Deleted => CleanupDisposition.Verified,
+                    ShellEffectState.Unverified => CleanupDisposition.Unverified,
+
+                    // MayExist: the obligation is live and not yet resolved. Reporting it as Unverified
+                    // would escalate a cleanup that is merely still in progress; reporting it as
+                    // NotRequired would be the bypass CV-16 exists to forbid. It is neither, so it is
+                    // reported as the fail-closed one until the shell says otherwise.
+                    ShellEffectState.MayExist => CleanupDisposition.Unverified,
+                    _ => CleanupDisposition.Unverified
+                };
+            }
+        }
     }
 
     /// <summary>Starts the initial establishment episode. Same arbiter as broadcast recovery.</summary>
-    public void Establish() => Dispatch(new TrayEvent(TrayEventKind.Establish, 0, false));
+    public void Establish() => Dispatch(new TrayEvent(TrayEventKind.Establish, 0, ShellOutcome.NotPerformed));
 
     /// <summary>A <c>TaskbarCreated</c> broadcast reached our window.</summary>
-    public void NotifyTaskbarCreated() => Dispatch(new TrayEvent(TrayEventKind.TaskbarCreated, 0, false));
+    public void NotifyTaskbarCreated() => Dispatch(new TrayEvent(TrayEventKind.TaskbarCreated, 0, ShellOutcome.NotPerformed));
 
     /// <summary>The single public terminal operation. Idempotent; a no-op once terminal.</summary>
-    public void Release() => Dispatch(new TrayEvent(TrayEventKind.Release, 0, false));
+    public void Release() => Dispatch(new TrayEvent(TrayEventKind.Release, 0, ShellOutcome.NotPerformed));
 
     // ---------------------------------------------------------------------------------------------
     // Dispatch: decide under the lock, execute outside it.
@@ -631,11 +769,14 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
         if (trayEvent.Success)
         {
             _effect = ShellEffectState.MayExist;
+            _shellMayHoldAnIcon = true;
             _state = TrayLifecycleState.Available;
             _episodeActive = false;
 
             return;
         }
+
+        RecordFailedAdd(trayEvent);
 
         if (_attemptsUsed >= MaxAttemptsPerEpisode)
         {
@@ -652,24 +793,68 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
         ReconcileStale(trayEvent);
     }
 
+    /// <summary>
+    /// Classifies an add that did not succeed: did it leave anything behind?
+    /// </summary>
+    /// <remarks>
+    /// This is the distinction the whole of Question D turns on. <c>NIM_ADD</c> refused means the shell is
+    /// not holding an icon because of this call, and if nothing else can still create one there is nothing
+    /// to remove — so a later <c>NIM_DELETE</c> returning false is not a failure, it is the truth.
+    /// <c>NIM_ADD</c> succeeding and <c>NIM_SETVERSION</c> failing is the opposite case: the icon exists
+    /// and removal is mandatory.
+    /// <para>
+    /// FAIL CLOSED where it cannot tell. <c>_effect</c> is set to <c>MayExist</c> BEFORE the call on
+    /// purpose, and it is downgraded only when the shell reported a refusal AND nothing else is in
+    /// flight that could still create an icon AND no earlier add ever left one behind.
+    /// </para>
+    /// </remarks>
+    private void RecordFailedAdd(TrayEvent trayEvent)
+    {
+        if (trayEvent.MayHaveCreatedAnEffect)
+        {
+            _effect = ShellEffectState.MayExist;
+            _shellMayHoldAnIcon = true;
+            return;
+        }
+
+        if (_reconciliationPending > 0 || _shellMayHoldAnIcon)
+        {
+            // Something may still create an icon, or one was created earlier. Required until reconciled.
+            return;
+        }
+
+        _effect = ShellEffectState.NeverCreated;
+    }
+
     private void ReconcileStale(TrayEvent trayEvent)
     {
         // The result is obsolete for the lifecycle. It is NOT obsolete for the shell: if it may have
-        // recreated the icon, a compensating Delete is mandatory.
-        if (trayEvent.Success)
+        // recreated the icon, a compensating Delete is mandatory — including the case where NIM_ADD
+        // succeeded and only the version call failed.
+        if (trayEvent.MayHaveCreatedAnEffect)
         {
             _effect = ShellEffectState.MayExist;
+            _shellMayHoldAnIcon = true;
             _cleanupAttempts = 0;
             Emit(EffectKind.DeleteIcon, TimeSpan.Zero);
         }
         else
         {
+            RecordFailedAdd(trayEvent);
             TryComplete();
         }
     }
 
     private void HandleCleanupCompleted(TrayEvent trayEvent)
     {
+        if (_effect is ShellEffectState.NeverCreated or ShellEffectState.NotIssued)
+        {
+            // A Delete that ran anyway — a stale effect, or a caller doing it by accident — reports false
+            // because there is nothing to delete. That is the state we want, not a failure, and it must
+            // never turn NotRequired into Unverified.
+            return;
+        }
+
         // REDUNDANT DELETE. Publication now runs before the drain, which makes a synchronous re-entry
         // possible: a subscriber that degrades, finds no window and asks for the authoritative exit
         // reaches Release on this very stack, and Release queues its own delete for an icon a previous
@@ -685,6 +870,7 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
         if (trayEvent.Success)
         {
             _effect = ShellEffectState.Deleted;
+            _shellMayHoldAnIcon = false;
             return;
         }
 
@@ -706,6 +892,14 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
 
     private void HandleTerminalCleanup(TrayEvent trayEvent)
     {
+        if (_effect is ShellEffectState.NeverCreated or ShellEffectState.NotIssued)
+        {
+            // Same rule on the terminal path. TryComplete still runs: the release IS resolved, because
+            // there was never anything to remove.
+            TryComplete();
+            return;
+        }
+
         if (_effect == ShellEffectState.Deleted)
         {
             // Same rule as HandleCleanupCompleted: a delete for an icon already positively removed is
@@ -717,6 +911,7 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
         if (trayEvent.Success)
         {
             _effect = ShellEffectState.Deleted;
+            _shellMayHoldAnIcon = false;
             TryComplete();
             return;
         }
@@ -742,7 +937,13 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
             return;
         }
 
-        if (_reconciliationPending == 0 && _effect is ShellEffectState.Deleted or ShellEffectState.NotIssued)
+        // NeverCreated resolves a release exactly as a verified removal does: there is nothing to remove
+        // and there never was. Treating it as unresolved is what made a failed registration hang on to a
+        // Releasing state and then escalate.
+        if (_reconciliationPending == 0
+            && _effect is ShellEffectState.Deleted
+                or ShellEffectState.NotIssued
+                or ShellEffectState.NeverCreated)
         {
             _state = TrayLifecycleState.Released;
         }
@@ -754,6 +955,8 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
         _state = TrayLifecycleState.Lost;
         _episodeActive = false;
 
+        // No Delete when nothing was ever created: the human decision is explicit that pointless delete
+        // retries should not run at all when cleanup is provably NotRequired.
         if (_effect == ShellEffectState.MayExist)
         {
             _cleanupAttempts = 0;
@@ -978,15 +1181,15 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
         switch (effect.Kind)
         {
             case EffectKind.ScheduleDebounce:
-                Schedule(effect.Delay, () => Dispatch(new TrayEvent(TrayEventKind.DebounceElapsed, effect.Generation, false)));
+                Schedule(effect.Delay, () => Dispatch(new TrayEvent(TrayEventKind.DebounceElapsed, effect.Generation, ShellOutcome.NotPerformed)));
                 return;
 
             case EffectKind.ScheduleRetry:
-                Schedule(effect.Delay, () => Dispatch(new TrayEvent(TrayEventKind.RetryDue, effect.Generation, false)));
+                Schedule(effect.Delay, () => Dispatch(new TrayEvent(TrayEventKind.RetryDue, effect.Generation, ShellOutcome.NotPerformed)));
                 return;
 
             case EffectKind.ScheduleDeadline:
-                Schedule(effect.Delay, () => Dispatch(new TrayEvent(TrayEventKind.DeadlineObserved, effect.Generation, false)));
+                Schedule(effect.Delay, () => Dispatch(new TrayEvent(TrayEventKind.DeadlineObserved, effect.Generation, ShellOutcome.NotPerformed)));
                 return;
 
             case EffectKind.AddIcon:
@@ -998,12 +1201,12 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
         }
 
         // The gate is already held by DrainEffects, which owns it for the whole drain.
-        var ok = _executor.Run(operation);
+        var outcome = _executor.Run(operation);
 
         Dispatch(new TrayEvent(
             effect.Kind == EffectKind.AddIcon ? TrayEventKind.AddCompleted : TrayEventKind.CleanupCompleted,
             effect.Generation,
-            ok));
+            outcome));
     }
 
     /// <summary>

@@ -30,13 +30,13 @@ MUTATIONS = [
 
  ("M42", "the lifecycle learns of the loss only after the shell I/O", [
    (MACHINE,
-    "            if (outcome.Publish)\n            {\n                PublishIfCurrent(outcome);\n            }\n\n            if (!nested)\n            {\n                DrainEffects();\n            }",
-    "            if (!nested)\n            {\n                DrainEffects();\n            }\n\n            if (outcome.Publish)\n            {\n                PublishIfCurrent(outcome);\n            }")]),
+    "            if (outcome.Publish)\n            {\n                PublishIfCurrent(outcome);\n            }\n\n            // Only NOW may this transition's effects run.",
+    "            ReleaseEmittedEffects(outcome);\n\n            if (outcome.Publish)\n            {\n                PublishIfCurrent(outcome);\n            }\n\n            // Only NOW may this transition's effects run.")]),
 
  ("M43", "a redundant delete for an already removed icon is treated as a failure", [
    (MACHINE,
-    "        if (_effect == ShellEffectState.Deleted)\n        {\n            return;\n        }\n\n        if (trayEvent.Success)\n        {\n            _effect = ShellEffectState.Deleted;\n            return;\n        }",
-    "        if (trayEvent.Success)\n        {\n            _effect = ShellEffectState.Deleted;\n            return;\n        }"),
+    "        if (_effect == ShellEffectState.Deleted)\n        {\n            return;\n        }\n\n        if (trayEvent.Success)\n        {\n            _effect = ShellEffectState.Deleted;\n            _shellMayHoldAnIcon = false;\n            return;\n        }",
+    "        if (trayEvent.Success)\n        {\n            _effect = ShellEffectState.Deleted;\n            _shellMayHoldAnIcon = false;\n            return;\n        }"),
    (MACHINE,
     "        if (_effect == ShellEffectState.Deleted)\n        {\n            // Same rule as HandleCleanupCompleted",
     "        if (false)\n        {\n            // Same rule as HandleCleanupCompleted")]),

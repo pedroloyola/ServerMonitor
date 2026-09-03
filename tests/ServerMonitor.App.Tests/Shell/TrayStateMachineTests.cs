@@ -706,33 +706,18 @@ public sealed class TrayStateMachineTests : IDisposable
     }
 
     /// <summary>
-    /// <b>RETURNED QUESTION, not an approved behaviour.</b> A registration that never succeeded currently
-    /// ends in a fail-safe exit request rather than a degraded foreground session.
+    /// QUESTION D, CASE 1. An initial registration that NEVER succeeded degrades; it does not end the
+    /// application.
     /// </summary>
     /// <remarks>
-    /// Found by making <see cref="BlockingNativeTrayRegistration"/> honest: the real
-    /// <c>Shell_NotifyIcon(NIM_DELETE)</c> returns FALSE when the shell holds no such icon, and the fake
-    /// used to return true unconditionally, so no test could ever see this. The chain is:
-    /// <c>NIM_ADD</c> fails three times → Lost → the compensating delete has nothing to delete and
-    /// reports false → three cleanup attempts → <c>Unverified</c> → CV-16 escalates to the authoritative
-    /// exit.
-    /// <para>
-    /// It is not obviously wrong. <c>Attempt()</c> marks <c>MayExist</c> BEFORE the call on purpose, and
-    /// a false result cannot be attributed: <c>Add() &amp;&amp; SetVersion()</c> also returns false when
-    /// the icon WAS registered and only the version call failed, and then the icon really is there and
-    /// really must be removed. So the machine cannot tell "nothing to delete" from "delete failed", and
-    /// escalating is the fail-closed reading of CV-16.
-    /// </para>
-    /// <para>
-    /// But the product consequence is that a machine where the tray registration fails cannot run the
-    /// app at all — the approved design says such a launch degrades to a foreground session with
-    /// true-exit semantics, and this exits instead. Two approved rules disagree, and choosing between
-    /// them is not mine. This test pins TODAY's behaviour so the decision is visible the moment it
-    /// changes; it is not an endorsement.
-    /// </para>
+    /// Every <c>NIM_ADD</c> was refused and nothing is in flight that could still create an icon, so
+    /// there is nothing to remove and there never was: the disposition is <c>NotRequired</c>, which is
+    /// not a cleanup failure. Reading a <c>NIM_DELETE</c> that has nothing to delete as a failure is what
+    /// used to turn this into a fail-safe exit and cost the user the app on a machine where the shell
+    /// simply would not take the icon.
     /// </remarks>
     [Fact]
-    public void OPEN_QUESTION_a_registration_that_never_succeeded_escalates_instead_of_degrading()
+    public void QD1_an_initial_registration_that_never_succeeded_degrades_instead_of_exiting()
     {
         _native.AddResult = false;
         using var machine = Create();
@@ -741,9 +726,150 @@ public sealed class TrayStateMachineTests : IDisposable
         _time.Advance(TrayStateMachine.FirstRetryDelay);
         _time.Advance(TrayStateMachine.SecondRetryDelay);
 
-        Assert.False(machine.CleanupVerified);
-        Assert.Equal(TrayLifecycleState.Releasing, machine.LifecycleState);
-        Assert.True(Volatile.Read(ref _exitRequests) > 0);
+        Assert.Equal(CleanupDisposition.NotRequired, machine.Cleanup);
+        Assert.Equal(ShellEffectState.NeverCreated, machine.EffectState);
+        Assert.Equal(TrayAffordanceState.Lost, machine.State);
+
+        // The degraded session is the outcome: no fail-safe exit, and no escalation.
+        Assert.Equal(0, Volatile.Read(ref _exitRequests));
+        Assert.Equal(0, Volatile.Read(ref _escalations));
+    }
+
+    /// <summary>
+    /// QUESTION D, CASE 1, second half: no pointless Delete is issued at all.
+    /// </summary>
+    /// <remarks>
+    /// The decision is explicit that removal retries should not run when cleanup is provably
+    /// <c>NotRequired</c>. Asserting the disposition alone would not catch a version that issued three
+    /// futile <c>NIM_DELETE</c> calls and then classified the result correctly.
+    /// </remarks>
+    [Fact]
+    public void QD1_no_delete_is_issued_when_nothing_was_ever_created()
+    {
+        _native.AddResult = false;
+        using var machine = Create();
+
+        machine.Establish();
+        _time.Advance(TrayStateMachine.FirstRetryDelay);
+        _time.Advance(TrayStateMachine.SecondRetryDelay);
+
+        Assert.Equal(0, _native.DeleteCallsSnapshot);
+    }
+
+    /// <summary>
+    /// QUESTION D, CASE 2. <c>NIM_ADD</c> succeeded and <c>NIM_SETVERSION</c> did not: the icon may
+    /// exist, so removal is REQUIRED. This is not equivalent to a failed add.
+    /// </summary>
+    [Fact]
+    public void QD2_an_add_that_succeeded_before_a_later_failure_requires_cleanup()
+    {
+        _native.AddResult = true;
+        _native.SetVersionResult = false;
+        using var machine = Create();
+
+        machine.Establish();
+        _time.Advance(TrayStateMachine.FirstRetryDelay);
+        _time.Advance(TrayStateMachine.SecondRetryDelay);
+
+        // Removal was required and, with a Delete that works, it is confirmed.
+        Assert.Equal(CleanupDisposition.Verified, machine.Cleanup);
+        Assert.True(_native.DeleteCallsSnapshot > 0, "a possible icon must be removed");
+        Assert.NotEqual(TrayAffordanceState.Available, machine.State);
+    }
+
+    /// <summary>
+    /// QUESTION D, CASE 2 continued: required cleanup plus a confirmed <c>NIM_DELETE</c> is
+    /// <c>Verified</c>, and the degraded session is allowed to continue.
+    /// </summary>
+    [Fact]
+    public void QD3_a_required_cleanup_that_is_confirmed_allows_the_degraded_session()
+    {
+        _native.AddResult = true;
+        _native.SetVersionResult = false;
+        _native.DeleteResult = true;
+        using var machine = Create();
+
+        machine.Establish();
+        _time.Advance(TrayStateMachine.FirstRetryDelay);
+        _time.Advance(TrayStateMachine.SecondRetryDelay);
+
+        Assert.Equal(CleanupDisposition.Verified, machine.Cleanup);
+        Assert.Equal(0, Volatile.Read(ref _exitRequests));
+    }
+
+    /// <summary>
+    /// QUESTION D, CASE 2 continued: required cleanup whose removal cannot be confirmed within its budget
+    /// is <c>Unverified</c>, and CV-16 still applies.
+    /// </summary>
+    [Fact]
+    public void QD4_a_required_cleanup_that_cannot_be_confirmed_escalates()
+    {
+        _native.AddResult = true;
+        _native.SetVersionResult = false;
+        _native.DeleteResult = false;
+        using var machine = Create();
+
+        machine.Establish();
+        _time.Advance(TrayStateMachine.FirstRetryDelay);
+        _time.Advance(TrayStateMachine.SecondRetryDelay);
+
+        Assert.Equal(CleanupDisposition.Unverified, machine.Cleanup);
+        Assert.Equal(TrayStateMachine.MaxCleanupAttempts, _native.DeleteCallsSnapshot);
+        Assert.True(Volatile.Read(ref _exitRequests) > 0, "CV-16 still escalates when removal was required");
+    }
+
+    /// <summary>
+    /// QUESTION D, CASE 3. An add still in flight keeps cleanup REQUIRED: a Release before it concludes
+    /// must not classify the machine as having created nothing.
+    /// </summary>
+    [Fact]
+    public void QD5_an_add_in_flight_keeps_cleanup_required_and_is_still_compensated()
+    {
+        _native.AddMayReturn.Reset();
+        using var machine = Create();
+
+        Run(machine.Establish);
+        Assert.True(_native.AddEntered.Wait(Patience), "the Add never started");
+
+        Run(machine.Release);
+        WaitForState(machine, TrayLifecycleState.Releasing);
+
+        // While the Add is outstanding the machine cannot claim nothing was created.
+        Assert.NotEqual(CleanupDisposition.NotRequired, machine.Cleanup);
+
+        _native.AddMayReturn.Set();
+        WaitForBackground();
+
+        // The late success is obsolete for the lifecycle and compensated for the shell.
+        Assert.NotEqual(TrayAffordanceState.Available, machine.State);
+        Assert.True(_native.DeleteCallsSnapshot > 0, "a late successful Add must still be compensated");
+    }
+
+    /// <summary>
+    /// QUESTION D, case 6. A <c>NIM_DELETE</c> that runs by accident when nothing was ever created cannot
+    /// turn <c>NotRequired</c> into <c>Unverified</c>.
+    /// </summary>
+    /// <remarks>
+    /// This is the bypass in the other direction, and it is the one Vigil has to be able to rule out: if
+    /// a stray failed delete could downgrade the disposition, <c>NotRequired</c> would become a way of
+    /// reaching an escalation rather than a way of avoiding one.
+    /// </remarks>
+    [Fact]
+    public void QD6_a_stray_failed_delete_cannot_turn_NotRequired_into_Unverified()
+    {
+        _native.AddResult = false;
+        using var machine = Create();
+
+        machine.Establish();
+        _time.Advance(TrayStateMachine.FirstRetryDelay);
+        _time.Advance(TrayStateMachine.SecondRetryDelay);
+        Assert.Equal(CleanupDisposition.NotRequired, machine.Cleanup);
+
+        // A cleanup completion arrives anyway, reporting failure, for the current generation.
+        machine.InjectForTests(TrayEventKind.CleanupCompleted, machine.GenerationForTests, false);
+
+        Assert.Equal(CleanupDisposition.NotRequired, machine.Cleanup);
+        Assert.Equal(0, Volatile.Read(ref _exitRequests));
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -940,8 +1066,12 @@ public sealed class TrayStateMachineTests : IDisposable
     [Fact]
     public void T5_an_unverifiable_cleanup_requests_the_authoritative_exit_and_does_not_degrade()
     {
-        _native.AddResult = false;
-        _native.DeleteResult = false;                 // compensation can never be confirmed
+        // CASE 2: NIM_ADD succeeded and NIM_SETVERSION did not, so the icon MAY EXIST and removal is
+        // required. An add that is refused outright no longer reaches here — that is CASE 1, and it
+        // degrades rather than escalating.
+        _native.AddResult = true;
+        _native.SetVersionResult = false;
+        _native.DeleteResult = false;                 // and the removal can never be confirmed
         using var machine = Create();
 
         machine.Establish();
@@ -958,8 +1088,12 @@ public sealed class TrayStateMachineTests : IDisposable
     [Fact]
     public void T13_a_sink_that_always_throws_still_terminates_through_the_escalation()
     {
-        _native.AddResult = false;
-        _native.DeleteResult = false;
+        // CASE 2: NIM_ADD succeeded and NIM_SETVERSION did not, so the icon MAY EXIST and removal is
+        // required. An add that is refused outright no longer reaches here — that is CASE 1, and it
+        // degrades rather than escalating.
+        _native.AddResult = true;
+        _native.SetVersionResult = false;
+        _native.DeleteResult = false;                 // and the removal can never be confirmed
         using var machine = Create(requestExit: () =>
         {
             Interlocked.Increment(ref _exitRequests);
@@ -982,8 +1116,12 @@ public sealed class TrayStateMachineTests : IDisposable
     [Fact]
     public void T12_the_fail_safe_request_runs_on_the_transition_thread_and_never_queues()
     {
-        _native.AddResult = false;
-        _native.DeleteResult = false;
+        // CASE 2: NIM_ADD succeeded and NIM_SETVERSION did not, so the icon MAY EXIST and removal is
+        // required. An add that is refused outright no longer reaches here — that is CASE 1, and it
+        // degrades rather than escalating.
+        _native.AddResult = true;
+        _native.SetVersionResult = false;
+        _native.DeleteResult = false;                 // and the removal can never be confirmed
         var sinkThread = 0;
         using var machine = Create(requestExit: () =>
         {

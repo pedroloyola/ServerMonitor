@@ -10,8 +10,8 @@ uma condição. Uma condição só sai marcada `SUPERSEDED BY <regra>`, com just
 `docs/m13-s2t-linearizable-state-machine.md` (desenho) · `.boss/BOSS.md` §9 e §10.
 
 **Base de medição:** worktree `ServerMonitor-m13-s2t`, ramo `agent/m13-s2t-tray`.
-Baseline dos testes filtrados por `Tray|Theme|Flyout|FailSafe`: **130 passam, 0 falham**.
-Gates completos na árvore entregue: **Debug 1834/1834**, **Release 1799/1799**. A diferença de 35 vem de um
+Baseline dos testes filtrados por `Tray|Theme|Flyout|FailSafe`: **143 passam, 0 falham**, em **10 corridas seguidas** com resultado idêntico.
+Gates completos na árvore entregue: **Debug 1847/1847**, **Release 1812/1812**, zero abortos. A diferença de 35 vem de um
 `ItemGroup Condition="'$(Configuration)' != 'Debug'"` no projeto de testes que remove `Qa\**\*.cs` —
 condição pré-existente, não introduzida por esta entrega.
 
@@ -33,11 +33,11 @@ condição pré-existente, não introduzida por esta entrega.
 | **CV-9** | reentrância com flyout aberto | `Shell/Tray/FlyoutReentrancyGate.cs` · `OwnedTrayIconAdapter.ShowFlyout` | `FlyoutReentrancyGateTests` (6) | M26, M27 | **FECHADA** na decisão; a ativação da janela auxiliar é medida humana (matriz P, passo 5) |
 | **CV-10** | acoplamento limitador ↔ custo de UI | `EpisodeFrequencyLimiter.DefaultCapacity = 5 / 60 s` | `T4` | M8 morta | **FECHADA** |
 | **CV-11** | residual de admissão suprimida (LOW, aceite) | ordem das guardas em `Transition` | `T4` | — | **FECHADA · residual escrito** |
-| **CV-12** | evidência de mutação na entrega | — | matriz da secção 3 | **48 mutações corridas** | **FECHADA com duas limitações declaradas** (M24, M25) |
+| **CV-12** | evidência de mutação na entrega | — | matriz da secção 3 | **65 entradas · 63 corridas** | **FECHADA com duas limitações declaradas** (M24, M25) |
 | **CV-13** | só um episódio ADMITIDO por B pode expirar | `BeginEpisode`, só depois de `TryBeginEpisode` | `CV13` | M14 morta | **FECHADA** |
 | **CV-14** | B não limita tentativas dentro de um episódio | `EpisodeFrequencyLimiter` com **um** método | `CV14` ×2 (inclui teste de arquitetura por reflexão) | M8 morta | **FECHADA** |
 | **CV-15** | integridade do documento normativo | — | este ficheiro | — | **ATIVA · este mapa é o cumprimento.** Ver a **retratação** na secção 4 |
-| **CV-16** | `CleanupVerified` fail-closed | `HandleCleanupCompleted` · `NativeTrayRegistration.Delete` devolve o BOOL real | `T5` | M10, **M44** | **FECHADA** · interação com a Questão D registada em `.boss/tmp/m13-s2t-open-question-d.md` |
+| **CV-16** | limpeza fail-closed, **REFINADA** | `CleanupDisposition` · `HandleCleanupCompleted` · `RecordFailedAdd` | `T5`, `QD1`–`QD6` | M10, M44, **M59–M64** | **FECHADA · refinada, não relaxada** (§7) |
 | **CV-17** | notificação informativa antes da saída fail-safe | `Services/FailSafeExitNotice.cs` · `WindowsAppNotificationService.ShowFailSafeExitNotice` (30 min) · gancho no CAS de `AppLifecycleController` | `FailSafeExitNoticeTests` (16) · `WindowsAppNotificationServiceTests` (3) | M36, M37, M37b, M39, M39b, M40 | **FECHADA** |
 | **CV-18** | contrato fechado da ação da notificação | `NotificationActivationContract` — **uma linha**: `("FailSafeExit", "OpenDashboard")` | quatro casos independentes + tabela de 9 pares | M38, M38b | **FECHADA** |
 | **CV-19** | ressalva do passo 2 para conclusões de efeito | `Transition`, passo 2 | `T11` · **`CV19_a_stale_add_completion_in_a_live_episode_is_reconciled_and_compensated`** | **M13** | **FECHADA.** O estado é construído por teste; ver §3.1 |
@@ -252,6 +252,67 @@ incluindo a prova da CV-19. O teste probabilístico de 200 tentativas foi substi
 
 ---
 
+## 7. Questão D — decidida pelo humano e implementada
+
+**Texto autoritativo:** `.boss/tmp/m13-s2t-question-d-decision.md`. O comportamento de produto aprovado
+prevalece: **uma falha de registo inicial DEGRADA, não termina a aplicação.**
+
+### 7.1 A causa era o resultado colapsado
+
+`Add() && SetVersion()` num único booleano destruía a distinção de que o ciclo de vida depende:
+`NIM_ADD FALSE` significa que a shell nunca ficou com o ícone; `NIM_ADD TRUE` com `NIM_SETVERSION FALSE`
+significa que o ícone pode existir e **tem** de ser removido. Ambos chegavam como `false`.
+
+A fronteira passa a devolver um **`ShellOutcome`** tipado:
+
+| valor | significado |
+|---|---|
+| `NotPerformed` | a operação não foi executada |
+| `Succeeded` | todas as chamadas nativas reportaram sucesso |
+| `FailedWithoutEffect` | falhou **sem deixar nada**: o `NIM_ADD` foi recusado |
+| `FailedWithPossibleEffect` | falhou **depois** de uma chamada que pode ter criado o ícone |
+
+O `TrayEvent` transporta o outcome, e `MayHaveCreatedAnEffect` é a pergunta que o ciclo de vida faz.
+
+### 7.2 A disposição da limpeza
+
+`CleanupDisposition`: **`NotRequired`** · **`Verified`** · **`Unverified`**. O nome é meu, como o humano
+deixou explícito; a semântica é a da decisão.
+
+| caso | classificação | desfecho |
+|---|---|---|
+| **1** — todos os `NIM_ADD` falsos e nada em voo | `NotRequired` · `ShellEffectState.NeverCreated` | sessão degradada; **nenhum `Delete` é sequer emitido** |
+| **2** — `NIM_ADD TRUE` + `NIM_SETVERSION FALSE` | limpeza **REQUIRED** | `Delete` confirmado → `Verified` → degradada continua · `Delete` não confirmável → `Unverified` → CV-16 → saída fail-safe |
+| **3** — `Add` em voo ou ambíguo | **REQUIRED** até reconciliar | fail-closed: `_shellMayHoldAnIcon` e `_reconciliationPending` impedem a desclassificação |
+
+### 7.3 A CV-16 é refinada, não relaxada
+
+`Unverified` só é alcançável a partir de `MayExist` — isto é, só quando a remoção **era** necessária — e
+continua a não autorizar nada: vai à saída autoritativa. **`NotRequired` não é uma falha de limpeza e não
+é mapeada para uma.** A **M63** (mapear `NotRequired` para `Unverified`) e a **M64** (deixar um `Delete`
+acidental degradar a disposição) existem exatamente para que o Vigil possa verificar que o `NotRequired`
+não se tornou um bypass — as duas morrem.
+
+### 7.4 Testes e mutações exigidos
+
+Os seis cenários da §5 da decisão, todos determinísticos e contra componentes de produção:
+`QD1` (×2, incluindo *nenhum `Delete` emitido*), `QD2`, `QD3`, `QD4`, `QD5`, `QD6`.
+
+As quatro mutações obrigatórias — colapsar o resultado (**M59**), classificar a falha inicial como
+`Unverified` (**M60**), classificar sucesso-de-`Add`/falha-de-`SetVersion` como `NotRequired` (**M61**),
+remover a compensação do `Add` tardio (**M62**) — mais duas minhas (**M63**, **M64**). Todas mortas.
+
+### 7.5 O vizinho, e a mutação que não mato
+
+- **Vizinho verificado:** três testes que provavam a escalada usavam `AddResult = false` — ou seja,
+  provavam-na sobre o caso que agora **degrada**. Passaram a construir o CASO 2, que é uma limpeza
+  genuinamente necessária. Sem isso teriam continuado verdes a provar a coisa errada.
+- **O que não mato:** que o `NativeTrayRegistration` real devolva os `BOOL` certos por operação. A
+  distinção é provada sobre o duplo; a fronteira nativa continua só observável num desktop, como as M24 e
+  M25.
+
+---
+
 ## 4. Retratação — uma afirmação minha que era falsa
 
 Na entrega da ligação escrevi, sobre `App.xaml.cs`:
@@ -283,12 +344,16 @@ entre cada uma. Filtro: `FullyQualifiedName~Tray` (M1–M25) e
 e `FullyQualifiedName~FailSafe|FullyQualifiedName~WindowsAppNotification|FullyQualifiedName~Notification`
 (M36–M40). Baselines **95** e **82**, ambas 0 falhas.
 
-**51 entradas · 48 corridas · 46 mortas · 2 sobrevivem.**
+**65 entradas · 63 corridas · 61 mortas · 2 sobrevivem.**
 
-Três não correm e cada uma tem razão escrita: **M4** e **M21** ficam `SUPERSEDED` — as suas âncoras
-desapareceram quando o código que atacavam foi reescrito, e o que verificavam passou para a **M48** e a
-**M34** respetivamente; a **M47** foi **retirada por mim**, porque o desenho que ela mutava foi revertido
-(§5.2).
+Duas não correm, com razão escrita: **M4** ficou `SUPERSEDED BY M55` e **M21** `SUPERSEDED BY M34`,
+porque o código que atacavam foi reescrito e a propriedade passou para a mutação nova. A **M47** foi
+retirada por mim (§5.2), e a **M46**, **M48** e **M50** foram retiradas quando a ronda 3 reformulou o
+mesmo código — as suas propriedades são agora atacadas pela **M53**, **M55** e **M56**.
+
+**Todas as outras âncoras foram reparadas em vez de deixadas mortas.** A Questão D reescreveu o executor e
+a reconciliação, o que partiu a M3, a M5, a M6 e a M43; foram re-apontadas ao código como está e voltam a
+matar. Uma matriz com âncoras mortas mente da mesma maneira que um mapa que cita ficheiros inexistentes.
 
 As duas sobreviventes — **M24** e **M25** — continuam limitações declaradas, não alegações. A **M13**
 deixou de ser uma delas: está morta (§3.1).
@@ -321,6 +386,9 @@ python tools/mutations/mutate_round10.py M46
 
 # Terceira ronda: prontidão, secção crítica da entrega, fallback, roteamento (M53–M58)
 python tools/mutations/mutate_round11.py M53
+
+# Questão D: resultado nativo tipado e disposição da limpeza (M59–M64)
+python tools/mutations/mutate_questiond.py M59
 
 # Prova diferencial da escalada CS8509
 python tools/mutations/cs8509_differential.py

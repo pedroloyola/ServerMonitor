@@ -33,3 +33,5 @@ config.json
 # Internal Boss orchestration framework + agent-oriented dev context (not public)
 /.boss/
 /CONTEXT.md
+mutation-results*.json
+TestResults/
