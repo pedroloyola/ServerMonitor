@@ -228,6 +228,23 @@ public partial class App : Application
 
             await ServicesHost.StartAsync();
 
+            // BLOCKING FIX (Prism, M13 S2-T). Resolving this is what SUBSCRIBES it to the affordance
+            // source, and Evaluate() is what makes the process act on the state it already has. Until
+            // now it was constructed lazily by WindowCloseCoordinator's lambda, so nothing evaluated it
+            // until the user's FIRST close — and the two situations that matter both happen before that:
+            //
+            //   * a --background launch whose registration failed published Unavailable to NOBODY, and
+            //     the process went on monitoring, invisible, with no way out. That is A12, the exact
+            //     thing this slice exists to remove.
+            //   * in the foreground, a Lost before the first close degraded nothing: the icon vanished
+            //     silently and the next close quit with no explanation.
+            //
+            // Placed AFTER StartAsync so the tray has already attempted its registration and the state is
+            // real rather than the fail-closed initial value, and BEFORE the activation branch so a
+            // degraded foreground launch navigates to Settings -> Background while the window is still
+            // hidden, instead of showing the Dashboard for a frame first.
+            EvaluateStartupAffordance(ServicesHost.Services);
+
             if (!startsHeadless)
             {
                 _mainWindow!.Activate();
@@ -270,6 +287,26 @@ public partial class App : Application
             }
         }
     }
+    /// <summary>
+    /// Subscribes the degraded-session policy and makes the process act on the affordance state it
+    /// already has.
+    /// <para>
+    /// An invocable method rather than two statements inside <c>OnLaunched</c>, for the same reason
+    /// <see cref="ConfigureApplicationServices"/> is one: <c>OnLaunched</c> needs a XAML runtime, so
+    /// anything only reachable from there is only reachable by a human with a desktop. Here the whole
+    /// behaviour — resolve, subscribe, evaluate, degrade — runs in a test against the real composition.
+    /// </para>
+    /// </summary>
+    internal static void EvaluateStartupAffordance(IServiceProvider services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        // Resolving it is half the fix: the constructor is what subscribes to the affordance source, so
+        // a lifecycle nobody resolves is a policy that never hears anything. Evaluate() is the other
+        // half: it acts on the state that already exists rather than waiting for a change.
+        services.GetRequiredService<TrayAffordanceLifecycle>().Evaluate();
+    }
+
     /// <summary>
     /// The composition root, as an invocable method rather than a lambda.
     /// <para>

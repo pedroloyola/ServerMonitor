@@ -476,6 +476,18 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
 
     private void HandleCleanupCompleted(TrayEvent trayEvent)
     {
+        // REDUNDANT DELETE. Publication now runs before the drain, which makes a synchronous re-entry
+        // possible: a subscriber that degrades, finds no window and asks for the authoritative exit
+        // reaches Release on this very stack, and Release queues its own delete for an icon a previous
+        // delete has already positively removed. Shell_NotifyIcon(NIM_DELETE) returns FALSE when there is
+        // nothing to delete, and that false is not a cleanup failure — it reports exactly the state the
+        // cleanup wanted. Only a positively verified removal reaches this branch: anything that could
+        // have recreated the icon sets _effect back to MayExist first, so a real failure still escalates.
+        if (_effect == ShellEffectState.Deleted)
+        {
+            return;
+        }
+
         if (trayEvent.Success)
         {
             _effect = ShellEffectState.Deleted;
@@ -500,6 +512,14 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
 
     private void HandleTerminalCleanup(TrayEvent trayEvent)
     {
+        if (_effect == ShellEffectState.Deleted)
+        {
+            // Same rule as HandleCleanupCompleted: a delete for an icon already positively removed is
+            // redundant, not failed. TryComplete still runs, because the release is resolved.
+            TryComplete();
+            return;
+        }
+
         if (trayEvent.Success)
         {
             _effect = ShellEffectState.Deleted;
@@ -583,12 +603,24 @@ internal sealed class TrayStateMachine : ITrayAffordanceSource, IDisposable
             RunFailSafeExit();
         }
 
-        DrainEffects();
-
+        // PUBLISH BEFORE THE SHELL I/O.
+        //
+        // The state change is a DECISION, already taken under the lock; the Delete that follows is
+        // cleanup of an icon that may or may not still exist. Draining first put the notification behind
+        // a synchronous Shell_NotifyIcon that waits on the native gate — possibly behind an in-flight
+        // NIM_ADD — and did so during an Explorer restart, which is the one moment shell calls are least
+        // predictable. Measured at 3-5 ms on a healthy shell, but there is no measured bound during a
+        // restart, and a bound nobody has measured is not a bound. The 1.5 s the lifecycle is promised
+        // must not be spent waiting for I/O whose duration is unknown.
+        //
+        // The fail-safe exit is ahead of BOTH for the older and stronger reason: it is the only progress
+        // mechanism left when everything else is stuck, so it may never depend on the gate.
         if (outcome.Publish)
         {
             PublishIfCurrent();
         }
+
+        DrainEffects();
     }
 
     private void DrainEffects()

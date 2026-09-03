@@ -11,7 +11,7 @@ uma condição. Uma condição só sai marcada `SUPERSEDED BY <regra>`, com just
 
 **Base de medição:** worktree `ServerMonitor-m13-s2t`, ramo `agent/m13-s2t-tray`.
 Baseline dos testes filtrados por `Tray|Theme|Flyout`: **95 passam, 0 falham**.
-Gates completos na árvore entregue (`eab2291`): **Debug 1817/1817**, **Release 1782/1782**. A diferença de 35 vem de um
+Gates completos na árvore entregue: **Debug 1827/1827**, **Release 1792/1792**. A diferença de 35 vem de um
 `ItemGroup Condition="'$(Configuration)' != 'Debug'"` no projeto de testes que remove `Qa\**\*.cs` —
 condição pré-existente, não introduzida por esta entrega.
 
@@ -24,19 +24,19 @@ condição pré-existente, não introduzida por esta entrega.
 | **CV-1** | modelo de confiança da `WndProc`, sete pontos | `Shell/Tray/TrayCallbackContract.cs` · roteamento em `TrayHostWindow.OnMessage` | `TrayCallbackContractTests` (9) | M15–M18 mortas | **FECHADA** para a função pura; a entrega da mensagem real é QA humana |
 | **CV-2 / CV-2b** | dois orçamentos independentes | `EpisodeFrequencyLimiter` · `TrayStateMachine.Transition` | `T4` + convergência adversarial | M8 morta | **FECHADA** |
 | **CV-3** | comportamento sob `TerminateProcess` | n/a — não há `NIM_DELETE` de um processo morto | — | — | **`NOT_RUN`** — S6, requer interação humana |
-| **CV-4** | `Unavailable` no ordinal 0 · produtor único de `Available` | `TrayLifecycleState.cs` · `HandleAddCompleted` | contrato de estados | M5 (7), M6 (6) mortas | **FECHADA** |
+| **CV-4** | `Unavailable` no ordinal 0 · produtor único de `Available` | `TrayLifecycleState.cs` · `HandleAddCompleted` · valores **explícitos** em `TrayAffordanceState` | contrato de estados + valores fixados | M5 (7), M6 (6), **M45** | **FECHADA** |
 | **CV-5** | `szTip`/`hIcon` estáticos | `NativeTrayRegistration` — resolvidos **uma vez** no construtor | `NativeTrayRegistrationTests` (6) | M23 morta | **FECHADA** na parte decidível |
 | **CV-6** | mensagem forjada ignorada | — | — | — | `SUPERSEDED BY` **CV-6b** |
 | **CV-6b** | quatro casos independentes de validação | `TrayCallbackContract.TryDecode` | quatro `[Fact]` A/B/C/D, cada um variando **um** campo | M15, M16 mortas | **FECHADA** |
 | **CV-7** | topologia de thread | `TrayHostWindow` (janela criada na thread de UI) | — | — | **MEDIDA · PASSA** (S-1(A), emissor sintético) |
 | **CV-8** | custo nativo síncrono na thread de UI | idem | — | — | **MEDIDA · aceitável**: `NIM_ADD` mediana 3,16 ms / máx 4,36 ms, `NIM_DELETE` mediana 0,36 ms, contra 16,7 ms por frame a 60 Hz, dentro do envelope de B |
-| **CV-9** | reentrância com flyout aberto | `Shell/Tray/FlyoutReentrancyGate.cs` · `OwnedTrayIconAdapter.ShowFlyout` | `FlyoutReentrancyGateTests` (6) | M26, M27 | **FECHADA** |
+| **CV-9** | reentrância com flyout aberto | `Shell/Tray/FlyoutReentrancyGate.cs` · `OwnedTrayIconAdapter.ShowFlyout` | `FlyoutReentrancyGateTests` (6) | M26, M27 | **FECHADA** na decisão; a ativação da janela auxiliar é medida humana (matriz P, passo 5) |
 | **CV-10** | acoplamento limitador ↔ custo de UI | `EpisodeFrequencyLimiter.DefaultCapacity = 5 / 60 s` | `T4` | M8 morta | **FECHADA** |
 | **CV-11** | residual de admissão suprimida (LOW, aceite) | ordem das guardas em `Transition` | `T4` | — | **FECHADA · residual escrito** |
-| **CV-12** | evidência de mutação na entrega | — | matriz da secção 3 | 42 mutações corridas | **FECHADA com limitações declaradas** (M13, M24, M25) |
+| **CV-12** | evidência de mutação na entrega | — | matriz da secção 3 | **49 mutações corridas** | **FECHADA com limitações declaradas** (M13, M24, M25) |
 | **CV-13** | só um episódio ADMITIDO por B pode expirar | `BeginEpisode`, só depois de `TryBeginEpisode` | `CV13` | M14 morta | **FECHADA** |
 | **CV-14** | B não limita tentativas dentro de um episódio | `EpisodeFrequencyLimiter` com **um** método | `CV14` ×2 (inclui teste de arquitetura por reflexão) | M8 morta | **FECHADA** |
-| **CV-15** | integridade do documento normativo | — | este ficheiro | — | **ATIVA · este mapa é o cumprimento** |
+| **CV-15** | integridade do documento normativo | — | este ficheiro | — | **ATIVA · este mapa é o cumprimento.** Ver a **retratação** na secção 4 |
 | **CV-16** | `CleanupVerified` fail-closed | `HandleCleanupCompleted` · `NativeTrayRegistration.Delete` devolve o BOOL real | `T5` | M10 morta | **FECHADA** |
 | **CV-17** | notificação informativa antes da saída fail-safe | `Services/FailSafeExitNotice.cs` · `WindowsAppNotificationService.ShowFailSafeExitNotice` (30 min) · gancho no CAS de `AppLifecycleController` | `FailSafeExitNoticeTests` (16) · `WindowsAppNotificationServiceTests` (3) | M36, M37, M37b, M39, M39b, M40 | **FECHADA** |
 | **CV-18** | contrato fechado da ação da notificação | `NotificationActivationContract` — **uma linha**: `("FailSafeExit", "OpenDashboard")` | quatro casos independentes + tabela de 9 pares | M38, M38b | **FECHADA** |
@@ -101,6 +101,63 @@ Não basta dizer que removi o caminho antigo. `TrayOwnershipCompletenessTests` a
 M33 confirma que isto não é decorativo: registar uma segunda instância como fonte de afordância faz
 falhar (4).
 
+
+### 3.6 M41b: uma afirmação minha sobre testes de texto, também falsa
+
+Escrevi que uma asserção de texto **positiva** não podia ser satisfeita por prosa, ao contrário da
+negativa que partira o T14c antigo. A M41b mostrou que pode: **comentar a chamada** deixa o texto no
+ficheiro, dentro do comentário, e a asserção continuava verde.
+
+Corrigido tirando os comentários antes de procurar, com o mesmo `StripComments` que os
+`TopmostMutationBoundaryTests` já usavam. A regra correta, sem a parte que inventei: **uma asserção sobre
+texto tem de olhar para código, e o que distingue código de prosa é retirar os comentários primeiro.**
+
+### 3.7 Um defeito encontrado por tornar o duplo honesto — QUESTÃO DEVOLVIDA
+
+Ao fazer a `BlockingNativeTrayRegistration` modelar o que o `Shell_NotifyIcon` faz de verdade —
+`NIM_DELETE` devolve **FALSE** quando a shell não tem o ícone — dois testes que passavam começaram a
+falhar. Não era o duplo a mentir a favor: era o duplo a esconder um comportamento real.
+
+**Cadeia:** `NIM_ADD` falha três vezes → `Lost` → o delete compensatório não tem nada para apagar e
+devolve false → três tentativas de limpeza → `Unverified` → a CV-16 escala para a saída autoritativa.
+
+**Consequência:** numa máquina onde o registo da tray falha, a aplicação **sai** em vez de degradar para
+sessão em primeiro plano — que é exatamente o que o desenho aprovado diz que deve acontecer nesse caso.
+
+**Não é obviamente errado.** O `Attempt()` marca `MayExist` **antes** da chamada de propósito, e um
+resultado falso não é atribuível: `Add() && SetVersion()` também devolve false quando o ícone **ficou**
+registado e só a versão falhou — e aí o ícone está mesmo lá e tem mesmo de ser removido. A máquina não
+consegue distinguir «não havia nada para apagar» de «o apagar falhou», e escalar é a leitura fail-closed
+da CV-16.
+
+**Duas regras aprovadas discordam, e escolher entre elas não é meu.** Fica pinado em
+`OPEN_QUESTION_a_registration_that_never_succeeded_escalates_instead_of_degrading`, que afirma o
+comportamento de **hoje** para que a decisão seja visível no momento em que mudar. Não é um endosso.
+
+
+## 4. Retratação — uma afirmação minha que era falsa
+
+Na entrega da ligação escrevi, sobre `App.xaml.cs`:
+
+> «o diff é grande e a mudança é NULA — as linhas são as mesmas, re-indentadas.»
+
+**É falso, e retiro-o.** O Cortex mediu: `git diff` 318/292, `git diff -w` 255/229, e o multiconjunto de
+linhas sem espaços passou de 522 para 547. Há mudanças reais nesse ficheiro:
+
+* o lambda do DI passou a `ConfigureApplicationServices(IServiceCollection)`;
+* saíram `PendingTrayAffordanceSource` e `WinUIExTrayIconAdapter`;
+* entrou `OwnedTrayIconAdapter`, registado uma vez e exposto nos dois papéis;
+* (nesta ronda) entrou `EvaluateStartupAffordance` e a sua chamada no `OnLaunched`.
+
+Cada uma dessas mudanças estava declarada noutro sítio do relatório, e nenhuma foi escondida. O problema
+é a frase em si: **convida a não ler o diff**. Uma alegação falsa num relatório é do mesmo tecido que uma
+mutação que não falsifica — descreve uma verificação que ninguém fez. É por isso que a CV-15 existe, e
+por isso a retratação fica aqui e não só numa mensagem.
+
+A afirmação correta: **o diff de `App.xaml.cs` é grande e contém mudanças reais e declaradas. Leiam-no.**
+
+---
+
 ## 3. Matriz de mutação — CV-12
 
 Uma mutação de cada vez, sempre contra o **código de produção**, com restauro e reconfirmação da baseline
@@ -109,7 +166,7 @@ entre cada uma. Filtro: `FullyQualifiedName~Tray` (M1–M25) e
 e `FullyQualifiedName~FailSafe|FullyQualifiedName~WindowsAppNotification|FullyQualifiedName~Notification`
 (M36–M40). Baselines **95** e **82**, ambas 0 falhas.
 
-**43 entradas · 42 corridas (a M21 está `SUPERSEDED`) · 39 mortas · 3 sobrevivem**, e cada uma das três é
+**50 entradas · 49 corridas (a M21 está `SUPERSEDED`) · 46 mortas · 3 sobrevivem**, e cada uma das três é
 uma limitação declarada, não uma alegação.
 
 ### Reprodução
@@ -127,6 +184,9 @@ python mutate_wiring.py M26      # ou qualquer subconjunto de M26..M35
 
 # Notificação de saída fail-safe, CV-17/CV-18 (M36–M40)
 python mutate_notice.py M36      # ou qualquer subconjunto de M36..M40
+
+# Ronda de correções: arranque, ordem de publicação, ordinais (M41–M45)
+python mutate_round9.py M41      # ou qualquer subconjunto de M41..M45
 
 # Prova diferencial da escalada CS8509
 python cs8509_differential.py
@@ -184,6 +244,13 @@ python cs8509_differential.py
 | M39 | a expiração passa a longa (30 dias) | CV-17, curta duração | 2 | **morta** |
 | M39b | a expiração é removida | idem | 1 | **morta** |
 | M40 | a fronteira deixa de ser fire-and-forget (devolve `Task`) | a saída não espera pela entrega | 5 | **morta** |
+| M41 | a sessão degradada nunca é avaliada no arranque | o bloqueante do Prism | 2 | **morta** |
+| M41b | a chamada é **comentada** no `OnLaunched` | idem, e ver 3.6 | 1 | **morta** |
+| M41c | o arranque resolve a política mas nunca a avalia | idem | 1 | **morta** |
+| M42 | a perda só chega ao lifecycle **depois** da I/O da shell | achado do Cortex | 2 | **morta** |
+| M43 | um delete redundante é tratado como falha | a reordenação não pode fabricar escalada | 1 | **morta** |
+| M44 | a regra do delete redundante engole uma falha **genuína** | CV-16 continua fail-closed | 4 | **morta** |
+| M45 | os ordinais da afordância são deslocados | valores fixados, não só a ordem | 2 | **morta** |
 
 ### 3.1 M13 sobrevive: a ressalva CV-19 está implementada mas **não provada**
 

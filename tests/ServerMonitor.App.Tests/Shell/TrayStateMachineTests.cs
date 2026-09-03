@@ -41,6 +41,107 @@ public sealed class TrayStateMachineTests : IDisposable
             limiter);
 
     // ---------------------------------------------------------------------------------------------
+    // The lifecycle learns BEFORE the shell I/O runs
+    // ---------------------------------------------------------------------------------------------
+
+    /// <summary>
+    /// Losing the affordance is published before the compensating <c>NIM_DELETE</c> is issued.
+    /// </summary>
+    /// <remarks>
+    /// The state change is a decision already taken under the lock; the delete is cleanup of an icon that
+    /// may or may not still be there. Draining first put the notification behind a synchronous shell call
+    /// waiting on the native gate, during an Explorer restart — the one moment shell calls are least
+    /// predictable, and the one case where nobody has measured a bound.
+    /// <para>
+    /// Asserted on the INTERLEAVING rather than by parking a call: the whole episode is driven on this
+    /// thread, so parking the delete would park the test. Recording the publication into the same ordered
+    /// list the shell writes to gives the sequence directly.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void Lost_reaches_the_lifecycle_before_the_compensating_delete_reaches_the_shell()
+    {
+        using var machine = Create();
+        machine.Establish();
+
+        machine.StateChanged += (_, _) => _native.Calls.Add($"publish:{machine.State}");
+
+        _native.AddResult = false;
+        machine.NotifyTaskbarCreated();
+
+        // Burn the whole episode: debounce, three attempts, both retry delays.
+        _time.Advance(TrayStateMachine.DebounceDelay);
+        _time.Advance(TrayStateMachine.FirstRetryDelay);
+        _time.Advance(TrayStateMachine.SecondRetryDelay);
+
+        var published = _native.Calls.IndexOf($"publish:{TrayAffordanceState.Lost}");
+        Assert.True(published >= 0, $"Lost was never published: [{string.Join(", ", _native.Calls)}]");
+
+        var deleteAfterLoss = _native.Calls.FindIndex(published, call => call == "Delete");
+        Assert.True(
+            deleteAfterLoss > published,
+            $"the delete must follow the publication: [{string.Join(", ", _native.Calls)}]");
+    }
+
+    /// <summary>
+    /// The hazard the reordering opens, closed: a subscriber that releases synchronously must not turn a
+    /// redundant delete into a fail-safe exit.
+    /// </summary>
+    /// <remarks>
+    /// This is the real path, not a contrived one. On Lost the lifecycle degrades; with no window it asks
+    /// for the authoritative exit, whose sequence removes the tray icon, which calls Release — all on the
+    /// publishing thread, before the first delete has run. Release then queues a delete for an icon the
+    /// first delete is about to remove. A second NIM_DELETE returns false because there is nothing left,
+    /// and a false delete is what escalates. The escalation would be manufactured by our own ordering.
+    /// </remarks>
+    [Fact]
+    public void A_subscriber_that_releases_on_Lost_does_not_manufacture_a_fail_safe_exit()
+    {
+        using var machine = Create();
+        machine.Establish();
+
+        machine.StateChanged += (_, _) =>
+        {
+            if (machine.State == TrayAffordanceState.Lost)
+            {
+                machine.Release();
+            }
+        };
+
+        _native.AddResult = false;
+
+        // Driven on THIS thread: nothing parks here, and the point of the test is the synchronous
+        // re-entry, which a background task would only make racy.
+        machine.NotifyTaskbarCreated();
+
+        _time.Advance(TrayStateMachine.DebounceDelay);
+        _time.Advance(TrayStateMachine.FirstRetryDelay);
+        _time.Advance(TrayStateMachine.SecondRetryDelay);
+
+        Assert.Equal(0, Volatile.Read(ref _exitRequests));
+        Assert.Equal(0, Volatile.Read(ref _escalations));
+        Assert.True(machine.CleanupVerified);
+    }
+
+    /// <summary>
+    /// A delete that reports false for an icon we have already positively removed is redundant, not
+    /// failed — but a delete that reports false for an icon that may still exist still escalates.
+    /// </summary>
+    [Fact]
+    public void A_genuinely_failing_delete_still_escalates()
+    {
+        using var machine = Create();
+        machine.Establish();
+
+        _native.DeleteResult = false;
+        machine.Release();
+
+        Assert.False(machine.CleanupVerified);
+        Assert.Equal(TrayStateMachine.MaxCleanupAttempts, _native.DeleteCalls);
+        Assert.True(Volatile.Read(ref _exitRequests) > 0, "an unverifiable cleanup must escalate");
+    }
+
+    // ---------------------------------------------------------------------------------------------
     // Establishment and the single producer of Available
     // ---------------------------------------------------------------------------------------------
 
@@ -83,6 +184,50 @@ public sealed class TrayStateMachineTests : IDisposable
     [Fact]
     public void An_exhausted_retry_budget_with_observed_failure_reaches_Lost()
     {
+        // Asserts that Lost is REACHED, not that it is the resting state. What happens after it is the
+        // open question recorded below, and pinning the resting state here would quietly decide it.
+        _native.AddResult = false;
+        using var machine = Create();
+        var visited = new List<TrayLifecycleState>();
+        machine.StateChanged += (_, _) => visited.Add(machine.LifecycleState);
+
+        machine.Establish();
+        _time.Advance(TrayStateMachine.FirstRetryDelay);
+        _time.Advance(TrayStateMachine.SecondRetryDelay);
+
+        Assert.Contains(TrayLifecycleState.Lost, visited);
+        Assert.Equal(TrayStateMachine.MaxAttemptsPerEpisode, _native.AddCalls);
+    }
+
+    /// <summary>
+    /// <b>RETURNED QUESTION, not an approved behaviour.</b> A registration that never succeeded currently
+    /// ends in a fail-safe exit request rather than a degraded foreground session.
+    /// </summary>
+    /// <remarks>
+    /// Found by making <see cref="BlockingNativeTrayRegistration"/> honest: the real
+    /// <c>Shell_NotifyIcon(NIM_DELETE)</c> returns FALSE when the shell holds no such icon, and the fake
+    /// used to return true unconditionally, so no test could ever see this. The chain is:
+    /// <c>NIM_ADD</c> fails three times → Lost → the compensating delete has nothing to delete and
+    /// reports false → three cleanup attempts → <c>Unverified</c> → CV-16 escalates to the authoritative
+    /// exit.
+    /// <para>
+    /// It is not obviously wrong. <c>Attempt()</c> marks <c>MayExist</c> BEFORE the call on purpose, and
+    /// a false result cannot be attributed: <c>Add() &amp;&amp; SetVersion()</c> also returns false when
+    /// the icon WAS registered and only the version call failed, and then the icon really is there and
+    /// really must be removed. So the machine cannot tell "nothing to delete" from "delete failed", and
+    /// escalating is the fail-closed reading of CV-16.
+    /// </para>
+    /// <para>
+    /// But the product consequence is that a machine where the tray registration fails cannot run the
+    /// app at all — the approved design says such a launch degrades to a foreground session with
+    /// true-exit semantics, and this exits instead. Two approved rules disagree, and choosing between
+    /// them is not mine. This test pins TODAY's behaviour so the decision is visible the moment it
+    /// changes; it is not an endorsement.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void OPEN_QUESTION_a_registration_that_never_succeeded_escalates_instead_of_degrading()
+    {
         _native.AddResult = false;
         using var machine = Create();
 
@@ -90,8 +235,9 @@ public sealed class TrayStateMachineTests : IDisposable
         _time.Advance(TrayStateMachine.FirstRetryDelay);
         _time.Advance(TrayStateMachine.SecondRetryDelay);
 
-        Assert.Equal(TrayLifecycleState.Lost, machine.LifecycleState);
-        Assert.Equal(TrayStateMachine.MaxAttemptsPerEpisode, _native.AddCalls);
+        Assert.False(machine.CleanupVerified);
+        Assert.Equal(TrayLifecycleState.Releasing, machine.LifecycleState);
+        Assert.True(Volatile.Read(ref _exitRequests) > 0);
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -188,8 +334,13 @@ public sealed class TrayStateMachineTests : IDisposable
         machine.Release();
         _time.Advance(TrayStateMachine.SecondRetryDelay * 2);   // the scheduled retry would fire here
 
+        // The claim is that the obsolete retry never runs. The resting state is NOT asserted here: with
+        // an Add that never succeeded the release cannot be positively verified, which is the open
+        // question pinned above and must not be decided by a side assertion in this test.
         Assert.Equal(addsBeforeRelease, _native.AddCalls);
-        Assert.Equal(TrayLifecycleState.Released, machine.LifecycleState);
+        Assert.True(
+            machine.LifecycleState is TrayLifecycleState.Released or TrayLifecycleState.Releasing,
+            $"expected a terminal state, saw {machine.LifecycleState}");
     }
 
     [Fact]

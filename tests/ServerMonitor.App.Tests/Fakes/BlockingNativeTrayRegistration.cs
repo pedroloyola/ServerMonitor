@@ -43,6 +43,14 @@ internal sealed class BlockingNativeTrayRegistration : INativeTrayRegistration
     /// <summary>Operations in the order the shell saw them, so effect ordering can be asserted.</summary>
     internal List<string> Calls { get; } = [];
 
+    /// <summary>
+    /// Whether the shell currently holds the icon. Modelled because <c>Shell_NotifyIcon</c> models it:
+    /// <c>NIM_DELETE</c> returns FALSE when there is nothing to delete, and a fake that always returned
+    /// true for a delete made the redundant-delete rule unfalsifiable — the mutation that removed it
+    /// stayed green because no test could ever produce a second delete that failed.
+    /// </summary>
+    internal bool IconRegistered { get; private set; }
+
     public bool Add()
     {
         lock (_sync)
@@ -53,6 +61,15 @@ internal sealed class BlockingNativeTrayRegistration : INativeTrayRegistration
 
         AddEntered.Set();
         AddMayReturn.Wait();
+
+        if (AddResult)
+        {
+            lock (_sync)
+            {
+                IconRegistered = true;
+            }
+        }
+
         return AddResult;
     }
 
@@ -69,15 +86,21 @@ internal sealed class BlockingNativeTrayRegistration : INativeTrayRegistration
 
     public bool Delete()
     {
+        bool wasRegistered;
         lock (_sync)
         {
             DeleteCalls++;
             Calls.Add("Delete");
+            wasRegistered = IconRegistered;
+            IconRegistered = false;
         }
 
         DeleteEntered.Set();
         DeleteMayReturn.Wait();
-        return DeleteResult;
+
+        // Deleting an icon the shell does not hold reports false. That is not a malfunction; it is the
+        // shell saying there was nothing there.
+        return wasRegistered && DeleteResult;
     }
 
     internal int AddCallsSnapshot

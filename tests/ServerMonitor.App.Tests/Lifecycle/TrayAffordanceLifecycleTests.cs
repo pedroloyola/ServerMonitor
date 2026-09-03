@@ -251,6 +251,18 @@ public sealed class TrayAffordanceLifecycleTests
     /// </para>
     /// </summary>
     [Fact]
+    public void The_contract_pins_the_VALUES_and_not_only_their_order()
+    {
+        // The order test below would still pass if the numbers moved. Nothing serializes this enum today
+        // — no cast to int, no ordered comparison, no payload or file carries it — so the numbers are
+        // safe; pinning them is what keeps "safe" from depending on nobody ever noticing.
+        Assert.Equal(0, (int)TrayAffordanceState.Unavailable);
+        Assert.Equal(1, (int)TrayAffordanceState.Available);
+        Assert.Equal(2, (int)TrayAffordanceState.Recovering);
+        Assert.Equal(3, (int)TrayAffordanceState.Lost);
+    }
+
+    [Fact]
     public void The_affordance_contract_has_exactly_the_four_agreed_states() =>
         Assert.Equal(
             [

@@ -134,6 +134,218 @@ public sealed class TrayOwnershipCompletenessTests
         Assert.Contains(services, d => d.ServiceType == typeof(ITrayAffordanceSource));
     }
 
+    // ------------------------------------------------------------------ the degraded session is WIRED
+
+    /// <summary>
+    /// The blocking defect, as a test: a launch whose registration never succeeded must degrade at
+    /// STARTUP, not at the user's first close.
+    /// </summary>
+    /// <remarks>
+    /// Before the fix, <see cref="TrayAffordanceLifecycle"/> was constructed lazily by the
+    /// <c>WindowCloseCoordinator</c> factory, so nothing evaluated it until someone clicked X. A
+    /// <c>--background</c> launch with a failed registration therefore published Unavailable to nobody
+    /// and went on monitoring, invisible, with no way out — A12, the thing this slice exists to remove.
+    /// </remarks>
+    [Fact]
+    public void A_launch_with_no_affordance_degrades_at_startup_and_not_at_the_first_close()
+    {
+        var harness = new StartupHarness(TrayAffordanceState.Unavailable);
+
+        App.EvaluateStartupAffordance(harness.Services);
+
+        Assert.True(harness.Notice.Raised);
+        Assert.Equal(1, harness.Window.BackgroundSettingsOpened);
+    }
+
+    /// <summary>
+    /// The other half: the subscription is LIVE from startup, so an affordance lost before the user has
+    /// closed anything degrades then, instead of the icon vanishing silently and the next close quitting
+    /// with no explanation.
+    /// </summary>
+    [Fact]
+    public void An_affordance_lost_before_any_user_close_degrades_immediately()
+    {
+        var harness = new StartupHarness(TrayAffordanceState.Available);
+
+        App.EvaluateStartupAffordance(harness.Services);
+        Assert.False(harness.Notice.Raised);
+
+        harness.Source.Publish(TrayAffordanceState.Lost);
+
+        Assert.True(harness.Notice.Raised);
+        Assert.Equal(1, harness.Window.BackgroundSettingsOpened);
+    }
+
+    [Fact]
+    public void A_healthy_launch_degrades_nothing()
+    {
+        var harness = new StartupHarness(TrayAffordanceState.Available);
+
+        App.EvaluateStartupAffordance(harness.Services);
+
+        Assert.False(harness.Notice.Raised);
+        Assert.Equal(0, harness.Window.BackgroundSettingsOpened);
+    }
+
+    [Fact]
+    public void A_recovering_affordance_at_startup_holds_without_degrading()
+    {
+        // CV-2b: an unauthenticated TaskbarCreated broadcast must not be able to cost the user the
+        // session. Evaluating at startup must not turn the bounded recovery window into a degradation.
+        var harness = new StartupHarness(TrayAffordanceState.Recovering);
+
+        App.EvaluateStartupAffordance(harness.Services);
+
+        Assert.False(harness.Notice.Raised);
+        Assert.Equal(0, harness.Window.BackgroundSettingsOpened);
+    }
+
+    /// <summary>
+    /// The one link the behaviour tests cannot reach: that <c>OnLaunched</c> actually calls the seam.
+    /// </summary>
+    /// <remarks>
+    /// A source assertion, declared as one — and comments are stripped first, which is not a detail. My
+    /// first version asserted the call text was present, and a mutation that COMMENTED THE CALL OUT
+    /// stayed green: the text was still there, inside the comment. I had claimed a positive assertion
+    /// could not be satisfied by prose. It can. Stripping comments is what makes the claim true.
+    /// </remarks>
+    [Fact]
+    public void OnLaunched_evaluates_the_affordance_after_the_host_starts_and_before_activation_routing()
+    {
+        var source = StripComments(File.ReadAllText(Path.Combine(
+            RepositoryRoot(), "src", "ServerMonitor.App", "App.xaml.cs")));
+
+        var startAsync = source.IndexOf("await ServicesHost.StartAsync();", StringComparison.Ordinal);
+        var evaluate = source.IndexOf(
+            "EvaluateStartupAffordance(ServicesHost.Services);", StringComparison.Ordinal);
+        var markReady = source.IndexOf("_activationRouter.MarkReady();", StringComparison.Ordinal);
+
+        Assert.True(startAsync >= 0, "the host start could not be found");
+        Assert.True(evaluate >= 0, "OnLaunched does not evaluate the affordance at startup");
+        Assert.True(markReady >= 0, "the activation hand-off could not be found");
+        Assert.InRange(evaluate, startAsync, markReady);
+    }
+
+    private static string StripComments(string source) =>
+        System.Text.RegularExpressions.Regex.Replace(
+            source, @"/\*[\s\S]*?\*/|//[^\r\n]*", string.Empty);
+
+    private static string RepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !Directory.Exists(Path.Combine(directory.FullName, "src")))
+        {
+            directory = directory.Parent;
+        }
+
+        return directory?.FullName ?? throw new InvalidOperationException("The repository root was not found.");
+    }
+
+    /// <summary>
+    /// The REAL composition, with only what a test cannot have replaced: the affordance source (so the
+    /// state under test can be chosen), the window and the notice (so degradation is observable), and the
+    /// lifecycle controller. <see cref="TrayAffordanceLifecycle"/> itself is the production registration.
+    /// </summary>
+    private sealed class StartupHarness
+    {
+        public FakeAffordanceSource Source { get; }
+
+        public FakeDegradationNotice Notice { get; } = new();
+
+        public FakeWindowController Window { get; } = new();
+
+        public ServiceProvider Services { get; }
+
+        public StartupHarness(TrayAffordanceState initial)
+        {
+            Source = new FakeAffordanceSource(initial);
+
+            var services = RealComposition();
+            services.AddLogging();
+            services.AddSingleton<IAppLifecycleController>(FakeLifecycle.Instance);
+            services.AddSingleton<ITrayAffordanceSource>(Source);
+            services.AddSingleton<IBackgroundDegradationNotice>(Notice);
+            services.AddSingleton<IApplicationWindowController>(Window);
+
+            Services = services.BuildServiceProvider();
+        }
+    }
+
+    private sealed class FakeAffordanceSource(TrayAffordanceState initial) : ITrayAffordanceSource
+    {
+        public event EventHandler? StateChanged;
+
+        public TrayAffordanceState State { get; private set; } = initial;
+
+        public void Publish(TrayAffordanceState state)
+        {
+            State = state;
+            StateChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    private sealed class FakeDegradationNotice : IBackgroundDegradationNotice
+    {
+        public event EventHandler? Changed;
+
+        public bool IsDegraded => Raised;
+
+        public bool Raised { get; private set; }
+
+        public void Raise()
+        {
+            Raised = true;
+            Changed?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    private sealed class FakeWindowController : IApplicationWindowController
+    {
+        public int BackgroundSettingsOpened { get; private set; }
+
+        public bool IsAttached => true;
+
+        public bool IsMaterialized => true;
+
+        public void OpenBackgroundSettings() => BackgroundSettingsOpened++;
+
+        public void Attach(Window window)
+        {
+        }
+
+        public void AttachWindowFactory(Func<Window> factory)
+        {
+        }
+
+        public void HideForMinimize()
+        {
+        }
+
+        public void HideToBackground()
+        {
+        }
+
+        public void RestoreAndActivate()
+        {
+        }
+
+        public void OpenSettings()
+        {
+        }
+
+        public void ToggleCompactMode()
+        {
+        }
+
+        public void RequestClose()
+        {
+        }
+
+        public void BeginShutdown()
+        {
+        }
+    }
+
     [Fact]
     public void The_owner_reports_no_affordance_until_a_registration_has_actually_succeeded()
     {

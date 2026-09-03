@@ -3,9 +3,17 @@ namespace ServerMonitor.App.Services;
 /// <summary>
 /// Whether a true-exit affordance is positively established. This is the S2-T contract, consumed by S2.
 /// <para>
-/// The three states are the ones the split decision fixed. There is deliberately no "probably" and no
-/// "we called Start and it returned": <see cref="Available"/> may only ever be reported after a shell
-/// registration reported REAL success through the native boundary S2-T owns.
+/// <b>Four states</b>, closed. The split decision fixed three; <see cref="Recovering"/> was added when
+/// S2-T landed, because a bounded revalidation window is neither of its neighbours. There is deliberately
+/// no "probably" and no "we called Start and it returned": <see cref="Available"/> may only ever be
+/// reported after a shell registration reported REAL success through the native boundary S2-T owns.
+/// </para>
+/// <para>
+/// <b>The values are explicit and NEVER serialized.</b> Nothing outside this assembly names this type,
+/// nothing casts it to <see cref="int"/>, nothing compares it with an order, and no payload, file or
+/// registry value carries it — so <see cref="Recovering"/> could be inserted in the middle without
+/// breaking anything. The numbers are written down anyway, because a guarantee that rests on nobody ever
+/// doing one of those things should be a guarantee somebody can read.
 /// </para>
 /// </summary>
 public enum TrayAffordanceState
@@ -14,12 +22,12 @@ public enum TrayAffordanceState
     /// No affordance is established. The starting state, and where a registration that never succeeded
     /// stays. BACKGROUND is not legitimate here.
     /// </summary>
-    Unavailable,
+    Unavailable = 0,
 
     /// <summary>
     /// The shell confirmed it holds the icon. The ONLY state in which the window may be hidden.
     /// </summary>
-    Available,
+    Available = 1,
 
     /// <summary>
     /// A bounded recovery episode is running: the previous proof is already invalid, so this is NOT
@@ -27,14 +35,14 @@ public enum TrayAffordanceState
     /// either, so it is not <see cref="Lost"/>. S2 HOLDS here — it neither degrades nor treats the tray
     /// as usable — for at most the bounded recovery deadline (M13 S2-T).
     /// </summary>
-    Recovering,
+    Recovering = 2,
 
     /// <summary>
     /// An affordance that WAS established is gone — Explorer restarted and re-registration failed within
     /// its budget. Treated exactly like <see cref="Unavailable"/> for the close semantics, but reported
     /// separately because it can happen mid-session while the window is already hidden.
     /// </summary>
-    Lost
+    Lost = 3
 }
 
 /// <summary>
