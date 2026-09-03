@@ -61,26 +61,3 @@ public interface ITrayAffordanceSource
     /// <summary>The current, positively established state. Never optimistic.</summary>
     TrayAffordanceState State { get; }
 }
-
-/// <summary>
-/// The placeholder S2 programs against until S2-T lands (split decision: "programa contra a forma
-/// conceptual").
-/// <para>
-/// It reports <see cref="TrayAffordanceState.Unavailable"/> and nothing else, on purpose: S2 has no way
-/// to establish an affordance and must not pretend otherwise. That makes an interim build degrade to a
-/// foreground session with true-exit semantics — the fail-closed outcome the contract demands — rather
-/// than repeat the fiction this seam exists to remove. It owns no window, registers no icon and calls no
-/// shell API: there is no duplicated ownership here for S2-T to collide with.
-/// </para>
-/// </summary>
-public sealed class PendingTrayAffordanceSource : ITrayAffordanceSource
-{
-    /// <summary>Never raised: the state never changes until S2-T supplies a real source.</summary>
-    public event EventHandler? StateChanged
-    {
-        add { }
-        remove { }
-    }
-
-    public TrayAffordanceState State => TrayAffordanceState.Unavailable;
-}

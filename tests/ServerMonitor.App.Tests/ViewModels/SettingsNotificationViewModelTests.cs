@@ -281,6 +281,8 @@ public sealed class SettingsNotificationViewModelTests
 
         public void Attach(FrameworkElement rootElement) => throw new NotSupportedException();
 
+        public void Detach(FrameworkElement rootElement) => throw new NotSupportedException();
+
         public void Apply(AppThemePreference preference)
         {
         }

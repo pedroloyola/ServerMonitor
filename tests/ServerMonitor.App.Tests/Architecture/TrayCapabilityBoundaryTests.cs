@@ -116,29 +116,10 @@ public sealed class TrayCapabilityBoundaryTests
         Assert.Equal(2, AllowedSignatureMembers.Length);
     }
 
-    // ------------------------------------------------------------------ T14c: the container
-
-    /// <summary>
-    /// The half the compiler cannot enforce: nothing stops someone adding
-    /// <c>services.AddSingleton&lt;INativeTrayRegistration&gt;</c> and putting the capability back into
-    /// circulation.
-    /// </summary>
-    /// <remarks>
-    /// <b>Known limitation, stated rather than glossed.</b> Atlas requires this to inspect the
-    /// <c>IServiceCollection</c> the composition root REALLY produces. The composition root is currently
-    /// a lambda inside <c>App.xaml.cs</c> with no seam to invoke, so this asserts over the composition
-    /// SOURCE instead — the same technique the accepted <c>WatchdogOwnershipBoundaryTests</c> uses. It
-    /// catches the registration mutation, but it is text, not the real collection, and it is recorded as
-    /// an open precision rather than claimed as satisfying the condition.
-    /// </remarks>
-    [Fact]
-    public void T14c_the_capability_is_never_registered_in_the_container()
-    {
-        var composition = File.ReadAllText(Path.Combine(
-            FindRepositoryRoot(), "src", "ServerMonitor.App", "App.xaml.cs"));
-
-        Assert.DoesNotContain("INativeTrayRegistration", composition, StringComparison.Ordinal);
-    }
+    // T14c lives in TrayOwnershipCompletenessTests now. It used to read the text of App.xaml.cs, and
+    // when the composition root grew a doc comment NAMING the capability, the text assertion failed over
+    // prose. That is the whole argument against the technique: it cannot tell a registration from a
+    // sentence. The replacement inspects the ServiceDescriptors the root really produces.
 
     // ------------------------------------------------------------------
 

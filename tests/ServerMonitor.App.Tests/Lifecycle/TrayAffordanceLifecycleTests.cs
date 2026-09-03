@@ -241,18 +241,6 @@ public sealed class TrayAffordanceLifecycleTests
     // ---------------------------------------------------------------- the contract itself
 
     /// <summary>
-    /// The interim source must be honest: S2 cannot establish an affordance, so it reports Unavailable
-    /// and the build fails closed. Anything else here would be the inference the split removed.
-    /// </summary>
-    [Fact]
-    public void The_pending_source_reports_unavailable_until_S2T_lands()
-    {
-        var source = new PendingTrayAffordanceSource();
-
-        Assert.Equal(TrayAffordanceState.Unavailable, source.State);
-    }
-
-    /// <summary>
     /// The contract is a closed, deliberate set, and this pins it so a state cannot be added casually.
     /// <para>
     /// It grew from three to four when S2-T landed: <c>Recovering</c> is the bounded window in which the
