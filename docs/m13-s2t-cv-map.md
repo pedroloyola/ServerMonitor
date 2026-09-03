@@ -11,7 +11,7 @@ uma condição. Uma condição só sai marcada `SUPERSEDED BY <regra>`, com just
 
 **Base de medição:** worktree `ServerMonitor-m13-s2t`, ramo `agent/m13-s2t-tray`.
 Baseline dos testes filtrados por `Tray|Theme|Flyout`: **95 passam, 0 falham**.
-Gates completos na árvore entregue (`8d6f740`): **Debug 1796/1796**, **Release 1761/1761**. A diferença de 35 vem de um
+Gates completos na árvore entregue (`eab2291`): **Debug 1817/1817**, **Release 1782/1782**. A diferença de 35 vem de um
 `ItemGroup Condition="'$(Configuration)' != 'Debug'"` no projeto de testes que remove `Qa\**\*.cs` —
 condição pré-existente, não introduzida por esta entrega.
 
@@ -33,17 +33,17 @@ condição pré-existente, não introduzida por esta entrega.
 | **CV-9** | reentrância com flyout aberto | `Shell/Tray/FlyoutReentrancyGate.cs` · `OwnedTrayIconAdapter.ShowFlyout` | `FlyoutReentrancyGateTests` (6) | M26, M27 | **FECHADA** |
 | **CV-10** | acoplamento limitador ↔ custo de UI | `EpisodeFrequencyLimiter.DefaultCapacity = 5 / 60 s` | `T4` | M8 morta | **FECHADA** |
 | **CV-11** | residual de admissão suprimida (LOW, aceite) | ordem das guardas em `Transition` | `T4` | — | **FECHADA · residual escrito** |
-| **CV-12** | evidência de mutação na entrega | — | matriz da secção 3 | 25 mutações corridas | **FECHADA com limitações declaradas** (M13, M24, M25) |
+| **CV-12** | evidência de mutação na entrega | — | matriz da secção 3 | 42 mutações corridas | **FECHADA com limitações declaradas** (M13, M24, M25) |
 | **CV-13** | só um episódio ADMITIDO por B pode expirar | `BeginEpisode`, só depois de `TryBeginEpisode` | `CV13` | M14 morta | **FECHADA** |
 | **CV-14** | B não limita tentativas dentro de um episódio | `EpisodeFrequencyLimiter` com **um** método | `CV14` ×2 (inclui teste de arquitetura por reflexão) | M8 morta | **FECHADA** |
 | **CV-15** | integridade do documento normativo | — | este ficheiro | — | **ATIVA · este mapa é o cumprimento** |
 | **CV-16** | `CleanupVerified` fail-closed | `HandleCleanupCompleted` · `NativeTrayRegistration.Delete` devolve o BOOL real | `T5` | M10 morta | **FECHADA** |
-| **CV-17** | notificação informativa antes da saída fail-safe | sink `RequestAuthoritativeExit` ligado; falta a notificação que o precede | — | — | **ABERTA** — ver secção 2 |
-| **CV-18** | contrato fechado da ação da notificação | **NÃO IMPLEMENTADA** | — | — | **ABERTA** — ver secção 2 |
+| **CV-17** | notificação informativa antes da saída fail-safe | `Services/FailSafeExitNotice.cs` · `WindowsAppNotificationService.ShowFailSafeExitNotice` (30 min) · gancho no CAS de `AppLifecycleController` | `FailSafeExitNoticeTests` (16) · `WindowsAppNotificationServiceTests` (3) | M36, M37, M37b, M39, M39b, M40 | **FECHADA** |
+| **CV-18** | contrato fechado da ação da notificação | `NotificationActivationContract` — **uma linha**: `("FailSafeExit", "OpenDashboard")` | quatro casos independentes + tabela de 9 pares | M38, M38b | **FECHADA** |
 | **CV-19** | ressalva do passo 2 para conclusões de efeito | `Transition`, passo 2 | `T11` | **M13 SOBREVIVE** | **IMPLEMENTADA, NÃO PROVADA** — ver 3.1 |
 | **CV-20** | canal de efeitos fechado por construção | tipos `private` aninhados em `TrayStateMachine`; capacidade retida só por `EffectExecutor._native` | `TrayCapabilityBoundaryTests` (T14a/b) · `TrayOwnershipCompletenessTests` (T14c) | M11, M19, M20, M22, **M34** | **FECHADA · a imprecisão do T14c foi corrigida** |
 | **CV-21** | exceção do sink não consome o único disparo | **NÃO IMPLEMENTADA AQUI** | — | — | **com o Cortex** (`ServerMonitor-m13-s2`) |
-| **CI-1b** | grafias numéricas de enum em payloads hostis | herdada da S2 | — | — | **REFERENCIADA**, dívida da S2 |
+| **CI-1b** | grafias numéricas de enum em payloads hostis | a ação `FailSafeExit` entra no mesmo `switch` de pares literais e **herda** o fail-closed | tabela de 9 pares, inclui `("FailSafeExit", "1")` e `("2", "1")` | M38b | **HERDADA · não agravada.** A dívida da S2 continua a ser da S2 |
 
 ---
 
@@ -71,16 +71,16 @@ condição pré-existente, não introduzida por esta entrega.
 
 ## 2. O que está por implementar, e porquê
 
-A ligação em DI e o flyout **foram feitos**. O que resta não é código por escrever; é verificação que
-exige um desktop e um humano.
+**Não falta código.** A ligação em DI, o flyout e a notificação de saída fail-safe estão feitos. O que
+resta é verificação que exige um desktop e um humano.
 
 | Item | Estado |
 |---|---|
-| **CV-17 / CV-18** — notificação informativa antes da saída fail-safe | **ABERTA.** O sink `RequestAuthoritativeExit` está ligado e é invocado; falta a notificação que o precede, que depende das strings RESW finais do Prism e cuja entrega só é verificável por observação. |
 | **CV-3** e o caso S6 `FORCED-TERMINATION TRAY CLEANUP` | **`NOT_RUN`.** Exigem terminar o processo à força. |
 | Reinício real do Explorer → recuperação | **`NOT_RUN`.** Exige reiniciar o Explorer. |
 | Ícone DPI após `WM_DPICHANGED` (M24) | **`NOT_RUN`.** Só é visível a olho. |
 | Entrega real de `TaskbarCreated` (M25) | **`NOT_RUN`.** Exige reinício real do shell. |
+| Aparência e clique da notificação de saída fail-safe | **`NOT_RUN`.** A emissão é provada; a entrega pelo Windows e o clique tardio são observação. |
 
 **THEME-1** (persistência da preferência entre processos) continua **fora de âmbito**, por decisão. O que
 esta entrega garante é que, dentro do processo, o Dashboard e o flyout resolvem a **mesma** preferência.
@@ -106,9 +106,11 @@ falhar (4).
 Uma mutação de cada vez, sempre contra o **código de produção**, com restauro e reconfirmação da baseline
 entre cada uma. Filtro: `FullyQualifiedName~Tray` (M1–M25) e
 `FullyQualifiedName~Tray|FullyQualifiedName~Theme|FullyQualifiedName~Flyout` (M26–M35).
-Baseline **95 passam / 0 falham**.
+e `FullyQualifiedName~FailSafe|FullyQualifiedName~WindowsAppNotification|FullyQualifiedName~Notification`
+(M36–M40). Baselines **95** e **82**, ambas 0 falhas.
 
-**35 mutações. 32 mortas. 3 sobrevivem, e cada uma é uma limitação declarada, não uma alegação.**
+**43 entradas · 42 corridas (a M21 está `SUPERSEDED`) · 39 mortas · 3 sobrevivem**, e cada uma das três é
+uma limitação declarada, não uma alegação.
 
 ### Reprodução
 
@@ -122,6 +124,9 @@ python mutate_t14.py M19         # ou qualquer subconjunto de M19..M25
 
 # Ligação em DI, flyout, CV-9 e tema (M26–M35)
 python mutate_wiring.py M26      # ou qualquer subconjunto de M26..M35
+
+# Notificação de saída fail-safe, CV-17/CV-18 (M36–M40)
+python mutate_notice.py M36      # ou qualquer subconjunto de M36..M40
 
 # Prova diferencial da escalada CS8509
 python cs8509_differential.py
@@ -171,6 +176,14 @@ python cs8509_differential.py
 | M33 | a fonte de afordância é uma **segunda instância** | um só dono do ícone | 1 | **morta** |
 | M34 | a capacidade é registada no contentor | CV-20 / T14c sobre descritores reais | 2 | **morta** |
 | M35 | o adaptador reporta `Available` antes de haver registo | fail-closed antes do `Start()` | 1 | **morta** |
+| M36 | a notificação é emitida quando o CAS foi **PERDIDO** | condição do Prism | 2 | **morta** |
+| M37 | a guarda do controlador desaparece | a falha não pode impedir o Exit | 1 | **morta** |
+| M37b | a guarda da própria notificação desaparece | idem, outra camada | 1 | **morta** |
+| M38 | o vocabulário aceita qualquer ação sob `FailSafeExit` | CV-18, par literal | 2 | **morta** |
+| M38b | o vocabulário aceita `OpenDashboard` sob qualquer kind | CV-18 / CI-1b | 3 | **morta** |
+| M39 | a expiração passa a longa (30 dias) | CV-17, curta duração | 2 | **morta** |
+| M39b | a expiração é removida | idem | 1 | **morta** |
+| M40 | a fronteira deixa de ser fire-and-forget (devolve `Task`) | a saída não espera pela entrega | 5 | **morta** |
 
 ### 3.1 M13 sobrevive: a ressalva CV-19 está implementada mas **não provada**
 
@@ -218,9 +231,28 @@ Ambas são regras corretas cuja violação **só um ambiente gráfico real revel
 Nenhuma é observável num teste sem desktop. Ficam ligadas aos casos S6 de QA humana, e não são
 apresentadas como provadas. Os passos exatos para as verificar estão no relatório, secção P, casos 6 e 4.
 
-### 3.4 Secção 1, atualizada pela ligação
+### 3.4 M37 e M37b: uma propriedade defendida duas vezes tem de ser provada duas vezes
+
+Na primeira passagem **ambas sobreviveram**, e a razão é instrutiva: «a falha da notificação nunca impede
+o Exit» está defendida em duas camadas — a própria notificação engole a exceção, e o `RunStep` do
+controlador engole o que passar. Removendo **uma** das duas, a outra ainda apanhava, e o teste
+ponta-a-ponta continuava verde.
+
+Defesa em profundidade é o que torna a mutação de uma camada invisível. Cada camada passou a ter o seu
+teste direto: `The_notice_itself_never_lets_a_platform_failure_escape` (a notificação, isolada) e
+`The_exit_path_survives_a_committed_hook_that_throws` (o controlador, com um gancho cru que rebenta, para
+que a guarda da notificação não possa substituir a dele). Ambas mortas com 1 falha cada.
+
+### 3.5 Secção 1, atualizada pela ligação
 
 Acrescenta-se ao que estava provado:
+
+### 3.5 continuação
+
+11. **A notificação de saída fail-safe.** Emitida do ramo que **venceu** o CAS existente para `Exiting`,
+    e só para `ExitReason.TrayCleanupUnverified`. Uma linha no `switch` de pares literais, ação
+    `OpenDashboard` que já estava na allowlist, zero parâmetros, 30 minutos, fire-and-forget com guarda
+    em cada camada.
 
 7. **Um dono do ícone.** `OwnedTrayIconAdapter` substitui o `WinUIExTrayIconAdapter`, que foi **apagado**
    junto com o `PendingTrayAffordanceSource` — não guardado como recurso. Provado contra o contentor real
