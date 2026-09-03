@@ -10,8 +10,8 @@ uma condição. Uma condição só sai marcada `SUPERSEDED BY <regra>`, com just
 `docs/m13-s2t-linearizable-state-machine.md` (desenho) · `.boss/BOSS.md` §9 e §10.
 
 **Base de medição:** worktree `ServerMonitor-m13-s2t`, ramo `agent/m13-s2t-tray`.
-Baseline dos testes filtrados por `Tray`: **68 passam, 0 falham**.
-Gates completos na árvore entregue (`f4c214c`): **Debug 1769/1769**, **Release 1734/1734**. A diferença de 35 vem de um
+Baseline dos testes filtrados por `Tray|Theme|Flyout`: **95 passam, 0 falham**.
+Gates completos na árvore entregue (`8d6f740`): **Debug 1796/1796**, **Release 1761/1761**. A diferença de 35 vem de um
 `ItemGroup Condition="'$(Configuration)' != 'Debug'"` no projeto de testes que remove `Qa\**\*.cs` —
 condição pré-existente, não introduzida por esta entrega.
 
@@ -30,7 +30,7 @@ condição pré-existente, não introduzida por esta entrega.
 | **CV-6b** | quatro casos independentes de validação | `TrayCallbackContract.TryDecode` | quatro `[Fact]` A/B/C/D, cada um variando **um** campo | M15, M16 mortas | **FECHADA** |
 | **CV-7** | topologia de thread | `TrayHostWindow` (janela criada na thread de UI) | — | — | **MEDIDA · PASSA** (S-1(A), emissor sintético) |
 | **CV-8** | custo nativo síncrono na thread de UI | idem | — | — | **MEDIDA · aceitável**: `NIM_ADD` mediana 3,16 ms / máx 4,36 ms, `NIM_DELETE` mediana 0,36 ms, contra 16,7 ms por frame a 60 Hz, dentro do envelope de B |
-| **CV-9** | reentrância com flyout aberto | **NÃO IMPLEMENTADA** — depende do flyout | — | — | **ABERTA** — ver secção 2 |
+| **CV-9** | reentrância com flyout aberto | `Shell/Tray/FlyoutReentrancyGate.cs` · `OwnedTrayIconAdapter.ShowFlyout` | `FlyoutReentrancyGateTests` (6) | M26, M27 | **FECHADA** |
 | **CV-10** | acoplamento limitador ↔ custo de UI | `EpisodeFrequencyLimiter.DefaultCapacity = 5 / 60 s` | `T4` | M8 morta | **FECHADA** |
 | **CV-11** | residual de admissão suprimida (LOW, aceite) | ordem das guardas em `Transition` | `T4` | — | **FECHADA · residual escrito** |
 | **CV-12** | evidência de mutação na entrega | — | matriz da secção 3 | 25 mutações corridas | **FECHADA com limitações declaradas** (M13, M24, M25) |
@@ -38,10 +38,10 @@ condição pré-existente, não introduzida por esta entrega.
 | **CV-14** | B não limita tentativas dentro de um episódio | `EpisodeFrequencyLimiter` com **um** método | `CV14` ×2 (inclui teste de arquitetura por reflexão) | M8 morta | **FECHADA** |
 | **CV-15** | integridade do documento normativo | — | este ficheiro | — | **ATIVA · este mapa é o cumprimento** |
 | **CV-16** | `CleanupVerified` fail-closed | `HandleCleanupCompleted` · `NativeTrayRegistration.Delete` devolve o BOOL real | `T5` | M10 morta | **FECHADA** |
-| **CV-17** | notificação informativa antes da saída fail-safe | **NÃO IMPLEMENTADA** | — | — | **ABERTA** — ver secção 2 |
+| **CV-17** | notificação informativa antes da saída fail-safe | sink `RequestAuthoritativeExit` ligado; falta a notificação que o precede | — | — | **ABERTA** — ver secção 2 |
 | **CV-18** | contrato fechado da ação da notificação | **NÃO IMPLEMENTADA** | — | — | **ABERTA** — ver secção 2 |
 | **CV-19** | ressalva do passo 2 para conclusões de efeito | `Transition`, passo 2 | `T11` | **M13 SOBREVIVE** | **IMPLEMENTADA, NÃO PROVADA** — ver 3.1 |
-| **CV-20** | canal de efeitos fechado por construção | tipos `private` aninhados em `TrayStateMachine`; capacidade retida só por `EffectExecutor._native` | `TrayCapabilityBoundaryTests` (T14a/b/c) | M11, M19–M22 mortas | **FECHADA com uma imprecisão declarada em T14c** |
+| **CV-20** | canal de efeitos fechado por construção | tipos `private` aninhados em `TrayStateMachine`; capacidade retida só por `EffectExecutor._native` | `TrayCapabilityBoundaryTests` (T14a/b) · `TrayOwnershipCompletenessTests` (T14c) | M11, M19, M20, M22, **M34** | **FECHADA · a imprecisão do T14c foi corrigida** |
 | **CV-21** | exceção do sink não consome o único disparo | **NÃO IMPLEMENTADA AQUI** | — | — | **com o Cortex** (`ServerMonitor-m13-s2`) |
 | **CI-1b** | grafias numéricas de enum em payloads hostis | herdada da S2 | — | — | **REFERENCIADA**, dívida da S2 |
 
@@ -71,33 +71,44 @@ condição pré-existente, não introduzida por esta entrega.
 
 ## 2. O que está por implementar, e porquê
 
-Estes pontos **não** estão entregues. Nenhum é uma dificuldade técnica por resolver; todos partilham a
-mesma razão: só são verificáveis por observação humana num ambiente que esta sessão não pode usar.
+A ligação em DI e o flyout **foram feitos**. O que resta não é código por escrever; é verificação que
+exige um desktop e um humano.
 
-| Item | Porque não está feito |
+| Item | Estado |
 |---|---|
-| Ligação em DI (`ITrayAffordanceSource` → `TrayStateMachine`), substituindo `PendingTrayAffordanceSource` e `WinUIExTrayIconAdapter` | Trocar a fonte de afordância remove o único ícone de tray da aplicação. O ícone novo não pode ser observado nesta sessão. A troca deixaria uma tray por verificar no caminho para `main`, e a que existe hoje funciona. |
-| Janela XAML do flyout (ordem: Abrir o ServerAlyzer · Modo compacto · Atualizar todos · Definições · Sair do ServerAlyzer) | Acoplada à troca acima: quem for dono do ícone tem de ser dono do menu, sob pena de haver dois ícones. Requer também a resolução multi-root de tema (HIGH do Prism) e QA visual. |
-| **CV-9** — reentrância com o flyout aberto | Sem flyout não há o que reentrar. |
-| **CV-17 / CV-18** — notificação informativa antes da saída fail-safe | Depende das strings RESW finais do Prism e da entrega real da notificação, que é QA humana. O sink `requestAuthoritativeExit` já existe e já é invocado; falta a notificação que o precede. |
-| **CV-3** e o caso S6 `FORCED-TERMINATION TRAY CLEANUP` | Exigem reiniciar o Explorer ou terminar o processo à força — fora do que esta sessão pode fazer. |
+| **CV-17 / CV-18** — notificação informativa antes da saída fail-safe | **ABERTA.** O sink `RequestAuthoritativeExit` está ligado e é invocado; falta a notificação que o precede, que depende das strings RESW finais do Prism e cuja entrega só é verificável por observação. |
+| **CV-3** e o caso S6 `FORCED-TERMINATION TRAY CLEANUP` | **`NOT_RUN`.** Exigem terminar o processo à força. |
+| Reinício real do Explorer → recuperação | **`NOT_RUN`.** Exige reiniciar o Explorer. |
+| Ícone DPI após `WM_DPICHANGED` (M24) | **`NOT_RUN`.** Só é visível a olho. |
+| Entrega real de `TaskbarCreated` (M25) | **`NOT_RUN`.** Exige reinício real do shell. |
 
-### Imprecisão declarada em T14c
+**THEME-1** (persistência da preferência entre processos) continua **fora de âmbito**, por decisão. O que
+esta entrega garante é que, dentro do processo, o Dashboard e o flyout resolvem a **mesma** preferência.
 
-O Atlas exige que T14c inspecione a `IServiceCollection` **realmente produzida** pelo composition root. O
-composition root é hoje um lambda dentro de `App.xaml.cs`, sem costura que permita invocá-lo a partir de
-um teste. T14c afirma por isso sobre o **texto** da composição — a mesma técnica dos
-`WatchdogOwnershipBoundaryTests` já aceites. Mata a mutação de registo (M21), mas é texto e não a coleção
-real. Fica registado como imprecisão em aberto, não como condição satisfeita.
+### A troca é completa — a prova
 
-Nota atenuante, medida e não inferida: M21 é morta **duas vezes** — por T14c e também por T14b, porque um
-registo por fábrica produz um método gerado cujo tipo de retorno é a capacidade. A forma
-`AddSingleton<INativeTrayRegistration, Concreto>()` seria apanhada só por T14c.
+Não basta dizer que removi o caminho antigo. `TrayOwnershipCompletenessTests` afirma, contra o
+**contentor real** construído por `App.ConfigureApplicationServices`:
+
+1. o assembly declara **um** `ITrayIconAdapter` — `OwnedTrayIconAdapter`;
+2. os únicos `ITrayAffordanceSource` são o adaptador e a própria `TrayStateMachine` a que ele reenvia,
+   nomeados por identidade — um terceiro seria uma segunda resposta a «o utilizador tem saída?»;
+3. **nenhum** tipo `WinUIExTray*` ou `PendingTrayAffordance*` sobrevive no assembly;
+4. o contentor resolve `ITrayIconAdapter`, `ITrayAffordanceSource` e o tipo concreto para a **mesma
+   instância** — verificado por resolução, não por leitura da forma do registo;
+5. existe exatamente **um** descritor para cada um dos três.
+
+M33 confirma que isto não é decorativo: registar uma segunda instância como fonte de afordância faz
+falhar (4).
 
 ## 3. Matriz de mutação — CV-12
 
 Uma mutação de cada vez, sempre contra o **código de produção**, com restauro e reconfirmação da baseline
-entre cada uma. Filtro em todas: `FullyQualifiedName~Tray`. Baseline **68 passam / 0 falham**.
+entre cada uma. Filtro: `FullyQualifiedName~Tray` (M1–M25) e
+`FullyQualifiedName~Tray|FullyQualifiedName~Theme|FullyQualifiedName~Flyout` (M26–M35).
+Baseline **95 passam / 0 falham**.
+
+**35 mutações. 32 mortas. 3 sobrevivem, e cada uma é uma limitação declarada, não uma alegação.**
 
 ### Reprodução
 
@@ -108,6 +119,9 @@ python mutate.py M1              # ou qualquer subconjunto de M1..M18
 
 # CV-20 e fronteira nativa (M19–M25)
 python mutate_t14.py M19         # ou qualquer subconjunto de M19..M25
+
+# Ligação em DI, flyout, CV-9 e tema (M26–M35)
+python mutate_wiring.py M26      # ou qualquer subconjunto de M26..M35
 
 # Prova diferencial da escalada CS8509
 python cs8509_differential.py
@@ -142,16 +156,31 @@ python cs8509_differential.py
 | M18 | a sanitização da âncora é removida | CV-1 ponto 5 | 1 | **morta** |
 | M19 | o executor deixa de ser `private`-aninhado | CV-20, fecho do canal | 1 | **morta** |
 | M20 | a máquina retém a capacidade num campo próprio | CV-20, detentor único | 2 | **morta** |
-| M21 | a capacidade é registada no composition root | CV-20, fora do contentor | 2 | **morta** |
+| M21 | a capacidade é registada no composition root | CV-20, fora do contentor | — | `SUPERSEDED BY` **M34** (a âncora era a antiga forma em lambda) |
 | M22 | um closure captura a capacidade num campo **gerado pelo compilador** | CV-20 sem exclusão por categoria | 2 | **morta** |
 | M23 | o tooltip deixa de ser ajustado ao buffer `szTip` | CV-5 | 1 | **morta** |
 | M24 | o `HICON` antigo é libertado **antes** de `NIM_MODIFY` | regra DPI do Prism | **0** | **SOBREVIVE — 3.3** |
 | M25 | a janela hospedeira passa a `HWND_MESSAGE` | entrega de `TaskbarCreated` | **0** | **SOBREVIVE — 3.3** |
+| M26 | a porta CV-9 admite todos os pedidos | um só flyout de cada vez | 4 | **morta** |
+| M27 | `Close` deixa de ser idempotente e dá um slot extra | CV-9 sob dupla notificação de fecho | 1 | **morta** |
+| M28 | a ordem do menu põe `Sair` em primeiro | ordem fixada pelo produto | 4 | **morta** |
+| M29 | um item desaparece do menu | idem | 3 | **morta** |
+| M30 | um item resolve a chave de recurso errada | item vazio = app que não se fecha | 2 | **morta** |
+| M31 | anexar um root de tema **substitui** o anterior | HIGH do Prism | 4 | **morta** |
+| M32 | o tema é aplicado só ao root mais recente | idem | 1 | **morta** |
+| M33 | a fonte de afordância é uma **segunda instância** | um só dono do ícone | 1 | **morta** |
+| M34 | a capacidade é registada no contentor | CV-20 / T14c sobre descritores reais | 2 | **morta** |
+| M35 | o adaptador reporta `Available` antes de haver registo | fail-closed antes do `Start()` | 1 | **morta** |
 
 ### 3.1 M13 sobrevive: a ressalva CV-19 está implementada mas **não provada**
 
 A ressalva existe no código — `&& trayEvent.Kind != TrayEventKind.AddCompleted`, no passo 2 do preâmbulo
 — e é exigida pela CV-19. Removê-la não faz falhar nenhum teste.
+
+**A ligação em DI não a torna alcançável** — verifiquei em vez de assumir. Há três incrementos de geração
+em `TrayStateMachine`: dois entram em `Releasing` (terminal, cortado pelo passo 1 do preâmbulo) e o
+terceiro é o `BeginEpisode`, cujos eventos já levam a geração nova. A ligação não acrescenta nenhuma
+fonte de incremento.
 
 A causa não é um teste em falta que eu possa escrever: **o estado que a ressalva protege é hoje
 inalcançável**. O passo 1 do preâmbulo (terminal) faz curto-circuito antes do passo 2, e todos os
@@ -187,4 +216,21 @@ Ambas são regras corretas cuja violação **só um ambiente gráfico real revel
   janelas de topo. O sintoma é a tray não voltar depois de reiniciar o Explorer.
 
 Nenhuma é observável num teste sem desktop. Ficam ligadas aos casos S6 de QA humana, e não são
-apresentadas como provadas.
+apresentadas como provadas. Os passos exatos para as verificar estão no relatório, secção P, casos 6 e 4.
+
+### 3.4 Secção 1, atualizada pela ligação
+
+Acrescenta-se ao que estava provado:
+
+7. **Um dono do ícone.** `OwnedTrayIconAdapter` substitui o `WinUIExTrayIconAdapter`, que foi **apagado**
+   junto com o `PendingTrayAffordanceSource` — não guardado como recurso. Provado contra o contentor real
+   (secção 2).
+8. **O composition root é invocável.** Era um lambda, e por isso a CV-20 só podia ser verificada por
+   leitura de texto. A primeira versão do T14c falhou por causa de um **comentário de documentação** que
+   nomeava a capacidade: o melhor argumento possível contra a técnica. Agora inspeciona os
+   `ServiceDescriptor` que o root produz mesmo.
+9. **CV-9 é um tipo, não um `bool`.** Uma flag dentro de uma chamada para o XAML só se exercita com
+   desktop; `FlyoutReentrancyGate` prova-se com seis testes e morre a duas mutações.
+10. **O tema chega a todos os roots.** O serviço guardava um `FrameworkElement`; anexar o flyout teria
+    feito o Dashboard deixar de seguir a preferência em silêncio. `ThemeRootSet` leva a contabilidade
+    sobre objetos simples, e por isso a regressão é uma asserção em vez de estado de UI não testável.
