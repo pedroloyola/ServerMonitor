@@ -11,7 +11,7 @@ uma condição. Uma condição só sai marcada `SUPERSEDED BY <regra>`, com just
 
 **Base de medição:** worktree `ServerMonitor-m13-s2t`, ramo `agent/m13-s2t-tray`.
 Baseline dos testes filtrados por `Tray|Theme|Flyout|FailSafe|WindowClose`: **161 passam, 0 falham**, em **10 corridas seguidas** com resultado idêntico e zero abortos.
-Gates completos na árvore entregue: **Debug 1879/1879**, **Release 1844/1844**, zero abortos. A diferença de 35 vem de um
+Gates completos na árvore entregue: **Debug 1886/1886**, **Release 1851/1851**, zero abortos. A diferença de 35 vem de um
 `ItemGroup Condition="'$(Configuration)' != 'Debug'"` no projeto de testes que remove `Qa\**\*.cs` —
 condição pré-existente, não introduzida por esta entrega.
 
@@ -33,7 +33,7 @@ condição pré-existente, não introduzida por esta entrega.
 | **CV-9** | reentrância com flyout aberto | `Shell/Tray/FlyoutReentrancyGate.cs` · `OwnedTrayIconAdapter.ShowFlyout` | `FlyoutReentrancyGateTests` (6) | M26, M27 | **FECHADA** na decisão; a ativação da janela auxiliar é medida humana (matriz P, passo 5) |
 | **CV-10** | acoplamento limitador ↔ custo de UI | `EpisodeFrequencyLimiter.DefaultCapacity = 5 / 60 s` | `T4` | M8 morta | **FECHADA** |
 | **CV-11** | residual de admissão suprimida (LOW, aceite) | ordem das guardas em `Transition` | `T4` | — | **FECHADA · residual escrito** |
-| **CV-12** | evidência de mutação na entrega | — | matriz da secção 3 | **89 definidas · 89 corridas · 87 mortas** | **FECHADA com duas limitações declaradas** (M24, M25) |
+| **CV-12** | evidência de mutação na entrega | — | matriz da secção 3 | **95 definidas · 95 corridas · 93 mortas** | **FECHADA com duas limitações declaradas** (M24, M25) |
 | **CV-13** | só um episódio ADMITIDO por B pode expirar | `BeginEpisode`, só depois de `TryBeginEpisode` | `CV13` | M14 morta | **FECHADA** |
 | **CV-14** | B não limita tentativas dentro de um episódio | `EpisodeFrequencyLimiter` com **um** método | `CV14` ×2 (inclui teste de arquitetura por reflexão) | M8 morta | **FECHADA** |
 | **CV-15** | integridade do documento normativo | — | este ficheiro | — | **ATIVA · este mapa é o cumprimento.** Ver a **retratação** na secção 4 |
@@ -706,12 +706,12 @@ aplicação desta regra em vez do reflexo de re-ancorar.
 
 | | |
 |---|---|
-| Definidas | **89** |
-| Corridas | **89** |
-| **Mortas** | **87** |
+| Definidas | **95** |
+| Corridas | **95** |
+| **Mortas** | **93** |
 | Sobreviventes | **2** — `M24`, `M25`, declaradas, só visíveis num desktop real |
 | `ANCHOR NOT FOUND` | **0** — as duas permanentes foram apagadas, e uma âncora partida aborta |
-| Baselines | **13/13** RAN e verdes |
+| Baselines | **14/14** RAN e verdes |
 
 **Nenhuma mutação anteriormente declarada morta sobreviveu**, nem na passagem antes dos patches nem na
 passagem sobre o código entregue.
@@ -749,7 +749,7 @@ entre cada uma. Filtro: `FullyQualifiedName~Tray` (M1–M25) e
 e `FullyQualifiedName~FailSafe|FullyQualifiedName~WindowsAppNotification|FullyQualifiedName~Notification`
 (M36–M40). Baselines **95** e **82**, ambas 0 falhas.
 
-**89 definidas · 89 corridas · 87 mortas · 2 sobrevivem.** (Ronda 8: contagem medida com o
+**95 definidas · 95 corridas · 93 mortas · 2 sobrevivem.** (Ronda 8: contagem medida com o
 instrumento corrigido — ver §13. As contagens anteriores deste ficheiro, 76/74/72, descreviam um estado
 que já não existia e foram apanhadas pelo Atlas.)
 
