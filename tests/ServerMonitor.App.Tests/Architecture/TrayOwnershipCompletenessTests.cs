@@ -377,8 +377,16 @@ public sealed class TrayOwnershipCompletenessTests
 
         controller.ConnectHideCapability(lifecycle, exit);
 
+        // FRESH receivers on the second call, and the reason matters: with the same two, the exception
+        // came from the LIFECYCLE's single-shot rather than the controller's, so the assertion passed
+        // whether or not the controller guarded anything. The mutation that removes the controller's
+        // guard survived, which is how the weakness surfaced.
+        var lifecycle2 = (TrayAffordanceLifecycle)RuntimeHelpers.GetUninitializedObject(
+            typeof(TrayAffordanceLifecycle));
+        var exit2 = (ExitSequence)RuntimeHelpers.GetUninitializedObject(typeof(ExitSequence));
+
         Assert.Throws<InvalidOperationException>(
-            () => controller.ConnectHideCapability(lifecycle, exit));
+            () => controller.ConnectHideCapability(lifecycle2, exit2));
     }
 
     [Fact]

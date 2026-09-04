@@ -32,7 +32,7 @@ MUTATIONS = [
  ("M96", "the hide capability is registered in the container", [
    (APP,
     "        services.AddSingleton<IApplicationWindowController>(sp =>\n            sp.GetRequiredService<ApplicationWindowController>());",
-    "        services.AddSingleton<IApplicationWindowController>(sp =>\n            sp.GetRequiredService<ApplicationWindowController>());\n        services.AddSingleton<IWindowHideCapability>(sp =>\n            sp.GetRequiredService<ApplicationWindowController>().TakeHideCapability());")]),
+    "        services.AddSingleton<IApplicationWindowController>(sp =>\n            sp.GetRequiredService<ApplicationWindowController>());\n        services.AddSingleton<IWindowHideCapability>(sp =>\n            null!);")]),
 
  # And the original shape: the act back on the contract every consumer holds. A default interface
  # implementation, so no implementer has to change and the mutation is purely additive.
@@ -67,7 +67,7 @@ MUTATIONS = [
     "    private readonly IApplicationWindowController _windowController;",
     "    private readonly IApplicationWindowController _windowController;\n\n    private void HideBySideDoor() =>\n        Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions\n            .GetRequiredService<ServerMonitor.App.Services.IWindowHideCapability>(\n                ServerMonitor.App.App.ServicesHost.Services)\n            .HideToBackground();")]),
 
- ("M102", "the hide capability can be taken more than once", [
+ ("M102", "the controller connects the hide capability more than once", [
    (CONTROLLER,
     "        if (_hideCapability is not null)\n        {\n            throw new InvalidOperationException(",
     "        if (false)\n        {\n            throw new InvalidOperationException(")]),
