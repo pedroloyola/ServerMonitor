@@ -37,19 +37,38 @@ public sealed class ApplicationWindowController(
     private IWindowHideCapability? _hideCapability;
 
     /// <summary>
-    /// Hands out the hide capability. SINGLE SHOT: composition takes it at startup, and a second caller
-    /// gets an exception rather than a second reference.
+    /// CONNECTS the hide capability to its two receivers. It does not RETURN it, and that distinction is
+    /// the ninth correction of the same defect.
     /// </summary>
-    internal IWindowHideCapability TakeHideCapability()
+    /// <remarks>
+    /// The previous version handed the capability back from an <c>internal</c> method, so the type was
+    /// unforgeable and there was a tap that distributed it: any code in the assembly could ask and
+    /// receive, including from a constructor — which is where the probe put it, and where the scanner was
+    /// not looking. Making a capability impossible to construct is worthless while something gives one
+    /// away.
+    /// <para>
+    /// So nothing returns it. The capability is created here and pushed into the two named receivers,
+    /// both <c>sealed</c>, both storing it privately, and neither handing it back. Single shot: a second
+    /// call is refused, so the process contains exactly one reference and there is no expression anywhere
+    /// that evaluates to it.
+    /// </para>
+    /// </remarks>
+    internal void ConnectHideCapability(TrayAffordanceLifecycle lifecycle, ExitSequence exitSequence)
     {
+        ArgumentNullException.ThrowIfNull(lifecycle);
+        ArgumentNullException.ThrowIfNull(exitSequence);
+
         if (_hideCapability is not null)
         {
             throw new InvalidOperationException(
-                "The hide capability has already been taken; there is exactly one.");
+                "The hide capability is already connected; there is exactly one.");
         }
 
-        _hideCapability = new HideCapability(this);
-        return _hideCapability;
+        var capability = new HideCapability(this);
+        _hideCapability = capability;
+
+        lifecycle.ConnectHide(capability);
+        exitSequence.ConnectHide(capability);
     }
 
     private readonly object _sync = new();

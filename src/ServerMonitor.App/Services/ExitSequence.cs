@@ -19,10 +19,24 @@ public sealed class ExitSequence(
     IRefreshAllCoordinator refreshAllCoordinator,
     TrayService trayService,
     ApplicationWindowController windowController,
-    IWindowHideCapability hideCapability,
     AppShutdownCoordinator shutdownCoordinator,
     ILogger<ExitSequence> logger) : IExitSequence
 {
+    private IWindowHideCapability? _hideCapability;
+
+    /// <summary>Receives the hide capability from its owner. Single shot; never handed back.</summary>
+    internal void ConnectHide(IWindowHideCapability capability)
+    {
+        ArgumentNullException.ThrowIfNull(capability);
+
+        if (_hideCapability is not null)
+        {
+            throw new InvalidOperationException("The hide capability is already connected.");
+        }
+
+        _hideCapability = capability;
+    }
+
     public void StopAcceptingForegroundWork()
     {
         notificationService.BeginShutdown();
@@ -37,7 +51,9 @@ public sealed class ExitSequence(
     {
         // Hide BEFORE the controller stops accepting commands, otherwise the hide itself is dropped.
         // Tolerates there being no window at all: that is the headless exit (A12).
-        hideCapability.HideToBackground();
+        // Tolerates never having been connected: the exit must not be blocked by wiring, and a window
+        // that was never hidden is closed by BeginShutdown a line later anyway.
+        _hideCapability?.HideToBackground();
         windowController.BeginShutdown();
     }
 

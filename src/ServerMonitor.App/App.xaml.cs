@@ -304,6 +304,13 @@ public partial class App : Application
         // Resolving it is half the fix: the constructor is what subscribes to the affordance source, so
         // a lifecycle nobody resolves is a policy that never hears anything. Evaluate() is the other
         // half: it acts on the state that already exists rather than waiting for a change.
+        // CONNECTED, not handed out. Nothing in the program returns the capability, so this is the only
+        // place it comes into existence and it is pushed straight into its two receivers. It must happen
+        // before the affordance is evaluated, because evaluating it can already decide to hide.
+        services.GetRequiredService<ApplicationWindowController>().ConnectHideCapability(
+            services.GetRequiredService<TrayAffordanceLifecycle>(),
+            (ExitSequence)services.GetRequiredService<IExitSequence>());
+
         services.GetRequiredService<TrayAffordanceLifecycle>().Evaluate();
     }
 
@@ -324,15 +331,6 @@ public partial class App : Application
     /// </summary>
     internal static void ConfigureApplicationServices(IServiceCollection services)
     {
-        // Taken ONCE and handed BY TYPE to the two holders. Deliberately NOT registered: putting it in
-        // the container is exactly the state this removes, and both a test and a mutation say so. The
-        // capability is a private nested type, so this is the only expression in the program that can
-        // produce one, and taking it a second time is refused.
-        IWindowHideCapability? hideCapability = null;
-
-        IWindowHideCapability Hide(IServiceProvider sp) =>
-            hideCapability ??= sp.GetRequiredService<ApplicationWindowController>().TakeHideCapability();
-
         services.AddSingleton<ILocalizationService, LocalizationService>();
         services.AddSingleton<IThemeService, ThemeService>();
         services.AddSingleton<IAppVersionProvider, AppVersionProvider>();
@@ -362,7 +360,6 @@ public partial class App : Application
             sp.GetRequiredService<IRefreshAllCoordinator>(),
             sp.GetRequiredService<TrayService>(),
             sp.GetRequiredService<ApplicationWindowController>(),
-            Hide(sp),
             sp.GetRequiredService<AppShutdownCoordinator>(),
             sp.GetRequiredService<ILogger<ExitSequence>>()));
         // CV-17. The notice hangs off the exit path's EXISTING CAS: the controller calls this only on the
@@ -403,7 +400,6 @@ public partial class App : Application
         services.AddSingleton(sp => new TrayAffordanceLifecycle(
             sp.GetRequiredService<ITrayAffordanceSource>(),
             sp.GetRequiredService<IApplicationWindowController>(),
-            Hide(sp),
             sp.GetRequiredService<IBackgroundDegradationNotice>(),
             sp.GetRequiredService<IAppLifecycleController>(),
             sp.GetRequiredService<IBackgroundNoticePresenter>(),

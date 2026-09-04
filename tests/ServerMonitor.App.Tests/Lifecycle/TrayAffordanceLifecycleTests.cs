@@ -237,8 +237,11 @@ public sealed class TrayAffordanceLifecycleTests
             Lifecycle = new FakeAppLifecycleController(lifecycleState);
             Notice.Changed += (_, _) => Order.Add("notice");
             Subject = new TrayAffordanceLifecycle(
-                Source, Window, new RecordingHideCapability(Window), Notice, Lifecycle, Presenter,
+                Source, Window, Notice, Lifecycle, Presenter,
                 NullLogger<TrayAffordanceLifecycle>.Instance);
+
+            // CONNECTED, like production: the capability is pushed in, never taken out.
+            Subject.ConnectHide(new RecordingHideCapability(Window));
         }
     }
 

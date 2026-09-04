@@ -146,9 +146,15 @@ public sealed class TrayOwnershipCompletenessTests
 
         foreach (var type in typeof(App).Assembly.GetTypes())
         {
-            foreach (var method in type.GetMethods(
-                         BindingFlags.Public | BindingFlags.NonPublic
-                         | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly))
+            var bodies = type
+                .GetMethods(BindingFlags.Public | BindingFlags.NonPublic
+                            | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly)
+                .Cast<MethodBase>()
+                .Concat(type.GetConstructors(BindingFlags.Public | BindingFlags.NonPublic
+                                             | BindingFlags.Instance | BindingFlags.Static
+                                             | BindingFlags.DeclaredOnly));
+
+            foreach (var method in bodies)
             {
                 byte[] il;
                 try
@@ -176,7 +182,9 @@ public sealed class TrayOwnershipCompletenessTests
                         target = type.Module.ResolveMethod(
                             token,
                             type.IsGenericType ? type.GetGenericArguments() : null,
-                            method.IsGenericMethod ? method.GetGenericArguments() : null);
+                            method is MethodInfo { IsGenericMethod: true } generic
+                                ? generic.GetGenericArguments()
+                                : null);
                     }
                     catch (Exception)
                     {
@@ -281,6 +289,38 @@ public sealed class TrayOwnershipCompletenessTests
         Assert.Equal([nameof(ExitSequence), nameof(TrayAffordanceLifecycle)], holders);
     }
 
+    /// <summary>
+    /// <c>ATLAS-O1-CTOR-LOCAL</c>, the ninth ring: NOTHING in the assembly hands the capability back.
+    /// </summary>
+    /// <remarks>
+    /// The possession sweep looked at parameters and fields, so a reference obtained as a RETURN VALUE and
+    /// kept in a local was invisible — and there was an <c>internal</c> method returning the public
+    /// interface, so any type could ask for one and get it. Making the capability unforgeable while
+    /// leaving a tap that distributes it is not a closure.
+    /// <para>
+    /// A local variable cannot be enumerated by reflection, so the question is asked of the API surface
+    /// instead, which is where it belongs: if no member returns the capability, no local can hold one.
+    /// The authorised composition CONNECTS it to its two receivers without the reference ever being
+    /// handed out.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void Nothing_in_the_assembly_returns_the_hide_capability()
+    {
+        const BindingFlags All = BindingFlags.Public | BindingFlags.NonPublic
+                                 | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly;
+
+        var offenders = typeof(App).Assembly
+            .GetTypes()
+            .SelectMany(t => t.GetMethods(All).Select(m => (Type: t, Method: (MethodBase)m)))
+            .Where(x => ((MethodInfo)x.Method).ReturnType == typeof(IWindowHideCapability))
+            .Select(x => $"{x.Type.Name}.{x.Method.Name}")
+            .OrderBy(n => n, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Empty(offenders);
+    }
+
     /// <summary>The scan is not vacuous: it really does find the calls it is asserting about.</summary>
     [Fact]
     public void The_hide_call_scan_finds_something()
@@ -320,18 +360,25 @@ public sealed class TrayOwnershipCompletenessTests
         Assert.Empty(offenders);
     }
 
-    /// <summary>The capability cannot be taken twice, so one reference exists in the process.</summary>
+    /// <summary>
+    /// The capability is connected once, so one reference exists in the process and no second delivery is
+    /// possible.
+    /// </summary>
     [Fact]
-    public void The_hide_capability_can_only_be_taken_once()
+    public void The_hide_capability_can_only_be_connected_once()
     {
-        // Built without its constructor: TakeHideCapability touches only its own field, and this avoids
-        // dragging a navigation service and a mode coordinator into an architecture test.
+        // Built without constructors: the connection touches only its own fields, and this keeps an
+        // architecture test from dragging a navigation service and a window into itself.
         var controller = (ApplicationWindowController)RuntimeHelpers.GetUninitializedObject(
             typeof(ApplicationWindowController));
+        var lifecycle = (TrayAffordanceLifecycle)RuntimeHelpers.GetUninitializedObject(
+            typeof(TrayAffordanceLifecycle));
+        var exit = (ExitSequence)RuntimeHelpers.GetUninitializedObject(typeof(ExitSequence));
 
-        controller.TakeHideCapability();
+        controller.ConnectHideCapability(lifecycle, exit);
 
-        Assert.Throws<InvalidOperationException>(() => controller.TakeHideCapability());
+        Assert.Throws<InvalidOperationException>(
+            () => controller.ConnectHideCapability(lifecycle, exit));
     }
 
     [Fact]

@@ -10,6 +10,7 @@ APP = os.path.join(SRC, "App.xaml.cs")
 MAINWINDOW = os.path.join(SRC, "MainWindow.xaml.cs")
 MACHINE = os.path.join(SRC, "Shell", "Tray", "TrayStateMachine.cs")
 CONTROLLER = os.path.join(SRC, "Services", "ApplicationWindowController.cs")
+LIFECYCLE2 = os.path.join(SRC, "Services", "TrayAffordanceLifecycle.cs")
 LIFECYCLE = os.path.join(SRC, "Services", "TrayAffordanceLifecycle.cs")
 MACHINE = os.path.join(SRC, "Shell", "Tray", "TrayStateMachine.cs")
 
@@ -79,6 +80,24 @@ MUTATIONS = [
    (MACHINE,
     "                if (delivered is TrayAffordanceState.Lost or TrayAffordanceState.Unavailable\n                    && IsStillDeliverable(outcome))",
     "                if (IsStillDeliverable(outcome))")]),
+ # ---------------------------------------------------------------- the NINTH ring
+ # A tap that HANDS the capability back. The probe that found this put the take in a real constructor,
+ # where the scanner was not looking -- so the mutation restores exactly that: a method that returns the
+ # capability, which is the shape the closure forbids.
+ ("M104", "the capability is handed back by an assembly-accessible method", [
+   (CONTROLLER,
+    "    internal void ConnectHideCapability(TrayAffordanceLifecycle lifecycle, ExitSequence exitSequence)",
+    "    internal IWindowHideCapability TakeHideCapability() => new HideCapability(this);\n\n    internal void ConnectHideCapability(TrayAffordanceLifecycle lifecycle, ExitSequence exitSequence)")]),
+
+ # And the connection itself: a second delivery would mean more than one reference in the process.
+ ("M105", "the hide capability can be connected more than once", [
+   (LIFECYCLE2,
+    "        if (Interlocked.CompareExchange(ref _hideCapability, capability, null) is not null)",
+    "        if (false)")]),
+ ("M106", "a window hide is reached from a CONSTRUCTOR through the service locator", [
+   (MAINWINDOW,
+    "    private readonly IApplicationWindowController _windowController;",
+    "    private readonly IApplicationWindowController _windowController;\n\n    private static readonly bool SideDoor = HideFromCtor();\n\n    private static bool HideFromCtor()\n    {\n        Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions\n            .GetRequiredService<ServerMonitor.App.Services.IWindowHideCapability>(\n                ServerMonitor.App.App.ServicesHost.Services)\n            .HideToBackground();\n        return true;\n    }")]),
 ]
 
 

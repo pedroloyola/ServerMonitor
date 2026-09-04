@@ -27,7 +27,7 @@ public sealed class TrayAffordanceLifecycle : ITrayLossConsumer, ITrayGuardedOpe
 {
     private readonly ITrayAffordanceSource _source;
     private readonly IApplicationWindowController _windowController;
-    private readonly IWindowHideCapability _hideCapability;
+    private IWindowHideCapability? _hideCapability;
     private readonly IBackgroundDegradationNotice _degradationNotice;
     private readonly IAppLifecycleController _lifecycleController;
     private readonly IBackgroundNoticePresenter _noticePresenter;
@@ -39,7 +39,6 @@ public sealed class TrayAffordanceLifecycle : ITrayLossConsumer, ITrayGuardedOpe
     public TrayAffordanceLifecycle(
         ITrayAffordanceSource source,
         IApplicationWindowController windowController,
-        IWindowHideCapability hideCapability,
         IBackgroundDegradationNotice degradationNotice,
         IAppLifecycleController lifecycleController,
         IBackgroundNoticePresenter noticePresenter,
@@ -47,7 +46,6 @@ public sealed class TrayAffordanceLifecycle : ITrayLossConsumer, ITrayGuardedOpe
     {
         _source = source ?? throw new ArgumentNullException(nameof(source));
         _windowController = windowController ?? throw new ArgumentNullException(nameof(windowController));
-        _hideCapability = hideCapability ?? throw new ArgumentNullException(nameof(hideCapability));
         _degradationNotice = degradationNotice ?? throw new ArgumentNullException(nameof(degradationNotice));
         _lifecycleController = lifecycleController ?? throw new ArgumentNullException(nameof(lifecycleController));
         _noticePresenter = noticePresenter ?? throw new ArgumentNullException(nameof(noticePresenter));
@@ -72,6 +70,22 @@ public sealed class TrayAffordanceLifecycle : ITrayLossConsumer, ITrayGuardedOpe
     /// new shape. A caller that needs to know what happened finds out from inside its own action, where
     /// what it learns is that the act was DONE, not that it MAY be done.
     /// </remarks>
+    /// <summary>
+    /// Receives the hide capability from its owner. Single shot, and it never hands it back.
+    /// </summary>
+    internal void ConnectHide(IWindowHideCapability capability)
+    {
+        ArgumentNullException.ThrowIfNull(capability);
+
+        // A CAS rather than the lock: single assignment needs no mutual exclusion, and this keeps the
+        // connection independent of field initialisers so it behaves the same however the object was
+        // built.
+        if (Interlocked.CompareExchange(ref _hideCapability, capability, null) is not null)
+        {
+            throw new InvalidOperationException("The hide capability is already connected.");
+        }
+    }
+
     public void Perform(TrayGuardedOperation operation)
     {
         lock (_sync)
@@ -96,7 +110,16 @@ public sealed class TrayAffordanceLifecycle : ITrayLossConsumer, ITrayGuardedOpe
     /// </summary>
     void ITrayGuardedOperations.EnterBackground()
     {
-        _hideCapability.HideToBackground();
+        // Fail closed if the wiring never happened: refusing is the outcome that keeps the window
+        // reachable, and it is what an unconnected capability means.
+        if (_hideCapability is not { } capability)
+        {
+            _logger.LogError("The hide capability is not connected; the background entry is refused.");
+            ((ITrayGuardedOperations)this).Refuse(TrayGuardedOperation.EnterBackground);
+            return;
+        }
+
+        capability.HideToBackground();
         _lifecycleController.EnterBackground();
         _logger.LogInformation("Window closed to background; monitoring continues.");
 
@@ -105,7 +128,16 @@ public sealed class TrayAffordanceLifecycle : ITrayLossConsumer, ITrayGuardedOpe
     }
 
     /// <summary>The minimize hide, under the same guard.</summary>
-    void ITrayGuardedOperations.HideForMinimize() => _hideCapability.HideForMinimize();
+    void ITrayGuardedOperations.HideForMinimize()
+    {
+        if (_hideCapability is not { } capability)
+        {
+            _logger.LogError("The hide capability is not connected; the minimize hide is refused.");
+            return;
+        }
+
+        capability.HideForMinimize();
+    }
 
     /// <summary>
     /// The other outcome, and there is no third one — but it depends on WHICH operation was refused.

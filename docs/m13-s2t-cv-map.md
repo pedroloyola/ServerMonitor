@@ -33,7 +33,7 @@ condição pré-existente, não introduzida por esta entrega.
 | **CV-9** | reentrância com flyout aberto | `Shell/Tray/FlyoutReentrancyGate.cs` · `OwnedTrayIconAdapter.ShowFlyout` | `FlyoutReentrancyGateTests` (6) | M26, M27 | **FECHADA** na decisão; a ativação da janela auxiliar é medida humana (matriz P, passo 5) |
 | **CV-10** | acoplamento limitador ↔ custo de UI | `EpisodeFrequencyLimiter.DefaultCapacity = 5 / 60 s` | `T4` | M8 morta | **FECHADA** |
 | **CV-11** | residual de admissão suprimida (LOW, aceite) | ordem das guardas em `Transition` | `T4` | — | **FECHADA · residual escrito** |
-| **CV-12** | evidência de mutação na entrega | — | matriz da secção 3 | **98 definidas · 98 corridas · 96 mortas** | **FECHADA com duas limitações declaradas** (M24, M25) |
+| **CV-12** | evidência de mutação na entrega | — | matriz da secção 3 | **ver o bloco gerado abaixo** | **FECHADA com duas limitações declaradas** (M24, M25) |
 | **CV-13** | só um episódio ADMITIDO por B pode expirar | `BeginEpisode`, só depois de `TryBeginEpisode` | `CV13` | M14 morta | **FECHADA** |
 | **CV-14** | B não limita tentativas dentro de um episódio | `EpisodeFrequencyLimiter` com **um** método | `CV14` ×2 (inclui teste de arquitetura por reflexão) | M8 morta | **FECHADA** |
 | **CV-15** | integridade do documento normativo | — | este ficheiro | — | **ATIVA · este mapa é o cumprimento.** Ver a **retratação** na secção 4 |
@@ -44,6 +44,27 @@ condição pré-existente, não introduzida por esta entrega.
 | **CV-20** | canal de efeitos fechado por construção | tipos `private` aninhados em `TrayStateMachine`; capacidade retida só por `EffectExecutor._native` | `TrayCapabilityBoundaryTests` (T14a/b) · `TrayOwnershipCompletenessTests` (T14c) | M11, M19, M20, M22, **M34** | **FECHADA · a imprecisão do T14c foi corrigida** |
 | **CV-21** | exceção do sink não consome o único disparo | **NÃO IMPLEMENTADA AQUI** | — | — | **com o Cortex** (`ServerMonitor-m13-s2`) |
 | **CI-1b** | grafias numéricas de enum em payloads hostis | a ação `FailSafeExit` entra no mesmo `switch` de pares literais e **herda** o fail-closed | tabela de 9 pares, inclui `("FailSafeExit", "1")` e `("2", "1")` | M38b | **HERDADA · não agravada.** A dívida da S2 continua a ser da S2 |
+
+
+<!-- COUNTS:BEGIN -->
+
+> **Bloco gerado.** `python tools/mutations/report_counts.py` reescreve-o a partir dos JSON dos
+> runners. Não editar à mão: os números aqui divergiram do commit entregue em três rondas
+> seguidas, e foram reconciliados à mão de cada vez. Um número derivado que se corrige à mão é um
+> processo que se repete.
+
+| | |
+|---|---|
+| Mutações com resultado registado | **90** |
+| **Mortas** | **88** |
+| Sobreviventes | **2** — `M24`, `M25` |
+| Sem resultado (âncora, build, aborto) | **0** — nenhuma |
+| Definidas sem registo nesta geração | **11** — `M95`, `M96`, `M97`, `M98`, `M99`, `M100`, `M101`, `M102`, `M103`, `M104`, `M105` |
+| Gate Debug | **1889/1889** |
+| Gate Release | **1854/1854** |
+| Suíte da fatia | **192/192** em **10** corridas, contagem descoberta idêntica |
+
+<!-- COUNTS:END -->
 
 ---
 
