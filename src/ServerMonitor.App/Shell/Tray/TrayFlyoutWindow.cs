@@ -60,6 +60,9 @@ internal sealed class TrayFlyoutWindow : IFlyoutSurface, IDisposable
     /// </summary>
     private WinEventDelegate? _foregroundCallback;
 
+    /// <summary>QA-11 human session (temporary): when the current menu was shown.</summary>
+    private DateTime _openedAt = DateTime.UtcNow;
+
     private FlyoutLifecycle? _lifecycle;
 
     private FlyoutLifecycle Lifecycle =>
@@ -155,6 +158,10 @@ internal sealed class TrayFlyoutWindow : IFlyoutSurface, IDisposable
         var menu = BuildMenu();
         _menu = menu;
         menu.ShowAt(_root, new FlyoutShowOptions { Placement = FlyoutPlacementMode.Auto });
+
+        // QA-11 human session (temporary).
+        _openedAt = DateTime.UtcNow;
+        QaDismissTrace.Note("MENU OPENED", $"anchor window 0x{WinRT.Interop.WindowNative.GetWindowHandle(_window):X}");
     }
 
     bool IFlyoutSurface.TryHideMenu()
@@ -177,6 +184,8 @@ internal sealed class TrayFlyoutWindow : IFlyoutSurface, IDisposable
             return false;
         }
     }
+
+    nint IFlyoutSurface.CaptureForeground() => GetForegroundWindow();
 
     void IFlyoutSurface.HideWindow()
     {
@@ -286,6 +295,7 @@ internal sealed class TrayFlyoutWindow : IFlyoutSurface, IDisposable
                 return;
             }
 
+            QaDismissTrace.Dismissal(hwnd, DateTime.UtcNow - _openedAt);
             Lifecycle.OnForeignForeground();
         }
         catch (Exception exception)
@@ -413,6 +423,9 @@ internal sealed class TrayFlyoutWindow : IFlyoutSurface, IDisposable
     [DllImport("user32.dll")]
     private static extern uint GetWindowThreadProcessId(nint hwnd, out uint processId);
 
+    [DllImport("user32.dll")]
+    private static extern nint GetForegroundWindow();
+
     private static uint CurrentProcessId { get; } =
         (uint)System.Diagnostics.Process.GetCurrentProcess().Id;
 
@@ -421,7 +434,11 @@ internal sealed class TrayFlyoutWindow : IFlyoutSurface, IDisposable
         var text = _localization.GetString(TrayFlyoutMenu.ResourceKeyFor(command));
         var item = new MenuFlyoutItem { Text = text };
         AutomationProperties.SetName(item, text);
-        item.Click += (_, _) => CommandInvoked?.Invoke(this, command);
+        item.Click += (_, _) =>
+        {
+            QaDismissTrace.Note("ITEM CLICKED", command.ToString());
+            CommandInvoked?.Invoke(this, command);
+        };
         return item;
     }
 

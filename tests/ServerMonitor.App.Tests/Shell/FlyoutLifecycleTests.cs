@@ -63,9 +63,18 @@ public sealed class FlyoutLifecycleTests
             WatchRemovals++;
         }
 
+        /// <summary>When set, the foreground moves while the menu is being shown — the blind window.</summary>
+        public nint? MoveForegroundOnPresent { get; set; }
+
         public void PresentMenu()
         {
             Calls.Add("PresentMenu");
+
+            if (MoveForegroundOnPresent is { } moved)
+            {
+                Foreground = moved;
+            }
+
 
             if (PresentThrows)
             {
@@ -92,6 +101,15 @@ public sealed class FlyoutLifecycleTests
         {
             Calls.Add("HideWindow");
             WindowHides++;
+        }
+
+        /// <summary>What the foreground reports. A test moves it to simulate a change.</summary>
+        public nint Foreground { get; set; } = 100;
+
+        public nint CaptureForeground()
+        {
+            Calls.Add("CaptureForeground");
+            return Foreground;
         }
     }
 
@@ -206,6 +224,46 @@ public sealed class FlyoutLifecycleTests
         Assert.True(
             surface.Calls.IndexOf("PresentMenu") < surface.Calls.IndexOf("TryInstallDismissalWatch"),
             $"[{string.Join(", ", surface.Calls)}]");
+    }
+
+    // ---------------------------------------------------------------- the blind window
+
+    /// <summary>
+    /// A foreground change that lands BETWEEN showing the menu and installing the watch is still a
+    /// dismissal, even though no callback will ever report it.
+    /// </summary>
+    /// <remarks>
+    /// The watch reports FUTURE transitions only. Whatever happens in the interval produces no event at
+    /// all, so without this the slot would stay held until some later, unrelated change — the same
+    /// liveness shape as the original defect, one layer along. Compared against THIS menu's own baseline,
+    /// not against "is the foreground foreign": in the states the defect lives in, the foreground is
+    /// already foreign when the menu legitimately opens.
+    /// </remarks>
+    [Fact]
+    public void A_foreground_change_during_the_blind_window_dismisses_the_menu()
+    {
+        var (subject, surface, releases) = Create();
+        surface.MoveForegroundOnPresent = 999;
+
+        subject.Show(new Point(10, 10));
+
+        Assert.False(surface.MenuShown);
+        subject.OnMenuClosed();
+        Assert.Equal(1, releases());
+    }
+
+    /// <summary>And an unchanged foreground leaves the menu alone — including when it was never ours.</summary>
+    [Fact]
+    public void A_menu_opened_under_a_foreign_foreground_stays_open_while_nothing_changes()
+    {
+        var (subject, surface, releases) = Create();
+        surface.Foreground = 777;   // someone else already had it, as in cells B, C and D
+
+        subject.Show(new Point(10, 10));
+
+        Assert.True(surface.MenuShown);
+        Assert.True(subject.IsPresented);
+        Assert.Equal(0, releases());
     }
 
     // ---------------------------------------------------------------- dismissal

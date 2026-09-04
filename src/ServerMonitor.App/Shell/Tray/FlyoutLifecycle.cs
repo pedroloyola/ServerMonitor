@@ -32,6 +32,12 @@ internal interface IFlyoutSurface
 
     /// <summary>Hides the auxiliary window. Must not throw.</summary>
     void HideWindow();
+
+    /// <summary>
+    /// Identifies whoever owns the foreground right now, so a change across an interval can be detected
+    /// without waiting for an event that may already have passed.
+    /// </summary>
+    nint CaptureForeground();
 }
 
 /// <summary>
@@ -146,6 +152,11 @@ internal sealed class FlyoutLifecycle(IFlyoutSurface surface, Action release)
 
     private void Present()
     {
+        // The baseline is taken BEFORE the menu exists, because the watch only reports FUTURE changes and
+        // there is an interval between showing and installing it. A change that lands in that interval
+        // produces no callback ever, and the slot would be held until some later, unrelated change.
+        var foregroundAtOpen = _surface.CaptureForeground();
+
         try
         {
             _surface.PresentMenu();
@@ -165,6 +176,17 @@ internal sealed class FlyoutLifecycle(IFlyoutSurface surface, Action release)
         {
             _surface.TryHideMenu();
             Terminate();
+            return;
+        }
+
+        // AND THEN CLOSE THE BLIND WINDOW. Comparing the level now against the baseline catches any change
+        // that happened while nothing was listening. It is a comparison against THIS menu's own starting
+        // point, not "is the foreground foreign" -- in the states this defect lives in, the foreground is
+        // ALREADY foreign when the menu legitimately opens, so a bare level check would dismiss every one
+        // of them on sight.
+        if (_surface.CaptureForeground() != foregroundAtOpen)
+        {
+            OnForeignForeground();
         }
     }
 
