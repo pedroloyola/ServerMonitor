@@ -37,7 +37,7 @@ internal sealed class FakeNotificationPlatform : IWindowsAppNotificationPlatform
 
     public bool IsSupported() => Supported;
 
-    public void Register(string displayName, Uri iconUri)
+    public void Register()
     {
         RegisterCount++;
         if (FailRegistration)

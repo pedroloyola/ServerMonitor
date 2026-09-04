@@ -122,8 +122,8 @@ public sealed class WindowsAppNotificationService : IUserNotificationService, IH
                 {
                     // The exact call site the evidence names, so a report can be tied to one line.
                     registerCallSite = $"{nameof(WindowsAppNotificationService)}.{nameof(StartAsync)}"
-                        + $" -> IWindowsAppNotificationPlatform.Register @ {SourceFile()}:{SourceLine()}";
-                    _platform.Register(ApplicationDisplayName, new Uri(_notificationIconPath));
+                        + $" -> IWindowsAppNotificationPlatform.Register() @ {SourceFile()}:{SourceLine()}";
+                    _platform.Register();
                     _registrationState = NotificationRegistrationState.Registered;
                     _accepting = true;
                 }
@@ -483,7 +483,18 @@ internal interface IWindowsAppNotificationPlatform
 
     AppNotificationSetting Setting { get; }
 
-    void Register(string displayName, Uri iconUri);
+    /// <summary>
+    /// Registers this process for app notifications using the PACKAGED contract: the COM server and the
+    /// assets — display name and icon — come from the app manifest.
+    /// <para>
+    /// It takes no arguments on purpose. The <c>Register(displayName, iconUri)</c> overload is the
+    /// UNPACKAGED one, and it rejects a packaged process outright: measured on the installed candidate on
+    /// 2026-09-04 it answered <c>E_ILLEGAL_METHOD_CALL</c> (0x8000000E), "A method was called at an
+    /// unexpected time. Not applicable for packaged applications". That is why no notification ever
+    /// arrived in M13.
+    /// </para>
+    /// </summary>
+    void Register();
 
     void Unregister();
 
@@ -521,7 +532,7 @@ internal sealed class WindowsAppNotificationPlatform : IWindowsAppNotificationPl
 
     public bool IsSupported() => _isSupported();
 
-    public void Register(string displayName, Uri iconUri)
+    public void Register()
     {
         // AppNotificationManager.Default may require the Windows App SDK Singleton package
         // for an unpackaged self-contained deployment. Do not resolve it before the caller
@@ -536,7 +547,10 @@ internal sealed class WindowsAppNotificationPlatform : IWindowsAppNotificationPl
 
         try
         {
-            manager.Register(displayName, iconUri);
+            // The parameterless overload, and only this one: the packaged app's COM server and assets are
+            // declared in the manifest. The two-argument overload is for unpackaged registration and
+            // refuses a packaged process with E_ILLEGAL_METHOD_CALL.
+            manager.Register();
         }
         catch
         {

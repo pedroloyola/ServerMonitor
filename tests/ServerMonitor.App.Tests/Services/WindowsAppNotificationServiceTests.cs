@@ -1,3 +1,4 @@
+using System.Reflection.Metadata;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.UI.Xaml;
 using Microsoft.Windows.AppNotifications;
@@ -14,6 +15,78 @@ public sealed class WindowsAppNotificationServiceTests : IDisposable
         $"server-monitor-notification-{Guid.NewGuid():N}.png");
 
     public WindowsAppNotificationServiceTests() => File.WriteAllBytes(_iconPath, [0x89, 0x50, 0x4e, 0x47]);
+
+    // ---------------------------------------------------------------- M13-QA-12: the packaged overload
+
+    /// <summary>
+    /// <b>Which overload the shipped binary actually calls</b> — asked of the COMPILED assembly, not of a
+    /// double, because the choice of overload is invisible behind any seam we could fake (BOSS.md §10).
+    /// <para>
+    /// A packaged app must call <c>AppNotificationManager.Register()</c>: its COM server and its assets
+    /// are declared in the manifest. The <c>Register(displayName, iconUri)</c> overload registers the
+    /// CALLING PROCESS as the COM server and takes assets from the shell, which is the unpackaged
+    /// contract, and it rejects a packaged process outright — measured on the installed candidate as
+    /// E_ILLEGAL_METHOD_CALL (0x8000000E), "Not applicable for packaged applications". That single wrong
+    /// overload is why no notification arrived for the whole of M13.
+    /// </para>
+    /// <para>
+    /// Reading the metadata answers both halves at once: the reference to the parameterless overload is
+    /// present, and no reference to the two-argument one exists anywhere in the application assembly.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void TheAppRegistersThroughThePackagedOverloadOnly()
+    {
+        var parameterCounts = RegisterReferenceParameterCounts();
+
+        Assert.Contains(0, parameterCounts);
+        Assert.DoesNotContain(
+            2,
+            parameterCounts);
+    }
+
+    /// <summary>
+    /// Every reference the application assembly makes to <c>AppNotificationManager.Register</c>, by
+    /// parameter count. Reads the metadata directly: a source-text scan is defeated by a comment, which
+    /// this slice already learned the hard way.
+    /// </summary>
+    private static IReadOnlyList<int> RegisterReferenceParameterCounts()
+    {
+        var assemblyPath = typeof(WindowsAppNotificationService).Assembly.Location;
+        using var stream = File.OpenRead(assemblyPath);
+        using var portableExecutable = new System.Reflection.PortableExecutable.PEReader(stream);
+        var metadata = portableExecutable.GetMetadataReader();
+        var counts = new List<int>();
+
+        foreach (var handle in metadata.MemberReferences)
+        {
+            var reference = metadata.GetMemberReference(handle);
+            if (!string.Equals(metadata.GetString(reference.Name), "Register", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            if (reference.Parent.Kind != HandleKind.TypeReference)
+            {
+                continue;
+            }
+
+            var parent = metadata.GetTypeReference(
+                (TypeReferenceHandle)reference.Parent);
+            if (!string.Equals(
+                    metadata.GetString(parent.Name), "AppNotificationManager", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            // A method signature blob is [calling convention][parameter count][return type][parameters].
+            var signature = metadata.GetBlobBytes(reference.Signature);
+            counts.Add(signature[1]);
+        }
+
+        Assert.NotEmpty(counts);
+        return counts;
+    }
 
     // ---------------------------------------------------------------- M13-QA-12: measurable evidence
 
@@ -108,6 +181,13 @@ public sealed class WindowsAppNotificationServiceTests : IDisposable
         Assert.False(managerFactoryCalled);
     }
 
+    /// <summary>
+    /// Once, with the handler already attached — the ordering Microsoft requires, and the one the
+    /// activation depends on. The display name and icon assertions are gone with the overload that took
+    /// them: a packaged app declares both in its manifest (M13-QA-12), so there is nothing to pass and
+    /// nothing left to assert here. What the process registers with is proved by
+    /// <see cref="TheAppRegistersThroughThePackagedOverloadOnly"/>, against the compiled assembly.
+    /// </summary>
     [Fact]
     public async Task Start_RegistersOnceWithHandlerAlreadyAttached()
     {
@@ -119,8 +199,7 @@ public sealed class WindowsAppNotificationServiceTests : IDisposable
 
         Assert.Equal(1, platform.RegisterCount);
         Assert.True(platform.HandlerWasAttachedAtRegister);
-        Assert.Equal("ServerAlyzer", platform.DisplayName);
-        Assert.Equal(new Uri(_iconPath), platform.IconUri);
+        Assert.Equal(NotificationRegistrationState.Registered, service.RegistrationState);
     }
 
     [Fact]
@@ -433,8 +512,6 @@ public sealed class WindowsAppNotificationServiceTests : IDisposable
         public int UnregisterCount { get; private set; }
         public int ShowCount { get; private set; }
         public bool HandlerWasAttachedAtRegister { get; private set; }
-        public string? DisplayName { get; private set; }
-        public Uri? IconUri { get; private set; }
         public string? Title { get; private set; }
         public string? Body { get; private set; }
 
@@ -443,12 +520,10 @@ public sealed class WindowsAppNotificationServiceTests : IDisposable
         /// <summary>When set, the platform refuses the registration exactly as the real one can.</summary>
         public Exception? RegistrationFailure { get; init; }
 
-        public void Register(string displayName, Uri iconUri)
+        public void Register()
         {
             RegisterCount++;
             HandlerWasAttachedAtRegister = _invoked is not null;
-            DisplayName = displayName;
-            IconUri = iconUri;
 
             if (RegistrationFailure is not null)
             {
