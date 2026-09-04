@@ -62,9 +62,12 @@ MUTATIONS = [
     "        services.AddSingleton<ITrayAffordanceSource>(sp => new Shell.Tray.OwnedTrayIconAdapter(\n            sp.GetRequiredService<IThemeService>(),\n            sp.GetRequiredService<ILocalizationService>(),\n            sp.GetRequiredService<IAppLifecycleController>,\n            sp.GetRequiredService<IProcessTerminator>(),\n            sp.GetRequiredService<ILoggerFactory>()));")]),
 
  ("M34", "the capability is registered in the container (T14c over real descriptors)", [
+   # Re-anchored in round 9: TrayAffordanceLifecycle is constructed explicitly now, because the hide
+   # capability is handed to it by type instead of being resolved. The anchor names a line that is still
+   # there; the property -- the capability must never be in the container -- is untouched.
    (APP,
-    "        services.AddSingleton<TrayAffordanceLifecycle>();",
-    "        services.AddSingleton<Shell.Tray.INativeTrayRegistration>(_ => null!);\n        services.AddSingleton<TrayAffordanceLifecycle>();")]),
+    "        services.AddSingleton<OrphanTemporaryCleaner>();",
+    "        services.AddSingleton<Shell.Tray.INativeTrayRegistration>(_ => null!);\n        services.AddSingleton<OrphanTemporaryCleaner>();")]),
 
  ("M35", "the adapter reports Available before anything is registered", [
    (ADAPTER,

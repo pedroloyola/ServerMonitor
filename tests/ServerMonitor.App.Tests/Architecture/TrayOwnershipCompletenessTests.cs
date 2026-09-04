@@ -162,6 +162,59 @@ public sealed class TrayOwnershipCompletenessTests
         Assert.Equal([nameof(ExitSequence), nameof(TrayAffordanceLifecycle)], holders);
     }
 
+    /// <summary>
+    /// The last edge of the same sweep: the CONCRETE controller, from which the internal hide methods are
+    /// reachable, has exactly one holder besides the capability itself.
+    /// </summary>
+    /// <remarks>
+    /// <c>HideToBackgroundCore</c> and <c>HideForMinimizeCore</c> are <c>internal</c>, and internal does
+    /// not separate consumers inside one assembly — so anything holding the concrete type is a door too.
+    /// Enumerating the interface holders and stopping there would have left exactly the gap this slice
+    /// keeps rediscovering: a capability closed under one name and open under another.
+    /// </remarks>
+    [Fact]
+    public void The_concrete_window_controller_has_exactly_one_holder_besides_the_capability()
+    {
+        // Compiler-generated closures and async state machines are resolved to the type that DECLARES
+        // them rather than excluded: a lambda that captures the controller is its enclosing class holding
+        // it, and skipping the generated types outright would hide exactly that. Here they resolve to
+        // App, which is the composition root and the one place allowed to build the capability.
+        static Type Owner(Type type)
+        {
+            while (type.DeclaringType is { } declaring)
+            {
+                type = declaring;
+            }
+
+            return type;
+        }
+
+        var holders = typeof(App).Assembly
+            .GetTypes()
+            .Where(t => t != typeof(WindowHideCapability))
+            .Where(t => t.GetConstructors(
+                            BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+                         .SelectMany(c => c.GetParameters())
+                         .Any(p => p.ParameterType == typeof(ApplicationWindowController))
+                     || t.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+                         .Any(f => f.FieldType == typeof(ApplicationWindowController)))
+            .Select(Owner)
+            // The controller's own lambdas capture `this`, and a type is not a door to itself.
+            .Where(t => t != typeof(ApplicationWindowController))
+            // And the composition root is excluded rather than asserted. It is ALLOWED to hold the
+            // controller -- it is the one place that builds the capability -- and whether it appears at
+            // all depends on whether the optimiser kept a closure that captures it: this assertion read
+            // ["App", "ExitSequence"] in Debug and ["ExitSequence"] in Release. Asserting its presence
+            // was asserting a codegen detail; the property is "besides the composition root, one holder".
+            .Where(t => t != typeof(App))
+            .Select(t => t.Name)
+            .Distinct()
+            .OrderBy(n => n)
+            .ToArray();
+
+        Assert.Equal([nameof(ExitSequence)], holders);
+    }
+
     /// <summary>The capability is never in the container — the same assertion CV-20 makes, for the door.</summary>
     [Fact]
     public void The_hide_capability_is_never_registered_in_the_container()

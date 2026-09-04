@@ -19,19 +19,21 @@ MUTATIONS = [
  # piece of that away.
  ("M87", "the operation is performed OUTSIDE the decision lock, so the interval comes back", [
    (MACHINE,
-    "        lock (_decision)\n        {\n            var operations = _operations\n                ?? throw new InvalidOperationException(\n                    \"No guarded operations are registered; the machine has nothing it may perform.\");\n\n            if (Project(_state, _time.GetTimestamp()) != TrayAffordanceState.Available)\n            {\n                operations.FallBackToExit();\n                return;\n            }\n\n            switch (operation)\n            {\n                case TrayGuardedOperation.EnterBackground:\n                    operations.EnterBackground();\n                    break;\n                default:",
-    "        ITrayGuardedOperations operations;\n        bool permitted;\n        lock (_decision)\n        {\n            operations = _operations\n                ?? throw new InvalidOperationException(\n                    \"No guarded operations are registered; the machine has nothing it may perform.\");\n            permitted = Project(_state, _time.GetTimestamp()) == TrayAffordanceState.Available;\n        }\n\n        {\n            if (!permitted)\n            {\n                operations.FallBackToExit();\n                return;\n            }\n\n            switch (operation)\n            {\n                case TrayGuardedOperation.EnterBackground:\n                    operations.EnterBackground();\n                    break;\n                default:")]),
+   # Re-anchored in round 9: the refusal takes the operation now, and there is a second case in the
+   # switch. The property is unchanged -- decide and perform must be ONE step under the lock.
+    "        lock (_decision)\n        {\n            var operations = _operations\n                ?? throw new InvalidOperationException(\n                    \"No guarded operations are registered; the machine has nothing it may perform.\");\n\n            if (Project(_state, _time.GetTimestamp()) != TrayAffordanceState.Available)\n            {\n                operations.Refuse(operation);\n                return;\n            }",
+    "        ITrayGuardedOperations operations;\n        bool permitted;\n        lock (_decision)\n        {\n            operations = _operations\n                ?? throw new InvalidOperationException(\n                    \"No guarded operations are registered; the machine has nothing it may perform.\");\n            permitted = Project(_state, _time.GetTimestamp()) == TrayAffordanceState.Available;\n        }\n\n        {\n            if (!permitted)\n            {\n                operations.Refuse(operation);\n                return;\n            }")]),
 
  ("M88", "the affordance guard is skipped entirely", [
    (MACHINE,
-    "            if (Project(_state, _time.GetTimestamp()) != TrayAffordanceState.Available)\n            {\n                operations.FallBackToExit();\n                return;\n            }",
-    "            if (false)\n            {\n                operations.FallBackToExit();\n                return;\n            }")]),
+    "            if (Project(_state, _time.GetTimestamp()) != TrayAffordanceState.Available)\n            {\n                operations.Refuse(operation);\n                return;\n            }",
+    "            if (false)\n            {\n                operations.Refuse(operation);\n                return;\n            }")]),
 
  # The QUIET failure: neither outcome happens, so the window is neither hidden nor closed. This is the
  # A12 zombie reached through the politest possible door, and it is why there is no silent branch.
  ("M89", "a refused operation is silent instead of falling back", [
    (MACHINE,
-    "                operations.FallBackToExit();\n                return;",
+    "                operations.Refuse(operation);\n                return;",
     "                return;")]),
 
  ("M90", "the machine's operations slot accepts a second registration", [
@@ -51,7 +53,7 @@ MUTATIONS = [
 
  ("M93", "the lifecycle refuses in silence instead of falling back", [
    (LIFECYCLE,
-    "                ((ITrayGuardedOperations)this).FallBackToExit();\n                return;",
+    "                ((ITrayGuardedOperations)this).Refuse(operation);\n                return;",
     "                return;")]),
 
  # The defect itself, put back: a surface that accepts the caller's own code, which is a place to capture

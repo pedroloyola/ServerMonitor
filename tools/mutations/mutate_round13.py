@@ -33,12 +33,16 @@ MUTATIONS = [
  # asking. That is precisely "the caller keeps the decision and acts later" -- the defect the ring
  # removes -- and it is now visible in the constructor, which is where the structural test looks.
  ("M73", "the coordinator gets the window back and hides after asking", [
+   # Re-anchored in round 9, and the re-anchoring is itself evidence. The old form took an
+   # IApplicationWindowController and hid through it; that no longer COMPILES, because the general window
+   # contract has lost every hide. So the mutation now has to take the CAPABILITY -- which is exactly the
+   # thing round 9 restricted to two holders, and the enumeration test sees a third appear.
    (COORDINATOR,
     "    Action<TrayGuardedOperation> perform,\n    ILogger<WindowCloseCoordinator> logger)",
-    "    Action<TrayGuardedOperation> perform,\n    ILogger<WindowCloseCoordinator> logger,\n    IApplicationWindowController? windowController = null)"),
+    "    Action<TrayGuardedOperation> perform,\n    ILogger<WindowCloseCoordinator> logger,\n    IWindowHideCapability? hideCapability = null)"),
    (COORDINATOR,
     "        perform(TrayGuardedOperation.EnterBackground);\n        return true;",
-    "        perform(TrayGuardedOperation.EnterBackground);\n        windowController?.HideToBackground();\n        return true;")]),
+    "        perform(TrayGuardedOperation.EnterBackground);\n        hideCapability?.HideToBackground();\n        return true;")]),
 
  ("M74", "an unacknowledged loss is swallowed instead of escalating", [
    (MACHINE,
