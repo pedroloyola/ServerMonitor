@@ -27,6 +27,7 @@ public sealed class WindowsAppNotificationServiceTests : IDisposable
     [InlineData(unchecked((int)0x80004005), "E_FAIL (0x80004005)")]
     [InlineData(unchecked((int)0x8007007E), "ERROR_MOD_NOT_FOUND (0x8007007E)")]
     [InlineData(unchecked((int)0x80070005), "E_ACCESSDENIED (0x80070005)")]
+    [InlineData(unchecked((int)0x8000000E), "E_ILLEGAL_METHOD_CALL (0x8000000E)")]
     [InlineData(unchecked((int)0xDEADBEEF), "0xDEADBEEF")]
     public void KnownRegistrationFailuresAreNamedAndUnknownOnesReportedRaw(int hresult, string expected) =>
         Assert.Equal(expected, WindowsAppNotificationService.DescribeHResult(hresult));

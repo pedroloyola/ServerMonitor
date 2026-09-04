@@ -317,6 +317,11 @@ public sealed class WindowsAppNotificationService : IUserNotificationService, IH
         unchecked((int)0x8007007E) => "ERROR_MOD_NOT_FOUND (0x8007007E)",
 
         unchecked((int)0x80070005) => "E_ACCESSDENIED (0x80070005)",
+
+        // Measured on the DEV candidate, 2026-09-04: the platform answered "A method was called at an
+        // unexpected time. Not applicable for packaged applications." Named here so the next reader sees
+        // the string, not a number.
+        unchecked((int)0x8000000E) => "E_ILLEGAL_METHOD_CALL (0x8000000E)",
         0 => "no HRESULT (0x00000000)",
         _ => $"0x{hresult:X8}"
     };
