@@ -10,8 +10,8 @@ uma condição. Uma condição só sai marcada `SUPERSEDED BY <regra>`, com just
 `docs/m13-s2t-linearizable-state-machine.md` (desenho) · `.boss/BOSS.md` §9 e §10.
 
 **Base de medição:** worktree `ServerMonitor-m13-s2t`, ramo `agent/m13-s2t-tray`.
-Baseline dos testes filtrados por `Tray|Theme|Flyout|FailSafe|WindowClose`: **191 passam, 0 falham**, em **10 corridas seguidas** com contagem descoberta idêntica e zero abortos.
-Gates completos na árvore entregue: **Debug 1889/1889**, **Release 1854/1854**, zero abortos. A diferença de 35 vem de um
+Baseline dos testes filtrados por `Tray|Theme|Flyout|FailSafe|WindowClose`, gates completos e contagens da matriz: **ver o bloco gerado** em §0 (`tools/mutations/report_counts.py`). Não estão repetidos aqui, porque um número repetido é um número que diverge.
+(Gates e contagens: bloco gerado em §0.)
 `ItemGroup Condition="'$(Configuration)' != 'Debug'"` no projeto de testes que remove `Qa\**\*.cs` —
 condição pré-existente, não introduzida por esta entrega.
 
@@ -55,13 +55,13 @@ condição pré-existente, não introduzida por esta entrega.
 
 | | |
 |---|---|
-| Mutações com resultado registado | **90** |
-| **Mortas** | **88** |
+| Mutações com resultado registado | **101** |
+| **Mortas** | **99** |
 | Sobreviventes | **2** — `M24`, `M25` |
 | Sem resultado (âncora, build, aborto) | **0** — nenhuma |
-| Definidas sem registo nesta geração | **11** — `M95`, `M96`, `M97`, `M98`, `M99`, `M100`, `M101`, `M102`, `M103`, `M104`, `M105` |
-| Gate Debug | **1889/1889** |
-| Gate Release | **1854/1854** |
+| Definidas sem registo nesta geração | **0** — nenhuma |
+| Gate Debug | **1890/1890** |
+| Gate Release | **1855/1855** |
 | Suíte da fatia | **192/192** em **10** corridas, contagem descoberta idêntica |
 
 <!-- COUNTS:END -->
@@ -778,7 +778,7 @@ entre cada uma. Filtro: `FullyQualifiedName~Tray` (M1–M25) e
 e `FullyQualifiedName~FailSafe|FullyQualifiedName~WindowsAppNotification|FullyQualifiedName~Notification`
 (M36–M40). Baselines **95** e **82**, ambas 0 falhas.
 
-**98 definidas · 98 corridas · 96 mortas · 2 sobrevivem.** (Ronda 8: contagem medida com o
+**Contagem da ronda 8, histórica; a actual está no bloco gerado em §0.** (Medida com o
 instrumento corrigido — ver §13. As contagens anteriores deste ficheiro, 76/74/72, descreviam um estado
 que já não existia e foram apanhadas pelo Atlas.)
 
