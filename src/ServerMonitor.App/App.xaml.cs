@@ -324,6 +324,15 @@ public partial class App : Application
     /// </summary>
     internal static void ConfigureApplicationServices(IServiceCollection services)
     {
+        // Taken ONCE and handed BY TYPE to the two holders. Deliberately NOT registered: putting it in
+        // the container is exactly the state this removes, and both a test and a mutation say so. The
+        // capability is a private nested type, so this is the only expression in the program that can
+        // produce one, and taking it a second time is refused.
+        IWindowHideCapability? hideCapability = null;
+
+        IWindowHideCapability Hide(IServiceProvider sp) =>
+            hideCapability ??= sp.GetRequiredService<ApplicationWindowController>().TakeHideCapability();
+
         services.AddSingleton<ILocalizationService, LocalizationService>();
         services.AddSingleton<IThemeService, ThemeService>();
         services.AddSingleton<IAppVersionProvider, AppVersionProvider>();
@@ -353,7 +362,7 @@ public partial class App : Application
             sp.GetRequiredService<IRefreshAllCoordinator>(),
             sp.GetRequiredService<TrayService>(),
             sp.GetRequiredService<ApplicationWindowController>(),
-            new WindowHideCapability(sp.GetRequiredService<ApplicationWindowController>()),
+            Hide(sp),
             sp.GetRequiredService<AppShutdownCoordinator>(),
             sp.GetRequiredService<ILogger<ExitSequence>>()));
         // CV-17. The notice hangs off the exit path's EXISTING CAS: the controller calls this only on the
@@ -394,7 +403,7 @@ public partial class App : Application
         services.AddSingleton(sp => new TrayAffordanceLifecycle(
             sp.GetRequiredService<ITrayAffordanceSource>(),
             sp.GetRequiredService<IApplicationWindowController>(),
-            new WindowHideCapability(sp.GetRequiredService<ApplicationWindowController>()),
+            Hide(sp),
             sp.GetRequiredService<IBackgroundDegradationNotice>(),
             sp.GetRequiredService<IAppLifecycleController>(),
             sp.GetRequiredService<IBackgroundNoticePresenter>(),

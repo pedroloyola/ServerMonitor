@@ -7,28 +7,51 @@ using WinUIEx;
 
 namespace ServerMonitor.App.Services;
 
-/// <summary>
-/// The only implementation of <see cref="IWindowHideCapability"/>, and deliberately a SEPARATE object from
-/// the window controller.
-/// </summary>
-/// <remarks>
-/// If the controller implemented the capability itself, every holder of the controller could reach it with
-/// a cast, and the whole point is that holding the window contract must not be enough. Nothing on the
-/// controller returns one of these, so the only way to have one is to be handed it by the composition
-/// root — which hands it to exactly two consumers.
-/// </remarks>
-internal sealed class WindowHideCapability(ApplicationWindowController controller) : IWindowHideCapability
-{
-    public void HideToBackground() => controller.HideToBackgroundCore();
-
-    public void HideForMinimize() => controller.HideForMinimizeCore();
-}
-
 public sealed class ApplicationWindowController(
     INavigationService navigationService,
     IWindowModeCoordinator modeCoordinator,
     ILogger<ApplicationWindowController> logger) : IApplicationWindowController
 {
+    /// <summary>
+    /// The only implementation of <see cref="IWindowHideCapability"/>, and a PRIVATE NESTED type on
+    /// purpose — the same shape CV-20 used for the tray registration.
+    /// </summary>
+    /// <remarks>
+    /// The previous version was an internal top-level class calling internal <c>...Core</c> methods, and
+    /// internal separates nothing inside one assembly: <c>App.ServicesHost</c> is public and the concrete
+    /// controller is registered, so any code could resolve it and hide the window without passing the
+    /// machine, the capability or the exit path. Closing the interface and leaving the concrete reachable
+    /// was closing the door and leaving the window beside it open.
+    /// <para>
+    /// Nested and private, nobody outside this class can name the type, construct one, or call the hide:
+    /// the implementations are private too. There is no compiling call site anywhere else.
+    /// </para>
+    /// </remarks>
+    private sealed class HideCapability(ApplicationWindowController owner) : IWindowHideCapability
+    {
+        public void HideToBackground() => owner.HideToBackgroundCore();
+
+        public void HideForMinimize() => owner.HideForMinimizeCore();
+    }
+
+    private IWindowHideCapability? _hideCapability;
+
+    /// <summary>
+    /// Hands out the hide capability. SINGLE SHOT: composition takes it at startup, and a second caller
+    /// gets an exception rather than a second reference.
+    /// </summary>
+    internal IWindowHideCapability TakeHideCapability()
+    {
+        if (_hideCapability is not null)
+        {
+            throw new InvalidOperationException(
+                "The hide capability has already been taken; there is exactly one.");
+        }
+
+        _hideCapability = new HideCapability(this);
+        return _hideCapability;
+    }
+
     private readonly object _sync = new();
     private Window? _window;
     private AppWindow? _appWindow;
@@ -73,7 +96,7 @@ public sealed class ApplicationWindowController(
         }
     }
 
-    internal void HideForMinimizeCore() => RunOnUiThread(() =>
+    private void HideForMinimizeCore() => RunOnUiThread(() =>
     {
         if (_appWindow is null)
         {
@@ -89,7 +112,7 @@ public sealed class ApplicationWindowController(
     /// The BACKGROUND transition. Identical window mechanics to the minimize path; a headless process
     /// with no window is already in the target state, so this is a no-op there rather than an error.
     /// </summary>
-    internal void HideToBackgroundCore() => RunOnUiThread(() =>
+    private void HideToBackgroundCore() => RunOnUiThread(() =>
     {
         if (_appWindow is null)
         {

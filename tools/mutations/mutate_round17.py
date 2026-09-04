@@ -7,6 +7,9 @@ SRC = os.path.join(ROOT, "src", "ServerMonitor.App")
 TRAYSERVICE = os.path.join(SRC, "Services", "TrayService.cs")
 ICONTROLLER = os.path.join(SRC, "Services", "IApplicationWindowController.cs")
 APP = os.path.join(SRC, "App.xaml.cs")
+MAINWINDOW = os.path.join(SRC, "MainWindow.xaml.cs")
+MACHINE = os.path.join(SRC, "Shell", "Tray", "TrayStateMachine.cs")
+CONTROLLER = os.path.join(SRC, "Services", "ApplicationWindowController.cs")
 LIFECYCLE = os.path.join(SRC, "Services", "TrayAffordanceLifecycle.cs")
 MACHINE = os.path.join(SRC, "Shell", "Tray", "TrayStateMachine.cs")
 
@@ -53,6 +56,29 @@ MUTATIONS = [
    (MACHINE,
     "                case TrayGuardedOperation.HideForMinimize:\n                    operations.HideForMinimize();",
     "                case TrayGuardedOperation.HideForMinimize:\n                    operations.EnterBackground();")]),
+ # ---------------------------------------------------------------- the SERVICE LOCATOR
+ # THE MUTATION THE CONDITION REQUIRES. App.ServicesHost is public, so any production type can resolve
+ # and act without passing the machine, the capability holders or the exit path. This is production code
+ # -- MainWindow -- and the IL scan sees the call site whether or not the resolution would succeed at
+ # runtime, which is the whole point of proving call sites by metadata instead of by declared parameters.
+ ("M101", "a window hide is reached through the service locator", [
+   (MAINWINDOW,
+    "    private readonly IApplicationWindowController _windowController;",
+    "    private readonly IApplicationWindowController _windowController;\n\n    private void HideBySideDoor() =>\n        Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions\n            .GetRequiredService<ServerMonitor.App.Services.IWindowHideCapability>(\n                ServerMonitor.App.App.ServicesHost.Services)\n            .HideToBackground();")]),
+
+ ("M102", "the hide capability can be taken more than once", [
+   (CONTROLLER,
+    "        if (_hideCapability is not null)\n        {\n            throw new InvalidOperationException(",
+    "        if (false)\n        {\n            throw new InvalidOperationException(")]),
+ # ---------------------------------------------------------------- CV-22
+ # Escalating on the ABSENCE of a consumer is right for a LOSS and wrong for everything else: widen it and
+ # a process with no loss consumer quits the moment the tray comes up successfully. The equivalent
+ # mutation died before the mechanism was rewritten around AcknowledgeLoss, and the coverage did not
+ # follow it -- so this pins the half that was left unproven.
+ ("M103", "the absence of a loss consumer escalates on ANY notification", [
+   (MACHINE,
+    "                if (delivered is TrayAffordanceState.Lost or TrayAffordanceState.Unavailable\n                    && IsStillDeliverable(outcome))",
+    "                if (IsStillDeliverable(outcome))")]),
 ]
 
 

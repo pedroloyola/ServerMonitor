@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.UI.Xaml;
@@ -127,92 +128,112 @@ public sealed class TrayOwnershipCompletenessTests
     // ------------------------------------------------------------------ CV-20 again, for the DOOR
 
     /// <summary>
-    /// <c>ATLAS-O1-DIRECT-HIDE</c>, the seventh ring: the hide capability has exactly TWO holders, and
-    /// they are enumerated here by type.
+    /// Every method in the assembly whose IL actually CALLS a window hide, found by reading metadata.
     /// </summary>
     /// <remarks>
-    /// Six rings removed six ways of obtaining the permission and every one of them left
-    /// <c>HideToBackground()</c> on the window contract, which every consumer holds — so the act stayed
-    /// reachable and the guard was advisory. Measured holders of that contract before this change:
-    /// MainWindow, TrayService, WindowsAppNotificationService, and two resolutions in the composition
-    /// root, none of which has any business hiding a window.
-    /// <para>
-    /// This is the cure CV-20 already proved for <c>INativeTrayRegistration</c>, applied to the door
-    /// instead of the ticket: off the general contract, out of the container, restricted by type, and
-    /// enumerated. <c>ExitSequence</c> is a legitimate holder — it is the authorised exit path — so it is
-    /// listed rather than broken.
-    /// </para>
+    /// The previous version of this enumeration looked at constructor parameters and instance fields, and
+    /// excluded <c>App</c>. That is the set of shapes I had already closed, and it passed over the three
+    /// that were still open: a STATIC field, a METHOD PARAMETER, and a LOCAL RESOLUTION through the public
+    /// <c>App.ServicesHost</c>. Reading the IL asks the only question that matters — who calls it — and
+    /// cannot be fooled by how the reference was obtained.
     /// </remarks>
-    [Fact]
-    public void The_hide_capability_has_exactly_two_holders()
+    private static IReadOnlyList<string> HideCallers()
     {
-        var holders = typeof(App).Assembly
-            .GetTypes()
-            .Where(t => t != typeof(WindowHideCapability))
-            .Where(t => t.GetConstructors(
-                            BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
-                         .SelectMany(c => c.GetParameters())
-                         .Any(p => p.ParameterType == typeof(IWindowHideCapability))
-                     || t.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
-                         .Any(f => f.FieldType == typeof(IWindowHideCapability)))
-            .Select(t => t.Name)
-            .OrderBy(n => n)
-            .ToArray();
+        var hideMethods = new HashSet<int>(
+            typeof(IWindowHideCapability).GetMethods().Select(m => m.MetadataToken));
 
-        Assert.Equal([nameof(ExitSequence), nameof(TrayAffordanceLifecycle)], holders);
+        var callers = new List<string>();
+
+        foreach (var type in typeof(App).Assembly.GetTypes())
+        {
+            foreach (var method in type.GetMethods(
+                         BindingFlags.Public | BindingFlags.NonPublic
+                         | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly))
+            {
+                byte[] il;
+                try
+                {
+                    il = method.GetMethodBody()?.GetILAsByteArray() ?? [];
+                }
+                catch (Exception)
+                {
+                    continue; // abstract, extern, or otherwise bodiless
+                }
+
+                for (var i = 0; i + 4 < il.Length; i++)
+                {
+                    // call (0x28) and callvirt (0x6F) are each followed by a 4-byte metadata token.
+                    if (il[i] is not (0x28 or 0x6F))
+                    {
+                        continue;
+                    }
+
+                    var token = BitConverter.ToInt32(il, i + 1);
+
+                    MethodBase? target;
+                    try
+                    {
+                        target = type.Module.ResolveMethod(
+                            token,
+                            type.IsGenericType ? type.GetGenericArguments() : null,
+                            method.IsGenericMethod ? method.GetGenericArguments() : null);
+                    }
+                    catch (Exception)
+                    {
+                        continue;
+                    }
+
+                    var namesAHide =
+                        target is not null
+                        && (hideMethods.Contains(target.MetadataToken)
+                            || target.Name is "HideToBackgroundCore" or "HideForMinimizeCore"
+                            || (target.DeclaringType == typeof(IWindowHideCapability)
+                                && target.Name.StartsWith("Hide", StringComparison.Ordinal)));
+
+                    if (namesAHide)
+                    {
+                        var owner = type;
+                        while (owner.DeclaringType is { } declaring)
+                        {
+                            owner = declaring;
+                        }
+
+                        callers.Add(owner.Name);
+                    }
+                }
+            }
+        }
+
+        return callers.Distinct().OrderBy(n => n, StringComparer.Ordinal).ToArray();
     }
 
     /// <summary>
-    /// The last edge of the same sweep: the CONCRETE controller, from which the internal hide methods are
-    /// reachable, has exactly one holder besides the capability itself.
+    /// <c>ATLAS-O1-CONCRETE-SERVICE-LOCATOR</c>, the eighth ring: the hide is called from exactly the
+    /// places the design intends, proved by IL rather than by declared dependencies.
     /// </summary>
     /// <remarks>
-    /// <c>HideToBackgroundCore</c> and <c>HideForMinimizeCore</c> are <c>internal</c>, and internal does
-    /// not separate consumers inside one assembly — so anything holding the concrete type is a door too.
-    /// Enumerating the interface holders and stopping there would have left exactly the gap this slice
-    /// keeps rediscovering: a capability closed under one name and open under another.
+    /// <c>ApplicationWindowController</c> appears because the capability is a PRIVATE NESTED type inside
+    /// it and the compiler attributes the nested type to its declaring class — that is the implementation
+    /// itself, not a consumer, and it is the shape that makes the eighth ring impossible: nobody outside
+    /// can name the type, construct one, or call the hide, because both implementations are private.
     /// </remarks>
     [Fact]
-    public void The_concrete_window_controller_has_exactly_one_holder_besides_the_capability()
+    public void Only_the_guarded_operation_and_the_exit_path_call_a_window_hide()
     {
-        // Compiler-generated closures and async state machines are resolved to the type that DECLARES
-        // them rather than excluded: a lambda that captures the controller is its enclosing class holding
-        // it, and skipping the generated types outright would hide exactly that. Here they resolve to
-        // App, which is the composition root and the one place allowed to build the capability.
-        static Type Owner(Type type)
-        {
-            while (type.DeclaringType is { } declaring)
-            {
-                type = declaring;
-            }
+        Assert.Equal(
+            [
+                nameof(ApplicationWindowController),
+                nameof(ExitSequence),
+                nameof(TrayAffordanceLifecycle),
+            ],
+            HideCallers());
+    }
 
-            return type;
-        }
-
-        var holders = typeof(App).Assembly
-            .GetTypes()
-            .Where(t => t != typeof(WindowHideCapability))
-            .Where(t => t.GetConstructors(
-                            BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
-                         .SelectMany(c => c.GetParameters())
-                         .Any(p => p.ParameterType == typeof(ApplicationWindowController))
-                     || t.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
-                         .Any(f => f.FieldType == typeof(ApplicationWindowController)))
-            .Select(Owner)
-            // The controller's own lambdas capture `this`, and a type is not a door to itself.
-            .Where(t => t != typeof(ApplicationWindowController))
-            // And the composition root is excluded rather than asserted. It is ALLOWED to hold the
-            // controller -- it is the one place that builds the capability -- and whether it appears at
-            // all depends on whether the optimiser kept a closure that captures it: this assertion read
-            // ["App", "ExitSequence"] in Debug and ["ExitSequence"] in Release. Asserting its presence
-            // was asserting a codegen detail; the property is "besides the composition root, one holder".
-            .Where(t => t != typeof(App))
-            .Select(t => t.Name)
-            .Distinct()
-            .OrderBy(n => n)
-            .ToArray();
-
-        Assert.Equal([nameof(ExitSequence)], holders);
+    /// <summary>The scan is not vacuous: it really does find the calls it is asserting about.</summary>
+    [Fact]
+    public void The_hide_call_scan_finds_something()
+    {
+        Assert.NotEmpty(HideCallers());
     }
 
     /// <summary>The capability is never in the container — the same assertion CV-20 makes, for the door.</summary>
@@ -222,8 +243,7 @@ public sealed class TrayOwnershipCompletenessTests
         var services = RealComposition();
 
         var offenders = services
-            .Where(d => d.ServiceType == typeof(IWindowHideCapability)
-                        || d.ImplementationType == typeof(WindowHideCapability))
+            .Where(d => d.ServiceType == typeof(IWindowHideCapability))
             .Select(d => d.ServiceType.FullName!)
             .ToArray();
 
@@ -231,18 +251,35 @@ public sealed class TrayOwnershipCompletenessTests
     }
 
     /// <summary>
-    /// And the general window contract does not carry it, which is what made every holder above a holder.
+    /// And the general window contract does not carry a hide, which is what made every holder of it a
+    /// holder of the act.
     /// </summary>
     [Fact]
     public void The_general_window_contract_cannot_hide_to_background()
     {
         var offenders = typeof(IApplicationWindowController)
             .GetMethods()
+            // EVERY hide, not just the one that was pointed at: HideForMinimize did exactly the same
+            // thing to the window and stayed on this contract through six rings. Swept by effect.
             .Where(m => m.Name.StartsWith("Hide", StringComparison.Ordinal))
             .Select(m => m.Name)
             .ToArray();
 
         Assert.Empty(offenders);
+    }
+
+    /// <summary>The capability cannot be taken twice, so one reference exists in the process.</summary>
+    [Fact]
+    public void The_hide_capability_can_only_be_taken_once()
+    {
+        // Built without its constructor: TakeHideCapability touches only its own field, and this avoids
+        // dragging a navigation service and a mode coordinator into an architecture test.
+        var controller = (ApplicationWindowController)RuntimeHelpers.GetUninitializedObject(
+            typeof(ApplicationWindowController));
+
+        controller.TakeHideCapability();
+
+        Assert.Throws<InvalidOperationException>(() => controller.TakeHideCapability());
     }
 
     [Fact]

@@ -10,7 +10,7 @@ uma condição. Uma condição só sai marcada `SUPERSEDED BY <regra>`, com just
 `docs/m13-s2t-linearizable-state-machine.md` (desenho) · `.boss/BOSS.md` §9 e §10.
 
 **Base de medição:** worktree `ServerMonitor-m13-s2t`, ramo `agent/m13-s2t-tray`.
-Baseline dos testes filtrados por `Tray|Theme|Flyout|FailSafe|WindowClose`: **161 passam, 0 falham**, em **10 corridas seguidas** com resultado idêntico e zero abortos.
+Baseline dos testes filtrados por `Tray|Theme|Flyout|FailSafe|WindowClose`: **190 passam, 0 falham**, em **10 corridas seguidas** com contagem descoberta idêntica e zero abortos.
 Gates completos na árvore entregue: **Debug 1886/1886**, **Release 1851/1851**, zero abortos. A diferença de 35 vem de um
 `ItemGroup Condition="'$(Configuration)' != 'Debug'"` no projeto de testes que remove `Qa\**\*.cs` —
 condição pré-existente, não introduzida por esta entrega.
@@ -421,12 +421,19 @@ código, à distância de um `grep`. A regra que fica: antes de escrever «nenhu
 
 **Invariante:** *o direito de esconder a janela não pode existir separado do acto de a esconder.*
 
-**Imposição:** o booleano legível **desapareceu**. `TrayAffordanceLifecycle.CanEnterBackground` não existe;
-existe `TryEnterBackground(Action)`, e o `TrayStateMachine` executa o acto **sob o mesmo lock** que decide
-que é permitido. O caller entrega o que quer feito; não recebe uma resposta para usar depois.
+**Imposição (estado actual, ronda 11):** não existe booleano legível, não existe retorno, e **não existe
+delegado**. `Perform(TrayGuardedOperation)` recebe um **valor**; a máquina possui a operação concreta e
+invoca-a **sob o mesmo lock** que decide. E a própria acção saiu do contrato geral: esconder a janela vive
+numa capacidade que é um **tipo privado aninhado** no controlador, com implementações privadas, entregue
+uma única vez à composição — não há sítio nenhum no assembly que consiga chamá-la sem ser a operação
+guardada ou o `ExitSequence`, e isso é provado por **varrimento de IL**, não por dependências declaradas.
 
-É a **terceira vez** nesta fatia que a mesma correção é precisa — o token de episódio, o canal de efeitos,
-e agora isto. O padrão é sempre o mesmo: *um valor que se pode guardar é uma capacidade que circula, e uma
+*(Este parágrafo descrevia `TryEnterBackground(Action)`, que deixou de existir na ronda 8. A CV-15 existe
+precisamente para impedir que o mapa descreva uma árvore que já não é a entregue.)*
+
+Foram **oito vezes** nesta fatia que a mesma correção foi precisa — o token de episódio, o canal de
+efeitos, a propriedade legível, o booleano devolvido, o delegado arbitrário, a acção alcançável, a segunda
+porta (`HideForMinimize`) e o localizador de serviços sobre o tipo concreto. O padrão é sempre o mesmo: *um valor que se pode guardar é uma capacidade que circula, e uma
 capacidade que circula é uma que se fabrica.* A cura é sempre a mesma: o direito atravessa a fronteira
 como delegado, executado por quem o concede.
 
@@ -545,8 +552,9 @@ defendida duas vezes tem de ser provada duas vezes*; e quando a segunda defesa �
 uma regra diferente, não há nada a provar — **há uma cópia a apagar**.
 
 Quatro âncoras partiram por mudança legítima de forma (`bool` → `void`, um `Invoke` → um ciclo): M69, M71,
-M72 e M73, re-ancoradas e todas mortas. A M73 na forma nova passa uma ação **vazia** ao commit e esconde
-por fora — é o bloqueante da ronda 6 escrito contra uma API `void`, e é agora a mutação mais afiada da
+M72 e M73, re-ancoradas e todas mortas. *(A M73 foi re-formada duas vezes desde então: na ronda 9 deixou
+de compilar, porque o contrato perdeu o hide, e passou a pedir a **capacidade**; ver §13.)* Na forma dessa
+ronda passava uma ação **vazia** ao commit e escondia por fora — é o bloqueante da ronda 6 escrito contra uma API `void`, e é agora a mutação mais afiada da
 fatia.
 
 ### 11.5 O que continua sem cobertura

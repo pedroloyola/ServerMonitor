@@ -45,7 +45,16 @@ public sealed class TrayStateMachineTests : IDisposable
     {
         public void EnterBackground() => onEnter();
 
-        public void HideForMinimize() => (onMinimize ?? onEnter)();
+        /// <summary>
+        /// NEVER falls back to the background callback. It used to run <c>onEnter</c> when no minimize
+        /// callback was supplied, which is a double that answers with the WRONG OPERATION -- the same
+        /// defect as the always-true NIM_DELETE, and the third of its family in this slice. A test that
+        /// forgets to supply it now fails loudly instead of passing by performing a background entry.
+        /// </summary>
+        public void HideForMinimize() =>
+            (onMinimize ?? throw new InvalidOperationException(
+                "This double was asked to minimize and no minimize callback was supplied. It will not "
+                + "stand in a background entry: supply one, or the test proves the wrong operation."))();
 
         public void Refuse(TrayGuardedOperation operation) => onRefuse();
     }
@@ -1409,6 +1418,28 @@ public sealed class TrayStateMachineTests : IDisposable
         machine.Establish();
 
         Assert.True(Volatile.Read(ref second) > 0, "the observer behind the failing one was not notified");
+    }
+
+    /// <summary>
+    /// CV-22: no authoritative consumer AND a NON-degrading notification must not ask for an exit.
+    /// </summary>
+    /// <remarks>
+    /// The pair to the absence rule below. Escalating on absence is right for a LOSS and wrong for
+    /// everything else — otherwise a process with no loss consumer would quit the moment the tray came up
+    /// successfully. The equivalent mutation died before the mechanism was rewritten; the dedicated
+    /// consumer with <c>AcknowledgeLoss</c> replaced it and the coverage did not follow, which is the
+    /// coverage-side version of "a test that only exercises the double proves the double".
+    /// </remarks>
+    [Fact]
+    public void A_non_degrading_notification_with_no_authoritative_consumer_does_not_request_an_exit()
+    {
+        using var machine = Create(withLossConsumer: false);
+
+        machine.Establish();
+
+        Assert.Equal(TrayAffordanceState.Available, machine.State);
+        Assert.Equal(0, Volatile.Read(ref _exitRequests));
+        Assert.Equal(0, Volatile.Read(ref _escalations));
     }
 
     /// <summary>
