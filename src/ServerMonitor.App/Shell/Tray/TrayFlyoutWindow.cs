@@ -60,8 +60,11 @@ internal sealed class TrayFlyoutWindow : IFlyoutSurface, IDisposable
     /// </summary>
     private WinEventDelegate? _foregroundCallback;
 
-    /// <summary>QA-11 human session (temporary): when the current menu was shown.</summary>
-    private DateTime _openedAt = DateTime.UtcNow;
+    /// <summary>
+    /// QA-11 human session (temporary): when the current menu was shown, on the SAME tick base the
+    /// window-event callback reports, so the two subtract cleanly.
+    /// </summary>
+    private uint _openedAtTick = (uint)Environment.TickCount;
 
     private FlyoutLifecycle? _lifecycle;
 
@@ -160,7 +163,7 @@ internal sealed class TrayFlyoutWindow : IFlyoutSurface, IDisposable
         menu.ShowAt(_root, new FlyoutShowOptions { Placement = FlyoutPlacementMode.Auto });
 
         // QA-11 human session (temporary).
-        _openedAt = DateTime.UtcNow;
+        _openedAtTick = (uint)Environment.TickCount;
         QaDismissTrace.Note("MENU OPENED", $"anchor window 0x{WinRT.Interop.WindowNative.GetWindowHandle(_window):X}");
     }
 
@@ -186,6 +189,17 @@ internal sealed class TrayFlyoutWindow : IFlyoutSurface, IDisposable
     }
 
     nint IFlyoutSurface.CaptureForeground() => GetForegroundWindow();
+
+    bool IFlyoutSurface.IsOurs(nint hwnd)
+    {
+        if (hwnd == nint.Zero)
+        {
+            return false;
+        }
+
+        _ = GetWindowThreadProcessId(hwnd, out var owningProcess);
+        return owningProcess == CurrentProcessId;
+    }
 
     void IFlyoutSurface.HideWindow()
     {
@@ -264,12 +278,30 @@ internal sealed class TrayFlyoutWindow : IFlyoutSurface, IDisposable
             return;
         }
 
-        // The unhook FAILED, so the hook may still fire. The handle is forgotten -- there is nothing more
-        // to do with it -- but the delegate is DELIBERATELY KEPT ALIVE, because releasing it while native
-        // code can still call it is a use-after-free rather than a leak.
+        // THE UNHOOK FAILED, so the hook may still fire into this delegate. The previous version cleared
+        // the handle and left the delegate in a field the NEXT request would overwrite -- after which the
+        // collector could take it while native code still pointed at it. It is moved somewhere that
+        // outlives every request instead: a deliberate retention, bounded by the number of failed unhooks,
+        // which should be none.
         _logger.LogWarning("The tray flyout could not remove its dismissal watch; the callback is retained.");
+
+        if (_foregroundCallback is { } stranded)
+        {
+            lock (StrandedCallbacks)
+            {
+                StrandedCallbacks.Add(stranded);
+            }
+        }
+
+        _foregroundCallback = null;
         _foregroundHook = 0;
     }
+
+    /// <summary>
+    /// Callbacks whose hook could not be removed, held for the life of the process on purpose. A live
+    /// native hook pointing at a collected delegate is a crash; a handful of retained delegates is not.
+    /// </summary>
+    private static readonly List<WinEventDelegate> StrandedCallbacks = new();
 
     /// <summary>
     /// The native callback. NOTHING may unwind from here: a managed exception crossing back into the
@@ -285,18 +317,14 @@ internal sealed class TrayFlyoutWindow : IFlyoutSurface, IDisposable
                 return;
             }
 
-            // OUR PROCESS, not our one window. The menu is hosted in its own top-level popup window, so
-            // showing it changes the foreground to a handle that is not _window -- and comparing against
-            // that single handle made the flyout dismiss ITSELF the moment it appeared. Measured: with the
-            // watch installed before the menu is shown, request 3 opened and vanished.
-            _ = GetWindowThreadProcessId(hwnd, out var owningProcess);
-            if (owningProcess == CurrentProcessId)
-            {
-                return;
-            }
-
-            QaDismissTrace.Dismissal(hwnd, DateTime.UtcNow - _openedAt);
-            Lifecycle.OnForeignForeground();
+            // NO CLASSIFICATION HERE. Deciding what counts as a dismissal in this method AND in the
+            // blind-window comparison is what let the two come apart: only one of them knew that our own
+            // popup taking the foreground is not a dismissal. The lifecycle decides, once, for both.
+            //
+            // The elapsed time comes from the event's OWN timestamp, so dispatch latency is not folded
+            // into the interval being measured -- and that interval is the whole question.
+            QaDismissTrace.Observed(hwnd, unchecked(time - _openedAtTick));
+            Lifecycle.OnForegroundObserved(hwnd);
         }
         catch (Exception exception)
         {

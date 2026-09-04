@@ -38,6 +38,9 @@ internal interface IFlyoutSurface
     /// without waiting for an event that may already have passed.
     /// </summary>
     nint CaptureForeground();
+
+    /// <summary>Whether a window belongs to this process — the menu's own popup included.</summary>
+    bool IsOurs(nint hwnd);
 }
 
 /// <summary>
@@ -62,6 +65,9 @@ internal sealed class FlyoutLifecycle(IFlyoutSurface surface, Action release)
 {
     private readonly IFlyoutSurface _surface = surface ?? throw new ArgumentNullException(nameof(surface));
     private readonly Action _release = release ?? throw new ArgumentNullException(nameof(release));
+
+    /// <summary>Who owned the foreground when the current menu was shown.</summary>
+    private nint _foregroundAtOpen;
 
     private bool _awaitingReadiness;
     private bool _presented;
@@ -118,10 +124,34 @@ internal sealed class FlyoutLifecycle(IFlyoutSurface surface, Action release)
         Present();
     }
 
-    /// <summary>The foreground moved to something that is not us: that is the dismissal.</summary>
-    internal void OnForeignForeground()
+    /// <summary>
+    /// A foreground owner has been observed. THE ONLY PLACE that decides whether it is a dismissal.
+    /// </summary>
+    /// <remarks>
+    /// Both routes come through here — the hook's callback and the blind-window comparison — because they
+    /// have to answer the same question the same way. They did not: the callback classified ownership and
+    /// the comparison did not, so showing the menu made our OWN popup the foreground, the raw handles
+    /// differed, and the flyout dismissed itself. That is the same defect the round-2 measurement found in
+    /// the install ORDER, returning through a second path; one property enforced by two routes has to be
+    /// decided in one place, or only one route enforces it.
+    /// </remarks>
+    internal void OnForegroundObserved(nint hwnd)
     {
-        if (!_presented)
+        if (!_presented || hwnd == nint.Zero)
+        {
+            return;
+        }
+
+        // Ours is not a dismissal: the menu's own popup takes the foreground when it appears.
+        if (_surface.IsOurs(hwnd))
+        {
+            return;
+        }
+
+        // Unchanged since this menu opened is not a dismissal either. In the states this defect lives in
+        // the foreground is ALREADY foreign when the menu legitimately opens, so "foreign" alone would
+        // close every one of them on sight.
+        if (hwnd == _foregroundAtOpen)
         {
             return;
         }
@@ -129,7 +159,7 @@ internal sealed class FlyoutLifecycle(IFlyoutSurface surface, Action release)
         if (!_surface.TryHideMenu())
         {
             // The hide did not happen, so no Closed is coming. Terminating here is the whole point: the
-            // slot must not depend on a notification that the platform has already declined to send.
+            // slot must not depend on a notification the platform has already declined to send.
             Terminate();
         }
     }
@@ -155,7 +185,7 @@ internal sealed class FlyoutLifecycle(IFlyoutSurface surface, Action release)
         // The baseline is taken BEFORE the menu exists, because the watch only reports FUTURE changes and
         // there is an interval between showing and installing it. A change that lands in that interval
         // produces no callback ever, and the slot would be held until some later, unrelated change.
-        var foregroundAtOpen = _surface.CaptureForeground();
+        _foregroundAtOpen = _surface.CaptureForeground();
 
         try
         {
@@ -184,10 +214,7 @@ internal sealed class FlyoutLifecycle(IFlyoutSurface surface, Action release)
         // point, not "is the foreground foreign" -- in the states this defect lives in, the foreground is
         // ALREADY foreign when the menu legitimately opens, so a bare level check would dismiss every one
         // of them on sight.
-        if (_surface.CaptureForeground() != foregroundAtOpen)
-        {
-            OnForeignForeground();
-        }
+        OnForegroundObserved(_surface.CaptureForeground());
     }
 
     /// <summary>The single exit. Idempotent, so no path can release the slot twice.</summary>

@@ -37,6 +37,36 @@ internal static class QaDismissTrace
     [DllImport("user32.dll")]
     private static extern uint GetWindowThreadProcessId(nint hwnd, out uint processId);
 
+    /// <summary>
+    /// Records every foreground observation with the elapsed time taken from the EVENT's own timestamp,
+    /// not from the moment it was delivered.
+    /// </summary>
+    internal static void Observed(nint hwnd, uint sinceOpenedMs)
+    {
+        var className = new StringBuilder(256);
+        _ = GetClassNameW(hwnd, className, className.Capacity);
+        _ = GetWindowThreadProcessId(hwnd, out var processId);
+
+        var processName = "?";
+        try
+        {
+            processName = System.Diagnostics.Process.GetProcessById((int)processId).ProcessName;
+        }
+        catch (Exception)
+        {
+            // A window whose process has gone is still worth recording by id.
+        }
+
+        Write(string.Format(
+            CultureInfo.InvariantCulture,
+            "FOREGROUND at {0,7} ms  hwnd=0x{1:X} class={2} pid={3} ({4})",
+            sinceOpenedMs,
+            hwnd,
+            className,
+            processId,
+            processName));
+    }
+
     internal static void Note(string stage, string detail)
     {
         Write($"{stage,-22} {detail}");

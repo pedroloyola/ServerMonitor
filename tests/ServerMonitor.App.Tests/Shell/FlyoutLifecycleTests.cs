@@ -111,7 +111,15 @@ public sealed class FlyoutLifecycleTests
             Calls.Add("CaptureForeground");
             return Foreground;
         }
+
+        /// <summary>Handles this fake considers ours — the menu's own popup among them.</summary>
+        public HashSet<nint> Owned { get; } = new() { 500 };
+
+        public bool IsOurs(nint hwnd) => Owned.Contains(hwnd);
     }
+
+    private const nint FOREIGN = 777;
+    private const nint OURS = 500;
 
     private static (FlyoutLifecycle Subject, FakeSurface Surface, Func<int> Releases) Create()
     {
@@ -266,6 +274,71 @@ public sealed class FlyoutLifecycleTests
         Assert.Equal(0, releases());
     }
 
+    // ------------------------------------------- the captured edge is classified like the callback
+
+    /// <summary>
+    /// OUR OWN window taking the foreground is not a dismissal — and this is proved separately, because
+    /// the defect was precisely that one of the two routes did not know it.
+    /// </summary>
+    /// <remarks>
+    /// Showing the menu makes the application's own popup the foreground. The callback classified that
+    /// and the blind-window comparison did not, so the raw handles differed and the flyout dismissed
+    /// itself. A single conjunctive test would have passed on the strength of the other cases.
+    /// </remarks>
+    [Fact]
+    public void An_edge_to_our_own_window_is_not_a_dismissal()
+    {
+        var (subject, surface, releases) = Create();
+        surface.MoveForegroundOnPresent = OURS;   // the popup itself becomes foreground
+
+        subject.Show(new Point(10, 10));
+
+        Assert.True(surface.MenuShown);
+        Assert.True(subject.IsPresented);
+        Assert.Equal(0, releases());
+    }
+
+    /// <summary>An edge to a FOREIGN window during the blind window is a dismissal.</summary>
+    [Fact]
+    public void An_edge_to_a_foreign_window_is_a_dismissal()
+    {
+        var (subject, surface, releases) = Create();
+        surface.MoveForegroundOnPresent = FOREIGN;
+
+        subject.Show(new Point(10, 10));
+
+        Assert.False(surface.MenuShown);
+        subject.OnMenuClosed();
+        Assert.Equal(1, releases());
+    }
+
+    /// <summary>
+    /// A→B→A entirely inside the blind window is NOT detected, and that is recorded rather than claimed
+    /// otherwise.
+    /// </summary>
+    /// <remarks>
+    /// Comparing a level against a baseline can only see where the foreground ENDED, never where it went
+    /// in between, and no event exists for the interval. The menu stays open; the slot is not stranded,
+    /// because the next real change still dismisses it. Written down so nobody reads the blind-window
+    /// closure as more complete than it is.
+    /// </remarks>
+    [Fact]
+    public void An_ABA_excursion_inside_the_blind_window_is_not_detected()
+    {
+        var (subject, surface, releases) = Create();
+        surface.Foreground = FOREIGN;
+        surface.MoveForegroundOnPresent = FOREIGN;   // left and came back before we looked
+
+        subject.Show(new Point(10, 10));
+
+        Assert.True(surface.MenuShown);
+        Assert.Equal(0, releases());
+
+        // And the slot is not stranded: the next genuine change still closes it.
+        subject.OnForegroundObserved(999);
+        Assert.False(surface.MenuShown);
+    }
+
     // ---------------------------------------------------------------- dismissal
 
     [Fact]
@@ -274,7 +347,7 @@ public sealed class FlyoutLifecycleTests
         var (subject, surface, releases) = Create();
         subject.Show(new Point(10, 10));
 
-        subject.OnForeignForeground();
+        subject.OnForegroundObserved(FOREIGN);
 
         Assert.False(surface.MenuShown);
 
@@ -291,7 +364,7 @@ public sealed class FlyoutLifecycleTests
         subject.Show(new Point(10, 10));
         surface.HideSucceeds = false;
 
-        subject.OnForeignForeground();
+        subject.OnForegroundObserved(FOREIGN);
 
         Assert.Equal(1, releases());
         Assert.True(surface.WatchRemovals > 0);
@@ -302,7 +375,7 @@ public sealed class FlyoutLifecycleTests
     {
         var (subject, surface, releases) = Create();
 
-        subject.OnForeignForeground();
+        subject.OnForegroundObserved(FOREIGN);
 
         Assert.Empty(surface.Calls);
         Assert.Equal(0, releases());
@@ -349,7 +422,7 @@ public sealed class FlyoutLifecycleTests
 
         subject.OnMenuClosed();
         subject.OnMenuClosed();
-        subject.OnForeignForeground();
+        subject.OnForegroundObserved(FOREIGN);
         subject.Dispose();
         subject.Dispose();
 
