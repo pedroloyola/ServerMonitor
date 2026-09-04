@@ -158,13 +158,16 @@ internal sealed class TrayFlyoutWindow : IFlyoutSurface, IDisposable
 
     void IFlyoutSurface.PresentMenu()
     {
+        // QA-11 human session (temporary): the baseline is read BEFORE the menu exists, which is the
+        // same instant the lifecycle captured it, so the log and the decision agree.
+        var baseline = GetForegroundWindow();
+
         var menu = BuildMenu();
         _menu = menu;
         menu.ShowAt(_root, new FlyoutShowOptions { Placement = FlyoutPlacementMode.Auto });
 
-        // QA-11 human session (temporary).
         _openedAtTick = (uint)Environment.TickCount;
-        QaDismissTrace.Note("MENU OPENED", $"anchor window 0x{WinRT.Interop.WindowNative.GetWindowHandle(_window):X}");
+        QaDismissTrace.Opened(WinRT.Interop.WindowNative.GetWindowHandle(_window), baseline);
     }
 
     bool IFlyoutSurface.TryHideMenu()

@@ -67,6 +67,46 @@ internal static class QaDismissTrace
             processName));
     }
 
+    /// <summary>
+    /// Records the menu opening WITH the foreground baseline. Without it a later
+    /// <c>FOREGROUND … class=Progman</c> line cannot be classified: taking the foreground away from the
+    /// overflow panel is a real dismissal, taking it from nothing is an artefact of the harness.
+    /// </summary>
+    internal static void Opened(nint anchorWindow, nint foregroundAtOpen)
+    {
+        Write(string.Format(
+            CultureInfo.InvariantCulture,
+            "MENU OPENED            anchor=0x{0:X}  baseline foreground: {1}",
+            anchorWindow,
+            Describe(foregroundAtOpen)));
+    }
+
+    private static string Describe(nint hwnd)
+    {
+        if (hwnd == nint.Zero)
+        {
+            return "none (hwnd=0)";
+        }
+
+        var className = new StringBuilder(256);
+        _ = GetClassNameW(hwnd, className, className.Capacity);
+        _ = GetWindowThreadProcessId(hwnd, out var processId);
+
+        var processName = "?";
+        try
+        {
+            processName = System.Diagnostics.Process.GetProcessById((int)processId).ProcessName;
+        }
+        catch (Exception)
+        {
+            // A window whose process has gone is still worth recording by id.
+        }
+
+        return string.Format(
+            CultureInfo.InvariantCulture,
+            "hwnd=0x{0:X} class={1} pid={2} ({3})", hwnd, className, processId, processName);
+    }
+
     internal static void Note(string stage, string detail)
     {
         Write($"{stage,-22} {detail}");
