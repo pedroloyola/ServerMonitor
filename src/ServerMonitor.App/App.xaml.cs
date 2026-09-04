@@ -379,7 +379,13 @@ public partial class App : Application
             onExitCommitted: sp.GetRequiredService<FailSafeExitNotice>().OnExitCommitted));
         services.AddSingleton(BackgroundSettingsStorageOptions.ForCurrentUser());
         services.AddSingleton<IBackgroundMonitoringSettingsService, JsonBackgroundMonitoringSettingsService>();
-        services.AddSingleton<IBackgroundNoticePresenter, BackgroundNoticePresenter>();
+        services.AddSingleton<IBackgroundNoticePresenter>(sp => new BackgroundNoticePresenter(
+            sp.GetRequiredService<IBackgroundMonitoringSettingsService>(),
+            sp.GetRequiredService<IUserNotificationService>(),
+            sp.GetRequiredService<ILocalizationService>(),
+            sp.GetRequiredService<IAppLifecycleController>(),
+            sp.GetRequiredService<ILogger<BackgroundNoticePresenter>>(),
+            sp.GetRequiredService<INotificationRegistrationEvidence>()));
         services.AddSingleton<IBackgroundDegradationNotice, BackgroundDegradationNotice>();
 
         // M13 S2-T. ONE owner of the icon, and the affordance state comes from the BOOL the shell
@@ -453,6 +459,11 @@ public partial class App : Application
             sp.GetRequiredService<IServerAlertCoordinator>(),
             sp.GetRequiredService<IAppLifecycleController>(),
             sp.GetRequiredService<ILogger<TrayService>>()));
+        // M13-QA-12. The registration outcome is written where a human can retrieve it: the host logs
+        // through AddDebug() alone, and Debug output goes nowhere in a packaged run — which is why a
+        // registration that failed for the whole of M13 was never seen by anyone.
+        services.AddSingleton(NotificationDiagnosticsOptions.ForCurrentUser());
+        services.AddSingleton<INotificationRegistrationEvidence, FileNotificationRegistrationEvidence>();
         services.AddSingleton<WindowsAppNotificationService>();
         services.AddSingleton<IUserNotificationService>(sp =>
             sp.GetRequiredService<WindowsAppNotificationService>());

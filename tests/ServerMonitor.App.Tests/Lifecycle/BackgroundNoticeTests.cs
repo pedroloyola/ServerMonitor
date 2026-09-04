@@ -18,19 +18,32 @@ public sealed class BackgroundNoticeTests
 
         public bool Throws { get; set; }
 
+        /// <summary>
+        /// What this stand-in reports about itself. It defaults to Registered because every test written
+        /// before M13-QA-12 assumed a working service; the ones that care state it explicitly.
+        /// </summary>
+        public NotificationRegistrationState RegistrationState { get; set; } =
+            NotificationRegistrationState.Registered;
+
         public void BeginShutdown() { }
 
         public Task ShowAsync(UserNotification notification, CancellationToken cancellationToken = default) =>
             Task.CompletedTask;
 
-        public void ShowBackgroundNotice(string title, string body)
+        public BackgroundNoticeAttempt ShowBackgroundNotice(string title, string body)
         {
             if (Throws)
             {
                 throw new InvalidOperationException("notifications unavailable");
             }
 
+            if (RegistrationState != NotificationRegistrationState.Registered)
+            {
+                return BackgroundNoticeAttempt.NotAttempted;
+            }
+
             BackgroundNotices.Add((title, body));
+            return BackgroundNoticeAttempt.ExercisedThroughRegisteredService;
         }
     }
 
@@ -70,14 +83,22 @@ public sealed class BackgroundNoticeTests
     }
 
     /// <summary>
-    /// Spent on ATTEMPT, not on delivery: notifications the user disabled must not turn the single notice
-    /// into a nag on every close.
+    /// Spent on a legitimate ATTEMPT, not on delivery: notifications the user disabled, or a display that
+    /// fails inside a REGISTERED service, must not turn the single notice into a nag on every close.
+    /// <para>
+    /// The service here reports itself Registered and then throws, which is the M13-QA-12 boundary from
+    /// the other side: the opportunity WAS exercised through a working service, so it stays spent.
+    /// </para>
     /// </summary>
     [Fact]
-    public void A_notice_that_cannot_be_delivered_is_still_spent()
+    public void A_notice_that_cannot_be_delivered_by_a_registered_service_is_still_spent()
     {
         var settings = new FakeBackgroundMonitoringSettingsService();
-        var notifications = new RecordingNotificationService { Throws = true };
+        var notifications = new RecordingNotificationService
+        {
+            Throws = true,
+            RegistrationState = NotificationRegistrationState.Registered
+        };
         var presenter = Create(settings, notifications);
 
         Assert.True(presenter.TryShowOnce());
@@ -115,6 +136,199 @@ public sealed class BackgroundNoticeTests
             Assert.DoesNotContain("@", text, StringComparison.Ordinal);
             Assert.DoesNotContain("://", text, StringComparison.Ordinal);
         }
+    }
+
+    // ---------------------------------------------------------------- M13-QA-12
+
+    /// <summary>
+    /// The whole defect, end to end, against the PRODUCTION service and the PRODUCTION presenter: the
+    /// platform refuses the registration, the service swallows nothing into a fake success, and the one
+    /// warning the user ever gets is NOT spent. Only the platform is a double.
+    /// </summary>
+    /// <summary>The window is irrelevant here; these tests are about registration and the marker.</summary>
+    private sealed class StubWindowController : IApplicationWindowController
+    {
+        public bool IsAttached => true;
+
+        public bool IsMaterialized => true;
+
+        public void Attach(Microsoft.UI.Xaml.Window window) { }
+
+        public void AttachWindowFactory(Func<Microsoft.UI.Xaml.Window> factory) { }
+
+        public void HideForMinimize() { }
+
+        public void HideToBackground() { }
+
+        public void RestoreAndActivate() { }
+
+        public void OpenSettings() { }
+
+        public void OpenBackgroundSettings() { }
+
+        public void ToggleCompactMode() { }
+
+        public void RequestClose() { }
+
+        public void BeginShutdown() { }
+    }
+
+    private sealed class RealServiceHarness : IDisposable
+    {
+        private readonly string _iconPath = Path.Combine(
+            Path.GetTempPath(), $"qa12-notification-{Guid.NewGuid():N}.png");
+
+        public RealServiceHarness(FakeNotificationPlatform platform, bool iconPresent = true)
+        {
+            if (iconPresent)
+            {
+                File.WriteAllBytes(_iconPath, [0x89, 0x50, 0x4e, 0x47]);
+            }
+
+            Platform = platform;
+            Service = new WindowsAppNotificationService(
+                platform,
+                new StubWindowController(),
+                Lifecycle,
+                NullLogger<WindowsAppNotificationService>.Instance,
+                _iconPath);
+            Presenter = new BackgroundNoticePresenter(
+                Settings,
+                Service,
+                new FakeLocalizationService(),
+                Lifecycle,
+                NullLogger<BackgroundNoticePresenter>.Instance);
+        }
+
+        public FakeNotificationPlatform Platform { get; }
+
+        public FakeBackgroundMonitoringSettingsService Settings { get; } = new();
+
+        public FakeAppLifecycleController Lifecycle { get; } = new();
+
+        public WindowsAppNotificationService Service { get; }
+
+        public BackgroundNoticePresenter Presenter { get; }
+
+        public Task Start() => Service.StartAsync(default);
+
+        public void Dispose()
+        {
+            if (File.Exists(_iconPath))
+            {
+                File.Delete(_iconPath);
+            }
+        }
+    }
+
+    /// <summary>QA-12 #1: a registration that succeeded is reported as such, and behaves so.</summary>
+    [Fact]
+    public async Task A_successful_registration_is_reported_as_registered()
+    {
+        using var h = new RealServiceHarness(new FakeNotificationPlatform());
+
+        await h.Start();
+
+        Assert.Equal(NotificationRegistrationState.Registered, h.Service.RegistrationState);
+        Assert.Equal(1, h.Platform.RegisterCount);
+    }
+
+    /// <summary>
+    /// QA-12 #2: THE defect. The registration throws, the top-level catch keeps startup alive — and the
+    /// service must NOT come out of it looking registered. It used to, and every later Show went nowhere.
+    /// </summary>
+    [Fact]
+    public async Task A_failed_registration_never_claims_success()
+    {
+        using var h = new RealServiceHarness(new FakeNotificationPlatform { FailRegistration = true });
+
+        await h.Start();
+
+        Assert.Equal(NotificationRegistrationState.NotRegistered, h.Service.RegistrationState);
+        Assert.False(
+            h.Platform.HasHandler,
+            "a failed registration must not leave the activation handler attached");
+    }
+
+    /// <summary>QA-12 #2b: a platform that cannot be used at all is Unavailable, not a silent success.</summary>
+    [Fact]
+    public async Task An_unusable_platform_is_reported_unavailable()
+    {
+        using var unsupported = new RealServiceHarness(new FakeNotificationPlatform { Supported = false });
+        using var noIcon = new RealServiceHarness(new FakeNotificationPlatform(), iconPresent: false);
+
+        await unsupported.Start();
+        await noIcon.Start();
+
+        Assert.Equal(NotificationRegistrationState.Unavailable, unsupported.Service.RegistrationState);
+        Assert.Equal(NotificationRegistrationState.Unavailable, noIcon.Service.RegistrationState);
+        Assert.Equal(0, noIcon.Platform.RegisterCount);
+    }
+
+    /// <summary>
+    /// QA-12 #4: the marker survives a failed registration. This is the user-visible half of the defect —
+    /// the single explanation was being burned against a service that could not deliver it, so the next
+    /// session stayed silent too.
+    /// </summary>
+    [Fact]
+    public async Task A_failed_registration_leaves_the_single_opportunity_unspent()
+    {
+        using var h = new RealServiceHarness(new FakeNotificationPlatform { FailRegistration = true });
+        await h.Start();
+
+        Assert.False(h.Presenter.TryShowOnce());
+
+        Assert.False(h.Settings.BackgroundNoticeShown);
+        Assert.Equal(0, h.Settings.ClaimAttempts);
+        Assert.Equal(0, h.Platform.ShowCount);
+    }
+
+    /// <summary>QA-12 #5: registered and closed for the first time — one Show, and the marker is spent.</summary>
+    [Fact]
+    public async Task A_registered_service_shows_the_notice_once_and_spends_the_marker()
+    {
+        using var h = new RealServiceHarness(new FakeNotificationPlatform());
+        await h.Start();
+
+        Assert.True(h.Presenter.TryShowOnce());
+
+        Assert.Equal(1, h.Platform.ShowCount);
+        Assert.True(h.Settings.BackgroundNoticeShown);
+        Assert.Equal(1, h.Settings.ClaimsGranted);
+    }
+
+    /// <summary>QA-12 #6: every later close is silent.</summary>
+    [Fact]
+    public async Task Later_closes_never_duplicate_the_notice()
+    {
+        using var h = new RealServiceHarness(new FakeNotificationPlatform());
+        await h.Start();
+
+        Assert.True(h.Presenter.TryShowOnce());
+        Assert.False(h.Presenter.TryShowOnce());
+        Assert.False(h.Presenter.TryShowOnce());
+
+        Assert.Equal(1, h.Platform.ShowCount);
+        Assert.Equal(1, h.Settings.ClaimsGranted);
+    }
+
+    /// <summary>
+    /// QA-12 #7: a display failure INSIDE a registered service changes nothing about the lifecycle and
+    /// does not reopen the opportunity. Delivery is best effort, and no acknowledgement is sought.
+    /// </summary>
+    [Fact]
+    public async Task A_display_failure_after_a_valid_registration_changes_nothing()
+    {
+        using var h = new RealServiceHarness(new FakeNotificationPlatform { FailShow = true });
+        await h.Start();
+
+        Assert.True(h.Presenter.TryShowOnce());
+
+        Assert.Equal(1, h.Platform.ShowCount);
+        Assert.True(h.Settings.BackgroundNoticeShown);
+        Assert.Equal(NotificationRegistrationState.Registered, h.Service.RegistrationState);
+        Assert.Equal(0, h.Lifecycle.ExitRequests);
+        Assert.False(h.Lifecycle.IsExiting);
     }
 
     // ---------------------------------------------------------------- the activation contract

@@ -33,25 +33,39 @@ public sealed class WindowsAppNotificationService : IUserNotificationService, IH
     internal static readonly TimeSpan FailSafeExitNoticeLifetime = TimeSpan.FromMinutes(30);
 
     private readonly IWindowsAppNotificationPlatform _platform;
+    private readonly INotificationRegistrationEvidence _evidence;
     private readonly IApplicationWindowController _windowController;
     private readonly IAppLifecycleController _lifecycleController;
     private readonly ILogger<WindowsAppNotificationService> _logger;
     private readonly string _notificationIconPath;
     private readonly object _sync = new();
-    private bool _registered;
+    private NotificationRegistrationState _registrationState = NotificationRegistrationState.NotRegistered;
     private bool _accepting;
     private bool _stopping;
+
+    /// <summary>
+    /// What the registration attempt actually produced (M13-QA-12). Reported, never inferred: this is
+    /// the field the swallowed exception used to leave looking like success.
+    /// </summary>
+    public NotificationRegistrationState RegistrationState
+    {
+        get { lock (_sync) { return _registrationState; } }
+    }
+
+    private bool IsRegistered => _registrationState == NotificationRegistrationState.Registered;
 
     public WindowsAppNotificationService(
         IApplicationWindowController windowController,
         IAppLifecycleController lifecycleController,
+        INotificationRegistrationEvidence evidence,
         ILogger<WindowsAppNotificationService> logger)
         : this(
             new WindowsAppNotificationPlatform(),
             windowController,
             lifecycleController,
             logger,
-            Path.Combine(AppContext.BaseDirectory, "Assets", "ServerMonitorNotification.png"))
+            Path.Combine(AppContext.BaseDirectory, "Assets", "ServerMonitorNotification.png"),
+            evidence)
     {
     }
 
@@ -60,8 +74,10 @@ public sealed class WindowsAppNotificationService : IUserNotificationService, IH
         IApplicationWindowController windowController,
         IAppLifecycleController lifecycleController,
         ILogger<WindowsAppNotificationService> logger,
-        string notificationIconPath)
+        string notificationIconPath,
+        INotificationRegistrationEvidence? evidence = null)
     {
+        _evidence = evidence ?? NullNotificationRegistrationEvidence.Instance;
         _platform = platform ?? throw new ArgumentNullException(nameof(platform));
         _windowController = windowController ?? throw new ArgumentNullException(nameof(windowController));
         _lifecycleController = lifecycleController ?? throw new ArgumentNullException(nameof(lifecycleController));
@@ -75,22 +91,26 @@ public sealed class WindowsAppNotificationService : IUserNotificationService, IH
     {
         lock (_sync)
         {
-            if (_registered || _stopping)
+            if (IsRegistered || _stopping)
             {
                 return Task.CompletedTask;
             }
 
             cancellationToken.ThrowIfCancellationRequested();
+            var stateBefore = _registrationState;
+            var registerCallSite = "not reached";
             try
             {
                 if (!_platform.IsSupported())
                 {
+                    _registrationState = NotificationRegistrationState.Unavailable;
                     _logger.LogWarning("Windows app notifications are unavailable on this system.");
                     return Task.CompletedTask;
                 }
 
                 if (!File.Exists(_notificationIconPath))
                 {
+                    _registrationState = NotificationRegistrationState.Unavailable;
                     _logger.LogWarning("Windows app notification registration skipped because its icon asset is missing.");
                     return Task.CompletedTask;
                 }
@@ -100,8 +120,11 @@ public sealed class WindowsAppNotificationService : IUserNotificationService, IH
                 _platform.Invoked += OnNotificationInvoked;
                 try
                 {
+                    // The exact call site the evidence names, so a report can be tied to one line.
+                    registerCallSite = $"{nameof(WindowsAppNotificationService)}.{nameof(StartAsync)}"
+                        + $" -> IWindowsAppNotificationPlatform.Register @ {SourceFile()}:{SourceLine()}";
                     _platform.Register(ApplicationDisplayName, new Uri(_notificationIconPath));
-                    _registered = true;
+                    _registrationState = NotificationRegistrationState.Registered;
                     _accepting = true;
                 }
                 catch
@@ -111,14 +134,25 @@ public sealed class WindowsAppNotificationService : IUserNotificationService, IH
                 }
 
                 _logger.LogInformation("Windows app notification service started.");
+                _evidence.Record(Report(stateBefore, registerCallSite, exception: null));
             }
             catch (Exception exception)
             {
-                // OS policy, an unavailable Singleton package, or registration restrictions
-                // must not prevent monitoring or the main window from starting.
-                _logger.LogWarning(
+                // M13-QA-12. Startup still does not fail: OS policy, an unavailable Singleton package or
+                // registration restrictions must not prevent monitoring or the main window from starting,
+                // and there is deliberately no modal. What changed is that the failure is no longer
+                // SILENT — the state stays NotRegistered, so no caller can mistake this for a working
+                // service and spend a one-shot opportunity against it. Error, not warning: an app that
+                // promises a first-close notice and cannot deliver one is a defect, not a condition.
+                _registrationState = NotificationRegistrationState.NotRegistered;
+                _accepting = false;
+                _logger.LogError(
                     exception,
-                    "Windows app notifications could not be registered; monitoring will continue.");
+                    "Windows app notifications could NOT be registered ({HResult}); the service stays "
+                    + "{State} and notifications will not be delivered. Monitoring continues.",
+                    DescribeHResult(exception.HResult),
+                    NotificationRegistrationState.NotRegistered);
+                _evidence.Record(Report(stateBefore, registerCallSite, exception));
             }
         }
 
@@ -136,12 +170,12 @@ public sealed class WindowsAppNotificationService : IUserNotificationService, IH
 
             _stopping = true;
             _accepting = false;
-            if (!_registered)
+            if (!IsRegistered)
             {
                 return Task.CompletedTask;
             }
 
-            _registered = false;
+            _registrationState = NotificationRegistrationState.NotRegistered;
             _platform.Invoked -= OnNotificationInvoked;
             try
             {
@@ -164,7 +198,7 @@ public sealed class WindowsAppNotificationService : IUserNotificationService, IH
 
         lock (_sync)
         {
-            if (!_registered || !_accepting || _stopping)
+            if (!IsRegistered || !_accepting || _stopping)
             {
                 return Task.CompletedTask;
             }
@@ -201,6 +235,98 @@ public sealed class WindowsAppNotificationService : IUserNotificationService, IH
     }
 
     /// <summary>
+    /// The registration outcome, as retrievable text. It records FACTS ONLY — the state on both sides of
+    /// the attempt, the call site, the exception and its HRESULT, and whether this process has package
+    /// identity. It deliberately draws no conclusion: whether a refusal is an artefact of how a package
+    /// was registered or a defect a Store build would also hit is not decidable from here, and guessing
+    /// is what this whole record exists to stop.
+    /// </summary>
+    private string Report(
+        NotificationRegistrationState stateBefore,
+        string registerCallSite,
+        Exception? exception)
+    {
+        var lines = new List<string>
+        {
+            $"timestampUtc={DateTimeOffset.UtcNow:O}",
+            $"timestampLocal={DateTimeOffset.Now:O}",
+            $"stateBefore={stateBefore}",
+            $"stateAfter={_registrationState}",
+            $"registerCallSite={registerCallSite}",
+            $"packageIdentity={DescribePackageIdentity()}",
+            $"displayName={ApplicationDisplayName}",
+            $"iconPath={_notificationIconPath}",
+            $"iconExists={File.Exists(_notificationIconPath)}",
+            $"platformSetting={DescribePlatformSetting()}"
+        };
+
+        if (exception is not null)
+        {
+            lines.Add($"hresultRaw=0x{exception.HResult:X8}");
+            lines.Add($"hresult={DescribeHResult(exception.HResult)}");
+            lines.Add($"exceptionType={exception.GetType().FullName}");
+            lines.Add($"exceptionMessage={exception.Message}");
+            lines.Add($"exception={exception}");
+        }
+
+        return string.Join(Environment.NewLine, lines) + Environment.NewLine;
+    }
+
+    /// <summary>
+    /// Whether this process has package identity at all, and which package. A registration failure means
+    /// something different with it than without it, and the answer is cheap and side-effect free.
+    /// </summary>
+    private static string DescribePackageIdentity()
+    {
+        try
+        {
+            return Windows.ApplicationModel.Package.Current.Id.FullName;
+        }
+        catch (Exception exception)
+        {
+            return $"unpackaged or unavailable ({exception.GetType().Name})";
+        }
+    }
+
+    private string DescribePlatformSetting()
+    {
+        try
+        {
+            return _platform.Setting.ToString();
+        }
+        catch (Exception exception)
+        {
+            return $"unavailable ({exception.GetType().Name})";
+        }
+    }
+
+    /// <summary>
+    /// Names the HRESULTs where this API is already known to fail, so the reader recognizes the number
+    /// instead of having to look it up. The raw value is always recorded alongside it, and an unlisted
+    /// one is reported raw: this is recognition, not a verdict about the cause.
+    /// </summary>
+    internal static string DescribeHResult(int hresult) => hresult switch
+    {
+        // "Class not registered", reported against packaged apps — WindowsAppSDK issue 2894.
+        unchecked((int)0x80040154) => "REGDB_E_CLASSNOTREG (0x80040154)",
+
+        // Reported for MSIX C# apps — WindowsAppSDK issue 3540.
+        unchecked((int)0x80004005) => "E_FAIL (0x80004005)",
+
+        // "The specified module could not be found" — WindowsAppSDK issue 6071.
+        unchecked((int)0x8007007E) => "ERROR_MOD_NOT_FOUND (0x8007007E)",
+
+        unchecked((int)0x80070005) => "E_ACCESSDENIED (0x80070005)",
+        0 => "no HRESULT (0x00000000)",
+        _ => $"0x{hresult:X8}"
+    };
+
+    private static string SourceFile([System.Runtime.CompilerServices.CallerFilePath] string file = "") =>
+        Path.GetFileName(file);
+
+    private static int SourceLine([System.Runtime.CompilerServices.CallerLineNumber] int line = 0) => line;
+
+    /// <summary>
     /// Routes a notification click through the closed activation contract (M13 S2 §D.1).
     /// <para>
     /// It used to call <see cref="IApplicationWindowController.RestoreAndActivate"/> for ANY click,
@@ -214,7 +340,7 @@ public sealed class WindowsAppNotificationService : IUserNotificationService, IH
     {
         lock (_sync)
         {
-            if (!_registered || !_accepting || _stopping)
+            if (!IsRegistered || !_accepting || _stopping)
             {
                 return;
             }
@@ -248,21 +374,30 @@ public sealed class WindowsAppNotificationService : IUserNotificationService, IH
     /// The one-time background notice. Short-lived and not kept in the Notification Centre: it explains a
     /// transition that has already happened, so it must not accumulate there.
     /// </summary>
-    public void ShowBackgroundNotice(string title, string body)
+    public BackgroundNoticeAttempt ShowBackgroundNotice(string title, string body)
     {
         lock (_sync)
         {
-            if (!_registered || !_accepting || _stopping)
+            if (!IsRegistered || !_accepting || _stopping)
             {
-                return;
+                // M13-QA-12: nothing was handed to Windows, so the one-shot opportunity was not
+                // exercised and the caller must keep it.
+                _logger.LogWarning(
+                    "The background notice was not attempted: the notification service is {State}.",
+                    _registrationState);
+                return BackgroundNoticeAttempt.NotAttempted;
             }
 
+            // Past this point the service IS registered, so the opportunity has been exercised whatever
+            // Windows then decides. Everything below is delivery, and delivery is best effort: a user who
+            // turned notifications off, or a shell that drops the toast, must not turn the single notice
+            // into a nag on every close. No delivery acknowledgement is sought — Windows guarantees none.
             try
             {
                 if (_platform.Setting != AppNotificationSetting.Enabled)
                 {
                     _logger.LogDebug("Windows suppressed the background notice because its OS setting is disabled.");
-                    return;
+                    return BackgroundNoticeAttempt.ExercisedThroughRegisteredService;
                 }
 
                 _platform.Show(
@@ -276,6 +411,8 @@ public sealed class WindowsAppNotificationService : IUserNotificationService, IH
             {
                 _logger.LogWarning(exception, "Windows could not display the background notice.");
             }
+
+            return BackgroundNoticeAttempt.ExercisedThroughRegisteredService;
         }
     }
 
@@ -289,7 +426,7 @@ public sealed class WindowsAppNotificationService : IUserNotificationService, IH
     {
         lock (_sync)
         {
-            if (!_registered)
+            if (!IsRegistered)
             {
                 return;
             }

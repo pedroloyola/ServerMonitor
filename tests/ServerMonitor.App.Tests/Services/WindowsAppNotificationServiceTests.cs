@@ -15,6 +15,82 @@ public sealed class WindowsAppNotificationServiceTests : IDisposable
 
     public WindowsAppNotificationServiceTests() => File.WriteAllBytes(_iconPath, [0x89, 0x50, 0x4e, 0x47]);
 
+    // ---------------------------------------------------------------- M13-QA-12: measurable evidence
+
+    /// <summary>
+    /// The HRESULTs this API is already known to fail with are NAMED, so a reader recognizes the number
+    /// instead of looking it up, and anything else is reported raw rather than guessed at. The raw value
+    /// is always recorded too — this is recognition, not a verdict about the cause.
+    /// </summary>
+    [Theory]
+    [InlineData(unchecked((int)0x80040154), "REGDB_E_CLASSNOTREG (0x80040154)")]
+    [InlineData(unchecked((int)0x80004005), "E_FAIL (0x80004005)")]
+    [InlineData(unchecked((int)0x8007007E), "ERROR_MOD_NOT_FOUND (0x8007007E)")]
+    [InlineData(unchecked((int)0x80070005), "E_ACCESSDENIED (0x80070005)")]
+    [InlineData(unchecked((int)0xDEADBEEF), "0xDEADBEEF")]
+    public void KnownRegistrationFailuresAreNamedAndUnknownOnesReportedRaw(int hresult, string expected) =>
+        Assert.Equal(expected, WindowsAppNotificationService.DescribeHResult(hresult));
+
+    /// <summary>
+    /// THE reason this defect survived M13: the failure was written to Debug output, which goes nowhere in
+    /// a packaged run. A failed registration must leave a RETRIEVABLE record carrying the exact exception
+    /// type, the exact HRESULT, the call site and the state on both sides of the attempt.
+    /// </summary>
+    [Fact]
+    public async Task FailedRegistration_LeavesRetrievableEvidenceWithTheRealHResult()
+    {
+        var evidence = new RecordingEvidence();
+        var platform = new FakePlatform
+        {
+            RegistrationFailure = new System.Runtime.InteropServices.COMException(
+                "Class not registered", unchecked((int)0x80040154))
+        };
+        var service = Create(platform, new FakeWindowController(), evidence: evidence);
+
+        await service.StartAsync(default);
+
+        Assert.Equal(NotificationRegistrationState.NotRegistered, service.RegistrationState);
+        var report = Assert.Single(evidence.Reports);
+        foreach (var expected in new[]
+                 {
+                     "hresultRaw=0x80040154",
+                     "REGDB_E_CLASSNOTREG (0x80040154)",
+                     "exceptionType=System.Runtime.InteropServices.COMException",
+                     "stateBefore=NotRegistered",
+                     "stateAfter=NotRegistered",
+                     "registerCallSite=WindowsAppNotificationService.StartAsync",
+                     "packageIdentity="
+                 })
+        {
+            Assert.Contains(expected, report, StringComparison.Ordinal);
+        }
+    }
+
+    /// <summary>A success is recorded too: the absence of a record must not be the only signal.</summary>
+    [Fact]
+    public async Task SuccessfulRegistration_IsRecordedAsRegistered()
+    {
+        var evidence = new RecordingEvidence();
+        var service = Create(new FakePlatform(), new FakeWindowController(), evidence: evidence);
+
+        await service.StartAsync(default);
+
+        var report = Assert.Single(evidence.Reports);
+        Assert.Contains("stateAfter=Registered", report, StringComparison.Ordinal);
+        Assert.DoesNotContain("hresult", report, StringComparison.Ordinal);
+    }
+
+    private sealed class RecordingEvidence : INotificationRegistrationEvidence
+    {
+        public List<string> Reports { get; } = new();
+
+        public List<string> Appended { get; } = new();
+
+        public void Record(string report) => Reports.Add(report);
+
+        public void Append(string line) => Appended.Add(line);
+    }
+
     [Fact]
     public void Platform_DoesNotResolveDefaultManagerBeforeCapabilityGatePasses()
     {
@@ -317,12 +393,14 @@ public sealed class WindowsAppNotificationServiceTests : IDisposable
     private WindowsAppNotificationService Create(
         IWindowsAppNotificationPlatform platform,
         IApplicationWindowController window,
-        IAppLifecycleController? lifecycle = null) => new(
+        IAppLifecycleController? lifecycle = null,
+        INotificationRegistrationEvidence? evidence = null) => new(
             platform,
             window,
             lifecycle ?? new FakeAppLifecycleController(),
             NullLogger<WindowsAppNotificationService>.Instance,
-            _iconPath);
+            _iconPath,
+            evidence);
 
     private static UserNotification Notification() => new(
         Guid.NewGuid(),
@@ -361,12 +439,20 @@ public sealed class WindowsAppNotificationServiceTests : IDisposable
 
         public bool IsSupported() => Supported;
 
+        /// <summary>When set, the platform refuses the registration exactly as the real one can.</summary>
+        public Exception? RegistrationFailure { get; init; }
+
         public void Register(string displayName, Uri iconUri)
         {
             RegisterCount++;
             HandlerWasAttachedAtRegister = _invoked is not null;
             DisplayName = displayName;
             IconUri = iconUri;
+
+            if (RegistrationFailure is not null)
+            {
+                throw RegistrationFailure;
+            }
         }
 
         public void Unregister() => UnregisterCount++;
