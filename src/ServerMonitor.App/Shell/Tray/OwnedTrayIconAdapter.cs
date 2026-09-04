@@ -488,11 +488,18 @@ internal sealed class OwnedTrayIconAdapter : ITrayIconAdapter, ITrayAffordanceSo
     /// </summary>
     private void ShowFlyout(System.Drawing.Point anchor)
     {
+        // QA-11 instrumentation (temporary).
+        var requestId = QaTrace.NextRequestId();
+        QaTrace.Write(requestId, "ShowFlyout.enter", $"gateOpenBefore={_flyoutGate.IsOpen} anchor={anchor}");
+
         if (!_flyoutGate.TryOpen())
         {
+            QaTrace.Write(requestId, "TryOpen", "RESULT=false -> REQUEST DISCARDED");
             _logger.LogDebug("A tray flyout is already open; the additional request is discarded.");
             return;
         }
+
+        QaTrace.Write(requestId, "TryOpen", "RESULT=true");
 
         TrayFlyoutWindow flyout;
 
@@ -506,8 +513,10 @@ internal sealed class OwnedTrayIconAdapter : ITrayIconAdapter, ITrayAffordanceSo
                     return;
                 }
 
+                var existed = _flyout is not null;
                 _flyout ??= CreateFlyout();
                 flyout = _flyout;
+                QaTrace.Write(requestId, "flyout.instance", existed ? "REUSED" : "CREATED");
             }
         }
         catch (Exception exception)
@@ -519,7 +528,9 @@ internal sealed class OwnedTrayIconAdapter : ITrayIconAdapter, ITrayAffordanceSo
             return;
         }
 
-        flyout.Show(anchor);
+        QaTrace.Write(requestId, "Show.call", "before");
+        flyout.Show(requestId, anchor);
+        QaTrace.Write(requestId, "Show.call", $"returned; gateOpenNow={_flyoutGate.IsOpen}");
     }
 
     private TrayFlyoutWindow CreateFlyout()
@@ -528,7 +539,12 @@ internal sealed class OwnedTrayIconAdapter : ITrayIconAdapter, ITrayAffordanceSo
             _themeService, _localization, _loggerFactory.CreateLogger<TrayFlyoutWindow>());
 
         flyout.CommandInvoked += OnFlyoutCommandInvoked;
-        flyout.Closed += (_, _) => _flyoutGate.Close();
+        flyout.Closed += (_, _) =>
+        {
+            QaTrace.Write(-1, "adapter.OnFlyoutClosed", $"gateOpenBefore={_flyoutGate.IsOpen}");
+            _flyoutGate.Close();
+            QaTrace.Write(-1, "adapter.OnFlyoutClosed", $"gateOpenAfter={_flyoutGate.IsOpen}");
+        };
         return flyout;
     }
 

@@ -47,6 +47,7 @@ internal sealed class TrayFlyoutWindow : IDisposable
     private readonly Grid _root;
 
     private MenuFlyout? _menu;
+    private int _requestId;
     private bool _disposed;
 
     /// <summary>Raised with the command the user picked. Never raised for a dismissal.</summary>
@@ -78,26 +79,38 @@ internal sealed class TrayFlyoutWindow : IDisposable
     /// reentrancy itself, because a second authority over the same question is how the first one stops
     /// being the answer.
     /// </remarks>
-    internal void Show(Point anchor)
+    internal void Show(int requestId, Point anchor)
     {
+        _requestId = requestId;
+
         if (_disposed)
         {
+            QaTrace.Write(requestId, "Show.enter", "DISPOSED -> returned");
             return;
         }
+
+        QaTrace.Write(requestId, "Show.enter", $"anchor={anchor}");
 
         try
         {
             MoveTo(anchor);
+            QaTrace.Write(requestId, "MoveTo", "done");
+
             _window.Activate();
+            QaTrace.Write(requestId, "Activate", "returned");
 
             var menu = BuildMenu();
             _menu = menu;
+
+            QaTrace.Write(requestId, "ShowAt", "BEFORE");
             menu.ShowAt(_root, new FlyoutShowOptions { Placement = FlyoutPlacementMode.Auto });
+            QaTrace.Write(requestId, "ShowAt", "AFTER (returned normally)");
         }
         catch (Exception exception)
         {
             // A flyout that cannot open must not take the process with it, and must not leave the gate
             // held — the caller learns through Closed that the slot is free again.
+            QaTrace.WriteException(requestId, "Show.catch", exception);
             _logger.LogError(exception, "The tray flyout could not be shown.");
             OnClosed(null, null);
         }
@@ -174,6 +187,7 @@ internal sealed class TrayFlyoutWindow : IDisposable
             menu.Items.Add(CreateItem(command));
         }
 
+        menu.Opened += (_, _) => QaTrace.Write(_requestId, "MenuFlyout.Opened", "fired");
         menu.Closed += OnClosed;
         return menu;
     }
@@ -189,6 +203,7 @@ internal sealed class TrayFlyoutWindow : IDisposable
 
     private void OnClosed(object? sender, object? args)
     {
+        QaTrace.Write(_requestId, "OnClosed.enter", $"fromMenu={sender is not null}");
         _menu = null;
 
         try
@@ -196,13 +211,17 @@ internal sealed class TrayFlyoutWindow : IDisposable
             // Hidden, not closed: the window is reused, and recreating a XAML root per right-click would
             // re-enter the theme attachment on every click.
             _window.AppWindow.Hide();
+            QaTrace.Write(_requestId, "AppWindow.Hide", $"returned; IsVisible={_window.AppWindow.IsVisible}");
         }
         catch (Exception exception)
         {
+            QaTrace.WriteException(_requestId, "AppWindow.Hide", exception);
             _logger.LogDebug(exception, "The tray flyout window could not be hidden.");
         }
 
+        QaTrace.Write(_requestId, "Closed.raise", "BEFORE");
         Closed?.Invoke(this, EventArgs.Empty);
+        QaTrace.Write(_requestId, "Closed.raise", "AFTER");
     }
 }
 
