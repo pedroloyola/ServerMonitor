@@ -11,8 +11,6 @@ namespace ServerMonitor.App.Services;
 /// </summary>
 public sealed class WindowsAppNotificationService : IUserNotificationService, IHostedService
 {
-    private const string ApplicationDisplayName = "ServerAlyzer";
-
     /// <summary>
     /// How long the single background notice stays available (M13 S2 §12). ExpiresOnReboot alone is not
     /// enough: a machine that is never rebooted would keep an educational one-off in the Notification
@@ -37,7 +35,6 @@ public sealed class WindowsAppNotificationService : IUserNotificationService, IH
     private readonly IApplicationWindowController _windowController;
     private readonly IAppLifecycleController _lifecycleController;
     private readonly ILogger<WindowsAppNotificationService> _logger;
-    private readonly string _notificationIconPath;
     private readonly object _sync = new();
     private NotificationRegistrationState _registrationState = NotificationRegistrationState.NotRegistered;
     private bool _accepting;
@@ -64,7 +61,6 @@ public sealed class WindowsAppNotificationService : IUserNotificationService, IH
             windowController,
             lifecycleController,
             logger,
-            Path.Combine(AppContext.BaseDirectory, "Assets", "ServerMonitorNotification.png"),
             evidence)
     {
     }
@@ -74,7 +70,6 @@ public sealed class WindowsAppNotificationService : IUserNotificationService, IH
         IApplicationWindowController windowController,
         IAppLifecycleController lifecycleController,
         ILogger<WindowsAppNotificationService> logger,
-        string notificationIconPath,
         INotificationRegistrationEvidence? evidence = null)
     {
         _evidence = evidence ?? NullNotificationRegistrationEvidence.Instance;
@@ -82,9 +77,6 @@ public sealed class WindowsAppNotificationService : IUserNotificationService, IH
         _windowController = windowController ?? throw new ArgumentNullException(nameof(windowController));
         _lifecycleController = lifecycleController ?? throw new ArgumentNullException(nameof(lifecycleController));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _notificationIconPath = string.IsNullOrWhiteSpace(notificationIconPath)
-            ? throw new ArgumentException("A notification icon path is required.", nameof(notificationIconPath))
-            : notificationIconPath;
     }
 
     public Task StartAsync(CancellationToken cancellationToken)
@@ -108,12 +100,15 @@ public sealed class WindowsAppNotificationService : IUserNotificationService, IH
                     return Task.CompletedTask;
                 }
 
-                if (!File.Exists(_notificationIconPath))
-                {
-                    _registrationState = NotificationRegistrationState.Unavailable;
-                    _logger.LogWarning("Windows app notification registration skipped because its icon asset is missing.");
-                    return Task.CompletedTask;
-                }
+                // There is deliberately NO local asset check here. One used to stand in this place, and
+                // it outlived its reason: it existed to feed Register(displayName, iconUri), and a packaged
+                // app takes its display name and icon from the manifest. Verified against both manifests
+                // before removal — Assets\ServerMonitorNotification.png is referenced by neither, and by no
+                // code but the gate itself. Availability is now decided by what the PLATFORM answers, never
+                // inferred in advance from a local file: a missing unused file must not be able to
+                // manufacture an Unavailable the platform would never have reported. Assets the manifests
+                // DO require are a package-integrity contract, checked at build and by
+                // ManifestAssetIntegrityTests, not re-litigated at every startup.
 
                 // Microsoft requires the activation handler to be connected before Register;
                 // otherwise clicking a notification can launch an unnecessary second process.
@@ -254,9 +249,6 @@ public sealed class WindowsAppNotificationService : IUserNotificationService, IH
             $"stateAfter={_registrationState}",
             $"registerCallSite={registerCallSite}",
             $"packageIdentity={DescribePackageIdentity()}",
-            $"displayName={ApplicationDisplayName}",
-            $"iconPath={_notificationIconPath}",
-            $"iconExists={File.Exists(_notificationIconPath)}",
             $"platformSetting={DescribePlatformSetting()}"
         };
 

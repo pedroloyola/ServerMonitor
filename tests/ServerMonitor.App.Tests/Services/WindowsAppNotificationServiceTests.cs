@@ -8,14 +8,8 @@ using ServerMonitor.Core.Alerts;
 
 namespace ServerMonitor.App.Tests.Services;
 
-public sealed class WindowsAppNotificationServiceTests : IDisposable
+public sealed class WindowsAppNotificationServiceTests
 {
-    private readonly string _iconPath = Path.Combine(
-        Path.GetTempPath(),
-        $"server-monitor-notification-{Guid.NewGuid():N}.png");
-
-    public WindowsAppNotificationServiceTests() => File.WriteAllBytes(_iconPath, [0x89, 0x50, 0x4e, 0x47]);
-
     // ---------------------------------------------------------------- M13-QA-12: the packaged overload
 
     /// <summary>
@@ -470,7 +464,7 @@ public sealed class WindowsAppNotificationServiceTests : IDisposable
         Assert.Equal(0, platform.ShowCount);
     }
 
-    private WindowsAppNotificationService Create(
+    private static WindowsAppNotificationService Create(
         IWindowsAppNotificationPlatform platform,
         IApplicationWindowController window,
         IAppLifecycleController? lifecycle = null,
@@ -479,7 +473,6 @@ public sealed class WindowsAppNotificationServiceTests : IDisposable
             window,
             lifecycle ?? new FakeAppLifecycleController(),
             NullLogger<WindowsAppNotificationService>.Instance,
-            _iconPath,
             evidence);
 
     private static UserNotification Notification() => new(
@@ -487,14 +480,6 @@ public sealed class WindowsAppNotificationServiceTests : IDisposable
         ServerAlertCategory.Offline,
         "Offline",
         "Server unavailable");
-
-    public void Dispose()
-    {
-        if (File.Exists(_iconPath))
-        {
-            File.Delete(_iconPath);
-        }
-    }
 
     private sealed class FakePlatform : IWindowsAppNotificationPlatform
     {

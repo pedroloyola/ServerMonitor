@@ -173,25 +173,16 @@ public sealed class BackgroundNoticeTests
         public void BeginShutdown() { }
     }
 
-    private sealed class RealServiceHarness : IDisposable
+    private sealed class RealServiceHarness
     {
-        private readonly string _iconPath = Path.Combine(
-            Path.GetTempPath(), $"qa12-notification-{Guid.NewGuid():N}.png");
-
-        public RealServiceHarness(FakeNotificationPlatform platform, bool iconPresent = true)
+        public RealServiceHarness(FakeNotificationPlatform platform)
         {
-            if (iconPresent)
-            {
-                File.WriteAllBytes(_iconPath, [0x89, 0x50, 0x4e, 0x47]);
-            }
-
             Platform = platform;
             Service = new WindowsAppNotificationService(
                 platform,
                 new StubWindowController(),
                 Lifecycle,
-                NullLogger<WindowsAppNotificationService>.Instance,
-                _iconPath);
+                NullLogger<WindowsAppNotificationService>.Instance);
             Presenter = new BackgroundNoticePresenter(
                 Settings,
                 Service,
@@ -211,21 +202,13 @@ public sealed class BackgroundNoticeTests
         public BackgroundNoticePresenter Presenter { get; }
 
         public Task Start() => Service.StartAsync(default);
-
-        public void Dispose()
-        {
-            if (File.Exists(_iconPath))
-            {
-                File.Delete(_iconPath);
-            }
-        }
     }
 
     /// <summary>QA-12 #1: a registration that succeeded is reported as such, and behaves so.</summary>
     [Fact]
     public async Task A_successful_registration_is_reported_as_registered()
     {
-        using var h = new RealServiceHarness(new FakeNotificationPlatform());
+        var h = new RealServiceHarness(new FakeNotificationPlatform());
 
         await h.Start();
 
@@ -240,7 +223,7 @@ public sealed class BackgroundNoticeTests
     [Fact]
     public async Task A_failed_registration_never_claims_success()
     {
-        using var h = new RealServiceHarness(new FakeNotificationPlatform { FailRegistration = true });
+        var h = new RealServiceHarness(new FakeNotificationPlatform { FailRegistration = true });
 
         await h.Start();
 
@@ -254,15 +237,56 @@ public sealed class BackgroundNoticeTests
     [Fact]
     public async Task An_unusable_platform_is_reported_unavailable()
     {
-        using var unsupported = new RealServiceHarness(new FakeNotificationPlatform { Supported = false });
-        using var noIcon = new RealServiceHarness(new FakeNotificationPlatform(), iconPresent: false);
+        var unsupported = new RealServiceHarness(new FakeNotificationPlatform { Supported = false });
 
         await unsupported.Start();
-        await noIcon.Start();
 
         Assert.Equal(NotificationRegistrationState.Unavailable, unsupported.Service.RegistrationState);
-        Assert.Equal(NotificationRegistrationState.Unavailable, noIcon.Service.RegistrationState);
-        Assert.Equal(0, noIcon.Platform.RegisterCount);
+        Assert.Equal(0, unsupported.Platform.RegisterCount);
+    }
+
+    /// <summary>
+    /// <b>Availability is what the PLATFORM answered, never what a local file suggests.</b> A gate used to
+    /// stand between the two: if <c>Assets\ServerMonitorNotification.png</c> was missing, the service went
+    /// straight to Unavailable and never called Register at all. That asset fed the unpackaged
+    /// <c>Register(displayName, iconUri)</c> overload, which is gone; neither manifest references it (see
+    /// <c>ManifestAssetIntegrityTests</c>), and no code but the gate ever read it. Its absence must
+    /// therefore be incapable of manufacturing a failure the platform would never have reported, and
+    /// nothing speculative may take its place.
+    /// <para>
+    /// The asset is hidden for the duration and put back afterwards, because absent is the only state in
+    /// which the removed gate would have bitten: asserting against a file that is present would let the
+    /// gate come back unnoticed.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public async Task A_missing_obsolete_icon_asset_cannot_make_notifications_unavailable()
+    {
+        var obsoleteAsset = Path.Combine(AppContext.BaseDirectory, "Assets", "ServerMonitorNotification.png");
+        var hidden = obsoleteAsset + $".hidden-{Guid.NewGuid():N}";
+        var wasPresent = File.Exists(obsoleteAsset);
+        if (wasPresent)
+        {
+            File.Move(obsoleteAsset, hidden);
+        }
+
+        try
+        {
+            var h = new RealServiceHarness(new FakeNotificationPlatform());
+
+            await h.Start();
+
+            Assert.False(File.Exists(obsoleteAsset));
+            Assert.Equal(NotificationRegistrationState.Registered, h.Service.RegistrationState);
+            Assert.Equal(1, h.Platform.RegisterCount);
+        }
+        finally
+        {
+            if (wasPresent)
+            {
+                File.Move(hidden, obsoleteAsset, overwrite: true);
+            }
+        }
     }
 
     /// <summary>
@@ -273,7 +297,7 @@ public sealed class BackgroundNoticeTests
     [Fact]
     public async Task A_failed_registration_leaves_the_single_opportunity_unspent()
     {
-        using var h = new RealServiceHarness(new FakeNotificationPlatform { FailRegistration = true });
+        var h = new RealServiceHarness(new FakeNotificationPlatform { FailRegistration = true });
         await h.Start();
 
         Assert.False(h.Presenter.TryShowOnce());
@@ -287,7 +311,7 @@ public sealed class BackgroundNoticeTests
     [Fact]
     public async Task A_registered_service_shows_the_notice_once_and_spends_the_marker()
     {
-        using var h = new RealServiceHarness(new FakeNotificationPlatform());
+        var h = new RealServiceHarness(new FakeNotificationPlatform());
         await h.Start();
 
         Assert.True(h.Presenter.TryShowOnce());
@@ -301,7 +325,7 @@ public sealed class BackgroundNoticeTests
     [Fact]
     public async Task Later_closes_never_duplicate_the_notice()
     {
-        using var h = new RealServiceHarness(new FakeNotificationPlatform());
+        var h = new RealServiceHarness(new FakeNotificationPlatform());
         await h.Start();
 
         Assert.True(h.Presenter.TryShowOnce());
@@ -319,7 +343,7 @@ public sealed class BackgroundNoticeTests
     [Fact]
     public async Task A_display_failure_after_a_valid_registration_changes_nothing()
     {
-        using var h = new RealServiceHarness(new FakeNotificationPlatform { FailShow = true });
+        var h = new RealServiceHarness(new FakeNotificationPlatform { FailShow = true });
         await h.Start();
 
         Assert.True(h.Presenter.TryShowOnce());
