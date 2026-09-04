@@ -229,6 +229,58 @@ public sealed class TrayOwnershipCompletenessTests
             HideCallers());
     }
 
+    /// <summary>
+    /// Who HOLDS the capability — every shape, including the three the previous version of this test
+    /// missed.
+    /// </summary>
+    /// <remarks>
+    /// This is the complement to the IL scan and not a duplicate of it, and the difference cost a
+    /// surviving mutation to notice: IL sees who CALLS a hide, and a consumer that merely takes the
+    /// capability and never uses it calls nothing. When the call-site scan replaced the old
+    /// declared-dependency test, that case stopped being covered and <c>M95</c> came back to life.
+    /// <para>
+    /// So this enumerates holdings by every route a reference can arrive: constructor parameters,
+    /// instance fields, STATIC fields, and METHOD PARAMETERS. The first two are the shapes the earlier
+    /// test knew about; the last two are among the three it passed over.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void Only_the_guarded_operation_and_the_exit_path_hold_the_capability()
+    {
+        static Type Owner(Type type)
+        {
+            while (type.DeclaringType is { } declaring)
+            {
+                type = declaring;
+            }
+
+            return type;
+        }
+
+        const BindingFlags All = BindingFlags.Public | BindingFlags.NonPublic
+                                 | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly;
+
+        var holders = typeof(App).Assembly
+            .GetTypes()
+            .Where(t => t.GetConstructors(All)
+                         .SelectMany(c => c.GetParameters())
+                         .Any(p => p.ParameterType == typeof(IWindowHideCapability))
+                     || t.GetFields(All).Any(f => f.FieldType == typeof(IWindowHideCapability))
+                     || t.GetMethods(All)
+                         .SelectMany(m => m.GetParameters())
+                         .Any(p => p.ParameterType == typeof(IWindowHideCapability)))
+            .Select(Owner)
+            // The composition root is where the capability is taken and handed out; it is allowed to
+            // touch one, and whether a capturing closure survives is an optimiser detail.
+            .Where(t => t != typeof(App) && t != typeof(ApplicationWindowController))
+            .Select(t => t.Name)
+            .Distinct()
+            .OrderBy(n => n, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Equal([nameof(ExitSequence), nameof(TrayAffordanceLifecycle)], holders);
+    }
+
     /// <summary>The scan is not vacuous: it really does find the calls it is asserting about.</summary>
     [Fact]
     public void The_hide_call_scan_finds_something()

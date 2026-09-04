@@ -31,7 +31,7 @@ MUTATIONS = [
  ("M96", "the hide capability is registered in the container", [
    (APP,
     "        services.AddSingleton<IApplicationWindowController>(sp =>\n            sp.GetRequiredService<ApplicationWindowController>());",
-    "        services.AddSingleton<IApplicationWindowController>(sp =>\n            sp.GetRequiredService<ApplicationWindowController>());\n        services.AddSingleton<IWindowHideCapability>(sp =>\n            new WindowHideCapability(sp.GetRequiredService<ApplicationWindowController>()));")]),
+    "        services.AddSingleton<IApplicationWindowController>(sp =>\n            sp.GetRequiredService<ApplicationWindowController>());\n        services.AddSingleton<IWindowHideCapability>(sp =>\n            sp.GetRequiredService<ApplicationWindowController>().TakeHideCapability());")]),
 
  # And the original shape: the act back on the contract every consumer holds. A default interface
  # implementation, so no implementer has to change and the mutation is purely additive.
