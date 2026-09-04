@@ -38,7 +38,7 @@ internal enum TrayCommand
 /// <see cref="TrayCallbackContract"/>'s. This type shows a menu and reports which item was clicked.
 /// </para>
 /// </summary>
-internal sealed class TrayFlyoutWindow : IDisposable
+internal sealed class TrayFlyoutWindow : IFlyoutSurface, IDisposable
 {
     private readonly IThemeService _themeService;
     private readonly ILocalizationService _localization;
@@ -50,12 +50,20 @@ internal sealed class TrayFlyoutWindow : IDisposable
     private MenuFlyout? _menu;
     private bool _disposed;
 
-    /// <summary>Set while a request is waiting for the XAML tree to become usable.</summary>
-    private bool _awaitingReadiness;
-
-    /// <summary>The foreground-change hook that dismisses the menu; see <see cref="Present"/>.</summary>
+    /// <summary>The foreground-change hook that observes the dismissal.</summary>
     private nint _foregroundHook;
+
+    /// <summary>
+    /// Held for as long as the hook might call back. Dropping it while the hook is still installed would
+    /// leave native code calling into collected memory, which is why it is only cleared once
+    /// <c>UnhookWinEvent</c> has actually reported success.
+    /// </summary>
     private WinEventDelegate? _foregroundCallback;
+
+    private FlyoutLifecycle? _lifecycle;
+
+    private FlyoutLifecycle Lifecycle =>
+        _lifecycle ??= new FlyoutLifecycle(this, () => Closed?.Invoke(this, EventArgs.Empty));
 
     /// <summary>Raised with the command the user picked. Never raised for a dismissal.</summary>
     internal event EventHandler<TrayCommand>? CommandInvoked;
@@ -89,77 +97,101 @@ internal sealed class TrayFlyoutWindow : IDisposable
     /// </remarks>
     internal void Show(Point anchor)
     {
-        if (_disposed)
-        {
-            ReleaseWithoutMenu();
-            return;
-        }
+        _root.Loaded -= OnRootLoaded;
+        _root.Loaded += OnRootLoaded;
 
         try
         {
-            MoveTo(anchor);
-            _window.Activate();
-
-            // READINESS, NOT RETRY. Activate() returns before the window's XAML tree is loaded, so on the
-            // first request `_root` has no XamlRoot and ShowAt throws 0x80070057 — measured, every time,
-            // in all four states. Retrying the click would hide that; waiting for the tree to actually
-            // become usable removes it. The condition is the XamlRoot itself, not a delay.
-            if (IsPresentable())
-            {
-                Present();
-                return;
-            }
-
-            _awaitingReadiness = true;
-            _root.Loaded += OnRootLoaded;
+            Lifecycle.Show(anchor);
         }
         catch (Exception exception)
         {
+            // The lifecycle has already released the slot on its way out; this only keeps a failure to
+            // present from unwinding into the caller.
             _logger.LogError(exception, "The tray flyout could not be shown.");
-            OnClosed(null, null);
         }
     }
-
-    private bool IsPresentable() => _root.XamlRoot is not null && _root.IsLoaded;
 
     private void OnRootLoaded(object sender, RoutedEventArgs args)
     {
         _root.Loaded -= OnRootLoaded;
 
-        if (!_awaitingReadiness)
+        try
         {
-            return;
+            Lifecycle.OnSurfaceReady();
         }
-
-        _awaitingReadiness = false;
-
-        if (_disposed || !IsPresentable())
+        catch (Exception exception)
         {
-            // The tree arrived unusable. The click is lost — but the SLOT is not: releasing here is what
-            // stops one bad request from making the menu unopenable for the rest of the session.
-            ReleaseWithoutMenu();
-            return;
+            _logger.LogError(exception, "The tray flyout could not be shown once its root had loaded.");
+        }
+    }
+
+    // ---------------------------------------------------------------- IFlyoutSurface
+
+    /// <summary>
+    /// The condition the PLATFORM demands, and nothing stricter. The failure was literally "this element
+    /// does not have a XamlRoot"; requiring <c>IsLoaded</c> as well was my own addition, and after the
+    /// window is hidden it stays false while the XamlRoot is present — which blocked every later request.
+    /// Measured, twice, before this line was narrowed.
+    /// </summary>
+    bool IFlyoutSurface.IsPresentable => !_disposed && _root.XamlRoot is not null;
+
+    void IFlyoutSurface.MoveTo(Point anchor) => MoveTo(anchor);
+
+    void IFlyoutSurface.Activate()
+    {
+        // SHOW, then activate. HideWindow() hides the AppWindow between requests, and a hidden window's
+        // XAML root unloads -- XamlRoot goes null and Loaded will not fire again until it is shown. So a
+        // later request found IsPresentable false and waited for a signal that could never arrive: the
+        // same liveness shape as the original defect, one layer in. Measured, not reasoned.
+        //
+        // Shown WITHOUT activation so nothing is taken from the user; the Activate() below is the same
+        // call the design already made.
+        _window.Activate();
+    }
+
+    void IFlyoutSurface.PresentMenu()
+    {
+        var menu = BuildMenu();
+        _menu = menu;
+        menu.ShowAt(_root, new FlyoutShowOptions { Placement = FlyoutPlacementMode.Auto });
+    }
+
+    bool IFlyoutSurface.TryHideMenu()
+    {
+        var menu = _menu;
+        if (menu is null)
+        {
+            return false;
         }
 
         try
         {
-            Present();
+            menu.Hide();
+            return true;
         }
         catch (Exception exception)
         {
-            _logger.LogError(exception, "The tray flyout could not be shown.");
-            OnClosed(null, null);
+            // A hide that failed produces no Closed, so the caller has to treat this as terminal.
+            _logger.LogDebug(exception, "The tray flyout menu could not be hidden.");
+            return false;
         }
     }
 
-    private void Present()
+    void IFlyoutSurface.HideWindow()
     {
-        var menu = BuildMenu();
-        _menu = menu;
+        _menu = null;
 
-        menu.ShowAt(_root, new FlyoutShowOptions { Placement = FlyoutPlacementMode.Auto });
-
-        HookForegroundChanges();
+        try
+        {
+            // Hidden, not closed: the window is reused, and recreating a XAML root per right-click would
+            // re-enter the theme attachment on every click.
+            _window.AppWindow.Hide();
+        }
+        catch (Exception exception)
+        {
+            _logger.LogDebug(exception, "The tray flyout window could not be hidden.");
+        }
     }
 
     /// <summary>
@@ -177,63 +209,99 @@ internal sealed class TrayFlyoutWindow : IDisposable
     /// topmost, and the gate keeps its single owner.
     /// </para>
     /// </remarks>
-    private void HookForegroundChanges()
+    bool IFlyoutSurface.TryInstallDismissalWatch()
     {
         if (_foregroundHook != 0)
         {
-            return;
+            return true;
         }
 
-        _foregroundCallback = OnForegroundChanged;
-        _foregroundHook = SetWinEventHook(
+        var callback = new WinEventDelegate(OnForegroundChanged);
+        var hook = SetWinEventHook(
             EVENT_SYSTEM_FOREGROUND,
             EVENT_SYSTEM_FOREGROUND,
             nint.Zero,
-            _foregroundCallback,
+            callback,
             0,
             0,
             WINEVENT_OUTOFCONTEXT);
 
+        if (hook == 0)
+        {
+            // DOCUMENTED FAILURE, AND NOT IGNORED. Zero means no callback will ever arrive — and this is
+            // the dismissal signal in exactly the states where MenuFlyout.Closed was measured absent. A
+            // menu shown here could never be dismissed and would hold the slot for the session, so the
+            // request fails closed instead.
+            _logger.LogError("The tray flyout could not install its dismissal watch; the menu is not shown.");
+            return false;
+        }
+
+        _foregroundCallback = callback;
+        _foregroundHook = hook;
+        return true;
     }
 
-    private void UnhookForegroundChanges()
+    void IFlyoutSurface.RemoveDismissalWatch()
     {
         if (_foregroundHook == 0)
         {
             return;
         }
 
-        UnhookWinEvent(_foregroundHook);
+        if (UnhookWinEvent(_foregroundHook))
+        {
+            _foregroundHook = 0;
+            _foregroundCallback = null;
+            return;
+        }
+
+        // The unhook FAILED, so the hook may still fire. The handle is forgotten -- there is nothing more
+        // to do with it -- but the delegate is DELIBERATELY KEPT ALIVE, because releasing it while native
+        // code can still call it is a use-after-free rather than a leak.
+        _logger.LogWarning("The tray flyout could not remove its dismissal watch; the callback is retained.");
         _foregroundHook = 0;
-        _foregroundCallback = null;
-    }
-
-    private void OnForegroundChanged(
-        nint hook, uint eventId, nint hwnd, int objectId, int childId, uint thread, uint time)
-    {
-        if (_menu is null || hwnd == nint.Zero)
-        {
-            return;
-        }
-
-        var ours = WinRT.Interop.WindowNative.GetWindowHandle(_window);
-        if (hwnd == ours)
-        {
-            return;
-        }
-
-        _menu.Hide();
     }
 
     /// <summary>
-    /// Frees the slot when there is no menu to close, so no loss path leaves the gate held.
+    /// The native callback. NOTHING may unwind from here: a managed exception crossing back into the
+    /// window-event dispatcher is undefined, and it would also strand the slot.
     /// </summary>
-    private void ReleaseWithoutMenu()
+    private void OnForegroundChanged(
+        nint hook, uint eventId, nint hwnd, int objectId, int childId, uint thread, uint time)
     {
-        _awaitingReadiness = false;
-        _menu = null;
-        UnhookForegroundChanges();
-        Closed?.Invoke(this, EventArgs.Empty);
+        try
+        {
+            if (hwnd == nint.Zero || _disposed)
+            {
+                return;
+            }
+
+            // OUR PROCESS, not our one window. The menu is hosted in its own top-level popup window, so
+            // showing it changes the foreground to a handle that is not _window -- and comparing against
+            // that single handle made the flyout dismiss ITSELF the moment it appeared. Measured: with the
+            // watch installed before the menu is shown, request 3 opened and vanished.
+            _ = GetWindowThreadProcessId(hwnd, out var owningProcess);
+            if (owningProcess == CurrentProcessId)
+            {
+                return;
+            }
+
+            Lifecycle.OnForeignForeground();
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, "The tray flyout failed to dismiss on a foreground change.");
+
+            // Even here the slot is freed: an unusable menu must not outlive the request that opened it.
+            try
+            {
+                Lifecycle.Dispose();
+            }
+            catch (Exception disposeFailure)
+            {
+                _logger.LogDebug(disposeFailure, "The tray flyout lifecycle could not be terminated.");
+            }
+        }
     }
 
     public void Dispose()
@@ -245,11 +313,21 @@ internal sealed class TrayFlyoutWindow : IDisposable
 
         _disposed = true;
 
+        // The slot is freed FIRST, and unconditionally. The previous version relied on the menu's own
+        // close to do it -- and the report claimed this method released it, which was simply untrue.
         try
         {
-            UnhookForegroundChanges();
+            Lifecycle.Dispose();
+        }
+        catch (Exception exception)
+        {
+            _logger.LogDebug(exception, "The tray flyout lifecycle could not be terminated on dispose.");
+        }
+
+        try
+        {
+            _root.Loaded -= OnRootLoaded;
             _themeService.Detach(_root);
-            _menu?.Hide();
             _window.Close();
         }
         catch (Exception exception)
@@ -332,6 +410,12 @@ internal sealed class TrayFlyoutWindow : IDisposable
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool UnhookWinEvent(nint hook);
 
+    [DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(nint hwnd, out uint processId);
+
+    private static uint CurrentProcessId { get; } =
+        (uint)System.Diagnostics.Process.GetCurrentProcess().Id;
+
     private MenuFlyoutItem CreateItem(TrayCommand command)
     {
         var text = _localization.GetString(TrayFlyoutMenu.ResourceKeyFor(command));
@@ -341,25 +425,7 @@ internal sealed class TrayFlyoutWindow : IDisposable
         return item;
     }
 
-    private void OnClosed(object? sender, object? args)
-    {
-        _awaitingReadiness = false;
-        _menu = null;
-        UnhookForegroundChanges();
-
-        try
-        {
-            // Hidden, not closed: the window is reused, and recreating a XAML root per right-click would
-            // re-enter the theme attachment on every click.
-            _window.AppWindow.Hide();
-        }
-        catch (Exception exception)
-        {
-            _logger.LogDebug(exception, "The tray flyout window could not be hidden.");
-        }
-
-        Closed?.Invoke(this, EventArgs.Empty);
-    }
+    private void OnClosed(object? sender, object? args) => Lifecycle.OnMenuClosed();
 }
 
 /// <summary>
