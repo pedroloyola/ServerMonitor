@@ -97,6 +97,12 @@ public sealed class WindowsAppNotificationService : IUserNotificationService, IH
                 {
                     _registrationState = NotificationRegistrationState.Unavailable;
                     _logger.LogWarning("Windows app notifications are unavailable on this system.");
+
+                    // EVERY terminal outcome replaces the record. This branch used to return before
+                    // writing anything, so a previous run's file survived and read as if it described
+                    // this one — stale evidence passing for current, which is the exact failure mode this
+                    // record exists to end (review, 2026-09-04).
+                    _evidence.Record(Report(stateBefore, registerCallSite, exception: null));
                     return Task.CompletedTask;
                 }
 

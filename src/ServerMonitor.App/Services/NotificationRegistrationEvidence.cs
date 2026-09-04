@@ -31,13 +31,17 @@ public sealed record NotificationDiagnosticsOptions
 /// <para>
 /// <b>Deliberately narrow.</b> This is not a logging framework and must not grow into one: a general
 /// recoverable log sink is a product decision — location, retention, what may be written — that has not
-/// been taken. One file, rewritten at each start and appended to only by the few events of this one
-/// question, so it cannot grow without bound.
+/// been taken. One file, replaced by EVERY terminal registration outcome and appended to only by the few
+/// events of this one question, so it cannot grow without bound and cannot describe a previous run.
 /// </para>
 /// </summary>
 public interface INotificationRegistrationEvidence
 {
-    /// <summary>Starts the record for this process, replacing the previous one.</summary>
+    /// <summary>
+    /// Starts the record for this process, REPLACING whatever was there. Every terminal registration
+    /// outcome calls it, including the ones that never reach the platform: a run that wrote nothing would
+    /// leave the previous run's file in place, and it would be read as current.
+    /// </summary>
     void Record(string report);
 
     /// <summary>Adds a later fact to the record for this process.</summary>

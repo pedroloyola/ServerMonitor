@@ -30,8 +30,14 @@ public sealed class BackgroundNoticeTests
         public Task ShowAsync(UserNotification notification, CancellationToken cancellationToken = default) =>
             Task.CompletedTask;
 
+        /// <summary>Registered, handed the notice, and Windows declined to show it. Still a RESULT.</summary>
+        public bool DeclineDelivery { get; set; }
+
+        public int ShowCalls { get; private set; }
+
         public BackgroundNoticeAttempt ShowBackgroundNotice(string title, string body)
         {
+            ShowCalls++;
             if (Throws)
             {
                 throw new InvalidOperationException("notifications unavailable");
@@ -42,7 +48,11 @@ public sealed class BackgroundNoticeTests
                 return BackgroundNoticeAttempt.NotAttempted;
             }
 
-            BackgroundNotices.Add((title, body));
+            if (!DeclineDelivery)
+            {
+                BackgroundNotices.Add((title, body));
+            }
+
             return BackgroundNoticeAttempt.ExercisedThroughRegisteredService;
         }
     }
@@ -50,12 +60,30 @@ public sealed class BackgroundNoticeTests
     private static BackgroundNoticePresenter Create(
         FakeBackgroundMonitoringSettingsService settings,
         RecordingNotificationService notifications,
-        FakeAppLifecycleController? lifecycle = null) => new(
+        FakeAppLifecycleController? lifecycle = null,
+        ILocalizationService? localization = null) => new(
         settings,
         notifications,
-        new FakeLocalizationService(),
+        localization ?? new FakeLocalizationService(),
         lifecycle ?? new FakeAppLifecycleController(),
         NullLogger<BackgroundNoticePresenter>.Instance);
+
+    /// <summary>A localization service that fails — a failure of OURS, before the platform is reached.</summary>
+    private sealed class ThrowingLocalizationService : ILocalizationService
+    {
+        public string? CurrentLanguageOverride => null;
+
+        public string GetString(string resourceKey) =>
+            throw new InvalidOperationException("resources unavailable");
+
+        public void InitializeFromSystem()
+        {
+        }
+
+        public void SetLanguage(string? languageTag)
+        {
+        }
+    }
 
     [Fact]
     public void The_notice_is_attempted_exactly_once_ever()
@@ -83,15 +111,39 @@ public sealed class BackgroundNoticeTests
     }
 
     /// <summary>
-    /// Spent on a legitimate ATTEMPT, not on delivery: notifications the user disabled, or a display that
-    /// fails inside a REGISTERED service, must not turn the single notice into a nag on every close.
+    /// Spent on a legitimate ATTEMPT, not on delivery: a notice the user's Windows settings suppress must
+    /// not turn the single notice into a nag on every close. The registered service RETURNS
+    /// <see cref="BackgroundNoticeAttempt.ExercisedThroughRegisteredService"/> for that case — which is
+    /// what production does when Windows declines — and the marker is spent.
     /// <para>
-    /// The service here reports itself Registered and then throws, which is the M13-QA-12 boundary from
-    /// the other side: the opportunity WAS exercised through a working service, so it stays spent.
+    /// The double no longer THROWS to express this. A throw is not a result, and a result is the only
+    /// thing allowed to spend the opportunity (review, 2026-09-04); the throwing case is now
+    /// <see cref="An_exception_from_the_service_preserves_the_single_opportunity"/>.
     /// </para>
     /// </summary>
     [Fact]
-    public void A_notice_that_cannot_be_delivered_by_a_registered_service_is_still_spent()
+    public void A_notice_the_platform_declines_to_deliver_is_still_spent()
+    {
+        var settings = new FakeBackgroundMonitoringSettingsService();
+        var notifications = new RecordingNotificationService
+        {
+            RegistrationState = NotificationRegistrationState.Registered,
+            DeclineDelivery = true
+        };
+        var presenter = Create(settings, notifications);
+
+        Assert.True(presenter.TryShowOnce());
+        Assert.False(presenter.TryShowOnce());
+        Assert.True(settings.BackgroundNoticeShown);
+        Assert.Empty(notifications.BackgroundNotices); // handed over, not displayed
+    }
+
+    /// <summary>
+    /// <b>An exception is not a result.</b> The service threw, so nothing came back and nothing was
+    /// exercised: the single warning must survive for a session that can actually deliver it.
+    /// </summary>
+    [Fact]
+    public void An_exception_from_the_service_preserves_the_single_opportunity()
     {
         var settings = new FakeBackgroundMonitoringSettingsService();
         var notifications = new RecordingNotificationService
@@ -99,11 +151,35 @@ public sealed class BackgroundNoticeTests
             Throws = true,
             RegistrationState = NotificationRegistrationState.Registered
         };
-        var presenter = Create(settings, notifications);
 
-        Assert.True(presenter.TryShowOnce());
-        Assert.False(presenter.TryShowOnce());
-        Assert.True(settings.BackgroundNoticeShown);
+        Assert.False(Create(settings, notifications).TryShowOnce());
+
+        Assert.False(settings.BackgroundNoticeShown);
+        Assert.Equal(0, settings.ClaimAttempts);
+    }
+
+    /// <summary>
+    /// THE door the review found: a failure that has nothing to do with notifications, raised BEFORE the
+    /// service is called, used to spend the opportunity anyway because the presenter fell back to asking
+    /// the service whether it was registered. The service is never even reached here.
+    /// </summary>
+    [Fact]
+    public void A_localization_failure_never_spends_the_opportunity()
+    {
+        var settings = new FakeBackgroundMonitoringSettingsService();
+        var notifications = new RecordingNotificationService
+        {
+            RegistrationState = NotificationRegistrationState.Registered
+        };
+
+        var shown = Create(settings, notifications, localization: new ThrowingLocalizationService())
+            .TryShowOnce();
+
+        Assert.False(shown);
+        Assert.False(settings.BackgroundNoticeShown);
+        Assert.Equal(0, settings.ClaimAttempts);
+        Assert.Equal(0, notifications.ShowCalls);
+        Assert.Empty(notifications.BackgroundNotices);
     }
 
     [Fact]

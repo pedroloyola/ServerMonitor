@@ -148,6 +148,26 @@ public sealed class WindowsAppNotificationServiceTests
         Assert.DoesNotContain("hresult", report, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// EVERY terminal outcome replaces the record, including the ones that never reach the platform. This
+    /// branch used to return before writing anything, so a previous run's file survived and was read as if
+    /// it described this one — stale evidence passing for current, which is the failure this record exists
+    /// to end. Measured by the review, not guessed.
+    /// </summary>
+    [Fact]
+    public async Task AnUnusablePlatform_StillReplacesTheEvidence()
+    {
+        var evidence = new RecordingEvidence();
+        var service = Create(
+            new FakePlatform { Supported = false }, new FakeWindowController(), evidence: evidence);
+
+        await service.StartAsync(default);
+
+        Assert.Equal(NotificationRegistrationState.Unavailable, service.RegistrationState);
+        var report = Assert.Single(evidence.Reports);
+        Assert.Contains("stateAfter=Unavailable", report, StringComparison.Ordinal);
+    }
+
     private sealed class RecordingEvidence : INotificationRegistrationEvidence
     {
         public List<string> Reports { get; } = new();

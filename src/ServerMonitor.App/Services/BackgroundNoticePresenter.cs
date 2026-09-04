@@ -109,28 +109,50 @@ public sealed class BackgroundNoticePresenter(
             + " reachedFromBackgroundEntry=true (the hide and the BACKGROUND transition already happened)");
 
     /// <summary>
-    /// One attempt, and what it was worth. A throwing implementation reports nothing, so the registration
-    /// state answers instead: a service that IS registered has had its opportunity exercised even if the
-    /// call then failed, and one that is not has not.
+    /// One attempt, and what it was worth. <b>Only an explicit RESULT from the notification service can
+    /// spend the opportunity</b> (review, 2026-09-04). An earlier version answered from
+    /// <c>RegistrationState</c> whenever anything threw, which left a door the whole fix was meant to
+    /// close: a localization failure — nothing to do with notifications, raised BEFORE the service was
+    /// even called — burned the single warning without one line of it reaching Windows. An exception is
+    /// not a result. Anything that goes wrong before the service answers preserves the opportunity.
+    /// <para>
+    /// The strings are resolved OUTSIDE the call for the same reason: an argument that cannot be built is
+    /// a failure of ours, on this side of the boundary, and must not be confused with the platform's
+    /// answer.
+    /// </para>
     /// </summary>
     private BackgroundNoticeAttempt Attempt()
     {
+        string title;
+        string body;
         try
         {
-            return notificationService.ShowBackgroundNotice(
-                localizationService.GetString("BackgroundNoticeTitle"),
-                localizationService.GetString("BackgroundNoticeBody"));
+            title = localizationService.GetString("BackgroundNoticeTitle");
+            body = localizationService.GetString("BackgroundNoticeBody");
         }
         catch (Exception exception)
         {
-            // The notice is a courtesy; Settings carries the durable explanation.
             logger.LogWarning(
-                "The background notice could not be shown ({Type}).",
+                "The background notice text could not be resolved ({Type}); the service was not called and "
+                + "the single warning opportunity stays available.",
                 exception.GetType().Name);
+            return BackgroundNoticeAttempt.NotAttempted;
+        }
 
-            return notificationService.RegistrationState == NotificationRegistrationState.Registered
-                ? BackgroundNoticeAttempt.ExercisedThroughRegisteredService
-                : BackgroundNoticeAttempt.NotAttempted;
+        try
+        {
+            return notificationService.ShowBackgroundNotice(title, body);
+        }
+        catch (Exception exception)
+        {
+            // The notice is a courtesy; Settings carries the durable explanation. No result came back, so
+            // nothing was exercised: a delivery the platform DECLINES is reported as a result and does
+            // spend the opportunity, but a call that threw reported nothing at all.
+            logger.LogWarning(
+                "The background notice call threw ({Type}); no result came back, so the single warning "
+                + "opportunity stays available.",
+                exception.GetType().Name);
+            return BackgroundNoticeAttempt.NotAttempted;
         }
     }
 }

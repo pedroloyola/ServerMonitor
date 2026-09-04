@@ -733,4 +733,142 @@ public sealed class TrayAffordanceLifecycleTests
         Assert.False(EnteredBackground(h), "background must be refused");
         Assert.DoesNotContain("OpenBackgroundSettings", h.Window.Calls);
     }
+
+    // ---------------------------------------------------------------- M13-QA-12 through the real path
+
+    /// <summary>
+    /// The background transition, end to end, with NO doubles between the window and the platform: the
+    /// production <see cref="TrayAffordanceLifecycle"/>, the production
+    /// <see cref="BackgroundNoticePresenter"/> and the production
+    /// <see cref="WindowsAppNotificationService"/>, with only the Windows platform faked.
+    /// <para>
+    /// The review's point, and it is the right one: a test that calls the presenter directly proves the
+    /// presenter. What has to be proved is that a REAL registration failure changes nothing about
+    /// hiding the window, entering BACKGROUND, or staying alive — and that it costs the user nothing.
+    /// </para>
+    /// </summary>
+    private sealed class RealNoticeHarness
+    {
+        public RealNoticeHarness(FakeNotificationPlatform platform)
+        {
+            Platform = platform;
+            Notifications = new WindowsAppNotificationService(
+                platform,
+                Window,
+                Lifecycle,
+                NullLogger<WindowsAppNotificationService>.Instance);
+            Presenter = new BackgroundNoticePresenter(
+                Settings,
+                Notifications,
+                new FakeLocalizationService(),
+                Lifecycle,
+                NullLogger<BackgroundNoticePresenter>.Instance);
+            Subject = new TrayAffordanceLifecycle(
+                Source, Window, Notice, Lifecycle, Presenter,
+                NullLogger<TrayAffordanceLifecycle>.Instance);
+            Subject.ConnectHide(new RecordingHideCapability(Window));
+        }
+
+        public FakeNotificationPlatform Platform { get; }
+
+        public FakeAffordanceSource Source { get; } = new(TrayAffordanceState.Available);
+
+        public RecordingWindowController Window { get; } = new();
+
+        public BackgroundDegradationNotice Notice { get; } = new();
+
+        public FakeAppLifecycleController Lifecycle { get; } = new();
+
+        public FakeBackgroundMonitoringSettingsService Settings { get; } = new();
+
+        public WindowsAppNotificationService Notifications { get; }
+
+        public BackgroundNoticePresenter Presenter { get; }
+
+        public TrayAffordanceLifecycle Subject { get; }
+
+        public Task StartNotifications() => Notifications.StartAsync(default);
+
+        /// <summary>What the window close does, through the guarded operation production uses.</summary>
+        public void CloseToBackground() => ((ITrayGuardedOperations)Subject).EnterBackground();
+    }
+
+    /// <summary>
+    /// Scenario #3: the registration REALLY failed, and the window still hides, the session still enters
+    /// BACKGROUND, and the process is not asked to exit. Notifications are a courtesy; the lifecycle
+    /// never depended on them and must be seen not to.
+    /// </summary>
+    [Fact]
+    public async Task A_real_registration_failure_does_not_disturb_the_background_transition()
+    {
+        var h = new RealNoticeHarness(new FakeNotificationPlatform { FailRegistration = true });
+        await h.StartNotifications();
+        Assert.Equal(NotificationRegistrationState.NotRegistered, h.Notifications.RegistrationState);
+
+        h.CloseToBackground();
+
+        Assert.Contains("HideToBackground", h.Window.Calls);
+        Assert.Equal(AppLifecycleState.Background, h.Lifecycle.State);
+        Assert.Equal(1, h.Lifecycle.BackgroundTransitions);
+        Assert.Equal(0, h.Lifecycle.ExitRequests);
+        Assert.False(h.Subject.IsDegradedForSession);
+    }
+
+    /// <summary>
+    /// Scenario #4, at the same altitude: that same real failure must not cost the user their single
+    /// warning. Nothing was handed to Windows, so nothing was explained, so nothing is spent.
+    /// </summary>
+    [Fact]
+    public async Task A_real_registration_failure_leaves_the_single_notice_unspent()
+    {
+        var h = new RealNoticeHarness(new FakeNotificationPlatform { FailRegistration = true });
+        await h.StartNotifications();
+
+        h.CloseToBackground();
+
+        Assert.False(h.Settings.BackgroundNoticeShown);
+        Assert.Equal(0, h.Settings.ClaimAttempts);
+        Assert.Equal(0, h.Platform.ShowCount);
+    }
+
+    /// <summary>
+    /// Scenario #7: a REAL display failure inside a registered service. The platform threw on Show, the
+    /// service swallowed it and reported the attempt, and the lifecycle is untouched: hidden, BACKGROUND,
+    /// alive. The marker is spent, because the notice did reach a registered platform.
+    /// </summary>
+    [Fact]
+    public async Task A_real_display_failure_leaves_the_background_session_intact()
+    {
+        var h = new RealNoticeHarness(new FakeNotificationPlatform { FailShow = true });
+        await h.StartNotifications();
+        Assert.Equal(NotificationRegistrationState.Registered, h.Notifications.RegistrationState);
+
+        h.CloseToBackground();
+
+        Assert.Equal(1, h.Platform.ShowCount);
+        Assert.Contains("HideToBackground", h.Window.Calls);
+        Assert.Equal(AppLifecycleState.Background, h.Lifecycle.State);
+        Assert.Equal(0, h.Lifecycle.ExitRequests);
+        Assert.True(h.Settings.BackgroundNoticeShown);
+    }
+
+    /// <summary>
+    /// And the happy path at the same altitude: registered, first close, exactly one notice handed over,
+    /// marker spent — then every later close is silent while the session stays in BACKGROUND.
+    /// </summary>
+    [Fact]
+    public async Task A_registered_service_notices_once_across_repeated_closes()
+    {
+        var h = new RealNoticeHarness(new FakeNotificationPlatform());
+        await h.StartNotifications();
+
+        h.CloseToBackground();
+        h.CloseToBackground();
+        h.CloseToBackground();
+
+        Assert.Equal(1, h.Platform.ShowCount);
+        Assert.Equal(1, h.Settings.ClaimsGranted);
+        Assert.Equal(AppLifecycleState.Background, h.Lifecycle.State);
+        Assert.Equal(0, h.Lifecycle.ExitRequests);
+    }
 }
