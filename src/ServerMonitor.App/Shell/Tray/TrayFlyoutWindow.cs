@@ -1,4 +1,5 @@
 using System.Drawing;
+using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.UI;
 using Microsoft.UI.Windowing;
@@ -47,8 +48,14 @@ internal sealed class TrayFlyoutWindow : IDisposable
     private readonly Grid _root;
 
     private MenuFlyout? _menu;
-    private int _requestId;
     private bool _disposed;
+
+    /// <summary>Set while a request is waiting for the XAML tree to become usable.</summary>
+    private bool _awaitingReadiness;
+
+    /// <summary>The foreground-change hook that dismisses the menu; see <see cref="Present"/>.</summary>
+    private nint _foregroundHook;
+    private WinEventDelegate? _foregroundCallback;
 
     /// <summary>Raised with the command the user picked. Never raised for a dismissal.</summary>
     internal event EventHandler<TrayCommand>? CommandInvoked;
@@ -65,6 +72,7 @@ internal sealed class TrayFlyoutWindow : IDisposable
         _root = new Grid { Width = 1, Height = 1 };
         _window = new Window { Content = _root };
 
+
         ConfigurePresentation();
 
         // The second XAML root. Attaching it is the whole Prism HIGH.
@@ -79,41 +87,153 @@ internal sealed class TrayFlyoutWindow : IDisposable
     /// reentrancy itself, because a second authority over the same question is how the first one stops
     /// being the answer.
     /// </remarks>
-    internal void Show(int requestId, Point anchor)
+    internal void Show(Point anchor)
     {
-        _requestId = requestId;
-
         if (_disposed)
         {
-            QaTrace.Write(requestId, "Show.enter", "DISPOSED -> returned");
+            ReleaseWithoutMenu();
             return;
         }
-
-        QaTrace.Write(requestId, "Show.enter", $"anchor={anchor}");
 
         try
         {
             MoveTo(anchor);
-            QaTrace.Write(requestId, "MoveTo", "done");
-
             _window.Activate();
-            QaTrace.Write(requestId, "Activate", "returned");
 
-            var menu = BuildMenu();
-            _menu = menu;
+            // READINESS, NOT RETRY. Activate() returns before the window's XAML tree is loaded, so on the
+            // first request `_root` has no XamlRoot and ShowAt throws 0x80070057 — measured, every time,
+            // in all four states. Retrying the click would hide that; waiting for the tree to actually
+            // become usable removes it. The condition is the XamlRoot itself, not a delay.
+            if (IsPresentable())
+            {
+                Present();
+                return;
+            }
 
-            QaTrace.Write(requestId, "ShowAt", "BEFORE");
-            menu.ShowAt(_root, new FlyoutShowOptions { Placement = FlyoutPlacementMode.Auto });
-            QaTrace.Write(requestId, "ShowAt", "AFTER (returned normally)");
+            _awaitingReadiness = true;
+            _root.Loaded += OnRootLoaded;
         }
         catch (Exception exception)
         {
-            // A flyout that cannot open must not take the process with it, and must not leave the gate
-            // held — the caller learns through Closed that the slot is free again.
-            QaTrace.WriteException(requestId, "Show.catch", exception);
             _logger.LogError(exception, "The tray flyout could not be shown.");
             OnClosed(null, null);
         }
+    }
+
+    private bool IsPresentable() => _root.XamlRoot is not null && _root.IsLoaded;
+
+    private void OnRootLoaded(object sender, RoutedEventArgs args)
+    {
+        _root.Loaded -= OnRootLoaded;
+
+        if (!_awaitingReadiness)
+        {
+            return;
+        }
+
+        _awaitingReadiness = false;
+
+        if (_disposed || !IsPresentable())
+        {
+            // The tree arrived unusable. The click is lost — but the SLOT is not: releasing here is what
+            // stops one bad request from making the menu unopenable for the rest of the session.
+            ReleaseWithoutMenu();
+            return;
+        }
+
+        try
+        {
+            Present();
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, "The tray flyout could not be shown.");
+            OnClosed(null, null);
+        }
+    }
+
+    private void Present()
+    {
+        var menu = BuildMenu();
+        _menu = menu;
+
+        menu.ShowAt(_root, new FlyoutShowOptions { Placement = FlyoutPlacementMode.Auto });
+
+        HookForegroundChanges();
+    }
+
+    /// <summary>
+    /// The dismissal source of truth, and it is deliberately NOT a window event.
+    /// </summary>
+    /// <remarks>
+    /// Measured: when this process does not own the foreground, dismissing by clicking elsewhere produces
+    /// NO <c>MenuFlyout.Closed</c>, no <c>Closing</c>, and no <c>Activated(Deactivated)</c> — the window
+    /// was never truly foreground, so Windows never deactivates it. Every in-process signal is absent, so
+    /// the menu stayed open forever and the gate was never released.
+    /// <para>
+    /// A foreground CHANGE is observable without owning the foreground and without taking it. When it
+    /// moves to anything that is not this window, the menu is closed here, which produces the ordinary
+    /// <c>Closed</c> the rest of the design already depends on. No focus is taken, nothing is made
+    /// topmost, and the gate keeps its single owner.
+    /// </para>
+    /// </remarks>
+    private void HookForegroundChanges()
+    {
+        if (_foregroundHook != 0)
+        {
+            return;
+        }
+
+        _foregroundCallback = OnForegroundChanged;
+        _foregroundHook = SetWinEventHook(
+            EVENT_SYSTEM_FOREGROUND,
+            EVENT_SYSTEM_FOREGROUND,
+            nint.Zero,
+            _foregroundCallback,
+            0,
+            0,
+            WINEVENT_OUTOFCONTEXT);
+
+    }
+
+    private void UnhookForegroundChanges()
+    {
+        if (_foregroundHook == 0)
+        {
+            return;
+        }
+
+        UnhookWinEvent(_foregroundHook);
+        _foregroundHook = 0;
+        _foregroundCallback = null;
+    }
+
+    private void OnForegroundChanged(
+        nint hook, uint eventId, nint hwnd, int objectId, int childId, uint thread, uint time)
+    {
+        if (_menu is null || hwnd == nint.Zero)
+        {
+            return;
+        }
+
+        var ours = WinRT.Interop.WindowNative.GetWindowHandle(_window);
+        if (hwnd == ours)
+        {
+            return;
+        }
+
+        _menu.Hide();
+    }
+
+    /// <summary>
+    /// Frees the slot when there is no menu to close, so no loss path leaves the gate held.
+    /// </summary>
+    private void ReleaseWithoutMenu()
+    {
+        _awaitingReadiness = false;
+        _menu = null;
+        UnhookForegroundChanges();
+        Closed?.Invoke(this, EventArgs.Empty);
     }
 
     public void Dispose()
@@ -127,6 +247,7 @@ internal sealed class TrayFlyoutWindow : IDisposable
 
         try
         {
+            UnhookForegroundChanges();
             _themeService.Detach(_root);
             _menu?.Hide();
             _window.Close();
@@ -187,10 +308,29 @@ internal sealed class TrayFlyoutWindow : IDisposable
             menu.Items.Add(CreateItem(command));
         }
 
-        menu.Opened += (_, _) => QaTrace.Write(_requestId, "MenuFlyout.Opened", "fired");
         menu.Closed += OnClosed;
         return menu;
     }
+
+    private const uint EVENT_SYSTEM_FOREGROUND = 0x0003;
+    private const uint WINEVENT_OUTOFCONTEXT = 0x0000;
+
+    private delegate void WinEventDelegate(
+        nint hook, uint eventId, nint hwnd, int objectId, int childId, uint thread, uint time);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern nint SetWinEventHook(
+        uint eventMin,
+        uint eventMax,
+        nint module,
+        WinEventDelegate callback,
+        uint processId,
+        uint threadId,
+        uint flags);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool UnhookWinEvent(nint hook);
 
     private MenuFlyoutItem CreateItem(TrayCommand command)
     {
@@ -203,25 +343,22 @@ internal sealed class TrayFlyoutWindow : IDisposable
 
     private void OnClosed(object? sender, object? args)
     {
-        QaTrace.Write(_requestId, "OnClosed.enter", $"fromMenu={sender is not null}");
+        _awaitingReadiness = false;
         _menu = null;
+        UnhookForegroundChanges();
 
         try
         {
             // Hidden, not closed: the window is reused, and recreating a XAML root per right-click would
             // re-enter the theme attachment on every click.
             _window.AppWindow.Hide();
-            QaTrace.Write(_requestId, "AppWindow.Hide", $"returned; IsVisible={_window.AppWindow.IsVisible}");
         }
         catch (Exception exception)
         {
-            QaTrace.WriteException(_requestId, "AppWindow.Hide", exception);
             _logger.LogDebug(exception, "The tray flyout window could not be hidden.");
         }
 
-        QaTrace.Write(_requestId, "Closed.raise", "BEFORE");
         Closed?.Invoke(this, EventArgs.Empty);
-        QaTrace.Write(_requestId, "Closed.raise", "AFTER");
     }
 }
 
