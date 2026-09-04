@@ -30,13 +30,13 @@ internal sealed class OwnedTrayIconAdapter : ITrayIconAdapter, ITrayAffordanceSo
     private readonly ILogger<OwnedTrayIconAdapter> _logger;
 
     private readonly FlyoutReentrancyGate _flyoutGate = new();
+    private readonly TrayContextMenu _contextMenu;
     private readonly object _sync = new();
 
     private DispatcherQueue? _dispatcherQueue;
     private TrayHostWindow? _hostWindow;
     private NativeTrayRegistration? _registration;
     private TrayStateMachine? _machine;
-    private TrayFlyoutWindow? _flyout;
     private ITrayLossConsumer? _lossConsumer;
     private ITrayGuardedOperations? _operations;
     private bool _disposed;
@@ -68,6 +68,8 @@ internal sealed class OwnedTrayIconAdapter : ITrayIconAdapter, ITrayAffordanceSo
         _processTerminator = processTerminator ?? throw new ArgumentNullException(nameof(processTerminator));
         _loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
         _logger = _loggerFactory.CreateLogger<OwnedTrayIconAdapter>();
+        _contextMenu = new TrayContextMenu(
+            _localization, _themeService, _loggerFactory.CreateLogger<TrayContextMenu>());
         _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
@@ -271,7 +273,6 @@ internal sealed class OwnedTrayIconAdapter : ITrayIconAdapter, ITrayAffordanceSo
         TrayHostWindow? hostWindow;
         NativeTrayRegistration? registration;
         TrayStateMachine? machine;
-        TrayFlyoutWindow? flyout;
 
         lock (_sync)
         {
@@ -284,11 +285,9 @@ internal sealed class OwnedTrayIconAdapter : ITrayIconAdapter, ITrayAffordanceSo
             hostWindow = _hostWindow;
             registration = _registration;
             machine = _machine;
-            flyout = _flyout;
             _hostWindow = null;
             _registration = null;
             _machine = null;
-            _flyout = null;
         }
 
         if (hostWindow is not null)
@@ -303,7 +302,6 @@ internal sealed class OwnedTrayIconAdapter : ITrayIconAdapter, ITrayAffordanceSo
             machine.StateChanged -= OnMachineStateChanged;
         }
 
-        flyout?.Dispose();
         machine?.Dispose();
         registration?.Dispose();
         hostWindow?.Dispose();
@@ -486,50 +484,65 @@ internal sealed class OwnedTrayIconAdapter : ITrayIconAdapter, ITrayAffordanceSo
     /// CV-9. A second context-menu request while a flyout is open produces nothing: no second flyout, no
     /// reposition of the open one, no episode touched, and no auxiliary window made visible.
     /// </summary>
+    /// <summary>
+    /// Shows the tray menu — a NATIVE shell menu, owned by the tray host window.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The call is MODAL and returns the chosen command, which is why this method both opens the menu and
+    /// dispatches the result. There is no close event to wait for and nothing can be left open: M13-QA-11
+    /// was two liveness defects that existed only because the previous XAML flyout had to be told it had
+    /// closed, and in three of four measured states nothing ever told it.
+    /// </para>
+    /// <para>
+    /// The gate is still taken. With a modal menu a second request cannot arrive on this thread while one
+    /// is up, so it is now belt as well as braces — kept because CV-9 is stated in terms of it, and its
+    /// removal is a decision for the reviewers rather than a side effect of this fix.
+    /// </para>
+    /// </remarks>
     private void ShowFlyout(System.Drawing.Point anchor)
     {
         if (!_flyoutGate.TryOpen())
         {
-            _logger.LogDebug("A tray flyout is already open; the additional request is discarded.");
+            _logger.LogDebug("A tray menu is already open; the additional request is discarded.");
             return;
         }
 
-        TrayFlyoutWindow flyout;
-
         try
         {
+            nint owner;
             lock (_sync)
             {
                 if (_disposed)
                 {
-                    _flyoutGate.Close();
                     return;
                 }
 
-                _flyout ??= CreateFlyout();
-                flyout = _flyout;
+                owner = _hostWindow?.Handle ?? nint.Zero;
+            }
+
+            if (owner == nint.Zero)
+            {
+                _logger.LogError("The tray menu has no host window; the request is dropped.");
+                return;
+            }
+
+            var chosen = _contextMenu.Show(owner, anchor);
+
+            if (chosen is { } command)
+            {
+                OnFlyoutCommandInvoked(this, command);
             }
         }
         catch (Exception exception)
         {
-            // The gate is released here and nowhere else on this path: leaving it held would make the
-            // menu unopenable for the rest of the session, which is worse than the failure itself.
-            _flyoutGate.Close();
-            _logger.LogError(exception, "The tray flyout could not be created.");
-            return;
+            _logger.LogError(exception, "The tray menu could not be shown.");
         }
-
-        flyout.Show(anchor);
-    }
-
-    private TrayFlyoutWindow CreateFlyout()
-    {
-        var flyout = new TrayFlyoutWindow(
-            _themeService, _localization, _loggerFactory.CreateLogger<TrayFlyoutWindow>());
-
-        flyout.CommandInvoked += OnFlyoutCommandInvoked;
-        flyout.Closed += (_, _) => _flyoutGate.Close();
-        return flyout;
+        finally
+        {
+            // ONE release, on every path, because the menu is already closed by the time we get here.
+            _flyoutGate.Close();
+        }
     }
 
     private void OnFlyoutCommandInvoked(object? sender, TrayCommand command)

@@ -19,8 +19,41 @@ namespace ServerMonitor.App.Tests.Architecture;
 /// </summary>
 public sealed class ActivationForegroundBoundaryTests
 {
-    /// <summary>The one file allowed to ask for foreground: it owns the window and holds its handle.</summary>
-    private const string WindowOwner = "ApplicationWindowController.cs";
+    /// <summary>
+    /// The files allowed to ask for foreground. CLOSED AND NAMED: a third one must fail this test.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Why there are two, and not one.</b> The original rule named a single file, because the only
+    /// activation the app performed was the Dashboard activating itself. M13-QA-11 added a second, for a
+    /// documented reason rather than a convenient one: the context menu of a notification-area icon
+    /// REQUIRES its owning window to be the foreground window before <c>TrackPopupMenu</c>, and Microsoft
+    /// states that otherwise <i>"the menu will not disappear when the user clicks outside of the
+    /// menu"</i>. That is not a theory about this codebase — it is what QA measured in three of four
+    /// window states, and the reason the previous XAML flyout could not be dismissed.
+    /// https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-trackpopupmenu
+    /// </para>
+    /// <para>
+    /// It is also the OPPOSITE of focus theft: the call happens only because the user right-clicked, the
+    /// previous foreground window is restored in a <c>finally</c>, and — because our process is the
+    /// foreground process at that instant — Windows permits the hand-back. "The focus returns to the
+    /// previous window" is therefore a full criterion, not a relaxed one.
+    /// </para>
+    /// <para>
+    /// Routing this through <see cref="WindowOwners"/>[0] was considered and rejected: it would recouple
+    /// the tray to the main window, which is precisely the invariant slice S2-T exists to establish.
+    /// </para>
+    /// <para>
+    /// The sibling rule below is UNCHANGED and still absolute — <c>AttachThreadInput</c>,
+    /// <c>CoAllowSetForegroundWindow</c> and <c>AllowSetForegroundWindow</c> remain forbidden. The
+    /// native menu uses none of them, and that is the condition on which this second entry was granted.
+    /// </para>
+    /// </remarks>
+    private static readonly string[] WindowOwners =
+    [
+        "ApplicationWindowController.cs",  // owns the Dashboard window and holds its handle
+        "TrayContextMenu.cs"               // asks only for the TrayHostWindow handle it is given
+    ];
 
     /// <summary>
     /// Closed list from the human's QA-10 decision. Anything here is a z-order/input contortion, not a
@@ -60,7 +93,7 @@ public sealed class ActivationForegroundBoundaryTests
     public void Only_the_window_owner_asks_for_foreground()
     {
         var offenders = AppSourceFiles()
-            .Where(path => !Path.GetFileName(path).Equals(WindowOwner, StringComparison.OrdinalIgnoreCase))
+            .Where(path => !WindowOwners.Contains(Path.GetFileName(path), StringComparer.OrdinalIgnoreCase))
             .Where(path => StripComments(File.ReadAllText(path))
                 .Contains("SetForegroundWindow", StringComparison.Ordinal))
             .Select(Relative)
