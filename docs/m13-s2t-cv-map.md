@@ -43,6 +43,7 @@ condição pré-existente, não introduzida por esta entrega.
 | **CV-19** | ressalva do passo 2 para conclusões de efeito | `Transition`, passo 2 | `T11` · **`CV19_a_stale_add_completion_in_a_live_episode_is_reconciled_and_compensated`** | **M13** | **FECHADA.** O estado é construído por teste; ver §3.1 |
 | **CV-20** | canal de efeitos fechado por construção | tipos `private` aninhados em `TrayStateMachine`; capacidade retida só por `EffectExecutor._native` | `TrayCapabilityBoundaryTests` (T14a/b) · `TrayOwnershipCompletenessTests` (T14c) | M11, M19, M20, M22, **M34** | **FECHADA · a imprecisão do T14c foi corrigida** |
 | **CV-21** | exceção do sink não consome o único disparo | **NÃO IMPLEMENTADA AQUI** | — | — | **com o Cortex** (`ServerMonitor-m13-s2`) |
+| **CV-22** | a escalada por ausência de consumidor autoritativo aplica-se **só a uma perda** | `TrayStateMachine.PublishIfCurrent` — a escalada é condicionada a `Lost`/`Unavailable` | `A_non_degrading_notification_with_no_authoritative_consumer_does_not_request_an_exit` | **M103** | **FECHADA.** Levantada na ronda 11: a produção estava certa e a contraprova não existia, porque o mecanismo foi reescrito à volta do `AcknowledgeLoss` e a cobertura não o acompanhou |
 | **CI-1b** | grafias numéricas de enum em payloads hostis | a ação `FailSafeExit` entra no mesmo `switch` de pares literais e **herda** o fail-closed | tabela de 9 pares, inclui `("FailSafeExit", "1")` e `("2", "1")` | M38b | **HERDADA · não agravada.** A dívida da S2 continua a ser da S2 |
 
 
@@ -782,8 +783,15 @@ e `FullyQualifiedName~FailSafe|FullyQualifiedName~WindowsAppNotification|FullyQu
 instrumento corrigido — ver §13. As contagens anteriores deste ficheiro, 76/74/72, descreviam um estado
 que já não existia e foram apanhadas pelo Atlas.)
 
-Duas não correm, com razão escrita: **M4** ficou `SUPERSEDED BY M55` e **M21** `SUPERSEDED BY M34`,
-porque o código que atacavam foi reescrito e a propriedade passou para a mutação nova. A **M47** foi
+**M4** e **M21** foram **apagadas na ronda 8**, não deixadas a imprimir `ANCHOR NOT FOUND`: o código que
+atacavam foi reescrito e a propriedade passou para a mutação nova — **M4 → M55**, **M21 → M34**. Enquanto
+existissem, uma âncora genuinamente partida era indistinguível delas, e por isso `ANCHOR NOT FOUND` tinha
+de ser tolerado; apagadas, uma âncora que não encontra passa a abortar o runner.
+
+*(Correcção de ronda 13: a tabela da secção 3 dizia `SUPERSEDED BY M48`, o que estava errado duas vezes —
+a sucessora é a **M55**, e a própria **M48** tinha sido retirada, como esta mesma prosa diz duas linhas
+abaixo. A fonte autoritativa é o comentário no `tools/mutations/mutate.py`, que nomeia a M55. Tabela e
+prosa passam a dizer o mesmo.)* A **M47** foi
 retirada por mim (§5.2), e a **M46**, **M48** e **M50** foram retiradas quando a ronda 3 reformulou o
 mesmo código — as suas propriedades são agora atacadas pela **M53**, **M55** e **M56**.
 
@@ -851,7 +859,7 @@ python tools/mutations/cs8509_differential.py
 | M1 | `Transition` pode emitir `Add` durante `Releasing` | dominância do Release | 3 | **morta** |
 | M2 | um `Add` tardio anterior ao Release publica `Available` | `Available` = provadamente disponível | 1 | **morta** |
 | M3 | um `Add` tardio não recebe `Delete` compensatório | conclusão compensada | 1 | **morta** |
-| M4 | revalidação na entrega das notificações removida | Release domina as continuações | — | `SUPERSEDED BY` **M48** (âncora reescrita) |
+| M4 | revalidação na entrega das notificações removida | Release domina as continuações | — | `SUPERSEDED BY` **M55** · **linha apagada na ronda 8** |
 | M5 | um `Shell_NotifyIcon` falso é tratado como sucesso | a razão de ser da slice | 7 | **morta** |
 | M6 | um `Shell_NotifyIcon` verdadeiro é tratado como falha | idem, direção oposta | 6 | **morta** |
 | M7 | recuperação por `TaskbarCreated` removida | recuperação após reinício do Explorer | 1 | **morta** |
@@ -868,7 +876,7 @@ python tools/mutations/cs8509_differential.py
 | M18 | a sanitização da âncora é removida | CV-1 ponto 5 | 1 | **morta** |
 | M19 | o executor deixa de ser `private`-aninhado | CV-20, fecho do canal | 1 | **morta** |
 | M20 | a máquina retém a capacidade num campo próprio | CV-20, detentor único | 2 | **morta** |
-| M21 | a capacidade é registada no composition root | CV-20, fora do contentor | — | `SUPERSEDED BY` **M34** (a âncora era a antiga forma em lambda) |
+| M21 | a capacidade é registada no composition root | CV-20, fora do contentor | — | `SUPERSEDED BY` **M34** · **linha apagada na ronda 8** |
 | M22 | um closure captura a capacidade num campo **gerado pelo compilador** | CV-20 sem exclusão por categoria | 2 | **morta** |
 | M23 | o tooltip deixa de ser ajustado ao buffer `szTip` | CV-5 | 1 | **morta** |
 | M24 | o `HICON` antigo é libertado **antes** de `NIM_MODIFY` | regra DPI do Prism | **0** | **SOBREVIVE — 3.3** |
