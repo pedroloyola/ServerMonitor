@@ -39,21 +39,25 @@
          (both Package*.appxmanifest). Product/marketing SemVer stays 1.0.0 (first public RC). See
          PITFALL P-016.
 
-         M13/ADR-018: the Windows 11 widget is a user-visible feature addition, so this is a MINOR bump,
+         M13/ADR-018: the Windows 11 widget is a user-visible feature addition, so that was a MINOR bump,
          not another build bump. 1.1.0.0 > 1.0.1.0, so the Store upgrade path from the shipped 1.0.1.0
          stays valid, and product and package versions converge again (the 1.0.0-vs-1.0.1 divergence M12
-         had to accept is retired). Concept map:
-           Package/Identity Version : 1.1.0.0  (Store-valid; Revision 0)
-           FileVersion              : 1.1.0.0  (tracks the package build)
+         had to accept is retired).
+
+         M13 REOPENED after v1.1.0 was already published. QA-7, QA-8, QA-9, QA-10, QA-11 and QA-12 were
+         fixed afterwards, so the runtime behaviour differs from what v1.1.0 shipped and it must not carry
+         that version: PATCH bump to 1.1.1. The public v1.1.0 stays immutable. Concept map:
+           Package/Identity Version : 1.1.1.0  (Store-valid; Revision 0)
+           FileVersion              : 1.1.1.0  (tracks the package build)
            AssemblyVersion          : 1.0.0.0  (stable project baseline; unchanged for binding safety)
-           Product SemVer / Informational : 1.1.0
-         DisplayVersion (Settings/About) = Major.Minor.Build of the *running* version: 1.1.0 both
+           Product SemVer / Informational : 1.1.1
+         DisplayVersion (Settings/About) = Major.Minor.Build of the *running* version: 1.1.1 both
          packaged (reads Package.Current) and unpackaged/dev (assembly fallback). NÃO criar tag
-         v1.1.0 sem aprovação humana. -->
-    <Version>1.1.0</Version>
+         v1.1.1 sem aprovação humana. -->
+    <Version>1.1.1</Version>
     <AssemblyVersion>1.0.0.0</AssemblyVersion>
-    <FileVersion>1.1.0.0</FileVersion>
-    <InformationalVersion>1.1.0</InformationalVersion>
+    <FileVersion>1.1.1.0</FileVersion>
+    <InformationalVersion>1.1.1</InformationalVersion>
     <!-- M12/ADR-017: one app, two deployment profiles. Default is the existing UNPACKAGED,
          self-contained build (dev Debug + existing Release + every test/gate). Pass
          -p:Packaged=true for the production single-project MSIX profile below. Domain logic
