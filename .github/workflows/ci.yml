@@ -23,7 +23,7 @@ jobs:
       # First-party actions from the trusted `actions/` org. Pin to a commit SHA for
       # stricter supply-chain hardening if required by policy.
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup .NET 10 SDK
         uses: actions/setup-dotnet@v4
