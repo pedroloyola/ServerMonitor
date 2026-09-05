@@ -98,6 +98,8 @@ public sealed class TerminationWatchdog(IWatchdogScheduler scheduler, ILogger<Te
     private readonly IWatchdogScheduler _scheduler =
         scheduler ?? throw new ArgumentNullException(nameof(scheduler));
 
+    private readonly object _armGate = new();
+
     private int _armed;
 
     public bool IsArmed => Volatile.Read(ref _armed) == 1;
@@ -110,32 +112,85 @@ public sealed class TerminationWatchdog(IWatchdogScheduler scheduler, ILogger<Te
             throw new ArgumentOutOfRangeException(nameof(deadline));
         }
 
-        if (Interlocked.Exchange(ref _armed, 1) != 0)
+        // CV-21 A. The flag used to be set BEFORE the schedule was established, so a scheduler that threw
+        // left an object reporting IsArmed == true with no escalation behind it: a claim of a guarantee
+        // that did not exist, which is the same defect class as a discarded Shell_NotifyIcon BOOL one
+        // level down. The lock keeps "check, establish, publish" indivisible, so a concurrent caller can
+        // never observe the window between establishing the schedule and publishing the flag.
+        lock (_armGate)
         {
-            return; // monotonic and non-restartable: the first deadline is the deadline
-        }
+            if (Volatile.Read(ref _armed) == 1)
+            {
+                return; // already established: the first deadline is the deadline
+            }
 
-        _scheduler.ScheduleOnce(deadline, () =>
-        {
             try
             {
-                logger.LogWarning(
-                    "Shutdown exceeded the {Deadline} termination deadline; terminating the process.",
-                    deadline);
-                onDeadlineReached();
+                _scheduler.ScheduleOnce(deadline, () =>
+                {
+                    try
+                    {
+                        logger.LogWarning(
+                            "Shutdown exceeded the {Deadline} termination deadline; terminating the process.",
+                            deadline);
+                        onDeadlineReached();
+                    }
+                    catch (Exception exception)
+                    {
+                        logger.LogError(exception, "The termination watchdog failed.");
+                    }
+                });
             }
             catch (Exception exception)
             {
-                logger.LogError(exception, "The termination watchdog failed.");
+                // Fail closed: nothing was established, so nothing may claim to be armed.
+                Volatile.Write(ref _armed, 0);
+                logger.LogError(exception, "The termination watchdog could not be armed.");
+                throw new TerminationWatchdogArmingException(deadline, exception);
             }
-        });
+
+            // Only now is the escalation real.
+            Volatile.Write(ref _armed, 1);
+        }
     }
+}
+
+/// <summary>
+/// The terminal escalation could not be established (CV-21 A). Deterministic and impossible to ignore by
+/// accident - a return value could be dropped silently, which is exactly the defect class this slice
+/// corrects elsewhere. The watchdog is left NOT armed.
+/// </summary>
+public sealed class TerminationWatchdogArmingException(TimeSpan deadline, Exception innerException)
+    : InvalidOperationException(
+        $"The termination watchdog could not be armed for {deadline}.", innerException)
+{
+    /// <summary>The deadline that could not be established.</summary>
+    public TimeSpan Deadline { get; } = deadline;
+}
+
+/// <summary>
+/// What Windows answered when asked to end this process (CV-21 B).
+/// </summary>
+/// <param name="Requested">True only when <c>TerminateProcess</c> itself returned TRUE.</param>
+/// <param name="Win32Error">
+/// The error captured immediately after a FALSE return, before any other call could overwrite it. Zero
+/// when the request succeeded.
+/// </param>
+public readonly record struct ProcessTerminationResult(bool Requested, int Win32Error)
+{
+    public static ProcessTerminationResult Success { get; } = new(Requested: true, Win32Error: 0);
+
+    public static ProcessTerminationResult Failed(int win32Error) => new(Requested: false, win32Error);
 }
 
 /// <summary>Terminates this process. Separated so the watchdog path can be tested without dying.</summary>
 public interface IProcessTerminator
 {
-    void Terminate(int exitCode);
+    /// <summary>
+    /// Asks Windows to terminate this process and REPORTS what it answered. The result is not advisory:
+    /// discarding it is exactly the defect that made the tray registration fictional, one level down.
+    /// </summary>
+    ProcessTerminationResult Terminate(int exitCode);
 }
 
 /// <summary>
@@ -155,7 +210,31 @@ public sealed class ProcessTerminator : IProcessTerminator
     /// <summary>Distinct, non-zero, and not a common Windows error code, so it is recognizable in logs.</summary>
     public const int WatchdogExitCode = 0x5352;
 
-    public void Terminate(int exitCode) => TerminateProcess(GetCurrentProcess(), unchecked((uint)exitCode));
+    public ProcessTerminationResult Terminate(int exitCode) =>
+        TerminateHandle(GetCurrentProcess(), exitCode);
+
+    /// <summary>
+    /// The single place the native call happens, with the handle as a parameter so the REAL P/Invoke, the
+    /// REAL BOOL inspection and the REAL error capture can be exercised by a test without the test host
+    /// dying (a null handle is refused by Windows with ERROR_INVALID_HANDLE and terminates nothing).
+    /// <para>
+    /// The BOOL used to be discarded. <c>TerminateProcess</c> can legitimately fail - a handle without
+    /// PROCESS_TERMINATE, a process already being torn down - and a discarded FALSE meant the watchdog
+    /// reported a completed escalation while the process carried on. The last error is read IMMEDIATELY
+    /// after the call, before logging or anything else that could overwrite it.
+    /// </para>
+    /// </summary>
+    internal ProcessTerminationResult TerminateHandle(IntPtr processHandle, int exitCode)
+    {
+        var terminated = TerminateProcess(processHandle, unchecked((uint)exitCode));
+        if (terminated)
+        {
+            return ProcessTerminationResult.Success;
+        }
+
+        var error = Marshal.GetLastWin32Error();
+        return ProcessTerminationResult.Failed(error);
+    }
 
     [DllImport("kernel32.dll")]
     private static extern IntPtr GetCurrentProcess();

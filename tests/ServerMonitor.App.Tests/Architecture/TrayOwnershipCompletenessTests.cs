@@ -907,7 +907,7 @@ public sealed class TrayOwnershipCompletenessTests
 
     private sealed class UnusedProcessTerminator : IProcessTerminator
     {
-        public void Terminate(int exitCode) => throw new NotSupportedException();
+        public ProcessTerminationResult Terminate(int exitCode) => throw new NotSupportedException();
     }
 
     private static Type[] Implementations(Type contract) =>

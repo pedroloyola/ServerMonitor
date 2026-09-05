@@ -97,7 +97,11 @@ public sealed class ExitOwnershipTests
     {
         public int Count { get; private set; }
 
-        public void Terminate(int exitCode) => Count++;
+        public ProcessTerminationResult Terminate(int exitCode)
+        {
+            Count++;
+            return ProcessTerminationResult.Success;
+        }
     }
 
     /// <summary>

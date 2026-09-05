@@ -587,6 +587,12 @@ internal sealed class OwnedTrayIconAdapter : ITrayIconAdapter, ITrayAffordanceSo
     private void EscalateTermination()
     {
         _logger.LogError("The authoritative exit did not end the process after a tray cleanup failure; terminating.");
-        _processTerminator.Terminate(1);
+        var result = _processTerminator.Terminate(1);
+        if (!result.Requested)
+        {
+            _logger.LogError(
+                "TerminateProcess refused the fail-safe escalation (Win32 error {Win32Error}); the process may survive.",
+                result.Win32Error);
+        }
     }
 }

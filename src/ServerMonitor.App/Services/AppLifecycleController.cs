@@ -128,7 +128,13 @@ public sealed class AppLifecycleController : IAppLifecycleController
         // Armed only after the transition succeeded, so it can never fire outside Exiting, and never
         // restarted, so nothing can push the deadline out. It is intentionally NOT disarmed below: a
         // process that fails to die after Exit() is exactly what it is here to end.
-        _watchdog.Arm(_terminationDeadline, OnTerminationDeadlineReached);
+        // CV-21 A at the call site. Arm() is now fail-closed and THROWS when the escalation could not be
+        // established, and RequestExit is invoked from a window event handler and from the tray, where an
+        // exception would surface as a crash and skip the remaining steps. RunStep records the failure and
+        // the exit continues: losing the last resort must not also lose the shutdown. IsArmed stays false,
+        // so nothing downstream can mistake this for an armed watchdog. No second authority is introduced:
+        // Exiting remains the terminal authority.
+        RunStep("ArmTerminationWatchdog", () => _watchdog.Arm(_terminationDeadline, OnTerminationDeadlineReached));
 
         try
         {
@@ -165,7 +171,16 @@ public sealed class AppLifecycleController : IAppLifecycleController
     private void OnTerminationDeadlineReached()
     {
         // Only reachable from the watchdog, and only while Exiting.
-        _terminator.Terminate(ProcessTerminator.WatchdogExitCode);
+        // CV-21 B: the answer is inspected. A discarded FALSE meant the watchdog reported a completed
+        // escalation while the process carried on. There is nothing further to escalate to from here -
+        // this IS the last resort - so the correct handling is to make the failure visible.
+        var result = _terminator.Terminate(ProcessTerminator.WatchdogExitCode);
+        if (!result.Requested)
+        {
+            _logger.LogError(
+                "TerminateProcess refused the watchdog escalation (Win32 error {Win32Error}); the process may survive.",
+                result.Win32Error);
+        }
     }
 
     private void ExitApplicationOnce()

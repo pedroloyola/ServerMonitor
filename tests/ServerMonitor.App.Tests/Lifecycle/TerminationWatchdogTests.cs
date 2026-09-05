@@ -205,4 +205,70 @@ public sealed class TerminationWatchdogTests
         Assert.Same(watchdog, resolved);
         Assert.Equal(1, terminations);
     }
+
+    // ------------------------------------------------------------------ CV-21 A: arming fails closed
+
+    /// <summary>
+    /// A scheduler that cannot establish the wait leaves NOTHING behind it. The flag used to be set before
+    /// the schedule, so this exact case produced an object reporting <c>IsArmed == true</c> with no
+    /// escalation at all — a guarantee that existed only as a boolean.
+    /// </summary>
+    [Fact]
+    public void Arming_that_cannot_be_established_never_reports_armed()
+    {
+        var watchdog = new TerminationWatchdog(new ThrowingWatchdogScheduler(), NullLogger<TerminationWatchdog>.Instance);
+
+        var failure = Assert.Throws<TerminationWatchdogArmingException>(
+            () => watchdog.Arm(TimeSpan.FromSeconds(10), () => { }));
+
+        Assert.False(watchdog.IsArmed);
+        Assert.Equal(TimeSpan.FromSeconds(10), failure.Deadline);
+        Assert.IsType<InvalidOperationException>(failure.InnerException);
+    }
+
+    /// <summary>
+    /// Fail CLOSED, not fail DEAD. A failed attempt must not consume the one-shot: the process would then
+    /// be permanently unable to arm the last resort because of a transient scheduler failure.
+    /// </summary>
+    [Fact]
+    public void A_failed_arming_does_not_consume_the_one_shot()
+    {
+        var scheduler = new ManualWatchdogScheduler();
+        var watchdog = new TerminationWatchdog(new ThrowingWatchdogScheduler(), NullLogger<TerminationWatchdog>.Instance);
+        Assert.Throws<TerminationWatchdogArmingException>(
+            () => watchdog.Arm(TimeSpan.FromSeconds(10), () => { }));
+
+        var armed = Create(scheduler);
+        var terminations = 0;
+        armed.Arm(TimeSpan.FromSeconds(10), () => terminations++);
+        scheduler.ElapseAll();
+
+        Assert.True(armed.IsArmed);
+        Assert.Equal(1, terminations);
+    }
+
+    // ------------------------------------------------------- CV-21 B: the BOOL is inspected, for real
+
+    /// <summary>
+    /// The REAL P/Invoke, the REAL BOOL and the REAL last error, exercised without the test host dying:
+    /// a null handle is refused by Windows with <c>ERROR_INVALID_HANDLE</c> and terminates nothing. The
+    /// BOOL used to be discarded, so a refused escalation was reported as a completed one.
+    /// </summary>
+    [Fact]
+    public void A_refused_termination_reports_the_win32_error_and_kills_nothing()
+    {
+        const int ErrorInvalidHandle = 6;
+
+        var result = new ProcessTerminator().TerminateHandle(IntPtr.Zero, ProcessTerminator.WatchdogExitCode);
+
+        Assert.False(result.Requested);
+        Assert.Equal(ErrorInvalidHandle, result.Win32Error);
+    }
+
+    /// <summary>A scheduler that refuses to establish anything (CV-21 A).</summary>
+    private sealed class ThrowingWatchdogScheduler : IWatchdogScheduler
+    {
+        public void ScheduleOnce(TimeSpan delay, Action callback) =>
+            throw new InvalidOperationException("the wait could not be established");
+    }
 }

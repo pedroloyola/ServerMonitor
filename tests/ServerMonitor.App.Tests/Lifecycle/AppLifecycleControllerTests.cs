@@ -56,7 +56,66 @@ public sealed class AppLifecycleControllerTests
     {
         public List<int> Terminations { get; } = new();
 
-        public void Terminate(int exitCode) => Terminations.Add(exitCode);
+        public ProcessTerminationResult Terminate(int exitCode)
+        {
+            Terminations.Add(exitCode);
+            return Result;
+        }
+
+        /// <summary>What Windows is pretended to answer. CV-21 B: the call site must inspect it.</summary>
+        public ProcessTerminationResult Result { get; set; } = ProcessTerminationResult.Success;
+    }
+
+    // ------------------------------------------------- CV-21 at the call site, reconciled onto S2-T
+
+    /// <summary>
+    /// <c>Arm</c> is now fail-closed and THROWS when the escalation cannot be established, and
+    /// <c>RequestExit</c> runs from a window event handler and from the tray. Losing the last resort must
+    /// not also lose the shutdown: the exit still completes, and the watchdog still does not claim to be
+    /// armed. No second terminal authority appears — Exiting remains the authority.
+    /// </summary>
+    [Fact]
+    public void An_exit_completes_even_when_the_watchdog_cannot_be_armed()
+    {
+        var sequence = new RecordingExitSequence();
+        var exits = 0;
+        var watchdog = new TerminationWatchdog(
+            new ThrowingWatchdogScheduler(), NullLogger<TerminationWatchdog>.Instance);
+        var controller = new AppLifecycleController(
+            () => sequence,
+            () => exits++,
+            watchdog,
+            new RecordingTerminator(),
+            NullLogger<AppLifecycleController>.Instance);
+
+        controller.RequestExit(ExitReason.TrayExit);
+
+        Assert.Equal(1, exits);
+        Assert.False(watchdog.IsArmed);
+        Assert.Contains(nameof(IExitSequence.DrainHost), sequence.Steps);
+    }
+
+    /// <summary>
+    /// CV-21 B at the call site: a REFUSED termination is inspected, not discarded, and refusing it does
+    /// not turn the last resort into an exception thrown out of a window event handler.
+    /// </summary>
+    [Fact]
+    public void A_refused_watchdog_termination_is_inspected_and_does_not_throw()
+    {
+        var harness = new Harness(deadline: TimeSpan.FromSeconds(10));
+        harness.Terminator.Result = ProcessTerminationResult.Failed(win32Error: 5);
+
+        harness.Controller.RequestExit(ExitReason.TrayExit);
+        harness.ElapseDeadline();
+
+        Assert.Equal(new[] { ProcessTerminator.WatchdogExitCode }, harness.Terminator.Terminations);
+    }
+
+    /// <summary>A scheduler that refuses to establish anything (CV-21 A).</summary>
+    private sealed class ThrowingWatchdogScheduler : IWatchdogScheduler
+    {
+        public void ScheduleOnce(TimeSpan delay, Action callback) =>
+            throw new InvalidOperationException("the wait could not be established");
     }
 
     /// <summary>

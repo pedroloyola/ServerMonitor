@@ -362,9 +362,7 @@ public sealed class FailSafeExitNoticeTests
 
     private sealed class NullTerminator : IProcessTerminator
     {
-        public void Terminate(int exitCode)
-        {
-        }
+        public ProcessTerminationResult Terminate(int exitCode) => ProcessTerminationResult.Success;
     }
 
     /// <summary>Records the shutdown steps in order, on the same list the notice writes to.</summary>
