@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -141,6 +142,7 @@ public sealed class TrayOwnershipCompletenessTests
     {
         var hideMethods = new HashSet<int>(
             typeof(IWindowHideCapability).GetMethods().Select(m => m.MetadataToken));
+        var HideCapabilityModule = typeof(IWindowHideCapability).Module;
 
         var callers = new List<string>();
 
@@ -166,16 +168,8 @@ public sealed class TrayOwnershipCompletenessTests
                     continue; // abstract, extern, or otherwise bodiless
                 }
 
-                for (var i = 0; i + 4 < il.Length; i++)
+                foreach (var token in CallTokens(il))
                 {
-                    // call (0x28) and callvirt (0x6F) are each followed by a 4-byte metadata token.
-                    if (il[i] is not (0x28 or 0x6F))
-                    {
-                        continue;
-                    }
-
-                    var token = BitConverter.ToInt32(il, i + 1);
-
                     MethodBase? target;
                     try
                     {
@@ -191,10 +185,19 @@ public sealed class TrayOwnershipCompletenessTests
                         continue;
                     }
 
+                    // The module check is NOT decoration. A metadata token is unique only WITHIN a module,
+                    // and the compiler-generated members of a record call straight into CoreLib — whose
+                    // tokens can equal, by pure numeric coincidence, a token of IWindowHideCapability in
+                    // this assembly. That collision is what reported HistorySampleItem, HistoryClearItem
+                    // and HistoryResetItem — records in a queue with no reference to a hide anywhere — as
+                    // callers of the window hide.
                     var namesAHide =
                         target is not null
-                        && (hideMethods.Contains(target.MetadataToken)
-                            || target.Name is "HideToBackgroundCore" or "HideForMinimizeCore"
+                        && ((target.Module == HideCapabilityModule
+                             && hideMethods.Contains(target.MetadataToken))
+                            || (target.DeclaringType is { } declaringType
+                                && declaringType.Assembly == typeof(App).Assembly
+                                && target.Name is "HideToBackgroundCore" or "HideForMinimizeCore")
                             || (target.DeclaringType == typeof(IWindowHideCapability)
                                 && target.Name.StartsWith("Hide", StringComparison.Ordinal)));
 
@@ -213,6 +216,133 @@ public sealed class TrayOwnershipCompletenessTests
         }
 
         return callers.Distinct().OrderBy(n => n, StringComparer.Ordinal).ToArray();
+    }
+
+    /// <summary>
+    /// Every metadata token targeted by a REAL <c>call</c> or <c>callvirt</c> in this method body.
+    /// </summary>
+    /// <remarks>
+    /// <b>Why this exists.</b> The first version scanned the body byte by byte for <c>0x28</c>/<c>0x6F</c>
+    /// and read the next four bytes as a token. A byte inside an operand looks exactly like an opcode, so
+    /// the scan invented calls: it reported <c>HistorySampleItem</c>, <c>HistoryClearItem</c> and
+    /// <c>HistoryResetItem</c> — one-line records in a queue that contain no reference to a hide at all —
+    /// as callers. It had been passing only because the metadata tokens happened to fall where they did;
+    /// deleting unrelated files renumbered them and the accident stopped being lucky. A guard that passes
+    /// by coincidence is not a guard (BOSS.md §10).
+    /// <para>
+    /// This walks instruction by instruction using the runtime's OWN opcode table, so operand bytes can
+    /// never be mistaken for opcodes and every operand is skipped by its real width. No new dependency:
+    /// <see cref="OpCodes"/> is already in the BCL.
+    /// </para>
+    /// </remarks>
+    private static IEnumerable<int> CallTokens(byte[] il)
+    {
+        var tokens = new List<int>();
+        var offset = 0;
+
+        while (offset < il.Length)
+        {
+            OpCode opCode;
+            if (il[offset] == 0xFE)
+            {
+                if (offset + 1 >= il.Length || !TwoByteOpCodes.TryGetValue(il[offset + 1], out opCode))
+                {
+                    // An unknown opcode means the walk has lost the instruction boundary. Stopping is the
+                    // only honest answer: continuing would resume the byte-scanning defect this replaces.
+                    return tokens;
+                }
+
+                offset += 2;
+            }
+            else
+            {
+                if (!SingleByteOpCodes.TryGetValue(il[offset], out opCode))
+                {
+                    return tokens;
+                }
+
+                offset += 1;
+            }
+
+            var operandSize = OperandSize(opCode, il, offset);
+            if (operandSize < 0 || offset + operandSize > il.Length)
+            {
+                return tokens;
+            }
+
+            if ((opCode == OpCodes.Call || opCode == OpCodes.Callvirt) && operandSize == 4)
+            {
+                tokens.Add(BitConverter.ToInt32(il, offset));
+            }
+
+            offset += operandSize;
+        }
+
+        return tokens;
+    }
+
+    /// <summary>
+    /// The decoder must never read an operand byte as an opcode. This is the defect the previous scan had,
+    /// stated as a test instead of as a comment.
+    /// </summary>
+    [Fact]
+    public void Operand_bytes_that_look_like_a_call_are_not_read_as_one()
+    {
+        // ldc.i4 (0x20) takes a 4-byte operand; the operand here contains 0x28 (call) and 0x6F (callvirt).
+        // A byte scan finds two "calls" in it. A decoder finds none, because they are data.
+        byte[] il = [0x20, 0x28, 0x00, 0x6F, 0x28, 0x2A];
+
+        Assert.Empty(CallTokens(il));
+    }
+
+    /// <summary>The companion: a REAL call is still read, so the decoder is not simply blind.</summary>
+    [Fact]
+    public void A_real_call_instruction_still_yields_its_token()
+    {
+        byte[] il = [0x28, 0x11, 0x22, 0x33, 0x44, 0x2A]; // call 0x44332211; ret
+
+        Assert.Equal([0x44332211], CallTokens(il));
+    }
+
+    /// <summary>The width of the operand that follows, in bytes. Negative means "cannot be determined".</summary>
+    private static int OperandSize(OpCode opCode, byte[] il, int operandOffset) => opCode.OperandType switch
+    {
+        OperandType.InlineNone => 0,
+        OperandType.ShortInlineBrTarget or OperandType.ShortInlineI or OperandType.ShortInlineVar => 1,
+        OperandType.InlineVar => 2,
+        OperandType.InlineBrTarget or OperandType.InlineField or OperandType.InlineI
+            or OperandType.InlineMethod or OperandType.InlineSig or OperandType.InlineString
+            or OperandType.InlineTok or OperandType.InlineType or OperandType.ShortInlineR => 4,
+        OperandType.InlineI8 or OperandType.InlineR => 8,
+        // switch: a 4-byte count followed by that many 4-byte targets.
+        OperandType.InlineSwitch => operandOffset + 4 > il.Length
+            ? -1
+            : 4 + (BitConverter.ToInt32(il, operandOffset) * 4),
+        _ => -1
+    };
+
+    private static readonly Dictionary<byte, OpCode> SingleByteOpCodes = BuildOpCodes(twoByte: false);
+
+    private static readonly Dictionary<byte, OpCode> TwoByteOpCodes = BuildOpCodes(twoByte: true);
+
+    private static Dictionary<byte, OpCode> BuildOpCodes(bool twoByte)
+    {
+        var table = new Dictionary<byte, OpCode>();
+        foreach (var field in typeof(OpCodes).GetFields(BindingFlags.Public | BindingFlags.Static))
+        {
+            if (field.GetValue(null) is not OpCode opCode)
+            {
+                continue;
+            }
+
+            var isTwoByte = (opCode.Value & 0xFF00) == 0xFE00;
+            if (isTwoByte == twoByte)
+            {
+                table[(byte)(opCode.Value & 0xFF)] = opCode;
+            }
+        }
+
+        return table;
     }
 
     /// <summary>
