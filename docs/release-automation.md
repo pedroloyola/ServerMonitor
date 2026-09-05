@@ -12,7 +12,7 @@ make the product public.** Publishing stays a human act.
 | --- | --- | --- | --- |
 | `release-build.yml` | tag `v*`, or manual dispatch | no | no |
 | `store-submit.yml` | manual dispatch only, `microsoft-store` environment | yes | no |
-| `store-status.yml` | manual dispatch only, `microsoft-store-readonly` environment | reads only | no |
+| `store-status.yml` | manual dispatch only, `microsoft-store-status` environment | reads only | no |
 
 `release-build.yml` holds no Store secrets at all: it is not attached to the environment
 that carries them.
@@ -129,7 +129,18 @@ Center under *Additional Testing Info*, and stay there.
 ## Secrets
 
 Stored as GitHub **environment** secrets on `microsoft-store` and
-`microsoft-store-readonly`. Never in the repository, never printed.
+`microsoft-store-status`. Never in the repository, never printed.
+
+> **`microsoft-store-status` is not a privilege boundary.** Both environments carry the same
+> Entra application, and that application holds the Manager role in Partner Center — it can
+> write. Only the *commands in `store-status.yml`* are read-only. Anyone who can edit that
+> workflow, or add another workflow that joins the environment, holds a credential that
+> could submit or publish. What actually constrains the credential is the branch/ref
+> restriction on each environment and the required reviewer on `microsoft-store`.
+>
+> A genuinely read-only credential would need a second Entra application with a Partner
+> Center role that cannot submit. Microsoft documents Manager as the role for this flow and
+> does not document a weaker one that works, so that option is not available today.
 
 | secret | what it is |
 | --- | --- |

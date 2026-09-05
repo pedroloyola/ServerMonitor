@@ -30,11 +30,17 @@ jobs:
   status:
     runs-on: windows-latest
 
-    # Read-only, but the Store secrets live in the environment, so the job joins it. Give
-    # this environment no required reviewer if status checks should be self-service; keep
-    # one if even reads should be gated.
+    # This environment is NOT a privilege boundary.
+    #
+    # It carries the same Entra application as `microsoft-store`, and that application holds
+    # the Manager role in Partner Center. The credential can write. Only the commands in this
+    # workflow are read-only. Anyone who can change this file, or run a workflow that joins
+    # this environment, has a credential that could submit or publish.
+    #
+    # The protection that actually holds is therefore the branch/ref restriction on the
+    # environment, not the word "status" in its name.
     environment:
-      name: microsoft-store-readonly
+      name: microsoft-store-status
 
     steps:
       - name: Checkout

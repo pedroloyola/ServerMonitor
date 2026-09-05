@@ -1,0 +1,20 @@
+# Dependabot keeps the pinned GitHub Actions visible, so an update is a decision someone
+# makes rather than something that drifts in unnoticed.
+#
+# microsoft/microsoft-store-apppublisher is pinned to a commit SHA on purpose: it is a
+# third-party action that installs the tool which can submit and publish to the Microsoft
+# Store. Dependabot will open a PR proposing a newer SHA and name the release it belongs to.
+# Merging that PR is the deliberate update; moving the reference to a floating tag such as
+# @v1.4 is not, and must not be done for convenience.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore(actions)
+    labels:
+      - dependencies
+      - github-actions
