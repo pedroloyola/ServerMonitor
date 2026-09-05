@@ -111,7 +111,57 @@ jobs:
             Write-Warning "targetPublishMode is '$publishMode', not 'Manual'. This submission would publish itself once certification passes."
           }
 
+          # The shape of the response, which is what the parser depends on. Names only, no
+          # values, so this is safe to print unconditionally and is the thing worth reading
+          # when the CLI changes its output.
+          Write-Host ''
+          Write-Host '--- submission shape (field names only) ---'
+          Write-Host ("top level: " + (($submission.PSObject.Properties.Name | Sort-Object) -join ', '))
+          $firstPackage = @(Get-Field 'applicationPackages') | Select-Object -First 1
+          if ($firstPackage) {
+            Write-Host ("applicationPackages[0]: " + (($firstPackage.PSObject.Properties.Name | Sort-Object) -join ', '))
+          }
+          $listings = Get-Field 'listings'
+          if ($listings) {
+            Write-Host ("listings keys: " + (($listings.PSObject.Properties.Name | Sort-Object) -join ', '))
+          }
+
           if ('${{ inputs.include_metadata }}' -eq 'true') {
-            Write-Host '--- full submission JSON ---'
-            Write-Host ($submission | ConvertTo-Json -Depth 100)
+            # The submission resource carries fileUploadUrl, a shared access signature that
+            # grants package upload. Printing the raw object would put a live credential in
+            # the run log, where anyone who can read Actions could take it. Redact by
+            # property name, and also by value for anything carrying SAS or JWT markers,
+            # because the next field Microsoft adds will not be called fileUploadUrl.
+            function Protect-Value {
+              param($Node, [string] $Name = '')
+
+              if ($null -eq $Node) { return $null }
+
+              if ($Node -is [string]) {
+                if ($Name -match '(?i)uploadurl|sas|token|secret|password|credential|signature') { return '<redacted>' }
+                if ($Node -match '(?i)(\bsig=|\bsv=|\bse=&|^eyJ[A-Za-z0-9_-]{10,})') { return '<redacted>' }
+                return $Node
+              }
+
+              if ($Node -is [System.Collections.IEnumerable] -and $Node -isnot [string]) {
+                # The leading comma stops PowerShell unrolling a one-element array into a
+                # bare object; this dump exists to show the real shape, so an array must
+                # still look like an array.
+                return ,@($Node | ForEach-Object { Protect-Value -Node $_ -Name $Name })
+              }
+
+              if ($Node -is [psobject] -and $Node.PSObject.Properties.Count -gt 0) {
+                $copy = [ordered] @{}
+                foreach ($property in $Node.PSObject.Properties) {
+                  $copy[$property.Name] = Protect-Value -Node $property.Value -Name $property.Name
+                }
+                return [pscustomobject] $copy
+              }
+
+              return $Node
+            }
+
+            Write-Host ''
+            Write-Host '--- submission JSON (credentials redacted) ---'
+            Write-Host ((Protect-Value -Node $submission) | ConvertTo-Json -Depth 100)
           }

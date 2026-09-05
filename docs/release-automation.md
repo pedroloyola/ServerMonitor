@@ -189,7 +189,7 @@ repository, not in an issue, not in a run log.
 
 | description | created | expires |
 | --- | --- | --- |
-| _fill in on first rotation_ | | |
+| `GitHub Store CI` | 2026-09-05 | **2027-03-04** |
 
 ## Running a release
 
