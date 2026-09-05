@@ -70,9 +70,12 @@ public sealed class WidgetProviderComAdapter : IWidgetProvider
         Guard(nameof(DeleteWidget), () => _coordinator.OnWidgetDeleted(widgetId));
 
     public void Deactivate(string widgetId) =>
-        // The widget still exists; it is just not currently being viewed. Nothing to push until the next
-        // Activate/context change — keeping the registry as-is is correct.
-        Guard(nameof(Deactivate), () => { });
+        // The widget still exists; it is just not currently being viewed, so the registry is deliberately
+        // left as-is. What DOES change is that it stops counting as on screen: when the last visible widget
+        // deactivates the coordinator disarms the repaint pump, so the provider goes completely idle with
+        // the board closed (M13 QA-9). This used to be a no-op, which is why nothing ever turned the pump
+        // off — and, with no pump at all, why an open board never repainted.
+        Guard(nameof(Deactivate), () => _coordinator.OnWidgetDeactivated(widgetId));
 
     public void OnActionInvoked(WidgetActionInvokedArgs actionInvokedArgs) =>
         // A click on the card/row: map the allowlisted verb + opaque id to a serveralyzer:// launch (§14).

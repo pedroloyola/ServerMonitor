@@ -189,11 +189,13 @@
   <data name="SettingsNotificationsToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.HelpText" xml:space="preserve"><value>Controls all health-change alerts for monitored servers.</value></data>
   <data name="SettingsNotificationsSaveError.Title" xml:space="preserve"><value>Could not save the preference</value></data>
   <data name="SettingsNotificationsSaveError.Message" xml:space="preserve"><value>The previous notification setting was kept.</value></data>
+  <data name="TrayFailSafeExitNotificationTitle" xml:space="preserve"><value>ServerAlyzer was closed</value></data>
+  <data name="TrayFailSafeExitNotificationBody" xml:space="preserve"><value>The taskbar notification-area icon couldn't be safely restored, so ServerAlyzer closed. Open ServerAlyzer again to continue monitoring.</value></data>
   <data name="TrayToolTip" xml:space="preserve"><value>ServerAlyzer</value></data>
   <data name="TrayOpenMenuItem" xml:space="preserve"><value>Open ServerAlyzer</value></data>
   <data name="TrayRefreshAllMenuItem" xml:space="preserve"><value>Refresh all</value></data>
   <data name="TraySettingsMenuItem" xml:space="preserve"><value>Settings</value></data>
-  <data name="TrayExitMenuItem" xml:space="preserve"><value>Exit</value></data>
+  <data name="TrayExitMenuItem" xml:space="preserve"><value>Exit ServerAlyzer</value></data>
   <data name="NotificationServerFallbackName" xml:space="preserve"><value>Server</value></data>
   <data name="NotificationWarningTitle" xml:space="preserve"><value>Server needs attention</value></data>
   <data name="NotificationWarningBodyFormat" xml:space="preserve"><value>{0} is in a warning state.</value></data>
@@ -349,4 +351,16 @@
   <data name="WorkloadSummaryFailedFormat" xml:space="preserve"><value>{0} failing</value></data>
   <data name="WorkloadSummaryWarningFormat" xml:space="preserve"><value>{0} starting</value></data>
   <data name="WorkloadSummaryStoppedFormat" xml:space="preserve"><value>{0} stopped</value></data>
+  <data name="BackgroundNoticeTitle" xml:space="preserve"><value>ServerAlyzer is still monitoring</value></data>
+  <data name="BackgroundNoticeBody" xml:space="preserve"><value>The window was closed, but monitoring and the widget stay active. To quit, use "Exit ServerAlyzer" on the icon in the taskbar notification area — it may be under hidden icons (^). You can change this in Settings.</value></data>
+  <data name="SettingsBackgroundTitle.Text" xml:space="preserve"><value>Background</value></data>
+  <data name="SettingsBackgroundDescription.Text" xml:space="preserve"><value>Closing the window keeps ServerAlyzer monitoring and the widget up to date. To quit, use "Exit ServerAlyzer" on the notification-area icon — it may be under hidden icons (^).</value></data>
+  <data name="SettingsBackgroundToggle.Header" xml:space="preserve"><value>Keep running in the background when the window is closed</value></data>
+  <data name="SettingsBackgroundToggle.OnContent" xml:space="preserve"><value>On</value></data>
+  <data name="SettingsBackgroundToggle.OffContent" xml:space="preserve"><value>Off</value></data>
+  <data name="SettingsBackgroundToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Keep running in the background when the window is closed</value></data>
+  <data name="SettingsBackgroundToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.HelpText" xml:space="preserve"><value>When off, closing the window quits ServerAlyzer and stops monitoring and the widget.</value></data>
+  <data name="BackgroundDegradedNotice.Title" xml:space="preserve"><value>Background unavailable in this session</value></data>
+  <data name="BackgroundDegradedNotice.Message" xml:space="preserve"><value>ServerAlyzer opened this window because it could not place or keep its icon in the taskbar notification area. Without that icon there is no way to reopen or quit the app from the background, so closing this window now quits ServerAlyzer. Your preference was not changed: open ServerAlyzer again later to try again.</value></data>
+  <data name="SettingsBackgroundDegradedCaption.Text" xml:space="preserve"><value>Unavailable in this session: the notification-area icon could not be created or kept. Closing the window quits ServerAlyzer. Your preference was kept and will be used the next time you open the app.</value></data>
 </root>

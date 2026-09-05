@@ -29,4 +29,30 @@ public static class ProtocolActivationReader
 
         return null;
     }
+
+    /// <summary>
+    /// Classifies WHO asked (M13 S2 §H.2). A redirected plain launch carries its command line, so a
+    /// second <c>--background</c> launch is recognizable and must not surface the running instance's UI;
+    /// everything else is a person doing something. Classification uses the same strict
+    /// <see cref="LaunchModePolicy"/> as startup, so there is exactly one definition of the switch.
+    /// Anything unreadable degrades to <see cref="ActivationOrigin.UserActivation"/>, which is the
+    /// conservative answer: at worst the app shows itself when asked to, never the reverse.
+    /// </summary>
+    public static ActivationOrigin ClassifyOrigin(AppActivationArguments? args)
+    {
+        try
+        {
+            if (args?.Kind == ExtendedActivationKind.Launch &&
+                args.Data is ILaunchActivatedEventArgs launchArgs)
+            {
+                return ActivationOriginPolicy.FromLaunchCommandLine(launchArgs.Arguments);
+            }
+        }
+        catch
+        {
+            // Unreadable activation data: treat it as a user activation.
+        }
+
+        return ActivationOrigin.UserActivation;
+    }
 }

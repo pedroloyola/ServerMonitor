@@ -95,6 +95,52 @@
 
                     <Border Height="1" Background="{ThemeResource GlassBorderBrush}" />
 
+                    <!-- Background Section. The durable explanation of the background lifecycle: the
+                         one-time toast is a courtesy that may never arrive (notifications can be off),
+                         so this is what the user can always come back to (M13 S2 D.1). -->
+                    <StackPanel x:Name="BackgroundSection" Spacing="10">
+                        <StackPanel Spacing="2">
+                            <TextBlock
+                                x:Uid="SettingsBackgroundTitle"
+                                AutomationProperties.HeadingLevel="Level2"
+                                Style="{StaticResource SectionTitleTextStyle}" />
+                            <TextBlock
+                                x:Uid="SettingsBackgroundDescription"
+                                FontSize="12"
+                                Foreground="{ThemeResource TextSecondaryBrush}"
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+
+                        <ToggleSwitch
+                            x:Uid="SettingsBackgroundToggle"
+                            HorizontalAlignment="Left"
+                            MinHeight="36"
+                            IsOn="{Binding BackgroundMonitoringEnabled, Mode=TwoWay}" />
+
+                        <!-- STATE, not event: a short caption that survives closing the InfoBar, so the
+                             answer is still there when the user comes back asking why X quits the app.
+                             The toggle above stays enabled and keeps the persisted value: the preference
+                             did not change, it just has no effect this session. -->
+                        <TextBlock
+                            x:Uid="SettingsBackgroundDegradedCaption"
+                            AutomationProperties.LiveSetting="Polite"
+                            FontSize="12"
+                            Foreground="{ThemeResource TextSecondaryBrush}"
+                            TextWrapping="Wrap"
+                            Visibility="{Binding IsBackgroundDegraded, Mode=OneWay}" />
+
+                        <!-- EVENT: the same closable warning for both moments — the icon failing at
+                             startup and the icon being lost later. The user needs the same understanding
+                             and the same action in both, so there is one text, not two. -->
+                        <InfoBar
+                            x:Uid="BackgroundDegradedNotice"
+                            IsClosable="True"
+                            IsOpen="{Binding IsBackgroundDegradedNoticeOpen, Mode=TwoWay}"
+                            Severity="Warning" />
+                    </StackPanel>
+
+                    <Border Height="1" Background="{ThemeResource GlassBorderBrush}" />
+
                     <!-- Health Notifications Section -->
                     <StackPanel Spacing="10">
                         <StackPanel Spacing="2">

@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -21,37 +20,46 @@ public static class Program
 {
     private static IntPtr _redirectEventHandle = IntPtr.Zero;
 
-    // The single-instance key registered by the primary instance (null when bypassed for Debug QA).
-    // Released on shutdown so a launch that races the primary's exit becomes the new primary instead
-    // of redirecting into a process that is tearing down (M-1/shutdown race, Atlas reliability review).
-    private static string? _registeredInstanceKey;
+    /// <summary>
+    /// How this process was launched. Read once, before anything is built, and used by the lifecycle
+    /// controller to decide the initial state and by the first-close notice to stay silent (M13 S2 §B.2).
+    /// </summary>
+    public static LaunchMode LaunchMode { get; private set; } = LaunchMode.Foreground;
 
     /// <summary>
-    /// Releases the single-instance registration so a subsequent launch can take over cleanly during
-    /// shutdown. Best-effort and idempotent; the OS releases the key on process exit regardless.
+    /// PROCESS-scoped termination watchdog (M13 S2 §F.3, corrected). It is created here, before the
+    /// <c>IHost</c> exists, and is deliberately NOT owned by it: the first implementation registered it
+    /// as a container-created singleton inside the very host the exit stops and disposes, so
+    /// <c>host.Dispose()</c> disposed the watchdog and an <c>Application.Exit()</c> that failed to end
+    /// the process left NO escalation — an indefinite zombie still holding the AppInstance key. The
+    /// class no longer implements <see cref="IDisposable"/> and has no disarm, so nothing but the death
+    /// of the process can make it inert.
     /// </summary>
-    public static void ReleaseSingleInstanceKey()
-    {
-        var key = Interlocked.Exchange(ref _registeredInstanceKey, null);
-        if (key is null)
-        {
-            return;
-        }
+    public static ITerminationWatchdog TerminationWatchdog { get; } = new TerminationWatchdog(
+        new DedicatedThreadWatchdogScheduler(),
+        Microsoft.Extensions.Logging.Abstractions.NullLogger<TerminationWatchdog>.Instance);
 
-        try
-        {
-            AppInstance.GetCurrent().UnregisterKey();
-        }
-        catch
-        {
-            // Best-effort: process exit releases the key anyway.
-        }
-    }
+    /// <summary>Process-scoped too, for the same reason: the terminal action must outlive the host.</summary>
+    public static IProcessTerminator ProcessTerminator { get; } = new ProcessTerminator();
+
+    // OWNERSHIP (M13 S2 §F.2). There is deliberately NO method to release the single-instance key while
+    // this process is alive. Releasing it early used to be the recommendation, so that a launch racing
+    // the teardown became the new primary instead of redirecting into a dying process — but
+    // UnregisterKey and Exit are separate calls with no atomic combination in the AppInstance API, so
+    // that left an interval in which this process was alive and unowned, and a launch inside it became a
+    // SECOND primary with a second monitoring host writing the same snapshot. Ordering can only shrink
+    // that interval, never close it. Letting process termination release the registration removes it by
+    // construction: termination is atomic from the OS's side. The accepted residual is that while this
+    // process dies it stays the redirect target and discards what arrives (EXIT WINS), bounded by the
+    // termination watchdog.
 
     [STAThread]
     private static int Main(string[] args)
     {
         WinRT.ComWrappersSupport.InitializeComWrappers();
+
+        // Strict, two-valued, and read before anything else exists (Vigil C4).
+        LaunchMode = LaunchModePolicy.Resolve(args);
 
         if (ShouldRedirectToExistingInstance())
         {
@@ -94,10 +102,10 @@ public static class Program
 
         if (keyInstance.IsCurrent)
         {
-            // We are the primary instance. Remember the key so it can be released on shutdown. Deliver THIS
-            // launch's own cold intent BEFORE subscribing to redirects, so a later redirect (a newer user
-            // action) correctly supersedes it under the hand-off's latest-wins rule (§M-1).
-            _registeredInstanceKey = key;
+            // We are the primary instance, and we keep the key for the whole life of the process (see the
+            // ownership note above). Deliver THIS launch's own cold intent BEFORE subscribing to
+            // redirects, so a later redirect (a newer user action) correctly supersedes it under the
+            // hand-off's latest-wins rule (§M-1).
             _pendingActivation.Deliver(ProtocolActivationReader.TryGetIntent(activationArgs));
             keyInstance.Activated += OnActivated;
             return false;
@@ -118,17 +126,26 @@ public static class Program
     public static void AttachActivationConsumer(Action<ActivationIntent> consumer) =>
         _pendingActivation.Attach(consumer);
 
-    private static void OnActivated(object? sender, AppActivationArguments args)
-    {
-        // A second launch (notification click, ExtendedActivationKind.AppNotification, or a
-        // serveralyzer:// protocol/widget deep-link) was redirected here. Funnel any deep-link intent
-        // through the single hand-off (buffered before the App exists, delivered straight to the router
-        // after) and, if the shell is already up, foreground the one authoritative window. Routing never
-        // reads Application.Current — it is set before the router is built, so it is not a readiness flag
-        // (§M-1). A non-deep-link activation carries a null intent and only restores the window.
-        _pendingActivation.Deliver(ProtocolActivationReader.TryGetIntent(args));
-        (Application.Current as App)?.RestoreOnRedirect();
-    }
+    /// <summary>
+    /// One redirected activation (a notification click, an <c>ExtendedActivationKind.AppNotification</c>,
+    /// or a <c>serveralyzer://</c> protocol/widget deep-link) — dispatched so that it produces EXACTLY ONE
+    /// restore of the window (M13-QA-10 defensive fix B); see <see cref="ActivationDispatch"/>. Routing
+    /// never reads <c>Application.Current</c> as a readiness flag: it is set while the derived App
+    /// constructor is still wiring the router (§M-1).
+    /// </summary>
+    private static void OnActivated(object? sender, AppActivationArguments args) =>
+        _activationDispatch.Dispatch(
+            ProtocolActivationReader.TryGetIntent(args),
+            ProtocolActivationReader.ClassifyOrigin(args));
+
+    /// <summary>
+    /// The redirect step: deliver the intent, and restore the window only when nothing else will. Built
+    /// from the two fields above; the lambdas read them at call time, so declaration order is irrelevant.
+    /// </summary>
+    private static readonly ActivationDispatch _activationDispatch = new(
+        intent => _pendingActivation.Deliver(intent),
+        () => (Application.Current as App)?.RestoreOnRedirect(),
+        () => (Application.Current as App)?.IsExiting == true);
 
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
     private static extern IntPtr CreateEvent(
@@ -141,11 +158,26 @@ public static class Program
     private static extern uint CoWaitForMultipleObjects(
         uint dwFlags, uint dwMilliseconds, ulong nHandles, IntPtr[] pHandles, out uint dwIndex);
 
-    [DllImport("user32.dll")]
-    private static extern bool SetForegroundWindow(IntPtr hWnd);
-
-    // Redirects on another thread and uses a non-blocking wait so the STA message pump stays
-    // responsive, then brings the running instance's window to the foreground (Microsoft pattern).
+    /// <summary>
+    /// Redirects on another thread and uses a non-blocking wait so the STA message pump stays responsive.
+    /// <para>
+    /// It deliberately does NOT try to foreground the running instance itself (M13-QA-10 defensive fix A).
+    /// It used to call <c>SetForegroundWindow(Process.GetProcessById(pid).MainWindowHandle)</c>, and that
+    /// handle is a guess taken from OUTSIDE the target process: measured on the shipping build, the app
+    /// has more than one top-level window of the same class, so the property returns the first VISIBLE
+    /// unowned one — which is <c>IntPtr.Zero</c> whenever the window is minimized to the tray, and would
+    /// be the hidden 1440x789 <c>TOPMOST</c> WinUIEx helper window if that one ever became visible first.
+    /// Either way this process cannot know which HWND is authoritative; the primary can, because it owns
+    /// the <c>MainWindow</c>/<c>AppWindow</c>, and it already surfaces itself through
+    /// <see cref="Services.IApplicationWindowController.RestoreAndActivate"/> using that window's own
+    /// handle. Removing the guess loses nothing: <c>RedirectActivationToAsync</c> is what carries the
+    /// activation (and the foreground right) across, and the primary was measured coming to the
+    /// foreground with this call skipped entirely — from a launcher with no foreground rights, with the
+    /// window hidden in the tray, on a machine with the foreground lock fully engaged.
+    /// </para>
+    /// This is activation hygiene, NOT the QA-10 fix: a widget click is covered by the board, which is a
+    /// <c>WS_EX_TOPMOST</c> window, and no amount of foreground work on our side changes that.
+    /// </summary>
     private static void RedirectActivationTo(AppActivationArguments args, AppInstance keyInstance)
     {
         _redirectEventHandle = CreateEvent(IntPtr.Zero, true, false, null);
@@ -169,22 +201,7 @@ public static class Program
         _ = CoWaitForMultipleObjects(
             CWMO_DEFAULT, INFINITE, 1, [_redirectEventHandle], out _);
 
-        try
-        {
-            using var process = Process.GetProcessById((int)keyInstance.ProcessId);
-            var mainWindowHandle = process.MainWindowHandle;
-            if (mainWindowHandle != IntPtr.Zero)
-            {
-                SetForegroundWindow(mainWindowHandle);
-            }
-        }
-        catch (ArgumentException)
-        {
-            // The target instance exited between redirect and foreground; nothing to activate.
-        }
-        catch (InvalidOperationException)
-        {
-            // Same as above — the process object is no longer associated with a running process.
-        }
+        // Nothing else to do here. Surfacing the window is the PRIMARY instance's job, from the one
+        // authoritative handle it owns (see the remarks above); this process only forwards and exits.
     }
 }

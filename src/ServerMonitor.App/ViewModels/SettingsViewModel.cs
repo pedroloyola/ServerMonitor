@@ -15,6 +15,10 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
     private readonly IServerService _serverService;
     private readonly IServerDiscoveryService _discoveryService;
     private readonly INotificationSettingsService _notificationSettingsService;
+    private readonly IBackgroundMonitoringSettingsService _backgroundSettingsService;
+    private readonly INavigationService _navigationService;
+    private readonly IBackgroundDegradationNotice _backgroundDegradationNotice;
+    private bool _isBackgroundDegradedNoticeOpen;
     private readonly IHistoryMaintenanceService _historyMaintenance;
     private readonly ILogger<SettingsViewModel> _logger;
     private int _selectedLanguageIndex;
@@ -39,6 +43,8 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
         IServerService serverService,
         IServerDiscoveryService discoveryService,
         INotificationSettingsService notificationSettingsService,
+        IBackgroundMonitoringSettingsService backgroundSettingsService,
+        IBackgroundDegradationNotice backgroundDegradationNotice,
         IHistoryMaintenanceService historyMaintenance,
         IAppVersionProvider appVersionProvider,
         ILogger<SettingsViewModel> logger)
@@ -49,6 +55,12 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
         _serverService = serverService;
         _discoveryService = discoveryService;
         _notificationSettingsService = notificationSettingsService;
+        _backgroundSettingsService = backgroundSettingsService;
+        _navigationService = navigationService;
+        _backgroundDegradationNotice = backgroundDegradationNotice;
+        _isBackgroundDegradedNoticeOpen = backgroundDegradationNotice.IsDegraded;
+        backgroundDegradationNotice.Changed += OnBackgroundDegradationChanged;
+        _backgroundMonitoringEnabled = backgroundSettingsService.BackgroundMonitoringEnabled;
         _historyMaintenance = historyMaintenance;
         _logger = logger;
         _serverService.ServersChanged += OnServersChanged;
@@ -144,6 +156,88 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
     {
         get => _isResetIgnoredErrorOpen;
         set => SetProperty(ref _isResetIgnoredErrorOpen, value);
+    }
+
+    private bool _backgroundMonitoringEnabled;
+    private bool _isBackgroundSectionRequested;
+
+    /// <summary>
+    /// Open while this session has no notification-area icon. The window appears without the user asking
+    /// for it in that case, so it must arrive WITH the explanation: closing now quits, and the saved
+    /// preference was not changed (§13).
+    /// </summary>
+    public bool IsBackgroundDegradedNoticeOpen
+    {
+        get => _isBackgroundDegradedNoticeOpen;
+        set => SetProperty(ref _isBackgroundDegradedNoticeOpen, value);
+    }
+
+    /// <summary>
+    /// The persistent half of the degradation UX: visible for as long as the session is degraded, even
+    /// after the InfoBar is dismissed. Bound to Visibility, so it is simply absent otherwise.
+    /// </summary>
+    public Microsoft.UI.Xaml.Visibility IsBackgroundDegraded =>
+        _backgroundDegradationNotice.IsDegraded
+            ? Microsoft.UI.Xaml.Visibility.Visible
+            : Microsoft.UI.Xaml.Visibility.Collapsed;
+
+    private void OnBackgroundDegradationChanged(object? sender, EventArgs args)
+    {
+        IsBackgroundDegradedNoticeOpen = _backgroundDegradationNotice.IsDegraded;
+        OnPropertyChanged(nameof(IsBackgroundDegraded));
+    }
+
+    /// <summary>
+    /// True when this navigation was asked to land on the Background section — the activation of the
+    /// one-time notice. The page brings the section into view when it is set.
+    /// </summary>
+    public bool IsBackgroundSectionRequested
+    {
+        get => _isBackgroundSectionRequested;
+        private set => SetProperty(ref _isBackgroundSectionRequested, value);
+    }
+
+    /// <summary>
+    /// Called by the page when it is navigated to. This is where the pending "focus the Background
+    /// section" request is actually CONSUMED — the request exists precisely so the notice's activation
+    /// can land on the right section, and a request nobody consumes is the same class of defect as a
+    /// RefreshAll nobody calls.
+    /// </summary>
+    public void NotifyNavigatedTo() =>
+        IsBackgroundSectionRequested = _navigationService.ConsumeBackgroundSettingsFocus();
+
+    /// <summary>
+    /// Whether closing the window keeps ServerAlyzer monitoring in the background (M13 S2). This is the
+    /// durable half of the explanation: the one-time toast may never arrive — notifications can be off —
+    /// so this section, its description and its HelpText are what the user can always come back to.
+    /// </summary>
+    public bool BackgroundMonitoringEnabled
+    {
+        get => _backgroundMonitoringEnabled;
+        set
+        {
+            if (_backgroundMonitoringEnabled == value)
+            {
+                return;
+            }
+
+            try
+            {
+                _backgroundSettingsService.SetBackgroundMonitoringEnabled(value);
+                SetProperty(
+                    ref _backgroundMonitoringEnabled,
+                    _backgroundSettingsService.BackgroundMonitoringEnabled);
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(
+                    "Could not persist the background setting. Exception type: {ExceptionType}.",
+                    exception.GetType().Name);
+                // The service commits its property only after the atomic replace, so re-notify to make
+                // the toggle visibly return to the last committed value.
+                OnPropertyChanged(nameof(BackgroundMonitoringEnabled));
+            }
+        }
     }
 
     /// <summary>Global switch for all server-health notifications.</summary>

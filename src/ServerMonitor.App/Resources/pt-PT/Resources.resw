@@ -189,11 +189,13 @@
   <data name="SettingsNotificationsToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.HelpText" xml:space="preserve"><value>Controla todos os alertas de alteração de estado dos servidores monitorizados.</value></data>
   <data name="SettingsNotificationsSaveError.Title" xml:space="preserve"><value>Não foi possível guardar a preferência</value></data>
   <data name="SettingsNotificationsSaveError.Message" xml:space="preserve"><value>A configuração anterior de notificações foi mantida.</value></data>
+  <data name="TrayFailSafeExitNotificationTitle" xml:space="preserve"><value>O ServerAlyzer foi encerrado</value></data>
+  <data name="TrayFailSafeExitNotificationBody" xml:space="preserve"><value>Não foi possível restaurar em segurança o ícone da área de notificação da barra de tarefas, por isso o ServerAlyzer encerrou. Abra o ServerAlyzer de novo para continuar a monitorização.</value></data>
   <data name="TrayToolTip" xml:space="preserve"><value>ServerAlyzer</value></data>
   <data name="TrayOpenMenuItem" xml:space="preserve"><value>Abrir o ServerAlyzer</value></data>
   <data name="TrayRefreshAllMenuItem" xml:space="preserve"><value>Atualizar todos</value></data>
   <data name="TraySettingsMenuItem" xml:space="preserve"><value>Definições</value></data>
-  <data name="TrayExitMenuItem" xml:space="preserve"><value>Sair</value></data>
+  <data name="TrayExitMenuItem" xml:space="preserve"><value>Sair do ServerAlyzer</value></data>
   <data name="NotificationServerFallbackName" xml:space="preserve"><value>Servidor</value></data>
   <data name="NotificationWarningTitle" xml:space="preserve"><value>O servidor requer atenção</value></data>
   <data name="NotificationWarningBodyFormat" xml:space="preserve"><value>{0} está em estado de atenção.</value></data>
@@ -349,4 +351,16 @@
   <data name="WorkloadSummaryFailedFormat" xml:space="preserve"><value>{0} com falha</value></data>
   <data name="WorkloadSummaryWarningFormat" xml:space="preserve"><value>{0} a iniciar</value></data>
   <data name="WorkloadSummaryStoppedFormat" xml:space="preserve"><value>{0} parados</value></data>
+  <data name="BackgroundNoticeTitle" xml:space="preserve"><value>O ServerAlyzer continua a monitorizar</value></data>
+  <data name="BackgroundNoticeBody" xml:space="preserve"><value>A janela foi fechada, mas a monitorização e o widget continuam ativos. Para sair mesmo, use "Sair do ServerAlyzer" no ícone da área de notificação da barra de tarefas — pode estar nos ícones ocultos (^). Pode alterar isto nas Definições.</value></data>
+  <data name="SettingsBackgroundTitle.Text" xml:space="preserve"><value>Segundo plano</value></data>
+  <data name="SettingsBackgroundDescription.Text" xml:space="preserve"><value>Fechar a janela mantém o ServerAlyzer a monitorizar e o widget atualizado. Para encerrar, use "Sair do ServerAlyzer" no ícone da área de notificação — pode estar nos ícones ocultos (^).</value></data>
+  <data name="SettingsBackgroundToggle.Header" xml:space="preserve"><value>Continuar em segundo plano ao fechar a janela</value></data>
+  <data name="SettingsBackgroundToggle.OnContent" xml:space="preserve"><value>Ativado</value></data>
+  <data name="SettingsBackgroundToggle.OffContent" xml:space="preserve"><value>Desativado</value></data>
+  <data name="SettingsBackgroundToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Continuar em segundo plano ao fechar a janela</value></data>
+  <data name="SettingsBackgroundToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.HelpText" xml:space="preserve"><value>Quando desativado, fechar a janela encerra o ServerAlyzer e para a monitorização e o widget.</value></data>
+  <data name="BackgroundDegradedNotice.Title" xml:space="preserve"><value>Segundo plano indisponível nesta sessão</value></data>
+  <data name="BackgroundDegradedNotice.Message" xml:space="preserve"><value>O ServerAlyzer abriu esta janela porque não conseguiu colocar ou manter o seu ícone na área de notificação da barra de tarefas. Sem esse ícone não há forma de reabrir ou encerrar a app em segundo plano, por isso fechar esta janela agora encerra o ServerAlyzer. A sua preferência não foi alterada: abra o ServerAlyzer de novo mais tarde para tentar outra vez.</value></data>
+  <data name="SettingsBackgroundDegradedCaption.Text" xml:space="preserve"><value>Indisponível nesta sessão: o ícone da área de notificação não pôde ser criado ou mantido. Fechar a janela encerra o ServerAlyzer. A sua preferência foi mantida e será usada na próxima abertura.</value></data>
 </root>

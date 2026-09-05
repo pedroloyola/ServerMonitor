@@ -1,6 +1,8 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.UI.Xaml;
+using Microsoft.Extensions.Time.Testing;
 using ServerMonitor.App.Services;
+using ServerMonitor.App.Tests.Fakes;
 
 namespace ServerMonitor.App.Tests.Services;
 
@@ -31,7 +33,10 @@ public sealed class TrayServiceTests
         harness.Icon.RaiseRefreshAll();
         await harness.Refresh.Called.Task.WaitAsync(TimeSpan.FromSeconds(2));
 
-        Assert.Equal(1, harness.Window.HideCount);
+        // The minimize hide is ASKED FOR, not done: since round 9 it goes through the same guard as the
+        // close hide, because the two were identical window mechanics and only one of them was guarded.
+        Assert.Equal([TrayGuardedOperation.HideForMinimize], harness.Requested);
+        Assert.Equal(0, harness.Window.HideCount);
         Assert.Equal(1, harness.Window.RestoreCount);
         Assert.Equal(1, harness.Window.SettingsCount);
         Assert.Equal(1, harness.Refresh.RefreshCount);
@@ -51,7 +56,7 @@ public sealed class TrayServiceTests
     }
 
     [Fact]
-    public async Task RepeatedExit_RequestsAuthoritativeWindowCloseOnce()
+    public async Task RepeatedExit_RequestsTheAuthoritativeExitOnce()
     {
         var harness = new Harness();
         await harness.Service.StartAsync(default);
@@ -59,7 +64,11 @@ public sealed class TrayServiceTests
         harness.Icon.RaiseExit();
         harness.Icon.RaiseExit();
 
-        Assert.Equal(1, harness.Window.CloseCount);
+        // "Sair do ServerAlyzer" no longer closes the window and rides Window.Closed (M13 S2 §C): it
+        // calls the one authoritative exit, which is what makes the headless exit possible at all.
+        Assert.Equal(1, harness.Lifecycle.ExitRequests);
+        Assert.Equal(ExitReason.TrayExit, Assert.Single(harness.Lifecycle.ExitReasons));
+        Assert.Equal(0, harness.Window.CloseCount);
     }
 
     [Fact]
@@ -110,15 +119,102 @@ public sealed class TrayServiceTests
 
         public TrayService Service { get; }
 
-        public Harness()
+        public FakeAppLifecycleController Lifecycle { get; } = new();
+
+
+
+        public FakeTimeProvider Clock { get; } = new(new DateTimeOffset(2026, 9, 2, 12, 0, 0, TimeSpan.Zero));
+
+        /// <summary>
+        /// What the service ASKED for. Since round 9 the minimize hide is a guarded operation, so this
+        /// records a request rather than the window recording a hide it was told to do.
+        /// </summary>
+        public List<TrayGuardedOperation> Requested { get; } = new();
+
+        public Harness(int maxIconAttempts = 1)
         {
             Service = new TrayService(
                 Icon,
                 Window,
+                Requested.Add,
                 Refresh,
                 Alert,
-                NullLogger<TrayService>.Instance);
+                Lifecycle,
+                NullLogger<TrayService>.Instance,
+                Clock,
+                maxIconAttempts,
+                TimeSpan.FromSeconds(1));
         }
+    }
+
+    // ------------------------------------------------- M13 S2-T: the icon object is not the affordance
+
+    /// <summary>
+    /// Vigil C2 lives on: a failing icon must not abort startup. What CHANGED with the S2-T split is that
+    /// this class no longer decides whether an affordance exists — the icon object being constructed
+    /// never proved the shell holds the icon, and that inference is gone. The consequences of not having
+    /// an affordance are proved in TrayAffordanceLifecycleTests.
+    /// </summary>
+    [Fact]
+    public async Task A_failing_tray_icon_does_not_abort_startup()
+    {
+        var harness = new Harness();
+        harness.Icon.ThrowOnStart = true;
+
+        var thrown = await Record.ExceptionAsync(() => harness.Service.StartAsync(default));
+
+        Assert.Null(thrown);
+        Assert.False(harness.Service.IconObjectCreated);
+    }
+
+    [Fact]
+    public async Task A_failing_tray_icon_is_retried_before_giving_up()
+    {
+        var harness = new Harness(maxIconAttempts: 3);
+        harness.Icon.ThrowOnStart = true;
+
+        var start = harness.Service.StartAsync(default);
+        // The retry delay is on the injected clock, so the wait is deterministic rather than timed.
+        while (!start.IsCompleted)
+        {
+            harness.Clock.Advance(TimeSpan.FromSeconds(1));
+            await Task.Yield();
+        }
+
+        await start;
+        Assert.Equal(3, harness.Icon.StartAttempts);
+    }
+
+    /// <summary>
+    /// Creating the object is reported as exactly that — diagnostic, never an affordance signal. The
+    /// difference is the whole point of the split: only S2-T can say the shell holds the icon.
+    /// </summary>
+    [Fact]
+    public async Task A_created_icon_object_is_diagnostic_only()
+    {
+        var harness = new Harness();
+
+        await harness.Service.StartAsync(default);
+
+        Assert.True(harness.Service.IconObjectCreated);
+        Assert.DoesNotContain(
+            typeof(TrayService).GetProperties(),
+            property => property.Name is "CanEnterBackground" or "ExitAffordanceDegraded");
+    }
+
+    /// <summary>Vigil C3: the icon is removed by the committed exit, and only then.</summary>
+    [Fact]
+    public async Task The_icon_is_removed_only_by_the_committed_exit()
+    {
+        var harness = new Harness();
+        await harness.Service.StartAsync(default);
+        Assert.Equal(0, harness.Icon.StopCount);
+
+        harness.Service.RemoveIconForExit();
+        harness.Service.RemoveIconForExit();
+
+        Assert.Equal(1, harness.Icon.StopCount);
+        Assert.False(harness.Service.IconObjectCreated);
     }
 
     private sealed class FakeTrayIcon : ITrayIconAdapter
@@ -130,10 +226,25 @@ public sealed class TrayServiceTests
         public event EventHandler? ExitRequested;
 
         public int StartCount { get; private set; }
+        public int StartAttempts { get; private set; }
         public int SynchronousStopCount { get; private set; }
         public int AsyncStopCount { get; private set; }
 
-        public void Start() => StartCount++;
+        /// <summary>Shell_NotifyIcon failing, which is what §K is about.</summary>
+        public bool ThrowOnStart { get; set; }
+
+        public int StopCount => SynchronousStopCount;
+
+        public void Start()
+        {
+            StartAttempts++;
+            if (ThrowOnStart)
+            {
+                throw new InvalidOperationException("the notification area is unavailable");
+            }
+
+            StartCount++;
+        }
         public void StopSynchronously() => SynchronousStopCount++;
         public Task StopAsync(CancellationToken cancellationToken = default)
         {
@@ -153,6 +264,9 @@ public sealed class TrayServiceTests
         public bool IsAttached => true;
         public int HideCount { get; private set; }
         public int RestoreCount { get; private set; }
+
+        /// <summary>False models a headless process whose window cannot be created at all.</summary>
+        public bool CanMaterialize { get; set; } = true;
         public int SettingsCount { get; private set; }
         public int CloseCount { get; private set; }
         public int BeginShutdownCount { get; private set; }
@@ -160,8 +274,26 @@ public sealed class TrayServiceTests
         public int ToggleCompactCount { get; private set; }
 
         public void Attach(Window window) { }
+
+        public bool IsMaterialized => CanMaterialize && (RestoreCount > 0 || OpenBackgroundSettingsCount > 0);
+
+        public void AttachWindowFactory(Func<Window> factory) { }
+
+        public void HideToBackground() => HideToBackgroundCount++;
+
+        public int HideToBackgroundCount { get; private set; }
+
+        public void OpenBackgroundSettings()
+        {
+            OpenBackgroundSettingsCount++;
+            BackgroundSettingsOpened?.Invoke();
+        }
+
+        public int OpenBackgroundSettingsCount { get; private set; }
         public void HideForMinimize() => HideCount++;
         public void RestoreAndActivate() => RestoreCount++;
+
+        public event Action? BackgroundSettingsOpened;
         public void OpenSettings() => SettingsCount++;
         public void ToggleCompactMode() => ToggleCompactCount++;
         public void RequestClose() => CloseCount++;

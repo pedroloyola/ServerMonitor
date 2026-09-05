@@ -22,9 +22,24 @@ internal sealed class FakeNavigationService : INavigationService
 
     public void GoToDashboard() => DashboardCount++;
 
-    public void GoToSettings()
+    public void RequestBackgroundSettingsFocus() => BackgroundSettingsFocusRequests++;
+
+    public int BackgroundSettingsFocusRequests { get; private set; }
+
+    public bool ConsumeBackgroundSettingsFocus()
     {
+        if (BackgroundSettingsFocusRequests == 0)
+        {
+            return false;
+        }
+
+        BackgroundSettingsFocusRequests--;
+        return true;
     }
+
+    public int SettingsCount { get; private set; }
+
+    public void GoToSettings() => SettingsCount++;
 
     public void GoToHistory(Guid serverId, string serverName) => LastHistoryServerId = serverId;
 

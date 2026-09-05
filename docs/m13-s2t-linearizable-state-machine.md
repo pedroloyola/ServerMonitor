@@ -1,0 +1,853 @@
+# M13 S2-T — LINEARIZABLE STATE MACHINE
+
+**Autor:** Relay (platform-infra), implementer da S2-T / dono do Windows Shell.
+**Branch:** `agent/m13-s2t-tray`, base `221eda4`. **DESENHO. Sem implementação.**
+**Desenho normativo vigente.** Substitui `m13-s2t-root-state-machine-redesign.md` (actor FIFO) e
+`m13-s2t-architecture-review.md` (revisões 1–7). **Nenhum deles revoga uma condição CV** — o mapa da
+secção 8 é a autoridade sobre o estado das condições (CV-15).
+
+---
+
+## 0 — Porque o modelo de actor estava errado
+
+O actor FIFO **separava a admissão do evento da transição de estado**:
+
+```
+WndProc admite TaskbarCreated → enfileira Admit → o actor ainda não consumiu
+                                                → o Available antigo continua publicado  ✗
+```
+
+Foi assim que o intervalo voltou, pela terceira estrutura diferente. A causa não era a fila, o CAS ou
+o lock: era **haver um passo entre aceitar o evento e mudar o estado**. A correção é eliminar o passo,
+não encurtá-lo.
+
+## 1 — A função de transição
+
+**Existe uma e uma só autoridade de ciclo de vida: `Transition`.**
+
+```csharp
+// A ÚNICA escritora de estado de ciclo de vida em todo o sistema.
+TransitionResult Transition(TrayEvent e, long monotonicNow);
+```
+
+- **Chamada DIRETAMENTE pelas fontes de evento**, de forma síncrona, na thread da própria fonte.
+  **Não há fila, não há despacho, não há passo intermédio.**
+- Corpo executado sob **um** domínio de exclusão mútua que protege **apenas a decisão**. Dentro dele:
+  **nenhum I/O nativo, nenhum `await`, nenhum despacho para a UI, nenhum `ShowAt`, nenhuma aquisição
+  do gate.** É aritmética sobre campos privados.
+- Devolve **efeitos**. Os efeitos correm **depois** de o domínio ser libertado, **nunca** mutam estado,
+  e os seus resultados **reentram por `Transition`**.
+
+### Preâmbulo normativo — corre em toda a chamada, antes de olhar para o evento
+
+```
+1. se o estado for Releasing/Released  → só eventos terminalmente legais prosseguem  (D)
+2. se o evento trouxer geração ≠ geração atual → DESCARTAR                            (obsolescência)
+   ⚠ RESSALVA CV-19, normativa: os eventos de CONCLUSÃO DE EFEITO capazes de ter criado
+     uma afordância de shell — AddCompleted, SetVersionCompleted — NUNCA são descartados
+     por geração obsoleta. São encaminhados para RECONCILIAÇÃO (§5.2). O passo 2 mantém-se
+     para todos os outros eventos.
+3. se houver episódio ativo e monotonicNow ≥ deadline → TERMINALIZAR como Lost AQUI,
+   nesta execução, ANTES de processar o evento                                        (A)
+4. só então despachar o evento
+```
+
+O passo 3 é o que torna a garantia do deadline **uma propriedade da função e não de um temporizador**.
+
+> **CV-19 — porque a ressalva do passo 2 é obrigatória e não cosmética.** Um `AddCompleted` tardio traz
+> **sempre** a geração antiga, porque o `Releasing` mudou a geração terminal. Lido à letra, o passo 2
+> descartá-lo-ia **antes** de a reconciliação da §5.2 acontecer — que é exatamente o defeito que a §5.2
+> existe para impedir, e um implementer que siga o preâmbulo literalmente escreve o ícone órfão. **O
+> passo 2 não é removido**: continua a ser carga estrutural para todos os outros eventos e tem mutação
+> própria.
+
+### Fontes de evento
+
+Admissão de `TaskbarCreated` · `Release` · continuação de retry · resultado de registo nativo ·
+resultado de `NIM_SETVERSION` · observação do deadline · resultado da limpeza · callbacks do tray.
+
+**Todas chamam a mesma função. Nenhuma escreve estado por outra via.**
+
+## 2 — Semântica do deadline, reformulada *(A)*
+
+**Não se exige transição em tempo real em T+1500 ms.** O Windows não oferece escalonamento de tempo
+real e a aplicação não o pode garantir. **1500 ms não é, e não é descrito como, garantia de
+escalonamento do Windows.**
+
+> **Garantia normativa (segurança).** Depois do deadline monotónico, **nenhuma** observação,
+> continuação, callback, retry ou resultado nativo pode publicar `Available`.
+> **A terminalização ocorre na primeira execução agendada que observa o deadline expirado.**
+
+Isto é **segurança**; a promptidão é **vivacidade** e é dada, sem ser garantida, pelo temporizador
+one-shot — que passa a ser **apenas mais uma fonte de evento** cuja única função é assegurar que
+*alguma* execução acontece mesmo que nada mais dispare. Se o temporizador atrasar, a segurança
+mantém-se: quem chegar primeiro terminaliza.
+
+**Exemplo canónico, e é literalmente o passo 3 do preâmbulo:**
+
+```
+NIM_ADD começa antes do deadline
+→ devolve SUCESSO depois do deadline
+→ o resultado reentra por Transition(NativeAddCompleted(gen, ok:true), now)
+→ preâmbulo relê o tempo monotónico e vê o deadline expirado
+→ terminaliza como Lost NESTA execução, antes de olhar para o ok:true
+→ o sucesso é obsoleto e NÃO publica Available
+→ o efeito emitido é a compensação, não a promoção
+```
+
+O deadline é **monotónico · capturado uma vez · nunca reiniciado**, e é verificado **depois de cada
+`await`, depois de cada chamada nativa síncrona, e antes de publicar `Available`** — as três, porque
+todas essas são reentradas em `Transition`.
+
+## 3 — Admissão: uma só operação linearizável *(C)*
+
+```csharp
+// Na WndProc, thread de UI. Síncrono. Sem fila.
+case TrayEvent.TaskbarCreated:
+    if (_state != Available) { /* coalesce ou descartar, conforme o estado */ break; }
+    if (!_frequencyLimiter.TryBeginEpisode(monotonicNow)) break;   // B: sem episódio, sem deadline, sem Lost
+    _generation++;                       //  ┐
+    _episodeStart = monotonicNow;        //  │ MESMA transição, mesmo domínio,
+    _deadline = monotonicNow + 1500ms;   //  │ sem nada entre elas
+    _state = Recovering;                 //  ┘ ◄── Available deixa de estar publicado AQUI
+    effects += StartDebounce(_generation);
+    break;
+```
+
+**A consulta a B acontece DENTRO da transição.** É por isso que não existe janela entre "admitido" e
+"invalidado": não há duas operações a ordenar. **Zero intervalo entre aceitar o `TaskbarCreated` e
+deixar de publicar `Available`** — e agora sem depender de a `WndProc` ser síncrona, porque a
+propriedade é da função de transição.
+
+**Debounce, retry e I/O nativo só começam como efeitos, depois da decisão.** O debounce vive **dentro**
+do episódio e do deadline; coalesce mensagens adicionais e **não** move o relógio, **não** cria
+geração, **não** preserva `Available`.
+
+## 4 — Estados e transições
+
+`Unavailable(0)` · `Available(1)` · `Recovering(2)` · `Lost(3)` · `Releasing(4)` · `Released(5)`
+
+| Estado | Evento | Novo estado | Efeitos |
+|---|---|---|---|
+| `Available` | `TaskbarCreated` admitido por B | **`Recovering`** | iniciar debounce |
+| `Unavailable` | `Establish` | `Recovering` | iniciar tentativa |
+| `Recovering` | `NativeAddCompleted(ok)` **dentro do prazo**, `SetVersion` ok | `Available` | publicar; limpar efeito |
+| `Recovering` | falha nativa com orçamento A esgotado | `Lost` | compensar |
+| `Recovering` | **deadline expirado** (preâmbulo) | `Lost` | compensar |
+| `Lost` | `CleanupCompleted(verified: true)` | `Lost` | notificar a S2 ⇒ UX degradada aprovada |
+| `Lost` | `CleanupCompleted(verified: false)` | **`Releasing`** | CV-17 + **`FailSafeExitRequested`** (§6.4) |
+| **qualquer** | `Release` | **`Releasing`** | compensar |
+| `Releasing` | `AddCompleted`/`SetVersionCompleted` obsoletos | `Releasing` | **`DeleteIcon` compensatório** (§5.2) |
+| `Releasing` | `CleanupCompleted(verified: true)` **e** nenhuma reconciliação pendente | **`Released`** | — |
+| `Releasing` | `CleanupCompleted(verified: false)` | `Releasing` | **`FailSafeExitRequested`** (§6.4) |
+
+**`Lost` tem duas causas legítimas:** esgotamento do orçamento A com falha nativa **observada**, e
+expiração do deadline. **Supressão por B não produz `Lost`** — sem episódio não há causa terminal.
+
+## 5 — `Release` absorvente: **emissão** vs **conclusão** *(D · decisão OPÇÃO A)*
+
+A regra literal anterior — *"nenhum `NIM_ADD` pode executar depois do `Release`"* — **está substituída**
+pelo invariante causal abaixo. Satisfazê-la à letra exigiria que o `Release` esperasse pelo gate de I/O
+nativo, **o que reintroduziria o defeito de timer/deadlock provado na revisão 6**. O gate **não** volta
+a ser acoplado ao ciclo de vida.
+
+### 5.1 Emissão — capacidade **opaca e não fabricável**
+
+> **Uma vez comprometido `Releasing`, a `Transition` NUNCA emite um efeito `Add` novo.**
+
+**A revisão anterior não cumpria isto.** `EpisodeToken` e `AddIcon.For` eram `internal`: qualquer código
+do assembly podia fabricar token e efeito **sem passar pela `Transition`**. Esse `Add` não entrava no
+contador `pending`, a máquina podia atingir `Released` com a guarda satisfeita, e o `Add` posterior
+deixava um ícone real. **O token não era o mecanismo — era a convenção de ninguém o construir.**
+
+**Reincidência corrigida (CV-20).** A versão anterior fechou o **produtor concreto** e deixou o
+**contrato aberto** — a mesma classe de erro do `EpisodeToken`, uma camada acima. Com `IShellEffect`
+`internal` e implementável, qualquer tipo do assembly podia implementá-lo, declarar
+`MayCreateAffordance = false`, chamar `native.Add` dentro do seu `Execute`, e **ser executado pelo nosso
+executor**: sem passar pela `Transition`, sem incrementar `pending`, com `Released` alcançável e ícone
+vivo. **Esta via não usa reflexão** e não estava coberta pelo recorte aceite.
+
+**Mecanismo: efeitos são DADOS PASSIVOS; só o executor vê a capacidade nativa.**
+
+> **Contradição interna corrigida nesta volta.** A versão anterior afirmava "detentor único da
+> capacidade nativa" e **contradizia-se em três sítios**: `IEffect.Execute` recebia
+> `INativeTrayRegistration`, as implementações recebiam-no, e a própria `TrayStateMachine` conservava
+> `_native`. **O T14 teria falhado já no baseline.** Um efeito deixa de executar seja o que for.
+
+```csharp
+internal sealed class TrayStateMachine
+{
+    // (1) EFEITO = DADO PASSIVO. Descreve O QUE fazer. Não executa, não recebe capacidade,
+    //     não referencia INativeTrayRegistration em lado nenhum.
+    private enum EffectKind { AddIcon, DeleteIcon, FailSafeExit }
+
+    private readonly record struct Effect(EffectKind Kind, long Generation, long Sequence);
+
+    // (2) A operação nativa e a afordância vêm da MESMA fonte, num switch EXAUSTIVO
+    //     SEM ramo default: um Kind novo é ERRO DE COMPILAÇÃO, não um `false` silencioso.
+    //     Os dois valores não podem discordar porque não vivem em sítios diferentes.
+    private static (NativeOp Op, bool MayCreateAffordance) Describe(EffectKind kind) => kind switch
+    {
+        EffectKind.AddIcon      => (NativeOp.Add,    true),
+        EffectKind.DeleteIcon   => (NativeOp.Delete, false),
+        EffectKind.FailSafeExit => (NativeOp.None,   false),
+        // sem `_ =>` de propósito (CS8509 tratado como erro)
+    };
+
+    // (3) EXECUTOR privado aninhado: o ÚNICO tipo que RETÉM a capacidade nativa.
+    private sealed class EffectExecutor(INativeTrayRegistration native)
+    {
+        private readonly INativeTrayRegistration _native = native;   // único campo deste tipo no programa
+        internal ShellOpResult Run(Effect effect) => effect.Kind switch { … };
+    }
+
+    // (4) A TrayStateMachine NÃO conserva _native. Só detém o executor.
+    private readonly EffectExecutor _executor;
+
+    // (5) ÚNICO ponto de travessia da capacidade em todo o assembly: este parâmetro,
+    //     que a encaminha para o executor sem a reter.
+    internal TrayStateMachine(INativeTrayRegistration native, …) => _executor = new EffectExecutor(native);
+}
+```
+
+**Porque não sobra via:**
+
+1. **`Effect` é um `record struct` `private` aninhado ⇒ não é nomeável, declarável nem construível fora**
+   da classe. Não há interface implementável: **um efeito não tem comportamento para alguém redefinir.**
+2. **`MayCreateAffordance` é derivada de `Kind`, na mesma expressão que escolhe a operação nativa.** A
+   sequência exata da CV-20 — *declarar `MayCreateAffordance = false` e chamar `native.Add` dentro do
+   `Execute`* — **deixa de ser representável**: não há `Execute`, e o sinalizador não é armazenável em
+   desacordo com a operação.
+   **Pin do Vigil, adotado:** o acoplamento `Kind → (operação, afordância)` vivia em **dois sítios**, e
+   um **`Kind` novo podia recriar a mentira por omissão**. Passa a viver num **switch exaustivo sem
+   ramo `default`**. As três metades que o sustentam estão na §5.1.1.
+   *Fecho-a agora e não na quarta volta: é a mesma classe de defeito das anteriores — a garantia a
+   depender de alguém se lembrar.*
+
+### 5.1.1 O que sustenta o `switch` exaustivo — configuração, e duas guardas distintas
+
+> **Correção de uma afirmação falsa minha.** O documento dizia "erro de compilação" sobre configuração
+> que **não existe**: `CS8509` é **aviso** por omissão, e o repositório **não tem
+> `Directory.Build.props` nem `TreatWarningsAsErrors`** — verifiquei. Uma garantia afirmada sem a
+> configuração que a sustenta é exatamente o padrão que me devolveu quatro vezes nesta fatia. Escolho a
+> via do Vigil: **tornar a garantia verdadeira**, não suavizar a redação.
+
+**Configuração normativa** — ficheiro `src/ServerMonitor.App/ServerMonitor.App.csproj`, propriedade
+`WarningsAsErrors`:
+
+```xml
+<!-- CS8509: o switch não trata todos os valores NOMEADOS do enum.
+     Escalado a ERRO: é o que torna "um Kind novo não descrito não compila" verdadeiro. -->
+<WarningsAsErrors>$(WarningsAsErrors);CS8509</WarningsAsErrors>
+```
+
+> **Por aplicar.** Esta escalada é **normativa mas ainda não está na árvore** — nenhum `.csproj`,
+> `.props` ou `.targets` tem `WarningsAsErrors` hoje. Logo a garantia desta secção **ainda não é
+> verdadeira no repositório** e a sua prova não pode ser corrida. É **item de entrega da CV-12**:
+> ver §12.1.
+
+**`CS8524` é coberto por decisão explícita de NÃO o escalar, e a razão importa.** O `CS8524` é o
+diagnóstico do valor de enum **não nomeado** — dispara quando o `switch` cobre todos os valores
+nomeados mas não os não nomeados. **Escalá-lo a erro obrigaria a acrescentar exatamente o ramo
+`default` que este desenho existe para proibir**: os dois requisitos são incompatíveis, e escalar os
+dois seria contraditório. Portanto `CS8524` **fica como aviso, deliberadamente**, e a sua manifestação
+em runtime — a `SwitchExpressionException` para um valor não nomeado — **é precisamente o que o T18
+afirma**. Se algum dia se ligar `TreatWarningsAsErrors` global, `CS8524` **tem de ser excluído** via
+`<WarningsNotAsErrors>$(WarningsNotAsErrors);CS8524</WarningsNotAsErrors>`, ou o desenho quebra.
+
+**Duas guardas distintas, porque provam coisas diferentes:**
+
+| Guarda | Prova | Falha quando |
+|---|---|---|
+| **`CS8509` como erro** | nenhum `Kind` **nomeado** fica por descrever | se acrescentar um `EffectKind` sem braço próprio ⇒ **não compila** |
+| **T17** | nenhum `Kind` **definido** chega a `Add` com o sinalizador errado | se um `Kind` mapear para `Add` com `MayCreateAffordance = false` |
+| **T18** | **ausência de ramo `default`** | ver ponto seguinte |
+
+> **Defeito na minha própria mutação declarada, apanhado pelo Atlas.** Eu tinha escrito que acrescentar
+> um ramo `default` faria falhar o T17. **Não faz.** O `Enum.GetValues` só devolve valores **definidos**,
+> todos caem nos braços explícitos, e o `default` **nunca é exercitado** — a mutação passava verde. O
+> T17 prova que nenhum `Kind` definido chega a `Add` com o sinalizador errado; **não prova a ausência
+> de `default`**, que era a metade estrutural. É a §10 do `BOSS.md` aplicada ao meu próprio pin: escrevi
+> uma mutação que não falsifica a garantia que digo provar.
+
+**Guarda própria: T18, sonda de valor não definido.**
+
+```
+Describe((EffectKind)int.MaxValue)      // valor legal do tipo, nunca definido
+```
+
+- **Baseline, sem ramo `default`:** o `switch` expression **lança `SwitchExpressionException`** ⇒ o
+  teste **passa**.
+- **Mutação, ramo `default` acrescentado:** o `switch` **devolve o tuplo por omissão em vez de lançar**
+  ⇒ o teste **falha**. É exatamente assim que a guarda deteta a adição do `default`.
+
+O `Describe` é `private static`; o T18 **invoca-o por reflexão**, tal como o T14 lê metadata. Isto não
+alarga visibilidade de produção e não colide com a CV-20: o que a CV-20 proíbe é **a nossa maquinaria
+ser veículo** de um efeito de origem não provada, e um teste a sondar um método privado não é isso —
+é a mesma fronteira do recorte da reflexão já aceite. **Escolhi a sonda comportamental e não a
+inspeção de IL** porque a primeira observa a propriedade real (o que acontece a um valor não coberto)
+e a segunda seria frágil à forma como o compilador emite o `switch`.
+3. **`EffectExecutor` é `private` aninhado e é o único tipo com um campo `INativeTrayRegistration`.**
+4. **A capacidade atravessa a fronteira exatamente uma vez**, mas isso custa **dois parâmetros de
+   construtor** — o da máquina, que a encaminha **sem a reter**, e o do executor, que a retém. **Um
+   único campo detentor.** É o mínimo honesto: a capacidade tem de entrar uma vez, tem de ser
+   encaminhada uma vez, e o seam para testes tem de continuar a existir.
+
+   > **Correção de contagem, e é a terceira vez.** Escrevi "a única outra ocorrência" quando são duas.
+   > As três afirmações de unicidade que fiz nesta fatia foram **mais fortes do que o desenho aguenta**.
+   > Por isso a allowlist do T14b passa a ser **enumerada explicitamente** em vez de descrita por
+   > exclusão — uma lista fechada não pode ficar desatualizada em silêncio, uma negação pode.
+5. Os únicos `new Effect(EffectKind.AddIcon, …)` estão nos ramos de emissão da `Transition`, que o
+   **passo 1 do preâmbulo** torna inalcançáveis em `Releasing`/`Released`.
+
+> **Fronteira honesta, e é diferente do buraco que se fechou.** Código do assembly que faça P/Invoke a
+> `Shell_NotifyIcon` por sua conta **não está a contornar a autoridade** — está a ser um programa
+> diferente a escrever no shell, e nenhum sistema de tipos nosso o impede. O defeito da CV-20 era
+> outro: **a nossa própria maquinaria servir de veículo** a um efeito de origem não provada. Isso deixa
+> de ser possível. É a mesma fronteira do recorte da reflexão, e não a alarga.
+
+**Escolhi a variante ESTRUTURAL, não a normativa.** A garantia é do **compilador**, não de um teste.
+O **T14** entra como **guarda de regressão** — e, na metade que o compilador *não* pode impor, como
+**única** guarda.
+
+> **A metade não imposta pelo compilador, identificada pelo Vigil.** Nada no sistema de tipos impede
+> alguém de acrescentar `services.AddSingleton<INativeTrayRegistration>(…)` e assim pôr a capacidade a
+> circular pelo contentor. **Essa metade é guardada só pelo T14**, e é por isso que ele tem de asserir
+> as três coisas, sobre **metadata real e não texto**:
+>
+> 1. `Effect`, `EffectKind` e `EffectExecutor` **não são visíveis** fora de `TrayStateMachine`;
+> 2. **exatamente um tipo retém a capacidade** — `TrayStateMachine+EffectExecutor` é o único com um
+>    campo de tipo `INativeTrayRegistration`. A allowlist é fixada **por IDENTIDADE de metadata, não
+>    por contagem** — contar dois não distingue *quais* dois:
+>
+>    | Membro (identidade de metadata) | Papel |
+>    |---|---|
+>    | `TrayStateMachine..ctor`, parâmetro `native` | travessia da fronteira; **não retém** |
+>    | `TrayStateMachine+EffectExecutor..ctor`, parâmetro `native` | entrega ao detentor |
+>    | `TrayStateMachine+EffectExecutor._native`, campo | **único detentor** |
+>
+>    Qualquer membro do assembly que nomeie o tipo e **não esteja nesta lista** faz o teste falhar.
+>
+>    **Campos gerados pelo compilador são INSPECIONADOS, não excluídos.** A redação da ronda anterior
+>    — *"o T14b tem de ignorar campos `[CompilerGenerated]`"* — **abria uma via real e é substituída**:
+>    uma **closure**, uma **auto-property** ou a **captura do parâmetro** pode **reter a capacidade num
+>    campo gerado** e escapar à allowlist. Isso **não é ruído alheio à segurança — é retenção
+>    adicional**, exatamente o que o T14b existe para detetar.
+>
+>    *É o meu próprio argumento aplicado contra mim: uma exclusão por **categoria** é uma negação
+>    disfarçada, e as negações não ficam desatualizadas ruidosamente. A allowlist por identidade fica.*
+>
+>    **Âmbito da varredura:** **todos os tipos do assembly**, incluindo tipos gerados
+>    (`<>c__DisplayClass…` de closures) e tipos aninhados; **todos os campos**, gerados incluídos;
+>    match pelo **tipo da capacidade**. Falha para qualquer campo fora da tabela de identidades.
+>
+>    **Campos gerados no baseline: ZERO do tipo da capacidade.** O construtor primário do
+>    `EffectExecutor` só usa `native` no inicializador de `_native`, e nesse caso o compilador **não
+>    emite campo de captura** — o parâmetro é consumido no construtor. Os únicos campos gerados nestes
+>    tipos são os *backing fields* posicionais do `readonly record struct Effect`, de tipo `EffectKind`
+>    e `long`, que **não correspondem ao tipo da capacidade** e por isso nem entram na comparação.
+>    **A tabela acima não precisa hoje de nenhuma entrada gerada.**
+>
+>    **Se algum dia aparecer um campo gerado legítimo** — por exemplo, um corpo de método a referenciar
+>    `native` em vez de `_native`, que faz o compilador emitir `<native>P` — o teste **falha**, e a
+>    resolução correta é **nomear a sua identidade concreta na tabela, por decisão de review**, não
+>    voltar a excluí-lo por ser gerado. **A preocupação do Vigil fica satisfeita pela identidade, não
+>    pela categoria;**
+> 3. **ausência de registo no contentor** — nenhum `ServiceDescriptor` do composition root tem
+>    `INativeTrayRegistration` como `ServiceType` nem como `ImplementationType`. **Isto NÃO é
+>    metadata:** o teste **constrói a `IServiceCollection` realmente produzida pelo composition root** e
+>    inspeciona os `ServiceDescriptor` que dela saem. Varrer tipos ou texto **não serve** — só a
+>    coleção real deteta a mutação de registo.
+>
+> **Com esta correção o T14 passa no baseline.** Antes não passaria, e era esse o achado.
+
+> **Escolha explícita no ponto 3: asserção própria, NÃO mutação combinada.** O T15 tinha perdido o
+> referente — a mutação *"`MayCreateAffordance` passa a campo"* **não o pode falhar**, porque com os
+> tipos privados o efeito estrangeiro continua a não compilar. Podia declarar uma **mutação
+> combinada**, mas a regra da §10 do `BOSS.md` é que **uma prova conjuntiva passa com metade da
+> condição implementada** — e isso já me custou uma volta na CV-6b. Por isso **separo**: o **T15** fica
+> com um só referente (a mutação de visibilidade) e nasce o **T16** com asserção própria sobre a forma
+> do `Effect` e a derivação por `Kind`. **Cada mutação continua isolada e cada teste tem um referente
+> único.**
+
+> **Sobre falsificabilidade, registado porque foi arbitrado:** uma mutação que **não compila**
+> representa uma garantia **estrutural mais forte**, não uma fuga à falsificação. **T14 + T15 são prova
+> adequada desde que o T14 inspecione metadata real.**
+
+**`DeleteIcon` continua a não exigir token** — decisão mantida: compensar tem de ser sempre legal em
+estado terminal.
+
+### 5.2 Conclusão — o que pode acontecer fisicamente depois
+
+Um `Add` **legitimamente emitido e linearizado ANTES** de `Releasing` **pode completar fisicamente
+depois**. Esse resultado é **trabalho obsoleto e compensado**:
+
+- reentra na **mesma** `Transition`;
+- observa `Releasing` / geração obsoleta;
+- **não publica `Available`** · **não reabre recuperação** · **não muta o ciclo de vida para fora de
+  `Releasing`**;
+- **se pode ter recriado o ícone no shell ⇒ `Delete` compensatório é OBRIGATÓRIO.**
+
+> **O passo 1 do preâmbulo deixa de significar "ignorar".** Em estado terminal, `AddCompleted` e
+> `SetVersionCompleted` **não são descartados em silêncio: são RECONCILIADOS.** Descartá-los seria
+> exatamente o defeito — o resultado é obsoleto para o *ciclo de vida*, mas não para o *shell*.
+
+### 5.3 Absorção, tal como se mantém
+
+`Releasing` **+** `TaskbarCreated` · `AddCompleted` · `SetVersionCompleted` · `Retry` · `Deadline` ·
+`Lost` · callback · continuação de notificação ⇒ **nunca** volta a `Available` nem a `Recovering`.
+δ(`Releasing`, x) = `Releasing` ∀x, salvo a transição interna para `Released` da §6.
+**Nenhum resultado obsoleto contorna a `Transition`.**
+
+## 6 — Efeitos, gate de I/O, entrega de notificações, e a saída fail-safe
+
+### 6.1 Efeitos
+
+Um efeito **nunca** muta estado. Os efeitos de uma transição correm **depois** de libertar o domínio de
+decisão, e cada um carrega a **geração** e o **número de sequência** da transição que o produziu.
+
+> **Ordem:** os efeitos que tocam o shell são executados **pela ordem de sequência em que foram
+> produzidos**, serializados pelo gate. Sem isto, um `Add` e um `Delete` de transições consecutivas
+> poderiam chegar ao shell trocados.
+
+**É proibido chamar `Transition` de dentro do domínio de decisão.** Os efeitos correm fora e os seus
+resultados reentram como eventos novos.
+
+### 6.2 Gate
+
+`_nativeGate` serializa **exclusivamente** I/O nativo do shell. **Não decide** admissão, `Available`,
+`Recovering`, `Lost`, `Releasing`, nem terminalidade da limpeza. **Nunca é adquirido dentro do domínio
+de decisão, e o `Release` nunca espera por ele** — é isso que impede o defeito de timer/deadlock da
+revisão 6.
+
+### 6.3 Entrega de notificações — revalidação **no momento da entrega** *(§7 da decisão)*
+
+> **Um evento ser válido quando foi enfileirado NÃO É SUFICIENTE.**
+
+Toda entrega enfileirada ou atrasada — `StateChanged` para a S2, notificações de UI, a notificação
+CV-17/CV-18 — **revalida geração e estado de ciclo de vida no instante da ENTREGA**, e não apenas no
+instante em que foi enfileirada.
+
+```csharp
+// Avaliado NA ENTREGA, contra o estado atómico atual. Não é um snapshot capturado no enqueue.
+bool ShouldDeliver(Delivery d) => d.Generation == CurrentGeneration && d.Class.IsLegalIn(CurrentState);
+```
+
+**Classificação, porque "suprimir" não é uniforme:**
+
+| Classe de entrega | Em `Releasing`/`Released` |
+|---|---|
+| semântica de sessão (`Available`, `Recovering`, `Lost` degradável) | **SUPRIMIDA** — não pode dizer à S2 para degradar nem para confiar numa afordância |
+| dirigida ao terminal (`Releasing`, `Released`) | **ENTREGUE** — é precisamente para isto que existem |
+| **pedido fail-safe de saída** | **NÃO É UMA ENTREGA** — invocação direta do sink, §6.4; nunca passa por esta classificação |
+| notificação CV-17/CV-18 | entregue **uma vez**, fire-and-forget, nunca aguardada |
+
+### 6.4 Limpeza, `Released`, e escalada fail-safe **sem reentrância**
+
+Efeito registado como `NotIssued` / `MayExist` / `Deleted` / `Unverified`, com **`MayExist` marcado
+antes de emitir o `NIM_ADD`** — direção de erro deliberada: marcar depois deixaria uma interrupção
+convencer-nos de que não há efeito quando há; marcar antes custa, no pior caso, um `NIM_DELETE`
+redundante. Política limitada: até **3** `NIM_DELETE` consecutivos, sem esperas (custo medido: mediana
+0,36 ms, máx 0,74 ms ⇒ pior caso ≈2 ms).
+
+#### `Released` exige compensação positivamente resolvida
+
+> **`Released` NÃO significa "o `ReleaseAsync` retornou".** Significa: nenhum efeito de shell novo pode
+> ser emitido · nenhum efeito obsoleto pode publicar estado de ciclo de vida · **todo** efeito em voo
+> conhecido capaz de deixar uma afordância de tray foi **reconciliado** · e a compensação exigida
+> **completou positivamente** — **ou** a terminação do processo já está a ser **irreversivelmente
+> imposta** pelo caminho fail-safe/watchdog.
+
+Estruturalmente, `Releasing` mantém um **contador de reconciliações pendentes**, incrementado ao emitir
+qualquer efeito capaz de criar afordância e decrementado quando o seu resultado reentra e é
+reconciliado. **A transição `Releasing → Released` é guardada por `pending == 0 && effect ∈ {Deleted,
+NotIssued}`.** Enquanto houver um `Add` em voo, `Released` é **inalcançável** — não por disciplina, mas
+porque a guarda o proíbe.
+
+#### Falha de limpeza: efeito, não chamada
+
+**NÃO** se implementa a cadeia que se auto-bloqueia:
+
+```
+CleanupCompleted(false) → RequestExit → ExitSequence.RemoveTrayIcon() → ReleaseAsync
+→ reentra na mesma maquinaria de release → bloqueia até o watchdog matar o processo   ✗
+```
+
+Substituída por:
+
+```
+CleanupCompleted(false) → Transition → Releasing MANTÉM-SE terminal
+                        → emite o efeito FailSafeExitRequested
+                        → o ciclo de vida EXTERIOR da S2 consome o efeito
+                        → inicia o Exit verdadeiro autoritativo (RequestExit)
+                        → watchdog de 10 s mantém-se autoritativo
+```
+
+#### O consumo é DIRETO e LIMITADO — não é uma entrega enfileirada
+
+**Correção a um defeito real da versão anterior:** dizer apenas *"é um efeito entregue"* trocava a
+reentrância por uma **entrega**, e a entrega herdava o problema noutra forma. Se ficasse enfileirada, o
+`RequestExit` não corria, e **o watchdog de 10 s só é armado dentro do `RequestExit`** — ou seja, antes
+disso **não há rede nenhuma** e o processo podia ficar vivo em `Releasing` indefinidamente.
+
+**Mecanismo:** o pedido fail-safe **não é uma entrega**. É a **invocação síncrona e direta de um sink
+registado**, executada pelo executor de efeitos **imediatamente após a libertação do lock, na própria
+thread que correu a `Transition`**.
+
+```csharp
+// Injetado na construção. Null ⇒ ArgumentNullException na construção, nunca um drop silencioso.
+internal sealed class TrayStateMachine(Action requestAuthoritativeExit, …);
+
+// No executor, fora do lock, ANTES de qualquer outro efeito da mesma transição:
+if (effects.HasFailSafeExit) { _failSafeOnce.RunOnce(requestAuthoritativeExit); }
+```
+
+**Porque não pode ficar pendente:**
+
+1. **Fora do lock, sem fila, sem dispatcher, sem UI.** Não passa pelo mecanismo de entrega da §6.3, logo
+   não pode ser classificado, adiado, coalescido nem suprimido.
+2. **É o primeiro efeito executado** da transição que o produziu, portanto nada da própria S2-T se lhe
+   pode interpor.
+3. **Não depende de a thread de UI estar viva** — corre na thread da fonte de evento que terminalizou,
+   que pode ser a do worker nativo ou a do temporizador.
+4. **Sink obrigatório na construção.** Ausência é erro de construção, não uma condição de runtime que
+   se descubra tarde.
+5. **`RunOnce` marca como executado APÓS retorno normal do sink — não à entrada (CV-21).** Ver 6.4.1.
+
+#### 6.4.1 CV-21 — uma exceção do sink não pode consumir o único disparo
+
+**Achado do Vigil.** Na versão anterior, se o **próprio sink lançasse**, a exceção era registada e o
+`RunOnce` **já tinha consumido o único disparo**: o `RequestExit` podia não ter chegado a armar o
+watchdog, e ficava-se em `Releasing` **sem rede e sem segunda tentativa** — exatamente o estado que
+esta revisão eliminou para o caso enfileirado, a persistir para o caso excecional.
+
+**Variante escolhida: (a) marcar só após sucesso, COM limite — mais a escalada da (b) quando o limite
+esgota.** Só a (a) deixaria um sink que lança sempre a gerar tentativas sem fim; só a (b) desperdiçaria
+uma falha transitória. As duas juntas fecham os dois lados.
+
+```
+tentativa := 1..3            // imediatas, sem espera: já estamos em Releasing e a corrida é por uma rede
+  invocar o sink
+  retorno normal  ⇒ RunOnce marca como executado. FIM.
+  exceção         ⇒ registar; NÃO marcar; tentar de novo
+esgotadas as 3   ⇒ ESCALAR: invocar o sink de terminação injetado pela S2
+```
+
+**O que impede tentativas sem fim:** o limite **fixo de 3**, contado no próprio episódio terminal, sem
+temporizador e sem espera. Um sink que lança sempre custa três chamadas e escala; não há laço.
+
+**A escalada não é um mecanismo de kill novo do tray.** É um segundo sink **injetado pela S2**, ligado
+ao passo terminal que a S2 já possui — o mesmo que o seu `RequestExit` executa no `finally`. A S2-T
+**invoca**; não decide como se morre.
+
+> **Facto mitigante, lido no código e não assumido.** No `AppLifecycleController.RequestExit`, o
+> `_watchdog.Arm(...)` é a **primeira** ação depois do CAS `TryTransitionToExiting()`, antes de sequer
+> se construir a `ExitSequence`. Logo, um sink que lance **depois** do CAS já deixou a rede armada; a
+> janela de exposição real é apenas entre a entrada no sink e esse CAS. A escalada existe para essa
+> janela e para o caso de o sink lançar antes de lá chegar.
+
+**Teste exigido:** sink que **lança sempre** ⇒ o processo **termina na mesma dentro do envelope** —
+três tentativas, escalada, terminação. E `Releasing` **nunca** fica sem mecanismo de progresso.
+
+> ### ⚖️ CV-21 — EM ARBITRAGEM. Secção deliberadamente NÃO reescrita nesta volta.
+> O Atlas classificou-a como reincidência que **exige decisão arquitetural**: se o sink primário lançar
+> três vezes **e o sink terminal também lançar, ou regressar sem terminar**, fica-se vivo em
+> `Releasing` sem watchdog armado. O Vigil propôs um fecho mecânico — o último degrau deixar de ser um
+> delegado falível e passar a armar diretamente o `Program.TerminationWatchdog` (estático, sem
+> `Disarm`) ou o `IProcessTerminator`. **Está em arbitragem se isso dissolve a decisão.** Reescrever
+> agora obrigaria a reescrever duas vezes.
+>
+> **O que já é certo e fica registado:**
+> - O **facto mitigante foi confirmado de forma independente pelo Vigil**: `_watchdog.Arm(...)` é a
+>   primeira ação após o CAS em `AppLifecycleController.RequestExit`.
+> - As **três tentativas imediatas** foram validadas: *"antes do CAS a repetição é inócua e barata;
+>   depois do CAS o watchdog já está armado e a tentativa seguinte encontra `Exiting` e retorna cedo.
+>   Imediato é preferível a backoff: corre-se por uma rede, não se alivia um recurso contendido."*
+6. Assim que o sink corre, o `RequestExit` da S2 arma o watchdog de 10 s logo após o seu CAS para
+   `Exiting`. **A partir daí existe rede; antes, o único que garante progresso é este consumo direto.**
+
+> **Só a NOTIFICAÇÃO (CV-17/CV-18) é fire-and-forget. O pedido de saída não é.**
+
+**Sem autoridade de release recursiva dentro do tray**, e a reentrância continua inofensiva porque
+**`ReleaseAsync` em `Releasing`/`Released` é um no-op que retorna imediatamente** — logo o
+`ExitSequence.RemoveTrayIcon()` do caminho autoritativo da S2 **não pode bloquear** à espera do tray.
+
+**`CleanupVerified = false` nunca autoriza continuação em background ou degradada** (CV-16). A S2 nunca
+observa `Lost` com limpeza não verificada.
+
+### 6.5 CV-17 / CV-18 — a notificação informativa antes da saída fail-safe
+
+#### Condição de emissão *(Prism)*
+
+> A notificação **só é emitida quando a chamada fail-safe ao `RequestExit` VENCE a transição para
+> `Exiting`.**
+
+Se o utilizador **já tinha pedido Sair** — pelo menu do tray, ou por X com o segundo plano desligado —
+e a compensação falhar **durante essa saída**, **não há notificação**: o desfecho é exatamente o que
+ele pediu, e *"abra o ServerAlyzer novamente para continuar"* **contradiria a sua própria ação**. Como
+o `RequestExit` já é one-shot por CAS (`TryTransitionToExiting`), isto é uma **condição sobre o
+resultado desse CAS no caminho existente**, e **não** um mecanismo novo: emite-se a notificação apenas
+no ramo em que o nosso pedido foi o que ganhou.
+
+#### Conteúdo
+
+**Strings FINAIS já escritas pelo Prism** em `.boss/tmp/m13-s2-strings.md`, chaves
+`TrayFailSafeExitNotificationTitle` e `TrayFailSafeExitNotificationBody`, em **pt-BR / pt-PT / en-US**.
+**Referência, não cópia — não invento redação.** Instaladas nos `.resw` reais; sem strings de UI
+hardcoded.
+
+**Expiração:** **30 minutos**, valor **sugerido pelo Prism** por ainda cobrir quem regressa ao ecrã
+alguns minutos depois, sem ficar indefinidamente no Centro de Notificações. Registado como sugestão
+dele, não como número meu.
+
+#### CV-18 — contrato da ação, normativo *(FECHADA)*
+
+Tipo de ação **literal e fechado**, **zero parâmetros**, **sem payload arbitrário** — nada do episódio,
+do shell ou da frota atravessa a notificação. **Fire-and-forget**; **não modal**; **sem** dados de
+servidor/frota; **sem** terminologia técnica de Shell/`NIM`. **A falha da notificação é ignorada e
+NUNCA pode atrasar nem impedir o Exit verdadeiro** — é o único efeito desta secção que é
+fire-and-forget, ao contrário do pedido de saída (§6.4). Um **clique tardio**, já com o processo morto,
+produz **apenas** o comportamento de lançamento que já está na allowlist — **sem capacidade especial e
+sem laço**: não reabre o episódio, não reentra no tray, não transporta estado.
+
+## 7 — Independência A / B, por tipo *(G)*
+
+**A** — retry dentro de um episódio admitido: 3 tentativas, atrasos 250 ms e 1000 ms (~1250 ms
+programados) sob o deadline de 1500 ms; um sucesso pode repô-lo para um episódio futuro.
+**B** — admissão: janela deslizante monotónica, **5 admissões / 60 s**, contadas independentemente do
+desfecho.
+
+```csharp
+internal sealed class EpisodeFrequencyLimiter
+{
+    public bool TryBeginEpisode(long monotonicTimestamp);   // único método público
+}
+```
+
+**Nos dois sentidos:** B **não tem API** para receber desfechos, logo o sucesso não o repõe e não pode
+esfomear os retries de A; A **não tem referência** ao limitador, logo não cria episódios nem muta o
+histórico de B. **Rejeição por B ⇒ sem episódio, sem deadline, sem `Lost`.** Tráfego adversarial com
+**sucesso-sempre** bate na supressão de B, porque B conta admissões e não desfechos.
+
+## 8 — Mapa de condições CV *(CV-15)*
+
+**Remover redação durante condensação NÃO revoga uma condição.** Uma condição só desaparece marcada
+`SUPERSEDED BY <regra>` com justificação.
+
+| CV | Assunto | Secção | Estado |
+|---|---|---|---|
+| CV-1 | modelo de confiança da `WndProc`, sete pontos | §9 | **ATIVA** |
+| CV-2 | `TaskbarCreated` coalescido e limitado | §3, §7 | ATIVA · fechada |
+| CV-2b | dois orçamentos independentes | §7 | ATIVA · fechada, por tipo |
+| CV-3 | comportamento sob `TerminateProcess` | §10 | ATIVA · fechada |
+| CV-4 | `Unavailable` no ordinal 0 · produtor único de `Available` | §4, §1 | ATIVA · fechada |
+| CV-5 | `szTip`/`hIcon` estáticos | §9 | ATIVA · fechada |
+| CV-6 | mensagem forjada ignorada | §9 | `SUPERSEDED BY` **CV-6b** — conjunção substituída por quatro casos |
+| CV-6b | quatro casos independentes | §9 | **ATIVA** |
+| CV-7 | topologia de thread | §11 | ATIVA · **MEDIDA, PASSA** |
+| CV-8 | custo nativo síncrono na thread de UI | §11 | ATIVA · **MEDIDA, aceitável** sob o envelope de B |
+| CV-9 | reentrância com flyout aberto | §9 | ATIVA · fechada |
+| CV-10 | acoplamento limitador ↔ custo de UI | §11 | ATIVA · fechada |
+| CV-11 | residual de admissão suprimida | §11 | ATIVA · LOW aceite, redação corrigida |
+| CV-12 | evidência de mutação na entrega | §12, §12.1 | **ABERTA** — fecha na entrega. Transporta as precisões vinculativas do Vigil sobre a CV-20, **e agora também a aplicação da escalada do `CS8509` ao `.csproj` mais a prova diferencial C1/C2**, que hoje não é facto do repositório (§12.1) |
+| CV-13 · CV-14 | *(fechadas pelo Vigil na revisão 6)* | — | ATIVA · fechadas |
+| CV-15 | integridade do documento normativo | §8 | **ATIVA** — este mapa é o cumprimento |
+| CV-16 | `CleanupVerified` fail-closed | §6 | **ATIVA** |
+| CV-17 | notificação informativa antes da saída fail-safe | §6.5 | **ATIVA** — slot definido, redação do Prism |
+| CV-18 | contrato fechado da ação da notificação fail-safe | §6.5 | **ATIVA · FECHADA** |
+| CV-19 | ressalva do passo 2 para eventos de conclusão de efeito | §1 (preâmbulo) | **ATIVA** |
+| CV-20 | canal de efeitos fechado: efeitos como dados passivos, executor detentor único | §5.1 | **FECHADA pelo Vigil.** Mecanismo **estável e intocado**. Esta volta corrigiu de novo só a **declaração de prova**: T14b por **identidade** e sem campos gerados, T14c sobre a coleção real, T15/T16 com referentes separados, **T18** para a ausência de `default`, e a política de diagnósticos da §5.1.1. Precisões vinculativas transportadas pela **CV-12** |
+| CV-21 | uma exceção do sink não consome o único disparo | §6.4.1 | **ATIVA · EM ARBITRAGEM** — ver a nota da §6.4.1; **não reescrita nesta volta** |
+| CI-1b | *(dívida do lado da S2)* grafias numéricas de enum em payloads hostis do contrato de ativação | §6.5 | **REFERENCIADA, não herdada em silêncio.** A ação `FailSafeExit` é acrescentada a esse mesmo contrato, logo a CI-1b **aplica-se-lhe**: vocabulário genuinamente fechado por `switch`/allowlist exata, e grafia numérica ou desconhecida ⇒ **fail closed**. A dívida continua a ser da S2; fica aqui registada porque a S2-T alarga o contrato. |
+| — | regra literal *"nenhum `NIM_ADD` pode executar depois do `Release`"* | §5 | **`SUPERSEDED BY` o invariante normativo do `Release` (§5.1 emissão + §5.2 conclusão compensada).** Justificação: satisfazê-la à letra obrigaria o `Release` a esperar pelo gate de I/O nativo, reacoplando ciclo de vida e I/O e reintroduzindo o defeito de timer/deadlock provado na revisão 6. O invariante substituto é **causalmente mais forte**: proíbe a *emissão* pelo tipo e obriga a *compensação* da conclusão tardia, o que a regra literal não fazia. |
+
+## 9 — `WndProc`: confiança e default-deny *(CV-1 · CV-6b · CV-9)*
+
+Sete pontos, integrais: default-deny · identidade da mensagem (o id é seletor, **nunca prova de
+origem**) · `lParam` low word na lista fechada `NIN_SELECT`/`NIN_KEYSELECT`/`WM_CONTEXTMENU`/
+`WM_LBUTTONDBLCLK` · high word `uID == 1` · `wParam` é coordenada não confiável, só âncora, saneada,
+**fora de todos os monitores ⇒ DESCARTAR** · nenhuma mensagem transporta ou desreferencia ponteiro ·
+teto de impacto de uma forja = incómodo de UI, sem chegar ao `RequestExit` sem clique real.
+
+**Guarda de estado, e porque é mais necessária e não menos:** callbacks são descartados em **`Lost`**,
+**`Releasing`/`Released`**, e **enquanto o efeito estiver por confirmar** (`MayExist`/`Unverified`) —
+o estado `Unverified` torna o **ícone vivo mas repudiado** uma possibilidade explícita do desenho, e é
+exatamente aí que um callback não pode ser aceite. Os callbacks entram por `Transition` como qualquer
+outro evento, logo o preâmbulo aplica-lhes as mesmas guardas.
+
+**CV-6b — quatro casos independentes, sem prova só conjuntiva.** Restantes campos válidos em cada
+caso; **B e C obrigatórios**; a mutação de **cada** validação isolada tem de falhar.
+
+| | callback | `uID` | resultado |
+|---|---|---|---|
+| A | válido | válido | **aceite** |
+| **B** | inválido | válido | **ignorado** |
+| **C** | válido | inválido | **ignorado** |
+| D | inválido | inválido | ignorado |
+
+**CV-9:** com o flyout aberto, `WM_CONTEXTMENU` adicional ou forjada é descartada — sem segundo
+flyout, sem reposicionamento, sem mutação de episódio, sem alteração de visibilidade da janela
+auxiliar.
+
+## 10 — `FORCED-TERMINATION TRAY CLEANUP` (S6 · CV-3)
+
+**`EMPIRICAL QA ACCEPTANCE WINDOW` = 120 s, fixada a priori.** `TerminateProcess` → 120 s sem interação
+→ **uma** passagem do rato sobre a área de notificação → registar. Órfão transitório aceitável; **órfão
+persistente = FAIL**; obsoleto não interativo; lançamento seguinte cria **exatamente um** ícone; sem
+duplicados; sem consola/WER. Não se exige `NIM_DELETE` do processo morto — o kernel reclama os handles
+USER/GDI.
+
+## 11 — CV-7, CV-8, CV-10, CV-11
+
+**CV-7 (medida, passa).** `TaskbarCreated` recebido num HWND da thread de UI, com `WS_EX_TOOLWINDOW`,
+top-level, sem dono, nunca mostrado, em processo empacotado **headless**. Emissor:
+`PostMessage(HWND_BROADCAST, …)` desta sessão, **não o Explorer**.
+
+**CV-8 (medida, aceitável).** Frio ~10,06 ms; steady/churn máx < 4,7 ms; limiar de um frame a 60 Hz =
+16,7 ms. O `Shell_NotifyIcon` mantém-se na thread de UI **sob o envelope de frequência aprovado —
+dependência arquitetural de ~5 episódios/60 s**. **Estas medições não são garantia de desempenho do
+Windows.**
+
+**CV-10.** Adversarial ~5 ciclos/60 s ≈ 18,5 ms ≈ 0,031 % · critério ≤1 % ≈ ≤600 ms/60 s · folga ~7×
+em episódios. **Reabrem a CV-8 e obrigam a re-medir:** subir o teto de B · encurtar a janela de B ·
+reduzir o debounce · aumentar as tentativas de A · permitir mais do que um episódio em voo.
+
+**CV-11 (LOW, aceite).** Um atacante esgota B com 5 broadcasts forjados; se um reinício legítimo do
+Explorer cair nessa janela, a mensagem verdadeira não é admitida e publica-se `Available` sobre um
+ícone morto até a janela deslizar (≤60 s). O atacante escolhe o instante mas **não provoca a perda sem
+já ter controlo sobre a sessão do utilizador** — só atrasa a deteção de uma perda já ocorrida. Item
+**Q** da matriz.
+
+## 12 — Testes e plano de mutação *(CV-12)*
+
+**Harness.** O duplo de `INativeTrayRegistration` **bloqueia dentro de `Add`, `SetVersion` e `Delete`**
+sob controlo do teste; tempo por `FakeTimeProvider`; entregas conduzidas por um despachante
+determinístico que permite **atrasar uma entrega já enfileirada**. **Um teste que não consiga parar o
+mundo dentro de uma chamada nativa não prova nada disto.**
+
+### Casos determinísticos
+
+| Teste | Prova |
+|---|---|
+| T1 | estacionado em `Add`, avançar o tempo além do prazo; ao libertar com `ok:true`, a reentrada terminaliza `Lost` **na própria execução** e **não publica `Available`** |
+| T2 | `Release` durante: `Available` · debounce pendente · `Recovering` · atraso de retry · **chamada nativa em voo** · limpeza em curso ⇒ **`Releasing` vence em todos**. **Reforço obrigatório:** não basta observar que o estado é `Releasing` — o teste **CONTA os efeitos `Add` emitidos após o `Release` e exige ZERO**. Sem essa contagem, a M1 passa mutada. |
+| T3 | admissão: entre `TryBeginEpisode` devolver `true` e o estado ser `Recovering` **não existe estado observável** |
+| T4 | rejeição por B ⇒ sem episódio, sem deadline, sem `Lost`; sucesso-sempre adversarial converge para supressão |
+| T5 | `Delete` falha 3× ⇒ `Releasing` + CV-17 + **efeito `FailSafeExitRequested`**, e **não** sessão degradada |
+| T6 | efeitos de `Add`/`Delete` de transições consecutivas chegam ao shell **pela ordem de sequência** |
+| T7 | temporizador atrasado: a **primeira** reentrada posterior terminaliza — a segurança não depende da promptidão |
+| **T8** | **`Add` PENDENTE ainda não iniciado** — efeito emitido e ainda não entregue ao worker quando o `Release` é comprometido: o efeito é **cancelado antes de tocar no shell**, não há `Add`, e a reconciliação pendente resolve-se sem `Delete` |
+| **T9** | **notificação de UI obsoleta** — entrega enfileirada em `Recovering`, atrasada, e entregue já em `Releasing`: é **suprimida** por classe de sessão, enquanto uma entrega dirigida ao terminal na mesma fila **é entregue** |
+| **T10** | **reentrância completa do `RequestExit`, atravessando o caminho real** — `CleanupCompleted(false)` ⇒ o executor **invoca o sink registado** (§6.4), **não** o teste a chamar `RequestExit` diretamente ⇒ a S2 corre o `ExitSequence` **real**, cujo `RemoveTrayIcon()` chama `ReleaseAsync` de volta: **retorna imediatamente como no-op**, o `ExitSequence` completa, e **nada fica à espera do watchdog**. O teste **só conta se atravessar a invocação real do sink**. |
+| **T11** | `Add` tardio pré-`Release` conclui com `ok:true` ⇒ **`Delete` compensatório emitido** e `Released` **inalcançável** até esse `Delete` verificar. **Reforço obrigatório, as duas asserções:** (i) o **estado** nunca é `Available`; (ii) **nenhuma entrega** de `Available` é produzida. Sem as duas, a M2 passa mutada. |
+
+| **T12** | **o pedido fail-safe não pode ficar pendente** — com o despachante de UI **parado** e a fila de entregas **bloqueada**, `CleanupCompleted(false)` ⇒ o sink é invocado **na mesma pilha**, fora do lock, antes de qualquer outro efeito |
+| **T13** | **sink que lança sempre** ⇒ 3 tentativas, **escalada** pelo sink de terminação da S2, e o processo **termina dentro do envelope**; `Releasing` nunca fica sem mecanismo de progresso *(CV-21)* |
+| **T14** | **arquitetura, sobre METADATA REAL e não texto** — três asserções: **(a)** `Effect`, `EffectKind` e `EffectExecutor` não são visíveis fora de `TrayStateMachine`; **(b)** allowlist fixada **por IDENTIDADE de metadata e não por contagem** — os três membros nomeados na §5.1 e mais nenhum; **campos gerados pelo compilador são INSPECIONADOS e não excluídos** — a varredura cobre todos os tipos do assembly, incluindo display classes de closures, e todos os campos; no baseline **não existe nenhum campo gerado do tipo da capacidade**, e um que apareça tem de ser **allowlistado por identidade concreta**, nunca por categoria; **(c)** sobre a **`IServiceCollection` REALMENTE PRODUZIDA pelo composition root** — nenhum `ServiceDescriptor` com `INativeTrayRegistration` como `ServiceType` ou `ImplementationType`. **Metadata para (a) e (b); coleção real para (c).** **Passa no baseline** — antes desta correção não passaria *(CV-20)* |
+| **T15** | **efeito estrangeiro** — alimentar o executor com um efeito de origem externa: sob o desenho **não compila** (dado passivo privado, sem comportamento a redefinir); com a **visibilidade alargada**, compila e **falha**. Referente: a **mutação de visibilidade**, e só ela *(CV-20)* |
+| **T16** | **forma do `Effect` e derivação por `Kind`** — sobre metadata: `Effect` **não tem membro `MayCreateAffordance`**, e a afordância é obtida de uma **função estática de `Kind`** na mesma expressão que escolhe a operação nativa. Referente: a mutação **função → campo**, isoladamente *(CV-20)* |
+| **T18** | **ausência de ramo `default`** — `Describe((EffectKind)int.MaxValue)`, invocado por reflexão, tem de lançar `SwitchExpressionException`. Com um `default` acrescentado devolve um tuplo em vez de lançar e o teste **falha**. É esta a guarda da metade estrutural — **o T17 não a prova** *(achado do Atlas)* |
+| **T17** | **exaustividade do acoplamento** — iterando `Enum.GetValues<EffectKind>()` (com `Assert.NotEmpty` como pré-condição): **todo `Kind` cuja operação é `Add` tem `MayCreateAffordance == true`**, e todo `Kind` está descrito. Um `Kind` novo é coberto automaticamente *(pin do Vigil)* |
+
+### Plano de mutação — obrigatório, **uma mutação de cada vez**
+
+Formato exigido na entrega (§10 do `BOSS.md`): **baseline → mutação → invariante violado → testes que
+falham com contagens → restauro provado → baseline PASS**. **Nesta volta declara-se o plano; a
+evidência acompanha a entrega do código (CV-12).**
+
+| # | Mutação (isolada) | Invariante violado | Teste determinístico que TEM de falhar |
+|---|---|---|---|
+| **M1** | permitir que a `Transition` emita `Add` durante `Releasing` | §5.1 — emissão não fabricável | **T2** pela **contagem de zero `Add`**, e **T8** |
+| **M2** | um `Add` tardio pré-`Release` bem-sucedido publica `Available` | §5.2 — conclusão é obsoleta | **T11** pelas **duas** asserções (estado **e** entregas), e **T1** para a variante por deadline |
+| **M3** | um `Add` tardio **não** recebe `Delete` compensatório | §5.2 + §6.4 — `Released` exige reconciliação | **T11** e **T5** |
+| **M4** | remover a revalidação em tempo de entrega das notificações | §6.3 — validade no enqueue não basta | **T9** |
+
+**Mutações herdadas, mantidas:** passo 1 do preâmbulo removido · passo 2 removido · **passo 3 removido**
+· `TryBeginEpisode` movido para fora da transição · `Available` publicado sem revalidar o prazo · gate
+adquirido dentro do domínio de decisão · `Transition` chamada de dentro do domínio · efeitos a mutar
+estado · ordem de sequência removida · `CleanupCompleted(false)` a permanecer em `Lost` ·
+**sink fail-safe convertido em entrega enfileirada** (deve falhar **T12**) ·
+**`IEffect`/executor alargados de `private` a `internal`** (deve falhar **T14**, e só então **T15**
+passa a compilar e falha — é a forma falsificável da mutação que o Atlas pediu) ·
+**`INativeTrayRegistration` retido por outro tipo além do executor** (deve falhar **T14b**) ·
+**`INativeTrayRegistration` registado no contentor** (deve falhar **T14c** — é a metade que o
+compilador não impõe) ·
+**`MayCreateAffordance` convertido de função de `Kind` em campo independente do efeito** (volta a
+tornar representável a mentira da CV-20; deve falhar **T16**, **isoladamente**) ·
+**ramo `default` acrescentado ao `switch` de `Describe`** (deve falhar **T18** — **não o T17**, que
+passaria verde porque `Enum.GetValues` só devolve valores definidos e o `default` nunca é exercitado) ·
+**`Kind` novo mapeado para `Add` com `MayCreateAffordance = false`** (deve falhar **T17**) ·
+**escalada do `CS8509` — PROVA DIFERENCIAL DE DUAS COMPILAÇÕES, não mutação conjunta** (ver §12.1) ·
+**`RunOnce` a marcar à entrada em vez de após retorno normal** (deve falhar **T13**) ·
+**limite de 3 tentativas do sink removido** (deve falhar **T13** por não terminar) ·
+**`AddIcon`/`DeleteIcon` promovidos de `private` aninhado a `internal`** (deve falhar a asserção de
+arquitetura que proíbe produtores de efeito fora da máquina) ·
+**ressalva CV-19 removida do passo 2**, voltando a descartar `AddCompleted` obsoleto por geração
+(deve falhar **T11**) ·
+**guarda `pending == 0` removida da transição para `Released`** (deve falhar **T11**) · default-deny
+removido em `Lost`/`Unverified` · cada validação da CV-6b isoladamente · `NIM_DELETE == false` ignorado
+· B reposto por sucesso.
+
+**Cada uma TEM de falhar testes. Nada entregue só com suite verde.**
+
+### 12.1 Prova diferencial da escalada do `CS8509`
+
+Como **mutação conjunta única** — mudar a fonte **e** a configuração de uma vez — **não isola a causa**:
+um build que falha não distingue se falhou por o `Kind` estar por descrever ou por outra razão da
+configuração. É a mesma regra da §10 do `BOSS.md` que já invoquei para recusar a mutação combinada no
+T15/T16, aplicada agora à **minha própria** mutação de configuração.
+
+**Duas compilações nomeadas, com a MESMA fonte, diferindo APENAS na configuração:**
+
+| | Fonte | Configuração | Resultado exigido | O que estabelece |
+|---|---|---|---|---|
+| **C1** | `EffectKind` novo **sem braço próprio** no `Describe` | `CS8509` **em** `WarningsAsErrors` | **NÃO COMPILA** (`CS8509` como erro) | a condição *"`Kind` por descrever"* **é detetada** |
+| **C2** | **a mesma fonte de C1**, byte a byte | `CS8509` **removido** de `WarningsAsErrors` | **COMPILA** (fica aviso) | a deteção é **causada pela configuração**, e não por outra coisa |
+
+**C1 sozinha** provaria só que algo falha. **C2 sozinha** provaria só que algo compila. **O par isola a
+causa**: a única variável entre as duas é a propriedade do `.csproj`.
+
+Registar as duas no formato da §10 do `BOSS.md`: baseline → mutação → invariante violado → saída de
+compilação com os códigos de diagnóstico → restauro provado → baseline PASS.
+
+> ### ⚠️ A escalada do `CS8509` é ITEM DE ENTREGA, não facto do repositório
+> **Verificado hoje:** não existe `WarningsAsErrors` em nenhum `.csproj`, `.props` ou `.targets`, nem
+> `Directory.Build.props`. A escalada está especificada **normativamente** na §5.1.1 e **não aplicada à
+> árvore** — coerente com a regra "sem implementação" destas rondas, mas com duas consequências que
+> ficam escritas em vez de assumidas:
+>
+> 1. a garantia *"acrescentar um `Kind` sem braço é erro de compilação"* **ainda NÃO é verdadeira** no
+>    repositório;
+> 2. **a prova diferencial C1/C2 não pode ser corrida hoje.**
+>
+> Ambas passam a **item de entrega da CV-12**, a aplicar com o código, e **não** a facto estabelecido.
+
+## 13 — As cinco perguntas do Atlas
+
+| | Pergunta | Resposta | Porquê, estruturalmente |
+|---|---|---|---|
+| 1 | Admissão e invalidação são **uma** operação linearizável? | **SIM** | §3 — `TryBeginEpisode`, geração, timestamp, deadline e `Recovering` são o mesmo corpo, sob o mesmo domínio, sem nada entre eles |
+| — | *(por que a 3 e a 5 ficam SIM sem ressalva)* | — | a ressalva que restava era o **contrato aberto**: `IShellEffect` `internal` deixava um tipo do assembly implementá-lo e ser executado pela nossa maquinaria, sem `Transition` e sem `pending` (CV-20). Fechado o canal — **efeitos como dados passivos privados, sem comportamento a redefinir, e o executor como único detentor da capacidade** (§5.1) — deixa de existir a via, e a garantia passa a ser do **compilador**. O que fica de fora é P/Invoke próprio, que não contorna a autoridade: é outro programa a escrever no shell, a mesma fronteira do recorte da reflexão |
+| 2 | Existe **exatamente uma** autoridade? | **SIM** | `Transition` é a única escritora de estado; efeitos nunca mutam estado; o gate não decide |
+| 3 | `Release` é **estruturalmente** absorvente? | **SIM**, com a distinção clarificada | passo 1 do preâmbulo ∀ chamada; δ(`Releasing`,x)=`Releasing` ∀x. **Sem `Add` NOVO** depois de `Releasing` — imposto pelo tipo (§5.1); um `Add` pré-existente só pode completar **como trabalho obsoleto e compensado** (§5.2) |
+| 4 | Algo **depois do deadline** pode publicar `Available`? | **NÃO** | passo 3 do preâmbulo terminaliza **antes** de o evento ser olhado; o ramo que publica `Available` é inalcançável em estado terminal |
+| 5 | Algum resultado obsoleto pode **contornar** a função? | **NÃO**, sem ressalva | resultados não publicam: **reentram** por `Transition`. O passo 2 descarta geração obsoleta **exceto** conclusões de efeito, que são **reconciliadas** (CV-19). E **nenhum efeito é fabricável nem implementável fora da máquina**, nem existe entrada no executor para um efeito estrangeiro (§5.1, CV-20) |
+
+## 14 — Matriz de plataforma real
+
+| | Caso | Estado |
+|---|---|---|
+| A–C | registo inicial · tray headless · menu/flyout (teclado, tema, CV-9) | `NOT_RUN` |
+| D–E | reinício real do Explorer em `FOREGROUND` / `BACKGROUND` | `NOT_RUN` — **autorização humana** |
+| F | `TaskbarCreated` entregue **pelo próprio Explorer** | `NOT_RUN` — não promovível do sintético |
+| G–K | restauro · sem duplicado · sem janela auxiliar/botão · degradação forçada · sem consola/WER | `NOT_RUN` |
+| L | `FORCED-TERMINATION TRAY CLEANUP` | `NOT_RUN` |
+| M | CV-7 — entrega na topologia do desenho | **MEDIDO · PASSA** (emissor sintético) |
+| N | CV-8 — custo nativo na thread de UI | **MEDIDO · aceitável** |
+| O | CV-8 pior caso com o shell a reiniciar | `NOT_RUN` — **autorização humana** |
+| P | 1500 ms operacionalmente adequado num reinício real | `NOT_RUN` — **autorização humana** |
+| Q | CV-11 — reinício do Explorer com o orçamento B esgotado | `NOT_RUN` — **autorização humana** |
+| R | a compensação alguma vez falha num shell real (⇒ escalada da §6) | `NOT_RUN` |
+| **S** | **CV-17 — a notificação aparece e não atrasa a saída** | `NOT_RUN` |
+
+**O Explorer não é reiniciado nesta volta.**

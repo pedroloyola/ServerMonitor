@@ -1,0 +1,1076 @@
+using System.Reflection;
+using System.Reflection.Emit;
+using System.Runtime.CompilerServices;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.UI.Xaml;
+using ServerMonitor.Core.Enums;
+using ServerMonitor.App;
+using ServerMonitor.App.Services;
+using ServerMonitor.App.Shell.Tray;
+using ServerMonitor.App.Tests.Fakes;
+
+namespace ServerMonitor.App.Tests.Architecture;
+
+/// <summary>
+/// The swap is COMPLETE: one owner of the icon, and no path that can bring the old one back.
+/// <para>
+/// This is the M13-QA-9 lesson applied to itself. That defect was correct code with no caller; the
+/// inverse — a new owner registered beside the old one, or an old one still reachable behind a fallback —
+/// is the same class of defect, and "I removed it" is not evidence. These assertions are the evidence,
+/// and they run against the container the application really builds.
+/// </para>
+/// </summary>
+public sealed class TrayOwnershipCompletenessTests
+{
+    private static readonly Assembly AppAssembly = typeof(TrayStateMachine).Assembly;
+
+    /// <summary>Builds the real composition, exactly as <c>App</c> does, without starting a host.</summary>
+    private static ServiceCollection RealComposition()
+    {
+        var services = new ServiceCollection();
+        App.ConfigureApplicationServices(services);
+        return services;
+    }
+
+    // ------------------------------------------------------------------ one owner
+
+    [Fact]
+    public void The_assembly_declares_exactly_one_tray_icon_owner()
+    {
+        var owners = Implementations(typeof(ITrayIconAdapter));
+
+        Assert.Equal([typeof(OwnedTrayIconAdapter)], owners);
+    }
+
+    [Fact]
+    public void The_assembly_declares_exactly_one_affordance_source()
+    {
+        // Two types implement the interface, and the second one is not a competitor: TrayStateMachine IS
+        // the state, and OwnedTrayIconAdapter forwards to it so that something exists to hand the
+        // container before Start() has run. Naming both by identity is the point — the placeholder that
+        // used to answer this question is gone, and a THIRD implementation appearing would mean a second
+        // answer to whether the user has a way out.
+        var sources = Implementations(typeof(ITrayAffordanceSource));
+
+        Assert.Equal([typeof(OwnedTrayIconAdapter), typeof(TrayStateMachine)], sources);
+    }
+
+    [Fact]
+    public void No_type_from_the_replaced_tray_implementation_survives()
+    {
+        var leftovers = AppAssembly
+            .GetTypes()
+            .Where(t => t.Name.Contains("WinUIExTray", StringComparison.Ordinal)
+                        || t.Name.Contains("PendingTrayAffordance", StringComparison.Ordinal))
+            .Select(t => t.FullName!)
+            .ToArray();
+
+        Assert.Empty(leftovers);
+    }
+
+    // ------------------------------------------------------------------ the real container
+
+    [Fact]
+    public void The_container_resolves_both_tray_roles_to_the_same_single_instance()
+    {
+        // Two registrations of the same type would be two Shell_NotifyIcon owners with one icon id. The
+        // factories must both forward to the one concrete singleton, and this proves they do — by
+        // resolving, not by reading the registration shape.
+        var services = RealComposition();
+        services.AddSingleton<IAppLifecycleController>(FakeLifecycle.Instance);
+
+        // Logging comes from ConfigureLogging, which is a different builder stage; the composition root
+        // does not register it and is not supposed to.
+        services.AddLogging();
+
+        using var provider = services.BuildServiceProvider();
+
+        var byRole = provider.GetRequiredService<ITrayIconAdapter>();
+        var byAffordance = provider.GetRequiredService<ITrayAffordanceSource>();
+        var concrete = provider.GetRequiredService<OwnedTrayIconAdapter>();
+
+        Assert.Same(concrete, byRole);
+        Assert.Same(concrete, byAffordance);
+    }
+
+    [Fact]
+    public void Nothing_registers_a_second_implementation_for_either_tray_role()
+    {
+        var services = RealComposition();
+
+        Assert.Single(services, d => d.ServiceType == typeof(ITrayIconAdapter));
+        Assert.Single(services, d => d.ServiceType == typeof(ITrayAffordanceSource));
+        Assert.Single(services, d => d.ServiceType == typeof(OwnedTrayIconAdapter));
+    }
+
+    /// <summary>
+    /// CV-20, T14c, over the <see cref="IServiceCollection"/> the composition root REALLY produces.
+    /// </summary>
+    /// <remarks>
+    /// This replaces the source-text approximation the first delivery shipped with. Text would pass over
+    /// a registration written any other way — a factory, a generic helper, an extension method — and the
+    /// condition was explicit that it had to be the descriptors.
+    /// </remarks>
+    [Fact]
+    public void T14c_the_capability_is_never_registered_in_the_container()
+    {
+        var services = RealComposition();
+
+        var offenders = services
+            .Where(d => d.ServiceType == typeof(INativeTrayRegistration)
+                        || d.ImplementationType == typeof(INativeTrayRegistration))
+            .Select(d => d.ServiceType.FullName!)
+            .ToArray();
+
+        Assert.Empty(offenders);
+    }
+
+    // ------------------------------------------------------------------ CV-20 again, for the DOOR
+
+    /// <summary>
+    /// Every method in the assembly whose IL actually CALLS a window hide, found by reading metadata.
+    /// </summary>
+    /// <remarks>
+    /// The previous version of this enumeration looked at constructor parameters and instance fields, and
+    /// excluded <c>App</c>. That is the set of shapes I had already closed, and it passed over the three
+    /// that were still open: a STATIC field, a METHOD PARAMETER, and a LOCAL RESOLUTION through the public
+    /// <c>App.ServicesHost</c>. Reading the IL asks the only question that matters — who calls it — and
+    /// cannot be fooled by how the reference was obtained.
+    /// </remarks>
+    private static IReadOnlyList<string> HideCallers()
+    {
+        var hideMethods = new HashSet<int>(
+            typeof(IWindowHideCapability).GetMethods().Select(m => m.MetadataToken));
+        var HideCapabilityModule = typeof(IWindowHideCapability).Module;
+
+        var callers = new List<string>();
+
+        foreach (var type in typeof(App).Assembly.GetTypes())
+        {
+            var bodies = type
+                .GetMethods(BindingFlags.Public | BindingFlags.NonPublic
+                            | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly)
+                .Cast<MethodBase>()
+                .Concat(type.GetConstructors(BindingFlags.Public | BindingFlags.NonPublic
+                                             | BindingFlags.Instance | BindingFlags.Static
+                                             | BindingFlags.DeclaredOnly));
+
+            foreach (var method in bodies)
+            {
+                byte[] il;
+                try
+                {
+                    il = method.GetMethodBody()?.GetILAsByteArray() ?? [];
+                }
+                catch (Exception)
+                {
+                    continue; // abstract, extern, or otherwise bodiless
+                }
+
+                foreach (var token in CallTokens(il))
+                {
+                    MethodBase? target;
+                    try
+                    {
+                        target = type.Module.ResolveMethod(
+                            token,
+                            type.IsGenericType ? type.GetGenericArguments() : null,
+                            method is MethodInfo { IsGenericMethod: true } generic
+                                ? generic.GetGenericArguments()
+                                : null);
+                    }
+                    catch (Exception)
+                    {
+                        continue;
+                    }
+
+                    // The module check is NOT decoration. A metadata token is unique only WITHIN a module,
+                    // and the compiler-generated members of a record call straight into CoreLib — whose
+                    // tokens can equal, by pure numeric coincidence, a token of IWindowHideCapability in
+                    // this assembly. That collision is what reported HistorySampleItem, HistoryClearItem
+                    // and HistoryResetItem — records in a queue with no reference to a hide anywhere — as
+                    // callers of the window hide.
+                    var namesAHide =
+                        target is not null
+                        && ((target.Module == HideCapabilityModule
+                             && hideMethods.Contains(target.MetadataToken))
+                            || (target.DeclaringType is { } declaringType
+                                && declaringType.Assembly == typeof(App).Assembly
+                                && target.Name is "HideToBackgroundCore" or "HideForMinimizeCore")
+                            || (target.DeclaringType == typeof(IWindowHideCapability)
+                                && target.Name.StartsWith("Hide", StringComparison.Ordinal)));
+
+                    if (namesAHide)
+                    {
+                        var owner = type;
+                        while (owner.DeclaringType is { } declaring)
+                        {
+                            owner = declaring;
+                        }
+
+                        callers.Add(owner.Name);
+                    }
+                }
+            }
+        }
+
+        return callers.Distinct().OrderBy(n => n, StringComparer.Ordinal).ToArray();
+    }
+
+    /// <summary>
+    /// Every metadata token targeted by a REAL <c>call</c> or <c>callvirt</c> in this method body.
+    /// </summary>
+    /// <remarks>
+    /// <b>Why this exists.</b> The first version scanned the body byte by byte for <c>0x28</c>/<c>0x6F</c>
+    /// and read the next four bytes as a token. A byte inside an operand looks exactly like an opcode, so
+    /// the scan invented calls: it reported <c>HistorySampleItem</c>, <c>HistoryClearItem</c> and
+    /// <c>HistoryResetItem</c> — one-line records in a queue that contain no reference to a hide at all —
+    /// as callers. It had been passing only because the metadata tokens happened to fall where they did;
+    /// deleting unrelated files renumbered them and the accident stopped being lucky. A guard that passes
+    /// by coincidence is not a guard (BOSS.md §10).
+    /// <para>
+    /// This walks instruction by instruction using the runtime's OWN opcode table, so operand bytes can
+    /// never be mistaken for opcodes and every operand is skipped by its real width. No new dependency:
+    /// <see cref="OpCodes"/> is already in the BCL.
+    /// </para>
+    /// </remarks>
+    private static IEnumerable<int> CallTokens(byte[] il)
+    {
+        var tokens = new List<int>();
+        var offset = 0;
+
+        while (offset < il.Length)
+        {
+            OpCode opCode;
+            if (il[offset] == 0xFE)
+            {
+                if (offset + 1 >= il.Length || !TwoByteOpCodes.TryGetValue(il[offset + 1], out opCode))
+                {
+                    // An unknown opcode means the walk has lost the instruction boundary. Stopping is the
+                    // only honest answer: continuing would resume the byte-scanning defect this replaces.
+                    return tokens;
+                }
+
+                offset += 2;
+            }
+            else
+            {
+                if (!SingleByteOpCodes.TryGetValue(il[offset], out opCode))
+                {
+                    return tokens;
+                }
+
+                offset += 1;
+            }
+
+            var operandSize = OperandSize(opCode, il, offset);
+            if (operandSize < 0 || offset + operandSize > il.Length)
+            {
+                return tokens;
+            }
+
+            if ((opCode == OpCodes.Call || opCode == OpCodes.Callvirt) && operandSize == 4)
+            {
+                tokens.Add(BitConverter.ToInt32(il, offset));
+            }
+
+            offset += operandSize;
+        }
+
+        return tokens;
+    }
+
+    /// <summary>
+    /// The decoder must never read an operand byte as an opcode. This is the defect the previous scan had,
+    /// stated as a test instead of as a comment.
+    /// </summary>
+    [Fact]
+    public void Operand_bytes_that_look_like_a_call_are_not_read_as_one()
+    {
+        // ldc.i4 (0x20) takes a 4-byte operand; the operand here contains 0x28 (call) and 0x6F (callvirt).
+        // A byte scan finds two "calls" in it. A decoder finds none, because they are data.
+        byte[] il = [0x20, 0x28, 0x00, 0x6F, 0x28, 0x2A];
+
+        Assert.Empty(CallTokens(il));
+    }
+
+    /// <summary>The companion: a REAL call is still read, so the decoder is not simply blind.</summary>
+    [Fact]
+    public void A_real_call_instruction_still_yields_its_token()
+    {
+        byte[] il = [0x28, 0x11, 0x22, 0x33, 0x44, 0x2A]; // call 0x44332211; ret
+
+        Assert.Equal([0x44332211], CallTokens(il));
+    }
+
+    /// <summary>The width of the operand that follows, in bytes. Negative means "cannot be determined".</summary>
+    private static int OperandSize(OpCode opCode, byte[] il, int operandOffset) => opCode.OperandType switch
+    {
+        OperandType.InlineNone => 0,
+        OperandType.ShortInlineBrTarget or OperandType.ShortInlineI or OperandType.ShortInlineVar => 1,
+        OperandType.InlineVar => 2,
+        OperandType.InlineBrTarget or OperandType.InlineField or OperandType.InlineI
+            or OperandType.InlineMethod or OperandType.InlineSig or OperandType.InlineString
+            or OperandType.InlineTok or OperandType.InlineType or OperandType.ShortInlineR => 4,
+        OperandType.InlineI8 or OperandType.InlineR => 8,
+        // switch: a 4-byte count followed by that many 4-byte targets.
+        OperandType.InlineSwitch => operandOffset + 4 > il.Length
+            ? -1
+            : 4 + (BitConverter.ToInt32(il, operandOffset) * 4),
+        _ => -1
+    };
+
+    private static readonly Dictionary<byte, OpCode> SingleByteOpCodes = BuildOpCodes(twoByte: false);
+
+    private static readonly Dictionary<byte, OpCode> TwoByteOpCodes = BuildOpCodes(twoByte: true);
+
+    private static Dictionary<byte, OpCode> BuildOpCodes(bool twoByte)
+    {
+        var table = new Dictionary<byte, OpCode>();
+        foreach (var field in typeof(OpCodes).GetFields(BindingFlags.Public | BindingFlags.Static))
+        {
+            if (field.GetValue(null) is not OpCode opCode)
+            {
+                continue;
+            }
+
+            var isTwoByte = (opCode.Value & 0xFF00) == 0xFE00;
+            if (isTwoByte == twoByte)
+            {
+                table[(byte)(opCode.Value & 0xFF)] = opCode;
+            }
+        }
+
+        return table;
+    }
+
+    /// <summary>
+    /// <c>ATLAS-O1-CONCRETE-SERVICE-LOCATOR</c>, the eighth ring: the hide is called from exactly the
+    /// places the design intends, proved by IL rather than by declared dependencies.
+    /// </summary>
+    /// <remarks>
+    /// <c>ApplicationWindowController</c> appears because the capability is a PRIVATE NESTED type inside
+    /// it and the compiler attributes the nested type to its declaring class — that is the implementation
+    /// itself, not a consumer, and it is the shape that makes the eighth ring impossible: nobody outside
+    /// can name the type, construct one, or call the hide, because both implementations are private.
+    /// </remarks>
+    [Fact]
+    public void Only_the_guarded_operation_and_the_exit_path_call_a_window_hide()
+    {
+        Assert.Equal(
+            [
+                nameof(ApplicationWindowController),
+                nameof(ExitSequence),
+                nameof(TrayAffordanceLifecycle),
+            ],
+            HideCallers());
+    }
+
+    /// <summary>
+    /// Who HOLDS the capability — every shape, including the three the previous version of this test
+    /// missed.
+    /// </summary>
+    /// <remarks>
+    /// This is the complement to the IL scan and not a duplicate of it, and the difference cost a
+    /// surviving mutation to notice: IL sees who CALLS a hide, and a consumer that merely takes the
+    /// capability and never uses it calls nothing. When the call-site scan replaced the old
+    /// declared-dependency test, that case stopped being covered and <c>M95</c> came back to life.
+    /// <para>
+    /// So this enumerates holdings by every route a reference can arrive: constructor parameters,
+    /// instance fields, STATIC fields, and METHOD PARAMETERS. The first two are the shapes the earlier
+    /// test knew about; the last two are among the three it passed over.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void Only_the_guarded_operation_and_the_exit_path_hold_the_capability()
+    {
+        static Type Owner(Type type)
+        {
+            while (type.DeclaringType is { } declaring)
+            {
+                type = declaring;
+            }
+
+            return type;
+        }
+
+        const BindingFlags All = BindingFlags.Public | BindingFlags.NonPublic
+                                 | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly;
+
+        var holders = typeof(App).Assembly
+            .GetTypes()
+            .Where(t => t.GetConstructors(All)
+                         .SelectMany(c => c.GetParameters())
+                         .Any(p => p.ParameterType == typeof(IWindowHideCapability))
+                     || t.GetFields(All).Any(f => f.FieldType == typeof(IWindowHideCapability))
+                     || t.GetMethods(All)
+                         .SelectMany(m => m.GetParameters())
+                         .Any(p => p.ParameterType == typeof(IWindowHideCapability)))
+            .Select(Owner)
+            // The composition root is where the capability is taken and handed out; it is allowed to
+            // touch one, and whether a capturing closure survives is an optimiser detail.
+            .Where(t => t != typeof(App) && t != typeof(ApplicationWindowController))
+            .Select(t => t.Name)
+            .Distinct()
+            .OrderBy(n => n, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Equal([nameof(ExitSequence), nameof(TrayAffordanceLifecycle)], holders);
+    }
+
+    /// <summary>
+    /// <c>ATLAS-O1-CTOR-LOCAL</c>, the ninth ring: NOTHING in the assembly hands the capability back.
+    /// </summary>
+    /// <remarks>
+    /// The possession sweep looked at parameters and fields, so a reference obtained as a RETURN VALUE and
+    /// kept in a local was invisible — and there was an <c>internal</c> method returning the public
+    /// interface, so any type could ask for one and get it. Making the capability unforgeable while
+    /// leaving a tap that distributes it is not a closure.
+    /// <para>
+    /// A local variable cannot be enumerated by reflection, so the question is asked of the API surface
+    /// instead, which is where it belongs: if no member returns the capability, no local can hold one.
+    /// The authorised composition CONNECTS it to its two receivers without the reference ever being
+    /// handed out.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void Nothing_in_the_assembly_returns_the_hide_capability()
+    {
+        const BindingFlags All = BindingFlags.Public | BindingFlags.NonPublic
+                                 | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly;
+
+        var offenders = typeof(App).Assembly
+            .GetTypes()
+            .SelectMany(t => t.GetMethods(All).Select(m => (Type: t, Method: (MethodBase)m)))
+            .Where(x => ((MethodInfo)x.Method).ReturnType == typeof(IWindowHideCapability))
+            .Select(x => $"{x.Type.Name}.{x.Method.Name}")
+            .OrderBy(n => n, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Empty(offenders);
+    }
+
+    /// <summary>The scan is not vacuous: it really does find the calls it is asserting about.</summary>
+    [Fact]
+    public void The_hide_call_scan_finds_something()
+    {
+        Assert.NotEmpty(HideCallers());
+    }
+
+    /// <summary>The capability is never in the container — the same assertion CV-20 makes, for the door.</summary>
+    [Fact]
+    public void The_hide_capability_is_never_registered_in_the_container()
+    {
+        var services = RealComposition();
+
+        var offenders = services
+            .Where(d => d.ServiceType == typeof(IWindowHideCapability))
+            .Select(d => d.ServiceType.FullName!)
+            .ToArray();
+
+        Assert.Empty(offenders);
+    }
+
+    /// <summary>
+    /// And the general window contract does not carry a hide, which is what made every holder of it a
+    /// holder of the act.
+    /// </summary>
+    [Fact]
+    public void The_general_window_contract_cannot_hide_to_background()
+    {
+        var offenders = typeof(IApplicationWindowController)
+            .GetMethods()
+            // EVERY hide, not just the one that was pointed at: HideForMinimize did exactly the same
+            // thing to the window and stayed on this contract through six rings. Swept by effect.
+            .Where(m => m.Name.StartsWith("Hide", StringComparison.Ordinal))
+            .Select(m => m.Name)
+            .ToArray();
+
+        Assert.Empty(offenders);
+    }
+
+    /// <summary>
+    /// The capability is connected once, so one reference exists in the process and no second delivery is
+    /// possible.
+    /// </summary>
+    [Fact]
+    public void The_hide_capability_can_only_be_connected_once()
+    {
+        // Built without constructors: the connection touches only its own fields, and this keeps an
+        // architecture test from dragging a navigation service and a window into itself.
+        var controller = (ApplicationWindowController)RuntimeHelpers.GetUninitializedObject(
+            typeof(ApplicationWindowController));
+        var lifecycle = (TrayAffordanceLifecycle)RuntimeHelpers.GetUninitializedObject(
+            typeof(TrayAffordanceLifecycle));
+        var exit = (ExitSequence)RuntimeHelpers.GetUninitializedObject(typeof(ExitSequence));
+
+        controller.ConnectHideCapability(lifecycle, exit);
+
+        // FRESH receivers on the second call, and the reason matters: with the same two, the exception
+        // came from the LIFECYCLE's single-shot rather than the controller's, so the assertion passed
+        // whether or not the controller guarded anything. The mutation that removes the controller's
+        // guard survived, which is how the weakness surfaced.
+        var lifecycle2 = (TrayAffordanceLifecycle)RuntimeHelpers.GetUninitializedObject(
+            typeof(TrayAffordanceLifecycle));
+        var exit2 = (ExitSequence)RuntimeHelpers.GetUninitializedObject(typeof(ExitSequence));
+
+        Assert.Throws<InvalidOperationException>(
+            () => controller.ConnectHideCapability(lifecycle2, exit2));
+    }
+
+    [Fact]
+    public void T14c_is_not_vacuous_because_the_composition_really_ran()
+    {
+        // An empty collection would satisfy the assertion above for the wrong reason. This pins that the
+        // seam actually produced the application's registrations.
+        var services = RealComposition();
+
+        Assert.True(services.Count > 50, $"the composition produced only {services.Count} descriptors");
+        Assert.Contains(services, d => d.ServiceType == typeof(ITrayAffordanceSource));
+    }
+
+    // ------------------------------------------------------------------ the DPI update is ROUTED
+
+    /// <summary>
+    /// The adapter SENDS its own shell updates through the machine's gate.
+    /// </summary>
+    /// <remarks>
+    /// The previous test proved only that <c>InvokeUnderShellGate</c> serializes — a property of the
+    /// machine. A mutation that sent the DPI update straight to the shell left it green, because nothing
+    /// asserted that this adapter uses the gate at all. This asserts the routing.
+    /// </remarks>
+    [Fact]
+    public void A_shell_update_owned_by_the_adapter_is_routed_through_the_machines_gate()
+    {
+        var native = new BlockingNativeTrayRegistration();
+        using var machine = new TrayStateMachine(
+            native,
+            () => { },
+            () => { },
+            TimeProvider.System,
+            NullLogger<TrayStateMachine>.Instance);
+
+        var ran = false;
+        OwnedTrayIconAdapter.RouteShellUpdate(machine, () =>
+        {
+            ran = true;
+
+            // Inside the gate: a second shell call from this thread is re-entrant, but the point is that
+            // the update runs where the machine's own calls are serialized.
+            native.Calls.Add("Dpi");
+        });
+
+        Assert.True(ran, "the update never ran");
+        Assert.Contains("Dpi", native.Calls);
+    }
+
+    [Fact]
+    public void A_shell_update_still_runs_when_there_is_no_machine_to_serialize_against()
+    {
+        var ran = false;
+
+        OwnedTrayIconAdapter.RouteShellUpdate(null, () => ran = true);
+
+        Assert.True(ran, "with no machine there is nothing to serialize against, so it must still run");
+    }
+
+    /// <summary>
+    /// The link the behaviour tests cannot reach: that the DPI handler uses the router.
+    /// </summary>
+    /// <remarks>
+    /// A source assertion, comments stripped, declared as one — <c>OnDpiChanged</c> needs a real
+    /// <c>TrayHostWindow</c> and a real registration, so no test can drive it.
+    /// </remarks>
+    [Fact]
+    public void The_DPI_handler_goes_through_the_router_and_not_straight_to_the_shell()
+    {
+        var source = StripComments(File.ReadAllText(Path.Combine(
+            RepositoryRoot(), "src", "ServerMonitor.App", "Shell", "Tray", "OwnedTrayIconAdapter.cs")));
+
+        var handler = source.IndexOf("private void OnDpiChanged", StringComparison.Ordinal);
+        Assert.True(handler >= 0, "the DPI handler could not be found");
+
+        var body = source[handler..];
+        var end = body.IndexOf("internal static void RouteShellUpdate", StringComparison.Ordinal);
+        Assert.True(end > 0, "the router could not be found");
+
+        body = body[..end];
+
+        // The update is handed to the router, not issued directly and not gated by hand. Naming
+        // UpdateForDpi is expected — it is the delegate being routed; what must not appear is a call
+        // that bypasses the router or reimplements it.
+        Assert.Contains(
+            "RouteShellUpdate(machine, () => registration.UpdateForDpi(dpi));", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("InvokeUnderShellGate", body, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The UI marshaller has exactly ONE inline invocation — the branch where we already own the thread —
+    /// and no fallback that runs the continuation when the dispatcher refuses.
+    /// </summary>
+    /// <remarks>
+    /// Source-level, and declared as one: taking the false branch needs a real <c>DispatcherQueue</c> in
+    /// the middle of shutting down, which no test can produce. The fallback is what cancelled the
+    /// topology guarantee, so its ABSENCE is what has to be pinned.
+    /// </remarks>
+    [Fact]
+    public void The_UI_marshaller_has_no_inline_fallback()
+    {
+        var source = StripComments(File.ReadAllText(Path.Combine(
+            RepositoryRoot(), "src", "ServerMonitor.App", "Shell", "Tray", "OwnedTrayIconAdapter.cs")));
+
+        var start = source.IndexOf("private bool RunOnUiThread", StringComparison.Ordinal);
+        Assert.True(start >= 0, "the marshaller could not be found");
+
+        var body = source[start..];
+        var end = body.IndexOf("\n    }", StringComparison.Ordinal);
+        Assert.True(end > 0, "the marshaller body could not be delimited");
+        body = body[..end];
+
+        var inlineCalls = body.Split("continuation();").Length - 1;
+        Assert.Equal(1, inlineCalls);
+        Assert.Contains("return dispatcher.TryEnqueue(", body, StringComparison.Ordinal);
+    }
+
+    // ------------------------------------------------------------------ the degraded session is WIRED
+
+    /// <summary>
+    /// The blocking defect, as a test: a launch whose registration never succeeded must degrade at
+    /// STARTUP, not at the user's first close.
+    /// </summary>
+    /// <remarks>
+    /// Before the fix, <see cref="TrayAffordanceLifecycle"/> was constructed lazily by the
+    /// <c>WindowCloseCoordinator</c> factory, so nothing evaluated it until someone clicked X. A
+    /// <c>--background</c> launch with a failed registration therefore published Unavailable to nobody
+    /// and went on monitoring, invisible, with no way out — A12, the thing this slice exists to remove.
+    /// </remarks>
+    [Fact]
+    public void A_launch_with_no_affordance_degrades_at_startup_and_not_at_the_first_close()
+    {
+        var harness = new StartupHarness(TrayAffordanceState.Unavailable);
+
+        App.EvaluateStartupAffordance(harness.Services);
+
+        Assert.True(harness.Notice.Raised);
+        Assert.Equal(1, harness.Window.BackgroundSettingsOpened);
+    }
+
+    /// <summary>
+    /// The other half: the subscription is LIVE from startup, so an affordance lost before the user has
+    /// closed anything degrades then, instead of the icon vanishing silently and the next close quitting
+    /// with no explanation.
+    /// </summary>
+    [Fact]
+    public void An_affordance_lost_before_any_user_close_degrades_immediately()
+    {
+        var harness = new StartupHarness(TrayAffordanceState.Available);
+
+        App.EvaluateStartupAffordance(harness.Services);
+        Assert.False(harness.Notice.Raised);
+
+        harness.Source.Publish(TrayAffordanceState.Lost);
+
+        Assert.True(harness.Notice.Raised);
+        Assert.Equal(1, harness.Window.BackgroundSettingsOpened);
+    }
+
+    [Fact]
+    public void A_healthy_launch_degrades_nothing()
+    {
+        var harness = new StartupHarness(TrayAffordanceState.Available);
+
+        App.EvaluateStartupAffordance(harness.Services);
+
+        Assert.False(harness.Notice.Raised);
+        Assert.Equal(0, harness.Window.BackgroundSettingsOpened);
+    }
+
+    [Fact]
+    public void A_recovering_affordance_at_startup_holds_without_degrading()
+    {
+        // CV-2b: an unauthenticated TaskbarCreated broadcast must not be able to cost the user the
+        // session. Evaluating at startup must not turn the bounded recovery window into a degradation.
+        var harness = new StartupHarness(TrayAffordanceState.Recovering);
+
+        App.EvaluateStartupAffordance(harness.Services);
+
+        Assert.False(harness.Notice.Raised);
+        Assert.Equal(0, harness.Window.BackgroundSettingsOpened);
+    }
+
+    /// <summary>
+    /// The one link the behaviour tests cannot reach: that <c>OnLaunched</c> actually calls the seam.
+    /// </summary>
+    /// <remarks>
+    /// A source assertion, declared as one — and comments are stripped first, which is not a detail. My
+    /// first version asserted the call text was present, and a mutation that COMMENTED THE CALL OUT
+    /// stayed green: the text was still there, inside the comment. I had claimed a positive assertion
+    /// could not be satisfied by prose. It can. Stripping comments is what makes the claim true.
+    /// </remarks>
+    [Fact]
+    public void OnLaunched_evaluates_the_affordance_after_the_host_starts_and_before_activation_routing()
+    {
+        var source = StripComments(File.ReadAllText(Path.Combine(
+            RepositoryRoot(), "src", "ServerMonitor.App", "App.xaml.cs")));
+
+        var startAsync = source.IndexOf("await ServicesHost.StartAsync();", StringComparison.Ordinal);
+        var evaluate = source.IndexOf(
+            "EvaluateStartupAffordance(ServicesHost.Services);", StringComparison.Ordinal);
+        var markReady = source.IndexOf("_activationRouter.MarkReady();", StringComparison.Ordinal);
+
+        Assert.True(startAsync >= 0, "the host start could not be found");
+        Assert.True(evaluate >= 0, "OnLaunched does not evaluate the affordance at startup");
+        Assert.True(markReady >= 0, "the activation hand-off could not be found");
+        Assert.InRange(evaluate, startAsync, markReady);
+    }
+
+    private static string StripComments(string source) =>
+        System.Text.RegularExpressions.Regex.Replace(
+            source, @"/\*[\s\S]*?\*/|//[^\r\n]*", string.Empty);
+
+    private static string RepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !Directory.Exists(Path.Combine(directory.FullName, "src")))
+        {
+            directory = directory.Parent;
+        }
+
+        return directory?.FullName ?? throw new InvalidOperationException("The repository root was not found.");
+    }
+
+    /// <summary>
+    /// The REAL composition, with only what a test cannot have replaced: the affordance source (so the
+    /// state under test can be chosen), the window and the notice (so degradation is observable), and the
+    /// lifecycle controller. <see cref="TrayAffordanceLifecycle"/> itself is the production registration.
+    /// </summary>
+    private sealed class StartupHarness
+    {
+        public FakeAffordanceSource Source { get; }
+
+        public FakeDegradationNotice Notice { get; } = new();
+
+        public FakeWindowController Window { get; } = new();
+
+        public ServiceProvider Services { get; }
+
+        public StartupHarness(TrayAffordanceState initial)
+        {
+            Source = new FakeAffordanceSource(initial);
+
+            var services = RealComposition();
+            services.AddLogging();
+            services.AddSingleton<IAppLifecycleController>(FakeLifecycle.Instance);
+            services.AddSingleton<ITrayAffordanceSource>(Source);
+            services.AddSingleton<IBackgroundDegradationNotice>(Notice);
+            services.AddSingleton<IApplicationWindowController>(Window);
+
+            Services = services.BuildServiceProvider();
+        }
+    }
+
+    private sealed class FakeAffordanceSource(TrayAffordanceState initial) : ITrayAffordanceSource
+    {
+        public event EventHandler? StateChanged;
+
+        public TrayAffordanceState State { get; private set; } = initial;
+
+        /// <summary>
+        /// THE SAME TWO CHANNELS AS PRODUCTION. A fake that delivered a loss on the observer event would
+        /// be a permanent mutation applied to the environment instead of the code: every degradation test
+        /// would keep passing while the real machine had stopped using that channel. So the loss goes to
+        /// the registered consumer, exactly as the machine does it, and single assignment is enforced
+        /// here too.
+        /// </summary>
+        private ITrayLossConsumer? _lossConsumer;
+
+        public void SetLossConsumer(ITrayLossConsumer consumer)
+        {
+            if (_lossConsumer is not null)
+            {
+                throw new InvalidOperationException(
+                    "The authoritative loss consumer is already registered; there is exactly one.");
+            }
+
+            _lossConsumer = consumer;
+        }
+
+        public void Publish(TrayAffordanceState state)
+        {
+            State = state;
+
+            if (state is TrayAffordanceState.Lost or TrayAffordanceState.Unavailable)
+            {
+                _lossConsumer?.AcknowledgeLoss(state);
+                return;
+            }
+
+            StateChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        /// <summary>
+        /// The commit, faked the way the real one behaves: the act runs only while the affordance is
+        /// established, and it runs INSIDE the determination so a test can invalidate the affordance from
+        /// within and see that the act was still refused.
+        /// </summary>
+        /// <summary>
+        /// THE SAME SHAPE AS PRODUCTION, INCLUDING THE FALLBACK. A fake that merely did nothing when the
+        /// affordance was absent would hide the defect this ring exists to prevent: an outcome where the
+        /// window is neither hidden nor closed. It also takes a VALUE, not a delegate, so a test cannot
+        /// smuggle in a capture that production would refuse.
+        /// </summary>
+        private ITrayGuardedOperations? _operations;
+
+        public void SetGuardedOperations(ITrayGuardedOperations operations)
+        {
+            if (_operations is not null)
+            {
+                throw new InvalidOperationException(
+                    "The guarded operations are already registered; there is exactly one set.");
+            }
+
+            _operations = operations;
+        }
+
+        public void Perform(TrayGuardedOperation operation)
+        {
+            if (State != TrayAffordanceState.Available)
+            {
+                _operations?.Refuse(operation);
+                return;
+            }
+
+            // DISPATCHES ON THE OPERATION, like the real machine. It used to call EnterBackground()
+            // whatever was asked, which made a minimize test pass by performing a background entry -- a
+            // fake that answers the wrong question is a permanent mutation applied to the environment.
+            switch (operation)
+            {
+                case TrayGuardedOperation.EnterBackground:
+                    _operations?.EnterBackground();
+                    break;
+                case TrayGuardedOperation.HideForMinimize:
+                    _operations?.HideForMinimize();
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(operation), operation, null);
+            }
+        }
+    }
+
+    private sealed class FakeDegradationNotice : IBackgroundDegradationNotice
+    {
+        public event EventHandler? Changed;
+
+        public bool IsDegraded => Raised;
+
+        public bool Raised { get; private set; }
+
+        public void Raise()
+        {
+            Raised = true;
+            Changed?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    private sealed class FakeWindowController : IApplicationWindowController
+    {
+        public int BackgroundSettingsOpened { get; private set; }
+
+        public bool IsAttached => true;
+
+        public bool IsMaterialized => true;
+
+        public void OpenBackgroundSettings() => BackgroundSettingsOpened++;
+
+        public void Attach(Window window)
+        {
+        }
+
+        public void AttachWindowFactory(Func<Window> factory)
+        {
+        }
+
+        public void HideForMinimize()
+        {
+        }
+
+        public void HideToBackground()
+        {
+        }
+
+        public void RestoreAndActivate()
+        {
+        }
+
+        public void OpenSettings()
+        {
+        }
+
+        public void ToggleCompactMode()
+        {
+        }
+
+        public void RequestClose()
+        {
+        }
+
+        public void BeginShutdown()
+        {
+        }
+    }
+
+    [Fact]
+    public void The_owner_reports_no_affordance_until_a_registration_has_actually_succeeded()
+    {
+        // Fail-closed at the only moment it is free to be wrong: before Start() there is no machine and
+        // therefore no proof of anything. Reporting Available here would let the window hide on a process
+        // that never registered an icon — the A12 zombie this whole contract exists to prevent.
+        var adapter = new OwnedTrayIconAdapter(
+            new UnusedThemeService(),
+            new UnusedLocalizationService(),
+            () => FakeLifecycle.Instance,
+            new UnusedProcessTerminator(),
+            NullLoggerFactory.Instance);
+
+        Assert.Equal(TrayAffordanceState.Unavailable, adapter.State);
+    }
+
+    /// <summary>
+    /// The OWNER's own single-assignment guard, on the owner and not on a double.
+    /// </summary>
+    /// <remarks>
+    /// This test exists because its absence was measured: the mutation that lets a latecomer displace the
+    /// authoritative loss consumer SURVIVED, while a test named for exactly that property passed. That
+    /// test was driving the fake source, whose guard is a copy — so it proved the copy and nothing about
+    /// the owner. A guard that only a test double enforces is not a guard, and it is the same lesson the
+    /// honest-delete fake taught earlier in this slice.
+    /// <para>
+    /// Displacement is the INVERSE abuse of the seam: instead of failing to consume a loss, a latecomer
+    /// consumes every loss silently and suppresses the fail-safe that should have fired.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void The_owner_refuses_a_second_authoritative_loss_consumer()
+    {
+        var adapter = new OwnedTrayIconAdapter(
+            new UnusedThemeService(),
+            new UnusedLocalizationService(),
+            () => FakeLifecycle.Instance,
+            new UnusedProcessTerminator(),
+            NullLoggerFactory.Instance);
+
+        adapter.SetLossConsumer(new NoopLossConsumer());
+
+        Assert.Throws<InvalidOperationException>(() => adapter.SetLossConsumer(new NoopLossConsumer()));
+    }
+
+    /// <summary>
+    /// The owner's single-assignment guard for the GUARDED OPERATIONS, on the owner and not on a double.
+    /// </summary>
+    /// <remarks>
+    /// Written because the mutation for it survived: the equivalent test for the loss consumer proved the
+    /// owner, and there was no such test for this slot at all. Whoever holds this slot is the authorised
+    /// action, so displacing it is how a caller would reinstall its own code as the thing the machine
+    /// performs under its lock.
+    /// </remarks>
+    [Fact]
+    public void The_owner_refuses_a_second_set_of_guarded_operations()
+    {
+        var adapter = new OwnedTrayIconAdapter(
+            new UnusedThemeService(),
+            new UnusedLocalizationService(),
+            () => FakeLifecycle.Instance,
+            new UnusedProcessTerminator(),
+            NullLoggerFactory.Instance);
+
+        adapter.SetGuardedOperations(new NoopOperations());
+
+        Assert.Throws<InvalidOperationException>(() => adapter.SetGuardedOperations(new NoopOperations()));
+    }
+
+    private sealed class NoopOperations : ITrayGuardedOperations
+    {
+        public void EnterBackground()
+        {
+        }
+
+        public void HideForMinimize()
+        {
+        }
+
+        public void Refuse(TrayGuardedOperation operation)
+        {
+        }
+    }
+
+    private sealed class NoopLossConsumer : ITrayLossConsumer
+    {
+        public void AcknowledgeLoss(TrayAffordanceState state)
+        {
+        }
+    }
+
+    // ------------------------------------------------------------------
+
+    private sealed class UnusedThemeService : IThemeService
+    {
+        public AppThemePreference Current => AppThemePreference.System;
+
+        public void Attach(FrameworkElement rootElement) => throw new NotSupportedException();
+
+        public void Detach(FrameworkElement rootElement) => throw new NotSupportedException();
+
+        public void Apply(AppThemePreference preference) => throw new NotSupportedException();
+    }
+
+    private sealed class UnusedLocalizationService : ILocalizationService
+    {
+        public string? CurrentLanguageOverride => null;
+
+        public string GetString(string resourceKey) => throw new NotSupportedException();
+
+        public void InitializeFromSystem() => throw new NotSupportedException();
+
+        public void SetLanguage(string? languageTag) => throw new NotSupportedException();
+    }
+
+    private sealed class UnusedProcessTerminator : IProcessTerminator
+    {
+        public ProcessTerminationResult Terminate(int exitCode) => throw new NotSupportedException();
+    }
+
+    private static Type[] Implementations(Type contract) =>
+        [.. AppAssembly
+            .GetTypes()
+            .Where(t => t is { IsAbstract: false, IsInterface: false } && contract.IsAssignableFrom(t))
+            .OrderBy(t => t.FullName, StringComparer.Ordinal)];
+
+    /// <summary>
+    /// The composition registers <see cref="IAppLifecycleController"/> through a factory that reaches
+    /// process-level statics. Overriding it keeps this test about tray ownership rather than about the
+    /// lifecycle it is not testing.
+    /// </summary>
+    private sealed class FakeLifecycle : IAppLifecycleController
+    {
+        internal static readonly FakeLifecycle Instance = new();
+
+        public AppLifecycleState State => AppLifecycleState.Foreground;
+
+        public bool StartedInBackground => false;
+
+        public bool IsExiting => false;
+
+        public void EnterForeground()
+        {
+        }
+
+        public void EnterBackground()
+        {
+        }
+
+        public void RequestExit(ExitReason reason)
+        {
+        }
+    }
+}

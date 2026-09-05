@@ -12,6 +12,20 @@
     <Platforms>x64</Platforms>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <UseWinUI>true</UseWinUI>
+
+    <!--
+      M13 S2-T. The tray effect switch maps Kind -> (native operation, MayCreateAffordance) in ONE
+      exhaustive expression with NO default arm, so a new EffectKind that nobody described is a BUILD
+      FAILURE rather than a silent `false`. That is only true if CS8509 is an error, so it is escalated
+      here; before this the guarantee was asserted in the design but not true in the tree.
+
+      CS8524 is deliberately NOT escalated. It is the unnamed-enum-value diagnostic, and treating it as
+      an error would require covering unnamed values — normally with exactly the default arm this design
+      forbids. The two requirements are incompatible. Its runtime manifestation, SwitchExpressionException
+      for an undefined value, is what the absence-of-default test asserts instead. If TreatWarningsAsErrors
+      is ever enabled globally, CS8524 must be excluded via WarningsNotAsErrors or this design breaks.
+    -->
+    <WarningsAsErrors>$(WarningsAsErrors);CS8509</WarningsAsErrors>
     <DefaultLanguage>pt-BR</DefaultLanguage>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
@@ -25,21 +39,25 @@
          (both Package*.appxmanifest). Product/marketing SemVer stays 1.0.0 (first public RC). See
          PITFALL P-016.
 
-         M13/ADR-018: the Windows 11 widget is a user-visible feature addition, so this is a MINOR bump,
+         M13/ADR-018: the Windows 11 widget is a user-visible feature addition, so that was a MINOR bump,
          not another build bump. 1.1.0.0 > 1.0.1.0, so the Store upgrade path from the shipped 1.0.1.0
          stays valid, and product and package versions converge again (the 1.0.0-vs-1.0.1 divergence M12
-         had to accept is retired). Concept map:
-           Package/Identity Version : 1.1.0.0  (Store-valid; Revision 0)
-           FileVersion              : 1.1.0.0  (tracks the package build)
+         had to accept is retired).
+
+         M13 REOPENED after v1.1.0 was already published. QA-7, QA-8, QA-9, QA-10, QA-11 and QA-12 were
+         fixed afterwards, so the runtime behaviour differs from what v1.1.0 shipped and it must not carry
+         that version: PATCH bump to 1.1.1. The public v1.1.0 stays immutable. Concept map:
+           Package/Identity Version : 1.1.1.0  (Store-valid; Revision 0)
+           FileVersion              : 1.1.1.0  (tracks the package build)
            AssemblyVersion          : 1.0.0.0  (stable project baseline; unchanged for binding safety)
-           Product SemVer / Informational : 1.1.0
-         DisplayVersion (Settings/About) = Major.Minor.Build of the *running* version: 1.1.0 both
+           Product SemVer / Informational : 1.1.1
+         DisplayVersion (Settings/About) = Major.Minor.Build of the *running* version: 1.1.1 both
          packaged (reads Package.Current) and unpackaged/dev (assembly fallback). NÃO criar tag
-         v1.1.0 sem aprovação humana. -->
-    <Version>1.1.0</Version>
+         v1.1.1 sem aprovação humana. -->
+    <Version>1.1.1</Version>
     <AssemblyVersion>1.0.0.0</AssemblyVersion>
-    <FileVersion>1.1.0.0</FileVersion>
-    <InformationalVersion>1.1.0</InformationalVersion>
+    <FileVersion>1.1.1.0</FileVersion>
+    <InformationalVersion>1.1.1</InformationalVersion>
     <!-- M12/ADR-017: one app, two deployment profiles. Default is the existing UNPACKAGED,
          self-contained build (dev Debug + existing Release + every test/gate). Pass
          -p:Packaged=true for the production single-project MSIX profile below. Domain logic
@@ -140,6 +158,62 @@
     (the two Package*.appxmanifest files); the widget payload is identical, so what board QA exercised is
     exactly what the Store package ships.
   -->
+  <!--
+    M13-QA-7 gate, backing the check inside StageWidgetProviderForPackage below. It parses the PE header
+    itself (no external tooling, no PowerShell dependency): e_lfanew at 0x3C gives the PE signature offset,
+    the optional header starts after the 4-byte signature plus the 20-byte COFF header, and its Subsystem
+    field sits at offset 68 within it - the same offset for PE32 and PE32+.
+  -->
+  <UsingTask TaskName="VerifyPeSubsystem" TaskFactory="RoslynCodeTaskFactory"
+             AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <ExecutablePath ParameterType="System.String" Required="true" />
+      <ExpectedSubsystem ParameterType="System.Int32" Required="true" />
+    </ParameterGroup>
+    <Task>
+      <Code Type="Fragment" Language="cs"><![CDATA[
+        int subsystem = -1;
+        using (var stream = System.IO.File.OpenRead(ExecutablePath))
+        using (var reader = new System.IO.BinaryReader(stream))
+        {
+            stream.Position = 0x3C;
+            long peOffset = reader.ReadInt32();
+            // Signature (4) + COFF header (20) + Subsystem at 68 within the optional header, then 2 bytes.
+            if (peOffset > 0 && peOffset + 94 <= stream.Length)
+            {
+                stream.Position = peOffset;
+                if (reader.ReadUInt32() == 0x00004550) // PE signature
+                {
+                    stream.Position = peOffset + 4 + 20 + 68;
+                    subsystem = reader.ReadUInt16();
+                }
+            }
+        }
+
+        if (subsystem < 0)
+        {
+            Log.LogError(
+                "PE subsystem gate: '" + ExecutablePath + "' does not have a readable PE header, so the " +
+                "widget provider's subsystem could not be verified. Refusing to package it.");
+        }
+        else if (subsystem != ExpectedSubsystem)
+        {
+            Log.LogError(
+                "PE subsystem gate failed for '" + ExecutablePath + "': expected " + ExpectedSubsystem +
+                " (IMAGE_SUBSYSTEM_WINDOWS_GUI) but the staged binary is " + subsystem + ". A console-" +
+                "subsystem (3) widget provider makes Windows show a console window when COM activates it " +
+                "on the Widgets board (M13-QA-7). Check <OutputType> in " +
+                "ServerMonitor.WidgetProvider.csproj: it must be WinExe.");
+        }
+        else
+        {
+            Log.LogMessage(Microsoft.Build.Framework.MessageImportance.High,
+                "Widget provider PE subsystem verified: " + subsystem + " (IMAGE_SUBSYSTEM_WINDOWS_GUI).");
+        }
+      ]]></Code>
+    </Task>
+  </UsingTask>
+
   <Target Name="StageWidgetProviderForPackage" BeforeTargets="AssignTargetPaths"
           Condition="'$(Packaged)' == 'true'">
     <PropertyGroup>
@@ -165,6 +239,15 @@
            Text="Widget provider staging incomplete: ServerAlyzer.WidgetProvider.deps.json missing." />
     <Error Condition="!Exists('$(WidgetProviderPackageStage)ServerAlyzer.WidgetProvider.runtimeconfig.json')"
            Text="Widget provider staging incomplete: ServerAlyzer.WidgetProvider.runtimeconfig.json missing." />
+    <!-- M13-QA-7 BLOCKING GATE. Read the PE subsystem byte out of the exe that is ACTUALLY about to be
+         packaged and fail the build unless it is 2 (IMAGE_SUBSYSTEM_WINDOWS_GUI). A console-subsystem (3)
+         provider makes Windows allocate and SHOW a console window when COM activates it - unconditionally,
+         whether or not the process writes anything. This is measured on the staged binary rather than
+         trusted from the csproj property because 1.1.0.0 shipped subsystem 3 with a fully green suite, and
+         because a smoke launch from a terminal INHERITS that terminal's console and can never observe the
+         defect. -->
+    <VerifyPeSubsystem ExecutablePath="$(WidgetProviderPackageStage)ServerAlyzer.WidgetProvider.exe"
+                       ExpectedSubsystem="2" />
     <!-- Explicit literal Link per file. Do NOT use %(Filename)%(Extension) here: inside a target ItemGroup
          that batches over the whole @(Content) vector (README, icons, logos), producing a cartesian set of
          wrong relative paths. KeepDuplicates=false because AssignTargetPaths fires in both build and publish
