@@ -44,7 +44,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup the Microsoft Store Developer CLI
         # microsoft/microsoft-store-apppublisher@v1.4, pinned to its commit.
