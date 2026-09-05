@@ -1771,12 +1771,35 @@ public sealed class TrayStateMachineTests : IDisposable
         Run(machine.Release);
         WaitForState(machine, TrayLifecycleState.Releasing);
 
-        // The Add was emitted BEFORE Releasing, so it may complete physically afterwards — as obsolete
-        // and compensated work.
-        _native.AddMayReturn.Set();
+        // Every state published from here on. "It never became Available" is then proved across the
+        // whole window instead of being sampled at whatever instant the assertion happened to run.
+        // A concurrent queue and nothing else: this handler is invoked while the decision lock is
+        // held, so it must not block.
+        var observed = new System.Collections.Concurrent.ConcurrentQueue<TrayLifecycleState>();
+        void Record(object? sender, EventArgs args) => observed.Enqueue(machine.LifecycleState);
+
+        machine.LifecycleChangedForTests += Record;
+        try
+        {
+            // The Add was emitted BEFORE Releasing, so it may complete physically afterwards — as
+            // obsolete and compensated work.
+            _native.AddMayReturn.Set();
+
+            // Released is the normative end state and the machine signals it. This used to wait on
+            // WaitForBackground(), which waits for the test's OWN dispatch tasks — and Release()
+            // only enqueues an event, while the compensation runs on whichever thread the late Add
+            // returns on. So the wait could return before the machine had finished, and the
+            // assertions read a state that was still in motion.
+            WaitForState(machine, TrayLifecycleState.Released);
+        }
+        finally
+        {
+            machine.LifecycleChangedForTests -= Record;
+        }
+
         WaitForBackground();
 
-        Assert.NotEqual(TrayLifecycleState.Available, machine.LifecycleState);
+        Assert.DoesNotContain(TrayLifecycleState.Available, observed);
         Assert.True(_native.DeleteCallsSnapshot >= 1, "a compensating Delete is mandatory");
         Assert.Equal(TrayLifecycleState.Released, machine.LifecycleState);
     }
@@ -2132,7 +2155,22 @@ public sealed class TrayStateMachineTests : IDisposable
 
     private void Run(Action action) => _background.Add(Task.Run(action));
 
-    private void WaitForBackground() => Task.WaitAll([.. _background], Patience);
+    /// <summary>
+    /// Waits for the work this test started on the thread pool.
+    /// </summary>
+    /// <remarks>
+    /// The return value of <see cref="Task.WaitAll(Task[], TimeSpan)"/> used to be discarded, so a
+    /// timeout was indistinguishable from success and the test carried on asserting against a state
+    /// that had not settled. It is asserted now: if the patience window expires, that is a finding,
+    /// not something to step over.
+    ///
+    /// This only covers tasks the TEST started. It is not a barrier for work the product does on its
+    /// own threads — wait for the state the product publishes instead.
+    /// </remarks>
+    private void WaitForBackground() =>
+        Assert.True(
+            Task.WaitAll([.. _background], Patience),
+            $"background work started by the test did not finish within {Patience.TotalSeconds:n0}s");
 
     /// <summary>
     /// Waits for a state by SIGNAL, not by polling a wall clock.

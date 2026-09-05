@@ -28,7 +28,7 @@ public sealed class ServerDiscoveryServiceTests
         Assert.Equal([IPAddress.Parse("192.168.1.42")], service.Addresses);
         Assert.Equal(StartTime, service.FirstSeenAt);
         Assert.Equal(StartTime, service.LastSeenAt);
-        await h.FlushNotificationsAsync();
+        await h.FlushNotificationsAsync(1);
         Assert.Equal(1, h.ChangeCount);
     }
 
@@ -46,7 +46,7 @@ public sealed class ServerDiscoveryServiceTests
         var service = Assert.Single(h.Service.GetDiscovered());
         Assert.Equal(StartTime, service.FirstSeenAt);
         Assert.Equal(h.Time.GetUtcNow(), service.LastSeenAt);
-        await h.FlushNotificationsAsync();
+        await h.FlushNotificationsAsync(1);
         Assert.Equal(1, h.ChangeCount);
     }
 
@@ -97,7 +97,7 @@ public sealed class ServerDiscoveryServiceTests
         await using var h = await Harness.StartAsync();
         h.Browser.EmitFound(h.Observation("Server", "old-host", 22, ["10.0.0.4"]));
         var discoveryId = Assert.Single(h.Service.GetDiscovered()).DiscoveryId;
-        await h.FlushNotificationsAsync();
+        await h.FlushNotificationsAsync(1);
 
         h.Time.Advance(TimeSpan.FromSeconds(1));
         h.Browser.EmitUpdated(h.Observation("server", "new-host", 2222, ["10.0.0.9"]));
@@ -107,7 +107,7 @@ public sealed class ServerDiscoveryServiceTests
         Assert.Equal("new-host.local", updated.HostName);
         Assert.Equal(2222, updated.Port);
         Assert.Equal([IPAddress.Parse("10.0.0.9")], updated.Addresses);
-        await h.FlushNotificationsAsync();
+        await h.FlushNotificationsAsync(2);
         Assert.Equal(2, h.ChangeCount);
     }
 
@@ -123,10 +123,10 @@ public sealed class ServerDiscoveryServiceTests
             h.Browser.EmitUpdated(h.Observation("Server", "server", addresses: ["10.0.0.4"]));
         }
 
-        await h.FlushNotificationsAsync();
+        await h.FlushNotificationsAsync(1);
         Assert.Equal(1, h.ChangeCount);
         h.Browser.EmitUpdated(h.Observation("Server", "server", addresses: ["10.0.0.5"]));
-        await h.FlushNotificationsAsync();
+        await h.FlushNotificationsAsync(2);
         Assert.Equal(2, h.ChangeCount);
     }
 
@@ -198,7 +198,7 @@ public sealed class ServerDiscoveryServiceTests
         h.Time.Advance(TimeSpan.FromSeconds(2));
 
         Assert.Equal(discoveryId, Assert.Single(h.Service.GetDiscovered()).DiscoveryId);
-        await h.FlushNotificationsAsync();
+        await h.FlushNotificationsAsync(1);
         Assert.Equal(1, h.ChangeCount);
     }
 
@@ -341,7 +341,7 @@ public sealed class ServerDiscoveryServiceTests
 
         Assert.Single(h.Service.GetDiscovered());
         Assert.Equal(2, h.Browser.StartCount);
-        await h.FlushNotificationsAsync();
+        await h.FlushNotificationsAsync(1);
         Assert.Equal(1, h.ChangeCount);
         await h.DisposeAsync();
     }
@@ -357,7 +357,7 @@ public sealed class ServerDiscoveryServiceTests
 
         Assert.Equal(DiscoveryInputPolicy.MaxVisibleServices, h.Service.GetDiscovered().Count);
         Assert.Equal(0, h.ChangeCount);
-        await h.FlushNotificationsAsync();
+        await h.FlushNotificationsAsync(1);
         Assert.Equal(1, h.ChangeCount);
         var afterUnique = h.ChangeCount;
         var existing = h.Observation("Server 0000", "server-0000");
@@ -388,12 +388,12 @@ public sealed class ServerDiscoveryServiceTests
         };
 
         h.Browser.EmitFound(h.Observation("First", "first"));
-        await h.FlushNotificationsAsync();
+        await h.FlushNotificationsAsync(1);
 
         Assert.Equal(1, h.ChangeCount);
         Assert.Equal(2, h.Service.GetDiscovered().Count);
 
-        await h.FlushNotificationsAsync();
+        await h.FlushNotificationsAsync(2);
 
         Assert.Equal(2, h.ChangeCount);
         Assert.Equal(["First", "Second"],
@@ -417,7 +417,7 @@ public sealed class ServerDiscoveryServiceTests
 
         h.Browser.EmitFound(h.Observation("Current", "current"));
         Assert.Equal("Current", Assert.Single(h.Service.GetDiscovered()).DisplayName);
-        await h.FlushNotificationsAsync();
+        await h.FlushNotificationsAsync(1);
         Assert.Equal(1, h.ChangeCount);
         await h.DisposeAsync();
     }
@@ -477,21 +477,104 @@ public sealed class ServerDiscoveryServiceTests
                     ChangeNotificationDelay = TimeSpan.FromMilliseconds(100),
                     StopDrainTimeout = TimeSpan.FromSeconds(5)
                 });
-            Service.DiscoveredChanged += (_, _) => ChangeCount++;
+            Service.DiscoveredChanged += (_, _) =>
+            {
+                lock (_notificationGate)
+                {
+                    _changeCount++;
+                }
+            };
         }
+
+        /// <summary>The notification delay configured on the service under test.</summary>
+        private static readonly TimeSpan NotificationDelay = TimeSpan.FromMilliseconds(100);
+
+        /// <summary>
+        /// A deadline for producing a readable failure, never the thing being measured. If a flush
+        /// ever gets near it, the notification did not arrive at all and the test should say so
+        /// rather than hang the run.
+        /// </summary>
+        private static readonly TimeSpan FlushDeadline = TimeSpan.FromSeconds(30);
+
+        private readonly object _notificationGate = new();
+        private int _changeCount;
 
         public FakeMdnsServiceBrowser Browser { get; }
         public FakeIgnoredDeviceStore Store { get; }
         public FakeTimeProvider Time { get; }
         public ServerDiscoveryService Service { get; }
-        public int ChangeCount { get; private set; }
 
-        public async Task FlushNotificationsAsync()
+        public int ChangeCount
         {
-            Time.Advance(TimeSpan.FromMilliseconds(100));
-            for (var attempt = 0; attempt < 10; attempt++)
+            get { lock (_notificationGate) { return _changeCount; } }
+        }
+
+        /// <summary>
+        /// Advances the virtual clock past the coalescing window and waits until the service has
+        /// actually raised <c>DiscoveredChanged</c> the expected number of times.
+        /// </summary>
+        /// <remarks>
+        /// This used to advance the clock and then <c>await Task.Yield()</c> ten times. Advancing the
+        /// clock only completes the service's <c>Task.Delay</c>; the continuation that raises the
+        /// event is then queued on the thread pool, and ten yields are a guess about scheduling, not
+        /// a guarantee that it ran. On a machine where the pool is contended the assertion could run
+        /// first and read a stale count, which is a test that fails for reasons the product does not
+        /// control.
+        ///
+        /// The count is registered BEFORE the clock is advanced, so a notification that lands
+        /// immediately cannot be missed, and an expectation that is already satisfied returns without
+        /// waiting at all — some tests advance time enough for the notification to have fired before
+        /// they flush.
+        /// </remarks>
+        public async Task FlushNotificationsAsync(int expectedChangeCount)
+        {
+            var delivered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            void Signal(object? sender, EventArgs args)
             {
-                await Task.Yield();
+                lock (_notificationGate)
+                {
+                    if (_changeCount < expectedChangeCount)
+                    {
+                        return;
+                    }
+                }
+
+                delivered.TrySetResult();
+            }
+
+            // Subscribed HERE and not in the constructor, so it is the last handler in the multicast
+            // and runs after any handler the test itself added. A subscriber that reacts to the
+            // notification — one of these tests discovers a second service from inside it — must have
+            // finished before the flush returns, or the test resumes against a half-applied world and
+            // sees one service where two exist.
+            Service.DiscoveredChanged += Signal;
+            try
+            {
+                lock (_notificationGate)
+                {
+                    if (_changeCount >= expectedChangeCount)
+                    {
+                        delivered.TrySetResult();
+                    }
+                }
+
+                Time.Advance(NotificationDelay);
+
+                try
+                {
+                    await delivered.Task.WaitAsync(FlushDeadline);
+                }
+                catch (TimeoutException)
+                {
+                    throw new InvalidOperationException(
+                        $"DiscoveredChanged was raised {ChangeCount} time(s); the flush was waiting for "
+                            + $"{expectedChangeCount}. The notification never arrived, so this is not slowness.");
+                }
+            }
+            finally
+            {
+                Service.DiscoveredChanged -= Signal;
             }
         }
 
