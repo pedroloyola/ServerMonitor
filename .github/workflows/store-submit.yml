@@ -45,7 +45,11 @@ concurrency:
 env:
   STORE_PRODUCT_ID: 9N6ZBSBN1TD2
   STORE_IDENTITY_NAME: PedroLoy.ServerAlyzer
-  STORE_VISIBILITY: Private
+  # The product's real audience, read from the submission API on 2026-09-05, not assumed.
+  # This is asserted and never written: the workflow stops rather than committing if the
+  # audience has changed underneath it, because that would mean something outside this
+  # pipeline altered who can see the product.
+  STORE_VISIBILITY: Public
 
 jobs:
   submit:
