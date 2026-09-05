@@ -151,6 +151,46 @@ Stored as GitHub **environment** secrets on `microsoft-store` and
 
 These four names are the ones Microsoft's own documentation uses.
 
+### The identity behind them
+
+| | |
+| --- | --- |
+| Entra tenant | `ServerAlyzer.onmicrosoft.com` — dedicated to this project, nothing else lives in it |
+| Tenant ID | `483ae5df-a88a-4256-9c93-5b419c9e312f` |
+| Application | **ServerAlyzer Store CI** |
+| Client ID | `3539a75c-3fca-42be-af76-c472706d5e8c` |
+| Partner Center role | Manager (Windows), and only that role |
+| Reply URL | `https://pedroloyola.com` — mandatory in the Partner Center creation form; unused, because the runtime authenticates with client credentials and never performs an interactive redirect |
+
+`SELLER_ID` comes from Partner Center → Account settings → **Legal info**.
+
+## Rotating the client secret
+
+Entra caps client secrets at 24 months and Microsoft recommends under 12; this one is
+issued for **6 months**. Rotate it **before** it expires — an expired secret fails every
+Store workflow at the `msstore reconfigure` step, and the error does not say "expired" in
+an obvious way.
+
+Overlap the old and new secret. Never revoke first:
+
+1. **Create the new secret** in Entra → App registrations → ServerAlyzer Store CI →
+   Certificates & secrets → New client secret. Description `GitHub Store CI <yyyy-mm>`,
+   expiry 6 months. Copy the **Value**, not the Secret ID — they are different, and only
+   the Value works. It is shown once.
+2. **Update `AZURE_AD_APPLICATION_SECRET`** in *both* environments, `microsoft-store` and
+   `microsoft-store-status`. Missing one leaves a workflow that fails later, in isolation,
+   for no visible reason.
+3. **Run `store-status.yml`** and confirm it authenticates and reports the real state. This
+   is the proof the new secret works, and it writes nothing.
+4. **Only then delete the old secret** in Entra.
+
+Record the description and the expiry date. Never record the value — not in this
+repository, not in an issue, not in a run log.
+
+| description | created | expires |
+| --- | --- | --- |
+| _fill in on first rotation_ | | |
+
 ## Running a release
 
 1. Land the version bump and tag the commit (`vX.Y.Z`).
