@@ -105,11 +105,6 @@ internal sealed class TrayContextMenu(
             // user clicks away. Whether the call succeeds is logged rather than assumed, because the same
             // foreground rules defeated the XAML path's Activate().
             var tookForeground = SetForegroundWindow(ownerWindow);
-            QaDismissTrace.Note(
-                "MENU SHOW",
-                $"owner=0x{ownerWindow:X} anchor={anchor.X},{anchor.Y} "
-                + $"prevForeground=0x{previousForeground:X} setForeground={tookForeground} "
-                + $"foregroundNow=0x{GetForegroundWindow():X}");
             if (!tookForeground)
             {
                 _logger.LogWarning(
@@ -128,7 +123,6 @@ internal sealed class TrayContextMenu(
             // the menu appears and immediately disappears.
             _ = PostMessageW(ownerWindow, WM_NULL, nint.Zero, nint.Zero);
 
-            QaDismissTrace.Note("MENU CLOSED", $"selection={selection} -> {FromCommandId(selection)}");
             return FromCommandId(selection);
         }
         catch (Exception exception)

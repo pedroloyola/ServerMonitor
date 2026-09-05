@@ -459,11 +459,10 @@ public partial class App : Application
             sp.GetRequiredService<IServerAlertCoordinator>(),
             sp.GetRequiredService<IAppLifecycleController>(),
             sp.GetRequiredService<ILogger<TrayService>>()));
-        // M13-QA-12. The registration outcome is written where a human can retrieve it: the host logs
-        // through AddDebug() alone, and Debug output goes nowhere in a packaged run — which is why a
-        // registration that failed for the whole of M13 was never seen by anyone.
-        services.AddSingleton(NotificationDiagnosticsOptions.ForCurrentUser());
-        services.AddSingleton<INotificationRegistrationEvidence, FileNotificationRegistrationEvidence>();
+        // M13-QA-12. The evidence SEAM stays — it is what keeps a silent registration failure from being
+        // shippable again — but the QA-only file sink does not: production collects nothing. A recoverable
+        // log sink is a product decision (location, retention, contents) that has not been taken.
+        services.AddSingleton<INotificationRegistrationEvidence>(NullNotificationRegistrationEvidence.Instance);
         services.AddSingleton<WindowsAppNotificationService>();
         services.AddSingleton<IUserNotificationService>(sp =>
             sp.GetRequiredService<WindowsAppNotificationService>());

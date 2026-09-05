@@ -1,22 +1,4 @@
-using Microsoft.Extensions.Logging;
-
 namespace ServerMonitor.App.Services;
-
-/// <summary>Where the notification registration outcome is written so a human can read it later.</summary>
-public sealed record NotificationDiagnosticsOptions
-{
-    public required string FilePath { get; init; }
-
-    public static NotificationDiagnosticsOptions ForCurrentUser()
-    {
-        var localApplicationData = Environment.GetFolderPath(
-            Environment.SpecialFolder.LocalApplicationData);
-        return new NotificationDiagnosticsOptions
-        {
-            FilePath = Path.Combine(localApplicationData, "ServerMonitor", "notification-registration.log")
-        };
-    }
-}
 
 /// <summary>
 /// Recoverable evidence for one thing only: what the notification registration actually did, and what the
@@ -46,49 +28,6 @@ public interface INotificationRegistrationEvidence
 
     /// <summary>Adds a later fact to the record for this process.</summary>
     void Append(string line);
-}
-
-/// <inheritdoc />
-public sealed class FileNotificationRegistrationEvidence(
-    NotificationDiagnosticsOptions options,
-    ILogger<FileNotificationRegistrationEvidence> logger) : INotificationRegistrationEvidence
-{
-    private readonly object _sync = new();
-
-    public void Record(string report) => Write(report, append: false);
-
-    public void Append(string line) => Write(line + Environment.NewLine, append: true);
-
-    /// <summary>Never throws: evidence must not become a second failure.</summary>
-    private void Write(string text, bool append)
-    {
-        lock (_sync)
-        {
-            try
-            {
-                var directory = Path.GetDirectoryName(options.FilePath);
-                if (!string.IsNullOrEmpty(directory))
-                {
-                    Directory.CreateDirectory(directory);
-                }
-
-                if (append)
-                {
-                    File.AppendAllText(options.FilePath, text);
-                }
-                else
-                {
-                    File.WriteAllText(options.FilePath, text);
-                }
-            }
-            catch (Exception exception)
-            {
-                logger.LogWarning(
-                    "The notification registration evidence could not be written ({Type}).",
-                    exception.GetType().Name);
-            }
-        }
-    }
 }
 
 /// <summary>Used where the outcome is not being collected — tests that are about something else.</summary>
