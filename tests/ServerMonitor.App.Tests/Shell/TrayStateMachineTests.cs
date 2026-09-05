@@ -2153,7 +2153,44 @@ public sealed class TrayStateMachineTests : IDisposable
 
     // ---------------------------------------------------------------------------------------------
 
-    private void Run(Action action) => _background.Add(Task.Run(action));
+    /// <summary>
+    /// Starts a concurrent call on a dedicated thread, and records it so the test can wait for it.
+    /// </summary>
+    /// <remarks>
+    /// This used to be <c>Task.Run</c>. These tests deliberately block a call inside the fake shell —
+    /// <c>AddMayReturn</c> is held shut on purpose — so the thread running it is parked. On a machine
+    /// with few cores the thread pool then injects new workers at roughly one per second, and the
+    /// NEXT call queued here (typically the Release) simply does not start for several seconds. The
+    /// waits time out, and the failure looks like the product losing a transition when in truth the
+    /// call under test had not been made yet.
+    ///
+    /// A dedicated thread starts immediately no matter how saturated the pool is, which is the
+    /// property every one of these tests already assumed it had. It is a scheduling guarantee, not a
+    /// longer deadline.
+    /// </remarks>
+    private void Run(Action action)
+    {
+        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                action();
+                completion.TrySetResult();
+            }
+            catch (Exception exception)
+            {
+                completion.TrySetException(exception);
+            }
+        })
+        {
+            IsBackground = true,
+            Name = "tray-state-machine-test-call"
+        };
+
+        _background.Add(completion.Task);
+        thread.Start();
+    }
 
     /// <summary>
     /// Waits for the work this test started on the thread pool.
