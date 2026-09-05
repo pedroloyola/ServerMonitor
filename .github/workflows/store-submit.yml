@@ -1,0 +1,218 @@
+name: Store submit
+
+# Submits an already-built, already-verified MSIX to the EXISTING ServerAlyzer product and
+# sends it to certification. It never builds anything: the package comes from a release-build
+# run, and its SHA-256 must match what that run reported.
+#
+# What this workflow deliberately does NOT do:
+#   * publish the product to customers - the submission is committed with the publishing
+#     hold intact, so a person still has to press "Publish now" in Partner Center
+#   * create a product, an identity, or a listing
+#   * delete a submission, cancel one, or overwrite one that is in flight
+#   * change pricing, markets, age ratings, visibility, or any listing field other than
+#     the release notes tracked under release/store/
+#
+# Manual dispatch only, behind the `microsoft-store` environment, which is configured with a
+# required reviewer.
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_run_id:
+        description: 'Run ID of the release-build workflow that produced the package'
+        required: true
+        type: string
+      package_version:
+        description: 'Expected package version, e.g. 1.1.2.0'
+        required: true
+        type: string
+      expected_sha256:
+        description: 'SHA-256 reported by that release-build run'
+        required: true
+        type: string
+      confirm:
+        description: 'Type SUBMIT to confirm this sends the package to Microsoft for certification'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: store-submit
+  cancel-in-progress: false
+
+env:
+  STORE_PRODUCT_ID: 9N6ZBSBN1TD2
+  STORE_IDENTITY_NAME: PedroLoy.ServerAlyzer
+  STORE_VISIBILITY: Private
+
+jobs:
+  submit:
+    runs-on: windows-latest
+
+    # Gate. The environment carries the Store secrets AND the required reviewer, so nothing
+    # below runs until a human approves this specific run.
+    environment:
+      name: microsoft-store
+      url: https://partner.microsoft.com/dashboard/products/9N6ZBSBN1TD2/overview
+
+    permissions:
+      contents: read
+      actions: read          # to download the artifact from the release-build run
+
+    steps:
+      - name: Check the confirmation phrase
+        shell: pwsh
+        run: |
+          if ('${{ inputs.confirm }}' -cne 'SUBMIT') {
+            throw "Confirmation phrase was not SUBMIT. Nothing has been done."
+          }
+          if ('${{ inputs.package_version }}' -notmatch '^\d+\.\d+\.\d+\.\d+$') {
+            throw "package_version '${{ inputs.package_version }}' is not a four-part version."
+          }
+          if ('${{ inputs.expected_sha256 }}' -notmatch '^[0-9a-fA-F]{64}$') {
+            throw 'expected_sha256 is not a 64-character hex digest.'
+          }
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download the package from the release-build run
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ inputs.release_run_id }}
+          github-token: ${{ github.token }}
+          name: serveralyzer-msix-${{ inputs.package_version }}
+          path: incoming
+
+      - name: Re-verify the package before anything touches the Store
+        id: verify
+        shell: pwsh
+        run: |
+          $packages = @(Get-ChildItem -Path incoming -Filter '*.msix' -Recurse)
+          if ($packages.Count -ne 1) {
+            throw "Expected exactly one MSIX in the artifact, found $($packages.Count)."
+          }
+          $package = $packages[0].FullName
+          "packagePath=$package" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+          # Independent of the checksum file that travelled with the artifact.
+          ./tools/release/Assert-PackageIdentity.ps1 `
+            -PackagePath $package `
+            -ExpectedVersion '${{ inputs.package_version }}' `
+            -ExpectedIdentityName '${{ env.STORE_IDENTITY_NAME }}' `
+            -ExpectedSha256 '${{ inputs.expected_sha256 }}'
+
+      - name: Setup the Microsoft Store Developer CLI
+        # microsoft/microsoft-store-apppublisher@v1.4, pinned to its commit.
+        uses: microsoft/microsoft-store-apppublisher@cc9910a8d59f2eb55cbb83df0a3800cf3b5300e0
+
+      # GitHub masks secret values in logs; none of them are echoed here either way.
+      - name: Configure the CLI
+        shell: pwsh
+        run: |
+          msstore reconfigure `
+            --tenantId ${{ secrets.AZURE_AD_TENANT_ID }} `
+            --sellerId ${{ secrets.SELLER_ID }} `
+            --clientId ${{ secrets.AZURE_AD_APPLICATION_CLIENT_ID }} `
+            --clientSecret ${{ secrets.AZURE_AD_APPLICATION_SECRET }}
+          if ($LASTEXITCODE -ne 0) { throw 'msstore reconfigure failed.' }
+
+      - name: Confirm we are pointed at the existing ServerAlyzer product
+        shell: pwsh
+        run: |
+          $output = msstore apps get ${{ env.STORE_PRODUCT_ID }} 2>&1 | Out-String
+          Write-Host $output
+          if ($LASTEXITCODE -ne 0) { throw "msstore apps get failed for ${{ env.STORE_PRODUCT_ID }}." }
+          if ($output -notmatch '${{ env.STORE_IDENTITY_NAME }}') {
+            throw "The product ${{ env.STORE_PRODUCT_ID }} did not report the expected identity ${{ env.STORE_IDENTITY_NAME }}. Refusing to continue."
+          }
+          Write-Host 'Product identity confirmed.'
+
+      # The critical guard: msstore publish DELETES a pending draft and rebuilds it from the
+      # last published submission. Never run it while something is in flight.
+      - name: Refuse to run if a submission is already in flight
+        shell: pwsh
+        run: |
+          msstore submission get ${{ env.STORE_PRODUCT_ID }} 2>&1 | Out-String | Set-Content -LiteralPath before.json -Encoding UTF8
+          ./tools/release/Assert-NoPendingSubmission.ps1 -SubmissionPath before.json
+
+      # --noCommit uploads the package and leaves the submission in draft. Metadata edits
+      # must come after this, because publish recreates the draft.
+      - name: Upload the package, leaving the submission in draft
+        shell: pwsh
+        run: |
+          msstore publish '${{ steps.verify.outputs.packagePath }}' -id ${{ env.STORE_PRODUCT_ID }} --noCommit
+          if ($LASTEXITCODE -ne 0) { throw 'msstore publish --noCommit failed.' }
+
+      - name: Stage the release notes and prove the publishing hold survives
+        id: metadata
+        shell: pwsh
+        run: |
+          msstore submission get ${{ env.STORE_PRODUCT_ID }} | Out-File -FilePath draft.json -Encoding utf8
+          if ($LASTEXITCODE -ne 0) { throw 'msstore submission get failed.' }
+
+          ./tools/release/Update-StoreSubmission.ps1 `
+            -SubmissionPath draft.json `
+            -OutputPath updated.json `
+            -ExpectedPackageVersion '${{ inputs.package_version }}' `
+            -ExpectedVisibility '${{ env.STORE_VISIBILITY }}'
+
+      - name: Apply the metadata
+        shell: pwsh
+        run: |
+          $updated = Get-Content -Raw updated.json
+          msstore submission update ${{ env.STORE_PRODUCT_ID }} $updated
+          if ($LASTEXITCODE -ne 0) { throw 'msstore submission update failed.' }
+
+      # Read back what the Store actually stored, and check the hold on that, not on the
+      # file we sent. This is the last gate before the submission becomes irreversible.
+      - name: Re-read the submission and re-check the hold before committing
+        shell: pwsh
+        run: |
+          msstore submission get ${{ env.STORE_PRODUCT_ID }} | Out-File -FilePath readback.json -Encoding utf8
+          if ($LASTEXITCODE -ne 0) { throw 'msstore submission get failed on read-back.' }
+
+          $raw = Get-Content -Raw readback.json
+          $start = $raw.IndexOf('{'); $end = $raw.LastIndexOf('}')
+          if ($start -lt 0 -or $end -le $start) { throw 'STOP: could not parse the read-back submission. Not committing.' }
+          $submission = $raw.Substring($start, $end - $start + 1) | ConvertFrom-Json
+
+          $mode = ($submission.PSObject.Properties | Where-Object { $_.Name -ieq 'targetPublishMode' } | Select-Object -First 1).Value
+          if ($mode -ne 'Manual') {
+            throw "STOP: the Store reports targetPublishMode '$mode', not 'Manual'. Committing now could publish the release without anyone deciding. The draft is left uncommitted; deal with it in Partner Center."
+          }
+          Write-Host "  ok    the Store reports targetPublishMode = Manual"
+
+          $visibility = ($submission.PSObject.Properties | Where-Object { $_.Name -ieq 'visibility' } | Select-Object -First 1).Value
+          if ($visibility -ne '${{ env.STORE_VISIBILITY }}') {
+            throw "STOP: visibility is '$visibility', expected '${{ env.STORE_VISIBILITY }}'. Not committing."
+          }
+          Write-Host "  ok    visibility is still $visibility"
+
+      - name: Commit the submission to certification
+        shell: pwsh
+        run: |
+          msstore submission publish ${{ env.STORE_PRODUCT_ID }}
+          if ($LASTEXITCODE -ne 0) { throw 'msstore submission publish failed.' }
+          Write-Host 'Submitted for certification.'
+
+      - name: Report the resulting state
+        if: always()
+        shell: pwsh
+        run: |
+          $raw = msstore submission status ${{ env.STORE_PRODUCT_ID }} 2>&1 | Out-String
+          Write-Host $raw
+          $start = $raw.IndexOf('{'); $end = $raw.LastIndexOf('}')
+          if ($start -ge 0 -and $end -gt $start) {
+            $status = ($raw.Substring($start, $end - $start + 1) | ConvertFrom-Json)
+            $value = ($status.PSObject.Properties | Where-Object { $_.Name -ieq 'status' } | Select-Object -First 1).Value
+            if ($value) { ./tools/release/Get-SubmissionState.ps1 -Status $value -Visibility '${{ env.STORE_VISIBILITY }}' }
+          }
+          @(
+            ''
+            'Certification is decided by Microsoft, not by this workflow. Nothing here means'
+            'the update passed certification, and nothing here makes the product public: the'
+            'submission was committed with the publishing hold in force.'
+          ) | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append

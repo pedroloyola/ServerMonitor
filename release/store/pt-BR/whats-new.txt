@@ -1,0 +1,13 @@
+Esta atualização corrige o comportamento do widget do Windows 11 e do ícone na área de notificação. Não há recursos novos: nada muda na forma como você usa o aplicativo.
+
+O widget continua atualizando com a janela fechada. Antes, fechar a janela do ServerAlyzer congelava o widget na última leitura. Agora o monitoramento continua e o widget recebe valores novos, mesmo com o painel de widgets aberto na sua frente.
+
+Menu da área de notificação mais confiável. O menu passou a ser o menu nativo do Windows e abre de primeira, completo, com a janela aberta, minimizada, atrás de outro aplicativo ou oculta.
+
+O ícone volta depois que o Explorador de Arquivos reinicia. Se a barra de tarefas for reiniciada, o ícone do ServerAlyzer reaparece sozinho e o menu volta a funcionar — nunca fica um aplicativo monitorando sem forma de encerrá-lo.
+
+O aviso de primeiro fechamento voltou a aparecer. Na primeira vez que você fecha a janela com o monitoramento em segundo plano ativo, o ServerAlyzer avisa que continua em execução e indica onde encontrar o botão de sair. O aviso aparece uma única vez.
+
+Encerramento mais previsível. "Sair do ServerAlyzer" encerra mesmo o aplicativo e remove o ícone. Com o monitoramento em segundo plano desativado, fechar a janela volta a ser uma saída completa.
+
+Sem janelas de console. O processo que desenha o widget não pode mais mostrar uma janela de console.

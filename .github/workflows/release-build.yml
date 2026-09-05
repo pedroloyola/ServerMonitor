@@ -1,0 +1,204 @@
+name: Release build
+
+# Builds the production MSIX from an exact tag, proves the package is the one the tag
+# claims, and publishes it as a workflow artifact plus (optionally) a GitHub Release.
+#
+# This workflow never talks to the Microsoft Store. It holds no Store secrets and has no
+# access to the `microsoft-store` environment. Submitting is store-submit.yml's job, and it
+# starts from the artifact this workflow produced.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build (must already exist, e.g. v1.1.2)'
+        required: true
+        type: string
+      create_release:
+        description: 'Create the GitHub Release if it does not exist'
+        required: false
+        default: true
+        type: boolean
+      attach_package:
+        description: 'Attach the MSIX to the GitHub Release (the Store is the distribution channel; normally false)'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-build-${{ inputs.tag || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: write        # only to create/read the GitHub Release for this tag
+    outputs:
+      version: ${{ steps.tagcheck.outputs.version }}
+      packageVersion: ${{ steps.tagcheck.outputs.packageVersion }}
+      sha256: ${{ steps.identity.outputs.sha256 }}
+      packageName: ${{ steps.collect.outputs.packageName }}
+
+    steps:
+      - name: Resolve the tag
+        id: resolve
+        shell: pwsh
+        run: |
+          $tag = '${{ inputs.tag }}'
+          if (-not $tag) { $tag = '${{ github.ref_name }}' }
+          if (-not $tag) { throw 'No tag to build.' }
+          if ($tag -notmatch '^v\d+\.\d+\.\d+$') { throw "Refusing to build '$tag': not a vMAJOR.MINOR.PATCH release tag." }
+          "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Host "Building tag $tag"
+
+      # Full history and tags, so the tag can be resolved to a commit and compared.
+      - name: Checkout the exact tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.resolve.outputs.tag }}
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Tag, commit and version coherence
+        id: tagcheck
+        shell: pwsh
+        run: |
+          $commit = (git rev-parse HEAD).Trim()
+          ./tools/release/Assert-TagVersion.ps1 -Tag '${{ steps.resolve.outputs.tag }}' -ExpectedCommit $commit
+
+      - name: Setup .NET 10 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore ServerMonitor.slnx
+
+      # Fresh, non-incremental build: a stale output has bitten this repo before (P-008),
+      # and a release is exactly the run where that must not happen.
+      - name: Build (Release)
+        run: dotnet build ServerMonitor.slnx -c Release --no-incremental --disable-build-servers
+
+      - name: Test (Release)
+        run: dotnet test ServerMonitor.slnx -c Release --no-build --disable-build-servers
+
+      - name: Vulnerability scan (fail on any vulnerable package)
+        shell: pwsh
+        run: |
+          $output = dotnet list ServerMonitor.slnx package --vulnerable --include-transitive 2>&1 | Out-String
+          Write-Host $output
+          if ($output -match 'has the following vulnerable packages') {
+            Write-Error 'Vulnerable packages detected.'
+            exit 1
+          }
+          Write-Host 'No vulnerable packages found.'
+
+      # Release checks are themselves tested, so a green package check means something.
+      - name: Self-test the release checks
+        shell: pwsh
+        run: |
+          ./tools/release/Test-ReleaseChecks.ps1
+          ./tools/release/Test-StoreSubmissionUpdate.ps1
+          ./tools/release/Get-SubmissionState.ps1 -SelfTest
+
+      - name: Build the MSIX package
+        run: >
+          dotnet build src/ServerMonitor.App/ServerMonitor.App.csproj
+          -c Release -p:Packaged=true --no-incremental --disable-build-servers
+
+      - name: Collect the package
+        id: collect
+        shell: pwsh
+        run: |
+          $candidates = @(Get-ChildItem -Recurse -Filter '*.msix' -Path 'src/ServerMonitor.App/AppPackages' |
+            Where-Object { $_.FullName -notmatch '\\Dependencies\\' })
+          if ($candidates.Count -eq 0) { throw 'No app MSIX was produced.' }
+          if ($candidates.Count -gt 1) {
+            throw "Expected exactly one app MSIX, found $($candidates.Count): $(($candidates | ForEach-Object { $_.FullName }) -join ', '). Refusing to guess which one to ship."
+          }
+
+          $version = '${{ steps.tagcheck.outputs.packageVersion }}'
+          $shortSha = '${{ github.sha }}'.Substring(0, 7)
+          $name = "ServerAlyzer_${version}_x64_$shortSha.msix"
+
+          New-Item -ItemType Directory -Force -Path 'artifacts/release' | Out-Null
+          Copy-Item -LiteralPath $candidates[0].FullName -Destination "artifacts/release/$name"
+          "packageName=$name" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Host "Collected artifacts/release/$name"
+
+      - name: Package identity, capabilities and GUI subsystem
+        id: identity
+        shell: pwsh
+        run: |
+          ./tools/release/Assert-PackageIdentity.ps1 `
+            -PackagePath "artifacts/release/${{ steps.collect.outputs.packageName }}" `
+            -ExpectedVersion '${{ steps.tagcheck.outputs.packageVersion }}' `
+            -WriteChecksumFile
+
+      - name: Summary
+        shell: pwsh
+        run: |
+          @(
+            '## Release build'
+            ''
+            '| field | value |'
+            '| --- | --- |'
+            '| tag | `${{ steps.resolve.outputs.tag }}` |'
+            '| commit | `${{ github.sha }}` |'
+            '| product version | `${{ steps.tagcheck.outputs.version }}` |'
+            '| package version | `${{ steps.tagcheck.outputs.packageVersion }}` |'
+            '| package | `${{ steps.collect.outputs.packageName }}` |'
+            '| sha-256 | `${{ steps.identity.outputs.sha256 }}` |'
+          ) | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+
+      - name: Upload the package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: serveralyzer-msix-${{ steps.tagcheck.outputs.packageVersion }}
+          path: artifacts/release/
+          if-no-files-found: error
+          retention-days: 90
+
+      # Creating a Release is additive. Updating one that already exists would rewrite
+      # published notes, so this refuses instead and says so.
+      - name: Create the GitHub Release
+        if: ${{ inputs.create_release != false }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = '${{ steps.resolve.outputs.tag }}'
+
+          $existing = gh release view $tag --json tagName 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "Release $tag already exists; leaving it exactly as it is."
+            Write-Host 'Delete it by hand first if it really needs to be rebuilt.'
+            exit 0
+          }
+
+          $notesPath = "docs/release-notes-${{ steps.tagcheck.outputs.version }}.md"
+          $arguments = @('release', 'create', $tag, '--title', "ServerAlyzer ${{ steps.tagcheck.outputs.version }}")
+          if (Test-Path -LiteralPath $notesPath) {
+            Write-Host "Using $notesPath for the release notes."
+            $arguments += @('--notes-file', $notesPath)
+          }
+          else {
+            Write-Host "No $notesPath found; creating the release with a pointer instead of invented notes."
+            $arguments += @('--notes', 'Release notes for this version are not in the repository yet.')
+          }
+
+          if ('${{ inputs.attach_package }}' -eq 'true') {
+            $arguments += "artifacts/release/${{ steps.collect.outputs.packageName }}"
+          }
+          else {
+            Write-Host 'Not attaching the package: the Microsoft Store is the distribution channel.'
+          }
+
+          gh @arguments

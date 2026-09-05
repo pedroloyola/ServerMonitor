@@ -1,0 +1,117 @@
+name: Store status
+
+# Read-only report on where the ServerAlyzer Store submission currently is.
+#
+# Every command here reads. Nothing submits, commits, publishes, deletes, cancels or
+# changes metadata. It is safe to run at any time, including while a submission is in
+# certification.
+
+on:
+  workflow_dispatch:
+    inputs:
+      include_metadata:
+        description: 'Also print the full submission JSON (large; listings only, no credentials)'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: store-status
+  cancel-in-progress: true
+
+env:
+  STORE_PRODUCT_ID: 9N6ZBSBN1TD2
+  STORE_IDENTITY_NAME: PedroLoy.ServerAlyzer
+
+jobs:
+  status:
+    runs-on: windows-latest
+
+    # This environment is NOT a privilege boundary.
+    #
+    # It carries the same Entra application as `microsoft-store`, and that application holds
+    # the Manager role in Partner Center. The credential can write. Only the commands in this
+    # workflow are read-only. Anyone who can change this file, or run a workflow that joins
+    # this environment, has a credential that could submit or publish.
+    #
+    # The protection that actually holds is therefore the branch/ref restriction on the
+    # environment, not the word "status" in its name.
+    environment:
+      name: microsoft-store-status
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup the Microsoft Store Developer CLI
+        # microsoft/microsoft-store-apppublisher@v1.4, pinned to its commit.
+        uses: microsoft/microsoft-store-apppublisher@cc9910a8d59f2eb55cbb83df0a3800cf3b5300e0
+
+      - name: Configure the CLI
+        shell: pwsh
+        run: |
+          msstore reconfigure `
+            --tenantId ${{ secrets.AZURE_AD_TENANT_ID }} `
+            --sellerId ${{ secrets.SELLER_ID }} `
+            --clientId ${{ secrets.AZURE_AD_APPLICATION_CLIENT_ID }} `
+            --clientSecret ${{ secrets.AZURE_AD_APPLICATION_SECRET }}
+          if ($LASTEXITCODE -ne 0) { throw 'msstore reconfigure failed.' }
+
+      - name: Confirm the product
+        shell: pwsh
+        run: |
+          $output = msstore apps get ${{ env.STORE_PRODUCT_ID }} 2>&1 | Out-String
+          Write-Host $output
+          if ($LASTEXITCODE -ne 0) { throw "msstore apps get failed for ${{ env.STORE_PRODUCT_ID }}." }
+          if ($output -notmatch '${{ env.STORE_IDENTITY_NAME }}') {
+            throw "Product ${{ env.STORE_PRODUCT_ID }} did not report identity ${{ env.STORE_IDENTITY_NAME }}."
+          }
+
+      - name: Report the submission state
+        shell: pwsh
+        run: |
+          $raw = msstore submission get ${{ env.STORE_PRODUCT_ID }} 2>&1 | Out-String
+          if ($LASTEXITCODE -ne 0) { throw 'msstore submission get failed.' }
+
+          $start = $raw.IndexOf('{'); $end = $raw.LastIndexOf('}')
+          if ($start -lt 0 -or $end -le $start) {
+            Write-Host $raw
+            throw 'Could not find a JSON submission object in the CLI output. Reporting nothing rather than guessing.'
+          }
+
+          $submission = $raw.Substring($start, $end - $start + 1) | ConvertFrom-Json
+          function Get-Field([string] $name) {
+            ($submission.PSObject.Properties | Where-Object { $_.Name -ieq $name } | Select-Object -First 1).Value
+          }
+
+          $status = [string] (Get-Field 'status')
+          $visibility = [string] (Get-Field 'visibility')
+          $publishMode = [string] (Get-Field 'targetPublishMode')
+
+          $versions = @()
+          foreach ($package in @(Get-Field 'applicationPackages')) {
+            $version = ($package.PSObject.Properties | Where-Object { $_.Name -ieq 'version' } | Select-Object -First 1).Value
+            if ($version) { $versions += $version }
+          }
+
+          Write-Host "packages        : $($versions -join ', ')"
+          Write-Host "publish mode    : $publishMode"
+
+          ./tools/release/Get-SubmissionState.ps1 -Status $status -Visibility $visibility
+
+          @(
+            "| packages | ``$($versions -join ', ')`` |"
+            "| targetPublishMode | ``$publishMode`` |"
+          ) | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+
+          if ($publishMode -ne 'Manual') {
+            Write-Warning "targetPublishMode is '$publishMode', not 'Manual'. This submission would publish itself once certification passes."
+          }
+
+          if ('${{ inputs.include_metadata }}' -eq 'true') {
+            Write-Host '--- full submission JSON ---'
+            Write-Host ($submission | ConvertTo-Json -Depth 100)
+          }

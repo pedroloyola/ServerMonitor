@@ -1,0 +1,13 @@
+This update fixes how the Windows 11 widget and the notification area icon behave. There are no new features: nothing changes in the way you use the app.
+
+The widget keeps updating while the window is closed. Previously, closing the ServerAlyzer window froze the widget on its last reading. Monitoring now continues and the widget receives fresh values, even with the widgets board open in front of you.
+
+A more reliable notification area menu. The menu is now the native Windows menu, and it opens on the first try, complete, whether the window is open, minimized, behind another app or hidden.
+
+The icon comes back after Windows Explorer restarts. If the taskbar is restarted, the ServerAlyzer icon reappears on its own and the menu works again — you are never left with an app monitoring in the background and no way to close it.
+
+The first-close notice is back. The first time you close the window with background monitoring active, ServerAlyzer tells you it is still running and points you to the exit command. The notice appears only once.
+
+More predictable shutdown. "Exit ServerAlyzer" really does close the app and removes the icon. With background monitoring turned off, closing the window is a full exit again.
+
+No console windows. The process that draws the widget can no longer show a console window.
