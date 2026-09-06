@@ -1,0 +1,28 @@
+<Project>
+
+  <!--
+    THE ONE BUILD EXTENSION POINT, AND IT IS EMPTY HERE.
+
+    build/Commercial.targets does not exist in this repository and is listed in .gitignore, so the
+    condition below is FALSE for every clone, every CI run and every release build of this repository.
+    Nothing is imported, nothing changes, and the build is byte-for-byte what it was before this file
+    existed. A clone of this repository builds and runs on its own, with no missing file and no unmet
+    condition - that is a hard requirement, not a convenience.
+
+    What it is for: a separate build may place its own targets file at that path to add project
+    references of its own and to supply the single optional `AddCommercialModules` partial declared in
+    App.xaml.cs. The extension point is one-way by construction. This file names no assembly, no type
+    and no repository outside this tree; it declares a hook, not a reference, so nothing here can create
+    a dependency from this repository onto anything else.
+
+    Enforced, not documented (CommunityBoundaryGuardTests):
+      * no TRACKED file may exist at the overlay path - .gitignore alone does not stop `git add -f`;
+      * this Import must stay CONDITIONAL, and it is the ONLY import in the tracked tree allowed to
+        reference a path that is not present;
+      * the guard is an ALLOWLIST over structure. It deliberately does not carry a list of forbidden
+        proprietary names, because publishing that list here would itself be the leak it aims to prevent.
+  -->
+  <Import Project="$(MSBuildThisFileDirectory)build\Commercial.targets"
+          Condition="Exists('$(MSBuildThisFileDirectory)build\Commercial.targets')" />
+
+</Project>

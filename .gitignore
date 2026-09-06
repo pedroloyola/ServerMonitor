@@ -39,3 +39,9 @@ TestResults/
 # Python bytecode from the mutation runners in tools/
 __pycache__/
 *.pyc
+
+# M14.1 build extension point (Directory.Build.targets imports it conditionally).
+# It must never exist in this repository: the tracked tree stays independently buildable, and a
+# guard test asserts no TRACKED file lives here - .gitignore alone does not stop `git add -f`.
+build/Commercial.targets
+ProModuleRegistrar.cs

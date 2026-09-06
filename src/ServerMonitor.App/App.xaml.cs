@@ -3,6 +3,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
+using ServerMonitor.App.Features;
 using ServerMonitor.App.Services;
 using ServerMonitor.App.ViewModels;
 using ServerMonitor.App.Views;
@@ -15,6 +16,7 @@ using ServerMonitor.Core.History;
 using ServerMonitor.Core.Interfaces;
 using ServerMonitor.Core.Monitoring;
 using ServerMonitor.Core.Workloads;
+using ServerMonitor.Features;
 using ServerMonitor.Infrastructure.Collectors.Linux;
 using ServerMonitor.Infrastructure.Collectors.MacOS;
 using ServerMonitor.Infrastructure.Collectors.Workloads;
@@ -500,6 +502,19 @@ public partial class App : Application
         services.AddSingleton<IServerWorkloadStore, InMemoryServerWorkloadStore>();
         services.AddSingleton<IWorkloadRefreshCoordinator, NullWorkloadRefreshCoordinator>();
 
+        // M7 discovery. Default: nothing is ever suggested. This closes the one gap M14.0 found - Discovery
+        // was the only already-isolated capability without an inert default, even though both the Dashboard
+        // and Settings view-models require the service. Every composition today (the real one and all seven
+        // Debug QA harnesses) registers its own later and therefore overrides this, so it changes nothing
+        // that is observable now; it exists so a composition that omits the Discovery module degrades to
+        // "no suggestions" instead of failing to build the container.
+        services.AddSingleton<IServerDiscoveryService, NullServerDiscoveryService>();
+
+        // M14.1 feature catalog. Default: nothing composed, in the same idiom as the inert defaults above,
+        // so IFeatureCatalog resolves in every composition. The non-QA branch replaces it with the catalog
+        // that records what was ACTUALLY registered.
+        services.AddSingleton<IFeatureCatalog>(FeatureCatalog.Empty);
+
         // Automatic monitoring. One instance backs the IMonitoringEngine facade and
         // the hosted-service lifecycle, so the app starts/stops a single engine.
         // The Debug-only QA harnesses (--qa-health, --qa-discovery) replace the data plane
@@ -518,52 +533,49 @@ public partial class App : Application
 #endif
         if (!qaMode)
         {
-            // M10 history stack: recorder (IMonitoringCycleObserver) → bounded channel →
-            // single writer → SQLite. A database failure never blocks monitoring (ADR-015).
-            services.AddSingleton(HistoryStorageOptions.ForCurrentUser());
-            services.AddSingleton<SqliteServerHistoryStore>();
-            services.AddSingleton<IServerHistoryStore>(sp => sp.GetRequiredService<SqliteServerHistoryStore>());
-            services.AddSingleton<HistorySampleChannel>();
-            services.AddSingleton<HistoryRecorder>();
-            services.AddSingleton<HistoryWriterService>();
-            services.AddSingleton<IServerHistoryQueryService>(sp => new ServerHistoryQueryService(
-                sp.GetRequiredService<IServerHistoryStore>(),
-                sp.GetRequiredService<ILogger<ServerHistoryQueryService>>()));
-            services.AddSingleton<IHistoryMaintenanceService, HistoryMaintenanceService>();
+            // M14.1 feature composition (ADR-020). The four capabilities that were already isolated behind
+            // inert defaults are composed here as explicit modules. This is a REGISTRATION-SHAPE change and
+            // nothing else: each module holds exactly the AddSingleton calls that used to be written inline
+            // in this branch, so the set of service descriptors this branch produces is unchanged.
+            //
+            // The module list is a LITERAL. Nothing is discovered - no assembly scan, no directory probe, no
+            // type resolution by name. That is the security boundary recorded as M14-MOD-1: a dynamically
+            // loaded assembly would hold full in-process authority over SSH, the Credential Manager and the
+            // host-key trust store, and in the unpackaged build the application directory is not protected.
+            //
+            // Every module here declares RequiresEntitlement = false, so FeatureComposition registers them
+            // WITHOUT consulting the entitlement provider. That is the binding condition on the human
+            // classification M14-ENT-1: entitlement may gate the availability of commercial functionality and
+            // nothing else. Gating these would make it authority over the user's access to their own local
+            // history, workloads and widget snapshot, which the classification forbids outright.
+            var modules = new List<IFeatureModule>
+            {
+                new HistoryFeatureModule(),
+                new WorkloadsFeatureModule(),
+                new WidgetSnapshotFeatureModule(),
+                new DiscoveryFeatureModule()
+            };
 
-            // M11 read-only workloads (Docker + services). The cadence observer rides the same
-            // cycle signal as history; the collector service runs SSH off the engine thread with
-            // its own single-flight and concurrency limit. The real WorkloadCollector maps the
-            // fixed read-only catalog (platform-infra) over the shared SSH session; a Debug
-            // --qa-workloads run replaces it with a deterministic fake (registered later, wins).
-            services.AddSingleton(WorkloadOptions.Default);
-            services.AddSingleton<IWorkloadCollector>(sp =>
-                new WorkloadCollector(sp.GetRequiredService<IWorkloadRemoteSource>()));
-            services.AddSingleton<WorkloadRequestQueue>();
-            services.AddSingleton(sp => new WorkloadCadencePolicy(
-                sp.GetRequiredService<WorkloadOptions>().MinCadence));
-            services.AddSingleton<WorkloadCadenceObserver>();
-            services.AddSingleton<WorkloadCollectorService>();
-            services.AddSingleton<IWorkloadRefreshCoordinator>(sp =>
-                sp.GetRequiredService<WorkloadCollectorService>());
+            // The empty public extension point. Nothing in this repository implements it, so the C# compiler
+            // removes this call outright - the Community binary does not even contain the call site. The
+            // CLASSIC partial form (no accessibility modifier, void return, no out parameter) is what keeps
+            // the implementation optional; declared any other way the implementation becomes MANDATORY and a
+            // public clone would stop compiling.
+            AddCommercialModules(modules);
 
-            // M13 widget snapshot (ADR-018 Slice 1): the recorder rides the SAME cycle signal
-            // (no new timer/worker, §14/§15), builds a sanitized fleet snapshot from the live
-            // stores, and writes %LOCALAPPDATA%\ServerMonitor\widget-state.json atomically. It is
-            // best-effort and failure-isolated: a write fault never touches monitoring (§16). The
-            // out-of-process widget provider (later slices) reads this file; nothing here starts
-            // COM/SSH/a second engine.
-            services.AddSingleton(WidgetStateOptions.ForCurrentUser());
-            services.AddSingleton<IWidgetStateWriter>(sp => new AtomicWidgetStateWriter(
-                sp.GetRequiredService<WidgetStateOptions>(),
-                sp.GetRequiredService<ILogger<AtomicWidgetStateWriter>>()));
-            services.AddSingleton(sp => new WidgetSnapshotRecorder(
-                sp.GetRequiredService<IServerService>(),
-                sp.GetRequiredService<IServerMonitoringStateStore>(),
-                sp.GetRequiredService<IServerMetricsStore>(),
-                sp.GetRequiredService<IWidgetStateWriter>(),
-                sp.GetRequiredService<ILogger<WidgetSnapshotRecorder>>()));
+            // composition.Skipped is provably empty in this repository: it can only receive a module that
+            // declares RequiresEntitlement, and none does. A build that supplies such modules owns reporting
+            // what it skipped - the result carries the reason rather than swallowing it.
+            var composition = FeatureComposition.Compose(
+                services,
+                modules,
+                CommunityEntitlementProvider.Instance);
+            services.AddSingleton<IFeatureCatalog>(composition.Catalog);
 
+            // HAZARD, deliberate: the composite below resolves one recorder from EACH of three modules, so
+            // those three are all-or-nothing by construction. It is safe today because all four modules are
+            // unconditional. Making any of them optional without first giving the composite a way to cope
+            // with a missing observer would turn this into a startup failure, not a degraded feature.
             // Fan-out: the engine sees a single observer; history (M10), workloads (M11), and the
             // M13 widget snapshot all ride the cycle, each isolated from the others (§38). History
             // is first so its behavior is unchanged; the widget recorder is last (pure consumer).
@@ -586,22 +598,6 @@ public partial class App : Application
                 options: null,
                 cycleObserver: sp.GetRequiredService<IMonitoringCycleObserver>()));
             services.AddSingleton<IMonitoringEngine>(sp => sp.GetRequiredService<MonitoringEngine>());
-
-            // Passive local network discovery (mDNS/DNS-SD, _ssh._tcp only). One instance
-            // backs the IServerDiscoveryService facade and the hosted-service lifecycle.
-            // The Tmds.MDns adapter is the fakeable Found/Updated/Removed seam; the ignored
-            // decisions live in their own non-sensitive file, separate from servers.json.
-            services.AddSingleton(IgnoredDeviceStorageOptions.ForCurrentUser());
-            services.AddSingleton(MdnsServiceBrowserOptions.Default);
-            services.AddSingleton<IIgnoredDeviceStore, JsonIgnoredDeviceStore>();
-            services.AddSingleton<IMdnsServiceBrowser>(sp => new TmdsMdnsServiceBrowser(
-                sp.GetRequiredService<ILogger<TmdsMdnsServiceBrowser>>(),
-                sp.GetRequiredService<MdnsServiceBrowserOptions>()));
-            services.AddSingleton(sp => new ServerDiscoveryService(
-                sp.GetRequiredService<IMdnsServiceBrowser>(),
-                sp.GetRequiredService<IIgnoredDeviceStore>(),
-                sp.GetRequiredService<ILogger<ServerDiscoveryService>>()));
-            services.AddSingleton<IServerDiscoveryService>(sp => sp.GetRequiredService<ServerDiscoveryService>());
         }
 #if DEBUG
         else if (qaHealth)
@@ -675,4 +671,21 @@ public partial class App : Application
         services.AddTransient<MainWindow>();
     }
 
+    /// <summary>
+    /// The one public extension point for out-of-tree feature modules, and it is deliberately empty.
+    /// <para>
+    /// Nothing in this repository implements it. Because this is the CLASSIC partial form - no accessibility
+    /// modifier, <c>void</c> return, no <c>out</c> parameter - the implementation is OPTIONAL, and with none
+    /// present the C# compiler removes both the body and the call site entirely. Declared any other way (for
+    /// instance <c>public static partial void</c>) an implementation becomes MANDATORY and a public clone of
+    /// this repository would stop compiling, which is exactly the failure the dependency rules exist to
+    /// prevent.
+    /// </para>
+    /// <para>
+    /// This declaration names no type, assembly or path outside this repository. It is a hook, not a
+    /// reference: the Community build has no knowledge of what might implement it, and the dependency
+    /// direction stays one-way.
+    /// </para>
+    /// </summary>
+    static partial void AddCommercialModules(IList<IFeatureModule> modules);
 }
