@@ -17,7 +17,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-test:
+  # These jobs are intentionally independent: Actions can run them concurrently, so CI
+  # wall-clock is bounded by the slower path instead of the sum of both builds.
+  debug-test:
+    name: Debug build + tests
     runs-on: windows-latest
     steps:
       # First-party actions from the trusted `actions/` org. Pin to a commit SHA for
@@ -30,6 +33,27 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      # Cache packages only, never bin/, obj/, test outputs, or assemblies. The Directory.*,
+      # NuGet.Config, and lock-file patterns intentionally match nothing today: they are kept
+      # so future repository-level dependency inputs invalidate the cache when introduced.
+      - name: Cache NuGet packages
+        id: nuget-cache
+        uses: actions/cache@v4
+        with:
+          # On Windows, ~ resolves to %USERPROFILE%, the NuGet global-packages default.
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-${{ runner.arch }}-nuget-${{ hashFiles('**/*.csproj', 'global.json', '**/Directory.Packages.props', '**/Directory.Build.props', '**/Directory.Build.targets', '**/NuGet.Config', '**/nuget.config', '**/packages.lock.json') }}
+
+      - name: Verify cache isolation
+        shell: pwsh
+        run: |
+          $buildOutputs = @(Get-ChildItem -Path src,tests -Directory -Recurse -Force |
+            Where-Object { $_.Name -in @('bin', 'obj') })
+          if ($buildOutputs.Count -ne 0) {
+            throw "The package cache restored build outputs: $($buildOutputs.FullName -join ', ')"
+          }
+          Write-Host 'Cache isolation verified: no bin/ or obj/ directories were restored.'
+
       - name: Restore
         run: dotnet restore ServerMonitor.slnx
 
@@ -40,8 +64,54 @@ jobs:
       - name: Test
         run: dotnet test ServerMonitor.slnx -c Debug --no-build --disable-build-servers
 
+      # GitHub's job/step timestamps are the authoritative wall-clock measurement. The
+      # summary adds only the cache result needed to distinguish cold and warm runs.
+      - name: CI measurement
+        if: ${{ always() }}
+        shell: pwsh
+        run: |
+          @(
+            '## Debug build + tests'
+            ''
+            '- Cache action outcome: `${{ steps.nuget-cache.outcome }}`'
+            '- Exact cache hit (`true` = hit; empty = miss): `${{ steps.nuget-cache.outputs.cache-hit }}`'
+            '- Job and step wall-clock: GitHub Actions timestamps (authoritative)'
+          ) | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+
+  release-security:
+    name: Release build + vulnerability scan
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Cache NuGet packages
+        id: nuget-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-${{ runner.arch }}-nuget-${{ hashFiles('**/*.csproj', 'global.json', '**/Directory.Packages.props', '**/Directory.Build.props', '**/Directory.Build.targets', '**/NuGet.Config', '**/nuget.config', '**/packages.lock.json') }}
+
+      - name: Verify cache isolation
+        shell: pwsh
+        run: |
+          $buildOutputs = @(Get-ChildItem -Path src,tests -Directory -Recurse -Force |
+            Where-Object { $_.Name -in @('bin', 'obj') })
+          if ($buildOutputs.Count -ne 0) {
+            throw "The package cache restored build outputs: $($buildOutputs.FullName -join ', ')"
+          }
+          Write-Host 'Cache isolation verified: no bin/ or obj/ directories were restored.'
+
+      - name: Restore
+        run: dotnet restore ServerMonitor.slnx
+
       - name: Build (Release)
-        run: dotnet build ServerMonitor.slnx -c Release --no-incremental --disable-build-servers
+        run: dotnet build ServerMonitor.slnx -c Release --no-restore --no-incremental --disable-build-servers
 
       - name: Vulnerability scan (fail on any vulnerable package)
         shell: pwsh
@@ -53,3 +123,15 @@ jobs:
             exit 1
           }
           Write-Host 'No vulnerable packages found.'
+
+      - name: CI measurement
+        if: ${{ always() }}
+        shell: pwsh
+        run: |
+          @(
+            '## Release build + vulnerability scan'
+            ''
+            '- Cache action outcome: `${{ steps.nuget-cache.outcome }}`'
+            '- Exact cache hit (`true` = hit; empty = miss): `${{ steps.nuget-cache.outputs.cache-hit }}`'
+            '- Job and step wall-clock: GitHub Actions timestamps (authoritative)'
+          ) | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
