@@ -5,6 +5,7 @@ using ServerMonitor.Core.Interfaces;
 using ServerMonitor.Core.Models;
 using ServerMonitor.Core.Monitoring;
 using ServerMonitor.Core.Security;
+using ServerMonitor.Core.SshConfig;
 
 namespace ServerMonitor.App.ViewModels;
 
@@ -17,6 +18,9 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
     private readonly IPrivateKeyFilePicker _privateKeyFilePicker;
     private readonly ILocalizationService _localizationService;
     private readonly Server? _existingServer;
+    private readonly ISshConfigImportSource? _sshConfigImportSource;
+    private readonly bool _portIsAddDefault;
+    private bool _isPortEdited;
     private CancellationTokenSource? _testCancellation;
     private SecretValue? _secret;
     private CredentialContext? _secretContext;
@@ -40,6 +44,11 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
     private string _trustedHostKeyFingerprint = string.Empty;
     private HostKeyIdentity? _pendingHostKey;
     private SshConnectionResult? _lastConnectionResult;
+    private bool _isSshConfigImportOpen;
+    private bool _isLoadingSshConfig;
+    private string _sshConfigStatusMessage = string.Empty;
+    private string _sshConfigFileWarningMessage = string.Empty;
+    private IReadOnlyList<SshConfigHostOptionViewModel> _sshConfigHosts = [];
 
     public ServerEditorViewModel(
         IServerValidator validator,
@@ -49,7 +58,8 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
         IPrivateKeyFilePicker privateKeyFilePicker,
         ILocalizationService localizationService,
         Server? server,
-        ServerDiscoveryPrefill? prefill = null)
+        ServerDiscoveryPrefill? prefill = null,
+        ISshConfigImportSource? sshConfigImportSource = null)
     {
         _validator = validator;
         _sshConnectionService = sshConnectionService;
@@ -58,12 +68,16 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
         _privateKeyFilePicker = privateKeyFilePicker;
         _localizationService = localizationService;
         _existingServer = server;
+        _sshConfigImportSource = sshConfigImportSource;
         // Discovery prefill only seeds an add (server is null): name/host/port come from the
         // suggestion, everything else keeps its blank add-mode default. It never turns an add into
         // an edit (_existingServer stays null) and never touches auth, credentials or the OS guess.
         _name = server?.Name ?? prefill?.Name ?? string.Empty;
         _host = server?.Host ?? prefill?.Host ?? string.Empty;
         _port = (server?.Port ?? prefill?.Port ?? 22).ToString(CultureInfo.InvariantCulture);
+        // Only the untouched add-mode default counts as "empty" for an SSH config import; a saved,
+        // discovered or typed port (even a typed 22) is a value the user already has.
+        _portIsAddDefault = server is null && prefill is null;
         _username = server?.Username ?? string.Empty;
         _privateKeyPath = server?.PrivateKeyPath ?? string.Empty;
         _selectedOperatingSystemIndex = (int)(server?.OperatingSystem ?? ServerOperatingSystem.Auto);
@@ -76,7 +90,17 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
 
     public string Host { get => _host; set => SetSecurityContextProperty(ref _host, value); }
 
-    public string Port { get => _port; set => SetSecurityContextProperty(ref _port, value); }
+    public string Port
+    {
+        get => _port;
+        set
+        {
+            if (SetSecurityContextProperty(ref _port, value))
+            {
+                _isPortEdited = true;
+            }
+        }
+    }
 
     public string Username { get => _username; set => SetSecurityContextProperty(ref _username, value); }
 
@@ -217,6 +241,193 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
     public string EndpointDisplay => TryCreateEndpoint(out var endpoint)
         ? endpoint!.ToString()
         : Host;
+
+    /// <summary>Import is offered only when adding a server; an edit never pulls values from ssh config.</summary>
+    public bool IsSshConfigImportAvailable => _sshConfigImportSource is not null && _existingServer is null;
+
+    public bool IsSshConfigImportOpen
+    {
+        get => _isSshConfigImportOpen;
+        private set => SetProperty(ref _isSshConfigImportOpen, value);
+    }
+
+    public bool IsLoadingSshConfig
+    {
+        get => _isLoadingSshConfig;
+        private set => SetProperty(ref _isLoadingSshConfig, value);
+    }
+
+    public IReadOnlyList<SshConfigHostOptionViewModel> SshConfigHosts
+    {
+        get => _sshConfigHosts;
+        private set
+        {
+            if (SetProperty(ref _sshConfigHosts, value))
+            {
+                OnPropertyChanged(nameof(HasSshConfigHosts));
+            }
+        }
+    }
+
+    public bool HasSshConfigHosts => SshConfigHosts.Count > 0;
+
+    public string SshConfigStatusMessage
+    {
+        get => _sshConfigStatusMessage;
+        private set
+        {
+            if (SetProperty(ref _sshConfigStatusMessage, value))
+            {
+                OnPropertyChanged(nameof(HasSshConfigStatus));
+            }
+        }
+    }
+
+    public bool HasSshConfigStatus => SshConfigStatusMessage.Length > 0;
+
+    public string SshConfigFileWarningMessage
+    {
+        get => _sshConfigFileWarningMessage;
+        private set
+        {
+            if (SetProperty(ref _sshConfigFileWarningMessage, value))
+            {
+                OnPropertyChanged(nameof(HasSshConfigFileWarning));
+            }
+        }
+    }
+
+    public bool HasSshConfigFileWarning => SshConfigFileWarningMessage.Length > 0;
+
+    /// <summary>
+    /// Reads <c>~/.ssh/config</c> (read-only) and lists its concrete aliases for preview. Nothing
+    /// in the form changes until the user picks one with <see cref="ApplySshConfigHost(SshConfigHostEntry)"/>.
+    /// </summary>
+    public async Task LoadSshConfigHostsAsync(CancellationToken cancellationToken = default)
+    {
+        if (!IsSshConfigImportAvailable || IsLoadingSshConfig)
+        {
+            return;
+        }
+
+        IsSshConfigImportOpen = true;
+        IsLoadingSshConfig = true;
+        SshConfigHosts = [];
+        SshConfigStatusMessage = string.Empty;
+        SshConfigFileWarningMessage = string.Empty;
+        try
+        {
+            SshConfigImportResult result;
+            try
+            {
+                result = await _sshConfigImportSource!.LoadAsync(cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch
+            {
+                result = SshConfigImportResult.Failed(SshConfigImportErrorCode.Unreadable);
+            }
+
+            switch (result.Status)
+            {
+                case SshConfigImportStatus.NotFound:
+                    SshConfigStatusMessage = _localizationService.GetString("SshConfigImportNotFound");
+                    break;
+                case SshConfigImportStatus.Error:
+                    SshConfigStatusMessage = _localizationService.GetString($"SshConfigImportError{result.ErrorCode}");
+                    break;
+                default:
+                    SshConfigHosts = result.Hosts
+                        .Select(host => new SshConfigHostOptionViewModel(host, _localizationService))
+                        .ToList();
+                    SshConfigStatusMessage = result.Hosts.Count == 0
+                        ? _localizationService.GetString("SshConfigImportNoHosts")
+                        : string.Empty;
+                    SshConfigFileWarningMessage = string.Join(
+                        Environment.NewLine,
+                        result.FileWarnings.Select(warning => _localizationService.GetString($"SshConfigImportWarning{warning}")));
+                    break;
+            }
+        }
+        finally
+        {
+            IsLoadingSshConfig = false;
+        }
+    }
+
+    public void CloseSshConfigImport()
+    {
+        IsSshConfigImportOpen = false;
+        SshConfigHosts = [];
+        SshConfigStatusMessage = string.Empty;
+        SshConfigFileWarningMessage = string.Empty;
+    }
+
+    public bool ApplySshConfigHost(SshConfigHostOptionViewModel option) => ApplySshConfigHost(option.Entry);
+
+    /// <summary>
+    /// Fills only the form fields that are still empty (or the untouched add-mode port) from one
+    /// alias. What the user already typed, the chosen authentication method and any saved server
+    /// are never changed. A host that needs ProxyJump/ProxyCommand is refused, never imported as a
+    /// direct connection. Password authentication is never inferred.
+    /// </summary>
+    public bool ApplySshConfigHost(SshConfigHostEntry entry)
+    {
+        if (!IsSshConfigImportAvailable || !entry.IsImportable || IsTestingConnection)
+        {
+            return false;
+        }
+
+        // User, port and key belong to a host. They are only taken when the entry's host is known
+        // and the form's host is empty (and so comes from this entry) or already is that host —
+        // never mixed into a host the user typed, nor attached to an unresolved HostName.
+        var hostWasEmpty = string.IsNullOrWhiteSpace(Host);
+        var sameHost = entry.HostName is not null
+            && (hostWasEmpty || string.Equals(Host.Trim(), entry.HostName, StringComparison.OrdinalIgnoreCase));
+
+        if (string.IsNullOrWhiteSpace(Name))
+        {
+            Name = entry.Alias;
+        }
+
+        if (hostWasEmpty && entry.HostName is not null)
+        {
+            Host = entry.HostName;
+        }
+
+        if (sameHost)
+        {
+            if (entry.Port is { } port
+                && (string.IsNullOrWhiteSpace(Port) || (_portIsAddDefault && !_isPortEdited)))
+            {
+                Port = port.ToString(CultureInfo.InvariantCulture);
+            }
+
+            if (string.IsNullOrWhiteSpace(Username) && entry.User is not null)
+            {
+                Username = entry.User;
+            }
+
+            // The add-mode default is key authentication with no key chosen, i.e. "auth not set
+            // yet". A form already on password auth, or with a key path, is left exactly as it is.
+            if (entry.IdentityFile is not null
+                && IsPrivateKeyAuthentication
+                && string.IsNullOrWhiteSpace(PrivateKeyPath))
+            {
+                PrivateKeyPath = entry.IdentityFile;
+            }
+        }
+
+        CloseSshConfigImport();
+        SshConfigStatusMessage = string.Format(
+            CultureInfo.CurrentCulture,
+            _localizationService.GetString("SshConfigImportAppliedFormat"),
+            entry.Alias);
+        return true;
+    }
 
     public void CaptureSecret(string? value)
     {

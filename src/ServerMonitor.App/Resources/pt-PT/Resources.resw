@@ -363,4 +363,32 @@
   <data name="BackgroundDegradedNotice.Title" xml:space="preserve"><value>Segundo plano indisponível nesta sessão</value></data>
   <data name="BackgroundDegradedNotice.Message" xml:space="preserve"><value>O ServerAlyzer abriu esta janela porque não conseguiu colocar ou manter o seu ícone na área de notificação da barra de tarefas. Sem esse ícone não há forma de reabrir ou encerrar a app em segundo plano, por isso fechar esta janela agora encerra o ServerAlyzer. A sua preferência não foi alterada: abra o ServerAlyzer de novo mais tarde para tentar outra vez.</value></data>
   <data name="SettingsBackgroundDegradedCaption.Text" xml:space="preserve"><value>Indisponível nesta sessão: o ícone da área de notificação não pôde ser criado ou mantido. Fechar a janela encerra o ServerAlyzer. A sua preferência foi mantida e será usada na próxima abertura.</value></data>
+  <data name="ServerFormImportSshConfigButton.Content" xml:space="preserve"><value>Importar da configuração SSH</value></data>
+  <data name="ServerFormSshConfigTitle.Text" xml:space="preserve"><value>Anfitriões em ~/.ssh/config</value></data>
+  <data name="ServerFormSshConfigCloseButton.Content" xml:space="preserve"><value>Fechar</value></data>
+  <data name="ServerFormSshConfigUseButton.Content" xml:space="preserve"><value>Usar</value></data>
+  <data name="SshConfigHostUseForFormat" xml:space="preserve"><value>Usar {0}</value></data>
+  <data name="SshConfigImportNotFound" xml:space="preserve"><value>Não foi encontrado ~/.ssh/config.</value></data>
+  <data name="SshConfigImportNoHosts" xml:space="preserve"><value>Não há anfitriões para importar em ~/.ssh/config.</value></data>
+  <data name="SshConfigImportErrorTooLarge" xml:space="preserve"><value>O ~/.ssh/config é demasiado grande para importar (limite de 256 KB).</value></data>
+  <data name="SshConfigImportErrorUnreadable" xml:space="preserve"><value>Não foi possível ler o ~/.ssh/config.</value></data>
+  <data name="SshConfigImportErrorInvalidEncoding" xml:space="preserve"><value>O ~/.ssh/config não é texto UTF-8 válido.</value></data>
+  <data name="SshConfigImportWarningIncludeNotFollowed" xml:space="preserve"><value>Este ficheiro usa Include, que não é seguido. Os valores importados podem estar incompletos.</value></data>
+  <data name="SshConfigImportWarningMatchNotEvaluated" xml:space="preserve"><value>Este ficheiro usa blocos Match, que não são avaliados. Os valores importados podem ser inexatos.</value></data>
+  <data name="SshConfigHostUnsupportedFormat" xml:space="preserve"><value>Não suportado: {0}</value></data>
+  <data name="SshConfigHostAmbiguousFormat" xml:space="preserve"><value>Ambíguo: {0} (escolha manualmente)</value></data>
+  <data name="SshConfigHostInvalidFormat" xml:space="preserve"><value>Inválido: {0}</value></data>
+  <data name="SshConfigHostIgnoredFormat" xml:space="preserve"><value>Ignorado (não relevante): {0}</value></data>
+  <data name="SshConfigPreviewHostNameFormat" xml:space="preserve"><value>Anfitrião: {0}</value></data>
+  <data name="SshConfigPreviewUserFormat" xml:space="preserve"><value>Utilizador: {0}</value></data>
+  <data name="SshConfigPreviewPortFormat" xml:space="preserve"><value>Porta: {0}</value></data>
+  <data name="SshConfigPreviewIdentityFileFormat" xml:space="preserve"><value>Chave: {0}</value></data>
+  <data name="SshConfigImportAppliedFormat" xml:space="preserve"><value>Os campos vazios foram preenchidos a partir de {0}. Os valores que já tinha introduzido foram mantidos.</value></data>
+  <data name="SshConfigHostBlockedProxyJump" xml:space="preserve"><value>Requer ProxyJump — ainda não suportado</value></data>
+  <data name="SshConfigHostBlockedProxyCommand" xml:space="preserve"><value>Requer ProxyCommand — ainda não suportado</value></data>
+  <data name="SshConfigHostBlockedProxyMaySetByMatch" xml:space="preserve"><value>Um bloco Match pode definir um proxy — não é possível verificar, não importado</value></data>
+  <data name="SshConfigHostBlockedProxyMaySetByInclude" xml:space="preserve"><value>O Include não é seguido — não é possível verificar o proxy, não importado</value></data>
+  <data name="SshConfigImportWarningHostsTruncated" xml:space="preserve"><value>Só são listados os primeiros 500 anfitriões.</value></data>
+  <data name="SshConfigImportErrorInvalidSyntax" xml:space="preserve"><value>O ~/.ssh/config tem uma linha Host ou Match mal formada, que o ssh rejeitaria. Nada foi importado.</value></data>
+  <data name="ServerFormSshConfigHostList.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Anfitriões em ~/.ssh/config</value></data>
 </root>

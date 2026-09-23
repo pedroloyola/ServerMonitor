@@ -36,6 +36,31 @@ public sealed partial class ServerFormControl : UserControl
         }
     }
 
+    private async void OnImportSshConfigClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is ServerEditorViewModel viewModel)
+        {
+            await viewModel.LoadSshConfigHostsAsync();
+        }
+    }
+
+    private void OnCloseSshConfigImportClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is ServerEditorViewModel viewModel)
+        {
+            viewModel.CloseSshConfigImport();
+        }
+    }
+
+    private void OnUseSshConfigHostClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is ServerEditorViewModel viewModel
+            && sender is FrameworkElement { DataContext: SshConfigHostOptionViewModel option })
+        {
+            viewModel.ApplySshConfigHost(option);
+        }
+    }
+
     private async void OnTestConnectionClick(object sender, RoutedEventArgs e)
     {
         if (DataContext is ServerEditorViewModel viewModel)

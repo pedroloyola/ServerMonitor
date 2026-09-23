@@ -363,4 +363,32 @@
   <data name="BackgroundDegradedNotice.Title" xml:space="preserve"><value>Background unavailable in this session</value></data>
   <data name="BackgroundDegradedNotice.Message" xml:space="preserve"><value>ServerAlyzer opened this window because it could not place or keep its icon in the taskbar notification area. Without that icon there is no way to reopen or quit the app from the background, so closing this window now quits ServerAlyzer. Your preference was not changed: open ServerAlyzer again later to try again.</value></data>
   <data name="SettingsBackgroundDegradedCaption.Text" xml:space="preserve"><value>Unavailable in this session: the notification-area icon could not be created or kept. Closing the window quits ServerAlyzer. Your preference was kept and will be used the next time you open the app.</value></data>
+  <data name="ServerFormImportSshConfigButton.Content" xml:space="preserve"><value>Import from SSH config</value></data>
+  <data name="ServerFormSshConfigTitle.Text" xml:space="preserve"><value>Hosts in ~/.ssh/config</value></data>
+  <data name="ServerFormSshConfigCloseButton.Content" xml:space="preserve"><value>Close</value></data>
+  <data name="ServerFormSshConfigUseButton.Content" xml:space="preserve"><value>Use</value></data>
+  <data name="SshConfigHostUseForFormat" xml:space="preserve"><value>Use {0}</value></data>
+  <data name="SshConfigImportNotFound" xml:space="preserve"><value>No ~/.ssh/config found.</value></data>
+  <data name="SshConfigImportNoHosts" xml:space="preserve"><value>No hosts to import in ~/.ssh/config.</value></data>
+  <data name="SshConfigImportErrorTooLarge" xml:space="preserve"><value>~/.ssh/config is too large to import (limit 256 KB).</value></data>
+  <data name="SshConfigImportErrorUnreadable" xml:space="preserve"><value>~/.ssh/config could not be read.</value></data>
+  <data name="SshConfigImportErrorInvalidEncoding" xml:space="preserve"><value>~/.ssh/config is not valid UTF-8 text.</value></data>
+  <data name="SshConfigImportWarningIncludeNotFollowed" xml:space="preserve"><value>This file uses Include, which is not followed. Imported values may be incomplete.</value></data>
+  <data name="SshConfigImportWarningMatchNotEvaluated" xml:space="preserve"><value>This file uses Match blocks, which are not evaluated. Imported values may be inexact.</value></data>
+  <data name="SshConfigHostUnsupportedFormat" xml:space="preserve"><value>Unsupported: {0}</value></data>
+  <data name="SshConfigHostAmbiguousFormat" xml:space="preserve"><value>Ambiguous: {0} (choose manually)</value></data>
+  <data name="SshConfigHostInvalidFormat" xml:space="preserve"><value>Invalid: {0}</value></data>
+  <data name="SshConfigHostIgnoredFormat" xml:space="preserve"><value>Ignored (not relevant): {0}</value></data>
+  <data name="SshConfigPreviewHostNameFormat" xml:space="preserve"><value>Host: {0}</value></data>
+  <data name="SshConfigPreviewUserFormat" xml:space="preserve"><value>User: {0}</value></data>
+  <data name="SshConfigPreviewPortFormat" xml:space="preserve"><value>Port: {0}</value></data>
+  <data name="SshConfigPreviewIdentityFileFormat" xml:space="preserve"><value>Key: {0}</value></data>
+  <data name="SshConfigImportAppliedFormat" xml:space="preserve"><value>Filled the empty fields from {0}. Values you had already entered were kept.</value></data>
+  <data name="SshConfigHostBlockedProxyJump" xml:space="preserve"><value>Requires ProxyJump — not supported yet</value></data>
+  <data name="SshConfigHostBlockedProxyCommand" xml:space="preserve"><value>Requires ProxyCommand — not supported yet</value></data>
+  <data name="SshConfigHostBlockedProxyMaySetByMatch" xml:space="preserve"><value>A Match block may set a proxy — cannot verify, not imported</value></data>
+  <data name="SshConfigHostBlockedProxyMaySetByInclude" xml:space="preserve"><value>Include is not followed — cannot verify the proxy, not imported</value></data>
+  <data name="SshConfigImportWarningHostsTruncated" xml:space="preserve"><value>Only the first 500 hosts are listed.</value></data>
+  <data name="SshConfigImportErrorInvalidSyntax" xml:space="preserve"><value>~/.ssh/config has a malformed Host or Match line, so ssh would reject it. Nothing was imported.</value></data>
+  <data name="ServerFormSshConfigHostList.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Hosts in ~/.ssh/config</value></data>
 </root>

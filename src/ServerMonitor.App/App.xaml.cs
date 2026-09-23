@@ -24,6 +24,7 @@ using ServerMonitor.Infrastructure.Discovery;
 using ServerMonitor.Infrastructure.Persistence;
 using ServerMonitor.Infrastructure.Security;
 using ServerMonitor.Infrastructure.SSH;
+using ServerMonitor.Infrastructure.SshConfig;
 using ServerMonitor.App.Windowing;
 using ServerMonitor.WidgetContract;
 using ServerMonitor.ActivationContract;
@@ -480,6 +481,7 @@ public partial class App : Application
         services.AddSingleton<IServerCredentialStore, WindowsCredentialStore>();
         services.AddSingleton<IServerProfileService, ServerProfileService>();
         services.AddSingleton<IHostKeyTrustStore, JsonHostKeyTrustStore>();
+        services.AddSingleton<ISshConfigImportSource, SshConfigFileImportSource>();
         services.AddSingleton<SshConnectionService>();
         services.AddSingleton<ISshConnectionService>(sp => sp.GetRequiredService<SshConnectionService>());
         services.AddSingleton<ILinuxMetricsRemoteSource>(sp => sp.GetRequiredService<SshConnectionService>());
