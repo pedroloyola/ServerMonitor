@@ -363,4 +363,51 @@
   <data name="BackgroundDegradedNotice.Title" xml:space="preserve"><value>Segundo plano indisponível nesta sessão</value></data>
   <data name="BackgroundDegradedNotice.Message" xml:space="preserve"><value>O ServerAlyzer abriu esta janela porque não conseguiu colocar ou manter o seu ícone na área de notificação da barra de tarefas. Sem esse ícone não há forma de reabrir ou encerrar a app em segundo plano, por isso fechar esta janela agora encerra o ServerAlyzer. A sua preferência não foi alterada: abra o ServerAlyzer de novo mais tarde para tentar outra vez.</value></data>
   <data name="SettingsBackgroundDegradedCaption.Text" xml:space="preserve"><value>Indisponível nesta sessão: o ícone da área de notificação não pôde ser criado ou mantido. Fechar a janela encerra o ServerAlyzer. A sua preferência foi mantida e será usada na próxima abertura.</value></data>
+  <data name="ServerFormImportSshConfigButton.Content" xml:space="preserve"><value>Importar da configuração SSH</value></data>
+  <data name="ServerFormSshConfigTitle.Text" xml:space="preserve"><value>Anfitriões em ~/.ssh/config</value></data>
+  <data name="ServerFormSshConfigCloseButton.Content" xml:space="preserve"><value>Fechar</value></data>
+  <data name="ServerFormSshConfigUseButton.Content" xml:space="preserve"><value>Usar</value></data>
+  <data name="SshConfigHostUseForFormat" xml:space="preserve"><value>Usar {0}</value></data>
+  <data name="SshConfigImportNotFound" xml:space="preserve"><value>Não foi encontrado ~/.ssh/config.</value></data>
+  <data name="SshConfigImportNoHosts" xml:space="preserve"><value>Não há anfitriões para importar em ~/.ssh/config.</value></data>
+  <data name="SshConfigImportErrorTooLarge" xml:space="preserve"><value>O ~/.ssh/config ou um ficheiro que ele inclui é demasiado grande para importar (256 KB por ficheiro, 1 MB no total). Nada foi importado.</value></data>
+  <data name="SshConfigImportErrorUnreadable" xml:space="preserve"><value>Não foi possível ler o ~/.ssh/config ou um ficheiro que ele inclui. Nada foi importado.</value></data>
+  <data name="SshConfigImportErrorInvalidEncoding" xml:space="preserve"><value>O ~/.ssh/config ou um ficheiro que ele inclui não é texto UTF-8 válido. Nada foi importado.</value></data>
+  <data name="SshConfigImportWarningIncludeNotFollowed" xml:space="preserve"><value>Algumas linhas Include não puderam ser verificadas e não foram seguidas. Os anfitriões que podem afetar não são importados.</value></data>
+  <data name="SshConfigImportWarningMatchNotEvaluated" xml:space="preserve"><value>Este ficheiro usa blocos Match, que não são avaliados. Os valores importados podem ser inexatos.</value></data>
+  <data name="SshConfigHostUnsupportedFormat" xml:space="preserve"><value>Não suportado: {0}</value></data>
+  <data name="SshConfigHostAmbiguousFormat" xml:space="preserve"><value>Ambíguo: {0} (escolha manualmente)</value></data>
+  <data name="SshConfigHostInvalidFormat" xml:space="preserve"><value>Inválido: {0}</value></data>
+  <data name="SshConfigHostIgnoredFormat" xml:space="preserve"><value>Ignorado (não relevante): {0}</value></data>
+  <data name="SshConfigPreviewHostNameFormat" xml:space="preserve"><value>Anfitrião: {0}</value></data>
+  <data name="SshConfigPreviewUserFormat" xml:space="preserve"><value>Utilizador: {0}</value></data>
+  <data name="SshConfigPreviewPortFormat" xml:space="preserve"><value>Porta: {0}</value></data>
+  <data name="SshConfigPreviewIdentityFileFormat" xml:space="preserve"><value>Chave: {0}</value></data>
+  <data name="SshConfigImportAppliedFormat" xml:space="preserve"><value>Os campos vazios foram preenchidos a partir de {0}. Os valores que já tinha introduzido foram mantidos.</value></data>
+  <data name="SshConfigHostBlockedProxyJump" xml:space="preserve"><value>Requer ProxyJump — ainda não suportado</value></data>
+  <data name="SshConfigHostBlockedProxyCommand" xml:space="preserve"><value>Requer ProxyCommand — ainda não suportado</value></data>
+  <data name="SshConfigHostBlockedProxyMaySetByMatch" xml:space="preserve"><value>Um bloco Match pode definir um proxy — não é possível verificar, não importado</value></data>
+  <data name="SshConfigHostBlockedProxyMaySetByInclude" xml:space="preserve"><value>Um Include não pôde ser verificado — não é possível confirmar o proxy, não importado</value></data>
+  <data name="SshConfigImportWarningHostsTruncated" xml:space="preserve"><value>Só são listados os primeiros 500 anfitriões.</value></data>
+  <data name="SshConfigImportErrorInvalidSyntax" xml:space="preserve"><value>O ~/.ssh/config ou um ficheiro que ele inclui tem uma linha mal formada, que o ssh rejeitaria. Nada foi importado.</value></data>
+  <data name="ServerFormSshConfigHostList.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Anfitriões em ~/.ssh/config</value></data>
+  <data name="SshConfigImportErrorTooManyFiles" xml:space="preserve"><value>Demasiados ficheiros incluídos (limite de 64 ficheiros, 256 correspondências por Include). Nada foi importado.</value></data>
+  <data name="SshConfigImportErrorIncludeCycle" xml:space="preserve"><value>Um ficheiro inclui-se a si próprio, diretamente ou através de outros ficheiros, e o ssh falharia. Nada foi importado.</value></data>
+  <data name="SshConfigImportErrorIncludeTooDeep" xml:space="preserve"><value>Os ficheiros Include estão aninhados em mais de 16 níveis, e o ssh falharia. Nada foi importado.</value></data>
+  <data name="SshConfigImportErrorFileFormat" xml:space="preserve"><value>Ficheiro: {0}</value></data>
+  <data name="SshConfigImportDiagnosticIncludeMatchedNoFiles" xml:space="preserve"><value>O Include '{0}' não corresponde a nenhum ficheiro.</value></data>
+  <data name="SshConfigImportDiagnosticIncludeNotVerified" xml:space="preserve"><value>O Include '{0}' não foi seguido ({1}). Os anfitriões que pode afetar não são importados.</value></data>
+  <data name="SshConfigIncludeIssueNotFollowed" xml:space="preserve"><value>não seguido</value></data>
+  <data name="SshConfigIncludeIssueOutsideSshDirectory" xml:space="preserve"><value>fora de ~/.ssh</value></data>
+  <data name="SshConfigIncludeIssueReparsePoint" xml:space="preserve"><value>ligação simbólica ou junção</value></data>
+  <data name="SshConfigIncludeIssueNotRegularFile" xml:space="preserve"><value>não é um ficheiro normal</value></data>
+  <data name="SshConfigIncludeIssueUnsupportedPattern" xml:space="preserve"><value>padrão não suportado</value></data>
+  <data name="SshConfigIncludeIssueUnsupportedExpansion" xml:space="preserve"><value>expansão não suportada</value></data>
+  <data name="SshConfigIncludeIssueMissingArgument" xml:space="preserve"><value>caminho em falta ou mal formado</value></data>
+  <data name="SshConfigImportErrorConfigIsLink" xml:space="preserve"><value>O ~/.ssh ou o ~/.ssh/config é uma ligação (simbólica, junção ou ligação física), por isso não foi lido e nada foi importado. Gestores de dotfiles e o OneDrive podem criar estas ligações; por segurança, o ServerAlyzer nunca as segue. Para importar, copie a sua configuração SSH para um ficheiro normal em ~/.ssh/config.</value></data>
+  <data name="SshConfigIncludeIssueFinalPathMismatch" xml:space="preserve"><value>não foi possível confirmar que o ficheiro aberto é o verificado</value></data>
+  <data name="SshConfigIncludeIssueHardLinked" xml:space="preserve"><value>ficheiro com ligação física não seguido</value></data>
+  <data name="SshConfigHostAccessibleImportableFormat" xml:space="preserve"><value>{0} — importável</value></data>
+  <data name="SshConfigHostAccessibleBlockedFormat" xml:space="preserve"><value>{0} — bloqueado: {1}</value></data>
+  <data name="SshConfigHostAccessibleNotesFormat" xml:space="preserve"><value>Notas: {0}</value></data>
 </root>

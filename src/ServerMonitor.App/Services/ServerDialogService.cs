@@ -15,7 +15,8 @@ public sealed class ServerDialogService(
     IHostKeyTrustStore hostKeyTrustStore,
     IServerConnectionStateStore connectionStateStore,
     IPrivateKeyFilePicker privateKeyFilePicker,
-    ILocalizationService localizationService) : IServerDialogService
+    ILocalizationService localizationService,
+    ISshConfigImportSource sshConfigImportSource) : IServerDialogService
 {
     public Task<ServerEditorResult?> ShowEditorAsync(Server? server) =>
         ShowEditorCoreAsync(server, prefill: null, isEdit: server is not null);
@@ -36,7 +37,8 @@ public sealed class ServerDialogService(
             privateKeyFilePicker,
             localizationService,
             server,
-            prefill);
+            prefill,
+            sshConfigImportSource);
 
         try
         {

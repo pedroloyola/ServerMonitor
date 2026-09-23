@@ -45,6 +45,16 @@ internal sealed class FakeLocalizationService : ILocalizationService
             ["HistoryChartSummaryFormat"] = "{0}. {1}. Current {2}. Maximum {3}.",
             ["HistoryChartSummaryOfflineSuffix"] = " Contains an offline period shown as a gap.",
             ["HistoryValueUnknownAccessible"] = "Unknown",
+            ["SshConfigImportDiagnosticIncludeMatchedNoFiles"] = "Include '{0}' matched no files.",
+            ["SshConfigImportDiagnosticIncludeNotVerified"] = "Include '{0}' was not followed ({1}).",
+            ["SshConfigImportErrorFileFormat"] = "File: {0}",
+            ["SshConfigHostAccessibleImportableFormat"] = "{0} — importable",
+            ["SshConfigHostAccessibleBlockedFormat"] = "{0} — blocked: {1}",
+            ["SshConfigHostAccessibleNotesFormat"] = "Notes: {0}",
+            ["SshConfigHostAmbiguousFormat"] = "Ambiguous: {0} (choose manually)",
+            ["SshConfigHostUnsupportedFormat"] = "Unsupported: {0}",
+            ["SshConfigHostIgnoredFormat"] = "Ignored (not relevant): {0}",
+            ["SshConfigHostBlockedProxyJump"] = "Requires ProxyJump — not supported yet",
         };
 
     public string? CurrentLanguageOverride => null;

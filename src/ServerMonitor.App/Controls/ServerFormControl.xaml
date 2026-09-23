@@ -15,6 +15,106 @@
                 IsOpen="{Binding HasValidationErrors}"
                 Severity="Error" />
 
+            <!-- Import from ~/.ssh/config: read-only preview; choosing a host fills only empty fields -->
+            <StackPanel
+                Spacing="8"
+                Visibility="{Binding IsSshConfigImportAvailable, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <Button
+                    x:Uid="ServerFormImportSshConfigButton"
+                    Click="OnImportSshConfigClick"
+                    IsEnabled="{Binding IsNotTestingConnection}"
+                    Style="{StaticResource QuietPillButtonStyle}" />
+                <TextBlock
+                    AutomationProperties.LiveSetting="Polite"
+                    FontSize="12"
+                    Foreground="{ThemeResource TextSecondaryBrush}"
+                    Text="{Binding SshConfigStatusMessage}"
+                    TextWrapping="Wrap"
+                    Visibility="{Binding HasSshConfigStatus, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                <Border
+                    Padding="12"
+                    Background="{ThemeResource MutedSurfaceBrush}"
+                    BorderBrush="{ThemeResource GlassBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="{StaticResource RadiusMedium}"
+                    Visibility="{Binding IsSshConfigImportOpen, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <StackPanel Spacing="8">
+                        <Grid ColumnSpacing="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock
+                                x:Uid="ServerFormSshConfigTitle"
+                                VerticalAlignment="Center"
+                                AutomationProperties.HeadingLevel="Level2"
+                                FontSize="13"
+                                FontWeight="SemiBold" />
+                            <Button
+                                x:Uid="ServerFormSshConfigCloseButton"
+                                Grid.Column="1"
+                                Click="OnCloseSshConfigImportClick"
+                                Style="{StaticResource QuietPillButtonStyle}" />
+                        </Grid>
+                        <ProgressRing
+                            Width="18"
+                            Height="18"
+                            HorizontalAlignment="Left"
+                            IsActive="{Binding IsLoadingSshConfig}"
+                            Visibility="{Binding IsLoadingSshConfig, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                        <TextBlock
+                            FontSize="12"
+                            Foreground="{ThemeResource TextSecondaryBrush}"
+                            Text="{Binding SshConfigFileWarningMessage}"
+                            TextWrapping="Wrap"
+                            Visibility="{Binding HasSshConfigFileWarning, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                        <!-- Virtualized and height-bounded: the list is capped at 500 hosts by the resolver. -->
+                        <ListView
+                            x:Uid="ServerFormSshConfigHostList"
+                            MaxHeight="320"
+                            IsItemClickEnabled="False"
+                            ContainerContentChanging="OnSshConfigHostContainerContentChanging"
+                            ItemsSource="{Binding SshConfigHosts}"
+                            SelectionMode="None">
+                            <ListView.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Padding="0,6" ColumnSpacing="8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Spacing="2">
+                                            <TextBlock FontSize="13" FontWeight="SemiBold" Text="{Binding Alias}" TextWrapping="Wrap" />
+                                            <TextBlock FontSize="12" Foreground="{ThemeResource TextSecondaryBrush}" Text="{Binding Preview}" TextWrapping="Wrap" />
+                                            <TextBlock
+                                                FontSize="12"
+                                                FontWeight="SemiBold"
+                                                Text="{Binding RequirementText}"
+                                                TextWrapping="Wrap"
+                                                Visibility="{Binding HasRequirement, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                            <TextBlock
+                                                FontSize="11"
+                                                Foreground="{ThemeResource TextTertiaryBrush}"
+                                                Text="{Binding ClassificationText}"
+                                                TextWrapping="Wrap"
+                                                Visibility="{Binding HasClassification, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                        </StackPanel>
+                                        <Button
+                                            x:Uid="ServerFormSshConfigUseButton"
+                                            Grid.Column="1"
+                                            VerticalAlignment="Top"
+                                            AutomationProperties.Name="{Binding UseAutomationName}"
+                                            Click="OnUseSshConfigHostClick"
+                                            IsEnabled="{Binding IsImportable}"
+                                            Style="{StaticResource QuietPillButtonStyle}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
             <!-- Server Name -->
             <TextBox
                 x:Name="NameField"

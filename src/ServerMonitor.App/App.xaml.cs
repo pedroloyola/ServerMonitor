@@ -24,6 +24,7 @@ using ServerMonitor.Infrastructure.Discovery;
 using ServerMonitor.Infrastructure.Persistence;
 using ServerMonitor.Infrastructure.Security;
 using ServerMonitor.Infrastructure.SSH;
+using ServerMonitor.Infrastructure.SshConfig;
 using ServerMonitor.App.Windowing;
 using ServerMonitor.WidgetContract;
 using ServerMonitor.ActivationContract;
@@ -51,6 +52,11 @@ public partial class App : Application
             .ConfigureServices(services => ConfigureApplicationServices(services))
             .Build();
 
+#if DEBUG
+        // Debug-only QA: --qa-ui-language <tag> forces the UI language before the first ResourceLoader
+        // (LocalizationService loads lazily) and before InitializeComponent resolves any x:Uid.
+        Qa.QaUiLanguageComposition.ApplyRequested();
+#endif
         ServicesHost.Services
             .GetRequiredService<ILocalizationService>()
             .InitializeFromSystem();
@@ -480,6 +486,14 @@ public partial class App : Application
         services.AddSingleton<IServerCredentialStore, WindowsCredentialStore>();
         services.AddSingleton<IServerProfileService, ServerProfileService>();
         services.AddSingleton<IHostKeyTrustStore, JsonHostKeyTrustStore>();
+        services.AddSingleton<ISshConfigImportSource, SshConfigFileImportSource>();
+#if DEBUG
+        // Debug-only QA: --qa-ssh-config <dir> roots the import at a fixture profile instead of ~/.ssh.
+        if (Qa.QaSshConfigComposition.RequestedProfile() is { } qaSshConfigProfile)
+        {
+            Qa.QaSshConfigComposition.Apply(services, qaSshConfigProfile);
+        }
+#endif
         services.AddSingleton<SshConnectionService>();
         services.AddSingleton<ISshConnectionService>(sp => sp.GetRequiredService<SshConnectionService>());
         services.AddSingleton<ILinuxMetricsRemoteSource>(sp => sp.GetRequiredService<SshConnectionService>());
