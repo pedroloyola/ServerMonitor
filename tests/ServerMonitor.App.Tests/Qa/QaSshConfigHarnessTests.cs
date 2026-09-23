@@ -15,6 +15,12 @@ public sealed class QaSshConfigHarnessTests
     }
 
     [Fact]
+    public void UiLanguageHarnessIsNotRequestedByDefault()
+    {
+        Assert.Null(QaUiLanguageComposition.RequestedLanguage());
+    }
+
+    [Fact]
     public void WithoutTheFlag_TheCompositionReadsTheRealProfile()
     {
         var services = new ServiceCollection();

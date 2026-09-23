@@ -73,6 +73,7 @@
                             x:Uid="ServerFormSshConfigHostList"
                             MaxHeight="320"
                             IsItemClickEnabled="False"
+                            ContainerContentChanging="OnSshConfigHostContainerContentChanging"
                             ItemsSource="{Binding SshConfigHosts}"
                             SelectionMode="None">
                             <ListView.ItemTemplate>

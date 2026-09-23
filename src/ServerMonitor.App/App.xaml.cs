@@ -52,6 +52,11 @@ public partial class App : Application
             .ConfigureServices(services => ConfigureApplicationServices(services))
             .Build();
 
+#if DEBUG
+        // Debug-only QA: --qa-ui-language <tag> forces the UI language before the first ResourceLoader
+        // (LocalizationService loads lazily) and before InitializeComponent resolves any x:Uid.
+        Qa.QaUiLanguageComposition.ApplyRequested();
+#endif
         ServicesHost.Services
             .GetRequiredService<ILocalizationService>()
             .InitializeFromSystem();

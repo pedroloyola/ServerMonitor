@@ -34,6 +34,22 @@ public sealed class SshConfigHostOptionViewModel
             .Where(group => group.Keywords.Count > 0)
             .Select(group => Format(localization, group.Key, string.Join(", ", group.Keywords)))
             .Concat(entry.FindingsTruncated ? ["…"] : []));
+
+        // What a screen reader announces for the list item: alias, importable/blocked (with why), and
+        // the classification notes (e.g. an ambiguous key) on one line.
+        var state = entry.IsImportable
+            ? Format(localization, "SshConfigHostAccessibleImportableFormat", entry.Alias)
+            : string.Format(
+                CultureInfo.CurrentCulture,
+                localization.GetString("SshConfigHostAccessibleBlockedFormat"),
+                entry.Alias,
+                RequirementText);
+        AccessibleName = ClassificationText.Length == 0
+            ? state
+            : state + ". " + Format(
+                localization,
+                "SshConfigHostAccessibleNotesFormat",
+                ClassificationText.Replace(Environment.NewLine, "; ", StringComparison.Ordinal));
     }
 
     public SshConfigHostEntry Entry { get; }
@@ -44,6 +60,9 @@ public sealed class SshConfigHostOptionViewModel
 
     public string UseAutomationName { get; }
 
+    /// <summary>The list item's UI Automation name (set on the ListViewItem container).</summary>
+    public string AccessibleName { get; }
+
     public string Preview { get; }
 
     public string RequirementText { get; }
@@ -53,6 +72,9 @@ public sealed class SshConfigHostOptionViewModel
     public string ClassificationText { get; }
 
     public bool HasClassification => ClassificationText.Length > 0;
+
+    /// <summary>Defense in depth: any UIA fallback to ToString reads the same text, never the type name.</summary>
+    public override string ToString() => AccessibleName;
 
     private static IEnumerable<string> PreviewParts(SshConfigHostEntry entry, ILocalizationService localization)
     {

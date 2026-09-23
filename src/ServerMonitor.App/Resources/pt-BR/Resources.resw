@@ -412,4 +412,7 @@
   <data name="SshConfigImportErrorConfigIsLink" xml:space="preserve"><value>O ~/.ssh ou o ~/.ssh/config é um link (simbólico, junção ou link físico), por isso não foi lido e nada foi importado. Gerenciadores de dotfiles e o OneDrive podem criar esses links; por segurança, o ServerAlyzer nunca os segue. Para importar, copie sua configuração SSH para um arquivo comum em ~/.ssh/config.</value></data>
   <data name="SshConfigIncludeIssueFinalPathMismatch" xml:space="preserve"><value>não foi possível confirmar que o arquivo aberto é o verificado</value></data>
   <data name="SshConfigIncludeIssueHardLinked" xml:space="preserve"><value>arquivo com link físico não seguido</value></data>
+  <data name="SshConfigHostAccessibleImportableFormat" xml:space="preserve"><value>{0} — importável</value></data>
+  <data name="SshConfigHostAccessibleBlockedFormat" xml:space="preserve"><value>{0} — bloqueado: {1}</value></data>
+  <data name="SshConfigHostAccessibleNotesFormat" xml:space="preserve"><value>Observações: {0}</value></data>
 </root>

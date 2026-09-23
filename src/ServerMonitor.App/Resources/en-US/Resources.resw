@@ -407,4 +407,7 @@
   <data name="SshConfigImportErrorConfigIsLink" xml:space="preserve"><value>~/.ssh or ~/.ssh/config is a link (symbolic link, junction or hard link), so it was not read and nothing was imported. Dotfile managers and OneDrive can create such links; for your security ServerAlyzer never follows them. To import, copy your SSH config into a regular file at ~/.ssh/config.</value></data>
   <data name="SshConfigIncludeIssueFinalPathMismatch" xml:space="preserve"><value>the opened file could not be confirmed as the checked one</value></data>
   <data name="SshConfigIncludeIssueHardLinked" xml:space="preserve"><value>hard-linked file not followed</value></data>
+  <data name="SshConfigHostAccessibleImportableFormat" xml:space="preserve"><value>{0} — importable</value></data>
+  <data name="SshConfigHostAccessibleBlockedFormat" xml:space="preserve"><value>{0} — blocked: {1}</value></data>
+  <data name="SshConfigHostAccessibleNotesFormat" xml:space="preserve"><value>Notes: {0}</value></data>
 </root>

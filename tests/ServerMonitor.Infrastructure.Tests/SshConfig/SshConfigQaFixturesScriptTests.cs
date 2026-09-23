@@ -11,16 +11,30 @@ namespace ServerMonitor.Infrastructure.Tests.SshConfig;
 public sealed class SshConfigQaFixturesScriptTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), "sm-sshqa-" + Guid.NewGuid().ToString("N"));
+    private readonly string _bin = Path.Combine(Path.GetTempPath(), "sm-sshqa-bin-" + Guid.NewGuid().ToString("N"));
 
     public void Dispose()
     {
-        try
+        foreach (var directory in new[] { _root, _bin })
         {
-            Directory.Delete(_root, recursive: true);
+            try
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+            catch (IOException)
+            {
+            }
         }
-        catch (IOException)
-        {
-        }
+    }
+
+    /// <summary>A stand-in for the Debug executable (never launched), with a chosen build time.</summary>
+    private string FakeAppExe(DateTime writeTimeUtc)
+    {
+        Directory.CreateDirectory(_bin);
+        var exe = Path.Combine(_bin, "ServerMonitor.App.exe");
+        File.WriteAllText(exe, "not a real executable");
+        File.SetLastWriteTimeUtc(exe, writeTimeUtc);
+        return exe;
     }
 
     private static string ScriptPath()
@@ -35,7 +49,7 @@ public sealed class SshConfigQaFixturesScriptTests : IDisposable
         return Path.Combine(directory!.FullName, "tools", "qa", "ssh-config-fixtures.ps1");
     }
 
-    private static (int ExitCode, string Output) RunScript(string root)
+    private static (int ExitCode, string Output) RunScript(string root, string? appExe = null)
     {
         var shell = File.Exists(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "PowerShell", "7", "pwsh.exe"))
             ? "pwsh.exe"
@@ -50,6 +64,12 @@ public sealed class SshConfigQaFixturesScriptTests : IDisposable
         foreach (var argument in new[] { "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", ScriptPath(), "-Root", root })
         {
             start.ArgumentList.Add(argument);
+        }
+
+        if (appExe is not null)
+        {
+            start.ArgumentList.Add("-AppExe");
+            start.ArgumentList.Add(appExe);
         }
 
         using var process = Process.Start(start)!;
@@ -84,12 +104,22 @@ public sealed class SshConfigQaFixturesScriptTests : IDisposable
     [Fact]
     public async Task FixtureScript_GeneratesTheFiveProfiles_AsDocumented()
     {
-        var (exitCode, output) = RunScript(_root);
+        var exe = FakeAppExe(DateTime.UtcNow);
+        var (exitCode, output) = RunScript(_root, exe);
         Assert.True(exitCode == 0, output);
         foreach (var scenario in new[] { "empty", "error", "big", "blocked", "normal" })
         {
-            Assert.Contains($"--qa-ssh-config \"{Path.Combine(_root, scenario)}\"", output);
+            // The exact executable, never `dotnet run` (which may launch a different, stale binary).
+            Assert.Contains($"& \"{exe}\" --qa-ssh-config \"{Path.Combine(_root, scenario)}\"", output);
+            foreach (var language in new[] { "en-US", "pt-BR" })
+            {
+                Assert.Contains(
+                    $"& \"{exe}\" --qa-ssh-config \"{Path.Combine(_root, scenario)}\" --qa-ui-language {language}",
+                    output);
+            }
         }
+
+        Assert.DoesNotContain("dotnet run", output);
 
         // (a) empty
         Assert.Equal(SshConfigImportStatus.NotFound, (await LoadAsync("empty")).Result.Status);
@@ -135,6 +165,28 @@ public sealed class SshConfigQaFixturesScriptTests : IDisposable
             Assert.False(File.Exists(host.IdentityFile));
         });
         Assert.All(normalSpy.Paths, path => Assert.DoesNotContain("qa_missing", path));
+    }
+
+    [Fact]
+    public void FixtureScript_MissingExecutable_WarnsAndPrintsNoLaunchCommand()
+    {
+        var (exitCode, output) = RunScript(_root, Path.Combine(_bin, "missing", "ServerMonitor.App.exe"));
+
+        Assert.True(exitCode == 0, output);
+        Assert.Contains("no launch command printed", output);
+        Assert.DoesNotContain("--qa-ssh-config", output);
+        Assert.DoesNotContain("--qa-ui-language", output);
+        Assert.True(File.Exists(Path.Combine(_root, "normal", ".ssh", "config")), "fixtures are still written");
+    }
+
+    [Fact]
+    public void FixtureScript_ExecutableOlderThanHead_WarnsAndPrintsNoLaunchCommand()
+    {
+        var (exitCode, output) = RunScript(_root, FakeAppExe(new DateTime(2000, 1, 1, 0, 0, 0, DateTimeKind.Utc)));
+
+        Assert.True(exitCode == 0, output);
+        Assert.Contains("is older than HEAD", output);
+        Assert.DoesNotContain("--qa-ssh-config", output);
     }
 
     [Fact]

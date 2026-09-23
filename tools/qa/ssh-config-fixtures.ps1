@@ -17,17 +17,32 @@
 
     Nothing outside -Root is written. No key file is ever created.
 
+    Launch commands point at the EXACT Debug executable produced by the solution build
+    (src\ServerMonitor.App\bin\x64\Debug\...\ServerMonitor.App.exe), never at `dotnet run`: an
+    older binary without the --qa-ssh-config flag would silently read the REAL ~/.ssh/config.
+    If that executable is missing or older than the HEAD commit, the script warns and prints no
+    launch command.
+
 .PARAMETER Root
     Output directory. Defaults to a new directory under %TEMP%. Must be missing or empty, and may
     not be the real user profile.
 
+.PARAMETER AppExe
+    The Debug executable to launch. Defaults to the newest
+    src\ServerMonitor.App\bin\x64\Debug\*\win-x64\ServerMonitor.App.exe of this repository.
+
 .EXAMPLE
+    ~/.dotnet/dotnet build ServerMonitor.slnx -c Debug
     pwsh -NoProfile -File tools/qa/ssh-config-fixtures.ps1
-    dotnet run -c Debug --project src/ServerMonitor.App/ServerMonitor.App.csproj -- --qa-ssh-config "<Root>\normal"
+    # then paste one of the printed lines, e.g.:
+    & "<repo>\src\ServerMonitor.App\bin\x64\Debug\net10.0-windows10.0.19041.0\win-x64\ServerMonitor.App.exe" --qa-ssh-config "<Root>\normal"
+    # the same, forcing the UI language (en-US | pt-PT | pt-BR; Debug only):
+    & "<repo>\...\ServerMonitor.App.exe" --qa-ssh-config "<Root>\normal" --qa-ui-language en-US
 #>
 [CmdletBinding()]
 param(
-    [string] $Root = (Join-Path ([System.IO.Path]::GetTempPath()) ('serveralyzer-ssh-qa-' + [guid]::NewGuid().ToString('N')))
+    [string] $Root = (Join-Path ([System.IO.Path]::GetTempPath()) ('serveralyzer-ssh-qa-' + [guid]::NewGuid().ToString('N'))),
+    [string] $AppExe
 )
 
 $ErrorActionPreference = 'Stop'
@@ -182,9 +197,58 @@ Host lab-b
     IdentityFile ~/.ssh/qa_missing_lab_b
 '@
 
-$project = 'src/ServerMonitor.App/ServerMonitor.App.csproj'
 Write-Output "SSH config QA fixtures written to: $Root"
+
+# Launch only the exact executable of the current solution build. A stale or different binary may
+# not know --qa-ssh-config and would read the REAL ~/.ssh/config instead of the fixture.
+$repo = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
+$buildHint = "Build first: dotnet build `"$(Join-Path $repo 'ServerMonitor.slnx')`" -c Debug"
+if (-not $AppExe) {
+    $AppExe = Get-ChildItem -Path (Join-Path $repo 'src\ServerMonitor.App\bin\x64\Debug') -Filter 'ServerMonitor.App.exe' -Recurse -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.Directory.Name -eq 'win-x64' } |
+        Sort-Object LastWriteTimeUtc -Descending |
+        Select-Object -First 1 -ExpandProperty FullName
+}
+
+if (-not $AppExe -or -not (Test-Path -LiteralPath $AppExe -PathType Leaf)) {
+    Write-Warning "No Debug ServerMonitor.App.exe from the solution build was found; no launch command printed. $buildHint"
+    return
+}
+
+$AppExe = [System.IO.Path]::GetFullPath($AppExe)
+$headSeconds = $null
+if (Get-Command git -ErrorAction SilentlyContinue) {
+    $headSeconds = & git -C $repo log -1 --format=%ct 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        $headSeconds = $null
+    }
+}
+
+if (-not $headSeconds) {
+    Write-Warning "Could not read the HEAD commit time; no launch command printed. $buildHint"
+    return
+}
+
+# The managed assembly carries the code; fall back to the executable when it is not beside it.
+$assembly = Join-Path (Split-Path -Parent $AppExe) 'ServerMonitor.App.dll'
+$builtAt = (Get-Item -LiteralPath $(if (Test-Path -LiteralPath $assembly) { $assembly } else { $AppExe })).LastWriteTimeUtc
+$headAt = [DateTimeOffset]::FromUnixTimeSeconds([long]$headSeconds).UtcDateTime
+if ($builtAt -lt $headAt) {
+    Write-Warning "$AppExe (built $($builtAt.ToString('u'))) is older than HEAD ($($headAt.ToString('u'))); no launch command printed. $buildHint"
+    return
+}
+
+Write-Output "Launch (Debug build of the solution, $($builtAt.ToString('u'))):"
 foreach ($scenario in 'empty', 'error', 'big', 'blocked', 'normal') {
     $directory = Join-Path $Root $scenario
-    Write-Output ("  {0,-8} dotnet run -c Debug --project {1} -- --qa-ssh-config `"{2}`"" -f $scenario, $project, $directory)
+    Write-Output ("  {0,-8} & `"{1}`" --qa-ssh-config `"{2}`"" -f $scenario, $AppExe, $directory)
+}
+
+# The in-app language choice does not persist on an unpackaged build, so force it per launch.
+Write-Output 'Language variants (--qa-ui-language, Debug only):'
+foreach ($language in 'en-US', 'pt-BR') {
+    foreach ($scenario in 'empty', 'error', 'big', 'blocked', 'normal') {
+        $directory = Join-Path $Root $scenario
+        Write-Output ("  {0,-8} & `"{1}`" --qa-ssh-config `"{2}`" --qa-ui-language {3}" -f $scenario, $AppExe, $directory, $language)
+    }
 }

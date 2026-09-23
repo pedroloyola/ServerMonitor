@@ -1,4 +1,5 @@
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using ServerMonitor.App.ViewModels;
 
@@ -49,6 +50,16 @@ public sealed partial class ServerFormControl : UserControl
         if (DataContext is ServerEditorViewModel viewModel)
         {
             viewModel.CloseSshConfigImport();
+        }
+    }
+
+    // A ListViewItem's UIA name otherwise falls back to the item's type name; give each container the
+    // localized "alias — importable / blocked: why" text (containers are recycled, so set it every time).
+    private void OnSshConfigHostContainerContentChanging(ListViewBase sender, ContainerContentChangingEventArgs args)
+    {
+        if (args.Item is SshConfigHostOptionViewModel option)
+        {
+            AutomationProperties.SetName(args.ItemContainer, option.AccessibleName);
         }
     }
 
