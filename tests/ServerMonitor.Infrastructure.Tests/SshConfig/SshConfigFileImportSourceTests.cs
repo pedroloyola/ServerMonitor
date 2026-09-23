@@ -95,10 +95,26 @@ public sealed class SshConfigFileImportSourceTests : IDisposable
     {
         var opener = new SpyOpener(_ => new NonSeekableStream(new byte[SshConfigFileImportSource.MaxBytes + 10]));
 
-        var result = await new SshConfigFileImportSource(_profile, opener.Open).LoadAsync();
+        var result = await new SshConfigFileImportSource(_profile, opener.Open, TrustInMemoryStream).LoadAsync();
 
         Assert.Equal(SshConfigImportErrorCode.TooLarge, result.ErrorCode);
     }
+
+    [Fact]
+    public async Task StreamWhoseIdentityCannotBeVerified_IsNeverTrusted()
+    {
+        // The default verifier needs a real file handle; anything else fails closed before a byte is read.
+        var opener = new SpyOpener(_ => new MemoryStream("Host a\n"u8.ToArray(), writable: false));
+
+        var result = await new SshConfigFileImportSource(_profile, opener.Open).LoadAsync();
+
+        Assert.Equal(SshConfigImportErrorCode.Unreadable, result.ErrorCode);
+        Assert.Empty(result.Hosts);
+    }
+
+    // For tests that exercise bounds or threading with in-memory streams, which have no file handle.
+    private static SshConfigOpenedFileIdentity TrustInMemoryStream(Stream stream, string expectedPath) =>
+        SshConfigOpenedFileIdentity.Verified;
 
     [Fact]
     public async Task InvalidUtf8_IsClassifiedInvalidEncoding()
@@ -193,7 +209,7 @@ public sealed class SshConfigFileImportSourceTests : IDisposable
             seenByOpen = SynchronizationContext.Current;
             return new MemoryStream("Host a\n"u8.ToArray(), writable: false);
         });
-        var source = new SshConfigFileImportSource(_profile, opener.Open);
+        var source = new SshConfigFileImportSource(_profile, opener.Open, TrustInMemoryStream);
 
         var previous = SynchronizationContext.Current;
         Task<SshConfigImportResult> load;

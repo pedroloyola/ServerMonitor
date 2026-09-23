@@ -9,10 +9,12 @@ namespace ServerMonitor.Core.SshConfig;
 /// before a concrete block wins). Everything outside the subset is classified, never interpreted.
 /// </summary>
 /// <remarks>
-/// Proxy safety is fail-closed: until the proxy decision (the first applicable
-/// <c>ProxyJump</c>/<c>ProxyCommand</c>) is made, anything that is or may be a proxy — a proxy
-/// line, valid or not, an unevaluated <c>Match</c> block that sets one, or an unfollowed
-/// <c>Include</c> — makes the host non-importable. Only an exact <c>none</c> decides "no proxy".
+/// It consumes the spliced sequence from <see cref="SshConfigIncludeExpander"/>, so followed
+/// <c>Include</c> files take part in first-wins exactly where they appear. Proxy safety is
+/// fail-closed: until the proxy decision (the first applicable <c>ProxyJump</c>/<c>ProxyCommand</c>)
+/// is made, anything that is or may be a proxy — a proxy line, valid or not, one under an
+/// unevaluated <c>Match</c>, or an <c>Include</c> that could not be verified — makes the host
+/// non-importable. Only an exact <c>none</c> decides "no proxy".
 /// </remarks>
 public static class SshConfigResolver
 {
@@ -49,22 +51,33 @@ public static class SshConfigResolver
         "UserKnownHostsFile"
     };
 
-    public static SshConfigImportResult Import(string text, string userProfile)
+    /// <summary>Text-only import: <c>Include</c> is not followed and stays "cannot verify".</summary>
+    public static SshConfigImportResult Import(string text, string userProfile) =>
+        Resolve(SshConfigIncludeExpander.FromText(text), userProfile);
+
+    /// <summary>Reads <c>~/.ssh/config</c> and follows its includes, read-only, inside <c>~/.ssh</c>.</summary>
+    public static SshConfigImportResult Import(
+        ISshConfigFileSystem fileSystem,
+        string userProfile,
+        CancellationToken cancellationToken = default) =>
+        Resolve(SshConfigIncludeExpander.Load(fileSystem, userProfile, cancellationToken), userProfile);
+
+    private static SshConfigImportResult Resolve(SshConfigExpansion expansion, string userProfile)
     {
-        var document = SshConfigParser.Parse(text);
-        if (document.HasFatalSyntaxError)
+        if (expansion.Failure is not null)
         {
-            return SshConfigImportResult.Failed(SshConfigImportErrorCode.InvalidSyntax);
+            return expansion.Failure;
         }
 
+        var document = expansion.Document!;
         var plan = new ResolutionPlan(document);
         var warnings = new List<SshConfigFileWarning>();
-        if (plan.HasInclude)
+        if (plan.HasUnverifiedInclude)
         {
             warnings.Add(SshConfigFileWarning.IncludeNotFollowed);
         }
 
-        if (plan.HasMatch)
+        if (document.HasMatch)
         {
             warnings.Add(SshConfigFileWarning.MatchNotEvaluated);
         }
@@ -79,21 +92,28 @@ public static class SshConfigResolver
         return new SshConfigImportResult
         {
             Status = SshConfigImportStatus.Loaded,
-            Hosts = aliases.Select(alias => Resolve(plan, alias, userProfile)).ToList(),
-            FileWarnings = warnings
+            Hosts = aliases.Select(alias => Resolve(plan, document.HasMatch, alias, userProfile)).ToList(),
+            FileWarnings = warnings,
+            Diagnostics = document.Diagnostics
         };
     }
 
-    /// <summary>Aliases from <c>Host</c> lines with no wildcard or negation, in file order.</summary>
-    public static IReadOnlyList<string> ConcreteAliases(SshConfigDocument document, int limit = int.MaxValue)
+    /// <summary>
+    /// Concrete aliases (no wildcard or negation) from <c>Host</c> lines, in spliced order, that can
+    /// apply to themselves: a <c>Host</c> inside a file included from a non-matching block never can.
+    /// </summary>
+    private static List<string> ConcreteAliases(SshConfigSplicedDocument document, int limit)
     {
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var offered = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var aliases = new List<string>();
-        foreach (var block in document.Blocks.Where(block => block.Kind == SshConfigBlockKind.Host))
+        foreach (var scope in document.HostScopes)
         {
-            foreach (var pattern in block.Patterns)
+            foreach (var pattern in scope.Patterns)
             {
-                if (IsConcrete(pattern) && seen.Add(pattern))
+                if (IsConcrete(pattern)
+                    && !offered.Contains(pattern)
+                    && Evaluate(scope, pattern) != Applicability.No
+                    && offered.Add(pattern))
                 {
                     aliases.Add(pattern);
                     if (aliases.Count >= limit)
@@ -107,10 +127,7 @@ public static class SshConfigResolver
         return aliases;
     }
 
-    public static SshConfigHostEntry Resolve(SshConfigDocument document, string alias, string userProfile) =>
-        Resolve(new ResolutionPlan(document), alias, userProfile);
-
-    private static SshConfigHostEntry Resolve(ResolutionPlan plan, string alias, string userProfile)
+    private static SshConfigHostEntry Resolve(ResolutionPlan plan, bool hasMatch, string alias, string userProfile)
     {
         var findings = new List<SshConfigFinding>();
         var findingKeys = new HashSet<(string, SshConfigFindingKind)>();
@@ -149,13 +166,19 @@ public static class SshConfigResolver
             }
         }
 
-        foreach (var block in plan.BlocksFor(alias))
+        foreach (var segment in plan.SegmentsFor(alias))
         {
-            if (block.Kind == SshConfigBlockKind.Match)
+            var applicability = Evaluate(segment.Scope, alias);
+            if (applicability == Applicability.No)
             {
-                // Match criteria are never evaluated. If the block could set a proxy (or pull one in
-                // through Include) before the proxy is decided, the host cannot be verified.
-                if (!proxyDecided && MatchMayConfigureProxy(block))
+                continue;
+            }
+
+            if (applicability == Applicability.Unknown)
+            {
+                // Under an unevaluated Match: nothing here is applied. If it could set a proxy
+                // before the proxy is decided, the host cannot be verified.
+                if (!proxyDecided && MayConfigureProxy(segment))
                 {
                     Block(SshConfigHostBlocker.ProxyMaySetByMatch);
                 }
@@ -163,13 +186,21 @@ public static class SshConfigResolver
                 continue;
             }
 
-            if (block.Kind == SshConfigBlockKind.Host && !BlockApplies(block.Patterns, alias))
+            foreach (var spliced in segment.Directives)
             {
-                continue;
-            }
+                if (spliced.IncludeIssue != SshConfigIncludeIssue.None)
+                {
+                    // An Include that could not be verified may hide anything, including a proxy.
+                    Add("Include", SshConfigFindingKind.Unsupported, IncludeReason(spliced.IncludeIssue));
+                    if (!proxyDecided)
+                    {
+                        Block(SshConfigHostBlocker.ProxyMaySetByInclude);
+                    }
 
-            foreach (var directive in block.Directives)
-            {
+                    continue;
+                }
+
+                var directive = spliced.Directive;
                 var keyword = CanonicalKeyword(directive.Keyword);
                 switch (keyword)
                 {
@@ -186,14 +217,6 @@ public static class SshConfigResolver
                         {
                             Block(keyword == "ProxyJump" ? SshConfigHostBlocker.ProxyJump : SshConfigHostBlocker.ProxyCommand);
                             Add(keyword, SshConfigFindingKind.Unsupported, SshConfigFindingReason.UnsupportedKeyword);
-                        }
-
-                        break;
-                    case "Include":
-                        Add(keyword, SshConfigFindingKind.Unsupported, SshConfigFindingReason.UnsupportedKeyword);
-                        if (!proxyDecided)
-                        {
-                            Block(SshConfigHostBlocker.ProxyMaySetByInclude);
                         }
 
                         break;
@@ -282,7 +305,7 @@ public static class SshConfigResolver
             }
         }
 
-        if (plan.HasMatch)
+        if (hasMatch)
         {
             Add("Match", SshConfigFindingKind.Unsupported, SshConfigFindingReason.MatchNotEvaluated);
         }
@@ -310,14 +333,54 @@ public static class SshConfigResolver
             && directive.Arguments.Count == 1
             && string.Equals(directive.Arguments[0], "none", StringComparison.Ordinal);
 
-    private static bool MatchMayConfigureProxy(SshConfigBlock block) =>
-        block.Directives.Any(directive => CanonicalKeyword(directive.Keyword) switch
+    private static bool MayConfigureProxy(SshConfigSegment segment) =>
+        segment.Directives.Any(spliced => spliced.IncludeIssue != SshConfigIncludeIssue.None
+            || CanonicalKeyword(spliced.Directive.Keyword) switch
+            {
+                "ProxyJump" => !IsProxyNone(spliced.Directive, "ProxyJump"),
+                "ProxyCommand" => !IsProxyNone(spliced.Directive, "ProxyCommand"),
+                _ => false
+            });
+
+    private static SshConfigFindingReason IncludeReason(SshConfigIncludeIssue issue) => issue switch
+    {
+        SshConfigIncludeIssue.OutsideSshDirectory => SshConfigFindingReason.IncludeOutsideSshDirectory,
+        SshConfigIncludeIssue.ReparsePoint => SshConfigFindingReason.IncludeReparsePoint,
+        SshConfigIncludeIssue.NotRegularFile => SshConfigFindingReason.IncludeNotRegularFile,
+        SshConfigIncludeIssue.UnsupportedPattern => SshConfigFindingReason.IncludeUnsupportedPattern,
+        SshConfigIncludeIssue.UnsupportedExpansion => SshConfigFindingReason.IncludeUnsupportedExpansion,
+        SshConfigIncludeIssue.MissingArgument => SshConfigFindingReason.IncludeMissingArgument,
+        SshConfigIncludeIssue.FinalPathMismatch => SshConfigFindingReason.IncludeFinalPathMismatch,
+        SshConfigIncludeIssue.HardLinked => SshConfigFindingReason.IncludeHardLinked,
+        _ => SshConfigFindingReason.IncludeNotFollowed
+    };
+
+    private enum Applicability
+    {
+        Yes,
+        No,
+        Unknown
+    }
+
+    /// <summary>
+    /// Whether a line in <paramref name="scope"/> applies to <paramref name="alias"/>: its own
+    /// header must apply, and so must the scope of every <c>Include</c> above it. A header in a file
+    /// included from a block that does not apply never applies (OpenSSH SSHCONF_NEVERMATCH); a
+    /// <c>Match</c> anywhere in the chain makes it unknown.
+    /// </summary>
+    private static Applicability Evaluate(SshConfigScope scope, string alias)
+    {
+        var own = scope.Kind switch
         {
-            "Include" => true,
-            "ProxyJump" => !IsProxyNone(directive, "ProxyJump"),
-            "ProxyCommand" => !IsProxyNone(directive, "ProxyCommand"),
-            _ => false
-        });
+            SshConfigBlockKind.Host => BlockApplies(scope.Patterns, alias) ? Applicability.Yes : Applicability.No,
+            SshConfigBlockKind.Match => Applicability.Unknown,
+            _ => Applicability.Yes
+        };
+        var inherited = scope.IncludeParent is null ? Applicability.Yes : Evaluate(scope.IncludeParent, alias);
+        return inherited == Applicability.No || own == Applicability.No ? Applicability.No
+            : inherited == Applicability.Unknown || own == Applicability.Unknown ? Applicability.Unknown
+            : Applicability.Yes;
+    }
 
     private static string? ResolveIdentityFile(
         List<string> values,
@@ -446,76 +509,69 @@ public static class SshConfigResolver
     };
 
     /// <summary>
-    /// Per-file index so resolving many aliases does not rescan every block for each one: Global
-    /// blocks, proxy-relevant Match blocks and wildcard/negated Host blocks are visited for every
-    /// alias; purely concrete Host blocks only for the aliases they name. File order is preserved.
+    /// Index so resolving many aliases does not rescan every segment for each one. A segment whose
+    /// own header is a purely concrete <c>Host</c> can only apply to the aliases it names; segments
+    /// without a header, under a wildcard/negated <c>Host</c>, or under a <c>Match</c> that may set
+    /// a proxy are visited for every alias; other <c>Match</c> segments never apply and are skipped.
+    /// Spliced order is preserved.
     /// </summary>
     private sealed class ResolutionPlan
     {
-        private readonly IReadOnlyList<SshConfigBlock> _blocks;
+        private readonly IReadOnlyList<SshConfigSegment> _segments;
         private readonly List<int> _alwaysVisit = [];
-        private readonly Dictionary<string, List<int>> _concreteBlocks = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, List<int>> _concreteSegments = new(StringComparer.OrdinalIgnoreCase);
 
-        public ResolutionPlan(SshConfigDocument document)
+        public ResolutionPlan(SshConfigSplicedDocument document)
         {
-            _blocks = document.Blocks;
-            for (var index = 0; index < _blocks.Count; index++)
+            _segments = document.Segments;
+            for (var index = 0; index < _segments.Count; index++)
             {
-                var block = _blocks[index];
-                HasInclude |= block.Directives.Any(directive => CanonicalKeyword(directive.Keyword) == "Include");
-                switch (block.Kind)
+                var segment = _segments[index];
+                HasUnverifiedInclude |= segment.Directives.Any(spliced => spliced.IncludeIssue != SshConfigIncludeIssue.None);
+                var scope = segment.Scope;
+                switch (scope.Kind)
                 {
-                    case SshConfigBlockKind.Global:
-                        _alwaysVisit.Add(index);
-                        break;
                     case SshConfigBlockKind.Match:
-                        HasMatch = true;
-                        if (MatchMayConfigureProxy(block))
+                        if (MayConfigureProxy(segment))
                         {
                             _alwaysVisit.Add(index);
+                        }
+
+                        break;
+                    case SshConfigBlockKind.Host when scope.Patterns.All(IsConcrete):
+                        foreach (var pattern in scope.Patterns.Distinct(StringComparer.OrdinalIgnoreCase))
+                        {
+                            if (!_concreteSegments.TryGetValue(pattern, out var list))
+                            {
+                                _concreteSegments[pattern] = list = [];
+                            }
+
+                            list.Add(index);
                         }
 
                         break;
                     default:
-                        if (block.Patterns.All(IsConcrete))
-                        {
-                            foreach (var pattern in block.Patterns.Distinct(StringComparer.OrdinalIgnoreCase))
-                            {
-                                if (!_concreteBlocks.TryGetValue(pattern, out var list))
-                                {
-                                    _concreteBlocks[pattern] = list = [];
-                                }
-
-                                list.Add(index);
-                            }
-                        }
-                        else
-                        {
-                            _alwaysVisit.Add(index);
-                        }
-
+                        _alwaysVisit.Add(index);
                         break;
                 }
             }
         }
 
-        public bool HasInclude { get; }
+        public bool HasUnverifiedInclude { get; }
 
-        public bool HasMatch { get; }
-
-        public IEnumerable<SshConfigBlock> BlocksFor(string alias)
+        public IEnumerable<SshConfigSegment> SegmentsFor(string alias)
         {
-            var own = _concreteBlocks.TryGetValue(alias, out var list) ? list : [];
+            var own = _concreteSegments.TryGetValue(alias, out var list) ? list : [];
             int a = 0, o = 0;
             while (a < _alwaysVisit.Count || o < own.Count)
             {
                 if (o >= own.Count || (a < _alwaysVisit.Count && _alwaysVisit[a] < own[o]))
                 {
-                    yield return _blocks[_alwaysVisit[a++]];
+                    yield return _segments[_alwaysVisit[a++]];
                 }
                 else
                 {
-                    yield return _blocks[own[o++]];
+                    yield return _segments[own[o++]];
                 }
             }
         }

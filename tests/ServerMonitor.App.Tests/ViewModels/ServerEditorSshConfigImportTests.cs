@@ -312,6 +312,7 @@ public sealed class ServerEditorSshConfigImportTests
     [InlineData(SshConfigImportErrorCode.TooLarge)]
     [InlineData(SshConfigImportErrorCode.Unreadable)]
     [InlineData(SshConfigImportErrorCode.InvalidEncoding)]
+    [InlineData(SshConfigImportErrorCode.ConfigIsLink)]
     public async Task Load_ClassifiedErrors_AreShownNotThrown(SshConfigImportErrorCode code)
     {
         var vm = Editor(result: SshConfigImportResult.Failed(code));
@@ -320,6 +321,115 @@ public sealed class ServerEditorSshConfigImportTests
 
         Assert.False(vm.HasSshConfigHosts);
         Assert.Equal($"SshConfigImportError{code}", vm.SshConfigStatusMessage);
+    }
+
+    [Fact]
+    public async Task Load_IncludeDiagnostics_AreListedWithTheArgumentAsWritten()
+    {
+        var vm = Editor(result: new SshConfigImportResult
+        {
+            Status = SshConfigImportStatus.Loaded,
+            Hosts = [Entry("Host a\n", "a")],
+            Diagnostics =
+            [
+                new SshConfigDiagnostic(SshConfigDiagnosticKind.IncludeMatchedNoFiles, "conf.d/*.conf"),
+                new SshConfigDiagnostic(
+                    SshConfigDiagnosticKind.IncludeNotVerified,
+                    "../x",
+                    SshConfigIncludeIssue.OutsideSshDirectory)
+            ]
+        });
+
+        await vm.LoadSshConfigHostsAsync();
+
+        Assert.Equal(
+            "Include 'conf.d/*.conf' matched no files." + Environment.NewLine
+                + "Include '../x' was not followed (SshConfigIncludeIssueOutsideSshDirectory).",
+            vm.SshConfigFileWarningMessage);
+    }
+
+    [Theory]
+    [InlineData(SshConfigImportErrorCode.IncludeCycle)]
+    [InlineData(SshConfigImportErrorCode.IncludeTooDeep)]
+    [InlineData(SshConfigImportErrorCode.TooManyFiles)]
+    public async Task Load_IncludeErrors_NameTheFile(SshConfigImportErrorCode code)
+    {
+        var vm = Editor(result: SshConfigImportResult.Failed(code) with { ErrorDetail = @"C:\Users\tester\.ssh\a" });
+
+        await vm.LoadSshConfigHostsAsync();
+
+        Assert.False(vm.HasSshConfigHosts);
+        Assert.Equal($@"SshConfigImportError{code} File: C:\Users\tester\.ssh\a", vm.SshConfigStatusMessage);
+    }
+
+    private sealed class BlockingSshConfigSource : ISshConfigImportSource
+    {
+        public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public CancellationToken SeenToken { get; private set; }
+
+        public async Task<SshConfigImportResult> LoadAsync(CancellationToken cancellationToken = default)
+        {
+            SeenToken = cancellationToken;
+            Started.SetResult();
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+            return SshConfigImportResult.Failed(SshConfigImportErrorCode.Unreadable);
+        }
+    }
+
+    [Fact]
+    public async Task Close_CancelsAnInFlightLoad_WithoutAnyVisibleError()
+    {
+        var source = new BlockingSshConfigSource();
+        var vm = new ServerEditorViewModel(
+            new ServerValidator(),
+            new ThrowingSshConnectionService(),
+            new ThrowingHostKeyTrustStore(),
+            new FakeConnectionStateStore(),
+            new NullPicker(),
+            new FakeLocalizationService(),
+            server: null,
+            prefill: null,
+            sshConfigImportSource: source);
+
+        var load = vm.LoadSshConfigHostsAsync();
+        await source.Started.Task;
+        Assert.True(vm.IsLoadingSshConfig);
+
+        vm.CloseSshConfigImport();
+        await load;
+
+        Assert.True(source.SeenToken.IsCancellationRequested);
+        Assert.False(vm.IsLoadingSshConfig);
+        Assert.False(vm.IsSshConfigImportOpen);
+        Assert.False(vm.HasSshConfigHosts);
+        Assert.False(vm.HasSshConfigStatus);
+        Assert.False(vm.HasSshConfigFileWarning);
+    }
+
+    [Fact]
+    public async Task Dispose_CancelsAnInFlightLoad()
+    {
+        var source = new BlockingSshConfigSource();
+        var vm = new ServerEditorViewModel(
+            new ServerValidator(),
+            new ThrowingSshConnectionService(),
+            new ThrowingHostKeyTrustStore(),
+            new FakeConnectionStateStore(),
+            new NullPicker(),
+            new FakeLocalizationService(),
+            server: null,
+            prefill: null,
+            sshConfigImportSource: source);
+
+        var load = vm.LoadSshConfigHostsAsync();
+        await source.Started.Task;
+        vm.Dispose();
+        await load;
+
+        Assert.True(source.SeenToken.IsCancellationRequested);
+        Assert.False(vm.IsLoadingSshConfig);
+        Assert.False(vm.HasSshConfigStatus);
     }
 
     [Fact]

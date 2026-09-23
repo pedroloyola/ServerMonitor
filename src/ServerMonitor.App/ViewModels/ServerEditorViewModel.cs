@@ -49,6 +49,7 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
     private string _sshConfigStatusMessage = string.Empty;
     private string _sshConfigFileWarningMessage = string.Empty;
     private IReadOnlyList<SshConfigHostOptionViewModel> _sshConfigHosts = [];
+    private CancellationTokenSource? _sshConfigLoadCancellation;
 
     public ServerEditorViewModel(
         IServerValidator validator,
@@ -315,20 +316,28 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
         SshConfigHosts = [];
         SshConfigStatusMessage = string.Empty;
         SshConfigFileWarningMessage = string.Empty;
+        var cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        _sshConfigLoadCancellation = cancellation;
         try
         {
             SshConfigImportResult result;
             try
             {
-                result = await _sshConfigImportSource!.LoadAsync(cancellationToken);
+                result = await _sshConfigImportSource!.LoadAsync(cancellation.Token);
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
             {
-                throw;
+                // Closed (or the editor went away) while loading: nothing to show, nothing to report.
+                return;
             }
             catch
             {
                 result = SshConfigImportResult.Failed(SshConfigImportErrorCode.Unreadable);
+            }
+
+            if (cancellation.IsCancellationRequested)
+            {
+                return;
             }
 
             switch (result.Status)
@@ -337,7 +346,10 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
                     SshConfigStatusMessage = _localizationService.GetString("SshConfigImportNotFound");
                     break;
                 case SshConfigImportStatus.Error:
-                    SshConfigStatusMessage = _localizationService.GetString($"SshConfigImportError{result.ErrorCode}");
+                    var error = _localizationService.GetString($"SshConfigImportError{result.ErrorCode}");
+                    SshConfigStatusMessage = result.ErrorDetail is null
+                        ? error
+                        : error + " " + Format("SshConfigImportErrorFileFormat", result.ErrorDetail);
                     break;
                 default:
                     SshConfigHosts = result.Hosts
@@ -348,18 +360,41 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
                         : string.Empty;
                     SshConfigFileWarningMessage = string.Join(
                         Environment.NewLine,
-                        result.FileWarnings.Select(warning => _localizationService.GetString($"SshConfigImportWarning{warning}")));
+                        result.FileWarnings
+                            .Select(warning => _localizationService.GetString($"SshConfigImportWarning{warning}"))
+                            .Concat(result.Diagnostics.Select(DescribeDiagnostic)));
                     break;
             }
         }
         finally
         {
             IsLoadingSshConfig = false;
+            if (ReferenceEquals(_sshConfigLoadCancellation, cancellation))
+            {
+                _sshConfigLoadCancellation = null;
+            }
+
+            cancellation.Dispose();
         }
     }
 
+    private string DescribeDiagnostic(SshConfigDiagnostic diagnostic) => diagnostic.Kind switch
+    {
+        SshConfigDiagnosticKind.IncludeMatchedNoFiles =>
+            Format("SshConfigImportDiagnosticIncludeMatchedNoFiles", diagnostic.Argument),
+        _ => Format(
+            "SshConfigImportDiagnosticIncludeNotVerified",
+            diagnostic.Argument,
+            _localizationService.GetString($"SshConfigIncludeIssue{diagnostic.Issue}"))
+    };
+
+    private string Format(string key, params object[] arguments) =>
+        string.Format(CultureInfo.CurrentCulture, _localizationService.GetString(key), arguments);
+
+    /// <summary>Closes the panel; a load still in progress is cancelled and its result discarded.</summary>
     public void CloseSshConfigImport()
     {
+        _sshConfigLoadCancellation?.Cancel();
         IsSshConfigImportOpen = false;
         SshConfigHosts = [];
         SshConfigStatusMessage = string.Empty;
@@ -600,6 +635,7 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
 
     public void Dispose()
     {
+        _sshConfigLoadCancellation?.Cancel();
         _testCancellation?.Cancel();
         _testCancellation?.Dispose();
         _secret?.Dispose();

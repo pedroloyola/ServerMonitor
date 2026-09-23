@@ -45,6 +45,9 @@ internal sealed class FakeLocalizationService : ILocalizationService
             ["HistoryChartSummaryFormat"] = "{0}. {1}. Current {2}. Maximum {3}.",
             ["HistoryChartSummaryOfflineSuffix"] = " Contains an offline period shown as a gap.",
             ["HistoryValueUnknownAccessible"] = "Unknown",
+            ["SshConfigImportDiagnosticIncludeMatchedNoFiles"] = "Include '{0}' matched no files.",
+            ["SshConfigImportDiagnosticIncludeNotVerified"] = "Include '{0}' was not followed ({1}).",
+            ["SshConfigImportErrorFileFormat"] = "File: {0}",
         };
 
     public string? CurrentLanguageOverride => null;

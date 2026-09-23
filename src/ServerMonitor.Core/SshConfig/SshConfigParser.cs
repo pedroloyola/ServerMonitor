@@ -16,17 +16,13 @@ public sealed record SshConfigDirective(
 
 public enum SshConfigBlockKind
 {
-    /// <summary>Lines before the first <c>Host</c>/<c>Match</c>: they apply to every host.</summary>
+    /// <summary>No header yet: the root file's leading lines, or an included file's lines before its first header.</summary>
     Global,
     Host,
     Match
 }
 
-public sealed record SshConfigBlock(
-    SshConfigBlockKind Kind,
-    IReadOnlyList<string> Patterns,
-    IReadOnlyList<SshConfigDirective> Directives);
-
+/// <param name="Directives">Every non-comment line in file order, including <c>Host</c>/<c>Match</c> headers.</param>
 /// <param name="HasFatalSyntaxError">
 /// The file cannot be read faithfully, so nothing in it is trusted: a <c>Host</c> or <c>Match</c>
 /// line without valid arguments (ssh rejects the whole file), or a keyword containing a quote.
@@ -34,24 +30,20 @@ public sealed record SshConfigBlock(
 /// <c>Proxy"Jump" bastion</c> are both a real ProxyJump); rather than emulate that, any keyword
 /// with a quote in any position fails the file closed.
 /// </param>
-public sealed record SshConfigDocument(IReadOnlyList<SshConfigBlock> Blocks, bool HasFatalSyntaxError = false);
+public sealed record SshConfigLines(IReadOnlyList<SshConfigDirective> Directives, bool HasFatalSyntaxError);
 
 /// <summary>
 /// Pure, I/O-free tokenizer for ssh_config(5) text. It only splits lines into keywords and
-/// arguments and groups them into <c>Host</c>/<c>Match</c> blocks; it interprets nothing.
+/// arguments; block structure and <c>Include</c> splicing are done by <see cref="SshConfigIncludeExpander"/>.
 /// </summary>
 public static class SshConfigParser
 {
-    public static SshConfigDocument Parse(string text)
+    public static SshConfigLines ParseLines(string text)
     {
         ArgumentNullException.ThrowIfNull(text);
 
-        var blocks = new List<SshConfigBlock>();
-        var currentKind = SshConfigBlockKind.Global;
-        IReadOnlyList<string> currentPatterns = [];
-        var currentDirectives = new List<SshConfigDirective>();
+        var directives = new List<SshConfigDirective>();
         var hasFatalSyntaxError = false;
-
         var lineNumber = 0;
         foreach (var rawLine in text.Split('\n'))
         {
@@ -67,24 +59,23 @@ public static class SshConfigParser
                 hasFatalSyntaxError = true;
             }
 
-            var isHost = string.Equals(directive.Keyword, "Host", StringComparison.OrdinalIgnoreCase);
-            var isMatch = string.Equals(directive.Keyword, "Match", StringComparison.OrdinalIgnoreCase);
-            if (isHost || isMatch)
+            if (HeaderKind(directive) is not null && !directive.IsValid)
             {
-                hasFatalSyntaxError |= !directive.IsValid;
-                blocks.Add(new SshConfigBlock(currentKind, currentPatterns, currentDirectives));
-                currentKind = isHost ? SshConfigBlockKind.Host : SshConfigBlockKind.Match;
-                currentPatterns = directive.IsValid ? directive.Arguments : [];
-                currentDirectives = [];
-                continue;
+                hasFatalSyntaxError = true;
             }
 
-            currentDirectives.Add(directive);
+            directives.Add(directive);
         }
 
-        blocks.Add(new SshConfigBlock(currentKind, currentPatterns, currentDirectives));
-        return new SshConfigDocument(blocks, hasFatalSyntaxError);
+        return new SshConfigLines(directives, hasFatalSyntaxError);
     }
+
+    /// <summary><see cref="SshConfigBlockKind.Host"/> or <see cref="SshConfigBlockKind.Match"/> for a header line, else null.</summary>
+    public static SshConfigBlockKind? HeaderKind(SshConfigDirective directive) =>
+        string.Equals(directive.Keyword, "Host", StringComparison.OrdinalIgnoreCase) ? SshConfigBlockKind.Host
+        : string.Equals(directive.Keyword, "Match", StringComparison.OrdinalIgnoreCase) ? SshConfigBlockKind.Match
+        : null;
+
 
     private static SshConfigDirective? ParseLine(string line, int lineNumber)
     {

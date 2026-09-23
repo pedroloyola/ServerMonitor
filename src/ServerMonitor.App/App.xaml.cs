@@ -482,6 +482,13 @@ public partial class App : Application
         services.AddSingleton<IServerProfileService, ServerProfileService>();
         services.AddSingleton<IHostKeyTrustStore, JsonHostKeyTrustStore>();
         services.AddSingleton<ISshConfigImportSource, SshConfigFileImportSource>();
+#if DEBUG
+        // Debug-only QA: --qa-ssh-config <dir> roots the import at a fixture profile instead of ~/.ssh.
+        if (Qa.QaSshConfigComposition.RequestedProfile() is { } qaSshConfigProfile)
+        {
+            Qa.QaSshConfigComposition.Apply(services, qaSshConfigProfile);
+        }
+#endif
         services.AddSingleton<SshConnectionService>();
         services.AddSingleton<ISshConnectionService>(sp => sp.GetRequiredService<SshConnectionService>());
         services.AddSingleton<ILinuxMetricsRemoteSource>(sp => sp.GetRequiredService<SshConnectionService>());

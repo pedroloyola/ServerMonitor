@@ -26,7 +26,18 @@ public enum SshConfigFindingReason
     MatchNotEvaluated,
     MultipleValues,
     InvalidValue,
-    NotRelevant
+    NotRelevant,
+
+    // An Include that could not be verified (see SshConfigIncludeIssue).
+    IncludeNotFollowed,
+    IncludeOutsideSshDirectory,
+    IncludeReparsePoint,
+    IncludeNotRegularFile,
+    IncludeUnsupportedPattern,
+    IncludeUnsupportedExpansion,
+    IncludeMissingArgument,
+    IncludeFinalPathMismatch,
+    IncludeHardLinked
 }
 
 public sealed record SshConfigFinding(
@@ -84,13 +95,13 @@ public enum SshConfigHostBlocker
     /// <summary>An unevaluated <c>Match</c> block may set a proxy before one is decided.</summary>
     ProxyMaySetByMatch,
 
-    /// <summary>An unfollowed <c>Include</c> may set a proxy before one is decided.</summary>
+    /// <summary>An <c>Include</c> that could not be verified may set a proxy before one is decided.</summary>
     ProxyMaySetByInclude
 }
 
 public enum SshConfigFileWarning
 {
-    /// <summary><c>Include</c> is not followed, so values may be incomplete.</summary>
+    /// <summary>At least one <c>Include</c> could not be verified and was not followed, so values may be incomplete.</summary>
     IncludeNotFollowed,
 
     /// <summary><c>Match</c> blocks are not evaluated, so values after one may be inexact.</summary>
@@ -118,8 +129,41 @@ public enum SshConfigImportErrorCode
     InvalidEncoding,
 
     /// <summary>A malformed <c>Host</c>/<c>Match</c> line or a quoted keyword: the file is not trusted.</summary>
-    InvalidSyntax
+    InvalidSyntax,
+
+    /// <summary>
+    /// Over an Include budget: 64 files, 256 matches per argument, 256 Include arguments, 64 enumerated
+    /// directories, 4096 entries in one directory or 16384 listed entries in total.
+    /// </summary>
+    TooManyFiles,
+
+    /// <summary>A file includes itself, directly or through other files.</summary>
+    IncludeCycle,
+
+    /// <summary>Includes nested deeper than OpenSSH allows (16).</summary>
+    IncludeTooDeep,
+
+    /// <summary>
+    /// <c>~/.ssh</c> or <c>~/.ssh/config</c> is a symlink, junction or other reparse point (never opened), or the
+    /// opened config is not provably that plain file (its final path differs, or it is hard-linked).
+    /// </summary>
+    ConfigIsLink
 }
+
+public enum SshConfigDiagnosticKind
+{
+    /// <summary>A missing file or a glob with no matches: OpenSSH silently contributes nothing.</summary>
+    IncludeMatchedNoFiles,
+
+    /// <summary>An Include (or one of its matches) could not be verified and was not followed.</summary>
+    IncludeNotVerified
+}
+
+/// <summary>An informational note about <c>Include</c>, with the argument as written.</summary>
+public sealed record SshConfigDiagnostic(
+    SshConfigDiagnosticKind Kind,
+    string Argument,
+    SshConfigIncludeIssue Issue = SshConfigIncludeIssue.None);
 
 public sealed record SshConfigImportResult
 {
@@ -130,6 +174,11 @@ public sealed record SshConfigImportResult
     public IReadOnlyList<SshConfigHostEntry> Hosts { get; init; } = [];
 
     public IReadOnlyList<SshConfigFileWarning> FileWarnings { get; init; } = [];
+
+    public IReadOnlyList<SshConfigDiagnostic> Diagnostics { get; init; } = [];
+
+    /// <summary>The file an error is about, when it is not <c>~/.ssh/config</c> itself.</summary>
+    public string? ErrorDetail { get; init; }
 
     public static SshConfigImportResult NotFound { get; } = new() { Status = SshConfigImportStatus.NotFound };
 
