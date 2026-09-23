@@ -51,6 +51,18 @@ public static class FeatureComposition
     /// deliberately NOT caught: it propagates and fails the build of the host. Only the entitlement
     /// question is allowed to fail softly, and only towards "absent".
     /// </para>
+    /// <para>
+    /// <b>R8, enforced for entitlement-requiring modules.</b> Such a module may only ADD. Its
+    /// <see cref="IFeatureModule.Register"/> is checked against a snapshot taken just before the call, and
+    /// an <see cref="InvalidOperationException"/> naming the feature and the service type is thrown when it
+    /// removed, replaced or reordered a descriptor that was already present; when it added a descriptor for
+    /// a service type that was already registered (DI resolves the last one, so that would shadow the
+    /// existing implementation); or when it registered anything assignable to
+    /// <see cref="IEntitlementProvider"/>, which must never be reachable from the container. The rule is
+    /// strict on purpose: a legitimate need for multi-registration would be an explicit, reviewed allowlist,
+    /// not a relaxation here. Unconditional modules are not checked, so their behaviour and cost are
+    /// unchanged.
+    /// </para>
     /// </summary>
     public static FeatureCompositionResult Compose(
         IServiceCollection services,
@@ -91,11 +103,79 @@ public static class FeatureComposition
                 continue;
             }
 
-            module.Register(services);
+            if (descriptor.RequiresEntitlement)
+            {
+                RegisterAdditively(module, descriptor.Id, services);
+            }
+            else
+            {
+                module.Register(services);
+            }
+
             composed.Add(descriptor);
         }
 
         return new FeatureCompositionResult(new FeatureCatalog(composed), skipped);
+    }
+
+    /// <summary>
+    /// Runs <paramref name="module"/>'s registration and proves it only appended (R8). A violation is a
+    /// defect in our own module, so it is loud, exactly like an exception thrown by Register itself.
+    /// </summary>
+    private static void RegisterAdditively(IFeatureModule module, FeatureId id, IServiceCollection services)
+    {
+        var before = new ServiceDescriptor[services.Count];
+        services.CopyTo(before, 0);
+        var existingTypes = new HashSet<Type>(before.Select(descriptor => descriptor.ServiceType));
+
+        module.Register(services);
+
+        // (a) Everything that was there is still there, by reference, in the same place.
+        for (var i = 0; i < before.Length; i++)
+        {
+            if (i >= services.Count || !ReferenceEquals(services[i], before[i]))
+            {
+                throw new InvalidOperationException(
+                    $"Feature '{id}' removed, replaced or reordered the existing registration of " +
+                    $"'{before[i].ServiceType.FullName}'. An entitlement-requiring module may only add.");
+            }
+        }
+
+        for (var i = before.Length; i < services.Count; i++)
+        {
+            var added = services[i];
+
+            // (b) No new descriptor for a type that is already registered: last-one-wins would shadow it.
+            if (existingTypes.Contains(added.ServiceType))
+            {
+                throw new InvalidOperationException(
+                    $"Feature '{id}' registered '{added.ServiceType.FullName}', which is already registered. " +
+                    "An entitlement-requiring module may not shadow an existing service.");
+            }
+
+            // (c) The provider is consulted once, here, and is never reachable from the container.
+            if (ExposesEntitlementProvider(added))
+            {
+                throw new InvalidOperationException(
+                    $"Feature '{id}' registered an entitlement provider as '{added.ServiceType.FullName}'. " +
+                    "The entitlement provider must never be registered in the container.");
+            }
+        }
+    }
+
+    private static bool ExposesEntitlementProvider(ServiceDescriptor descriptor)
+    {
+        // Keyed descriptors throw from the non-keyed accessors, so read the matching pair.
+        var implementationType = descriptor.IsKeyedService
+            ? descriptor.KeyedImplementationType
+            : descriptor.ImplementationType;
+        var implementationInstance = descriptor.IsKeyedService
+            ? descriptor.KeyedImplementationInstance
+            : descriptor.ImplementationInstance;
+
+        return typeof(IEntitlementProvider).IsAssignableFrom(descriptor.ServiceType)
+            || (implementationType is not null && typeof(IEntitlementProvider).IsAssignableFrom(implementationType))
+            || implementationInstance is IEntitlementProvider;
     }
 
     private static bool TryEntitle(IEntitlementProvider entitlements, FeatureId id, out Exception? error)
