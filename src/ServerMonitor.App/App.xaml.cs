@@ -533,44 +533,22 @@ public partial class App : Application
 #endif
         if (!qaMode)
         {
-            // M14.1 feature composition (ADR-020). The four capabilities that were already isolated behind
-            // inert defaults are composed here as explicit modules. This is a REGISTRATION-SHAPE change and
-            // nothing else: each module holds exactly the AddSingleton calls that used to be written inline
-            // in this branch, so the set of service descriptors this branch produces is unchanged.
-            //
-            // The module list is a LITERAL. Nothing is discovered - no assembly scan, no directory probe, no
-            // type resolution by name. That is the security boundary recorded as M14-MOD-1: a dynamically
-            // loaded assembly would hold full in-process authority over SSH, the Credential Manager and the
-            // host-key trust store, and in the unpackaged build the application directory is not protected.
-            //
-            // Every module here declares RequiresEntitlement = false, so FeatureComposition registers them
-            // WITHOUT consulting the entitlement provider. That is the binding condition on the human
-            // classification M14-ENT-1: entitlement may gate the availability of commercial functionality and
-            // nothing else. Gating these would make it authority over the user's access to their own local
-            // history, workloads and widget snapshot, which the classification forbids outright.
-            var modules = new List<IFeatureModule>
-            {
-                new HistoryFeatureModule(),
-                new WorkloadsFeatureModule(),
-                new WidgetSnapshotFeatureModule(),
-                new DiscoveryFeatureModule()
-            };
-
             // The empty public extension point. Nothing in this repository implements it, so the C# compiler
             // removes this call outright - the Community binary does not even contain the call site. The
             // CLASSIC partial form (no accessibility modifier, void return, no out parameter) is what keeps
             // the implementation optional; declared any other way the implementation becomes MANDATORY and a
             // public clone would stop compiling.
-            AddCommercialModules(modules);
+            //
+            // The hook receives a FRESH list that holds only what it adds. It never sees the Community
+            // modules, so it cannot remove, replace or reorder them; ComposeFeatures owns that list.
+            var commercialModules = new List<IFeatureModule>();
+            IEntitlementProvider? commercialEntitlements = null;
+            AddCommercialComposition(commercialModules, ref commercialEntitlements);
 
-            // composition.Skipped is provably empty in this repository: it can only receive a module that
-            // declares RequiresEntitlement, and none does. A build that supplies such modules owns reporting
-            // what it skipped - the result carries the reason rather than swallowing it.
-            var composition = FeatureComposition.Compose(
-                services,
-                modules,
-                CommunityEntitlementProvider.Instance);
-            services.AddSingleton<IFeatureCatalog>(composition.Catalog);
+            // The result's Skipped list is provably empty in this repository: it can only receive a module
+            // that declares RequiresEntitlement, and none does. A build that supplies such modules owns
+            // reporting what it skipped - the result carries the reason rather than swallowing it.
+            _ = ComposeFeatures(services, commercialModules, commercialEntitlements);
 
             // HAZARD, deliberate: the composite below resolves one recorder from EACH of three modules, so
             // those three are all-or-nothing by construction. It is safe today because all four modules are
@@ -672,14 +650,94 @@ public partial class App : Application
     }
 
     /// <summary>
+    /// Composes the Community capabilities, then any supplied commercial modules, and registers the
+    /// resulting catalog. The composition root calls this exactly once.
+    /// <para>
+    /// M14.1 feature composition (ADR-020). The four capabilities that were already isolated behind inert
+    /// defaults are composed as explicit modules. Each module holds exactly the AddSingleton calls that used
+    /// to be written inline in the root, so the set of service descriptors is unchanged.
+    /// </para>
+    /// <para>
+    /// The Community list is a LITERAL built here, and it is composed FIRST. Nothing is discovered - no
+    /// assembly scan, no directory probe, no type resolution by name. That is the security boundary recorded
+    /// as M14-MOD-1: a dynamically loaded assembly would hold full in-process authority over SSH, the
+    /// Credential Manager and the host-key trust store, and in the unpackaged build the application
+    /// directory is not protected. <paramref name="commercialModules"/> is appended after it and can neither
+    /// remove nor reorder a Community module in this list. It cannot shadow a Community capability either:
+    /// reusing a Community feature id throws in <see cref="FeatureComposition.Compose"/>, and so does an
+    /// entitlement-requiring module that removes, replaces or reorders an existing registration, registers a
+    /// service type that is already registered, or registers an entitlement provider (R8).
+    /// </para>
+    /// <para>
+    /// Every module in <paramref name="commercialModules"/> must declare RequiresEntitlement. One declared
+    /// unconditional would bypass both the entitlement question and the R8 check, so it is rejected with an
+    /// <see cref="InvalidOperationException"/> naming its feature id. That validation runs before anything is
+    /// composed, so a rejected input registers nothing.
+    /// </para>
+    /// <para>
+    /// Every Community module declares RequiresEntitlement = false, so FeatureComposition registers them
+    /// WITHOUT consulting any provider - including <paramref name="commercialEntitlements"/>. That is the
+    /// binding condition on the human classification M14-ENT-1: entitlement may gate the availability of
+    /// commercial functionality and nothing else. When no provider is supplied the Community provider is
+    /// used, which grants nothing, so a conditional module is skipped rather than composed.
+    /// </para>
+    /// <para>
+    /// The provider is handed to the composition and then dropped. It is deliberately NOT registered in the
+    /// container, so nothing downstream can consult it.
+    /// </para>
+    /// </summary>
+    internal static FeatureCompositionResult ComposeFeatures(
+        IServiceCollection services,
+        IReadOnlyList<IFeatureModule> commercialModules,
+        IEntitlementProvider? commercialEntitlements)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(commercialModules);
+
+        // Validated before anything is composed, so a rejected input registers nothing.
+        foreach (var module in commercialModules)
+        {
+            ArgumentNullException.ThrowIfNull(module);
+            if (!module.Descriptor.RequiresEntitlement)
+            {
+                throw new InvalidOperationException(
+                    $"Feature '{module.Descriptor.Id}' is supplied as a commercial module but does not require " +
+                    "entitlement. Commercial modules must declare RequiresEntitlement.");
+            }
+        }
+
+        var modules = new List<IFeatureModule>
+        {
+            new HistoryFeatureModule(),
+            new WorkloadsFeatureModule(),
+            new WidgetSnapshotFeatureModule(),
+            new DiscoveryFeatureModule()
+        };
+        modules.AddRange(commercialModules);
+
+        var composition = FeatureComposition.Compose(
+            services,
+            modules,
+            commercialEntitlements ?? CommunityEntitlementProvider.Instance);
+        services.AddSingleton<IFeatureCatalog>(composition.Catalog);
+        return composition;
+    }
+
+    /// <summary>
     /// The one public extension point for out-of-tree feature modules, and it is deliberately empty.
     /// <para>
     /// Nothing in this repository implements it. Because this is the CLASSIC partial form - no accessibility
     /// modifier, <c>void</c> return, no <c>out</c> parameter - the implementation is OPTIONAL, and with none
     /// present the C# compiler removes both the body and the call site entirely. Declared any other way (for
-    /// instance <c>public static partial void</c>) an implementation becomes MANDATORY and a public clone of
-    /// this repository would stop compiling, which is exactly the failure the dependency rules exist to
-    /// prevent.
+    /// instance <c>public static partial void</c>, or with an <c>out</c> parameter) an implementation becomes
+    /// MANDATORY and a public clone of this repository would stop compiling, which is exactly the failure the
+    /// dependency rules exist to prevent. That is why the provider travels by <c>ref</c>, initialised to
+    /// <c>null</c> by the caller, rather than by <c>out</c> or as a return value.
+    /// </para>
+    /// <para>
+    /// <paramref name="modules"/> starts empty and holds only what the implementation adds; the Community
+    /// modules are never passed here. <paramref name="entitlements"/> left <c>null</c> means the Community
+    /// provider, which grants nothing.
     /// </para>
     /// <para>
     /// This declaration names no type, assembly or path outside this repository. It is a hook, not a
@@ -687,5 +745,5 @@ public partial class App : Application
     /// direction stays one-way.
     /// </para>
     /// </summary>
-    static partial void AddCommercialModules(IList<IFeatureModule> modules);
+    static partial void AddCommercialComposition(IList<IFeatureModule> modules, ref IEntitlementProvider? entitlements);
 }

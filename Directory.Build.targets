@@ -10,8 +10,8 @@
     condition - that is a hard requirement, not a convenience.
 
     What it is for: a separate build may place its own targets file at that path to add project
-    references of its own and to supply the single optional `AddCommercialModules` partial declared in
-    App.xaml.cs. The extension point is one-way by construction. This file names no assembly, no type
+    references of its own and to supply the single optional `AddCommercialComposition` partial declared
+    in App.xaml.cs. The extension point is one-way by construction. This file names no assembly, no type
     and no repository outside this tree; it declares a hook, not a reference, so nothing here can create
     a dependency from this repository onto anything else.
 

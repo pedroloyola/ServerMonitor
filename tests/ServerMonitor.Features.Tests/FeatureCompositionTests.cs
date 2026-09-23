@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using ServerMonitor.Features;
 
 namespace ServerMonitor.Features.Tests;
@@ -211,6 +212,152 @@ public sealed class FeatureCompositionTests
         public FeatureDescriptor Descriptor => default;
 
         public void Register(IServiceCollection services) => services.AddSingleton<IProbe, Probe>();
+    }
+
+    // ---- R8: an entitlement-requiring module may only add ------------------------------------------
+
+    private interface IOther;
+
+    private sealed class Other : IOther;
+
+    private sealed class FakeProvider : IEntitlementProvider
+    {
+        public bool IsEntitled(FeatureId id) => true;
+    }
+
+    private sealed class DelegateModule(FeatureDescriptor descriptor, Action<IServiceCollection> register)
+        : IFeatureModule
+    {
+        public FeatureDescriptor Descriptor { get; } = descriptor;
+
+        public void Register(IServiceCollection services) => register(services);
+    }
+
+    private static DelegateModule ConditionalDoing(Action<IServiceCollection> register) =>
+        new(new FeatureDescriptor(new FeatureId("some.commercial.capability"), RequiresEntitlement: true),
+            register);
+
+    /// <summary>A collection that already holds one registration of <see cref="IProbe"/>.</summary>
+    private static ServiceCollection WithExistingProbe()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<IProbe, Probe>();
+        return services;
+    }
+
+    public static TheoryData<string> RemovalsAndReplacements => ["replace", "remove-all", "remove-at", "insert"];
+
+    [Theory]
+    [MemberData(nameof(RemovalsAndReplacements))]
+    public void ConditionalModule_ThatRemovesOrReplacesAnExistingRegistration_IsRejected(string mutation)
+    {
+        var services = WithExistingProbe();
+        var module = ConditionalDoing(collection =>
+        {
+            switch (mutation)
+            {
+                case "replace":
+                    collection.Replace(ServiceDescriptor.Singleton<IProbe, Probe>());
+                    break;
+                case "remove-all":
+                    collection.RemoveAll<IProbe>();
+                    break;
+                case "remove-at":
+                    collection.RemoveAt(0);
+                    collection.AddSingleton<IOther, Other>();
+                    break;
+                case "insert":
+                    collection.Insert(0, ServiceDescriptor.Singleton<IOther, Other>());
+                    break;
+            }
+        });
+
+        var error = Assert.Throws<InvalidOperationException>(() =>
+            FeatureComposition.Compose(services, [module], new GrantAll()));
+
+        Assert.Contains("some.commercial.capability", error.Message, StringComparison.Ordinal);
+        Assert.Contains(typeof(IProbe).FullName!, error.Message, StringComparison.Ordinal);
+        Assert.Contains("removed, replaced or reordered", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ConditionalModule_ThatAddsAnAlreadyRegisteredServiceType_IsRejected()
+    {
+        var services = WithExistingProbe();
+        var original = services[0];
+        var module = ConditionalDoing(collection => collection.AddSingleton<IProbe, Probe>());
+
+        var error = Assert.Throws<InvalidOperationException>(() =>
+            FeatureComposition.Compose(services, [module], new GrantAll()));
+
+        Assert.Contains("some.commercial.capability", error.Message, StringComparison.Ordinal);
+        Assert.Contains(typeof(IProbe).FullName!, error.Message, StringComparison.Ordinal);
+        Assert.Contains("may not shadow", error.Message, StringComparison.Ordinal);
+        Assert.Same(original, services[0]);
+    }
+
+    public static TheoryData<string> ProviderRegistrations => ["service-type", "implementation-type", "instance", "keyed"];
+
+    [Theory]
+    [MemberData(nameof(ProviderRegistrations))]
+    public void ConditionalModule_ThatRegistersAnEntitlementProvider_IsRejected(string shape)
+    {
+        var services = new ServiceCollection();
+        var module = ConditionalDoing(collection =>
+        {
+            switch (shape)
+            {
+                case "service-type":
+                    collection.AddSingleton<IEntitlementProvider>(_ => new FakeProvider());
+                    break;
+                case "implementation-type":
+                    // Hidden behind an unrelated service type: the implementation still gives it away.
+                    collection.Add(ServiceDescriptor.Singleton(typeof(object), typeof(FakeProvider)));
+                    break;
+                case "instance":
+                    collection.AddSingleton<object>(new FakeProvider());
+                    break;
+                case "keyed":
+                    collection.AddKeyedSingleton<object>("key", new FakeProvider());
+                    break;
+            }
+        });
+
+        var error = Assert.Throws<InvalidOperationException>(() =>
+            FeatureComposition.Compose(services, [module], new GrantAll()));
+
+        Assert.Contains("some.commercial.capability", error.Message, StringComparison.Ordinal);
+        Assert.Contains("entitlement provider", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ConditionalModule_ThatOnlyAddsNewServiceTypes_IsComposed()
+    {
+        var services = WithExistingProbe();
+        var original = services[0];
+        var module = ConditionalDoing(collection => collection.AddSingleton<IOther, Other>());
+
+        var result = FeatureComposition.Compose(services, [module], new GrantAll());
+
+        Assert.True(result.Catalog.IsComposed(module.Descriptor.Id));
+        Assert.Equal(2, services.Count);
+        Assert.Same(original, services[0]);
+        Assert.Equal(typeof(IOther), services[1].ServiceType);
+    }
+
+    [Fact]
+    public void UnconditionalModule_ThatReRegistersAnExistingServiceType_IsStillAllowed()
+    {
+        // Community behaviour is unchanged by R8: the Community modules deliberately override inert
+        // defaults registered earlier in the root, and that must keep working.
+        var services = WithExistingProbe();
+        var module = Unconditional("history.local");
+
+        var result = FeatureComposition.Compose(services, [module], new DenyAll());
+
+        Assert.True(module.Registered);
+        Assert.True(result.Catalog.IsComposed(module.Descriptor.Id));
+        Assert.Equal(2, services.Count(descriptor => descriptor.ServiceType == typeof(IProbe)));
     }
 
     // ---- catalog -----------------------------------------------------------------------------------

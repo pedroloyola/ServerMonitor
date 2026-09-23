@@ -20,6 +20,12 @@ public interface IFeatureModule
     /// <summary>
     /// Adds this capability's services. Called at most once, only from the composition root, and only
     /// after the module has been cleared for composition.
+    /// <para>
+    /// A module that declares <see cref="FeatureDescriptor.RequiresEntitlement"/> may only ADD (R8): it must
+    /// not remove, replace or reorder an existing registration, must not register a service type that is
+    /// already registered, and must not register an <see cref="IEntitlementProvider"/>.
+    /// <see cref="FeatureComposition.Compose"/> enforces this and throws on a violation.
+    /// </para>
     /// </summary>
     void Register(IServiceCollection services);
 }
