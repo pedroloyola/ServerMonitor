@@ -312,10 +312,18 @@ public sealed class SshConnectionServiceRoutedTests
         f.Tunnels.EnqueueTarget(new Session(TargetKey, SshConnectionErrorCode.None, waitUntilCancelled: true));
         using var cancellation = new CancellationTokenSource();
         var operation = f.Service.TestConnectionAsync(f.Request(), cancellation.Token);
-        while (f.Tunnels.Created.Count == 0 || f.Tunnels.Created[0].TargetSessions.Count == 0)
+
+        // Bounded: if the pipeline never reaches the target (a regression), fall through and fail the asserts
+        // instead of hanging the run.
+        var deadline = System.Diagnostics.Stopwatch.StartNew();
+        while ((f.Tunnels.Created.Count == 0 || f.Tunnels.Created[0].TargetSessions.Count == 0)
+               && !operation.IsCompleted
+               && deadline.Elapsed < TimeSpan.FromSeconds(10))
         {
             await Task.Delay(5);
         }
+
+        Assert.Single(Assert.Single(f.Tunnels.Created).TargetSessions);
 
         await cancellation.CancelAsync();
         var result = await operation;
