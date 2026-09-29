@@ -39,6 +39,12 @@ internal sealed class SshNetJumpClient(
 {
     private readonly SshClient _client = new(connectionInfo);
     private int _disposed;
+    private int _errorSubscribed;
+
+    public event Action? Faulted;
+
+    // Session-level errors only (socket loss, disconnect received); channel errors surface on the forward.
+    private void OnErrorOccurred(object? sender, ExceptionEventArgs args) => Faulted?.Invoke();
 
     public bool IsConnected
     {
@@ -77,6 +83,11 @@ internal sealed class SshNetJumpClient(
                 args.CanTrust = false;
                 rejected = true;
             }
+        }
+
+        if (Interlocked.Exchange(ref _errorSubscribed, 1) == 0)
+        {
+            _client.ErrorOccurred += OnErrorOccurred;
         }
 
         _client.HostKeyReceived += OnHostKeyReceived;

@@ -103,6 +103,14 @@ public sealed class SshConnectionServiceRoutedTests
         var result = await f.Service.TestConnectionAsync(f.Request());
 
         Assert.Equal(SshConnectionErrorCode.JumpHostKeyMismatch, result.ErrorCode);
+        Assert.Equal(ServerConnectionState.HostKeyMismatch, result.State);
+        Assert.Equal(SshHostKeyHop.Jump, result.HostKeyHop);   // the panel names the JUMP, not the target
+        Assert.Equal(JumpEndpoint, result.HostKeyEndpoint);
+        Assert.Null(result.HostKeyRoute);
+        Assert.Equal(Key(8), result.PresentedHostKey);
+        Assert.Equal(JumpKey, result.TrustedHostKey!.Identity);
+        Assert.Empty(f.Direct.Writes);
+        Assert.Empty(f.Routed.Writes);
         Assert.Empty(Assert.Single(f.Tunnels.Created).TargetSessions);
         Assert.True(f.Tunnels.Created[0].Disposed);
         Assert.DoesNotContain(f.Credentials.Reads, r => r.Kind == ServerCredentialKind.Password);
@@ -346,6 +354,78 @@ public sealed class SshConnectionServiceRoutedTests
     }
 
     [Fact]
+    public async Task Deadline_during_the_jump_is_a_timeout_not_a_jump_failure()
+    {
+        var f = new Fixture().TrustJump().TrustTarget();
+        f.Sessions.Probes.Enqueue(new Session(JumpKey, SshConnectionErrorCode.None, waitUntilCancelled: true) { Name = "jump.probe" });
+
+        var result = await f.Service.TestConnectionAsync(f.Request(timeout: TimeSpan.FromMilliseconds(200)));
+
+        Assert.Equal(SshConnectionErrorCode.ConnectionTimedOut, result.ErrorCode);
+        Assert.Empty(f.Credentials.Reads);
+        Assert.Empty(f.Tunnels.Created);
+    }
+
+    [Fact]
+    public async Task Caller_cancellation_during_the_jump_stays_cancelled()
+    {
+        var f = new Fixture().TrustJump().TrustTarget();
+        f.Sessions.Probes.Enqueue(new Session(JumpKey, SshConnectionErrorCode.None, waitUntilCancelled: true) { Name = "jump.probe" });
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMilliseconds(150));
+
+        var result = await f.Service.TestConnectionAsync(f.Request(timeout: TimeSpan.FromSeconds(30)), cancellation.Token);
+
+        Assert.Equal(SshConnectionErrorCode.Cancelled, result.ErrorCode);
+    }
+
+    [Fact]
+    public async Task Deadline_during_the_tunnel_open_is_a_timeout()
+    {
+        var f = new Fixture().TrustJump().TrustTarget();
+        f.JumpProbe(JumpKey);
+        f.Tunnels.OpenDelay = Timeout.InfiniteTimeSpan;
+
+        var result = await f.Service.TestConnectionAsync(f.Request(timeout: TimeSpan.FromMilliseconds(200)));
+
+        Assert.Equal(SshConnectionErrorCode.ConnectionTimedOut, result.ErrorCode);
+        Assert.True(Assert.Single(f.Tunnels.Created).Disposed);
+    }
+
+    [Fact]
+    public async Task A_jump_error_raised_before_the_target_failure_is_classified_is_a_jump_failure_on_the_real_tunnel()
+    {
+        // The REAL SshJumpTunnel owner (fake SSH.NET parts): the jump reports ErrorOccurred during the target
+        // operation while its IsConnected still reads true. The latch must win over the lagging flag.
+        var parts = new RealTunnelParts();
+        var f = new Fixture(tunnelFactory: parts).TrustJump().TrustTarget();
+        f.JumpProbe(JumpKey);
+        parts.Targets.Enqueue(new Session(TargetKey, SshConnectionErrorCode.AuthenticationFailed));
+        var dropping = new Session(TargetKey, SshConnectionErrorCode.RemoteDisconnected);
+        dropping.DuringOperation = () => parts.Jump!.RaiseFault();
+        parts.Targets.Enqueue(dropping);
+
+        var result = await f.Service.TestConnectionAsync(f.Request());
+
+        Assert.Equal(SshConnectionErrorCode.JumpConnectionFailed, result.ErrorCode);
+        Assert.True(parts.Jump!.IsConnected);
+        Assert.True(parts.Jump.Disposed);
+    }
+
+    [Fact]
+    public async Task Without_a_jump_error_the_same_target_failure_stays_the_targets_on_the_real_tunnel()
+    {
+        var parts = new RealTunnelParts();
+        var f = new Fixture(tunnelFactory: parts).TrustJump().TrustTarget();
+        f.JumpProbe(JumpKey);
+        parts.Targets.Enqueue(new Session(TargetKey, SshConnectionErrorCode.AuthenticationFailed));
+        parts.Targets.Enqueue(new Session(TargetKey, SshConnectionErrorCode.RemoteDisconnected));
+
+        var result = await f.Service.TestConnectionAsync(f.Request());
+
+        Assert.Equal(SshConnectionErrorCode.RemoteDisconnected, result.ErrorCode);
+    }
+
+    [Fact]
     public async Task Jump_private_key_that_cannot_be_loaded_is_a_jump_credential_error()
     {
         var f = new Fixture().TrustJump().TrustTarget();
@@ -382,7 +462,7 @@ public sealed class SshConnectionServiceRoutedTests
         public static readonly Guid JumpReference = Guid.Parse("33333333-3333-3333-3333-333333333333");
         private readonly Func<JumpHop, JumpHop>? _configureJump;
 
-        public Fixture(Func<JumpHop, JumpHop>? configureJump = null)
+        public Fixture(Func<JumpHop, JumpHop>? configureJump = null, IJumpTunnelFactory? tunnelFactory = null)
         {
             _configureJump = configureJump;
             Direct = new DirectTrustStore(Log);
@@ -392,7 +472,7 @@ public sealed class SshConnectionServiceRoutedTests
             Credentials.Secrets[ServerCredentialKind.Password] = "target-secret";
             Tunnels = new TunnelFactory(Log);
             Sessions = new ProbeFactory(Log);
-            Service = new SshConnectionService(Direct, Routed, Credentials, Logger, Sessions, new HookedFactory(this));
+            Service = new SshConnectionService(Direct, Routed, Credentials, Logger, Sessions, tunnelFactory ?? new HookedFactory(this));
         }
 
         public EventLog Log { get; } = new();
@@ -470,6 +550,62 @@ public sealed class SshConnectionServiceRoutedTests
                 var tunnel = (Tunnel)owner.Tunnels.Create(jump, jumpLogin, target, timeout);
                 owner.OnTunnelCreated?.Invoke(tunnel);
                 return tunnel;
+            }
+        }
+    }
+
+    /// <summary>Builds the PRODUCTION <see cref="SshJumpTunnel"/> over fake SSH.NET parts.</summary>
+    private sealed class RealTunnelParts : IJumpTunnelFactory, ISshDialSessionFactory, ITcpOwnerLookup
+    {
+        public Queue<Session> Targets { get; } = new();
+
+        public FakeJump? Jump { get; private set; }
+
+        public IJumpTunnel Create(SshDialTarget jump, SshLogin jumpLogin, SshEndpoint target, TimeSpan timeout) =>
+            new SshJumpTunnel(Jump = new FakeJump(), target, this, Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance, this, Environment.ProcessId);
+
+        public ISshSession Create(SshDialTarget dial, SshLogin login, TimeSpan timeout, ISshConnectGate? gate) => Targets.Dequeue();
+
+        public int? FindLoopbackConnectionOwner(int localPort, int remotePort) => null;
+
+        public bool IsLoopbackListenerOwnedBy(int port, int processId) => true;
+
+        public sealed class FakeJump : IJumpClient
+        {
+            public event Action? Faulted;
+
+            public bool IsConnected => true;
+
+            public bool Disposed { get; private set; }
+
+            public void RaiseFault() => Faulted?.Invoke();
+
+            public Task<SshSessionResult> ConnectAsync(Func<HostKeyIdentity, bool> hostKeyVerifier, CancellationToken cancellationToken) =>
+                Task.FromResult(new SshSessionResult { ErrorCode = SshConnectionErrorCode.None, IdentificationReceived = true });
+
+            public ILocalForward CreateLocalForward(string bindHost, string targetHost, uint targetPort) => new Forward();
+
+            public void Dispose() => Disposed = true;
+        }
+
+        private sealed class Forward : ILocalForward
+        {
+            public string BoundHost => SshJumpTunnel.LoopbackHost;
+
+            public uint BoundPort { get; private set; }
+
+            public bool IsStarted { get; private set; }
+
+            public void Start(Action<string, uint> onRequest)
+            {
+                BoundPort = 40000;
+                IsStarted = true;
+            }
+
+            public void Stop() => IsStarted = false;
+
+            public void Dispose()
+            {
             }
         }
     }

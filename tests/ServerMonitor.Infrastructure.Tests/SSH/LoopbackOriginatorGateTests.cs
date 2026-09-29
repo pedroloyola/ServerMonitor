@@ -90,6 +90,7 @@ public sealed class LoopbackOriginatorGateTests
         var failing = new LoopbackOriginatorGate(new ThrowingLookup(), Environment.ProcessId);
         failing.ArmNext();
         Assert.Equal(OriginatorRejection.LookupFailed, failing.Evaluate("127.0.0.1", 50000, 40000).Rejection);
+        Assert.True(failing.IsArmed); // a failed lookup never consumes the arm
         Assert.True(gate.IsArmed);
     }
 

@@ -186,20 +186,43 @@ internal static class SshRoutedTestDoubles
 
         public bool IsJumpConnected => JumpConnected;
 
-        public Task<JumpTunnelOpenResult> OpenAsync(Func<HostKeyIdentity, bool> jumpHostKeyVerifier, CancellationToken cancellationToken)
+        public async Task<JumpTunnelOpenResult> OpenAsync(Func<HostKeyIdentity, bool> jumpHostKeyVerifier, CancellationToken cancellationToken)
         {
             owner.Log?.Add("tunnel.open");
+            if (owner.OpenDelay is { } delay)
+            {
+                try
+                {
+                    await Task.Delay(delay, cancellationToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    return new JumpTunnelOpenResult(JumpTunnelOpenStage.Jump, new SshSessionResult { ErrorCode = SshConnectionErrorCode.Cancelled });
+                }
+            }
+
+            return OpenCore(jumpHostKeyVerifier);
+        }
+
+        private JumpTunnelOpenResult OpenCore(Func<HostKeyIdentity, bool> jumpHostKeyVerifier)
+        {
             if (owner.OpenResult is { } scripted)
             {
-                return Task.FromResult(scripted);
+                return scripted;
             }
 
             var accepted = jumpHostKeyVerifier(owner.JumpKey);
-            return Task.FromResult(accepted
+            return accepted
                 ? new JumpTunnelOpenResult(JumpTunnelOpenStage.Opened, new SshSessionResult { ErrorCode = SshConnectionErrorCode.None, IdentificationReceived = true })
                 : new JumpTunnelOpenResult(
                     JumpTunnelOpenStage.Jump,
-                    new SshSessionResult { ErrorCode = SshConnectionErrorCode.HostKeyMismatch, HostKeyRejected = true, IdentificationReceived = true }));
+                    new SshSessionResult
+                    {
+                        ErrorCode = SshConnectionErrorCode.HostKeyMismatch,
+                        HostKeyRejected = true,
+                        IdentificationReceived = true,
+                        PresentedHostKey = owner.JumpKey
+                    });
         }
 
         public ISshSession CreateTargetSession(string username, SshLogin login, TimeSpan timeout)
@@ -234,6 +257,8 @@ internal static class SshRoutedTestDoubles
         public List<Tunnel> Created { get; } = [];
 
         public JumpTunnelOpenResult? OpenResult { get; set; }
+
+        public TimeSpan? OpenDelay { get; set; }
 
         /// <summary>The key the jump presents on the authenticated connection (defaults to the probe's).</summary>
         public HostKeyIdentity JumpKey { get; set; } = Key(1);

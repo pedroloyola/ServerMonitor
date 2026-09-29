@@ -28,11 +28,33 @@ public sealed class ProxyJumpFailureClassifierTests
     ];
 
     [Fact]
-    public void Jump_stage_only_ever_produces_jump_codes()
+    public void Jump_stage_only_ever_produces_jump_codes_or_the_stage_neutral_timeout()
     {
         foreach (var failure in AllStates(ProxyJumpStage.Jump).Where(f => !f.Cancelled))
         {
-            Assert.Contains(ProxyJumpFailureClassifier.Classify(failure), JumpCodes);
+            var code = ProxyJumpFailureClassifier.Classify(failure);
+            if (failure.TimedOut)
+            {
+                Assert.Equal(SshConnectionErrorCode.ConnectionTimedOut, code);
+            }
+            else
+            {
+                Assert.Contains(code, JumpCodes);
+            }
+        }
+    }
+
+    [Fact]
+    public void Deadline_is_stage_neutral_after_cancellation()
+    {
+        foreach (var stage in new[] { ProxyJumpStage.Jump, ProxyJumpStage.Target })
+        {
+            foreach (var failure in AllStates(stage).Where(f => f.TimedOut))
+            {
+                Assert.Equal(
+                    failure.Cancelled ? SshConnectionErrorCode.Cancelled : SshConnectionErrorCode.ConnectionTimedOut,
+                    ProxyJumpFailureClassifier.Classify(failure));
+            }
         }
     }
 

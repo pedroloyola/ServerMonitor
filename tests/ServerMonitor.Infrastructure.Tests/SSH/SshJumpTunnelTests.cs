@@ -32,6 +32,61 @@ public sealed class SshJumpTunnelTests
     }
 
     [Fact]
+    public async Task A_jump_error_latches_the_jump_as_dropped_even_while_IsConnected_still_lags()
+    {
+        var parts = new Parts();
+        var tunnel = parts.Tunnel();
+        await tunnel.OpenAsync(_ => true, default);
+        Assert.True(tunnel.IsJumpConnected);
+
+        parts.Jump!.RaiseFault(); // SSH.NET's ErrorOccurred; the client's IsConnected has not caught up yet
+        Assert.True(parts.Jump.IsConnected);
+
+        Assert.False(tunnel.IsJumpConnected);
+        parts.Jump.RaiseFault();
+        Assert.False(tunnel.IsJumpConnected); // sticky
+    }
+
+    [Fact]
+    public async Task Rejection_warnings_are_capped_per_tunnel_and_the_rest_are_summarised_at_teardown()
+    {
+        var parts = new Parts { BoundPort = 45678 };
+        parts.Lookup.ConnectionOwner = 4242;
+        var tunnel = (SshJumpTunnel)parts.Tunnel();
+        await tunnel.OpenAsync(_ => true, default);
+
+        for (var i = 0; i < 20; i++)
+        {
+            Assert.Throws<TunnelOriginatorRejectedException>(() => parts.Forward!.Handler!("127.0.0.1", (uint)(50000 + i)));
+        }
+
+        var individual = parts.Logger.Warnings.Where(w => w.Contains("rejected a loopback connection")).ToList();
+        Assert.Equal(SshJumpTunnel.IndividuallyLoggedRejections, individual.Count);
+        Assert.All(individual, w => Assert.Contains("owner PID 4242", w));
+        Assert.Contains("originator port 50000", individual[0]);
+
+        await tunnel.DisposeAsync();
+
+        var summary = Assert.Single(parts.Logger.Warnings, w => w.Contains("further loopback connections"));
+        Assert.Contains("15 further", summary);
+        Assert.Contains("total 20", summary);
+        Assert.Equal(SshJumpTunnel.IndividuallyLoggedRejections + 1, parts.Logger.Warnings.Count);
+    }
+
+    [Fact]
+    public async Task A_few_rejections_produce_no_teardown_summary()
+    {
+        var parts = new Parts { BoundPort = 45678 };
+        var tunnel = parts.Tunnel();
+        await tunnel.OpenAsync(_ => true, default);
+        Assert.Throws<TunnelOriginatorRejectedException>(() => parts.Forward!.Handler!("127.0.0.1", 50000));
+
+        await tunnel.DisposeAsync();
+
+        Assert.Single(parts.Logger.Warnings);
+    }
+
+    [Fact]
     public async Task A_failed_jump_connect_creates_no_forward_and_still_releases_the_jump()
     {
         var parts = new Parts { JumpResult = new SshSessionResult { ErrorCode = SshConnectionErrorCode.AuthenticationFailed } };
@@ -124,11 +179,15 @@ public sealed class SshJumpTunnelTests
         Assert.True(tunnel.Gate.IsArmed);
     }
 
-    private sealed class Parts
+    internal sealed class Parts
     {
         public EventLog Log { get; } = new();
 
         public FakeLookup Lookup { get; } = new();
+
+        public CapturingLogger Logger { get; } = new();
+
+        public FakeJump? Jump { get; private set; }
 
         public SshSessionResult JumpResult { get; set; } = new() { ErrorCode = SshConnectionErrorCode.None, IdentificationReceived = true };
 
@@ -142,11 +201,15 @@ public sealed class SshJumpTunnelTests
 
         public List<(SshDialTarget Dial, ISshConnectGate? Gate)> TargetDials { get; } = [];
 
-        public IJumpTunnel Tunnel() => new SshJumpTunnel(new FakeJump(this), Target, new FakeTargets(this), NullLogger.Instance, Lookup, Environment.ProcessId);
+        public IJumpTunnel Tunnel() => new SshJumpTunnel(Jump = new FakeJump(this), Target, new FakeTargets(this), Logger, Lookup, Environment.ProcessId);
 
-        private sealed class FakeJump(Parts parts) : IJumpClient
+        internal sealed class FakeJump(Parts parts) : IJumpClient
         {
+            public event Action? Faulted;
+
             public bool IsConnected => true;
+
+            public void RaiseFault() => Faulted?.Invoke();
 
             public Task<SshSessionResult> ConnectAsync(Func<HostKeyIdentity, bool> hostKeyVerifier, CancellationToken cancellationToken)
             {
@@ -189,7 +252,7 @@ public sealed class SshJumpTunnelTests
         }
     }
 
-    private sealed class FakeForward(Parts parts) : ILocalForward
+    internal sealed class FakeForward(Parts parts) : ILocalForward
     {
         public Action<string, uint>? Handler { get; private set; }
 
@@ -218,7 +281,24 @@ public sealed class SshJumpTunnelTests
         public void Dispose() => parts.Log.Add("forward.dispose");
     }
 
-    private sealed class FakeLookup : ITcpOwnerLookup
+    internal sealed class CapturingLogger : ILogger
+    {
+        public List<string> Warnings { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+        {
+            if (logLevel == LogLevel.Warning)
+            {
+                Warnings.Add(formatter(state, exception));
+            }
+        }
+    }
+
+    internal sealed class FakeLookup : ITcpOwnerLookup
     {
         public bool ListenerOwned { get; set; } = true;
 

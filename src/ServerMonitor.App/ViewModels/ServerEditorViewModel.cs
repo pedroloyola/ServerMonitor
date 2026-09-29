@@ -673,7 +673,8 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
         {
             case SshHostKeyHop.Direct when !UseJumpHost
                 && TryCreateEndpoint(out var endpoint)
-                && (_pendingHostKeyEndpoint is null || endpoint == _pendingHostKeyEndpoint):
+                && _pendingHostKeyEndpoint is not null
+                && endpoint == _pendingHostKeyEndpoint:
                 directEndpoint = endpoint;
                 break;
             case SshHostKeyHop.Jump when TryCreateRoute(out var jumpRoute)

@@ -391,7 +391,7 @@ public sealed class SshConnectionService
             {
                 return Complete(
                     server,
-                    ClassifyJump(jumpProbe, hostKeyUnknown: trustedJumpKey is null, cancellationToken),
+                    ClassifyJump(jumpProbe, hostKeyUnknown: trustedJumpKey is null, cancellationToken, timeoutSource),
                     stopwatch.Elapsed,
                     request.Timeout,
                     exceptionType: jumpProbe.ExceptionType);
@@ -434,13 +434,25 @@ public sealed class SshConnectionService
                     .ConfigureAwait(false);
                 if (!open.IsOpen)
                 {
+                    // The jump presented a different key on the authenticated connection than on the probe:
+                    // a JUMP mismatch, reported for the jump hop (L2) — never as the target.
+                    if (open.Stage == JumpTunnelOpenStage.Jump
+                        && open.JumpResult is { PresentedHostKey: { } changedJumpKey } rejectedJump
+                        && (rejectedJump.HostKeyRejected || rejectedJump.ErrorCode == SshConnectionErrorCode.HostKeyMismatch)
+                        && !cancellationToken.IsCancellationRequested
+                        && !timeoutSource.IsCancellationRequested)
+                    {
+                        return CompleteHop(server, SshConnectionErrorCode.JumpHostKeyMismatch, stopwatch, request,
+                            changedJumpKey, SshHostKeyHop.Jump, endpoint: jumpEndpoint, trusted: verifiedJumpKey);
+                    }
+
                     var openCode = open.Stage == JumpTunnelOpenStage.TunnelListen
                         ? ProxyJumpFailureClassifier.Classify(new ProxyJumpFailure
                         {
                             Stage = ProxyJumpStage.TunnelListen,
                             Cancelled = cancellationToken.IsCancellationRequested
                         })
-                        : ClassifyJump(open.JumpResult!, hostKeyUnknown: false, cancellationToken);
+                        : ClassifyJump(open.JumpResult!, hostKeyUnknown: false, cancellationToken, timeoutSource);
                     return Complete(server, openCode, stopwatch.Elapsed, request.Timeout,
                         exceptionType: open.ExceptionType ?? open.JumpResult?.ExceptionType);
                 }
@@ -524,11 +536,14 @@ public sealed class SshConnectionService
     private static SshConnectionErrorCode ClassifyJump(
         SshSessionResult result,
         bool hostKeyUnknown,
-        CancellationToken callerToken) =>
+        CancellationToken callerToken,
+        CancellationTokenSource timeoutSource) =>
         ProxyJumpFailureClassifier.Classify(new ProxyJumpFailure
         {
             Stage = ProxyJumpStage.Jump,
             Cancelled = callerToken.IsCancellationRequested,
+            // L3: the linked deadline expiring during the jump probe/open is a timeout, as on the other paths.
+            TimedOut = timeoutSource.IsCancellationRequested,
             IdentificationReceived = result.IdentificationReceived,
             HostKeyRejected = result.HostKeyRejected || result.ErrorCode == SshConnectionErrorCode.HostKeyMismatch,
             HostKeyUnknown = hostKeyUnknown,

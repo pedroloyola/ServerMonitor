@@ -141,6 +141,53 @@ public sealed class ServerEditorRouteTests
     }
 
     [Fact]
+    public async Task A_jump_key_that_changed_during_the_tunnel_open_names_the_jump_and_writes_nothing()
+    {
+        var f = new Fixture();
+        f.Ssh.Results.Enqueue(new SshConnectionResult
+        {
+            State = ServerConnectionState.HostKeyMismatch,
+            ErrorCode = SshConnectionErrorCode.JumpHostKeyMismatch,
+            PresentedHostKey = Key(8),
+            HostKeyHop = SshHostKeyHop.Jump,
+            HostKeyEndpoint = JumpEndpoint,
+            TrustedHostKey = new TrustedHostKey { Endpoint = JumpEndpoint, Identity = JumpKey }
+        });
+        var vm = f.RoutedEditor();
+
+        await vm.TestConnectionAsync();
+        await vm.TrustAndConnectAsync();
+
+        Assert.True(vm.HasHostKeyMismatch);
+        Assert.Equal("jump host bastion.example.test:2222", vm.HostKeySubjectDisplay);
+        Assert.Equal(JumpKey.Sha256Fingerprint, vm.TrustedHostKeyFingerprint);
+        Assert.Empty(f.Direct.Writes);
+        Assert.Empty(f.Routed.Writes);
+    }
+
+    [Fact]
+    public async Task A_direct_prompt_without_an_endpoint_is_dismissed_without_writing()
+    {
+        var f = new Fixture();
+        f.Ssh.Results.Enqueue(new SshConnectionResult
+        {
+            State = ServerConnectionState.HostKeyUnknown,
+            ErrorCode = SshConnectionErrorCode.HostKeyUnknown,
+            PresentedHostKey = TargetKey,
+            HostKeyHop = SshHostKeyHop.Direct,
+            HostKeyEndpoint = null
+        });
+        var vm = f.Editor(TestData.LinuxServer() with { CredentialReferenceId = Guid.NewGuid() });
+
+        await vm.TestConnectionAsync();
+        await vm.TrustAndConnectAsync();
+
+        Assert.Empty(f.Direct.Writes);
+        Assert.Empty(f.Routed.Writes);
+        Assert.False(vm.HasUnknownHostKey);
+    }
+
+    [Fact]
     public async Task A_conflicting_routed_trust_shows_the_routed_mismatch_and_never_overwrites()
     {
         var f = new Fixture();

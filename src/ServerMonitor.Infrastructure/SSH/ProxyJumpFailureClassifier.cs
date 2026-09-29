@@ -80,6 +80,13 @@ public static class ProxyJumpFailureClassifier
 
     private static SshConnectionErrorCode ClassifyJump(in ProxyJumpFailure failure)
     {
+        // The operation deadline is stage-neutral like cancellation: the user sees the same timeout whether it
+        // expired on the jump, the target or a direct server.
+        if (failure.TimedOut)
+        {
+            return SshConnectionErrorCode.ConnectionTimedOut;
+        }
+
         if (failure.HostKeyRejected)
         {
             return failure.HostKeyUnknown

@@ -15,6 +15,12 @@ internal interface IJumpClient : IDisposable
 
     bool IsConnected { get; }
 
+    /// <summary>
+    /// Raised when the jump session reports an error (production: <c>SshClient.ErrorOccurred</c>). The tunnel
+    /// latches it: once faulted, the jump counts as dropped even while <see cref="IsConnected"/> still lags.
+    /// </summary>
+    event Action? Faulted;
+
     ILocalForward CreateLocalForward(string bindHost, string targetHost, uint targetPort);
 }
 
@@ -97,6 +103,11 @@ internal sealed class SshJumpTunnel : IJumpTunnel
     private ILocalForward? _forward;
     private bool _opened;
     private int _disposed;
+    private int _jumpFaulted;
+    private int _rejections;
+
+    /// <summary>Rejections logged individually per tunnel; the rest are counted into one teardown summary.</summary>
+    internal const int IndividuallyLoggedRejections = 5;
 
     internal SshJumpTunnel(
         IJumpClient jump,
@@ -113,11 +124,17 @@ internal sealed class SshJumpTunnel : IJumpTunnel
         _ownerLookup = ownerLookup ?? IpHelperTcpOwnerLookup.Instance;
         _processId = processId ?? Environment.ProcessId;
         _gate = new LoopbackOriginatorGate(_ownerLookup, _processId);
+
+        // Sticky and thread-safe: a jump error raised on SSH.NET's thread before the target failure is
+        // classified must still classify it as the jump dropping (L1).
+        _jump.Faulted += OnJumpFaulted;
     }
 
     internal LoopbackOriginatorGate Gate => _gate;
 
-    public bool IsJumpConnected => _jump.IsConnected;
+    public bool IsJumpConnected => Volatile.Read(ref _jumpFaulted) == 0 && _jump.IsConnected;
+
+    private void OnJumpFaulted() => Volatile.Write(ref _jumpFaulted, 1);
 
     public async Task<JumpTunnelOpenResult> OpenAsync(
         Func<HostKeyIdentity, bool> jumpHostKeyVerifier,
@@ -232,12 +249,16 @@ internal sealed class SshJumpTunnel : IJumpTunnel
             return;
         }
 
-        // C6: owner PID + originator port only — never the ConnectionInfo, never a credential.
-        _logger.LogWarning(
+        // C6: owner PID + originator port only — never the ConnectionInfo, never a credential. Throttled per
+        // tunnel so a local flood cannot flood the log; the remainder is summarised at teardown.
+        if (Interlocked.Increment(ref _rejections) <= IndividuallyLoggedRejections)
+        {
+            _logger.LogWarning(
             "ProxyJump tunnel rejected a loopback connection: reason {Reason}, owner PID {OwnerPid}, originator port {OriginatorPort}.",
-            decision.Rejection,
-            decision.OwnerPid,
-            originatorPort);
+                decision.Rejection,
+                decision.OwnerPid,
+                originatorPort);
+        }
 
         // Throwing from the request handler closes the foreign socket and opens NO channel (measured, pinned by E2E).
         throw new TunnelOriginatorRejectedException(decision.Rejection);
@@ -251,6 +272,17 @@ internal sealed class SshJumpTunnel : IJumpTunnel
         }
 
         _gate.Seal();
+        _jump.Faulted -= OnJumpFaulted;
+
+        var rejections = Volatile.Read(ref _rejections);
+        if (rejections > IndividuallyLoggedRejections)
+        {
+            _logger.LogWarning(
+                "ProxyJump tunnel rejected {SuppressedCount} further loopback connections (total {TotalCount}); only the first {LoggedCount} were logged individually.",
+                rejections - IndividuallyLoggedRejections,
+                rejections,
+                IndividuallyLoggedRejections);
+        }
 
         ISshSession[] sessions;
         ILocalForward? forward;
