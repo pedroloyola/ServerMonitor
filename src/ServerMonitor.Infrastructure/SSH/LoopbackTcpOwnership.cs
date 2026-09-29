@@ -188,11 +188,8 @@ internal sealed class LoopbackOriginatorGate : ISshConnectGate
 
     public OriginatorDecision Evaluate(string? originatorHost, uint originatorPort, uint boundPort)
     {
-        if (!IsArmed)
-        {
-            return OriginatorDecision.Reject(OriginatorRejection.NotArmed);
-        }
-
+        // The owner is resolved even when the gate is sealed, so every rejection can be logged with the
+        // originator's PID; every branch below still rejects unless ALL conditions hold.
         if (!IPAddress.TryParse(originatorHost, out var address)
             || !address.Equals(IPAddress.Loopback)
             || originatorPort is 0 or > 65535
@@ -219,6 +216,11 @@ internal sealed class LoopbackOriginatorGate : ISshConnectGate
         if (owner.Value != _processId)
         {
             return OriginatorDecision.Reject(OriginatorRejection.ForeignOwner, owner);
+        }
+
+        if (!IsArmed)
+        {
+            return OriginatorDecision.Reject(OriginatorRejection.NotArmed, owner);
         }
 
         // Consume the single arm atomically: a second connection racing the first is rejected.

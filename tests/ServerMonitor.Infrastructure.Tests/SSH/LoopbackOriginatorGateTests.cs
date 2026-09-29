@@ -54,6 +54,10 @@ public sealed class LoopbackOriginatorGateTests
         var originatorPort = (uint)((IPEndPoint)accepted.Client.RemoteEndPoint!).Port;
         var gate = new LoopbackOriginatorGate();
 
+        var sealedDecision = gate.Evaluate("127.0.0.1", originatorPort, boundPort);
+        Assert.False(sealedDecision.Admitted);
+        Assert.Equal(child.Pid, sealedDecision.OwnerPid); // logged with the originator's PID
+
         gate.ArmNext();
         var decision = gate.Evaluate("127.0.0.1", originatorPort, boundPort);
 
