@@ -10,7 +10,17 @@ public enum ServerValidationErrorCode
     PrivateKeyPathRequired,
     CredentialReferenceRequired,
     CredentialReferenceInvalid,
-    ServerNotFound
+    ServerNotFound,
+
+    // M14.4b route rules. An invalid route is quarantined, never treated as direct.
+    RouteJumpRequired,
+    JumpHostRequired,
+    JumpPortOutOfRange,
+    JumpUsernameRequired,
+    JumpAuthenticationMethodRequired,
+    JumpPrivateKeyPathRequired,
+    JumpCredentialReferenceRequired,
+    JumpCredentialReferenceInvalid
 }
 
 public sealed record ServerValidationError(

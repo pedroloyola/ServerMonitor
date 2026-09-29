@@ -143,6 +143,14 @@
   <data name="ConnectionErrorProtocolError" xml:space="preserve"><value>Não foi possível concluir o handshake SSH em segurança.</value></data>
   <data name="ConnectionErrorCancelled" xml:space="preserve"><value>O teste foi cancelado.</value></data>
   <data name="ConnectionErrorUnexpected" xml:space="preserve"><value>O teste de ligação falhou inesperadamente.</value></data>
+  <data name="ConnectionErrorJumpConnectionFailed" xml:space="preserve"><value>Não foi possível alcançar o anfitrião de salto.</value></data>
+  <data name="ConnectionErrorJumpAuthenticationFailed" xml:space="preserve"><value>O anfitrião de salto recusou a autenticação.</value></data>
+  <data name="ConnectionErrorJumpHostKeyUnknown" xml:space="preserve"><value>A chave do anfitrião de salto ainda não é fidedigna. Ligue-se diretamente ao anfitrião de salto e confirme a chave.</value></data>
+  <data name="ConnectionErrorJumpHostKeyMismatch" xml:space="preserve"><value>A chave do anfitrião de salto mudou. A ligação foi bloqueada.</value></data>
+  <data name="ConnectionErrorJumpCredentialUnavailable" xml:space="preserve"><value>A credencial guardada do anfitrião de salto não está disponível. Introduza-a novamente.</value></data>
+  <data name="ConnectionErrorTargetUnreachableViaJump" xml:space="preserve"><value>O anfitrião de salto não conseguiu alcançar o servidor.</value></data>
+  <data name="ConnectionErrorRoutedHostKeyUnknown" xml:space="preserve"><value>A chave do servidor, vista através do anfitrião de salto, ainda não é fidedigna.</value></data>
+  <data name="ConnectionErrorRoutedHostKeyMismatch" xml:space="preserve"><value>A chave do servidor, vista através do anfitrião de salto, mudou. A ligação foi bloqueada.</value></data>
   <data name="ServerMetricsWaitingForData.Text" xml:space="preserve"><value>A aguardar dados</value></data>
   <data name="ServerMetricsRefreshingLabel.Text" xml:space="preserve"><value>A atualizar…</value></data>
   <data name="ServerMetricsRefreshFor" xml:space="preserve"><value>Atualizar métricas de {0}</value></data>

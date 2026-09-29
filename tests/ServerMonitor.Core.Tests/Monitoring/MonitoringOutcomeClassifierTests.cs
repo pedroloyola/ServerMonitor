@@ -68,6 +68,12 @@ public sealed class MonitoringOutcomeClassifierTests
     [InlineData(SshConnectionErrorCode.PrivateKeyInvalid)]
     [InlineData(SshConnectionErrorCode.UnsupportedAlgorithm)]
     [InlineData(SshConnectionErrorCode.InvalidConfiguration)]
+    [InlineData(SshConnectionErrorCode.JumpAuthenticationFailed)]
+    [InlineData(SshConnectionErrorCode.JumpHostKeyUnknown)]
+    [InlineData(SshConnectionErrorCode.JumpHostKeyMismatch)]
+    [InlineData(SshConnectionErrorCode.JumpCredentialUnavailable)]
+    [InlineData(SshConnectionErrorCode.RoutedHostKeyUnknown)]
+    [InlineData(SshConnectionErrorCode.RoutedHostKeyMismatch)]
     public void Stable_ssh_problems_are_non_retryable(SshConnectionErrorCode code) =>
         Assert.Equal(MonitoringOutcome.NonRetryable, MonitoringOutcomeClassifier.Classify(ConnectionFailed(code)));
 
@@ -79,6 +85,8 @@ public sealed class MonitoringOutcomeClassifierTests
     [InlineData(SshConnectionErrorCode.ConnectionTimedOut)]
     [InlineData(SshConnectionErrorCode.RemoteDisconnected)]
     [InlineData(SshConnectionErrorCode.ProtocolError)]
+    [InlineData(SshConnectionErrorCode.JumpConnectionFailed)]
+    [InlineData(SshConnectionErrorCode.TargetUnreachableViaJump)]
     public void Transient_ssh_problems_are_retryable(SshConnectionErrorCode code) =>
         Assert.Equal(MonitoringOutcome.Retryable, MonitoringOutcomeClassifier.Classify(ConnectionFailed(code)));
 

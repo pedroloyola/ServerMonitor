@@ -421,6 +421,14 @@ public sealed class SshConnectionService
     private static bool TryValidate(SshConnectionRequest? request, out SshEndpoint endpoint)
     {
         endpoint = new SshEndpoint(string.Empty, 0);
+
+        // A routed server must never be dialled direct. Until the ProxyJump transport exists it is an
+        // invalid configuration for this service: fail closed before any socket is opened.
+        if (request?.Server is { Route: not null })
+        {
+            return false;
+        }
+
         if (request?.Server is not { } server ||
             string.IsNullOrWhiteSpace(server.Host) ||
             string.IsNullOrWhiteSpace(server.Username) ||
@@ -510,10 +518,21 @@ public sealed class SshConnectionService
         };
     }
 
-    private static ServerConnectionState ToState(SshConnectionErrorCode errorCode) => errorCode switch
+    // Jump and routed-target host-key codes deliberately map to Error, NOT HostKeyUnknown/HostKeyMismatch:
+    // those states open the editor's trust panel for the TARGET endpoint in the DIRECT store, which is the
+    // wrong store for a jump key and for a key seen through a jump (until the routed trust UI exists).
+    internal static ServerConnectionState ToState(SshConnectionErrorCode errorCode) => errorCode switch
     {
         SshConnectionErrorCode.None => ServerConnectionState.Connected,
-        SshConnectionErrorCode.AuthenticationFailed => ServerConnectionState.AuthenticationFailed,
+        SshConnectionErrorCode.AuthenticationFailed or
+        SshConnectionErrorCode.JumpAuthenticationFailed => ServerConnectionState.AuthenticationFailed,
+        SshConnectionErrorCode.JumpHostKeyUnknown or
+        SshConnectionErrorCode.JumpHostKeyMismatch or
+        SshConnectionErrorCode.JumpCredentialUnavailable or
+        SshConnectionErrorCode.RoutedHostKeyUnknown or
+        SshConnectionErrorCode.RoutedHostKeyMismatch => ServerConnectionState.Error,
+        SshConnectionErrorCode.JumpConnectionFailed or
+        SshConnectionErrorCode.TargetUnreachableViaJump => ServerConnectionState.Unreachable,
         SshConnectionErrorCode.HostKeyUnknown => ServerConnectionState.HostKeyUnknown,
         SshConnectionErrorCode.HostKeyMismatch => ServerConnectionState.HostKeyMismatch,
         SshConnectionErrorCode.ConnectionTimedOut => ServerConnectionState.TimedOut,

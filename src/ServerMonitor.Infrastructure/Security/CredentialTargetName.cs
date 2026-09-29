@@ -29,6 +29,8 @@ internal static class CredentialTargetName
         {
             ServerCredentialKind.Password => "password",
             ServerCredentialKind.PrivateKeyPassphrase => "key-passphrase",
+            ServerCredentialKind.JumpPassword => "jump-password",
+            ServerCredentialKind.JumpPrivateKeyPassphrase => "jump-key-passphrase",
             _ => throw new ArgumentException("The credential kind is invalid.", nameof(reference))
         };
 

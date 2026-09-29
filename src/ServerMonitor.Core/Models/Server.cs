@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using ServerMonitor.Core.Enums;
 using ServerMonitor.Core.Monitoring;
 
@@ -32,4 +33,12 @@ public sealed record Server
     public int RefreshIntervalSeconds { get; init; } = RefreshIntervalPolicy.DefaultSeconds;
 
     public DateTimeOffset CreatedAt { get; init; }
+
+    /// <summary>
+    /// How the server is reached. <see langword="null"/> is a DIRECT connection, the only shape
+    /// <c>servers.json</c> may hold; a routed server lives in <c>routed-servers.json</c> and must never
+    /// degrade to direct. Omitted when null so the legacy file keeps its exact schema.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ServerRoute? Route { get; init; }
 }

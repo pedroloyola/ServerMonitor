@@ -180,6 +180,67 @@ public sealed class SshConnectionServiceTests
     }
 
     [Fact]
+    public async Task Routed_server_is_never_dialled_direct()
+    {
+        // Everything a direct dial needs is present and would succeed: only the route must stop it.
+        var fixture = new Fixture
+        {
+            TrustedHostKey = Trusted(Identity(1))
+        };
+        fixture.Credentials.Secret = "password";
+        fixture.Factory.Enqueue(new FakeSession(Identity(1), SshConnectionErrorCode.AuthenticationFailed));
+        fixture.Factory.Enqueue(new FakeSession(Identity(1), SshConnectionErrorCode.None));
+        var request = Request(server => server with
+        {
+            Route = new ServerRoute
+            {
+                Jump = new JumpHop
+                {
+                    Host = "bastion.example",
+                    Username = "jump",
+                    AuthenticationMethod = AuthenticationMethod.SshKey,
+                    PrivateKeyPath = "C:\\keys\\jump"
+                }
+            }
+        });
+
+        var connect = await fixture.Service.ConnectAsync(request);
+        var test = await fixture.Service.TestConnectionAsync(request);
+        var metrics = await fixture.Service.CollectAsync(request.Server, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2));
+
+        Assert.Equal(SshConnectionErrorCode.InvalidConfiguration, connect.ErrorCode);
+        Assert.Equal(SshConnectionErrorCode.InvalidConfiguration, test.ErrorCode);
+        Assert.Equal(SshConnectionErrorCode.InvalidConfiguration, metrics.ConnectionResult.ErrorCode);
+        Assert.Empty(fixture.Factory.Calls);
+        Assert.Equal(0, fixture.Credentials.ReadCount);
+    }
+
+    [Fact]
+    public void Every_error_code_has_an_explicit_state_and_jump_codes_never_open_target_trust()
+    {
+        foreach (var code in Enum.GetValues<SshConnectionErrorCode>())
+        {
+            var state = SshConnectionService.ToState(code);
+            if (code.ToString().StartsWith("Jump", StringComparison.Ordinal)
+                || code.ToString().StartsWith("Routed", StringComparison.Ordinal))
+            {
+                // HostKeyUnknown/HostKeyMismatch would offer to trust the TARGET endpoint in the direct store.
+                Assert.NotEqual(ServerConnectionState.HostKeyUnknown, state);
+                Assert.NotEqual(ServerConnectionState.HostKeyMismatch, state);
+            }
+        }
+
+        Assert.Equal(ServerConnectionState.AuthenticationFailed, SshConnectionService.ToState(SshConnectionErrorCode.JumpAuthenticationFailed));
+        Assert.Equal(ServerConnectionState.Error, SshConnectionService.ToState(SshConnectionErrorCode.JumpHostKeyUnknown));
+        Assert.Equal(ServerConnectionState.Error, SshConnectionService.ToState(SshConnectionErrorCode.JumpHostKeyMismatch));
+        Assert.Equal(ServerConnectionState.Error, SshConnectionService.ToState(SshConnectionErrorCode.JumpCredentialUnavailable));
+        Assert.Equal(ServerConnectionState.Error, SshConnectionService.ToState(SshConnectionErrorCode.RoutedHostKeyUnknown));
+        Assert.Equal(ServerConnectionState.Error, SshConnectionService.ToState(SshConnectionErrorCode.RoutedHostKeyMismatch));
+        Assert.Equal(ServerConnectionState.Unreachable, SshConnectionService.ToState(SshConnectionErrorCode.JumpConnectionFailed));
+        Assert.Equal(ServerConnectionState.Unreachable, SshConnectionService.ToState(SshConnectionErrorCode.TargetUnreachableViaJump));
+    }
+
+    [Fact]
     public async Task Excessive_timeout_is_invalid_instead_of_throwing()
     {
         var fixture = new Fixture();

@@ -8,5 +8,9 @@ public sealed class ServerEditorResult : IDisposable
 
     public SshConnectionResult? ConnectionResult { get; init; }
 
-    public void Dispose() => Profile.CredentialChange.Secret?.Dispose();
+    public void Dispose()
+    {
+        Profile.CredentialChange.Secret?.Dispose();
+        Profile.JumpCredentialChange?.Secret?.Dispose();
+    }
 }
