@@ -37,5 +37,9 @@ public enum SshConnectionErrorCode
     // The TARGET's host key, seen through a jump. Distinct from HostKeyUnknown/HostKeyMismatch, which drive
     // the DIRECT trust flow: a routed target's key must only ever be trusted in the routed store.
     RoutedHostKeyUnknown,
-    RoutedHostKeyMismatch
+    RoutedHostKeyMismatch,
+
+    // M14.4b-2: the LOCAL end of the jump tunnel could not be established as required (IPv4 loopback,
+    // ephemeral port, owned by this process). Never a jump or target diagnosis.
+    LocalTunnelFailed
 }

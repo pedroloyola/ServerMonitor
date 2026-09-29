@@ -1,18 +1,15 @@
-using System.Net.Sockets;
-using Renci.SshNet.Common;
-using Renci.SshNet.Messages.Transport;
 using ServerMonitor.Core.Enums;
 using ServerMonitor.Infrastructure.SSH;
 
 namespace ServerMonitor.Infrastructure.Tests.SSH;
 
+/// <summary>
+/// M14.4b-2 §3: the classifier is STRUCTURAL — its inputs are booleans and a type-mapped code, never exception
+/// text. The state space below is enumerated exhaustively (every flag combination × every mapped code), so the
+/// separation invariants are checked over the whole domain, not over a few samples.
+/// </summary>
 public sealed class ProxyJumpFailureClassifierTests
 {
-    // SSH.NET 2026.0.0's exact text for a peer that closes before its version line (measured in the spike):
-    // through a jump, this is the ONLY symptom of a refused/failed direct-tcpip channel.
-    private const string ClosedBeforeIdentification =
-        "The connection to the remote server was closed before a valid SSH identification string was received.";
-
     private static readonly SshConnectionErrorCode[] JumpCodes =
     [
         SshConnectionErrorCode.JumpConnectionFailed,
@@ -22,141 +19,197 @@ public sealed class ProxyJumpFailureClassifierTests
         SshConnectionErrorCode.JumpCredentialUnavailable
     ];
 
-    public static TheoryData<string> Shapes => new(ShapeFactories.Keys);
+    private static readonly SshConnectionErrorCode[] DirectNetworkCodes =
+    [
+        SshConnectionErrorCode.DnsResolutionFailed,
+        SshConnectionErrorCode.ConnectionRefused,
+        SshConnectionErrorCode.HostUnreachable,
+        SshConnectionErrorCode.NetworkUnavailable
+    ];
 
-    private static readonly Dictionary<string, Func<Exception>> ShapeFactories = new()
+    [Fact]
+    public void Jump_stage_only_ever_produces_jump_codes()
     {
-        ["auth"] = () => new SshAuthenticationException("Permission denied (publickey)."),
-        ["hostkey-rejected"] = () => new SshConnectionException("Key exchange negotiation failed.", DisconnectReason.KeyExchangeFailed),
-        ["socket-refused"] = () => new SocketException((int)SocketError.ConnectionRefused),
-        ["socket-dns"] = () => new SocketException((int)SocketError.HostNotFound),
-        ["socket-unreachable"] = () => new SocketException((int)SocketError.HostUnreachable),
-        ["wrapped-socket"] = () => new SshConnectionException("wrapped", new SocketException((int)SocketError.NetworkUnreachable)),
-        ["closed-before-identification"] = () => new SshConnectionException(ClosedBeforeIdentification),
-        ["connection-lost"] = () => new SshConnectionException("lost", DisconnectReason.ConnectionLost),
-        ["protocol"] = () => new SshConnectionException("bad", DisconnectReason.ProtocolError),
-        ["timeout"] = () => new SshOperationTimeoutException("Socket read timed out."),
-        ["operation-cancelled"] = () => new OperationCanceledException(),
-        ["key-load"] = () => new SshPrivateKeyLoadException(new InvalidOperationException()),
-        ["generic-ssh"] = () => new SshException("generic"),
-        ["unexpected"] = () => new InvalidOperationException("unexpected")
-    };
-
-    [Theory]
-    [MemberData(nameof(Shapes))]
-    public void Jump_stage_never_produces_a_target_code(string shape)
-    {
-        foreach (var (rejected, unknown) in FlagCombinations())
+        foreach (var failure in AllStates(ProxyJumpStage.Jump).Where(f => !f.Cancelled))
         {
-            var code = Classify(ProxyJumpStage.Jump, shape, rejected, unknown);
-
-            Assert.Contains(code, JumpCodes);
+            Assert.Contains(ProxyJumpFailureClassifier.Classify(failure), JumpCodes);
         }
     }
 
-    [Theory]
-    [MemberData(nameof(Shapes))]
-    public void Channel_and_target_stages_never_produce_a_jump_code(string shape)
+    [Fact]
+    public void Target_stage_never_produces_a_jump_code_except_the_jump_dropping()
     {
-        foreach (var stage in new[] { ProxyJumpStage.Channel, ProxyJumpStage.Target })
+        var sawDrop = false;
+        foreach (var failure in AllStates(ProxyJumpStage.Target).Where(f => !f.Cancelled))
         {
-            foreach (var (rejected, unknown) in FlagCombinations())
+            var code = ProxyJumpFailureClassifier.Classify(failure);
+            if (code == SshConnectionErrorCode.JumpConnectionFailed)
             {
-                var code = Classify(stage, shape, rejected, unknown);
-
-                Assert.DoesNotContain(code, JumpCodes);
-                Assert.NotEqual(SshConnectionErrorCode.None, code);
+                Assert.False(failure.JumpConnected);
+                sawDrop = true;
+                continue;
             }
+
+            Assert.DoesNotContain(code, JumpCodes);
+            Assert.NotEqual(SshConnectionErrorCode.None, code);
+            Assert.NotEqual(SshConnectionErrorCode.LocalTunnelFailed, code);
         }
+
+        Assert.True(sawDrop);
     }
 
-    [Theory]
-    [MemberData(nameof(Shapes))]
-    public void No_stage_ever_enters_the_direct_trust_flow(string shape)
+    [Fact]
+    public void Nothing_through_a_jump_enters_the_direct_trust_flow_or_a_direct_network_diagnosis()
     {
-        // HostKeyUnknown/HostKeyMismatch open the DIRECT trust panel (direct store, bare host:port). Nothing
-        // seen through a jump may produce them.
         foreach (var stage in Enum.GetValues<ProxyJumpStage>())
         {
-            foreach (var (rejected, unknown) in FlagCombinations())
+            foreach (var failure in AllStates(stage))
             {
-                var code = Classify(stage, shape, rejected, unknown);
-
+                var code = ProxyJumpFailureClassifier.Classify(failure);
                 Assert.NotEqual(SshConnectionErrorCode.HostKeyUnknown, code);
                 Assert.NotEqual(SshConnectionErrorCode.HostKeyMismatch, code);
+                Assert.DoesNotContain(code, DirectNetworkCodes);
             }
         }
     }
 
-    [Theory]
-    [MemberData(nameof(Shapes))]
-    public void Cancellation_is_stage_neutral(string shape)
+    [Fact]
+    public void Cancellation_wins_on_every_stage()
     {
         foreach (var stage in Enum.GetValues<ProxyJumpStage>())
         {
-            Assert.Equal(
-                SshConnectionErrorCode.Cancelled,
-                ProxyJumpFailureClassifier.Classify(stage, ShapeFactories[shape](), true, true, cancelled: true));
+            foreach (var failure in AllStates(stage).Where(f => f.Cancelled))
+            {
+                Assert.Equal(SshConnectionErrorCode.Cancelled, ProxyJumpFailureClassifier.Classify(failure));
+            }
         }
+    }
+
+    [Fact]
+    public void Tunnel_listen_is_always_local()
+    {
+        foreach (var failure in AllStates(ProxyJumpStage.TunnelListen).Where(f => !f.Cancelled))
+        {
+            Assert.Equal(SshConnectionErrorCode.LocalTunnelFailed, ProxyJumpFailureClassifier.Classify(failure));
+        }
+    }
+
+    [Fact]
+    public void A_target_that_never_identified_is_unreachable_via_the_jump_regardless_of_the_exception()
+    {
+        // Channel refused (prohibited), jump-side connect failure, target closed pre-banner: all look like this.
+        foreach (var mapped in Enum.GetValues<SshConnectionErrorCode>().Where(c => c is not (SshConnectionErrorCode.ConnectionTimedOut)))
+        {
+            var failure = Target(mapped) with { IdentificationReceived = false };
+            Assert.Equal(SshConnectionErrorCode.TargetUnreachableViaJump, ProxyJumpFailureClassifier.Classify(failure));
+        }
+    }
+
+    [Fact]
+    public void Order_is_cancelled_then_timeout_then_jump_drop_then_identification()
+    {
+        var worst = Target(SshConnectionErrorCode.RemoteDisconnected) with
+        {
+            Cancelled = true,
+            TimedOut = true,
+            JumpConnected = false,
+            IdentificationReceived = false
+        };
+
+        Assert.Equal(SshConnectionErrorCode.Cancelled, ProxyJumpFailureClassifier.Classify(worst));
+        Assert.Equal(SshConnectionErrorCode.ConnectionTimedOut, ProxyJumpFailureClassifier.Classify(worst with { Cancelled = false }));
+        Assert.Equal(SshConnectionErrorCode.JumpConnectionFailed, ProxyJumpFailureClassifier.Classify(worst with { Cancelled = false, TimedOut = false }));
+        Assert.Equal(
+            SshConnectionErrorCode.TargetUnreachableViaJump,
+            ProxyJumpFailureClassifier.Classify(worst with { Cancelled = false, TimedOut = false, JumpConnected = true }));
+    }
+
+    [Fact]
+    public void Identified_target_shapes_keep_their_target_codes()
+    {
+        Assert.Equal(SshConnectionErrorCode.RoutedHostKeyUnknown, ProxyJumpFailureClassifier.Classify(
+            Target(SshConnectionErrorCode.HostKeyMismatch) with { HostKeyRejected = true, HostKeyUnknown = true }));
+        Assert.Equal(SshConnectionErrorCode.RoutedHostKeyMismatch, ProxyJumpFailureClassifier.Classify(
+            Target(SshConnectionErrorCode.HostKeyMismatch) with { HostKeyRejected = true }));
+        Assert.Equal(SshConnectionErrorCode.AuthenticationFailed, ProxyJumpFailureClassifier.Classify(Target(SshConnectionErrorCode.AuthenticationFailed)));
+        Assert.Equal(SshConnectionErrorCode.ConnectionTimedOut, ProxyJumpFailureClassifier.Classify(Target(SshConnectionErrorCode.ConnectionTimedOut)));
+        Assert.Equal(SshConnectionErrorCode.ConnectionTimedOut, ProxyJumpFailureClassifier.Classify(Target(SshConnectionErrorCode.Cancelled)));
+        Assert.Equal(SshConnectionErrorCode.RemoteDisconnected, ProxyJumpFailureClassifier.Classify(Target(SshConnectionErrorCode.RemoteDisconnected)));
+        Assert.Equal(SshConnectionErrorCode.ProtocolError, ProxyJumpFailureClassifier.Classify(Target(SshConnectionErrorCode.ProtocolError)));
+        Assert.Equal(SshConnectionErrorCode.TargetUnreachableViaJump, ProxyJumpFailureClassifier.Classify(Target(SshConnectionErrorCode.ConnectionRefused)));
+        Assert.Equal(SshConnectionErrorCode.Unexpected, ProxyJumpFailureClassifier.Classify(Target(SshConnectionErrorCode.None)));
     }
 
     [Fact]
     public void Measured_jump_shapes_map_to_their_jump_codes()
     {
-        Assert.Equal(SshConnectionErrorCode.JumpAuthenticationFailed, Classify(ProxyJumpStage.Jump, "auth"));
-        Assert.Equal(SshConnectionErrorCode.JumpHostKeyUnknown, Classify(ProxyJumpStage.Jump, "hostkey-rejected", rejected: true, unknown: true));
-        Assert.Equal(SshConnectionErrorCode.JumpHostKeyMismatch, Classify(ProxyJumpStage.Jump, "hostkey-rejected", rejected: true, unknown: false));
-        Assert.Equal(SshConnectionErrorCode.JumpConnectionFailed, Classify(ProxyJumpStage.Jump, "socket-refused"));
-        Assert.Equal(SshConnectionErrorCode.JumpConnectionFailed, Classify(ProxyJumpStage.Jump, "socket-dns"));
-        Assert.Equal(SshConnectionErrorCode.JumpConnectionFailed, Classify(ProxyJumpStage.Jump, "timeout"));
-        Assert.Equal(SshConnectionErrorCode.JumpCredentialUnavailable, Classify(ProxyJumpStage.Jump, "key-load"));
+        Assert.Equal(SshConnectionErrorCode.JumpAuthenticationFailed, Classify(Jump(SshConnectionErrorCode.AuthenticationFailed)));
+        Assert.Equal(SshConnectionErrorCode.JumpHostKeyUnknown, Classify(Jump(SshConnectionErrorCode.HostKeyMismatch) with { HostKeyRejected = true, HostKeyUnknown = true }));
+        Assert.Equal(SshConnectionErrorCode.JumpHostKeyMismatch, Classify(Jump(SshConnectionErrorCode.HostKeyMismatch) with { HostKeyRejected = true }));
+        Assert.Equal(SshConnectionErrorCode.JumpConnectionFailed, Classify(Jump(SshConnectionErrorCode.ConnectionRefused)));
+        Assert.Equal(SshConnectionErrorCode.JumpConnectionFailed, Classify(Jump(SshConnectionErrorCode.DnsResolutionFailed)));
+        Assert.Equal(SshConnectionErrorCode.JumpConnectionFailed, Classify(Jump(SshConnectionErrorCode.ConnectionTimedOut)));
+        Assert.Equal(SshConnectionErrorCode.JumpCredentialUnavailable, Classify(Jump(SshConnectionErrorCode.PrivateKeyInvalid)));
+        Assert.Equal(SshConnectionErrorCode.JumpCredentialUnavailable, Classify(Jump(SshConnectionErrorCode.PrivateKeyUnavailable)));
     }
 
     [Fact]
-    public void Channel_refusal_is_target_unreachable_via_jump()
+    public void Undefined_stage_is_rejected()
     {
-        // The refusal surfaces ONLY on the target client, as "closed before identification".
-        Assert.Equal(SshConnectionErrorCode.TargetUnreachableViaJump, Classify(ProxyJumpStage.Target, "closed-before-identification"));
-        Assert.Equal(SshConnectionErrorCode.TargetUnreachableViaJump, Classify(ProxyJumpStage.Channel, "closed-before-identification"));
-        Assert.Equal(SshConnectionErrorCode.TargetUnreachableViaJump, Classify(ProxyJumpStage.Channel, "socket-refused"));
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            ProxyJumpFailureClassifier.Classify(new ProxyJumpFailure { Stage = (ProxyJumpStage)99 }));
     }
 
     [Fact]
-    public void Target_socket_failures_are_the_tunnel_not_a_target_network_diagnosis()
+    public void The_classifier_has_no_exception_input()
     {
-        Assert.Equal(SshConnectionErrorCode.TargetUnreachableViaJump, Classify(ProxyJumpStage.Target, "socket-refused"));
-        Assert.Equal(SshConnectionErrorCode.TargetUnreachableViaJump, Classify(ProxyJumpStage.Target, "socket-dns"));
-        Assert.Equal(SshConnectionErrorCode.TargetUnreachableViaJump, Classify(ProxyJumpStage.Target, "wrapped-socket"));
+        // §3: the SSH.NET message-text dependency is gone; the only public entry point takes the state record.
+        var method = Assert.Single(typeof(ProxyJumpFailureClassifier).GetMethods(), m => m.Name == "Classify");
+        Assert.Equal([typeof(ProxyJumpFailure).MakeByRefType()], method.GetParameters().Select(p => p.ParameterType));
+        Assert.DoesNotContain(
+            typeof(ProxyJumpFailure).GetProperties(),
+            p => typeof(Exception).IsAssignableFrom(p.PropertyType) || p.PropertyType == typeof(string));
     }
 
-    [Fact]
-    public void Target_shapes_keep_their_target_codes()
+    private static SshConnectionErrorCode Classify(ProxyJumpFailure failure) => ProxyJumpFailureClassifier.Classify(failure);
+
+    private static ProxyJumpFailure Jump(SshConnectionErrorCode mapped) => new()
     {
-        Assert.Equal(SshConnectionErrorCode.AuthenticationFailed, Classify(ProxyJumpStage.Target, "auth"));
-        Assert.Equal(SshConnectionErrorCode.RoutedHostKeyUnknown, Classify(ProxyJumpStage.Target, "hostkey-rejected", rejected: true, unknown: true));
-        Assert.Equal(SshConnectionErrorCode.RoutedHostKeyMismatch, Classify(ProxyJumpStage.Target, "hostkey-rejected", rejected: true, unknown: false));
-        Assert.Equal(SshConnectionErrorCode.ConnectionTimedOut, Classify(ProxyJumpStage.Target, "timeout"));
-        Assert.Equal(SshConnectionErrorCode.ConnectionTimedOut, Classify(ProxyJumpStage.Target, "operation-cancelled"));
-        Assert.Equal(SshConnectionErrorCode.RemoteDisconnected, Classify(ProxyJumpStage.Target, "connection-lost"));
-        Assert.Equal(SshConnectionErrorCode.ProtocolError, Classify(ProxyJumpStage.Target, "protocol"));
-    }
+        Stage = ProxyJumpStage.Jump,
+        MappedCode = mapped,
+        IdentificationReceived = true
+    };
 
-    [Fact]
-    public void Undefined_stage_and_null_exception_are_rejected()
+    private static ProxyJumpFailure Target(SshConnectionErrorCode mapped) => new()
     {
-        Assert.Throws<ArgumentOutOfRangeException>(() => ProxyJumpFailureClassifier.Classify(
-            (ProxyJumpStage)99, new SshException("x"), false, false, false));
-        Assert.Throws<ArgumentNullException>(() => ProxyJumpFailureClassifier.Classify(
-            ProxyJumpStage.Jump, null!, false, false, false));
+        Stage = ProxyJumpStage.Target,
+        MappedCode = mapped,
+        JumpConnected = true,
+        IdentificationReceived = true
+    };
+
+    private static IEnumerable<ProxyJumpFailure> AllStates(ProxyJumpStage stage)
+    {
+        bool[] bits = [false, true];
+        foreach (var mapped in Enum.GetValues<SshConnectionErrorCode>())
+        foreach (var cancelled in bits)
+        foreach (var timedOut in bits)
+        foreach (var jumpConnected in bits)
+        foreach (var identified in bits)
+        foreach (var rejected in bits)
+        foreach (var unknown in bits)
+        {
+            yield return new ProxyJumpFailure
+            {
+                Stage = stage,
+                MappedCode = mapped,
+                Cancelled = cancelled,
+                TimedOut = timedOut,
+                JumpConnected = jumpConnected,
+                IdentificationReceived = identified,
+                HostKeyRejected = rejected,
+                HostKeyUnknown = unknown
+            };
+        }
     }
-
-    private static SshConnectionErrorCode Classify(
-        ProxyJumpStage stage,
-        string shape,
-        bool rejected = false,
-        bool unknown = false) =>
-        ProxyJumpFailureClassifier.Classify(stage, ShapeFactories[shape](), rejected, unknown, cancelled: false);
-
-    private static IEnumerable<(bool Rejected, bool Unknown)> FlagCombinations() =>
-        [(false, false), (true, false), (true, true), (false, true)];
 }

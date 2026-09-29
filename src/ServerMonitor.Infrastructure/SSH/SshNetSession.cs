@@ -14,7 +14,8 @@ namespace ServerMonitor.Infrastructure.SSH;
 internal sealed class SshNetSession(
     ConnectionInfo connectionInfo,
     Renci.SshNet.AuthenticationMethod authentication,
-    IDisposable? authenticationResource) : ISshSession
+    IDisposable? authenticationResource,
+    ISshConnectGate? connectGate = null) : ISshSession
 {
     private const int DefaultOutputLimit = 256 * 1024;
     private const int SmallOutputLimit = 16 * 1024;
@@ -100,7 +101,16 @@ internal sealed class SshNetSession(
         _client.HostKeyReceived += OnHostKeyReceived;
         try
         {
-            await _client.ConnectAsync(cancellationToken).ConfigureAwait(false);
+            // The gate (jump tunnel only) admits exactly the one loopback connection this connect opens.
+            connectGate?.BeforeConnect();
+            try
+            {
+                await _client.ConnectAsync(cancellationToken).ConfigureAwait(false);
+            }
+            finally
+            {
+                connectGate?.AfterConnect();
+            }
 
             var detectedOperatingSystem = ServerOperatingSystem.Unknown;
             LinuxMetricsRawData? linuxMetrics = null;
@@ -140,7 +150,8 @@ internal sealed class SshNetSession(
                 DetectedOperatingSystem = detectedOperatingSystem,
                 LinuxMetrics = linuxMetrics,
                 MacOsMetrics = macOsMetrics,
-                Workloads = workloads
+                Workloads = workloads,
+                IdentificationReceived = true
             };
         }
         catch (Exception exception)
@@ -151,7 +162,10 @@ internal sealed class SshNetSession(
                     ? SshConnectionErrorCode.HostKeyMismatch
                     : SshExceptionMapper.Map(exception),
                 PresentedHostKey = presentedHostKey,
-                ExceptionType = exception.GetType().Name
+                ExceptionType = exception.GetType().Name,
+                HostKeyRejected = hostKeyWasRejected,
+                // Structural, not textual (M14.4b-2 §3): set only once the peer's version line arrived.
+                IdentificationReceived = !string.IsNullOrEmpty(connectionInfo.ServerVersion)
             };
         }
         finally

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Logging;
 using ServerMonitor.Core.Enums;
 using ServerMonitor.Core.Interfaces;
@@ -14,28 +15,37 @@ public sealed class SshConnectionService
     : ISshConnectionService, ILinuxMetricsRemoteSource, IMacOsMetricsRemoteSource, IWorkloadRemoteSource
 {
     private readonly IHostKeyTrustStore _hostKeyTrustStore;
+    private readonly IRoutedHostKeyTrustStore _routedHostKeyTrustStore;
     private readonly IServerCredentialStore _credentialStore;
     private readonly ILogger<SshConnectionService> _logger;
     private readonly ISshSessionFactory _sessionFactory;
+    private readonly IJumpTunnelFactory _tunnelFactory;
 
     public SshConnectionService(
         IHostKeyTrustStore hostKeyTrustStore,
+        IRoutedHostKeyTrustStore routedHostKeyTrustStore,
         IServerCredentialStore credentialStore,
         ILogger<SshConnectionService> logger)
-        : this(hostKeyTrustStore, credentialStore, logger, new SshNetSessionFactory())
+        : this(hostKeyTrustStore, routedHostKeyTrustStore, credentialStore, logger, new SshNetSessionFactory(), null)
     {
     }
 
     internal SshConnectionService(
         IHostKeyTrustStore hostKeyTrustStore,
+        IRoutedHostKeyTrustStore routedHostKeyTrustStore,
         IServerCredentialStore credentialStore,
         ILogger<SshConnectionService> logger,
-        ISshSessionFactory sessionFactory)
+        ISshSessionFactory sessionFactory,
+        IJumpTunnelFactory? tunnelFactory)
     {
         _hostKeyTrustStore = hostKeyTrustStore ?? throw new ArgumentNullException(nameof(hostKeyTrustStore));
+        _routedHostKeyTrustStore = routedHostKeyTrustStore ?? throw new ArgumentNullException(nameof(routedHostKeyTrustStore));
         _credentialStore = credentialStore ?? throw new ArgumentNullException(nameof(credentialStore));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _sessionFactory = sessionFactory ?? throw new ArgumentNullException(nameof(sessionFactory));
+        _tunnelFactory = tunnelFactory ?? new SshNetJumpTunnelFactory(
+            _sessionFactory as ISshDialSessionFactory ?? new SshNetSessionFactory(),
+            _logger);
     }
 
     public Task<SshConnectionResult> ConnectAsync(
@@ -173,6 +183,22 @@ public sealed class SshConnectionService
         CancellationToken cancellationToken)
     {
         var stopwatch = Stopwatch.StartNew();
+
+        // A routed server is ONLY ever dialled through its jump host. Anything carrying a route - valid or
+        // not - takes the routed path, which fails closed; it never falls through to a direct dial.
+        if (request?.Server is { Route: not null })
+        {
+            return await ExecuteRoutedAsync(
+                    request,
+                    operation,
+                    cpuSampleInterval,
+                    captureSession,
+                    workloadPlan,
+                    stopwatch,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+
         if (!TryValidate(request, out var endpoint))
         {
             return Complete(
@@ -207,7 +233,8 @@ public sealed class SshConnectionService
                     SshConnectionErrorCode.HostKeyUnknown,
                     stopwatch.Elapsed,
                     request.Timeout,
-                    probe.PresentedHostKey);
+                    probe.PresentedHostKey,
+                    hostKeyEndpoint: endpoint);
             }
 
             if (trustedHostKey is not null &&
@@ -220,7 +247,8 @@ public sealed class SshConnectionService
                     stopwatch.Elapsed,
                     request.Timeout,
                     probe.PresentedHostKey,
-                    trustedHostKey);
+                    trustedHostKey,
+                    hostKeyEndpoint: endpoint);
             }
 
             if (probe.PresentedHostKey is null ||
@@ -236,9 +264,17 @@ public sealed class SshConnectionService
                     exceptionType: probe.ExceptionType);
             }
 
-            var sessionResult = await ConnectAuthenticatedAsync(
+            var server = request.Server;
+            var (sessionResult, _) = await ConnectAuthenticatedAsync(
                     request,
-                    trustedHostKey!,
+                    identity => trustedHostKey!.Identity.Matches(identity),
+                    login => login.Kind == SshLoginKind.Password
+                        ? _sessionFactory.CreatePasswordSession(server, login.Password!, request.Timeout)
+                        : _sessionFactory.CreatePrivateKeySession(
+                            server,
+                            login.PrivateKeyPath!,
+                            login.Passphrase,
+                            request.Timeout),
                     operation,
                     cpuSampleInterval,
                     workloadPlan,
@@ -293,9 +329,356 @@ public sealed class SshConnectionService
             .ConfigureAwait(false);
     }
 
-    private async Task<SshSessionResult> ConnectAuthenticatedAsync(
+    /// <summary>
+    /// M14.4b-2: one single-hop ProxyJump operation. Probe-before-auth holds for BOTH hops: the jump's key is
+    /// checked against the DIRECT store (jump endpoint) before any jump credential is read; the target's key is
+    /// checked, through the tunnel, against the ROUTED store (jump endpoint + LOGICAL target, never the loopback)
+    /// before any target credential is read. Nothing is ever trusted automatically on this path. One tunnel per
+    /// operation, torn down (await using) before this method returns; one linked deadline spans both hops.
+    /// </summary>
+    private async Task<SshConnectionResult> ExecuteRoutedAsync(
         SshConnectionRequest request,
-        TrustedHostKey trustedHostKey,
+        SshSessionOperation operation,
+        TimeSpan cpuSampleInterval,
+        Action<SshSessionResult>? captureSession,
+        WorkloadCollectionPlan workloadPlan,
+        Stopwatch stopwatch,
+        CancellationToken cancellationToken)
+    {
+        var server = request.Server;
+        if (!TryValidate(request, out var targetEndpoint)
+            || server.Route?.Jump is not { } jump
+            || !TryValidateJump(jump, out var jumpEndpoint))
+        {
+            return Complete(server, SshConnectionErrorCode.InvalidConfiguration, stopwatch.Elapsed, request.Timeout);
+        }
+
+        var route = SshRoute.Create(jumpEndpoint, targetEndpoint);
+        var jumpDial = new SshDialTarget(jump.Host.Trim(), jump.Port, jump.Username.Trim());
+
+        using var timeoutSource = new CancellationTokenSource(request.Timeout);
+        using var linkedSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutSource.Token);
+        var token = linkedSource.Token;
+
+        try
+        {
+            // ---- Hop 1: the jump host, verified against the DIRECT store under its own endpoint. ----
+            var trustedJumpKey = await _hostKeyTrustStore.GetAsync(jumpEndpoint, token).ConfigureAwait(false);
+            SshSessionResult jumpProbe;
+            using (var probe = _sessionFactory.CreateJumpHostKeyProbe(jumpDial, request.Timeout))
+            {
+                jumpProbe = await probe.ConnectAsync(
+                        identity => trustedJumpKey is not null && trustedJumpKey.Identity.Matches(identity),
+                        token)
+                    .ConfigureAwait(false);
+            }
+
+            if (trustedJumpKey is null && jumpProbe.PresentedHostKey is not null)
+            {
+                return CompleteHop(server, SshConnectionErrorCode.JumpHostKeyUnknown, stopwatch, request,
+                    jumpProbe.PresentedHostKey, SshHostKeyHop.Jump, endpoint: jumpEndpoint);
+            }
+
+            if (trustedJumpKey is not null && jumpProbe.PresentedHostKey is not null
+                && !trustedJumpKey.Identity.Matches(jumpProbe.PresentedHostKey))
+            {
+                return CompleteHop(server, SshConnectionErrorCode.JumpHostKeyMismatch, stopwatch, request,
+                    jumpProbe.PresentedHostKey, SshHostKeyHop.Jump, endpoint: jumpEndpoint, trusted: trustedJumpKey);
+            }
+
+            if (jumpProbe.PresentedHostKey is null
+                || jumpProbe.ErrorCode is not (SshConnectionErrorCode.None or SshConnectionErrorCode.AuthenticationFailed))
+            {
+                return Complete(
+                    server,
+                    ClassifyJump(jumpProbe, hostKeyUnknown: trustedJumpKey is null, cancellationToken),
+                    stopwatch.Elapsed,
+                    request.Timeout,
+                    exceptionType: jumpProbe.ExceptionType);
+            }
+
+            var verifiedJumpKey = trustedJumpKey!;
+
+            // The jump key is trusted: only now is the jump credential read.
+            var (jumpLogin, jumpSecret) = await ResolveJumpLoginAsync(server, jump, request.JumpCredentialOverride, token)
+                .ConfigureAwait(false);
+            IJumpTunnel tunnel;
+            try
+            {
+                if (jumpLogin is null)
+                {
+                    return Complete(server, SshConnectionErrorCode.JumpCredentialUnavailable, stopwatch.Elapsed, request.Timeout);
+                }
+
+                try
+                {
+                    tunnel = _tunnelFactory.Create(jumpDial, jumpLogin, targetEndpoint, request.Timeout);
+                }
+                catch (Exception exception) when (exception is IOException
+                                                      or UnauthorizedAccessException
+                                                      or SshPrivateKeyLoadException)
+                {
+                    return Complete(server, SshConnectionErrorCode.JumpCredentialUnavailable, stopwatch.Elapsed,
+                        request.Timeout, exceptionType: exception.GetType().Name);
+                }
+            }
+            finally
+            {
+                jumpSecret?.Dispose();
+            }
+
+            await using (tunnel.ConfigureAwait(false))
+            {
+                var open = await tunnel
+                    .OpenAsync(identity => verifiedJumpKey.Identity.Matches(identity), token)
+                    .ConfigureAwait(false);
+                if (!open.IsOpen)
+                {
+                    var openCode = open.Stage == JumpTunnelOpenStage.TunnelListen
+                        ? ProxyJumpFailureClassifier.Classify(new ProxyJumpFailure
+                        {
+                            Stage = ProxyJumpStage.TunnelListen,
+                            Cancelled = cancellationToken.IsCancellationRequested
+                        })
+                        : ClassifyJump(open.JumpResult!, hostKeyUnknown: false, cancellationToken);
+                    return Complete(server, openCode, stopwatch.Elapsed, request.Timeout,
+                        exceptionType: open.ExceptionType ?? open.JumpResult?.ExceptionType);
+                }
+
+                // ---- Hop 2: the target through the tunnel, verified against the ROUTED store. ----
+                var trustedTargetKey = await _routedHostKeyTrustStore.GetAsync(route, token).ConfigureAwait(false);
+                SshSessionResult targetProbe;
+                using (var probe = tunnel.CreateTargetSession(server.Username.Trim(), SshLogin.None, request.Timeout))
+                {
+                    targetProbe = await probe.ConnectAsync(
+                            identity => trustedTargetKey is not null && trustedTargetKey.Identity.Matches(identity),
+                            token)
+                        .ConfigureAwait(false);
+                }
+
+                if (trustedTargetKey is null && targetProbe.PresentedHostKey is not null)
+                {
+                    return CompleteHop(server, SshConnectionErrorCode.RoutedHostKeyUnknown, stopwatch, request,
+                        targetProbe.PresentedHostKey, SshHostKeyHop.Target, route: route);
+                }
+
+                if (trustedTargetKey is not null && targetProbe.PresentedHostKey is not null
+                    && !trustedTargetKey.Identity.Matches(targetProbe.PresentedHostKey))
+                {
+                    return CompleteHop(server, SshConnectionErrorCode.RoutedHostKeyMismatch, stopwatch, request,
+                        targetProbe.PresentedHostKey, SshHostKeyHop.Target, route: route, trustedRouted: trustedTargetKey);
+                }
+
+                if (targetProbe.PresentedHostKey is null
+                    || targetProbe.ErrorCode is not (SshConnectionErrorCode.None or SshConnectionErrorCode.AuthenticationFailed))
+                {
+                    return Complete(
+                        server,
+                        ClassifyTarget(targetProbe, trustedTargetKey is null, tunnel, cancellationToken, timeoutSource),
+                        stopwatch.Elapsed,
+                        request.Timeout,
+                        exceptionType: targetProbe.ExceptionType);
+                }
+
+                var verifiedTargetKey = trustedTargetKey!;
+                var username = server.Username.Trim();
+                var (sessionResult, sessionRan) = await ConnectAuthenticatedAsync(
+                        request,
+                        identity => verifiedTargetKey.Identity.Matches(identity),
+                        login => tunnel.CreateTargetSession(username, login, request.Timeout),
+                        operation,
+                        cpuSampleInterval,
+                        workloadPlan,
+                        token)
+                    .ConfigureAwait(false);
+
+                captureSession?.Invoke(sessionResult);
+
+                var code = sessionResult.IsSuccess || !sessionRan
+                    ? sessionResult.ErrorCode
+                    : ClassifyTarget(sessionResult, hostKeyUnknown: false, tunnel, cancellationToken, timeoutSource);
+                return Complete(
+                    server,
+                    code,
+                    stopwatch.Elapsed,
+                    request.Timeout,
+                    detectedOperatingSystem: sessionResult.DetectedOperatingSystem,
+                    exceptionType: sessionResult.ExceptionType);
+            }
+        }
+        catch (OperationCanceledException exception)
+        {
+            var error = cancellationToken.IsCancellationRequested
+                ? SshConnectionErrorCode.Cancelled
+                : SshConnectionErrorCode.ConnectionTimedOut;
+            return Complete(server, error, stopwatch.Elapsed, request.Timeout, exceptionType: exception.GetType().Name);
+        }
+        catch (Exception exception)
+        {
+            // Never a direct diagnosis for a routed server.
+            return Complete(server, SshConnectionErrorCode.Unexpected, stopwatch.Elapsed, request.Timeout,
+                exceptionType: exception.GetType().Name);
+        }
+    }
+
+    private static SshConnectionErrorCode ClassifyJump(
+        SshSessionResult result,
+        bool hostKeyUnknown,
+        CancellationToken callerToken) =>
+        ProxyJumpFailureClassifier.Classify(new ProxyJumpFailure
+        {
+            Stage = ProxyJumpStage.Jump,
+            Cancelled = callerToken.IsCancellationRequested,
+            IdentificationReceived = result.IdentificationReceived,
+            HostKeyRejected = result.HostKeyRejected || result.ErrorCode == SshConnectionErrorCode.HostKeyMismatch,
+            HostKeyUnknown = hostKeyUnknown,
+            MappedCode = result.ErrorCode
+        });
+
+    private static SshConnectionErrorCode ClassifyTarget(
+        SshSessionResult result,
+        bool hostKeyUnknown,
+        IJumpTunnel tunnel,
+        CancellationToken callerToken,
+        CancellationTokenSource timeoutSource) =>
+        ProxyJumpFailureClassifier.Classify(new ProxyJumpFailure
+        {
+            Stage = ProxyJumpStage.Target,
+            Cancelled = callerToken.IsCancellationRequested,
+            TimedOut = timeoutSource.IsCancellationRequested || result.ErrorCode == SshConnectionErrorCode.ConnectionTimedOut,
+            JumpConnected = tunnel.IsJumpConnected,
+            IdentificationReceived = result.IdentificationReceived,
+            HostKeyRejected = result.HostKeyRejected || result.ErrorCode == SshConnectionErrorCode.HostKeyMismatch,
+            HostKeyUnknown = hostKeyUnknown,
+            MappedCode = result.ErrorCode
+        });
+
+    /// <summary>
+    /// The jump host's login: its own credential reference (<see cref="ServerCredentialKind.JumpPassword"/> /
+    /// <see cref="ServerCredentialKind.JumpPrivateKeyPassphrase"/>) or the editor's unsaved
+    /// <see cref="SshConnectionRequest.JumpCredentialOverride"/>. Never the target's credential. A null login
+    /// means the jump credential is unavailable.
+    /// </summary>
+    private async Task<(SshLogin? Login, SecretValue? Stored)> ResolveJumpLoginAsync(
+        Server server,
+        JumpHop jump,
+        SecretValue? jumpOverride,
+        CancellationToken cancellationToken)
+    {
+        switch (jump.AuthenticationMethod)
+        {
+            case AuthenticationMethod.Password:
+            {
+                var secret = jumpOverride;
+                SecretValue? stored = null;
+                if (secret is null)
+                {
+                    if (jump.CredentialReferenceId is not { } referenceId || referenceId == Guid.Empty)
+                    {
+                        return (null, null);
+                    }
+
+                    stored = await _credentialStore.ReadAsync(
+                            new CredentialReference(server.Id, ServerCredentialKind.JumpPassword, referenceId),
+                            cancellationToken)
+                        .ConfigureAwait(false);
+                    secret = stored;
+                }
+
+                return secret is null
+                    ? (null, null)
+                    : (new SshLogin(SshLoginKind.Password, Password: secret.RevealAsString()), stored);
+            }
+
+            case AuthenticationMethod.SshKey:
+            {
+                if (string.IsNullOrWhiteSpace(jump.PrivateKeyPath))
+                {
+                    return (null, null);
+                }
+
+                var passphrase = jumpOverride;
+                SecretValue? stored = null;
+                if (passphrase is null && jump.CredentialReferenceId is { } referenceId && referenceId != Guid.Empty)
+                {
+                    stored = await _credentialStore.ReadAsync(
+                            new CredentialReference(server.Id, ServerCredentialKind.JumpPrivateKeyPassphrase, referenceId),
+                            cancellationToken)
+                        .ConfigureAwait(false);
+                    if (stored is null)
+                    {
+                        return (null, null);
+                    }
+
+                    passphrase = stored;
+                }
+
+                return (new SshLogin(
+                        SshLoginKind.PrivateKey,
+                        PrivateKeyPath: jump.PrivateKeyPath,
+                        Passphrase: passphrase?.RevealAsString()),
+                    stored);
+            }
+
+            default:
+                return (null, null);
+        }
+    }
+
+    private static bool TryValidateJump(JumpHop jump, out SshEndpoint endpoint)
+    {
+        endpoint = new SshEndpoint(string.Empty, 0);
+        if (string.IsNullOrWhiteSpace(jump.Host)
+            || string.IsNullOrWhiteSpace(jump.Username)
+            || jump.Port is < 1 or > 65535)
+        {
+            return false;
+        }
+
+        try
+        {
+            endpoint = SshEndpoint.Create(jump.Host, jump.Port);
+            return true;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+    }
+
+    private SshConnectionResult CompleteHop(
+        Server server,
+        SshConnectionErrorCode errorCode,
+        Stopwatch stopwatch,
+        SshConnectionRequest request,
+        HostKeyIdentity presentedHostKey,
+        SshHostKeyHop hop,
+        SshEndpoint? endpoint = null,
+        SshRoute? route = null,
+        TrustedHostKey? trusted = null,
+        TrustedRoutedHostKey? trustedRouted = null) =>
+        Complete(
+            server,
+            errorCode,
+            stopwatch.Elapsed,
+            request.Timeout,
+            presentedHostKey,
+            trusted,
+            hop: hop,
+            hostKeyEndpoint: endpoint,
+            hostKeyRoute: route,
+            trustedRoutedHostKey: trustedRouted);
+
+    /// <summary>
+    /// Resolves the TARGET's credential (only after its host key was verified by the caller) and runs the
+    /// operation in one authenticated session created by <paramref name="createSession"/>. SessionRan is false
+    /// when no session was attempted (a credential problem), so a routed caller never reads a missing
+    /// identification into it.
+    /// </summary>
+    private async Task<(SshSessionResult Result, bool SessionRan)> ConnectAuthenticatedAsync(
+        SshConnectionRequest request,
+        Func<HostKeyIdentity, bool> verifier,
+        Func<SshLogin, ISshSession> createSession,
         SshSessionOperation operation,
         TimeSpan cpuSampleInterval,
         WorkloadCollectionPlan workloadPlan,
@@ -316,7 +699,7 @@ public sealed class SshConnectionService
                     {
                         if (server.CredentialReferenceId is not { } referenceId || referenceId == Guid.Empty)
                         {
-                            return Failure(SshConnectionErrorCode.CredentialNotConfigured);
+                            return (Failure(SshConnectionErrorCode.CredentialNotConfigured), false);
                         }
 
                         storedSecret = await _credentialStore.ReadAsync(
@@ -328,13 +711,10 @@ public sealed class SshConnectionService
 
                     if (secret is null)
                     {
-                        return Failure(SshConnectionErrorCode.CredentialUnavailable);
+                        return (Failure(SshConnectionErrorCode.CredentialUnavailable), false);
                     }
 
-                    session = _sessionFactory.CreatePasswordSession(
-                        server,
-                        secret.RevealAsString(),
-                        request.Timeout);
+                    session = createSession(new SshLogin(SshLoginKind.Password, Password: secret.RevealAsString()));
                     break;
                 }
 
@@ -342,7 +722,7 @@ public sealed class SshConnectionService
                 {
                     if (string.IsNullOrWhiteSpace(server.PrivateKeyPath))
                     {
-                        return Failure(SshConnectionErrorCode.PrivateKeyUnavailable);
+                        return (Failure(SshConnectionErrorCode.PrivateKeyUnavailable), false);
                     }
 
                     var passphrase = request.CredentialOverride;
@@ -358,7 +738,7 @@ public sealed class SshConnectionService
 
                         if (storedSecret is null)
                         {
-                            return Failure(SshConnectionErrorCode.CredentialUnavailable);
+                            return (Failure(SshConnectionErrorCode.CredentialUnavailable), false);
                         }
 
                         passphrase = storedSecret;
@@ -366,32 +746,30 @@ public sealed class SshConnectionService
 
                     try
                     {
-                        session = _sessionFactory.CreatePrivateKeySession(
-                            server,
-                            server.PrivateKeyPath,
-                            passphrase?.RevealAsString(),
-                            request.Timeout);
+                        session = createSession(new SshLogin(
+                            SshLoginKind.PrivateKey,
+                            PrivateKeyPath: server.PrivateKeyPath,
+                            Passphrase: passphrase?.RevealAsString()));
                     }
                     catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
                     {
-                        return Failure(SshConnectionErrorCode.PrivateKeyUnavailable, exception);
+                        return (Failure(SshConnectionErrorCode.PrivateKeyUnavailable, exception), false);
                     }
                     catch (SshPrivateKeyLoadException exception)
                     {
-                        return Failure(SshConnectionErrorCode.PrivateKeyInvalid, exception);
+                        return (Failure(SshConnectionErrorCode.PrivateKeyInvalid, exception), false);
                     }
 
                     break;
                 }
 
                 default:
-                    return Failure(SshConnectionErrorCode.CredentialNotConfigured);
+                    return (Failure(SshConnectionErrorCode.CredentialNotConfigured), false);
             }
 
             using (session)
             {
-                var verifier = (HostKeyIdentity identity) => trustedHostKey.Identity.Matches(identity);
-                return operation switch
+                var result = operation switch
                 {
                     SshSessionOperation.Connect => await session
                         .ConnectAsync(verifier, cancellationToken)
@@ -410,6 +788,7 @@ public sealed class SshConnectionService
                         .ConfigureAwait(false),
                     _ => Failure(SshConnectionErrorCode.Unexpected)
                 };
+                return (result, true);
             }
         }
         finally
@@ -418,16 +797,9 @@ public sealed class SshConnectionService
         }
     }
 
-    private static bool TryValidate(SshConnectionRequest? request, out SshEndpoint endpoint)
+    private static bool TryValidate([NotNullWhen(true)] SshConnectionRequest? request, out SshEndpoint endpoint)
     {
         endpoint = new SshEndpoint(string.Empty, 0);
-
-        // A routed server must never be dialled direct. Until the ProxyJump transport exists it is an
-        // invalid configuration for this service: fail closed before any socket is opened.
-        if (request?.Server is { Route: not null })
-        {
-            return false;
-        }
 
         if (request?.Server is not { } server ||
             string.IsNullOrWhiteSpace(server.Host) ||
@@ -483,8 +855,14 @@ public sealed class SshConnectionService
         HostKeyIdentity? presentedHostKey = null,
         TrustedHostKey? trustedHostKey = null,
         ServerOperatingSystem detectedOperatingSystem = ServerOperatingSystem.Unknown,
-        string? exceptionType = null)
+        string? exceptionType = null,
+        SshHostKeyHop hop = SshHostKeyHop.Direct,
+        SshEndpoint? hostKeyEndpoint = null,
+        SshRoute? hostKeyRoute = null,
+        TrustedRoutedHostKey? trustedRoutedHostKey = null)
     {
+        // C6: only ids, the LOGICAL host, the state and an exception TYPE are logged — never ConnectionInfo,
+        // an authentication method, a credential, command output or the tunnel's loopback port.
         var state = ToState(errorCode);
         if (errorCode == SshConnectionErrorCode.None)
         {
@@ -513,28 +891,33 @@ public sealed class SshConnectionService
             ErrorCode = errorCode,
             PresentedHostKey = presentedHostKey,
             TrustedHostKey = trustedHostKey,
+            HostKeyHop = hop,
+            HostKeyEndpoint = hostKeyEndpoint,
+            HostKeyRoute = hostKeyRoute,
+            TrustedRoutedHostKey = trustedRoutedHostKey,
             DetectedOperatingSystem = detectedOperatingSystem,
             Duration = duration
         };
     }
 
-    // Jump and routed-target host-key codes deliberately map to Error, NOT HostKeyUnknown/HostKeyMismatch:
-    // those states open the editor's trust panel for the TARGET endpoint in the DIRECT store, which is the
-    // wrong store for a jump key and for a key seen through a jump (until the routed trust UI exists).
+    // M14.4b-2: jump and routed-target host-key codes open the trust panel like a direct key does, but the
+    // result's HostKeyHop decides the store (jump → DIRECT store under the jump endpoint; target → ROUTED
+    // store under the SshRoute). The editor never writes a hop's key anywhere else.
     internal static ServerConnectionState ToState(SshConnectionErrorCode errorCode) => errorCode switch
     {
         SshConnectionErrorCode.None => ServerConnectionState.Connected,
         SshConnectionErrorCode.AuthenticationFailed or
         SshConnectionErrorCode.JumpAuthenticationFailed => ServerConnectionState.AuthenticationFailed,
-        SshConnectionErrorCode.JumpHostKeyUnknown or
-        SshConnectionErrorCode.JumpHostKeyMismatch or
         SshConnectionErrorCode.JumpCredentialUnavailable or
-        SshConnectionErrorCode.RoutedHostKeyUnknown or
-        SshConnectionErrorCode.RoutedHostKeyMismatch => ServerConnectionState.Error,
+        SshConnectionErrorCode.LocalTunnelFailed => ServerConnectionState.Error,
         SshConnectionErrorCode.JumpConnectionFailed or
         SshConnectionErrorCode.TargetUnreachableViaJump => ServerConnectionState.Unreachable,
-        SshConnectionErrorCode.HostKeyUnknown => ServerConnectionState.HostKeyUnknown,
-        SshConnectionErrorCode.HostKeyMismatch => ServerConnectionState.HostKeyMismatch,
+        SshConnectionErrorCode.HostKeyUnknown or
+        SshConnectionErrorCode.JumpHostKeyUnknown or
+        SshConnectionErrorCode.RoutedHostKeyUnknown => ServerConnectionState.HostKeyUnknown,
+        SshConnectionErrorCode.HostKeyMismatch or
+        SshConnectionErrorCode.JumpHostKeyMismatch or
+        SshConnectionErrorCode.RoutedHostKeyMismatch => ServerConnectionState.HostKeyMismatch,
         SshConnectionErrorCode.ConnectionTimedOut => ServerConnectionState.TimedOut,
         SshConnectionErrorCode.Cancelled => ServerConnectionState.Cancelled,
         SshConnectionErrorCode.DnsResolutionFailed or

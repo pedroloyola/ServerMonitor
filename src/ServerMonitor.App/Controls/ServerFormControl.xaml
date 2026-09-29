@@ -258,6 +258,102 @@
                     Visibility="{Binding HasSavedPassword, Converter={StaticResource BooleanToVisibilityConverter}}" />
             </StackPanel>
 
+            <Border Height="1" Margin="0,4" Background="{ThemeResource GlassBorderBrush}" />
+
+            <!-- Route: single-hop jump host (M14.4b-2). The server is then reached ONLY through the jump. -->
+            <TextBlock
+                x:Uid="ServerFormRouteTitle"
+                AutomationProperties.HeadingLevel="Level2"
+                Style="{StaticResource SectionTitleTextStyle}" />
+            <CheckBox
+                x:Uid="ServerFormUseJumpHost"
+                IsChecked="{Binding UseJumpHost, Mode=TwoWay}"
+                IsEnabled="{Binding IsNotTestingConnection}" />
+            <StackPanel
+                Spacing="8"
+                Visibility="{Binding UseJumpHost, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <TextBlock
+                    x:Uid="ServerFormJumpHostHint"
+                    FontSize="12"
+                    Foreground="{ThemeResource TextSecondaryBrush}"
+                    TextWrapping="Wrap" />
+                <Grid ColumnSpacing="10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="120" />
+                    </Grid.ColumnDefinitions>
+                    <TextBox
+                        x:Uid="ServerFormJumpHostField"
+                        CornerRadius="{StaticResource RadiusSmall}"
+                        IsEnabled="{Binding IsNotTestingConnection}"
+                        Text="{Binding JumpHost, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    <TextBox
+                        x:Uid="ServerFormJumpPortField"
+                        Grid.Column="1"
+                        CornerRadius="{StaticResource RadiusSmall}"
+                        InputScope="Number"
+                        IsEnabled="{Binding IsNotTestingConnection}"
+                        MaxLength="5"
+                        Text="{Binding JumpPort, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                </Grid>
+                <TextBox
+                    x:Uid="ServerFormJumpUsernameField"
+                    CornerRadius="{StaticResource RadiusSmall}"
+                    IsEnabled="{Binding IsNotTestingConnection}"
+                    Text="{Binding JumpUsername, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                <ComboBox
+                    x:Uid="ServerFormJumpAuthenticationMethodField"
+                    HorizontalAlignment="Stretch"
+                    CornerRadius="{StaticResource RadiusSmall}"
+                    IsEnabled="{Binding IsNotTestingConnection}"
+                    SelectedIndex="{Binding SelectedJumpAuthenticationIndex, Mode=TwoWay}">
+                    <ComboBoxItem x:Uid="JumpAuthenticationSshKeyOption" />
+                    <ComboBoxItem x:Uid="JumpAuthenticationPasswordOption" />
+                </ComboBox>
+                <StackPanel
+                    Spacing="8"
+                    Visibility="{Binding IsJumpPrivateKeyAuthentication, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Grid ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox
+                            x:Uid="ServerFormJumpPrivateKeyPathField"
+                            CornerRadius="{StaticResource RadiusSmall}"
+                            IsReadOnly="True"
+                            Text="{Binding JumpPrivateKeyPath}" />
+                        <Button
+                            x:Uid="ServerFormChooseJumpPrivateKeyButton"
+                            Grid.Column="1"
+                            Margin="0,0,0,1"
+                            VerticalAlignment="Bottom"
+                            Click="OnChooseJumpPrivateKeyClick"
+                            IsEnabled="{Binding IsNotTestingConnection}"
+                            Style="{StaticResource QuietPillButtonStyle}" />
+                    </Grid>
+                    <PasswordBox
+                        x:Name="JumpPassphraseField"
+                        x:Uid="ServerFormJumpPassphraseField"
+                        CornerRadius="{StaticResource RadiusSmall}"
+                        IsEnabled="{Binding IsNotTestingConnection}"
+                        PasswordRevealMode="Peek" />
+                </StackPanel>
+                <PasswordBox
+                    x:Name="JumpPasswordField"
+                    x:Uid="ServerFormJumpPasswordField"
+                    CornerRadius="{StaticResource RadiusSmall}"
+                    IsEnabled="{Binding IsNotTestingConnection}"
+                    PasswordRevealMode="Peek"
+                    Visibility="{Binding IsJumpPasswordAuthentication, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                <TextBlock
+                    x:Uid="ServerFormSavedJumpSecretHint"
+                    FontSize="12"
+                    Foreground="{ThemeResource TextSecondaryBrush}"
+                    TextWrapping="Wrap"
+                    Visibility="{Binding HasSavedJumpSecret, Converter={StaticResource BooleanToVisibilityConverter}}" />
+            </StackPanel>
+
             <!-- Test Connection Row -->
             <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,2,0,0">
                 <Button
@@ -307,7 +403,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel Spacing="2">
                             <TextBlock x:Uid="HostKeyServerLabel" FontSize="11" Foreground="{ThemeResource TextTertiaryBrush}" FontWeight="Medium" />
-                            <TextBlock Text="{Binding EndpointDisplay}" FontWeight="SemiBold" FontSize="12" />
+                            <TextBlock Text="{Binding HostKeySubjectDisplay}" FontWeight="SemiBold" FontSize="12" TextWrapping="Wrap" />
                         </StackPanel>
                         <StackPanel Grid.Column="1" Spacing="2">
                             <TextBlock x:Uid="HostKeyAlgorithmLabel" FontSize="11" Foreground="{ThemeResource TextTertiaryBrush}" FontWeight="Medium" />
@@ -360,6 +456,10 @@
                         FontWeight="SemiBold"
                         Foreground="{ThemeResource StatusCriticalBrush}" />
                     <TextBlock x:Uid="HostKeyMismatchDescription" FontSize="12" Foreground="{ThemeResource TextSecondaryBrush}" TextWrapping="Wrap" />
+                    <StackPanel Spacing="2">
+                        <TextBlock x:Uid="HostKeyMismatchServerLabel" FontSize="11" Foreground="{ThemeResource TextTertiaryBrush}" FontWeight="Medium" />
+                        <TextBlock Text="{Binding HostKeySubjectDisplay}" FontWeight="SemiBold" FontSize="12" TextWrapping="Wrap" />
+                    </StackPanel>
                     <StackPanel Spacing="3">
                         <TextBlock x:Uid="HostKeyKnownFingerprintLabel" FontSize="11" Foreground="{ThemeResource TextTertiaryBrush}" FontWeight="Medium" />
                         <Border

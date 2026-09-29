@@ -55,6 +55,8 @@ internal sealed class FakeLocalizationService : ILocalizationService
             ["SshConfigHostUnsupportedFormat"] = "Unsupported: {0}",
             ["SshConfigHostIgnoredFormat"] = "Ignored (not relevant): {0}",
             ["SshConfigHostBlockedProxyJump"] = "Requires ProxyJump — not supported yet",
+            ["HostKeySubjectJumpFormat"] = "jump host {0}",
+            ["HostKeySubjectTargetFormat"] = "target {0} via {1}",
         };
 
     public string? CurrentLanguageOverride => null;

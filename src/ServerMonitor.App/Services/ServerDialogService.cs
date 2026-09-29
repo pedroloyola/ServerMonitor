@@ -13,6 +13,7 @@ public sealed class ServerDialogService(
     IServerValidator validator,
     ISshConnectionService sshConnectionService,
     IHostKeyTrustStore hostKeyTrustStore,
+    IRoutedHostKeyTrustStore routedHostKeyTrustStore,
     IServerConnectionStateStore connectionStateStore,
     IPrivateKeyFilePicker privateKeyFilePicker,
     ILocalizationService localizationService,
@@ -38,7 +39,8 @@ public sealed class ServerDialogService(
             localizationService,
             server,
             prefill,
-            sshConfigImportSource);
+            sshConfigImportSource,
+            routedHostKeyTrustStore);
 
         try
         {

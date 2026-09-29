@@ -74,7 +74,8 @@ public static class MonitoringOutcomeClassifier
             or SshConnectionErrorCode.RoutedHostKeyMismatch => MonitoringOutcome.NonRetryable,
         // Reachability through the jump is transient like any other network failure.
         SshConnectionErrorCode.JumpConnectionFailed
-            or SshConnectionErrorCode.TargetUnreachableViaJump => MonitoringOutcome.Retryable,
+            or SshConnectionErrorCode.TargetUnreachableViaJump
+            or SshConnectionErrorCode.LocalTunnelFailed => MonitoringOutcome.Retryable,
         SshConnectionErrorCode.Cancelled => MonitoringOutcome.Cancelled,
         _ => MonitoringOutcome.Retryable
     };
