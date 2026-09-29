@@ -65,7 +65,16 @@ public static class MonitoringOutcomeClassifier
             or SshConnectionErrorCode.CredentialUnavailable
             or SshConnectionErrorCode.PrivateKeyUnavailable
             or SshConnectionErrorCode.PrivateKeyInvalid
-            or SshConnectionErrorCode.UnsupportedAlgorithm => MonitoringOutcome.NonRetryable,
+            or SshConnectionErrorCode.UnsupportedAlgorithm
+            or SshConnectionErrorCode.JumpAuthenticationFailed
+            or SshConnectionErrorCode.JumpHostKeyUnknown
+            or SshConnectionErrorCode.JumpHostKeyMismatch
+            or SshConnectionErrorCode.JumpCredentialUnavailable
+            or SshConnectionErrorCode.RoutedHostKeyUnknown
+            or SshConnectionErrorCode.RoutedHostKeyMismatch => MonitoringOutcome.NonRetryable,
+        // Reachability through the jump is transient like any other network failure.
+        SshConnectionErrorCode.JumpConnectionFailed
+            or SshConnectionErrorCode.TargetUnreachableViaJump => MonitoringOutcome.Retryable,
         SshConnectionErrorCode.Cancelled => MonitoringOutcome.Cancelled,
         _ => MonitoringOutcome.Retryable
     };

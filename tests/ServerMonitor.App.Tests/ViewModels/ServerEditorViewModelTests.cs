@@ -167,6 +167,88 @@ public sealed class ServerEditorViewModelTests
     }
 
     [Fact]
+    public void EditingARoutedServer_CarriesTheRouteThrough_NeverDegradingToDirect()
+    {
+        // The editor has no route UI in M14.4b-1: saving an edit must keep the route unchanged.
+        var route = new ServerRoute
+        {
+            Jump = new JumpHop
+            {
+                Host = "bastion.example.test",
+                Username = "jump",
+                AuthenticationMethod = AuthenticationMethod.Password,
+                CredentialReferenceId = Guid.NewGuid()
+            }
+        };
+        var server = TestData.LinuxServer() with { Route = route, CredentialReferenceId = Guid.NewGuid() };
+        var vm = new ServerEditorViewModel(
+            new ServerValidator(),
+            new FakeSshConnectionService(),
+            new FakeHostKeyTrustStore(),
+            new FakeConnectionStateStore(),
+            new FakePrivateKeyFilePicker(),
+            new FakeLocalizationService(),
+            server)
+        {
+            Name = "Renamed"
+        };
+
+        var ok = vm.TryCreateResult(out var result);
+
+        Assert.True(ok);
+        Assert.Equal(route, result!.Profile.Configuration.Route);
+        Assert.Null(result.Profile.JumpCredentialChange);
+    }
+
+    [Theory]
+    [InlineData(false, 1)] // control: a direct server reaches the direct trust store (the path is not vacuous)
+    [InlineData(true, 0)]  // a routed server must NEVER write the direct store (T1b cross-scope leak)
+    public async Task TrustAndConnect_NeverWritesTheDirectTrustStoreForARoutedServer(bool routed, int expectedTrustWrites)
+    {
+        // Even if a transport ever reported a plain HostKeyUnknown for a routed server, the editor must not
+        // trust the target's bare host:port in the direct store.
+        var server = TestData.LinuxServer() with
+        {
+            CredentialReferenceId = Guid.NewGuid(),
+            Route = routed
+                ? new ServerRoute
+                {
+                    Jump = new JumpHop
+                    {
+                        Host = "bastion.example.test",
+                        Username = "jump",
+                        AuthenticationMethod = AuthenticationMethod.SshKey,
+                        PrivateKeyPath = "C:\\keys\\jump"
+                    }
+                }
+                : null
+        };
+        var ssh = new FakeSshConnectionService
+        {
+            Result = new SshConnectionResult
+            {
+                State = ServerConnectionState.HostKeyUnknown,
+                ErrorCode = SshConnectionErrorCode.HostKeyUnknown,
+                PresentedHostKey = HostKeyIdentity.Create("ssh-ed25519", Convert.ToBase64String(new byte[32]))
+            }
+        };
+        var trust = new FakeHostKeyTrustStore();
+        var vm = new ServerEditorViewModel(
+            new ServerValidator(),
+            ssh,
+            trust,
+            new FakeConnectionStateStore(),
+            new FakePrivateKeyFilePicker(),
+            new FakeLocalizationService(),
+            server);
+
+        await vm.TestConnectionAsync();
+        await vm.TrustAndConnectAsync();
+
+        Assert.Equal(expectedTrustWrites, trust.TrustCount);
+    }
+
+    [Fact]
     public void TryCreateResult_ValidData_CreatesProfileResult()
     {
         var vm = new ServerEditorViewModel(

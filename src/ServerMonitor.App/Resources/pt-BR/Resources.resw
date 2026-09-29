@@ -148,6 +148,14 @@
   <data name="ConnectionErrorProtocolError" xml:space="preserve"><value>O handshake SSH não pôde ser concluído com segurança.</value></data>
   <data name="ConnectionErrorCancelled" xml:space="preserve"><value>O teste foi cancelado.</value></data>
   <data name="ConnectionErrorUnexpected" xml:space="preserve"><value>O teste de conexão falhou inesperadamente.</value></data>
+  <data name="ConnectionErrorJumpConnectionFailed" xml:space="preserve"><value>Não foi possível acessar o host de salto.</value></data>
+  <data name="ConnectionErrorJumpAuthenticationFailed" xml:space="preserve"><value>O host de salto recusou a autenticação.</value></data>
+  <data name="ConnectionErrorJumpHostKeyUnknown" xml:space="preserve"><value>A chave do host de salto ainda não é confiável. Conecte-se diretamente ao host de salto e confirme a chave.</value></data>
+  <data name="ConnectionErrorJumpHostKeyMismatch" xml:space="preserve"><value>A chave do host de salto mudou. A conexão foi bloqueada.</value></data>
+  <data name="ConnectionErrorJumpCredentialUnavailable" xml:space="preserve"><value>A credencial salva do host de salto não está disponível. Digite-a novamente.</value></data>
+  <data name="ConnectionErrorTargetUnreachableViaJump" xml:space="preserve"><value>O host de salto não conseguiu acessar o servidor.</value></data>
+  <data name="ConnectionErrorRoutedHostKeyUnknown" xml:space="preserve"><value>A chave do servidor, vista pelo host de salto, ainda não é confiável.</value></data>
+  <data name="ConnectionErrorRoutedHostKeyMismatch" xml:space="preserve"><value>A chave do servidor, vista pelo host de salto, mudou. A conexão foi bloqueada.</value></data>
   <data name="ServerMetricsWaitingForData.Text" xml:space="preserve"><value>Aguardando dados</value></data>
   <data name="ServerMetricsRefreshingLabel.Text" xml:space="preserve"><value>Atualizando…</value></data>
   <data name="ServerMetricsRefreshFor" xml:space="preserve"><value>Atualizar métricas de {0}</value></data>

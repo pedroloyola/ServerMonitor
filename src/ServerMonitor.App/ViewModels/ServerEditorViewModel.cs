@@ -541,6 +541,15 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
 
     public async Task TrustAndConnectAsync()
     {
+        // A routed server's target key belongs in the ROUTED trust store (keyed by via + target), never in
+        // the direct store under the target's bare host:port (the T1b cross-scope leak). Until the routed
+        // trust UI exists, the editor refuses to trust anything for a routed server.
+        if (_existingServer?.Route is not null)
+        {
+            DismissHostKeyPrompt();
+            return;
+        }
+
         if (_pendingHostKey is null || !TryCreateEndpoint(out var endpoint))
         {
             return;
@@ -602,7 +611,10 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
             AuthenticationMethod = draft.AuthenticationMethod,
             PrivateKeyPath = draft.PrivateKeyPath,
             CredentialReferenceId = draft.CredentialReferenceId,
-            RefreshIntervalSeconds = SelectedRefreshIntervalSeconds
+            RefreshIntervalSeconds = SelectedRefreshIntervalSeconds,
+            // The editor has no route UI yet (M14.4b-1): an edit must carry the route through unchanged,
+            // or saving would silently turn a routed server into a direct one.
+            Route = draft.Route
         };
 
         CredentialChange credentialChange;
@@ -691,7 +703,8 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
             AuthenticationMethod = input.AuthenticationMethod,
             PrivateKeyPath = string.IsNullOrWhiteSpace(input.PrivateKeyPath) ? null : input.PrivateKeyPath,
             CredentialReferenceId = input.CredentialReferenceId,
-            CreatedAt = _existingServer?.CreatedAt ?? DateTimeOffset.UtcNow
+            CreatedAt = _existingServer?.CreatedAt ?? DateTimeOffset.UtcNow,
+            Route = _existingServer?.Route
         };
         return true;
     }

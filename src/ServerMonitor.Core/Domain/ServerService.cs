@@ -11,6 +11,11 @@ public sealed class ServerService(
     private readonly SemaphoreSlim _gate = new(1, 1);
     private List<Server>? _servers;
 
+    // Persisted servers the validator rejects (including every invalid route). Never exposed to
+    // monitoring or the UI, never treated as direct, and written back verbatim on every save so a
+    // bad entry is never silently deleted (M14.4b-1 H2a).
+    private List<Server> _quarantined = [];
+
     public event EventHandler? ServersChanged;
 
     public async Task<IReadOnlyList<Server>> GetAllAsync(CancellationToken cancellationToken = default)
@@ -61,6 +66,7 @@ public sealed class ServerService(
             PrivateKeyPath = normalized.PrivateKeyPath,
             CredentialReferenceId = normalized.CredentialReferenceId,
             RefreshIntervalSeconds = normalized.RefreshIntervalSeconds,
+            Route = normalized.Route,
             IsHidden = false,
             CreatedAt = DateTimeOffset.UtcNow
         };
@@ -100,7 +106,8 @@ public sealed class ServerService(
                 AuthenticationMethod = normalized.AuthenticationMethod,
                 PrivateKeyPath = normalized.PrivateKeyPath,
                 CredentialReferenceId = normalized.CredentialReferenceId,
-                RefreshIntervalSeconds = normalized.RefreshIntervalSeconds
+                RefreshIntervalSeconds = normalized.RefreshIntervalSeconds,
+                Route = normalized.Route
             };
 
             var copy = servers.ToList();
@@ -163,7 +170,7 @@ public sealed class ServerService(
                 return false;
             }
 
-            await repository.SaveAllAsync(candidate, cancellationToken);
+            await repository.SaveAllAsync([.. candidate, .. _quarantined], cancellationToken);
             _servers = candidate;
             changed = true;
         }
@@ -188,7 +195,15 @@ public sealed class ServerService(
         }
 
         var persisted = await repository.GetAllAsync(cancellationToken);
-        _servers = persisted.Where(server => validator.Validate(server).IsValid).ToList();
+        var valid = new List<Server>();
+        var quarantined = new List<Server>();
+        foreach (var server in persisted)
+        {
+            (validator.Validate(server).IsValid ? valid : quarantined).Add(server);
+        }
+
+        _quarantined = quarantined;
+        _servers = valid;
     }
 
     private static ServerInput Normalize(ServerInput input)
@@ -203,7 +218,23 @@ public sealed class ServerService(
             PrivateKeyPath = string.IsNullOrWhiteSpace(input.PrivateKeyPath)
                 ? null
                 : Path.GetFullPath(input.PrivateKeyPath.Trim()),
-            RefreshIntervalSeconds = RefreshIntervalPolicy.Normalize(input.RefreshIntervalSeconds)
+            RefreshIntervalSeconds = RefreshIntervalPolicy.Normalize(input.RefreshIntervalSeconds),
+            Route = Normalize(input.Route)
         };
     }
+
+    private static ServerRoute? Normalize(ServerRoute? route) =>
+        route?.Jump is not { } jump
+            ? route
+            : route with
+            {
+                Jump = jump with
+                {
+                    Host = (jump.Host ?? string.Empty).Trim(),
+                    Username = (jump.Username ?? string.Empty).Trim(),
+                    PrivateKeyPath = string.IsNullOrWhiteSpace(jump.PrivateKeyPath)
+                        ? null
+                        : Path.GetFullPath(jump.PrivateKeyPath.Trim())
+                }
+            };
 }

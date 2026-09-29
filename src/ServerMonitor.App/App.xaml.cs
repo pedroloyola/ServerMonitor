@@ -218,6 +218,8 @@ public partial class App : Application
             // (Vigil C10) before anything reads or writes the trust store.
             ServicesHost.Services.GetRequiredService<OrphanTemporaryCleaner>().CleanKnownHostTemporary(
                 ServicesHost.Services.GetRequiredService<HostKeyTrustStorageOptions>().FilePath);
+            ServicesHost.Services.GetRequiredService<OrphanTemporaryCleaner>().CleanKnownHostTemporary(
+                ServicesHost.Services.GetRequiredService<RoutedHostKeyTrustStorageOptions>().FilePath);
 
             // Headless (--background) starts monitoring and the tray but creates NO window: a
             // never-activated background process IS the BACKGROUND state. A later legitimate activation
@@ -480,12 +482,16 @@ public partial class App : Application
 
         services.AddSingleton(ServerStorageOptions.ForCurrentUser());
         services.AddSingleton(HostKeyTrustStorageOptions.ForCurrentUser());
+        // Routed trust lives in a sibling file derived from the direct store's path, never the same file.
+        services.AddSingleton(sp => RoutedHostKeyTrustStorageOptions.From(
+            sp.GetRequiredService<HostKeyTrustStorageOptions>()));
         services.AddSingleton<IServerValidator, ServerValidator>();
         services.AddSingleton<IServerRepository, JsonServerRepository>();
         services.AddSingleton<IServerService, ServerService>();
         services.AddSingleton<IServerCredentialStore, WindowsCredentialStore>();
         services.AddSingleton<IServerProfileService, ServerProfileService>();
         services.AddSingleton<IHostKeyTrustStore, JsonHostKeyTrustStore>();
+        services.AddSingleton<IRoutedHostKeyTrustStore, JsonRoutedHostKeyTrustStore>();
         services.AddSingleton<ISshConfigImportSource, SshConfigFileImportSource>();
 #if DEBUG
         // Debug-only QA: --qa-ssh-config <dir> roots the import at a fixture profile instead of ~/.ssh.

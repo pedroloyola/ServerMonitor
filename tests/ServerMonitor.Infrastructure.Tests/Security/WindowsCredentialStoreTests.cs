@@ -14,6 +14,8 @@ public sealed class WindowsCredentialStoreTests
     [Theory]
     [InlineData(ServerCredentialKind.Password, "password")]
     [InlineData(ServerCredentialKind.PrivateKeyPassphrase, "key-passphrase")]
+    [InlineData(ServerCredentialKind.JumpPassword, "jump-password")]
+    [InlineData(ServerCredentialKind.JumpPrivateKeyPassphrase, "jump-key-passphrase")]
     public void TargetName_UsesOnlyScopedIdentifiers(
         ServerCredentialKind kind,
         string expectedKind)
@@ -29,6 +31,25 @@ public sealed class WindowsCredentialStoreTests
             target);
         Assert.DoesNotContain("host", target, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("user", target, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void JumpTargetNames_KeepTheProductFormat_AndNeverCollideWithTheTargetsSecrets()
+    {
+        var serverId = Guid.Parse("40be3d25-ef62-4c5e-8d4d-d1164cc722f1");
+        var referenceId = Guid.Parse("443065c4-2549-450f-85dc-5ec020cf575a");
+
+        var names = Enum.GetValues<ServerCredentialKind>()
+            .Select(kind => CredentialTargetName.Create(new CredentialReference(serverId, kind, referenceId)))
+            .ToArray();
+
+        Assert.Equal(4, names.Distinct(StringComparer.OrdinalIgnoreCase).Count());
+        Assert.Contains(
+            "ServerMonitor:v1:ssh:40be3d25ef624c5e8d4dd1164cc722f1:jump-password:443065c42549450f85dc5ec020cf575a",
+            names);
+        Assert.Contains(
+            "ServerMonitor:v1:ssh:40be3d25ef624c5e8d4dd1164cc722f1:jump-key-passphrase:443065c42549450f85dc5ec020cf575a",
+            names);
     }
 
     [Theory]

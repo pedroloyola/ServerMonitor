@@ -22,4 +22,7 @@ public sealed record ServerInput
     public Guid? CredentialReferenceId { get; init; }
 
     public int RefreshIntervalSeconds { get; init; } = RefreshIntervalPolicy.DefaultSeconds;
+
+    /// <summary><see langword="null"/> is a direct connection. See <see cref="Server.Route"/>.</summary>
+    public ServerRoute? Route { get; init; }
 }

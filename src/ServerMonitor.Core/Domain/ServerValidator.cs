@@ -23,12 +23,20 @@ public sealed class ServerValidator : IServerValidator
             AuthenticationMethod = server.AuthenticationMethod,
             PrivateKeyPath = server.PrivateKeyPath,
             CredentialReferenceId = server.CredentialReferenceId,
-            RefreshIntervalSeconds = server.RefreshIntervalSeconds
+            RefreshIntervalSeconds = server.RefreshIntervalSeconds,
+            Route = server.Route
         };
 
-        return server.AuthenticationMethod == Enums.AuthenticationMethod.NotConfigured
-            ? ValidateCommon(input)
-            : ValidateInput(input, true);
+        if (server.AuthenticationMethod != Enums.AuthenticationMethod.NotConfigured)
+        {
+            return ValidateInput(input, true);
+        }
+
+        // A migrated (M2) target may still lack authentication, but its route never gets that latitude.
+        var errors = ValidateCommon(input).Errors.Concat(ValidateRoute(input.Route, true)).ToList();
+        return errors.Count == 0
+            ? ServerValidationResult.Success
+            : new ServerValidationResult(errors);
     }
 
     private static ServerValidationResult ValidateInput(ServerInput input, bool requireCredentialReference)
@@ -61,9 +69,65 @@ public sealed class ServerValidator : IServerValidator
             errors.Add(new(nameof(input.CredentialReferenceId), ServerValidationErrorCode.CredentialReferenceInvalid));
         }
 
+        errors.AddRange(ValidateRoute(input.Route, requireCredentialReference));
+
         return errors.Count == 0
             ? ServerValidationResult.Success
             : new ServerValidationResult(errors);
+    }
+
+    private static IEnumerable<ServerValidationError> ValidateRoute(ServerRoute? route, bool requireCredentialReference)
+    {
+        if (route is null)
+        {
+            yield break;
+        }
+
+        if (route.Jump is not { } jump)
+        {
+            yield return new(nameof(ServerInput.Route), ServerValidationErrorCode.RouteJumpRequired);
+            yield break;
+        }
+
+        if (string.IsNullOrWhiteSpace(jump.Host))
+        {
+            yield return new(nameof(JumpHop.Host), ServerValidationErrorCode.JumpHostRequired);
+        }
+
+        if (jump.Port is < 1 or > 65535)
+        {
+            yield return new(nameof(JumpHop.Port), ServerValidationErrorCode.JumpPortOutOfRange);
+        }
+
+        if (string.IsNullOrWhiteSpace(jump.Username))
+        {
+            yield return new(nameof(JumpHop.Username), ServerValidationErrorCode.JumpUsernameRequired);
+        }
+
+        // Unlike a migrated target, a jump host always needs a real authentication method.
+        if (jump.AuthenticationMethod == Enums.AuthenticationMethod.NotConfigured
+            || !Enum.IsDefined(jump.AuthenticationMethod))
+        {
+            yield return new(nameof(JumpHop.AuthenticationMethod), ServerValidationErrorCode.JumpAuthenticationMethodRequired);
+        }
+
+        if (jump.AuthenticationMethod == Enums.AuthenticationMethod.SshKey
+            && string.IsNullOrWhiteSpace(jump.PrivateKeyPath))
+        {
+            yield return new(nameof(JumpHop.PrivateKeyPath), ServerValidationErrorCode.JumpPrivateKeyPathRequired);
+        }
+
+        if (requireCredentialReference
+            && jump.AuthenticationMethod == Enums.AuthenticationMethod.Password
+            && jump.CredentialReferenceId is null)
+        {
+            yield return new(nameof(JumpHop.CredentialReferenceId), ServerValidationErrorCode.JumpCredentialReferenceRequired);
+        }
+
+        if (jump.CredentialReferenceId == Guid.Empty)
+        {
+            yield return new(nameof(JumpHop.CredentialReferenceId), ServerValidationErrorCode.JumpCredentialReferenceInvalid);
+        }
     }
 
     private static ServerValidationResult ValidateCommon(ServerInput input)

@@ -1,5 +1,9 @@
 namespace ServerMonitor.Core.Enums;
 
+/// <summary>
+/// Append only — never renumber. Not persisted today (history stores health only, the widget snapshot
+/// carries no error code, the connection-state store is in memory), but resolved to resource keys by name.
+/// </summary>
 public enum SshConnectionErrorCode
 {
     None,
@@ -20,5 +24,18 @@ public enum SshConnectionErrorCode
     RemoteDisconnected,
     ProtocolError,
     Cancelled,
-    Unexpected
+    Unexpected,
+
+    // M14.4b route (jump host) failures. A jump-stage failure never reports a target code.
+    JumpConnectionFailed,
+    JumpAuthenticationFailed,
+    JumpHostKeyUnknown,
+    JumpHostKeyMismatch,
+    JumpCredentialUnavailable,
+    TargetUnreachableViaJump,
+
+    // The TARGET's host key, seen through a jump. Distinct from HostKeyUnknown/HostKeyMismatch, which drive
+    // the DIRECT trust flow: a routed target's key must only ever be trusted in the routed store.
+    RoutedHostKeyUnknown,
+    RoutedHostKeyMismatch
 }
