@@ -11,12 +11,14 @@ using ServerMonitor.Collectors;
 using ServerMonitor.Collectors.Linux;
 using ServerMonitor.Collectors.MacOS;
 using ServerMonitor.Collectors.Workloads;
+using ServerMonitor.Core.Backup;
 using ServerMonitor.Core.Domain;
 using ServerMonitor.Core.History;
 using ServerMonitor.Core.Interfaces;
 using ServerMonitor.Core.Monitoring;
 using ServerMonitor.Core.Workloads;
 using ServerMonitor.Features;
+using ServerMonitor.Infrastructure.Backup;
 using ServerMonitor.Infrastructure.Collectors.Linux;
 using ServerMonitor.Infrastructure.Collectors.MacOS;
 using ServerMonitor.Infrastructure.Collectors.Workloads;
@@ -214,6 +216,17 @@ public partial class App : Application
         {
             _uiDispatcherQueue = DispatcherQueue.GetForCurrentThread();
 
+            // M14.6 §5.2: finish or undo an interrupted restore BEFORE any configuration store or the engine is
+            // created. Only a launch that owns the single-instance key recovers (Cortex-2): nothing else can write.
+            await StartupRestoreRecovery.RunAsync(
+                ServicesHost.Services,
+                Environment.GetCommandLineArgs(),
+#if DEBUG
+                isDebugBuild: true);
+#else
+                isDebugBuild: false);
+#endif
+
             // A watchdog termination can only ever orphan one known temporary; clean exactly that one
             // (Vigil C10) before anything reads or writes the trust store.
             ServicesHost.Services.GetRequiredService<OrphanTemporaryCleaner>().CleanKnownHostTemporary(
@@ -388,7 +401,9 @@ public partial class App : Application
             terminationDeadline: null,
             onExitCommitted: sp.GetRequiredService<FailSafeExitNotice>().OnExitCommitted));
         services.AddSingleton(BackgroundSettingsStorageOptions.ForCurrentUser());
-        services.AddSingleton<IBackgroundMonitoringSettingsService, JsonBackgroundMonitoringSettingsService>();
+        services.AddSingleton<JsonBackgroundMonitoringSettingsService>();
+        services.AddSingleton<IBackgroundMonitoringSettingsService>(sp =>
+            sp.GetRequiredService<JsonBackgroundMonitoringSettingsService>());
         services.AddSingleton<IBackgroundNoticePresenter>(sp => new BackgroundNoticePresenter(
             sp.GetRequiredService<IBackgroundMonitoringSettingsService>(),
             sp.GetRequiredService<IUserNotificationService>(),
@@ -430,7 +445,9 @@ public partial class App : Application
         // M8 application-shell services. All Windows-specific behavior stays behind
         // fakeable boundaries; alert policy observes M6 but never performs SSH itself.
         services.AddSingleton(NotificationSettingsStorageOptions.ForCurrentUser());
-        services.AddSingleton<INotificationSettingsService, JsonNotificationSettingsService>();
+        services.AddSingleton<JsonNotificationSettingsService>();
+        services.AddSingleton<INotificationSettingsService>(sp =>
+            sp.GetRequiredService<JsonNotificationSettingsService>());
         services.AddSingleton<ApplicationWindowController>();
         services.AddSingleton<IApplicationWindowController>(sp =>
             sp.GetRequiredService<ApplicationWindowController>());
@@ -485,13 +502,37 @@ public partial class App : Application
         // Routed trust lives in a sibling file derived from the direct store's path, never the same file.
         services.AddSingleton(sp => RoutedHostKeyTrustStorageOptions.From(
             sp.GetRequiredService<HostKeyTrustStorageOptions>()));
+        // M14.6 §5.5: one data-layer gate for every ordinary configuration writer.
+        services.AddSingleton(_ => new ConfigurationWriteGate());
+        services.AddSingleton<IConfigurationWriteGate>(sp => sp.GetRequiredService<ConfigurationWriteGate>());
         services.AddSingleton<IServerValidator, ServerValidator>();
-        services.AddSingleton<IServerRepository, JsonServerRepository>();
+        services.AddSingleton<JsonServerRepository>();
+        services.AddSingleton<IServerRepository>(sp => sp.GetRequiredService<JsonServerRepository>());
         services.AddSingleton<IServerService, ServerService>();
-        services.AddSingleton<IServerCredentialStore, WindowsCredentialStore>();
+
+        // The raw store is reachable only as UngatedCredentialStore (backup engine + startup recovery);
+        // every ordinary caller gets the gated decorator.
+        services.AddSingleton<WindowsCredentialStore>();
+        services.AddSingleton(sp => new UngatedCredentialStore(sp.GetRequiredService<WindowsCredentialStore>()));
+        services.AddSingleton<IServerCredentialStore>(sp => new GatedCredentialStore(
+            sp.GetRequiredService<UngatedCredentialStore>().Store,
+            sp.GetRequiredService<IConfigurationWriteGate>()));
         services.AddSingleton<IServerProfileService, ServerProfileService>();
-        services.AddSingleton<IHostKeyTrustStore, JsonHostKeyTrustStore>();
-        services.AddSingleton<IRoutedHostKeyTrustStore, JsonRoutedHostKeyTrustStore>();
+        services.AddSingleton<JsonHostKeyTrustStore>();
+        services.AddSingleton<IHostKeyTrustStore>(sp => sp.GetRequiredService<JsonHostKeyTrustStore>());
+        services.AddSingleton<JsonRoutedHostKeyTrustStore>();
+        services.AddSingleton<IRoutedHostKeyTrustStore>(sp => sp.GetRequiredService<JsonRoutedHostKeyTrustStore>());
+
+        // M14.6 encrypted backup & restore (Community: no entitlement check anywhere on this path).
+        services.AddSingleton<IPortableSettingsParticipant, PortableSettingsParticipant>();
+        services.AddSingleton<IRestoreMonitoringControl, RestoreMonitoringControl>();
+        services.AddSingleton<RestoreRecoveryStatus>();
+        services.AddSingleton(sp => new BackupServiceOptions
+        {
+            AppVersion = sp.GetRequiredService<IAppVersionProvider>().DisplayVersion
+        });
+        services.AddSingleton<ConfigurationBackupService>();
+        services.AddSingleton<IConfigurationBackupService>(sp => sp.GetRequiredService<ConfigurationBackupService>());
         services.AddSingleton<ISshConfigImportSource, SshConfigFileImportSource>();
         // M14.5: default keys in ~/.ssh, metadata only (never opened). Parameterless ctor = the real profile.
         services.AddSingleton<ILocalSshKeyDiscovery>(_ => new LocalSshKeyDiscovery());
@@ -635,6 +676,14 @@ public partial class App : Application
         {
             Qa.QaDiscoveryComposition.Apply(services);
         }
+
+        // M14.6 Addendum 2: every Debug harness resolves the backup service. Harnesses that do not isolate the whole
+        // data plane get the real engine over a per-process temp directory and an in-memory credential store; the
+        // proxy-jump harness is already fully isolated (its paths + in-memory store) and keeps the real wiring.
+        if ((qaMode && !qaProxyJump) || Qa.QaSshConfigComposition.RequestedProfile() is not null)
+        {
+            Qa.QaBackupComposition.ApplyIsolated(services, Qa.QaBackupComposition.DefaultDirectory());
+        }
 #endif
 
         // Hosted-service order is deliberate. The alert observer is live before M6 can
@@ -665,6 +714,11 @@ public partial class App : Application
         }
 #endif
 
+        // M14.6 backup and restore UI. IConfigurationBackupService itself is registered with the engine.
+        services.AddSingleton<IBackupFilePicker, BackupFilePicker>();
+        services.AddSingleton<IBackupRestoreInteraction, BackupRestoreDialogService>();
+        services.AddSingleton<BackupRestoreViewModel>();
+
         services.AddSingleton<DashboardViewModel>();
         services.AddSingleton<SettingsViewModel>();
         services.AddSingleton<DashboardPage>();
@@ -676,6 +730,14 @@ public partial class App : Application
         services.AddTransient<WorkloadsViewModel>();
         services.AddTransient<WorkloadsPage>();
         services.AddTransient<MainWindow>();
+#if DEBUG
+        // Debug-only QA: --qa-backup <scenario> swaps the backup engine and its file pickers for in-memory
+        // doubles. Last, so it wins over the real registrations wherever they are made.
+        if (Qa.QaBackupScenarioComposition.RequestedScenario() is { } qaBackupScenario)
+        {
+            Qa.QaBackupScenarioComposition.Apply(services, qaBackupScenario);
+        }
+#endif
     }
 
     /// <summary>

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.Extensions.Logging.Abstractions;
 using ServerMonitor.App.Services;
+using ServerMonitor.Core.Backup;
 
 namespace ServerMonitor.App.Tests.Services;
 
@@ -103,5 +104,5 @@ public sealed class JsonNotificationSettingsServiceTests : IDisposable
 
     private static JsonNotificationSettingsService Create(string path) => new(
         new NotificationSettingsStorageOptions { FilePath = path },
-        NullLogger<JsonNotificationSettingsService>.Instance);
+        NullLogger<JsonNotificationSettingsService>.Instance, new ConfigurationWriteGate());
 }

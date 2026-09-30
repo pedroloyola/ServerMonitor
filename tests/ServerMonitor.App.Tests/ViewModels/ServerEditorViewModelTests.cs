@@ -53,13 +53,15 @@ public sealed class ServerEditorViewModelTests
 
         public int RemoveCount { get; private set; }
 
+        public Exception? TrustException { get; init; }
+
         public Task<TrustedHostKey?> GetAsync(SshEndpoint endpoint, CancellationToken cancellationToken = default) =>
             CountGet();
 
         public Task TrustAsync(SshEndpoint endpoint, HostKeyIdentity identity, CancellationToken cancellationToken = default)
         {
             TrustCount++;
-            return Task.CompletedTask;
+            return TrustException is null ? Task.CompletedTask : Task.FromException(TrustException);
         }
 
         public Task<bool> RemoveAsync(SshEndpoint endpoint, CancellationToken cancellationToken = default)
@@ -248,6 +250,46 @@ public sealed class ServerEditorViewModelTests
         await vm.TrustAndConnectAsync();
 
         Assert.Equal(expectedTrustWrites, trust.TrustCount);
+    }
+
+    /// <summary>M14.6: while a restore holds the configuration the trust write is refused; the editor says
+    /// so instead of the generic "unexpected error" (a retry cannot help).</summary>
+    [Theory]
+    [InlineData(true, "ConfigurationLocked")]
+    [InlineData(false, "ConnectionErrorUnexpected")] // control: any other write failure keeps its message
+    public async Task TrustAndConnect_ARefusedTrustWriteIsReportedAsConfigurationLocked(bool locked, string expectedMessage)
+    {
+        var server = TestData.LinuxServer() with { CredentialReferenceId = Guid.NewGuid() };
+        var ssh = new FakeSshConnectionService
+        {
+            Result = new SshConnectionResult
+            {
+                State = ServerConnectionState.HostKeyUnknown,
+                ErrorCode = SshConnectionErrorCode.HostKeyUnknown,
+                PresentedHostKey = HostKeyIdentity.Create("ssh-ed25519", Convert.ToBase64String(new byte[32])),
+                HostKeyEndpoint = SshEndpoint.Create(server.Host, server.Port)
+            }
+        };
+        var trust = new FakeHostKeyTrustStore
+        {
+            TrustException = locked
+                ? new ServerMonitor.Core.Backup.ConfigurationLockedException()
+                : new IOException("disk unavailable")
+        };
+        var vm = new ServerEditorViewModel(
+            new ServerValidator(),
+            ssh,
+            trust,
+            new FakeConnectionStateStore(),
+            new FakePrivateKeyFilePicker(),
+            new FakeLocalizationService(),
+            server);
+
+        await vm.TestConnectionAsync();
+        await vm.TrustAndConnectAsync();
+
+        Assert.Equal(1, trust.TrustCount);
+        Assert.Equal(expectedMessage, vm.ConnectionStatusMessage);
     }
 
     [Fact]

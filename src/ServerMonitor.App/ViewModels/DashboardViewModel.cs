@@ -4,6 +4,7 @@ using System.Windows.Input;
 using Microsoft.Extensions.Logging;
 using Microsoft.UI.Dispatching;
 using ServerMonitor.App.Services;
+using ServerMonitor.Core.Backup;
 using ServerMonitor.Core.Discovery;
 using ServerMonitor.Core.Interfaces;
 using ServerMonitor.Core.Models;
@@ -48,6 +49,7 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
     private bool _hasDiscoveredServers;
     private int _discoveredCount;
     private bool _isOperationErrorOpen;
+    private bool _isConfigurationLockedOpen;
     // Non-null only when the composed discovery service is the live one (M14.5 empty-state search indicator).
     private readonly IServerDiscoveryActivity? _discoveryActivity;
 
@@ -224,6 +226,19 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         get => _isOperationErrorOpen;
         set => SetProperty(ref _isOperationErrorOpen, value);
     }
+
+    /// <summary>
+    /// A write was refused because a restore holds the configuration (M14.6). Separate from the generic
+    /// error: "try again" would be wrong, the change can only be made after ServerAlyzer restarts.
+    /// </summary>
+    public bool IsConfigurationLockedOpen
+    {
+        get => _isConfigurationLockedOpen;
+        set => SetProperty(ref _isConfigurationLockedOpen, value);
+    }
+
+    public string ConfigurationLockedMessage =>
+        _localizationService?.GetString(BackupMessageKeys.ConfigurationLocked) ?? string.Empty;
 
     public async Task LoadAsync()
     {
@@ -553,8 +568,14 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         card?.ApplyMonitoringState(_monitoringStateStore.Get(serverId));
     }
 
-    private void HandleError(Exception exception, string operation)
+    internal void HandleError(Exception exception, string operation)
     {
+        if (exception is ConfigurationLockedException)
+        {
+            IsConfigurationLockedOpen = true;
+            return;
+        }
+
         _logger.LogError(
             "Could not {Operation}. Exception type: {ExceptionType}.",
             operation,

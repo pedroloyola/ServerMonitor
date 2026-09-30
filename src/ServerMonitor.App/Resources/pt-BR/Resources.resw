@@ -522,4 +522,76 @@
   <data name="ConnectionHintRoutedHostKeyUnknown" xml:space="preserve"><value>É a primeira vez que este servidor é visto através do host de salto. Compare a impressão digital SHA-256 abaixo com a do servidor antes de confiar.</value></data>
   <data name="ConnectionHintRoutedHostKeyMismatch" xml:space="preserve"><value>A identidade do servidor, vista através do host de salto, é diferente da que estava salva. A conexão foi bloqueada. Não continue até confirmar com quem administra o servidor que a chave realmente mudou.</value></data>
   <data name="ConnectionHintLocalTunnelFailed" xml:space="preserve"><value>Não foi possível abrir neste computador o túnel local para o host de salto. Não é um problema do servidor: teste de novo.</value></data>
+  <!-- M14.6 Backup e restauração criptografados -->
+  <data name="BackupSectionTitle.Text" xml:space="preserve"><value>Backup e restauração</value></data>
+  <data name="BackupSectionDescription.Text" xml:space="preserve"><value>Salve seus servidores, rotas, chaves de host confiáveis e senhas salvas em um arquivo criptografado que você pode restaurar neste ou em outro computador. O arquivo é protegido por uma passphrase escolhida por você. Arquivos de chave privada nunca são incluídos, apenas os caminhos.</value></data>
+  <data name="BackupCreateButton.Content" xml:space="preserve"><value>Criar backup…</value></data>
+  <data name="BackupRestoreButton.Content" xml:space="preserve"><value>Restaurar de um backup…</value></data>
+  <data name="BackupFileTypeLabel" xml:space="preserve"><value>Backup do ServerAlyzer</value></data>
+  <data name="BackupCreateTitle" xml:space="preserve"><value>Criar backup criptografado</value></data>
+  <data name="BackupPassphraseLabel" xml:space="preserve"><value>Passphrase</value></data>
+  <data name="BackupPassphraseConfirmLabel" xml:space="preserve"><value>Confirme a passphrase</value></data>
+  <data name="BackupPassphraseHint" xml:space="preserve"><value>No mínimo 12 caracteres. Algumas palavras sem relação entre si funcionam bem.</value></data>
+  <data name="BackupNoRecoveryWarning" xml:space="preserve"><value>Se você perder esta passphrase, o backup não poderá ser aberto. O ServerAlyzer não a armazena e não consegue recuperá-la.</value></data>
+  <data name="BackupContainsSecretsNote" xml:space="preserve"><value>O arquivo contém suas senhas salvas, criptografadas. Guarde-o em um lugar seguro.</value></data>
+  <data name="BackupCreatePrimary" xml:space="preserve"><value>Escolher local e salvar</value></data>
+  <data name="Cancel" xml:space="preserve"><value>Cancelar</value></data>
+  <data name="PassphraseTooShort" xml:space="preserve"><value>Use no mínimo 12 caracteres.</value></data>
+  <data name="PassphraseTooLong" xml:space="preserve"><value>Use no máximo 256 caracteres.</value></data>
+  <data name="PassphraseInvalidCharacters" xml:space="preserve"><value>A passphrase contém caracteres que não podem ser usados.</value></data>
+  <data name="PassphraseMismatch" xml:space="preserve"><value>As passphrases não coincidem.</value></data>
+  <data name="PassphraseEmpty" xml:space="preserve"><value>Digite a passphrase.</value></data>
+  <data name="BackupCreatedTitle" xml:space="preserve"><value>Backup criado</value></data>
+  <data name="BackupCreatedMessage" xml:space="preserve"><value>Backup salvo em {3}. Servidores: {0} · Chaves de host confiáveis: {1} · Senhas salvas: {2}</value></data>
+  <data name="BackupMissingCredentialsWarning" xml:space="preserve"><value>Nenhuma senha salva foi encontrada para: {0}. Depois de restaurar, ela será solicitada.</value></data>
+  <data name="BackupExcludedEntriesWarning" xml:space="preserve"><value>Entradas de servidor ilegíveis, não incluídas: {0}</value></data>
+  <data name="BackupExcludedTrustNote" xml:space="preserve"><value>Chaves de host confiáveis não usadas por nenhum servidor, não incluídas: {0}</value></data>
+  <data name="BackupFailedTitle" xml:space="preserve"><value>Backup não criado</value></data>
+  <data name="BackupFailedWrite" xml:space="preserve"><value>Não foi possível gravar o arquivo nesse local. Escolha outra pasta e tente novamente.</value></data>
+  <data name="BackupFailedCredentialStore" xml:space="preserve"><value>Não foi possível ler as senhas salvas no Gerenciador de Credenciais do Windows. Nada foi salvo.</value></data>
+  <data name="BackupFailedTrustStore" xml:space="preserve"><value>Não foi possível ler o arquivo de chaves de host confiáveis. Nada foi salvo.</value></data>
+  <data name="BackupFailedTooLarge" xml:space="preserve"><value>Sua configuração é grande demais para o backup.</value></data>
+  <data name="BackupFailedInvalidContent" xml:space="preserve"><value>Sua configuração atual contém valores que não podem ser incluídos no backup. Nada foi salvo.</value></data>
+  <data name="BackupUnsupported" xml:space="preserve"><value>A criptografia não está disponível neste sistema.</value></data>
+  <data name="RestoreOpenTitle" xml:space="preserve"><value>Restaurar de um backup</value></data>
+  <data name="RestoreOpenMessage" xml:space="preserve"><value>Digite a passphrase de {0}. Nada muda até você revisar e confirmar.</value></data>
+  <data name="RestoreOpenPrimary" xml:space="preserve"><value>Abrir backup</value></data>
+  <data name="RestoreOpening" xml:space="preserve"><value>Verificando o backup…</value></data>
+  <data name="RestoreErrorWrongPassphraseOrDamaged" xml:space="preserve"><value>A passphrase está errada, ou o arquivo está danificado ou foi modificado. Nada foi alterado.</value></data>
+  <data name="RestoreErrorNotABackup" xml:space="preserve"><value>Este arquivo não é um backup do ServerAlyzer. Nada foi alterado.</value></data>
+  <data name="RestoreErrorDamaged" xml:space="preserve"><value>O arquivo de backup está danificado ou incompleto. Nada foi alterado.</value></data>
+  <data name="RestoreErrorIncompatible" xml:space="preserve"><value>Este backup foi criado por uma versão mais recente do ServerAlyzer. Atualize o ServerAlyzer e tente novamente. Nada foi alterado.</value></data>
+  <data name="RestoreErrorInvalidContent" xml:space="preserve"><value>O backup contém dados que o ServerAlyzer não pode aceitar. Nada foi alterado.</value></data>
+  <data name="RestoreErrorTooLarge" xml:space="preserve"><value>O arquivo é grande demais para ser um backup do ServerAlyzer. Nada foi alterado.</value></data>
+  <data name="RestoreErrorFileAccess" xml:space="preserve"><value>Não foi possível abrir o arquivo. Nada foi alterado.</value></data>
+  <data name="RestoreConfirmTitle" xml:space="preserve"><value>Substituir a configuração deste computador?</value></data>
+  <data name="RestoreConfirmIntro" xml:space="preserve"><value>Backup de {0}. Restaurar substitui, não mescla:</value></data>
+  <data name="RestoreSummaryServers" xml:space="preserve"><value>Servidores: {0} atuais → {1} do backup ({2} por jump host)</value></data>
+  <data name="RestoreSummaryTrust" xml:space="preserve"><value>Chaves de host confiáveis: {0} atuais → {1} do backup</value></data>
+  <data name="RestoreSummaryTrustRemoved" xml:space="preserve"><value>Chaves de host confiáveis neste computador que não estão no backup e serão removidas: {0}</value></data>
+  <data name="RestoreSummaryTrustDelegated" xml:space="preserve"><value>As chaves de host confiáveis do backup passarão a ser confiáveis sem nova confirmação. Restaure apenas backups criados por você.</value></data>
+  <data name="RestoreSummaryPasswords" xml:space="preserve"><value>Senhas salvas: {0} (todas as senhas salvas atuais são substituídas)</value></data>
+  <data name="RestoreSummaryMissingPasswords" xml:space="preserve"><value>Não estão no backup, serão solicitadas novamente: {0}</value></data>
+  <data name="RestoreSummaryMissingKeys" xml:space="preserve"><value>Arquivos de chave não encontrados neste computador: {0}</value></data>
+  <data name="RestoreSummaryNetworkKeys" xml:space="preserve"><value>Caminhos de chave de rede ou não suportados (não verificados, não poderão ser usados): {0}</value></data>
+  <data name="RestoreSummaryUnsupportedKeys" xml:space="preserve"><value>Caminhos de chave que são links ou não são arquivos (não poderão ser usados): {0}</value></data>
+  <data name="RestoreSummarySettings" xml:space="preserve"><value>As configurações de notificações e de monitoramento em segundo plano também são restauradas. O histórico é mantido.</value></data>
+  <data name="RestoreSummaryHistoryKept" xml:space="preserve"><value>O histórico é mantido.</value></data>
+  <data name="RestoreSummaryUnknown" xml:space="preserve"><value>desconhecido</value></data>
+  <data name="RestoreSummarySome" xml:space="preserve"><value>algumas</value></data>
+  <data name="RestoreConfirmNote" xml:space="preserve"><value>O ServerAlyzer será fechado quando a restauração terminar. Esta ação não pode ser desfeita.</value></data>
+  <data name="RestoreConfirmPrimary" xml:space="preserve"><value>Substituir configuração</value></data>
+  <data name="RestoreApplying" xml:space="preserve"><value>Restaurando… Não feche o ServerAlyzer.</value></data>
+  <data name="RestoreCompletedTitle" xml:space="preserve"><value>Restauração concluída</value></data>
+  <data name="RestoreCompletedMessage" xml:space="preserve"><value>O ServerAlyzer será fechado agora. Abra-o novamente para usar a configuração restaurada.</value></data>
+  <data name="RestoreCompletedPrimary" xml:space="preserve"><value>Fechar o ServerAlyzer</value></data>
+  <data name="RestoreRolledBackTitle" xml:space="preserve"><value>Falha na restauração</value></data>
+  <data name="RestoreRolledBackMessage" xml:space="preserve"><value>Algo deu errado durante a restauração e todas as alterações foram desfeitas. Sua configuração está exatamente como antes.</value></data>
+  <data name="RestorePartialPendingMessage" xml:space="preserve"><value>A restauração falhou e ainda não pôde ser totalmente desfeita. Feche e abra novamente o ServerAlyzer para concluir.</value></data>
+  <data name="RestoreCanceled" xml:space="preserve"><value>Restauração cancelada. Nada foi alterado.</value></data>
+  <data name="RestoreBusy" xml:space="preserve"><value>O ServerAlyzer está ocupado salvando alterações. Tente novamente em instantes. Nada foi alterado.</value></data>
+  <data name="ConfigurationLocked" xml:space="preserve"><value>Uma restauração está em andamento. Alterações não podem ser salvas até o ServerAlyzer reiniciar.</value></data>
+  <data name="RestoreRecoveredUndone" xml:space="preserve"><value>Uma restauração foi interrompida e foi desfeita. Sua configuração está como antes.</value></data>
+  <data name="RestoreRecoveredCompleted" xml:space="preserve"><value>Uma restauração interrompida foi concluída.</value></data>
+  <data name="RestorePendingBlocked" xml:space="preserve"><value>Backup e restauração estão indisponíveis porque uma restauração interrompida não pôde ser concluída nem desfeita. Reinicie o ServerAlyzer para tentar novamente de forma automática. Se isso continuar acontecendo, feche o ServerAlyzer e exclua a pasta {0}. Excluí-la abandona o desfazer automático dessa restauração.</value></data>
 </root>

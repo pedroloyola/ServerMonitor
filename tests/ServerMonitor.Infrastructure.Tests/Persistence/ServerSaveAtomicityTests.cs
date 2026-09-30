@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging.Abstractions;
+using ServerMonitor.Core.Backup;
 using ServerMonitor.Core.Domain;
 using ServerMonitor.Core.Enums;
 using ServerMonitor.Core.Interfaces;
@@ -157,7 +158,7 @@ public sealed class ServerSaveAtomicityTests : IDisposable
 
     private JsonServerRepository CreateRepository(Action<string>? faults = null) => new(
         new ServerStorageOptions { FilePath = DirectPath },
-        NullLogger<JsonServerRepository>.Instance)
+        NullLogger<JsonServerRepository>.Instance, new ConfigurationWriteGate())
     {
         FaultInjector = faults
     };
@@ -166,8 +167,8 @@ public sealed class ServerSaveAtomicityTests : IDisposable
         IServerRepository repository,
         IServerCredentialStore credentials)
     {
-        var service = new ServerService(repository, new ServerValidator());
-        return (new ServerProfileService(service, credentials), service);
+        var service = new ServerService(repository, new ServerValidator(), new ConfigurationWriteGate());
+        return (new ServerProfileService(service, credentials, new ConfigurationWriteGate()), service);
     }
 
     private static async Task<Server> AddDirectAsync(ServerProfileService profiles)

@@ -289,7 +289,7 @@ public sealed class CredentialNamespaceMigrationTests : IDisposable
     }
 
     // Fake Credential Manager keyed by target name, with per-target failure injection.
-    private sealed class DictionaryCredentialManagerNative : ICredentialManagerNative, IDisposable
+    internal sealed class DictionaryCredentialManagerNative : ICredentialManagerNative, IDisposable
     {
         private static readonly Encoding Utf8 = new UTF8Encoding(false, false);
 

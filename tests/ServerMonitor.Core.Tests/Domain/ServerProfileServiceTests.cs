@@ -1,3 +1,4 @@
+using ServerMonitor.Core.Backup;
 using ServerMonitor.Core.Domain;
 using ServerMonitor.Core.Enums;
 using ServerMonitor.Core.Interfaces;
@@ -13,8 +14,8 @@ public sealed class ServerProfileServiceTests
     {
         var repository = new InMemoryRepository();
         var credentials = new InMemoryCredentialStore();
-        using var serverService = new ServerService(repository, new ServerValidator());
-        var profiles = new ServerProfileService(serverService, credentials);
+        using var serverService = new ServerService(repository, new ServerValidator(), new ConfigurationWriteGate());
+        var profiles = new ServerProfileService(serverService, credentials, new ConfigurationWriteGate());
         using var secret = new SecretValue("correct horse".AsSpan());
 
         var result = await profiles.AddAsync(new ServerProfileInput
@@ -34,8 +35,8 @@ public sealed class ServerProfileServiceTests
     {
         var repository = new InMemoryRepository { ThrowOnSave = true };
         var credentials = new InMemoryCredentialStore();
-        using var serverService = new ServerService(repository, new ServerValidator());
-        var profiles = new ServerProfileService(serverService, credentials);
+        using var serverService = new ServerService(repository, new ServerValidator(), new ConfigurationWriteGate());
+        var profiles = new ServerProfileService(serverService, credentials, new ConfigurationWriteGate());
         using var secret = new SecretValue("temporary".AsSpan());
 
         await Assert.ThrowsAsync<IOException>(() => profiles.AddAsync(new ServerProfileInput
@@ -52,8 +53,8 @@ public sealed class ServerProfileServiceTests
     {
         var repository = new InMemoryRepository();
         var credentials = new InMemoryCredentialStore();
-        using var serverService = new ServerService(repository, new ServerValidator());
-        var profiles = new ServerProfileService(serverService, credentials);
+        using var serverService = new ServerService(repository, new ServerValidator(), new ConfigurationWriteGate());
+        var profiles = new ServerProfileService(serverService, credentials, new ConfigurationWriteGate());
         using var secret = new SecretValue("initial".AsSpan());
         var created = (await profiles.AddAsync(new ServerProfileInput
         {
@@ -77,8 +78,8 @@ public sealed class ServerProfileServiceTests
     {
         var repository = new InMemoryRepository();
         var credentials = new InMemoryCredentialStore();
-        using var serverService = new ServerService(repository, new ServerValidator());
-        var profiles = new ServerProfileService(serverService, credentials);
+        using var serverService = new ServerService(repository, new ServerValidator(), new ConfigurationWriteGate());
+        var profiles = new ServerProfileService(serverService, credentials, new ConfigurationWriteGate());
         using var initial = new SecretValue("initial".AsSpan());
         var created = (await profiles.AddAsync(new ServerProfileInput
         {
@@ -103,8 +104,8 @@ public sealed class ServerProfileServiceTests
     {
         var repository = new InMemoryRepository();
         var credentials = new InMemoryCredentialStore();
-        using var serverService = new ServerService(repository, new ServerValidator());
-        var profiles = new ServerProfileService(serverService, credentials);
+        using var serverService = new ServerService(repository, new ServerValidator(), new ConfigurationWriteGate());
+        var profiles = new ServerProfileService(serverService, credentials, new ConfigurationWriteGate());
         using var secret = new SecretValue("initial".AsSpan());
         var created = (await profiles.AddAsync(new ServerProfileInput
         {

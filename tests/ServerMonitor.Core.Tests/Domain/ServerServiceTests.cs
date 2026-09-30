@@ -1,3 +1,4 @@
+using ServerMonitor.Core.Backup;
 using ServerMonitor.Core.Domain;
 using ServerMonitor.Core.Enums;
 using ServerMonitor.Core.Interfaces;
@@ -123,7 +124,7 @@ public sealed class ServerServiceTests
     }
 
     private static ServerService CreateService(InMemoryServerRepository? repository = null) =>
-        new(repository ?? new InMemoryServerRepository(), new ServerValidator());
+        new(repository ?? new InMemoryServerRepository(), new ServerValidator(), new ConfigurationWriteGate());
 
     private static ServerInput CreateInput() => new()
     {

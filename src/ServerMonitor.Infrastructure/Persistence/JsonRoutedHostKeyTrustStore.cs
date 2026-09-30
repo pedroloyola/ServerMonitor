@@ -1,8 +1,10 @@
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using ServerMonitor.Core.Backup;
 using ServerMonitor.Core.Interfaces;
 using ServerMonitor.Core.Models;
 using ServerMonitor.Core.Security;
+using ServerMonitor.Infrastructure.Backup;
 
 namespace ServerMonitor.Infrastructure.Persistence;
 
@@ -19,7 +21,8 @@ namespace ServerMonitor.Infrastructure.Persistence;
 /// </summary>
 public sealed class JsonRoutedHostKeyTrustStore(
     RoutedHostKeyTrustStorageOptions storageOptions,
-    ILogger<JsonRoutedHostKeyTrustStore> logger) : IRoutedHostKeyTrustStore, IDisposable
+    ILogger<JsonRoutedHostKeyTrustStore> logger,
+    IConfigurationWriteGate writeGate) : IRoutedHostKeyTrustStore, IDisposable
 {
     internal const int SupportedSchemaVersion = 1;
 
@@ -61,6 +64,7 @@ public sealed class JsonRoutedHostKeyTrustStore(
         await _gate.WaitAsync(cancellationToken);
         try
         {
+            using var lease = writeGate.EnterWrite();
             await EnsureLoadedAsync(cancellationToken);
             if (_entries!.TryGetValue(normalizedRoute, out var existing))
             {
@@ -99,6 +103,7 @@ public sealed class JsonRoutedHostKeyTrustStore(
         await _gate.WaitAsync(cancellationToken);
         try
         {
+            using var lease = writeGate.EnterWrite();
             await EnsureLoadedAsync(cancellationToken);
             if (!_entries!.Remove(normalized))
             {
@@ -115,6 +120,131 @@ public sealed class JsonRoutedHostKeyTrustStore(
     }
 
     public void Dispose() => _gate.Dispose();
+
+    /// <summary>Export (M14.6 H-4, N2): normalized entries whose route is in <paramref name="referenced"/>, and
+    /// how many were left out. An invalid or unreadable file throws, so a backup never silently drops trust.</summary>
+    internal async Task<(IReadOnlyList<TrustedRoutedHostKey> Entries, int Excluded)> ExportReferencedAsync(
+        IReadOnlySet<SshRoute> referenced,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(referenced);
+        var all = await ExportAllAsync(cancellationToken);
+        var included = all.Where(entry => referenced.Contains(entry.Route)).ToList();
+        return (included, all.Count - included.Count);
+    }
+
+    /// <summary>Every entry, normalized, in file order (the store's own parser).</summary>
+    internal async Task<IReadOnlyList<TrustedRoutedHostKey>> ExportAllAsync(CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            await EnsureLoadedAsync(cancellationToken);
+            return Order(_entries!.Values).ToList();
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    /// <summary>Restore-only replace (<paramref name="content"/> null deletes the file) under this store's lock;
+    /// the cache is dropped so the next read loads the new file.</summary>
+    internal async Task ReplaceForRestoreAsync(RestoreWriteToken token, byte[]? content, CancellationToken cancellationToken)
+    {
+        writeGate.EnsureHeldBy(token);
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            DurableFile.Replace(storageOptions.FilePath, content);
+            _entries = null;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    /// <summary>The file bytes (schema envelope included) for <paramref name="entries"/>, exactly as a normal
+    /// save writes them.</summary>
+    internal static byte[] Render(IEnumerable<TrustedRoutedHostKey> entries) =>
+        JsonSerializer.SerializeToUtf8Bytes(
+            new RoutedTrustFile
+            {
+                SchemaVersion = SupportedSchemaVersion,
+                Entries = Order(entries).Select(ToEntry).ToList<RoutedTrustEntry?>()
+            },
+            SerializerOptions);
+
+    /// <summary>Entries in the file's entry shape (the backup payload's <c>routedKnownHosts</c>).</summary>
+    internal static RoutedTrustEntry ToEntry(TrustedRoutedHostKey entry) => new()
+    {
+        Via = entry.Route.Via,
+        Endpoint = entry.Route.Target,
+        Identity = entry.Identity,
+        ConfirmedAt = entry.ConfirmedAt
+    };
+
+    /// <summary>Parses a JSON array of entries with the given options (the backup reader passes its strict
+    /// overlay) and applies the store's normalization and duplicate rule. Throws <see cref="InvalidDataException"/>.</summary>
+    internal static IReadOnlyList<TrustedRoutedHostKey> ParseEntries(JsonElement array, JsonSerializerOptions options)
+    {
+        List<RoutedTrustEntry?>? persisted;
+        try
+        {
+            persisted = array.Deserialize<List<RoutedTrustEntry?>>(options);
+        }
+        catch (Exception exception) when (exception is JsonException or NotSupportedException or InvalidOperationException)
+        {
+            throw new InvalidDataException("The routed SSH host trust entries are invalid.", exception);
+        }
+
+        return Order(NormalizeEntries(persisted ?? throw new InvalidDataException("The routed SSH host trust entries are missing.")).Values).ToList();
+    }
+
+    private static IOrderedEnumerable<TrustedRoutedHostKey> Order(IEnumerable<TrustedRoutedHostKey> entries) =>
+        entries
+            .OrderBy(entry => entry.Route.Via.Host, StringComparer.Ordinal)
+            .ThenBy(entry => entry.Route.Via.Port)
+            .ThenBy(entry => entry.Route.Target.Host, StringComparer.Ordinal)
+            .ThenBy(entry => entry.Route.Target.Port);
+
+    private static Dictionary<SshRoute, TrustedRoutedHostKey> NormalizeEntries(IEnumerable<RoutedTrustEntry?> persisted)
+    {
+        var loadedEntries = new Dictionary<SshRoute, TrustedRoutedHostKey>();
+        foreach (var entry in persisted)
+        {
+            try
+            {
+                if (entry?.Via is null || entry.Endpoint is null || entry.Identity is null)
+                {
+                    throw new InvalidDataException("The routed SSH host trust entry is incomplete.");
+                }
+
+                var route = SshRoute.Create(entry.Via, entry.Endpoint);
+                var identity = HostKeyIdentity.Create(
+                    entry.Identity.Algorithm,
+                    entry.Identity.Sha256Fingerprint);
+                if (!loadedEntries.TryAdd(
+                        route,
+                        new TrustedRoutedHostKey
+                        {
+                            Route = route,
+                            Identity = identity,
+                            ConfirmedAt = entry.ConfirmedAt
+                        }))
+                {
+                    throw new InvalidDataException("The routed SSH host trust file contains a duplicate route.");
+                }
+            }
+            catch (Exception exception) when (exception is ArgumentException or FormatException or InvalidDataException)
+            {
+                throw new InvalidDataException("The routed SSH host trust file contains an invalid entry.", exception);
+            }
+        }
+
+        return loadedEntries;
+    }
 
     private static SshRoute Normalize(SshRoute route)
     {
@@ -135,7 +265,6 @@ public sealed class JsonRoutedHostKeyTrustStore(
             return;
         }
 
-        var loadedEntries = new Dictionary<SshRoute, TrustedRoutedHostKey>();
         try
         {
             await using var stream = new FileStream(
@@ -162,37 +291,8 @@ public sealed class JsonRoutedHostKeyTrustStore(
                 throw new InvalidDataException("The routed SSH host trust file uses a newer schema version.");
             }
 
-            foreach (var entry in persisted.Entries
-                ?? throw new InvalidDataException("The routed SSH host trust file has no entry list."))
-            {
-                try
-                {
-                    if (entry?.Via is null || entry.Endpoint is null || entry.Identity is null)
-                    {
-                        throw new InvalidDataException("The routed SSH host trust entry is incomplete.");
-                    }
-
-                    var route = SshRoute.Create(entry.Via, entry.Endpoint);
-                    var identity = HostKeyIdentity.Create(
-                        entry.Identity.Algorithm,
-                        entry.Identity.Sha256Fingerprint);
-                    if (!loadedEntries.TryAdd(
-                            route,
-                            new TrustedRoutedHostKey
-                            {
-                                Route = route,
-                                Identity = identity,
-                                ConfirmedAt = entry.ConfirmedAt
-                            }))
-                    {
-                        throw new InvalidDataException("The routed SSH host trust file contains a duplicate route.");
-                    }
-                }
-                catch (Exception exception) when (exception is ArgumentException or FormatException or InvalidDataException)
-                {
-                    throw new InvalidDataException("The routed SSH host trust file contains an invalid entry.", exception);
-                }
-            }
+            var loadedEntries = NormalizeEntries(persisted.Entries
+                ?? throw new InvalidDataException("The routed SSH host trust file has no entry list."));
 
             _entries = loadedEntries;
         }
@@ -219,24 +319,6 @@ public sealed class JsonRoutedHostKeyTrustStore(
         Directory.CreateDirectory(directory);
         var temporaryFile = storageOptions.FilePath + ".tmp";
 
-        var file = new RoutedTrustFile
-        {
-            SchemaVersion = SupportedSchemaVersion,
-            Entries = _entries!.Values
-                .OrderBy(entry => entry.Route.Via.Host, StringComparer.Ordinal)
-                .ThenBy(entry => entry.Route.Via.Port)
-                .ThenBy(entry => entry.Route.Target.Host, StringComparer.Ordinal)
-                .ThenBy(entry => entry.Route.Target.Port)
-                .Select(entry => new RoutedTrustEntry
-                {
-                    Via = entry.Route.Via,
-                    Endpoint = entry.Route.Target,
-                    Identity = entry.Identity,
-                    ConfirmedAt = entry.ConfirmedAt
-                })
-                .ToList<RoutedTrustEntry?>()
-        };
-
         try
         {
             await using (var stream = new FileStream(
@@ -247,7 +329,7 @@ public sealed class JsonRoutedHostKeyTrustStore(
                 4096,
                 useAsync: true))
             {
-                await JsonSerializer.SerializeAsync(stream, file, SerializerOptions, cancellationToken);
+                await stream.WriteAsync(Render(_entries!.Values), cancellationToken);
                 await stream.FlushAsync(cancellationToken);
             }
 
@@ -269,7 +351,7 @@ public sealed class JsonRoutedHostKeyTrustStore(
         public List<RoutedTrustEntry?>? Entries { get; init; }
     }
 
-    private sealed record RoutedTrustEntry
+    internal sealed record RoutedTrustEntry
     {
         public SshEndpoint? Via { get; init; }
 

@@ -67,20 +67,32 @@ public sealed class QaProxyJumpHarnessTests
     }
 
     [Fact]
-    public void OnTheRealRoot_TheProfileServiceGetsTheProcessLocalCredentialStore()
+    public async Task OnTheRealRoot_TheProfileServiceGetsTheProcessLocalCredentialStore()
     {
         var services = BuildHarnessServices();
 
-        var winning = services.Last(descriptor => descriptor.ServiceType == typeof(IServerCredentialStore));
-        Assert.Equal(typeof(QaInMemoryCredentialStore), winning.ImplementationType);
-
+        // M14.6: the raw store is swapped (UngatedCredentialStore); ordinary callers get it through the gate.
         using var provider = services.BuildServiceProvider();
-        var store = provider.GetRequiredService<IServerCredentialStore>();
-        Assert.IsType<QaInMemoryCredentialStore>(store);
-        Assert.IsNotType<WindowsCredentialStore>(store);
+        var raw = provider.GetRequiredService<UngatedCredentialStore>().Store;
+        Assert.IsType<QaInMemoryCredentialStore>(raw);
+        Assert.IsNotType<WindowsCredentialStore>(raw);
 
-        // The real consumers resolve through the same singleton: nothing in the editor path can reach the
-        // Credential Manager registration, which stays in the collection but is shadowed.
+        var store = provider.GetRequiredService<IServerCredentialStore>();
+        Assert.IsType<GatedCredentialStore>(store);
+
+        // A write through the ordinary store lands in the process-local one: nothing in the editor path can
+        // reach the Credential Manager registration, which stays in the collection but is shadowed.
+        var reference = CredentialReference.Create(Guid.NewGuid(), ServerCredentialKind.Password);
+        using (var secret = new SecretValue("synthetic"))
+        {
+            await store.WriteAsync(reference, secret);
+        }
+
+        using (var read = await raw.ReadAsync(reference))
+        {
+            Assert.NotNull(read);
+        }
+
         Assert.NotNull(provider.GetRequiredService<IServerProfileService>());
         Assert.Same(store, provider.GetRequiredService<IServerCredentialStore>());
     }

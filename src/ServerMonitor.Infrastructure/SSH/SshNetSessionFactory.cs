@@ -98,20 +98,21 @@ internal sealed class SshNetSessionFactory : ISshSessionFactory, ISshDialSession
 
     private static SshDialTarget Dial(Server server) => new(server.Host, server.Port, server.Username);
 
-    private static ModernPrivateKeySource LoadPrivateKey(string privateKeyPath, string? passphrase)
+    private static ModernPrivateKeySource LoadPrivateKey(string privateKeyPath, string? passphrase) =>
+        LoadPrivateKey(privateKeyPath, passphrase, LocalKeyFileAccess.Real);
+
+    /// <summary>Test seam: <paramref name="access"/> substitutes drive type, attributes and open, so a test
+    /// can prove a network/device path is rejected before any open (M14.6 V11).</summary>
+    internal static ModernPrivateKeySource LoadPrivateKey(string privateKeyPath, string? passphrase, LocalKeyFileAccess access)
     {
         try
         {
             var fullPath = Path.GetFullPath(privateKeyPath);
-            EnsureLocalRegularFile(fullPath);
 
-            using var stream = new FileStream(
-                fullPath,
-                FileMode.Open,
-                FileAccess.Read,
-                FileShare.Read,
-                bufferSize: 4096,
-                FileOptions.SequentialScan);
+            // The same predicate as the restore probe (M14.6 V1): nothing non-local is ever opened.
+            LocalKeyPathPolicy.EnsureLocalRegularFile(fullPath, access);
+
+            using var stream = access.Open(fullPath);
             if (stream.Length is <= 0 or > MaximumPrivateKeySize)
             {
                 throw new InvalidDataException("The private-key file size is invalid.");
@@ -131,40 +132,7 @@ internal sealed class SshNetSessionFactory : ISshSessionFactory, ISshDialSession
         }
     }
 
-    private static void EnsureLocalRegularFile(string fullPath)
-    {
-        if (fullPath.StartsWith(@"\\", StringComparison.Ordinal))
-        {
-            throw new UnauthorizedAccessException("Only regular local private-key files are supported.");
-        }
-
-        var root = Path.GetPathRoot(fullPath);
-        if (string.IsNullOrWhiteSpace(root))
-        {
-            throw new UnauthorizedAccessException("The private-key path has no local drive root.");
-        }
-
-        var driveType = new DriveInfo(root).DriveType;
-        if (driveType is not (DriveType.Fixed or DriveType.Removable))
-        {
-            throw new UnauthorizedAccessException("Network and virtual drives are not supported for private keys.");
-        }
-
-        for (var current = fullPath; !string.IsNullOrEmpty(current); current = Path.GetDirectoryName(current))
-        {
-            if (File.GetAttributes(current).HasFlag(FileAttributes.ReparsePoint))
-            {
-                throw new UnauthorizedAccessException("Reparse points are not supported for private keys.");
-            }
-
-            if (string.Equals(current, root, StringComparison.OrdinalIgnoreCase))
-            {
-                break;
-            }
-        }
-    }
-
-    private sealed class ModernPrivateKeySource : IPrivateKeySource, IDisposable
+    internal sealed class ModernPrivateKeySource : IPrivateKeySource, IDisposable
     {
         private readonly PrivateKeyFile _inner;
 
