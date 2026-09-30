@@ -27,6 +27,14 @@ public sealed partial class ServerFormControl : UserControl
         viewModel.CaptureSecret(secret);
         PasswordField.Password = string.Empty;
         PassphraseField.Password = string.Empty;
+
+        // The jump host's secret is independent of the target's and staged separately.
+        var jumpSecret = viewModel.IsJumpPasswordAuthentication
+            ? JumpPasswordField.Password
+            : JumpPassphraseField.Password;
+        viewModel.CaptureJumpSecret(jumpSecret);
+        JumpPasswordField.Password = string.Empty;
+        JumpPassphraseField.Password = string.Empty;
     }
 
     private async void OnChoosePrivateKeyClick(object sender, RoutedEventArgs e)
@@ -34,6 +42,14 @@ public sealed partial class ServerFormControl : UserControl
         if (DataContext is ServerEditorViewModel viewModel)
         {
             await viewModel.SelectPrivateKeyAsync();
+        }
+    }
+
+    private async void OnChooseJumpPrivateKeyClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is ServerEditorViewModel viewModel)
+        {
+            await viewModel.SelectJumpPrivateKeyAsync();
         }
     }
 

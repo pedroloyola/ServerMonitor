@@ -21,6 +21,57 @@ internal interface ISshSessionFactory
         string privateKeyPath,
         string? passphrase,
         TimeSpan timeout);
+
+    /// <summary>
+    /// A <c>none</c>-auth host-key probe of a route's JUMP host, dialled direct at its own endpoint. No
+    /// credential is involved; the presented key is checked against the direct store by the caller.
+    /// </summary>
+    ISshSession CreateJumpHostKeyProbe(SshDialTarget jump, TimeSpan timeout);
+}
+
+/// <summary>Where an SSH client dials and as whom. Never a secret.</summary>
+internal readonly record struct SshDialTarget(string Host, int Port, string Username);
+
+internal enum SshLoginKind
+{
+    None,
+    Password,
+    PrivateKey
+}
+
+/// <summary>
+/// The credential material for one SSH login. Built only after the host key of the hop it is for has been
+/// verified against the right store; never logged (<see cref="ToString"/> is redacted).
+/// </summary>
+internal sealed record SshLogin(
+    SshLoginKind Kind,
+    string? Password = null,
+    string? PrivateKeyPath = null,
+    string? Passphrase = null)
+{
+    public static SshLogin None { get; } = new(SshLoginKind.None);
+
+    public override string ToString() => $"SshLogin {{ Kind = {Kind}, Secret = [REDACTED] }}";
+}
+
+/// <summary>
+/// Creates an SSH.NET-backed session for an explicit dial target (the tunnel's loopback end), optionally
+/// bracketing its TCP connect with a <see cref="ISshConnectGate"/>.
+/// </summary>
+internal interface ISshDialSessionFactory
+{
+    ISshSession Create(SshDialTarget dial, SshLogin login, TimeSpan timeout, ISshConnectGate? gate);
+}
+
+/// <summary>
+/// Called immediately before and after a session's TCP/SSH connect. The jump tunnel arms its originator
+/// gate for exactly one connection in <see cref="BeforeConnect"/> and seals it in <see cref="AfterConnect"/>.
+/// </summary>
+internal interface ISshConnectGate
+{
+    void BeforeConnect();
+
+    void AfterConnect();
 }
 
 /// <summary>
@@ -83,6 +134,16 @@ internal sealed record SshSessionResult
     public WorkloadRawData? Workloads { get; init; }
 
     public string? ExceptionType { get; init; }
+
+    /// <summary>The HostKeyReceived handler refused the presented key (never sent credentials).</summary>
+    public bool HostKeyRejected { get; init; }
+
+    /// <summary>
+    /// The peer's SSH identification string was received (<c>ConnectionInfo.ServerVersion</c> set). Through a
+    /// jump, false means the tunnel never carried a target: channel refused, jump-side connect failure, or the
+    /// target closed before its banner (measured, M14.4b-2).
+    /// </summary>
+    public bool IdentificationReceived { get; init; }
 
     public bool IsSuccess => ErrorCode == SshConnectionErrorCode.None;
 }

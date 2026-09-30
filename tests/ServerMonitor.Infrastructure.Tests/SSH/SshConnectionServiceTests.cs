@@ -180,16 +180,16 @@ public sealed class SshConnectionServiceTests
     }
 
     [Fact]
-    public async Task Routed_server_is_never_dialled_direct()
+    public async Task Routed_server_is_never_dialled_direct_and_goes_through_the_tunnel()
     {
-        // Everything a direct dial needs is present and would succeed: only the route must stop it.
+        // Everything a DIRECT dial needs is present and would succeed (FakeTrustStore trusts EVERY endpoint,
+        // including the target's bare host:port): the route must still win. The ONLY target dials are through
+        // the tunnel; the direct factory only ever probes the jump host.
         var fixture = new Fixture
         {
             TrustedHostKey = Trusted(Identity(1))
         };
         fixture.Credentials.Secret = "password";
-        fixture.Factory.Enqueue(new FakeSession(Identity(1), SshConnectionErrorCode.AuthenticationFailed));
-        fixture.Factory.Enqueue(new FakeSession(Identity(1), SshConnectionErrorCode.None));
         var request = Request(server => server with
         {
             Route = new ServerRoute
@@ -198,44 +198,76 @@ public sealed class SshConnectionServiceTests
                 {
                     Host = "bastion.example",
                     Username = "jump",
-                    AuthenticationMethod = AuthenticationMethod.SshKey,
-                    PrivateKeyPath = "C:\\keys\\jump"
+                    AuthenticationMethod = AuthenticationMethod.Password,
+                    CredentialReferenceId = Guid.NewGuid()
                 }
             }
         });
 
-        var connect = await fixture.Service.ConnectAsync(request);
-        var test = await fixture.Service.TestConnectionAsync(request);
-        var metrics = await fixture.Service.CollectAsync(request.Server, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2));
+        var operations = new Func<Task<SshConnectionResult>>[]
+        {
+            () => fixture.Service.ConnectAsync(request),
+            () => fixture.Service.TestConnectionAsync(request),
+            async () => (await fixture.Service.CollectAsync(request.Server, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2))).ConnectionResult
+        };
+        foreach (var operation in operations)
+        {
+            // Jump probe presents the (trusted) key; through the tunnel the target presents an UNKNOWN key.
+            fixture.Factory.Enqueue(new FakeSession(Identity(1), SshConnectionErrorCode.AuthenticationFailed));
+            fixture.Tunnels.EnqueueTarget(new SshRoutedTestDoubles.Session(Identity(9), SshConnectionErrorCode.AuthenticationFailed));
 
-        Assert.Equal(SshConnectionErrorCode.InvalidConfiguration, connect.ErrorCode);
-        Assert.Equal(SshConnectionErrorCode.InvalidConfiguration, test.ErrorCode);
-        Assert.Equal(SshConnectionErrorCode.InvalidConfiguration, metrics.ConnectionResult.ErrorCode);
+            var result = await operation();
+
+            Assert.Equal(SshConnectionErrorCode.RoutedHostKeyUnknown, result.ErrorCode);
+            Assert.Equal(SshHostKeyHop.Target, result.HostKeyHop);
+        }
+
+        Assert.Equal(["jump-probe", "jump-probe", "jump-probe"], fixture.Factory.Calls);
+        Assert.Equal(3, fixture.Tunnels.Created.Count);
+        Assert.All(fixture.Tunnels.Created, tunnel => Assert.True(tunnel.Disposed));
+    }
+
+    [Fact]
+    public async Task Invalid_route_fails_closed_without_any_dial()
+    {
+        var fixture = new Fixture { TrustedHostKey = Trusted(Identity(1)) };
+        fixture.Credentials.Secret = "password";
+        fixture.Factory.Enqueue(new FakeSession(Identity(1), SshConnectionErrorCode.None));
+        var request = Request(server => server with { Route = new ServerRoute { Jump = null } });
+
+        var result = await fixture.Service.ConnectAsync(request);
+
+        Assert.Equal(SshConnectionErrorCode.InvalidConfiguration, result.ErrorCode);
         Assert.Empty(fixture.Factory.Calls);
+        Assert.Empty(fixture.Tunnels.Created);
         Assert.Equal(0, fixture.Credentials.ReadCount);
     }
 
     [Fact]
-    public void Every_error_code_has_an_explicit_state_and_jump_codes_never_open_target_trust()
+    public void Every_error_code_has_an_explicit_state_and_only_host_key_codes_open_a_trust_panel()
     {
+        HashSet<SshConnectionErrorCode> trustCodes =
+        [
+            SshConnectionErrorCode.HostKeyUnknown, SshConnectionErrorCode.HostKeyMismatch,
+            SshConnectionErrorCode.JumpHostKeyUnknown, SshConnectionErrorCode.JumpHostKeyMismatch,
+            SshConnectionErrorCode.RoutedHostKeyUnknown, SshConnectionErrorCode.RoutedHostKeyMismatch
+        ];
         foreach (var code in Enum.GetValues<SshConnectionErrorCode>())
         {
             var state = SshConnectionService.ToState(code);
-            if (code.ToString().StartsWith("Jump", StringComparison.Ordinal)
-                || code.ToString().StartsWith("Routed", StringComparison.Ordinal))
-            {
-                // HostKeyUnknown/HostKeyMismatch would offer to trust the TARGET endpoint in the direct store.
-                Assert.NotEqual(ServerConnectionState.HostKeyUnknown, state);
-                Assert.NotEqual(ServerConnectionState.HostKeyMismatch, state);
-            }
+            Assert.Equal(
+                trustCodes.Contains(code),
+                state is ServerConnectionState.HostKeyUnknown or ServerConnectionState.HostKeyMismatch);
         }
 
+        // M14.4b-2: jump/routed key codes open the trust panel; the result's HostKeyHop picks the store.
         Assert.Equal(ServerConnectionState.AuthenticationFailed, SshConnectionService.ToState(SshConnectionErrorCode.JumpAuthenticationFailed));
-        Assert.Equal(ServerConnectionState.Error, SshConnectionService.ToState(SshConnectionErrorCode.JumpHostKeyUnknown));
-        Assert.Equal(ServerConnectionState.Error, SshConnectionService.ToState(SshConnectionErrorCode.JumpHostKeyMismatch));
+        Assert.Equal(ServerConnectionState.HostKeyUnknown, SshConnectionService.ToState(SshConnectionErrorCode.JumpHostKeyUnknown));
+        Assert.Equal(ServerConnectionState.HostKeyMismatch, SshConnectionService.ToState(SshConnectionErrorCode.JumpHostKeyMismatch));
         Assert.Equal(ServerConnectionState.Error, SshConnectionService.ToState(SshConnectionErrorCode.JumpCredentialUnavailable));
-        Assert.Equal(ServerConnectionState.Error, SshConnectionService.ToState(SshConnectionErrorCode.RoutedHostKeyUnknown));
-        Assert.Equal(ServerConnectionState.Error, SshConnectionService.ToState(SshConnectionErrorCode.RoutedHostKeyMismatch));
+        Assert.Equal(ServerConnectionState.Error, SshConnectionService.ToState(SshConnectionErrorCode.LocalTunnelFailed));
+        Assert.Equal(ServerConnectionState.HostKeyUnknown, SshConnectionService.ToState(SshConnectionErrorCode.RoutedHostKeyUnknown));
+        Assert.Equal(ServerConnectionState.HostKeyMismatch, SshConnectionService.ToState(SshConnectionErrorCode.RoutedHostKeyMismatch));
         Assert.Equal(ServerConnectionState.Unreachable, SshConnectionService.ToState(SshConnectionErrorCode.JumpConnectionFailed));
         Assert.Equal(ServerConnectionState.Unreachable, SshConnectionService.ToState(SshConnectionErrorCode.TargetUnreachableViaJump));
     }
@@ -576,10 +608,14 @@ public sealed class SshConnectionServiceTests
 
         public Fixture()
         {
-            Service = new SshConnectionService(_trust, Credentials, Logger, Factory);
+            Service = new SshConnectionService(_trust, Routed, Credentials, Logger, Factory, Tunnels);
         }
 
         public FakeCredentialStore Credentials { get; } = new();
+
+        public SshRoutedTestDoubles.RoutedTrustStore Routed { get; } = new();
+
+        public SshRoutedTestDoubles.TunnelFactory Tunnels { get; } = new();
 
         public FakeSessionFactory Factory { get; } = new();
 
@@ -661,6 +697,12 @@ public sealed class SshConnectionServiceTests
         public ISshSession CreateHostKeyProbe(Server server, TimeSpan timeout)
         {
             Calls.Add("probe");
+            return Take();
+        }
+
+        public ISshSession CreateJumpHostKeyProbe(SshDialTarget jump, TimeSpan timeout)
+        {
+            Calls.Add("jump-probe");
             return Take();
         }
 

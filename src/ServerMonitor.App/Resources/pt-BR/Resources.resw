@@ -156,6 +156,7 @@
   <data name="ConnectionErrorTargetUnreachableViaJump" xml:space="preserve"><value>O host de salto não conseguiu acessar o servidor.</value></data>
   <data name="ConnectionErrorRoutedHostKeyUnknown" xml:space="preserve"><value>A chave do servidor, vista pelo host de salto, ainda não é confiável.</value></data>
   <data name="ConnectionErrorRoutedHostKeyMismatch" xml:space="preserve"><value>A chave do servidor, vista pelo host de salto, mudou. A conexão foi bloqueada.</value></data>
+  <data name="ConnectionErrorLocalTunnelFailed" xml:space="preserve"><value>Não foi possível abrir com segurança o túnel local para o host de salto. Tente novamente.</value></data>
   <data name="ServerMetricsWaitingForData.Text" xml:space="preserve"><value>Aguardando dados</value></data>
   <data name="ServerMetricsRefreshingLabel.Text" xml:space="preserve"><value>Atualizando…</value></data>
   <data name="ServerMetricsRefreshFor" xml:space="preserve"><value>Atualizar métricas de {0}</value></data>
@@ -423,4 +424,23 @@
   <data name="SshConfigHostAccessibleImportableFormat" xml:space="preserve"><value>{0} — importável</value></data>
   <data name="SshConfigHostAccessibleBlockedFormat" xml:space="preserve"><value>{0} — bloqueado: {1}</value></data>
   <data name="SshConfigHostAccessibleNotesFormat" xml:space="preserve"><value>Observações: {0}</value></data>
+  <data name="ServerFormRouteTitle.Text" xml:space="preserve"><value>Rota</value></data>
+  <data name="ServerFormUseJumpHost.Content" xml:space="preserve"><value>Conectar por um host de salto</value></data>
+  <data name="ServerFormJumpHostHint.Text" xml:space="preserve"><value>O servidor passa a ser acessado apenas por este host de salto (um salto). A host key dele é confirmada separadamente.</value></data>
+  <data name="ServerFormJumpHostField.Header" xml:space="preserve"><value>Host de salto</value></data>
+  <data name="ServerFormJumpHostField.PlaceholderText" xml:space="preserve"><value>Ex.: bastion.example.com</value></data>
+  <data name="ServerFormJumpPortField.Header" xml:space="preserve"><value>Porta</value></data>
+  <data name="ServerFormJumpPortField.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Porta do host de salto</value></data>
+  <data name="ServerFormJumpUsernameField.Header" xml:space="preserve"><value>Usuário do host de salto</value></data>
+  <data name="ServerFormJumpAuthenticationMethodField.Header" xml:space="preserve"><value>Autenticação do host de salto</value></data>
+  <data name="JumpAuthenticationSshKeyOption.Content" xml:space="preserve"><value>Chave privada SSH</value></data>
+  <data name="JumpAuthenticationPasswordOption.Content" xml:space="preserve"><value>Senha</value></data>
+  <data name="ServerFormJumpPrivateKeyPathField.Header" xml:space="preserve"><value>Arquivo da chave privada do host de salto</value></data>
+  <data name="ServerFormChooseJumpPrivateKeyButton.Content" xml:space="preserve"><value>Escolher arquivo…</value></data>
+  <data name="ServerFormJumpPassphraseField.Header" xml:space="preserve"><value>Passphrase da chave do host de salto (opcional)</value></data>
+  <data name="ServerFormJumpPasswordField.Header" xml:space="preserve"><value>Senha do host de salto</value></data>
+  <data name="ServerFormSavedJumpSecretHint.Text" xml:space="preserve"><value>O segredo do host de salto está protegido no Gerenciador de Credenciais. Digite apenas para substituí-lo.</value></data>
+  <data name="HostKeySubjectJumpFormat" xml:space="preserve"><value>Host de salto {0}</value></data>
+  <data name="HostKeySubjectTargetFormat" xml:space="preserve"><value>Destino {0} via {1}</value></data>
+  <data name="HostKeyMismatchServerLabel.Text" xml:space="preserve"><value>Servidor</value></data>
 </root>

@@ -14,6 +14,7 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
     private readonly IServerValidator _validator;
     private readonly ISshConnectionService _sshConnectionService;
     private readonly IHostKeyTrustStore _hostKeyTrustStore;
+    private readonly IRoutedHostKeyTrustStore? _routedHostKeyTrustStore;
     private readonly IServerConnectionStateStore _connectionStateStore;
     private readonly IPrivateKeyFilePicker _privateKeyFilePicker;
     private readonly ILocalizationService _localizationService;
@@ -43,6 +44,18 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
     private string _presentedHostKeyFingerprint = string.Empty;
     private string _trustedHostKeyFingerprint = string.Empty;
     private HostKeyIdentity? _pendingHostKey;
+    private SshHostKeyHop _pendingHostKeyHop;
+    private SshEndpoint? _pendingHostKeyEndpoint;
+    private SshRoute? _pendingHostKeyRoute;
+    private string _hostKeySubjectDisplay = string.Empty;
+    private bool _useJumpHost;
+    private string _jumpHost = string.Empty;
+    private string _jumpPort = "22";
+    private string _jumpUsername = string.Empty;
+    private int _selectedJumpAuthenticationIndex;
+    private string _jumpPrivateKeyPath = string.Empty;
+    private SecretValue? _jumpSecret;
+    private JumpCredentialContext? _jumpSecretContext;
     private SshConnectionResult? _lastConnectionResult;
     private bool _isSshConfigImportOpen;
     private bool _isLoadingSshConfig;
@@ -60,11 +73,14 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
         ILocalizationService localizationService,
         Server? server,
         ServerDiscoveryPrefill? prefill = null,
-        ISshConfigImportSource? sshConfigImportSource = null)
+        ISshConfigImportSource? sshConfigImportSource = null,
+        IRoutedHostKeyTrustStore? routedHostKeyTrustStore = null)
     {
         _validator = validator;
         _sshConnectionService = sshConnectionService;
         _hostKeyTrustStore = hostKeyTrustStore;
+        // Absent, a target key seen through a jump can never be trusted from this editor (fail closed).
+        _routedHostKeyTrustStore = routedHostKeyTrustStore;
         _connectionStateStore = connectionStateStore;
         _privateKeyFilePicker = privateKeyFilePicker;
         _localizationService = localizationService;
@@ -85,6 +101,101 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
         _selectedAuthenticationIndex = server?.AuthenticationMethod == AuthenticationMethod.Password ? 1 : 0;
         _selectedRefreshIntervalIndex = IndexOfInterval(
             server?.RefreshIntervalSeconds ?? RefreshIntervalPolicy.DefaultSeconds);
+        if (server?.Route?.Jump is { } jump)
+        {
+            _useJumpHost = true;
+            _jumpHost = jump.Host;
+            _jumpPort = jump.Port.ToString(CultureInfo.InvariantCulture);
+            _jumpUsername = jump.Username;
+            _selectedJumpAuthenticationIndex = jump.AuthenticationMethod == AuthenticationMethod.Password ? 1 : 0;
+            _jumpPrivateKeyPath = jump.PrivateKeyPath ?? string.Empty;
+        }
+    }
+
+    /// <summary>"Connect through a jump host": the server is then reached ONLY through the jump (single hop).</summary>
+    public bool UseJumpHost
+    {
+        get => _useJumpHost;
+        set
+        {
+            if (SetJumpContextProperty(ref _useJumpHost, value))
+            {
+                OnPropertyChanged(nameof(IsJumpPrivateKeyAuthentication));
+                OnPropertyChanged(nameof(IsJumpPasswordAuthentication));
+                OnPropertyChanged(nameof(HasSavedJumpSecret));
+            }
+        }
+    }
+
+    public string JumpHost { get => _jumpHost; set => SetJumpContextProperty(ref _jumpHost, value); }
+
+    public string JumpPort { get => _jumpPort; set => SetJumpContextProperty(ref _jumpPort, value); }
+
+    public string JumpUsername { get => _jumpUsername; set => SetJumpContextProperty(ref _jumpUsername, value); }
+
+    public int SelectedJumpAuthenticationIndex
+    {
+        get => _selectedJumpAuthenticationIndex;
+        set
+        {
+            if (SetJumpContextProperty(ref _selectedJumpAuthenticationIndex, value))
+            {
+                OnPropertyChanged(nameof(IsJumpPrivateKeyAuthentication));
+                OnPropertyChanged(nameof(IsJumpPasswordAuthentication));
+                OnPropertyChanged(nameof(HasSavedJumpSecret));
+            }
+        }
+    }
+
+    public string JumpPrivateKeyPath
+    {
+        get => _jumpPrivateKeyPath;
+        set
+        {
+            if (SetJumpContextProperty(ref _jumpPrivateKeyPath, value))
+            {
+                OnPropertyChanged(nameof(HasSavedJumpSecret));
+            }
+        }
+    }
+
+    public bool IsJumpPrivateKeyAuthentication => UseJumpHost && SelectedJumpAuthenticationIndex == 0;
+
+    public bool IsJumpPasswordAuthentication => UseJumpHost && SelectedJumpAuthenticationIndex == 1;
+
+    /// <summary>The jump host's secret is protected in Credential Manager and still belongs to this jump login.</summary>
+    public bool HasSavedJumpSecret => UseJumpHost && GetExistingJumpCredentialReference() is not null;
+
+    /// <summary>
+    /// Who presented the key in the trust panels: the server itself, "jump host bastion:22", or
+    /// "target 10.0.0.5:22 via bastion:22". Never the tunnel's loopback address.
+    /// </summary>
+    public string HostKeySubjectDisplay
+    {
+        get => _hostKeySubjectDisplay;
+        private set => SetProperty(ref _hostKeySubjectDisplay, value);
+    }
+
+    public void CaptureJumpSecret(string? value)
+    {
+        if (string.IsNullOrEmpty(value) || !UseJumpHost)
+        {
+            return;
+        }
+
+        _jumpSecret?.Dispose();
+        _jumpSecret = new SecretValue(value.AsSpan());
+        _jumpSecretContext = TryCreateJumpCredentialContext(out var context) ? context : null;
+        InvalidateConnectionResult();
+    }
+
+    public async Task SelectJumpPrivateKeyAsync()
+    {
+        var selected = await _privateKeyFilePicker.PickAsync();
+        if (!string.IsNullOrWhiteSpace(selected))
+        {
+            JumpPrivateKeyPath = selected;
+        }
     }
 
     public string Name { get => _name; set => SetEditorProperty(ref _name, value); }
@@ -512,6 +623,7 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
                 {
                     Server = draft!,
                     CredentialOverride = _secret,
+                    JumpCredentialOverride = draft!.Route is null ? null : _jumpSecret,
                     Timeout = TimeSpan.FromSeconds(10)
                 },
                 _testCancellation.Token);
@@ -539,40 +651,84 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
         }
     }
 
+    /// <summary>
+    /// Trusts the presented key in the ONE store its hop belongs to, then retests (M14.4b-2 two-step flow):
+    /// a direct server's key → direct store under the server endpoint; a jump host's key → direct store under
+    /// the JUMP endpoint; a target seen through the jump → routed store under (jump, target). A target key never
+    /// reaches the direct store, a jump key never reaches the routed store, and a key whose hop no longer
+    /// matches the form (the route was edited meanwhile) is not trusted at all.
+    /// </summary>
     public async Task TrustAndConnectAsync()
     {
-        // A routed server's target key belongs in the ROUTED trust store (keyed by via + target), never in
-        // the direct store under the target's bare host:port (the T1b cross-scope leak). Until the routed
-        // trust UI exists, the editor refuses to trust anything for a routed server.
-        if (_existingServer?.Route is not null)
-        {
-            DismissHostKeyPrompt();
-            return;
-        }
-
-        if (_pendingHostKey is null || !TryCreateEndpoint(out var endpoint))
+        if (_pendingHostKey is null)
         {
             return;
         }
 
         var presentedHostKey = _pendingHostKey;
+        var hop = _pendingHostKeyHop;
+        SshEndpoint? directEndpoint = null;
+        SshRoute? route = null;
+        switch (hop)
+        {
+            case SshHostKeyHop.Direct when !UseJumpHost
+                && TryCreateEndpoint(out var endpoint)
+                && _pendingHostKeyEndpoint is not null
+                && endpoint == _pendingHostKeyEndpoint:
+                directEndpoint = endpoint;
+                break;
+            case SshHostKeyHop.Jump when TryCreateRoute(out var jumpRoute)
+                && jumpRoute!.Via == _pendingHostKeyEndpoint:
+                directEndpoint = jumpRoute.Via;
+                break;
+            case SshHostKeyHop.Target when _routedHostKeyTrustStore is not null
+                && TryCreateRoute(out var targetRoute)
+                && targetRoute == _pendingHostKeyRoute:
+                route = targetRoute;
+                break;
+            default:
+                DismissHostKeyPrompt();
+                return;
+        }
+
         try
         {
-            await _hostKeyTrustStore.TrustAsync(endpoint!, presentedHostKey);
+            if (route is not null)
+            {
+                await _routedHostKeyTrustStore!.TrustAsync(route, presentedHostKey);
+            }
+            else
+            {
+                await _hostKeyTrustStore.TrustAsync(directEndpoint!, presentedHostKey);
+            }
+
             HasUnknownHostKey = false;
             _pendingHostKey = null;
             await TestConnectionAsync();
         }
         catch (HostKeyTrustConflictException)
         {
-            var trustedHostKey = await _hostKeyTrustStore.GetAsync(endpoint!);
-            ApplyConnectionResult(new SshConnectionResult
-            {
-                State = ServerConnectionState.HostKeyMismatch,
-                ErrorCode = SshConnectionErrorCode.HostKeyMismatch,
-                PresentedHostKey = presentedHostKey,
-                TrustedHostKey = trustedHostKey
-            });
+            ApplyConnectionResult(route is not null
+                ? new SshConnectionResult
+                {
+                    State = ServerConnectionState.HostKeyMismatch,
+                    ErrorCode = SshConnectionErrorCode.RoutedHostKeyMismatch,
+                    PresentedHostKey = presentedHostKey,
+                    HostKeyHop = SshHostKeyHop.Target,
+                    HostKeyRoute = route,
+                    TrustedRoutedHostKey = await _routedHostKeyTrustStore!.GetAsync(route)
+                }
+                : new SshConnectionResult
+                {
+                    State = ServerConnectionState.HostKeyMismatch,
+                    ErrorCode = hop == SshHostKeyHop.Jump
+                        ? SshConnectionErrorCode.JumpHostKeyMismatch
+                        : SshConnectionErrorCode.HostKeyMismatch,
+                    PresentedHostKey = presentedHostKey,
+                    HostKeyHop = hop,
+                    HostKeyEndpoint = directEndpoint,
+                    TrustedHostKey = await _hostKeyTrustStore.GetAsync(directEndpoint!)
+                });
         }
         catch
         {
@@ -590,6 +746,9 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
     {
         HasUnknownHostKey = false;
         _pendingHostKey = null;
+        _pendingHostKeyHop = SshHostKeyHop.Direct;
+        _pendingHostKeyEndpoint = null;
+        _pendingHostKeyRoute = null;
     }
 
     public bool TryCreateResult(out ServerEditorResult? result)
@@ -612,10 +771,26 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
             PrivateKeyPath = draft.PrivateKeyPath,
             CredentialReferenceId = draft.CredentialReferenceId,
             RefreshIntervalSeconds = SelectedRefreshIntervalSeconds,
-            // The editor has no route UI yet (M14.4b-1): an edit must carry the route through unchanged,
-            // or saving would silently turn a routed server into a direct one.
+            // The route comes from the "Connect through a jump host" section; unchecking it is the ONLY way an
+            // edit turns a routed server into a direct one.
             Route = draft.Route
         };
+
+        CredentialChange? jumpCredentialChange = null;
+        if (draft.Route?.Jump is { } draftJump)
+        {
+            if (_jumpSecret is not null)
+            {
+                jumpCredentialChange = CredentialChange.Replace(_jumpSecret);
+                _jumpSecret = null;
+                _jumpSecretContext = null;
+            }
+            else if (draftJump.CredentialReferenceId is null && _existingServer?.Route?.Jump?.CredentialReferenceId is not null)
+            {
+                // The saved jump secret belongs to another jump login (host/user/auth/key changed): drop it.
+                jumpCredentialChange = CredentialChange.Clear;
+            }
+        }
 
         CredentialChange credentialChange;
         if (_secret is not null)
@@ -638,7 +813,8 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
             Profile = new ServerProfileInput
             {
                 Configuration = configuration,
-                CredentialChange = credentialChange
+                CredentialChange = credentialChange,
+                JumpCredentialChange = jumpCredentialChange
             },
             ConnectionResult = _lastConnectionResult
         };
@@ -653,6 +829,9 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
         _secret?.Dispose();
         _secret = null;
         _secretContext = null;
+        _jumpSecret?.Dispose();
+        _jumpSecret = null;
+        _jumpSecretContext = null;
     }
 
     private bool TryCreateDraft(out Server? draft)
@@ -670,6 +849,34 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
         var authenticationMethod = IsPasswordAuthentication
             ? AuthenticationMethod.Password
             : AuthenticationMethod.SshKey;
+        ServerRoute? route = null;
+        if (UseJumpHost)
+        {
+            if (!int.TryParse(JumpPort, NumberStyles.None, CultureInfo.InvariantCulture, out var parsedJumpPort))
+            {
+                HasValidationErrors = true;
+                return false;
+            }
+
+            var jumpAuthentication = SelectedJumpAuthenticationIndex == 1
+                ? AuthenticationMethod.Password
+                : AuthenticationMethod.SshKey;
+            route = new ServerRoute
+            {
+                Jump = new JumpHop
+                {
+                    Host = JumpHost.Trim(),
+                    Port = parsedJumpPort,
+                    Username = JumpUsername.Trim(),
+                    AuthenticationMethod = jumpAuthentication,
+                    PrivateKeyPath = jumpAuthentication == AuthenticationMethod.SshKey && !string.IsNullOrWhiteSpace(JumpPrivateKeyPath)
+                        ? JumpPrivateKeyPath
+                        : null,
+                    CredentialReferenceId = GetExistingJumpCredentialReference()
+                }
+            };
+        }
+
         var input = new ServerInput
         {
             Name = Name,
@@ -679,14 +886,19 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
             OperatingSystem = operatingSystem,
             AuthenticationMethod = authenticationMethod,
             PrivateKeyPath = IsPrivateKeyAuthentication ? PrivateKeyPath : null,
-            CredentialReferenceId = GetExistingCredentialReference(authenticationMethod)
+            CredentialReferenceId = GetExistingCredentialReference(authenticationMethod),
+            Route = route
         };
 
+        EnsureStagedJumpSecretMatchesCurrentContext();
         var validation = _validator.ValidateDraft(input);
         var passwordMissing = authenticationMethod == AuthenticationMethod.Password
             && _secret is null
             && input.CredentialReferenceId is null;
-        HasValidationErrors = !validation.IsValid || passwordMissing;
+        var jumpPasswordMissing = route?.Jump is { AuthenticationMethod: AuthenticationMethod.Password } jumpHop
+            && _jumpSecret is null
+            && jumpHop.CredentialReferenceId is null;
+        HasValidationErrors = !validation.IsValid || passwordMissing || jumpPasswordMissing;
         if (HasValidationErrors)
         {
             return false;
@@ -704,7 +916,7 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
             PrivateKeyPath = string.IsNullOrWhiteSpace(input.PrivateKeyPath) ? null : input.PrivateKeyPath,
             CredentialReferenceId = input.CredentialReferenceId,
             CreatedAt = _existingServer?.CreatedAt ?? DateTimeOffset.UtcNow,
-            Route = _existingServer?.Route
+            Route = route
         };
         return true;
     }
@@ -733,6 +945,117 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
             && existingContext == currentContext
                 ? _existingServer.CredentialReferenceId
                 : null;
+    }
+
+    /// <summary>
+    /// The existing jump credential reference, kept only while it still belongs to the same jump login
+    /// (endpoint, user, auth kind and — for a key — the same key file).
+    /// </summary>
+    private Guid? GetExistingJumpCredentialReference()
+    {
+        if (_existingServer?.Route?.Jump is not { CredentialReferenceId: not null } existing)
+        {
+            return null;
+        }
+
+        return TryCreateJumpCredentialContext(out var current)
+            && TryCreateJumpCredentialContext(
+                existing.Host,
+                existing.Port.ToString(CultureInfo.InvariantCulture),
+                existing.Username,
+                existing.AuthenticationMethod,
+                existing.PrivateKeyPath,
+                out var saved)
+            && current == saved
+                ? existing.CredentialReferenceId
+                : null;
+    }
+
+    private bool TryCreateJumpCredentialContext(out JumpCredentialContext? context) =>
+        TryCreateJumpCredentialContext(
+            JumpHost,
+            JumpPort,
+            JumpUsername,
+            SelectedJumpAuthenticationIndex == 1 ? AuthenticationMethod.Password : AuthenticationMethod.SshKey,
+            JumpPrivateKeyPath,
+            out context);
+
+    private static bool TryCreateJumpCredentialContext(
+        string host,
+        string portText,
+        string username,
+        AuthenticationMethod authenticationMethod,
+        string? privateKeyPath,
+        out JumpCredentialContext? context)
+    {
+        context = null;
+        if (!TryCreateCredentialContext(host, portText, username, authenticationMethod, privateKeyPath, out var inner))
+        {
+            return false;
+        }
+
+        context = new JumpCredentialContext(inner!);
+        return true;
+    }
+
+    /// <summary>The route the form currently describes, normalized; false when the jump section is off or invalid.</summary>
+    private bool TryCreateRoute(out SshRoute? route)
+    {
+        route = null;
+        if (!UseJumpHost
+            || !TryCreateEndpoint(out var target)
+            || !int.TryParse(JumpPort, NumberStyles.None, CultureInfo.InvariantCulture, out var jumpPort))
+        {
+            return false;
+        }
+
+        try
+        {
+            route = SshRoute.Create(SshEndpoint.Create(JumpHost, jumpPort), target!);
+            return true;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+    }
+
+    private void EnsureStagedJumpSecretMatchesCurrentContext()
+    {
+        if (_jumpSecret is null)
+        {
+            return;
+        }
+
+        if (!UseJumpHost
+            || _jumpSecretContext is null
+            || !TryCreateJumpCredentialContext(out var current)
+            || _jumpSecretContext != current)
+        {
+            ClearStagedJumpSecret();
+        }
+    }
+
+    private void ClearStagedJumpSecret()
+    {
+        _jumpSecret?.Dispose();
+        _jumpSecret = null;
+        _jumpSecretContext = null;
+    }
+
+    private bool SetJumpContextProperty<T>(
+        ref T storage,
+        T value,
+        [System.Runtime.CompilerServices.CallerMemberName] string? propertyName = null)
+    {
+        var changed = SetEditorProperty(ref storage, value, propertyName);
+        if (changed)
+        {
+            // A staged jump secret never follows the jump login to another host/user/auth/key.
+            ClearStagedJumpSecret();
+        }
+
+        return changed;
     }
 
     private static int IndexOfInterval(int seconds)
@@ -778,9 +1101,17 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
     private void ApplyConnectionResult(SshConnectionResult result)
     {
         _lastConnectionResult = result;
+        if (result.State is ServerConnectionState.HostKeyUnknown or ServerConnectionState.HostKeyMismatch)
+        {
+            HostKeySubjectDisplay = DescribeHostKeySubject(result);
+        }
+
         if (result.State == ServerConnectionState.HostKeyUnknown && result.PresentedHostKey is not null)
         {
             _pendingHostKey = result.PresentedHostKey;
+            _pendingHostKeyHop = result.HostKeyHop;
+            _pendingHostKeyEndpoint = result.HostKeyEndpoint;
+            _pendingHostKeyRoute = result.HostKeyRoute;
             PresentedHostKeyAlgorithm = result.PresentedHostKey.Algorithm;
             PresentedHostKeyFingerprint = result.PresentedHostKey.Sha256Fingerprint;
             HasUnknownHostKey = true;
@@ -789,7 +1120,9 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
         {
             PresentedHostKeyAlgorithm = result.PresentedHostKey?.Algorithm ?? string.Empty;
             PresentedHostKeyFingerprint = result.PresentedHostKey?.Sha256Fingerprint ?? string.Empty;
-            TrustedHostKeyFingerprint = result.TrustedHostKey?.Identity.Sha256Fingerprint ?? string.Empty;
+            TrustedHostKeyFingerprint = result.TrustedHostKey?.Identity.Sha256Fingerprint
+                ?? result.TrustedRoutedHostKey?.Identity.Sha256Fingerprint
+                ?? string.Empty;
             HasHostKeyMismatch = true;
         }
         else if (result.IsSuccess
@@ -804,6 +1137,15 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
 
         SetConnectionState(result);
     }
+
+    private string DescribeHostKeySubject(SshConnectionResult result) => result.HostKeyHop switch
+    {
+        SshHostKeyHop.Jump when result.HostKeyEndpoint is not null =>
+            Format("HostKeySubjectJumpFormat", result.HostKeyEndpoint),
+        SshHostKeyHop.Target when result.HostKeyRoute is not null =>
+            Format("HostKeySubjectTargetFormat", result.HostKeyRoute.Target, result.HostKeyRoute.Via),
+        _ => result.HostKeyEndpoint?.ToString() ?? EndpointDisplay
+    };
 
     private void SetConnectionState(SshConnectionResult result)
     {
@@ -824,6 +1166,7 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
 
     private void ResetHostKeyPanels()
     {
+        HostKeySubjectDisplay = string.Empty;
         HasUnknownHostKey = false;
         HasHostKeyMismatch = false;
         PresentedHostKeyAlgorithm = string.Empty;
@@ -948,6 +1291,8 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
 
         return changed;
     }
+
+    private sealed record JumpCredentialContext(CredentialContext Login);
 
     private sealed record CredentialContext(
         SshEndpoint Endpoint,

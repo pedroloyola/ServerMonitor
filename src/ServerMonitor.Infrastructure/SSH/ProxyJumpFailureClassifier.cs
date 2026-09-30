@@ -1,5 +1,3 @@
-using System.Net.Sockets;
-using Renci.SshNet.Common;
 using ServerMonitor.Core.Enums;
 
 namespace ServerMonitor.Infrastructure.SSH;
@@ -10,119 +8,154 @@ public enum ProxyJumpStage
     /// <summary>TCP connect, key exchange, host-key check and authentication to the jump host.</summary>
     Jump,
 
-    /// <summary>Opening the direct-tcpip channel to the target through the authenticated jump host.</summary>
-    Channel,
+    /// <summary>The LOCAL loopback listener of the tunnel (bind / ownership proof).</summary>
+    TunnelListen,
 
-    /// <summary>The target's SSH handshake, host-key check and authentication, carried through the jump.</summary>
+    /// <summary>
+    /// Everything carried through the tunnel: the jump's direct-tcpip channel, the target's SSH handshake,
+    /// host-key check, authentication and the session itself.
+    /// </summary>
     Target
 }
 
 /// <summary>
-/// Pure mapping of a ProxyJump failure to an <see cref="SshConnectionErrorCode"/> (M14.4b-1 §4), built on
-/// the shapes measured with SSH.NET 2026.0.0:
-/// jump auth = <see cref="SshAuthenticationException"/> on the jump client; jump host key rejected =
-/// <see cref="SshConnectionException"/> after HostKeyReceived set CanTrust=false; jump TCP =
-/// <see cref="SocketException"/>; a jump that refuses the direct-tcpip channel raises NO forwarded-port
-/// exception and surfaces ONLY as a target-side <see cref="SshConnectionException"/> "closed before a valid
-/// SSH identification string"; cancellation = <see cref="OperationCanceledException"/>; timeout =
-/// <see cref="SshOperationTimeoutException"/>.
+/// The observed STATE of a failed ProxyJump attempt. No exception text, no SSH.NET message: only booleans and
+/// the exception-type mapping (<see cref="SshExceptionMapper"/>) of the failure.
+/// </summary>
+public readonly record struct ProxyJumpFailure
+{
+    public required ProxyJumpStage Stage { get; init; }
+
+    /// <summary>The caller cancelled.</summary>
+    public bool Cancelled { get; init; }
+
+    /// <summary>The operation deadline elapsed (linked timeout, or the SSH.NET timeout of the same value).</summary>
+    public bool TimedOut { get; init; }
+
+    /// <summary>The jump session was still connected when the failure was observed.</summary>
+    public bool JumpConnected { get; init; }
+
+    /// <summary>The failing hop's SSH identification string was received (<c>ServerVersion</c> set).</summary>
+    public bool IdentificationReceived { get; init; }
+
+    public bool HostKeyRejected { get; init; }
+
+    /// <summary>The rejected key had no entry in its store (as opposed to a different entry).</summary>
+    public bool HostKeyUnknown { get; init; }
+
+    /// <summary><see cref="SshExceptionMapper"/>'s code for the failure (type-based, never text).</summary>
+    public SshConnectionErrorCode MappedCode { get; init; }
+}
+
+/// <summary>
+/// Pure, structural mapping of a ProxyJump failure to an <see cref="SshConnectionErrorCode"/> (M14.4b-2 §3).
+/// Through a jump, a refused/failed direct-tcpip channel raises no forwarded-port exception: the ONLY signal is
+/// that the target client never received an identification string (measured with SSH.NET 2026.0.0: null
+/// <c>ServerVersion</c> after a refused channel, after a jump-side connect failure and before a silent
+/// target's banner; set after a successful identification, including a rejected key).
 /// <para>
-/// Stage separation is the invariant: a jump-stage failure never yields a target code (the user would be
-/// sent to fix the wrong host), and a channel/target failure never yields a jump code. Only
-/// <see cref="SshConnectionErrorCode.Cancelled"/> is stage-neutral.
+/// Order: cancelled → timeout → jump dropped → no identification → host key → authentication → the target
+/// mapping. Stage separation is the invariant: a jump-stage failure never yields a target code, a target-stage
+/// failure never yields a jump code other than the jump dropping (<see cref="SshConnectionErrorCode.JumpConnectionFailed"/>),
+/// and nothing through a jump ever yields the DIRECT trust codes or a direct network diagnosis.
 /// </para>
 /// </summary>
 public static class ProxyJumpFailureClassifier
 {
-    // SSH.NET's exact text when the peer closes before sending its version line. Through a jump this is
-    // what a refused/failed direct-tcpip channel looks like from the target client.
-    private const string ClosedBeforeIdentification = "closed before a valid SSH identification string";
-
-    public static SshConnectionErrorCode Classify(
-        ProxyJumpStage stage,
-        Exception exception,
-        bool hostKeyRejected,
-        bool hostKeyUnknown,
-        bool cancelled)
+    public static SshConnectionErrorCode Classify(in ProxyJumpFailure failure)
     {
-        ArgumentNullException.ThrowIfNull(exception);
-
-        if (cancelled)
+        if (failure.Cancelled)
         {
             return SshConnectionErrorCode.Cancelled;
         }
 
-        return stage switch
+        return failure.Stage switch
         {
-            ProxyJumpStage.Jump => ClassifyJump(exception, hostKeyRejected, hostKeyUnknown),
-            ProxyJumpStage.Channel => SshConnectionErrorCode.TargetUnreachableViaJump,
-            ProxyJumpStage.Target => ClassifyTarget(exception, hostKeyRejected, hostKeyUnknown),
-            _ => throw new ArgumentOutOfRangeException(nameof(stage))
+            ProxyJumpStage.Jump => ClassifyJump(failure),
+            ProxyJumpStage.TunnelListen => SshConnectionErrorCode.LocalTunnelFailed,
+            ProxyJumpStage.Target => ClassifyTarget(failure),
+            _ => throw new ArgumentOutOfRangeException(nameof(failure))
         };
     }
 
-    private static SshConnectionErrorCode ClassifyJump(
-        Exception exception,
-        bool hostKeyRejected,
-        bool hostKeyUnknown)
+    private static SshConnectionErrorCode ClassifyJump(in ProxyJumpFailure failure)
     {
-        if (hostKeyRejected)
-        {
-            return hostKeyUnknown
-                ? SshConnectionErrorCode.JumpHostKeyUnknown
-                : SshConnectionErrorCode.JumpHostKeyMismatch;
-        }
-
-        if (exception is SshAuthenticationException)
-        {
-            return SshConnectionErrorCode.JumpAuthenticationFailed;
-        }
-
-        if (exception is SshPrivateKeyLoadException)
-        {
-            return SshConnectionErrorCode.JumpCredentialUnavailable;
-        }
-
-        // TCP, DNS, timeout, key exchange, protocol, anything else: the jump could not be established.
-        return SshConnectionErrorCode.JumpConnectionFailed;
-    }
-
-    private static SshConnectionErrorCode ClassifyTarget(
-        Exception exception,
-        bool hostKeyRejected,
-        bool hostKeyUnknown)
-    {
-        // Never HostKeyUnknown/HostKeyMismatch: those would route a routed target's key into the DIRECT
-        // trust flow (direct store, bare host:port). The routed codes keep it in the routed scope.
-        if (hostKeyRejected)
-        {
-            return hostKeyUnknown
-                ? SshConnectionErrorCode.RoutedHostKeyUnknown
-                : SshConnectionErrorCode.RoutedHostKeyMismatch;
-        }
-
-        if (exception is SshConnectionException connectionException
-            && connectionException.Message.Contains(ClosedBeforeIdentification, StringComparison.OrdinalIgnoreCase))
-        {
-            return SshConnectionErrorCode.TargetUnreachableViaJump;
-        }
-
-        // The target transport is the tunnel, so a socket failure is the tunnel failing — never a target
-        // DNS/refused/unreachable diagnosis.
-        for (Exception? current = exception; current is not null; current = current.InnerException)
-        {
-            if (current is SocketException)
-            {
-                return SshConnectionErrorCode.TargetUnreachableViaJump;
-            }
-        }
-
-        // Not caller-cancelled (handled above), so an OperationCanceledException here is the timeout.
-        if (exception is OperationCanceledException)
+        // The operation deadline is stage-neutral like cancellation: the user sees the same timeout whether it
+        // expired on the jump, the target or a direct server.
+        if (failure.TimedOut)
         {
             return SshConnectionErrorCode.ConnectionTimedOut;
         }
 
-        return SshExceptionMapper.Map(exception);
+        if (failure.HostKeyRejected)
+        {
+            return failure.HostKeyUnknown
+                ? SshConnectionErrorCode.JumpHostKeyUnknown
+                : SshConnectionErrorCode.JumpHostKeyMismatch;
+        }
+
+        return failure.MappedCode switch
+        {
+            SshConnectionErrorCode.AuthenticationFailed => SshConnectionErrorCode.JumpAuthenticationFailed,
+            SshConnectionErrorCode.CredentialNotConfigured or
+            SshConnectionErrorCode.CredentialUnavailable or
+            SshConnectionErrorCode.PrivateKeyUnavailable or
+            SshConnectionErrorCode.PrivateKeyInvalid => SshConnectionErrorCode.JumpCredentialUnavailable,
+            // TCP, DNS, timeout, key exchange, protocol, anything else: the jump could not be established.
+            _ => SshConnectionErrorCode.JumpConnectionFailed
+        };
     }
+
+    private static SshConnectionErrorCode ClassifyTarget(in ProxyJumpFailure failure)
+    {
+        if (failure.TimedOut)
+        {
+            return SshConnectionErrorCode.ConnectionTimedOut;
+        }
+
+        if (!failure.JumpConnected)
+        {
+            return SshConnectionErrorCode.JumpConnectionFailed;
+        }
+
+        if (!failure.IdentificationReceived)
+        {
+            return SshConnectionErrorCode.TargetUnreachableViaJump;
+        }
+
+        // Never HostKeyUnknown/HostKeyMismatch: those are the DIRECT trust flow (direct store, bare host:port).
+        if (failure.HostKeyRejected)
+        {
+            return failure.HostKeyUnknown
+                ? SshConnectionErrorCode.RoutedHostKeyUnknown
+                : SshConnectionErrorCode.RoutedHostKeyMismatch;
+        }
+
+        return failure.MappedCode switch
+        {
+            SshConnectionErrorCode.AuthenticationFailed => SshConnectionErrorCode.AuthenticationFailed,
+            // The target transport IS the tunnel: a socket failure is the tunnel, never a target network diagnosis.
+            SshConnectionErrorCode.DnsResolutionFailed or
+            SshConnectionErrorCode.ConnectionRefused or
+            SshConnectionErrorCode.HostUnreachable or
+            SshConnectionErrorCode.NetworkUnavailable => SshConnectionErrorCode.TargetUnreachableViaJump,
+            // Not caller-cancelled (handled first), so a cancellation here is the deadline.
+            SshConnectionErrorCode.Cancelled or
+            SshConnectionErrorCode.ConnectionTimedOut => SshConnectionErrorCode.ConnectionTimedOut,
+            // A key refusal that was not flagged is still a refusal in the ROUTED scope.
+            SshConnectionErrorCode.HostKeyUnknown => SshConnectionErrorCode.RoutedHostKeyUnknown,
+            SshConnectionErrorCode.HostKeyMismatch => SshConnectionErrorCode.RoutedHostKeyMismatch,
+            SshConnectionErrorCode.None => SshConnectionErrorCode.Unexpected,
+            var code when IsJumpCode(code) => SshConnectionErrorCode.Unexpected,
+            var code => code
+        };
+    }
+
+    private static bool IsJumpCode(SshConnectionErrorCode code) => code is
+        SshConnectionErrorCode.JumpConnectionFailed or
+        SshConnectionErrorCode.JumpAuthenticationFailed or
+        SshConnectionErrorCode.JumpHostKeyUnknown or
+        SshConnectionErrorCode.JumpHostKeyMismatch or
+        SshConnectionErrorCode.JumpCredentialUnavailable or
+        SshConnectionErrorCode.LocalTunnelFailed;
 }

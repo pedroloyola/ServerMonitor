@@ -229,7 +229,9 @@ public sealed class ServerEditorViewModelTests
             {
                 State = ServerConnectionState.HostKeyUnknown,
                 ErrorCode = SshConnectionErrorCode.HostKeyUnknown,
-                PresentedHostKey = HostKeyIdentity.Create("ssh-ed25519", Convert.ToBase64String(new byte[32]))
+                PresentedHostKey = HostKeyIdentity.Create("ssh-ed25519", Convert.ToBase64String(new byte[32])),
+                // The real service always names the endpoint of a Direct prompt (L5: no endpoint, no write).
+                HostKeyEndpoint = SshEndpoint.Create(server.Host, server.Port)
             }
         };
         var trust = new FakeHostKeyTrustStore();
