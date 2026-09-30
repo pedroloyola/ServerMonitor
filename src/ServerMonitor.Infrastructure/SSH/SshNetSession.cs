@@ -164,22 +164,27 @@ internal sealed class SshNetSession(
                 MacOsMetrics = macOsMetrics,
                 Workloads = workloads,
                 IdentificationReceived = true,
-                AuthenticationCompleted = true
+                AuthenticationCompleted = true,
+                ConnectionEstablished = true
             };
         }
         catch (Exception exception)
         {
+            // Structural, not textual (M14.4b-2 §3): set only once the peer's version line arrived.
+            var identificationReceived = !string.IsNullOrEmpty(connectionInfo.ServerVersion);
             return new SshSessionResult
             {
                 ErrorCode = hostKeyWasRejected
                     ? SshConnectionErrorCode.HostKeyMismatch
-                    : SshExceptionMapper.Map(exception),
+                    : SshExceptionMapper.Map(exception, identificationReceived),
                 PresentedHostKey = presentedHostKey,
                 ExceptionType = exception.GetType().Name,
                 HostKeyRejected = hostKeyWasRejected,
-                // Structural, not textual (M14.4b-2 §3): set only once the peer's version line arrived.
-                IdentificationReceived = !string.IsNullOrEmpty(connectionInfo.ServerVersion),
-                AuthenticationCompleted = authenticated
+                IdentificationReceived = identificationReceived,
+                AuthenticationCompleted = authenticated,
+                ConnectionEstablished = identificationReceived
+                                        || presentedHostKey is not null
+                                        || SshExceptionMapper.ProvesEstablishedConnection(exception)
             };
         }
         finally

@@ -56,6 +56,36 @@ public static class SshExceptionMapper
         return SshConnectionErrorCode.Unexpected;
     }
 
+    /// <summary>
+    /// M14.5 D-1: a failure before the peer's SSH identification line arrived, on a connection that was
+    /// established (<see cref="ProvesEstablishedConnection"/>), means the port answered but the peer never
+    /// identified as SSH — an HTTP or other service, or a server dropping the connection before its banner.
+    /// Measured on SSH.NET 2026.0.0: the exception is the same whether or not non-SSH bytes were received, so
+    /// both are <see cref="SshConnectionErrorCode.ProtocolError"/>. Everything else maps as <see cref="Map(Exception)"/>.
+    /// </summary>
+    public static SshConnectionErrorCode Map(Exception exception, bool identificationReceived) =>
+        !identificationReceived && ProvesEstablishedConnection(exception)
+            ? SshConnectionErrorCode.ProtocolError
+            : Map(exception);
+
+    /// <summary>
+    /// True only for failures SSH.NET raises on an ESTABLISHED TCP connection: the peer closed it
+    /// (<see cref="DisconnectReason.ConnectionLost"/>, "closed before a valid SSH identification string was
+    /// received") or reset/aborted it (<see cref="SocketError.ConnectionReset"/>, <see cref="SocketError.ConnectionAborted"/>).
+    /// A refused, unreachable, unresolved or timed-out connect is never one of these.
+    /// </summary>
+    public static bool ProvesEstablishedConnection(Exception exception)
+    {
+        ArgumentNullException.ThrowIfNull(exception);
+
+        if (Find<SocketException>(exception) is { } socketException)
+        {
+            return socketException.SocketErrorCode is SocketError.ConnectionReset or SocketError.ConnectionAborted;
+        }
+
+        return exception is SshConnectionException { DisconnectReason: DisconnectReason.ConnectionLost };
+    }
+
     private static SshConnectionErrorCode MapSocket(SocketError error) => error switch
     {
         SocketError.HostNotFound or
@@ -67,6 +97,9 @@ public static class SshExceptionMapper
         SocketError.NetworkReset or
         SocketError.NetworkUnreachable => SshConnectionErrorCode.NetworkUnavailable,
         SocketError.TimedOut => SshConnectionErrorCode.ConnectionTimedOut,
+        // An established connection the peer reset or that was aborted (measured: HTTP 400 then RST).
+        SocketError.ConnectionReset or
+        SocketError.ConnectionAborted => SshConnectionErrorCode.RemoteDisconnected,
         _ => SshConnectionErrorCode.Unexpected
     };
 

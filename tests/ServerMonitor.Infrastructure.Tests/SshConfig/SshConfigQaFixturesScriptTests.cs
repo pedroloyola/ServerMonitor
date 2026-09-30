@@ -110,17 +110,28 @@ public sealed class SshConfigQaFixturesScriptTests : IDisposable
         Assert.True(exitCode == 0, output);
         foreach (var scenario in new[] { "empty", "error", "big", "blocked", "normal", "proxyjump", "keys", "keys-rsa", "keys-edge" })
         {
-            // The exact executable, never `dotnet run` (which may launch a different, stale binary).
-            Assert.Contains($"& \"{exe}\" --qa-ssh-config \"{Path.Combine(_root, scenario)}\"", output);
+            // The exact executable, never `dotnet run` (which may launch a different, stale binary), and always
+            // ISOLATED (M14.5 D-2): its own data directory, in-memory secrets, no monitoring.
+            var isolated = $"& \"{exe}\" --qa-proxyjump --qa-proxyjump-dir=\"{Path.Combine(_root, scenario)}-data\" --qa-ssh-config \"{Path.Combine(_root, scenario)}\"";
+            Assert.Matches(new System.Text.RegularExpressions.Regex(System.Text.RegularExpressions.Regex.Escape(isolated) + @"\r?$", System.Text.RegularExpressions.RegexOptions.Multiline), output);
             foreach (var language in new[] { "en-US", "pt-BR" })
             {
-                Assert.Contains(
-                    $"& \"{exe}\" --qa-ssh-config \"{Path.Combine(_root, scenario)}\" --qa-ui-language {language}",
-                    output);
+                Assert.Contains($"{isolated} --qa-ui-language {language}", output);
             }
         }
 
         Assert.DoesNotContain("dotnet run", output);
+
+        // No launch line runs the real composition: every one that names --qa-ssh-config is isolated.
+        var launchLines = output.Split(["\r\n", "\n"], StringSplitOptions.None)
+            .Where(line => line.Contains("--qa-ssh-config", StringComparison.Ordinal))
+            .ToList();
+        Assert.Equal(9 * 3, launchLines.Count);
+        Assert.All(launchLines, line =>
+        {
+            Assert.Contains("--qa-proxyjump --qa-proxyjump-dir=\"", line);
+            Assert.Contains("-data\" --qa-ssh-config", line);
+        });
 
         // (a) empty
         Assert.Equal(SshConfigImportStatus.NotFound, (await LoadAsync("empty")).Result.Status);

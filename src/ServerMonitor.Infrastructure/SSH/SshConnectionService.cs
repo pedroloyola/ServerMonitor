@@ -236,7 +236,7 @@ public sealed class SshConnectionService
                     linkedSource.Token)
                 .ConfigureAwait(false);
 
-            AdvanceAfterProbe(stages, probe, trustedHostKey?.Identity);
+            AdvanceAfterProbe(stages, probe, trustedHostKey?.Identity, establishedConnectionCounts: true);
 
             if (trustedHostKey is null && probe.PresentedHostKey is not null)
             {
@@ -337,14 +337,21 @@ public sealed class SshConnectionService
 
     /// <summary>
     /// After a host-key probe (direct, or the routed TARGET through the tunnel): the port answered only if the
-    /// peer presented a key or its SSH identification line arrived — both need a TCP connection. A probe that
-    /// failed before either (DNS, refused, unreachable, timeout, or a close before the banner) proves nothing
-    /// and stays at <see cref="SshConnectionStage.None"/>. The key is verified ONLY when the presented key
-    /// matches the stored trusted key; first sight (no trusted key) never counts.
+    /// peer presented a key, its SSH identification line arrived or (direct only, M14.5 D-1) the probe failed in
+    /// a way that proves an established TCP connection (<see cref="SshSessionResult.ConnectionEstablished"/>).
+    /// A probe that failed before any of these (DNS, refused, unreachable, timeout) proves nothing and stays at
+    /// <see cref="SshConnectionStage.None"/>. The key is verified ONLY when the presented key matches the stored
+    /// trusted key; first sight (no trusted key) never counts.
     /// </summary>
-    private static void AdvanceAfterProbe(StageTracker stages, SshSessionResult probe, HostKeyIdentity? trustedIdentity)
+    private static void AdvanceAfterProbe(
+        StageTracker stages,
+        SshSessionResult probe,
+        HostKeyIdentity? trustedIdentity,
+        bool establishedConnectionCounts)
     {
-        if (probe.PresentedHostKey is null && !probe.IdentificationReceived)
+        if (probe.PresentedHostKey is null
+            && !probe.IdentificationReceived
+            && !(establishedConnectionCounts && probe.ConnectionEstablished))
         {
             return;
         }
@@ -541,7 +548,8 @@ public sealed class SshConnectionService
                     : (SshConnectionErrorCode?)null;
                 if (targetProbeFailure is not { } failure || !IsJumpStageFailure(failure))
                 {
-                    AdvanceAfterProbe(stages, targetProbe, trustedTargetKey?.Identity);
+                    // Through the tunnel an established connection only proves the LOCAL forwarder, never the target.
+                    AdvanceAfterProbe(stages, targetProbe, trustedTargetKey?.Identity, establishedConnectionCounts: false);
                 }
 
                 if (trustedTargetKey is null && targetProbe.PresentedHostKey is not null)

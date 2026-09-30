@@ -70,6 +70,22 @@ public sealed class SshConnectionStageTests
         Assert.Equal([SshConnectionStage.PortReachable], f.Progress.Reports);
     }
 
+    [Theory]
+    [InlineData(SshConnectionErrorCode.ProtocolError)]
+    [InlineData(SshConnectionErrorCode.RemoteDisconnected)]
+    public async Task Direct_probe_failing_on_a_proven_established_connection_reached_the_port(SshConnectionErrorCode code)
+    {
+        // M14.5 D-1: e.g. an HTTP service on the port - no banner, no key, but the connection was established.
+        var f = new Fixture().TrustDirect();
+        f.Sessions.Probes.Enqueue(ScriptedSession.FailsOnEstablishedConnection(code));
+
+        var result = await f.Service.TestConnectionAsync(f.DirectRequest());
+
+        Assert.Equal(code, result.ErrorCode);
+        Assert.Equal(SshConnectionStage.PortReachable, result.ReachedStage);
+        Assert.Equal([SshConnectionStage.PortReachable], f.Progress.Reports);
+    }
+
     [Fact]
     public async Task Invalid_configuration_reached_nothing_and_dials_nothing()
     {
@@ -496,6 +512,23 @@ public sealed class SshConnectionStageTests
         Assert.Empty(f.Progress.Reports);
     }
 
+    [Theory]
+    [InlineData(SshConnectionErrorCode.ConnectionTimedOut)]
+    [InlineData(SshConnectionErrorCode.ProtocolError)]
+    public async Task Routed_established_connection_only_proves_the_local_tunnel_so_the_target_reached_nothing(SshConnectionErrorCode code)
+    {
+        // Through the tunnel every target session connects to the LOCAL forwarder: that is never the target's port.
+        var f = new Fixture().TrustJump().TrustTarget();
+        f.Sessions.Probes.Enqueue(ScriptedSession.Presents(Key(1), SshConnectionErrorCode.AuthenticationFailed));
+        f.Tunnels.Targets.Enqueue(ScriptedSession.FailsOnEstablishedConnection(code));
+
+        var result = await f.Service.TestConnectionAsync(f.RoutedRequest());
+
+        Assert.NotEqual(SshConnectionErrorCode.None, result.ErrorCode);
+        Assert.Equal(SshConnectionStage.None, result.ReachedStage);
+        Assert.Empty(f.Progress.Reports);
+    }
+
     [Fact]
     public async Task Routed_first_sight_of_the_target_key_is_never_verified()
     {
@@ -864,6 +897,15 @@ public sealed class SshConnectionStageTests
                     PresentedHostKey = key,
                     IdentificationReceived = true
                 }));
+
+        /// <summary>No banner and no key, but the session proved an established TCP connection (M14.5 D-1).</summary>
+        public static ScriptedSession FailsOnEstablishedConnection(SshConnectionErrorCode code) =>
+            new((_, _) => Task.FromResult(new SshSessionResult
+            {
+                ErrorCode = code,
+                IdentificationReceived = false,
+                ConnectionEstablished = true
+            }));
 
         public static ScriptedSession Fails(SshConnectionErrorCode code, bool identificationReceived) =>
             new((_, _) => Task.FromResult(new SshSessionResult { ErrorCode = code, IdentificationReceived = identificationReceived }));
