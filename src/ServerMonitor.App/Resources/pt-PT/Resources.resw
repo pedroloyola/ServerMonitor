@@ -13,8 +13,8 @@
   <data name="DashboardAddButton.Content" xml:space="preserve"><value>Adicionar servidor</value></data>
   <data name="DashboardSettingsButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Abrir definições</value></data>
   <data name="DashboardSettingsButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Definições</value></data>
-  <data name="DashboardEmptyState.Title" xml:space="preserve"><value>Ainda não existem servidores</value></data>
-  <data name="DashboardEmptyState.Description" xml:space="preserve"><value>Adicione o primeiro servidor para começar a organizar o painel.</value></data>
+  <data name="DashboardEmptyState.Title" xml:space="preserve"><value>Vamos ligar o teu primeiro servidor?</value></data>
+  <data name="DashboardEmptyState.Description" xml:space="preserve"><value>Adiciona uma ligação SSH para acompanhar o estado, as métricas e o histórico do servidor.</value></data>
   <data name="DashboardEmptyState.ActionText" xml:space="preserve"><value>Adicionar servidor</value></data>
   <data name="SettingsTitle.Text" xml:space="preserve"><value>Definições</value></data>
   <data name="SettingsBackButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Voltar aos servidores</value></data>
@@ -105,7 +105,6 @@
   <data name="ServerFormSavedPasswordHint.Text" xml:space="preserve"><value>Existe uma palavra-passe protegida no Gestor de Credenciais. Digite apenas para a substituir.</value></data>
   <data name="ServerFormTestConnectionButton.Content" xml:space="preserve"><value>Testar ligação</value></data>
   <data name="ServerFormCancelTestButton.Content" xml:space="preserve"><value>Cancelar teste</value></data>
-  <data name="ServerFormConnectionStatus.Title" xml:space="preserve"><value>Teste de ligação</value></data>
   <data name="HostKeyUnknownTitle.Text" xml:space="preserve"><value>Confirmar identidade do servidor</value></data>
   <data name="HostKeyUnknownDescription.Text" xml:space="preserve"><value>Esta host key ainda não é conhecida. Compare a fingerprint SHA-256 através de um canal independente antes de confiar.</value></data>
   <data name="HostKeyServerLabel.Text" xml:space="preserve"><value>Servidor</value></data>
@@ -446,4 +445,76 @@
   <data name="HostKeySubjectJumpFormat" xml:space="preserve"><value>Anfitrião de salto {0}</value></data>
   <data name="HostKeySubjectTargetFormat" xml:space="preserve"><value>Destino {0} via {1}</value></data>
   <data name="HostKeyMismatchServerLabel.Text" xml:space="preserve"><value>Servidor</value></data>
+  <data name="DashboardEmptyState.SecondaryActionText" xml:space="preserve"><value>Importar de SSH</value></data>
+  <data name="DashboardEmptyDiscoverySearching.Text" xml:space="preserve"><value>A procurar servidores SSH na tua rede local…</value></data>
+  <data name="DashboardEmptyDiscoveryFoundFormat" xml:space="preserve"><value>Encontrado na rede local: {0}</value></data>
+  <data name="ServerFormLocalKeySelector.Header" xml:space="preserve"><value>Chaves encontradas em .ssh</value></data>
+  <data name="ServerFormLocalKeySelector.PlaceholderText" xml:space="preserve"><value>Escolher uma chave encontrada…</value></data>
+  <data name="ServerFormJumpLocalKeySelector.Header" xml:space="preserve"><value>Chaves encontradas em .ssh (anfitrião de salto)</value></data>
+  <data name="ServerFormJumpLocalKeySelector.PlaceholderText" xml:space="preserve"><value>Escolher uma chave encontrada…</value></data>
+  <data name="LocalKeyOptionRecommendedFormat" xml:space="preserve"><value>{0} · Recomendada</value></data>
+  <data name="LocalKeyOptionBrowse" xml:space="preserve"><value>Procurar outro ficheiro…</value></data>
+  <data name="LocalKeyAutoSelectedHint" xml:space="preserve"><value>Chave encontrada em .ssh</value></data>
+  <data name="LocalKeyNoneFoundHint" xml:space="preserve"><value>Não foi encontrada nenhuma chave em .ssh. Seleciona id_ed25519, id_rsa ou outra chave compatível.</value></data>
+  <data name="ServerFormCredentialReassurance.Text" xml:space="preserve"><value>A tua chave permanece neste dispositivo. Palavras-passe e frases-passe ficam protegidas pelo Gestor de Credenciais do Windows.</value></data>
+  <data name="ServerFormPrepHelpLink.Content" xml:space="preserve"><value>Como preparar o meu servidor?</value></data>
+  <data name="ServerPrepTitle.Text" xml:space="preserve"><value>Como preparar o meu servidor</value></data>
+  <data name="ServerPrepIntro.Text" xml:space="preserve"><value>O ServerAlyzer não requer root nem instala nada no servidor. Um utilizador normal chega para ler as métricas.</value></data>
+  <data name="ServerPrepKeygenStep.Text" xml:space="preserve"><value>Ainda não tens uma chave? Cria uma no PowerShell deste computador:</value></data>
+  <data name="ServerPrepCopyKeyStep.Text" xml:space="preserve"><value>Copia a chave PÚBLICA para o servidor, também a partir do PowerShell:</value></data>
+  <data name="ServerPrepPlaceholderNote.Text" xml:space="preserve"><value>Substitui os campos entre &lt; &gt; pelos dados do teu servidor antes de executar.</value></data>
+  <data name="ServerPrepServiceStep.Text" xml:space="preserve"><value>O serviço SSH tem de estar a correr no servidor. Se não estiver, fala com quem administra o servidor.</value></data>
+  <data name="ServerPrepCopyKeygenButton.Content" xml:space="preserve"><value>Copiar</value></data>
+  <data name="ServerPrepCopyKeygenButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Copiar o comando que cria a chave</value></data>
+  <data name="ServerPrepCopyKeyButton.Content" xml:space="preserve"><value>Copiar</value></data>
+  <data name="ServerPrepCopyKeyButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Copiar o comando que envia a chave pública</value></data>
+  <data name="ServerPrepCopied" xml:space="preserve"><value>Copiado</value></data>
+  <data name="ServerPrepUserPlaceholder" xml:space="preserve"><value>&lt;utilizador&gt;</value></data>
+  <data name="ServerPrepHostPlaceholder" xml:space="preserve"><value>&lt;servidor&gt;</value></data>
+  <data name="ServerPrepJumpPlaceholder" xml:space="preserve"><value>&lt;anfitrião-de-salto&gt;</value></data>
+  <data name="ServerFormChecklistTitle.Text" xml:space="preserve"><value>Teste de ligação</value></data>
+  <data name="ConnectionStepPortTitle" xml:space="preserve"><value>Porta SSH</value></data>
+  <data name="ConnectionStepPortViaJumpFormat" xml:space="preserve"><value>Porta SSH (via {0})</value></data>
+  <data name="ConnectionStepHostKeyTitle" xml:space="preserve"><value>Identidade do servidor (SHA-256)</value></data>
+  <data name="ConnectionStepAuthenticationTitle" xml:space="preserve"><value>Autenticação</value></data>
+  <data name="ConnectionStepOperatingSystemTitle" xml:space="preserve"><value>Sistema operativo</value></data>
+  <data name="ConnectionStepStatePending" xml:space="preserve"><value>Por verificar</value></data>
+  <data name="ConnectionStepStateRunning" xml:space="preserve"><value>A verificar…</value></data>
+  <data name="ConnectionStepStatePassed" xml:space="preserve"><value>Verificado</value></data>
+  <data name="ConnectionStepStateFailed" xml:space="preserve"><value>Falhou</value></data>
+  <data name="ConnectionStepStateNotReached" xml:space="preserve"><value>Não verificado</value></data>
+  <data name="ConnectionStepStateActionRequired" xml:space="preserve"><value>Confirmar identidade</value></data>
+  <data name="ConnectionStepStateWarning" xml:space="preserve"><value>Atenção</value></data>
+  <data name="ConnectionStepStateOperatingSystemUnknown" xml:space="preserve"><value>Não identificado</value></data>
+  <data name="ConnectionStepOperatingSystemUnknownHint" xml:space="preserve"><value>A ligação funciona, mas não foi possível identificar o sistema operativo. Podes escolhê-lo no campo "Sistema operativo".</value></data>
+  <data name="ConnectionStepAccessibleFormat" xml:space="preserve"><value>{0}: {1}</value></data>
+  <data name="ConnectionStepCopyCommandButton.Content" xml:space="preserve"><value>Copiar</value></data>
+  <data name="ConnectionStepCopyCommandButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Copiar o comando</value></data>
+  <data name="ConnectionHintInvalidConfiguration" xml:space="preserve"><value>Os dados de ligação não estão completos ou não são válidos. Revê o endereço, a porta e o utilizador.</value></data>
+  <data name="ConnectionHintCredentialNotConfigured" xml:space="preserve"><value>Falta a credencial deste servidor. Indica a palavra-passe, ou escolhe uma chave privada.</value></data>
+  <data name="ConnectionHintCredentialUnavailable" xml:space="preserve"><value>Não foi possível ler a credencial guardada no Gestor de Credenciais do Windows. Volta a introduzi-la e testa de novo.</value></data>
+  <data name="ConnectionHintPrivateKeyUnavailable" xml:space="preserve"><value>O ficheiro da chave privada não existe ou não pode ser lido. Escolhe outro ficheiro, ou cria uma chave nova.</value></data>
+  <data name="ConnectionHintPrivateKeyInvalid" xml:space="preserve"><value>Não foi possível usar esta chave. Confirma que é uma chave PRIVADA em formato OpenSSH (não o ficheiro .pub) e que a frase-passe está correta, ou escolhe outro ficheiro.</value></data>
+  <data name="ConnectionHintAuthenticationFailed" xml:space="preserve"><value>O servidor respondeu, mas não aceitou este início de sessão. Confirma o utilizador e a frase-passe, e que a chave PÚBLICA está em ~/.ssh/authorized_keys desse mesmo utilizador. No servidor, com esse utilizador:</value></data>
+  <data name="ConnectionHintHostKeyUnknown" xml:space="preserve"><value>É a primeira vez que este servidor é visto. Compara a impressão digital SHA-256 abaixo com a do servidor antes de confiar.</value></data>
+  <data name="ConnectionHintHostKeyMismatch" xml:space="preserve"><value>A identidade deste servidor é diferente da que estava guardada. A ligação foi bloqueada. Não continues até confirmares com quem administra o servidor que a chave mudou de facto.</value></data>
+  <data name="ConnectionHintUnsupportedAlgorithm" xml:space="preserve"><value>O servidor só oferece algoritmos SSH antigos que o ServerAlyzer não aceita. Pede a quem administra o servidor para atualizar o OpenSSH ou ativar algoritmos atuais.</value></data>
+  <data name="ConnectionHintDnsResolutionFailed" xml:space="preserve"><value>O nome do servidor não foi encontrado. Confirma se está bem escrito, ou experimenta o endereço IP.</value></data>
+  <data name="ConnectionHintConnectionRefused" xml:space="preserve"><value>A porta SSH recusou a ligação. O serviço SSH está ativo, e a porta é a certa? No servidor:</value></data>
+  <data name="ConnectionHintHostUnreachable" xml:space="preserve"><value>Não há caminho de rede até este endereço. Confirma o endereço e se este computador está na mesma rede ou VPN do servidor.</value></data>
+  <data name="ConnectionHintNetworkUnavailable" xml:space="preserve"><value>Este computador não tem rede neste momento. Verifica a ligação Wi-Fi ou por cabo e testa de novo.</value></data>
+  <data name="ConnectionHintConnectionTimedOut" xml:space="preserve"><value>O servidor não respondeu a tempo. Confirma o endereço e a porta, e se uma firewall (ufw, iptables ou o router) deixa passar a porta SSH.</value></data>
+  <data name="ConnectionHintRemoteDisconnected" xml:space="preserve"><value>O servidor fechou a ligação antes do fim. Testa de novo; se continuar, o servidor pode estar a limitar ligações (MaxStartups, fail2ban).</value></data>
+  <data name="ConnectionHintProtocolError" xml:space="preserve"><value>A porta respondeu, mas não como um servidor SSH. Confirma que esta é a porta do SSH e não a de outro serviço.</value></data>
+  <data name="ConnectionHintCancelled" xml:space="preserve"><value>Cancelaste o teste. Podes voltar a testar quando quiseres.</value></data>
+  <data name="ConnectionHintUnexpected" xml:space="preserve"><value>Algo inesperado interrompeu o teste. Testa de novo; se continuar, reinicia a aplicação.</value></data>
+  <data name="ConnectionHintJumpConnectionFailed" xml:space="preserve"><value>O problema está no anfitrião de salto, não no servidor: não foi possível chegar a ele. Confirma o endereço e a porta do anfitrião de salto.</value></data>
+  <data name="ConnectionHintJumpAuthenticationFailed" xml:space="preserve"><value>O problema está no anfitrião de salto, não no servidor: ele não aceitou o início de sessão. Confirma o utilizador e a chave ou palavra-passe do anfitrião de salto. No anfitrião de salto, com esse utilizador:</value></data>
+  <data name="ConnectionHintJumpHostKeyUnknown" xml:space="preserve"><value>A identidade do anfitrião de salto ainda não é conhecida. Compara a impressão digital SHA-256 com a do anfitrião de salto antes de confiar.</value></data>
+  <data name="ConnectionHintJumpHostKeyMismatch" xml:space="preserve"><value>A identidade do anfitrião de salto é diferente da que estava guardada. A ligação foi bloqueada. Não continues até confirmares com quem o administra que a chave mudou de facto.</value></data>
+  <data name="ConnectionHintJumpCredentialUnavailable" xml:space="preserve"><value>Não foi possível ler a credencial guardada do anfitrião de salto. Volta a introduzi-la na secção do anfitrião de salto e testa de novo.</value></data>
+  <data name="ConnectionHintTargetUnreachableViaJump" xml:space="preserve"><value>O anfitrião de salto funcionou, mas não conseguiu chegar ao servidor. Confirma o endereço e a porta do servidor tal como são vistos a partir do anfitrião de salto.</value></data>
+  <data name="ConnectionHintRoutedHostKeyUnknown" xml:space="preserve"><value>É a primeira vez que este servidor é visto através do anfitrião de salto. Compara a impressão digital SHA-256 abaixo com a do servidor antes de confiar.</value></data>
+  <data name="ConnectionHintRoutedHostKeyMismatch" xml:space="preserve"><value>A identidade do servidor, vista através do anfitrião de salto, é diferente da que estava guardada. A ligação foi bloqueada. Não continues até confirmares com quem administra o servidor que a chave mudou de facto.</value></data>
+  <data name="ConnectionHintLocalTunnelFailed" xml:space="preserve"><value>Não foi possível abrir neste computador o túnel local para o anfitrião de salto. Não é um problema do servidor: testa de novo.</value></data>
 </root>

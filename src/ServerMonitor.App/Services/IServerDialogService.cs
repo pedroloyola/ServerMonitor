@@ -14,5 +14,11 @@ public interface IServerDialogService
     /// </summary>
     Task<ServerEditorResult?> ShowEditorForDiscoveryAsync(ServerDiscoveryPrefill prefill);
 
+    /// <summary>
+    /// Opens the editor as a normal add with the read-only <c>~/.ssh/config</c> import panel already open
+    /// (M14.5 empty state, "Import from SSH"). Nothing is filled until the user picks a host.
+    /// </summary>
+    Task<ServerEditorResult?> ShowEditorForSshImportAsync();
+
     Task<bool> ConfirmRemoveAsync(Server server);
 }

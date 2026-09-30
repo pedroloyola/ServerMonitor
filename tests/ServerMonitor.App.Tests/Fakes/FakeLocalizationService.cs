@@ -62,6 +62,13 @@ internal sealed class FakeLocalizationService : ILocalizationService
             ["SshConfigHostJumpClassificationFormat"] = "Jump host {0}: {1}",
             ["HostKeySubjectJumpFormat"] = "jump host {0}",
             ["HostKeySubjectTargetFormat"] = "target {0} via {1}",
+            ["ConnectionStepAccessibleFormat"] = "{0}: {1}",
+            ["ConnectionStepPortViaJumpFormat"] = "ConnectionStepPortTitle (via {0})",
+            ["LocalKeyOptionRecommendedFormat"] = "{0} · Recommended",
+            ["DashboardEmptyDiscoveryFoundFormat"] = "Found on your local network: {0}",
+            ["ServerPrepUserPlaceholder"] = "<user>",
+            ["ServerPrepHostPlaceholder"] = "<server>",
+            ["ServerPrepJumpPlaceholder"] = "<jump-host>",
         };
 
     public string? CurrentLanguageOverride => null;
