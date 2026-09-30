@@ -505,7 +505,7 @@
   <data name="ConnectionHintNetworkUnavailable" xml:space="preserve"><value>Este computador não tem rede neste momento. Verifica a ligação Wi-Fi ou por cabo e testa de novo.</value></data>
   <data name="ConnectionHintConnectionTimedOut" xml:space="preserve"><value>O servidor não respondeu a tempo. Confirma o endereço e a porta, e se uma firewall (ufw, iptables ou o router) deixa passar a porta SSH.</value></data>
   <data name="ConnectionHintRemoteDisconnected" xml:space="preserve"><value>O servidor fechou a ligação antes do fim. Testa de novo; se continuar, o servidor pode estar a limitar ligações (MaxStartups, fail2ban).</value></data>
-  <data name="ConnectionHintProtocolError" xml:space="preserve"><value>A porta respondeu, mas não como um servidor SSH. Confirma que esta é a porta do SSH e não a de outro serviço.</value></data>
+  <data name="ConnectionHintProtocolError" xml:space="preserve"><value>A porta respondeu, mas não como um servidor SSH. Confirma que esta é a porta do SSH e não a de outro serviço. Se for, o serviço SSH pode estar a recusar novas ligações (demasiadas tentativas ou uma regra de acesso).</value></data>
   <data name="ConnectionHintCancelled" xml:space="preserve"><value>Cancelaste o teste. Podes voltar a testar quando quiseres.</value></data>
   <data name="ConnectionHintUnexpected" xml:space="preserve"><value>Algo inesperado interrompeu o teste. Testa de novo; se continuar, reinicia a aplicação.</value></data>
   <data name="ConnectionHintJumpConnectionFailed" xml:space="preserve"><value>O problema está no anfitrião de salto, não no servidor: não foi possível chegar a ele. Confirma o endereço e a porta do anfitrião de salto.</value></data>

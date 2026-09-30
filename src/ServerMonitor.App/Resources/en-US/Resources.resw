@@ -505,7 +505,7 @@
   <data name="ConnectionHintNetworkUnavailable" xml:space="preserve"><value>This computer has no network right now. Check the Wi-Fi or cable connection and retest.</value></data>
   <data name="ConnectionHintConnectionTimedOut" xml:space="preserve"><value>The server did not answer in time. Check the address and the port, and that a firewall (ufw, iptables or the router) lets the SSH port through.</value></data>
   <data name="ConnectionHintRemoteDisconnected" xml:space="preserve"><value>The server closed the connection early. Retest; if it keeps happening, the server may be limiting connections (MaxStartups, fail2ban).</value></data>
-  <data name="ConnectionHintProtocolError" xml:space="preserve"><value>The port answered, but not like an SSH server. Make sure this is the SSH port and not another service's.</value></data>
+  <data name="ConnectionHintProtocolError" xml:space="preserve"><value>The port answered, but not like an SSH server. Make sure this is the SSH port and not another service's. If it is, the SSH service may be refusing new connections (too many attempts or an access rule).</value></data>
   <data name="ConnectionHintCancelled" xml:space="preserve"><value>You cancelled the test. You can retest whenever you like.</value></data>
   <data name="ConnectionHintUnexpected" xml:space="preserve"><value>Something unexpected interrupted the test. Retest; if it keeps happening, restart the app.</value></data>
   <data name="ConnectionHintJumpConnectionFailed" xml:space="preserve"><value>The problem is the jump host, not the server: it could not be reached. Check the jump host's address and port.</value></data>
