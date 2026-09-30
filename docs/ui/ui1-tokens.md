@@ -49,41 +49,47 @@ Primitivas não são usadas diretamente em HC.
 | Offline | #FF858D | #BD5766 | SystemColorWindowTextColor | Manual págs. 04–05 |
 | BorderNeutral | #99999999 | #99737373 | SystemColorWindowTextColor | Checkbox 112:8522 / 112:8708 |
 | BorderSubtle | #21999999 | #99FFFFFF | SystemColorWindowTextColor | Input 112:3339 / 112:3500 |
-| Divider | #484848 | #D3D3D3 | SystemColorWindowTextColor | 05 companion 112:12427 / 112:12820; adaptação transversal, verificar em UI.2 |
+| Divider | #484848 | #D3D3D3 | SystemColorWindowTextColor | Variável Figma `dark/border` / `light/border` (112:12427 / 112:12820). Uso 1: separador |
+| BorderInset (só brush `SaBorderInsetBrush`, alias de `SaColorDivider*`) | #484848 | #D3D3D3 | SystemColorWindowTextColor | Mesma variável; uso 2: contorno dos insets de métrica (112:12056 / 112:12449) e segmentos vazios (112:12108) |
 | DisabledSurface | #22525252 | #4AFFFFFF | SystemColorWindowColor | 112:3399 / 112:3560; alfa do paint × opacity 0.58 |
-| DisabledText | #ADADAD | #626262 | SystemColorGrayTextColor | DERIVED - needs Prism check; secundário do Manual |
-| Hover | #DB242424 | #D6F7F7F7 | SystemColorHighlightColor | 05 companion 112:12043 / 112:12436; DERIVED - needs Prism check para controlos Windows |
+| DisabledText | #ADADAD | #626262 | SystemColorGrayTextColor | Figma 112:3400 / 112:3561 = `#808080` / `#7A7A7A` @ opacity .58 (efetivo ≈ #5E5E5E sobre #242424, ≈ #B4B4B4 sobre #F7F7F7). **Desvio deliberado** (exceção 3 de UI.0 §0.2, legibilidade): usa o secundário do Manual a 100 % |
+| Hover | #1E525252 | #40FFFFFF | SystemColorHighlightColor | **DERIVED – no Figma source, validate in UI.2 gallery.** A página 05 não tem estado pointer-over de controlos Windows (os nós 112:12043/12436/12829/13111 são popovers opacos do companion macOS, não hover). Regra reproduzível: paint de Selected (112:969 / 112:1180) a metade do alfa (alfa 0x3B → 59/2 = 29,5 → 0x1E; 0x80 → 0x40) — progressão Fluent rest → hover → selected |
+| HoverText (só brush `SaHoverTextBrush`) | #F5F5F5 | #202020 | SystemColorHighlightTextColor | = Text em Dark/Light; em HC garante contraste sobre o fill Highlight do hover (Cortex F-5) |
 | Selected | #3B525252 | #80FFFFFF | SystemColorHighlightColor | Navegação 112:969 / 112:1180 |
-| SelectedText | #F5F5F5 | #202020 | SystemColorHighlightTextColor | Manual; em HC HighlightText sobre Highlight |
-| FocusRing | #F5F5F5 | #202020 | SystemColorHighlightColor | DERIVED - needs Prism check; texto neutro do Manual; não foi encontrado ring Windows explícito |
+| SelectedText | #F5F5F5 | #202020 | SystemColorHighlightTextColor | Manual; em HC HighlightText sobre Highlight. Nota: 112:975 ainda usa `--color-text #F4F6F8` da coleção `Primitives` antiga — prevalece o Manual; não "corrigir" o token |
+| FocusRing | #F5F5F5 | #202020 | SystemColorHighlightColor | DERIVED; texto neutro do Manual; pesquisa em 05 sem nenhum nó focus/foco (confirmado por Prism) |
+| GlassBorder | #5EF0F0F0 | #F2FFFFFF | SystemColorWindowTextColor | Contorno do painel glass (Manual pág. 07 "contorno fino"): 112:1010 `rgba(240,240,240,.37)` / 112:1222 `rgba(255,255,255,.95)` |
+| GlassHighlight | #1FFFFFFF | #CCFFFFFF | Transparent | Highlight interno `inset 0 1px 1px rgba(255,255,255,.12)` / `.8` (112:1010/1222; também 112:8559/8745, 112:969/1180, 112:3399/3560) |
 
 DisabledSurface tem o alfa combinado (0.23×0.58 Dark; 0.50×0.58 Light); **não** voltar a aplicar opacity 0.58 ao mesmo brush. DisabledText é separado para manter legibilidade.
-Hover/Divider derivados do companion são foundations por validar em UI.2, não autorização para alterar o companion.
+Hover é uma derivação declarada sem fonte Figma (validar na galeria UI.2). Divider e BorderInset são a mesma variável Figma `border` com dois usos: separadores (`SaDividerBrush`) e contorno de insets de métrica/segmentos vazios (`SaBorderInsetBrush`).
+Os ecrãs 05 ainda referenciam a coleção `Primitives` antiga em alguns nós (ex.: 112:975 `#F4F6F8`, 112:1019 `--color-green #B7F76B`; ver UI.0 §4.3.2). Os tokens seguem o Manual (§0.1) — `#F5F5F5`, `#53DAB1`; ninguém deve "corrigir" os tokens para os valores da coleção antiga.
 FocusRing é uma adaptação de acessibilidade explicitamente derivada, não uma medição Figma.
 Cor de estado deve ser acompanhada por texto/ícone. Unknown não é zero. As cores oficiais de métricas não implicam autorização para texto pequeno sem medir contraste. Cálculo sRGB WCAG sobre #F7F7F7: atenção #B87B2F = **3.32:1**, erro #BD5766 = **4.15:1**, secundário #626262 = **5.69:1**, texto #202020 = **15.21:1**. Atenção/erro falham 4.5:1 para texto normal: em UI.2 usar texto neutro com indicador semântico, ou propor token de texto acessível separado; não escurecer silenciosamente o token oficial.
 
 ## 4. Tipografia, espaço e geometria
 
 Cada papel define `SaFontSize{Papel}` (Double), `SaLineHeight{Papel}` (Double) e `Sa{Papel}TextStyle` (TextBlock explícito).
-LineStackingStrategy = BlockLineHeight; LineHeight = 1.4 × FontSize, em DIPs. TextBox/Control não suportam este mesmo contrato; adoção posterior deve respeitar as limitações reais.
+LineStackingStrategy = BlockLineHeight; LineHeight em DIPs **inteiros** (evita baselines em sub-pixel). O 140 % dos estilos Manrope (descartados por D1) não é usado: o Manual não define altura de linha, e os valores seguem os ecrãs 05 (SF Pro) ou o type ramp Fluent de Segoe UI Variable. TextBox/Control não suportam este mesmo contrato; adoção posterior deve respeitar as limitações reais.
 Valores idênticos em Dark/Light/HC, sem Foreground imposto pelo estilo.
 
 | Papel | Família SaFont* | Tamanho | Peso WinUI | LineHeight | Fonte |
 |---|---|---|---|---|---|
-| Display | Display | 44 | SemiBold | 61.6 | Manual 107:528–540 |
-| Heading | Display | 30 | SemiBold | 42 | Estilo Figma ServerAlyzer/Heading |
-| Metric | Display | 28 | SemiBold | 39.2 | Manual 107:528–540 |
-| Title | Display | 20 | SemiBold | 28 | Manual 107:528–540 |
-| TitleCompact | Text | 18 | SemiBold | 25.2 | Estilo Figma ServerAlyzer/Title |
-| Body | Text | 14 | Normal | 19.6 | Manual 107:528–540 |
-| Caption | Text | 12 | Normal | 16.8 | Manual 107:528–540 |
-| Label | Text | 12 | Medium | 16.8 | 05 112:3338/3342/3346 (SF Pro Medium 12) |
-| Micro | Text | 10 | SemiBold | 14 | Estilo Figma ServerAlyzer/Micro |
-| Mono | Mono | 12 | Normal | 16.8 | Adaptação Windows para conteúdo técnico; DERIVED - needs Prism check |
+| Display | Display | 44 | SemiBold | 56 | Tamanho: Manual 107:528. LH: calibração Prism, inteiro ≈ 1,27× (ecrã 05 não tem Display; Fluent Display 68/92 não escala linearmente) — validar na galeria |
+| Heading | Display | 30 | SemiBold | 40 | Tamanho: estilo Figma ServerAlyzer/Heading. LH: calibração Prism, inteiro ≈ 1,33× (proporção de Fluent Title Large 40/52) |
+| Metric | Display | 28 | SemiBold | 36 | Tamanho: Manual 107:531. LH: ecrã 05 112:12058 (28/36) = Fluent Title 28/36 |
+| Title | Display | 20 | SemiBold | 28 | Tamanho: Manual 107:534. LH: Fluent Subtitle 20/28 (ecrã 112:12053 usa 26 com SF Pro) |
+| TitleCompact | Text | 18 | SemiBold | 24 | Tamanho: estilo Figma ServerAlyzer/Title. LH: Fluent Body Large 18/24 |
+| Body | Text | 14 | Normal | 20 | Tamanho: Manual 107:537. LH: ecrã I112:12146;112:11857 (14/20) = Fluent Body 14/20 |
+| Caption | Text | 12 | Normal | 16 | Tamanho: Manual 107:540. LH: Fluent Caption 12/16 (ecrã 112:12054 usa 18 com SF Pro) |
+| Control | Text | 13 | Medium | 18 | 05: nav 112:975, botões 112:3400, inputs 112:3340, chips 112:8570 (SF Pro 13, ≈1,4). LH 18 = inteiro mais próximo de 13×1,4 |
+| Label | Text | 12 | Medium | 16 | Tamanho/peso: 05 112:3338/3342/3346 (SF Pro Medium 12). LH: Fluent Caption 12/16 |
+| Micro | Text | 10 | SemiBold | 14 | Tamanho: estilo Figma ServerAlyzer/Micro. LH: inteiro (Fluent não tem 10) |
+| Mono | Mono | 12 | Normal | 16 | Adaptação Windows para conteúdo técnico (DERIVED). LH: alinhado a Caption 12/16 |
 
 Famílias: `SaFontDisplay` = Segoe UI Variable Display; `SaFontText` = Segoe UI Variable Text; `SaFontMono` = Cascadia Code, Cascadia Mono, Consolas (fallback ordenado).
 Reconciliação: Title 20 é a secção do Manual; TitleCompact 18 é uma variante explícita do estilo Figma; Heading 30 não substitui Display 44. Os estilos locais Figma estão em Manrope (Display/Body/Caption Medium); o Manual prevalece com Semibold/Regular, e os ecrãs usam SF Pro.
-Calibração inicial SF Pro → Segoe: manter tamanhos, pesos semânticos e 140%; Display nos tamanhos 20+, Text nos restantes; sem compensação arbitrária de tracking. Não se declara equivalência ótica validada: clipping, quebra de linha e culturas são gate de UI.2 na galeria. Nenhuma fonte Apple é distribuída.
+Calibração inicial SF Pro → Segoe: manter tamanhos e pesos semânticos; alturas de linha inteiras pelo ecrã 05 quando coincide com Fluent, senão pelo ramp Fluent (Title 28 em vez de 26 e Caption 16 em vez de 18: a métrica vertical de Segoe UI Variable difere da de SF Pro, e o ramp Fluent é a calibração nativa); Display nos tamanhos 20+, Text nos restantes; sem compensação arbitrária de tracking. Não se declara equivalência ótica validada: clipping, quebra de linha e culturas são gate de UI.2 na galeria. Nenhuma fonte Apple é distribuída.
 
 | Chave | Dark = Light = HC | Fonte |
 |---|---|---|
@@ -98,7 +104,7 @@ Calibração inicial SF Pro → Segoe: manter tamanhos, pesos semânticos e 140%
 | SaDividerThickness | Thickness 0,0,0,1 | Adaptação do separador de 1 DIP |
 | SaFocusRingThickness | Thickness 2 | DERIVED - needs Prism check; foco Windows |
 
-Os botões de 05 mostram raios 20/22/23, mas o Manual pede controlo 12; o token Control segue o Manual. Não se alterou qualquer botão para impor esta decisão.
+Raios: os botões e a navegação de 05 têm raio 20/22/23 = metade da altura (40/44/46 px), ou seja são **pills** → `SaRadiusPill` (variável Figma `radius/pill = 99`). "Controlos 12" do Manual corresponde, em 05, a **inputs e insets** (112:3339) → `SaRadiusControl`. Não há conflito. Nenhum botão foi alterado.
 
 ## 5. Materiais / elevação (definidos, não aplicados)
 
@@ -111,7 +117,10 @@ Os botões de 05 mostram raios 20/22/23, mas o Manual pede controlo 12; o token 
 | SaModalSurfaceBrush | #1A1A1A opaco | #F7F7F7 opaco | SystemColorWindowColor | 112:8559/8745, opacity .94 elevada a 1 para contraste sustentável |
 | SaOpaqueFallbackBrush | #242424 | #F7F7F7 | SystemColorWindowColor | Manual |
 | SaOverlaySmokeBrush | #5C000000 | #33000000 | SystemColorWindowColor | 112:8558/8744 |
-| SaSurfaceShadow | ThemeShadow sem receivers | igual | não anexar em HC | D7, substituição nativa das sombras Figma |
+| SaSurfaceShadow | ThemeShadow sem receivers | igual | não anexar em HC | D7, substituição nativa das sombras Figma. **Nunca mutar** esta instância partilhada (ex.: `Receivers`); cada primitiva cria o seu próprio `ThemeShadow` |
+
+Todas as cores de material vêm de primitivas nomeadas em Color.Primitives (`SaColorElevatedSurface*`, `SaColorGlassTint*`, `SaColorSidebarTint*`, `SaColorModalSurface*`, `SaColorOverlaySmoke*`, mais `SaColorSurface*`/`SaColorCanvas*` para os fallbacks), merged dentro de Elevation.xaml como em Color.Semantic; só as opacidades Acrylic ficam literais.
+Sombras medidas em 05 (referência para afinar `Translation.Z` em UI.2, não aplicadas): Dark painéis `0 12px 12px rgba(0,0,0,.2)`, controlos `0 3px 5px rgba(0,0,0,.16)`; Light painéis `0 10px 12px rgba(0,0,0,.06)`, controlos `0 4px 6px rgba(0,0,0,.07)`.
 
 Desvio deliberado D7: Acrylic nativo não simula refração/dispersion GLASS do Figma. TintOpacity não é uma promessa de igualdade ao alpha de um paint; é ponto inicial documentado para galeria. Todos os FallbackColor são opacos. Material desativado/sem transparência deve usar fallback; HC nunca usa Acrylic. ThemeShadow é apenas recurso; a primitiva futura decide receivers/Z e suprime sombra em HC. Não há vidro dentro de vidro nem aplicação automática ao shell.
 
@@ -155,6 +164,14 @@ git grep -n -E 'GetTypes\(|GetExportedTypes|Type\.GetType|Activator\.CreateInsta
 Resultado: reflexão só em `TrayCapabilityBoundaryTests` e `TrayOwnershipCompletenessTests` (`AppAssembly.GetTypes()`), que são verificações negativas/allowlist (nenhum tipo `WinUIExTray*`; só membros permitidos nomeiam a capability) — remover tipos não pode falhar essas asserções. `CommunityBoundaryGuardTests` só contém as strings proibidas `Type.GetType(`/`Activator.CreateInstanceFrom`. Nenhum teste verifica chaves resw órfãs nem os x:Uid destes diálogos (OnboardingLocalizationTests só lê ServerFormControl.xaml e DashboardPage.xaml). Nenhum XAML/código usa a chave `ConnectionStateToBrushConverter` → remover o registo não muda a resolução de nenhuma outra chave (zero drift).
 Contraprova: build Debug e Release e a suite completa verdes **depois** da remoção (§8); smoke `--qa-health` arranca e renderiza.
 
+### 7.2 Gates obrigatórios de UI.2 (das revisões Cortex/Prism de UI.1)
+
+UI.2 não adota nenhum token `Sa*` em páginas antes de estes gates estarem verdes:
+1. **Resolução runtime (Cortex F-1):** página de galeria Debug / `--qa-tokens` que aplica `RequestedTheme` Dark → Light → HC num host e resolve **todas** as chaves `Sa*Brush`/`Sa*TextStyle` via `{ThemeResource}` em elementos reais; fail-closed se alguma faltar (o merge aninhado de Color.Primitives dentro de ThemeDictionaries ainda não foi instanciado em runtime).
+2. **Accent legado (Cortex F-3):** enquanto os overrides globais `SystemAccentColor*`/`AccentFill*` (#1846E1) vivem (até UI.6), cada primitiva UI.2 que aloje/templatize controlos WinUI (CheckBox, ToggleSwitch, RadioButton, ProgressBar, focus visuals, seleção) sobrepõe localmente os recursos dependentes do accent com `Sa*`; a galeria verifica visualmente "sem #1846E1". Alternativa: antecipar a remoção do override global com scan de zero referências. Registar a decisão aqui.
+3. **Motion a partir de C# (Cortex F-4):** o único consumidor (pulso em `ServerFullCard.xaml.cs`) é C#; `Resources["SaMotion*"]` devolve `string`. Ao migrar: acessor `MotionTokens` com parse invariante (`TimeSpan.Parse(..., CultureInfo.InvariantCulture)` e KeySpline), com teste unitário e falha explícita em formato inválido; a galeria inclui um storyboard XAML que consome cada `SaMotion*`; `AnimationsEnabled` continua respeitado.
+4. **Smoke HC (Prism F-07):** `SaOverlaySmokeBrush` em HC é `SystemColorWindowColor` opaco (igual ao legado `ModalSmokeBrush`, logo sem drift) e esconde o contexto por trás do modal; validar na galeria com HC ativo; alternativa `Transparent` em HC, deixando a borda `SystemColorWindowTextColor` do diálogo separar.
+
 Plano por milestone (não é autorização para executar agora):
 - UI.2: primitivas/galeria adotam Sa*; validar HC/fallback, contraste e calibração; rever Default/converter; manter aliases com consumidores.
 - UI.3: History/Workloads migram status/texto/superfícies; remover aliases específicos apenas com zero referências e testes.
@@ -180,8 +197,8 @@ Comandos exatamente como o CI (a `.slnx` já mapeia os projetos Windows para x64
 | Debug build | PASS, 0 erros / 10 avisos (CS8524, xUnit2031 — pré-existentes, fora dos ficheiros tocados) |
 | Debug testes | **3664 passed, 0 failed, 0 skipped** — ActivationContract 38, WidgetContract 69, Features 52, Collectors 342, Core 626, WidgetProvider 295, App 1404, Infrastructure 838 |
 | Release build | PASS, 0 erros / 10 avisos (mesmas categorias) |
-| Novo namespace | 133 chaves únicas `Sa*`; interseção com chaves XAML existentes = só os nomes de tema `Dark`/`Light`/`HighContrast` (chaves de ThemeDictionaries, não recursos) |
-| Theme dictionaries | Paridade de chaves Dark/Light/HC em Color.Semantic (22) e Elevation (7) |
+| Novo namespace | 154 chaves únicas `Sa*`; interseção com chaves XAML existentes = só os nomes de tema `Dark`/`Light`/`HighContrast` (chaves de ThemeDictionaries, não recursos) |
+| Theme dictionaries | Paridade de chaves Dark/Light/HC em Color.Semantic (26) e Elevation (7) |
 | Legado | `git diff -- src/ServerMonitor.App/Styles/DesignTokens.xaml` vazio; Controls.xaml só perde a linha do converter morto |
 | Runtime | `ServerMonitor.App.exe --qa-health --qa-ui-language pt-PT` (Debug), PID próprio **43820**: vivo e `Responding` após 12 s, janela "ServerAlyzer" 1400×900, dashboard QA (Healthy/Warning/Critical) renderizado em pt-PT com o visual legado; sem evento de crash no Application log; parado por PID exato após verificar caminho + linha de comando |
 | AppData | `window-placement.json` copiado antes para `.boss/evidence/ui1/guard/window-placement.json.bak`; SHA-256 antes = depois = backup = `924F663A…A3AB55`; **nenhum** ficheiro em `%LocalAppData%\ServerMonitor` mudou (hash de todos antes/depois), restauro desnecessário |
@@ -225,10 +242,10 @@ Mapa de todas as 70 chaves de DesignTokens.xaml. Valores antigos continuam no fi
 | ContentDialogPrimaryButtonForegroundPressed | Estilo DialogShell UI.2 com SaText/Selected/Surface; sem alias direto | Mantido, valor antigo |
 | ContentDialogSeparatorBorderBrush | SaBorderSubtleBrush | Mantido, valor antigo |
 | ContentDialogSmokeFill | SaOverlaySmokeBrush | Mantido, valor antigo |
-| GlassBorderBrush | SaBorderSubtleBrush | Mantido, valor antigo |
+| GlassBorderBrush | SaGlassBorderBrush | Mantido, valor antigo |
 | GlassBorderThickness | SaBorderThickness | Mantido, valor antigo |
 | GlassCardPadding | Composição SaSpace* por primitiva; sem substituição automática | Mantido, valor antigo |
-| GlassHighlightBrush | SaBorderNeutralBrush | Mantido, valor antigo |
+| GlassHighlightBrush | SaGlassHighlightBrush | Mantido, valor antigo |
 | GlassSurfaceBrush | SaGlassSurfaceBrush | Mantido, valor antigo |
 | ModalSmokeBrush | SaOverlaySmokeBrush | Mantido, valor antigo |
 | MutedSurfaceBrush | SaInteriorBrush | Mantido, valor antigo |
@@ -282,3 +299,20 @@ Mapa de todas as 70 chaves de DesignTokens.xaml. Valores antigos continuam no fi
 | 5 | Valores do Manual, prefixo, paridade de temas, ausência de estilos implícitos, DesignTokens intacto | Verificados, sem alteração |
 
 Pendências: dicionário `Default` duplicado e indireções HC de DesignTokens continuam por tratar (UI.2, com contraprova); em HC o `SaOverlaySmokeBrush` é opaco (SystemColorWindowColor) — confirmar na galeria se é o comportamento desejado.
+
+## 11. Correções da revisão UI.1 (Prism + Cortex, sobre c603efb)
+
+| Achado | Resolução |
+|---|---|
+| Prism F-01 hover sem fonte | `SaColorHover*` = `#1E525252` / `#40FFFFFF` (Selected a metade do alfa), marcado "DERIVED – no Figma source, validate in UI.2 gallery"; citação enganadora removida (§3) |
+| Prism F-02 contorno/highlight glass | `SaColorGlassBorder*`, `SaColorGlassHighlight*` + `SaGlassBorderBrush` (HC WindowText), `SaGlassHighlightBrush` (HC Transparent); mapa §9 atualizado |
+| Prism F-03 line-heights | Inteiros 56/40/36/28/24/20/16/16/14/16, fonte por linha (§4) |
+| Prism F-04 texto de controlo | `SaFontSizeControl` 13, `SaLineHeightControl` 18, `SaControlTextStyle` (Text, Medium) |
+| Prism F-05 Divider = border | Chaves Divider mantidas; `SaBorderInsetBrush` alias com o mesmo valor; dois usos anotados |
+| Prism F-06/F-08/F-09/F-10 | Correções de documentação (§3 DisabledText, §4 raios pill, §3 coleção antiga, §5 sombras medidas) |
+| Prism F-07, Cortex F-1/F-3/F-4 | Gates explícitos de UI.2 (§7.2) |
+| Cortex F-2 literais em Elevation | Primitivas nomeadas em Color.Primitives; Primitives merged em Elevation.xaml; só opacidades Acrylic literais |
+| Cortex F-5 hover em HC | `SaHoverTextBrush` nos 3 temas (Dark/Light = Text; HC HighlightText) |
+| Cortex F-7 sombra partilhada | Nota "nunca mutar" no XAML e §5 |
+
+Zero drift mantido: só ficheiros `Styles/Tokens/**` e este documento mudaram; nenhuma chave existente nem consumidor XAML alterado. Runtime NÃO relançado nesta ronda (QA do Beacon em curso); §8 Runtime refere-se ao smoke anterior sobre a versão pré-revisão.

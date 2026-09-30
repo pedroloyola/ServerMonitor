@@ -3,24 +3,27 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <!-- Defined only. D7: native Acrylic replaces Figma refraction; all fallbacks are opaque.
          Never nest glass surfaces. HC replaces every material with a solid system brush. -->
+    <ResourceDictionary.MergedDictionaries>
+        <ResourceDictionary Source="ms-appx:///Styles/Tokens/Color.Primitives.xaml" />
+    </ResourceDictionary.MergedDictionaries>
     <ResourceDictionary.ThemeDictionaries>
         <ResourceDictionary x:Key="Dark">
-            <SolidColorBrush x:Key="SaNeutralSurfaceBrush" Color="#242424" />
-            <SolidColorBrush x:Key="SaElevatedSurfaceBrush" Color="#313131" />
-            <AcrylicBrush x:Key="SaGlassSurfaceBrush" TintColor="#292929" TintOpacity=".43" TintLuminosityOpacity=".18" FallbackColor="#242424" />
-            <AcrylicBrush x:Key="SaSidebarMaterialBrush" TintColor="#121212" TintOpacity=".28" TintLuminosityOpacity=".18" FallbackColor="#141414" />
-            <SolidColorBrush x:Key="SaModalSurfaceBrush" Color="#1A1A1A" />
-            <SolidColorBrush x:Key="SaOpaqueFallbackBrush" Color="#242424" />
-            <SolidColorBrush x:Key="SaOverlaySmokeBrush" Color="#5C000000" />
+            <SolidColorBrush x:Key="SaNeutralSurfaceBrush" Color="{StaticResource SaColorSurfaceDark}" />
+            <SolidColorBrush x:Key="SaElevatedSurfaceBrush" Color="{StaticResource SaColorElevatedSurfaceDark}" />
+            <AcrylicBrush x:Key="SaGlassSurfaceBrush" TintColor="{StaticResource SaColorGlassTintDark}" TintOpacity=".43" TintLuminosityOpacity=".18" FallbackColor="{StaticResource SaColorSurfaceDark}" />
+            <AcrylicBrush x:Key="SaSidebarMaterialBrush" TintColor="{StaticResource SaColorSidebarTintDark}" TintOpacity=".28" TintLuminosityOpacity=".18" FallbackColor="{StaticResource SaColorCanvasDark}" />
+            <SolidColorBrush x:Key="SaModalSurfaceBrush" Color="{StaticResource SaColorModalSurfaceDark}" />
+            <SolidColorBrush x:Key="SaOpaqueFallbackBrush" Color="{StaticResource SaColorSurfaceDark}" />
+            <SolidColorBrush x:Key="SaOverlaySmokeBrush" Color="{StaticResource SaColorOverlaySmokeDark}" />
         </ResourceDictionary>
         <ResourceDictionary x:Key="Light">
-            <SolidColorBrush x:Key="SaNeutralSurfaceBrush" Color="#F7F7F7" />
-            <SolidColorBrush x:Key="SaElevatedSurfaceBrush" Color="#FFFFFF" />
-            <AcrylicBrush x:Key="SaGlassSurfaceBrush" TintColor="#FFFFFF" TintOpacity=".42" TintLuminosityOpacity=".9" FallbackColor="#F7F7F7" />
-            <AcrylicBrush x:Key="SaSidebarMaterialBrush" TintColor="#FAFAFA" TintOpacity=".27" TintLuminosityOpacity=".9" FallbackColor="#E7E7E7" />
-            <SolidColorBrush x:Key="SaModalSurfaceBrush" Color="#F7F7F7" />
-            <SolidColorBrush x:Key="SaOpaqueFallbackBrush" Color="#F7F7F7" />
-            <SolidColorBrush x:Key="SaOverlaySmokeBrush" Color="#33000000" />
+            <SolidColorBrush x:Key="SaNeutralSurfaceBrush" Color="{StaticResource SaColorSurfaceLight}" />
+            <SolidColorBrush x:Key="SaElevatedSurfaceBrush" Color="{StaticResource SaColorElevatedSurfaceLight}" />
+            <AcrylicBrush x:Key="SaGlassSurfaceBrush" TintColor="{StaticResource SaColorGlassTintLight}" TintOpacity=".42" TintLuminosityOpacity=".9" FallbackColor="{StaticResource SaColorSurfaceLight}" />
+            <AcrylicBrush x:Key="SaSidebarMaterialBrush" TintColor="{StaticResource SaColorSidebarTintLight}" TintOpacity=".27" TintLuminosityOpacity=".9" FallbackColor="{StaticResource SaColorCanvasLight}" />
+            <SolidColorBrush x:Key="SaModalSurfaceBrush" Color="{StaticResource SaColorModalSurfaceLight}" />
+            <SolidColorBrush x:Key="SaOpaqueFallbackBrush" Color="{StaticResource SaColorSurfaceLight}" />
+            <SolidColorBrush x:Key="SaOverlaySmokeBrush" Color="{StaticResource SaColorOverlaySmokeLight}" />
         </ResourceDictionary>
         <ResourceDictionary x:Key="HighContrast">
             <SolidColorBrush x:Key="SaNeutralSurfaceBrush" Color="{ThemeResource SystemColorWindowColor}" />
@@ -32,6 +35,7 @@
             <SolidColorBrush x:Key="SaOverlaySmokeBrush" Color="{ThemeResource SystemColorWindowColor}" />
         </ResourceDictionary>
     </ResourceDictionary.ThemeDictionaries>
-    <!-- Native shadow object only; receivers and Translation.Z belong to UI.2 primitives. -->
+    <!-- Native shadow object only. NEVER mutate this shared instance (e.g. Receivers): it is app-wide.
+         Primitives create their own ThemeShadow; receivers and Translation.Z belong to UI.2 primitives. -->
     <ThemeShadow x:Key="SaSurfaceShadow" />
 </ResourceDictionary>

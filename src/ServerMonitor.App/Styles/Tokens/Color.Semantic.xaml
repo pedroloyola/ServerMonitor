@@ -31,6 +31,10 @@
             <SolidColorBrush x:Key="SaSelectedBrush" Color="{StaticResource SaColorSelectedDark}" />
             <SolidColorBrush x:Key="SaSelectedTextBrush" Color="{StaticResource SaColorSelectedTextDark}" />
             <SolidColorBrush x:Key="SaFocusRingBrush" Color="{StaticResource SaColorFocusRingDark}" />
+            <SolidColorBrush x:Key="SaHoverTextBrush" Color="{StaticResource SaColorTextDark}" />
+            <SolidColorBrush x:Key="SaBorderInsetBrush" Color="{StaticResource SaColorDividerDark}" />
+            <SolidColorBrush x:Key="SaGlassBorderBrush" Color="{StaticResource SaColorGlassBorderDark}" />
+            <SolidColorBrush x:Key="SaGlassHighlightBrush" Color="{StaticResource SaColorGlassHighlightDark}" />
         </ResourceDictionary>
         <ResourceDictionary x:Key="Light">
             <SolidColorBrush x:Key="SaCanvasBrush" Color="{StaticResource SaColorCanvasLight}" />
@@ -55,6 +59,10 @@
             <SolidColorBrush x:Key="SaSelectedBrush" Color="{StaticResource SaColorSelectedLight}" />
             <SolidColorBrush x:Key="SaSelectedTextBrush" Color="{StaticResource SaColorSelectedTextLight}" />
             <SolidColorBrush x:Key="SaFocusRingBrush" Color="{StaticResource SaColorFocusRingLight}" />
+            <SolidColorBrush x:Key="SaHoverTextBrush" Color="{StaticResource SaColorTextLight}" />
+            <SolidColorBrush x:Key="SaBorderInsetBrush" Color="{StaticResource SaColorDividerLight}" />
+            <SolidColorBrush x:Key="SaGlassBorderBrush" Color="{StaticResource SaColorGlassBorderLight}" />
+            <SolidColorBrush x:Key="SaGlassHighlightBrush" Color="{StaticResource SaColorGlassHighlightLight}" />
         </ResourceDictionary>
         <ResourceDictionary x:Key="HighContrast">
             <SolidColorBrush x:Key="SaCanvasBrush" Color="{ThemeResource SystemColorWindowColor}" />
@@ -79,6 +87,10 @@
             <SolidColorBrush x:Key="SaSelectedBrush" Color="{ThemeResource SystemColorHighlightColor}" />
             <SolidColorBrush x:Key="SaSelectedTextBrush" Color="{ThemeResource SystemColorHighlightTextColor}" />
             <SolidColorBrush x:Key="SaFocusRingBrush" Color="{ThemeResource SystemColorHighlightColor}" />
+            <SolidColorBrush x:Key="SaHoverTextBrush" Color="{ThemeResource SystemColorHighlightTextColor}" />
+            <SolidColorBrush x:Key="SaBorderInsetBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="SaGlassBorderBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="SaGlassHighlightBrush" Color="Transparent" />
         </ResourceDictionary>
     </ResourceDictionary.ThemeDictionaries>
 </ResourceDictionary>
