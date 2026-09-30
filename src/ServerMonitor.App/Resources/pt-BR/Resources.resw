@@ -400,6 +400,8 @@
   <data name="SshConfigPreviewJumpFormat" xml:space="preserve"><value>Via: {0}</value></data>
   <data name="SshConfigHostJumpClassificationFormat" xml:space="preserve"><value>Host de salto {0}: {1}</value></data>
   <data name="SshConfigImportAppliedFormat" xml:space="preserve"><value>Os campos vazios foram preenchidos a partir de {0}. Os valores que você já tinha informado foram mantidos.</value></data>
+  <data name="SshConfigImportNothingFilledHostDiffersFormat" xml:space="preserve"><value>Nada foi preenchido a partir de {0}: o host que você informou é diferente. Seus valores foram mantidos.</value></data>
+  <data name="SshConfigImportNothingFilledFormat" xml:space="preserve"><value>Nada foi preenchido a partir de {0}: os campos que ele oferece já têm valores.</value></data>
   <data name="SshConfigHostBlockedProxyCommand" xml:space="preserve"><value>Requer ProxyCommand (no host ou no host de salto) — não suportado</value></data>
   <data name="SshConfigHostBlockedJumpMultiHop" xml:space="preserve"><value>Requer mais de um host de salto (ProxyJump multi-hop ou encadeado) — não suportado</value></data>
   <data name="SshConfigHostBlockedJumpUnparsable" xml:space="preserve"><value>O valor de ProxyJump não pode ser lido com exatidão — não importado</value></data>

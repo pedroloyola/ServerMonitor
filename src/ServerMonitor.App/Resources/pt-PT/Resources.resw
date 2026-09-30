@@ -395,6 +395,8 @@
   <data name="SshConfigPreviewJumpFormat" xml:space="preserve"><value>Através de: {0}</value></data>
   <data name="SshConfigHostJumpClassificationFormat" xml:space="preserve"><value>Anfitrião de salto {0}: {1}</value></data>
   <data name="SshConfigImportAppliedFormat" xml:space="preserve"><value>Os campos vazios foram preenchidos a partir de {0}. Os valores que já tinha introduzido foram mantidos.</value></data>
+  <data name="SshConfigImportNothingFilledHostDiffersFormat" xml:space="preserve"><value>Nada foi preenchido a partir de {0}: o anfitrião que introduziu é diferente. Os seus valores foram mantidos.</value></data>
+  <data name="SshConfigImportNothingFilledFormat" xml:space="preserve"><value>Nada foi preenchido a partir de {0}: os campos que oferece já têm valores.</value></data>
   <data name="SshConfigHostBlockedProxyCommand" xml:space="preserve"><value>Requer ProxyCommand (no anfitrião ou no anfitrião de salto) — não suportado</value></data>
   <data name="SshConfigHostBlockedJumpMultiHop" xml:space="preserve"><value>Requer mais do que um anfitrião de salto (ProxyJump multi-salto ou encadeado) — não suportado</value></data>
   <data name="SshConfigHostBlockedJumpUnparsable" xml:space="preserve"><value>O valor de ProxyJump não pode ser lido com exatidão — não importado</value></data>

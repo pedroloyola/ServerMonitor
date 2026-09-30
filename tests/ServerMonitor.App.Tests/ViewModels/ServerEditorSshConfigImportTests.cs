@@ -633,4 +633,110 @@ public sealed class ServerEditorSshConfigImportTests
 
         Assert.False(vm.IsSshConfigImportAvailable);
     }
+
+    // ---- M14.4c QA LOW-2: the status claims "filled" only when a field actually changed
+
+    [Fact]
+    public void Apply_FillingFields_SaysTheEmptyFieldsWereFilled()
+    {
+        var vm = Editor();
+
+        Assert.True(vm.ApplySshConfigHost(Entry(FullConfig, "web")));
+
+        Assert.Equal("SshConfigImportAppliedFormat", vm.SshConfigStatusMessage);
+    }
+
+    [Fact]
+    public void Apply_TypedDifferentHost_FillingOnlyTheName_StillSaysFilled()
+    {
+        var vm = Editor();
+        vm.Host = "other.example.com";
+
+        Assert.True(vm.ApplySshConfigHost(Entry(FullConfig, "web")));
+
+        Assert.Equal("web", vm.Name);
+        Assert.Equal("SshConfigImportAppliedFormat", vm.SshConfigStatusMessage);
+    }
+
+    [Fact]
+    public void Apply_TypedDifferentHost_FillingNothing_SaysTheHostDiffers()
+    {
+        var vm = Editor();
+        vm.Name = "Mine";
+        vm.Host = "other.example.com";
+
+        Assert.True(vm.ApplySshConfigHost(Entry(FullConfig, "web")));
+
+        Assert.Equal("Mine", vm.Name);
+        Assert.Equal("other.example.com", vm.Host);
+        Assert.Equal("SshConfigImportNothingFilledHostDiffersFormat", vm.SshConfigStatusMessage);
+    }
+
+    [Fact]
+    public void Apply_JumpHostIntoADifferentTypedHost_FillingNothing_SaysTheHostDiffers()
+    {
+        var vm = Editor();
+        vm.Name = "Mine";
+        vm.Host = "192.0.2.50";
+
+        Assert.True(vm.ApplySshConfigHost(Entry(JumpConfig, "inner")));
+
+        Assert.False(vm.UseJumpHost);
+        Assert.Equal("SshConfigImportNothingFilledHostDiffersFormat", vm.SshConfigStatusMessage);
+    }
+
+    [Fact]
+    public void Apply_EveryOfferedFieldAlreadyTyped_SaysNothingWasFilled()
+    {
+        var vm = Editor();
+        vm.Name = "Mine";
+        vm.Host = "10.0.0.5";
+        vm.Port = "2200";
+        vm.Username = "me";
+        vm.PrivateKeyPath = @"C:\keys\mine";
+
+        Assert.True(vm.ApplySshConfigHost(Entry(FullConfig, "web")));
+
+        Assert.Equal("SshConfigImportNothingFilledFormat", vm.SshConfigStatusMessage);
+    }
+
+    [Fact]
+    public void Apply_JumpHost_EveryOfferedFieldAlreadyTyped_SaysNothingWasFilled()
+    {
+        var vm = Editor();
+        vm.Name = "Mine";
+        vm.Host = "10.1.0.9";
+        vm.Port = "2201";
+        vm.Username = "me";
+        vm.PrivateKeyPath = @"C:\keys\mine";
+        vm.UseJumpHost = true;
+        vm.JumpHost = "203.0.113.7";
+        vm.JumpPort = "2222";
+        vm.JumpUsername = "mine";
+        vm.JumpPrivateKeyPath = @"C:\keys\jump";
+
+        Assert.True(vm.ApplySshConfigHost(Entry(JumpConfig, "inner")));
+
+        Assert.Equal("SshConfigImportNothingFilledFormat", vm.SshConfigStatusMessage);
+    }
+
+    [Fact]
+    public void Apply_OnlySwitchingToTheJump_SaysFilled()
+    {
+        var vm = Editor();
+        vm.Name = "Mine";
+        vm.Host = "10.1.0.9";
+        vm.Port = "2201";
+        vm.Username = "me";
+        vm.PrivateKeyPath = @"C:\keys\mine";
+        vm.JumpHost = "203.0.113.7";
+        vm.JumpPort = "2222";
+        vm.JumpUsername = "mine";
+        vm.JumpPrivateKeyPath = @"C:\keys\jump";
+
+        Assert.True(vm.ApplySshConfigHost(Entry(JumpConfig, "inner")));
+
+        Assert.True(vm.UseJumpHost);
+        Assert.Equal("SshConfigImportAppliedFormat", vm.SshConfigStatusMessage);
+    }
 }

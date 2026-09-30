@@ -542,6 +542,7 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
         // User, port and key belong to a host. They are only taken when the entry's host is known
         // and the form's host is empty (and so comes from this entry) or already is that host —
         // never mixed into a host the user typed, nor attached to an unresolved HostName.
+        var before = SshConfigImportFields();
         var hostWasEmpty = string.IsNullOrWhiteSpace(Host);
         var sameHost = entry.HostName is not null
             && (hostWasEmpty || string.Equals(Host.Trim(), entry.HostName, StringComparison.OrdinalIgnoreCase));
@@ -614,13 +615,24 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
             }
         }
 
+        // The status says what actually happened: "filled" only when a field changed; otherwise why
+        // nothing was (a typed host that is not this entry's), never a claim that fields were filled.
+        var messageKey = SshConfigImportFields() != before
+            ? "SshConfigImportAppliedFormat"
+            : !hostWasEmpty && !sameHost && entry.HostName is not null
+                ? "SshConfigImportNothingFilledHostDiffersFormat"
+                : "SshConfigImportNothingFilledFormat";
         CloseSshConfigImport();
         SshConfigStatusMessage = string.Format(
             CultureInfo.CurrentCulture,
-            _localizationService.GetString("SshConfigImportAppliedFormat"),
+            _localizationService.GetString(messageKey),
             entry.Alias);
         return true;
     }
+
+    // Every form field ApplySshConfigHost may write, compared before/after to tell whether it changed anything.
+    private (string, string, string, string, string, bool, string, string, string, string) SshConfigImportFields() =>
+        (Name, Host, Port, Username, PrivateKeyPath, UseJumpHost, JumpHost, JumpPort, JumpUsername, JumpPrivateKeyPath);
 
     public void CaptureSecret(string? value)
     {
