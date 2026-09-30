@@ -386,9 +386,10 @@ public sealed class SshConfigProxyJumpTests
 
     [Fact]
     public void UnverifiableIncludeBeforeTheJumpsHostName_Blocks() =>
+        // Proxy and canonicalisation are already decided: only the jump's pending HostName is at stake.
         AssertBlocked(
             SshConfigHostBlocker.ProxyMaySetByInclude,
-            "Host target\n  ProxyJump bastion\nHost bastion\n  ProxyJump none\n  Include conf.d/*\n  HostName 203.0.113.7\n");
+            "Host target\n  CanonicalizeHostname no\n  ProxyJump bastion\nHost bastion\n  ProxyJump none\n  CanonicalizeHostname no\n  Include conf.d/*\n  HostName 203.0.113.7\n");
 
     [Fact]
     public void UnverifiableIncludeAfterTheJumpsAddressAndProxyAreDecided_DoesNotBlock()
