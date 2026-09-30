@@ -30,6 +30,12 @@ public sealed record SshConnectionResult
     /// <summary>The routed store's entry when a Target key mismatches it.</summary>
     public TrustedRoutedHostKey? TrustedRoutedHostKey { get; init; }
 
+    /// <summary>
+    /// M14.5 — the last "Test connection" step that completed (see <see cref="SshConnectionStage"/>). The step
+    /// after it is the one that failed. Set by the connection service from observation, never guessed.
+    /// </summary>
+    public SshConnectionStage ReachedStage { get; init; } = SshConnectionStage.None;
+
     public ServerOperatingSystem DetectedOperatingSystem { get; init; } = ServerOperatingSystem.Unknown;
 
     public TimeSpan Duration { get; init; }
