@@ -1,0 +1,84 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- Consume with ThemeResource. HC uses user-selected system colours.
+         Color.Primitives is merged HERE (not as an App.xaml sibling) so every StaticResource below resolves
+         inside this dictionary's own lookup scope, independent of App.xaml parse order. -->
+    <ResourceDictionary.MergedDictionaries>
+        <ResourceDictionary Source="ms-appx:///Styles/Tokens/Color.Primitives.xaml" />
+    </ResourceDictionary.MergedDictionaries>
+    <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="Dark">
+            <SolidColorBrush x:Key="SaCanvasBrush" Color="{StaticResource SaColorCanvasDark}" />
+            <SolidColorBrush x:Key="SaSurfaceBrush" Color="{StaticResource SaColorSurfaceDark}" />
+            <SolidColorBrush x:Key="SaInteriorBrush" Color="{StaticResource SaColorInteriorDark}" />
+            <SolidColorBrush x:Key="SaTextBrush" Color="{StaticResource SaColorTextDark}" />
+            <SolidColorBrush x:Key="SaTextSecondaryBrush" Color="{StaticResource SaColorTextSecondaryDark}" />
+            <SolidColorBrush x:Key="SaCpuBrush" Color="{StaticResource SaColorCpuDark}" />
+            <SolidColorBrush x:Key="SaMemoryBrush" Color="{StaticResource SaColorMemoryDark}" />
+            <SolidColorBrush x:Key="SaDiskBrush" Color="{StaticResource SaColorDiskDark}" />
+            <SolidColorBrush x:Key="SaAttentionBrush" Color="{StaticResource SaColorAttentionDark}" />
+            <SolidColorBrush x:Key="SaHealthyBrush" Color="{StaticResource SaColorHealthyDark}" />
+            <SolidColorBrush x:Key="SaSuccessBrush" Color="{StaticResource SaColorSuccessDark}" />
+            <SolidColorBrush x:Key="SaErrorBrush" Color="{StaticResource SaColorErrorDark}" />
+            <SolidColorBrush x:Key="SaOfflineBrush" Color="{StaticResource SaColorOfflineDark}" />
+            <SolidColorBrush x:Key="SaBorderNeutralBrush" Color="{StaticResource SaColorBorderNeutralDark}" />
+            <SolidColorBrush x:Key="SaBorderSubtleBrush" Color="{StaticResource SaColorBorderSubtleDark}" />
+            <SolidColorBrush x:Key="SaDividerBrush" Color="{StaticResource SaColorDividerDark}" />
+            <SolidColorBrush x:Key="SaDisabledSurfaceBrush" Color="{StaticResource SaColorDisabledSurfaceDark}" />
+            <SolidColorBrush x:Key="SaDisabledTextBrush" Color="{StaticResource SaColorDisabledTextDark}" />
+            <SolidColorBrush x:Key="SaHoverBrush" Color="{StaticResource SaColorHoverDark}" />
+            <SolidColorBrush x:Key="SaSelectedBrush" Color="{StaticResource SaColorSelectedDark}" />
+            <SolidColorBrush x:Key="SaSelectedTextBrush" Color="{StaticResource SaColorSelectedTextDark}" />
+            <SolidColorBrush x:Key="SaFocusRingBrush" Color="{StaticResource SaColorFocusRingDark}" />
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="Light">
+            <SolidColorBrush x:Key="SaCanvasBrush" Color="{StaticResource SaColorCanvasLight}" />
+            <SolidColorBrush x:Key="SaSurfaceBrush" Color="{StaticResource SaColorSurfaceLight}" />
+            <SolidColorBrush x:Key="SaInteriorBrush" Color="{StaticResource SaColorInteriorLight}" />
+            <SolidColorBrush x:Key="SaTextBrush" Color="{StaticResource SaColorTextLight}" />
+            <SolidColorBrush x:Key="SaTextSecondaryBrush" Color="{StaticResource SaColorTextSecondaryLight}" />
+            <SolidColorBrush x:Key="SaCpuBrush" Color="{StaticResource SaColorCpuLight}" />
+            <SolidColorBrush x:Key="SaMemoryBrush" Color="{StaticResource SaColorMemoryLight}" />
+            <SolidColorBrush x:Key="SaDiskBrush" Color="{StaticResource SaColorDiskLight}" />
+            <SolidColorBrush x:Key="SaAttentionBrush" Color="{StaticResource SaColorAttentionLight}" />
+            <SolidColorBrush x:Key="SaHealthyBrush" Color="{StaticResource SaColorHealthyLight}" />
+            <SolidColorBrush x:Key="SaSuccessBrush" Color="{StaticResource SaColorSuccessLight}" />
+            <SolidColorBrush x:Key="SaErrorBrush" Color="{StaticResource SaColorErrorLight}" />
+            <SolidColorBrush x:Key="SaOfflineBrush" Color="{StaticResource SaColorOfflineLight}" />
+            <SolidColorBrush x:Key="SaBorderNeutralBrush" Color="{StaticResource SaColorBorderNeutralLight}" />
+            <SolidColorBrush x:Key="SaBorderSubtleBrush" Color="{StaticResource SaColorBorderSubtleLight}" />
+            <SolidColorBrush x:Key="SaDividerBrush" Color="{StaticResource SaColorDividerLight}" />
+            <SolidColorBrush x:Key="SaDisabledSurfaceBrush" Color="{StaticResource SaColorDisabledSurfaceLight}" />
+            <SolidColorBrush x:Key="SaDisabledTextBrush" Color="{StaticResource SaColorDisabledTextLight}" />
+            <SolidColorBrush x:Key="SaHoverBrush" Color="{StaticResource SaColorHoverLight}" />
+            <SolidColorBrush x:Key="SaSelectedBrush" Color="{StaticResource SaColorSelectedLight}" />
+            <SolidColorBrush x:Key="SaSelectedTextBrush" Color="{StaticResource SaColorSelectedTextLight}" />
+            <SolidColorBrush x:Key="SaFocusRingBrush" Color="{StaticResource SaColorFocusRingLight}" />
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="HighContrast">
+            <SolidColorBrush x:Key="SaCanvasBrush" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="SaSurfaceBrush" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="SaInteriorBrush" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="SaTextBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="SaTextSecondaryBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="SaCpuBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="SaMemoryBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="SaDiskBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="SaAttentionBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="SaHealthyBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="SaSuccessBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="SaErrorBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="SaOfflineBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="SaBorderNeutralBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="SaBorderSubtleBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="SaDividerBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="SaDisabledSurfaceBrush" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="SaDisabledTextBrush" Color="{ThemeResource SystemColorGrayTextColor}" />
+            <SolidColorBrush x:Key="SaHoverBrush" Color="{ThemeResource SystemColorHighlightColor}" />
+            <SolidColorBrush x:Key="SaSelectedBrush" Color="{ThemeResource SystemColorHighlightColor}" />
+            <SolidColorBrush x:Key="SaSelectedTextBrush" Color="{ThemeResource SystemColorHighlightTextColor}" />
+            <SolidColorBrush x:Key="SaFocusRingBrush" Color="{ThemeResource SystemColorHighlightColor}" />
+        </ResourceDictionary>
+    </ResourceDictionary.ThemeDictionaries>
+</ResourceDictionary>

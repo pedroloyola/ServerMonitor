@@ -1,0 +1,19 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- Definition only. Consumers must honour UISettings.AnimationsEnabled.
+         Stored as x:String exactly like WinUI's own ControlFastAnimationDuration / ControlFastOutSlowInKeySpline
+         resources, so they convert wherever a KeyTime, Duration or KeySpline attribute consumes them.
+         Focus timings preserve ServerFullCard's existing keyframe times (not three phase lengths).
+         Fluent: https://learn.microsoft.com/windows/apps/design/motion/ -->
+    <x:String x:Key="SaMotionFocusPeakTime">0:0:0.180</x:String>
+    <x:String x:Key="SaMotionFocusFadeEndTime">0:0:1.600</x:String>
+    <x:String x:Key="SaMotionFocusReducedHoldTime">0:0:2</x:String>
+    <x:String x:Key="SaMotionFadeDuration">0:0:0.083</x:String>
+    <x:String x:Key="SaMotionFastDuration">0:0:0.167</x:String>
+    <x:String x:Key="SaMotionNormalDuration">0:0:0.250</x:String>
+    <x:String x:Key="SaMotionSlowDuration">0:0:0.333</x:String>
+    <x:String x:Key="SaMotionLinearKeySpline">0,0,1,1</x:String>
+    <x:String x:Key="SaMotionDirectKeySpline">0,0,0,1</x:String>
+    <x:String x:Key="SaMotionPointToPointKeySpline">0.55,0.55,0,1</x:String>
+</ResourceDictionary>
