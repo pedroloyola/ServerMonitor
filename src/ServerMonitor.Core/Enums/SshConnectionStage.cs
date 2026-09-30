@@ -4,6 +4,9 @@ namespace ServerMonitor.Core.Enums;
 /// M14.5 — the four user-visible steps of "Test connection", in order. A result's
 /// <see cref="Models.SshConnectionResult.ReachedStage"/> is the LAST step that completed; the step after it is
 /// the one that failed. Set by the connection service from what it actually observed, never inferred by the UI.
+/// Exception (races): a result never carries less than what its progress already reported, so a host-key
+/// mismatch or a jump failure can arrive with <see cref="HostKeyVerified"/>; consumers decide the failed step by
+/// the error-code family first (see <see cref="Models.SshConnectionResult.ReachedStage"/>).
 /// Append only — never renumber.
 /// </summary>
 public enum SshConnectionStage

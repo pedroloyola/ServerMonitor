@@ -33,6 +33,16 @@ public sealed record SshConnectionResult
     /// <summary>
     /// M14.5 — the last "Test connection" step that completed (see <see cref="SshConnectionStage"/>). The step
     /// after it is the one that failed. Set by the connection service from observation, never guessed.
+    /// <para>
+    /// Monotonic race exception: the stage never drops below a step already reported through
+    /// <see cref="SshConnectionRequest.StageProgress"/>. So when the host key changes between the probe and the
+    /// authenticated connection (<see cref="SshConnectionErrorCode.HostKeyMismatch"/>), or the jump fails during
+    /// the routed target's authentication (a <c>Jump*</c> code or
+    /// <see cref="SshConnectionErrorCode.TargetUnreachableViaJump"/>), this can be
+    /// <see cref="SshConnectionStage.HostKeyVerified"/>. Consumers decide the failed step by the
+    /// <see cref="ErrorCode"/> family FIRST (host-key codes: the identity step; jump codes: the jump), and only
+    /// then by this stage.
+    /// </para>
     /// </summary>
     public SshConnectionStage ReachedStage { get; init; } = SshConnectionStage.None;
 
