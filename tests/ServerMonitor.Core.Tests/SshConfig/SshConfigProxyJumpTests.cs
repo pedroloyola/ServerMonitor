@@ -425,6 +425,17 @@ public sealed class SshConfigProxyJumpTests
     }
 
     [Fact]
+    public void TargetBlockedByItsOwnInclude_NeverCarriesAJump_EvenWhenTheJumpIsClean()
+    {
+        // The Include applies only to the target, so the jump alone would resolve cleanly.
+        var host = Host("Host target\n  Include ../outside\n  ProxyJump bastion\nHost bastion\n  HostName 203.0.113.7\n", "target");
+
+        Assert.Equal(SshConfigHostBlocker.ProxyMaySetByInclude, host.Blocker);
+        Assert.False(host.IsImportable);
+        Assert.Null(host.Jump);
+    }
+
+    [Fact]
     public void BlockedJump_IsListedAsAnUnsupportedProxyJump()
     {
         var host = Host("Host target\n  ProxyJump a,b\n", "target");
