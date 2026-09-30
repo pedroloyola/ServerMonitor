@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using ServerMonitor.Core.Enums;
 using ServerMonitor.Core.SshConfig;
 using ServerMonitor.Infrastructure.SshConfig;
 
@@ -107,19 +108,30 @@ public sealed class SshConfigQaFixturesScriptTests : IDisposable
         var exe = FakeAppExe(DateTime.UtcNow);
         var (exitCode, output) = RunScript(_root, exe);
         Assert.True(exitCode == 0, output);
-        foreach (var scenario in new[] { "empty", "error", "big", "blocked", "normal", "proxyjump" })
+        foreach (var scenario in new[] { "empty", "error", "big", "blocked", "normal", "proxyjump", "keys", "keys-rsa", "keys-edge" })
         {
-            // The exact executable, never `dotnet run` (which may launch a different, stale binary).
-            Assert.Contains($"& \"{exe}\" --qa-ssh-config \"{Path.Combine(_root, scenario)}\"", output);
+            // The exact executable, never `dotnet run` (which may launch a different, stale binary), and always
+            // ISOLATED (M14.5 D-2): its own data directory, in-memory secrets, no monitoring.
+            var isolated = $"& \"{exe}\" --qa-proxyjump --qa-proxyjump-dir=\"{Path.Combine(_root, scenario)}-data\" --qa-ssh-config \"{Path.Combine(_root, scenario)}\"";
+            Assert.Matches(new System.Text.RegularExpressions.Regex(System.Text.RegularExpressions.Regex.Escape(isolated) + @"\r?$", System.Text.RegularExpressions.RegexOptions.Multiline), output);
             foreach (var language in new[] { "en-US", "pt-BR" })
             {
-                Assert.Contains(
-                    $"& \"{exe}\" --qa-ssh-config \"{Path.Combine(_root, scenario)}\" --qa-ui-language {language}",
-                    output);
+                Assert.Contains($"{isolated} --qa-ui-language {language}", output);
             }
         }
 
         Assert.DoesNotContain("dotnet run", output);
+
+        // No launch line runs the real composition: every one that names --qa-ssh-config is isolated.
+        var launchLines = output.Split(["\r\n", "\n"], StringSplitOptions.None)
+            .Where(line => line.Contains("--qa-ssh-config", StringComparison.Ordinal))
+            .ToList();
+        Assert.Equal(9 * 3, launchLines.Count);
+        Assert.All(launchLines, line =>
+        {
+            Assert.Contains("--qa-proxyjump --qa-proxyjump-dir=\"", line);
+            Assert.Contains("-data\" --qa-ssh-config", line);
+        });
 
         // (a) empty
         Assert.Equal(SshConfigImportStatus.NotFound, (await LoadAsync("empty")).Result.Status);
@@ -203,6 +215,53 @@ public sealed class SshConfigQaFixturesScriptTests : IDisposable
         Assert.Equal(SshConfigHostBlocker.JumpCycle, HostOf("cycle-b").Blocker);
         Assert.All(proxyJump.Hosts.Where(host => !host.IsImportable), host => Assert.Null(host.Jump));
         Assert.All(proxyJumpSpy.Paths, path => Assert.DoesNotContain("qa_missing", path));
+    }
+
+    [Fact]
+    public async Task FixtureScript_KeyScenarios_DriveTheRealKeyDiscovery_WithDummyBytesOnly()
+    {
+        var (exitCode, output) = RunScript(_root, FakeAppExe(DateTime.UtcNow.AddMinutes(5)));
+        Assert.True(exitCode == 0, output);
+
+        // keys: the three defaults, ed25519 recommended; every excluded name exists but is never listed.
+        var keysSsh = Path.Combine(_root, "keys", ".ssh");
+        var keys = await new LocalSshKeyDiscovery(Path.Combine(_root, "keys")).DiscoverAsync();
+        Assert.Equal(["id_ed25519", "id_ecdsa", "id_rsa"], keys.Select(key => key.FileName));
+        Assert.Equal([true, false, false], keys.Select(key => key.IsRecommended));
+        Assert.All(keys, key => Assert.Equal(keysSsh, Path.GetDirectoryName(key.Path)));
+        foreach (var excluded in new[] { "id_dsa", "id_ed25519_sk", "id_ecdsa_sk", "id_ed25519.pub", "my_server_key" })
+        {
+            Assert.True(File.Exists(Path.Combine(keysSsh, excluded)), excluded);
+        }
+
+        // Every "key" file is the dummy marker, never key material.
+        foreach (var file in Directory.EnumerateFiles(Path.Combine(_root, "keys"), "*", SearchOption.AllDirectories)
+                     .Where(path => Path.GetFileName(path) != "config"))
+        {
+            var text = File.ReadAllText(file);
+            Assert.StartsWith("QA FIXTURE - NOT A PRIVATE KEY", text);
+            Assert.DoesNotContain("PRIVATE KEY-----", text);
+        }
+
+        // keys: "keyed" imports its own IdentityFile (a discovered default); "plain" has none.
+        var (keysConfig, _) = await LoadAsync("keys");
+        var keyed = Assert.Single(keysConfig.Hosts, host => host.Alias == "keyed");
+        Assert.Equal(Path.Combine(keysSsh, "id_rsa"), keyed.IdentityFile);
+        Assert.Null(Assert.Single(keysConfig.Hosts, host => host.Alias == "plain").IdentityFile);
+
+        // keys-rsa: one key, recommended.
+        var rsa = Assert.Single(await new LocalSshKeyDiscovery(Path.Combine(_root, "keys-rsa")).DiscoverAsync());
+        Assert.Equal(("id_rsa", LocalSshKeyKind.Rsa, true), (rsa.FileName, rsa.Kind, rsa.IsRecommended));
+
+        // keys-edge: oversize, empty and a directory - nothing offered.
+        var edge = Path.Combine(_root, "keys-edge", ".ssh");
+        Assert.Equal(LocalSshKeyDiscovery.MaxKeyFileBytes + 1, new FileInfo(Path.Combine(edge, "id_ed25519")).Length);
+        Assert.Equal(0, new FileInfo(Path.Combine(edge, "id_ecdsa")).Length);
+        Assert.True(Directory.Exists(Path.Combine(edge, "id_rsa")));
+        Assert.Empty(await new LocalSshKeyDiscovery(Path.Combine(_root, "keys-edge")).DiscoverAsync());
+
+        // The other scenarios have no key files at all (today's "no key found" behaviour).
+        Assert.Empty(await new LocalSshKeyDiscovery(Path.Combine(_root, "normal")).DiscoverAsync());
     }
 
     [Fact]

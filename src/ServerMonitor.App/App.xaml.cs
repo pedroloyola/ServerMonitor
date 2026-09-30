@@ -493,8 +493,10 @@ public partial class App : Application
         services.AddSingleton<IHostKeyTrustStore, JsonHostKeyTrustStore>();
         services.AddSingleton<IRoutedHostKeyTrustStore, JsonRoutedHostKeyTrustStore>();
         services.AddSingleton<ISshConfigImportSource, SshConfigFileImportSource>();
+        // M14.5: default keys in ~/.ssh, metadata only (never opened). Parameterless ctor = the real profile.
+        services.AddSingleton<ILocalSshKeyDiscovery>(_ => new LocalSshKeyDiscovery());
 #if DEBUG
-        // Debug-only QA: --qa-ssh-config <dir> roots the import at a fixture profile instead of ~/.ssh.
+        // Debug-only QA: --qa-ssh-config <dir> roots the import AND key discovery at a fixture profile instead of ~/.ssh.
         if (Qa.QaSshConfigComposition.RequestedProfile() is { } qaSshConfigProfile)
         {
             Qa.QaSshConfigComposition.Apply(services, qaSshConfigProfile);

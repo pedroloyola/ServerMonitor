@@ -15,8 +15,15 @@ internal sealed class SshNetSession(
     ConnectionInfo connectionInfo,
     Renci.SshNet.AuthenticationMethod authentication,
     IDisposable? authenticationResource,
-    ISshConnectGate? connectGate = null) : ISshSession
+    ISshConnectGate? connectGate = null,
+    SshNetSession.ClientConnector? connectClient = null) : ISshSession
 {
+    /// <summary>
+    /// Test seam for the one SSH connect (TCP + key exchange + user authentication). Production always uses
+    /// <see cref="SshClient.ConnectAsync"/>; a test substitutes it to prove when a session counts as authenticated.
+    /// </summary>
+    internal delegate Task ClientConnector(SshClient client, CancellationToken cancellationToken);
+
     private const int DefaultOutputLimit = 256 * 1024;
     private const int SmallOutputLimit = 16 * 1024;
     private const int ErrorOutputLimit = 16 * 1024;
@@ -25,6 +32,7 @@ internal sealed class SshNetSession(
     private const int WorkloadListOutputLimit = 1024 * 1024;
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
     private readonly SshClient _client = new(connectionInfo);
+    private readonly ClientConnector _connect = connectClient ?? (static (client, token) => client.ConnectAsync(token));
     private bool _disposed;
 
     public Task<SshSessionResult> ConnectAsync(
@@ -79,6 +87,7 @@ internal sealed class SshNetSession(
 
         HostKeyIdentity? presentedHostKey = null;
         var hostKeyWasRejected = false;
+        var authenticated = false;
 
         void OnHostKeyReceived(object? sender, Renci.SshNet.Common.HostKeyEventArgs args)
         {
@@ -105,12 +114,15 @@ internal sealed class SshNetSession(
             connectGate?.BeforeConnect();
             try
             {
-                await _client.ConnectAsync(cancellationToken).ConfigureAwait(false);
+                await _connect(_client, cancellationToken).ConfigureAwait(false);
             }
             finally
             {
                 connectGate?.AfterConnect();
             }
+
+            // SshClient.ConnectAsync returns only after the server accepted the credential.
+            authenticated = true;
 
             var detectedOperatingSystem = ServerOperatingSystem.Unknown;
             LinuxMetricsRawData? linuxMetrics = null;
@@ -151,21 +163,28 @@ internal sealed class SshNetSession(
                 LinuxMetrics = linuxMetrics,
                 MacOsMetrics = macOsMetrics,
                 Workloads = workloads,
-                IdentificationReceived = true
+                IdentificationReceived = true,
+                AuthenticationCompleted = true,
+                ConnectionEstablished = true
             };
         }
         catch (Exception exception)
         {
+            // Structural, not textual (M14.4b-2 §3): set only once the peer's version line arrived.
+            var identificationReceived = !string.IsNullOrEmpty(connectionInfo.ServerVersion);
             return new SshSessionResult
             {
                 ErrorCode = hostKeyWasRejected
                     ? SshConnectionErrorCode.HostKeyMismatch
-                    : SshExceptionMapper.Map(exception),
+                    : SshExceptionMapper.Map(exception, identificationReceived),
                 PresentedHostKey = presentedHostKey,
                 ExceptionType = exception.GetType().Name,
                 HostKeyRejected = hostKeyWasRejected,
-                // Structural, not textual (M14.4b-2 §3): set only once the peer's version line arrived.
-                IdentificationReceived = !string.IsNullOrEmpty(connectionInfo.ServerVersion)
+                IdentificationReceived = identificationReceived,
+                AuthenticationCompleted = authenticated,
+                ConnectionEstablished = identificationReceived
+                                        || presentedHostKey is not null
+                                        || SshExceptionMapper.ProvesEstablishedConnection(exception)
             };
         }
         finally

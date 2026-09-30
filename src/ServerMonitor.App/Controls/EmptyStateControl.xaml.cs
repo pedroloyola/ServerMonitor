@@ -46,4 +46,25 @@ public sealed partial class EmptyStateControl : UserControl
         get => (ICommand?)GetValue(ActionCommandProperty);
         set => SetValue(ActionCommandProperty, value);
     }
+
+    public static readonly DependencyProperty SecondaryActionTextProperty = DependencyProperty.Register(
+        nameof(SecondaryActionText), typeof(string), typeof(EmptyStateControl), new PropertyMetadata(string.Empty));
+
+    public static readonly DependencyProperty SecondaryActionCommandProperty = DependencyProperty.Register(
+        nameof(SecondaryActionCommand), typeof(ICommand), typeof(EmptyStateControl), new PropertyMetadata(null));
+
+    public string SecondaryActionText
+    {
+        get => (string)GetValue(SecondaryActionTextProperty);
+        set => SetValue(SecondaryActionTextProperty, value);
+    }
+
+    public ICommand? SecondaryActionCommand
+    {
+        get => (ICommand?)GetValue(SecondaryActionCommandProperty);
+        set => SetValue(SecondaryActionCommandProperty, value);
+    }
+
+    public Visibility SecondaryActionVisibility(string? text) =>
+        string.IsNullOrEmpty(text) ? Visibility.Collapsed : Visibility.Visible;
 }

@@ -4,20 +4,40 @@ using Windows.Storage.Pickers;
 
 namespace ServerMonitor.App.Services;
 
-public sealed class PrivateKeyFilePicker(IWindowContext windowContext) : IPrivateKeyFilePicker
+public sealed class PrivateKeyFilePicker : IPrivateKeyFilePicker
 {
+    private readonly IWindowContext _windowContext;
+
     private const int HResultOk = 0;
     private const int HResultCancelled = unchecked((int)0x800704C7); // HRESULT_FROM_WIN32(ERROR_CANCELLED)
     private const uint FosForceFileSystem = 0x00000040;
     private const uint FosFileMustExist = 0x00001000;
     private const uint SigdnFileSystemPath = 0x80058000;
 
+    public PrivateKeyFilePicker(IWindowContext windowContext)
+        : this(windowContext, userProfile: null)
+    {
+    }
+
+    /// <summary>
+    /// M14.5 D-2b: the Debug <c>--qa-ssh-config &lt;dir&gt;</c> harness opens the picker at <c>&lt;dir&gt;\.ssh</c>
+    /// (or <c>&lt;dir&gt;</c>) instead of the real profile. <see langword="null"/> = the real user profile.
+    /// </summary>
+    internal PrivateKeyFilePicker(IWindowContext windowContext, string? userProfile)
+    {
+        _windowContext = windowContext;
+        UserProfile = userProfile;
+    }
+
+    /// <summary>The profile the dialog starts in (its <c>.ssh</c> when present); null = the real one.</summary>
+    internal string? UserProfile { get; }
+
     public async Task<string?> PickAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
         // 1. Try modern native COM IFileOpenDialog which allows setting initial directory directly to %USERPROFILE%\.ssh
-        var (succeeded, path) = TryPickViaNativeDialog(windowContext.WindowHandle);
+        var (succeeded, path) = TryPickViaNativeDialog(_windowContext.WindowHandle, UserProfile);
         if (succeeded)
         {
             return path;
@@ -27,12 +47,12 @@ public sealed class PrivateKeyFilePicker(IWindowContext windowContext) : IPrivat
         return await PickViaWinRtPickerAsync(cancellationToken).ConfigureAwait(true);
     }
 
-    private static (bool Handled, string? Path) TryPickViaNativeDialog(nint windowHandle)
+    private static (bool Handled, string? Path) TryPickViaNativeDialog(nint windowHandle, string? profileOverride)
     {
         try
         {
             var dialog = (IFileOpenDialog)new FileOpenDialogRCW();
-            var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            var userProfile = profileOverride ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             var sshDir = Path.Combine(userProfile, ".ssh");
             var initialDir = Directory.Exists(sshDir) ? sshDir : userProfile;
 
@@ -82,7 +102,7 @@ public sealed class PrivateKeyFilePicker(IWindowContext windowContext) : IPrivat
             ViewMode = PickerViewMode.List
         };
         picker.FileTypeFilter.Add("*");
-        WinRT.Interop.InitializeWithWindow.Initialize(picker, windowContext.WindowHandle);
+        WinRT.Interop.InitializeWithWindow.Initialize(picker, _windowContext.WindowHandle);
 
         var file = await picker.PickSingleFileAsync().AsTask(cancellationToken);
         return file?.Path;

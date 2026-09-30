@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    QA-ONLY. Generates SSH config fixture profiles for the Debug --qa-ssh-config harness (M14.4a, M14.4c).
+    QA-ONLY. Generates SSH config fixture profiles for the Debug --qa-ssh-config harness (M14.4a, M14.4c, M14.5).
 
 .DESCRIPTION
     Creates one fake user profile per scenario under -Root, each with its own .ssh\config, so
@@ -19,8 +19,21 @@
                user@host:port, literal, IPv6, via Include)   blocked-* / cycle-* listed with their own
                and every blocked jump shape                  reason (multi-hop, chained, ProxyCommand
                                                              on the jump, ssh://, token, cycle, HostName)
+      keys     id_ed25519 + id_ecdsa + id_rsa, plus names    -> key discovery lists the three defaults,
+               that are never candidates (id_dsa, *_sk,       id_ed25519 recommended; "keyed" imports
+               .pub, custom); config: "keyed" (IdentityFile   its own IdentityFile (must win over the
+               ~/.ssh/id_rsa) and "plain" (no IdentityFile)   auto-selection), "plain" gets the default
+      keys-rsa only id_rsa (+ id_rsa.pub)                    -> one key found, id_rsa recommended
+      keys-edge id_ed25519 > 64 KiB, empty id_ecdsa,          -> no key offered (today's behaviour + hint)
+               id_rsa is a directory
 
-    Nothing outside -Root is written. No key file is ever created.
+    Nothing outside -Root is written. The M14.5 "key" files are DUMMY bytes (a plain-text marker, or
+    padding), never a real or parseable private key; key discovery only reads their metadata.
+
+    Every launch command is ISOLATED (M14.5 D-2): --qa-proxyjump --qa-proxyjump-dir=<Root>\<scenario>-data
+    keeps servers.json, both trust stores and the settings in that directory, secrets in memory (never the
+    Credential Manager) and monitoring/discovery inert. --qa-ssh-config alone would run the REAL composition
+    (real servers.json, Credential Manager, live SSH monitoring), so it is never printed on its own.
 
     Launch commands point at the EXACT Debug executable produced by the solution build
     (src\ServerMonitor.App\bin\x64\Debug\...\ServerMonitor.App.exe), never at `dotnet run`: an
@@ -40,9 +53,9 @@
     ~/.dotnet/dotnet build ServerMonitor.slnx -c Debug
     pwsh -NoProfile -File tools/qa/ssh-config-fixtures.ps1
     # then paste one of the printed lines, e.g.:
-    & "<repo>\src\ServerMonitor.App\bin\x64\Debug\net10.0-windows10.0.19041.0\win-x64\ServerMonitor.App.exe" --qa-ssh-config "<Root>\normal"
+    & "<repo>\src\ServerMonitor.App\bin\x64\Debug\net10.0-windows10.0.19041.0\win-x64\ServerMonitor.App.exe" --qa-proxyjump --qa-proxyjump-dir="<Root>\normal-data" --qa-ssh-config "<Root>\normal"
     # the same, forcing the UI language (en-US | pt-PT | pt-BR; Debug only):
-    & "<repo>\...\ServerMonitor.App.exe" --qa-ssh-config "<Root>\normal" --qa-ui-language en-US
+    & "<repo>\...\ServerMonitor.App.exe" --qa-proxyjump --qa-proxyjump-dir="<Root>\normal-data" --qa-ssh-config "<Root>\normal" --qa-ui-language en-US
 #>
 [CmdletBinding()]
 param(
@@ -298,6 +311,41 @@ Host inc-bastion
     Port 2209
 '@
 
+# (g) keys / keys-rsa / keys-edge (M14.5): default key discovery. DUMMY bytes only, never a real key.
+$dummyKey = [System.Text.Encoding]::ASCII.GetBytes("QA FIXTURE - NOT A PRIVATE KEY (ServerAlyzer M14.5 key discovery)`n")
+
+function Write-DummyKey([string] $Scenario, [string] $Name, [byte[]] $Bytes = $dummyKey) {
+    $path = Ssh $Scenario $Name
+    $directory = Split-Path -Parent $path
+    if (-not (Test-Path -LiteralPath $directory)) {
+        New-Item -ItemType Directory -Path $directory -Force | Out-Null
+    }
+
+    [System.IO.File]::WriteAllBytes($path, $Bytes)
+}
+
+foreach ($name in 'id_ed25519', 'id_ecdsa', 'id_rsa', 'id_dsa', 'id_ed25519_sk', 'id_ecdsa_sk', 'id_ed25519.pub', 'my_server_key') {
+    Write-DummyKey 'keys' $name
+}
+Write-Fixture (Ssh 'keys' 'config') @'
+# QA fixture: key auto-selection vs an imported IdentityFile.
+Host keyed
+    HostName 10.60.0.10
+    User deploy
+    IdentityFile ~/.ssh/id_rsa
+
+Host plain
+    HostName 10.60.0.11
+    User deploy
+'@
+
+Write-DummyKey 'keys-rsa' 'id_rsa'
+Write-DummyKey 'keys-rsa' 'id_rsa.pub'
+
+Write-DummyKey 'keys-edge' 'id_ed25519' ([byte[]]::new(64 * 1024 + 1))
+Write-DummyKey 'keys-edge' 'id_ecdsa' ([byte[]]::new(0))
+New-Item -ItemType Directory -Path (Ssh 'keys-edge' 'id_rsa') -Force | Out-Null
+
 Write-Output "SSH config QA fixtures written to: $Root"
 
 # Launch only the exact executable of the current solution build. A stale or different binary may
@@ -340,16 +388,17 @@ if ($builtAt -lt $headAt) {
 }
 
 Write-Output "Launch (Debug build of the solution, $($builtAt.ToString('u'))):"
-foreach ($scenario in 'empty', 'error', 'big', 'blocked', 'normal', 'proxyjump') {
+Write-Output '  Isolated: servers, trust stores and settings live in <Root>\<scenario>-data, secrets in memory, no monitoring.'
+foreach ($scenario in 'empty', 'error', 'big', 'blocked', 'normal', 'proxyjump', 'keys', 'keys-rsa', 'keys-edge') {
     $directory = Join-Path $Root $scenario
-    Write-Output ("  {0,-9} & `"{1}`" --qa-ssh-config `"{2}`"" -f $scenario, $AppExe, $directory)
+    Write-Output ("  {0,-9} & `"{1}`" --qa-proxyjump --qa-proxyjump-dir=`"{2}-data`" --qa-ssh-config `"{2}`"" -f $scenario, $AppExe, $directory)
 }
 
 # The in-app language choice does not persist on an unpackaged build, so force it per launch.
 Write-Output 'Language variants (--qa-ui-language, Debug only):'
 foreach ($language in 'en-US', 'pt-BR') {
-    foreach ($scenario in 'empty', 'error', 'big', 'blocked', 'normal', 'proxyjump') {
+    foreach ($scenario in 'empty', 'error', 'big', 'blocked', 'normal', 'proxyjump', 'keys', 'keys-rsa', 'keys-edge') {
         $directory = Join-Path $Root $scenario
-        Write-Output ("  {0,-9} & `"{1}`" --qa-ssh-config `"{2}`" --qa-ui-language {3}" -f $scenario, $AppExe, $directory, $language)
+        Write-Output ("  {0,-9} & `"{1}`" --qa-proxyjump --qa-proxyjump-dir=`"{2}-data`" --qa-ssh-config `"{2}`" --qa-ui-language {3}" -f $scenario, $AppExe, $directory, $language)
     }
 }

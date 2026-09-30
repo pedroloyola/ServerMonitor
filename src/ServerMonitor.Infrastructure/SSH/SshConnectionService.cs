@@ -20,6 +20,7 @@ public sealed class SshConnectionService
     private readonly ILogger<SshConnectionService> _logger;
     private readonly ISshSessionFactory _sessionFactory;
     private readonly IJumpTunnelFactory _tunnelFactory;
+    private readonly TimeProvider _timeProvider;
 
     public SshConnectionService(
         IHostKeyTrustStore hostKeyTrustStore,
@@ -36,7 +37,8 @@ public sealed class SshConnectionService
         IServerCredentialStore credentialStore,
         ILogger<SshConnectionService> logger,
         ISshSessionFactory sessionFactory,
-        IJumpTunnelFactory? tunnelFactory)
+        IJumpTunnelFactory? tunnelFactory,
+        TimeProvider? timeProvider = null)
     {
         _hostKeyTrustStore = hostKeyTrustStore ?? throw new ArgumentNullException(nameof(hostKeyTrustStore));
         _routedHostKeyTrustStore = routedHostKeyTrustStore ?? throw new ArgumentNullException(nameof(routedHostKeyTrustStore));
@@ -46,6 +48,8 @@ public sealed class SshConnectionService
         _tunnelFactory = tunnelFactory ?? new SshNetJumpTunnelFactory(
             _sessionFactory as ISshDialSessionFactory ?? new SshNetSessionFactory(),
             _logger);
+        // The operation deadline's clock; production is always the system clock (tests drive it explicitly).
+        _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
     public Task<SshConnectionResult> ConnectAsync(
@@ -184,6 +188,10 @@ public sealed class SshConnectionService
     {
         var stopwatch = Stopwatch.StartNew();
 
+        // M14.5: every result carries the last step that was OBSERVED to complete; the optional live progress
+        // sees exactly those steps, in order. Monitoring and collection requests never carry a progress sink.
+        var stages = new StageTracker(request?.StageProgress, _logger);
+
         // A routed server is ONLY ever dialled through its jump host. Anything carrying a route - valid or
         // not - takes the routed path, which fails closed; it never falls through to a direct dial.
         if (request?.Server is { Route: not null })
@@ -195,6 +203,7 @@ public sealed class SshConnectionService
                     captureSession,
                     workloadPlan,
                     stopwatch,
+                    stages,
                     cancellationToken)
                 .ConfigureAwait(false);
         }
@@ -205,10 +214,11 @@ public sealed class SshConnectionService
                 request?.Server,
                 SshConnectionErrorCode.InvalidConfiguration,
                 stopwatch.Elapsed,
-                request?.Timeout ?? TimeSpan.Zero);
+                request?.Timeout ?? TimeSpan.Zero,
+                stages: stages);
         }
 
-        using var timeoutSource = new CancellationTokenSource(request.Timeout);
+        using var timeoutSource = new CancellationTokenSource(request.Timeout, _timeProvider);
         using var linkedSource = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken,
             timeoutSource.Token);
@@ -226,6 +236,8 @@ public sealed class SshConnectionService
                     linkedSource.Token)
                 .ConfigureAwait(false);
 
+            AdvanceAfterProbe(stages, probe, trustedHostKey?.Identity, establishedConnectionCounts: true);
+
             if (trustedHostKey is null && probe.PresentedHostKey is not null)
             {
                 return Complete(
@@ -234,7 +246,8 @@ public sealed class SshConnectionService
                     stopwatch.Elapsed,
                     request.Timeout,
                     probe.PresentedHostKey,
-                    hostKeyEndpoint: endpoint);
+                    hostKeyEndpoint: endpoint,
+                    stages: stages);
             }
 
             if (trustedHostKey is not null &&
@@ -248,7 +261,8 @@ public sealed class SshConnectionService
                     request.Timeout,
                     probe.PresentedHostKey,
                     trustedHostKey,
-                    hostKeyEndpoint: endpoint);
+                    hostKeyEndpoint: endpoint,
+                    stages: stages);
             }
 
             if (probe.PresentedHostKey is null ||
@@ -261,7 +275,8 @@ public sealed class SshConnectionService
                     request.Timeout,
                     probe.PresentedHostKey,
                     trustedHostKey,
-                    exceptionType: probe.ExceptionType);
+                    exceptionType: probe.ExceptionType,
+                    stages: stages);
             }
 
             var server = request.Server;
@@ -282,6 +297,7 @@ public sealed class SshConnectionService
                 .ConfigureAwait(false);
 
             captureSession?.Invoke(sessionResult);
+            AdvanceAfterAuthenticatedSession(stages, sessionResult);
 
             return Complete(
                 request.Server,
@@ -291,7 +307,8 @@ public sealed class SshConnectionService
                 sessionResult.PresentedHostKey,
                 trustedHostKey,
                 sessionResult.DetectedOperatingSystem,
-                sessionResult.ExceptionType);
+                sessionResult.ExceptionType,
+                stages: stages);
         }
         catch (OperationCanceledException exception)
         {
@@ -303,7 +320,8 @@ public sealed class SshConnectionService
                 error,
                 stopwatch.Elapsed,
                 request.Timeout,
-                exceptionType: exception.GetType().Name);
+                exceptionType: exception.GetType().Name,
+                stages: stages);
         }
         catch (Exception exception)
         {
@@ -312,7 +330,60 @@ public sealed class SshConnectionService
                 SshExceptionMapper.Map(exception),
                 stopwatch.Elapsed,
                 request.Timeout,
-                exceptionType: exception.GetType().Name);
+                exceptionType: exception.GetType().Name,
+                stages: stages);
+        }
+    }
+
+    /// <summary>
+    /// After a host-key probe (direct, or the routed TARGET through the tunnel): the port answered only if the
+    /// peer presented a key, its SSH identification line arrived or (direct only, M14.5 D-1) the probe failed in
+    /// a way that proves an established TCP connection (<see cref="SshSessionResult.ConnectionEstablished"/>).
+    /// A probe that failed before any of these (DNS, refused, unreachable, timeout) proves nothing and stays at
+    /// <see cref="SshConnectionStage.None"/>. The key is verified ONLY when the presented key matches the stored
+    /// trusted key; first sight (no trusted key) never counts.
+    /// </summary>
+    private static void AdvanceAfterProbe(
+        StageTracker stages,
+        SshSessionResult probe,
+        HostKeyIdentity? trustedIdentity,
+        bool establishedConnectionCounts)
+    {
+        if (probe.PresentedHostKey is null
+            && !probe.IdentificationReceived
+            && !(establishedConnectionCounts && probe.ConnectionEstablished))
+        {
+            return;
+        }
+
+        stages.Advance(SshConnectionStage.PortReachable);
+
+        if (trustedIdentity is not null
+            && probe.PresentedHostKey is { } presented
+            && trustedIdentity.Matches(presented))
+        {
+            stages.Advance(SshConnectionStage.HostKeyVerified);
+        }
+    }
+
+    /// <summary>
+    /// After the authenticated session: authenticated when the session says the SSH connect (which includes
+    /// user authentication) completed, or it succeeded; the OS step only for an identified Linux/macOS. An
+    /// unknown OS is still a success that stops at <see cref="SshConnectionStage.Authenticated"/>.
+    /// </summary>
+    private static void AdvanceAfterAuthenticatedSession(StageTracker stages, SshSessionResult session)
+    {
+        if (!session.IsSuccess && !session.AuthenticationCompleted)
+        {
+            return;
+        }
+
+        stages.Advance(SshConnectionStage.Authenticated);
+
+        if (session.IsSuccess
+            && session.DetectedOperatingSystem is ServerOperatingSystem.Linux or ServerOperatingSystem.MacOS)
+        {
+            stages.Advance(SshConnectionStage.OperatingSystemIdentified);
         }
     }
 
@@ -343,6 +414,7 @@ public sealed class SshConnectionService
         Action<SshSessionResult>? captureSession,
         WorkloadCollectionPlan workloadPlan,
         Stopwatch stopwatch,
+        StageTracker stages,
         CancellationToken cancellationToken)
     {
         var server = request.Server;
@@ -350,13 +422,13 @@ public sealed class SshConnectionService
             || server.Route?.Jump is not { } jump
             || !TryValidateJump(jump, out var jumpEndpoint))
         {
-            return Complete(server, SshConnectionErrorCode.InvalidConfiguration, stopwatch.Elapsed, request.Timeout);
+            return Complete(server, SshConnectionErrorCode.InvalidConfiguration, stopwatch.Elapsed, request.Timeout, stages: stages);
         }
 
         var route = SshRoute.Create(jumpEndpoint, targetEndpoint);
         var jumpDial = new SshDialTarget(jump.Host.Trim(), jump.Port, jump.Username.Trim());
 
-        using var timeoutSource = new CancellationTokenSource(request.Timeout);
+        using var timeoutSource = new CancellationTokenSource(request.Timeout, _timeProvider);
         using var linkedSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutSource.Token);
         var token = linkedSource.Token;
 
@@ -376,14 +448,14 @@ public sealed class SshConnectionService
             if (trustedJumpKey is null && jumpProbe.PresentedHostKey is not null)
             {
                 return CompleteHop(server, SshConnectionErrorCode.JumpHostKeyUnknown, stopwatch, request,
-                    jumpProbe.PresentedHostKey, SshHostKeyHop.Jump, endpoint: jumpEndpoint);
+                    jumpProbe.PresentedHostKey, SshHostKeyHop.Jump, endpoint: jumpEndpoint, stages: stages);
             }
 
             if (trustedJumpKey is not null && jumpProbe.PresentedHostKey is not null
                 && !trustedJumpKey.Identity.Matches(jumpProbe.PresentedHostKey))
             {
                 return CompleteHop(server, SshConnectionErrorCode.JumpHostKeyMismatch, stopwatch, request,
-                    jumpProbe.PresentedHostKey, SshHostKeyHop.Jump, endpoint: jumpEndpoint, trusted: trustedJumpKey);
+                    jumpProbe.PresentedHostKey, SshHostKeyHop.Jump, endpoint: jumpEndpoint, trusted: trustedJumpKey, stages: stages);
             }
 
             if (jumpProbe.PresentedHostKey is null
@@ -394,7 +466,7 @@ public sealed class SshConnectionService
                     ClassifyJump(jumpProbe, hostKeyUnknown: trustedJumpKey is null, cancellationToken, timeoutSource),
                     stopwatch.Elapsed,
                     request.Timeout,
-                    exceptionType: jumpProbe.ExceptionType);
+                    exceptionType: jumpProbe.ExceptionType, stages: stages);
             }
 
             var verifiedJumpKey = trustedJumpKey!;
@@ -407,7 +479,7 @@ public sealed class SshConnectionService
             {
                 if (jumpLogin is null)
                 {
-                    return Complete(server, SshConnectionErrorCode.JumpCredentialUnavailable, stopwatch.Elapsed, request.Timeout);
+                    return Complete(server, SshConnectionErrorCode.JumpCredentialUnavailable, stopwatch.Elapsed, request.Timeout, stages: stages);
                 }
 
                 try
@@ -419,7 +491,7 @@ public sealed class SshConnectionService
                                                       or SshPrivateKeyLoadException)
                 {
                     return Complete(server, SshConnectionErrorCode.JumpCredentialUnavailable, stopwatch.Elapsed,
-                        request.Timeout, exceptionType: exception.GetType().Name);
+                        request.Timeout, exceptionType: exception.GetType().Name, stages: stages);
                 }
             }
             finally
@@ -443,7 +515,7 @@ public sealed class SshConnectionService
                         && !timeoutSource.IsCancellationRequested)
                     {
                         return CompleteHop(server, SshConnectionErrorCode.JumpHostKeyMismatch, stopwatch, request,
-                            changedJumpKey, SshHostKeyHop.Jump, endpoint: jumpEndpoint, trusted: verifiedJumpKey);
+                            changedJumpKey, SshHostKeyHop.Jump, endpoint: jumpEndpoint, trusted: verifiedJumpKey, stages: stages);
                     }
 
                     var openCode = open.Stage == JumpTunnelOpenStage.TunnelListen
@@ -454,7 +526,7 @@ public sealed class SshConnectionService
                         })
                         : ClassifyJump(open.JumpResult!, hostKeyUnknown: false, cancellationToken, timeoutSource);
                     return Complete(server, openCode, stopwatch.Elapsed, request.Timeout,
-                        exceptionType: open.ExceptionType ?? open.JumpResult?.ExceptionType);
+                        exceptionType: open.ExceptionType ?? open.JumpResult?.ExceptionType, stages: stages);
                 }
 
                 // ---- Hop 2: the target through the tunnel, verified against the ROUTED store. ----
@@ -468,17 +540,29 @@ public sealed class SshConnectionService
                         .ConfigureAwait(false);
                 }
 
+                // The steps describe the TARGET as reached through the jump. A probe that ends in a jump-stage
+                // failure (the jump or the tunnel, not the target) reached nothing, whatever it saw.
+                var targetProbeFailure = targetProbe.PresentedHostKey is null
+                                         || targetProbe.ErrorCode is not (SshConnectionErrorCode.None or SshConnectionErrorCode.AuthenticationFailed)
+                    ? ClassifyTarget(targetProbe, trustedTargetKey is null, tunnel, cancellationToken, timeoutSource)
+                    : (SshConnectionErrorCode?)null;
+                if (targetProbeFailure is not { } failure || !IsJumpStageFailure(failure))
+                {
+                    // Through the tunnel an established connection only proves the LOCAL forwarder, never the target.
+                    AdvanceAfterProbe(stages, targetProbe, trustedTargetKey?.Identity, establishedConnectionCounts: false);
+                }
+
                 if (trustedTargetKey is null && targetProbe.PresentedHostKey is not null)
                 {
                     return CompleteHop(server, SshConnectionErrorCode.RoutedHostKeyUnknown, stopwatch, request,
-                        targetProbe.PresentedHostKey, SshHostKeyHop.Target, route: route);
+                        targetProbe.PresentedHostKey, SshHostKeyHop.Target, route: route, stages: stages);
                 }
 
                 if (trustedTargetKey is not null && targetProbe.PresentedHostKey is not null
                     && !trustedTargetKey.Identity.Matches(targetProbe.PresentedHostKey))
                 {
                     return CompleteHop(server, SshConnectionErrorCode.RoutedHostKeyMismatch, stopwatch, request,
-                        targetProbe.PresentedHostKey, SshHostKeyHop.Target, route: route, trustedRouted: trustedTargetKey);
+                        targetProbe.PresentedHostKey, SshHostKeyHop.Target, route: route, trustedRouted: trustedTargetKey, stages: stages);
                 }
 
                 if (targetProbe.PresentedHostKey is null
@@ -486,10 +570,10 @@ public sealed class SshConnectionService
                 {
                     return Complete(
                         server,
-                        ClassifyTarget(targetProbe, trustedTargetKey is null, tunnel, cancellationToken, timeoutSource),
+                        targetProbeFailure!.Value,
                         stopwatch.Elapsed,
                         request.Timeout,
-                        exceptionType: targetProbe.ExceptionType);
+                        exceptionType: targetProbe.ExceptionType, stages: stages);
                 }
 
                 var verifiedTargetKey = trustedTargetKey!;
@@ -505,6 +589,7 @@ public sealed class SshConnectionService
                     .ConfigureAwait(false);
 
                 captureSession?.Invoke(sessionResult);
+                AdvanceAfterAuthenticatedSession(stages, sessionResult);
 
                 var code = sessionResult.IsSuccess || !sessionRan
                     ? sessionResult.ErrorCode
@@ -515,7 +600,7 @@ public sealed class SshConnectionService
                     stopwatch.Elapsed,
                     request.Timeout,
                     detectedOperatingSystem: sessionResult.DetectedOperatingSystem,
-                    exceptionType: sessionResult.ExceptionType);
+                    exceptionType: sessionResult.ExceptionType, stages: stages);
             }
         }
         catch (OperationCanceledException exception)
@@ -523,13 +608,13 @@ public sealed class SshConnectionService
             var error = cancellationToken.IsCancellationRequested
                 ? SshConnectionErrorCode.Cancelled
                 : SshConnectionErrorCode.ConnectionTimedOut;
-            return Complete(server, error, stopwatch.Elapsed, request.Timeout, exceptionType: exception.GetType().Name);
+            return Complete(server, error, stopwatch.Elapsed, request.Timeout, exceptionType: exception.GetType().Name, stages: stages);
         }
         catch (Exception exception)
         {
             // Never a direct diagnosis for a routed server.
             return Complete(server, SshConnectionErrorCode.Unexpected, stopwatch.Elapsed, request.Timeout,
-                exceptionType: exception.GetType().Name);
+                exceptionType: exception.GetType().Name, stages: stages);
         }
     }
 
@@ -671,7 +756,8 @@ public sealed class SshConnectionService
         SshEndpoint? endpoint = null,
         SshRoute? route = null,
         TrustedHostKey? trusted = null,
-        TrustedRoutedHostKey? trustedRouted = null) =>
+        TrustedRoutedHostKey? trustedRouted = null,
+        StageTracker? stages = null) =>
         Complete(
             server,
             errorCode,
@@ -682,7 +768,8 @@ public sealed class SshConnectionService
             hop: hop,
             hostKeyEndpoint: endpoint,
             hostKeyRoute: route,
-            trustedRoutedHostKey: trustedRouted);
+            trustedRoutedHostKey: trustedRouted,
+            stages: stages);
 
     /// <summary>
     /// Resolves the TARGET's credential (only after its host key was verified by the caller) and runs the
@@ -874,7 +961,8 @@ public sealed class SshConnectionService
         SshHostKeyHop hop = SshHostKeyHop.Direct,
         SshEndpoint? hostKeyEndpoint = null,
         SshRoute? hostKeyRoute = null,
-        TrustedRoutedHostKey? trustedRoutedHostKey = null)
+        TrustedRoutedHostKey? trustedRoutedHostKey = null,
+        StageTracker? stages = null)
     {
         // C6: only ids, the LOGICAL host, the state and an exception TYPE are logged — never ConnectionInfo,
         // an authentication method, a credential, command output or the tunnel's loopback port.
@@ -911,9 +999,20 @@ public sealed class SshConnectionService
             HostKeyRoute = hostKeyRoute,
             TrustedRoutedHostKey = trustedRoutedHostKey,
             DetectedOperatingSystem = detectedOperatingSystem,
+            ReachedStage = stages?.Complete() ?? SshConnectionStage.None,
             Duration = duration
         };
     }
+
+    // M14.5: a failure of the jump or of the local tunnel end is never a step reached on the TARGET.
+    private static bool IsJumpStageFailure(SshConnectionErrorCode code) => code is
+        SshConnectionErrorCode.JumpConnectionFailed or
+        SshConnectionErrorCode.JumpAuthenticationFailed or
+        SshConnectionErrorCode.JumpHostKeyUnknown or
+        SshConnectionErrorCode.JumpHostKeyMismatch or
+        SshConnectionErrorCode.JumpCredentialUnavailable or
+        SshConnectionErrorCode.LocalTunnelFailed or
+        SshConnectionErrorCode.TargetUnreachableViaJump;
 
     // M14.4b-2: jump and routed-target host-key codes open the trust panel like a direct key does, but the
     // result's HostKeyHop decides the store (jump → DIRECT store under the jump endpoint; target → ROUTED
@@ -941,6 +1040,60 @@ public sealed class SshConnectionService
         SshConnectionErrorCode.NetworkUnavailable => ServerConnectionState.Unreachable,
         _ => ServerConnectionState.Error
     };
+
+    /// <summary>
+    /// M14.5 — the "Test connection" steps of ONE operation. Only moves forward; each step is reported to the
+    /// optional progress exactly once, in order, with every intermediate step reported before a later one. Once
+    /// the result is built (<see cref="Complete"/>) nothing more is reported, so the progress never shows a step
+    /// the result does not carry. A throwing progress sink never changes the outcome: its exception TYPE is
+    /// logged and the operation continues.
+    /// </summary>
+    internal sealed class StageTracker(IProgress<SshConnectionStage>? progress, ILogger logger)
+    {
+        private bool _completed;
+
+        public SshConnectionStage Reached { get; private set; } = SshConnectionStage.None;
+
+        public void Advance(SshConnectionStage stage)
+        {
+            if (_completed)
+            {
+                return;
+            }
+
+            while (Reached < stage)
+            {
+                Reached++;
+                Report(Reached);
+            }
+        }
+
+        /// <summary>Freezes the tracker as the result is built and returns the stage the result carries.</summary>
+        public SshConnectionStage Complete()
+        {
+            _completed = true;
+            return Reached;
+        }
+
+        private void Report(SshConnectionStage stage)
+        {
+            if (progress is null)
+            {
+                return;
+            }
+
+            try
+            {
+                progress.Report(stage);
+            }
+            catch (Exception exception)
+            {
+                logger.LogWarning(
+                    "SSH connection stage progress observer failed with exception type {ExceptionType}; the operation continues.",
+                    exception.GetType().Name);
+            }
+        }
+    }
 
     private enum SshSessionOperation
     {

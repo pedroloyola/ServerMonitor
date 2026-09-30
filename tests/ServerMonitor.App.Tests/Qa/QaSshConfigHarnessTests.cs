@@ -1,11 +1,12 @@
 using Microsoft.Extensions.DependencyInjection;
 using ServerMonitor.App.Qa;
+using ServerMonitor.App.Services;
 using ServerMonitor.Core.Interfaces;
 using ServerMonitor.Infrastructure.SshConfig;
 
 namespace ServerMonitor.App.Tests.Qa;
 
-/// <summary>The Debug-only --qa-ssh-config harness: off by default, and it only re-roots the import source.</summary>
+/// <summary>The Debug-only --qa-ssh-config harness: off by default, and it only re-roots the import source and (M14.5) key discovery.</summary>
 public sealed class QaSshConfigHarnessTests
 {
     [Fact]
@@ -50,5 +51,81 @@ public sealed class QaSshConfigHarnessTests
         using var provider = services.BuildServiceProvider();
         var source = Assert.IsType<SshConfigFileImportSource>(provider.GetRequiredService<ISshConfigImportSource>());
         Assert.Equal(@"C:\qa\fixtures\normal\.ssh\config", source.ConfigPath);
+    }
+
+    [Fact]
+    public void WithoutTheFlag_KeyDiscoveryLooksInTheRealProfile()
+    {
+        var services = new ServiceCollection();
+        App.ConfigureApplicationServices(services);
+
+        var registration = services.Last(descriptor => descriptor.ServiceType == typeof(ILocalSshKeyDiscovery));
+        IServiceCollection isolated = new ServiceCollection();
+        isolated.Add(registration);
+        using var provider = isolated.BuildServiceProvider();
+        var discovery = Assert.IsType<LocalSshKeyDiscovery>(provider.GetRequiredService<ILocalSshKeyDiscovery>());
+        Assert.Equal(
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".ssh"),
+            discovery.SshDirectory);
+    }
+
+    [Fact]
+    public void Apply_AlsoRootsKeyDiscoveryAtTheFixtureProfile_SoQaNeverTouchesTheRealSshDirectory()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<ILocalSshKeyDiscovery>(_ => new LocalSshKeyDiscovery());
+
+        QaSshConfigComposition.Apply(services, @"C:\qa\fixtures\keys");
+
+        using var provider = services.BuildServiceProvider();
+        var discovery = Assert.IsType<LocalSshKeyDiscovery>(provider.GetRequiredService<ILocalSshKeyDiscovery>());
+        Assert.Equal(@"C:\qa\fixtures\keys\.ssh", discovery.SshDirectory);
+    }
+
+    [Fact]
+    public void WithoutTheFlag_ThePrivateKeyPickerStartsInTheRealProfile()
+    {
+        var services = new ServiceCollection();
+        App.ConfigureApplicationServices(services);
+
+        var registration = services.Last(descriptor => descriptor.ServiceType == typeof(IPrivateKeyFilePicker));
+        IServiceCollection isolated = new ServiceCollection();
+        isolated.Add(registration);
+        isolated.AddSingleton<IWindowContext, InertWindowContext>();
+        using var provider = isolated.BuildServiceProvider();
+
+        var picker = Assert.IsType<PrivateKeyFilePicker>(provider.GetRequiredService<IPrivateKeyFilePicker>());
+        Assert.Null(picker.UserProfile);
+    }
+
+    [Fact]
+    public void Apply_AlsoStartsThePrivateKeyPickerAtTheFixtureProfile()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<IWindowContext, InertWindowContext>();
+        services.AddSingleton<IPrivateKeyFilePicker, PrivateKeyFilePicker>();
+
+        QaSshConfigComposition.Apply(services, @"C:\qa\fixtures\keys");
+
+        using var provider = services.BuildServiceProvider();
+        var picker = Assert.IsType<PrivateKeyFilePicker>(provider.GetRequiredService<IPrivateKeyFilePicker>());
+        Assert.Equal(@"C:\qa\fixtures\keys", picker.UserProfile);
+    }
+
+    /// <summary>Only lets the picker be constructed; no window exists in these tests.</summary>
+    private sealed class InertWindowContext : IWindowContext
+    {
+        public Microsoft.UI.Xaml.XamlRoot XamlRoot => throw new NotSupportedException();
+
+        public nint WindowHandle => throw new NotSupportedException();
+
+        public Microsoft.UI.Xaml.ElementTheme ActualTheme => throw new NotSupportedException();
+
+        public Microsoft.UI.Xaml.Controls.Panel? ModalHost => null;
+
+        public void Attach(
+            Microsoft.UI.Xaml.Window window,
+            Microsoft.UI.Xaml.FrameworkElement rootElement,
+            Microsoft.UI.Xaml.Controls.Panel? modalHost = null) => throw new NotSupportedException();
     }
 }

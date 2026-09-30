@@ -145,6 +145,19 @@ internal sealed record SshSessionResult
     /// </summary>
     public bool IdentificationReceived { get; init; }
 
+    /// <summary>
+    /// M14.5: the SSH connect, including user authentication, completed on this session; set even when a later
+    /// step (a command, cancellation) fails. Lets "Test connection" report the step it reached, never guessed.
+    /// </summary>
+    public bool AuthenticationCompleted { get; init; }
+
+    /// <summary>
+    /// M14.5 D-1: the TCP connection was established, proved by the peer's identification, its key, or a failure
+    /// SSH.NET only raises on an established connection (<see cref="SshExceptionMapper.ProvesEstablishedConnection"/>).
+    /// False means "not proven", never "not connected". Through a jump tunnel it only proves the LOCAL forwarder.
+    /// </summary>
+    public bool ConnectionEstablished { get; init; }
+
     public bool IsSuccess => ErrorCode == SshConnectionErrorCode.None;
 }
 

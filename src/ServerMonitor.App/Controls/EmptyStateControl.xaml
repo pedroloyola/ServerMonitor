@@ -38,11 +38,21 @@
                 TextAlignment="Center"
                 TextWrapping="Wrap" />
         </StackPanel>
-        <Button
-            HorizontalAlignment="Center"
+        <StackPanel
             Margin="0,4,0,0"
-            Command="{x:Bind ActionCommand, Mode=OneWay}"
-            Content="{x:Bind ActionText, Mode=OneWay}"
-            Style="{StaticResource AccentPillButtonStyle}" />
+            HorizontalAlignment="Center"
+            Orientation="Horizontal"
+            Spacing="10">
+            <Button
+                Command="{x:Bind ActionCommand, Mode=OneWay}"
+                Content="{x:Bind ActionText, Mode=OneWay}"
+                Style="{StaticResource AccentPillButtonStyle}" />
+            <!-- Optional quieter second action; absent unless the host supplies its text. -->
+            <Button
+                Command="{x:Bind SecondaryActionCommand, Mode=OneWay}"
+                Content="{x:Bind SecondaryActionText, Mode=OneWay}"
+                Style="{StaticResource QuietPillButtonStyle}"
+                Visibility="{x:Bind SecondaryActionVisibility(SecondaryActionText), Mode=OneWay}" />
+        </StackPanel>
     </StackPanel>
 </UserControl>

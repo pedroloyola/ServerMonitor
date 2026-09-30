@@ -41,7 +41,10 @@ public sealed class DiscoveredServerViewModel
     /// <summary>"host:port" for display; IPv6 is bracketed so the port stays unambiguous.</summary>
     public string Endpoint => FormatEndpoint(PrimaryHost, Discovered.Port);
 
-    public string AddAutomationName => Format("DiscoveredServerAddFor", DisplayName);
+    /// <summary>"Found on the local network: {name}" — the row's headline inside the dashboard's empty state (M14.5).</summary>
+    public string LocalNetworkHeadline => Format("DashboardEmptyDiscoveryFoundFormat", DisplayName);
+
+    public string AddAutomationName =>Format("DiscoveredServerAddFor", DisplayName);
 
     public string IgnoreAutomationName => Format("DiscoveredServerIgnoreFor", DisplayName);
 
