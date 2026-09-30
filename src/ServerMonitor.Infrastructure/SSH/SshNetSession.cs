@@ -79,6 +79,7 @@ internal sealed class SshNetSession(
 
         HostKeyIdentity? presentedHostKey = null;
         var hostKeyWasRejected = false;
+        var authenticated = false;
 
         void OnHostKeyReceived(object? sender, Renci.SshNet.Common.HostKeyEventArgs args)
         {
@@ -111,6 +112,9 @@ internal sealed class SshNetSession(
             {
                 connectGate?.AfterConnect();
             }
+
+            // SshClient.ConnectAsync returns only after the server accepted the credential.
+            authenticated = true;
 
             var detectedOperatingSystem = ServerOperatingSystem.Unknown;
             LinuxMetricsRawData? linuxMetrics = null;
@@ -151,7 +155,8 @@ internal sealed class SshNetSession(
                 LinuxMetrics = linuxMetrics,
                 MacOsMetrics = macOsMetrics,
                 Workloads = workloads,
-                IdentificationReceived = true
+                IdentificationReceived = true,
+                AuthenticationCompleted = true
             };
         }
         catch (Exception exception)
@@ -165,7 +170,8 @@ internal sealed class SshNetSession(
                 ExceptionType = exception.GetType().Name,
                 HostKeyRejected = hostKeyWasRejected,
                 // Structural, not textual (M14.4b-2 §3): set only once the peer's version line arrived.
-                IdentificationReceived = !string.IsNullOrEmpty(connectionInfo.ServerVersion)
+                IdentificationReceived = !string.IsNullOrEmpty(connectionInfo.ServerVersion),
+                AuthenticationCompleted = authenticated
             };
         }
         finally

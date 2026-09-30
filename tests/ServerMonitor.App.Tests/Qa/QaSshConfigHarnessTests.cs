@@ -5,7 +5,7 @@ using ServerMonitor.Infrastructure.SshConfig;
 
 namespace ServerMonitor.App.Tests.Qa;
 
-/// <summary>The Debug-only --qa-ssh-config harness: off by default, and it only re-roots the import source.</summary>
+/// <summary>The Debug-only --qa-ssh-config harness: off by default, and it only re-roots the import source and (M14.5) key discovery.</summary>
 public sealed class QaSshConfigHarnessTests
 {
     [Fact]
@@ -50,5 +50,34 @@ public sealed class QaSshConfigHarnessTests
         using var provider = services.BuildServiceProvider();
         var source = Assert.IsType<SshConfigFileImportSource>(provider.GetRequiredService<ISshConfigImportSource>());
         Assert.Equal(@"C:\qa\fixtures\normal\.ssh\config", source.ConfigPath);
+    }
+
+    [Fact]
+    public void WithoutTheFlag_KeyDiscoveryLooksInTheRealProfile()
+    {
+        var services = new ServiceCollection();
+        App.ConfigureApplicationServices(services);
+
+        var registration = services.Last(descriptor => descriptor.ServiceType == typeof(ILocalSshKeyDiscovery));
+        IServiceCollection isolated = new ServiceCollection();
+        isolated.Add(registration);
+        using var provider = isolated.BuildServiceProvider();
+        var discovery = Assert.IsType<LocalSshKeyDiscovery>(provider.GetRequiredService<ILocalSshKeyDiscovery>());
+        Assert.Equal(
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".ssh"),
+            discovery.SshDirectory);
+    }
+
+    [Fact]
+    public void Apply_AlsoRootsKeyDiscoveryAtTheFixtureProfile_SoQaNeverTouchesTheRealSshDirectory()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<ILocalSshKeyDiscovery>(_ => new LocalSshKeyDiscovery());
+
+        QaSshConfigComposition.Apply(services, @"C:\qa\fixtures\keys");
+
+        using var provider = services.BuildServiceProvider();
+        var discovery = Assert.IsType<LocalSshKeyDiscovery>(provider.GetRequiredService<ILocalSshKeyDiscovery>());
+        Assert.Equal(@"C:\qa\fixtures\keys\.ssh", discovery.SshDirectory);
     }
 }

@@ -145,6 +145,12 @@ internal sealed record SshSessionResult
     /// </summary>
     public bool IdentificationReceived { get; init; }
 
+    /// <summary>
+    /// M14.5: the SSH connect, including user authentication, completed on this session; set even when a later
+    /// step (a command, cancellation) fails. Lets "Test connection" report the step it reached, never guessed.
+    /// </summary>
+    public bool AuthenticationCompleted { get; init; }
+
     public bool IsSuccess => ErrorCode == SshConnectionErrorCode.None;
 }
 
