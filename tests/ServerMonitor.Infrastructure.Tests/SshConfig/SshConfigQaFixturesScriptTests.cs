@@ -148,6 +148,7 @@ public sealed class SshConfigQaFixturesScriptTests : IDisposable
         Assert.Equal(SshConfigHostBlocker.ProxyCommand, BlockerOf("via-proxycommand"));
         Assert.Equal(SshConfigHostBlocker.ProxyMaySetByInclude, BlockerOf("via-include"));
         Assert.Equal(SshConfigHostBlocker.ProxyMaySetByMatch, BlockerOf("via-match"));
+        Assert.Equal(SshConfigHostBlocker.CanonicalizationMayChangeRoute, BlockerOf("via-canonicalize"));
         Assert.Contains(new SshConfigDiagnostic(SshConfigDiagnosticKind.IncludeMatchedNoFiles, "conf.d/*.missing"), blocked.Diagnostics);
         Assert.DoesNotContain(blockedSpy.Paths, path => path.EndsWith("outside.conf", StringComparison.OrdinalIgnoreCase));
 

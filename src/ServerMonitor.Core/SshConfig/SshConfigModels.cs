@@ -131,14 +131,29 @@ public enum SshConfigHostBlocker
     /// <summary>The jump host is the host itself, reaches the same endpoint, or jumps back (A→B→A).</summary>
     JumpCycle,
 
-    /// <summary>The jump host's own <c>HostName</c> cannot be resolved exactly (tokens or an invalid value).</summary>
+    /// <summary>
+    /// The jump host's own <c>HostName</c> cannot be resolved exactly (tokens or an invalid value), or the
+    /// jump canonicalises its name (<c>CanonicalizeHostname</c> other than <c>no</c>).
+    /// </summary>
     JumpHostNameUnresolved,
 
-    /// <summary>An unevaluated <c>Match</c> block may set a proxy (or, for the jump host, its <c>HostName</c>) before it is decided.</summary>
+    /// <summary>
+    /// An unevaluated <c>Match</c> block may set a proxy or turn <c>CanonicalizeHostname</c> on (or, for the
+    /// jump host, set its <c>HostName</c>) before it is decided.
+    /// </summary>
     ProxyMaySetByMatch,
 
-    /// <summary>An <c>Include</c> that could not be verified may set a proxy (or, for the jump host, its <c>HostName</c>) before it is decided.</summary>
-    ProxyMaySetByInclude
+    /// <summary>
+    /// An <c>Include</c> that could not be verified may set a proxy or <c>CanonicalizeHostname</c> (or, for the
+    /// jump host, its <c>HostName</c>) before it is decided.
+    /// </summary>
+    ProxyMaySetByInclude,
+
+    /// <summary>
+    /// The host's effective <c>CanonicalizeHostname</c> is not <c>no</c>: ssh re-reads the config after
+    /// canonicalising the name, so its address or route may change (human decision M14-SSHCFG-CANON-1).
+    /// </summary>
+    CanonicalizationMayChangeRoute
 }
 
 public enum SshConfigFileWarning

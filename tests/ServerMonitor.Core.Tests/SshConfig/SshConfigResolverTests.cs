@@ -282,7 +282,19 @@ public sealed class SshConfigResolverTests
         Assert.True(Has(host, "HostKeyAlias", SshConfigFindingKind.Unsupported));
         Assert.True(Has(host, "ServerAliveInterval", SshConfigFindingKind.Ignored));
         Assert.True(Has(host, "ForwardAgent", SshConfigFindingKind.Ignored));
+        // Human decision M14-SSHCFG-CANON-1: a canonicalising host is not imported.
+        Assert.False(host.IsImportable);
+        Assert.Equal(SshConfigHostBlocker.CanonicalizationMayChangeRoute, host.Blocker);
+    }
+
+    [Fact]
+    public void HostAffectingKeywordsWithoutCanonicalization_StayWarningsOnAnImportableHost()
+    {
+        var host = Host("Host a\n  CanonicalizeHostname no\n  HostKeyAlias other\n  ForwardAgent yes\n", "a");
+
         Assert.True(host.IsImportable);
+        Assert.False(Has(host, "CanonicalizeHostname", SshConfigFindingKind.Unsupported));
+        Assert.True(Has(host, "HostKeyAlias", SshConfigFindingKind.Unsupported));
     }
 
     [Fact]
@@ -391,8 +403,8 @@ public sealed class SshConfigResolverTests
     }
 
     [Theory]
-    [InlineData("Host a\n  ProxyJump none\n  Include conf.d/*\n")]
-    [InlineData("ProxyJump none\nInclude conf.d/*\nHost a\n")]
+    [InlineData("Host a\n  ProxyJump none\n  CanonicalizeHostname no\n  Include conf.d/*\n")]
+    [InlineData("ProxyJump none\nCanonicalizeHostname no\nInclude conf.d/*\nHost a\n")]
     [InlineData("Host b\n  Include conf.d/b\nHost a\n")]
     public void Resolve_IncludeAfterNoneOrNotApplicable_StaysImportable(string text)
     {
@@ -548,12 +560,60 @@ public sealed class SshConfigResolverTests
     }
 
     [Fact]
-    public void CanonicalizeAndHostKeyAlias_StayVisibleWarningsOnAnImportableHost()
+    public void CanonicalizingHost_IsBlockedWithItsOwnReason_AndKeepsItsWarnings()
     {
         var host = Host("Host a\n  CanonicalizeHostname always\n  HostKeyAlias other\n", "a");
 
-        Assert.True(host.IsImportable);
+        Assert.False(host.IsImportable);
+        Assert.Equal(SshConfigHostBlocker.CanonicalizationMayChangeRoute, host.Blocker);
+        Assert.Null(host.Jump);
         Assert.True(Has(host, "CanonicalizeHostname", SshConfigFindingKind.Unsupported));
         Assert.True(Has(host, "HostKeyAlias", SshConfigFindingKind.Unsupported));
     }
+
+    // ---- Human decision M14-SSHCFG-CANON-1: CanonicalizeHostname other than "no" blocks the TARGET too.
+
+    [Theory]
+    [InlineData("Host a\n  CanonicalizeHostname yes\n")]
+    [InlineData("Host a\n  CanonicalizeHostname YES\n")]
+    [InlineData("Host a\n  CanonicalizeHostname\n")]
+    [InlineData("Host a\n  CanonicalizeHostname \"yes\n")]
+    [InlineData("Host *\n  CanonicalizeHostname always\nHost a\n")]
+    public void CanonicalizingTarget_IsNotImportable(string text)
+    {
+        var host = Host(text, "a");
+
+        Assert.False(host.IsImportable);
+        Assert.Equal(SshConfigHostBlocker.CanonicalizationMayChangeRoute, host.Blocker);
+    }
+
+    [Theory]
+    [InlineData("Host a\n  HostName a.lan\n")]
+    [InlineData("Host a\n  CanonicalizeHostname no\nHost *\n  CanonicalizeHostname yes\n")]
+    [InlineData("Host a\n  CanonicalizeHostname No\n")]
+    public void TargetWithoutCanonicalization_StaysImportable(string text)
+    {
+        var host = Host(text, "a");
+
+        Assert.True(host.IsImportable);
+        Assert.Equal(SshConfigHostBlocker.None, host.Blocker);
+    }
+
+    [Theory]
+    [InlineData("Match all\n  CanonicalizeHostname yes\nHost a\n")]
+    [InlineData("Host a\n  HostName a.lan\nMatch all\n  CanonicalizeHostname always\n")]
+    public void MatchThatMayTurnOnTheTargetsCanonicalisation_Blocks(string text) =>
+        Assert.Equal(SshConfigHostBlocker.ProxyMaySetByMatch, Host(text, "a").Blocker);
+
+    [Theory]
+    [InlineData("Host a\n  CanonicalizeHostname no\nMatch all\n  CanonicalizeHostname yes\n")]
+    [InlineData("Match all\n  CanonicalizeHostname no\nHost a\n")]
+    public void MatchAfterCanonicalisationIsDecidedOrWithNo_DoesNotBlock(string text) =>
+        Assert.True(Host(text, "a").IsImportable);
+
+    [Fact]
+    public void UnverifiableIncludeBeforeTheTargetsCanonicalisationIsDecided_Blocks() =>
+        Assert.Equal(
+            SshConfigHostBlocker.ProxyMaySetByInclude,
+            Host("Host a\n  ProxyJump none\n  Include conf.d/*\n", "a").Blocker);
 }

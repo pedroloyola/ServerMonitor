@@ -405,6 +405,7 @@
   <data name="SshConfigHostBlockedJumpUnparsable" xml:space="preserve"><value>O valor de ProxyJump não pode ser lido com exatidão — não importado</value></data>
   <data name="SshConfigHostBlockedJumpCycle" xml:space="preserve"><value>O ProxyJump volta para este host — não importado</value></data>
   <data name="SshConfigHostBlockedJumpHostNameUnresolved" xml:space="preserve"><value>O HostName do host de salto não pode ser resolvido com exatidão — não importado</value></data>
+  <data name="SshConfigHostBlockedCanonicalizationMayChangeRoute" xml:space="preserve"><value>CanonicalizeHostname pode mudar para onde o ssh se conecta — não importado</value></data>
   <data name="SshConfigHostBlockedProxyMaySetByMatch" xml:space="preserve"><value>Um bloco Match pode definir um proxy — não é possível verificar, não importado</value></data>
   <data name="SshConfigHostBlockedProxyMaySetByInclude" xml:space="preserve"><value>Um Include não pôde ser verificado — não é possível confirmar o proxy, não importado</value></data>
   <data name="SshConfigImportWarningHostsTruncated" xml:space="preserve"><value>Somente os primeiros 500 hosts são listados.</value></data>

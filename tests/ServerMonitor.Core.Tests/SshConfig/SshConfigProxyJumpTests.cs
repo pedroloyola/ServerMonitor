@@ -422,14 +422,14 @@ public sealed class SshConfigProxyJumpTests
     public void JumpInheritingCanonicalizeHostnameFromAWildcard_Blocks() =>
         AssertBlocked(
             SshConfigHostBlocker.JumpHostNameUnresolved,
-            "Host target\n  ProxyJump bastion\nHost *\n  CanonicalizeHostname yes\n");
+            "Host target\n  CanonicalizeHostname no\n  ProxyJump bastion\nHost *\n  CanonicalizeHostname yes\n");
 
     [Theory]
     [InlineData("CanonicalizeHostname no")]
     [InlineData("CanonicalizeHostname NO")]
     public void JumpWithCanonicalizeHostnameNo_IsImportable(string line)
     {
-        var jump = Jump($"Host target\n  ProxyJump bastion\nHost bastion\n  {line}\nHost *\n  CanonicalizeHostname yes\n", "target");
+        var jump = Jump($"Host target\n  CanonicalizeHostname no\n  ProxyJump bastion\nHost bastion\n  {line}\nHost *\n  CanonicalizeHostname yes\n", "target");
 
         Assert.Equal("bastion", jump.HostName);
     }
@@ -444,7 +444,7 @@ public sealed class SshConfigProxyJumpTests
     public void MatchWithCanonicalizeHostnameAfterTheJumpDecidedIt_DoesNotBlock()
     {
         var jump = Jump(
-            "Host target\n  ProxyJump bastion\nHost bastion\n  CanonicalizeHostname no\nMatch all\n  CanonicalizeHostname yes\n",
+            "Host target\n  CanonicalizeHostname no\n  ProxyJump bastion\nHost bastion\n  CanonicalizeHostname no\nMatch all\n  CanonicalizeHostname yes\n",
             "target");
 
         Assert.Equal("bastion", jump.HostName);
@@ -459,14 +459,21 @@ public sealed class SshConfigProxyJumpTests
     }
 
     [Fact]
-    public void TargetThatCanonicalises_KeepsItsM144aBehaviour_AndItsJumpIsStillImported()
+    public void TargetThatCanonicalises_IsBlockedWithItsOwnReason_EvenWithACleanJump()
     {
+        // M14-SSHCFG-CANON-1: the target blocks too, with its own reason (never JumpHostNameUnresolved).
         var host = Host("Host target\n  CanonicalizeHostname yes\n  ProxyJump bastion\nHost bastion\n  CanonicalizeHostname no\n", "target");
 
-        Assert.True(host.IsImportable);
-        Assert.Contains(host.Findings, f => f.Keyword == "CanonicalizeHostname" && f.Kind == SshConfigFindingKind.Unsupported);
-        Assert.Equal("bastion", host.Jump?.HostName);
+        Assert.False(host.IsImportable);
+        Assert.Equal(SshConfigHostBlocker.CanonicalizationMayChangeRoute, host.Blocker);
+        Assert.Null(host.Jump);
     }
+
+    [Fact]
+    public void JumpThatCanonicalises_UnderAClearTarget_KeepsTheJumpReason() =>
+        AssertBlocked(
+            SshConfigHostBlocker.JumpHostNameUnresolved,
+            "Host target\n  CanonicalizeHostname no\n  ProxyJump bastion\nHost bastion\n  CanonicalizeHostname yes\n");
 
     // ---- Vigil M14.4c M-2: only ' ' and '\t' separate words to OpenSSH.
 

@@ -296,11 +296,12 @@ public static class SshConfigResolver
 
             if (applicability == Applicability.Unknown)
             {
-                // Under an unevaluated Match: nothing here is applied. If it could set a proxy
-                // before the proxy is decided (or change a jump's HostName before that is decided),
-                // the host cannot be verified.
+                // Under an unevaluated Match: nothing here is applied. If it could set a proxy before
+                // the proxy is decided, turn canonicalisation on before that is decided, or set a
+                // jump's HostName before it is obtained, the host cannot be verified.
                 if ((!proxyDecided && MayConfigureProxy(segment))
-                    || (isJump && MayChangeJumpHostName(segment, obtained)))
+                    || MayTurnOnCanonicalization(segment, obtained)
+                    || (isJump && MaySetJumpHostName(segment, obtained)))
                 {
                     Block(SshConfigHostBlocker.ProxyMaySetByMatch);
                 }
@@ -312,9 +313,12 @@ public static class SshConfigResolver
             {
                 if (spliced.IncludeIssue != SshConfigIncludeIssue.None)
                 {
-                    // An Include that could not be verified may hide anything, including a proxy.
+                    // An Include that could not be verified may hide anything, including a proxy or
+                    // CanonicalizeHostname (or a jump's HostName) not decided yet.
                     Add("Include", SshConfigFindingKind.Unsupported, IncludeReason(spliced.IncludeIssue));
-                    if (!proxyDecided || (isJump && !IsJumpHostNameDecided(obtained)))
+                    if (!proxyDecided
+                        || !obtained.Contains("CanonicalizeHostname")
+                        || (isJump && !obtained.Contains("HostName")))
                     {
                         Block(SshConfigHostBlocker.ProxyMaySetByInclude);
                     }
@@ -415,13 +419,12 @@ public static class SshConfigResolver
                         {
                             Add(keyword, SshConfigFindingKind.Unsupported, SshConfigFindingReason.UnsupportedKeyword);
 
-                            // Vigil M14.4c M-3: ssh canonicalises the jump's name and then re-reads the
-                            // config, where it may gain another HostName or a proxy. The jump is only
-                            // imported when that cannot happen. (The target keeps its M14.4a behaviour.)
-                            if (isJump)
-                            {
-                                Block(SshConfigHostBlocker.JumpHostNameUnresolved);
-                            }
+                            // Vigil M14.4c M-3 (+ human decision M14-SSHCFG-CANON-1): ssh canonicalises the
+                            // name and then re-reads the config, where the host (or the jump) may gain
+                            // another HostName or a proxy. Neither is imported when that can happen.
+                            Block(isJump
+                                ? SshConfigHostBlocker.JumpHostNameUnresolved
+                                : SshConfigHostBlocker.CanonicalizationMayChangeRoute);
                         }
 
                         break;
@@ -478,21 +481,19 @@ public static class SshConfigResolver
         segment.Directives.Any(spliced => spliced.IncludeIssue != SshConfigIncludeIssue.None
             || CanonicalKeyword(spliced.Directive.Keyword) is "HostName" or "CanonicalizeHostname");
 
-    // A jump's address is decided once both its HostName and its CanonicalizeHostname are obtained.
-    private static bool IsJumpHostNameDecided(HashSet<string> obtained) =>
-        obtained.Contains("HostName") && obtained.Contains("CanonicalizeHostname");
+    // Whether an unevaluated segment could still turn canonicalisation on (for any destination): a
+    // CanonicalizeHostname other than "no", or an unverifiable Include, before it is obtained.
+    private static bool MayTurnOnCanonicalization(SshConfigSegment segment, HashSet<string> obtained) =>
+        !obtained.Contains("CanonicalizeHostname")
+        && segment.Directives.Any(spliced => spliced.IncludeIssue != SshConfigIncludeIssue.None
+            || (CanonicalKeyword(spliced.Directive.Keyword) == "CanonicalizeHostname" && !IsCanonicalizeNo(spliced.Directive)));
 
-    // Whether an unevaluated segment could still change a jump's address: a HostName or a
-    // CanonicalizeHostname other than "no" not yet obtained, or an unverifiable Include while undecided.
-    private static bool MayChangeJumpHostName(SshConfigSegment segment, HashSet<string> obtained) =>
-        segment.Directives.Any(spliced => spliced.IncludeIssue != SshConfigIncludeIssue.None
-            ? !IsJumpHostNameDecided(obtained)
-            : CanonicalKeyword(spliced.Directive.Keyword) switch
-            {
-                "HostName" => !obtained.Contains("HostName"),
-                "CanonicalizeHostname" => !obtained.Contains("CanonicalizeHostname") && !IsCanonicalizeNo(spliced.Directive),
-                _ => false
-            });
+    // Whether an unevaluated segment could still set a jump's HostName: a HostName line, or an
+    // unverifiable Include, before it is obtained.
+    private static bool MaySetJumpHostName(SshConfigSegment segment, HashSet<string> obtained) =>
+        !obtained.Contains("HostName")
+        && segment.Directives.Any(spliced => spliced.IncludeIssue != SshConfigIncludeIssue.None
+            || CanonicalKeyword(spliced.Directive.Keyword) == "HostName");
 
     private static bool IsCanonicalizeNo(SshConfigDirective directive) =>
         directive.IsValid && string.Equals(directive.Arguments[0], "no", StringComparison.OrdinalIgnoreCase);

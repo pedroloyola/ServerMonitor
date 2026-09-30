@@ -11,7 +11,8 @@
       big      Include conf.d/* with 640 hosts             -> capped at 500 + mix of importable /
                                                               via a jump / ambiguous / warnings
       blocked  multi-hop ProxyJump, ProxyCommand, Match    -> listed, not importable (one contrast
-               with proxy, unverifiable Include              host with ProxyJump none is importable)
+               with proxy, unverifiable Include,             host with ProxyJump none is importable)
+               CanonicalizeHostname yes
       normal   5 hosts with HostName/User/Port/IdentityFile -> all importable; IdentityFile points
                (2 of them via Include)                       at key paths that do NOT exist
       proxyjump single-hop ProxyJump (alias, explicit       -> via-* importable with the jump filled;
@@ -150,6 +151,10 @@ Host via-proxycommand
 Host via-include
     HostName 10.30.0.4
     Include ../outside.conf
+
+Host via-canonicalize
+    HostName 10.30.0.6
+    CanonicalizeHostname yes
 
 Host via-match
     HostName 10.30.0.5
