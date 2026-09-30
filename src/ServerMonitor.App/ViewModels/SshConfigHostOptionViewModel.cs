@@ -63,6 +63,12 @@ public sealed class SshConfigHostOptionViewModel
 
     public string Preview { get; }
 
+    /// <summary>
+    /// False when the alias offers no value to preview (e.g. <c>HostName %h</c> alone, which is not
+    /// resolved): the preview line is then omitted rather than shown blank with an empty UIA name.
+    /// </summary>
+    public bool HasPreview => Preview.Length > 0;
+
     public string RequirementText { get; }
 
     public bool HasRequirement => RequirementText.Length > 0;

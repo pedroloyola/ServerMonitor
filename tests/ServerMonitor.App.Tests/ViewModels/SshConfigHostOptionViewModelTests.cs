@@ -1,3 +1,4 @@
+using System.Xml.Linq;
 using ServerMonitor.App.Tests.Fakes;
 using ServerMonitor.App.ViewModels;
 using ServerMonitor.Core.SshConfig;
@@ -77,5 +78,54 @@ public sealed class SshConfigHostOptionViewModelTests
 
         Assert.Equal(option.AccessibleName, option.ToString());
         Assert.DoesNotContain(nameof(SshConfigHostOptionViewModel), option.ToString());
+    }
+
+    // M14.4c QA LOW-1: a host with nothing to preview (HostName %h is not resolved) never shows a
+    // blank preview line with an empty UIA name; the line is omitted and the row is still named.
+    [Fact]
+    public void HostWithNothingToPreview_OmitsThePreviewLine_AndIsStillNamed()
+    {
+        var option = Option("Host tok-bastion\n  HostName %h\n", "tok-bastion");
+
+        Assert.True(option.IsImportable);
+        Assert.False(option.HasPreview);
+        Assert.Equal("tok-bastion — importable. Notes: Unsupported: HostName", option.AccessibleName);
+    }
+
+    [Fact]
+    public void HostWithValues_ShowsThePreviewLine()
+    {
+        var option = Option("Host web\n  HostName 10.0.0.5\n", "web");
+
+        Assert.True(option.HasPreview);
+        Assert.False(string.IsNullOrWhiteSpace(option.Preview));
+    }
+
+    [Fact]
+    public void ThePreviewLine_IsCollapsedByHasPreview_InTheHostList()
+    {
+        XNamespace presentation = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
+        var xaml = XDocument.Load(Path.Combine(
+            FindRepositoryRoot(), "src", "ServerMonitor.App", "Controls", "ServerFormControl.xaml"));
+
+        var preview = Assert.Single(
+            xaml.Descendants(presentation + "TextBlock"),
+            block => (string?)block.Attribute("Text") == "{Binding Preview}");
+
+        Assert.Equal(
+            "{Binding HasPreview, Converter={StaticResource BooleanToVisibilityConverter}}",
+            (string?)preview.Attribute("Visibility"));
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "ServerMonitor.slnx")))
+        {
+            directory = directory.Parent;
+        }
+
+        return directory?.FullName
+            ?? throw new DirectoryNotFoundException("Could not locate ServerMonitor.slnx from test output.");
     }
 }
