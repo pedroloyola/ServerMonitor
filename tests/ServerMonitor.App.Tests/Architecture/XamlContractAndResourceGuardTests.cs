@@ -68,7 +68,15 @@ public sealed partial class XamlContractAndResourceGuardTests
         "SystemColorHighlightBrush",
         "SystemColorHighlightTextBrush",
         "SystemColorWindowBrush",
-        "SystemColorWindowTextBrush"
+        "SystemColorWindowTextBrush",
+
+        // High-contrast system colours (framework HighContrast theme), used via ThemeResource by the HC theme
+        // dictionaries in Styles/Tokens/Color.Semantic.xaml and Styles/Tokens/Elevation.xaml.
+        "SystemColorGrayTextColor",
+        "SystemColorHighlightColor",
+        "SystemColorHighlightTextColor",
+        "SystemColorWindowColor",
+        "SystemColorWindowTextColor"
     };
 
     [Fact]
