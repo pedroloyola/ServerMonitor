@@ -20,6 +20,7 @@ public sealed class SshConnectionService
     private readonly ILogger<SshConnectionService> _logger;
     private readonly ISshSessionFactory _sessionFactory;
     private readonly IJumpTunnelFactory _tunnelFactory;
+    private readonly TimeProvider _timeProvider;
 
     public SshConnectionService(
         IHostKeyTrustStore hostKeyTrustStore,
@@ -36,7 +37,8 @@ public sealed class SshConnectionService
         IServerCredentialStore credentialStore,
         ILogger<SshConnectionService> logger,
         ISshSessionFactory sessionFactory,
-        IJumpTunnelFactory? tunnelFactory)
+        IJumpTunnelFactory? tunnelFactory,
+        TimeProvider? timeProvider = null)
     {
         _hostKeyTrustStore = hostKeyTrustStore ?? throw new ArgumentNullException(nameof(hostKeyTrustStore));
         _routedHostKeyTrustStore = routedHostKeyTrustStore ?? throw new ArgumentNullException(nameof(routedHostKeyTrustStore));
@@ -46,6 +48,8 @@ public sealed class SshConnectionService
         _tunnelFactory = tunnelFactory ?? new SshNetJumpTunnelFactory(
             _sessionFactory as ISshDialSessionFactory ?? new SshNetSessionFactory(),
             _logger);
+        // The operation deadline's clock; production is always the system clock (tests drive it explicitly).
+        _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
     public Task<SshConnectionResult> ConnectAsync(
@@ -214,7 +218,7 @@ public sealed class SshConnectionService
                 stages: stages);
         }
 
-        using var timeoutSource = new CancellationTokenSource(request.Timeout);
+        using var timeoutSource = new CancellationTokenSource(request.Timeout, _timeProvider);
         using var linkedSource = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken,
             timeoutSource.Token);
@@ -417,7 +421,7 @@ public sealed class SshConnectionService
         var route = SshRoute.Create(jumpEndpoint, targetEndpoint);
         var jumpDial = new SshDialTarget(jump.Host.Trim(), jump.Port, jump.Username.Trim());
 
-        using var timeoutSource = new CancellationTokenSource(request.Timeout);
+        using var timeoutSource = new CancellationTokenSource(request.Timeout, _timeProvider);
         using var linkedSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutSource.Token);
         var token = linkedSource.Token;
 

@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Time.Testing;
 using ServerMonitor.Core.Enums;
 using ServerMonitor.Core.Models;
 using ServerMonitor.Infrastructure.Collectors.Workloads;
@@ -234,10 +235,11 @@ public sealed class SshConnectionStageTests
     public async Task Caller_cancel_during_the_probe_keeps_its_code_and_reached_nothing()
     {
         var f = new Fixture().TrustDirect();
-        f.Sessions.Probes.Enqueue(ScriptedSession.WaitsForCancellation(key: null, authenticationCompleted: false));
-        using var cancel = new CancellationTokenSource(TimeSpan.FromMilliseconds(50));
+        var probe = ScriptedSession.WaitsForCancellation(key: null, authenticationCompleted: false);
+        f.Sessions.Probes.Enqueue(probe);
+        using var cancel = new CancellationTokenSource();
 
-        var result = await f.Service.TestConnectionAsync(f.DirectRequest(), cancel.Token);
+        var result = await CancelOnceEntered(f.Service.TestConnectionAsync(f.DirectRequest(), cancel.Token), probe, cancel.Cancel);
 
         Assert.Equal(SshConnectionErrorCode.Cancelled, result.ErrorCode);
         Assert.Equal(SshConnectionStage.None, result.ReachedStage);
@@ -248,9 +250,19 @@ public sealed class SshConnectionStageTests
     public async Task Deadline_during_the_probe_keeps_its_code_and_reached_nothing()
     {
         var f = new Fixture().TrustDirect();
-        f.Sessions.Probes.Enqueue(ScriptedSession.WaitsForCancellation(key: null, authenticationCompleted: false));
+        var probe = ScriptedSession.WaitsForCancellation(key: null, authenticationCompleted: false);
+        f.Sessions.Probes.Enqueue(probe);
+        var timeout = TimeSpan.FromSeconds(5);
 
-        var result = await f.Service.TestConnectionAsync(f.DirectRequest(timeout: TimeSpan.FromMilliseconds(50)));
+        var operation = f.Service.TestConnectionAsync(f.DirectRequest(timeout: timeout));
+        await probe.Entered.WaitAsync(Watchdog);
+
+        // Fake clock: one tick before the deadline nothing is cancelled; at the deadline the probe is.
+        f.Time.Advance(timeout - TimeSpan.FromTicks(1));
+        Assert.False(probe.ObservedToken.IsCancellationRequested);
+        f.Time.Advance(TimeSpan.FromTicks(1));
+        Assert.True(probe.ObservedToken.IsCancellationRequested);
+        var result = await operation.WaitAsync(Watchdog);
 
         Assert.Equal(SshConnectionErrorCode.ConnectionTimedOut, result.ErrorCode);
         Assert.Equal(SshConnectionStage.None, result.ReachedStage);
@@ -261,10 +273,11 @@ public sealed class SshConnectionStageTests
     {
         var f = new Fixture().TrustDirect();
         f.Sessions.Probes.Enqueue(ScriptedSession.Presents(ServerKey, SshConnectionErrorCode.AuthenticationFailed));
-        f.Sessions.Authenticated.Enqueue(ScriptedSession.WaitsForCancellation(ServerKey, authenticationCompleted: false));
-        using var cancel = new CancellationTokenSource(TimeSpan.FromMilliseconds(50));
+        var authentication = ScriptedSession.WaitsForCancellation(ServerKey, authenticationCompleted: false);
+        f.Sessions.Authenticated.Enqueue(authentication);
+        using var cancel = new CancellationTokenSource();
 
-        var result = await f.Service.TestConnectionAsync(f.DirectRequest(), cancel.Token);
+        var result = await CancelOnceEntered(f.Service.TestConnectionAsync(f.DirectRequest(), cancel.Token), authentication, cancel.Cancel);
 
         Assert.Equal(SshConnectionErrorCode.Cancelled, result.ErrorCode);
         AssertStages(result, f.Progress, SshConnectionStage.HostKeyVerified);
@@ -275,10 +288,11 @@ public sealed class SshConnectionStageTests
     {
         var f = new Fixture().TrustDirect();
         f.Sessions.Probes.Enqueue(ScriptedSession.Presents(ServerKey, SshConnectionErrorCode.AuthenticationFailed));
-        f.Sessions.Authenticated.Enqueue(ScriptedSession.WaitsForCancellation(ServerKey, authenticationCompleted: true));
-        using var cancel = new CancellationTokenSource(TimeSpan.FromMilliseconds(50));
+        var uname = ScriptedSession.WaitsForCancellation(ServerKey, authenticationCompleted: true);
+        f.Sessions.Authenticated.Enqueue(uname);
+        using var cancel = new CancellationTokenSource();
 
-        var result = await f.Service.TestConnectionAsync(f.DirectRequest(), cancel.Token);
+        var result = await CancelOnceEntered(f.Service.TestConnectionAsync(f.DirectRequest(), cancel.Token), uname, cancel.Cancel);
 
         Assert.Equal(SshConnectionErrorCode.Cancelled, result.ErrorCode);
         AssertStages(result, f.Progress, SshConnectionStage.Authenticated);
@@ -576,10 +590,11 @@ public sealed class SshConnectionStageTests
         var f = new Fixture().TrustJump().TrustTarget();
         f.Sessions.Probes.Enqueue(ScriptedSession.Presents(Key(1), SshConnectionErrorCode.AuthenticationFailed));
         f.Tunnels.Targets.Enqueue(ScriptedSession.Presents(ServerKey, SshConnectionErrorCode.AuthenticationFailed));
-        f.Tunnels.Targets.Enqueue(ScriptedSession.WaitsForCancellation(ServerKey, authenticationCompleted: false));
-        using var cancel = new CancellationTokenSource(TimeSpan.FromMilliseconds(50));
+        var targetAuthentication = ScriptedSession.WaitsForCancellation(ServerKey, authenticationCompleted: false);
+        f.Tunnels.Targets.Enqueue(targetAuthentication);
+        using var cancel = new CancellationTokenSource();
 
-        var result = await f.Service.TestConnectionAsync(f.RoutedRequest(), cancel.Token);
+        var result = await CancelOnceEntered(f.Service.TestConnectionAsync(f.RoutedRequest(), cancel.Token), targetAuthentication, cancel.Cancel);
 
         Assert.Equal(SshConnectionErrorCode.Cancelled, result.ErrorCode);
         AssertStages(result, f.Progress, SshConnectionStage.HostKeyVerified);
@@ -608,6 +623,29 @@ public sealed class SshConnectionStageTests
 
     private static HostKeyIdentity Key(byte value) => SshRoutedTestDoubles.Key(value);
 
+    /// <summary>A hang guard only: it never decides an outcome, it turns a lost signal into a failure.</summary>
+    private static readonly TimeSpan Watchdog = TimeSpan.FromSeconds(30);
+
+    /// <summary>
+    /// Deterministic "cancel during a phase": wait until the scripted session of that phase has been entered
+    /// (it signals before blocking), only then cancel, and collect the result. No timer decides the phase.
+    /// </summary>
+    private static async Task<SshConnectionResult> CancelOnceEntered(
+        Task<SshConnectionResult> operation,
+        ScriptedSession phase,
+        Action cancel)
+    {
+        await phase.Entered.WaitAsync(Watchdog);
+        Assert.False(operation.IsCompleted);
+        Assert.False(phase.ObservedToken.IsCancellationRequested);
+
+        cancel();
+
+        var result = await operation.WaitAsync(Watchdog);
+        Assert.True(phase.ObservedToken.IsCancellationRequested);
+        return result;
+    }
+
     private sealed class Fixture
     {
         public Fixture()
@@ -617,7 +655,7 @@ public sealed class SshConnectionStageTests
             Credentials = new CredentialStore();
             Credentials.Secrets[ServerCredentialKind.Password] = "target-secret";
             Credentials.Secrets[ServerCredentialKind.JumpPassword] = "jump-secret";
-            Service = new SshConnectionService(Direct, Routed, Credentials, Logger, Sessions, Tunnels);
+            Service = new SshConnectionService(Direct, Routed, Credentials, Logger, Sessions, Tunnels, Time);
         }
 
         public DirectTrustStore Direct { get; }
@@ -631,6 +669,9 @@ public sealed class SshConnectionStageTests
         public ScriptedTunnelFactory Tunnels { get; } = new();
 
         public RecordingProgress Progress { get; } = new();
+
+        /// <summary>The operation deadline's clock: nothing times out unless a test advances it.</summary>
+        public FakeTimeProvider Time { get; } = new();
 
         public ListLogger Logger { get; } = new();
 
@@ -793,6 +834,14 @@ public sealed class SshConnectionStageTests
     /// <summary>One scripted connection attempt; every operation runs the same script.</summary>
     private sealed class ScriptedSession(Func<Func<HostKeyIdentity, bool>, CancellationToken, Task<SshSessionResult>> run) : ISshSession
     {
+        private readonly TaskCompletionSource _entered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        /// <summary>Completes when the service starts this session's operation (before a waiting script blocks).</summary>
+        public Task Entered => _entered.Task;
+
+        /// <summary>The token the service passed to this session's operation.</summary>
+        public CancellationToken ObservedToken { get; private set; }
+
         /// <summary>Presents <paramref name="key"/>: <paramref name="whenTrusted"/> if the verifier accepts it, else refused before auth.</summary>
         public static ScriptedSession Presents(
             HostKeyIdentity key,
@@ -846,22 +895,29 @@ public sealed class SshConnectionStageTests
             });
 
         public Task<SshSessionResult> ConnectAsync(Func<HostKeyIdentity, bool> hostKeyVerifier, CancellationToken cancellationToken) =>
-            run(hostKeyVerifier, cancellationToken);
+            Run(hostKeyVerifier, cancellationToken);
 
         public Task<SshSessionResult> DetectOperatingSystemAsync(Func<HostKeyIdentity, bool> hostKeyVerifier, CancellationToken cancellationToken) =>
-            run(hostKeyVerifier, cancellationToken);
+            Run(hostKeyVerifier, cancellationToken);
 
         public Task<SshSessionResult> CollectLinuxMetricsAsync(Func<HostKeyIdentity, bool> hostKeyVerifier, TimeSpan cpuSampleInterval, CancellationToken cancellationToken) =>
-            run(hostKeyVerifier, cancellationToken);
+            Run(hostKeyVerifier, cancellationToken);
 
         public Task<SshSessionResult> CollectMacOsMetricsAsync(Func<HostKeyIdentity, bool> hostKeyVerifier, CancellationToken cancellationToken) =>
-            run(hostKeyVerifier, cancellationToken);
+            Run(hostKeyVerifier, cancellationToken);
 
         public Task<SshSessionResult> CollectWorkloadsAsync(Func<HostKeyIdentity, bool> hostKeyVerifier, WorkloadCollectionPlan plan, CancellationToken cancellationToken) =>
-            run(hostKeyVerifier, cancellationToken);
+            Run(hostKeyVerifier, cancellationToken);
 
         public void Dispose()
         {
+        }
+
+        private Task<SshSessionResult> Run(Func<HostKeyIdentity, bool> verifier, CancellationToken token)
+        {
+            ObservedToken = token;
+            _entered.TrySetResult();
+            return run(verifier, token);
         }
     }
 
