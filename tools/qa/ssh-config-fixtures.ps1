@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    QA-ONLY. Generates SSH config fixture profiles for the Debug --qa-ssh-config harness (M14.4a).
+    QA-ONLY. Generates SSH config fixture profiles for the Debug --qa-ssh-config harness (M14.4a, M14.4c).
 
 .DESCRIPTION
     Creates one fake user profile per scenario under -Root, each with its own .ssh\config, so
@@ -9,11 +9,15 @@
       empty    .ssh exists, no config                     -> "No ~/.ssh/config found"
       error    Host line with an unterminated quote       -> classified error, nothing imported
       big      Include conf.d/* with 640 hosts             -> capped at 500 + mix of importable /
-                                                              blocked / ambiguous / warnings
-      blocked  ProxyJump, ProxyCommand, Match with proxy,  -> listed, not importable (one contrast
-               unverifiable Include                          host with ProxyJump none is importable)
+                                                              via a jump / ambiguous / warnings
+      blocked  multi-hop ProxyJump, ProxyCommand, Match    -> listed, not importable (one contrast
+               with proxy, unverifiable Include              host with ProxyJump none is importable)
       normal   5 hosts with HostName/User/Port/IdentityFile -> all importable; IdentityFile points
                (2 of them via Include)                       at key paths that do NOT exist
+      proxyjump single-hop ProxyJump (alias, explicit       -> via-* importable with the jump filled;
+               user@host:port, literal, IPv6, via Include)   blocked-* / cycle-* listed with their own
+               and every blocked jump shape                  reason (multi-hop, chained, ProxyCommand
+                                                             on the jump, ssh://, token, cycle, HostName)
 
     Nothing outside -Root is written. No key file is ever created.
 
@@ -107,7 +111,7 @@ foreach ($file in 1..4) {
         [void]$builder.AppendLine("    User qa$($hostNumber % 7)")
         [void]$builder.AppendLine("    Port $(2200 + ($hostNumber % 50))")
         if ($hostNumber % 4 -eq 0) {
-            [void]$builder.AppendLine('    ProxyJump qa-bastion')                        # blocked
+            [void]$builder.AppendLine('    ProxyJump qa-bastion')                        # via a jump
         }
         elseif ($hostNumber % 5 -eq 0) {
             [void]$builder.AppendLine("    IdentityFile ~/.ssh/qa_missing_a_$hostNumber") # ambiguous
@@ -135,9 +139,9 @@ Host ok-contrast
     HostName 10.30.0.1
     User qa
 
-Host via-proxyjump
+Host via-multihop
     HostName 10.30.0.2
-    ProxyJump qa-bastion
+    ProxyJump qa-bastion-a,qa-bastion-b
 
 Host via-proxycommand
     HostName 10.30.0.3
@@ -197,6 +201,98 @@ Host lab-b
     IdentityFile ~/.ssh/qa_missing_lab_b
 '@
 
+# (f) proxyjump (M14.4c): single-hop ProxyJump import. The via-* hosts are importable with the jump
+# filled in the editor; every blocked-* / cycle-* host shows its own reason. No Match here on purpose:
+# an unevaluated Match that may set a proxy would (correctly) block every jump.
+Write-Fixture (Ssh 'proxyjump' 'config') @'
+# QA fixture: single-hop ProxyJump. The Include is at the top so its hosts apply everywhere.
+Include conf.d/*.conf
+
+Host bastion
+    HostName 10.50.0.1
+    User jumpuser
+    Port 2222
+    IdentityFile ~/.ssh/qa_missing_bastion
+    ProxyJump none
+
+Host via-alias
+    HostName 10.50.1.1
+    User app
+    Port 2201
+    IdentityFile ~/.ssh/qa_missing_app
+    ProxyJump bastion
+
+Host via-explicit
+    HostName 10.50.1.2
+    User app
+    ProxyJump ops@bastion:2200
+
+Host via-literal
+    HostName 10.50.1.3
+    ProxyJump jump.qa.internal
+
+Host via-ipv6
+    HostName 10.50.1.4
+    ProxyJump admin@[fd00::10]:2022
+
+Host via-include-jump
+    HostName 10.50.1.5
+    ProxyJump inc-bastion
+
+Host blocked-multihop
+    HostName 10.50.2.1
+    ProxyJump bastion,jump.qa.internal
+
+Host blocked-chained
+    HostName 10.50.2.2
+    ProxyJump chained-bastion
+
+Host chained-bastion
+    HostName 10.50.0.2
+    ProxyJump bastion
+
+Host blocked-proxycommand-jump
+    HostName 10.50.2.3
+    ProxyJump pc-bastion
+
+Host pc-bastion
+    HostName 10.50.0.3
+    ProxyCommand ssh -W %h:%p bastion
+
+Host blocked-uri
+    HostName 10.50.2.4
+    ProxyJump ssh://bastion:22
+
+Host blocked-token
+    HostName 10.50.2.5
+    ProxyJump %r@bastion
+
+Host blocked-hostname-token
+    HostName 10.50.2.6
+    ProxyJump tok-bastion
+
+Host tok-bastion
+    HostName %h.qa.internal
+
+Host cycle-self
+    HostName 10.50.2.7
+    ProxyJump cycle-self
+
+Host cycle-a
+    HostName 10.50.2.8
+    ProxyJump cycle-b
+
+Host cycle-b
+    HostName 10.50.2.9
+    ProxyJump cycle-a
+'@
+Write-Fixture (Ssh 'proxyjump' 'conf.d\10-jump.conf') @'
+Host inc-bastion
+    HostName 10.50.0.9
+    User incuser
+    Port 2209
+'@
+
 Write-Output "SSH config QA fixtures written to: $Root"
 
 # Launch only the exact executable of the current solution build. A stale or different binary may
@@ -239,16 +335,16 @@ if ($builtAt -lt $headAt) {
 }
 
 Write-Output "Launch (Debug build of the solution, $($builtAt.ToString('u'))):"
-foreach ($scenario in 'empty', 'error', 'big', 'blocked', 'normal') {
+foreach ($scenario in 'empty', 'error', 'big', 'blocked', 'normal', 'proxyjump') {
     $directory = Join-Path $Root $scenario
-    Write-Output ("  {0,-8} & `"{1}`" --qa-ssh-config `"{2}`"" -f $scenario, $AppExe, $directory)
+    Write-Output ("  {0,-9} & `"{1}`" --qa-ssh-config `"{2}`"" -f $scenario, $AppExe, $directory)
 }
 
 # The in-app language choice does not persist on an unpackaged build, so force it per launch.
 Write-Output 'Language variants (--qa-ui-language, Debug only):'
 foreach ($language in 'en-US', 'pt-BR') {
-    foreach ($scenario in 'empty', 'error', 'big', 'blocked', 'normal') {
+    foreach ($scenario in 'empty', 'error', 'big', 'blocked', 'normal', 'proxyjump') {
         $directory = Join-Path $Root $scenario
-        Write-Output ("  {0,-8} & `"{1}`" --qa-ssh-config `"{2}`" --qa-ui-language {3}" -f $scenario, $AppExe, $directory, $language)
+        Write-Output ("  {0,-9} & `"{1}`" --qa-ssh-config `"{2}`" --qa-ui-language {3}" -f $scenario, $AppExe, $directory, $language)
     }
 }

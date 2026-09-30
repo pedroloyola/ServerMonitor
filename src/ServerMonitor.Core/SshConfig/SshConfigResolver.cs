@@ -4,9 +4,10 @@ namespace ServerMonitor.Core.SshConfig;
 
 /// <summary>
 /// Pure resolver for the import subset of ssh_config(5): <c>HostName</c>, <c>User</c>,
-/// <c>Port</c> and <c>IdentityFile</c> for concrete <c>Host</c> aliases. Blocks are walked
-/// top-to-bottom and, per keyword, the first value obtained wins (so a <c>Host *</c> placed
-/// before a concrete block wins). Everything outside the subset is classified, never interpreted.
+/// <c>Port</c> and <c>IdentityFile</c> for concrete <c>Host</c> aliases, plus a single-hop
+/// <c>ProxyJump</c>. Blocks are walked top-to-bottom and, per keyword, the first value obtained
+/// wins (so a <c>Host *</c> placed before a concrete block wins). Everything outside the subset is
+/// classified, never interpreted.
 /// </summary>
 /// <remarks>
 /// It consumes the spliced sequence from <see cref="SshConfigIncludeExpander"/>, so followed
@@ -14,7 +15,10 @@ namespace ServerMonitor.Core.SshConfig;
 /// fail-closed: until the proxy decision (the first applicable <c>ProxyJump</c>/<c>ProxyCommand</c>)
 /// is made, anything that is or may be a proxy — a proxy line, valid or not, one under an
 /// unevaluated <c>Match</c>, or an <c>Include</c> that could not be verified — makes the host
-/// non-importable. Only an exact <c>none</c> decides "no proxy".
+/// non-importable. Only an exact <c>none</c> decides "no proxy". A decided <c>ProxyJump</c> is
+/// imported only when it is one verified hop: its host is resolved as a destination against the
+/// same config (as the jump's own ssh would), and that resolution must itself be safe, direct and
+/// exact; every other shape blocks the host with a specific reason, never a direct import.
 /// </remarks>
 public static class SshConfigResolver
 {
@@ -129,6 +133,121 @@ public static class SshConfigResolver
 
     private static SshConfigHostEntry Resolve(ResolutionPlan plan, bool hasMatch, string alias, string userProfile)
     {
+        var target = ResolveDestination(plan, hasMatch, alias, userProfile, isJump: false);
+        if (target.ProxyJump is not { } proxyJump)
+        {
+            return target.Entry;
+        }
+
+        if (target.Entry.Blocker != SshConfigHostBlocker.None)
+        {
+            return WithProxyJumpFinding(target.Entry);
+        }
+
+        var (jump, blocker) = ResolveJump(plan, hasMatch, target.Entry, proxyJump, userProfile);
+        return blocker == SshConfigHostBlocker.None
+            ? target.Entry with { Jump = jump }
+            : WithProxyJumpFinding(target.Entry with { Blocker = blocker });
+    }
+
+    /// <summary>
+    /// The jump of a target whose effective <c>ProxyJump</c> is <paramref name="directive"/>. ssh runs a
+    /// second ssh for the jump host with the same config and <c>-l</c>/<c>-p</c> from the value, so the
+    /// jump is resolved here the same way and must itself be direct: a jump that has its own proxy is a
+    /// chain (or a cycle), never flattened into one hop.
+    /// </summary>
+    private static (SshConfigJumpHost? Jump, SshConfigHostBlocker Blocker) ResolveJump(
+        ResolutionPlan plan,
+        bool hasMatch,
+        SshConfigHostEntry target,
+        SshConfigDirective directive,
+        string userProfile)
+    {
+        switch (SshConfigProxyJump.Parse(directive, out var spec))
+        {
+            case SshConfigProxyJumpParse.MultiHop:
+                return (null, SshConfigHostBlocker.JumpMultiHop);
+            case SshConfigProxyJumpParse.Unparsable:
+                return (null, SshConfigHostBlocker.JumpUnparsable);
+        }
+
+        if (string.Equals(spec!.Host, target.Alias, StringComparison.OrdinalIgnoreCase))
+        {
+            return (null, SshConfigHostBlocker.JumpCycle);
+        }
+
+        var jump = ResolveDestination(plan, hasMatch, spec.Host, userProfile, isJump: true);
+        if (jump.Entry.Blocker != SshConfigHostBlocker.None)
+        {
+            return (null, jump.Entry.Blocker);
+        }
+
+        if (jump.ProxyJump is { } chained)
+        {
+            // Back to the target or to the jump itself is a cycle; any other proxy is a second hop.
+            var loops = SshConfigProxyJump.Parse(chained, out var next) == SshConfigProxyJumpParse.SingleHop
+                && (string.Equals(next!.Host, target.Alias, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(next.Host, spec.Host, StringComparison.OrdinalIgnoreCase));
+            return (null, loops ? SshConfigHostBlocker.JumpCycle : SshConfigHostBlocker.JumpMultiHop);
+        }
+
+        if (jump.Entry.HostName is not { } jumpHostName)
+        {
+            return (null, SshConfigHostBlocker.JumpHostNameUnresolved);
+        }
+
+        var port = spec.Port ?? jump.Entry.Port;
+        if (target.HostName is not null
+            && string.Equals(jumpHostName, target.HostName, StringComparison.OrdinalIgnoreCase)
+            && (port ?? DefaultPort) == (target.Port ?? DefaultPort))
+        {
+            return (null, SshConfigHostBlocker.JumpCycle);
+        }
+
+        return (new SshConfigJumpHost
+        {
+            Name = spec.Host,
+            HostName = jumpHostName,
+            User = spec.User ?? jump.Entry.User,
+            Port = port,
+            IdentityFile = jump.Entry.IdentityFile,
+            Findings = jump.Entry.Findings,
+            FindingsTruncated = jump.Entry.FindingsTruncated
+        }, SshConfigHostBlocker.None);
+    }
+
+    // A blocked ProxyJump is also listed among the keywords ServerAlyzer does not reproduce.
+    private static SshConfigHostEntry WithProxyJumpFinding(SshConfigHostEntry entry)
+    {
+        const string keyword = "ProxyJump";
+        if (entry.Findings.Any(finding => finding.Keyword == keyword && finding.Kind == SshConfigFindingKind.Unsupported))
+        {
+            return entry;
+        }
+
+        return entry.Findings.Count >= MaxFindingsPerHost
+            ? entry with { FindingsTruncated = true }
+            : entry with
+            {
+                Findings = [.. entry.Findings, new SshConfigFinding(keyword, SshConfigFindingKind.Unsupported, SshConfigFindingReason.UnsupportedKeyword)]
+            };
+    }
+
+    /// <summary>The resolved entry and, when the decided proxy is a <c>ProxyJump</c> other than <c>none</c>, its line.</summary>
+    private readonly record struct DestinationResolution(SshConfigHostEntry Entry, SshConfigDirective? ProxyJump);
+
+    /// <summary>
+    /// Resolves one destination: a listed alias, or the host named by a <c>ProxyJump</c>. For a jump
+    /// (<paramref name="isJump"/>) its <c>HostName</c> is a routing decision too, so an unevaluated
+    /// <c>Match</c> or an unverifiable <c>Include</c> that may set it before it is obtained blocks.
+    /// </summary>
+    private static DestinationResolution ResolveDestination(
+        ResolutionPlan plan,
+        bool hasMatch,
+        string alias,
+        string userProfile,
+        bool isJump)
+    {
         var findings = new List<SshConfigFinding>();
         var findingKeys = new HashSet<(string, SshConfigFindingKind)>();
         var findingsTruncated = false;
@@ -140,6 +259,7 @@ public static class SshConfigResolver
         var hostNameUnresolved = false;
         var identityFileInvalid = false;
         var proxyDecided = false;
+        SshConfigDirective? proxyJump = null;
         var blocker = SshConfigHostBlocker.None;
 
         void Add(string keyword, SshConfigFindingKind kind, SshConfigFindingReason reason)
@@ -177,8 +297,10 @@ public static class SshConfigResolver
             if (applicability == Applicability.Unknown)
             {
                 // Under an unevaluated Match: nothing here is applied. If it could set a proxy
-                // before the proxy is decided, the host cannot be verified.
-                if (!proxyDecided && MayConfigureProxy(segment))
+                // before the proxy is decided (or a jump's HostName before it is obtained), the
+                // host cannot be verified.
+                if ((!proxyDecided && MayConfigureProxy(segment))
+                    || (isJump && !obtained.Contains("HostName") && MaySetHostName(segment)))
                 {
                     Block(SshConfigHostBlocker.ProxyMaySetByMatch);
                 }
@@ -192,7 +314,7 @@ public static class SshConfigResolver
                 {
                     // An Include that could not be verified may hide anything, including a proxy.
                     Add("Include", SshConfigFindingKind.Unsupported, IncludeReason(spliced.IncludeIssue));
-                    if (!proxyDecided)
+                    if (!proxyDecided || (isJump && !obtained.Contains("HostName")))
                     {
                         Block(SshConfigHostBlocker.ProxyMaySetByInclude);
                     }
@@ -206,16 +328,26 @@ public static class SshConfigResolver
                 {
                     case "ProxyJump" or "ProxyCommand":
                         // One shared first-wins slot. Any applicable proxy line decides it; only an
-                        // exact "none" means no proxy. A malformed line blocks too (fail-closed).
+                        // exact "none" means no proxy. A ProxyJump line, valid or not, is handed to the
+                        // caller to verify as a single hop; a ProxyCommand blocks (fail-closed).
                         if (proxyDecided)
                         {
                             break;
                         }
 
                         proxyDecided = true;
-                        if (!IsProxyNone(directive, keyword))
+                        if (IsProxyNone(directive, keyword))
                         {
-                            Block(keyword == "ProxyJump" ? SshConfigHostBlocker.ProxyJump : SshConfigHostBlocker.ProxyCommand);
+                            break;
+                        }
+
+                        if (keyword == "ProxyJump")
+                        {
+                            proxyJump = directive;
+                        }
+                        else
+                        {
+                            Block(SshConfigHostBlocker.ProxyCommand);
                             Add(keyword, SshConfigFindingKind.Unsupported, SshConfigFindingReason.UnsupportedKeyword);
                         }
 
@@ -311,7 +443,7 @@ public static class SshConfigResolver
         }
 
         var identityFile = identityFileInvalid ? null : ResolveIdentityFile(identityFiles, userProfile, Add);
-        return new SshConfigHostEntry
+        return new DestinationResolution(new SshConfigHostEntry
         {
             Alias = alias,
             HostName = hostNameUnresolved ? null : hostName ?? alias,
@@ -322,8 +454,10 @@ public static class SshConfigResolver
             Findings = findings,
             FindingsTruncated = findingsTruncated,
             Blocker = blocker
-        };
+        }, proxyJump);
     }
+
+    private const int DefaultPort = 22;
 
     // "none" only when it is the whole argument: ProxyJump has exactly one token "none"; OpenSSH
     // reads ProxyCommand raw (no tokenizing), so its entire raw text must be "none".
@@ -332,6 +466,11 @@ public static class SshConfigResolver
         : directive.IsValid
             && directive.Arguments.Count == 1
             && string.Equals(directive.Arguments[0], "none", StringComparison.Ordinal);
+
+    // Any HostName line, valid or not, or an unverifiable Include: it could decide where a jump host is.
+    private static bool MaySetHostName(SshConfigSegment segment) =>
+        segment.Directives.Any(spliced => spliced.IncludeIssue != SshConfigIncludeIssue.None
+            || CanonicalKeyword(spliced.Directive.Keyword) == "HostName");
 
     private static bool MayConfigureProxy(SshConfigSegment segment) =>
         segment.Directives.Any(spliced => spliced.IncludeIssue != SshConfigIncludeIssue.None
@@ -512,7 +651,8 @@ public static class SshConfigResolver
     /// Index so resolving many aliases does not rescan every segment for each one. A segment whose
     /// own header is a purely concrete <c>Host</c> can only apply to the aliases it names; segments
     /// without a header, under a wildcard/negated <c>Host</c>, or under a <c>Match</c> that may set
-    /// a proxy are visited for every alias; other <c>Match</c> segments never apply and are skipped.
+    /// a proxy or a <c>HostName</c> are visited for every destination; other <c>Match</c> segments
+    /// never apply and are skipped.
     /// Spliced order is preserved.
     /// </summary>
     private sealed class ResolutionPlan
@@ -532,7 +672,7 @@ public static class SshConfigResolver
                 switch (scope.Kind)
                 {
                     case SshConfigBlockKind.Match:
-                        if (MayConfigureProxy(segment))
+                        if (MayConfigureProxy(segment) || MaySetHostName(segment))
                         {
                             _alwaysVisit.Add(index);
                         }

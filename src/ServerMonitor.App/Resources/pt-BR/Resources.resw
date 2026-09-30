@@ -397,9 +397,14 @@
   <data name="SshConfigPreviewUserFormat" xml:space="preserve"><value>Usuário: {0}</value></data>
   <data name="SshConfigPreviewPortFormat" xml:space="preserve"><value>Porta: {0}</value></data>
   <data name="SshConfigPreviewIdentityFileFormat" xml:space="preserve"><value>Chave: {0}</value></data>
+  <data name="SshConfigPreviewJumpFormat" xml:space="preserve"><value>Via: {0}</value></data>
+  <data name="SshConfigHostJumpClassificationFormat" xml:space="preserve"><value>Host de salto {0}: {1}</value></data>
   <data name="SshConfigImportAppliedFormat" xml:space="preserve"><value>Os campos vazios foram preenchidos a partir de {0}. Os valores que você já tinha informado foram mantidos.</value></data>
-  <data name="SshConfigHostBlockedProxyJump" xml:space="preserve"><value>Requer ProxyJump — ainda não suportado</value></data>
-  <data name="SshConfigHostBlockedProxyCommand" xml:space="preserve"><value>Requer ProxyCommand — ainda não suportado</value></data>
+  <data name="SshConfigHostBlockedProxyCommand" xml:space="preserve"><value>Requer ProxyCommand (no host ou no host de salto) — não suportado</value></data>
+  <data name="SshConfigHostBlockedJumpMultiHop" xml:space="preserve"><value>Requer mais de um host de salto (ProxyJump multi-hop ou encadeado) — não suportado</value></data>
+  <data name="SshConfigHostBlockedJumpUnparsable" xml:space="preserve"><value>O valor de ProxyJump não pode ser lido com exatidão — não importado</value></data>
+  <data name="SshConfigHostBlockedJumpCycle" xml:space="preserve"><value>O ProxyJump volta para este host — não importado</value></data>
+  <data name="SshConfigHostBlockedJumpHostNameUnresolved" xml:space="preserve"><value>O HostName do host de salto não pode ser resolvido com exatidão — não importado</value></data>
   <data name="SshConfigHostBlockedProxyMaySetByMatch" xml:space="preserve"><value>Um bloco Match pode definir um proxy — não é possível verificar, não importado</value></data>
   <data name="SshConfigHostBlockedProxyMaySetByInclude" xml:space="preserve"><value>Um Include não pôde ser verificado — não é possível confirmar o proxy, não importado</value></data>
   <data name="SshConfigImportWarningHostsTruncated" xml:space="preserve"><value>Somente os primeiros 500 hosts são listados.</value></data>

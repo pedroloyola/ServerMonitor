@@ -230,26 +230,36 @@ public sealed class SshConfigResolverTests
         Assert.Equal(["a", "b"], result.Hosts.Select(h => h.Alias));
     }
 
-    [Theory]
-    [InlineData("ProxyJump bastion")]
-    [InlineData("ProxyCommand ssh -W %h:%p bastion")]
-    public void Resolve_ProxyJumpOrProxyCommand_IsUnsupportedAndNotImportable(string line)
+    [Fact]
+    public void Resolve_ProxyCommand_IsUnsupportedAndNotImportable()
     {
-        var host = Host($"Host inner\n  HostName 10.1.0.9\n  {line}\n", "inner");
-        var keyword = line.Split(' ')[0];
+        var host = Host("Host inner\n  HostName 10.1.0.9\n  ProxyCommand ssh -W %h:%p bastion\n", "inner");
 
         Assert.False(host.IsImportable);
-        Assert.Equal(Enum.Parse<SshConfigHostBlocker>(keyword), host.Blocker);
-        Assert.True(Has(host, keyword, SshConfigFindingKind.Unsupported));
+        Assert.Equal(SshConfigHostBlocker.ProxyCommand, host.Blocker);
+        Assert.True(Has(host, "ProxyCommand", SshConfigFindingKind.Unsupported));
+        Assert.Null(host.Jump);
     }
 
     [Fact]
-    public void ProxyJumpInheritedFromWildcard_MakesHostNotImportable()
+    public void ProxyJumpInheritedFromWildcard_ThatAlsoMatchesTheJump_IsACycle()
     {
+        // *.corp also applies to jump.corp itself: ssh would jump through jump.corp to reach jump.corp.
         var host = Host("Host *.corp\n  ProxyJump jump.corp\nHost db.corp\n  User dba\n", "db.corp");
 
         Assert.False(host.IsImportable);
-        Assert.Equal(SshConfigHostBlocker.ProxyJump, host.Blocker);
+        Assert.Equal(SshConfigHostBlocker.JumpCycle, host.Blocker);
+    }
+
+    [Fact]
+    public void ProxyJumpInheritedFromWildcard_IsTheHostsSingleHopJump()
+    {
+        var host = Host("Host jump.corp\n  ProxyJump none\nHost *.corp\n  ProxyJump jump.corp\nHost db.corp\n  User dba\n", "db.corp");
+
+        Assert.True(host.IsImportable);
+        Assert.Equal("db.corp", host.HostName);
+        Assert.Equal("jump.corp", host.Jump?.Name);
+        Assert.Equal("jump.corp", host.Jump?.HostName);
     }
 
     [Fact]
@@ -299,7 +309,8 @@ public sealed class SshConfigResolverTests
         var host = Host($"Host a\n  HostName a.lan\n  {line}\n", "a");
 
         Assert.False(host.IsImportable);
-        Assert.Equal(SshConfigHostBlocker.ProxyJump, host.Blocker);
+        Assert.Equal(SshConfigHostBlocker.JumpUnparsable, host.Blocker);
+        Assert.Null(host.Jump);
     }
 
     [Theory]
@@ -334,7 +345,7 @@ public sealed class SshConfigResolverTests
     {
         var result = Import("Host *\n  ProxyJump a b\nHost x\nHost y\n");
 
-        Assert.All(result.Hosts, host => Assert.Equal(SshConfigHostBlocker.ProxyJump, host.Blocker));
+        Assert.All(result.Hosts, host => Assert.Equal(SshConfigHostBlocker.JumpUnparsable, host.Blocker));
     }
 
     // ---- Vigil M14.4a H2: an unevaluated Match that may set a proxy, met before the proxy is decided.

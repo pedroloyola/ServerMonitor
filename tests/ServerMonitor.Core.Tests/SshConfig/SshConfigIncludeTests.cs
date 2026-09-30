@@ -156,12 +156,21 @@ public sealed class SshConfigIncludeTests
     // ---- proxy safety through includes
 
     [Fact]
-    public void ProxyJumpInsideAnIncludedFile_BlocksExactlyAsIfInline()
+    public void ProxyJumpInsideAnIncludedFile_ResolvesExactlyAsIfInline()
     {
         var host = Host(Config("Host a\n  Include x\n").File("x", "ProxyJump bastion\n"), "a");
 
+        Assert.True(host.IsImportable);
+        Assert.Equal("bastion", host.Jump?.HostName);
+    }
+
+    [Fact]
+    public void MultiHopProxyJumpInsideAnIncludedFile_BlocksExactlyAsIfInline()
+    {
+        var host = Host(Config("Host a\n  Include x\n").File("x", "ProxyJump j1,j2\n"), "a");
+
         Assert.False(host.IsImportable);
-        Assert.Equal(SshConfigHostBlocker.ProxyJump, host.Blocker);
+        Assert.Equal(SshConfigHostBlocker.JumpMultiHop, host.Blocker);
     }
 
     [Fact]

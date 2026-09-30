@@ -54,7 +54,12 @@ internal sealed class FakeLocalizationService : ILocalizationService
             ["SshConfigHostAmbiguousFormat"] = "Ambiguous: {0} (choose manually)",
             ["SshConfigHostUnsupportedFormat"] = "Unsupported: {0}",
             ["SshConfigHostIgnoredFormat"] = "Ignored (not relevant): {0}",
-            ["SshConfigHostBlockedProxyJump"] = "Requires ProxyJump — not supported yet",
+            ["SshConfigHostBlockedJumpMultiHop"] = "Requires more than one jump host — not supported",
+            ["SshConfigHostBlockedJumpUnparsable"] = "The ProxyJump value cannot be read exactly — not imported",
+            ["SshConfigHostBlockedJumpCycle"] = "The ProxyJump loops back to this host — not imported",
+            ["SshConfigHostBlockedJumpHostNameUnresolved"] = "The jump host's HostName cannot be resolved exactly — not imported",
+            ["SshConfigPreviewJumpFormat"] = "Via: {0}",
+            ["SshConfigHostJumpClassificationFormat"] = "Jump host {0}: {1}",
             ["HostKeySubjectJumpFormat"] = "jump host {0}",
             ["HostKeySubjectTargetFormat"] = "target {0} via {1}",
         };
