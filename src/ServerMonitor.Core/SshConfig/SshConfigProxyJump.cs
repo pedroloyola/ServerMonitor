@@ -63,10 +63,9 @@ public static class SshConfigProxyJump
             return SshConfigProxyJumpParse.MultiHop;
         }
 
-        // "none" in another case: OpenSSH versions disagree on whether it means "no proxy".
-        if (string.Equals(value, "none", StringComparison.OrdinalIgnoreCase)
-            || value.Contains('%')
-            || value.Contains('/'))
+        // "none" in another case: OpenSSH versions disagree on whether it means "no proxy". Tokens ('%'),
+        // URIs and '/' delimiters need no check of their own: the host and user whitelists exclude them.
+        if (string.Equals(value, "none", StringComparison.OrdinalIgnoreCase))
         {
             return SshConfigProxyJumpParse.Unparsable;
         }

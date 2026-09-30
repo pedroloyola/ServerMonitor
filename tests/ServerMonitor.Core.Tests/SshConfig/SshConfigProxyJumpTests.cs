@@ -280,6 +280,10 @@ public sealed class SshConfigProxyJumpTests
     [InlineData("[fe80::1%eth0]")]
     [InlineData("bastion/22")]
     [InlineData("-oProxyCommand=x")]
+    [InlineData("-bastion")]
+    [InlineData(".bastion")]
+    [InlineData("-l@bastion")]
+    [InlineData("ops@bastion%")]
     [InlineData("ops;rm@bastion")]
     [InlineData("bas$tion")]
     [InlineData("NONE")]
@@ -307,6 +311,12 @@ public sealed class SshConfigProxyJumpTests
     [InlineData("ops@target:2222")]
     public void JumpToTheTargetItself_IsACycle(string value) =>
         AssertBlocked(SshConfigHostBlocker.JumpCycle, $"Host target\n  HostName 10.0.0.5\n  ProxyJump {value}\n");
+
+    [Fact]
+    public void JumpToTheTargetItself_IsReportedAsACycle_EvenWhenAMatchWouldAlsoBlockTheJump() =>
+        AssertBlocked(
+            SshConfigHostBlocker.JumpCycle,
+            "Host target\n  ProxyJump target\nMatch host other\n  HostName 198.51.100.1\n");
 
     [Fact]
     public void JumpBackToTheTarget_IsACycle() =>
