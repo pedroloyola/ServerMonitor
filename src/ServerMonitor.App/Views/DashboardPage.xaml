@@ -51,14 +51,22 @@
             </StackPanel>
         </Grid>
 
-        <!-- Error InfoBar -->
-        <InfoBar
-            x:Uid="ServerOperationError"
-            Grid.Row="1"
-            Margin="0,0,0,12"
-            IsClosable="True"
-            IsOpen="{Binding IsOperationErrorOpen, Mode=TwoWay}"
-            Severity="Error" />
+        <!-- Error InfoBars -->
+        <StackPanel Grid.Row="1">
+            <InfoBar
+                x:Uid="ServerOperationError"
+                Margin="0,0,0,12"
+                IsClosable="True"
+                IsOpen="{Binding IsOperationErrorOpen, Mode=TwoWay}"
+                Severity="Error" />
+            <!-- A configuration write was refused because a restore holds the configuration (M14.6). -->
+            <InfoBar
+                Margin="0,0,0,12"
+                IsClosable="True"
+                IsOpen="{Binding IsConfigurationLockedOpen, Mode=TwoWay}"
+                Message="{Binding ConfigurationLockedMessage}"
+                Severity="Warning" />
+        </StackPanel>
 
         <!-- Servers + Discovery share one scroll region, so the "Encontrados na rede" section
              renders whether or not any server has been added yet. -->

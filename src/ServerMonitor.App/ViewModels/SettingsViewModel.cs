@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Windows.Input;
 using Microsoft.Extensions.Logging;
 using ServerMonitor.App.Services;
+using ServerMonitor.Core.Backup;
 using ServerMonitor.Core.Enums;
 using ServerMonitor.Core.Interfaces;
 using ServerMonitor.Core.Models;
@@ -35,6 +36,7 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
     private bool _isHistoryResetAvailable;
     private bool _isHistoryResetOpen;
     private bool _isHistoryResetErrorOpen;
+    private bool _isConfigurationLockedOpen;
 
     public SettingsViewModel(
         IThemeService themeService,
@@ -236,6 +238,10 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
                 // The service commits its property only after the atomic replace, so re-notify to make
                 // the toggle visibly return to the last committed value.
                 OnPropertyChanged(nameof(BackgroundMonitoringEnabled));
+                if (exception is ConfigurationLockedException)
+                {
+                    IsConfigurationLockedOpen = true;
+                }
             }
         }
     }
@@ -265,7 +271,14 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
                 // The service commits its property only after the atomic replace. Re-notify the
                 // binding so the ToggleSwitch visibly returns to the last committed value.
                 OnPropertyChanged(nameof(NotificationsEnabled));
-                IsNotificationSettingsErrorOpen = true;
+                if (exception is ConfigurationLockedException)
+                {
+                    IsConfigurationLockedOpen = true;
+                }
+                else
+                {
+                    IsNotificationSettingsErrorOpen = true;
+                }
             }
         }
     }
@@ -275,6 +288,18 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
         get => _isNotificationSettingsErrorOpen;
         set => SetProperty(ref _isNotificationSettingsErrorOpen, value);
     }
+
+    /// <summary>
+    /// A write was refused because a restore holds the configuration (M14.6). It gets its own message:
+    /// "try again" would be wrong, the change can only be made after ServerAlyzer restarts.
+    /// </summary>
+    public bool IsConfigurationLockedOpen
+    {
+        get => _isConfigurationLockedOpen;
+        set => SetProperty(ref _isConfigurationLockedOpen, value);
+    }
+
+    public string ConfigurationLockedMessage => _localizationService.GetString(BackupMessageKeys.ConfigurationLocked);
 
     public bool IsHistoryClearedOpen
     {
@@ -439,6 +464,12 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
 
     private void HandleError(Exception exception)
     {
+        if (exception is ConfigurationLockedException)
+        {
+            IsConfigurationLockedOpen = true;
+            return;
+        }
+
         _logger.LogError(exception, "Could not manage hidden servers.");
         IsServerOperationErrorOpen = true;
     }

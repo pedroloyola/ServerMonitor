@@ -32,6 +32,13 @@
                 </StackPanel>
             </Grid>
 
+            <!-- A configuration write was refused because a restore holds the configuration (M14.6). -->
+            <InfoBar
+                IsClosable="True"
+                IsOpen="{Binding IsConfigurationLockedOpen, Mode=TwoWay}"
+                Message="{Binding ConfigurationLockedMessage}"
+                Severity="Warning" />
+
             <!-- Main Glass Settings Card -->
             <controls:GlassCard>
                 <StackPanel Spacing="20">
@@ -360,6 +367,51 @@
                             IsClosable="True"
                             IsOpen="{Binding IsHistoryResetErrorOpen, Mode=TwoWay}"
                             Severity="Error" />
+                    </StackPanel>
+
+                    <Border Height="1" Background="{ThemeResource GlassBorderBrush}" />
+
+                    <!-- Backup and restore Section (M14.6). One status surface for both flows; its
+                         detail line is selectable so the stuck-journal folder can be copied. -->
+                    <StackPanel Spacing="10">
+                        <StackPanel Spacing="2">
+                            <TextBlock
+                                x:Uid="BackupSectionTitle"
+                                AutomationProperties.HeadingLevel="Level2"
+                                Style="{StaticResource SectionTitleTextStyle}" />
+                            <TextBlock
+                                x:Uid="BackupSectionDescription"
+                                FontSize="12"
+                                Foreground="{ThemeResource TextSecondaryBrush}"
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+
+                        <Button
+                            x:Uid="BackupCreateButton"
+                            HorizontalAlignment="Left"
+                            Command="{x:Bind Backup.CreateBackupCommand}"
+                            Style="{StaticResource QuietPillButtonStyle}" />
+
+                        <Button
+                            x:Uid="BackupRestoreButton"
+                            HorizontalAlignment="Left"
+                            Command="{x:Bind Backup.RestoreCommand}"
+                            Style="{StaticResource QuietPillButtonStyle}" />
+
+                        <InfoBar
+                            Title="{x:Bind Backup.StatusTitle, Mode=OneWay}"
+                            IsClosable="{x:Bind Backup.IsStatusClosable, Mode=OneWay}"
+                            IsOpen="{x:Bind Backup.IsStatusOpen, Mode=TwoWay}"
+                            Message="{x:Bind Backup.StatusMessage, Mode=OneWay}"
+                            Severity="{x:Bind Backup.StatusSeverity, Mode=OneWay}">
+                            <TextBlock
+                                Margin="0,0,0,12"
+                                FontSize="12"
+                                IsTextSelectionEnabled="True"
+                                Text="{x:Bind Backup.StatusDetail, Mode=OneWay}"
+                                TextWrapping="Wrap"
+                                Visibility="{x:Bind Backup.HasStatusDetail, Mode=OneWay}" />
+                        </InfoBar>
                     </StackPanel>
                 </StackPanel>
             </controls:GlassCard>

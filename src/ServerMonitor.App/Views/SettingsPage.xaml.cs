@@ -5,8 +5,13 @@ namespace ServerMonitor.App.Views;
 
 public sealed partial class SettingsPage : Page
 {
-    public SettingsPage(SettingsViewModel viewModel, WindowModeViewModel windowMode)
+    public SettingsPage(
+        SettingsViewModel viewModel,
+        WindowModeViewModel windowMode,
+        BackupRestoreViewModel backup)
     {
+        // Set before InitializeComponent: the Backup section binds with x:Bind.
+        Backup = backup;
         InitializeComponent();
         ViewModel = viewModel;
         WindowMode = windowMode;
@@ -18,6 +23,9 @@ public sealed partial class SettingsPage : Page
 
     /// <summary>Backs the compact widget's always-on-top preference toggle.</summary>
     public WindowModeViewModel WindowMode { get; }
+
+    /// <summary>Backs the Backup and restore section (M14.6).</summary>
+    public BackupRestoreViewModel Backup { get; }
 
     private async void OnLoaded(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
     {

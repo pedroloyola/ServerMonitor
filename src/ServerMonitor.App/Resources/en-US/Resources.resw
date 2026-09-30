@@ -517,4 +517,76 @@
   <data name="ConnectionHintRoutedHostKeyUnknown" xml:space="preserve"><value>This server has not been seen through the jump host before. Compare the SHA-256 fingerprint below with the server's own before trusting it.</value></data>
   <data name="ConnectionHintRoutedHostKeyMismatch" xml:space="preserve"><value>The server's identity, as seen through the jump host, differs from the one on record. The connection was blocked. Do not continue until whoever administers the server confirms the key really changed.</value></data>
   <data name="ConnectionHintLocalTunnelFailed" xml:space="preserve"><value>The local tunnel to the jump host could not be opened on this computer. It is not a server problem: retest.</value></data>
+  <!-- M14.6 Encrypted backup and restore -->
+  <data name="BackupSectionTitle.Text" xml:space="preserve"><value>Backup and restore</value></data>
+  <data name="BackupSectionDescription.Text" xml:space="preserve"><value>Save your servers, routes, trusted host keys and saved passwords to an encrypted file you can restore on this or another computer. The file is protected by a passphrase you choose. Private key files are never included, only their paths.</value></data>
+  <data name="BackupCreateButton.Content" xml:space="preserve"><value>Create backup…</value></data>
+  <data name="BackupRestoreButton.Content" xml:space="preserve"><value>Restore from backup…</value></data>
+  <data name="BackupFileTypeLabel" xml:space="preserve"><value>ServerAlyzer backup</value></data>
+  <data name="BackupCreateTitle" xml:space="preserve"><value>Create encrypted backup</value></data>
+  <data name="BackupPassphraseLabel" xml:space="preserve"><value>Passphrase</value></data>
+  <data name="BackupPassphraseConfirmLabel" xml:space="preserve"><value>Confirm passphrase</value></data>
+  <data name="BackupPassphraseHint" xml:space="preserve"><value>At least 12 characters. A few unrelated words work well.</value></data>
+  <data name="BackupNoRecoveryWarning" xml:space="preserve"><value>If you lose this passphrase, the backup can't be opened. ServerAlyzer doesn't store it and can't recover it.</value></data>
+  <data name="BackupContainsSecretsNote" xml:space="preserve"><value>The file contains your saved passwords, encrypted. Keep it somewhere safe.</value></data>
+  <data name="BackupCreatePrimary" xml:space="preserve"><value>Choose location and save</value></data>
+  <data name="Cancel" xml:space="preserve"><value>Cancel</value></data>
+  <data name="PassphraseTooShort" xml:space="preserve"><value>Use at least 12 characters.</value></data>
+  <data name="PassphraseTooLong" xml:space="preserve"><value>Use at most 256 characters.</value></data>
+  <data name="PassphraseInvalidCharacters" xml:space="preserve"><value>The passphrase contains characters that can't be used.</value></data>
+  <data name="PassphraseMismatch" xml:space="preserve"><value>The passphrases don't match.</value></data>
+  <data name="PassphraseEmpty" xml:space="preserve"><value>Enter the passphrase.</value></data>
+  <data name="BackupCreatedTitle" xml:space="preserve"><value>Backup created</value></data>
+  <data name="BackupCreatedMessage" xml:space="preserve"><value>{0} servers, {1} trusted host keys and {2} passwords saved to {3}.</value></data>
+  <data name="BackupMissingCredentialsWarning" xml:space="preserve"><value>No saved password was found for: {0}. After restoring, you'll be asked for it.</value></data>
+  <data name="BackupExcludedEntriesWarning" xml:space="preserve"><value>{0} unreadable server entries were not included.</value></data>
+  <data name="BackupExcludedTrustNote" xml:space="preserve"><value>{0} trusted host keys not used by any server were not included.</value></data>
+  <data name="BackupFailedTitle" xml:space="preserve"><value>Backup not created</value></data>
+  <data name="BackupFailedWrite" xml:space="preserve"><value>The file couldn't be written to that location. Choose another folder and try again.</value></data>
+  <data name="BackupFailedCredentialStore" xml:space="preserve"><value>Saved passwords couldn't be read from Windows Credential Manager. Nothing was saved.</value></data>
+  <data name="BackupFailedTrustStore" xml:space="preserve"><value>The trusted host keys file couldn't be read. Nothing was saved.</value></data>
+  <data name="BackupFailedTooLarge" xml:space="preserve"><value>Your configuration is too large to back up.</value></data>
+  <data name="BackupFailedInvalidContent" xml:space="preserve"><value>Your current configuration contains values that can't be backed up. Nothing was saved.</value></data>
+  <data name="BackupUnsupported" xml:space="preserve"><value>Encryption isn't available on this system.</value></data>
+  <data name="RestoreOpenTitle" xml:space="preserve"><value>Restore from backup</value></data>
+  <data name="RestoreOpenMessage" xml:space="preserve"><value>Enter the passphrase for {0}. Nothing changes until you review and confirm.</value></data>
+  <data name="RestoreOpenPrimary" xml:space="preserve"><value>Open backup</value></data>
+  <data name="RestoreOpening" xml:space="preserve"><value>Checking the backup…</value></data>
+  <data name="RestoreErrorWrongPassphraseOrDamaged" xml:space="preserve"><value>The passphrase is wrong, or the file is damaged or was modified. Nothing was changed.</value></data>
+  <data name="RestoreErrorNotABackup" xml:space="preserve"><value>This file isn't a ServerAlyzer backup. Nothing was changed.</value></data>
+  <data name="RestoreErrorDamaged" xml:space="preserve"><value>The backup file is damaged or incomplete. Nothing was changed.</value></data>
+  <data name="RestoreErrorIncompatible" xml:space="preserve"><value>This backup was created by a newer version of ServerAlyzer. Update ServerAlyzer and try again. Nothing was changed.</value></data>
+  <data name="RestoreErrorInvalidContent" xml:space="preserve"><value>The backup contains data ServerAlyzer can't accept. Nothing was changed.</value></data>
+  <data name="RestoreErrorTooLarge" xml:space="preserve"><value>The file is too large to be a ServerAlyzer backup. Nothing was changed.</value></data>
+  <data name="RestoreErrorFileAccess" xml:space="preserve"><value>The file couldn't be opened. Nothing was changed.</value></data>
+  <data name="RestoreConfirmTitle" xml:space="preserve"><value>Replace this computer's configuration?</value></data>
+  <data name="RestoreConfirmIntro" xml:space="preserve"><value>Backup from {0}. Restoring replaces, it doesn't merge:</value></data>
+  <data name="RestoreSummaryServers" xml:space="preserve"><value>Servers: {0} now → {1} from the backup ({2} through a jump host)</value></data>
+  <data name="RestoreSummaryTrust" xml:space="preserve"><value>Trusted host keys: {0} now → {1} from the backup</value></data>
+  <data name="RestoreSummaryTrustRemoved" xml:space="preserve"><value>{0} trusted host keys currently on this computer are not in the backup and will be removed.</value></data>
+  <data name="RestoreSummaryTrustDelegated" xml:space="preserve"><value>The trusted host keys in the backup will be trusted without asking again. Only restore backups you created.</value></data>
+  <data name="RestoreSummaryPasswords" xml:space="preserve"><value>Saved passwords: {0} (all current saved passwords are replaced)</value></data>
+  <data name="RestoreSummaryMissingPasswords" xml:space="preserve"><value>Not in the backup, you'll be asked again: {0}</value></data>
+  <data name="RestoreSummaryMissingKeys" xml:space="preserve"><value>Key files not found on this computer: {0}</value></data>
+  <data name="RestoreSummaryNetworkKeys" xml:space="preserve"><value>Network or unsupported key paths (not checked, won't be usable): {0}</value></data>
+  <data name="RestoreSummaryUnsupportedKeys" xml:space="preserve"><value>Key paths that are links or not files (won't be usable): {0}</value></data>
+  <data name="RestoreSummarySettings" xml:space="preserve"><value>Notification and background monitoring settings are also restored. History is kept.</value></data>
+  <data name="RestoreSummaryHistoryKept" xml:space="preserve"><value>History is kept.</value></data>
+  <data name="RestoreSummaryUnknown" xml:space="preserve"><value>unknown</value></data>
+  <data name="RestoreSummarySome" xml:space="preserve"><value>Some</value></data>
+  <data name="RestoreConfirmNote" xml:space="preserve"><value>ServerAlyzer will close when the restore finishes. This can't be undone.</value></data>
+  <data name="RestoreConfirmPrimary" xml:space="preserve"><value>Replace configuration</value></data>
+  <data name="RestoreApplying" xml:space="preserve"><value>Restoring… Don't close ServerAlyzer.</value></data>
+  <data name="RestoreCompletedTitle" xml:space="preserve"><value>Restore complete</value></data>
+  <data name="RestoreCompletedMessage" xml:space="preserve"><value>ServerAlyzer will close now. Open it again to use the restored configuration.</value></data>
+  <data name="RestoreCompletedPrimary" xml:space="preserve"><value>Close ServerAlyzer</value></data>
+  <data name="RestoreRolledBackTitle" xml:space="preserve"><value>Restore failed</value></data>
+  <data name="RestoreRolledBackMessage" xml:space="preserve"><value>Something went wrong while restoring, and every change was undone. Your configuration is exactly as it was.</value></data>
+  <data name="RestorePartialPendingMessage" xml:space="preserve"><value>The restore failed and couldn't be fully undone yet. Close and reopen ServerAlyzer to finish undoing it.</value></data>
+  <data name="RestoreCanceled" xml:space="preserve"><value>Restore canceled. Nothing was changed.</value></data>
+  <data name="RestoreBusy" xml:space="preserve"><value>ServerAlyzer is busy saving changes. Try again in a moment. Nothing was changed.</value></data>
+  <data name="ConfigurationLocked" xml:space="preserve"><value>A restore is in progress. Changes can't be saved until ServerAlyzer restarts.</value></data>
+  <data name="RestoreRecoveredUndone" xml:space="preserve"><value>A restore was interrupted and has been undone. Your configuration is as it was before.</value></data>
+  <data name="RestoreRecoveredCompleted" xml:space="preserve"><value>An interrupted restore was completed.</value></data>
+  <data name="RestorePendingBlocked" xml:space="preserve"><value>Backup and restore are unavailable: an interrupted restore couldn't be processed automatically. To unblock, close ServerAlyzer and delete the folder {0}. Deleting it abandons the automatic undo of that restore.</value></data>
 </root>

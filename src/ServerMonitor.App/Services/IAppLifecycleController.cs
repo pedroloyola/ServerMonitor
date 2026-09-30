@@ -37,7 +37,13 @@ public enum ExitReason
     /// normally or degraded — while it may still be holding an affordance whose removal cannot be
     /// established (M13 S2-T, CV-16). This is the ONLY reason that raises the fail-safe exit notice.
     /// </summary>
-    TrayCleanupUnverified
+    TrayCleanupUnverified,
+
+    /// <summary>
+    /// A configuration restore committed (M14.6). Configuration writes are refused until the process
+    /// ends, so the app closes and the user reopens it on the restored configuration.
+    /// </summary>
+    RestoreCompleted
 }
 
 /// <summary>

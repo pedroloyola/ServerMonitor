@@ -1,3 +1,4 @@
+using System.IO;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using ServerMonitor.App.Services;
@@ -100,5 +101,165 @@ internal static class QaBackupComposition
             _trust.Dispose();
             _routedTrust.Dispose();
         }
+    }
+}
+
+
+/// <summary>
+/// QA-ONLY scenario doubles for the M14.6 backup/restore UI (distinct from <see cref="QaBackupComposition"/>,
+/// which runs the REAL engine over isolated stores). Launch with <c>--qa-backup &lt;scenario&gt;</c>
+/// (see <see cref="QaBackupPolicy.Scenarios"/>), together with an isolated data harness such as
+/// <c>--qa-health</c>, to walk every dialog and outcome. The engine and both pickers are in-memory
+/// doubles: nothing is encrypted, read or written, and no native file dialog opens.
+/// The passphrase the double accepts is <see cref="QaBackupService.AcceptedPassphrase"/>.
+/// Excluded from Release (see ServerMonitor.App.csproj); the flag is ignored there.
+/// </summary>
+internal static class QaBackupScenarioComposition
+{
+    public static string? RequestedScenario() =>
+        QaBackupPolicy.ResolveScenario(Environment.GetCommandLineArgs(), isDebugBuild: true);
+
+    /// <summary>Registered last so it wins over the real registrations for every resolve.</summary>
+    public static void Apply(IServiceCollection services, string scenario)
+    {
+        services.AddSingleton<IConfigurationBackupService>(new QaBackupService(scenario));
+        services.AddSingleton<IBackupFilePicker, QaBackupFilePicker>();
+    }
+}
+
+/// <summary>Returns fixed paths under the temp folder without opening a dialog or touching a file.</summary>
+internal sealed class QaBackupFilePicker : IBackupFilePicker
+{
+    private static readonly string Folder = Path.Combine(Path.GetTempPath(), "serveralyzer-qa-backup");
+
+    public Task<string?> PickSaveAsync(
+        string suggestedFileName,
+        string fileTypeLabel,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<string?>(Path.Combine(Folder, suggestedFileName));
+
+    public Task<string?> PickOpenAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult<string?>(Path.Combine(Folder, "home-lab.serveralyzer-backup"));
+}
+
+internal sealed class QaBackupService(string scenario) : IConfigurationBackupService
+{
+    public const string AcceptedPassphrase = "correct horse battery staple";
+
+    private static readonly string Journal = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "ServerMonitor",
+        "restore-journal") + Path.DirectorySeparatorChar;
+
+    public RestoreRecoveryReport StartupRecovery { get; } = scenario switch
+    {
+        "stuck" => new RestoreRecoveryReport(RestoreRecoveryOutcome.Stuck, Journal),
+        "recovered" => new RestoreRecoveryReport(RestoreRecoveryOutcome.RolledBack, Journal),
+        _ => RestoreRecoveryReport.None(Journal)
+    };
+
+    public async Task<BackupExportResult> ExportAsync(
+        string destinationPath,
+        ReadOnlyMemory<char> passphrase,
+        ReadOnlyMemory<char> confirmation,
+        CancellationToken cancellationToken = default)
+    {
+        var problem = BackupPassphrasePolicy.ValidateForExport(passphrase.Span, confirmation.Span);
+        if (problem != BackupPassphraseProblem.None)
+        {
+            return new BackupExportResult { PassphraseProblem = problem };
+        }
+
+        await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
+        return scenario switch
+        {
+            "stuck" => new BackupExportResult { Error = BackupError.RestorePending, PendingJournalDirectory = Journal },
+            "invalid" => new BackupExportResult { Error = BackupError.WriteFailed },
+            _ => new BackupExportResult
+            {
+                Summary = new BackupExportSummary
+                {
+                    DirectServers = 4,
+                    RoutedServers = 2,
+                    Credentials = 3,
+                    DirectTrustedHostKeys = 4,
+                    RoutedTrustedHostKeys = 2,
+                    ExcludedUnreferencedTrustedHostKeys = 1,
+                    MissingCredentials = [new BackupCredentialFlag(Guid.NewGuid(), "backup-nas", IsJump: false)]
+                }
+            }
+        };
+    }
+
+    public async Task<RestoreInspectResult> InspectAsync(
+        string sourcePath,
+        ReadOnlyMemory<char> passphrase,
+        CancellationToken cancellationToken = default)
+    {
+        var problem = BackupPassphrasePolicy.ValidateForRestore(passphrase.Span);
+        if (problem != BackupPassphraseProblem.None)
+        {
+            return new RestoreInspectResult { PassphraseProblem = problem };
+        }
+
+        var accepted = passphrase.Span.SequenceEqual(AcceptedPassphrase);
+        await Task.Delay(TimeSpan.FromSeconds(1.5), cancellationToken);
+        if (scenario == "stuck")
+        {
+            return new RestoreInspectResult { Error = BackupError.RestorePending, PendingJournalDirectory = Journal };
+        }
+
+        if (scenario == "invalid")
+        {
+            return new RestoreInspectResult { Error = BackupError.NotABackup };
+        }
+
+        return accepted
+            ? new RestoreInspectResult { Plan = new QaRestorePlan(Summary()) }
+            : new RestoreInspectResult { Error = BackupError.WrongPassphraseOrDamaged };
+    }
+
+    public async Task<RestoreApplyResult> ApplyAsync(RestorePlan plan, CancellationToken cancellationToken = default)
+    {
+        ObjectDisposedException.ThrowIf(plan.IsDisposed, plan);
+        await Task.Delay(TimeSpan.FromSeconds(3), cancellationToken);
+        return scenario switch
+        {
+            "rollback" => new RestoreApplyResult { Outcome = RestoreApplyOutcome.RolledBack, Error = BackupError.WriteFailed },
+            "partial" => new RestoreApplyResult
+            {
+                Outcome = RestoreApplyOutcome.PartialRestoreRollbackPending,
+                Error = BackupError.CredentialStoreUnavailable,
+                JournalDirectory = Journal
+            },
+            _ => new RestoreApplyResult { Outcome = RestoreApplyOutcome.Completed }
+        };
+    }
+
+    private static RestoreSummary Summary() => new()
+    {
+        BackupCreatedAt = DateTimeOffset.Now.AddDays(-3),
+        BackupAppVersion = "1.2.0",
+        Backup = new RestoreCounts(4, 2, 3, 4, 2),
+        Current = new RestoreCounts(5, 1, 4, 7, 1),
+        DirectTrustedHostKeysToRemove = 3,
+        RoutedTrustedHostKeysToRemove = 0,
+        BackupSettings = new PortableSettings(NotificationsEnabled: false, BackgroundMonitoringEnabled: true),
+        CurrentSettings = new PortableSettings(NotificationsEnabled: true, BackgroundMonitoringEnabled: true),
+        MissingCredentials = [new BackupCredentialFlag(Guid.NewGuid(), "backup-nas", IsJump: false)],
+        KeyPathWarnings =
+        [
+            new KeyPathWarning(Guid.NewGuid(), "prod-web-01", IsJump: false, KeyPathStatus.Missing),
+            new KeyPathWarning(Guid.NewGuid(), "db-internal", IsJump: true, KeyPathStatus.NotChecked)
+        ]
+    };
+
+    private sealed class QaRestorePlan(RestoreSummary summary) : RestorePlan(summary)
+    {
+        private bool _disposed;
+
+        public override bool IsDisposed => _disposed;
+
+        protected override void Dispose(bool disposing) => _disposed = true;
     }
 }

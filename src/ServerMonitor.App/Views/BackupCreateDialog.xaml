@@ -1,0 +1,53 @@
+<ContentDialog
+    x:Class="ServerMonitor.App.Views.BackupCreateDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    DefaultButton="Primary"
+    Style="{StaticResource PremiumContentDialogStyle}"
+    PrimaryButtonClick="OnPrimaryButtonClick"
+    Closing="OnClosing">
+    <StackPanel
+        MinWidth="400"
+        MaxWidth="480"
+        Spacing="12">
+        <PasswordBox
+            x:Name="PassphraseBox"
+            CornerRadius="{StaticResource RadiusSmall}"
+            Header="{x:Bind Session.PassphraseLabel}"
+            IsEnabled="{x:Bind Session.IsNotBusy, Mode=OneWay}"
+            PasswordChanged="OnPasswordChanged"
+            PasswordRevealMode="Peek" />
+        <TextBlock
+            FontSize="12"
+            Foreground="{ThemeResource TextSecondaryBrush}"
+            Text="{x:Bind Session.Hint}"
+            TextWrapping="Wrap" />
+        <PasswordBox
+            x:Name="ConfirmationBox"
+            CornerRadius="{StaticResource RadiusSmall}"
+            Header="{x:Bind Session.ConfirmationLabel}"
+            IsEnabled="{x:Bind Session.IsNotBusy, Mode=OneWay}"
+            PasswordChanged="OnPasswordChanged"
+            PasswordRevealMode="Peek" />
+        <TextBlock
+            AutomationProperties.LiveSetting="Polite"
+            FontSize="12"
+            Foreground="{ThemeResource StatusCriticalBrush}"
+            Text="{x:Bind Session.ProblemMessage, Mode=OneWay}"
+            TextWrapping="Wrap"
+            Visibility="{x:Bind Session.HasProblem, Mode=OneWay}" />
+        <InfoBar
+            IsClosable="False"
+            IsOpen="True"
+            Message="{x:Bind Session.NoRecoveryWarning}"
+            Severity="Warning" />
+        <TextBlock
+            FontSize="12"
+            Foreground="{ThemeResource TextSecondaryBrush}"
+            Text="{x:Bind Session.SecretsNote}"
+            TextWrapping="Wrap" />
+        <ProgressBar
+            IsIndeterminate="True"
+            Visibility="{x:Bind Session.IsBusy, Mode=OneWay}" />
+    </StackPanel>
+</ContentDialog>

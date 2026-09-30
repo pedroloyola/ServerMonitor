@@ -19,6 +19,7 @@ public sealed partial class MainWindow : Window
     private readonly IWindowModeCoordinator _modeCoordinator;
     private readonly DashboardViewModel _dashboardViewModel;
     private readonly TrayService _trayService;
+    private readonly BackupRestoreViewModel _backupRestore;
     private readonly ILogger<MainWindow> _logger;
     private readonly DispatcherQueueTimer _persistTimer;
     private bool _isEnforcingMinimumSize;
@@ -38,6 +39,7 @@ public sealed partial class MainWindow : Window
         DashboardViewModel dashboardViewModel,
         TrayService trayService,
         WindowCloseCoordinator closeCoordinator,
+        BackupRestoreViewModel backupRestore,
         ILogger<MainWindow> logger)
     {
         InitializeComponent();
@@ -48,6 +50,7 @@ public sealed partial class MainWindow : Window
         _dashboardViewModel = dashboardViewModel;
         _trayService = trayService;
         _closeCoordinator = closeCoordinator;
+        _backupRestore = backupRestore;
         _logger = logger;
         Title = localizationService.GetString("AppWindowTitle");
 
@@ -147,6 +150,10 @@ public sealed partial class MainWindow : Window
         {
             _ = _dashboardViewModel.LoadAsync();
         }
+
+        // M14.6: what startup recovery did with an interrupted restore, once per process. It waits for
+        // the first window because the notice needs a XamlRoot; a headless start shows it here later.
+        _ = _backupRestore.ShowStartupRecoveryOnceAsync();
     }
 
     private void OnWindowModeChanged(object? sender, WindowMode mode)

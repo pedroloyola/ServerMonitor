@@ -738,6 +738,11 @@ public partial class App : Application
         }
 #endif
 
+        // M14.6 backup and restore UI. IConfigurationBackupService itself is registered with the engine.
+        services.AddSingleton<IBackupFilePicker, BackupFilePicker>();
+        services.AddSingleton<IBackupRestoreInteraction, BackupRestoreDialogService>();
+        services.AddSingleton<BackupRestoreViewModel>();
+
         services.AddSingleton<DashboardViewModel>();
         services.AddSingleton<SettingsViewModel>();
         services.AddSingleton<DashboardPage>();
@@ -749,6 +754,14 @@ public partial class App : Application
         services.AddTransient<WorkloadsViewModel>();
         services.AddTransient<WorkloadsPage>();
         services.AddTransient<MainWindow>();
+#if DEBUG
+        // Debug-only QA: --qa-backup <scenario> swaps the backup engine and its file pickers for in-memory
+        // doubles. Last, so it wins over the real registrations wherever they are made.
+        if (Qa.QaBackupScenarioComposition.RequestedScenario() is { } qaBackupScenario)
+        {
+            Qa.QaBackupScenarioComposition.Apply(services, qaBackupScenario);
+        }
+#endif
     }
 
     /// <summary>

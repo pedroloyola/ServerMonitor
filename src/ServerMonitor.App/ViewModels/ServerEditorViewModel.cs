@@ -1,5 +1,6 @@
 using System.Globalization;
 using ServerMonitor.App.Services;
+using ServerMonitor.Core.Backup;
 using ServerMonitor.Core.Enums;
 using ServerMonitor.Core.Interfaces;
 using ServerMonitor.Core.Models;
@@ -1044,6 +1045,17 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
                     HostKeyEndpoint = directEndpoint,
                     TrustedHostKey = await _hostKeyTrustStore.GetAsync(directEndpoint!)
                 });
+        }
+        catch (ConfigurationLockedException)
+        {
+            // A restore holds the configuration: nothing was trusted, and retrying cannot help.
+            ApplyConnectionResult(new SshConnectionResult
+            {
+                State = ServerConnectionState.Error,
+                ErrorCode = SshConnectionErrorCode.Unexpected,
+                ReachedStage = ConnectionChecklist.ReportedStage
+            });
+            ConnectionStatusMessage = _localizationService.GetString(BackupMessageKeys.ConfigurationLocked);
         }
         catch
         {
