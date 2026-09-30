@@ -547,7 +547,9 @@ public partial class App : Application
         var qaHistory = Qa.QaHistoryComposition.IsRequested();
         var qaWorkloads = Qa.QaWorkloadsComposition.IsRequested();
         var qaScreenshot = Qa.QaStoreScreenshotComposition.IsRequested();
-        var qaMode = qaHealth || qaDiscovery || qaNotifications || qaCompact || qaHistory || qaWorkloads || qaScreenshot;
+        var qaProxyJump = Qa.QaProxyJumpComposition.IsRequested();
+        var qaMode = qaHealth || qaDiscovery || qaNotifications || qaCompact || qaHistory || qaWorkloads || qaScreenshot
+            || qaProxyJump;
 #else
         const bool qaMode = false;
 #endif
@@ -621,6 +623,11 @@ public partial class App : Application
         else if (qaScreenshot)
         {
             Qa.QaStoreScreenshotComposition.Apply(services);
+        }
+        else if (qaProxyJump)
+        {
+            // Throws when --qa-proxyjump-dir is missing: the mode is refused, never pointed at the real profile.
+            Qa.QaProxyJumpComposition.Apply(services, Qa.QaProxyJumpComposition.RequiredDirectory());
         }
         else
         {
