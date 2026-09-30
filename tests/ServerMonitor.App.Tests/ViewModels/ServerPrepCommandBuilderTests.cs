@@ -12,7 +12,9 @@ public sealed class ServerPrepCommandBuilderTests
     private const string UserPlaceholder = "<user>";
     private const string HostPlaceholder = "<server>";
     private const string JumpPlaceholder = "<jump-host>";
-    private const string RemoteScript = "\"umask 077; mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys\"";
+    // Written out here, not read from the builder: the exact text the user pastes is what is under test.
+    private const string RemoteScript =
+        @"'umask 077; mkdir -p ~/.ssh; touch ~/.ssh/authorized_keys; test ! -s ~/.ssh/authorized_keys || test $(tail -c1 ~/.ssh/authorized_keys | wc -l) -eq 1 || echo >> ~/.ssh/authorized_keys; tr -d \\r >> ~/.ssh/authorized_keys'";
 
     private static ServerPrepCommands Build(
         string? user = "deploy",
@@ -243,6 +245,73 @@ public sealed class ServerPrepCommandBuilderTests
             $"type $env:USERPROFILE\\.ssh\\id_ed25519.pub | ssh -J {JumpPlaceholder} deploy@10.0.0.5 {RemoteScript}",
             commands.CopyPublicKey);
         Assert.True(commands.UsesPlaceholders);
+    }
+
+    [Fact]
+    public void RemoteScript_IsExactlyOneSingleQuotedPowerShellTokenWithNoQuotesInside()
+    {
+        Assert.Equal(RemoteScript, ServerPrepCommandBuilder.RemoteScript);
+        var script = ServerPrepCommandBuilder.RemoteScript;
+
+        Assert.StartsWith("'", script);
+        Assert.EndsWith("'", script);
+        var inner = script[1..^1];
+        Assert.DoesNotContain('\'', inner);
+        Assert.DoesNotContain('"', inner);
+        Assert.DoesNotContain('`', inner);
+        Assert.DoesNotContain('\n', inner);
+        Assert.DoesNotContain('\r', inner);
+        // Two real backslashes before r: the remote POSIX shell turns them into the single one tr needs.
+        Assert.Contains(@"tr -d \\r >> ~/.ssh/authorized_keys", inner);
+        // Never a blind append: the last line is closed first when the file does not end in a newline.
+        Assert.Contains("|| echo >> ~/.ssh/authorized_keys;", inner);
+        Assert.DoesNotContain("cat >>", inner);
+    }
+
+    [Fact]
+    public void WholeCommand_HasTheRemoteScriptAsItsOnlyQuotedToken()
+    {
+        foreach (var commands in new[]
+        {
+            Build(),
+            Build(user: "$(whoami)", host: "a'b", port: "22; id"),
+            ServerPrepCommandBuilder.Build(
+                "deploy", "10.0.0.5", "2222", "id_rsa", UserPlaceholder, HostPlaceholder,
+                useJumpHost: true, jumpUsername: "jumper", jumpHost: "bastion", jumpPort: "2200",
+                jumpPlaceholder: JumpPlaceholder),
+        })
+        {
+            var command = commands.CopyPublicKey;
+
+            Assert.EndsWith(" " + RemoteScript, command);
+            Assert.Equal(2, command.Count(character => character == '\''));
+            Assert.DoesNotContain('"', command);
+            Assert.DoesNotContain('`', command);
+        }
+    }
+
+    [Fact]
+    public void LocalValues_NeverAppearInsideTheRemoteScript()
+    {
+        var commands = ServerPrepCommandBuilder.Build(
+            "deployuser", "targethost.example", "2222", "id_rsa", UserPlaceholder, HostPlaceholder,
+            useJumpHost: true, jumpUsername: "jumpuser", jumpHost: "jumphost.example", jumpPort: "2200",
+            jumpPlaceholder: JumpPlaceholder);
+        var command = commands.CopyPublicKey;
+        var remote = command[command.IndexOf('\'')..];
+
+        Assert.Equal(RemoteScript, remote);
+        foreach (var local in new[] { "deployuser", "targethost.example", "2222", "id_rsa", "jumpuser", "jumphost.example", "2200", "USERPROFILE" })
+        {
+            Assert.Contains(local, command[..command.IndexOf('\'')]);
+            Assert.DoesNotContain(local, remote);
+        }
+
+        var placeholders = ServerPrepCommandBuilder.Build(
+            "a b", "c d", "22", null, UserPlaceholder, HostPlaceholder,
+            useJumpHost: true, jumpUsername: "", jumpHost: "", jumpPort: "", jumpPlaceholder: JumpPlaceholder);
+        var placeholderRemote = placeholders.CopyPublicKey[placeholders.CopyPublicKey.IndexOf('\'')..];
+        Assert.Equal(RemoteScript, placeholderRemote);
     }
 
     [Fact]
