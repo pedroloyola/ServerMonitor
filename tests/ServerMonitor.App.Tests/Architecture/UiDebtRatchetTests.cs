@@ -6,8 +6,9 @@ namespace ServerMonitor.App.Tests.Architecture;
 /// <summary>
 /// UI.1 debt ratchets (docs/ui/ui0-figma-audit.md §0/§6): the presentation rebuild may only REDUCE these
 /// counts. Each fails on growth and passes on today's tree; none fails when debt is removed.
-/// "Outside Styles" means every app XAML/C# source except Styles/** (the token/style dictionaries, scanned
-/// generically so new files under e.g. Styles/Tokens/ are exempt without editing this test).
+/// Scope (UI.1 review G-2): every app XAML/C# source, INCLUDING the legacy dictionaries Styles/DesignTokens.xaml
+/// and Styles/Controls.xaml (baselined like any page). Only the new token layer, Styles/Tokens/** (scanned
+/// generically), is exempt - and it must never reference the legacy accent (asserted separately).
 ///
 /// HOW TO LOWER A BASELINE: in the same PR that removes the debt, lower (or delete) the file's entry below to
 /// the new count reported by the test. Never raise a baseline; move the value into a Styles/** token instead.
@@ -15,8 +16,8 @@ namespace ServerMonitor.App.Tests.Architecture;
 public sealed partial class UiDebtRatchetTests
 {
     /// <summary>Literal <c>FontSize="n"</c> (attribute or <c>Setter Property="FontSize" Value="n"</c>) per file,
-    /// for every XAML outside Styles/** and App.xaml (Views/, Controls/, MainWindow.xaml, any new folder).
-    /// Files not listed have a baseline of zero. Total today: 184.</summary>
+    /// for every XAML except App.xaml and Styles/Tokens/** (Views/, Controls/, MainWindow.xaml, legacy Styles/*.xaml,
+    /// any new folder). Files not listed have a baseline of zero. Total today: 191.</summary>
     private static readonly IReadOnlyDictionary<string, int> FontSizeLiteralBaseline = new Dictionary<string, int>(StringComparer.Ordinal)
     {
         ["Controls/DiscoveredServerCard.xaml"] = 5,
@@ -27,6 +28,7 @@ public sealed partial class UiDebtRatchetTests
         ["Controls/ServerFormControl.xaml"] = 50,
         ["Controls/ServerFullCard.xaml"] = 21,
         ["MainWindow.xaml"] = 7,
+        ["Styles/Controls.xaml"] = 7,
         ["Views/BackupCreateDialog.xaml"] = 3,
         ["Views/DashboardPage.xaml"] = 8,
         ["Views/HistoryPage.xaml"] = 7,
@@ -36,64 +38,90 @@ public sealed partial class UiDebtRatchetTests
         ["Views/WorkloadsPage.xaml"] = 38
     };
 
-    /// <summary>References to the brand accent (<c>BrandAccent*</c> key or the <c>#1846E1</c> literal) outside
-    /// Styles/**, per file. Counted in XAML attribute values and C# code (comments excluded). Files not listed
-    /// have a baseline of zero.</summary>
-    private static readonly IReadOnlyDictionary<string, int> BrandAccentBaseline = new Dictionary<string, int>(StringComparer.Ordinal)
+    /// <summary>Hex colour literals per file, outside Styles/Tokens/** (XAML values and C# string literals; comments
+    /// excluded). Files not listed have a baseline of zero.</summary>
+    private static readonly IReadOnlyDictionary<string, int> HexColourBaseline = new Dictionary<string, int>(StringComparer.Ordinal)
     {
+        ["Styles/DesignTokens.xaml"] = 165
+    };
+
+    /// <summary>Legacy blue (#1846E1-derived) dependencies per file, outside Styles/Tokens/** (UI.1 review G-1):
+    /// <c>BrandAccent*</c>, <c>AccentSoft*</c>, <c>AccentText*</c>, <c>AccentPill*</c> (incl. AccentPillButtonStyle),
+    /// <c>AccentFill*</c>, <c>SystemAccent*</c> and the <c>#1846E1</c> literal. Counted in XAML attribute values/text and
+    /// C# code (comments excluded). Files not listed have a baseline of zero.</summary>
+    private static readonly IReadOnlyDictionary<string, int> LegacyAccentBaseline = new Dictionary<string, int>(StringComparer.Ordinal)
+    {
+        ["Controls/EmptyStateControl.xaml"] = 3,
         ["Controls/ServerCompactCard.xaml"] = 3,
+        ["Controls/ServerFormControl.xaml"] = 1,
         ["Controls/ServerFullCard.xaml"] = 4,
-        ["Views/HistoryPage.xaml"] = 3
+        ["MainWindow.xaml"] = 4,
+        ["Styles/Controls.xaml"] = 4,
+        ["Styles/DesignTokens.xaml"] = 92,
+        ["Views/DashboardPage.xaml"] = 1,
+        ["Views/HistoryPage.xaml"] = 6
     };
 
     [Fact]
-    public void LiteralFontSizesOutsideStyles_DoNotGrow()
+    public void LiteralFontSizesOutsideTokens_DoNotGrow()
     {
         var counts = AppSourceTree.Files(".xaml")
-            .Where(file => file != "App.xaml" && !AppSourceTree.IsUnderStyles(file))
+            .Where(file => file != "App.xaml" && !IsUnderTokens(file))
             .ToDictionary(file => file, file => CountFontSizeLiterals(AppSourceTree.LoadXaml(file)), StringComparer.Ordinal);
 
         AssertNoGrowth(counts, FontSizeLiteralBaseline, "literal FontSize values (use a type-ramp style/token from Styles/**)");
     }
 
     [Fact]
-    public void HexColourLiteralsOutsideStyles_StayAtZero()
+    public void HexColourLiteralsOutsideTokens_DoNotGrow()
     {
-        var offenders = new List<string>();
-        foreach (var file in AppSourceTree.Files(".xaml").Where(file => !AppSourceTree.IsUnderStyles(file)))
+        var counts = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var file in AppSourceTree.Files(".xaml").Where(file => !IsUnderTokens(file)))
         {
-            offenders.AddRange(XamlValues(AppSourceTree.LoadXaml(file))
-                .SelectMany(value => HexColour().Matches(value))
-                .Select(match => $"{file}: {match.Value}"));
+            counts[file] = XamlValues(AppSourceTree.LoadXaml(file)).Sum(value => HexColour().Matches(value).Count);
         }
 
-        foreach (var file in AppSourceTree.Files(".cs").Where(file => !AppSourceTree.IsUnderStyles(file)))
+        foreach (var file in AppSourceTree.Files(".cs").Where(file => !IsUnderTokens(file)))
         {
-            offenders.AddRange(StringLiteral().Matches(AppSourceTree.CodeWithoutComments(file))
-                .SelectMany(literal => HexColour().Matches(literal.Value))
-                .Select(match => $"{file}: {match.Value}"));
+            counts[file] = StringLiteral().Matches(AppSourceTree.CodeWithoutComments(file))
+                .Sum(literal => HexColour().Matches(literal.Value).Count);
         }
 
-        Assert.True(offenders.Count == 0,
-            "Hex colour literals are only allowed in Styles/** (define a token and reference it):" +
-            Environment.NewLine + string.Join(Environment.NewLine, offenders));
+        AssertNoGrowth(counts, HexColourBaseline, "hex colour literals (define a Styles/Tokens/** token and reference it)");
     }
 
     [Fact]
-    public void BrandAccentReferencesOutsideStyles_DoNotGrow()
+    public void LegacyAccentDependenciesOutsideTokens_DoNotGrow()
     {
         var counts = new Dictionary<string, int>(StringComparer.Ordinal);
-        foreach (var file in AppSourceTree.Files(".xaml").Where(file => !AppSourceTree.IsUnderStyles(file)))
+        foreach (var file in AppSourceTree.Files(".xaml").Where(file => !IsUnderTokens(file)))
         {
-            counts[file] = XamlValues(AppSourceTree.LoadXaml(file)).Sum(value => BrandAccent().Matches(value).Count);
+            counts[file] = XamlValues(AppSourceTree.LoadXaml(file)).Sum(value => LegacyAccent().Matches(value).Count);
         }
 
-        foreach (var file in AppSourceTree.Files(".cs").Where(file => !AppSourceTree.IsUnderStyles(file)))
+        foreach (var file in AppSourceTree.Files(".cs").Where(file => !IsUnderTokens(file)))
         {
-            counts[file] = BrandAccent().Matches(AppSourceTree.CodeWithoutComments(file)).Count;
+            counts[file] = LegacyAccent().Matches(AppSourceTree.CodeWithoutComments(file)).Count;
         }
 
-        AssertNoGrowth(counts, BrandAccentBaseline, "BrandAccent*/#1846E1 references (the accent is reserved; see §0)");
+        AssertNoGrowth(counts, LegacyAccentBaseline,
+            "legacy accent dependencies (BrandAccent*/AccentSoft*/AccentText*/AccentPill*/AccentFill*/SystemAccent*/#1846E1; use Sa* tokens)");
+    }
+
+    /// <summary>The token layer is exempt from the ratchets above, so it must never carry the legacy accent.</summary>
+    [Fact]
+    public void TokenDictionariesNeverReferenceTheLegacyAccent()
+    {
+        var offenders = AppSourceTree.Files(".xaml")
+            .Where(IsUnderTokens)
+            .SelectMany(file => XamlValues(AppSourceTree.LoadXaml(file))
+                .SelectMany(value => ForbiddenInTokens().Matches(value))
+                .Select(match => $"{file}: {match.Value}"))
+            .ToList();
+
+        Assert.True(offenders.Count == 0,
+            "Styles/Tokens/** must not reference #1846E1, SystemAccent* or BrandAccent*:" +
+            Environment.NewLine + string.Join(Environment.NewLine, offenders));
     }
 
     /// <summary>
@@ -163,8 +191,14 @@ public sealed partial class UiDebtRatchetTests
     [GeneratedRegex(@"(?<![\w&])#(?:[0-9A-Fa-f]{8}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{3,4})\b")]
     private static partial Regex HexColour();
 
-    [GeneratedRegex(@"BrandAccent\w*|#1846E1\b", RegexOptions.IgnoreCase)]
-    private static partial Regex BrandAccent();
+    private static bool IsUnderTokens(string relative) =>
+        relative.StartsWith("Styles/Tokens/", StringComparison.OrdinalIgnoreCase);
+
+    [GeneratedRegex(@"BrandAccent\w*|AccentSoft\w*|AccentText\w*|AccentPill\w*|AccentFill\w*|SystemAccent\w*|#1846E1\b", RegexOptions.IgnoreCase)]
+    private static partial Regex LegacyAccent();
+
+    [GeneratedRegex(@"#1846E1\b|SystemAccent\w*|BrandAccent\w*", RegexOptions.IgnoreCase)]
+    private static partial Regex ForbiddenInTokens();
 
     [GeneratedRegex(@"^Sa[A-Z]\w*Brush$")]
     private static partial Regex SaBrushKey();

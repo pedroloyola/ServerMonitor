@@ -172,6 +172,11 @@ UI.2 não adota nenhum token `Sa*` em páginas antes de estes gates estarem verd
 3. **Motion a partir de C# (Cortex F-4):** o único consumidor (pulso em `ServerFullCard.xaml.cs`) é C#; `Resources["SaMotion*"]` devolve `string`. Ao migrar: acessor `MotionTokens` com parse invariante (`TimeSpan.Parse(..., CultureInfo.InvariantCulture)` e KeySpline), com teste unitário e falha explícita em formato inválido; a galeria inclui um storyboard XAML que consome cada `SaMotion*`; `AnimationsEnabled` continua respeitado.
 4. **Smoke HC (Prism F-07):** `SaOverlaySmokeBrush` em HC é `SystemColorWindowColor` opaco (igual ao legado `ModalSmokeBrush`, logo sem drift) e esconde o contexto por trás do modal; validar na galeria com HC ativo; alternativa `Transparent` em HC, deixando a borda `SystemColorWindowTextColor` do diálogo separar.
 
+**UI.2 follow-ups (revisão Cortex dos guards UI.1; registados, não implementados em UI.1):**
+- **G-3 — contrato XAML para nomes resolvidos em runtime:** alargar a deteção de consumidores do inventário a `Storyboard.TargetName`/`TargetName`, `Setter Target="X.Prop"` de VisualState e literais `FindName("X")`/`GetTemplateChild("X")` em qualquer `.cs`, antes de as primitivas UI.2 introduzirem VisualStates.
+- **G-4 — "só doubles QA" prova apenas o delta do harness:** renomear para `…HarnessDeltaRegistersOnlyQaDoubles` ou, quando existir um seam de flag, testar a composição completa via `App.ConfigureApplicationServices` e verificar que persistência/credenciais/SSH resolvidos são QA ou isolados.
+- **G-5 — determinismo de screenshots:** o ficheiro de placement isolado em `%TEMP%\ServerMonitor-QA\<harness>\` persiste entre execuções; apagá-lo no `Apply` (ou usar subpasta por processo) e, para `--qa-store-screenshot`, considerar placement fixo em memória como `QaCompactPlacementStore`.
+
 Plano por milestone (não é autorização para executar agora):
 - UI.2: primitivas/galeria adotam Sa*; validar HC/fallback, contraste e calibração; rever Default/converter; manter aliases com consumidores.
 - UI.3: History/Workloads migram status/texto/superfícies; remover aliases específicos apenas com zero referências e testes.

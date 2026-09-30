@@ -179,6 +179,50 @@ public sealed partial class XamlContractAndResourceGuardTests
             string.Join(Environment.NewLine, unresolved));
     }
 
+    /// <summary>
+    /// UI.1 review G-6: app-wide set membership cannot see a key defined for one theme only. In every
+    /// ThemeDictionaries block under Styles/Tokens/**, Dark, Light and HighContrast must all exist and define the
+    /// identical key set, so a token never silently falls back (or fails) in one theme. Static check only; the
+    /// runtime resolution proof stays a UI.2 gate (ui1-tokens.md §7.2 #1).
+    /// </summary>
+    [Fact]
+    public void TokenThemeDictionariesDefineTheSameKeysInDarkLightAndHighContrast()
+    {
+        string[] themes = ["Dark", "Light", "HighContrast"];
+        var failures = new List<string>();
+        var blocks = 0;
+        foreach (var file in AppSourceTree.Files(".xaml").Where(f => f.StartsWith("Styles/Tokens/", StringComparison.OrdinalIgnoreCase)))
+        {
+            foreach (var block in AppSourceTree.LoadXaml(file).Descendants().Where(e => e.Name.LocalName == "ResourceDictionary.ThemeDictionaries"))
+            {
+                blocks++;
+                var byTheme = block.Elements()
+                    .Where(e => e.Attribute(AppSourceTree.Xaml + "Key") is not null)
+                    .ToDictionary(
+                        e => e.Attribute(AppSourceTree.Xaml + "Key")!.Value,
+                        e => e.Elements().Select(c => c.Attribute(AppSourceTree.Xaml + "Key")?.Value).OfType<string>().ToHashSet(StringComparer.Ordinal),
+                        StringComparer.Ordinal);
+
+                var missingThemes = themes.Where(theme => !byTheme.ContainsKey(theme)).ToList();
+                if (missingThemes.Count > 0)
+                {
+                    failures.Add($"{file}: ThemeDictionaries lacks {string.Join(", ", missingThemes)}");
+                    continue;
+                }
+
+                var all = themes.SelectMany(theme => byTheme[theme]).ToHashSet(StringComparer.Ordinal);
+                foreach (var theme in themes)
+                {
+                    failures.AddRange(all.Except(byTheme[theme]).OrderBy(k => k, StringComparer.Ordinal)
+                        .Select(key => $"{file}: {key} is not defined for {theme}"));
+                }
+            }
+        }
+
+        Assert.True(blocks > 0, "No ThemeDictionaries found under Styles/Tokens/** - the parity guard would be vacuous.");
+        Assert.True(failures.Count == 0, string.Join(Environment.NewLine, failures));
+    }
+
     [Fact]
     public void PlatformAllowlistNeverShadowsAnAppDefinedKey()
     {
