@@ -69,12 +69,93 @@
             <StackPanel Spacing="20">
                 <!-- Empty State Card (no configured servers yet) -->
                 <controls:GlassCard
-                    Height="260"
+                    MinHeight="260"
                     VerticalAlignment="Top"
                     Visibility="{Binding HasVisibleServers, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Invert}">
-                    <controls:EmptyStateControl
-                        x:Uid="DashboardEmptyState"
-                        ActionCommand="{Binding AddServerCommand}" />
+                    <StackPanel VerticalAlignment="Center" Spacing="18">
+                        <controls:EmptyStateControl
+                            x:Uid="DashboardEmptyState"
+                            ActionCommand="{Binding AddServerCommand}"
+                            SecondaryActionCommand="{Binding ImportFromSshCommand}" />
+
+                        <!-- Local network discovery, only while it is really running and has found nothing. -->
+                        <StackPanel
+                            HorizontalAlignment="Center"
+                            Orientation="Horizontal"
+                            Spacing="8"
+                            Visibility="{Binding IsSearchingLocalNetwork, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <ProgressRing
+                                Width="14"
+                                Height="14"
+                                VerticalAlignment="Center"
+                                IsActive="{Binding IsSearchingLocalNetwork}" />
+                            <TextBlock
+                                x:Uid="DashboardEmptyDiscoverySearching"
+                                VerticalAlignment="Center"
+                                FontSize="12"
+                                Foreground="{ThemeResource TextSecondaryBrush}"
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+
+                        <!-- Found on the local network: listed right under the empty state, same add/ignore actions. -->
+                        <ItemsControl
+                            MaxWidth="520"
+                            AutomationProperties.LiveSetting="Polite"
+                            ItemsSource="{Binding DiscoveredServers}"
+                            Visibility="{Binding ShowEmptyStateDiscoveries, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border
+                                        Margin="0,0,0,8"
+                                        Padding="14,10"
+                                        AutomationProperties.Name="{Binding AutomationSummary}"
+                                        Background="{ThemeResource MutedSurfaceBrush}"
+                                        BorderBrush="{ThemeResource GlassBorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="{StaticResource RadiusMedium}">
+                                        <Grid ColumnSpacing="10">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel VerticalAlignment="Center" Spacing="2">
+                                                <TextBlock
+                                                    FontSize="13"
+                                                    FontWeight="SemiBold"
+                                                    Text="{Binding LocalNetworkHeadline}"
+                                                    TextTrimming="CharacterEllipsis" />
+                                                <TextBlock
+                                                    FontSize="12"
+                                                    Foreground="{ThemeResource TextSecondaryBrush}"
+                                                    Text="{Binding Endpoint}"
+                                                    TextTrimming="CharacterEllipsis" />
+                                            </StackPanel>
+                                            <StackPanel
+                                                Grid.Column="1"
+                                                VerticalAlignment="Center"
+                                                Orientation="Horizontal"
+                                                Spacing="8">
+                                                <Button
+                                                    x:Uid="DiscoveredServerAddButton"
+                                                    AutomationProperties.Name="{Binding AddAutomationName}"
+                                                    Command="{Binding AddCommand}"
+                                                    Style="{StaticResource QuietPillButtonStyle}" />
+                                                <Button
+                                                    Width="36"
+                                                    Height="36"
+                                                    AutomationProperties.Name="{Binding IgnoreAutomationName}"
+                                                    Command="{Binding IgnoreCommand}"
+                                                    Style="{StaticResource SubtleIconButtonStyle}"
+                                                    ToolTipService.ToolTip="{Binding IgnoreAutomationName}">
+                                                    <FontIcon FontSize="12" Glyph="&#xE711;" />
+                                                </Button>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
                 </controls:GlassCard>
 
                 <!-- Configured Servers -->
@@ -89,10 +170,11 @@
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
 
-                <!-- Encontrados na rede (passive discovery suggestions) -->
+                <!-- Encontrados na rede (passive discovery suggestions). With no server yet, the same
+                     suggestions are listed inside the empty state above instead (M14.5). -->
                 <StackPanel
                     Spacing="10"
-                    Visibility="{Binding HasDiscoveredServers, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    Visibility="{Binding ShowDiscoverySection, Converter={StaticResource BooleanToVisibilityConverter}}">
                     <StackPanel Spacing="2">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <TextBlock

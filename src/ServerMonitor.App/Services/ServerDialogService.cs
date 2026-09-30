@@ -17,7 +17,8 @@ public sealed class ServerDialogService(
     IServerConnectionStateStore connectionStateStore,
     IPrivateKeyFilePicker privateKeyFilePicker,
     ILocalizationService localizationService,
-    ISshConfigImportSource sshConfigImportSource) : IServerDialogService
+    ISshConfigImportSource sshConfigImportSource,
+    ILocalSshKeyDiscovery localSshKeyDiscovery) : IServerDialogService
 {
     public Task<ServerEditorResult?> ShowEditorAsync(Server? server) =>
         ShowEditorCoreAsync(server, prefill: null, isEdit: server is not null);
@@ -25,10 +26,14 @@ public sealed class ServerDialogService(
     public Task<ServerEditorResult?> ShowEditorForDiscoveryAsync(ServerDiscoveryPrefill prefill) =>
         ShowEditorCoreAsync(server: null, prefill: prefill, isEdit: false);
 
+    public Task<ServerEditorResult?> ShowEditorForSshImportAsync() =>
+        ShowEditorCoreAsync(server: null, prefill: null, isEdit: false, openSshConfigImport: true);
+
     private async Task<ServerEditorResult?> ShowEditorCoreAsync(
         Server? server,
         ServerDiscoveryPrefill? prefill,
-        bool isEdit)
+        bool isEdit,
+        bool openSshConfigImport = false)
     {
         var viewModel = new ServerEditorViewModel(
             validator,
@@ -40,10 +45,17 @@ public sealed class ServerDialogService(
             server,
             prefill,
             sshConfigImportSource,
-            routedHostKeyTrustStore);
+            routedHostKeyTrustStore,
+            localSshKeyDiscovery);
 
         try
         {
+            if (openSshConfigImport)
+            {
+                // Same read-only load as the form's import button; it reports its own failures in the panel.
+                _ = viewModel.LoadSshConfigHostsAsync();
+            }
+
             return await ServerEditorModal.ShowAsync(
                 windowContext,
                 viewModel,

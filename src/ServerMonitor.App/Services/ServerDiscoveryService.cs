@@ -22,7 +22,7 @@ namespace ServerMonitor.App.Services;
 /// cleanly (and never poisons a later start), stop is idempotent and drain-safe, and dispose
 /// fences any future start. The store mutations use a separate monitor lock.
 /// </remarks>
-public sealed class ServerDiscoveryService : IServerDiscoveryService, IHostedService, IAsyncDisposable
+public sealed class ServerDiscoveryService : IServerDiscoveryService, IServerDiscoveryActivity, IHostedService, IAsyncDisposable
 {
     private enum LifecycleState
     {
@@ -61,6 +61,7 @@ public sealed class ServerDiscoveryService : IServerDiscoveryService, IHostedSer
     private CancellationTokenSource? _notificationCts;
     private Task _notificationTask = Task.CompletedTask;
     private long _materialChangeVersion;
+    private volatile bool _isSearching;
 
     public ServerDiscoveryService(
         IMdnsServiceBrowser browser,
@@ -77,6 +78,12 @@ public sealed class ServerDiscoveryService : IServerDiscoveryService, IHostedSer
     }
 
     public event EventHandler? DiscoveredChanged;
+
+    /// <inheritdoc />
+    public bool IsSearching => _isSearching;
+
+    /// <inheritdoc />
+    public event EventHandler? IsSearchingChanged;
 
     Task IHostedService.StartAsync(CancellationToken cancellationToken) => StartAsync(cancellationToken);
 
@@ -119,6 +126,7 @@ public sealed class ServerDiscoveryService : IServerDiscoveryService, IHostedSer
                 _sweepLoop = Task.Run(() => SweepLoopAsync(generation, token), CancellationToken.None);
 
                 _state = LifecycleState.Started;
+                SetSearching(true);
                 _logger.LogDebug("Discovery service started.");
             }
             catch (Exception exception)
@@ -235,6 +243,7 @@ public sealed class ServerDiscoveryService : IServerDiscoveryService, IHostedSer
         }
 
         _state = LifecycleState.Stopped;
+        SetSearching(false);
         EventHandler<DiscoveryObservation>? foundHandler;
         EventHandler<DiscoveryObservation>? updatedHandler;
         EventHandler<DiscoveryObservation>? removedHandler;
@@ -359,6 +368,26 @@ public sealed class ServerDiscoveryService : IServerDiscoveryService, IHostedSer
         _sweepLoop = Task.CompletedTask;
 
         _state = LifecycleState.Stopped;
+        SetSearching(false);
+    }
+
+    // Called only while the lifecycle gate is held. A subscriber that throws must never break start/stop.
+    private void SetSearching(bool value)
+    {
+        if (_isSearching == value)
+        {
+            return;
+        }
+
+        _isSearching = value;
+        try
+        {
+            IsSearchingChanged?.Invoke(this, EventArgs.Empty);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogDebug("Discovery activity subscriber raised {Type}.", exception.GetType().Name);
+        }
     }
 
     private void OnFoundOrUpdated(long generation, DiscoveryObservation observation)

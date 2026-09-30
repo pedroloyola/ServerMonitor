@@ -64,6 +64,17 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
     private string _sshConfigFileWarningMessage = string.Empty;
     private IReadOnlyList<SshConfigHostOptionViewModel> _sshConfigHosts = [];
     private CancellationTokenSource? _sshConfigLoadCancellation;
+    private readonly ILocalSshKeyDiscovery? _localSshKeyDiscovery;
+    // Cancelled (never disposed) when the editor goes away, so a discovery still running just stops.
+    private readonly CancellationTokenSource _lifetimeCancellation = new();
+    // Where stage progress may touch bound properties: the thread/context the editor was created on.
+    private readonly int _ownerThreadId = Environment.CurrentManagedThreadId;
+    private readonly SynchronizationContext? _ownerContext = SynchronizationContext.Current;
+    private IReadOnlyList<LocalSshKey> _localKeys = [];
+    private IReadOnlyList<LocalKeyOptionViewModel> _localKeyOptions = [];
+    private bool _localKeyDiscoveryCompleted;
+    private bool _isPrivateKeyAutoSelected;
+    private StageProgressRelay? _activeStageProgress;
 
     public ServerEditorViewModel(
         IServerValidator validator,
@@ -75,7 +86,8 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
         Server? server,
         ServerDiscoveryPrefill? prefill = null,
         ISshConfigImportSource? sshConfigImportSource = null,
-        IRoutedHostKeyTrustStore? routedHostKeyTrustStore = null)
+        IRoutedHostKeyTrustStore? routedHostKeyTrustStore = null,
+        ILocalSshKeyDiscovery? localSshKeyDiscovery = null)
     {
         _validator = validator;
         _sshConnectionService = sshConnectionService;
@@ -110,6 +122,198 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
             _jumpUsername = jump.Username;
             _selectedJumpAuthenticationIndex = jump.AuthenticationMethod == AuthenticationMethod.Password ? 1 : 0;
             _jumpPrivateKeyPath = jump.PrivateKeyPath ?? string.Empty;
+        }
+
+        ConnectionChecklist = new ConnectionChecklistViewModel(localizationService);
+        _localSshKeyDiscovery = localSshKeyDiscovery;
+        // Starts as the editor opens; metadata-only, off the UI thread inside the service.
+        LocalKeyDiscovery = DiscoverLocalKeysAsync();
+    }
+
+    /// <summary>The four-step "Test connection" checklist (M14.5), shown while <see cref="HasConnectionStatus"/>.</summary>
+    public ConnectionChecklistViewModel ConnectionChecklist { get; }
+
+    /// <summary>Completes when the default-key discovery started by the constructor is over. Never faults.</summary>
+    public Task LocalKeyDiscovery { get; }
+
+    /// <summary>
+    /// Default keys found in <c>.ssh</c> followed by "browse for another file"; empty when none was found
+    /// (the editor then looks exactly as before). The target and the jump host share this list.
+    /// </summary>
+    public IReadOnlyList<LocalKeyOptionViewModel> LocalKeyOptions
+    {
+        get => _localKeyOptions;
+        private set
+        {
+            if (SetProperty(ref _localKeyOptions, value))
+            {
+                OnPropertyChanged(nameof(HasLocalKeyOptions));
+                OnPropertyChanged(nameof(SelectedLocalKeyOption));
+                OnPropertyChanged(nameof(SelectedJumpLocalKeyOption));
+            }
+        }
+    }
+
+    public bool HasLocalKeyOptions => LocalKeyOptions.Count > 0;
+
+    /// <summary>The found key the target's key path currently points at, or null (another file, or none).</summary>
+    public LocalKeyOptionViewModel? SelectedLocalKeyOption => FindLocalKeyOption(PrivateKeyPath);
+
+    public LocalKeyOptionViewModel? SelectedJumpLocalKeyOption => FindLocalKeyOption(JumpPrivateKeyPath);
+
+    /// <summary>True while the key path is the recommended key this editor pre-selected, not a user/import choice.</summary>
+    public bool IsPrivateKeyAutoSelected
+    {
+        get => _isPrivateKeyAutoSelected;
+        private set
+        {
+            if (SetProperty(ref _isPrivateKeyAutoSelected, value))
+            {
+                OnPropertyChanged(nameof(PrivateKeyHint));
+                OnPropertyChanged(nameof(HasPrivateKeyHint));
+            }
+        }
+    }
+
+    /// <summary>"Key found in .ssh" after a pre-selection; a pointer to the picker when discovery found nothing.</summary>
+    public string PrivateKeyHint
+    {
+        get
+        {
+            if (IsPrivateKeyAutoSelected)
+            {
+                return _localizationService.GetString("LocalKeyAutoSelectedHint");
+            }
+
+            return _localSshKeyDiscovery is not null
+                && _localKeyDiscoveryCompleted
+                && _localKeys.Count == 0
+                && string.IsNullOrWhiteSpace(PrivateKeyPath)
+                    ? _localizationService.GetString("LocalKeyNoneFoundHint")
+                    : string.Empty;
+        }
+    }
+
+    public bool HasPrivateKeyHint => PrivateKeyHint.Length > 0;
+
+    /// <summary>The user picked a found key for the target. The browse entry is handled by <see cref="SelectPrivateKeyAsync"/>.</summary>
+    public void SelectLocalKey(LocalKeyOptionViewModel option)
+    {
+        if (option.Key is { } key && !IsTestingConnection)
+        {
+            PrivateKeyPath = key.Path;
+        }
+    }
+
+    /// <summary>The user picked a found key for the jump host (never pre-selected).</summary>
+    public void SelectJumpLocalKey(LocalKeyOptionViewModel option)
+    {
+        if (option.Key is { } key && !IsTestingConnection)
+        {
+            JumpPrivateKeyPath = key.Path;
+        }
+    }
+
+    /// <summary>
+    /// The helper's commands for the server currently in the form. Form values are substituted only when they
+    /// pass <see cref="ServerPrepCommandBuilder"/>'s strict grammar; otherwise placeholders are shown.
+    /// </summary>
+    public ServerPrepCommands BuildServerPrepCommands() => ServerPrepCommandBuilder.Build(
+        Username.Trim(),
+        Host.Trim(),
+        Port.Trim(),
+        IsPrivateKeyAuthentication ? SelectedLocalKeyOption?.Key?.FileName : null,
+        _localizationService.GetString("ServerPrepUserPlaceholder"),
+        _localizationService.GetString("ServerPrepHostPlaceholder"),
+        UseJumpHost,
+        JumpUsername.Trim(),
+        JumpHost.Trim(),
+        JumpPort.Trim(),
+        _localizationService.GetString("ServerPrepJumpPlaceholder"));
+
+    /// <summary>What a copy button says once the clipboard has taken its command.</summary>
+    public string CopiedLabel => _localizationService.GetString("ServerPrepCopied");
+
+    private LocalKeyOptionViewModel? FindLocalKeyOption(string path) =>
+        string.IsNullOrWhiteSpace(path)
+            ? null
+            : LocalKeyOptions.FirstOrDefault(option =>
+                option.Key is { } key && string.Equals(key.Path, path, StringComparison.OrdinalIgnoreCase));
+
+    private async Task DiscoverLocalKeysAsync()
+    {
+        if (_localSshKeyDiscovery is null)
+        {
+            return;
+        }
+
+        IReadOnlyList<LocalSshKey> keys;
+        try
+        {
+            keys = await _localSshKeyDiscovery.DiscoverAsync(_lifetimeCancellation.Token);
+        }
+        catch
+        {
+            // Cancelled with the editor, or a discovery that broke its "never throws" contract: no keys.
+            keys = [];
+        }
+
+        if (_lifetimeCancellation.IsCancellationRequested)
+        {
+            return;
+        }
+
+        _localKeys = keys.Where(key => !string.IsNullOrWhiteSpace(key.Path)).ToList();
+        _localKeyDiscoveryCompleted = true;
+        LocalKeyOptions = _localKeys.Count == 0
+            ? []
+            : _localKeys
+                .Select(key => new LocalKeyOptionViewModel(
+                    key,
+                    key.IsRecommended ? Format("LocalKeyOptionRecommendedFormat", key.FileName) : key.FileName))
+                .Append(new LocalKeyOptionViewModel(null, _localizationService.GetString("LocalKeyOptionBrowse")))
+                .ToList();
+        TryAutoSelectRecommendedKey();
+        OnPropertyChanged(nameof(PrivateKeyHint));
+        OnPropertyChanged(nameof(HasPrivateKeyHint));
+    }
+
+    /// <summary>
+    /// Add mode only, and only into a key path that is still empty once discovery is over: an imported or
+    /// chosen path is never replaced, a saved server is never touched, and nothing changes under a test.
+    /// </summary>
+    private void TryAutoSelectRecommendedKey()
+    {
+        if (_existingServer is not null
+            || !IsPrivateKeyAuthentication
+            || !string.IsNullOrWhiteSpace(PrivateKeyPath)
+            || IsTestingConnection
+            || HasConnectionStatus)
+        {
+            return;
+        }
+
+        if (_localKeys.FirstOrDefault(key => key.IsRecommended) is { } recommended)
+        {
+            SetPrivateKeyPath(recommended.Path, autoSelected: true);
+        }
+    }
+
+    private void SetPrivateKeyPath(string value, bool autoSelected)
+    {
+        var changed = SetSecurityContextProperty(ref _privateKeyPath, value, nameof(PrivateKeyPath));
+        if (changed || !autoSelected)
+        {
+            // Any path set by the user, the picker or an import is theirs, even when it equals the pre-selection.
+            IsPrivateKeyAutoSelected = autoSelected;
+        }
+
+        if (changed)
+        {
+            OnPropertyChanged(nameof(HasSavedPassphrase));
+            OnPropertyChanged(nameof(SelectedLocalKeyOption));
+            OnPropertyChanged(nameof(PrivateKeyHint));
+            OnPropertyChanged(nameof(HasPrivateKeyHint));
         }
     }
 
@@ -166,6 +370,7 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
             if (SetJumpContextProperty(ref _jumpPrivateKeyPath, value))
             {
                 OnPropertyChanged(nameof(HasSavedJumpSecret));
+                OnPropertyChanged(nameof(SelectedJumpLocalKeyOption));
             }
         }
     }
@@ -207,6 +412,9 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
         {
             JumpPrivateKeyPath = selected;
         }
+
+        // A cancelled picker leaves the path alone: let the selector snap back from its browse entry.
+        OnPropertyChanged(nameof(SelectedJumpLocalKeyOption));
     }
 
     public string Name { get => _name; set => SetEditorProperty(ref _name, value); }
@@ -230,13 +438,7 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
     public string PrivateKeyPath
     {
         get => _privateKeyPath;
-        set
-        {
-            if (SetSecurityContextProperty(ref _privateKeyPath, value))
-            {
-                OnPropertyChanged(nameof(HasSavedPassphrase));
-            }
-        }
+        set => SetPrivateKeyPath(value, autoSelected: false);
     }
 
     public int SelectedOperatingSystemIndex
@@ -571,10 +773,11 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
             }
 
             // The add-mode default is key authentication with no key chosen, i.e. "auth not set
-            // yet". A form already on password auth, or with a key path, is left exactly as it is.
+            // yet". A form already on password auth, or with a key path, is left exactly as it is —
+            // except a path this editor pre-selected from .ssh (M14.5): the host's own IdentityFile wins.
             if (entry.IdentityFile is not null
                 && IsPrivateKeyAuthentication
-                && string.IsNullOrWhiteSpace(PrivateKeyPath))
+                && (string.IsNullOrWhiteSpace(PrivateKeyPath) || IsPrivateKeyAutoSelected))
             {
                 PrivateKeyPath = entry.IdentityFile;
             }
@@ -655,6 +858,9 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
         {
             PrivateKeyPath = selected;
         }
+
+        // A cancelled picker leaves the path alone: let the selector snap back from its browse entry.
+        OnPropertyChanged(nameof(SelectedLocalKeyOption));
     }
 
     public async Task TestConnectionAsync()
@@ -674,6 +880,12 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
             State = ServerConnectionState.Connecting,
             ErrorCode = SshConnectionErrorCode.None
         });
+        // A routed server's first step is the port as reached THROUGH the jump: name the jump on that row.
+        ConnectionChecklist.Begin(draft!.Route?.Jump is { } jump
+            ? $"{jump.Host}:{jump.Port.ToString(CultureInfo.InvariantCulture)}"
+            : null);
+        var progress = new StageProgressRelay(this);
+        _activeStageProgress = progress;
 
         try
         {
@@ -683,17 +895,20 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
                     Server = draft!,
                     CredentialOverride = _secret,
                     JumpCredentialOverride = draft!.Route is null ? null : _jumpSecret,
-                    Timeout = TimeSpan.FromSeconds(10)
+                    Timeout = TimeSpan.FromSeconds(10),
+                    StageProgress = progress
                 },
                 _testCancellation.Token);
             ApplyConnectionResult(result);
         }
         catch (OperationCanceledException)
         {
+            // No result to read a stage from: the steps reported before the cancellation are what was observed.
             ApplyConnectionResult(new SshConnectionResult
             {
                 State = ServerConnectionState.Cancelled,
-                ErrorCode = SshConnectionErrorCode.Cancelled
+                ErrorCode = SshConnectionErrorCode.Cancelled,
+                ReachedStage = ConnectionChecklist.ReportedStage
             });
         }
         catch
@@ -701,12 +916,47 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
             ApplyConnectionResult(new SshConnectionResult
             {
                 State = ServerConnectionState.Error,
-                ErrorCode = SshConnectionErrorCode.Unexpected
+                ErrorCode = SshConnectionErrorCode.Unexpected,
+                ReachedStage = ConnectionChecklist.ReportedStage
             });
         }
         finally
         {
+            if (ReferenceEquals(_activeStageProgress, progress))
+            {
+                _activeStageProgress = null;
+            }
+
             IsTestingConnection = false;
+        }
+    }
+
+    // Stage progress may be reported from the connection's worker thread. It is applied where the editor
+    // lives (inline when already there), and only while its own test is still the running one: a report
+    // that arrives after the result was applied can no longer change the checklist.
+    private void OnStageProgress(StageProgressRelay source, SshConnectionStage stage)
+    {
+        if (ReferenceEquals(_activeStageProgress, source))
+        {
+            ConnectionChecklist.Report(stage);
+        }
+    }
+
+    private sealed class StageProgressRelay(ServerEditorViewModel owner) : IProgress<SshConnectionStage>
+    {
+        public void Report(SshConnectionStage value)
+        {
+            var context = owner._ownerContext;
+            if (context is null
+                || Environment.CurrentManagedThreadId == owner._ownerThreadId
+                || ReferenceEquals(SynchronizationContext.Current, context))
+            {
+                owner.OnStageProgress(this, value);
+            }
+            else
+            {
+                context.Post(_ => owner.OnStageProgress(this, value), null);
+            }
         }
     }
 
@@ -772,6 +1022,8 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
                 {
                     State = ServerConnectionState.HostKeyMismatch,
                     ErrorCode = SshConnectionErrorCode.RoutedHostKeyMismatch,
+                    // The key was presented by the test that led here, so the port did answer.
+                    ReachedStage = SshConnectionStage.PortReachable,
                     PresentedHostKey = presentedHostKey,
                     HostKeyHop = SshHostKeyHop.Target,
                     HostKeyRoute = route,
@@ -783,6 +1035,10 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
                     ErrorCode = hop == SshHostKeyHop.Jump
                         ? SshConnectionErrorCode.JumpHostKeyMismatch
                         : SshConnectionErrorCode.HostKeyMismatch,
+                    // A jump-stage failure reaches no step of the target; a direct server's port did answer.
+                    ReachedStage = hop == SshHostKeyHop.Jump
+                        ? SshConnectionStage.None
+                        : SshConnectionStage.PortReachable,
                     PresentedHostKey = presentedHostKey,
                     HostKeyHop = hop,
                     HostKeyEndpoint = directEndpoint,
@@ -791,10 +1047,12 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
         }
         catch
         {
+            // The trust store could not be written: the steps the last test reached still stand.
             ApplyConnectionResult(new SshConnectionResult
             {
                 State = ServerConnectionState.Error,
-                ErrorCode = SshConnectionErrorCode.Unexpected
+                ErrorCode = SshConnectionErrorCode.Unexpected,
+                ReachedStage = ConnectionChecklist.ReportedStage
             });
         }
     }
@@ -882,6 +1140,7 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
 
     public void Dispose()
     {
+        _lifetimeCancellation.Cancel();
         _sshConfigLoadCancellation?.Cancel();
         _testCancellation?.Cancel();
         _testCancellation?.Dispose();
@@ -1195,6 +1454,7 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
         }
 
         SetConnectionState(result);
+        ConnectionChecklist.Complete(result);
     }
 
     private string DescribeHostKeySubject(SshConnectionResult result) => result.HostKeyHop switch
@@ -1238,6 +1498,7 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
         _lastConnectionResult = null;
         _pendingHostKey = null;
         HasConnectionStatus = false;
+        ConnectionChecklist.Reset();
         ResetHostKeyPanels();
     }
 

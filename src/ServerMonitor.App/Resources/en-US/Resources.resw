@@ -13,8 +13,8 @@
   <data name="DashboardAddButton.Content" xml:space="preserve"><value>Add server</value></data>
   <data name="DashboardSettingsButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Open settings</value></data>
   <data name="DashboardSettingsButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Settings</value></data>
-  <data name="DashboardEmptyState.Title" xml:space="preserve"><value>No servers yet</value></data>
-  <data name="DashboardEmptyState.Description" xml:space="preserve"><value>Add your first server to start organizing the dashboard.</value></data>
+  <data name="DashboardEmptyState.Title" xml:space="preserve"><value>Ready to connect your first server?</value></data>
+  <data name="DashboardEmptyState.Description" xml:space="preserve"><value>Add an SSH connection to follow the server's status, metrics and history.</value></data>
   <data name="DashboardEmptyState.ActionText" xml:space="preserve"><value>Add server</value></data>
   <data name="SettingsTitle.Text" xml:space="preserve"><value>Settings</value></data>
   <data name="SettingsBackButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Back to servers</value></data>
@@ -105,7 +105,6 @@
   <data name="ServerFormSavedPasswordHint.Text" xml:space="preserve"><value>A password is protected in Credential Manager. Enter one only to replace it.</value></data>
   <data name="ServerFormTestConnectionButton.Content" xml:space="preserve"><value>Test connection</value></data>
   <data name="ServerFormCancelTestButton.Content" xml:space="preserve"><value>Cancel test</value></data>
-  <data name="ServerFormConnectionStatus.Title" xml:space="preserve"><value>Connection test</value></data>
   <data name="HostKeyUnknownTitle.Text" xml:space="preserve"><value>Confirm server identity</value></data>
   <data name="HostKeyUnknownDescription.Text" xml:space="preserve"><value>This host key is not known yet. Compare the SHA-256 fingerprint through an independent channel before trusting it.</value></data>
   <data name="HostKeyServerLabel.Text" xml:space="preserve"><value>Server</value></data>
@@ -446,4 +445,76 @@
   <data name="HostKeySubjectJumpFormat" xml:space="preserve"><value>Jump host {0}</value></data>
   <data name="HostKeySubjectTargetFormat" xml:space="preserve"><value>Target {0} via {1}</value></data>
   <data name="HostKeyMismatchServerLabel.Text" xml:space="preserve"><value>Server</value></data>
+  <data name="DashboardEmptyState.SecondaryActionText" xml:space="preserve"><value>Import from SSH</value></data>
+  <data name="DashboardEmptyDiscoverySearching.Text" xml:space="preserve"><value>Looking for SSH servers on your local network…</value></data>
+  <data name="DashboardEmptyDiscoveryFoundFormat" xml:space="preserve"><value>Found on your local network: {0}</value></data>
+  <data name="ServerFormLocalKeySelector.Header" xml:space="preserve"><value>Keys found in .ssh</value></data>
+  <data name="ServerFormLocalKeySelector.PlaceholderText" xml:space="preserve"><value>Choose a key that was found…</value></data>
+  <data name="ServerFormJumpLocalKeySelector.Header" xml:space="preserve"><value>Keys found in .ssh (jump host)</value></data>
+  <data name="ServerFormJumpLocalKeySelector.PlaceholderText" xml:space="preserve"><value>Choose a key that was found…</value></data>
+  <data name="LocalKeyOptionRecommendedFormat" xml:space="preserve"><value>{0} · Recommended</value></data>
+  <data name="LocalKeyOptionBrowse" xml:space="preserve"><value>Browse for another file…</value></data>
+  <data name="LocalKeyAutoSelectedHint" xml:space="preserve"><value>Key found in .ssh</value></data>
+  <data name="LocalKeyNoneFoundHint" xml:space="preserve"><value>No key was found in .ssh. Select id_ed25519, id_rsa or another compatible key.</value></data>
+  <data name="ServerFormCredentialReassurance.Text" xml:space="preserve"><value>Your key stays on this device. Passwords and passphrases are protected by Windows Credential Manager.</value></data>
+  <data name="ServerFormPrepHelpLink.Content" xml:space="preserve"><value>How do I prepare my server?</value></data>
+  <data name="ServerPrepTitle.Text" xml:space="preserve"><value>Preparing your server</value></data>
+  <data name="ServerPrepIntro.Text" xml:space="preserve"><value>ServerAlyzer needs no root access and installs nothing on the server. A regular user is enough to read the metrics.</value></data>
+  <data name="ServerPrepKeygenStep.Text" xml:space="preserve"><value>No key yet? Create one in PowerShell on this computer:</value></data>
+  <data name="ServerPrepCopyKeyStep.Text" xml:space="preserve"><value>Copy the PUBLIC key to the server, also from PowerShell:</value></data>
+  <data name="ServerPrepPlaceholderNote.Text" xml:space="preserve"><value>Replace the fields between &lt; &gt; with your server's details before running it.</value></data>
+  <data name="ServerPrepServiceStep.Text" xml:space="preserve"><value>The SSH service must be running on the server. If it is not, ask whoever administers the server.</value></data>
+  <data name="ServerPrepCopyKeygenButton.Content" xml:space="preserve"><value>Copy</value></data>
+  <data name="ServerPrepCopyKeygenButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Copy the command that creates the key</value></data>
+  <data name="ServerPrepCopyKeyButton.Content" xml:space="preserve"><value>Copy</value></data>
+  <data name="ServerPrepCopyKeyButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Copy the command that sends the public key</value></data>
+  <data name="ServerPrepCopied" xml:space="preserve"><value>Copied</value></data>
+  <data name="ServerPrepUserPlaceholder" xml:space="preserve"><value>&lt;user&gt;</value></data>
+  <data name="ServerPrepHostPlaceholder" xml:space="preserve"><value>&lt;server&gt;</value></data>
+  <data name="ServerPrepJumpPlaceholder" xml:space="preserve"><value>&lt;jump-host&gt;</value></data>
+  <data name="ServerFormChecklistTitle.Text" xml:space="preserve"><value>Connection test</value></data>
+  <data name="ConnectionStepPortTitle" xml:space="preserve"><value>SSH port</value></data>
+  <data name="ConnectionStepPortViaJumpFormat" xml:space="preserve"><value>SSH port (via {0})</value></data>
+  <data name="ConnectionStepHostKeyTitle" xml:space="preserve"><value>Server identity (SHA-256)</value></data>
+  <data name="ConnectionStepAuthenticationTitle" xml:space="preserve"><value>Authentication</value></data>
+  <data name="ConnectionStepOperatingSystemTitle" xml:space="preserve"><value>Operating system</value></data>
+  <data name="ConnectionStepStatePending" xml:space="preserve"><value>Waiting</value></data>
+  <data name="ConnectionStepStateRunning" xml:space="preserve"><value>Checking…</value></data>
+  <data name="ConnectionStepStatePassed" xml:space="preserve"><value>Verified</value></data>
+  <data name="ConnectionStepStateFailed" xml:space="preserve"><value>Failed</value></data>
+  <data name="ConnectionStepStateNotReached" xml:space="preserve"><value>Not checked</value></data>
+  <data name="ConnectionStepStateActionRequired" xml:space="preserve"><value>Confirm identity</value></data>
+  <data name="ConnectionStepStateWarning" xml:space="preserve"><value>Attention</value></data>
+  <data name="ConnectionStepStateOperatingSystemUnknown" xml:space="preserve"><value>Not identified</value></data>
+  <data name="ConnectionStepOperatingSystemUnknownHint" xml:space="preserve"><value>The connection works, but the operating system could not be identified. You can choose it in the "Operating system" field.</value></data>
+  <data name="ConnectionStepAccessibleFormat" xml:space="preserve"><value>{0}: {1}</value></data>
+  <data name="ConnectionStepCopyCommandButton.Content" xml:space="preserve"><value>Copy</value></data>
+  <data name="ConnectionStepCopyCommandButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Copy the command</value></data>
+  <data name="ConnectionHintInvalidConfiguration" xml:space="preserve"><value>The connection details are incomplete or not valid. Review the address, the port and the user.</value></data>
+  <data name="ConnectionHintCredentialNotConfigured" xml:space="preserve"><value>This server has no credential yet. Enter the password, or choose a private key.</value></data>
+  <data name="ConnectionHintCredentialUnavailable" xml:space="preserve"><value>The saved credential could not be read from Windows Credential Manager. Enter it again and retest.</value></data>
+  <data name="ConnectionHintPrivateKeyUnavailable" xml:space="preserve"><value>The private key file does not exist or cannot be read. Choose another file, or create a new key.</value></data>
+  <data name="ConnectionHintPrivateKeyInvalid" xml:space="preserve"><value>This key could not be used. Make sure it is a PRIVATE key in OpenSSH format (not the .pub file) and that the passphrase is right, or choose another file.</value></data>
+  <data name="ConnectionHintAuthenticationFailed" xml:space="preserve"><value>The server answered but did not accept this sign-in. Check the user and the passphrase, and that the PUBLIC key is in ~/.ssh/authorized_keys of that same user. On the server, as that user:</value></data>
+  <data name="ConnectionHintHostKeyUnknown" xml:space="preserve"><value>This server has not been seen before. Compare the SHA-256 fingerprint below with the server's own before trusting it.</value></data>
+  <data name="ConnectionHintHostKeyMismatch" xml:space="preserve"><value>This server's identity differs from the one on record. The connection was blocked. Do not continue until whoever administers the server confirms the key really changed.</value></data>
+  <data name="ConnectionHintUnsupportedAlgorithm" xml:space="preserve"><value>The server only offers old SSH algorithms that ServerAlyzer does not accept. Ask whoever administers the server to update OpenSSH or enable current algorithms.</value></data>
+  <data name="ConnectionHintDnsResolutionFailed" xml:space="preserve"><value>The server name was not found. Check the spelling, or try the IP address instead.</value></data>
+  <data name="ConnectionHintConnectionRefused" xml:space="preserve"><value>The SSH port refused the connection. Is the SSH service running, and is this the right port? On the server:</value></data>
+  <data name="ConnectionHintHostUnreachable" xml:space="preserve"><value>There is no network route to this address. Check the address and that this computer is on the same network or VPN as the server.</value></data>
+  <data name="ConnectionHintNetworkUnavailable" xml:space="preserve"><value>This computer has no network right now. Check the Wi-Fi or cable connection and retest.</value></data>
+  <data name="ConnectionHintConnectionTimedOut" xml:space="preserve"><value>The server did not answer in time. Check the address and the port, and that a firewall (ufw, iptables or the router) lets the SSH port through.</value></data>
+  <data name="ConnectionHintRemoteDisconnected" xml:space="preserve"><value>The server closed the connection early. Retest; if it keeps happening, the server may be limiting connections (MaxStartups, fail2ban).</value></data>
+  <data name="ConnectionHintProtocolError" xml:space="preserve"><value>The port answered, but not like an SSH server. Make sure this is the SSH port and not another service's.</value></data>
+  <data name="ConnectionHintCancelled" xml:space="preserve"><value>You cancelled the test. You can retest whenever you like.</value></data>
+  <data name="ConnectionHintUnexpected" xml:space="preserve"><value>Something unexpected interrupted the test. Retest; if it keeps happening, restart the app.</value></data>
+  <data name="ConnectionHintJumpConnectionFailed" xml:space="preserve"><value>The problem is the jump host, not the server: it could not be reached. Check the jump host's address and port.</value></data>
+  <data name="ConnectionHintJumpAuthenticationFailed" xml:space="preserve"><value>The problem is the jump host, not the server: it did not accept the sign-in. Check the jump host's user and its key or password. On the jump host, as that user:</value></data>
+  <data name="ConnectionHintJumpHostKeyUnknown" xml:space="preserve"><value>The jump host's identity is not known yet. Compare the SHA-256 fingerprint with the jump host's own before trusting it.</value></data>
+  <data name="ConnectionHintJumpHostKeyMismatch" xml:space="preserve"><value>The jump host's identity differs from the one on record. The connection was blocked. Do not continue until whoever administers it confirms the key really changed.</value></data>
+  <data name="ConnectionHintJumpCredentialUnavailable" xml:space="preserve"><value>The jump host's saved credential could not be read. Enter it again in the jump host section and retest.</value></data>
+  <data name="ConnectionHintTargetUnreachableViaJump" xml:space="preserve"><value>The jump host worked, but it could not reach the server. Check the server's address and port as seen from the jump host.</value></data>
+  <data name="ConnectionHintRoutedHostKeyUnknown" xml:space="preserve"><value>This server has not been seen through the jump host before. Compare the SHA-256 fingerprint below with the server's own before trusting it.</value></data>
+  <data name="ConnectionHintRoutedHostKeyMismatch" xml:space="preserve"><value>The server's identity, as seen through the jump host, differs from the one on record. The connection was blocked. Do not continue until whoever administers the server confirms the key really changed.</value></data>
+  <data name="ConnectionHintLocalTunnelFailed" xml:space="preserve"><value>The local tunnel to the jump host could not be opened on this computer. It is not a server problem: retest.</value></data>
 </root>

@@ -26,7 +26,21 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
     // Captured on the UI thread so engine state changes (raised on background loops) can be
     // marshalled back before touching bound properties. Null in unit tests, where handlers run
     // inline on the calling thread.
-    private readonly DispatcherQueue? _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
+    private readonly DispatcherQueue? _dispatcherQueue = TryGetDispatcher();
+
+    // GetForCurrentThread() throws a WinRT COMException in a non-UI/unpackaged host (e.g. the test
+    // runner). Treat that as "no dispatcher" so the view model stays constructible there. [P-010, L-016]
+    private static DispatcherQueue? TryGetDispatcher()
+    {
+        try
+        {
+            return DispatcherQueue.GetForCurrentThread();
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
     // Normalized "host|port" of every configured server (visible and hidden), so a suggestion
     // already added is suppressed. This is a UX de-duplication only — never a trust decision.
     private HashSet<string> _configuredEndpoints = new(StringComparer.Ordinal);
@@ -34,6 +48,8 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
     private bool _hasDiscoveredServers;
     private int _discoveredCount;
     private bool _isOperationErrorOpen;
+    // Non-null only when the composed discovery service is the live one (M14.5 empty-state search indicator).
+    private readonly IServerDiscoveryActivity? _discoveryActivity;
 
     public DashboardViewModel(
         IServerService serverService,
@@ -63,7 +79,14 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         _connectionStateStore.StateChanged += OnConnectionStateChanged;
         _monitoringStateStore.StateChanged += OnMonitoringStateChanged;
         _discoveryService.DiscoveredChanged += OnDiscoveredChanged;
+        _discoveryActivity = discoveryService as IServerDiscoveryActivity;
+        if (_discoveryActivity is not null)
+        {
+            _discoveryActivity.IsSearchingChanged += OnDiscoverySearchingChanged;
+        }
+
         AddServerCommand = new AsyncRelayCommand(AddServerAsync);
+        ImportFromSshCommand = new AsyncRelayCommand(ImportFromSshAsync);
         OpenSettingsCommand = new RelayCommand(navigationService.GoToSettings);
     }
 
@@ -124,18 +147,53 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
 
     public ICommand AddServerCommand { get; }
 
+    /// <summary>Empty state "Import from SSH": the normal add editor with the ssh-config import panel open.</summary>
+    public ICommand ImportFromSshCommand { get; }
+
     public ICommand OpenSettingsCommand { get; }
 
     public bool HasVisibleServers
     {
         get => _hasVisibleServers;
-        private set => SetProperty(ref _hasVisibleServers, value);
+        private set
+        {
+            if (SetProperty(ref _hasVisibleServers, value))
+            {
+                OnEmptyStateDiscoveryChanged();
+            }
+        }
     }
 
     public bool HasDiscoveredServers
     {
         get => _hasDiscoveredServers;
-        private set => SetProperty(ref _hasDiscoveredServers, value);
+        private set
+        {
+            if (SetProperty(ref _hasDiscoveredServers, value))
+            {
+                OnEmptyStateDiscoveryChanged();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Empty dashboard only: discovery is really running and has found nothing yet. False whenever discovery
+    /// is disabled, unavailable or replaced by a stand-in — the UI never shows a search that is not happening.
+    /// </summary>
+    public bool IsSearchingLocalNetwork =>
+        !HasVisibleServers && !HasDiscoveredServers && _discoveryActivity?.IsSearching == true;
+
+    /// <summary>Empty dashboard with suggestions: they are listed inside the empty state.</summary>
+    public bool ShowEmptyStateDiscoveries => !HasVisibleServers && HasDiscoveredServers;
+
+    /// <summary>The separate "Encontrados na rede" section, exactly as before, once a server exists.</summary>
+    public bool ShowDiscoverySection => HasVisibleServers && HasDiscoveredServers;
+
+    private void OnEmptyStateDiscoveryChanged()
+    {
+        OnPropertyChanged(nameof(IsSearchingLocalNetwork));
+        OnPropertyChanged(nameof(ShowEmptyStateDiscoveries));
+        OnPropertyChanged(nameof(ShowDiscoverySection));
     }
 
     /// <summary>
@@ -189,6 +247,10 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         _connectionStateStore.StateChanged -= OnConnectionStateChanged;
         _monitoringStateStore.StateChanged -= OnMonitoringStateChanged;
         _discoveryService.DiscoveredChanged -= OnDiscoveredChanged;
+        if (_discoveryActivity is not null)
+        {
+            _discoveryActivity.IsSearchingChanged -= OnDiscoverySearchingChanged;
+        }
     }
 
     private async Task AddServerAsync()
@@ -201,6 +263,20 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         catch (Exception exception)
         {
             HandleError(exception, "add server");
+        }
+    }
+
+    private async Task ImportFromSshAsync()
+    {
+        try
+        {
+            // A normal add: cancel persists nothing, a save goes through the same profile path.
+            using var editorResult = await _dialogService.ShowEditorForSshImportAsync();
+            await PersistEditorResultAsync(editorResult);
+        }
+        catch (Exception exception)
+        {
+            HandleError(exception, "add server from ssh config");
         }
     }
 
@@ -390,6 +466,19 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         else
         {
             _dispatcherQueue.TryEnqueue(RebuildDiscovered);
+        }
+    }
+
+    // Raised on the discovery service's lifecycle thread; marshal to the UI thread first.
+    private void OnDiscoverySearchingChanged(object? sender, EventArgs args)
+    {
+        if (_dispatcherQueue is null || _dispatcherQueue.HasThreadAccess)
+        {
+            OnPropertyChanged(nameof(IsSearchingLocalNetwork));
+        }
+        else
+        {
+            _dispatcherQueue.TryEnqueue(() => OnPropertyChanged(nameof(IsSearchingLocalNetwork)));
         }
     }
 

@@ -215,6 +215,7 @@ public sealed class DashboardDiscoveryViewModelTests
             return Task.FromResult(DiscoveryResult);
         }
         public Task<ServerEditorResult?> ShowEditorAsync(Server? server) => Task.FromResult<ServerEditorResult?>(null);
+        public Task<ServerEditorResult?> ShowEditorForSshImportAsync() => Task.FromResult<ServerEditorResult?>(null);
         public Task<bool> ConfirmRemoveAsync(Server server) => Task.FromResult(false);
     }
 

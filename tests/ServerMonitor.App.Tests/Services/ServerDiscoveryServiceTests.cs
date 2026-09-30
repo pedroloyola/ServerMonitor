@@ -305,6 +305,91 @@ public sealed class ServerDiscoveryServiceTests
         await h.DisposeAsync();
     }
 
+    // M14.5: the dashboard's "looking on your local network" indicator reads this. It must be true only
+    // while the browser is really started — never before a start, after a stop, or when a start failed.
+    [Fact]
+    public async Task IsSearching_IsTrueOnlyBetweenASuccessfulStartAndStop()
+    {
+        var h = Harness.Create();
+        IServerDiscoveryActivity activity = h.Service;
+        var observed = new List<bool>();
+        activity.IsSearchingChanged += (_, _) => observed.Add(activity.IsSearching);
+
+        Assert.False(activity.IsSearching);
+
+        await h.Service.StartAsync();
+        Assert.True(activity.IsSearching);
+        await h.Service.StartAsync();
+
+        await h.Service.StopAsync();
+        Assert.False(activity.IsSearching);
+        await h.Service.StopAsync();
+
+        await h.Service.StartAsync();
+        Assert.True(activity.IsSearching);
+        await h.DisposeAsync();
+        Assert.False(activity.IsSearching);
+
+        // One notification per real change; idempotent starts/stops raise nothing.
+        Assert.Equal([true, false, true, false], observed);
+    }
+
+    [Fact]
+    public async Task IsSearching_StaysFalseWhenTheBrowserFailsToStart()
+    {
+        var h = Harness.Create();
+        IServerDiscoveryActivity activity = h.Service;
+        var notifications = 0;
+        activity.IsSearchingChanged += (_, _) => notifications++;
+        h.Browser.StartException = new InvalidOperationException("synthetic");
+
+        await h.Service.StartAsync();
+
+        Assert.False(activity.IsSearching);
+        Assert.Equal(0, notifications);
+
+        h.Browser.StartException = null;
+        await h.Service.StartAsync();
+        Assert.True(activity.IsSearching);
+        Assert.Equal(1, notifications);
+        await h.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task IsSearching_StaysFalseWhenTheStartIsCancelled()
+    {
+        var store = new FakeIgnoredDeviceStore { BlockLoad = true };
+        var h = Harness.Create(store);
+        IServerDiscoveryActivity activity = h.Service;
+        using var cancellation = new CancellationTokenSource();
+        var start = h.Service.StartAsync(cancellation.Token);
+        await store.LoadEntered.Task;
+
+        cancellation.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => start);
+
+        Assert.False(activity.IsSearching);
+        store.ReleaseLoad();
+        await h.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task ThrowingActivitySubscriber_DoesNotBreakStartOrStop()
+    {
+        var h = Harness.Create();
+        IServerDiscoveryActivity activity = h.Service;
+        activity.IsSearchingChanged += (_, _) => throw new InvalidOperationException("synthetic subscriber");
+
+        await h.Service.StartAsync();
+        Assert.True(activity.IsSearching);
+        Assert.Equal(1, h.Browser.FoundSubscriberCount);
+
+        await h.Service.StopAsync();
+        Assert.False(activity.IsSearching);
+        Assert.Equal(1, h.Browser.StopCount);
+        await h.DisposeAsync();
+    }
+
     [Fact]
     public async Task ConcurrentStartAndStop_AreSerializedWithoutOrphanSubscription()
     {

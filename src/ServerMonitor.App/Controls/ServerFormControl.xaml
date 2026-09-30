@@ -190,10 +190,122 @@
             <Border Height="1" Margin="0,4" Background="{ThemeResource GlassBorderBrush}" />
 
             <!-- Authentication Section -->
-            <TextBlock
-                x:Uid="ServerFormAuthenticationTitle"
-                AutomationProperties.HeadingLevel="Level2"
-                Style="{StaticResource SectionTitleTextStyle}" />
+            <Grid ColumnSpacing="8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock
+                    x:Uid="ServerFormAuthenticationTitle"
+                    VerticalAlignment="Center"
+                    AutomationProperties.HeadingLevel="Level2"
+                    Style="{StaticResource SectionTitleTextStyle}" />
+                <!-- "How do I prepare my server?" (M14.5): text and copyable commands only; runs nothing. -->
+                <HyperlinkButton
+                    x:Name="PrepHelpLink"
+                    x:Uid="ServerFormPrepHelpLink"
+                    Grid.Column="1"
+                    Padding="6,2"
+                    VerticalAlignment="Center"
+                    Click="OnPrepHelpClick"
+                    FontSize="12">
+                    <FlyoutBase.AttachedFlyout>
+                        <Flyout
+                            x:Name="PrepHelpFlyout"
+                            Opening="OnPrepHelpOpening"
+                            Placement="Bottom">
+                            <StackPanel
+                                x:Name="PrepHelpContent"
+                                Width="400"
+                                Spacing="10">
+                                <TextBlock
+                                    x:Uid="ServerPrepTitle"
+                                    AutomationProperties.HeadingLevel="Level2"
+                                    Style="{StaticResource SectionTitleTextStyle}"
+                                    TextWrapping="Wrap" />
+                                <TextBlock
+                                    x:Uid="ServerPrepIntro"
+                                    FontSize="12"
+                                    TextWrapping="Wrap" />
+                                <TextBlock
+                                    x:Uid="ServerPrepKeygenStep"
+                                    FontSize="12"
+                                    Foreground="{ThemeResource TextSecondaryBrush}"
+                                    TextWrapping="Wrap" />
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <Border
+                                        Padding="10,7"
+                                        Background="{ThemeResource MutedSurfaceBrush}"
+                                        BorderBrush="{ThemeResource GlassBorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="{StaticResource RadiusSmall}">
+                                        <TextBlock
+                                            x:Name="PrepKeygenText"
+                                            FontFamily="Cascadia Code, Cascadia Mono, Consolas"
+                                            FontSize="12"
+                                            IsTextSelectionEnabled="True"
+                                            TextWrapping="Wrap" />
+                                    </Border>
+                                    <Button
+                                        x:Name="PrepCopyKeygenButton"
+                                        x:Uid="ServerPrepCopyKeygenButton"
+                                        Grid.Column="1"
+                                        VerticalAlignment="Top"
+                                        Click="OnCopyPrepKeygenClick"
+                                        Style="{StaticResource QuietPillButtonStyle}" />
+                                </Grid>
+                                <TextBlock
+                                    x:Uid="ServerPrepCopyKeyStep"
+                                    FontSize="12"
+                                    Foreground="{ThemeResource TextSecondaryBrush}"
+                                    TextWrapping="Wrap" />
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <Border
+                                        Padding="10,7"
+                                        Background="{ThemeResource MutedSurfaceBrush}"
+                                        BorderBrush="{ThemeResource GlassBorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="{StaticResource RadiusSmall}">
+                                        <TextBlock
+                                            x:Name="PrepCopyKeyText"
+                                            FontFamily="Cascadia Code, Cascadia Mono, Consolas"
+                                            FontSize="12"
+                                            IsTextSelectionEnabled="True"
+                                            TextWrapping="Wrap" />
+                                    </Border>
+                                    <Button
+                                        x:Name="PrepCopyKeyButton"
+                                        x:Uid="ServerPrepCopyKeyButton"
+                                        Grid.Column="1"
+                                        VerticalAlignment="Top"
+                                        Click="OnCopyPrepKeyClick"
+                                        Style="{StaticResource QuietPillButtonStyle}" />
+                                </Grid>
+                                <TextBlock
+                                    x:Name="PrepPlaceholderNote"
+                                    x:Uid="ServerPrepPlaceholderNote"
+                                    FontSize="12"
+                                    Foreground="{ThemeResource TextSecondaryBrush}"
+                                    TextWrapping="Wrap"
+                                    Visibility="Collapsed" />
+                                <TextBlock
+                                    x:Uid="ServerPrepServiceStep"
+                                    FontSize="12"
+                                    Foreground="{ThemeResource TextSecondaryBrush}"
+                                    TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Flyout>
+                    </FlyoutBase.AttachedFlyout>
+                </HyperlinkButton>
+            </Grid>
             <ComboBox
                 x:Uid="ServerFormAuthenticationMethodField"
                 HorizontalAlignment="Stretch"
@@ -208,6 +320,17 @@
             <StackPanel
                 Spacing="8"
                 Visibility="{Binding IsPrivateKeyAuthentication, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <!-- Default keys found in .ssh (metadata only); the last entry opens the file picker below. -->
+                <ComboBox
+                    x:Name="LocalKeySelector"
+                    x:Uid="ServerFormLocalKeySelector"
+                    HorizontalAlignment="Stretch"
+                    CornerRadius="{StaticResource RadiusSmall}"
+                    DisplayMemberPath="Label"
+                    IsEnabled="{Binding IsNotTestingConnection}"
+                    ItemsSource="{Binding LocalKeyOptions}"
+                    SelectionChanged="OnLocalKeySelectionChanged"
+                    Visibility="{Binding HasLocalKeyOptions, Converter={StaticResource BooleanToVisibilityConverter}}" />
                 <Grid ColumnSpacing="8">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
@@ -227,6 +350,13 @@
                         IsEnabled="{Binding IsNotTestingConnection}"
                         Style="{StaticResource QuietPillButtonStyle}" />
                 </Grid>
+                <TextBlock
+                    AutomationProperties.LiveSetting="Polite"
+                    FontSize="12"
+                    Foreground="{ThemeResource TextSecondaryBrush}"
+                    Text="{Binding PrivateKeyHint}"
+                    TextWrapping="Wrap"
+                    Visibility="{Binding HasPrivateKeyHint, Converter={StaticResource BooleanToVisibilityConverter}}" />
                 <PasswordBox
                     x:Name="PassphraseField"
                     x:Uid="ServerFormPassphraseField"
@@ -262,6 +392,12 @@
                     TextWrapping="Wrap"
                     Visibility="{Binding HasSavedPassword, Converter={StaticResource BooleanToVisibilityConverter}}" />
             </StackPanel>
+
+            <TextBlock
+                x:Uid="ServerFormCredentialReassurance"
+                FontSize="12"
+                Foreground="{ThemeResource TextTertiaryBrush}"
+                TextWrapping="Wrap" />
 
             <Border Height="1" Margin="0,4" Background="{ThemeResource GlassBorderBrush}" />
 
@@ -318,6 +454,17 @@
                 <StackPanel
                     Spacing="8"
                     Visibility="{Binding IsJumpPrivateKeyAuthentication, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <!-- Same found keys as the target; the jump host's key is never pre-selected. -->
+                    <ComboBox
+                        x:Name="JumpLocalKeySelector"
+                        x:Uid="ServerFormJumpLocalKeySelector"
+                        HorizontalAlignment="Stretch"
+                        CornerRadius="{StaticResource RadiusSmall}"
+                        DisplayMemberPath="Label"
+                        IsEnabled="{Binding IsNotTestingConnection}"
+                        ItemsSource="{Binding LocalKeyOptions}"
+                        SelectionChanged="OnJumpLocalKeySelectionChanged"
+                        Visibility="{Binding HasLocalKeyOptions, Converter={StaticResource BooleanToVisibilityConverter}}" />
                     <Grid ColumnSpacing="8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
@@ -378,12 +525,152 @@
                     Visibility="{Binding IsTestingConnection, Converter={StaticResource BooleanToVisibilityConverter}}" />
             </StackPanel>
 
-            <InfoBar
-                x:Uid="ServerFormConnectionStatus"
-                AutomationProperties.LiveSetting="Polite"
-                IsClosable="False"
-                IsOpen="{Binding HasConnectionStatus}"
-                Message="{Binding ConnectionStatusMessage}" />
+            <!-- Connection checklist (M14.5): port → identity → authentication → operating system.
+                 State changes are announced from code-behind (one notification per change). -->
+            <Border
+                x:Name="ChecklistPanel"
+                Padding="14,12"
+                Background="{ThemeResource MutedSurfaceBrush}"
+                BorderBrush="{ThemeResource GlassBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="{StaticResource RadiusMedium}"
+                Visibility="{Binding HasConnectionStatus, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <StackPanel Spacing="8">
+                    <Grid ColumnSpacing="10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock
+                            x:Uid="ServerFormChecklistTitle"
+                            VerticalAlignment="Center"
+                            AutomationProperties.HeadingLevel="Level2"
+                            FontSize="13"
+                            FontWeight="SemiBold" />
+                        <TextBlock
+                            Grid.Column="1"
+                            VerticalAlignment="Center"
+                            FontSize="12"
+                            Foreground="{ThemeResource TextSecondaryBrush}"
+                            HorizontalTextAlignment="Right"
+                            Text="{Binding ConnectionStatusMessage}"
+                            TextWrapping="Wrap" />
+                    </Grid>
+                    <ItemsControl IsTabStop="False" ItemsSource="{Binding ConnectionChecklist.Steps}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Padding="0,4" Spacing="6">
+                                    <Grid ColumnSpacing="10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="18" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <!-- One state mark at a time; the state is also always written out as text. -->
+                                        <Grid
+                                            Width="18"
+                                            Height="18"
+                                            VerticalAlignment="Top"
+                                            AutomationProperties.AccessibilityView="Raw">
+                                            <FontIcon
+                                                FontSize="14"
+                                                Foreground="{ThemeResource TextTertiaryBrush}"
+                                                Glyph="&#xEA3A;"
+                                                Visibility="{Binding IsPending, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                            <ProgressRing
+                                                Width="14"
+                                                Height="14"
+                                                IsActive="{Binding IsRunning}"
+                                                Visibility="{Binding IsRunning, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                            <FontIcon
+                                                FontSize="14"
+                                                Foreground="{ThemeResource StatusHealthyBrush}"
+                                                Glyph="&#xE73E;"
+                                                Visibility="{Binding IsPassed, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                            <FontIcon
+                                                FontSize="14"
+                                                Foreground="{ThemeResource StatusCriticalBrush}"
+                                                Glyph="&#xEA39;"
+                                                Visibility="{Binding IsFailed, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                            <FontIcon
+                                                FontSize="14"
+                                                Foreground="{ThemeResource TextTertiaryBrush}"
+                                                Glyph="&#xE738;"
+                                                Visibility="{Binding IsNotReached, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                            <FontIcon
+                                                FontSize="14"
+                                                Foreground="{ThemeResource StatusWarningBrush}"
+                                                Glyph="&#xE72E;"
+                                                Visibility="{Binding IsActionRequired, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                            <FontIcon
+                                                FontSize="14"
+                                                Foreground="{ThemeResource StatusWarningBrush}"
+                                                Glyph="&#xE7BA;"
+                                                Visibility="{Binding IsWarning, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                        </Grid>
+                                        <TextBlock
+                                            Grid.Column="1"
+                                            AutomationProperties.Name="{Binding AccessibleName}"
+                                            FontSize="13"
+                                            Text="{Binding Title}"
+                                            TextWrapping="Wrap" />
+                                        <TextBlock
+                                            Grid.Column="2"
+                                            AutomationProperties.AccessibilityView="Raw"
+                                            FontSize="12"
+                                            Foreground="{ThemeResource TextSecondaryBrush}"
+                                            Text="{Binding StateText}" />
+                                    </Grid>
+                                    <StackPanel
+                                        Margin="28,0,0,0"
+                                        Spacing="6"
+                                        Visibility="{Binding HasDetail, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                        <TextBlock
+                                            FontSize="12"
+                                            Foreground="{ThemeResource TextSecondaryBrush}"
+                                            IsTextSelectionEnabled="True"
+                                            Text="{Binding Detail}"
+                                            TextWrapping="Wrap" />
+                                        <Grid
+                                            ColumnSpacing="8"
+                                            Visibility="{Binding HasCommand, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <Border
+                                                Padding="10,7"
+                                                Background="{ThemeResource MutedSurfaceBrush}"
+                                                BorderBrush="{ThemeResource GlassBorderBrush}"
+                                                BorderThickness="1"
+                                                CornerRadius="{StaticResource RadiusSmall}">
+                                                <TextBlock
+                                                    FontFamily="Cascadia Code, Cascadia Mono, Consolas"
+                                                    FontSize="12"
+                                                    IsTextSelectionEnabled="True"
+                                                    Text="{Binding Command}"
+                                                    TextWrapping="Wrap" />
+                                            </Border>
+                                            <Button
+                                                x:Uid="ConnectionStepCopyCommandButton"
+                                                Grid.Column="1"
+                                                VerticalAlignment="Top"
+                                                Click="OnCopyStepCommandClick"
+                                                Style="{StaticResource QuietPillButtonStyle}" />
+                                        </Grid>
+                                        <HyperlinkButton
+                                            x:Uid="ServerFormPrepHelpLink"
+                                            Padding="0"
+                                            Click="OnPrepHelpClick"
+                                            FontSize="12"
+                                            Visibility="{Binding OffersPrepHelp, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
 
             <!-- Unknown Host Key Confirmation -->
             <Border
