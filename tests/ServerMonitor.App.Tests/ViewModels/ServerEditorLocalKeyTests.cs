@@ -304,11 +304,18 @@ public sealed class ServerEditorLocalKeyTests
     [Fact]
     public async Task JumpHost_GetsTheSameListButIsNeverPreselected()
     {
-        using var editor = Editor(discovery: new FakeLocalSshKeyDiscovery(Ed25519(), Rsa()));
+        // The jump section must already be ON, with its key auth and an empty key path, at the moment the
+        // discovery completes — otherwise nothing here could tell a jump pre-selection from its absence.
+        var discovery = new FakeLocalSshKeyDiscovery(Ed25519(), Rsa()) { Blocked = true };
+        using var editor = Editor(discovery: discovery);
         editor.UseJumpHost = true;
+        Assert.True(editor.IsJumpPrivateKeyAuthentication);
+        Assert.False(editor.LocalKeyDiscovery.IsCompleted);
 
+        discovery.Release();
         await editor.LocalKeyDiscovery;
 
+        Assert.Equal(3, editor.LocalKeyOptions.Count);
         Assert.Equal(string.Empty, editor.JumpPrivateKeyPath);
         Assert.Null(editor.SelectedJumpLocalKeyOption);
 
@@ -333,6 +340,46 @@ public sealed class ServerEditorLocalKeyTests
         Assert.True(discovery.LastToken.IsCancellationRequested);
         Assert.Equal(string.Empty, editor.PrivateKeyPath);
         Assert.Empty(editor.LocalKeyOptions);
+    }
+
+    // Completion raced cancellation: the keys were already produced when the editor went away, so the call
+    // returns them instead of throwing. A disposed editor must drop them, not list or pre-select anything.
+    [Fact]
+    public async Task ResultDeliveredAfterDispose_IsDroppedAndChangesNothing()
+    {
+        var discovery = new LateLocalSshKeyDiscovery();
+        var editor = Editor(discovery: discovery);
+        var changes = new List<string?>();
+        editor.PropertyChanged += (_, args) => changes.Add(args.PropertyName);
+        Assert.False(editor.LocalKeyDiscovery.IsCompleted);
+
+        editor.Dispose();
+        Assert.True(discovery.Token.IsCancellationRequested);
+        discovery.Result.SetResult([Ed25519(), Rsa()]);
+        await editor.LocalKeyDiscovery;
+
+        Assert.True(editor.LocalKeyDiscovery.IsCompletedSuccessfully);
+        Assert.Empty(editor.LocalKeyOptions);
+        Assert.False(editor.HasLocalKeyOptions);
+        Assert.Equal(string.Empty, editor.PrivateKeyPath);
+        Assert.False(editor.IsPrivateKeyAutoSelected);
+        Assert.False(editor.HasPrivateKeyHint);
+        Assert.Empty(changes);
+    }
+
+    private sealed class LateLocalSshKeyDiscovery : ILocalSshKeyDiscovery
+    {
+        public TaskCompletionSource<IReadOnlyList<LocalSshKey>> Result { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public CancellationToken Token { get; private set; }
+
+        // Ignores the token on purpose: the already-produced result still arrives after the cancellation.
+        public Task<IReadOnlyList<LocalSshKey>> DiscoverAsync(CancellationToken cancellationToken = default)
+        {
+            Token = cancellationToken;
+            return Result.Task;
+        }
     }
 
     [Fact]
@@ -385,7 +432,7 @@ public sealed class ServerEditorLocalKeyTests
 
         Assert.Equal("ssh-keygen -t ed25519", commands.GenerateKey);
         Assert.StartsWith(
-            "type $env:USERPROFILE\\.ssh\\id_rsa.pub | ssh -p 2222 deploy@web-01.example.com \"umask 077;",
+            "type $env:USERPROFILE\\.ssh\\id_rsa.pub | ssh -p 2222 deploy@web-01.example.com 'umask 077;",
             commands.CopyPublicKey);
         Assert.False(commands.UsesPlaceholders);
     }
@@ -400,8 +447,10 @@ public sealed class ServerEditorLocalKeyTests
         var commands = editor.BuildServerPrepCommands();
 
         Assert.Equal(
-            "type $env:USERPROFILE\\.ssh\\id_ed25519.pub | ssh <user>@<server> \"umask 077; mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys\"",
+            "type $env:USERPROFILE\\.ssh\\id_ed25519.pub | ssh <user>@<server> " + ServerPrepCommandBuilder.RemoteScript,
             commands.CopyPublicKey);
+        Assert.DoesNotContain("Remove-Item", commands.CopyPublicKey);
+        Assert.DoesNotContain("whoami", commands.CopyPublicKey);
         Assert.True(commands.UsesPlaceholders);
     }
 

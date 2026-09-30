@@ -219,6 +219,18 @@ public sealed class OnboardingLocalizationTests
         }
     }
 
+    // The unit is "ssh" on Debian/Ubuntu and "sshd" on RHEL/Fedora: the refused-port hint names both.
+    [Fact]
+    public void ConnectionRefusedHint_NamesTheSshdUnitToo()
+    {
+        foreach (var culture in Cultures)
+        {
+            var hint = LoadResources(culture)[ConnectionDiagnosis.HintKey(SshConnectionErrorCode.ConnectionRefused)];
+            Assert.Contains("systemctl status sshd", hint);
+            Assert.DoesNotContain("sudo", hint, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
     [Fact]
     public void HostKeyMismatchHints_NeverSuggestAcceptingTheNewKey()
     {

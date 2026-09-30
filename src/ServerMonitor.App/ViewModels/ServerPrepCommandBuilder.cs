@@ -21,7 +21,14 @@ public static class ServerPrepCommandBuilder
     public const string GenerateKeyCommand = "ssh-keygen -t ed25519";
 
     private const string DefaultPublicKeyFile = "id_ed25519.pub";
-    private const string RemoteScript = "\"umask 077; mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys\"";
+    // One PowerShell SINGLE-quoted token with no ' or " inside: PowerShell expands nothing in it and 5.1 has no
+    // embedded quote to mangle. On the server it starts a new line first when authorized_keys does not end in
+    // one (appending blindly would glue the new key to the last key and break both), and strips the CR that a
+    // Windows pipe adds. The text carries two backslashes before r; the remote shell hands tr a single \r.
+    internal const string RemoteScript =
+        "'umask 077; mkdir -p ~/.ssh; touch ~/.ssh/authorized_keys; "
+        + "test ! -s ~/.ssh/authorized_keys || test $(tail -c1 ~/.ssh/authorized_keys | wc -l) -eq 1 "
+        + "|| echo >> ~/.ssh/authorized_keys; tr -d \\\\r >> ~/.ssh/authorized_keys'";
     private const int MaxUserLength = 64;
     private const int MaxHostLength = 253;
     private const int MaxZoneLength = 16;
