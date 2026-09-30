@@ -391,13 +391,135 @@ public sealed class SshConfigProxyJumpTests
             "Host target\n  ProxyJump bastion\nHost bastion\n  ProxyJump none\n  Include conf.d/*\n  HostName 203.0.113.7\n");
 
     [Fact]
-    public void UnverifiableIncludeAfterTheJumpsHostNameAndProxy_DoesNotBlock()
+    public void UnverifiableIncludeAfterTheJumpsAddressAndProxyAreDecided_DoesNotBlock()
     {
         var jump = Jump(
-            "Host target\n  ProxyJump bastion\nHost bastion\n  HostName 203.0.113.7\n  ProxyJump none\n  Include conf.d/*\n",
+            "Host target\n  ProxyJump bastion\nHost bastion\n  HostName 203.0.113.7\n  CanonicalizeHostname no\n  ProxyJump none\n  Include conf.d/*\n",
             "target");
 
         Assert.Equal("203.0.113.7", jump.HostName);
+    }
+
+    [Fact]
+    public void UnverifiableIncludeBeforeTheJumpsCanonicalizeHostnameIsDecided_Blocks() =>
+        AssertBlocked(
+            SshConfigHostBlocker.ProxyMaySetByInclude,
+            "Host target\n  ProxyJump bastion\nHost bastion\n  HostName 203.0.113.7\n  ProxyJump none\n  Include conf.d/*\n");
+
+    // ---- Vigil M14.4c M-3: CanonicalizeHostname makes ssh re-read the config for the jump.
+
+    [Theory]
+    [InlineData("CanonicalizeHostname yes")]
+    [InlineData("CanonicalizeHostname always")]
+    [InlineData("CanonicalizeHostname")]
+    [InlineData("CanonicalizeHostname \"yes")]
+    public void JumpThatCanonicalisesItsName_Blocks(string line) =>
+        AssertBlocked(
+            SshConfigHostBlocker.JumpHostNameUnresolved,
+            $"Host target\n  HostName 10.0.0.5\n  ProxyJump bastion\nHost bastion\n  HostName 203.0.113.7\n  {line}\n");
+
+    [Fact]
+    public void JumpInheritingCanonicalizeHostnameFromAWildcard_Blocks() =>
+        AssertBlocked(
+            SshConfigHostBlocker.JumpHostNameUnresolved,
+            "Host target\n  ProxyJump bastion\nHost *\n  CanonicalizeHostname yes\n");
+
+    [Theory]
+    [InlineData("CanonicalizeHostname no")]
+    [InlineData("CanonicalizeHostname NO")]
+    public void JumpWithCanonicalizeHostnameNo_IsImportable(string line)
+    {
+        var jump = Jump($"Host target\n  ProxyJump bastion\nHost bastion\n  {line}\nHost *\n  CanonicalizeHostname yes\n", "target");
+
+        Assert.Equal("bastion", jump.HostName);
+    }
+
+    [Fact]
+    public void MatchThatMayTurnOnTheJumpsCanonicalisation_Blocks() =>
+        AssertBlocked(
+            SshConfigHostBlocker.ProxyMaySetByMatch,
+            "Host target\n  HostName 10.0.0.5\n  ProxyJump bastion\nMatch host bastion\n  CanonicalizeHostname yes\n");
+
+    [Fact]
+    public void MatchWithCanonicalizeHostnameAfterTheJumpDecidedIt_DoesNotBlock()
+    {
+        var jump = Jump(
+            "Host target\n  ProxyJump bastion\nHost bastion\n  CanonicalizeHostname no\nMatch all\n  CanonicalizeHostname yes\n",
+            "target");
+
+        Assert.Equal("bastion", jump.HostName);
+    }
+
+    [Fact]
+    public void MatchWithCanonicalizeHostnameNo_DoesNotBlock()
+    {
+        var jump = Jump("Host target\n  ProxyJump bastion\nMatch all\n  CanonicalizeHostname no\n", "target");
+
+        Assert.Equal("bastion", jump.HostName);
+    }
+
+    [Fact]
+    public void TargetThatCanonicalises_KeepsItsM144aBehaviour_AndItsJumpIsStillImported()
+    {
+        var host = Host("Host target\n  CanonicalizeHostname yes\n  ProxyJump bastion\nHost bastion\n  CanonicalizeHostname no\n", "target");
+
+        Assert.True(host.IsImportable);
+        Assert.Contains(host.Findings, f => f.Keyword == "CanonicalizeHostname" && f.Kind == SshConfigFindingKind.Unsupported);
+        Assert.Equal("bastion", host.Jump?.HostName);
+    }
+
+    // ---- Vigil M14.4c M-2: only ' ' and '\t' separate words to OpenSSH.
+
+    [Theory]
+    [InlineData(" ")]
+    [InlineData("　")]
+    [InlineData("\v")]
+    public void ForeignWhitespaceInTheJumpValue_IsUnparsable(string ws)
+    {
+        AssertBlocked(SshConfigHostBlocker.JumpUnparsable, $"Host target\n  ProxyJump bastion{ws}\n");
+        AssertBlocked(SshConfigHostBlocker.JumpUnparsable, $"Host target\n  ProxyJump bas{ws}tion\n");
+        AssertBlocked(SshConfigHostBlocker.JumpUnparsable, $"Host target\n  ProxyJump{ws}bastion\n");
+    }
+
+    [Theory]
+    [InlineData(" ")]
+    [InlineData("　")]
+    [InlineData("\v")]
+    public void ForeignWhitespaceAfterNone_IsNeverDirect(string ws) =>
+        AssertBlocked(SshConfigHostBlocker.JumpUnparsable, $"Host target\n  ProxyJump none{ws}\nHost *\n  ProxyJump bastion\n");
+
+    [Theory]
+    [InlineData(" ")]
+    [InlineData("　")]
+    [InlineData("\v")]
+    public void ForeignWhitespaceInTheJumpsOwnHostName_Blocks(string ws) =>
+        AssertBlocked(
+            SshConfigHostBlocker.JumpHostNameUnresolved,
+            $"Host target\n  ProxyJump bastion\nHost bastion\n  HostName 203.0.113.7{ws}\n");
+
+    [Theory]
+    [InlineData(" ")]
+    [InlineData("　")]
+    [InlineData("\v")]
+    public void ForeignWhitespaceInAHostHeader_FailsTheWholeFile(string ws)
+    {
+        // Scenario A: to ssh "web<NBSP>lab" is ONE pattern, so web falls through to Host * and is routed.
+        var result = SshConfigResolver.Import($"Host web{ws}lab\n  ProxyJump none\nHost *\n  ProxyJump bastion\n", Profile);
+
+        Assert.Equal(SshConfigImportStatus.Error, result.Status);
+        Assert.Equal(SshConfigImportErrorCode.InvalidSyntax, result.ErrorCode);
+        Assert.Empty(result.Hosts);
+    }
+
+    [Theory]
+    [InlineData(" ")]
+    [InlineData("　")]
+    [InlineData("\v")]
+    public void ALineLedByForeignWhitespace_IsNotAComment(string ws)
+    {
+        var host = Host($"Host target\n{ws}# ProxyJump none\n  HostName 10.0.0.5\n", "target");
+
+        Assert.Contains(host.Findings, f => f.Kind == SshConfigFindingKind.Invalid);
     }
 
     [Fact]

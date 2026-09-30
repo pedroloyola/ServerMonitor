@@ -453,12 +453,41 @@ public sealed class SshConfigResolverTests
     }
 
     [Fact]
-    public void QuotedArguments_AreStillAccepted()
+    public void QuotedArguments_AreStillAccepted_ButAQuotedProxyJumpNoneIsNotNone()
     {
+        // Vigil M14.4c M-1: OpenSSH reads ProxyJump raw, so "none" in quotes is a jump host named "none"
+        // (ssh tries to jump and fails): never a direct import.
         var host = Host("Host a\n  User \"u\"\n  ProxyJump \"none\"\nHost *\n  ProxyJump bastion\n", "a");
 
         Assert.Equal("u", host.User);
-        Assert.True(host.IsImportable);
+        Assert.False(host.IsImportable);
+        Assert.Equal(SshConfigHostBlocker.JumpUnparsable, host.Blocker);
+        Assert.Null(host.Jump);
+    }
+
+    [Theory]
+    [InlineData("ProxyJump 'none'")]
+    [InlineData("ProxyJump none # direct")]
+    [InlineData("ProxyJump \"none\"")]
+    [InlineData("ProxyJump none\\ ")]
+    public void Resolve_ProxyJumpNoneThatIsNotRawNone_IsNeverDirect(string line)
+    {
+        var host = Host($"Host a\n  HostName a.lan\n  {line}\nHost *\n  ProxyJump bastion\n", "a");
+
+        Assert.False(host.IsImportable);
+        Assert.Equal(SshConfigHostBlocker.JumpUnparsable, host.Blocker);
+        Assert.Null(host.Jump);
+    }
+
+    [Theory]
+    [InlineData("Match all\n  ProxyJump \"none\"\nHost a\n")]
+    [InlineData("Match all\n  ProxyJump none # c\nHost a\n")]
+    [InlineData("Match all\n  ProxyCommand \"none\"\nHost a\n")]
+    public void Resolve_MatchWithANonRawNone_MaySetAProxy(string text)
+    {
+        var host = Host(text, "a");
+
+        Assert.Equal(SshConfigHostBlocker.ProxyMaySetByMatch, host.Blocker);
     }
 
     [Fact]

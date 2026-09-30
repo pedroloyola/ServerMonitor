@@ -297,10 +297,10 @@ public static class SshConfigResolver
             if (applicability == Applicability.Unknown)
             {
                 // Under an unevaluated Match: nothing here is applied. If it could set a proxy
-                // before the proxy is decided (or a jump's HostName before it is obtained), the
-                // host cannot be verified.
+                // before the proxy is decided (or change a jump's HostName before that is decided),
+                // the host cannot be verified.
                 if ((!proxyDecided && MayConfigureProxy(segment))
-                    || (isJump && !obtained.Contains("HostName") && MaySetHostName(segment)))
+                    || (isJump && MayChangeJumpHostName(segment, obtained)))
                 {
                     Block(SshConfigHostBlocker.ProxyMaySetByMatch);
                 }
@@ -314,7 +314,7 @@ public static class SshConfigResolver
                 {
                     // An Include that could not be verified may hide anything, including a proxy.
                     Add("Include", SshConfigFindingKind.Unsupported, IncludeReason(spliced.IncludeIssue));
-                    if (!proxyDecided || (isJump && !obtained.Contains("HostName")))
+                    if (!proxyDecided || (isJump && !IsJumpHostNameDecided(obtained)))
                     {
                         Block(SshConfigHostBlocker.ProxyMaySetByInclude);
                     }
@@ -336,7 +336,7 @@ public static class SshConfigResolver
                         }
 
                         proxyDecided = true;
-                        if (IsProxyNone(directive, keyword))
+                        if (IsProxyNone(directive))
                         {
                             break;
                         }
@@ -411,10 +411,17 @@ public static class SshConfigResolver
 
                         break;
                     case "CanonicalizeHostname":
-                        if (obtained.Add(keyword)
-                            && !(directive.IsValid && string.Equals(directive.Arguments[0], "no", StringComparison.OrdinalIgnoreCase)))
+                        if (obtained.Add(keyword) && !IsCanonicalizeNo(directive))
                         {
                             Add(keyword, SshConfigFindingKind.Unsupported, SshConfigFindingReason.UnsupportedKeyword);
+
+                            // Vigil M14.4c M-3: ssh canonicalises the jump's name and then re-reads the
+                            // config, where it may gain another HostName or a proxy. The jump is only
+                            // imported when that cannot happen. (The target keeps its M14.4a behaviour.)
+                            if (isJump)
+                            {
+                                Block(SshConfigHostBlocker.JumpHostNameUnresolved);
+                            }
                         }
 
                         break;
@@ -459,25 +466,42 @@ public static class SshConfigResolver
 
     private const int DefaultPort = 22;
 
-    // "none" only when it is the whole argument: ProxyJump has exactly one token "none"; OpenSSH
-    // reads ProxyCommand raw (no tokenizing), so its entire raw text must be "none".
-    private static bool IsProxyNone(SshConfigDirective directive, string keyword) => keyword == "ProxyCommand"
-        ? string.Equals(directive.RawArguments, "none", StringComparison.Ordinal)
-        : directive.IsValid
-            && directive.Arguments.Count == 1
-            && string.Equals(directive.Arguments[0], "none", StringComparison.Ordinal);
+    // "none" only when it is the whole raw argument. OpenSSH reads both ProxyCommand and ProxyJump raw
+    // (readconf.c parse_jump(str + len): no quote handling), so a quoted "none", 'none' or "none # c" is
+    // not "no proxy" to ssh (it tries to jump and fails) and must never be imported as direct.
+    private static bool IsProxyNone(SshConfigDirective directive) =>
+        string.Equals(directive.RawArguments, "none", StringComparison.Ordinal);
 
-    // Any HostName line, valid or not, or an unverifiable Include: it could decide where a jump host is.
+    // Any HostName or CanonicalizeHostname line, valid or not, or an unverifiable Include: it could
+    // decide where a jump host is.
     private static bool MaySetHostName(SshConfigSegment segment) =>
         segment.Directives.Any(spliced => spliced.IncludeIssue != SshConfigIncludeIssue.None
-            || CanonicalKeyword(spliced.Directive.Keyword) == "HostName");
+            || CanonicalKeyword(spliced.Directive.Keyword) is "HostName" or "CanonicalizeHostname");
+
+    // A jump's address is decided once both its HostName and its CanonicalizeHostname are obtained.
+    private static bool IsJumpHostNameDecided(HashSet<string> obtained) =>
+        obtained.Contains("HostName") && obtained.Contains("CanonicalizeHostname");
+
+    // Whether an unevaluated segment could still change a jump's address: a HostName or a
+    // CanonicalizeHostname other than "no" not yet obtained, or an unverifiable Include while undecided.
+    private static bool MayChangeJumpHostName(SshConfigSegment segment, HashSet<string> obtained) =>
+        segment.Directives.Any(spliced => spliced.IncludeIssue != SshConfigIncludeIssue.None
+            ? !IsJumpHostNameDecided(obtained)
+            : CanonicalKeyword(spliced.Directive.Keyword) switch
+            {
+                "HostName" => !obtained.Contains("HostName"),
+                "CanonicalizeHostname" => !obtained.Contains("CanonicalizeHostname") && !IsCanonicalizeNo(spliced.Directive),
+                _ => false
+            });
+
+    private static bool IsCanonicalizeNo(SshConfigDirective directive) =>
+        directive.IsValid && string.Equals(directive.Arguments[0], "no", StringComparison.OrdinalIgnoreCase);
 
     private static bool MayConfigureProxy(SshConfigSegment segment) =>
         segment.Directives.Any(spliced => spliced.IncludeIssue != SshConfigIncludeIssue.None
             || CanonicalKeyword(spliced.Directive.Keyword) switch
             {
-                "ProxyJump" => !IsProxyNone(spliced.Directive, "ProxyJump"),
-                "ProxyCommand" => !IsProxyNone(spliced.Directive, "ProxyCommand"),
+                "ProxyJump" or "ProxyCommand" => !IsProxyNone(spliced.Directive),
                 _ => false
             });
 

@@ -95,7 +95,14 @@ public static class SshConfigParser
         }
 
         var keyword = line[keywordStart..index];
-        var rawArguments = line[index..].TrimStart(' ', '\t', '=').TrimEnd();
+        var rawArguments = line[index..].TrimStart(' ', '\t', '=').TrimEnd(' ', '\t');
+
+        // OpenSSH splits only on ' ' and '\t' (argv_split); any other whitespace (NBSP, U+3000, \v, a
+        // stray \r...) is part of a word to ssh but would be a separator to .NET. Rather than emulate
+        // that, such a line is never trusted: an invalid Host/Match header fails the file, an invalid
+        // proxy line blocks, anything else is reported invalid.
+        var hasForeignWhitespace = line.Any(c => char.IsWhiteSpace(c) && c is not (' ' or '\t'));
+
         SkipWhitespace(line, ref index);
         if (index < line.Length && line[index] == '=')
         {
@@ -109,7 +116,12 @@ public static class SshConfigParser
         }
 
         var arguments = SplitArguments(line, index, out var isValid);
-        return new SshConfigDirective(lineNumber, keyword, arguments, isValid && arguments.Count > 0, rawArguments);
+        return new SshConfigDirective(
+            lineNumber,
+            keyword,
+            arguments,
+            isValid && arguments.Count > 0 && !hasForeignWhitespace,
+            rawArguments);
     }
 
     // Mirrors OpenSSH argv_split: whitespace-separated words, single or double quotes group a
@@ -140,7 +152,7 @@ public static class SshConfigParser
                     continue;
                 }
 
-                if (quote is null && char.IsWhiteSpace(c))
+                if (quote is null && c is ' ' or '\t')
                 {
                     break;
                 }
@@ -171,9 +183,10 @@ public static class SshConfigParser
         }
     }
 
+    // Only ' ' and '\t' separate (OpenSSH argv_split): a line led by NBSP is a (invalid) keyword, never a comment.
     private static void SkipWhitespace(string line, ref int index)
     {
-        while (index < line.Length && char.IsWhiteSpace(line[index]))
+        while (index < line.Length && line[index] is ' ' or '\t')
         {
             index++;
         }
