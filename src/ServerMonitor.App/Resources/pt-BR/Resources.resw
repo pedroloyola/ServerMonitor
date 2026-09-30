@@ -462,8 +462,8 @@
   <data name="LocalKeyAutoSelectedHint" xml:space="preserve"><value>Chave encontrada em .ssh</value></data>
   <data name="LocalKeyNoneFoundHint" xml:space="preserve"><value>Nenhuma chave foi encontrada em .ssh. Selecione id_ed25519, id_rsa ou outra chave compatível.</value></data>
   <data name="ServerFormCredentialReassurance.Text" xml:space="preserve"><value>Sua chave permanece neste dispositivo. Senhas e passphrases ficam protegidas pelo Gerenciador de Credenciais do Windows.</value></data>
-  <data name="ServerFormPrepHelpLink.Content" xml:space="preserve"><value>Como preparar o meu servidor?</value></data>
-  <data name="ServerPrepTitle.Text" xml:space="preserve"><value>Como preparar o meu servidor</value></data>
+  <data name="ServerFormPrepHelpLink.Content" xml:space="preserve"><value>Como preparar meu servidor?</value></data>
+  <data name="ServerPrepTitle.Text" xml:space="preserve"><value>Como preparar meu servidor</value></data>
   <data name="ServerPrepIntro.Text" xml:space="preserve"><value>O ServerAlyzer não requer root nem instala nada no servidor. Um usuário comum é suficiente para ler as métricas.</value></data>
   <data name="ServerPrepKeygenStep.Text" xml:space="preserve"><value>Ainda não tem uma chave? Crie uma no PowerShell deste computador:</value></data>
   <data name="ServerPrepCopyKeyStep.Text" xml:space="preserve"><value>Copie a chave PÚBLICA para o servidor, também a partir do PowerShell:</value></data>
