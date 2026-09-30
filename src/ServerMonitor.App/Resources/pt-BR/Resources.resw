@@ -544,8 +544,8 @@
   <data name="BackupCreatedTitle" xml:space="preserve"><value>Backup criado</value></data>
   <data name="BackupCreatedMessage" xml:space="preserve"><value>{0} servidores, {1} chaves de host confiáveis e {2} senhas salvas em {3}.</value></data>
   <data name="BackupMissingCredentialsWarning" xml:space="preserve"><value>Nenhuma senha salva foi encontrada para: {0}. Depois de restaurar, ela será solicitada.</value></data>
-  <data name="BackupExcludedEntriesWarning" xml:space="preserve"><value>{0} entradas de servidor ilegíveis não foram incluídas.</value></data>
-  <data name="BackupExcludedTrustNote" xml:space="preserve"><value>{0} chaves de host confiáveis que nenhum servidor usa não foram incluídas.</value></data>
+  <data name="BackupExcludedEntriesWarning" xml:space="preserve"><value>Entradas de servidor ilegíveis, não incluídas: {0}</value></data>
+  <data name="BackupExcludedTrustNote" xml:space="preserve"><value>Chaves de host confiáveis não usadas por nenhum servidor, não incluídas: {0}</value></data>
   <data name="BackupFailedTitle" xml:space="preserve"><value>Backup não criado</value></data>
   <data name="BackupFailedWrite" xml:space="preserve"><value>Não foi possível gravar o arquivo nesse local. Escolha outra pasta e tente novamente.</value></data>
   <data name="BackupFailedCredentialStore" xml:space="preserve"><value>Não foi possível ler as senhas salvas no Gerenciador de Credenciais do Windows. Nada foi salvo.</value></data>
@@ -568,7 +568,7 @@
   <data name="RestoreConfirmIntro" xml:space="preserve"><value>Backup de {0}. Restaurar substitui, não mescla:</value></data>
   <data name="RestoreSummaryServers" xml:space="preserve"><value>Servidores: {0} atuais → {1} do backup ({2} por jump host)</value></data>
   <data name="RestoreSummaryTrust" xml:space="preserve"><value>Chaves de host confiáveis: {0} atuais → {1} do backup</value></data>
-  <data name="RestoreSummaryTrustRemoved" xml:space="preserve"><value>{0} chaves de host confiáveis atualmente neste computador não estão no backup e serão removidas.</value></data>
+  <data name="RestoreSummaryTrustRemoved" xml:space="preserve"><value>Chaves de host confiáveis neste computador que não estão no backup e serão removidas: {0}</value></data>
   <data name="RestoreSummaryTrustDelegated" xml:space="preserve"><value>As chaves de host confiáveis do backup passarão a ser confiáveis sem nova confirmação. Restaure apenas backups criados por você.</value></data>
   <data name="RestoreSummaryPasswords" xml:space="preserve"><value>Senhas salvas: {0} (todas as senhas salvas atuais são substituídas)</value></data>
   <data name="RestoreSummaryMissingPasswords" xml:space="preserve"><value>Não estão no backup, serão solicitadas novamente: {0}</value></data>
@@ -578,7 +578,7 @@
   <data name="RestoreSummarySettings" xml:space="preserve"><value>As configurações de notificações e de monitoramento em segundo plano também são restauradas. O histórico é mantido.</value></data>
   <data name="RestoreSummaryHistoryKept" xml:space="preserve"><value>O histórico é mantido.</value></data>
   <data name="RestoreSummaryUnknown" xml:space="preserve"><value>desconhecido</value></data>
-  <data name="RestoreSummarySome" xml:space="preserve"><value>Algumas</value></data>
+  <data name="RestoreSummarySome" xml:space="preserve"><value>algumas</value></data>
   <data name="RestoreConfirmNote" xml:space="preserve"><value>O ServerAlyzer será fechado quando a restauração terminar. Esta ação não pode ser desfeita.</value></data>
   <data name="RestoreConfirmPrimary" xml:space="preserve"><value>Substituir configuração</value></data>
   <data name="RestoreApplying" xml:space="preserve"><value>Restaurando… Não feche o ServerAlyzer.</value></data>

@@ -539,8 +539,8 @@
   <data name="BackupCreatedTitle" xml:space="preserve"><value>Cópia de segurança criada</value></data>
   <data name="BackupCreatedMessage" xml:space="preserve"><value>{0} servidores, {1} chaves de anfitrião confiáveis e {2} palavras-passe guardadas em {3}.</value></data>
   <data name="BackupMissingCredentialsWarning" xml:space="preserve"><value>Não foi encontrada nenhuma palavra-passe guardada para: {0}. Depois de restaurar, ser-lhe-á pedida.</value></data>
-  <data name="BackupExcludedEntriesWarning" xml:space="preserve"><value>{0} entradas de servidor ilegíveis não foram incluídas.</value></data>
-  <data name="BackupExcludedTrustNote" xml:space="preserve"><value>{0} chaves de anfitrião confiáveis que nenhum servidor usa não foram incluídas.</value></data>
+  <data name="BackupExcludedEntriesWarning" xml:space="preserve"><value>Entradas de servidor ilegíveis, não incluídas: {0}</value></data>
+  <data name="BackupExcludedTrustNote" xml:space="preserve"><value>Chaves de anfitrião confiáveis não usadas por nenhum servidor, não incluídas: {0}</value></data>
   <data name="BackupFailedTitle" xml:space="preserve"><value>Cópia de segurança não criada</value></data>
   <data name="BackupFailedWrite" xml:space="preserve"><value>Não foi possível gravar o ficheiro nesse local. Escolha outra pasta e tente novamente.</value></data>
   <data name="BackupFailedCredentialStore" xml:space="preserve"><value>Não foi possível ler as palavras-passe guardadas no Gestor de Credenciais do Windows. Nada foi guardado.</value></data>
@@ -563,7 +563,7 @@
   <data name="RestoreConfirmIntro" xml:space="preserve"><value>Cópia de segurança de {0}. O restauro substitui, não junta:</value></data>
   <data name="RestoreSummaryServers" xml:space="preserve"><value>Servidores: {0} atuais → {1} da cópia ({2} através de jump host)</value></data>
   <data name="RestoreSummaryTrust" xml:space="preserve"><value>Chaves de anfitrião confiáveis: {0} atuais → {1} da cópia</value></data>
-  <data name="RestoreSummaryTrustRemoved" xml:space="preserve"><value>{0} chaves de anfitrião confiáveis atualmente neste computador não estão na cópia e serão removidas.</value></data>
+  <data name="RestoreSummaryTrustRemoved" xml:space="preserve"><value>Chaves de anfitrião confiáveis neste computador que não estão na cópia e serão removidas: {0}</value></data>
   <data name="RestoreSummaryTrustDelegated" xml:space="preserve"><value>As chaves de anfitrião confiáveis da cópia passarão a ser confiáveis sem nova confirmação. Restaure apenas cópias criadas por si.</value></data>
   <data name="RestoreSummaryPasswords" xml:space="preserve"><value>Palavras-passe guardadas: {0} (todas as palavras-passe guardadas atuais são substituídas)</value></data>
   <data name="RestoreSummaryMissingPasswords" xml:space="preserve"><value>Não estão na cópia, ser-lhe-ão pedidas novamente: {0}</value></data>
@@ -573,7 +573,7 @@
   <data name="RestoreSummarySettings" xml:space="preserve"><value>As definições de notificações e de monitorização em segundo plano também são restauradas. O histórico é mantido.</value></data>
   <data name="RestoreSummaryHistoryKept" xml:space="preserve"><value>O histórico é mantido.</value></data>
   <data name="RestoreSummaryUnknown" xml:space="preserve"><value>desconhecido</value></data>
-  <data name="RestoreSummarySome" xml:space="preserve"><value>Algumas</value></data>
+  <data name="RestoreSummarySome" xml:space="preserve"><value>algumas</value></data>
   <data name="RestoreConfirmNote" xml:space="preserve"><value>O ServerAlyzer será fechado quando o restauro terminar. Esta ação não pode ser anulada.</value></data>
   <data name="RestoreConfirmPrimary" xml:space="preserve"><value>Substituir configuração</value></data>
   <data name="RestoreApplying" xml:space="preserve"><value>A restaurar… Não feche o ServerAlyzer.</value></data>

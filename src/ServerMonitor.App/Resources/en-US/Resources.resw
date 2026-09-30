@@ -539,8 +539,8 @@
   <data name="BackupCreatedTitle" xml:space="preserve"><value>Backup created</value></data>
   <data name="BackupCreatedMessage" xml:space="preserve"><value>{0} servers, {1} trusted host keys and {2} passwords saved to {3}.</value></data>
   <data name="BackupMissingCredentialsWarning" xml:space="preserve"><value>No saved password was found for: {0}. After restoring, you'll be asked for it.</value></data>
-  <data name="BackupExcludedEntriesWarning" xml:space="preserve"><value>{0} unreadable server entries were not included.</value></data>
-  <data name="BackupExcludedTrustNote" xml:space="preserve"><value>{0} trusted host keys not used by any server were not included.</value></data>
+  <data name="BackupExcludedEntriesWarning" xml:space="preserve"><value>Unreadable server entries, not included: {0}</value></data>
+  <data name="BackupExcludedTrustNote" xml:space="preserve"><value>Trusted host keys not used by any server, not included: {0}</value></data>
   <data name="BackupFailedTitle" xml:space="preserve"><value>Backup not created</value></data>
   <data name="BackupFailedWrite" xml:space="preserve"><value>The file couldn't be written to that location. Choose another folder and try again.</value></data>
   <data name="BackupFailedCredentialStore" xml:space="preserve"><value>Saved passwords couldn't be read from Windows Credential Manager. Nothing was saved.</value></data>
@@ -563,7 +563,7 @@
   <data name="RestoreConfirmIntro" xml:space="preserve"><value>Backup from {0}. Restoring replaces, it doesn't merge:</value></data>
   <data name="RestoreSummaryServers" xml:space="preserve"><value>Servers: {0} now → {1} from the backup ({2} through a jump host)</value></data>
   <data name="RestoreSummaryTrust" xml:space="preserve"><value>Trusted host keys: {0} now → {1} from the backup</value></data>
-  <data name="RestoreSummaryTrustRemoved" xml:space="preserve"><value>{0} trusted host keys currently on this computer are not in the backup and will be removed.</value></data>
+  <data name="RestoreSummaryTrustRemoved" xml:space="preserve"><value>Trusted host keys on this computer that are not in the backup and will be removed: {0}</value></data>
   <data name="RestoreSummaryTrustDelegated" xml:space="preserve"><value>The trusted host keys in the backup will be trusted without asking again. Only restore backups you created.</value></data>
   <data name="RestoreSummaryPasswords" xml:space="preserve"><value>Saved passwords: {0} (all current saved passwords are replaced)</value></data>
   <data name="RestoreSummaryMissingPasswords" xml:space="preserve"><value>Not in the backup, you'll be asked again: {0}</value></data>
@@ -573,7 +573,7 @@
   <data name="RestoreSummarySettings" xml:space="preserve"><value>Notification and background monitoring settings are also restored. History is kept.</value></data>
   <data name="RestoreSummaryHistoryKept" xml:space="preserve"><value>History is kept.</value></data>
   <data name="RestoreSummaryUnknown" xml:space="preserve"><value>unknown</value></data>
-  <data name="RestoreSummarySome" xml:space="preserve"><value>Some</value></data>
+  <data name="RestoreSummarySome" xml:space="preserve"><value>some</value></data>
   <data name="RestoreConfirmNote" xml:space="preserve"><value>ServerAlyzer will close when the restore finishes. This can't be undone.</value></data>
   <data name="RestoreConfirmPrimary" xml:space="preserve"><value>Replace configuration</value></data>
   <data name="RestoreApplying" xml:space="preserve"><value>Restoring… Don't close ServerAlyzer.</value></data>
