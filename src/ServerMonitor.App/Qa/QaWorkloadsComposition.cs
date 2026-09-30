@@ -28,6 +28,7 @@ internal static class QaWorkloadsComposition
 
     public static void Apply(IServiceCollection services)
     {
+        QaWindowPlacementIsolation.Apply(services, "workloads");
         // Registered last so they win over the real registrations for every resolve.
         services.AddSingleton<IServerService, QaWorkloadsServerService>();
         services.AddSingleton<IServerMetricsStore, QaWorkloadsMetricsStore>();

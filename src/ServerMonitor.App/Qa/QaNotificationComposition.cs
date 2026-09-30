@@ -21,6 +21,7 @@ internal static class QaNotificationComposition
 
     public static void Apply(IServiceCollection services)
     {
+        QaWindowPlacementIsolation.Apply(services, "notifications");
         services.AddSingleton<IServerService, QaNotificationServerService>();
         services.AddSingleton<IServerMetricsStore, QaMetricsStore>();
         services.AddSingleton<IMonitoringEngine, QaMonitoringEngine>();
