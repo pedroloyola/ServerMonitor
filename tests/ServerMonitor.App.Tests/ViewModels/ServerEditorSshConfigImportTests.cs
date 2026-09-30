@@ -261,9 +261,11 @@ public sealed class ServerEditorSshConfigImportTests
     }
 
     [Theory]
-    [InlineData("ProxyJump bastion")]
+    [InlineData("ProxyJump bastion,outer")]
+    [InlineData("ProxyJump ssh://bastion")]
+    [InlineData("ProxyJump inner")]
     [InlineData("ProxyCommand nc bastion 22")]
-    public void Apply_RefusesProxyJumpHost(string proxyLine)
+    public void Apply_RefusesBlockedProxyHost(string proxyLine)
     {
         var vm = Editor();
 
@@ -273,13 +275,15 @@ public sealed class ServerEditorSshConfigImportTests
         Assert.Equal(string.Empty, vm.Host);
         Assert.Equal(string.Empty, vm.Username);
         Assert.Equal("22", vm.Port);
+        Assert.False(vm.UseJumpHost);
+        Assert.Equal(string.Empty, vm.JumpHost);
     }
 
     [Fact]
     public async Task Load_ListsHostsWithPreviewAndClassification_AndChangesNothing()
     {
         var result = SshConfigResolver.Import(
-            FullConfig + "\nHost inner\n  ProxyJump web\n  ServerAliveInterval 5\nInclude extra\n",
+            FullConfig + "\nHost inner\n  ProxyJump web,other\n  ServerAliveInterval 5\nInclude extra\n",
             Profile);
         var vm = Editor(result: result);
 
@@ -432,6 +436,189 @@ public sealed class ServerEditorSshConfigImportTests
         Assert.False(vm.HasSshConfigStatus);
     }
 
+    // ---- M14.4c: single-hop ProxyJump import
+
+    private const string JumpConfig =
+        """
+        Host inner
+            HostName 10.1.0.9
+            User app
+            Port 2201
+            IdentityFile ~/.ssh/inner_key
+            ProxyJump bastion
+        Host bastion
+            HostName 203.0.113.7
+            User jumper
+            Port 2222
+            IdentityFile ~/.ssh/jump_key
+        """;
+
+    [Fact]
+    public void Apply_JumpHost_FillsTheRouteAndEveryEmptyJumpField()
+    {
+        var vm = Editor();
+
+        Assert.True(vm.ApplySshConfigHost(Entry(JumpConfig, "inner")));
+
+        Assert.Equal("inner", vm.Name);
+        Assert.Equal("10.1.0.9", vm.Host);
+        Assert.Equal("2201", vm.Port);
+        Assert.Equal("app", vm.Username);
+        Assert.True(vm.UseJumpHost);
+        Assert.Equal("203.0.113.7", vm.JumpHost);
+        Assert.Equal("2222", vm.JumpPort);
+        Assert.Equal("jumper", vm.JumpUsername);
+        Assert.Equal(@"C:\Users\tester\.ssh\jump_key", vm.JumpPrivateKeyPath);
+        Assert.True(vm.IsJumpPrivateKeyAuthentication);
+        Assert.False(vm.HasSavedJumpSecret);
+    }
+
+    [Fact]
+    public void Apply_JumpHost_SavesAsARoutedServer_NeverDirect_AndSetsNoSecret()
+    {
+        var vm = Editor();
+        Assert.True(vm.ApplySshConfigHost(Entry(JumpConfig, "inner")));
+
+        Assert.True(vm.TryCreateResult(out var result));
+
+        var configuration = result!.Profile.Configuration;
+        Assert.Equal("10.1.0.9", configuration.Host);
+        var jump = Assert.IsType<JumpHop>(configuration.Route?.Jump);
+        Assert.Equal("203.0.113.7", jump.Host);
+        Assert.Equal(2222, jump.Port);
+        Assert.Equal("jumper", jump.Username);
+        Assert.Equal(AuthenticationMethod.SshKey, jump.AuthenticationMethod);
+        Assert.Equal(@"C:\Users\tester\.ssh\jump_key", jump.PrivateKeyPath);
+        Assert.Null(jump.CredentialReferenceId);
+        Assert.Null(result.Profile.JumpCredentialChange);
+        Assert.Null(result.Profile.CredentialChange.Secret);
+    }
+
+    [Fact]
+    public void Apply_JumpWithoutUserOrPort_LeavesTheUserEmptyAndTheDefaultPort()
+    {
+        var vm = Editor();
+
+        Assert.True(vm.ApplySshConfigHost(Entry("Host inner\n  HostName 10.1.0.9\n  ProxyJump bastion\n", "inner")));
+
+        Assert.True(vm.UseJumpHost);
+        Assert.Equal("bastion", vm.JumpHost);
+        Assert.Equal("22", vm.JumpPort);
+        Assert.Equal(string.Empty, vm.JumpUsername);
+        Assert.Equal(string.Empty, vm.JumpPrivateKeyPath);
+    }
+
+    [Fact]
+    public void Apply_ExplicitJumpUserAndPort_AreWhatTheFormGets()
+    {
+        var vm = Editor();
+
+        Assert.True(vm.ApplySshConfigHost(Entry(JumpConfig.Replace("ProxyJump bastion", "ProxyJump ops@bastion:2200"), "inner")));
+
+        Assert.Equal("ops", vm.JumpUsername);
+        Assert.Equal("2200", vm.JumpPort);
+    }
+
+    [Fact]
+    public void Apply_NeverOverwritesTypedJumpFields()
+    {
+        var vm = Editor();
+        vm.JumpHost = "203.0.113.7";
+        vm.JumpPort = "2";
+        vm.JumpPort = "22";
+        vm.JumpUsername = "mine";
+        vm.JumpPrivateKeyPath = @"C:\keys\mine";
+
+        Assert.True(vm.ApplySshConfigHost(Entry(JumpConfig, "inner")));
+
+        Assert.True(vm.UseJumpHost);
+        Assert.Equal("203.0.113.7", vm.JumpHost);
+        Assert.Equal("22", vm.JumpPort);
+        Assert.Equal("mine", vm.JumpUsername);
+        Assert.Equal(@"C:\keys\mine", vm.JumpPrivateKeyPath);
+    }
+
+    [Fact]
+    public void Apply_TypedDifferentJumpHost_IsKept_AndNeverGetsTheImportedJumpsUserPortOrKey()
+    {
+        var vm = Editor();
+        vm.UseJumpHost = true;
+        vm.JumpHost = "other-bastion";
+
+        Assert.True(vm.ApplySshConfigHost(Entry(JumpConfig, "inner")));
+
+        Assert.True(vm.UseJumpHost);
+        Assert.Equal("other-bastion", vm.JumpHost);
+        Assert.Equal("22", vm.JumpPort);
+        Assert.Equal(string.Empty, vm.JumpUsername);
+        Assert.Equal(string.Empty, vm.JumpPrivateKeyPath);
+    }
+
+    [Fact]
+    public void Apply_JumpPasswordAuthentication_IsNeverChangedOrGivenAKey()
+    {
+        var vm = Editor();
+        vm.SelectedJumpAuthenticationIndex = 1;
+
+        Assert.True(vm.ApplySshConfigHost(Entry(JumpConfig, "inner")));
+
+        Assert.Equal(1, vm.SelectedJumpAuthenticationIndex);
+        Assert.Equal(string.Empty, vm.JumpPrivateKeyPath);
+    }
+
+    [Fact]
+    public void Apply_JumpHostWithUnresolvedTargetHostName_StillRoutesThroughTheJump()
+    {
+        var vm = Editor();
+
+        Assert.True(vm.ApplySshConfigHost(Entry("Host inner\n  HostName %h.corp\n  ProxyJump bastion\n", "inner")));
+
+        Assert.Equal(string.Empty, vm.Host);
+        Assert.True(vm.UseJumpHost);
+        Assert.Equal("bastion", vm.JumpHost);
+    }
+
+    [Fact]
+    public void Apply_JumpHostIntoADifferentTypedHost_FillsOnlyTheName_AndLeavesTheRouteAlone()
+    {
+        var vm = Editor();
+        vm.Host = "192.0.2.50";
+
+        Assert.True(vm.ApplySshConfigHost(Entry(JumpConfig, "inner")));
+
+        Assert.Equal("inner", vm.Name);
+        Assert.Equal("192.0.2.50", vm.Host);
+        Assert.False(vm.UseJumpHost);
+        Assert.Equal(string.Empty, vm.JumpHost);
+    }
+
+    [Fact]
+    public void Apply_DirectHost_NeverTouchesTheRoute()
+    {
+        var vm = Editor();
+
+        Assert.True(vm.ApplySshConfigHost(Entry(FullConfig, "web")));
+
+        Assert.False(vm.UseJumpHost);
+        Assert.Equal(string.Empty, vm.JumpHost);
+        Assert.Equal("22", vm.JumpPort);
+    }
+
+    [Fact]
+    public async Task Load_JumpHostIsImportable_AndItsRouteIsPreviewed()
+    {
+        var vm = Editor(result: SshConfigResolver.Import(JumpConfig, Profile));
+
+        await vm.LoadSshConfigHostsAsync();
+
+        var inner = Assert.Single(vm.SshConfigHosts, h => h.Alias == "inner");
+        Assert.True(inner.IsImportable);
+        Assert.False(inner.HasRequirement);
+        Assert.Contains("Via: bastion", inner.Preview);
+        Assert.False(vm.UseJumpHost);
+        Assert.Equal(string.Empty, vm.JumpHost);
+    }
+
     [Fact]
     public void NoImportSource_ImportIsUnavailable()
     {
@@ -445,5 +632,111 @@ public sealed class ServerEditorSshConfigImportTests
             null);
 
         Assert.False(vm.IsSshConfigImportAvailable);
+    }
+
+    // ---- M14.4c QA LOW-2: the status claims "filled" only when a field actually changed
+
+    [Fact]
+    public void Apply_FillingFields_SaysTheEmptyFieldsWereFilled()
+    {
+        var vm = Editor();
+
+        Assert.True(vm.ApplySshConfigHost(Entry(FullConfig, "web")));
+
+        Assert.Equal("SshConfigImportAppliedFormat", vm.SshConfigStatusMessage);
+    }
+
+    [Fact]
+    public void Apply_TypedDifferentHost_FillingOnlyTheName_StillSaysFilled()
+    {
+        var vm = Editor();
+        vm.Host = "other.example.com";
+
+        Assert.True(vm.ApplySshConfigHost(Entry(FullConfig, "web")));
+
+        Assert.Equal("web", vm.Name);
+        Assert.Equal("SshConfigImportAppliedFormat", vm.SshConfigStatusMessage);
+    }
+
+    [Fact]
+    public void Apply_TypedDifferentHost_FillingNothing_SaysTheHostDiffers()
+    {
+        var vm = Editor();
+        vm.Name = "Mine";
+        vm.Host = "other.example.com";
+
+        Assert.True(vm.ApplySshConfigHost(Entry(FullConfig, "web")));
+
+        Assert.Equal("Mine", vm.Name);
+        Assert.Equal("other.example.com", vm.Host);
+        Assert.Equal("SshConfigImportNothingFilledHostDiffersFormat", vm.SshConfigStatusMessage);
+    }
+
+    [Fact]
+    public void Apply_JumpHostIntoADifferentTypedHost_FillingNothing_SaysTheHostDiffers()
+    {
+        var vm = Editor();
+        vm.Name = "Mine";
+        vm.Host = "192.0.2.50";
+
+        Assert.True(vm.ApplySshConfigHost(Entry(JumpConfig, "inner")));
+
+        Assert.False(vm.UseJumpHost);
+        Assert.Equal("SshConfigImportNothingFilledHostDiffersFormat", vm.SshConfigStatusMessage);
+    }
+
+    [Fact]
+    public void Apply_EveryOfferedFieldAlreadyTyped_SaysNothingWasFilled()
+    {
+        var vm = Editor();
+        vm.Name = "Mine";
+        vm.Host = "10.0.0.5";
+        vm.Port = "2200";
+        vm.Username = "me";
+        vm.PrivateKeyPath = @"C:\keys\mine";
+
+        Assert.True(vm.ApplySshConfigHost(Entry(FullConfig, "web")));
+
+        Assert.Equal("SshConfigImportNothingFilledFormat", vm.SshConfigStatusMessage);
+    }
+
+    [Fact]
+    public void Apply_JumpHost_EveryOfferedFieldAlreadyTyped_SaysNothingWasFilled()
+    {
+        var vm = Editor();
+        vm.Name = "Mine";
+        vm.Host = "10.1.0.9";
+        vm.Port = "2201";
+        vm.Username = "me";
+        vm.PrivateKeyPath = @"C:\keys\mine";
+        vm.UseJumpHost = true;
+        vm.JumpHost = "203.0.113.7";
+        vm.JumpPort = "2222";
+        vm.JumpUsername = "mine";
+        vm.JumpPrivateKeyPath = @"C:\keys\jump";
+
+        Assert.True(vm.ApplySshConfigHost(Entry(JumpConfig, "inner")));
+
+        Assert.Equal("SshConfigImportNothingFilledFormat", vm.SshConfigStatusMessage);
+    }
+
+    [Fact]
+    public void Apply_OnlySwitchingToTheJump_SaysFilled()
+    {
+        var vm = Editor();
+        vm.Name = "Mine";
+        vm.Host = "10.1.0.9";
+        vm.Port = "2201";
+        vm.Username = "me";
+        vm.PrivateKeyPath = @"C:\keys\mine";
+        vm.JumpHost = "203.0.113.7";
+        vm.JumpPort = "2222";
+        vm.JumpUsername = "mine";
+        vm.JumpPrivateKeyPath = @"C:\keys\jump";
+
+        Assert.True(vm.ApplySshConfigHost(Entry(JumpConfig, "inner")));
+
+        Assert.True(vm.UseJumpHost);
+        Assert.Equal("SshConfigImportAppliedFormat", vm.SshConfigStatusMessage);
     }
 }

@@ -230,26 +230,36 @@ public sealed class SshConfigResolverTests
         Assert.Equal(["a", "b"], result.Hosts.Select(h => h.Alias));
     }
 
-    [Theory]
-    [InlineData("ProxyJump bastion")]
-    [InlineData("ProxyCommand ssh -W %h:%p bastion")]
-    public void Resolve_ProxyJumpOrProxyCommand_IsUnsupportedAndNotImportable(string line)
+    [Fact]
+    public void Resolve_ProxyCommand_IsUnsupportedAndNotImportable()
     {
-        var host = Host($"Host inner\n  HostName 10.1.0.9\n  {line}\n", "inner");
-        var keyword = line.Split(' ')[0];
+        var host = Host("Host inner\n  HostName 10.1.0.9\n  ProxyCommand ssh -W %h:%p bastion\n", "inner");
 
         Assert.False(host.IsImportable);
-        Assert.Equal(Enum.Parse<SshConfigHostBlocker>(keyword), host.Blocker);
-        Assert.True(Has(host, keyword, SshConfigFindingKind.Unsupported));
+        Assert.Equal(SshConfigHostBlocker.ProxyCommand, host.Blocker);
+        Assert.True(Has(host, "ProxyCommand", SshConfigFindingKind.Unsupported));
+        Assert.Null(host.Jump);
     }
 
     [Fact]
-    public void ProxyJumpInheritedFromWildcard_MakesHostNotImportable()
+    public void ProxyJumpInheritedFromWildcard_ThatAlsoMatchesTheJump_IsACycle()
     {
+        // *.corp also applies to jump.corp itself: ssh would jump through jump.corp to reach jump.corp.
         var host = Host("Host *.corp\n  ProxyJump jump.corp\nHost db.corp\n  User dba\n", "db.corp");
 
         Assert.False(host.IsImportable);
-        Assert.Equal(SshConfigHostBlocker.ProxyJump, host.Blocker);
+        Assert.Equal(SshConfigHostBlocker.JumpCycle, host.Blocker);
+    }
+
+    [Fact]
+    public void ProxyJumpInheritedFromWildcard_IsTheHostsSingleHopJump()
+    {
+        var host = Host("Host jump.corp\n  ProxyJump none\nHost *.corp\n  ProxyJump jump.corp\nHost db.corp\n  User dba\n", "db.corp");
+
+        Assert.True(host.IsImportable);
+        Assert.Equal("db.corp", host.HostName);
+        Assert.Equal("jump.corp", host.Jump?.Name);
+        Assert.Equal("jump.corp", host.Jump?.HostName);
     }
 
     [Fact]
@@ -272,7 +282,19 @@ public sealed class SshConfigResolverTests
         Assert.True(Has(host, "HostKeyAlias", SshConfigFindingKind.Unsupported));
         Assert.True(Has(host, "ServerAliveInterval", SshConfigFindingKind.Ignored));
         Assert.True(Has(host, "ForwardAgent", SshConfigFindingKind.Ignored));
+        // Human decision M14-SSHCFG-CANON-1: a canonicalising host is not imported.
+        Assert.False(host.IsImportable);
+        Assert.Equal(SshConfigHostBlocker.CanonicalizationMayChangeRoute, host.Blocker);
+    }
+
+    [Fact]
+    public void HostAffectingKeywordsWithoutCanonicalization_StayWarningsOnAnImportableHost()
+    {
+        var host = Host("Host a\n  CanonicalizeHostname no\n  HostKeyAlias other\n  ForwardAgent yes\n", "a");
+
         Assert.True(host.IsImportable);
+        Assert.False(Has(host, "CanonicalizeHostname", SshConfigFindingKind.Unsupported));
+        Assert.True(Has(host, "HostKeyAlias", SshConfigFindingKind.Unsupported));
     }
 
     [Fact]
@@ -299,7 +321,8 @@ public sealed class SshConfigResolverTests
         var host = Host($"Host a\n  HostName a.lan\n  {line}\n", "a");
 
         Assert.False(host.IsImportable);
-        Assert.Equal(SshConfigHostBlocker.ProxyJump, host.Blocker);
+        Assert.Equal(SshConfigHostBlocker.JumpUnparsable, host.Blocker);
+        Assert.Null(host.Jump);
     }
 
     [Theory]
@@ -334,7 +357,7 @@ public sealed class SshConfigResolverTests
     {
         var result = Import("Host *\n  ProxyJump a b\nHost x\nHost y\n");
 
-        Assert.All(result.Hosts, host => Assert.Equal(SshConfigHostBlocker.ProxyJump, host.Blocker));
+        Assert.All(result.Hosts, host => Assert.Equal(SshConfigHostBlocker.JumpUnparsable, host.Blocker));
     }
 
     // ---- Vigil M14.4a H2: an unevaluated Match that may set a proxy, met before the proxy is decided.
@@ -380,8 +403,8 @@ public sealed class SshConfigResolverTests
     }
 
     [Theory]
-    [InlineData("Host a\n  ProxyJump none\n  Include conf.d/*\n")]
-    [InlineData("ProxyJump none\nInclude conf.d/*\nHost a\n")]
+    [InlineData("Host a\n  ProxyJump none\n  CanonicalizeHostname no\n  Include conf.d/*\n")]
+    [InlineData("ProxyJump none\nCanonicalizeHostname no\nInclude conf.d/*\nHost a\n")]
     [InlineData("Host b\n  Include conf.d/b\nHost a\n")]
     public void Resolve_IncludeAfterNoneOrNotApplicable_StaysImportable(string text)
     {
@@ -442,12 +465,41 @@ public sealed class SshConfigResolverTests
     }
 
     [Fact]
-    public void QuotedArguments_AreStillAccepted()
+    public void QuotedArguments_AreStillAccepted_ButAQuotedProxyJumpNoneIsNotNone()
     {
+        // Vigil M14.4c M-1: OpenSSH reads ProxyJump raw, so "none" in quotes is a jump host named "none"
+        // (ssh tries to jump and fails): never a direct import.
         var host = Host("Host a\n  User \"u\"\n  ProxyJump \"none\"\nHost *\n  ProxyJump bastion\n", "a");
 
         Assert.Equal("u", host.User);
-        Assert.True(host.IsImportable);
+        Assert.False(host.IsImportable);
+        Assert.Equal(SshConfigHostBlocker.JumpUnparsable, host.Blocker);
+        Assert.Null(host.Jump);
+    }
+
+    [Theory]
+    [InlineData("ProxyJump 'none'")]
+    [InlineData("ProxyJump none # direct")]
+    [InlineData("ProxyJump \"none\"")]
+    [InlineData("ProxyJump none\\ ")]
+    public void Resolve_ProxyJumpNoneThatIsNotRawNone_IsNeverDirect(string line)
+    {
+        var host = Host($"Host a\n  HostName a.lan\n  {line}\nHost *\n  ProxyJump bastion\n", "a");
+
+        Assert.False(host.IsImportable);
+        Assert.Equal(SshConfigHostBlocker.JumpUnparsable, host.Blocker);
+        Assert.Null(host.Jump);
+    }
+
+    [Theory]
+    [InlineData("Match all\n  ProxyJump \"none\"\nHost a\n")]
+    [InlineData("Match all\n  ProxyJump none # c\nHost a\n")]
+    [InlineData("Match all\n  ProxyCommand \"none\"\nHost a\n")]
+    public void Resolve_MatchWithANonRawNone_MaySetAProxy(string text)
+    {
+        var host = Host(text, "a");
+
+        Assert.Equal(SshConfigHostBlocker.ProxyMaySetByMatch, host.Blocker);
     }
 
     [Fact]
@@ -508,12 +560,60 @@ public sealed class SshConfigResolverTests
     }
 
     [Fact]
-    public void CanonicalizeAndHostKeyAlias_StayVisibleWarningsOnAnImportableHost()
+    public void CanonicalizingHost_IsBlockedWithItsOwnReason_AndKeepsItsWarnings()
     {
         var host = Host("Host a\n  CanonicalizeHostname always\n  HostKeyAlias other\n", "a");
 
-        Assert.True(host.IsImportable);
+        Assert.False(host.IsImportable);
+        Assert.Equal(SshConfigHostBlocker.CanonicalizationMayChangeRoute, host.Blocker);
+        Assert.Null(host.Jump);
         Assert.True(Has(host, "CanonicalizeHostname", SshConfigFindingKind.Unsupported));
         Assert.True(Has(host, "HostKeyAlias", SshConfigFindingKind.Unsupported));
     }
+
+    // ---- Human decision M14-SSHCFG-CANON-1: CanonicalizeHostname other than "no" blocks the TARGET too.
+
+    [Theory]
+    [InlineData("Host a\n  CanonicalizeHostname yes\n")]
+    [InlineData("Host a\n  CanonicalizeHostname YES\n")]
+    [InlineData("Host a\n  CanonicalizeHostname\n")]
+    [InlineData("Host a\n  CanonicalizeHostname \"yes\n")]
+    [InlineData("Host *\n  CanonicalizeHostname always\nHost a\n")]
+    public void CanonicalizingTarget_IsNotImportable(string text)
+    {
+        var host = Host(text, "a");
+
+        Assert.False(host.IsImportable);
+        Assert.Equal(SshConfigHostBlocker.CanonicalizationMayChangeRoute, host.Blocker);
+    }
+
+    [Theory]
+    [InlineData("Host a\n  HostName a.lan\n")]
+    [InlineData("Host a\n  CanonicalizeHostname no\nHost *\n  CanonicalizeHostname yes\n")]
+    [InlineData("Host a\n  CanonicalizeHostname No\n")]
+    public void TargetWithoutCanonicalization_StaysImportable(string text)
+    {
+        var host = Host(text, "a");
+
+        Assert.True(host.IsImportable);
+        Assert.Equal(SshConfigHostBlocker.None, host.Blocker);
+    }
+
+    [Theory]
+    [InlineData("Match all\n  CanonicalizeHostname yes\nHost a\n")]
+    [InlineData("Host a\n  HostName a.lan\nMatch all\n  CanonicalizeHostname always\n")]
+    public void MatchThatMayTurnOnTheTargetsCanonicalisation_Blocks(string text) =>
+        Assert.Equal(SshConfigHostBlocker.ProxyMaySetByMatch, Host(text, "a").Blocker);
+
+    [Theory]
+    [InlineData("Host a\n  CanonicalizeHostname no\nMatch all\n  CanonicalizeHostname yes\n")]
+    [InlineData("Match all\n  CanonicalizeHostname no\nHost a\n")]
+    public void MatchAfterCanonicalisationIsDecidedOrWithNo_DoesNotBlock(string text) =>
+        Assert.True(Host(text, "a").IsImportable);
+
+    [Fact]
+    public void UnverifiableIncludeBeforeTheTargetsCanonicalisationIsDecided_Blocks() =>
+        Assert.Equal(
+            SshConfigHostBlocker.ProxyMaySetByInclude,
+            Host("Host a\n  ProxyJump none\n  Include conf.d/*\n", "a").Blocker);
 }

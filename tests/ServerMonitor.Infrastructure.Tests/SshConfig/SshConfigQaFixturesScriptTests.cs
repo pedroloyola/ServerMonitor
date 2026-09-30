@@ -102,12 +102,12 @@ public sealed class SshConfigQaFixturesScriptTests : IDisposable
     }
 
     [Fact]
-    public async Task FixtureScript_GeneratesTheFiveProfiles_AsDocumented()
+    public async Task FixtureScript_GeneratesTheSixProfiles_AsDocumented()
     {
         var exe = FakeAppExe(DateTime.UtcNow);
         var (exitCode, output) = RunScript(_root, exe);
         Assert.True(exitCode == 0, output);
-        foreach (var scenario in new[] { "empty", "error", "big", "blocked", "normal" })
+        foreach (var scenario in new[] { "empty", "error", "big", "blocked", "normal", "proxyjump" })
         {
             // The exact executable, never `dotnet run` (which may launch a different, stale binary).
             Assert.Contains($"& \"{exe}\" --qa-ssh-config \"{Path.Combine(_root, scenario)}\"", output);
@@ -135,7 +135,7 @@ public sealed class SshConfigQaFixturesScriptTests : IDisposable
         Assert.Equal(SshConfigResolver.MaxHosts, big.Hosts.Count);
         Assert.Contains(SshConfigFileWarning.HostsTruncated, big.FileWarnings);
         Assert.Contains(big.Hosts, host => host.IsImportable && host.IdentityFile is not null);
-        Assert.Contains(big.Hosts, host => host.Blocker == SshConfigHostBlocker.ProxyJump);
+        Assert.Contains(big.Hosts, host => host.IsImportable && host.Jump?.HostName == "qa-bastion");
         Assert.Contains(big.Hosts, host => host.Findings.Any(f => f.Kind == SshConfigFindingKind.Ambiguous));
         Assert.Contains(big.Hosts, host => host.Findings.Any(f => f.Kind == SshConfigFindingKind.Unsupported && f.Keyword == "HostKeyAlias"));
         Assert.All(big.Hosts, host => Assert.Contains(host.Findings, f => f.Kind == SshConfigFindingKind.Ignored));
@@ -144,10 +144,11 @@ public sealed class SshConfigQaFixturesScriptTests : IDisposable
         var (blocked, blockedSpy) = await LoadAsync("blocked");
         SshConfigHostBlocker BlockerOf(string alias) => Assert.Single(blocked.Hosts, host => host.Alias == alias).Blocker;
         Assert.Equal(SshConfigHostBlocker.None, BlockerOf("ok-contrast"));
-        Assert.Equal(SshConfigHostBlocker.ProxyJump, BlockerOf("via-proxyjump"));
+        Assert.Equal(SshConfigHostBlocker.JumpMultiHop, BlockerOf("via-multihop"));
         Assert.Equal(SshConfigHostBlocker.ProxyCommand, BlockerOf("via-proxycommand"));
         Assert.Equal(SshConfigHostBlocker.ProxyMaySetByInclude, BlockerOf("via-include"));
         Assert.Equal(SshConfigHostBlocker.ProxyMaySetByMatch, BlockerOf("via-match"));
+        Assert.Equal(SshConfigHostBlocker.CanonicalizationMayChangeRoute, BlockerOf("via-canonicalize"));
         Assert.Contains(new SshConfigDiagnostic(SshConfigDiagnosticKind.IncludeMatchedNoFiles, "conf.d/*.missing"), blocked.Diagnostics);
         Assert.DoesNotContain(blockedSpy.Paths, path => path.EndsWith("outside.conf", StringComparison.OrdinalIgnoreCase));
 
@@ -165,6 +166,43 @@ public sealed class SshConfigQaFixturesScriptTests : IDisposable
             Assert.False(File.Exists(host.IdentityFile));
         });
         Assert.All(normalSpy.Paths, path => Assert.DoesNotContain("qa_missing", path));
+
+        // (f) proxyjump: via-* importable with the jump resolved; every blocked shape has its own reason
+        var (proxyJump, proxyJumpSpy) = await LoadAsync("proxyjump");
+        SshConfigHostEntry HostOf(string alias) => Assert.Single(proxyJump.Hosts, host => host.Alias == alias);
+        SshConfigJumpHost JumpOf(string alias)
+        {
+            var host = HostOf(alias);
+            Assert.True(host.IsImportable, $"{alias}: {host.Blocker}");
+            return Assert.IsType<SshConfigJumpHost>(host.Jump);
+        }
+
+        var viaAlias = JumpOf("via-alias");
+        Assert.Equal(("10.50.0.1", "jumpuser", (int?)2222), (viaAlias.HostName, viaAlias.User, viaAlias.Port));
+        Assert.Equal(Path.Combine(_root, "proxyjump", ".ssh", "qa_missing_bastion"), viaAlias.IdentityFile);
+        Assert.False(File.Exists(viaAlias.IdentityFile));
+        var viaExplicit = JumpOf("via-explicit");
+        Assert.Equal(("10.50.0.1", "ops", (int?)2200), (viaExplicit.HostName, viaExplicit.User, viaExplicit.Port));
+        Assert.Equal("jump.qa.internal", JumpOf("via-literal").HostName);
+        var viaIpv6 = JumpOf("via-ipv6");
+        Assert.Equal(("fd00::10", "admin", (int?)2022), (viaIpv6.HostName, viaIpv6.User, viaIpv6.Port));
+        var viaInclude = JumpOf("via-include-jump");
+        Assert.Equal(("10.50.0.9", "incuser", (int?)2209), (viaInclude.HostName, viaInclude.User, viaInclude.Port));
+        Assert.Equal("10.50.0.1", JumpOf("chained-bastion").HostName);
+        Assert.True(HostOf("bastion").IsImportable);
+        Assert.Null(HostOf("bastion").Jump);
+        Assert.Equal(SshConfigHostBlocker.JumpMultiHop, HostOf("blocked-multihop").Blocker);
+        Assert.Equal(SshConfigHostBlocker.JumpMultiHop, HostOf("blocked-chained").Blocker);
+        Assert.Equal(SshConfigHostBlocker.ProxyCommand, HostOf("blocked-proxycommand-jump").Blocker);
+        Assert.Equal(SshConfigHostBlocker.ProxyCommand, HostOf("pc-bastion").Blocker);
+        Assert.Equal(SshConfigHostBlocker.JumpUnparsable, HostOf("blocked-uri").Blocker);
+        Assert.Equal(SshConfigHostBlocker.JumpUnparsable, HostOf("blocked-token").Blocker);
+        Assert.Equal(SshConfigHostBlocker.JumpHostNameUnresolved, HostOf("blocked-hostname-token").Blocker);
+        Assert.Equal(SshConfigHostBlocker.JumpCycle, HostOf("cycle-self").Blocker);
+        Assert.Equal(SshConfigHostBlocker.JumpCycle, HostOf("cycle-a").Blocker);
+        Assert.Equal(SshConfigHostBlocker.JumpCycle, HostOf("cycle-b").Blocker);
+        Assert.All(proxyJump.Hosts.Where(host => !host.IsImportable), host => Assert.Null(host.Jump));
+        Assert.All(proxyJumpSpy.Paths, path => Assert.DoesNotContain("qa_missing", path));
     }
 
     [Fact]

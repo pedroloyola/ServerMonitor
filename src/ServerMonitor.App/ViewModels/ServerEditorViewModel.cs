@@ -51,6 +51,7 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
     private bool _useJumpHost;
     private string _jumpHost = string.Empty;
     private string _jumpPort = "22";
+    private bool _isJumpPortEdited;
     private string _jumpUsername = string.Empty;
     private int _selectedJumpAuthenticationIndex;
     private string _jumpPrivateKeyPath = string.Empty;
@@ -129,7 +130,17 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
 
     public string JumpHost { get => _jumpHost; set => SetJumpContextProperty(ref _jumpHost, value); }
 
-    public string JumpPort { get => _jumpPort; set => SetJumpContextProperty(ref _jumpPort, value); }
+    public string JumpPort
+    {
+        get => _jumpPort;
+        set
+        {
+            if (SetJumpContextProperty(ref _jumpPort, value))
+            {
+                _isJumpPortEdited = true;
+            }
+        }
+    }
 
     public string JumpUsername { get => _jumpUsername; set => SetJumpContextProperty(ref _jumpUsername, value); }
 
@@ -517,8 +528,9 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
     /// <summary>
     /// Fills only the form fields that are still empty (or the untouched add-mode port) from one
     /// alias. What the user already typed, the chosen authentication method and any saved server
-    /// are never changed. A host that needs ProxyJump/ProxyCommand is refused, never imported as a
-    /// direct connection. Password authentication is never inferred.
+    /// are never changed. A host with a verified single-hop ProxyJump also fills the jump host (see
+    /// <see cref="SshConfigHostEntry.Jump"/>); any other proxy is refused, never imported as a direct
+    /// connection. Password authentication is never inferred, and no secret or trust is ever set.
     /// </summary>
     public bool ApplySshConfigHost(SshConfigHostEntry entry)
     {
@@ -530,6 +542,7 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
         // User, port and key belong to a host. They are only taken when the entry's host is known
         // and the form's host is empty (and so comes from this entry) or already is that host —
         // never mixed into a host the user typed, nor attached to an unresolved HostName.
+        var before = SshConfigImportFields();
         var hostWasEmpty = string.IsNullOrWhiteSpace(Host);
         var sameHost = entry.HostName is not null
             && (hostWasEmpty || string.Equals(Host.Trim(), entry.HostName, StringComparison.OrdinalIgnoreCase));
@@ -567,13 +580,59 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
             }
         }
 
+        // The route belongs to the host as well: whenever the form's host comes from this entry (or
+        // already is it), a host ssh reaches through a jump is switched to the jump, never left direct.
+        // Jump fields follow the host rule: only empty ones (or the untouched default jump port) are
+        // filled, and only while the form's jump host is empty or already this jump.
+        if (entry.Jump is { } jump && (hostWasEmpty || sameHost))
+        {
+            UseJumpHost = true;
+            var jumpHostWasEmpty = string.IsNullOrWhiteSpace(JumpHost);
+            if (jumpHostWasEmpty)
+            {
+                JumpHost = jump.HostName;
+            }
+
+            if (jumpHostWasEmpty || string.Equals(JumpHost.Trim(), jump.HostName, StringComparison.OrdinalIgnoreCase))
+            {
+                if (jump.Port is { } jumpPort
+                    && (string.IsNullOrWhiteSpace(JumpPort) || !_isJumpPortEdited))
+                {
+                    JumpPort = jumpPort.ToString(CultureInfo.InvariantCulture);
+                }
+
+                if (string.IsNullOrWhiteSpace(JumpUsername) && jump.User is not null)
+                {
+                    JumpUsername = jump.User;
+                }
+
+                if (jump.IdentityFile is not null
+                    && IsJumpPrivateKeyAuthentication
+                    && string.IsNullOrWhiteSpace(JumpPrivateKeyPath))
+                {
+                    JumpPrivateKeyPath = jump.IdentityFile;
+                }
+            }
+        }
+
+        // The status says what actually happened: "filled" only when a field changed; otherwise why
+        // nothing was (a typed host that is not this entry's), never a claim that fields were filled.
+        var messageKey = SshConfigImportFields() != before
+            ? "SshConfigImportAppliedFormat"
+            : !hostWasEmpty && !sameHost && entry.HostName is not null
+                ? "SshConfigImportNothingFilledHostDiffersFormat"
+                : "SshConfigImportNothingFilledFormat";
         CloseSshConfigImport();
         SshConfigStatusMessage = string.Format(
             CultureInfo.CurrentCulture,
-            _localizationService.GetString("SshConfigImportAppliedFormat"),
+            _localizationService.GetString(messageKey),
             entry.Alias);
         return true;
     }
+
+    // Every form field ApplySshConfigHost may write, compared before/after to tell whether it changed anything.
+    private (string, string, string, string, string, bool, string, string, string, string) SshConfigImportFields() =>
+        (Name, Host, Port, Username, PrivateKeyPath, UseJumpHost, JumpHost, JumpPort, JumpUsername, JumpPrivateKeyPath);
 
     public void CaptureSecret(string? value)
     {

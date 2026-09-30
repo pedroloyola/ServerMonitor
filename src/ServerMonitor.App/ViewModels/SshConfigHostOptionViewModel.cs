@@ -18,22 +18,20 @@ public sealed class SshConfigHostOptionViewModel
         RequirementText = entry.Blocker == SshConfigHostBlocker.None
             ? string.Empty
             : localization.GetString($"SshConfigHostBlocked{entry.Blocker}");
+        // The jump host's own notes (e.g. an ambiguous jump key) follow the host's, on one line.
+        var jumpClassification = entry.Jump is { } jump
+            ? string.Join("; ", Classify(jump.Findings, jump.FindingsTruncated, localization))
+            : string.Empty;
         ClassificationText = string.Join(
             Environment.NewLine,
-            new[]
-            {
-                (Kind: SshConfigFindingKind.Invalid, Key: "SshConfigHostInvalidFormat"),
-                (Kind: SshConfigFindingKind.Unsupported, Key: "SshConfigHostUnsupportedFormat"),
-                (Kind: SshConfigFindingKind.Ambiguous, Key: "SshConfigHostAmbiguousFormat"),
-                (Kind: SshConfigFindingKind.Ignored, Key: "SshConfigHostIgnoredFormat")
-            }
-            .Select(group => (group.Key, Keywords: entry.Findings
-                .Where(finding => finding.Kind == group.Kind)
-                .Select(finding => finding.Keyword)
-                .ToList()))
-            .Where(group => group.Keywords.Count > 0)
-            .Select(group => Format(localization, group.Key, string.Join(", ", group.Keywords)))
-            .Concat(entry.FindingsTruncated ? ["…"] : []));
+            Classify(entry.Findings, entry.FindingsTruncated, localization)
+                .Concat(jumpClassification.Length == 0
+                    ? []
+                    : [string.Format(
+                        CultureInfo.CurrentCulture,
+                        localization.GetString("SshConfigHostJumpClassificationFormat"),
+                        entry.Jump!.Name,
+                        jumpClassification)]));
 
         // What a screen reader announces for the list item: alias, importable/blocked (with why), and
         // the classification notes (e.g. an ambiguous key) on one line.
@@ -65,6 +63,12 @@ public sealed class SshConfigHostOptionViewModel
 
     public string Preview { get; }
 
+    /// <summary>
+    /// False when the alias offers no value to preview (e.g. <c>HostName %h</c> alone, which is not
+    /// resolved): the preview line is then omitted rather than shown blank with an empty UIA name.
+    /// </summary>
+    public bool HasPreview => Preview.Length > 0;
+
     public string RequirementText { get; }
 
     public bool HasRequirement => RequirementText.Length > 0;
@@ -75,6 +79,25 @@ public sealed class SshConfigHostOptionViewModel
 
     /// <summary>Defense in depth: any UIA fallback to ToString reads the same text, never the type name.</summary>
     public override string ToString() => AccessibleName;
+
+    private static IEnumerable<string> Classify(
+        IReadOnlyList<SshConfigFinding> findings,
+        bool truncated,
+        ILocalizationService localization) =>
+        new[]
+        {
+            (Kind: SshConfigFindingKind.Invalid, Key: "SshConfigHostInvalidFormat"),
+            (Kind: SshConfigFindingKind.Unsupported, Key: "SshConfigHostUnsupportedFormat"),
+            (Kind: SshConfigFindingKind.Ambiguous, Key: "SshConfigHostAmbiguousFormat"),
+            (Kind: SshConfigFindingKind.Ignored, Key: "SshConfigHostIgnoredFormat")
+        }
+        .Select(group => (group.Key, Keywords: findings
+            .Where(finding => finding.Kind == group.Kind)
+            .Select(finding => finding.Keyword)
+            .ToList()))
+        .Where(group => group.Keywords.Count > 0)
+        .Select(group => Format(localization, group.Key, string.Join(", ", group.Keywords)))
+        .Concat(truncated ? ["…"] : []);
 
     private static IEnumerable<string> PreviewParts(SshConfigHostEntry entry, ILocalizationService localization)
     {
@@ -96,6 +119,11 @@ public sealed class SshConfigHostOptionViewModel
         if (entry.IdentityFile is not null)
         {
             yield return Format(localization, "SshConfigPreviewIdentityFileFormat", entry.IdentityFile);
+        }
+
+        if (entry.Jump is { } jump)
+        {
+            yield return Format(localization, "SshConfigPreviewJumpFormat", jump.Name);
         }
     }
 

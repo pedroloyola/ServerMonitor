@@ -156,20 +156,38 @@ public sealed class SshConfigIncludeTests
     // ---- proxy safety through includes
 
     [Fact]
-    public void ProxyJumpInsideAnIncludedFile_BlocksExactlyAsIfInline()
+    public void ProxyJumpInsideAnIncludedFile_ResolvesExactlyAsIfInline()
     {
         var host = Host(Config("Host a\n  Include x\n").File("x", "ProxyJump bastion\n"), "a");
 
+        Assert.True(host.IsImportable);
+        Assert.Equal("bastion", host.Jump?.HostName);
+    }
+
+    [Fact]
+    public void MultiHopProxyJumpInsideAnIncludedFile_BlocksExactlyAsIfInline()
+    {
+        var host = Host(Config("Host a\n  Include x\n").File("x", "ProxyJump j1,j2\n"), "a");
+
         Assert.False(host.IsImportable);
-        Assert.Equal(SshConfigHostBlocker.ProxyJump, host.Blocker);
+        Assert.Equal(SshConfigHostBlocker.JumpMultiHop, host.Blocker);
     }
 
     [Fact]
     public void ProxyJumpNoneDecidedBeforeAnInclude_StaysImportable()
     {
-        var fs = Config("Host a\n  ProxyJump none\n  Include x ../outside\n").File("x", "ProxyJump bastion\n");
+        var fs = Config("Host a\n  ProxyJump none\n  CanonicalizeHostname no\n  Include x ../outside\n").File("x", "ProxyJump bastion\n");
 
         Assert.True(Host(fs, "a").IsImportable);
+    }
+
+    [Fact]
+    public void UnverifiableIncludeBeforeCanonicalisationIsDecided_Blocks()
+    {
+        // M14-SSHCFG-CANON-1: the unfollowed ../outside could turn CanonicalizeHostname on.
+        var fs = Config("Host a\n  ProxyJump none\n  Include x ../outside\n").File("x", "User u\n");
+
+        Assert.Equal(SshConfigHostBlocker.ProxyMaySetByInclude, Host(fs, "a").Blocker);
     }
 
     [Fact]

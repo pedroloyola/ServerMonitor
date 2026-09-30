@@ -392,9 +392,17 @@
   <data name="SshConfigPreviewUserFormat" xml:space="preserve"><value>Utilizador: {0}</value></data>
   <data name="SshConfigPreviewPortFormat" xml:space="preserve"><value>Porta: {0}</value></data>
   <data name="SshConfigPreviewIdentityFileFormat" xml:space="preserve"><value>Chave: {0}</value></data>
+  <data name="SshConfigPreviewJumpFormat" xml:space="preserve"><value>Através de: {0}</value></data>
+  <data name="SshConfigHostJumpClassificationFormat" xml:space="preserve"><value>Anfitrião de salto {0}: {1}</value></data>
   <data name="SshConfigImportAppliedFormat" xml:space="preserve"><value>Os campos vazios foram preenchidos a partir de {0}. Os valores que já tinha introduzido foram mantidos.</value></data>
-  <data name="SshConfigHostBlockedProxyJump" xml:space="preserve"><value>Requer ProxyJump — ainda não suportado</value></data>
-  <data name="SshConfigHostBlockedProxyCommand" xml:space="preserve"><value>Requer ProxyCommand — ainda não suportado</value></data>
+  <data name="SshConfigImportNothingFilledHostDiffersFormat" xml:space="preserve"><value>Nada foi preenchido a partir de {0}: o anfitrião que introduziu é diferente. Os seus valores foram mantidos.</value></data>
+  <data name="SshConfigImportNothingFilledFormat" xml:space="preserve"><value>Nada foi preenchido a partir de {0}: os campos que oferece já têm valores.</value></data>
+  <data name="SshConfigHostBlockedProxyCommand" xml:space="preserve"><value>Requer ProxyCommand (no anfitrião ou no anfitrião de salto) — não suportado</value></data>
+  <data name="SshConfigHostBlockedJumpMultiHop" xml:space="preserve"><value>Requer mais do que um anfitrião de salto (ProxyJump multi-salto ou encadeado) — não suportado</value></data>
+  <data name="SshConfigHostBlockedJumpUnparsable" xml:space="preserve"><value>O valor de ProxyJump não pode ser lido com exatidão — não importado</value></data>
+  <data name="SshConfigHostBlockedJumpCycle" xml:space="preserve"><value>O ProxyJump volta a este anfitrião — não importado</value></data>
+  <data name="SshConfigHostBlockedJumpHostNameUnresolved" xml:space="preserve"><value>O HostName do anfitrião de salto não pode ser resolvido com exatidão — não importado</value></data>
+  <data name="SshConfigHostBlockedCanonicalizationMayChangeRoute" xml:space="preserve"><value>CanonicalizeHostname pode mudar o destino a que o ssh se liga — não importado</value></data>
   <data name="SshConfigHostBlockedProxyMaySetByMatch" xml:space="preserve"><value>Um bloco Match pode definir um proxy — não é possível verificar, não importado</value></data>
   <data name="SshConfigHostBlockedProxyMaySetByInclude" xml:space="preserve"><value>Um Include não pôde ser verificado — não é possível confirmar o proxy, não importado</value></data>
   <data name="SshConfigImportWarningHostsTruncated" xml:space="preserve"><value>Só são listados os primeiros 500 anfitriões.</value></data>
