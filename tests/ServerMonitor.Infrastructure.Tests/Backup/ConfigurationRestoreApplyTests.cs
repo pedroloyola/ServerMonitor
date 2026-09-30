@@ -306,6 +306,36 @@ public sealed class ConfigurationRestoreApplyTests
         AssertUntouched(target, before);
     }
 
+    // Cortex-3: a rollback that could not finish leaves a half-applied configuration; nothing may write on top
+    // of it until the restart that completes the undo — the gate is SEALED, monitoring is not resumed.
+    [Fact]
+    public async Task PartialRollback_SealsTheGate_OrdinaryWritersStayRefused_MonitoringNotResumed()
+    {
+        using var target = await BackupScenarios.TargetAsync();
+        var (plan, service) = await InspectSourceAsync(target, faults: step =>
+        {
+            if (step == "write:settings.background")
+            {
+                throw new IOException("write failed");
+            }
+
+            if (step == "restore:servers.direct")
+            {
+                throw new IOException("restore failed");
+            }
+        });
+
+        var result = await service.ApplyAsync(plan);
+        plan.Dispose();
+
+        Assert.Equal(RestoreApplyOutcome.PartialRestoreRollbackPending, result.Outcome);
+        Assert.True(target.Gate.IsLocked);
+        await Assert.ThrowsAsync<ConfigurationLockedException>(() => target.Servers.HideAsync(BackupScenarios.TargetOther));
+        await Assert.ThrowsAsync<ConfigurationLockedException>(() => target.Repository.SaveAllAsync([]));
+        Assert.Equal(1, target.Monitoring.Stops);
+        Assert.Equal(0, target.Monitoring.Resumes);
+    }
+
     // ---------------------------------------------------------------- crash + startup recovery (cp 6, 8)
 
     [Theory]
@@ -511,16 +541,23 @@ public sealed class ConfigurationRestoreApplyTests
 
     // ---------------------------------------------------------------- gate drain (V5)
 
+    // Atlas-2: deterministic — the drain timeout runs on a manual clock, the writer is a barrier-held lease.
     [Fact]
     public async Task InFlightWrite_DrainTimeout_IsBusy_NothingTouched_MonitoringUntouched()
     {
         using var target = await BackupScenarios.TargetAsync();
-        var service = target.CreateService(drainTimeout: TimeSpan.FromMilliseconds(200));
+        var clock = new ManualTimeProvider();
+        target.GateClock = clock;
+        target.Reopen();
+        var service = target.CreateService(drainTimeout: TimeSpan.FromSeconds(10));
         using var plan = (await service.InspectAsync(await BackupScenarios.WriteSourceBackupAsync(target), Pass)).Plan!;
-        var inFlight = await Task.Run(target.Gate.EnterWrite); // a concurrent writer that does not finish in time
+        var inFlight = await Task.Run(target.Gate.EnterWrite); // a concurrent writer that does not finish
         var before = target.Snapshot();
 
-        var result = await service.ApplyAsync(plan);
+        var apply = service.ApplyAsync(plan);
+        await Guard(clock.TimerCreated);
+        clock.Advance(TimeSpan.FromSeconds(10));
+        var result = await Guard(apply);
         inFlight.Dispose();
 
         Assert.Equal(RestoreApplyOutcome.Busy, result.Outcome);
@@ -534,25 +571,29 @@ public sealed class ConfigurationRestoreApplyTests
     public async Task InFlightWrite_DrainsBeforeTheJournal_ThenTheRestoreProceeds()
     {
         using var target = await BackupScenarios.TargetAsync();
+        var clock = new ManualTimeProvider();
+        target.GateClock = clock;
+        target.Reopen();
         var inFlight = await Task.Run(target.Gate.EnterWrite);
         var leaseReleased = false;
         var journalStartedBeforeRelease = false;
         var (plan, service) = await InspectSourceAsync(target, faults: step =>
         {
-            if (step == "journal" && !leaseReleased)
+            if (step == "journal" && !Volatile.Read(ref leaseReleased))
             {
                 journalStartedBeforeRelease = true;
             }
         });
 
         var apply = service.ApplyAsync(plan);
-        await Task.Delay(100);
+        await Guard(clock.TimerCreated); // the drain is armed and waiting for the writer
+
         Assert.False(apply.IsCompleted);
         Assert.False(Directory.Exists(target.JournalDirectory));
-        leaseReleased = true;
+        Volatile.Write(ref leaseReleased, true);
         inFlight.Dispose();
 
-        Assert.Equal(RestoreApplyOutcome.Completed, (await apply).Outcome);
+        Assert.Equal(RestoreApplyOutcome.Completed, (await Guard(apply)).Outcome);
         Assert.False(journalStartedBeforeRelease);
         plan.Dispose();
     }
@@ -617,6 +658,11 @@ public sealed class ConfigurationRestoreApplyTests
     }
 
     // ---------------------------------------------------------------- helpers
+
+    // Outer deadlock deadline only: never the stimulus, never the assertion.
+    private static Task Guard(Task task) => task.WaitAsync(TimeSpan.FromSeconds(60));
+
+    private static Task<T> Guard<T>(Task<T> task) => task.WaitAsync(TimeSpan.FromSeconds(60));
 
     private static async Task<(RestorePlan Plan, ConfigurationBackupService Service)> InspectSourceAsync(
         BackupHarness target,

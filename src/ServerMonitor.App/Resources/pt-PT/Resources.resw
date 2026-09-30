@@ -537,7 +537,7 @@
   <data name="PassphraseMismatch" xml:space="preserve"><value>As frases-passe não coincidem.</value></data>
   <data name="PassphraseEmpty" xml:space="preserve"><value>Introduza a frase-passe.</value></data>
   <data name="BackupCreatedTitle" xml:space="preserve"><value>Cópia de segurança criada</value></data>
-  <data name="BackupCreatedMessage" xml:space="preserve"><value>{0} servidores, {1} chaves de anfitrião confiáveis e {2} palavras-passe guardadas em {3}.</value></data>
+  <data name="BackupCreatedMessage" xml:space="preserve"><value>Cópia de segurança guardada em {3}. Servidores: {0} · Chaves de anfitrião confiáveis: {1} · Palavras-passe guardadas: {2}</value></data>
   <data name="BackupMissingCredentialsWarning" xml:space="preserve"><value>Não foi encontrada nenhuma palavra-passe guardada para: {0}. Depois de restaurar, ser-lhe-á pedida.</value></data>
   <data name="BackupExcludedEntriesWarning" xml:space="preserve"><value>Entradas de servidor ilegíveis, não incluídas: {0}</value></data>
   <data name="BackupExcludedTrustNote" xml:space="preserve"><value>Chaves de anfitrião confiáveis não usadas por nenhum servidor, não incluídas: {0}</value></data>
@@ -588,5 +588,5 @@
   <data name="ConfigurationLocked" xml:space="preserve"><value>Está em curso um restauro. Não é possível guardar alterações até o ServerAlyzer reiniciar.</value></data>
   <data name="RestoreRecoveredUndone" xml:space="preserve"><value>Um restauro foi interrompido e foi anulado. A sua configuração está como estava antes.</value></data>
   <data name="RestoreRecoveredCompleted" xml:space="preserve"><value>Um restauro interrompido foi concluído.</value></data>
-  <data name="RestorePendingBlocked" xml:space="preserve"><value>A cópia de segurança e o restauro estão indisponíveis: um restauro interrompido não pôde ser processado automaticamente. Para desbloquear, feche o ServerAlyzer e elimine a pasta {0}. Eliminá-la abandona a anulação automática desse restauro.</value></data>
+  <data name="RestorePendingBlocked" xml:space="preserve"><value>A cópia de segurança e o restauro estão indisponíveis porque um restauro interrompido não pôde ser concluído nem anulado. Reinicie o ServerAlyzer para tentar novamente de forma automática. Se isto continuar a acontecer, feche o ServerAlyzer e elimine a pasta {0}. Eliminá-la abandona a anulação automática desse restauro.</value></data>
 </root>

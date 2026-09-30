@@ -116,4 +116,34 @@ public sealed class BackupStoreParticipationTests
         var loaded = await harness.Repository.GetAllAsync();
         Assert.DoesNotContain(loaded, server => server.Id == BackupHarness.Id(5) && server.Route is null);
     }
+
+    // Atlas-1 probe 1, ported (Cortex-1): a task started INSIDE a lease, released only after the lease is disposed
+    // and a restore holds (or has sealed) the gate, must not write through the REAL ServerService.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ATaskCapturedInsideALease_CannotWriteThroughTheRealServerService_AfterTheDrain(bool seal)
+    {
+        using var target = await BackupScenarios.TargetAsync();
+        var resume = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var outer = target.Gate.EnterWrite();
+        var child = Task.Run(async () =>
+        {
+            await resume.Task.ConfigureAwait(false);
+            return await Record.ExceptionAsync(() => target.Servers.HideAsync(BackupScenarios.TargetOther));
+        });
+        outer.Dispose();
+        var token = await target.Gate.BeginRestoreAsync(Timeout.InfiniteTimeSpan);
+        Assert.NotNull(token);
+        if (seal)
+        {
+            target.Gate.Seal(token);
+        }
+
+        var before = target.Snapshot();
+        resume.SetResult();
+
+        Assert.IsType<ConfigurationLockedException>(await child.WaitAsync(TimeSpan.FromSeconds(60)));
+        Assert.Equal(before, target.Snapshot());
+    }
 }

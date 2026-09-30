@@ -213,25 +213,17 @@ public sealed class ConfigurationBackupService : IConfigurationBackupService
         var servers = new List<Server>(loaded.Count);
         foreach (var server in loaded)
         {
-            Server normalized;
-            try
+            // Cortex-5: a live server this version's own reader would reject (hand-edited name, control
+            // character, non-canonical key path, ...) is left OUT — with its credentials and its trust, since both
+            // are derived from the included servers only — and counted below. It never costs the user the whole
+            // backup, and the backup still never contains anything its reader rejects.
+            if (TryNormalizeForBackup(server) is { } normalized)
             {
-                normalized = ServerNormalizer.Normalize(server);
+                servers.Add(normalized);
             }
-            catch (Exception exception) when (exception is ArgumentException or NotSupportedException or PathTooLongException)
-            {
-                return (null, null, BackupError.InvalidContent);
-            }
-
-            // Never produce a backup this version's own reader would reject.
-            if (!BackupPayloadSerializer.IsValidServer(normalized, _validator))
-            {
-                return (null, null, BackupError.InvalidContent);
-            }
-
-            servers.Add(normalized);
         }
 
+        // Stored entries that did not load, plus every loaded server that was left out above.
         var excludedUnreadable = await _repository.CountUnloadableAsync(cancellationToken)
             + Math.Max(0, (await _repository.GetAllAsync(cancellationToken)).Count - servers.Count);
 
@@ -313,6 +305,19 @@ public sealed class ConfigurationBackupService : IConfigurationBackupService
         };
 
         return (payload, summary, null);
+    }
+
+    private Server? TryNormalizeForBackup(Server server)
+    {
+        try
+        {
+            var normalized = ServerNormalizer.Normalize(server);
+            return BackupPayloadSerializer.IsValidServer(normalized, _validator) ? normalized : null;
+        }
+        catch (Exception exception) when (exception is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            return null;
+        }
     }
 
     // CreateNew with an unpredictable name next to the destination: an existing user file is never clobbered.
@@ -647,10 +652,19 @@ public sealed class ConfigurationBackupService : IConfigurationBackupService
                 ? await RecoverSafelyAsync(engine, journal)
                 : RecoveryStatus.Done;
 
-            _gate.Release(token);
-            if (monitoringStopped)
+            if (status == RecoveryStatus.Done)
             {
-                await ResumeMonitoringAsync();
+                _gate.Release(token);
+                if (monitoringStopped)
+                {
+                    await ResumeMonitoringAsync();
+                }
+            }
+            else
+            {
+                // Cortex-3: the configuration may be half-applied and the journal still says Applying. Nothing may
+                // write on top of it: lock until the restart that finishes the rollback, exactly as after a commit.
+                _gate.Seal(token);
             }
 
             return status == RecoveryStatus.Done

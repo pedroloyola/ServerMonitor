@@ -406,7 +406,7 @@ public sealed class BackupRestoreViewModel : ObservableObject, IDisposable
         var problem = BackupPassphrasePolicy.ValidateForRestore(passphrase);
         if (problem != BackupPassphraseProblem.None)
         {
-            session.ShowError(GetString(BackupMessageKeys.ForPassphraseProblem(problem)!));
+            session.ShowError(GetString(BackupMessageKeys.ForPassphraseProblem(problem) ?? BackupMessageKeys.Generic));
             return false;
         }
 
@@ -431,7 +431,7 @@ public sealed class BackupRestoreViewModel : ObservableObject, IDisposable
 
             if (result.PassphraseProblem != BackupPassphraseProblem.None)
             {
-                session.ShowError(GetString(BackupMessageKeys.ForPassphraseProblem(result.PassphraseProblem)!));
+                session.ShowError(GetString(BackupMessageKeys.ForPassphraseProblem(result.PassphraseProblem) ?? BackupMessageKeys.Generic));
                 return false;
             }
 
@@ -440,7 +440,7 @@ public sealed class BackupRestoreViewModel : ObservableObject, IDisposable
             {
                 case BackupError.WrongPassphraseOrDamaged:
                     // Stays in the dialog: the likely cause is a typo, and there is no retry limit.
-                    session.ShowError(GetString(BackupMessageKeys.ForInspectError(error.Value)!));
+                    session.ShowError(GetString(BackupMessageKeys.ForInspectError(error.Value) ?? BackupMessageKeys.Generic));
                     return false;
                 case BackupError.Canceled:
                     return false;

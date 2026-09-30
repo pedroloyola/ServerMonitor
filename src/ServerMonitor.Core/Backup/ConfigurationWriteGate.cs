@@ -14,9 +14,11 @@ public interface IConfigurationWriteGate
 
     /// <summary>
     /// Takes a shared lease for one mutation. Never waits: throws <see cref="ConfigurationLockedException"/>
-    /// when a restore holds the gate or it is sealed. A lease taken while the same logical call flow already
-    /// holds one always succeeds (a profile save that writes a credential and then the server list is one
-    /// mutation, and a restore that is draining waits for it to finish rather than breaking it in half).
+    /// when a restore holds the gate or it is sealed. While a restore is DRAINING, a lease nested inside a
+    /// still-open lease of the same logical call flow succeeds (a profile save that writes a credential and then
+    /// the server list is one mutation; the restore waits for it rather than breaking it in half). Re-entry is
+    /// tied to that exact outer lease: once it is disposed, a flow that inherited it (a task or loop started
+    /// inside it) gets no bypass. After the seal, every request is refused, re-entrant or not (M14.6 Cortex-1).
     /// </summary>
     IDisposable EnterWrite();
 
@@ -67,14 +69,27 @@ public sealed class ConfigurationWriteGate : IConfigurationWriteGate
     }
 
     private readonly object _sync = new();
+    private readonly TimeProvider _timeProvider;
 
-    // Leases held by the current logical call flow; makes a nested lease re-entrant.
-    private readonly AsyncLocal<int> _flowDepth = new();
+    // The innermost lease of the current logical call flow. Re-entry is granted only while THAT lease is still
+    // open; a child flow that inherited it keeps nothing once it is disposed (Cortex-1).
+    private readonly AsyncLocal<Lease?> _current = new();
 
     private GateState _state;
     private RestoreWriteToken? _token;
     private int _activeLeases;
     private TaskCompletionSource? _drained;
+
+    public ConfigurationWriteGate()
+        : this(TimeProvider.System)
+    {
+    }
+
+    /// <summary><paramref name="timeProvider"/> drives only the drain timeout (tests use a manual clock).</summary>
+    public ConfigurationWriteGate(TimeProvider timeProvider)
+    {
+        _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
+    }
 
     public bool IsLocked
     {
@@ -89,18 +104,22 @@ public sealed class ConfigurationWriteGate : IConfigurationWriteGate
 
     public IDisposable EnterWrite()
     {
+        var outer = _current.Value;
+        Lease lease;
         lock (_sync)
         {
-            if (_state != GateState.Open && _flowDepth.Value == 0)
+            var nestedInOpenLease = outer is not null && ReferenceEquals(outer.Owner, this) && !outer.IsDisposed;
+            if (_state == GateState.Sealed || (_state == GateState.Held && !nestedInOpenLease))
             {
                 throw new ConfigurationLockedException();
             }
 
             _activeLeases++;
+            lease = new Lease(this, outer);
         }
 
-        _flowDepth.Value++;
-        return new Lease(this);
+        _current.Value = lease;
+        return lease;
     }
 
     public async Task<RestoreWriteToken?> BeginRestoreAsync(
@@ -130,7 +149,7 @@ public sealed class ConfigurationWriteGate : IConfigurationWriteGate
 
         try
         {
-            await drained.WaitAsync(drainTimeout, cancellationToken).ConfigureAwait(false);
+            await drained.WaitAsync(drainTimeout, _timeProvider, cancellationToken).ConfigureAwait(false);
             return token;
         }
         catch (Exception exception) when (exception is TimeoutException or OperationCanceledException)
@@ -202,9 +221,14 @@ public sealed class ConfigurationWriteGate : IConfigurationWriteGate
         }
     }
 
-    private void Exit()
+    private void Exit(Lease lease)
     {
-        _flowDepth.Value = Math.Max(0, _flowDepth.Value - 1);
+        // Best effort for the disposing flow only; correctness never depends on it (IsDisposed does).
+        if (ReferenceEquals(_current.Value, lease))
+        {
+            _current.Value = lease.Outer;
+        }
+
         TaskCompletionSource? drained = null;
         lock (_sync)
         {
@@ -219,15 +243,21 @@ public sealed class ConfigurationWriteGate : IConfigurationWriteGate
         drained?.TrySetResult();
     }
 
-    private sealed class Lease(ConfigurationWriteGate owner) : IDisposable
+    private sealed class Lease(ConfigurationWriteGate owner, Lease? outer) : IDisposable
     {
         private int _disposed;
+
+        public ConfigurationWriteGate Owner { get; } = owner;
+
+        public Lease? Outer { get; } = outer;
+
+        public bool IsDisposed => Volatile.Read(ref _disposed) != 0;
 
         public void Dispose()
         {
             if (Interlocked.Exchange(ref _disposed, 1) == 0)
             {
-                owner.Exit();
+                Owner.Exit(this);
             }
         }
     }

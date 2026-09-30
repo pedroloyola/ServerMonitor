@@ -26,11 +26,19 @@ internal static class ReferenceGuard
             return true;
         }
 
-        var text = Encoding.UTF8.GetString(file);
+        // Vigil-2: skip a UTF-8 BOM exactly like JsonServerRepository.TryParse, so a file the store reads stays
+        // provable here too.
+        ReadOnlyMemory<byte> payload = file;
+        if (payload.Span.StartsWith((ReadOnlySpan<byte>)[0xEF, 0xBB, 0xBF]))
+        {
+            payload = payload[3..];
+        }
+
+        var text = Encoding.UTF8.GetString(payload.Span);
         HashSet<Guid>? parsed = null;
         try
         {
-            using var document = JsonDocument.Parse(file, new JsonDocumentOptions { MaxDepth = 64 });
+            using var document = JsonDocument.Parse(payload, new JsonDocumentOptions { MaxDepth = 64 });
             parsed = [];
             Collect(document.RootElement, parsed);
         }

@@ -59,6 +59,9 @@ internal sealed class BackupHarness : IDisposable
 
     public ConfigurationWriteGate Gate { get; private set; } = null!;
 
+    /// <summary>The clock of the gate's drain timeout; a test sets a manual one and calls <see cref="Reopen"/>.</summary>
+    public TimeProvider GateClock { get; set; } = TimeProvider.System;
+
     public JsonServerRepository Repository { get; private set; } = null!;
 
     public ServerService Servers { get; private set; } = null!;
@@ -97,7 +100,7 @@ internal sealed class BackupHarness : IDisposable
     /// <summary>A fresh "process": new stores, gate and caches over the same files and credential store.</summary>
     public void Reopen()
     {
-        Gate = new ConfigurationWriteGate();
+        Gate = new ConfigurationWriteGate(GateClock);
         Repository = new JsonServerRepository(ServerOptions, NullLogger<JsonServerRepository>.Instance, Gate);
         Servers = new ServerService(Repository, new ServerValidator(), Gate);
         DirectTrust = new JsonHostKeyTrustStore(TrustOptions, NullLogger<JsonHostKeyTrustStore>.Instance, Gate);

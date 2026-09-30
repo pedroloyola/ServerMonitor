@@ -537,7 +537,7 @@
   <data name="PassphraseMismatch" xml:space="preserve"><value>The passphrases don't match.</value></data>
   <data name="PassphraseEmpty" xml:space="preserve"><value>Enter the passphrase.</value></data>
   <data name="BackupCreatedTitle" xml:space="preserve"><value>Backup created</value></data>
-  <data name="BackupCreatedMessage" xml:space="preserve"><value>{0} servers, {1} trusted host keys and {2} passwords saved to {3}.</value></data>
+  <data name="BackupCreatedMessage" xml:space="preserve"><value>Backup saved to {3}. Servers: {0} · Trusted host keys: {1} · Saved passwords: {2}</value></data>
   <data name="BackupMissingCredentialsWarning" xml:space="preserve"><value>No saved password was found for: {0}. After restoring, you'll be asked for it.</value></data>
   <data name="BackupExcludedEntriesWarning" xml:space="preserve"><value>Unreadable server entries, not included: {0}</value></data>
   <data name="BackupExcludedTrustNote" xml:space="preserve"><value>Trusted host keys not used by any server, not included: {0}</value></data>
@@ -588,5 +588,5 @@
   <data name="ConfigurationLocked" xml:space="preserve"><value>A restore is in progress. Changes can't be saved until ServerAlyzer restarts.</value></data>
   <data name="RestoreRecoveredUndone" xml:space="preserve"><value>A restore was interrupted and has been undone. Your configuration is as it was before.</value></data>
   <data name="RestoreRecoveredCompleted" xml:space="preserve"><value>An interrupted restore was completed.</value></data>
-  <data name="RestorePendingBlocked" xml:space="preserve"><value>Backup and restore are unavailable: an interrupted restore couldn't be processed automatically. To unblock, close ServerAlyzer and delete the folder {0}. Deleting it abandons the automatic undo of that restore.</value></data>
+  <data name="RestorePendingBlocked" xml:space="preserve"><value>Backup and restore are unavailable because an interrupted restore couldn't be finished or undone. Restart ServerAlyzer to retry automatically. If this keeps happening, close ServerAlyzer and delete the folder {0}. Deleting it abandons the automatic undo of that restore.</value></data>
 </root>

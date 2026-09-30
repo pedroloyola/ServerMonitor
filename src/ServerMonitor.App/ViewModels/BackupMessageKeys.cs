@@ -81,6 +81,7 @@ public static class BackupMessageKeys
     {
         KeyPathStatus.Missing => "RestoreSummaryMissingKeys",
         KeyPathStatus.NotChecked => "RestoreSummaryNetworkKeys",
-        _ => "RestoreSummaryUnsupportedKeys"
+        KeyPathStatus.Unsupported => "RestoreSummaryUnsupportedKeys",
+        _ => Generic
     };
 }

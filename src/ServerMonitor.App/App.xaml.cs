@@ -210,37 +210,6 @@ public partial class App : Application
         }
     }
 
-    private static async Task RecoverInterruptedRestoreAsync()
-    {
-        var services = ServicesHost.Services;
-        var logger = services.GetRequiredService<ILogger<App>>();
-        var servers = services.GetRequiredService<ServerStorageOptions>();
-        RestoreRecoveryReport report;
-        try
-        {
-            report = await RestoreJournalRecovery.RecoverAsync(
-                servers,
-                services.GetRequiredService<HostKeyTrustStorageOptions>(),
-                services.GetRequiredService<RoutedHostKeyTrustStorageOptions>(),
-                services.GetRequiredService<NotificationSettingsStorageOptions>().FilePath,
-                services.GetRequiredService<BackgroundSettingsStorageOptions>().FilePath,
-                services.GetRequiredService<UngatedCredentialStore>().Store,
-                logger);
-        }
-        catch (Exception exception)
-        {
-            // Never block startup; the journal stays and backup/restore remain blocked (C-9).
-            logger.LogError("Restore recovery could not run ({ExceptionType}).", exception.GetType().Name);
-            report = new RestoreRecoveryReport(
-                RestoreRecoveryOutcome.Stuck,
-                Path.Combine(Path.GetDirectoryName(servers.FilePath) ?? string.Empty, "restore-journal"));
-        }
-
-        services.GetRequiredService<RestoreRecoveryStatus>().Report = report;
-        services.GetRequiredService<OrphanTemporaryCleaner>().CleanRestoreJournalTemporaries(
-            RestoreJournalRecovery.JournalTemporaryFiles(report.JournalDirectory));
-    }
-
     protected override async void OnLaunched(LaunchActivatedEventArgs args)
     {
         try
@@ -248,8 +217,15 @@ public partial class App : Application
             _uiDispatcherQueue = DispatcherQueue.GetForCurrentThread();
 
             // M14.6 §5.2: finish or undo an interrupted restore BEFORE any configuration store or the engine is
-            // created (single instance: nothing else writes). Only options and the raw credential store are resolved.
-            await RecoverInterruptedRestoreAsync();
+            // created. Only a launch that owns the single-instance key recovers (Cortex-2): nothing else can write.
+            await StartupRestoreRecovery.RunAsync(
+                ServicesHost.Services,
+                Environment.GetCommandLineArgs(),
+#if DEBUG
+                isDebugBuild: true);
+#else
+                isDebugBuild: false);
+#endif
 
             // A watchdog termination can only ever orphan one known temporary; clean exactly that one
             // (Vigil C10) before anything reads or writes the trust store.
@@ -527,7 +503,7 @@ public partial class App : Application
         services.AddSingleton(sp => RoutedHostKeyTrustStorageOptions.From(
             sp.GetRequiredService<HostKeyTrustStorageOptions>()));
         // M14.6 §5.5: one data-layer gate for every ordinary configuration writer.
-        services.AddSingleton<ConfigurationWriteGate>();
+        services.AddSingleton(_ => new ConfigurationWriteGate());
         services.AddSingleton<IConfigurationWriteGate>(sp => sp.GetRequiredService<ConfigurationWriteGate>());
         services.AddSingleton<IServerValidator, ServerValidator>();
         services.AddSingleton<JsonServerRepository>();

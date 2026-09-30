@@ -156,6 +156,56 @@ public sealed class GatedDomainWritersTests
         gate.Release(token);
     }
 
+    // Cortex-1, the confirmed path: ServerProfileService.AddAsync holds a lease while ServerService raises
+    // ServersChanged synchronously; a handler that starts a long-lived loop (like the monitoring engine) inherits
+    // that flow. Once the save returned, the loop must NOT be able to write under a restore or after the seal.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ALoopStartedFromServersChangedDuringAProfileSave_CannotWriteAfterwards(bool seal)
+    {
+        var repository = new CountingRepository();
+        var gate = new ConfigurationWriteGate();
+        using var service = new ServerService(repository, new ServerValidator(), gate);
+        var profiles = new ServerProfileService(service, new CountingCredentialStore(), gate);
+        var go = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Task<Exception?>? loop = null;
+        Guid? added = null;
+        service.ServersChanged += (_, _) => loop ??= Task.Run(async () =>
+        {
+            await go.Task;
+            try
+            {
+                await service.HideAsync(added!.Value);
+                return null;
+            }
+            catch (Exception exception)
+            {
+                return exception;
+            }
+        });
+        using var secret = new SecretValue("s");
+
+        var result = await profiles.AddAsync(new ServerProfileInput
+        {
+            Configuration = Input(),
+            CredentialChange = new CredentialChange { Mode = CredentialChangeMode.Replace, Secret = secret }
+        });
+        added = result.Server!.Id;
+        var saves = repository.Saves;
+
+        var token = (await gate.BeginRestoreAsync(TimeSpan.FromSeconds(1)))!;
+        if (seal)
+        {
+            gate.Seal(token);
+        }
+
+        go.SetResult();
+
+        Assert.IsType<ConfigurationLockedException>(await loop!);
+        Assert.Equal(saves, repository.Saves);
+    }
+
     private static ServerInput Input() => new()
     {
         Name = "s",

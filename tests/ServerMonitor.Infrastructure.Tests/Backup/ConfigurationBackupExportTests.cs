@@ -224,16 +224,32 @@ public sealed class ConfigurationBackupExportTests
         Assert.Equal(BackupError.Busy, result.Error);
     }
 
-    // Export never produces a backup its own reader would reject.
+    // Cortex-5: one live server the reader would reject is EXCLUDED and counted; the rest is backed up, and the
+    // backup still inspects cleanly through the strict reader.
     [Fact]
-    public async Task Export_AServerTheReaderWouldReject_FailsAsInvalidContent()
+    public async Task Export_AnUnrepresentableServer_IsExcludedAndCounted_TheRestIsBackedUp()
     {
         using var source = new BackupHarness();
-        await source.SeedAsync([BackupHarness.Direct(1, "h") with { Name = new string('n', 300) }]);
+        var bad = BackupHarness.Direct(1, "bad.example.com") with { Name = new string('n', 300) };
+        await source.SeedAsync([bad, BackupHarness.Direct(2, "a.example.com"), BackupHarness.Direct(3, "b.example.com")]);
+        source.SeedTrust([BackupHarness.DirectTrustEntry("bad.example.com"), BackupHarness.DirectTrustEntry("a.example.com")], []);
 
         var result = await source.CreateService().ExportAsync(source.OutPath(), Pass, Pass);
 
-        Assert.Equal(BackupError.InvalidContent, result.Error);
+        Assert.True(result.Succeeded);
+        Assert.Equal(2, result.Summary!.DirectServers);
+        Assert.Equal(1, result.Summary.ExcludedUnreadableServers);
+        Assert.Equal(2, result.Summary.Credentials);          // the excluded server's credential is not exported
+        Assert.Equal(1, result.Summary.DirectTrustedHostKeys); // nor its trust (now unreferenced)
+        var payload = await PayloadOf(source.OutPath());
+        Assert.DoesNotContain(BackupHarness.Id(1).ToString(), payload.ToJsonString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("bad.example.com", payload.ToJsonString(), StringComparison.Ordinal);
+
+        using var target = new BackupHarness();
+        var inspected = await target.CreateService().InspectAsync(source.OutPath(), Pass);
+        Assert.True(inspected.Succeeded);
+        Assert.Equal(2, inspected.Plan!.Summary.Backup.DirectServers);
+        inspected.Plan.Dispose();
     }
 
     // Vigil N2: export emits the store's NORMALIZED entries, so a legacy mixed-case / trailing-dot trust file

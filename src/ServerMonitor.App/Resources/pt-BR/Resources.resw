@@ -542,7 +542,7 @@
   <data name="PassphraseMismatch" xml:space="preserve"><value>As passphrases não coincidem.</value></data>
   <data name="PassphraseEmpty" xml:space="preserve"><value>Digite a passphrase.</value></data>
   <data name="BackupCreatedTitle" xml:space="preserve"><value>Backup criado</value></data>
-  <data name="BackupCreatedMessage" xml:space="preserve"><value>{0} servidores, {1} chaves de host confiáveis e {2} senhas salvas em {3}.</value></data>
+  <data name="BackupCreatedMessage" xml:space="preserve"><value>Backup salvo em {3}. Servidores: {0} · Chaves de host confiáveis: {1} · Senhas salvas: {2}</value></data>
   <data name="BackupMissingCredentialsWarning" xml:space="preserve"><value>Nenhuma senha salva foi encontrada para: {0}. Depois de restaurar, ela será solicitada.</value></data>
   <data name="BackupExcludedEntriesWarning" xml:space="preserve"><value>Entradas de servidor ilegíveis, não incluídas: {0}</value></data>
   <data name="BackupExcludedTrustNote" xml:space="preserve"><value>Chaves de host confiáveis não usadas por nenhum servidor, não incluídas: {0}</value></data>
@@ -593,5 +593,5 @@
   <data name="ConfigurationLocked" xml:space="preserve"><value>Uma restauração está em andamento. Alterações não podem ser salvas até o ServerAlyzer reiniciar.</value></data>
   <data name="RestoreRecoveredUndone" xml:space="preserve"><value>Uma restauração foi interrompida e foi desfeita. Sua configuração está como antes.</value></data>
   <data name="RestoreRecoveredCompleted" xml:space="preserve"><value>Uma restauração interrompida foi concluída.</value></data>
-  <data name="RestorePendingBlocked" xml:space="preserve"><value>Backup e restauração estão indisponíveis: uma restauração interrompida não pôde ser processada automaticamente. Para desbloquear, feche o ServerAlyzer e exclua a pasta {0}. Excluí-la abandona o desfazer automático dessa restauração.</value></data>
+  <data name="RestorePendingBlocked" xml:space="preserve"><value>Backup e restauração estão indisponíveis porque uma restauração interrompida não pôde ser concluída nem desfeita. Reinicie o ServerAlyzer para tentar novamente de forma automática. Se isso continuar acontecendo, feche o ServerAlyzer e exclua a pasta {0}. Excluí-la abandona o desfazer automático dessa restauração.</value></data>
 </root>
