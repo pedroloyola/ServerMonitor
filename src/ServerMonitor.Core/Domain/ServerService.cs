@@ -1,12 +1,13 @@
+using ServerMonitor.Core.Backup;
 using ServerMonitor.Core.Interfaces;
 using ServerMonitor.Core.Models;
-using ServerMonitor.Core.Monitoring;
 
 namespace ServerMonitor.Core.Domain;
 
 public sealed class ServerService(
     IServerRepository repository,
-    IServerValidator validator) : IServerService, IDisposable
+    IServerValidator validator,
+    IConfigurationWriteGate writeGate) : IServerService, IDisposable
 {
     private readonly SemaphoreSlim _gate = new(1, 1);
     private List<Server>? _servers;
@@ -47,7 +48,7 @@ public sealed class ServerService(
             throw new ArgumentException("The server id cannot be empty.", nameof(id));
         }
 
-        var normalized = Normalize(input);
+        var normalized = ServerNormalizer.Normalize(input);
         var validation = validator.Validate(normalized);
         if (!validation.IsValid)
         {
@@ -80,7 +81,7 @@ public sealed class ServerService(
         ServerInput input,
         CancellationToken cancellationToken = default)
     {
-        var normalized = Normalize(input);
+        var normalized = ServerNormalizer.Normalize(input);
         var validation = validator.Validate(normalized);
         if (!validation.IsValid)
         {
@@ -163,6 +164,8 @@ public sealed class ServerService(
         await _gate.WaitAsync(cancellationToken);
         try
         {
+            // Inside our own lock, so no restore can start between the check and the save (M14.6 V5).
+            using var lease = writeGate.EnterWrite();
             await EnsureLoadedAsync(cancellationToken);
             var candidate = mutation(_servers!);
             if (candidate is null)
@@ -205,36 +208,4 @@ public sealed class ServerService(
         _quarantined = quarantined;
         _servers = valid;
     }
-
-    private static ServerInput Normalize(ServerInput input)
-    {
-        ArgumentNullException.ThrowIfNull(input);
-
-        return input with
-        {
-            Name = (input.Name ?? string.Empty).Trim(),
-            Host = (input.Host ?? string.Empty).Trim(),
-            Username = (input.Username ?? string.Empty).Trim(),
-            PrivateKeyPath = string.IsNullOrWhiteSpace(input.PrivateKeyPath)
-                ? null
-                : Path.GetFullPath(input.PrivateKeyPath.Trim()),
-            RefreshIntervalSeconds = RefreshIntervalPolicy.Normalize(input.RefreshIntervalSeconds),
-            Route = Normalize(input.Route)
-        };
-    }
-
-    private static ServerRoute? Normalize(ServerRoute? route) =>
-        route?.Jump is not { } jump
-            ? route
-            : route with
-            {
-                Jump = jump with
-                {
-                    Host = (jump.Host ?? string.Empty).Trim(),
-                    Username = (jump.Username ?? string.Empty).Trim(),
-                    PrivateKeyPath = string.IsNullOrWhiteSpace(jump.PrivateKeyPath)
-                        ? null
-                        : Path.GetFullPath(jump.PrivateKeyPath.Trim())
-                }
-            };
 }

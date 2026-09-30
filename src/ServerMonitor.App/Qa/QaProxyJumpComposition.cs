@@ -3,6 +3,7 @@ using ServerMonitor.App.Services;
 using ServerMonitor.App.Windowing;
 using ServerMonitor.Core.Interfaces;
 using ServerMonitor.Infrastructure.Persistence;
+using ServerMonitor.Infrastructure.Security;
 
 namespace ServerMonitor.App.Qa;
 
@@ -54,7 +55,8 @@ internal static class QaProxyJumpComposition
             FilePath = Path.Combine(directory, "window-placement.json")
         });
 
-        services.AddSingleton<IServerCredentialStore, QaInMemoryCredentialStore>();
+        // The raw store is swapped; ordinary callers still get it through the gated decorator (M14.6 §5.5).
+        services.AddSingleton(new UngatedCredentialStore(new QaInMemoryCredentialStore()));
 
         // Inert data plane: nothing schedules, collects or discovers. The editor's Test connection calls
         // ISshConnectionService directly, which stays real.

@@ -223,6 +223,8 @@ internal sealed class BackupFileCodec
                 CryptographicOperations.ZeroMemory(passphraseBytes);
             }
 
+            // Kept on purpose (Vigil L1): AesGcm clears the destination itself only on a tag mismatch, not on
+            // other CNG failures, so this is the only zeroing on those paths.
             if (!succeeded)
             {
                 CryptographicOperations.ZeroMemory(plaintext);
@@ -396,6 +398,9 @@ internal sealed class BackupPlaintext : IDisposable
     }
 
     public ReadOnlySpan<byte> Span => _bytes ?? throw new ObjectDisposedException(nameof(BackupPlaintext));
+
+    /// <summary>The same pinned buffer as memory (the payload reader parses it in place, never copying it).</summary>
+    public ReadOnlyMemory<byte> Memory => _bytes ?? throw new ObjectDisposedException(nameof(BackupPlaintext));
 
     public void Dispose()
     {

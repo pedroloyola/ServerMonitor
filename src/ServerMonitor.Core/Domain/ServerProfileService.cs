@@ -1,3 +1,4 @@
+using ServerMonitor.Core.Backup;
 using ServerMonitor.Core.Enums;
 using ServerMonitor.Core.Interfaces;
 using ServerMonitor.Core.Models;
@@ -7,7 +8,8 @@ namespace ServerMonitor.Core.Domain;
 
 public sealed class ServerProfileService(
     IServerService serverService,
-    IServerCredentialStore credentialStore) : IServerProfileService
+    IServerCredentialStore credentialStore,
+    IConfigurationWriteGate writeGate) : IServerProfileService
 {
     public async Task<ServerOperationResult> AddAsync(
         ServerProfileInput input,
@@ -15,6 +17,9 @@ public sealed class ServerProfileService(
     {
         ArgumentNullException.ThrowIfNull(input);
         EnsureJumpChangeHasRoute(input);
+
+        // Before any credential write: a restore never sees half a profile save (M14.6 V5).
+        using var lease = writeGate.EnterWrite();
         var serverId = Guid.NewGuid();
         CredentialReference? stagedReference = null;
         CredentialReference? stagedJumpReference = null;
@@ -84,6 +89,7 @@ public sealed class ServerProfileService(
         ArgumentNullException.ThrowIfNull(input);
         EnsureJumpChangeHasRoute(input);
 
+        using var lease = writeGate.EnterWrite();
         var oldReference = CreateReference(existingServer);
         var oldJumpReference = CreateJumpReference(existingServer);
         CredentialReference? stagedReference = null;
@@ -184,6 +190,7 @@ public sealed class ServerProfileService(
     public async Task<bool> RemoveAsync(Server server, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(server);
+        using var lease = writeGate.EnterWrite();
 
         // A failed save (rolled back, or partial) throws here, before any secret is touched: the server may
         // still be on disk, so its secrets must survive.
@@ -313,42 +320,17 @@ public sealed class ServerProfileService(
             nameof(JumpHop.CredentialReferenceId),
             ServerValidationErrorCode.JumpCredentialReferenceRequired));
 
-    private static CredentialReference? CreateReference(Server server)
-    {
-        if (server.CredentialReferenceId is not Guid referenceId)
-        {
-            return null;
-        }
+    private static CredentialReference? CreateReference(Server server) =>
+        ServerCredentialReferences.Target(server);
 
-        return new CredentialReference(server.Id, GetCredentialKind(server.AuthenticationMethod), referenceId);
-    }
-
-    private static CredentialReference? CreateJumpReference(Server server)
-    {
-        if (server.Route?.Jump is not { CredentialReferenceId: Guid referenceId } jump
-            || GetJumpCredentialKind(jump.AuthenticationMethod) is not { } kind)
-        {
-            return null;
-        }
-
-        return new CredentialReference(server.Id, kind, referenceId);
-    }
+    private static CredentialReference? CreateJumpReference(Server server) =>
+        ServerCredentialReferences.Jump(server);
 
     private static ServerCredentialKind GetCredentialKind(AuthenticationMethod authenticationMethod) =>
-        authenticationMethod switch
-        {
-            AuthenticationMethod.Password => ServerCredentialKind.Password,
-            AuthenticationMethod.SshKey => ServerCredentialKind.PrivateKeyPassphrase,
-            _ => throw new ArgumentException("Authentication must be configured.", nameof(authenticationMethod))
-        };
+        ServerCredentialReferences.GetCredentialKind(authenticationMethod);
 
     private static ServerCredentialKind? GetJumpCredentialKind(AuthenticationMethod authenticationMethod) =>
-        authenticationMethod switch
-        {
-            AuthenticationMethod.Password => ServerCredentialKind.JumpPassword,
-            AuthenticationMethod.SshKey => ServerCredentialKind.JumpPrivateKeyPassphrase,
-            _ => null
-        };
+        ServerCredentialReferences.GetJumpCredentialKind(authenticationMethod);
 
     private sealed record JumpCredentialOutcome(
         ServerInput Configuration,

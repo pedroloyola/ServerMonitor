@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using ServerMonitor.Core.Backup;
 
 namespace ServerMonitor.App.Services;
 
@@ -19,15 +20,18 @@ public sealed class JsonNotificationSettingsService : INotificationSettingsServi
 
     private readonly NotificationSettingsStorageOptions _storageOptions;
     private readonly ILogger<JsonNotificationSettingsService> _logger;
+    private readonly IConfigurationWriteGate _writeGate;
     private readonly object _sync = new();
     private bool _notificationsEnabled;
 
     public JsonNotificationSettingsService(
         NotificationSettingsStorageOptions storageOptions,
-        ILogger<JsonNotificationSettingsService> logger)
+        ILogger<JsonNotificationSettingsService> logger,
+        IConfigurationWriteGate writeGate)
     {
         _storageOptions = storageOptions ?? throw new ArgumentNullException(nameof(storageOptions));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _writeGate = writeGate ?? throw new ArgumentNullException(nameof(writeGate));
         _notificationsEnabled = LoadOrDefault();
     }
 
@@ -54,12 +58,63 @@ public sealed class JsonNotificationSettingsService : INotificationSettingsServi
                 return;
             }
 
+            // M14.6 V5: refused while a restore holds the configuration gate or after it committed.
+            using var lease = _writeGate.EnterWrite();
             Save(enabled);
             _notificationsEnabled = enabled;
             changed = NotificationsEnabledChanged;
         }
 
         changed?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>The file bytes a save writes for <paramref name="enabled"/> (restore renders with it).</summary>
+    internal static byte[] Render(bool enabled) =>
+        JsonSerializer.SerializeToUtf8Bytes(
+            new NotificationSettingsDocument { NotificationsEnabled = enabled },
+            SerializerOptions);
+
+    /// <summary>The value the service would load from <paramref name="bytes"/> (null = no file).</summary>
+    internal static bool Parse(byte[]? bytes)
+    {
+        if (bytes is null || bytes.Length > MaxFileBytes)
+        {
+            return true;
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<NotificationSettingsDocument>(bytes, SerializerOptions)?.NotificationsEnabled ?? true;
+        }
+        catch (JsonException)
+        {
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// Restore-only replace of the file (<paramref name="content"/> null deletes it) under this service's lock;
+    /// the in-memory value is reloaded from the file without raising the change event (the app relaunches).
+    /// </summary>
+    internal void ReplaceForRestore(RestoreWriteToken token, byte[]? content)
+    {
+        _writeGate.EnsureHeldBy(token);
+        lock (_sync)
+        {
+            if (content is null)
+            {
+                if (File.Exists(_storageOptions.FilePath))
+                {
+                    File.Delete(_storageOptions.FilePath);
+                }
+            }
+            else
+            {
+                WriteAtomically(content);
+            }
+
+            _notificationsEnabled = LoadOrDefault();
+        }
     }
 
     private bool LoadOrDefault()
@@ -101,7 +156,9 @@ public sealed class JsonNotificationSettingsService : INotificationSettingsServi
         }
     }
 
-    private void Save(bool enabled)
+    private void Save(bool enabled) => WriteAtomically(Render(enabled));
+
+    private void WriteAtomically(byte[] content)
     {
         var directory = Path.GetDirectoryName(_storageOptions.FilePath)
             ?? throw new InvalidOperationException("The notification settings path has no directory.");
@@ -118,10 +175,7 @@ public sealed class JsonNotificationSettingsService : INotificationSettingsServi
                 4096,
                 FileOptions.WriteThrough))
             {
-                JsonSerializer.Serialize(
-                    stream,
-                    new NotificationSettingsDocument { NotificationsEnabled = enabled },
-                    SerializerOptions);
+                stream.Write(content);
                 stream.Flush(flushToDisk: true);
             }
 

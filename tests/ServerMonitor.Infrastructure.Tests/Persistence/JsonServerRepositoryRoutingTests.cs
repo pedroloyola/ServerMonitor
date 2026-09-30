@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.Logging.Abstractions;
+using ServerMonitor.Core.Backup;
 using ServerMonitor.Core.Enums;
 using ServerMonitor.Core.Models;
 using ServerMonitor.Infrastructure.Persistence;
@@ -488,7 +489,7 @@ public sealed class JsonServerRepositoryRoutingTests : IDisposable
 
     private JsonServerRepository CreateRepository(Action<string>? faults = null) => new(
         new ServerStorageOptions { FilePath = DirectPath },
-        NullLogger<JsonServerRepository>.Instance)
+        NullLogger<JsonServerRepository>.Instance, new ConfigurationWriteGate())
     {
         FaultInjector = faults
     };

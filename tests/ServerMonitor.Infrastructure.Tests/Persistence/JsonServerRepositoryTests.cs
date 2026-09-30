@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging.Abstractions;
+using ServerMonitor.Core.Backup;
 using ServerMonitor.Core.Enums;
 using ServerMonitor.Core.Models;
 using ServerMonitor.Core.Monitoring;
@@ -166,7 +167,7 @@ public sealed class JsonServerRepositoryTests : IDisposable
     private static JsonServerRepository CreateRepository(string filePath) =>
         new(
             new ServerStorageOptions { FilePath = filePath },
-            NullLogger<JsonServerRepository>.Instance);
+            NullLogger<JsonServerRepository>.Instance, new ConfigurationWriteGate());
 
     private static Server CreateServer() => new()
     {

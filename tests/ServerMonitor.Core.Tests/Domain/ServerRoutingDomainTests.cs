@@ -1,3 +1,4 @@
+using ServerMonitor.Core.Backup;
 using ServerMonitor.Core.Domain;
 using ServerMonitor.Core.Enums;
 using ServerMonitor.Core.Interfaces;
@@ -18,7 +19,7 @@ public sealed class ServerRoutingDomainTests
     {
         var invalid = PersistedServer() with { Name = " " };
         var repository = new InMemoryRepository([PersistedServer(), invalid]);
-        using var service = new ServerService(repository, new ServerValidator());
+        using var service = new ServerService(repository, new ServerValidator(), new ConfigurationWriteGate());
 
         var visible = await service.GetAllAsync();
         Assert.DoesNotContain(visible, server => server.Id == invalid.Id);
@@ -37,7 +38,7 @@ public sealed class ServerRoutingDomainTests
         var brokenRoute = PersistedServer() with { Route = new ServerRoute { Jump = null } };
         var badJump = PersistedServer() with { Route = new ServerRoute { Jump = Jump() with { Host = "" } } };
         var repository = new InMemoryRepository([brokenRoute, badJump]);
-        using var service = new ServerService(repository, new ServerValidator());
+        using var service = new ServerService(repository, new ServerValidator(), new ConfigurationWriteGate());
 
         Assert.Empty(await service.GetAllAsync());
 
@@ -50,7 +51,7 @@ public sealed class ServerRoutingDomainTests
     public async Task AddAndUpdate_CarryTheRoute_AndNormalizeTheJump()
     {
         var repository = new InMemoryRepository([]);
-        using var service = new ServerService(repository, new ServerValidator());
+        using var service = new ServerService(repository, new ServerValidator(), new ConfigurationWriteGate());
 
         var added = await service.AddAsync(DirectInput() with
         {
@@ -369,8 +370,8 @@ public sealed class ServerRoutingDomainTests
         public ProfileFixture(bool throwOnSave = false)
         {
             Repository = new InMemoryRepository([]) { ThrowOnSave = throwOnSave };
-            Service = new ServerService(Repository, new ServerValidator());
-            Profiles = new ServerProfileService(Service, Credentials);
+            Service = new ServerService(Repository, new ServerValidator(), new ConfigurationWriteGate());
+            Profiles = new ServerProfileService(Service, Credentials, new ConfigurationWriteGate());
         }
 
         public InMemoryRepository Repository { get; }

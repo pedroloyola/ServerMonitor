@@ -2,9 +2,11 @@ using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
 using Microsoft.Extensions.Logging;
+using ServerMonitor.Core.Backup;
 using ServerMonitor.Core.Domain;
 using ServerMonitor.Core.Interfaces;
 using ServerMonitor.Core.Models;
+using ServerMonitor.Infrastructure.Backup;
 
 namespace ServerMonitor.Infrastructure.Persistence;
 
@@ -31,7 +33,8 @@ namespace ServerMonitor.Infrastructure.Persistence;
 /// </summary>
 public sealed class JsonServerRepository(
     ServerStorageOptions storageOptions,
-    ILogger<JsonServerRepository> logger) : IServerRepository, IDisposable
+    ILogger<JsonServerRepository> logger,
+    IConfigurationWriteGate writeGate) : IServerRepository, IDisposable
 {
     internal const int SupportedRoutedSchemaVersion = 1;
 
@@ -96,6 +99,8 @@ public sealed class JsonServerRepository(
         await _gate.WaitAsync(cancellationToken);
         try
         {
+            // Defence in depth behind ServerService (M14.6 V5): checked inside our own lock.
+            using var lease = writeGate.EnterWrite();
             var directory = Path.GetDirectoryName(storageOptions.FilePath)
                 ?? throw new InvalidOperationException("The server storage path has no directory.");
             Directory.CreateDirectory(directory);
@@ -199,6 +204,93 @@ public sealed class JsonServerRepository(
     }
 
     public void Dispose() => _gate.Dispose();
+
+    /// <summary>The model's Web-default serializer options (the backup payload uses the same shape).</summary>
+    internal static JsonSerializerOptions ModelSerializerOptions => SerializerOptions;
+
+    /// <summary>
+    /// The two files that hold exactly <paramref name="servers"/> and nothing else (restore REPLACE: no
+    /// originals, no preserved entries): direct servers in the <c>servers.json</c> array, routed servers in the
+    /// <c>routed-servers.json</c> envelope. Built with the same writers as a normal save.
+    /// </summary>
+    internal static (byte[] Direct, byte[] Routed) RenderReplacement(IReadOnlyCollection<Server> servers)
+    {
+        ArgumentNullException.ThrowIfNull(servers);
+        var none = new Dictionary<Guid, JsonElement>();
+        var direct = BuildArray(servers.Where(server => server.Route is null), none, forDirectFile: true, preserved: []);
+        var routed = BuildRoutedFile(servers.Where(server => server.Route is not null), none, preserved: [], topLevel: []);
+        return (direct, routed);
+    }
+
+    /// <summary>
+    /// Restore-only replace of one of the two files (<paramref name="content"/> null deletes it), under this
+    /// store's lock. Only the restore holding the configuration gate can call it (M14.6 §5.5).
+    /// </summary>
+    internal async Task ReplaceFileForRestoreAsync(
+        RestoreWriteToken token,
+        bool routed,
+        byte[]? content,
+        CancellationToken cancellationToken)
+    {
+        writeGate.EnsureHeldBy(token);
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            DurableFile.Replace(routed ? storageOptions.RoutedFilePath : storageOptions.FilePath, content);
+            _knownIds.Clear();
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    /// <summary>
+    /// Reads both files with this store's own parser for restore verification. <see langword="null"/> when a
+    /// file is corrupt, read-only, or holds any entry that would not load (quarantine).
+    /// </summary>
+    internal async Task<IReadOnlyList<Server>?> ReadForVerifyAsync(CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            var direct = await ReadDirectAsync(cancellationToken);
+            var routed = await ReadRoutedAsync(cancellationToken);
+            if (direct.IsCorrupt || routed.IsCorrupt || routed.IsReadOnly
+                || direct.Quarantined.Count > 0 || routed.Quarantined.Count > 0
+                || direct.Entries.Any(entry => routed.ClaimedIds.Contains(entry.Server.Id)))
+            {
+                return null;
+            }
+
+            return routed.Entries.Select(entry => entry.Server).Concat(direct.Entries.Select(entry => entry.Server)).ToList();
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    /// <summary>Stored entries that do not load (quarantined or shadowed), plus one per unreadable file:
+    /// the export summary's "could not be read and were not included".</summary>
+    internal async Task<int> CountUnloadableAsync(CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            var direct = await ReadDirectAsync(cancellationToken);
+            var routed = await ReadRoutedAsync(cancellationToken);
+            return direct.Quarantined.Count
+                + routed.Quarantined.Count
+                + (direct.IsCorrupt ? 1 : 0)
+                + (routed.IsCorrupt ? 1 : 0)
+                + direct.Entries.Count(entry => routed.ClaimedIds.Contains(entry.Server.Id) && !routed.Entries.Exists(r => r.Server.Id == entry.Server.Id));
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
 
     /// <summary>
     /// Test-only fault seam: invoked with <c>write:&lt;path&gt;</c> before each file write and
@@ -482,7 +574,13 @@ public sealed class JsonServerRepository(
         }
     }
 
-    private static Server? TryDeserialize(JsonElement element)
+    private static Server? TryDeserialize(JsonElement element) => TryDeserialize(element, SerializerOptions);
+
+    /// <summary>
+    /// One server entry, or <see langword="null"/> when it does not bind or has an empty id. The options are a
+    /// parameter so the backup reader can apply its strict overlay while the store keeps its lenient load path.
+    /// </summary>
+    internal static Server? TryDeserialize(JsonElement element, JsonSerializerOptions options)
     {
         if (element.ValueKind != JsonValueKind.Object)
         {
@@ -491,7 +589,7 @@ public sealed class JsonServerRepository(
 
         try
         {
-            var server = element.Deserialize<Server>(SerializerOptions);
+            var server = element.Deserialize<Server>(options);
             return server is null || server.Id == Guid.Empty ? null : server;
         }
         catch (Exception exception) when (exception is JsonException

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using ServerMonitor.Core.Backup;
 
 namespace ServerMonitor.App.Services;
 
@@ -35,16 +36,19 @@ public sealed class JsonBackgroundMonitoringSettingsService : IBackgroundMonitor
 
     private readonly BackgroundSettingsStorageOptions _storageOptions;
     private readonly ILogger<JsonBackgroundMonitoringSettingsService> _logger;
+    private readonly IConfigurationWriteGate _writeGate;
     private readonly object _sync = new();
     private bool _backgroundMonitoringEnabled;
     private bool _backgroundNoticeShown;
 
     public JsonBackgroundMonitoringSettingsService(
         BackgroundSettingsStorageOptions storageOptions,
-        ILogger<JsonBackgroundMonitoringSettingsService> logger)
+        ILogger<JsonBackgroundMonitoringSettingsService> logger,
+        IConfigurationWriteGate writeGate)
     {
         _storageOptions = storageOptions ?? throw new ArgumentNullException(nameof(storageOptions));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _writeGate = writeGate ?? throw new ArgumentNullException(nameof(writeGate));
 
         var document = LoadOrDefault();
         _backgroundMonitoringEnabled = document.BackgroundMonitoringEnabled;
@@ -73,6 +77,8 @@ public sealed class JsonBackgroundMonitoringSettingsService : IBackgroundMonitor
                 return;
             }
 
+            // M14.6 V5: refused while a restore holds the configuration gate or after it committed.
+            using var lease = _writeGate.EnterWrite();
             Save(enabled, _backgroundNoticeShown);
             _backgroundMonitoringEnabled = enabled;
             changed = BackgroundMonitoringEnabledChanged;
@@ -98,7 +104,13 @@ public sealed class JsonBackgroundMonitoringSettingsService : IBackgroundMonitor
 
             try
             {
+                // While a restore holds the gate the claim stays in memory only: no file write (M14.6 §5.5).
+                using var lease = _writeGate.EnterWrite();
                 Save(_backgroundMonitoringEnabled, backgroundNoticeShown: true);
+            }
+            catch (ConfigurationLockedException)
+            {
+                _logger.LogInformation("The background notice was claimed in memory only: a restore holds the configuration.");
             }
             catch (Exception exception)
             {
@@ -109,6 +121,62 @@ public sealed class JsonBackgroundMonitoringSettingsService : IBackgroundMonitor
 
             _backgroundNoticeShown = true;
             return true;
+        }
+    }
+
+    /// <summary>The file bytes a save writes (restore renders with it).</summary>
+    internal static byte[] Render(bool backgroundMonitoringEnabled, bool backgroundNoticeShown) =>
+        JsonSerializer.SerializeToUtf8Bytes(
+            new BackgroundSettingsDocument
+            {
+                BackgroundMonitoringEnabled = backgroundMonitoringEnabled,
+                BackgroundNoticeShown = backgroundNoticeShown
+            },
+            SerializerOptions);
+
+    /// <summary>The monitoring preference the service would load from <paramref name="bytes"/> (null = no file).</summary>
+    internal static bool ParseBackgroundMonitoringEnabled(byte[]? bytes)
+    {
+        if (bytes is null || bytes.Length > MaxFileBytes)
+        {
+            return BackgroundSettingsDocument.Default.BackgroundMonitoringEnabled;
+        }
+
+        try
+        {
+            return (JsonSerializer.Deserialize<BackgroundSettingsDocument>(bytes, SerializerOptions)
+                ?? BackgroundSettingsDocument.Default).BackgroundMonitoringEnabled;
+        }
+        catch (JsonException)
+        {
+            return BackgroundSettingsDocument.Default.BackgroundMonitoringEnabled;
+        }
+    }
+
+    /// <summary>
+    /// Restore-only replace of the file (<paramref name="content"/> null deletes it) under this service's lock;
+    /// the in-memory values are reloaded from the file without raising the change event (the app relaunches).
+    /// </summary>
+    internal void ReplaceForRestore(RestoreWriteToken token, byte[]? content)
+    {
+        _writeGate.EnsureHeldBy(token);
+        lock (_sync)
+        {
+            if (content is null)
+            {
+                if (File.Exists(_storageOptions.FilePath))
+                {
+                    File.Delete(_storageOptions.FilePath);
+                }
+            }
+            else
+            {
+                WriteAtomically(content);
+            }
+
+            var document = LoadOrDefault();
+            _backgroundMonitoringEnabled = document.BackgroundMonitoringEnabled;
+            _backgroundNoticeShown = document.BackgroundNoticeShown;
         }
     }
 
@@ -149,7 +217,10 @@ public sealed class JsonBackgroundMonitoringSettingsService : IBackgroundMonitor
         }
     }
 
-    private void Save(bool backgroundMonitoringEnabled, bool backgroundNoticeShown)
+    private void Save(bool backgroundMonitoringEnabled, bool backgroundNoticeShown) =>
+        WriteAtomically(Render(backgroundMonitoringEnabled, backgroundNoticeShown));
+
+    private void WriteAtomically(byte[] content)
     {
         var directory = Path.GetDirectoryName(_storageOptions.FilePath)
             ?? throw new InvalidOperationException("The background settings path has no directory.");
@@ -161,15 +232,8 @@ public sealed class JsonBackgroundMonitoringSettingsService : IBackgroundMonitor
             using (var stream = new FileStream(
                 temporaryFile, FileMode.Create, FileAccess.Write, FileShare.None, 4096, FileOptions.WriteThrough))
             {
-                JsonSerializer.Serialize(
-                    stream,
-                    new BackgroundSettingsDocument
-                    {
-                        BackgroundMonitoringEnabled = backgroundMonitoringEnabled,
-                        BackgroundNoticeShown = backgroundNoticeShown
-                    },
-                    SerializerOptions);
-                stream.Flush();
+                stream.Write(content);
+                stream.Flush(flushToDisk: true);
             }
 
             File.Move(temporaryFile, _storageOptions.FilePath, overwrite: true);

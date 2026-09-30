@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging.Abstractions;
+using ServerMonitor.Core.Backup;
 using ServerMonitor.Core.Models;
 using ServerMonitor.Core.Security;
 using ServerMonitor.Infrastructure.Persistence;
@@ -210,9 +211,9 @@ public sealed class JsonRoutedHostKeyTrustStoreTests : IDisposable
 
     private JsonHostKeyTrustStore CreateDirect() => new(
         new HostKeyTrustStorageOptions { FilePath = DirectPath },
-        NullLogger<JsonHostKeyTrustStore>.Instance);
+        NullLogger<JsonHostKeyTrustStore>.Instance, new ConfigurationWriteGate());
 
     private JsonRoutedHostKeyTrustStore CreateRouted() => new(
         RoutedHostKeyTrustStorageOptions.From(new HostKeyTrustStorageOptions { FilePath = DirectPath }),
-        NullLogger<JsonRoutedHostKeyTrustStore>.Instance);
+        NullLogger<JsonRoutedHostKeyTrustStore>.Instance, new ConfigurationWriteGate());
 }

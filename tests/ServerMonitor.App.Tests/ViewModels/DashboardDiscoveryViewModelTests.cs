@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using ServerMonitor.App.Services;
 using ServerMonitor.App.Tests.Fakes;
 using ServerMonitor.App.ViewModels;
+using ServerMonitor.Core.Backup;
 using ServerMonitor.Core.Discovery;
 using ServerMonitor.Core.Domain;
 using ServerMonitor.Core.Enums;
@@ -88,9 +89,9 @@ public sealed class DashboardDiscoveryViewModelTests
     public async Task DiscoverySave_UsesNormalServerProfileServicePath()
     {
         var repository = new InMemoryRepository();
-        using var serverService = new ServerService(repository, new ServerValidator());
+        using var serverService = new ServerService(repository, new ServerValidator(), new ConfigurationWriteGate());
         var credentials = new RecordingCredentialStore();
-        var profiles = new ServerProfileService(serverService, credentials);
+        var profiles = new ServerProfileService(serverService, credentials, new ConfigurationWriteGate());
         var dialog = new FakeDialogService
         {
             DiscoveryResult = EditorResult("Example SSH", "example.local", 22)

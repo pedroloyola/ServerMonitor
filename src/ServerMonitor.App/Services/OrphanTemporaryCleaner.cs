@@ -27,6 +27,33 @@ public sealed class OrphanTemporaryCleaner(ILogger<OrphanTemporaryCleaner> logge
     /// Removes the known-host temporary if it is present. <paramref name="knownHostsPath"/> is the exact
     /// destination path the trust store uses; the temporary is that path plus the writer's suffix.
     /// </summary>
+    /// <summary>
+    /// Removes the restore journal's own temporaries (M14.6 §7): exactly the paths
+    /// <c>RestoreJournalRecovery.JournalTemporaryFiles</c> derives from the fixed journal layout — never a sweep.
+    /// Runs after journal recovery, so a temporary that recovery might still need is never involved.
+    /// </summary>
+    public void CleanRestoreJournalTemporaries(IEnumerable<string> exactPaths)
+    {
+        ArgumentNullException.ThrowIfNull(exactPaths);
+        foreach (var path in exactPaths)
+        {
+            try
+            {
+                if (File.Exists(path))
+                {
+                    File.Delete(path);
+                    logger.LogInformation("Removed a restore-journal temporary left by a previous forced termination.");
+                }
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                logger.LogWarning(
+                    "A restore-journal temporary could not be removed ({Type}); leaving it in place.",
+                    exception.GetType().Name);
+            }
+        }
+    }
+
     public void CleanKnownHostTemporary(string knownHostsPath)
     {
         if (string.IsNullOrWhiteSpace(knownHostsPath))
