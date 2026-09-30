@@ -430,6 +430,7 @@
   <data name="ServerFormJumpHostField.Header" xml:space="preserve"><value>Host de salto</value></data>
   <data name="ServerFormJumpHostField.PlaceholderText" xml:space="preserve"><value>Ex.: bastion.example.com</value></data>
   <data name="ServerFormJumpPortField.Header" xml:space="preserve"><value>Porta</value></data>
+  <data name="ServerFormJumpPortField.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Porta do host de salto</value></data>
   <data name="ServerFormJumpUsernameField.Header" xml:space="preserve"><value>Usuário do host de salto</value></data>
   <data name="ServerFormJumpAuthenticationMethodField.Header" xml:space="preserve"><value>Autenticação do host de salto</value></data>
   <data name="JumpAuthenticationSshKeyOption.Content" xml:space="preserve"><value>Chave privada SSH</value></data>
