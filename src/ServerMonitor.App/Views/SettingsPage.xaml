@@ -399,6 +399,7 @@
                             Style="{StaticResource QuietPillButtonStyle}" />
 
                         <InfoBar
+                            x:Name="BackupStatusBar"
                             Title="{x:Bind Backup.StatusTitle, Mode=OneWay}"
                             IsClosable="{x:Bind Backup.IsStatusClosable, Mode=OneWay}"
                             IsOpen="{x:Bind Backup.IsStatusOpen, Mode=TwoWay}"

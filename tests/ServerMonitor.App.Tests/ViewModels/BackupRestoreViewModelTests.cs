@@ -619,6 +619,7 @@ public sealed class BackupRestoreViewModelTests
             Assert.True(planDisposedAtCompletion);
             Assert.Equal(new[] { ExitReason.RestoreCompleted }, harness.Lifecycle.ExitReasons);
             Assert.False(viewModel.CanStart); // configuration writes are refused until the process ends
+            Assert.False(viewModel.IsAvailable);
             Assert.False(viewModel.CreateBackupCommand.CanExecute(null));
             Assert.False(viewModel.RestoreCommand.CanExecute(null));
             return;
@@ -737,7 +738,11 @@ public sealed class BackupRestoreViewModelTests
         var restore = viewModel.RestoreAsync();
 
         Assert.False(viewModel.CanStart);
-        Assert.False(viewModel.CreateBackupCommand.CanExecute(null));
+        // The buttons stay enabled (the dialogs are modal and keep the keyboard focus where it was);
+        // what refuses a second flow is the guard, however it is invoked.
+        Assert.True(viewModel.CreateBackupCommand.CanExecute(null));
+        viewModel.CreateBackupCommand.Execute(null);
+        viewModel.RestoreCommand.Execute(null);
         await viewModel.CreateBackupAsync();
         await viewModel.RestoreAsync();
         Assert.Equal(new[] { "open", "confirm" }, harness.Interaction.Calls);
@@ -897,6 +902,8 @@ public sealed class BackupRestoreViewModelTests
         Assert.Equal(JournalDirectory, viewModel.StatusDetail);
         Assert.True(viewModel.HasStatusDetail);
         Assert.False(viewModel.CanStart);
+        Assert.False(viewModel.CreateBackupCommand.CanExecute(null));
+        Assert.False(viewModel.RestoreCommand.CanExecute(null));
 
         await viewModel.CreateBackupAsync();
         await viewModel.RestoreAsync();

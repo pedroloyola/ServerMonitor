@@ -17,6 +17,7 @@ public sealed partial class SettingsPage : Page
         WindowMode = windowMode;
         DataContext = ViewModel;
         Loaded += OnLoaded;
+        Unloaded += OnUnloaded;
     }
 
     public SettingsViewModel ViewModel { get; }
@@ -38,6 +39,27 @@ public sealed partial class SettingsPage : Page
             BackgroundSection.StartBringIntoView();
         }
 
+        Backup.PropertyChanged -= OnBackupPropertyChanged;
+        Backup.PropertyChanged += OnBackupPropertyChanged;
         await ViewModel.LoadAsync();
+    }
+
+    private void OnUnloaded(object sender, Microsoft.UI.Xaml.RoutedEventArgs e) =>
+        Backup.PropertyChanged -= OnBackupPropertyChanged;
+
+    // The outcome of a backup or restore appears below the buttons, at the very end of the card: bring
+    // it into view so it is never reported off-screen. Also when the flow ends (CanStart): the dialog
+    // that just closed hands the focus back to its button, which scrolls the page to that button.
+    private void OnBackupPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(BackupRestoreViewModel.IsStatusOpen) or nameof(BackupRestoreViewModel.CanStart)
+            && Backup.IsStatusOpen)
+        {
+            DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+            {
+                BackupStatusBar.UpdateLayout();
+                BackupStatusBar.StartBringIntoView();
+            });
+        }
     }
 }

@@ -25,8 +25,8 @@ public sealed class BackupRestoreViewModel : ObservableObject, IDisposable
     private readonly ILocalizationService _localization;
     private readonly ILogger<BackupRestoreViewModel> _logger;
     private readonly TimeProvider _timeProvider;
-    private readonly AsyncRelayCommand _createBackupCommand;
-    private readonly AsyncRelayCommand _restoreCommand;
+    private readonly RelayCommand _createBackupCommand;
+    private readonly RelayCommand _restoreCommand;
     private RestorePlan? _plan;
     private bool _isRunning;
     private bool _isApplying;
@@ -56,17 +56,23 @@ public sealed class BackupRestoreViewModel : ObservableObject, IDisposable
         _localization = localization;
         _logger = logger;
         _timeProvider = timeProvider ?? TimeProvider.System;
-        _createBackupCommand = new AsyncRelayCommand(CreateBackupAsync, () => CanStart);
-        _restoreCommand = new AsyncRelayCommand(RestoreAsync, () => CanStart);
+        // The buttons stay enabled while a flow runs: its dialogs are modal, re-entry is refused by
+        // TryBegin, and a button that disables itself under the keyboard focus sends the focus (and the
+        // scroll position) to the top of the page.
+        _createBackupCommand = new RelayCommand(() => _ = CreateBackupAsync(), () => IsAvailable);
+        _restoreCommand = new RelayCommand(() => _ = RestoreAsync(), () => IsAvailable);
     }
 
     public ICommand CreateBackupCommand => _createBackupCommand;
 
     public ICommand RestoreCommand => _restoreCommand;
 
-    /// <summary>False while a flow runs, while a stuck journal blocks the feature, and once a restore
-    /// committed (the app is about to close and configuration writes are refused).</summary>
-    public bool CanStart => !_isRunning && !_isBlocked && !_isRestoreCommitted;
+    /// <summary>False while a stuck journal blocks the feature, and once a restore committed (the app is
+    /// about to close and configuration writes are refused).</summary>
+    public bool IsAvailable => !_isBlocked && !_isRestoreCommitted;
+
+    /// <summary>False while a flow is already running, or the feature is not available.</summary>
+    public bool CanStart => !_isRunning && IsAvailable;
 
     public bool IsBlocked => _isBlocked;
 
@@ -595,6 +601,7 @@ public sealed class BackupRestoreViewModel : ObservableObject, IDisposable
     private void NotifyCanStartChanged()
     {
         OnPropertyChanged(nameof(CanStart));
+        OnPropertyChanged(nameof(IsAvailable));
         _createBackupCommand.NotifyCanExecuteChanged();
         _restoreCommand.NotifyCanExecuteChanged();
     }

@@ -32,10 +32,15 @@ public sealed class BackupRestoreDialogService(IWindowContext windowContext) : I
 
     public async Task<RestoreApplyResult> ShowRestoringAsync(string message, Func<Task<RestoreApplyResult>> apply)
     {
+        // The progress bar takes the keyboard focus: with nothing focusable inside, the focus would stay
+        // on the page behind the dialog, where Enter could still act.
+        var progress = new ProgressBar { IsIndeterminate = true, IsTabStop = true, UseSystemFocusVisuals = false };
         var content = new StackPanel { Spacing = 12, MinWidth = 320 };
         content.Children.Add(new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap });
-        content.Children.Add(new ProgressBar { IsIndeterminate = true });
+        content.Children.Add(progress);
         var dialog = CreateDialog(content);
+        dialog.Resources["ContentDialogMinHeight"] = 0d; // no buttons: no empty command area
+        dialog.Opened += (_, _) => progress.Focus(FocusState.Programmatic);
 
         // No button, and Esc is refused: the surface leaves only when the restore has an outcome.
         var finished = false;
