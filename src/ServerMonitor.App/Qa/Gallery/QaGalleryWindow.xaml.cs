@@ -26,7 +26,8 @@ public sealed partial class QaGalleryWindow : Window
             ["colors"] = ("Colors", typeof(QaColorsPage)),
             ["spacing"] = ("Spacing & radius", typeof(QaSpacingPage)),
             ["materials"] = ("Materials", typeof(QaMaterialsPage)),
-            ["status"] = ("Status", typeof(QaStatusPage))
+            ["status"] = ("Status", typeof(QaStatusPage)),
+            ["motion"] = ("Motion", typeof(QaMotionPage))
         };
 
     private readonly QaGalleryRequest _request;

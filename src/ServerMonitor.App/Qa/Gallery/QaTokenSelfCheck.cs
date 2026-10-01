@@ -6,6 +6,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Shapes;
 using ServerMonitor.App.Controls.Primitives;
+using ServerMonitor.App.Services.Motion;
 using Windows.UI;
 
 namespace ServerMonitor.App.Qa.Gallery;
@@ -99,6 +100,10 @@ internal sealed class QaTokenSelfCheck(QaGalleryWindow window)
             results.AddRange(QaTokenManifest.Entries.Select(entry => Check(theme, entry, probes, themeEntries)));
             results.Add(CheckDefaultStyle(theme, page.DefaultStyleProbe, themeEntries));
         }
+
+        // F-4: the C# accessor parses every motion token straight from the live Application.Resources.
+        results.AddRange(MotionTokens.TimeKeys.Select(key => CheckMotion(key, () => MotionTokens.GetTime(Application.Current.Resources, key).ToString("c", CultureInfo.InvariantCulture))));
+        results.AddRange(MotionTokens.KeySplineKeys.Select(key => CheckMotion(key, () => MotionTokens.GetKeySpline(Application.Current.Resources, key).ToString())));
 
         var highContrast = QaHighContrastSimulation.ThemeEntries("HighContrast");
         results.AddRange(QaTokenManifest.Entries
@@ -215,6 +220,18 @@ internal sealed class QaTokenSelfCheck(QaGalleryWindow window)
         catch (Exception exception)
         {
             return new QaTokenResult(theme, DefaultStyleProbeKey, "Primitive", "templated", "<exception>", "FAIL", exception.Message);
+        }
+    }
+
+    private static QaTokenResult CheckMotion(string key, Func<string> parse)
+    {
+        try
+        {
+            return new QaTokenResult("Motion", key, "MotionTokens", "parses (invariant, fail-closed)", parse(), "PASS", "MotionTokens accessor over Application.Resources");
+        }
+        catch (Exception exception)
+        {
+            return new QaTokenResult("Motion", key, "MotionTokens", "parses (invariant, fail-closed)", "<exception>", "FAIL", exception.Message);
         }
     }
 

@@ -59,7 +59,13 @@ public sealed partial class XamlContractAndResourceGuardTests
             "ContentHost", "PageFrame"
         ],
         ["Qa/Gallery/QaTokenProbePage.xaml"] = ["DefaultStyleProbe"],
-        ["Qa/Gallery/QaColorsPage.xaml"] = ["PrimitiveSwatches"]
+        ["Qa/Gallery/QaColorsPage.xaml"] = ["PrimitiveSwatches"],
+        // Storyboard.TargetName lanes (G-3) and the C#-path lanes driven by the code-behind.
+        ["Qa/Gallery/QaMotionPage.xaml"] =
+        [
+            "XamlFadeBox", "XamlFastBox", "XamlNormalBox", "XamlSlowBox", "XamlFocusBox", "XamlReducedBox",
+            "CodeFadeBox", "CodeFastBox", "CodeNormalBox", "CodeSlowBox", "CodeFocusBox", "AnimationsText", "TokenValuesText"
+        ]
     };
 
     /// <summary>
