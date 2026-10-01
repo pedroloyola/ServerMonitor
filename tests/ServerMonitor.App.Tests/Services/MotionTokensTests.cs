@@ -63,6 +63,7 @@ public sealed class MotionTokensTests
     [InlineData("0.180")]
     [InlineData("0:0:0")]       // zero is not a duration
     [InlineData("-0:0:1")]
+    [InlineData("0:0:0.180\n")] // Cortex F-8: a trailing newline is not a valid token
     [InlineData("")]
     [InlineData(null)]
     public void MalformedTimesFailClosedNamingTheKey(string? value) => WithCulture("pt-PT", () =>

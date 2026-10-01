@@ -33,7 +33,11 @@ public sealed class SaStatusIndicator : Control
         nameof(Label),
         typeof(string),
         typeof(SaStatusIndicator),
-        new PropertyMetadata(string.Empty, (d, e) => AutomationProperties.SetName(d, e.NewValue as string ?? string.Empty)));
+        new PropertyMetadata(string.Empty, (d, e) => ((SaStatusIndicator)d).ApplyAutomationName(e.NewValue as string ?? string.Empty)));
+
+    // The name this control last applied. An explicit AutomationProperties.Name set by a consumer is never
+    // overwritten (Cortex F-2): only an empty name or the one this control set itself is replaced.
+    private string? _appliedAutomationName;
 
     public SaStatusIndicator()
     {
@@ -61,6 +65,16 @@ public sealed class SaStatusIndicator : Control
     {
         base.OnApplyTemplate();
         UpdateStatusState(useTransitions: false);
+    }
+
+    private void ApplyAutomationName(string label)
+    {
+        var current = AutomationProperties.GetName(this);
+        if (string.IsNullOrEmpty(current) || current == _appliedAutomationName)
+        {
+            AutomationProperties.SetName(this, label);
+            _appliedAutomationName = label;
+        }
     }
 
     private void UpdateStatusState(bool useTransitions) =>

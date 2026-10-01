@@ -45,10 +45,13 @@ public sealed partial class ComponentLayerGuardTests
             {
                 foreach (var key in StaticReferences(element))
                 {
+                    // Cortex F-7: an earlier key counts only when it lives in the consumer's own dictionary or one
+                    // of its ancestors - never in a sibling theme dictionary or another element's resources.
                     var lexicallyBefore = keyed.Any(k => k != element
                         && (string)k.Attribute(AppSourceTree.Xaml + "Key")! == key
                         && k.IsBefore(element)
-                        && !element.Ancestors().Contains(k));
+                        && !element.Ancestors().Contains(k)
+                        && k.Parent is { } container && element.Ancestors().Contains(container));
                     if (!lexicallyBefore && !merged.Contains(key) && !XamlContractAndResourceGuardTests.IsPlatformKey(key))
                     {
                         failures.Add($"{file}: {{StaticResource {key}}} does not resolve in the file's own scope " +

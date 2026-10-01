@@ -98,6 +98,6 @@ public static partial class MotionTokens
     private static InvalidOperationException Invalid(string key, object? value, string expected) =>
         new($"Motion token '{key}' has the invalid value '{value ?? "<missing>"}'; expected {expected}.");
 
-    [GeneratedRegex(@"^\d{1,2}:\d{1,2}:\d{1,2}(\.\d{1,7})?$")]
+    [GeneratedRegex(@"\A\d{1,2}:\d{1,2}:\d{1,2}(\.\d{1,7})?\z")]
     private static partial Regex TimeShape();
 }

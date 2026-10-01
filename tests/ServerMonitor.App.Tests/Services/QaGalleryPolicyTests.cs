@@ -29,7 +29,22 @@ public sealed class QaGalleryPolicyTests
     {
         Assert.Equal(QaGalleryMode.None, Resolve(true).Mode);
         Assert.Equal(QaGalleryMode.None, Resolve(true, "--qa-health").Mode);
-        Assert.Equal(QaGalleryMode.None, Resolve(true, "--qa-gallery-theme", "dark").Mode);
+    }
+
+    [Theory]
+    [InlineData("--qa-gallery-theme", "dark")]
+    [InlineData("--qa-gallery-page", "tokens")]
+    [InlineData("--qa-gallery-out", "C:\\qa")]
+    [InlineData("--qa-gallery-theme=light", null)]
+    public void AGalleryOptionWithoutTheGalleryIsRefusedNotIgnored(string flag, string? value)
+    {
+        string[] args = value is null ? [flag] : [flag, value];
+
+        var request = Resolve(true, args);
+
+        Assert.Equal(QaGalleryMode.Refused, request.Mode);
+        Assert.Contains(QaGalleryPolicy.ComponentsFlag, request.RefusalReason, StringComparison.Ordinal);
+        Assert.Equal(QaGalleryMode.None, Resolve(false, args).Mode);
     }
 
     [Fact]

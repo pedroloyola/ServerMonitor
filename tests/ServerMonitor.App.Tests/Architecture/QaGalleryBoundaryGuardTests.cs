@@ -66,6 +66,9 @@ public sealed class QaGalleryBoundaryGuardTests
         Assert.True(launch < recovery && launch < cleaner,
             "OnLaunched must hand over to the gallery before StartupRestoreRecovery and OrphanTemporaryCleaner.");
         Assert.Contains("return;", launched[launch..recovery], StringComparison.Ordinal);
+        var guard = launched.LastIndexOf("if (_galleryMode)", launch, StringComparison.Ordinal);
+        Assert.True(guard >= 0 && !launched[guard..launch].Contains('}'),
+            "QaGalleryComposition.Launch() must sit directly inside if (_galleryMode) (Cortex F-9).");
     }
 
     private static int IndexOf(string code, string marker)

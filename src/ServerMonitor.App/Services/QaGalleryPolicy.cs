@@ -48,6 +48,9 @@ public static class QaGalleryPolicy
     public const string PageFlag = "--qa-gallery-page";
     public const string OutputFlag = "--qa-gallery-out";
 
+    /// <summary>Every gallery option starts with this; on its own (without a gallery flag) it is refused.</summary>
+    public const string GalleryOptionPrefix = "--qa-gallery-";
+
     /// <summary>Gallery themes. <c>hc-sim</c> is a labelled resource simulation, never the real contrast theme.</summary>
     public static IReadOnlyList<string> Themes { get; } = ["dark", "light", "hc-sim"];
 
@@ -80,7 +83,11 @@ public static class QaGalleryPolicy
         var tokens = HasFlag(commandLineArgs, TokensFlag);
         if (!components && !tokens)
         {
-            return QaGalleryRequest.NotRequested;
+            // Cortex F-1: a gallery option without the gallery is a mistyped launch, not a production start.
+            var orphan = commandLineArgs.FirstOrDefault(argument => argument.StartsWith(GalleryOptionPrefix, StringComparison.OrdinalIgnoreCase));
+            return orphan is null
+                ? QaGalleryRequest.NotRequested
+                : Refuse($"{orphan.Split('=', 2)[0]} needs {ComponentsFlag} or {TokensFlag}.");
         }
 
         var foreign = commandLineArgs

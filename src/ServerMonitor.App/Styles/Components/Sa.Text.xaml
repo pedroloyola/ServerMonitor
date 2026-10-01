@@ -16,7 +16,13 @@
     <Style x:Key="SaSecondaryBodyTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SaBodyTextStyle}">
         <Setter Property="Foreground" Value="{ThemeResource SaTextSecondaryBrush}" />
     </Style>
-    <Style x:Key="SaTableHeaderTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SaLabelTextStyle}">
+    <!-- Table header 10/14 Medium muted, Figma 112:1434 (Boss B-3, Cortex F-5). Casing comes from the content. -->
+    <Style x:Key="SaTableHeaderTextStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource SaFontText}" />
+        <Setter Property="FontSize" Value="{StaticResource SaFontSizeTableHeader}" />
+        <Setter Property="FontWeight" Value="Medium" />
+        <Setter Property="LineHeight" Value="{StaticResource SaLineHeightTableHeader}" />
+        <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
         <Setter Property="Foreground" Value="{ThemeResource SaTextSecondaryBrush}" />
     </Style>
 </ResourceDictionary>

@@ -12,16 +12,17 @@
         <ResourceDictionary Source="ms-appx:///Styles/Tokens/Spacing.xaml" />
     </ResourceDictionary.MergedDictionaries>
 
-    <!-- Status: colour is never the only signal - the Label is always rendered and is the automation name.
-         Geometry is provisional (Prism inventory); colours are Sa* status brushes per visual state, so a
-         runtime theme change re-resolves them. -->
+    <!-- Status dot + label (Figma 112:1066 / 112:1448: dot 6, gap 7, 12 Regular muted). Colour is never the only
+         signal: the Label is always rendered and is the automation name (the visible text is Raw for UIA so it is
+         not read twice). Dot colours are the Manual tokens (D8), per visual state, so a theme change re-resolves
+         them. Stale is DERIVED: secondary text colour, never the disabled brush (HC GrayText = disabled; Cortex F-3). -->
     <Style TargetType="primitives:SaStatusIndicator">
         <Setter Property="IsTabStop" Value="False" />
-        <Setter Property="Foreground" Value="{ThemeResource SaTextBrush}" />
+        <Setter Property="Foreground" Value="{ThemeResource SaTextSecondaryBrush}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="primitives:SaStatusIndicator">
-                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SaSpace8}">
+                    <StackPanel Orientation="Horizontal" Spacing="7">
                         <VisualStateManager.VisualStateGroups>
                             <VisualStateGroup x:Name="StatusStates">
                                 <VisualState x:Name="Unknown">
@@ -51,19 +52,21 @@
                                 </VisualState>
                                 <VisualState x:Name="Stale">
                                     <VisualState.Setters>
-                                        <Setter Target="PART_Dot.Fill" Value="{ThemeResource SaDisabledTextBrush}" />
+                                        <Setter Target="PART_Dot.Fill" Value="{ThemeResource SaTextSecondaryBrush}" />
+                                        <Setter Target="PART_Dot.Opacity" Value="0.6" />
                                     </VisualState.Setters>
                                 </VisualState>
                             </VisualStateGroup>
                         </VisualStateManager.VisualStateGroups>
                         <Ellipse x:Name="PART_Dot"
-                                 Width="{StaticResource SaSpace8}"
-                                 Height="{StaticResource SaSpace8}"
+                                 Width="{StaticResource SaStatusDotSize}"
+                                 Height="{StaticResource SaStatusDotSize}"
                                  VerticalAlignment="Center"
                                  Fill="{ThemeResource SaTextSecondaryBrush}" />
                         <TextBlock x:Name="PART_Label"
                                    VerticalAlignment="Center"
-                                   Style="{StaticResource SaLabelTextStyle}"
+                                   AutomationProperties.AccessibilityView="Raw"
+                                   Style="{StaticResource SaCaptionTextStyle}"
                                    Foreground="{TemplateBinding Foreground}"
                                    Text="{TemplateBinding Label}" />
                     </StackPanel>
