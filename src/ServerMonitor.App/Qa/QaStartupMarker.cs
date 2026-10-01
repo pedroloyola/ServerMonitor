@@ -11,8 +11,9 @@ namespace ServerMonitor.App.Qa;
 /// listener needs no kernel session. Silent outside a harness launch (and EventSource writes nothing without a
 /// listener). Excluded from Release (see ServerMonitor.App.csproj).
 /// <list type="number">
-/// <item><c>ResourcesLoaded</c>: <c>App.InitializeComponent</c> returned - App.xaml and every merged dictionary are
-/// parsed; also carries the duration of that call alone.</item>
+/// <item><c>ResourcesLoaded</c>: <c>App.InitializeComponent</c> returned; also carries the duration of that call alone.
+/// NOT the dictionary cost: ETW (Microsoft-Windows-XAML) shows App.xbf and its merged dictionaries are parsed later, on
+/// the first resource access while the main window is built - see tools/perf/xaml-trace.ps1.</item>
 /// <item><c>ShellActivated</c>: <c>MainWindow.Activate()</c> returned.</item>
 /// <item><c>ContentLoaded</c>: the window's root content raised <c>Loaded</c> (first layout done).</item>
 /// <item><c>FirstFrame</c>: the first <c>CompositionTarget.Rendering</c> after <c>ContentLoaded</c> - the first frame

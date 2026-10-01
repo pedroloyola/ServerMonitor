@@ -33,7 +33,9 @@ param(
     [double]$SettleSeconds = 2.5,
     [double]$CooldownSeconds = 1.5,
     [int]$TimeoutSeconds = 45,
-    [int]$BootstrapSamples = 10000
+    [int]$BootstrapSamples = 10000,
+    # Alternate the order inside each pair (AB, BA, AB, ...) so neither build always runs right after the other.
+    [switch]$Counterbalance
 )
 
 $ErrorActionPreference = 'Stop'
@@ -93,7 +95,12 @@ function Invoke-Launch([string]$exe, [string]$condition, [int]$index) {
     $placementExisted = Test-Path -LiteralPath $PlacementFile
     $process = Start-Process -FilePath $exe -ArgumentList $Harness -PassThru
     $started = $process.StartTime
-    $info = Get-CimInstance Win32_Process -Filter "ProcessId=$($process.Id)"
+    # ExecutablePath can still be empty right after creation; re-query briefly (still fail-closed below).
+    for ($attempt = 0; $attempt -lt 20; $attempt++) {
+        $info = Get-CimInstance Win32_Process -Filter "ProcessId=$($process.Id)"
+        if (-not $info -or $info.ExecutablePath) { break }
+        Start-Sleep -Milliseconds 100
+    }
     if (-not $info -or $info.CommandLine -notmatch [regex]::Escape($Harness) -or $info.ExecutablePath -ne $exe) {
         $current = Get-Process -Id $process.Id -ErrorAction SilentlyContinue
         if ($current -and $current.Path -eq $exe -and $current.StartTime -eq $started) { Stop-Process -Id $process.Id -Force }
@@ -165,8 +172,13 @@ try {
         $launches.Add((Invoke-Launch $ExeB 'B-warmup' (-$w)))
     }
     for ($i = 1; $i -le $Runs; $i++) {
-        $launches.Add((Invoke-Launch $ExeA 'A' $i))
-        $launches.Add((Invoke-Launch $ExeB 'B' $i))
+        if ($Counterbalance -and $i % 2 -eq 0) {
+            $launches.Add((Invoke-Launch $ExeB 'B' $i))
+            $launches.Add((Invoke-Launch $ExeA 'A' $i))
+        } else {
+            $launches.Add((Invoke-Launch $ExeA 'A' $i))
+            $launches.Add((Invoke-Launch $ExeB 'B' $i))
+        }
         Write-Host ("pair {0}/{1} done" -f $i, $Runs)
     }
 }
@@ -240,7 +252,7 @@ $summary = foreach ($k in $metrics) {
 }
 
 $result = [pscustomobject]@{
-    Harness = $Harness; Runs = $Runs; WarmupPairs = $WarmupPairs; SettleSeconds = $SettleSeconds
+    Harness = $Harness; Runs = $Runs; Counterbalance = [bool]$Counterbalance; WarmupPairs = $WarmupPairs; SettleSeconds = $SettleSeconds
     ExeA = $ExeA; ExeB = $ExeB
     ExeASha256 = (Get-FileHash $ExeA).Hash; ExeBSha256 = (Get-FileHash $ExeB).Hash
     RealDataFiles = $before.Count; RealDataUnchanged = $realDataSame
