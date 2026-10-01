@@ -69,12 +69,41 @@ public sealed class RealDataIsolationGuardTests : IDisposable
         var production = IsolatedAppComposition.ProductionDescriptors().Select(d => d.ServiceType).ToHashSet();
         var discovered = RealDataIsolationGuard.DiscoverStorageOptionsTypes().Where(production.Contains).ToList();
 
+        // Vigil L-1C-2: an instance alone proves nothing - the production registration is an instance too. The
+        // effective one must be a DIFFERENT value whose every path lies under the isolated root. Pure inspection:
+        // the instances are read, nothing is resolved.
+        var root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(_composition.Root)) + Path.DirectorySeparatorChar;
+        var productionInstances = IsolatedAppComposition.ProductionDescriptors()
+            .Where(descriptor => descriptor.ImplementationInstance is not null)
+            .GroupBy(descriptor => descriptor.ServiceType)
+            .ToDictionary(group => group.Key, group => group.Last().ImplementationInstance!);
+
         Assert.NotEmpty(discovered);
         Assert.All(discovered, type =>
         {
-            var effective = _composition.Services.Last(descriptor => descriptor.ServiceType == type);
-            Assert.NotNull(effective.ImplementationInstance);
+            var effective = _composition.Services.Last(descriptor => descriptor.ServiceType == type).ImplementationInstance;
+            Assert.NotNull(effective);
+            if (productionInstances.TryGetValue(type, out var production))
+            {
+                Assert.NotEqual(production, effective);
+            }
+
+            var paths = RealDataIsolationGuard.PathProperties(type).Select(property => (string)property.GetValue(effective)!).ToList();
+            Assert.NotEmpty(paths);
+            Assert.All(paths, path => Assert.StartsWith(root, Path.GetFullPath(path), StringComparison.OrdinalIgnoreCase));
         });
+    }
+
+    [Fact]
+    public void The_production_descriptors_cannot_be_built()
+    {
+        // Vigil M-1C-1: a read-only list, not an IServiceCollection - BuildServiceProvider has nothing to extend.
+        var production = IsolatedAppComposition.ProductionDescriptors();
+
+        Assert.False(typeof(IServiceCollection).IsAssignableFrom(production.GetType()));
+        Assert.False(typeof(IServiceCollection).IsAssignableFrom(
+            typeof(IsolatedAppComposition).GetMethod(nameof(IsolatedAppComposition.ProductionDescriptors))!.ReturnType));
+        Assert.Throws<NotSupportedException>(() => ((IList<ServiceDescriptor>)production).Add(production[0]));
     }
 
     [Fact]

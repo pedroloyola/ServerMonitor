@@ -26,6 +26,11 @@
     <ProjectReference Include="..\..\src\ServerMonitor.App\ServerMonitor.App.csproj" />
   </ItemGroup>
 
+  <!-- The C# lexer the lexical test fences share (one source, compiled into each test assembly). -->
+  <ItemGroup>
+    <Compile Include="..\ServerMonitor.Infrastructure.Tests\TestSupport\CSharpSourceText.cs" Link="TestSupport\CSharpSourceText.cs" />
+  </ItemGroup>
+
   <!-- These tests exercise Debug-only QA composition and cannot be compiled when the
        corresponding application harness is intentionally excluded from Release. -->
   <ItemGroup Condition="'$(Configuration)' != 'Debug'">

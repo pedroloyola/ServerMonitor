@@ -15,7 +15,7 @@ namespace ServerMonitor.App.Tests.TestSupport;
 /// per-instance temp directory BEFORE anything is resolved: every storage options type, the ~/.ssh profile of the
 /// import source, key discovery and the key picker, and the Credential Manager. Tests that build a provider from
 /// <see cref="App.ConfigureApplicationServices"/> go through here; a test that only inspects descriptors may use
-/// <see cref="ProductionDescriptors"/>, which is never built.
+/// <see cref="ProductionDescriptors"/>, a read-only list that cannot be built.
 /// <para>
 /// The Credential Manager cannot be redirected, so it is REPLACED: the raw store behind
 /// <see cref="UngatedCredentialStore"/> is an in-memory one, and <see cref="WindowsCredentialStore"/> itself resolves
@@ -61,12 +61,16 @@ internal sealed class IsolatedAppComposition : IDisposable
 
     public InMemoryCredentialStore Credentials { get; } = new();
 
-    /// <summary>The production descriptors, for shape assertions only. Never build a provider from this.</summary>
-    public static ServiceCollection ProductionDescriptors()
+    /// <summary>
+    /// The production descriptors, for shape assertions only. A READ-ONLY list, deliberately not an
+    /// <see cref="IServiceCollection"/>: there is nothing to call <c>BuildServiceProvider</c> on (Vigil M-1C-1). A test
+    /// that needs to resolve or to compose further uses an instance of this class.
+    /// </summary>
+    public static IReadOnlyList<ServiceDescriptor> ProductionDescriptors()
     {
         var services = new ServiceCollection();
         App.ConfigureApplicationServices(services);
-        return services;
+        return services.ToList().AsReadOnly();
     }
 
     public ServiceProvider BuildProvider()

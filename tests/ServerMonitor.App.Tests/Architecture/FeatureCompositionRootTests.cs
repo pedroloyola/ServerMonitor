@@ -26,9 +26,9 @@ namespace ServerMonitor.App.Tests.Architecture;
 public sealed class FeatureCompositionRootTests
 {
     // Descriptors only, never built (TEST-REALDATA-AUDIT).
-    private static ServiceCollection RealComposition() => IsolatedAppComposition.ProductionDescriptors();
+    private static IReadOnlyList<ServiceDescriptor> RealComposition() => IsolatedAppComposition.ProductionDescriptors();
 
-    private static ServiceDescriptor[] DescriptorsFor(ServiceCollection services, Type serviceType) =>
+    private static ServiceDescriptor[] DescriptorsFor(IReadOnlyList<ServiceDescriptor> services, Type serviceType) =>
         [.. services.Where(descriptor => descriptor.ServiceType == serviceType)];
 
     /// <summary>Every service type the four modules own. The set IS the parity claim.</summary>

@@ -30,7 +30,7 @@ public sealed class TrayOwnershipCompletenessTests
     /// The real composition's descriptors, exactly as <c>App</c> produces them, for shape assertions. Never built:
     /// a test that resolves goes through <see cref="IsolatedAppComposition"/> (TEST-REALDATA-AUDIT).
     /// </summary>
-    private static ServiceCollection RealComposition() => IsolatedAppComposition.ProductionDescriptors();
+    private static IReadOnlyList<ServiceDescriptor> RealComposition() => IsolatedAppComposition.ProductionDescriptors();
 
     // ------------------------------------------------------------------ one owner
 

@@ -24,6 +24,17 @@ namespace ServerMonitor.App.Tests.TestSupport;
 /// </list>
 /// The structural phase runs first and alone in <see cref="IsolatedAppComposition.BuildProvider"/>, so a real root
 /// is refused before any store that reads at construction (the two settings services do) is built.
+/// <para>
+/// LIMITS, deliberately documented (Vigil L-1C-1, L-1C-5). The graph walk reads instance FIELDS that hold strings or
+/// ServerMonitor objects. It does not see: a path computed at USE time (a method calling
+/// <c>WidgetStateLocation.ForCurrentUser()</c> when it runs), one behind a <see cref="Lazy{T}"/> or a delegate
+/// (<c>Func&lt;string&gt;</c> - never invoked, because invoking could do the I/O this guard exists to prevent), a
+/// <see cref="FileSystemInfo"/>, or a static field. Those are covered only partly: the structural phase pins every
+/// storage options type, and the lexical fence (TestRealDataPathGuardTests) flags the constructors whose default is
+/// the real profile. The constructed phase runs on the base isolated composition
+/// (<c>The_isolated_real_composition_passes_both_phases</c>), not on every per-test override, which
+/// <see cref="IsolatedAppComposition.BuildProvider"/> checks structurally only.
+/// </para>
 /// </summary>
 internal static class RealDataIsolationGuard
 {
@@ -233,7 +244,7 @@ internal static class RealDataIsolationGuard
         }
     }
 
-    private static IEnumerable<PropertyInfo> PathProperties(Type type) =>
+    internal static IEnumerable<PropertyInfo> PathProperties(Type type) =>
         type.GetProperties(BindingFlags.Instance | BindingFlags.Public)
             .Where(property => property.PropertyType == typeof(string)
                                && property.GetIndexParameters().Length == 0
