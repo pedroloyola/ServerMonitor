@@ -1,0 +1,12 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- UI.2 component layer aggregator. Merged by App.xaml exactly once and LAST, so it can only ADD keys
+         (every key here starts with Sa and collides with nothing - ComponentDictionariesDefineOnlyNewSaKeys).
+         Sa.AccentNeutralScope.xaml is deliberately NOT merged here: it is a local scope (F-3), never app-wide. -->
+    <ResourceDictionary.MergedDictionaries>
+        <ResourceDictionary Source="ms-appx:///Styles/Components/Sa.Text.xaml" />
+        <ResourceDictionary Source="ms-appx:///Styles/Components/Sa.Surfaces.xaml" />
+        <ResourceDictionary Source="ms-appx:///Styles/Components/Sa.Primitives.xaml" />
+    </ResourceDictionary.MergedDictionaries>
+</ResourceDictionary>

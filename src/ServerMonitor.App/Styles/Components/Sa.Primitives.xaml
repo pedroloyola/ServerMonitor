@@ -1,0 +1,74 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:primitives="using:ServerMonitor.App.Controls.Primitives">
+    <!-- Default styles of the NEW Sa* templated controls only (implicit, TargetType primitives:Sa*): by
+         construction they cannot reach a production element (NoImplicitStylesExceptSaPrimitiveDefaults).
+         Delivered through Application.Resources (merged via Sa.Components.xaml), not Themes/Generic.xaml, so
+         a template can use the app's token StaticResources; the runtime proof is the gallery self-check.
+         Non-colour tokens are merged HERE so the StaticResources resolve in this file's own scope (T-2). -->
+    <ResourceDictionary.MergedDictionaries>
+        <ResourceDictionary Source="ms-appx:///Styles/Tokens/Typography.xaml" />
+        <ResourceDictionary Source="ms-appx:///Styles/Tokens/Spacing.xaml" />
+    </ResourceDictionary.MergedDictionaries>
+
+    <!-- Status: colour is never the only signal - the Label is always rendered and is the automation name.
+         Geometry is provisional (Prism inventory); colours are Sa* status brushes per visual state, so a
+         runtime theme change re-resolves them. -->
+    <Style TargetType="primitives:SaStatusIndicator">
+        <Setter Property="IsTabStop" Value="False" />
+        <Setter Property="Foreground" Value="{ThemeResource SaTextBrush}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="primitives:SaStatusIndicator">
+                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SaSpace8}">
+                        <VisualStateManager.VisualStateGroups>
+                            <VisualStateGroup x:Name="StatusStates">
+                                <VisualState x:Name="Unknown">
+                                    <VisualState.Setters>
+                                        <Setter Target="PART_Dot.Fill" Value="{ThemeResource SaTextSecondaryBrush}" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Healthy">
+                                    <VisualState.Setters>
+                                        <Setter Target="PART_Dot.Fill" Value="{ThemeResource SaHealthyBrush}" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Attention">
+                                    <VisualState.Setters>
+                                        <Setter Target="PART_Dot.Fill" Value="{ThemeResource SaAttentionBrush}" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Error">
+                                    <VisualState.Setters>
+                                        <Setter Target="PART_Dot.Fill" Value="{ThemeResource SaErrorBrush}" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Offline">
+                                    <VisualState.Setters>
+                                        <Setter Target="PART_Dot.Fill" Value="{ThemeResource SaOfflineBrush}" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Stale">
+                                    <VisualState.Setters>
+                                        <Setter Target="PART_Dot.Fill" Value="{ThemeResource SaDisabledTextBrush}" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                            </VisualStateGroup>
+                        </VisualStateManager.VisualStateGroups>
+                        <Ellipse x:Name="PART_Dot"
+                                 Width="{StaticResource SaSpace8}"
+                                 Height="{StaticResource SaSpace8}"
+                                 VerticalAlignment="Center"
+                                 Fill="{ThemeResource SaTextSecondaryBrush}" />
+                        <TextBlock x:Name="PART_Label"
+                                   VerticalAlignment="Center"
+                                   Style="{StaticResource SaLabelTextStyle}"
+                                   Foreground="{TemplateBinding Foreground}"
+                                   Text="{TemplateBinding Label}" />
+                    </StackPanel>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+</ResourceDictionary>

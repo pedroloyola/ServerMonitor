@@ -1,0 +1,22 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- Text roles built on the Typography ramp: ramp style + semantic foreground. Brushes are always
+         ThemeResource so Dark/Light/HC re-resolve at runtime. Typography is merged HERE so every BasedOn
+         resolves in this file's own scope, independent of App.xaml order (T-2). Final roles: Prism inventory. -->
+    <ResourceDictionary.MergedDictionaries>
+        <ResourceDictionary Source="ms-appx:///Styles/Tokens/Typography.xaml" />
+    </ResourceDictionary.MergedDictionaries>
+    <Style x:Key="SaSectionHeaderTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SaTitleTextStyle}">
+        <Setter Property="Foreground" Value="{ThemeResource SaTextBrush}" />
+    </Style>
+    <Style x:Key="SaPrimaryBodyTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SaBodyTextStyle}">
+        <Setter Property="Foreground" Value="{ThemeResource SaTextBrush}" />
+    </Style>
+    <Style x:Key="SaSecondaryBodyTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SaBodyTextStyle}">
+        <Setter Property="Foreground" Value="{ThemeResource SaTextSecondaryBrush}" />
+    </Style>
+    <Style x:Key="SaTableHeaderTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SaLabelTextStyle}">
+        <Setter Property="Foreground" Value="{ThemeResource SaTextSecondaryBrush}" />
+    </Style>
+</ResourceDictionary>

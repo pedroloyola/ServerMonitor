@@ -15,6 +15,8 @@
                 <ResourceDictionary Source="Styles/Tokens/Motion.xaml" />
                 <ResourceDictionary Source="Styles/DesignTokens.xaml" />
                 <ResourceDictionary Source="Styles/Controls.xaml" />
+                <!-- UI.2: component layer, merged LAST (only adds Sa* keys; AppXamlMergesComponentsLastAndScopeNever). -->
+                <ResourceDictionary Source="Styles/Components/Sa.Components.xaml" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Application.Resources>
