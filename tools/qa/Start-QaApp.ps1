@@ -9,14 +9,19 @@
       - every other argument starting with --qa is an exact harness flag or a well-formed modifier
         ('flag value' or 'flag=value'), when not in gallery mode.
     A launch with no --qa argument at all (the production composition) is always refused, and so is any executable that
-    is not a Debug x64 build (a Release build ignores every --qa flag and would start production).
+    is not a Debug x64 build (a Release build ignores every --qa flag and would start production). The executable is
+    judged on its CANONICAL, OS-resolved path (no '.'/'..' segment; junctions/symlinks resolved; never under Program Files
+    or WindowsApps; must be <worktree with ServerMonitor.slnx>\src\ServerMonitor.App\bin\x64\Debug\<tfm>\win-x64\), and
+    before the start the binary itself is read as metadata: ServerMonitor.App.dll must be AssemblyConfiguration 'Debug'
+    and contain ServerMonitor.App.Qa.QaStartupIsolation.
 
     The lists below mirror QaStartupIsolation.HarnessFlags / ModifierFlags; QaLaunchRefusalTests fails if they drift.
 
     After the start it re-reads the PID's image path and command line; a mismatch stops exactly that PID (image path +
     start time re-checked) and throws. Returns PID, StartTime, the Process object and the verified command line.
 
-    -ValidateOnly decides and prints ALLOWED without resolving or starting anything (used by the tests).
+    -ValidateOnly runs every check (the binary one too when the executable exists) and prints ALLOWED, but never starts
+    anything (used by the tests).
 
 .EXAMPLE
     $app = & tools/qa/Start-QaApp.ps1 -Exe $exe -Arguments '--qa-health', '--qa-ui-language', 'pt-PT'
@@ -62,13 +67,106 @@ function Join-CommandLine([string[]]$arguments) {
     }) -join ' '
 }
 
+if (-not ('QaLaunch.Native' -as [type])) {
+Add-Type -Namespace QaLaunch -Name Native -MemberDefinition @'
+[DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+public static extern Microsoft.Win32.SafeHandles.SafeFileHandle CreateFileW(string name, uint access, uint share, IntPtr security, uint disposition, uint flags, IntPtr template);
+[DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+public static extern uint GetFinalPathNameByHandleW(Microsoft.Win32.SafeHandles.SafeFileHandle handle, System.Text.StringBuilder path, uint size, uint flags);
+'@
+}
+
+# The REAL location of a path (Vigil M-1A-R1): every junction/symlink on the way resolved by the OS. A path that does not
+# exist yet resolves through its deepest existing ancestor; the missing tail is appended unchanged.
+function Get-FinalPath([string]$fullPath) {
+    $existing = $fullPath; $tail = @()
+    while ($existing -and -not (Test-Path -LiteralPath $existing)) {
+        $tail = @([IO.Path]::GetFileName($existing)) + $tail
+        $existing = [IO.Path]::GetDirectoryName($existing)
+    }
+    if (-not $existing) { return $fullPath }
+    # access 0 = attributes only (no data, no OneDrive hydration); BACKUP_SEMANTICS opens directories too.
+    $handle = [QaLaunch.Native]::CreateFileW($existing, 0, 7, [IntPtr]::Zero, 3, 0x02000000, [IntPtr]::Zero)
+    if ($handle.IsInvalid) { throw "QA launch refused: cannot resolve the real location of '$existing'." }
+    try {
+        $buffer = [System.Text.StringBuilder]::new(32768)
+        if ([QaLaunch.Native]::GetFinalPathNameByHandleW($handle, $buffer, 32768, 0) -eq 0) { throw "QA launch refused: cannot resolve the real location of '$existing'." }
+        $final = $buffer.ToString() -replace '^\\\\\?\\UNC\\', '\\' -replace '^\\\\\?\\', ''
+    }
+    finally { $handle.Dispose() }
+    if ($tail.Count -gt 0) { $final = [IO.Path]::Combine([string[]](@($final) + $tail)) }
+    $final
+}
+
+# Canonical-first (Vigil M-1A-R1): no '.'/'..' segment, then the OS-resolved real path must be a Debug x64 build output of
+# a ServerMonitor worktree - never an installation (Program Files / WindowsApps).
+function Get-QaExecutableRefusal([string]$exe) {
+    if (@($exe -split '[\\/]' | Where-Object { $_ -eq '..' -or $_ -eq '.' }).Count -gt 0) { return "'$exe' contains a '.' or '..' segment" }
+    if (-not [IO.Path]::IsPathFullyQualified($exe)) { return "'$exe' is not an absolute path" }
+    $installRoots = @($env:ProgramFiles, ${env:ProgramFiles(x86)}, $env:ProgramW6432) | Where-Object { $_ } | ForEach-Object { $_.TrimEnd('\') + '\' }
+    $isInstall = { param($p) $p -match '\\WindowsApps\\' -or @($installRoots | Where-Object { $p.StartsWith($_, [StringComparison]::OrdinalIgnoreCase) }).Count -gt 0 }
+    $full = [IO.Path]::GetFullPath($exe)
+    if (& $isInstall $full) { return "'$exe' is in an installation folder ($full)" }
+    $final = Get-FinalPath $full
+    if (& $isInstall $final) { return "'$exe' resolves to an installation folder ($final)" }
+    $match = [regex]::Match($final, '^(?<root>.+?)\\src\\ServerMonitor\.App\\bin\\x64\\Debug\\[^\\]+\\win-x64\\ServerMonitor\.App\.exe$', 'IgnoreCase')
+    if (-not $match.Success) { return "'$exe' resolves to '$final', not <worktree>\src\ServerMonitor.App\bin\x64\Debug\<tfm>\win-x64\ServerMonitor.App.exe (a Release build ignores --qa flags and starts production)" }
+    if (-not (Test-Path -LiteralPath (Join-Path $match.Groups['root'].Value 'ServerMonitor.slnx') -PathType Leaf)) { return "'$final' is not inside a ServerMonitor worktree (no ServerMonitor.slnx at $($match.Groups['root'].Value))" }
+    $null
+}
+
+# The binary itself, read as metadata only (never loaded or run): ServerMonitor.App.dll next to the exe must be a Debug
+# build that carries the gate 1A isolation (ServerMonitor.App.Qa.QaStartupIsolation).
+function Get-QaBinaryRefusal([string]$exe) {
+    $dll = [IO.Path]::ChangeExtension($exe, '.dll')
+    if (-not (Test-Path -LiteralPath $dll -PathType Leaf)) { return "no ServerMonitor.App.dll next to '$exe'" }
+    $stream = [IO.File]::OpenRead($dll)
+    try {
+        $pe = [System.Reflection.PortableExecutable.PEReader]::new($stream)
+        if (-not $pe.HasMetadata) { return "'$dll' is not a .NET assembly" }
+        $md = [System.Reflection.Metadata.PEReaderExtensions]::GetMetadataReader($pe)
+        $configuration = $null
+        foreach ($handle in $md.GetAssemblyDefinition().GetCustomAttributes()) {
+            $attribute = $md.GetCustomAttribute($handle)
+            $typeName = switch ($attribute.Constructor.Kind) {
+                ([System.Reflection.Metadata.HandleKind]::MemberReference) {
+                    $parent = $md.GetMemberReference([System.Reflection.Metadata.MemberReferenceHandle]$attribute.Constructor).Parent
+                    if ($parent.Kind -eq [System.Reflection.Metadata.HandleKind]::TypeReference) { $md.GetString($md.GetTypeReference([System.Reflection.Metadata.TypeReferenceHandle]$parent).Name) }
+                }
+                ([System.Reflection.Metadata.HandleKind]::MethodDefinition) {
+                    # The attribute type is defined in this very assembly (e.g. System.Private.CoreLib).
+                    $md.GetString($md.GetTypeDefinition($md.GetMethodDefinition([System.Reflection.Metadata.MethodDefinitionHandle]$attribute.Constructor).GetDeclaringType()).Name)
+                }
+            }
+            if ($typeName -ne 'AssemblyConfigurationAttribute') { continue }
+            $blob = $md.GetBlobReader($attribute.Value)
+            if ($blob.ReadUInt16() -eq 1) { $configuration = $blob.ReadSerializedString() }
+        }
+        if ($configuration -cne 'Debug') { return "'$dll' is a '$configuration' build, not Debug" }
+        $isolation = $false
+        foreach ($handle in $md.TypeDefinitions) {
+            $type = $md.GetTypeDefinition($handle)
+            if ($md.GetString($type.Name) -ceq 'QaStartupIsolation' -and $md.GetString($type.Namespace) -ceq 'ServerMonitor.App.Qa') { $isolation = $true; break }
+        }
+        if (-not $isolation) { return "'$dll' lacks ServerMonitor.App.Qa.QaStartupIsolation (pre-1A or non-QA build)" }
+    }
+    finally { $stream.Dispose() }
+    $null
+}
+
 $refusal = Get-QaLaunchRefusal $Arguments
 if ($refusal) { throw "QA launch refused: $refusal" }
-if ($Exe -notmatch '\\bin\\x64\\Debug\\') { throw "QA launch refused: '$Exe' is not a Debug x64 build (Release ignores --qa flags and starts production)." }
+$exeRefusal = Get-QaExecutableRefusal $Exe
+if ($exeRefusal) { throw "QA launch refused: $exeRefusal" }
+$exists = Test-Path -LiteralPath $Exe -PathType Leaf
+if ($exists) {
+    # Also under -ValidateOnly, so the binary rule is provable without ever reaching Start-Process.
+    $Exe = Get-FinalPath ([IO.Path]::GetFullPath($Exe))
+    $binaryRefusal = Get-QaBinaryRefusal $Exe
+    if ($binaryRefusal) { throw "QA launch refused: $binaryRefusal" }
+}
 if ($ValidateOnly) { 'ALLOWED'; return }
-
-if (-not (Test-Path -LiteralPath $Exe -PathType Leaf)) { throw "QA launch: executable not found: $Exe" }
-$Exe = (Resolve-Path -LiteralPath $Exe).Path
+if (-not $exists) { throw "QA launch: executable not found: $Exe" }
 
 $process = Start-Process -FilePath $Exe -ArgumentList (Join-CommandLine $Arguments) -PassThru
 $started = $process.StartTime

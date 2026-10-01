@@ -20,10 +20,112 @@ public sealed partial class StartQaAppScriptTests
 
     private static readonly string Script = Path.Combine(Tools, "qa", "Start-QaApp.ps1");
 
-    /// <summary>Never created: a Debug-looking path under a fresh temp folder.</summary>
-    private static readonly string SentinelExe = Path.Combine(
-        Path.GetTempPath(), "ServerMonitor-QA-sentinel", $"{Environment.ProcessId}-{Guid.NewGuid():N}",
-        "bin", "x64", "Debug", "ServerMonitor.App.exe");
+    private const string Tfm = "net10.0-windows10.0.19041.0";
+
+    /// <summary>A fake worktree under this assembly's QA root: only a ServerMonitor.slnx marker, nothing runnable.</summary>
+    private static readonly string FakeWorktree = CreateWorktree("worktree");
+
+    /// <summary>Never created: the Debug executable path of the fake worktree.</summary>
+    private static readonly string SentinelExe = ExeIn(FakeWorktree, "Debug");
+
+    private static string CreateWorktree(string name)
+    {
+        var root = Path.Combine(QaTestRoots.Root, $"start-qaapp-{name}-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        File.WriteAllText(Path.Combine(root, "ServerMonitor.slnx"), "<Solution />");
+        return root;
+    }
+
+    private static string ExeIn(string worktree, string configuration) =>
+        Path.Combine(worktree, "src", "ServerMonitor.App", "bin", "x64", configuration, Tfm, "win-x64", "ServerMonitor.App.exe");
+
+    // ---- M-1A-R1 (Vigil): the executable is judged on its canonical, OS-resolved path ----
+
+    public static TheoryData<string, string> RefusedExecutables => new()
+    {
+        // E3: a Debug\..\ traversal into Release.
+        { ExeIn(FakeWorktree, "Debug").Replace(@"\Debug\", @"\Debug\..\Release\", StringComparison.Ordinal), "'.' or '..' segment" },
+        // E4: a Debug\..\ traversal into the installed app.
+        { Path.Combine(FakeWorktree, "src", "ServerMonitor.App", "bin", "x64", "Debug") + @"\..\..\..\..\Program Files\WindowsApps\ServerAlyzer\ServerMonitor.App.exe", "'.' or '..' segment" },
+        { Path.Combine(FakeWorktree, "src", "ServerMonitor.App", "bin", "x64", "Debug", ".", Tfm, "win-x64", "ServerMonitor.App.exe"), "'.' or '..' segment" },
+        { @"C:\Program Files\WindowsApps\ServerAlyzer_1.1.1.0_x64__abc\ServerMonitor.App.exe", "installation folder" },
+        { Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "X", "src", "ServerMonitor.App", "bin", "x64", "Debug", Tfm, "win-x64", "ServerMonitor.App.exe"), "installation folder" },
+        { ExeIn(FakeWorktree, "Release"), "not <worktree>" },
+        { Path.Combine(QaTestRoots.Root, "no-slnx", "src", "ServerMonitor.App", "bin", "x64", "Debug", Tfm, "win-x64", "ServerMonitor.App.exe"), "not inside a ServerMonitor worktree" },
+        { @"src\ServerMonitor.App\bin\x64\Debug\" + Tfm + @"\win-x64\ServerMonitor.App.exe", "not an absolute path" }
+    };
+
+    [Theory]
+    [MemberData(nameof(RefusedExecutables))]
+    public void AnExecutableOutsideADebugWorktreeBuild_IsRefused_OnItsCanonicalPath(string exe, string reason)
+    {
+        var result = Assert.Single(RunScript([["--qa-health"]], exe, validateOnly: true));
+        Assert.StartsWith("REFUSED", result);
+        Assert.Contains(reason, result);
+    }
+
+    /// <summary>A junction makes a lexically-Debug path land in Release: the OS-resolved path decides.</summary>
+    [Fact]
+    public void AJunctionFromDebugToRelease_IsRefused()
+    {
+        var worktree = CreateWorktree("junction");
+        var bin = Path.Combine(worktree, "src", "ServerMonitor.App", "bin", "x64");
+        Directory.CreateDirectory(Path.Combine(bin, "Release", Tfm, "win-x64"));
+        var junction = Path.Combine(bin, "Debug");
+        var mklink = Process.Start(new ProcessStartInfo("cmd.exe", ["/c", "mklink", "/J", junction, Path.Combine(bin, "Release")])
+        {
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true
+        })!;
+        mklink.WaitForExit(30_000);
+        try
+        {
+            Assert.True((File.GetAttributes(junction) & FileAttributes.ReparsePoint) != 0, "the junction was not created");
+            Assert.True(ValidateAllowsLexically(ExeIn(worktree, "Debug")), "precondition: the path is Debug lexically");
+
+            var result = Assert.Single(RunScript([["--qa-health"]], ExeIn(worktree, "Debug"), validateOnly: true));
+            Assert.StartsWith("REFUSED", result);
+            Assert.Contains(@"\Release\", result);
+        }
+        finally
+        {
+            Directory.Delete(junction); // removes the link only, never the target's content
+        }
+    }
+
+    // ---- M-1A-R1 addendum: the binary itself (metadata only, never loaded or run) ----
+
+    [Fact]
+    public void TheBinary_MustBeADebugBuildCarryingTheIsolation()
+    {
+        var worktree = CreateWorktree("binary");
+        var exe = ExeIn(worktree, "Debug");
+        Directory.CreateDirectory(Path.GetDirectoryName(exe)!);
+        File.WriteAllBytes(exe, []); // 0 bytes: not runnable, and -ValidateOnly never starts anything anyway
+        var dll = Path.ChangeExtension(exe, ".dll");
+
+        Assert.Contains("no ServerMonitor.App.dll", Assert.Single(RunScript([["--qa-health"]], exe, validateOnly: true)));
+
+        // A Debug assembly without the gate 1A isolation (stands in for a pre-1A or non-App build).
+        File.Copy(typeof(ServerMonitor.Core.Interfaces.IServerService).Assembly.Location, dll, overwrite: true);
+        Assert.Contains("lacks ServerMonitor.App.Qa.QaStartupIsolation", Assert.Single(RunScript([["--qa-health"]], exe, validateOnly: true)));
+
+        // A Release assembly (the runtime's own CoreLib is built Release).
+        var release = typeof(object).Assembly;
+        Assert.Equal("Release", release.GetCustomAttributes(typeof(System.Reflection.AssemblyConfigurationAttribute), false)
+            .Cast<System.Reflection.AssemblyConfigurationAttribute>().Single().Configuration);
+        File.Copy(release.Location, dll, overwrite: true);
+        Assert.Contains("is a 'Release' build, not Debug", Assert.Single(RunScript([["--qa-health"]], exe, validateOnly: true)));
+
+        // The real Debug ServerMonitor.App.dll: accepted.
+        File.Copy(typeof(App).Assembly.Location, dll, overwrite: true);
+        Assert.Equal("ALLOWED", Assert.Single(RunScript([["--qa-health"]], exe, validateOnly: true)));
+    }
+
+    private static bool ValidateAllowsLexically(string exe) =>
+        exe.Contains(@"\bin\x64\Debug\", StringComparison.Ordinal) && !exe.Contains(@"\..\", StringComparison.Ordinal);
 
     [Fact]
     public void TheScriptsLists_AreExactlyTheCompositionRootsHarnessAndModifierFlags()
@@ -101,7 +203,7 @@ public sealed partial class StartQaAppScriptTests
         var release = SentinelExe.Replace(@"\Debug\", @"\Release\", StringComparison.Ordinal);
         var result = Assert.Single(RunScript([["--qa-health"]], release, validateOnly: true));
         Assert.StartsWith("REFUSED", result);
-        Assert.Contains("not a Debug x64 build", result);
+        Assert.Contains("a Release build ignores --qa flags", result);
     }
 
     /// <summary>

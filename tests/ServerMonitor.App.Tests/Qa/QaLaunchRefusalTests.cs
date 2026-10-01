@@ -189,6 +189,8 @@ public sealed partial class QaLaunchRefusalTests
     {
         var tools = Path.GetFullPath(Path.Combine(AppSourceTree.AppRoot, "..", "..", "tools"));
         var launches = Directory.EnumerateFiles(tools, "*.ps1", SearchOption.AllDirectories)
+            // The launcher itself holds no launch line, only refusal messages (it is covered by StartQaAppScriptTests).
+            .Where(file => !string.Equals(Path.GetFileName(file), "Start-QaApp.ps1", StringComparison.OrdinalIgnoreCase))
             .SelectMany(file => File.ReadLines(file).Select((line, index) => (file, index, line)))
             .Where(entry => QaFlag().IsMatch(entry.line) && LaunchContext().IsMatch(entry.line))
             .ToList();
