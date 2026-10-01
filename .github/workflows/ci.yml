@@ -61,7 +61,11 @@ jobs:
       - name: Build (Debug)
         run: dotnet build ServerMonitor.slnx -c Debug --no-restore --no-incremental --disable-build-servers
 
+      # The ONLY place the real Credential Manager tests run ([RealCredentialManagerFact]): an ephemeral runner, so
+      # their writes cannot reach a person's vault. Never set this on a developer machine (TEST-REALDATA-AUDIT R-1).
       - name: Test
+        env:
+          SERVERMONITOR_RUN_REAL_CREDMAN_TESTS: '1'
         run: dotnet test ServerMonitor.slnx -c Debug --no-build --disable-build-servers
 
       # GitHub's job/step timestamps are the authoritative wall-clock measurement. The

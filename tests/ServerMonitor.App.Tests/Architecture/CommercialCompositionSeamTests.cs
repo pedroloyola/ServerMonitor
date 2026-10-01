@@ -6,6 +6,7 @@ using ServerMonitor.App;
 using ServerMonitor.App.Features;
 using ServerMonitor.Core.History;
 using ServerMonitor.Features;
+using ServerMonitor.App.Tests.TestSupport;
 
 namespace ServerMonitor.App.Tests.Architecture;
 
@@ -235,8 +236,7 @@ public sealed class CommercialCompositionSeamTests
         Assert.Equal(CommunityIds, result.Catalog.Composed.Select(descriptor => descriptor.Id));
         Assert.Empty(result.Skipped);
 
-        var root = new ServiceCollection();
-        App.ConfigureApplicationServices(root);
+        var root = IsolatedAppComposition.ProductionDescriptors(); // descriptors only, never built
 
         // The root's composed catalog is the last IFeatureCatalog registration and must list the same ids.
         var rootCatalog = Assert.IsType<FeatureCatalog>(root
