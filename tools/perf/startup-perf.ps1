@@ -90,23 +90,15 @@ function Get-MachineState([string]$label) {
 }
 
 # ---- launch one ----------------------------------------------------------------------------------------------------
+$StartQaApp = Join-Path $PSScriptRoot '..\qa\Start-QaApp.ps1'
 $PlacementFile = Join-Path ([IO.Path]::GetTempPath()) ("ServerMonitor-QA\{0}\window-placement.json" -f ($Harness -replace '^--qa-', '' -replace '^store-screenshot$', 'screenshot'))
 function Invoke-Launch([string]$exe, [string]$condition, [int]$index) {
     # Only UI.2+ deletes a stale QA placement at startup; a leftover file would give the two builds different windows.
     $placementExisted = Test-Path -LiteralPath $PlacementFile
-    $process = Start-Process -FilePath $exe -ArgumentList $Harness -PassThru
-    $started = $process.StartTime
-    # ExecutablePath can still be empty right after creation; re-query briefly (still fail-closed below).
-    for ($attempt = 0; $attempt -lt 20; $attempt++) {
-        $info = Get-CimInstance Win32_Process -Filter "ProcessId=$($process.Id)"
-        if (-not $info -or $info.ExecutablePath) { break }
-        Start-Sleep -Milliseconds 100
-    }
-    if (-not $info -or $info.CommandLine -notmatch [regex]::Escape($Harness) -or $info.ExecutablePath -ne $exe) {
-        $current = Get-Process -Id $process.Id -ErrorAction SilentlyContinue
-        if ($current -and $current.Path -eq $exe -and $current.StartTime -eq $started) { Stop-Process -Id $process.Id -Force }
-        throw "PID $($process.Id) is not the expected harness launch: $($info.CommandLine)"
-    }
+    # The only launch path (UI.3 rule): refuses without an exact harness, verifies image + command line of the PID.
+    $app = & $StartQaApp -Exe $exe -Arguments @($Harness)
+    $process = $app.Process
+    $started = $app.StartTime
 
     $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
     while ((Get-Date) -lt $deadline) {

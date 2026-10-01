@@ -57,18 +57,10 @@ for ($r = 1; $r -le $Repeat; $r++) {
         & logman create trace $session -pf $providers -o $etl -bs 1024 -nb 64 256 -ets | Out-Null
         if ($LASTEXITCODE -ne 0) { throw "logman failed ($LASTEXITCODE)" }
         try {
-            $process = Start-Process -FilePath $path -ArgumentList $Harness -PassThru
-            $started = $process.StartTime
-            for ($a = 0; $a -lt 20; $a++) {
-                $info = Get-CimInstance Win32_Process -Filter "ProcessId=$($process.Id)"
-                if (-not $info -or $info.ExecutablePath) { break }
-                Start-Sleep -Milliseconds 100
-            }
-            if (-not $info -or $info.CommandLine -notmatch [regex]::Escape($Harness) -or $info.ExecutablePath -ne $path) {
-                $c = Get-Process -Id $process.Id -ErrorAction SilentlyContinue
-                if ($c -and $c.Path -eq $path -and $c.StartTime -eq $started) { Stop-Process -Id $process.Id -Force }
-                throw "PID $($process.Id) is not the expected harness launch."
-            }
+            # The only launch path (UI.3 rule): refuses without an exact harness, verifies the PID's image + command line.
+            $app = & (Join-Path $PSScriptRoot '..\qa\Start-QaApp.ps1') -Exe $path -Arguments @($Harness)
+            $process = $app.Process
+            $started = $app.StartTime
             $deadline = (Get-Date).AddSeconds(45)
             while ((Get-Date) -lt $deadline) { $process.Refresh(); if ($process.HasExited -or $process.MainWindowHandle -ne 0) { break }; Start-Sleep -Milliseconds 100 }
             Start-Sleep -Milliseconds ([int]($SettleSeconds * 1000))
