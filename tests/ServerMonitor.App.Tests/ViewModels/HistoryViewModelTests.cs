@@ -77,6 +77,7 @@ public sealed class HistoryViewModelTests
             query,
             metrics,
             new ServerMonitoringStateStore(),
+            new FakeServerService(),
             nav,
             new FakeLocalizationService(),
             NullLogger<HistoryViewModel>.Instance,

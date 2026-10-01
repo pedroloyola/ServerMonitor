@@ -37,7 +37,31 @@ public sealed class ServiceRowViewModel
             localization.GetString("WorkloadServiceAccessibleFormat"),
             Name,
             StateText);
+
+        // UI.3 columns (D-UI3-6): "Ativo"/"Inativo" for services; other states keep their text.
+        StateDisplay = localization.GetString(WorkloadPresentation.ServiceStateDisplayKey(service.State));
+        var startupKey = WorkloadPresentation.ServiceStartupDisplayKey(service.StartupState);
+        StartupDisplay = localization.GetString(startupKey ?? "WorkloadValueUnknown");
+        IsProblem = Severity == WorkloadSeverity.Negative;
+        DisplayAutomationName = string.Format(
+            CultureInfo.CurrentUICulture,
+            localization.GetString("WorkloadServiceDisplayAccessibleFormat"),
+            Name,
+            StateDisplay,
+            startupKey is null ? localization.GetString("WorkloadValueUnknownAccessible") : StartupDisplay);
     }
+
+    /// <summary>UI.3 state column: Running → "Ativo", Stopped → "Inativo", others as <see cref="StateText"/>.</summary>
+    public string StateDisplay { get; } = string.Empty;
+
+    /// <summary>UI.3 startup column: "Automático"/"Estático"/"Manual"/"Bloqueado", or "—" when unknown.</summary>
+    public string StartupDisplay { get; } = string.Empty;
+
+    /// <summary>Counts toward "Com problemas" (D-UI3-3): Negative severity only.</summary>
+    public bool IsProblem { get; }
+
+    /// <summary>Spoken summary matching the UI.3 columns (name, state, startup).</summary>
+    public string DisplayAutomationName { get; } = string.Empty;
 
     public string Name { get; }
 

@@ -57,7 +57,7 @@ public sealed class WorkloadsViewModelReliabilityTests
         var store = new InMemoryServerWorkloadStore();
         var coordinator = new GatedRefreshCoordinator();
         using var viewModel = new WorkloadsViewModel(
-            store, coordinator, new FakeNavigationService(), new FakeLocalizationService(),
+            store, coordinator, new FakeServerMetricsStore(), new FakeNavigationService(), new FakeLocalizationService(),
             NullLogger<WorkloadsViewModel>.Instance, new FakeTimeProvider(Now));
 
         viewModel.Load(previous, "previous");
@@ -77,6 +77,7 @@ public sealed class WorkloadsViewModelReliabilityTests
     private static WorkloadsViewModel New(InMemoryServerWorkloadStore store) => new(
         store,
         new NoOpWorkloadRefreshCoordinator(),
+        new FakeServerMetricsStore(),
         new FakeNavigationService(),
         new FakeLocalizationService(),
         NullLogger<WorkloadsViewModel>.Instance,
