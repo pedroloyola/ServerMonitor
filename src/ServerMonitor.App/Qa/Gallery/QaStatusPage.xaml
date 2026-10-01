@@ -1,0 +1,44 @@
+<Page
+    x:Class="ServerMonitor.App.Qa.Gallery.QaStatusPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:primitives="using:ServerMonitor.App.Controls.Primitives">
+    <!-- QA-ONLY (UI.2 S2): SaStatusIndicator (S1) in every SaStatusKind; the label is always visible and is the automation name. Geometry provisional until the Prism inventory. -->
+    <ScrollViewer Padding="24">
+        <StackPanel Spacing="{StaticResource SaSpace12}">
+            <TextBlock Style="{StaticResource SaSectionHeaderTextStyle}" Text="Status" />
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="Status=Unknown" VerticalAlignment="Center" />
+                <primitives:SaStatusIndicator Grid.Column="1" Status="Unknown" Label="Desconhecido" />
+            </Grid>
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="Status=Healthy" VerticalAlignment="Center" />
+                <primitives:SaStatusIndicator Grid.Column="1" Status="Healthy" Label="Saudável" />
+            </Grid>
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="Status=Attention" VerticalAlignment="Center" />
+                <primitives:SaStatusIndicator Grid.Column="1" Status="Attention" Label="Atenção" />
+            </Grid>
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="Status=Error" VerticalAlignment="Center" />
+                <primitives:SaStatusIndicator Grid.Column="1" Status="Error" Label="Crítico" />
+            </Grid>
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="Status=Offline" VerticalAlignment="Center" />
+                <primitives:SaStatusIndicator Grid.Column="1" Status="Offline" Label="Offline" />
+            </Grid>
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="Status=Stale" VerticalAlignment="Center" />
+                <primitives:SaStatusIndicator Grid.Column="1" Status="Stale" Label="Desatualizado" />
+            </Grid>
+            <TextBlock Style="{StaticResource SaSecondaryBodyTextStyle}" Text="On an inset surface" Margin="0,16,0,0" />
+            <Border Style="{StaticResource SaInsetSurfaceStyle}" Padding="16"><StackPanel Orientation="Horizontal" Spacing="{StaticResource SaSpace24}"><primitives:SaStatusIndicator Status="Healthy" Label="Saudável" /><primitives:SaStatusIndicator Status="Attention" Label="Atenção" /><primitives:SaStatusIndicator Status="Error" Label="Crítico" /></StackPanel></Border>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

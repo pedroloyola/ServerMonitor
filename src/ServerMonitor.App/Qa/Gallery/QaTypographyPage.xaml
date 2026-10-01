@@ -1,0 +1,89 @@
+<Page
+    x:Class="ServerMonitor.App.Qa.Gallery.QaTypographyPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:primitives="using:ServerMonitor.App.Controls.Primitives">
+    <!-- QA-ONLY (UI.2 S2): every Sa*TextStyle with pt-PT sample text (accents and descenders) and the Sa.Text roles. -->
+    <ScrollViewer Padding="24">
+        <StackPanel Spacing="{StaticResource SaSpace12}">
+            <TextBlock Style="{StaticResource SaSectionHeaderTextStyle}" Text="Typography" />
+            <TextBlock Style="{StaticResource SaSecondaryBodyTextStyle}" Text="Type ramp (Styles/Tokens/Typography.xaml) - size/line height in DIP" />
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="SaDisplayTextStyle 44/56" VerticalAlignment="Center" />
+                <Border Grid.Column="1" BorderBrush="{ThemeResource SaDividerBrush}" BorderThickness="0,0,0,1"><TextBlock Style="{StaticResource SaDisplayTextStyle}" Foreground="{ThemeResource SaTextBrush}" Text="Ágil ç gjpqy ÃÕ · Servidor saudável" /></Border>
+            </Grid>
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="SaHeadingTextStyle 30/40" VerticalAlignment="Center" />
+                <Border Grid.Column="1" BorderBrush="{ThemeResource SaDividerBrush}" BorderThickness="0,0,0,1"><TextBlock Style="{StaticResource SaHeadingTextStyle}" Foreground="{ThemeResource SaTextBrush}" Text="Ágil ç gjpqy ÃÕ · Servidor saudável" /></Border>
+            </Grid>
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="SaMetricTextStyle 28/36" VerticalAlignment="Center" />
+                <Border Grid.Column="1" BorderBrush="{ThemeResource SaDividerBrush}" BorderThickness="0,0,0,1"><TextBlock Style="{StaticResource SaMetricTextStyle}" Foreground="{ThemeResource SaTextBrush}" Text="Ágil ç gjpqy ÃÕ · Servidor saudável" /></Border>
+            </Grid>
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="SaTitleTextStyle 20/28" VerticalAlignment="Center" />
+                <Border Grid.Column="1" BorderBrush="{ThemeResource SaDividerBrush}" BorderThickness="0,0,0,1"><TextBlock Style="{StaticResource SaTitleTextStyle}" Foreground="{ThemeResource SaTextBrush}" Text="Ágil ç gjpqy ÃÕ · Servidor saudável" /></Border>
+            </Grid>
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="SaTitleCompactTextStyle 18/24" VerticalAlignment="Center" />
+                <Border Grid.Column="1" BorderBrush="{ThemeResource SaDividerBrush}" BorderThickness="0,0,0,1"><TextBlock Style="{StaticResource SaTitleCompactTextStyle}" Foreground="{ThemeResource SaTextBrush}" Text="Ágil ç gjpqy ÃÕ · Servidor saudável" /></Border>
+            </Grid>
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="SaBodyTextStyle 14/20" VerticalAlignment="Center" />
+                <Border Grid.Column="1" BorderBrush="{ThemeResource SaDividerBrush}" BorderThickness="0,0,0,1"><TextBlock Style="{StaticResource SaBodyTextStyle}" Foreground="{ThemeResource SaTextBrush}" Text="Ágil ç gjpqy ÃÕ · Servidor saudável" /></Border>
+            </Grid>
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="SaCaptionTextStyle 12/16" VerticalAlignment="Center" />
+                <Border Grid.Column="1" BorderBrush="{ThemeResource SaDividerBrush}" BorderThickness="0,0,0,1"><TextBlock Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextBrush}" Text="Ágil ç gjpqy ÃÕ · Servidor saudável" /></Border>
+            </Grid>
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="SaControlTextStyle 13/18" VerticalAlignment="Center" />
+                <Border Grid.Column="1" BorderBrush="{ThemeResource SaDividerBrush}" BorderThickness="0,0,0,1"><TextBlock Style="{StaticResource SaControlTextStyle}" Foreground="{ThemeResource SaTextBrush}" Text="Ágil ç gjpqy ÃÕ · Servidor saudável" /></Border>
+            </Grid>
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="SaLabelTextStyle 12/16" VerticalAlignment="Center" />
+                <Border Grid.Column="1" BorderBrush="{ThemeResource SaDividerBrush}" BorderThickness="0,0,0,1"><TextBlock Style="{StaticResource SaLabelTextStyle}" Foreground="{ThemeResource SaTextBrush}" Text="Ágil ç gjpqy ÃÕ · Servidor saudável" /></Border>
+            </Grid>
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="SaMicroTextStyle 10/14" VerticalAlignment="Center" />
+                <Border Grid.Column="1" BorderBrush="{ThemeResource SaDividerBrush}" BorderThickness="0,0,0,1"><TextBlock Style="{StaticResource SaMicroTextStyle}" Foreground="{ThemeResource SaTextBrush}" Text="Ágil ç gjpqy ÃÕ · Servidor saudável" /></Border>
+            </Grid>
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="SaMonoTextStyle 12/16" VerticalAlignment="Center" />
+                <Border Grid.Column="1" BorderBrush="{ThemeResource SaDividerBrush}" BorderThickness="0,0,0,1"><TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextBrush}" Text="Ágil ç gjpqy ÃÕ · Servidor saudável" /></Border>
+            </Grid>
+            <TextBlock Style="{StaticResource SaSecondaryBodyTextStyle}" Text="Text roles (Styles/Components/Sa.Text.xaml)" Margin="0,16,0,0" />
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="SaSectionHeaderTextStyle" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1" Style="{StaticResource SaSectionHeaderTextStyle}" Text="Ágil ç gjpqy ÃÕ · Servidor saudável" />
+            </Grid>
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="SaPrimaryBodyTextStyle" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1" Style="{StaticResource SaPrimaryBodyTextStyle}" Text="Ágil ç gjpqy ÃÕ · Servidor saudável" />
+            </Grid>
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="SaSecondaryBodyTextStyle" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1" Style="{StaticResource SaSecondaryBodyTextStyle}" Text="Ágil ç gjpqy ÃÕ · Servidor saudável" />
+            </Grid>
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="SaTableHeaderTextStyle" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1" Style="{StaticResource SaTableHeaderTextStyle}" Text="Ágil ç gjpqy ÃÕ · Servidor saudável" />
+            </Grid>
+        </StackPanel>
+    </ScrollViewer>
+</Page>
