@@ -110,6 +110,7 @@ internal sealed class QaTokenSelfCheck(QaGalleryWindow window)
         await SettleAsync();
         results.AddRange(CheckIconData());
         results.Add(await CheckIconStrokeAsync(page.StrokeProbe16));
+        results.Add(await CheckIconStrokeAsync(page.StrokeProbe24));
         results.Add(await CheckIconStrokeAsync(page.StrokeProbe48));
 
         // F-4: the C# accessor parses every motion token straight from the live Application.Resources.

@@ -94,4 +94,6 @@ foreach ($page in $Pages) {
         $log.Add($line); $line
     }
 }
-$log | Set-Content (Join-Path $OutDir 'manifest.txt')
+# Appended, so a partial re-shoot never erases the record of an earlier full run.
+Add-Content (Join-Path $OutDir 'manifest.txt') ("# run $(Get-Date -Format o)")
+$log | Add-Content (Join-Path $OutDir 'manifest.txt')

@@ -72,7 +72,7 @@ public sealed partial class XamlContractAndResourceGuardTests
             "GalleryRoot", "DarkThemeOption", "LightThemeOption", "HcSimThemeOption", "HcBannerText", "PageList",
             "ContentHost", "SimulationHost", "PageFrame"
         ],
-        ["Qa/Gallery/QaTokenProbePage.xaml"] = ["DefaultStyleProbe", "StrokeProbe16", "StrokeProbe48"],
+        ["Qa/Gallery/QaTokenProbePage.xaml"] = ["DefaultStyleProbe", "StrokeProbe16", "StrokeProbe24", "StrokeProbe48"],
         ["Qa/Gallery/QaColorsPage.xaml"] = ["PrimitiveSwatches"],
         ["Qa/Gallery/QaMaterialsPage.xaml"] = ["FallbackToggle", "GlassSample", "GlassFallbackSample"],
         // Storyboard.TargetName lanes (G-3) and the C#-path lanes driven by the code-behind.

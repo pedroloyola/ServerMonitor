@@ -60,6 +60,9 @@ public sealed class SaIcon : Control
             ? size / DesignSize
             : throw new ArgumentOutOfRangeException(nameof(size), size, "An icon size must be a positive, finite number of DIPs.");
 
+    /// <summary>True at the design size, where no geometry transform may be applied (an identity transform renders nothing).</summary>
+    public static bool IsIdentityScale(double scale) => Math.Abs(scale - 1) < 1e-9;
+
     protected override void OnApplyTemplate()
     {
         base.OnApplyTemplate();
@@ -83,7 +86,9 @@ public sealed class SaIcon : Control
         // A fresh geometry per instance: the Transform is per icon, so a shared Geometry must never be mutated.
         var geometry = (Geometry)XamlBindingHelper.ConvertValue(typeof(Geometry), Data);
         var scale = ScaleFor(Size);
-        geometry.Transform = new ScaleTransform { ScaleX = scale, ScaleY = scale };
+        // EMPIRICAL (UI.2 --qa-tokens): an identity ScaleTransform (Size 24) makes WinUI render the path EMPTY, so the
+        // native 24 size draws the geometry untransformed.
+        geometry.Transform = IsIdentityScale(scale) ? null : new ScaleTransform { ScaleX = scale, ScaleY = scale };
         _path.Data = geometry;
     }
 }

@@ -86,6 +86,16 @@ public sealed partial class IconResourceGuardTests
         Assert.Throws<ArgumentOutOfRangeException>(() => SaIcon.ScaleFor(double.NaN));
     }
 
+    /// <summary>EMPIRICAL (--qa-tokens): an identity geometry transform renders the icon empty, so 24 px uses none.</summary>
+    [Theory]
+    [InlineData(24, true)]
+    [InlineData(16, false)]
+    [InlineData(48, false)]
+    public void TheDesignSizeIsTheOnlyIdentityScale(double size, bool identity)
+    {
+        Assert.Equal(identity, SaIcon.IsIdentityScale(SaIcon.ScaleFor(size)));
+    }
+
     /// <summary>The template draws the stroke at exactly the constant width, never a Viewbox.</summary>
     [Fact]
     public void IconTemplateStrokesAtTheConstantWidthWithoutAViewbox()
