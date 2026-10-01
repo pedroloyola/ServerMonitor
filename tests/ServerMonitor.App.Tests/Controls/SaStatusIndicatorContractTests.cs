@@ -15,12 +15,28 @@ public sealed class SaStatusIndicatorContractTests
     [Fact]
     public void EveryStatusKindHasADeclaredVisualStateInOneGroup()
     {
-        var states = typeof(SaStatusIndicator).GetCustomAttributes<TemplateVisualStateAttribute>().ToList();
+        var states = typeof(SaStatusIndicator).GetCustomAttributes<TemplateVisualStateAttribute>()
+            .Where(s => s.GroupName == "StatusStates")
+            .ToList();
 
         Assert.Equal(
             Enum.GetNames<SaStatusKind>().OrderBy(n => n, StringComparer.Ordinal),
             states.Select(s => s.Name).OrderBy(n => n, StringComparer.Ordinal));
-        Assert.Equal("StatusStates", Assert.Single(states.Select(s => s.GroupName).Distinct()));
+    }
+
+    /// <summary>
+    /// UI.3: the only other group is the label toggle (dot-only presentation). Status colours stay in StatusStates,
+    /// so hiding the label can never change which brush a status gets.
+    /// </summary>
+    [Fact]
+    public void LabelVisibilityIsItsOwnTwoStateGroup()
+    {
+        var groups = typeof(SaStatusIndicator).GetCustomAttributes<TemplateVisualStateAttribute>()
+            .GroupBy(s => s.GroupName)
+            .ToDictionary(g => g.Key, g => g.Select(s => s.Name).Order(StringComparer.Ordinal).ToArray(), StringComparer.Ordinal);
+
+        Assert.Equal(new[] { "LabelStates", "StatusStates" }, groups.Keys.Order(StringComparer.Ordinal));
+        Assert.Equal(new[] { "LabelHidden", "LabelVisible" }, groups["LabelStates"]);
     }
 
     [Fact]

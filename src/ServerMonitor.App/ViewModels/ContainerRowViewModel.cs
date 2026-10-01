@@ -32,6 +32,16 @@ public sealed class ContainerRowViewModel
             or ContainerHealth.Starting;
         HealthText = HasHealth ? localization.GetString($"WorkloadContainerHealth{container.Health}") : null;
 
+        var healthKey = WorkloadPresentation.ContainerHealthDisplayKey(container.State, container.Health);
+        HealthDisplay = localization.GetString(healthKey ?? "WorkloadValueUnknown");
+        IsProblem = Severity == WorkloadSeverity.Negative;
+        DisplayAutomationName = string.Format(
+            CultureInfo.CurrentUICulture,
+            localization.GetString("WorkloadContainerAccessibleWithHealthFormat"),
+            Name,
+            StateText,
+            healthKey is null ? localization.GetString("WorkloadValueUnknownAccessible") : HealthDisplay);
+
         AutomationName = HasHealth
             ? string.Format(
                 CultureInfo.CurrentUICulture,
@@ -70,4 +80,17 @@ public sealed class ContainerRowViewModel
 
     /// <summary>Full spoken summary, e.g. "postgres, container em execução, saudável" (§53).</summary>
     public string AutomationName { get; }
+
+    /// <summary>
+    /// UI.3 health column: always a value. "Sem verificação" when the image has no health check,
+    /// "—" when the container is not running or the verdict is unknown (unknown ≠ "no check"), else the
+    /// health verdict ("Saudável"/"Não saudável"/"A iniciar").
+    /// </summary>
+    public string HealthDisplay { get; } = string.Empty;
+
+    /// <summary>Counts toward "Com problemas" (D-UI3-3): Negative severity only.</summary>
+    public bool IsProblem { get; }
+
+    /// <summary>Spoken summary matching the UI.3 columns (name, state, health — "unknown" spoken, not "—").</summary>
+    public string DisplayAutomationName { get; } = string.Empty;
 }

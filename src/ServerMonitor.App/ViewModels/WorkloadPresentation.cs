@@ -78,6 +78,109 @@ public static class WorkloadPresentation
     /// </summary>
     public static int ContainerSortRank(ContainerState state) => state == ContainerState.Running ? 0 : 1;
 
+    /// <summary>
+    /// UI.3 health column key. Only a running (or restarting) container has a meaningful health verdict;
+    /// a stopped one reads "—". <c>None</c> = the image defines no check ("Sem verificação"), which is not
+    /// the same as <c>Unknown</c> ("—"). Returns <c>null</c> for "—" so callers can speak "unknown".
+    /// </summary>
+    public static string? ContainerHealthDisplayKey(ContainerState state, ContainerHealth health)
+    {
+        if (state is not (ContainerState.Running or ContainerState.Restarting))
+        {
+            return null;
+        }
+
+        return health switch
+        {
+            ContainerHealth.None => "WorkloadContainerHealthNone",
+            ContainerHealth.Healthy or ContainerHealth.Unhealthy or ContainerHealth.Starting =>
+                $"WorkloadContainerHealth{health}",
+            _ => null
+        };
+    }
+
+    /// <summary>UI.3 service state key (D-UI3-6): Running → "Ativo", Stopped → "Inativo", others unchanged.</summary>
+    public static string ServiceStateDisplayKey(ServiceState state) => state switch
+    {
+        ServiceState.Running => "WorkloadServiceStatusActive",
+        ServiceState.Stopped => "WorkloadServiceStatusInactive",
+        _ => $"WorkloadServiceState{state}"
+    };
+
+    /// <summary>UI.3 startup key (D-UI3-6); <c>null</c> (shown as "—") when not reported or unknown.</summary>
+    public static string? ServiceStartupDisplayKey(ServiceStartupState? startup) => startup switch
+    {
+        ServiceStartupState.Enabled => "WorkloadServiceStartupAutomatic",
+        ServiceStartupState.Static => "WorkloadServiceStartupStaticDisplay",
+        ServiceStartupState.Disabled => "WorkloadServiceStartupManual",
+        ServiceStartupState.Masked => "WorkloadServiceStartupBlocked",
+        _ => null
+    };
+
+    /// <summary>
+    /// Plural form key: "<paramref name="baseKey"/>One" for exactly 1, else "…Other". Counts of 0 never
+    /// reach plural copy (segments and badges are omitted at 0), which keeps pt-BR's CLDR 0/1 rule moot.
+    /// </summary>
+    public static string PluralKey(string baseKey, int count) => count == 1 ? baseKey + "One" : baseKey + "Other";
+
+    /// <summary>
+    /// Container lifecycle bucket for the UI.3 section summary ("Docker · 5 em execução · 1 parado"). Counts by
+    /// lifecycle, not severity: an unhealthy but running container is "em execução" (its problem is the badge).
+    /// </summary>
+    public static string ContainerLifecycleKey(ContainerState state) => state switch
+    {
+        ContainerState.Running => "WorkloadLifecycleRunning",
+        ContainerState.Restarting => "WorkloadLifecycleRestarting",
+        ContainerState.Paused => "WorkloadLifecyclePaused",
+        ContainerState.Dead => "WorkloadLifecycleDead",
+        ContainerState.Created or ContainerState.Exited or ContainerState.Removing => "WorkloadLifecycleStopped",
+        _ => "WorkloadLifecycleUnknown"
+    };
+
+    /// <summary>Service lifecycle bucket for the UI.3 section summary ("systemd · 5 ativos · 1 falha").</summary>
+    public static string ServiceLifecycleKey(ServiceState state) => state switch
+    {
+        ServiceState.Running => "WorkloadServiceCountActive",
+        ServiceState.Failed => "WorkloadServiceCountFailed",
+        ServiceState.Starting => "WorkloadServiceCountStarting",
+        ServiceState.Stopping => "WorkloadServiceCountStopping",
+        ServiceState.Stopped => "WorkloadServiceCountInactive",
+        _ => "WorkloadServiceCountUnknown"
+    };
+
+    /// <summary>Summary segment order: active first, failures right after so they are never read last (H-02).</summary>
+    public static readonly IReadOnlyList<string> ContainerLifecycleOrder =
+    [
+        "WorkloadLifecycleRunning",
+        "WorkloadLifecycleDead",
+        "WorkloadLifecycleRestarting",
+        "WorkloadLifecyclePaused",
+        "WorkloadLifecycleStopped",
+        "WorkloadLifecycleUnknown"
+    ];
+
+    public static readonly IReadOnlyList<string> ServiceLifecycleOrder =
+    [
+        "WorkloadServiceCountActive",
+        "WorkloadServiceCountFailed",
+        "WorkloadServiceCountStarting",
+        "WorkloadServiceCountStopping",
+        "WorkloadServiceCountInactive",
+        "WorkloadServiceCountUnknown"
+    ];
+
+    /// <summary>
+    /// UI.3 global search: one text over container name + image and service name + description. Ordinal
+    /// ignore-case is culture-invariant (no tr-TR dotless-i surprises) and matches the ASCII-heavy unit
+    /// and image names; an empty/whitespace query matches everything.
+    /// </summary>
+    public static bool Matches(string query, params string?[] fields)
+    {
+        var trimmed = query?.Trim() ?? string.Empty;
+        return trimmed.Length == 0
+            || fields.Any(field => field?.Contains(trimmed, StringComparison.OrdinalIgnoreCase) == true);
+    }
+
     /// <summary>Stable primary sort key for services: failed first, then running, then everything else (§49).</summary>
     public static int ServiceSortRank(ServiceState state) => state switch
     {

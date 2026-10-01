@@ -98,7 +98,7 @@
          signal: the Label is always rendered and is the automation name (the visible text is Raw for UIA so it is
          not read twice). Dot colours are the Manual tokens (D8), per visual state, so a theme change re-resolves
          them. Stale is DERIVED: secondary text colour, never the disabled brush (HC GrayText = disabled; Cortex F-3). -->
-    <Style TargetType="primitives:SaStatusIndicator">
+    <Style x:Key="SaStatusIndicatorStyle" TargetType="primitives:SaStatusIndicator">
         <Setter Property="IsTabStop" Value="False" />
         <Setter Property="Foreground" Value="{ThemeResource SaTextSecondaryBrush}" />
         <Setter Property="Template">
@@ -139,6 +139,16 @@
                                     </VisualState.Setters>
                                 </VisualState>
                             </VisualStateGroup>
+                            <!-- UI.3: IsLabelVisible=False (SaStatusDotOnlyStyle) collapses ONLY the label; the dot and its
+                                 per-status brush above are shared, never duplicated. -->
+                            <VisualStateGroup x:Name="LabelStates">
+                                <VisualState x:Name="LabelVisible" />
+                                <VisualState x:Name="LabelHidden">
+                                    <VisualState.Setters>
+                                        <Setter Target="PART_Label.Visibility" Value="Collapsed" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                            </VisualStateGroup>
                         </VisualStateManager.VisualStateGroups>
                         <Ellipse x:Name="PART_Dot"
                                  Width="{StaticResource SaStatusDotSize}"
@@ -155,6 +165,15 @@
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
+    </Style>
+    <!-- Implicit default = the keyed base, so variants can be BasedOn it (WinUI BasedOn needs a key). -->
+    <Style TargetType="primitives:SaStatusIndicator" BasedOn="{StaticResource SaStatusIndicatorStyle}" />
+    <!-- UI.3 (Boss decision): dot-only status, Workloads rows 112:2650 / 112:2708 (dot 6, the state is the row text on
+         the right). Same template, same state->brush/HC mapping; only the label rendering is collapsed. Raw in UIA because
+         the row text already carries the status (never colour alone); Label stays required by the guard. Reuse: UI.4 lists. -->
+    <Style x:Key="SaStatusDotOnlyStyle" TargetType="primitives:SaStatusIndicator" BasedOn="{StaticResource SaStatusIndicatorStyle}">
+        <Setter Property="IsLabelVisible" Value="False" />
+        <Setter Property="AutomationProperties.AccessibilityView" Value="Raw" />
     </Style>
     <!-- ===================== UI.2 S6: data and feedback primitives ===================== -->
 

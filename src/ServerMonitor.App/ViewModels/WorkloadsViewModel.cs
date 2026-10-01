@@ -41,6 +41,16 @@ public enum WorkloadFilter
 }
 
 /// <summary>
+/// UI.3 page-wide filter (D-UI3-3) over both lists: "Todos" or "Com problemas" (Negative severity only —
+/// transient Warning states such as "A iniciar"/"A reiniciar" are not problems).
+/// </summary>
+public enum WorkloadGlobalFilter
+{
+    All,
+    Problems
+}
+
+/// <summary>
 /// Presents one server's read-only workloads (M11): Docker containers and managed services. Like the
 /// dashboard, it observes the transient <see cref="IServerWorkloadStore"/> and never runs a timer of its
 /// own — the collector/coordinator refresh the snapshot, this VM re-renders on <c>WorkloadChanged</c>.
@@ -85,6 +95,18 @@ public sealed class WorkloadsViewModel : ObservableObject, IDisposable
     private WorkloadFilter _containerFilter = WorkloadFilter.All;
     private WorkloadFilter _serviceFilter = WorkloadFilter.All;
 
+    // UI.3 additions. Null-safe so a runtime-free host that skips field initializers can still read them.
+    private readonly IServerMetricsStore? _metricsStore;
+    private readonly RelayCommand? _clearSearchCommand;
+    private string? _searchText;
+    private WorkloadGlobalFilter _globalFilter;
+    private ServiceManager _servicesManager;
+    private string? _contextDisplay;
+    private string? _dockerLifecycleSummary;
+    private string? _servicesLifecycleSummary;
+    private string? _dockerProblemBadge;
+    private string? _servicesProblemBadge;
+
     // GetForCurrentThread() throws a WinRT COMException in a non-UI/unpackaged host (test runner). Treat
     // that as "no dispatcher" so the VM stays constructible and runs inline there. [mirrors HistoryVM]
     private static DispatcherQueue? TryGetDispatcher()
@@ -102,6 +124,7 @@ public sealed class WorkloadsViewModel : ObservableObject, IDisposable
     public WorkloadsViewModel(
         IServerWorkloadStore workloadStore,
         IWorkloadRefreshCoordinator refreshCoordinator,
+        IServerMetricsStore metricsStore,
         INavigationService navigationService,
         ILocalizationService localizationService,
         ILogger<WorkloadsViewModel> logger,
@@ -109,6 +132,7 @@ public sealed class WorkloadsViewModel : ObservableObject, IDisposable
     {
         _workloadStore = workloadStore ?? throw new ArgumentNullException(nameof(workloadStore));
         _refreshCoordinator = refreshCoordinator ?? throw new ArgumentNullException(nameof(refreshCoordinator));
+        _metricsStore = metricsStore ?? throw new ArgumentNullException(nameof(metricsStore));
         ArgumentNullException.ThrowIfNull(navigationService);
         _localization = localizationService ?? throw new ArgumentNullException(nameof(localizationService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -116,9 +140,153 @@ public sealed class WorkloadsViewModel : ObservableObject, IDisposable
 
         BackCommand = new RelayCommand(navigationService.GoToDashboard);
         _refreshCommand = new AsyncRelayCommand(RefreshAsync, () => !IsRefreshing);
+        _clearSearchCommand = new RelayCommand(ClearSearch);
 
         RefreshAutomationName = _localization.GetString("WorkloadRefreshButton");
     }
+
+    // --- UI.3 page-wide search + filter (D-UI3-3) ------------------------------------------------------
+
+    /// <summary>
+    /// One search over both lists (container name + image, service name + description). Setting it also
+    /// drives the legacy per-section texts, so the pre-UI.3 page keeps working until phase 2 rebinds.
+    /// </summary>
+    public string SearchText
+    {
+        get => _searchText ?? string.Empty;
+        set
+        {
+            value ??= string.Empty;
+            if (string.Equals(_searchText ?? string.Empty, value, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            _searchText = value;
+            OnPropertyChanged();
+            _containerSearchText = value;
+            _serviceSearchText = value;
+            OnPropertyChanged(nameof(ContainerSearchText));
+            OnPropertyChanged(nameof(ServiceSearchText));
+            ApplyContainerView();
+            ApplyServiceView();
+        }
+    }
+
+    public WorkloadGlobalFilter GlobalFilter
+    {
+        get => _globalFilter;
+        set
+        {
+            if (SetProperty(ref _globalFilter, value))
+            {
+                OnPropertyChanged(nameof(GlobalFilterIndex));
+                ApplyContainerView();
+                ApplyServiceView();
+            }
+        }
+    }
+
+    /// <summary>0/1 → Todos/Com problemas, two-way bound to the segmented filter.</summary>
+    public int GlobalFilterIndex
+    {
+        get => (int)_globalFilter;
+        set
+        {
+            if (value is 0 or 1)
+            {
+                GlobalFilter = (WorkloadGlobalFilter)value;
+            }
+        }
+    }
+
+    /// <summary>Counts are shown once at least one section has a known list (never "Todos · 0" while loading).</summary>
+    public bool HasFilterCounts =>
+        DockerState is DockerViewState.Containers or DockerViewState.Empty
+        || ServicesState is ServicesViewState.List or ServicesViewState.Empty;
+
+    public int AllCount => _allContainers.Count + _allServices.Count;
+
+    /// <summary>Negative severity only (D-UI3-3).</summary>
+    public int ProblemCount => _allContainers.Count(c => c.IsProblem) + _allServices.Count(s => s.IsProblem);
+
+    /// <summary>"Todos · 12", or "Todos" before any list is known.</summary>
+    public string FilterAllLabel => HasFilterCounts
+        ? Format("WorkloadFilterAllFormat", AllCount)
+        : _localization?.GetString("WorkloadFilterAll") ?? string.Empty;
+
+    /// <summary>"Com problemas · 2", or "Com problemas" before any list is known.</summary>
+    public string FilterProblemsLabel => HasFilterCounts
+        ? Format("WorkloadFilterProblemsFormat", ProblemCount)
+        : _localization?.GetString("WorkloadFilterProblems") ?? string.Empty;
+
+    /// <summary>A search text or the "Com problemas" filter is narrowing the lists.</summary>
+    public bool HasActiveQuery => SearchText.Trim().Length > 0 || _globalFilter != WorkloadGlobalFilter.All;
+
+    /// <summary>
+    /// Page-level "Nenhum resultado": a query is active, at least one section has a list, and every
+    /// visible list came back empty. Section-only misses use <see cref="ShowDockerSectionNoResults"/> /
+    /// <see cref="ShowServicesSectionNoResults"/>.
+    /// </summary>
+    public bool ShowGlobalNoResults =>
+        HasActiveQuery
+        && (ShowDockerContainers || ShowServicesList)
+        && (!ShowDockerContainers || Containers.Count == 0)
+        && (!ShowServicesList || Services.Count == 0);
+
+    /// <summary>"Sem resultados nesta secção" inside the Containers card (the other card still has rows).</summary>
+    public bool ShowDockerSectionNoResults => ShowDockerNoResults && !ShowGlobalNoResults;
+
+    /// <summary>"Sem resultados nesta secção" inside the Services card (the other card still has rows).</summary>
+    public bool ShowServicesSectionNoResults => ShowServicesNoResults && !ShowGlobalNoResults;
+
+    /// <summary>"Nenhum resultado para “redis”", or "Nenhum problema encontrado" for the filter alone.</summary>
+    public string NoResultsTitle
+    {
+        get
+        {
+            var search = SearchText.Trim();
+            return search.Length > 0
+                ? string.Format(CultureInfo.CurrentUICulture, _localization.GetString("WorkloadNoResultsTitleFormat"), search)
+                : _localization.GetString("WorkloadNoProblemsTitle");
+        }
+    }
+
+    /// <summary>"Limpar pesquisa": clears the search AND resets the filter(s) to Todos.</summary>
+    public ICommand ClearSearchCommand => _clearSearchCommand ?? new RelayCommand(ClearSearch);
+
+    // --- UI.3 header context + section summaries --------------------------------------------------------
+
+    /// <summary>
+    /// "prod-web-01 · Ubuntu 24.04 LTS · Atualizado há 3 min" (D-UI3-9: minutes, no timer). The OS is
+    /// omitted when unknown; "Falha na última consulta" is appended when the list is stale and replaces the
+    /// freshness when nothing could be read; "A consultar serviços e containers…" before the first attempt.
+    /// </summary>
+    public string ContextDisplay => _contextDisplay ?? string.Empty;
+
+    /// <summary>"Docker · 5 em execução · 1 parado" — by lifecycle, not severity; empty without a list.</summary>
+    public string DockerLifecycleSummary => _dockerLifecycleSummary ?? string.Empty;
+
+    /// <summary>"systemd · 5 ativos · 1 falha" — manager from <see cref="ServiceSnapshot.Manager"/>.</summary>
+    public string ServicesLifecycleSummary => _servicesLifecycleSummary ?? string.Empty;
+
+    /// <summary>"1 problema" / "N problemas" for the Containers card; null when none.</summary>
+    public string? DockerProblemBadge => _dockerProblemBadge;
+
+    public bool HasDockerProblems => _dockerProblemBadge is not null;
+
+    /// <summary>"1 problema" / "N problemas" for the Services card; null when none.</summary>
+    public string? ServicesProblemBadge => _servicesProblemBadge;
+
+    public bool HasServicesProblems => _servicesProblemBadge is not null;
+
+    /// <summary>Page panel "Não foi possível obter os serviços": both sections failed to be read.</summary>
+    public bool ShowAllUnavailable =>
+        DockerState == DockerViewState.Error && ServicesState == ServicesViewState.Error;
+
+    /// <summary>Page panel "Nada para apresentar": both reads succeeded and found nothing.</summary>
+    public bool ShowNothingToShow =>
+        DockerState == DockerViewState.Empty && ServicesState == ServicesViewState.Empty;
 
     public ICommand BackCommand { get; }
 
@@ -457,6 +625,106 @@ public sealed class WorkloadsViewModel : ObservableObject, IDisposable
         ApplyFreshness(snapshot);
         ApplyDocker(snapshot);
         ApplyServices(snapshot);
+        ApplyUi3Summaries();
+        ApplyContext(snapshot);
+    }
+
+    private void ApplyContext(ServerWorkloadSnapshot? snapshot)
+    {
+        string context;
+        if (snapshot is null || snapshot.LastAttemptAtUtc is null)
+        {
+            context = ServerContextPresentation.Join(Title, _localization.GetString("WorkloadContextLoading"));
+        }
+        else if (ShowAllUnavailable)
+        {
+            context = ServerContextPresentation.Join(Title, _localization.GetString("WorkloadContextLastQueryFailed"));
+        }
+        else
+        {
+            var os = ServerContextPresentation.OperatingSystemDisplay(_metricsStore?.GetLastSnapshot(_serverId));
+            context = ServerContextPresentation.Join(
+                Title,
+                os,
+                UpdatedAgoDisplay,
+                IsStale ? _localization.GetString("WorkloadContextLastQueryFailed") : null);
+        }
+
+        if (!string.Equals(_contextDisplay, context, StringComparison.Ordinal))
+        {
+            _contextDisplay = context;
+            OnPropertyChanged(nameof(ContextDisplay));
+        }
+    }
+
+    private void ApplyUi3Summaries()
+    {
+        _dockerLifecycleSummary = DockerState == DockerViewState.Containers
+            ? LifecycleSummary(
+                _localization.GetString("WorkloadManagerDocker"),
+                _allContainers.Select(c => WorkloadPresentation.ContainerLifecycleKey(c.State)),
+                WorkloadPresentation.ContainerLifecycleOrder)
+            : string.Empty;
+        _servicesLifecycleSummary = ServicesState == ServicesViewState.List
+            ? LifecycleSummary(
+                _localization.GetString($"WorkloadManager{_servicesManager}"),
+                _allServices.Select(s => WorkloadPresentation.ServiceLifecycleKey(s.State)),
+                WorkloadPresentation.ServiceLifecycleOrder)
+            : string.Empty;
+        _dockerProblemBadge = ProblemBadge(_allContainers.Count(c => c.IsProblem));
+        _servicesProblemBadge = ProblemBadge(_allServices.Count(s => s.IsProblem));
+
+        OnPropertyChanged(nameof(DockerLifecycleSummary));
+        OnPropertyChanged(nameof(ServicesLifecycleSummary));
+        OnPropertyChanged(nameof(DockerProblemBadge));
+        OnPropertyChanged(nameof(HasDockerProblems));
+        OnPropertyChanged(nameof(ServicesProblemBadge));
+        OnPropertyChanged(nameof(HasServicesProblems));
+        OnPropertyChanged(nameof(HasFilterCounts));
+        OnPropertyChanged(nameof(AllCount));
+        OnPropertyChanged(nameof(ProblemCount));
+        OnPropertyChanged(nameof(FilterAllLabel));
+        OnPropertyChanged(nameof(FilterProblemsLabel));
+        OnPropertyChanged(nameof(ShowAllUnavailable));
+        OnPropertyChanged(nameof(ShowNothingToShow));
+        RaiseNoResults();
+    }
+
+    private string LifecycleSummary(string manager, IEnumerable<string> keys, IReadOnlyList<string> order)
+    {
+        var counts = keys.GroupBy(key => key).ToDictionary(group => group.Key, group => group.Count());
+        var segments = new List<string> { manager };
+        foreach (var key in order)
+        {
+            if (counts.TryGetValue(key, out var count) && count > 0)
+            {
+                segments.Add(Format(WorkloadPresentation.PluralKey(key, count), count));
+            }
+        }
+
+        return string.Join(" · ", segments);
+    }
+
+    private string? ProblemBadge(int problems) =>
+        problems > 0 ? Format(WorkloadPresentation.PluralKey("WorkloadProblemBadge", problems), problems) : null;
+
+    private void ClearSearch()
+    {
+        SearchText = string.Empty;
+        GlobalFilter = WorkloadGlobalFilter.All;
+        ContainerFilter = WorkloadFilter.All;
+        ServiceFilter = WorkloadFilter.All;
+        ContainerSearchText = string.Empty;
+        ServiceSearchText = string.Empty;
+    }
+
+    private void RaiseNoResults()
+    {
+        OnPropertyChanged(nameof(HasActiveQuery));
+        OnPropertyChanged(nameof(ShowGlobalNoResults));
+        OnPropertyChanged(nameof(ShowDockerSectionNoResults));
+        OnPropertyChanged(nameof(ShowServicesSectionNoResults));
+        OnPropertyChanged(nameof(NoResultsTitle));
     }
 
     private void ApplyFreshness(ServerWorkloadSnapshot? snapshot)
@@ -556,6 +824,7 @@ public sealed class WorkloadsViewModel : ObservableObject, IDisposable
 
         var services = snapshot.Services;
         _servicesTruncated = services.Truncated;
+        _servicesManager = services.Manager;
 
         // No supported manager (unknown OS, non-systemd Linux) is "unsupported" regardless of the
         // availability code — there is simply nothing to read here (§45).
@@ -664,15 +933,19 @@ public sealed class WorkloadsViewModel : ObservableObject, IDisposable
             view = view.Where(c => c.Severity == wanted);
         }
 
+        if (_globalFilter == WorkloadGlobalFilter.Problems)
+        {
+            view = view.Where(c => c.IsProblem);
+        }
+
         if (search.Length > 0)
         {
-            view = view.Where(c =>
-                c.Name.Contains(search, StringComparison.CurrentCultureIgnoreCase)
-                || c.Image.Contains(search, StringComparison.CurrentCultureIgnoreCase));
+            view = view.Where(c => WorkloadPresentation.Matches(search, c.Name, c.Image));
         }
 
         ReplaceAll(Containers, view);
         OnPropertyChanged(nameof(ShowDockerNoResults));
+        RaiseNoResults();
     }
 
     private void ApplyServiceView()
@@ -688,15 +961,19 @@ public sealed class WorkloadsViewModel : ObservableObject, IDisposable
             view = view.Where(s => s.Severity == wanted);
         }
 
+        if (_globalFilter == WorkloadGlobalFilter.Problems)
+        {
+            view = view.Where(s => s.IsProblem);
+        }
+
         if (search.Length > 0)
         {
-            view = view.Where(s =>
-                s.Name.Contains(search, StringComparison.CurrentCultureIgnoreCase)
-                || (s.Description?.Contains(search, StringComparison.CurrentCultureIgnoreCase) ?? false));
+            view = view.Where(s => WorkloadPresentation.Matches(search, s.Name, s.Description));
         }
 
         ReplaceAll(Services, view);
         OnPropertyChanged(nameof(ShowServicesNoResults));
+        RaiseNoResults();
     }
 
     private static void ReplaceAll<T>(ObservableCollection<T> target, IEnumerable<T> items)

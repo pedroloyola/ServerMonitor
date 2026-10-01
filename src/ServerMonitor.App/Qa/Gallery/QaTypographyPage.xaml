@@ -99,6 +99,21 @@
                 <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="SaTableHeaderTextStyle 10/14 · 112:1434" VerticalAlignment="Center" />
                 <TextBlock Grid.Column="1" Style="{StaticResource SaTableHeaderTextStyle}" Foreground="{ThemeResource SaTextBrush}" Text="SERVIDOR · SISTEMA · ESTADO" />
             </Grid>
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="SaChartValue+UnitTextStyle 112:2291" VerticalAlignment="Center" />
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2"><TextBlock Style="{StaticResource SaChartValueTextStyle}" Foreground="{ThemeResource SaTextBrush}" Text="24" VerticalAlignment="Center" /><TextBlock Style="{StaticResource SaChartUnitTextStyle}" Text="%" VerticalAlignment="Center" /></StackPanel>
+            </Grid>
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="SaPageSubtitleTextStyle 112:2262" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1" Style="{StaticResource SaPageSubtitleTextStyle}" Text="Ágil ç gjpqy ÃÕ · Utilização de recursos ao longo do tempo" />
+            </Grid>
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="SaChartAxisTextStyle · 112:2298" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1" Style="{StaticResource SaChartAxisTextStyle}" Text="15:00 · 21:00 · 03:00 · 09:00 · 15:00 · 100 · 50 · 0" />
+            </Grid>
             <TextBlock Style="{StaticResource SaSecondaryBodyTextStyle}" Text="Display / Heading line heights (B-3 decided: Heading 42) - same text as the Figma refs" Margin="0,16,0,0" />
             <Grid ColumnSpacing="24">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>

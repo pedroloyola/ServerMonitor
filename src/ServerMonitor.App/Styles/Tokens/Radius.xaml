@@ -16,4 +16,6 @@
     <CornerRadius x:Key="SaRadiusDialogButton">13</CornerRadius>
     <CornerRadius x:Key="SaRadiusSegment">11</CornerRadius>
     <CornerRadius x:Key="SaRadiusSkeleton">6</CornerRadius>
+    <!-- UI.3 additive (D-UI3-8): rich server selector 330x52 r16, 112:2264 / 112:2442. -->
+    <CornerRadius x:Key="SaRadiusSelector">16</CornerRadius>
 </ResourceDictionary>
