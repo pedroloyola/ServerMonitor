@@ -24,6 +24,7 @@ internal static class QaStoreScreenshotComposition
 
     public static void Apply(IServiceCollection services)
     {
+        QaWindowPlacementIsolation.Apply(services, "screenshot");
         var entries = BuildEntries();
 
         services.AddSingleton<IServerService>(

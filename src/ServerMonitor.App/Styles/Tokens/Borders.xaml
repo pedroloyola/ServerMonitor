@@ -1,0 +1,9 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- Brushes: SaBorderNeutralBrush, SaBorderSubtleBrush, SaDividerBrush, SaFocusRingBrush. -->
+    <Thickness x:Key="SaBorderThickness">1</Thickness>
+    <Thickness x:Key="SaDividerThickness">0,0,0,1</Thickness>
+    <!-- DERIVED - needs Prism check: accessible Windows focus geometry, not a sampled Figma ring. -->
+    <Thickness x:Key="SaFocusRingThickness">2</Thickness>
+</ResourceDictionary>

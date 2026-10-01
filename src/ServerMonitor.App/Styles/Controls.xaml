@@ -4,7 +4,6 @@
     xmlns:controls="using:ServerMonitor.App.Controls"
     xmlns:converters="using:ServerMonitor.App.Converters">
     <converters:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
-    <converters:ConnectionStateToBrushConverter x:Key="ConnectionStateToBrushConverter" />
     <converters:HealthToBrushConverter x:Key="HealthToBrushConverter" />
     <converters:WorkloadSeverityToDotStyleConverter x:Key="WorkloadSeverityToDotStyleConverter" />
     <converters:WorkloadSeverityToTextStyleConverter x:Key="WorkloadSeverityToTextStyleConverter" />

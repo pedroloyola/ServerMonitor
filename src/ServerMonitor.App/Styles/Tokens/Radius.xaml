@@ -1,0 +1,12 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- Manual 107:603; mini bar 112:1040, checkbox 112:8522, health segment 112:1019. -->
+    <CornerRadius x:Key="SaRadiusPanel">24</CornerRadius>
+    <CornerRadius x:Key="SaRadiusCard">24</CornerRadius>
+    <CornerRadius x:Key="SaRadiusControl">12</CornerRadius>
+    <CornerRadius x:Key="SaRadiusPill">99</CornerRadius>
+    <CornerRadius x:Key="SaRadiusMiniBar">3</CornerRadius>
+    <CornerRadius x:Key="SaRadiusSmall">4</CornerRadius>
+    <CornerRadius x:Key="SaRadiusHealthSegment">6</CornerRadius>
+</ResourceDictionary>

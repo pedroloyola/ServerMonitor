@@ -21,6 +21,7 @@ internal static class QaHealthComposition
 
     public static void Apply(IServiceCollection services)
     {
+        QaWindowPlacementIsolation.Apply(services, "health");
         // Registered last so they win over the real registrations for every resolve.
         services.AddSingleton<IServerService, QaServerService>();
         services.AddSingleton<IServerMetricsStore, QaMetricsStore>();

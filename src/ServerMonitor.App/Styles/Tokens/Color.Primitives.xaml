@@ -1,0 +1,69 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- Sa = ServerAlyzer. New foundations only; never override legacy resources. -->
+    <Color x:Key="SaColorCanvasDark">#141414</Color>
+    <Color x:Key="SaColorCanvasLight">#E7E7E7</Color>
+    <Color x:Key="SaColorSurfaceDark">#242424</Color>
+    <Color x:Key="SaColorSurfaceLight">#F7F7F7</Color>
+    <Color x:Key="SaColorInteriorDark">#313131</Color>
+    <Color x:Key="SaColorInteriorLight">#E8E8E8</Color>
+    <Color x:Key="SaColorTextDark">#F5F5F5</Color>
+    <Color x:Key="SaColorTextLight">#202020</Color>
+    <Color x:Key="SaColorTextSecondaryDark">#ADADAD</Color>
+    <Color x:Key="SaColorTextSecondaryLight">#626262</Color>
+    <Color x:Key="SaColorCpuDark">#B69AF8</Color>
+    <Color x:Key="SaColorCpuLight">#8668CA</Color>
+    <Color x:Key="SaColorMemoryDark">#7DB8FF</Color>
+    <Color x:Key="SaColorMemoryLight">#427EC5</Color>
+    <Color x:Key="SaColorDiskDark">#FFC16E</Color>
+    <Color x:Key="SaColorDiskLight">#B87B2F</Color>
+    <Color x:Key="SaColorAttentionDark">#FFC16E</Color>
+    <Color x:Key="SaColorAttentionLight">#B87B2F</Color>
+    <Color x:Key="SaColorHealthyDark">#53DAB1</Color>
+    <Color x:Key="SaColorHealthyLight">#299985</Color>
+    <Color x:Key="SaColorSuccessDark">#53DAB1</Color>
+    <Color x:Key="SaColorSuccessLight">#299985</Color>
+    <Color x:Key="SaColorErrorDark">#FF858D</Color>
+    <Color x:Key="SaColorErrorLight">#BD5766</Color>
+    <Color x:Key="SaColorOfflineDark">#FF858D</Color>
+    <Color x:Key="SaColorOfflineLight">#BD5766</Color>
+    <Color x:Key="SaColorBorderNeutralDark">#99999999</Color>
+    <Color x:Key="SaColorBorderNeutralLight">#99737373</Color>
+    <Color x:Key="SaColorBorderSubtleDark">#21999999</Color>
+    <Color x:Key="SaColorBorderSubtleLight">#99FFFFFF</Color>
+    <Color x:Key="SaColorDividerDark">#484848</Color>
+    <Color x:Key="SaColorDividerLight">#D3D3D3</Color>
+    <Color x:Key="SaColorDisabledSurfaceDark">#22525252</Color>
+    <Color x:Key="SaColorDisabledSurfaceLight">#4AFFFFFF</Color>
+    <Color x:Key="SaColorDisabledTextDark">#ADADAD</Color>
+    <Color x:Key="SaColorDisabledTextLight">#626262</Color>
+    <!-- DERIVED - no Figma source, validate in UI.2 gallery: page 05 has no pointer-over state for Windows
+         controls. Reproducible rule: the Selected paint (nav 112:969 / 112:1180) at half its alpha
+         (alpha 0x3B -> 59/2 = 29.5 -> 0x1E; 0x80 -> 0x40), i.e. the Fluent rest -> hover -> selected progression. -->
+    <Color x:Key="SaColorHoverDark">#1E525252</Color>
+    <Color x:Key="SaColorHoverLight">#40FFFFFF</Color>
+    <Color x:Key="SaColorSelectedDark">#3B525252</Color>
+    <Color x:Key="SaColorSelectedLight">#80FFFFFF</Color>
+    <Color x:Key="SaColorSelectedTextDark">#F5F5F5</Color>
+    <Color x:Key="SaColorSelectedTextLight">#202020</Color>
+    <Color x:Key="SaColorFocusRingDark">#F5F5F5</Color>
+    <Color x:Key="SaColorFocusRingLight">#202020</Color>
+    <!-- Glass panel contour + inner highlight (Manual p.07 "contorno fino"): panel 112:1010 / 112:1222
+         border rgba(240,240,240,.37) / rgba(255,255,255,.95); inset 0 1px 1px rgba(255,255,255,.12) / .8. -->
+    <Color x:Key="SaColorGlassBorderDark">#5EF0F0F0</Color>
+    <Color x:Key="SaColorGlassBorderLight">#F2FFFFFF</Color>
+    <Color x:Key="SaColorGlassHighlightDark">#1FFFFFFF</Color>
+    <Color x:Key="SaColorGlassHighlightLight">#CCFFFFFF</Color>
+    <!-- Material / elevation primitives consumed by Elevation.xaml (only Acrylic opacities stay literal there). -->
+    <Color x:Key="SaColorElevatedSurfaceDark">#313131</Color>
+    <Color x:Key="SaColorElevatedSurfaceLight">#FFFFFF</Color>
+    <Color x:Key="SaColorGlassTintDark">#292929</Color>
+    <Color x:Key="SaColorGlassTintLight">#FFFFFF</Color>
+    <Color x:Key="SaColorSidebarTintDark">#121212</Color>
+    <Color x:Key="SaColorSidebarTintLight">#FAFAFA</Color>
+    <Color x:Key="SaColorModalSurfaceDark">#1A1A1A</Color>
+    <Color x:Key="SaColorModalSurfaceLight">#F7F7F7</Color>
+    <Color x:Key="SaColorOverlaySmokeDark">#5C000000</Color>
+    <Color x:Key="SaColorOverlaySmokeLight">#33000000</Color>
+</ResourceDictionary>

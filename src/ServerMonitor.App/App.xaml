@@ -6,6 +6,13 @@
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
+                <ResourceDictionary Source="Styles/Tokens/Color.Semantic.xaml" />
+                <ResourceDictionary Source="Styles/Tokens/Typography.xaml" />
+                <ResourceDictionary Source="Styles/Tokens/Spacing.xaml" />
+                <ResourceDictionary Source="Styles/Tokens/Radius.xaml" />
+                <ResourceDictionary Source="Styles/Tokens/Borders.xaml" />
+                <ResourceDictionary Source="Styles/Tokens/Elevation.xaml" />
+                <ResourceDictionary Source="Styles/Tokens/Motion.xaml" />
                 <ResourceDictionary Source="Styles/DesignTokens.xaml" />
                 <ResourceDictionary Source="Styles/Controls.xaml" />
             </ResourceDictionary.MergedDictionaries>
