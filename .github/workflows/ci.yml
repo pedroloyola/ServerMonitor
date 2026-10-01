@@ -38,7 +38,7 @@ jobs:
       # so future repository-level dependency inputs invalidate the cache when introduced.
       - name: Cache NuGet packages
         id: nuget-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           # On Windows, ~ resolves to %USERPROFILE%, the NuGet global-packages default.
           path: ~/.nuget/packages
@@ -92,7 +92,7 @@ jobs:
 
       - name: Cache NuGet packages
         id: nuget-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.nuget/packages
           key: ${{ runner.os }}-${{ runner.arch }}-nuget-${{ hashFiles('**/*.csproj', 'global.json', '**/Directory.Packages.props', '**/Directory.Build.props', '**/Directory.Build.targets', '**/NuGet.Config', '**/nuget.config', '**/packages.lock.json') }}
