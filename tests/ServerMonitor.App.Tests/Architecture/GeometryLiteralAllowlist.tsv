@@ -1,0 +1,28 @@
+# UI.3 gate 1B geometry ratchet - AUTHORISED exceptions (not debt). Guarded by GeometryLiteralRatchetTests.
+# Columns (TAB-separated): app-relative file | property | value | exact count | reason (>= 20 chars).
+# One exact key per line, no wildcards. New entries need Boss approval. Ratcheted exactly like the baseline:
+# growth beyond the count fails, a stale count fails.
+Qa/Gallery/QaButtonsPage.xaml	Padding	24	3	Debug-only QA gallery (csproj: <Page Remove="Qa\**\*.xaml" /> in Release); page/section inset (24) framing the specimens; not product UI
+Qa/Gallery/QaColorsPage.xaml	Padding	24	1	Debug-only QA gallery (csproj: <Page Remove="Qa\**\*.xaml" /> in Release); page/section inset (24) framing the specimens; not product UI
+Qa/Gallery/QaDataPage.xaml	Padding	24	1	Debug-only QA gallery (csproj: <Page Remove="Qa\**\*.xaml" /> in Release); page/section inset (24) framing the specimens; not product UI
+Qa/Gallery/QaFeedbackPage.xaml	Padding	24	1	Debug-only QA gallery (csproj: <Page Remove="Qa\**\*.xaml" /> in Release); page/section inset (24) framing the specimens; not product UI
+Qa/Gallery/QaFeedbackPage.xaml	Padding	48	1	Debug-only QA gallery (csproj: <Page Remove="Qa\**\*.xaml" /> in Release); frame around the SaEmptyState specimen, sized to show it at panel scale
+Qa/Gallery/QaFormsPage.xaml	Padding	24	2	Debug-only QA gallery (csproj: <Page Remove="Qa\**\*.xaml" /> in Release); page/section inset (24) framing the specimens; not product UI
+Qa/Gallery/QaGalleryWindow.xaml	Padding	24,16	1	Debug-only QA gallery (csproj: <Page Remove="Qa\**\*.xaml" /> in Release); gallery window header bar inset (chrome, not product UI)
+Qa/Gallery/QaGalleryWindow.xaml	Padding	24,8	1	Debug-only QA gallery (csproj: <Page Remove="Qa\**\*.xaml" /> in Release); gallery window toolbar strip inset (chrome, not product UI)
+Qa/Gallery/QaGalleryWindow.xaml	Padding	8,16	1	Debug-only QA gallery (csproj: <Page Remove="Qa\**\*.xaml" /> in Release); gallery page list inset (chrome, not product UI)
+Qa/Gallery/QaIconsPage.xaml	Padding	24	1	Debug-only QA gallery (csproj: <Page Remove="Qa\**\*.xaml" /> in Release); page/section inset (24) framing the specimens; not product UI
+Qa/Gallery/QaMaterialsPage.xaml	Padding	0	5	Debug-only QA gallery (csproj: <Page Remove="Qa\**\*.xaml" /> in Release); strips the surface style padding so the material specimen shows its own edge
+Qa/Gallery/QaMaterialsPage.xaml	Padding	16	8	Debug-only QA gallery (csproj: <Page Remove="Qa\**\*.xaml" /> in Release); inner content inset of each material specimen
+Qa/Gallery/QaMaterialsPage.xaml	Padding	24	1	Debug-only QA gallery (csproj: <Page Remove="Qa\**\*.xaml" /> in Release); page/section inset (24) framing the specimens; not product UI
+Qa/Gallery/QaMotionPage.xaml	Padding	24	1	Debug-only QA gallery (csproj: <Page Remove="Qa\**\*.xaml" /> in Release); page/section inset (24) framing the specimens; not product UI
+Qa/Gallery/QaMotionPage.xaml	Padding	4	11	Debug-only QA gallery (csproj: <Page Remove="Qa\**\*.xaml" /> in Release); 4px track around each motion specimen box
+Qa/Gallery/QaNavigationPage.xaml	Padding	24	3	Debug-only QA gallery (csproj: <Page Remove="Qa\**\*.xaml" /> in Release); page/section inset (24) framing the specimens; not product UI
+Qa/Gallery/QaPopupComboPage.xaml	Padding	24	1	Debug-only QA gallery (csproj: <Page Remove="Qa\**\*.xaml" /> in Release); page/section inset (24) framing the specimens; not product UI
+Qa/Gallery/QaPopupDialogPage.xaml	Padding	24	1	Debug-only QA gallery (csproj: <Page Remove="Qa\**\*.xaml" /> in Release); page/section inset (24) framing the specimens; not product UI
+Qa/Gallery/QaPopupFlyoutPage.xaml	Padding	24	1	Debug-only QA gallery (csproj: <Page Remove="Qa\**\*.xaml" /> in Release); page/section inset (24) framing the specimens; not product UI
+Qa/Gallery/QaSpacingPage.xaml	Padding	24	1	Debug-only QA gallery (csproj: <Page Remove="Qa\**\*.xaml" /> in Release); page/section inset (24) framing the specimens; not product UI
+Qa/Gallery/QaStatusPage.xaml	Padding	16	1	Debug-only QA gallery (csproj: <Page Remove="Qa\**\*.xaml" /> in Release); inset around the status indicator specimen row
+Qa/Gallery/QaStatusPage.xaml	Padding	24	1	Debug-only QA gallery (csproj: <Page Remove="Qa\**\*.xaml" /> in Release); page/section inset (24) framing the specimens; not product UI
+Qa/Gallery/QaTokenProbePage.xaml	Padding	24	1	Debug-only QA gallery (csproj: <Page Remove="Qa\**\*.xaml" /> in Release); page/section inset (24) framing the specimens; not product UI
+Qa/Gallery/QaTypographyPage.xaml	Padding	24	1	Debug-only QA gallery (csproj: <Page Remove="Qa\**\*.xaml" /> in Release); page/section inset (24) framing the specimens; not product UI
