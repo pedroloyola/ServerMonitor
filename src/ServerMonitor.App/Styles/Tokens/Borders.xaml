@@ -8,4 +8,6 @@
     <Thickness x:Key="SaFocusRingThickness">2</Thickness>
     <!-- UI.2 additive (Boss B-3): input error border 1.5, 112:16924 / 112:17088. -->
     <Thickness x:Key="SaErrorBorderThickness">1.5</Thickness>
+    <!-- UI.3 additive (D-UI3-8): history chart line stroke 2.4, round caps, 112:2299 / 112:2476. -->
+    <x:Double x:Key="SaChartLineThickness">2.4</x:Double>
 </ResourceDictionary>

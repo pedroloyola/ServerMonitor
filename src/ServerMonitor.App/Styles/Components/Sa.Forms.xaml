@@ -393,6 +393,39 @@
         <Setter Property="FontSize" Value="{StaticResource SaFontSizeCaption}" />
     </Style>
 
+    <!-- Item template of SaSelectorRichStyle. Contract (no VM type): the item exposes Name and Subtitle strings;
+         an empty Subtitle keeps its line so the closed selector never changes height. Icon and name INHERIT the
+         ComboBox foreground (text at rest, the Fluent disabled colour when disabled); only the subtitle is muted. -->
+    <DataTemplate x:Key="SaSelectorRichItemTemplate">
+        <Grid ColumnSpacing="{StaticResource SaSpace12}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <primitives:SaIcon Data="{StaticResource SaIconServerStack01Data}" Size="{StaticResource SaIconSizeMedium}" VerticalAlignment="Center" />
+            <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                <TextBlock Text="{Binding Name}" Style="{StaticResource SaButtonTextStyle}" TextTrimming="CharacterEllipsis" MaxLines="1" />
+                <TextBlock Text="{Binding Subtitle}" Style="{StaticResource SaHelperTextStyle}"
+                           Foreground="{ThemeResource SaTextSecondaryBrush}" TextTrimming="CharacterEllipsis" MaxLines="1" />
+            </StackPanel>
+        </Grid>
+    </DataTemplate>
+    <!-- UI.3 additive (D-UI3-8). Rich selector 112:2264 / 112:2442: 330x52 r16, pad-x 16, fill = search fill
+         (#666666@.18 / #FFF@.42 measured, the SaSearchFill token), no rest border (HC 1px via the Secondary border
+         tokens); content = ServerStack01 20 + name 14 Medium + subtitle 11 muted, gap 12 / 2. The chevron stays the
+         Fluent glyph (same accepted deviation as SaSelectorFieldStyle). Reuse: History server selector now,
+         Overview/Servers (UI.4) and Settings later (Prism inventory 6.2). -->
+    <Style x:Key="SaSelectorRichStyle" TargetType="ComboBox" BasedOn="{StaticResource SaSelectorFieldStyle}">
+        <Setter Property="Height" Value="52" />
+        <Setter Property="MinWidth" Value="240" />
+        <Setter Property="Padding" Value="16,0,0,0" />
+        <Setter Property="CornerRadius" Value="{StaticResource SaRadiusSelector}" />
+        <Setter Property="Background" Value="{ThemeResource SaSearchFillBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource SaSecondaryBorderBrush}" />
+        <Setter Property="BorderThickness" Value="{ThemeResource SaSecondaryBorderThickness}" />
+        <Setter Property="ItemTemplate" Value="{StaticResource SaSelectorRichItemTemplate}" />
+    </Style>
+
     <!-- ===== CheckBox 155:240 / 159:394: box 15x15 radius 4; unchecked 1px neutral border, no fill; checked fill =
          text colour + tick 11 in the input fill colour (exactly the Figma rgba(36,36,36,.65) / rgba(255,255,255,.34)
          glyph); label 13 Regular muted, gap 8. Indeterminate is DERIVED (a bar). WinUI's CombinedStates names. ===== -->
@@ -680,6 +713,14 @@
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
+    </Style>
+    <!-- UI.3 additive (D-UI3-8). Filter segment 112:2634 / 112:2850 ("Todos · 12" / "Com problemas · 2"): same
+         geometry/states as SaSegmentedRectItemStyle, but 12 Medium in the TEXT colour in both states (the unselected
+         item is not muted). Selected keeps the rect segment fill + highlight. -->
+    <Style x:Key="SaSegmentedRectFilterItemStyle" TargetType="RadioButton" BasedOn="{StaticResource SaSegmentedRectItemStyle}">
+        <Setter Property="FontSize" Value="{StaticResource SaFontSizeCaption}" />
+        <Setter Property="FontWeight" Value="Medium" />
+        <Setter Property="Foreground" Value="{ThemeResource SaTextBrush}" />
     </Style>
     <!-- Pill segment 112:3356: h34 radius h/2; selected rgba(107,107,107,.45)/rgba(255,255,255,.75), 12 Medium; unselected 12 Medium muted; icon 16 gap 7 in content. -->
     <Style x:Key="SaSegmentedPillItemStyle" TargetType="RadioButton">

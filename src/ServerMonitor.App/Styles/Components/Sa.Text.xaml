@@ -45,4 +45,31 @@
     <Style x:Key="SaTableCellAttentionTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SaButtonTextStyle}">
         <Setter Property="Foreground" Value="{ThemeResource SaAttentionTextBrush}" />
     </Style>
+    <!-- UI.3 additive (D-UI3-8). Page subtitle 13 Regular muted, 112:2262 / 112:2437 (SaControlTextStyle is Medium). -->
+    <Style x:Key="SaPageSubtitleTextStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource SaFontText}" />
+        <Setter Property="FontSize" Value="{StaticResource SaFontSizeControl}" />
+        <Setter Property="FontWeight" Value="Normal" />
+        <Setter Property="LineHeight" Value="{StaticResource SaLineHeightControl}" />
+        <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
+        <Setter Property="Foreground" Value="{ThemeResource SaTextSecondaryBrush}" />
+    </Style>
+    <!-- Chart axis labels 10 Regular muted, 112:2298 (SaMicroTextStyle is SemiBold). -->
+    <Style x:Key="SaChartAxisTextStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource SaFontText}" />
+        <Setter Property="FontSize" Value="{StaticResource SaFontSizeMicro}" />
+        <Setter Property="FontWeight" Value="Normal" />
+        <Setter Property="LineHeight" Value="{StaticResource SaLineHeightMicro}" />
+        <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
+        <Setter Property="Foreground" Value="{ThemeResource SaTextSecondaryBrush}" />
+    </Style>
+    <!-- Chart value unit "%" 19 Regular muted next to the 38 Light SaChartValueTextStyle, 112:2291. -->
+    <Style x:Key="SaChartUnitTextStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource SaFontText}" />
+        <Setter Property="FontSize" Value="{StaticResource SaFontSizeChartUnit}" />
+        <Setter Property="FontWeight" Value="Normal" />
+        <Setter Property="LineHeight" Value="{StaticResource SaLineHeightChartUnit}" />
+        <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
+        <Setter Property="Foreground" Value="{ThemeResource SaTextSecondaryBrush}" />
+    </Style>
 </ResourceDictionary>

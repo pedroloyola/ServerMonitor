@@ -82,4 +82,9 @@
         <Setter Property="MinHeight" Value="78" />
         <Setter Property="Padding" Value="0" />
     </Style>
+    <!-- UI.3 additive (D-UI3-8): compact row h64 for the Workloads tables, 112:2650 (container) / 112:2708 (service).
+         Same contract as the server row (no dividers, cells laid out by the consumer); only the height differs. -->
+    <Style x:Key="SaDataTableCompactRowStyle" TargetType="Border" BasedOn="{StaticResource SaDataTableRowStyle}">
+        <Setter Property="MinHeight" Value="64" />
+    </Style>
 </ResourceDictionary>

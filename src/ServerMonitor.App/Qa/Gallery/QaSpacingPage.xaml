@@ -38,6 +38,16 @@
                 <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="SaSpace32" VerticalAlignment="Center" />
                 <Border Grid.Column="1" HorizontalAlignment="Left" Height="{StaticResource SaSpace16}" Width="{StaticResource SaSpace32}" Background="{ThemeResource SaTextBrush}" />
             </Grid>
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="SaSpace20 · UI.3 gap 112:2258" VerticalAlignment="Center" />
+                <Border Grid.Column="1" HorizontalAlignment="Left" Height="{StaticResource SaSpace16}" Width="{StaticResource SaSpace20}" Background="{ThemeResource SaTextBrush}" />
+            </Grid>
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="SaSpace40 · UI.3 page pad 112:2258" VerticalAlignment="Center" />
+                <Border Grid.Column="1" HorizontalAlignment="Left" Height="{StaticResource SaSpace16}" Width="{StaticResource SaSpace40}" Background="{ThemeResource SaTextBrush}" />
+            </Grid>
             <TextBlock Style="{StaticResource SaSecondaryBodyTextStyle}" Text="Radius (Radius.xaml)" Margin="0,16,0,0" />
             <Grid ColumnSpacing="16">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
@@ -68,6 +78,11 @@
                 <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                 <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="SaRadiusPanel" VerticalAlignment="Center" />
                 <Border Grid.Column="1" HorizontalAlignment="Left" Width="160" Height="56" CornerRadius="{StaticResource SaRadiusPanel}" Background="{ThemeResource SaInteriorBrush}" BorderBrush="{ThemeResource SaBorderNeutralBrush}" BorderThickness="{StaticResource SaBorderThickness}" />
+            </Grid>
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="SaRadiusSelector · UI.3 112:2264" VerticalAlignment="Center" />
+                <Border Grid.Column="1" HorizontalAlignment="Left" Width="160" Height="56" CornerRadius="{StaticResource SaRadiusSelector}" Background="{ThemeResource SaInteriorBrush}" BorderBrush="{ThemeResource SaBorderNeutralBrush}" BorderThickness="{StaticResource SaBorderThickness}" />
             </Grid>
             <Grid ColumnSpacing="16">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>

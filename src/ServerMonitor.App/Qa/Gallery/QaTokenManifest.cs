@@ -242,6 +242,11 @@ public static class QaTokenManifest
         new("SaButtonTextStyle", QaTokenKind.Style),
         new("SaFontSizeTableHeader", QaTokenKind.Double),
         new("SaLineHeightTableHeader", QaTokenKind.Double),
+        new("SaFontSizeChartValue", QaTokenKind.Double),
+        new("SaLineHeightChartValue", QaTokenKind.Double),
+        new("SaChartValueTextStyle", QaTokenKind.Style),
+        new("SaFontSizeChartUnit", QaTokenKind.Double),
+        new("SaLineHeightChartUnit", QaTokenKind.Double),
         // Styles/Tokens/Spacing.xaml
         new("SaSpace4", QaTokenKind.Double),
         new("SaSpace8", QaTokenKind.Double),
@@ -254,6 +259,8 @@ public static class QaTokenManifest
         new("SaIconSizeMedium", QaTokenKind.Double),
         new("SaIconSizeLarge", QaTokenKind.Double),
         new("SaStatusDotSize", QaTokenKind.Double),
+        new("SaSpace20", QaTokenKind.Double),
+        new("SaSpace40", QaTokenKind.Double),
         // Styles/Tokens/Radius.xaml
         new("SaRadiusPanel", QaTokenKind.CornerRadius),
         new("SaRadiusCard", QaTokenKind.CornerRadius),
@@ -267,11 +274,13 @@ public static class QaTokenManifest
         new("SaRadiusDialogButton", QaTokenKind.CornerRadius),
         new("SaRadiusSegment", QaTokenKind.CornerRadius),
         new("SaRadiusSkeleton", QaTokenKind.CornerRadius),
+        new("SaRadiusSelector", QaTokenKind.CornerRadius),
         // Styles/Tokens/Borders.xaml
         new("SaBorderThickness", QaTokenKind.Thickness),
         new("SaDividerThickness", QaTokenKind.Thickness),
         new("SaFocusRingThickness", QaTokenKind.Thickness),
         new("SaErrorBorderThickness", QaTokenKind.Thickness),
+        new("SaChartLineThickness", QaTokenKind.Double),
         // Styles/Tokens/Motion.xaml
         new("SaMotionFocusPeakTime", QaTokenKind.MotionString),
         new("SaMotionFocusFadeEndTime", QaTokenKind.MotionString),
