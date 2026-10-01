@@ -6,4 +6,6 @@
     <Thickness x:Key="SaDividerThickness">0,0,0,1</Thickness>
     <!-- DERIVED - needs Prism check: accessible Windows focus geometry, not a sampled Figma ring. -->
     <Thickness x:Key="SaFocusRingThickness">2</Thickness>
+    <!-- UI.2 additive (Boss B-3): input error border 1.5, 112:16924 / 112:17088. -->
+    <Thickness x:Key="SaErrorBorderThickness">1.5</Thickness>
 </ResourceDictionary>

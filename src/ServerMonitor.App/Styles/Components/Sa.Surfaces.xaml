@@ -1,0 +1,85 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- UI.2 S6 surfaces (Prism 1.1, Boss B-4) as keyed Border styles. Two real families coexist in Figma 05:
+         GLASS (RAW, sections 01-11) and SOLID Manual (VAR). Glass uses the native in-app AcrylicBrush (D7: Acrylic replaces
+         Figma refraction; opaque fallback when transparency effects are off). Inner highlights and drop shadows are not
+         reproduced by these Border styles (deviation; ThemeShadow adoption is per page, UI.3+). Never nest glass in glass.
+         HC: every material is a solid system colour (tokens); modal border 2px WindowText (F-07). -->
+    <ResourceDictionary.MergedDictionaries>
+        <ResourceDictionary Source="ms-appx:///Styles/Tokens/Radius.xaml" />
+        <ResourceDictionary Source="ms-appx:///Styles/Tokens/Borders.xaml" />
+    </ResourceDictionary.MergedDictionaries>
+    <!-- F-07: the modal/dialog border is 1px glass contour normally, 2px (WindowText via SaGlassBorderBrush) in High Contrast.
+         R1 (Prism MF-4): the secondary/icon/search/selector rest controls draw no border in Dark/Light and a 1px
+         ButtonText border (SaSecondaryBorderBrush) in High Contrast. -->
+    <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="Dark">
+            <Thickness x:Key="SaModalBorderThickness">1</Thickness>
+            <Thickness x:Key="SaSecondaryBorderThickness">0</Thickness>
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="Light">
+            <Thickness x:Key="SaModalBorderThickness">1</Thickness>
+            <Thickness x:Key="SaSecondaryBorderThickness">0</Thickness>
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="HighContrast">
+            <Thickness x:Key="SaModalBorderThickness">2</Thickness>
+            <Thickness x:Key="SaSecondaryBorderThickness">1</Thickness>
+        </ResourceDictionary>
+    </ResourceDictionary.ThemeDictionaries>
+
+    <!-- Glass card 112:1010 / 112:1222: fill rgba(41,41,41,.43) / rgba(255,255,255,.42) (acrylic), 1px glass contour, radius 24, pad 24. -->
+    <Style x:Key="SaGlassSurfaceStyle" TargetType="Border">
+        <Setter Property="Background" Value="{ThemeResource SaGlassSurfaceBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource SaGlassBorderBrush}" />
+        <Setter Property="BorderThickness" Value="{StaticResource SaBorderThickness}" />
+        <Setter Property="CornerRadius" Value="{StaticResource SaRadiusCard}" />
+        <Setter Property="Padding" Value="24" />
+    </Style>
+    <!-- Solid (Manual) panel 112:14088 / 112:14182: #242424 / #F7F7F7, border #484848 / #D3D3D3, radius 24, pad 24. -->
+    <Style x:Key="SaSolidSurfaceStyle" TargetType="Border">
+        <Setter Property="Background" Value="{ThemeResource SaSurfaceBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource SaBorderInsetBrush}" />
+        <Setter Property="BorderThickness" Value="{StaticResource SaBorderThickness}" />
+        <Setter Property="CornerRadius" Value="{StaticResource SaRadiusPanel}" />
+        <Setter Property="Padding" Value="24" />
+    </Style>
+    <!-- Inset Manual 112:22183: #313131 / #E8E8E8, border #484848 / #D3D3D3, radius 12. -->
+    <Style x:Key="SaInsetSurfaceStyle" TargetType="Border">
+        <Setter Property="Background" Value="{ThemeResource SaInteriorBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource SaBorderInsetBrush}" />
+        <Setter Property="BorderThickness" Value="{StaticResource SaBorderThickness}" />
+        <Setter Property="CornerRadius" Value="{StaticResource SaRadiusControl}" />
+    </Style>
+    <!-- Inset tinted (glass dialogs) 112:8562 / 112:8748: rgba(153,153,153,.08) / rgba(102,102,102,.08), no border, radius 11, pad-L 12. -->
+    <Style x:Key="SaInsetTintedSurfaceStyle" TargetType="Border">
+        <Setter Property="Background" Value="{ThemeResource SaInsetTintedBrush}" />
+        <Setter Property="CornerRadius" Value="{StaticResource SaRadiusSegment}" />
+        <Setter Property="Padding" Value="12,0" />
+        <Setter Property="MinHeight" Value="38" />
+    </Style>
+    <!-- Modal / dialog shell 112:8559 / 112:8745: opaque #1A1A1A / #F7F7F7 (deliberate UI.1 deviation from .94), glass
+         contour, radius 24, pad 28, gap 16 (consumer). HC: 2px WindowText border (F-07). -->
+    <Style x:Key="SaModalSurfaceStyle" TargetType="Border">
+        <Setter Property="Background" Value="{ThemeResource SaModalSurfaceBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource SaGlassBorderBrush}" />
+        <Setter Property="BorderThickness" Value="{ThemeResource SaModalBorderThickness}" />
+        <Setter Property="CornerRadius" Value="{StaticResource SaRadiusPanel}" />
+        <Setter Property="Padding" Value="28" />
+    </Style>
+    <!-- Modal backdrop 112:8558 / 112:8744: rgba(0,0,0,.36) / .20; HC = opaque Window (F-07, same as legacy ModalSmokeBrush). -->
+    <Style x:Key="SaOverlayStyle" TargetType="Border">
+        <Setter Property="Background" Value="{ThemeResource SaOverlaySmokeBrush}" />
+    </Style>
+
+    <!-- DataTable foundation 112:1434 / 112:1616: header row h34 (SaTableHeaderTextStyle), body rows min h78, gap 10;
+         NO dividers (Figma has none). Columns are the page's Grid. -->
+    <Style x:Key="SaDataTableHeaderStyle" TargetType="Border">
+        <Setter Property="MinHeight" Value="34" />
+        <Setter Property="Padding" Value="0" />
+    </Style>
+    <Style x:Key="SaDataTableRowStyle" TargetType="Border">
+        <Setter Property="MinHeight" Value="78" />
+        <Setter Property="Padding" Value="0" />
+    </Style>
+</ResourceDictionary>

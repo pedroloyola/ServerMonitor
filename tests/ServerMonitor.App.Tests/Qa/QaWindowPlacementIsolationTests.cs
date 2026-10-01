@@ -66,6 +66,113 @@ public sealed class QaWindowPlacementIsolationTests
         Assert.DoesNotContain(paths, IsUnderRealAppData);
     }
 
+    /// <summary>T-13 (UI.2 G-5): a placement file left by an earlier run is gone after Apply, so every run starts from the default.</summary>
+    [Fact]
+    public void ApplyStartsFromAFreshPlacement()
+    {
+        const string harness = "t13-fresh-placement";
+        var directory = QaWindowPlacementIsolation.DirectoryFor(harness);
+        Directory.CreateDirectory(directory);
+        var stale = Path.Combine(directory, QaWindowPlacementIsolation.FileName);
+        File.WriteAllText(stale, """{ "Mode": "Compact" }""");
+
+        var services = new ServiceCollection();
+        QaWindowPlacementIsolation.Apply(services, harness);
+
+        Assert.False(File.Exists(stale), "A stale placement file survived Apply: the run would not start from the default.");
+        using var provider = services.BuildServiceProvider();
+        Assert.Equal(stale, provider.GetRequiredService<WindowPlacementStorageOptions>().FilePath);
+    }
+
+    /// <summary>
+    /// The delete is fail-closed to the QA root. SAFETY: this test NEVER passes a real user path - not even to prove a
+    /// refusal - because a regression in the guard would then delete real data (it did once, during a UI.2
+    /// counterproof). It uses a sentinel file outside the QA root, inside the test's own temp folder, and asserts it
+    /// both throws and leaves the sentinel in place.
+    /// </summary>
+    [Fact]
+    public void StaleDeleteRefusesAnyPathOutsideTheQaRoot()
+    {
+        var outside = Path.Combine(Path.GetTempPath(), "ServerMonitor-QA-guard-sentinel");
+        Directory.CreateDirectory(outside);
+        var sentinel = Path.Combine(outside, QaWindowPlacementIsolation.FileName);
+        File.WriteAllText(sentinel, "sentinel");
+        var escaping = Path.Combine(QaWindowPlacementIsolation.Root, "..", "ServerMonitor-QA-guard-sentinel", QaWindowPlacementIsolation.FileName);
+
+        Assert.Throws<InvalidOperationException>(() => QaWindowPlacementIsolation.DeleteStalePlacement(sentinel));
+        Assert.Throws<InvalidOperationException>(() => QaWindowPlacementIsolation.DeleteStalePlacement(escaping));
+        Assert.True(File.Exists(sentinel), "The guard let a delete escape the QA root.");
+        Assert.False(Path.GetFullPath(sentinel).StartsWith(Path.GetFullPath(RealAppDataRoot), StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>G-5: the Store screenshot harness uses a fixed in-memory placement that never persists.</summary>
+    [Fact]
+    public void StoreScreenshotPlacementIsFixedAndNeverPersisted()
+    {
+        // SAFETY: a temp path stands in for the production options, so even a regressed composition cannot write real data.
+        var services = new ServiceCollection();
+        services.AddSingleton(new WindowPlacementStorageOptions { FilePath = Path.Combine(Path.GetTempPath(), "ServerMonitor-QA-tests", "placement", QaWindowPlacementIsolation.FileName) });
+        services.AddSingleton<JsonWindowPlacementStore>();
+        services.AddSingleton<IWindowPlacementStore>(sp => sp.GetRequiredService<JsonWindowPlacementStore>());
+        QaStoreScreenshotComposition.Apply(services);
+
+        using var provider = services.BuildServiceProvider();
+        var store = provider.GetRequiredService<IWindowPlacementStore>();
+        Assert.IsType<QaInMemoryPlacementStore>(store);
+        store.Save(new WindowPlacementSettings { Mode = WindowMode.Compact });
+        Assert.Equal(WindowPlacementSettings.Default, store.Load());
+    }
+
+    /// <summary>Vigil F-10: the suite runs under its own QA root, never the live root that running harnesses share.</summary>
+    [Fact]
+    public void TestsUseAnIsolatedQaRoot()
+    {
+        var live = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "ServerMonitor-QA"));
+        Assert.Equal(QaTestRoots.Root, QaWindowPlacementIsolation.Root);
+        Assert.False(Path.GetFullPath(QaWindowPlacementIsolation.Root).StartsWith(live + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase));
+        Assert.NotEqual(live, Path.GetFullPath(QaWindowPlacementIsolation.Root), StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Cortex R-9: a junction inside the QA root must not redirect the delete. SAFETY: the junction targets a temp
+    /// sentinel folder created by this test - never a real path - and the test asserts the sentinel file survives.
+    /// </summary>
+    [Fact]
+    public void StaleDeleteRefusesToFollowAJunction()
+    {
+        var target = Path.Combine(Path.GetTempPath(), "ServerMonitor-QA-junction-sentinel", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(target);
+        var sentinel = Path.Combine(target, QaWindowPlacementIsolation.FileName);
+        File.WriteAllText(sentinel, "sentinel");
+        var link = QaWindowPlacementIsolation.DirectoryFor("junction-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.GetDirectoryName(link)!);
+        CreateJunction(link, target);
+        try
+        {
+            var throughLink = Path.Combine(link, QaWindowPlacementIsolation.FileName);
+            Assert.True(QaPathSafety.CrossesReparsePoint(throughLink));
+            Assert.Throws<InvalidOperationException>(() => QaWindowPlacementIsolation.DeleteStalePlacement(throughLink));
+            Assert.True(File.Exists(sentinel), "The delete followed the junction.");
+            Assert.False(QaPathSafety.CrossesReparsePoint(sentinel));
+        }
+        finally
+        {
+            Directory.Delete(link); // removes the junction only, never its target's contents
+        }
+    }
+
+    private static void CreateJunction(string link, string target)
+    {
+        using var process = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("cmd.exe", $"/c mklink /J \"{link}\" \"{target}\"")
+        {
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardOutput = true
+        })!;
+        process.WaitForExit(10_000);
+        Assert.True(Directory.Exists(link) && (File.GetAttributes(link) & FileAttributes.ReparsePoint) != 0, "Could not create the test junction.");
+    }
+
     private static bool IsUnderRealAppData(string path) =>
         Path.GetFullPath(path).StartsWith(
             Path.GetFullPath(RealAppDataRoot).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar,

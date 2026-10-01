@@ -1,0 +1,16 @@
+<Page
+    x:Class="ServerMonitor.App.Qa.Gallery.QaPopupComboPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:primitives="using:ServerMonitor.App.Controls.Primitives"
+    xmlns:qa="using:ServerMonitor.App.Qa.Gallery"
+    Foreground="{ThemeResource SaTextBrush}">
+    <!-- QA-ONLY (UI.2 S4): F-3 popup check - the ComboBox dropdown opened on load; its selection pill must be neutral, not the legacy blue. -->
+    <ScrollViewer AutomationProperties.AutomationId="PageScroll" qa:QaWallpaper.IsEnabled="True" BringIntoViewOnFocusChange="False">
+        <StackPanel Padding="24" Spacing="{StaticResource SaSpace16}">
+            <TextBlock Style="{StaticResource SaSectionHeaderTextStyle}" Text="Popup check · ComboBox" />
+            <TextBlock Style="{StaticResource SaSecondaryBodyTextStyle}" TextWrapping="Wrap" Text="Opened automatically. The selected item's pill and hover come from ComboBoxItem* keys: neutral = the accent-neutral scope reaches the popup; blue = it does not (limitation until UI.6)." />
+            <primitives:SaFormField Header="Atualizar a cada" Width="360" HorizontalAlignment="Left"><ComboBox Style="{StaticResource SaSelectorFieldStyle}" HorizontalAlignment="Stretch" SelectedIndex="1" qa:QaForcedState.State="OpenDropDown"><ComboBoxItem Content="15 segundos" /><ComboBoxItem Content="30 segundos" /><ComboBoxItem Content="1 minuto" /><ComboBoxItem Content="5 minutos" /></ComboBox></primitives:SaFormField>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

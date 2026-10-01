@@ -25,6 +25,9 @@ internal static class QaStoreScreenshotComposition
     public static void Apply(IServiceCollection services)
     {
         QaWindowPlacementIsolation.Apply(services, "screenshot");
+        // UI.2 G-5: a fixed in-memory placement, so every Store screenshot run frames the window identically.
+        services.AddSingleton<ServerMonitor.App.Windowing.IWindowPlacementStore>(
+            new QaInMemoryPlacementStore(ServerMonitor.App.Windowing.WindowPlacementSettings.Default));
         var entries = BuildEntries();
 
         services.AddSingleton<IServerService>(

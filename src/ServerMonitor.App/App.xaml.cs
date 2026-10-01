@@ -41,8 +41,30 @@ public partial class App : Application
     // the navigation on the UI thread; the router buffers an intent that arrives before the shell is ready.
     private readonly ActivationRouter _activationRouter;
 
+#if DEBUG
+    // UI.2 S2: --qa-components / --qa-tokens run the Debug-only component gallery INSTEAD of the application.
+    private readonly bool _galleryMode;
+#endif
+
     public App()
     {
+        // Built first so the gallery branch below can return early. Constructing the router is inert: it only
+        // executes intents after MarkReady, which the gallery never calls (and it is never attached to Program).
+        _activationRouter = new ActivationRouter(ExecuteActivationIntent);
+
+#if DEBUG
+        // UI.2 S2: the gallery short-circuits BEFORE the host is built - no services, tray, notifications,
+        // engine, settings or Credential Manager - and loads only App.xaml (tokens + components).
+        // ServicesHost stays null, so anything that reaches for it fails loudly (GalleryShortCircuitPrecedesHostConstruction).
+        if (Qa.Gallery.QaGalleryComposition.IsRequested())
+        {
+            Qa.Gallery.QaGalleryComposition.InitializeBeforeResources();
+            _galleryMode = true;
+            InitializeComponent();
+            return;
+        }
+#endif
+
         ServicesHost = Microsoft.Extensions.Hosting.Host
             .CreateDefaultBuilder()
             .ConfigureLogging(logging =>
@@ -62,7 +84,6 @@ public partial class App : Application
         ServicesHost.Services
             .GetRequiredService<ILocalizationService>()
             .InitializeFromSystem();
-        _activationRouter = new ActivationRouter(ExecuteActivationIntent);
         // Attach the router to the single activation hand-off now that it exists: this atomically flushes
         // the latest intent buffered before this App object was built (the cold launch, or a redirect that
         // raced construction). The router buffers it internally until the shell signals ready (§M-1).
@@ -212,6 +233,15 @@ public partial class App : Application
 
     protected override async void OnLaunched(LaunchActivatedEventArgs args)
     {
+#if DEBUG
+        // UI.2 S2: before StartupRestoreRecovery and OrphanTemporaryCleaner - the gallery touches no user data.
+        if (_galleryMode)
+        {
+            Qa.Gallery.QaGalleryComposition.Launch();
+            return;
+        }
+#endif
+
         try
         {
             _uiDispatcherQueue = DispatcherQueue.GetForCurrentThread();

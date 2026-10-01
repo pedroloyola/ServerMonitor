@@ -66,4 +66,67 @@
     <Color x:Key="SaColorModalSurfaceLight">#F7F7F7</Color>
     <Color x:Key="SaColorOverlaySmokeDark">#5C000000</Color>
     <Color x:Key="SaColorOverlaySmokeLight">#33000000</Color>
+    <!-- UI.2 additive (Boss B-2, D8: the Manual is authority; RAW Figma divergences are not adopted). Alpha rounded to the nearest byte. -->
+    <!-- accessible attention text, Figma 112:1468 D / 112:1650 L; SaAttention* unchanged. R1 (Beacon F-2, Boss): Light
+         darkened from the Figma #A6611F (4.51:1 on #F7F7F7, < 4.5 on the glass) to #8F5318 - >= 4.5:1 on every Light
+         surface (deliberate deviation from 112:1468, a11y over Figma). -->
+    <Color x:Key="SaColorAttentionTextDark">#FFB866</Color>
+    <Color x:Key="SaColorAttentionTextLight">#8F5318</Color>
+    <!-- destructive text 112:8576 D / 112:8762 L. R1 (Boss): Light darkened from the Figma #AD4038 (4.38:1 on glass over
+         the darkest reference wallpaper) to #A83E36 - >= 4.5:1 on every Light surface (deliberate deviation, a11y over Figma). -->
+    <Color x:Key="SaColorDangerTextDark">#FF9187</Color>
+    <Color x:Key="SaColorDangerTextLight">#A83E36</Color>
+    <!-- destructive fill .12 D / .07 L, 112:8575 / 112:8761 -->
+    <Color x:Key="SaColorDangerFillDark">#1FFF9187</Color>
+    <Color x:Key="SaColorDangerFillLight">#12AD4038</Color>
+    <!-- destructive border .22, 112:8575 / 112:8761 -->
+    <Color x:Key="SaColorDangerBorderDark">#38FF9187</Color>
+    <Color x:Key="SaColorDangerBorderLight">#38AD4038</Color>
+    <!-- primary button fill: D glass rgba(82,82,82,.28) 112:1004, L solid 112:1216 -->
+    <Color x:Key="SaColorPrimaryFillDark">#47525252</Color>
+    <Color x:Key="SaColorPrimaryFillLight">#303030</Color>
+    <!-- primary border D rgba(255,255,255,.28) 112:1004; L none -->
+    <Color x:Key="SaColorPrimaryBorderDark">#47FFFFFF</Color>
+    <Color x:Key="SaColorPrimaryBorderLight">#00FFFFFF</Color>
+    <!-- primary text: D Manual text (Figma RAW #F0F0F0, D8), L inverted #FAFAFA 112:1216 -->
+    <Color x:Key="SaColorPrimaryTextDark">#F5F5F5</Color>
+    <Color x:Key="SaColorPrimaryTextLight">#FAFAFA</Color>
+    <!-- input fill rgba(36,36,36,.65) / rgba(255,255,255,.34), 112:3337 / 112:3498 -->
+    <Color x:Key="SaColorInputFillDark">#A6242424</Color>
+    <Color x:Key="SaColorInputFillLight">#57FFFFFF</Color>
+    <!-- page search fill rgba(102,102,102,.18) / rgba(255,255,255,.4), 112:1429 / 112:1611 -->
+    <Color x:Key="SaColorSearchFillDark">#2E666666</Color>
+    <Color x:Key="SaColorSearchFillLight">#66FFFFFF</Color>
+    <!-- rect segmented track .14, 112:2634 / 112:2850 -->
+    <Color x:Key="SaColorSegmentedTrackDark">#24000000</Color>
+    <Color x:Key="SaColorSegmentedTrackLight">#24FFFFFF</Color>
+    <!-- pill segmented track rgba(89,89,89,.2) / rgba(255,255,255,.25), 112:3356 / 112:3517 -->
+    <Color x:Key="SaColorSegmentedPillTrackDark">#33595959</Color>
+    <Color x:Key="SaColorSegmentedPillTrackLight">#40FFFFFF</Color>
+    <!-- pill segment selected rgba(107,107,107,.45) / rgba(255,255,255,.75), 112:3356 / 112:3517 -->
+    <Color x:Key="SaColorSegmentedPillSelectedDark">#736B6B6B</Color>
+    <Color x:Key="SaColorSegmentedPillSelectedLight">#BFFFFFFF</Color>
+    <!-- toggle off track 112:7982 / 112:8143. R2 (Beacon N-1, Boss: a11y > Figma, deliberate deviation): the Figma
+         #474747 / #B8B8B8 were 1.40-1.98 / 1.47-1.93:1 (WCAG 1.4.11 needs 3:1). Now >= 3:1 against every surface of its
+         theme AND the #FCFCFC thumb against the track (guard ToggleOffTrackMeetsNonTextContrast). -->
+    <Color x:Key="SaColorToggleOffTrackDark">#7A7A7A</Color>
+    <Color x:Key="SaColorToggleOffTrackLight">#7E7E7E</Color>
+    <!-- toggle thumb 112:7956 / 112:8117 -->
+    <Color x:Key="SaColorToggleThumbDark">#FCFCFC</Color>
+    <Color x:Key="SaColorToggleThumbLight">#FCFCFC</Color>
+    <!-- skeleton = Manual secondary text @ .14, 112:15602 / 112:15726 -->
+    <Color x:Key="SaColorSkeletonDark">#24ADADAD</Color>
+    <Color x:Key="SaColorSkeletonLight">#24626262</Color>
+    <!-- dialog inset rgba(153,153,153,.08) / rgba(102,102,102,.08), 112:8562 / 112:8748 -->
+    <Color x:Key="SaColorInsetTintedDark">#14999999</Color>
+    <Color x:Key="SaColorInsetTintedLight">#14666666</Color>
+    <!-- empty bar rgba(184,184,184,.13) / rgba(64,64,64,.10), 112:1813 / 112:2050 -->
+    <Color x:Key="SaColorBarEmptyDark">#21B8B8B8</Color>
+    <Color x:Key="SaColorBarEmptyLight">#1A404040</Color>
+    <!-- dialog button fill rgba(115,115,115,.14) / rgba(102,102,102,.12), 112:8573 / 112:8759 -->
+    <Color x:Key="SaColorDialogButtonFillDark">#24737373</Color>
+    <Color x:Key="SaColorDialogButtonFillLight">#1F666666</Color>
+    <!-- dialog button border rgba(255,255,255,.14) / rgba(128,128,128,.16), 112:8573 / 112:8759 -->
+    <Color x:Key="SaColorDialogButtonBorderDark">#24FFFFFF</Color>
+    <Color x:Key="SaColorDialogButtonBorderLight">#29808080</Color>
 </ResourceDictionary>

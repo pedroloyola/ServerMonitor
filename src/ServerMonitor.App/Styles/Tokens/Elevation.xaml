@@ -19,8 +19,11 @@
         <ResourceDictionary x:Key="Light">
             <SolidColorBrush x:Key="SaNeutralSurfaceBrush" Color="{StaticResource SaColorSurfaceLight}" />
             <SolidColorBrush x:Key="SaElevatedSurfaceBrush" Color="{StaticResource SaColorElevatedSurfaceLight}" />
-            <AcrylicBrush x:Key="SaGlassSurfaceBrush" TintColor="{StaticResource SaColorGlassTintLight}" TintOpacity=".42" TintLuminosityOpacity=".9" FallbackColor="{StaticResource SaColorSurfaceLight}" />
-            <AcrylicBrush x:Key="SaSidebarMaterialBrush" TintColor="{StaticResource SaColorSidebarTintLight}" TintOpacity=".27" TintLuminosityOpacity=".9" FallbackColor="{StaticResource SaColorCanvasLight}" />
+            <!-- R1 (Prism MF-1): Light calibrated on the Figma 112:1142 wallpaper to card +3 levels over the backdrop (112:1222:
+                 229 over 226; measured 236.7 over 233.4). Was TintOpacity .42 / TintLuminosityOpacity .9 (+17: white on white).
+                 Sidebar: same luminosity, tint scaled by the same ratio (.27 -> .06). Dark unchanged. -->
+            <AcrylicBrush x:Key="SaGlassSurfaceBrush" TintColor="{StaticResource SaColorGlassTintLight}" TintOpacity=".1" TintLuminosityOpacity=".2" FallbackColor="{StaticResource SaColorSurfaceLight}" />
+            <AcrylicBrush x:Key="SaSidebarMaterialBrush" TintColor="{StaticResource SaColorSidebarTintLight}" TintOpacity=".06" TintLuminosityOpacity=".2" FallbackColor="{StaticResource SaColorCanvasLight}" />
             <SolidColorBrush x:Key="SaModalSurfaceBrush" Color="{StaticResource SaColorModalSurfaceLight}" />
             <SolidColorBrush x:Key="SaOpaqueFallbackBrush" Color="{StaticResource SaColorSurfaceLight}" />
             <SolidColorBrush x:Key="SaOverlaySmokeBrush" Color="{StaticResource SaColorOverlaySmokeLight}" />

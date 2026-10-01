@@ -285,9 +285,12 @@
              Condition="'$(Packaged)' != 'true'" />
   </ItemGroup>
 
-  <!-- QA visual health harness is Debug-only. It must never ship in a Release build. -->
+  <!-- QA visual health harness is Debug-only. It must never ship in a Release build. The Page removal is the
+       UI.2 component gallery's XAML (Qa/Gallery/*.xaml): without it Release would still compile the pages and
+       generate InitializeComponent/XamlTypeInfo for code-behind that no longer exists. -->
   <ItemGroup Condition="'$(Configuration)' != 'Debug'">
     <Compile Remove="Qa\**\*.cs" />
+    <Page Remove="Qa\**\*.xaml" />
   </ItemGroup>
 
   <ItemGroup>

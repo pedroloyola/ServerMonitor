@@ -1,0 +1,66 @@
+<Window
+    x:Class="ServerMonitor.App.Qa.Gallery.QaGalleryWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="ServerAlyzer - QA component gallery">
+    <!-- QA-ONLY (UI.2 S2). Fixed-size window, no placement store. GalleryRoot carries the Dark/Light
+         RequestedTheme; ContentHost receives the HighContrast resource simulation (hc-sim). QA text is
+         literal English by design (Qa/** is excluded from Release; no resw keys). -->
+    <Grid x:Name="GalleryRoot" Background="{ThemeResource SaCanvasBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Grid Padding="24,16" ColumnSpacing="16" Background="{ThemeResource SaSurfaceBrush}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel VerticalAlignment="Center">
+                <TextBlock Style="{StaticResource SaSectionHeaderTextStyle}" Text="Component gallery (QA)" />
+                <TextBlock Style="{StaticResource SaSecondaryBodyTextStyle}" Text="UI.2 · Debug-only · no services, no user data" />
+            </StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <TextBlock Style="{StaticResource SaLabelTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="Theme" VerticalAlignment="Center" />
+                <RadioButton x:Name="DarkThemeOption" GroupName="GalleryTheme" Content="Dark" Tag="dark"
+                             AutomationProperties.Name="Dark theme" Checked="OnThemeOptionChecked" />
+                <RadioButton x:Name="LightThemeOption" GroupName="GalleryTheme" Content="Light" Tag="light"
+                             AutomationProperties.Name="Light theme" Checked="OnThemeOptionChecked" />
+                <RadioButton x:Name="HcSimThemeOption" GroupName="GalleryTheme" Content="HC-sim" Tag="hc-sim"
+                             AutomationProperties.Name="High contrast resource simulation" Checked="OnThemeOptionChecked" />
+            </StackPanel>
+        </Grid>
+
+        <Border Grid.Row="1" Padding="24,8" BorderThickness="0,0,0,1"
+                Background="{ThemeResource SaInteriorBrush}" BorderBrush="{ThemeResource SaDividerBrush}">
+            <TextBlock x:Name="HcBannerText" Style="{StaticResource SaCaptionTextStyle}"
+                       Foreground="{ThemeResource SaTextBrush}" TextWrapping="Wrap" />
+        </Border>
+
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="200" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <ListView x:Name="PageList" Padding="8,16" SelectionMode="Single"
+                      AutomationProperties.Name="Gallery pages" SelectionChanged="OnPageSelectionChanged" />
+            <!-- F-3: the accent-neutral scope is merged HERE, on the container that adopts the primitives - never app-wide. -->
+            <Grid x:Name="ContentHost" Grid.Column="1" Background="{ThemeResource SaCanvasBrush}">
+                <Grid.Resources>
+                    <ResourceDictionary>
+                        <ResourceDictionary.MergedDictionaries>
+                            <ResourceDictionary Source="ms-appx:///Styles/Components/Sa.AccentNeutralScope.xaml" />
+                        </ResourceDictionary.MergedDictionaries>
+                    </ResourceDictionary>
+                </Grid.Resources>
+                <!-- HC-sim injects the HighContrast token entries HERE, nearer to the content than the F-3 scope (whose merged
+                     Color.Semantic would otherwise win). -->
+                <Grid x:Name="SimulationHost">
+                    <Frame x:Name="PageFrame" />
+                </Grid>
+            </Grid>
+        </Grid>
+    </Grid>
+</Window>

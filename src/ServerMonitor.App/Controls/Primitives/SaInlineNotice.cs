@@ -1,0 +1,70 @@
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
+using Microsoft.UI.Xaml.Automation.Peers;
+using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media.Animation;
+using Windows.UI.ViewManagement;
+
+namespace ServerMonitor.App.Controls.Primitives;
+
+/// <summary>
+/// UI.2 inline notice. Error (Figma callout 112:18273): Manual inset surface, "!" marker in danger text, title 14
+/// Semibold, message 12 muted, optional action (Content) on the right; announced assertively. Info (112:2756): no
+/// surface, Information icon 15 + 12 muted text; polite.
+/// </summary>
+[TemplateVisualState(Name = "Info", GroupName = "SeverityStates")]
+[TemplateVisualState(Name = "Error", GroupName = "SeverityStates")]
+public sealed class SaInlineNotice : ContentControl
+{
+    public static readonly DependencyProperty SeverityProperty = DependencyProperty.Register(
+        nameof(Severity), typeof(SaNoticeSeverity), typeof(SaInlineNotice),
+        new PropertyMetadata(SaNoticeSeverity.Info, (d, _) => ((SaInlineNotice)d).Update()));
+
+    public static readonly DependencyProperty TitleProperty = DependencyProperty.Register(
+        nameof(Title), typeof(string), typeof(SaInlineNotice), new PropertyMetadata(string.Empty, (d, _) => ((SaInlineNotice)d).Update()));
+
+    public static readonly DependencyProperty MessageProperty = DependencyProperty.Register(
+        nameof(Message), typeof(string), typeof(SaInlineNotice), new PropertyMetadata(string.Empty, (d, _) => ((SaInlineNotice)d).Update()));
+
+    public SaInlineNotice()
+    {
+        DefaultStyleKey = typeof(SaInlineNotice);
+        IsTabStop = false;
+    }
+
+    public SaNoticeSeverity Severity
+    {
+        get => (SaNoticeSeverity)GetValue(SeverityProperty);
+        set => SetValue(SeverityProperty, value);
+    }
+
+    public string Title
+    {
+        get => (string)GetValue(TitleProperty);
+        set => SetValue(TitleProperty, value);
+    }
+
+    public string Message
+    {
+        get => (string)GetValue(MessageProperty);
+        set => SetValue(MessageProperty, value);
+    }
+
+    protected override void OnApplyTemplate()
+    {
+        base.OnApplyTemplate();
+        Update();
+    }
+
+    private void Update()
+    {
+        var error = Severity == SaNoticeSeverity.Error;
+        AutomationProperties.SetLiveSetting(this, error ? AutomationLiveSetting.Assertive : AutomationLiveSetting.Polite);
+        AutomationProperties.SetName(this, string.IsNullOrWhiteSpace(Title) ? Message : $"{Title}. {Message}");
+        VisualStateManager.GoToState(this, error ? "Error" : "Info", useTransitions: false);
+        if (IsLoaded)
+        {
+            FrameworkElementAutomationPeer.FromElement(this)?.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
+        }
+    }
+}

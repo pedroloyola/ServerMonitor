@@ -62,6 +62,23 @@ public sealed partial class UiDebtRatchetTests
         ["Views/HistoryPage.xaml"] = 6
     };
 
+    /// <summary>
+    /// Cortex F-11: the WinUI lightweight-styling key NAMES that the F-3 accent-neutral scope overrides. They contain
+    /// "AccentFill" but are not a use of the legacy blue: they are the keys being neutralised. They are exempt from the
+    /// legacy-accent count ONLY as <c>x:Key</c> attribute values - by name, never by file, never a baseline - so a
+    /// <c>#1846E1</c> / <c>SystemAccent*</c> VALUE anywhere, or any other accent key name, still counts.
+    /// <see cref="AccentScopeOverridesExactlyTheExemptKeyNames"/> keeps this list identical to the scope's keys.
+    /// </summary>
+    internal static readonly IReadOnlySet<string> AccentScopeOverriddenKeyNames = new HashSet<string>(StringComparer.Ordinal)
+    {
+        "AccentFillColorDefaultBrush",
+        "AccentFillColorSecondaryBrush",
+        "AccentFillColorTertiaryBrush",
+        "AccentFillColorDisabledBrush",
+        "AccentFillColorSelectedTextBackgroundBrush",
+        "TextOnAccentFillColorPrimaryBrush"
+    };
+
     [Fact]
     public void LiteralFontSizesOutsideTokens_DoNotGrow()
     {
@@ -96,7 +113,7 @@ public sealed partial class UiDebtRatchetTests
         var counts = new Dictionary<string, int>(StringComparer.Ordinal);
         foreach (var file in AppSourceTree.Files(".xaml").Where(file => !IsUnderTokens(file)))
         {
-            counts[file] = XamlValues(AppSourceTree.LoadXaml(file)).Sum(value => LegacyAccent().Matches(value).Count);
+            counts[file] = XamlValuesExceptExemptAccentKeys(AppSourceTree.LoadXaml(file)).Sum(value => LegacyAccent().Matches(value).Count);
         }
 
         foreach (var file in AppSourceTree.Files(".cs").Where(file => !IsUnderTokens(file)))
@@ -122,6 +139,51 @@ public sealed partial class UiDebtRatchetTests
         Assert.True(offenders.Count == 0,
             "Styles/Tokens/** must not reference #1846E1, SystemAccent* or BrandAccent*:" +
             Environment.NewLine + string.Join(Environment.NewLine, offenders));
+    }
+
+    /// <summary>
+    /// UI.2 T-8: the new presentation layer starts at ZERO debt. Styles/Components/**, Controls/Primitives/** and
+    /// the Debug gallery (Qa/**) are scanned by the three ratchets above like any other file, and none of them may
+    /// ever be given a baseline entry - a literal there is a defect to fix, not debt to record.
+    /// </summary>
+    [Fact]
+    public void NewComponentFoldersCarryNoRatchetBaseline()
+    {
+        string[] zeroDebtFolders = ["Styles/Components/", "Controls/Primitives/", "Qa/"];
+        var baselined = FontSizeLiteralBaseline.Keys.Concat(HexColourBaseline.Keys).Concat(LegacyAccentBaseline.Keys)
+            .Where(file => zeroDebtFolders.Any(folder => file.StartsWith(folder, StringComparison.OrdinalIgnoreCase)))
+            .ToList();
+
+        Assert.True(baselined.Count == 0, "Zero-debt folders must not be baselined: " + string.Join(", ", baselined));
+    }
+
+    /// <summary>
+    /// UI.2 T-8 (F-3): component dictionaries and primitives never USE the legacy blue - no <c>#1846E1</c>,
+    /// <c>SystemAccent*</c>, <c>BrandAccent*</c> or <c>AccentFill*</c> value or code reference. The only place such a
+    /// name may appear is as an overridden <c>x:Key</c> in the accent-neutral scope, whose job is to replace it.
+    /// </summary>
+    [Fact]
+    public void ComponentsNeverReferenceTheLegacyAccent()
+    {
+        var offenders = new List<string>();
+        foreach (var file in AppSourceTree.Files(".xaml").Where(IsComponentLayer))
+        {
+            offenders.AddRange(XamlValuesExceptExemptAccentKeys(AppSourceTree.LoadXaml(file))
+                .SelectMany(v => LegacyAccentInComponents().Matches(v)).Select(m => $"{file}: {m.Value}"));
+        }
+
+        foreach (var file in AppSourceTree.Files(".cs").Where(IsComponentLayer))
+        {
+            offenders.AddRange(LegacyAccentInComponents().Matches(AppSourceTree.CodeWithoutComments(file)).Select(m => $"{file}: {m.Value}"));
+        }
+
+        Assert.True(offenders.Count == 0,
+            "The component layer must not use the legacy accent (#1846E1/SystemAccent*/BrandAccent*/AccentFill*):" +
+            Environment.NewLine + string.Join(Environment.NewLine, offenders));
+
+        static bool IsComponentLayer(string file) =>
+            file.StartsWith("Styles/Components/", StringComparison.OrdinalIgnoreCase)
+            || file.StartsWith("Controls/Primitives/", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -180,6 +242,40 @@ public sealed partial class UiDebtRatchetTests
         return attributes + setters;
     }
 
+    /// <summary>Vigil F-1: the legacy blue is caught with or without an alpha byte, in any case (RRGGBB / AARRGGBB only).</summary>
+    [Theory]
+    [InlineData("#1846E1", true)]
+    [InlineData("#FF1846E1", true)]
+    [InlineData("#ff1846e1", true)]
+    [InlineData("Color=\"#FF1846E1\"", true)]
+    [InlineData("#401846E1", true)]
+    [InlineData("#1846E1FF", false)]
+    [InlineData("#F5F5F5", false)]
+    public void LegacyAccentHexIsCaughtInEveryValidForm(string value, bool expected)
+    {
+        Assert.Equal(expected, LegacyAccent().IsMatch(value));
+        Assert.Equal(expected, ForbiddenInTokens().IsMatch(value));
+        Assert.Equal(expected, LegacyAccentInComponents().IsMatch(value));
+    }
+
+    /// <summary>F-11: the exempt key names must be exactly the legacy-accent-shaped keys the F-3 scope overrides.</summary>
+    [Fact]
+    public void AccentScopeOverridesExactlyTheExemptKeyNames()
+    {
+        var scopeKeys = AppSourceTree.LoadXaml("Styles/Components/Sa.AccentNeutralScope.xaml").Descendants()
+            .Attributes(AppSourceTree.Xaml + "Key").Select(a => a.Value)
+            .Where(key => LegacyAccent().IsMatch(key))
+            .ToHashSet(StringComparer.Ordinal);
+
+        Assert.Equal(AccentScopeOverriddenKeyNames.Order(StringComparer.Ordinal), scopeKeys.Order(StringComparer.Ordinal));
+    }
+
+    private static IEnumerable<string> XamlValuesExceptExemptAccentKeys(XDocument document) =>
+        document.Descendants().Attributes()
+            .Where(a => !(a.Name == AppSourceTree.Xaml + "Key" && AccentScopeOverriddenKeyNames.Contains(a.Value)))
+            .Select(a => a.Value)
+            .Concat(document.DescendantNodes().OfType<XText>().Select(t => t.Value));
+
     /// <summary>Attribute values and element text; XML comments are never included.</summary>
     private static IEnumerable<string> XamlValues(XDocument document) =>
         document.Descendants().Attributes().Select(a => a.Value)
@@ -194,11 +290,14 @@ public sealed partial class UiDebtRatchetTests
     private static bool IsUnderTokens(string relative) =>
         relative.StartsWith("Styles/Tokens/", StringComparison.OrdinalIgnoreCase);
 
-    [GeneratedRegex(@"BrandAccent\w*|AccentSoft\w*|AccentText\w*|AccentPill\w*|AccentFill\w*|SystemAccent\w*|#1846E1\b", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"BrandAccent\w*|AccentSoft\w*|AccentText\w*|AccentPill\w*|AccentFill\w*|SystemAccent\w*|#(?:[0-9A-F]{2})?1846E1\b", RegexOptions.IgnoreCase)]
     private static partial Regex LegacyAccent();
 
-    [GeneratedRegex(@"#1846E1\b|SystemAccent\w*|BrandAccent\w*", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"#(?:[0-9A-F]{2})?1846E1\b|SystemAccent\w*|BrandAccent\w*", RegexOptions.IgnoreCase)]
     private static partial Regex ForbiddenInTokens();
+
+    [GeneratedRegex(@"#(?:[0-9A-F]{2})?1846E1\b|SystemAccent\w*|BrandAccent\w*|AccentFill\w*", RegexOptions.IgnoreCase)]
+    private static partial Regex LegacyAccentInComponents();
 
     [GeneratedRegex(@"^Sa[A-Z]\w*Brush$")]
     private static partial Regex SaBrushKey();

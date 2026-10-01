@@ -49,7 +49,48 @@ public sealed partial class XamlContractAndResourceGuardTests
             "UnknownHostHeading"
         ],
         // HistoryChart parts: the chart draws into these by name.
-        ["Controls/HistoryChart.xaml"] = ["RootGrid", "GridCanvas", "PlotCanvas"]
+        ["Controls/HistoryChart.xaml"] = ["RootGrid", "GridCanvas", "PlotCanvas"],
+        // UI.2 primitive templates: names resolved at runtime by VisualState setters (G-3).
+        ["Styles/Components/Sa.Primitives.xaml"] =
+        [
+            "PART_Dot", "PART_Path", "PART_Header", "PART_Helper", "PART_Error", "PART_PasswordBox", "PART_RevealButton",
+            // S6
+            "RootGrid", "KeyColumn", "PART_Key", "PART_Value", "PART_Fill", "PART_Track", "PART_Text", "PART_Icon", "PART_Chevron",
+            "PART_Detail", "PART_Trailing", "PART_InfoLayout", "PART_ErrorLayout", "PART_CloseButton", "PART_Parent"
+        ],
+        // UI.2 S4 control templates: names targeted by VisualState setters / storyboards (G-3).
+        ["Styles/Components/Sa.Buttons.xaml"] = ["RootGrid", "StateOverlay", "ContentPresenter"],
+        ["Styles/Components/Sa.Forms.xaml"] =
+        [
+            "RootGrid", "HoverOverlay", "FocusRing", "Shell", "Highlight", "StateOverlay", "ContentPresenter", "Box",
+            "CheckGlyph", "IndeterminateGlyph", "SwitchAreaGrid", "SwitchKnobBounds", "KnobTranslateTransform"
+        ],
+        ["Styles/Components/Sa.Navigation.xaml"] = ["RootGrid", "Shell", "Highlight", "StateOverlay", "ContentPresenter"],
+        // UI.2 R1 (Prism MF-3): the Sa ContentDialog template keeps the Fluent PART names - ContentDialog's own code resolves
+        // them (GetTemplateChild) and the VisualState setters target them; SaDialog focuses PrimaryButton/CloseButton by name.
+        ["Styles/Components/Sa.Dialogs.xaml"] =
+        [
+            "Container", "LayoutRoot", "SmokeLayerBackground", "BackgroundElement", "ScaleTransform", "DialogSpace",
+            "ContentScrollViewer", "Title", "Content", "CommandSpace", "PrimaryButton", "SecondaryButton", "CloseButton"
+        ],
+        // UI.2 Debug-only component gallery (Qa/Gallery/**, excluded from Release).
+        ["Qa/Gallery/QaGalleryWindow.xaml"] =
+        [
+            "GalleryRoot", "DarkThemeOption", "LightThemeOption", "HcSimThemeOption", "HcBannerText", "PageList",
+            "ContentHost", "SimulationHost", "PageFrame"
+        ],
+        ["Qa/Gallery/QaTokenProbePage.xaml"] = ["DefaultStyleProbe", "StrokeProbe16", "StrokeProbe20", "StrokeProbe24", "StrokeProbe48", "RevealNameProbe",
+            "IconButtonNameProbe", "ToastNameProbe"],
+        ["Qa/Gallery/QaColorsPage.xaml"] = ["PrimitiveSwatches"],
+        // DialogInitialFocus / DialogResult are also read by AutomationId by tools/qa/ui2-dialog-probe.ps1.
+        ["Qa/Gallery/QaPopupDialogPage.xaml"] = ["Description", "InitialFocusText", "DefaultButtonText", "ResultText"],
+        ["Qa/Gallery/QaMaterialsPage.xaml"] = ["FallbackToggle", "GlassSample", "GlassFallbackSample"],
+        // Storyboard.TargetName lanes (G-3) and the C#-path lanes driven by the code-behind.
+        ["Qa/Gallery/QaMotionPage.xaml"] =
+        [
+            "XamlFadeBox", "XamlFastBox", "XamlNormalBox", "XamlSlowBox", "XamlFocusBox", "XamlReducedBox",
+            "CodeFadeBox", "CodeFastBox", "CodeNormalBox", "CodeSlowBox", "CodeFocusBox", "AnimationsText", "TokenValuesText"
+        ]
     };
 
     /// <summary>
@@ -76,8 +117,14 @@ public sealed partial class XamlContractAndResourceGuardTests
         "SystemColorHighlightColor",
         "SystemColorHighlightTextColor",
         "SystemColorWindowColor",
-        "SystemColorWindowTextColor"
+        "SystemColorWindowTextColor",
+        // UI.2 R1 (Prism MF-4): HC rest fill/border of secondary controls - the framework's ButtonFace/ButtonText.
+        "SystemColorButtonFaceColor",
+        "SystemColorButtonTextColor"
     };
+
+    /// <summary>True for a documented WinUI platform key (shared with the UI.2 component-layer guards).</summary>
+    internal static bool IsPlatformKey(string key) => PlatformResourceKeys.Contains(key);
 
     [Fact]
     public void NamedElementsUsedByCodeRemainInTheirXamlFiles()
@@ -106,10 +153,20 @@ public sealed partial class XamlContractAndResourceGuardTests
         Assert.True(failures.Count == 0, string.Join(Environment.NewLine, failures));
     }
 
-    /// <summary>Keeps the contract honest: a new code-behind or ElementName dependency must be inventoried.</summary>
+    /// <summary>
+    /// Keeps the contract honest: a new dependency on a named element must be inventoried. Consumers are the
+    /// paired code-behind, runtime <c>ElementName</c> bindings, and (UI.2 G-3) every other name resolved at
+    /// runtime: <c>Storyboard.TargetName</c>/<c>TargetName</c> and VisualState <c>Setter Target="X.Prop"</c> in the
+    /// same file, and <c>FindName("X")</c>/<c>GetTemplateChild("X")</c>/<c>[TemplatePart(Name = "X")]</c> literals in
+    /// any app C# file.
+    /// </summary>
     [Fact]
     public void ContractInventoryCoversEveryNameCodeBehindOrElementNameDependsOn()
     {
+        var codeLookups = AppSourceTree.Files(".cs")
+            .SelectMany(file => RuntimeNameLookups(AppSourceTree.CodeWithoutComments(file)))
+            .ToHashSet(StringComparer.Ordinal);
+
         var missing = new List<string>();
         foreach (var xaml in AppSourceTree.Files(".xaml"))
         {
@@ -132,6 +189,20 @@ public sealed partial class XamlContractAndResourceGuardTests
                 .SelectMany(attribute => ElementNameReference().Matches(attribute.Value))
                 .Select(match => match.Groups[1].Value)
                 .Where(declared.Contains));
+
+            used.UnionWith(document.Descendants().Attributes()
+                .Where(attribute => attribute.Name.LocalName is "Storyboard.TargetName" or "TargetName")
+                .Select(attribute => attribute.Value)
+                .Where(declared.Contains));
+
+            used.UnionWith(document.Descendants()
+                .Where(element => element.Name.LocalName == "Setter")
+                .Select(element => (string?)element.Attribute("Target"))
+                .OfType<string>()
+                .Select(target => target.Split('.')[0])
+                .Where(declared.Contains));
+
+            used.UnionWith(codeLookups.Where(declared.Contains));
 
             var inventoried = Contract.TryGetValue(xaml, out var names) ? names.ToHashSet(StringComparer.Ordinal) : [];
             missing.AddRange(used.Where(name => !inventoried.Contains(name)).OrderBy(n => n, StringComparer.Ordinal)
@@ -191,7 +262,9 @@ public sealed partial class XamlContractAndResourceGuardTests
         string[] themes = ["Dark", "Light", "HighContrast"];
         var failures = new List<string>();
         var blocks = 0;
-        foreach (var file in AppSourceTree.Files(".xaml").Where(f => f.StartsWith("Styles/Tokens/", StringComparison.OrdinalIgnoreCase)))
+        // UI.2 T-4: the component layer (Styles/Components/**, e.g. the F-3 accent-neutral scope) obeys the same parity.
+        foreach (var file in AppSourceTree.Files(".xaml").Where(f => f.StartsWith("Styles/Tokens/", StringComparison.OrdinalIgnoreCase)
+                     || f.StartsWith("Styles/Components/", StringComparison.OrdinalIgnoreCase)))
         {
             foreach (var block in AppSourceTree.LoadXaml(file).Descendants().Where(e => e.Name.LocalName == "ResourceDictionary.ThemeDictionaries"))
             {
@@ -298,6 +371,34 @@ public sealed partial class XamlContractAndResourceGuardTests
             }
         }
     }
+
+    /// <summary>Names looked up at runtime: a literal, or a <c>const string</c> declared in the same file (G-3).</summary>
+    internal static IEnumerable<string> RuntimeNameLookups(string code)
+    {
+        var constants = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (Match constant in ConstString().Matches(code))
+        {
+            constants.TryAdd(constant.Groups[1].Value, constant.Groups[2].Value);
+        }
+
+        foreach (Match match in RuntimeNameLookup().Matches(code))
+        {
+            if (match.Groups["literal"].Success)
+            {
+                yield return match.Groups["literal"].Value;
+            }
+            else if (constants.TryGetValue(match.Groups["constant"].Value, out var value))
+            {
+                yield return value;
+            }
+        }
+    }
+
+    [GeneratedRegex(@"\b(?:(?:FindName|GetTemplateChild)\s*\(|TemplatePart\s*\(\s*Name\s*=)\s*(?:""(?<literal>[^""]+)""|(?<constant>[A-Za-z_]\w*))")]
+    private static partial Regex RuntimeNameLookup();
+
+    [GeneratedRegex(@"\bconst\s+string\s+([A-Za-z_]\w*)\s*=\s*""([^""]*)""")]
+    private static partial Regex ConstString();
 
     [GeneratedRegex(@"ElementName\s*=\s*([A-Za-z_][A-Za-z0-9_]*)")]
     private static partial Regex ElementNameReference();

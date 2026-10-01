@@ -1,0 +1,95 @@
+<Page
+    x:Class="ServerMonitor.App.Qa.Gallery.QaSpacingPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:primitives="using:ServerMonitor.App.Controls.Primitives">
+    <!-- QA-ONLY (UI.2 S2): spacing scale, radius scale and border/focus thicknesses. -->
+    <ScrollViewer AutomationProperties.AutomationId="PageScroll" Padding="24">
+        <StackPanel Spacing="{StaticResource SaSpace12}">
+            <TextBlock Style="{StaticResource SaSectionHeaderTextStyle}" Text="Spacing &amp; radius" />
+            <TextBlock Style="{StaticResource SaSecondaryBodyTextStyle}" Text="Spacing (Spacing.xaml) - bar width = token" Margin="0,0,0,0" />
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="SaSpace4" VerticalAlignment="Center" />
+                <Border Grid.Column="1" HorizontalAlignment="Left" Height="{StaticResource SaSpace16}" Width="{StaticResource SaSpace4}" Background="{ThemeResource SaTextBrush}" />
+            </Grid>
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="SaSpace8" VerticalAlignment="Center" />
+                <Border Grid.Column="1" HorizontalAlignment="Left" Height="{StaticResource SaSpace16}" Width="{StaticResource SaSpace8}" Background="{ThemeResource SaTextBrush}" />
+            </Grid>
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="SaSpace12" VerticalAlignment="Center" />
+                <Border Grid.Column="1" HorizontalAlignment="Left" Height="{StaticResource SaSpace16}" Width="{StaticResource SaSpace12}" Background="{ThemeResource SaTextBrush}" />
+            </Grid>
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="SaSpace16" VerticalAlignment="Center" />
+                <Border Grid.Column="1" HorizontalAlignment="Left" Height="{StaticResource SaSpace16}" Width="{StaticResource SaSpace16}" Background="{ThemeResource SaTextBrush}" />
+            </Grid>
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="SaSpace24" VerticalAlignment="Center" />
+                <Border Grid.Column="1" HorizontalAlignment="Left" Height="{StaticResource SaSpace16}" Width="{StaticResource SaSpace24}" Background="{ThemeResource SaTextBrush}" />
+            </Grid>
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="SaSpace32" VerticalAlignment="Center" />
+                <Border Grid.Column="1" HorizontalAlignment="Left" Height="{StaticResource SaSpace16}" Width="{StaticResource SaSpace32}" Background="{ThemeResource SaTextBrush}" />
+            </Grid>
+            <TextBlock Style="{StaticResource SaSecondaryBodyTextStyle}" Text="Radius (Radius.xaml)" Margin="0,16,0,0" />
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="SaRadiusSmall" VerticalAlignment="Center" />
+                <Border Grid.Column="1" HorizontalAlignment="Left" Width="160" Height="56" CornerRadius="{StaticResource SaRadiusSmall}" Background="{ThemeResource SaInteriorBrush}" BorderBrush="{ThemeResource SaBorderNeutralBrush}" BorderThickness="{StaticResource SaBorderThickness}" />
+            </Grid>
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="SaRadiusMiniBar" VerticalAlignment="Center" />
+                <Border Grid.Column="1" HorizontalAlignment="Left" Width="160" Height="56" CornerRadius="{StaticResource SaRadiusMiniBar}" Background="{ThemeResource SaInteriorBrush}" BorderBrush="{ThemeResource SaBorderNeutralBrush}" BorderThickness="{StaticResource SaBorderThickness}" />
+            </Grid>
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="SaRadiusHealthSegment" VerticalAlignment="Center" />
+                <Border Grid.Column="1" HorizontalAlignment="Left" Width="160" Height="56" CornerRadius="{StaticResource SaRadiusHealthSegment}" Background="{ThemeResource SaInteriorBrush}" BorderBrush="{ThemeResource SaBorderNeutralBrush}" BorderThickness="{StaticResource SaBorderThickness}" />
+            </Grid>
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="SaRadiusControl" VerticalAlignment="Center" />
+                <Border Grid.Column="1" HorizontalAlignment="Left" Width="160" Height="56" CornerRadius="{StaticResource SaRadiusControl}" Background="{ThemeResource SaInteriorBrush}" BorderBrush="{ThemeResource SaBorderNeutralBrush}" BorderThickness="{StaticResource SaBorderThickness}" />
+            </Grid>
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="SaRadiusCard" VerticalAlignment="Center" />
+                <Border Grid.Column="1" HorizontalAlignment="Left" Width="160" Height="56" CornerRadius="{StaticResource SaRadiusCard}" Background="{ThemeResource SaInteriorBrush}" BorderBrush="{ThemeResource SaBorderNeutralBrush}" BorderThickness="{StaticResource SaBorderThickness}" />
+            </Grid>
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="SaRadiusPanel" VerticalAlignment="Center" />
+                <Border Grid.Column="1" HorizontalAlignment="Left" Width="160" Height="56" CornerRadius="{StaticResource SaRadiusPanel}" Background="{ThemeResource SaInteriorBrush}" BorderBrush="{ThemeResource SaBorderNeutralBrush}" BorderThickness="{StaticResource SaBorderThickness}" />
+            </Grid>
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="SaRadiusPill" VerticalAlignment="Center" />
+                <Border Grid.Column="1" HorizontalAlignment="Left" Width="160" Height="56" CornerRadius="{StaticResource SaRadiusPill}" Background="{ThemeResource SaInteriorBrush}" BorderBrush="{ThemeResource SaBorderNeutralBrush}" BorderThickness="{StaticResource SaBorderThickness}" />
+            </Grid>
+            <TextBlock Style="{StaticResource SaSecondaryBodyTextStyle}" Text="Borders (Borders.xaml)" Margin="0,16,0,0" />
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="SaBorderThickness" VerticalAlignment="Center" />
+                <Border Grid.Column="1" HorizontalAlignment="Left" Width="160" Height="40" CornerRadius="{StaticResource SaRadiusControl}" BorderBrush="{ThemeResource SaBorderNeutralBrush}" BorderThickness="{StaticResource SaBorderThickness}" />
+            </Grid>
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="SaDividerThickness" VerticalAlignment="Center" />
+                <Border Grid.Column="1" HorizontalAlignment="Left" Width="160" Height="40" CornerRadius="{StaticResource SaRadiusControl}" BorderBrush="{ThemeResource SaDividerBrush}" BorderThickness="{StaticResource SaDividerThickness}" />
+            </Grid>
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="SaFocusRingThickness" VerticalAlignment="Center" />
+                <Border Grid.Column="1" HorizontalAlignment="Left" Width="160" Height="40" CornerRadius="{StaticResource SaRadiusControl}" BorderBrush="{ThemeResource SaFocusRingBrush}" BorderThickness="{StaticResource SaFocusRingThickness}" />
+            </Grid>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

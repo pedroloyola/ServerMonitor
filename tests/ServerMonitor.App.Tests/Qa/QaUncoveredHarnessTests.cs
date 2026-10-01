@@ -47,7 +47,7 @@ public sealed class QaUncoveredHarnessTests
 
     [Theory]
     [MemberData(nameof(Harnesses))]
-    public void CompositionRegistersOnlyQaDoublesOrInMemoryState(string harness)
+    public void HarnessDeltaRegistersOnlyQaDoublesOrInMemoryState(string harness)
     {
         var services = new ServiceCollection();
         Apply(harness, services);

@@ -9,4 +9,11 @@
     <CornerRadius x:Key="SaRadiusMiniBar">3</CornerRadius>
     <CornerRadius x:Key="SaRadiusSmall">4</CornerRadius>
     <CornerRadius x:Key="SaRadiusHealthSegment">6</CornerRadius>
+    <!-- UI.2 additive (Boss B-3): toast 112:19613 (also disclosure 112:7985); rect button / page search / segmented
+         track 112:1806 112:1429 112:2634; dialog button 112:8573; segment 112:2634; skeleton block 112:15602. -->
+    <CornerRadius x:Key="SaRadiusToast">20</CornerRadius>
+    <CornerRadius x:Key="SaRadiusRect">14</CornerRadius>
+    <CornerRadius x:Key="SaRadiusDialogButton">13</CornerRadius>
+    <CornerRadius x:Key="SaRadiusSegment">11</CornerRadius>
+    <CornerRadius x:Key="SaRadiusSkeleton">6</CornerRadius>
 </ResourceDictionary>

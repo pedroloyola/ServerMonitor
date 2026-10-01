@@ -76,7 +76,7 @@ Valores idênticos em Dark/Light/HC, sem Foreground imposto pelo estilo.
 | Papel | Família SaFont* | Tamanho | Peso WinUI | LineHeight | Fonte |
 |---|---|---|---|---|---|
 | Display | Display | 44 | SemiBold | 56 | Tamanho: Manual 107:528. LH: calibração Prism, inteiro ≈ 1,27× (ecrã 05 não tem Display; Fluent Display 68/92 não escala linearmente) — validar na galeria |
-| Heading | Display | 30 | SemiBold | 40 | Tamanho: estilo Figma ServerAlyzer/Heading. LH: calibração Prism, inteiro ≈ 1,33× (proporção de Fluent Title Large 40/52) |
+| Heading | Display | 30 | SemiBold | 42 | Tamanho: estilo Figma ServerAlyzer/Heading. LH: **42** (UI.2 R1, decisão Prism B-3: Figma lh 1.4 em `112:3319`; era 40) |
 | Metric | Display | 28 | SemiBold | 36 | Tamanho: Manual 107:531. LH: ecrã 05 112:12058 (28/36) = Fluent Title 28/36 |
 | Title | Display | 20 | SemiBold | 28 | Tamanho: Manual 107:534. LH: Fluent Subtitle 20/28 (ecrã 112:12053 usa 26 com SF Pro) |
 | TitleCompact | Text | 18 | SemiBold | 24 | Tamanho: estilo Figma ServerAlyzer/Title. LH: Fluent Body Large 18/24 |
@@ -96,7 +96,7 @@ Calibração inicial SF Pro → Segoe: manter tamanhos e pesos semânticos; altu
 | SaSpace4/8/12/16/24/32 | Double 4/8/12/16/24/32 | Manual 107:603 |
 | SaRadiusPanel, SaRadiusCard | CornerRadius 24 | Manual 107:603; 112:1010/1222 |
 | SaRadiusControl | CornerRadius 12 | Manual; Input 112:3339/3500 |
-| SaRadiusPill | CornerRadius 99 | UI.0 §3.1, coleção Figma |
+| SaRadiusPill | CornerRadius 99 | UI.0 §3.1, coleção Figma. **Não usar em WinUI** (UI.2: um raio > h/2 desenha uma elipse); os componentes usam h/2 literal — guard `ComponentsNeverConsumeTheFigmaPillRadius` |
 | SaRadiusMiniBar | CornerRadius 3 | 112:1040/1252 |
 | SaRadiusSmall | CornerRadius 4 | 112:8522/8708 |
 | SaRadiusHealthSegment | CornerRadius 6 | 112:1019/1231 |
@@ -165,6 +165,8 @@ Resultado: reflexão só em `TrayCapabilityBoundaryTests` e `TrayOwnershipComple
 Contraprova: build Debug e Release e a suite completa verdes **depois** da remoção (§8); smoke `--qa-health` arranca e renderiza.
 
 ### 7.2 Gates obrigatórios de UI.2 (das revisões Cortex/Prism de UI.1)
+
+> **Fechado em UI.2** → `docs/ui/ui2-components.md` §4 (F-1, F-3, F-4, F-07, Color.Primitives, Default, G-3, G-4, G-5). Texto abaixo mantido como registo histórico.
 
 UI.2 não adota nenhum token `Sa*` em páginas antes de estes gates estarem verdes:
 1. **Resolução runtime (Cortex F-1):** página de galeria Debug / `--qa-tokens` que aplica `RequestedTheme` Dark → Light → HC num host e resolve **todas** as chaves `Sa*Brush`/`Sa*TextStyle` via `{ThemeResource}` em elementos reais; fail-closed se alguma faltar (o merge aninhado de Color.Primitives dentro de ThemeDictionaries ainda não foi instanciado em runtime).

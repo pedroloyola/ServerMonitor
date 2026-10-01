@@ -1,0 +1,337 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- UI.2 S4 buttons (Boss B-4: reproduce the four Figma families). Keyed styles on the native Button, so
+         semantics, keyboard and UI Automation stay WinUI's. Rest + Disabled are MEASURED; hover / pressed / focus
+         are DERIVED (B-4). Drop shadows are not reproduced (deviation, ui2-components.md). Non-colour tokens are
+         merged HERE so every StaticResource resolves in this file's own scope (T-2). Generated layout, hand-kept. -->
+    <ResourceDictionary.MergedDictionaries>
+        <ResourceDictionary Source="ms-appx:///Styles/Tokens/Typography.xaml" />
+        <ResourceDictionary Source="ms-appx:///Styles/Tokens/Radius.xaml" />
+        <ResourceDictionary Source="ms-appx:///Styles/Tokens/Borders.xaml" />
+        <ResourceDictionary Source="ms-appx:///Styles/Components/Sa.Surfaces.xaml" />
+    </ResourceDictionary.MergedDictionaries>
+
+    <!-- Glass families (secondary pill/rect, icon button): inner highlight; hover/pressed text = SaHoverTextBrush (HC: HighlightText on Highlight). -->
+    <ControlTemplate x:Key="SaGlassButtonTemplate" TargetType="Button">
+        <Grid x:Name="RootGrid" Background="Transparent">
+            <VisualStateManager.VisualStateGroups>
+                <VisualStateGroup x:Name="CommonStates">
+                    <VisualState x:Name="Normal" />
+                    <!-- DERIVED (no Figma state): hover = SaHoverBrush veil. -->
+                    <VisualState x:Name="PointerOver">
+                        <VisualState.Setters>
+                            <Setter Target="StateOverlay.Background" Value="{ThemeResource SaHoverBrush}" />
+                                <Setter Target="ContentPresenter.Foreground" Value="{ThemeResource SaHoverTextBrush}" />
+                        </VisualState.Setters>
+                    </VisualState>
+                    <!-- DERIVED: pressed = SaSelectedBrush veil (one step above hover). -->
+                    <VisualState x:Name="Pressed">
+                        <VisualState.Setters>
+                            <Setter Target="StateOverlay.Background" Value="{ThemeResource SaSelectedBrush}" />
+                                <Setter Target="ContentPresenter.Foreground" Value="{ThemeResource SaHoverTextBrush}" />
+                        </VisualState.Setters>
+                    </VisualState>
+                    <!-- MEASURED rule 112:3399: the whole button at opacity .58, text in the disabled text colour. -->
+                    <VisualState x:Name="Disabled">
+                        <VisualState.Setters>
+                            <Setter Target="RootGrid.Opacity" Value="0.58" />
+                            <Setter Target="ContentPresenter.Foreground" Value="{ThemeResource SaDisabledTextBrush}" />
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+            </VisualStateManager.VisualStateGroups>
+            <Border x:Name="Shell"
+                    Background="{TemplateBinding Background}"
+                    BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="{TemplateBinding BorderThickness}"
+                    CornerRadius="{TemplateBinding CornerRadius}">
+                <Grid>
+                <!-- Inner top highlight (Figma inset 0 1 1 rgba(255,255,255,.12-.19) / .8): a 1px top line inside the shape. -->
+                <Border x:Name="Highlight"
+                        CornerRadius="{TemplateBinding CornerRadius}"
+                        BorderThickness="0,1,0,0"
+                        BorderBrush="{ThemeResource SaGlassHighlightBrush}"
+                        IsHitTestVisible="False" />
+                    <Border x:Name="StateOverlay" CornerRadius="{TemplateBinding CornerRadius}" IsHitTestVisible="False" />
+                    <ContentPresenter x:Name="ContentPresenter"
+                                      Padding="{TemplateBinding Padding}"
+                                      HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                      VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                                      Content="{TemplateBinding Content}"
+                                      ContentTemplate="{TemplateBinding ContentTemplate}"
+                                      ContentTransitions="{TemplateBinding ContentTransitions}"
+                                      FontFamily="{TemplateBinding FontFamily}"
+                                      FontSize="{TemplateBinding FontSize}"
+                                      FontWeight="{TemplateBinding FontWeight}"
+                                      Foreground="{TemplateBinding Foreground}"
+                                      AutomationProperties.AccessibilityView="Raw" />
+                </Grid>
+            </Border>
+        </Grid>
+    </ControlTemplate>
+    <!-- Flat families (dialog, solid, ghost): no highlight; hover/pressed text = SaHoverTextBrush. -->
+    <ControlTemplate x:Key="SaFlatButtonTemplate" TargetType="Button">
+        <Grid x:Name="RootGrid" Background="Transparent">
+            <VisualStateManager.VisualStateGroups>
+                <VisualStateGroup x:Name="CommonStates">
+                    <VisualState x:Name="Normal" />
+                    <!-- DERIVED (no Figma state): hover = SaHoverBrush veil. -->
+                    <VisualState x:Name="PointerOver">
+                        <VisualState.Setters>
+                            <Setter Target="StateOverlay.Background" Value="{ThemeResource SaHoverBrush}" />
+                                <Setter Target="ContentPresenter.Foreground" Value="{ThemeResource SaHoverTextBrush}" />
+                        </VisualState.Setters>
+                    </VisualState>
+                    <!-- DERIVED: pressed = SaSelectedBrush veil (one step above hover). -->
+                    <VisualState x:Name="Pressed">
+                        <VisualState.Setters>
+                            <Setter Target="StateOverlay.Background" Value="{ThemeResource SaSelectedBrush}" />
+                                <Setter Target="ContentPresenter.Foreground" Value="{ThemeResource SaHoverTextBrush}" />
+                        </VisualState.Setters>
+                    </VisualState>
+                    <!-- MEASURED rule 112:3399: the whole button at opacity .58, text in the disabled text colour. -->
+                    <VisualState x:Name="Disabled">
+                        <VisualState.Setters>
+                            <Setter Target="RootGrid.Opacity" Value="0.58" />
+                            <Setter Target="ContentPresenter.Foreground" Value="{ThemeResource SaDisabledTextBrush}" />
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+            </VisualStateManager.VisualStateGroups>
+            <Border x:Name="Shell"
+                    Background="{TemplateBinding Background}"
+                    BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="{TemplateBinding BorderThickness}"
+                    CornerRadius="{TemplateBinding CornerRadius}">
+                <Grid>
+                    <Border x:Name="StateOverlay" CornerRadius="{TemplateBinding CornerRadius}" IsHitTestVisible="False" />
+                    <ContentPresenter x:Name="ContentPresenter"
+                                      Padding="{TemplateBinding Padding}"
+                                      HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                      VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                                      Content="{TemplateBinding Content}"
+                                      ContentTemplate="{TemplateBinding ContentTemplate}"
+                                      ContentTransitions="{TemplateBinding ContentTransitions}"
+                                      FontFamily="{TemplateBinding FontFamily}"
+                                      FontSize="{TemplateBinding FontSize}"
+                                      FontWeight="{TemplateBinding FontWeight}"
+                                      Foreground="{TemplateBinding Foreground}"
+                                      AutomationProperties.AccessibilityView="Raw" />
+                </Grid>
+            </Border>
+        </Grid>
+    </ControlTemplate>
+    <!-- Primary: highlight; text colour kept (inverted #FAFAFA on #303030 in Light); pressed reuses the hover veil so the text keeps its contrast. -->
+    <ControlTemplate x:Key="SaPrimaryButtonTemplate" TargetType="Button">
+        <Grid x:Name="RootGrid" Background="Transparent">
+            <VisualStateManager.VisualStateGroups>
+                <VisualStateGroup x:Name="CommonStates">
+                    <VisualState x:Name="Normal" />
+                    <!-- DERIVED (no Figma state): hover = SaHoverBrush veil. -->
+                    <VisualState x:Name="PointerOver">
+                        <VisualState.Setters>
+                            <Setter Target="StateOverlay.Background" Value="{ThemeResource SaHoverBrush}" />
+                        </VisualState.Setters>
+                    </VisualState>
+                    <!-- DERIVED: pressed = SaSelectedBrush veil (one step above hover). -->
+                    <VisualState x:Name="Pressed">
+                        <VisualState.Setters>
+                            <Setter Target="StateOverlay.Background" Value="{ThemeResource SaHoverBrush}" />
+                        </VisualState.Setters>
+                    </VisualState>
+                    <!-- MEASURED rule 112:3399: the whole button at opacity .58. R1 (Prism nit): the primary keeps SaPrimaryText -
+                         the disabled text colour on the Light #303030 fill was illegible; the opacity does the work. -->
+                    <VisualState x:Name="Disabled">
+                        <VisualState.Setters>
+                            <Setter Target="RootGrid.Opacity" Value="0.58" />
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+            </VisualStateManager.VisualStateGroups>
+            <!-- R1 (Prism MF-2): the fill runs under the 1px border (OuterBorderEdge), so the transparent Light border no
+                 longer shrinks the visible shape to 42 - it is 44 as in 112:1216. -->
+            <Border x:Name="Shell"
+                    BackgroundSizing="OuterBorderEdge"
+                    Background="{TemplateBinding Background}"
+                    BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="{TemplateBinding BorderThickness}"
+                    CornerRadius="{TemplateBinding CornerRadius}">
+                <Grid>
+                <!-- Inner top highlight (Figma inset 0 1 1 rgba(255,255,255,.12-.19) / .8): a 1px top line inside the shape. -->
+                <Border x:Name="Highlight"
+                        CornerRadius="{TemplateBinding CornerRadius}"
+                        BorderThickness="0,1,0,0"
+                        BorderBrush="{ThemeResource SaGlassHighlightBrush}"
+                        IsHitTestVisible="False" />
+                    <Border x:Name="StateOverlay" CornerRadius="{TemplateBinding CornerRadius}" IsHitTestVisible="False" />
+                    <ContentPresenter x:Name="ContentPresenter"
+                                      Padding="{TemplateBinding Padding}"
+                                      HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                      VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                                      Content="{TemplateBinding Content}"
+                                      ContentTemplate="{TemplateBinding ContentTemplate}"
+                                      ContentTransitions="{TemplateBinding ContentTransitions}"
+                                      FontFamily="{TemplateBinding FontFamily}"
+                                      FontSize="{TemplateBinding FontSize}"
+                                      FontWeight="{TemplateBinding FontWeight}"
+                                      Foreground="{TemplateBinding Foreground}"
+                                      AutomationProperties.AccessibilityView="Raw" />
+                </Grid>
+            </Border>
+        </Grid>
+    </ControlTemplate>
+    <!-- Destructive: no highlight; danger text colour kept in every state. -->
+    <ControlTemplate x:Key="SaKeepForegroundButtonTemplate" TargetType="Button">
+        <Grid x:Name="RootGrid" Background="Transparent">
+            <VisualStateManager.VisualStateGroups>
+                <VisualStateGroup x:Name="CommonStates">
+                    <VisualState x:Name="Normal" />
+                    <!-- DERIVED (no Figma state): hover = SaHoverBrush veil. -->
+                    <VisualState x:Name="PointerOver">
+                        <VisualState.Setters>
+                            <Setter Target="StateOverlay.Background" Value="{ThemeResource SaHoverBrush}" />
+                        </VisualState.Setters>
+                    </VisualState>
+                    <!-- DERIVED: pressed = SaSelectedBrush veil (one step above hover). -->
+                    <VisualState x:Name="Pressed">
+                        <VisualState.Setters>
+                            <Setter Target="StateOverlay.Background" Value="{ThemeResource SaSelectedBrush}" />
+                        </VisualState.Setters>
+                    </VisualState>
+                    <!-- MEASURED rule 112:3399: the whole button at opacity .58, text in the disabled text colour. -->
+                    <VisualState x:Name="Disabled">
+                        <VisualState.Setters>
+                            <Setter Target="RootGrid.Opacity" Value="0.58" />
+                            <Setter Target="ContentPresenter.Foreground" Value="{ThemeResource SaDisabledTextBrush}" />
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+            </VisualStateManager.VisualStateGroups>
+            <Border x:Name="Shell"
+                    Background="{TemplateBinding Background}"
+                    BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="{TemplateBinding BorderThickness}"
+                    CornerRadius="{TemplateBinding CornerRadius}">
+                <Grid>
+                    <Border x:Name="StateOverlay" CornerRadius="{TemplateBinding CornerRadius}" IsHitTestVisible="False" />
+                    <ContentPresenter x:Name="ContentPresenter"
+                                      Padding="{TemplateBinding Padding}"
+                                      HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                      VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                                      Content="{TemplateBinding Content}"
+                                      ContentTemplate="{TemplateBinding ContentTemplate}"
+                                      ContentTransitions="{TemplateBinding ContentTransitions}"
+                                      FontFamily="{TemplateBinding FontFamily}"
+                                      FontSize="{TemplateBinding FontSize}"
+                                      FontWeight="{TemplateBinding FontWeight}"
+                                      Foreground="{TemplateBinding Foreground}"
+                                      AutomationProperties.AccessibilityView="Raw" />
+                </Grid>
+            </Border>
+        </Grid>
+    </ControlTemplate>
+    <!-- Pill radii are h/2 literals (Figma): a radius above h/2 - e.g. SaRadiusPill 99 - renders ELLIPTICAL in WinUI. -->
+    <!-- Shared by every Sa button: focus is the SYSTEM focus visual (keyboard only) in SaFocusRingBrush, 2px
+         (DERIVED, Boss B-4); text in the Segoe UI Variable Text family. -->
+    <Style x:Key="SaButtonBaseStyle" TargetType="Button">
+        <Setter Property="FontFamily" Value="{StaticResource SaFontText}" />
+        <Setter Property="FontSize" Value="{StaticResource SaFontSizeControl}" />
+        <Setter Property="FontWeight" Value="Medium" />
+        <Setter Property="Foreground" Value="{ThemeResource SaTextBrush}" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="UseSystemFocusVisuals" Value="True" />
+        <Setter Property="FocusVisualPrimaryBrush" Value="{ThemeResource SaFocusRingBrush}" />
+        <Setter Property="FocusVisualPrimaryThickness" Value="{StaticResource SaFocusRingThickness}" />
+        <Setter Property="FocusVisualSecondaryThickness" Value="0" />
+        <Setter Property="FocusVisualMargin" Value="-3" />
+        <Setter Property="Template" Value="{StaticResource SaGlassButtonTemplate}" />
+    </Style>
+    <!-- Primary pill 112:1004 D / 112:1216 L: h44, radius h/2, gap 8 (content), 14 Medium. D glass fill .28 + border .28; L solid #303030, no border, #FAFAFA text (asymmetric per theme via SaPrimary* tokens). Drop shadow not reproduced (deviation). -->
+    <Style x:Key="SaPrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource SaButtonBaseStyle}">
+        <Setter Property="Template" Value="{StaticResource SaPrimaryButtonTemplate}" />
+        <Setter Property="Height" Value="44" />
+        <Setter Property="Padding" Value="20,0" />
+        <Setter Property="CornerRadius" Value="22" />
+        <Setter Property="Background" Value="{ThemeResource SaPrimaryFillBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource SaPrimaryBorderBrush}" />
+        <Setter Property="BorderThickness" Value="{StaticResource SaBorderThickness}" />
+        <Setter Property="Foreground" Value="{ThemeResource SaPrimaryTextBrush}" />
+        <Setter Property="FontSize" Value="{StaticResource SaFontSizeButton}" />
+    </Style>
+    <!-- Secondary pill 112:3323 / 112:3484 (also disabled 112:3399): h42, radius h/2, fill rgba(82,82,82,.23) / rgba(255,255,255,.5) = SaSecondaryFillBrush (R1 MF-4: ButtonFace + ButtonText border in HC), no border, inner highlight, 13 Medium. -->
+    <Style x:Key="SaSecondaryButtonStyle" TargetType="Button" BasedOn="{StaticResource SaButtonBaseStyle}">
+        <Setter Property="Height" Value="42" />
+        <Setter Property="Padding" Value="18,0" />
+        <Setter Property="CornerRadius" Value="21" />
+        <Setter Property="Background" Value="{ThemeResource SaSecondaryFillBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource SaSecondaryBorderBrush}" />
+        <Setter Property="BorderThickness" Value="{ThemeResource SaSecondaryBorderThickness}" />
+    </Style>
+    <!-- Secondary rect 112:1806 / 112:2043 (Atualizar / Editar): h42, radius 14, same fill/highlight as the pill, gap 8, 13 Medium. -->
+    <Style x:Key="SaSecondaryRectButtonStyle" TargetType="Button" BasedOn="{StaticResource SaButtonBaseStyle}">
+        <Setter Property="Height" Value="42" />
+        <Setter Property="Padding" Value="16,0" />
+        <Setter Property="CornerRadius" Value="{StaticResource SaRadiusRect}" />
+        <Setter Property="Background" Value="{ThemeResource SaSecondaryFillBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource SaSecondaryBorderBrush}" />
+        <Setter Property="BorderThickness" Value="{ThemeResource SaSecondaryBorderThickness}" />
+    </Style>
+    <!-- Dialog neutral 112:8573 / 112:8759: h42, radius 13, min width 168, fill .14/.12 + 1px border .14/.16, 13 Medium; no highlight. -->
+    <Style x:Key="SaDialogButtonStyle" TargetType="Button" BasedOn="{StaticResource SaButtonBaseStyle}">
+        <Setter Property="Template" Value="{StaticResource SaFlatButtonTemplate}" />
+        <Setter Property="Height" Value="42" />
+        <Setter Property="MinWidth" Value="168" />
+        <Setter Property="Padding" Value="16,0" />
+        <Setter Property="CornerRadius" Value="{StaticResource SaRadiusDialogButton}" />
+        <Setter Property="Background" Value="{ThemeResource SaDialogButtonFillBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource SaDialogButtonBorderBrush}" />
+        <Setter Property="BorderThickness" Value="{StaticResource SaBorderThickness}" />
+    </Style>
+    <!-- Destructive 112:8575 / 112:8761: h42, radius 13, min width 196, danger fill .12/.07 + border .22, danger text, 13 Medium; text colour kept in every state. -->
+    <Style x:Key="SaDestructiveButtonStyle" TargetType="Button" BasedOn="{StaticResource SaButtonBaseStyle}">
+        <Setter Property="Template" Value="{StaticResource SaKeepForegroundButtonTemplate}" />
+        <Setter Property="Height" Value="42" />
+        <Setter Property="MinWidth" Value="196" />
+        <Setter Property="Padding" Value="16,0" />
+        <Setter Property="CornerRadius" Value="{StaticResource SaRadiusDialogButton}" />
+        <Setter Property="Background" Value="{ThemeResource SaDangerFillBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource SaDangerBorderBrush}" />
+        <Setter Property="BorderThickness" Value="{StaticResource SaBorderThickness}" />
+        <Setter Property="Foreground" Value="{ThemeResource SaDangerTextBrush}" />
+    </Style>
+    <!-- Solid (Manual) 112:14098 / 112:14192: h40, radius 12, fill inset #313131/#E8E8E8, 1px border #484848/#D3D3D3, 14 Semibold text. -->
+    <Style x:Key="SaSolidButtonStyle" TargetType="Button" BasedOn="{StaticResource SaButtonBaseStyle}">
+        <Setter Property="Template" Value="{StaticResource SaFlatButtonTemplate}" />
+        <Setter Property="Height" Value="40" />
+        <Setter Property="Padding" Value="16,0" />
+        <Setter Property="CornerRadius" Value="{StaticResource SaRadiusControl}" />
+        <Setter Property="Background" Value="{ThemeResource SaInteriorBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource SaBorderInsetBrush}" />
+        <Setter Property="BorderThickness" Value="{StaticResource SaBorderThickness}" />
+        <Setter Property="FontSize" Value="{StaticResource SaFontSizeButton}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <!-- Icon button 112:1001 / 112:1213: 44x44 circle, Secondary fill + highlight, icon 19. Icon-only: the consumer MUST set AutomationProperties.Name (T-17). -->
+    <Style x:Key="SaIconButtonStyle" TargetType="Button" BasedOn="{StaticResource SaButtonBaseStyle}">
+        <Setter Property="Width" Value="44" />
+        <Setter Property="Height" Value="44" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="CornerRadius" Value="22" />
+        <Setter Property="Background" Value="{ThemeResource SaSecondaryFillBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource SaSecondaryBorderBrush}" />
+        <Setter Property="BorderThickness" Value="{ThemeResource SaSecondaryBorderThickness}" />
+    </Style>
+    <!-- Ghost icon button 112:19619 (toast close): 28x28, no fill, muted glyph 20. Icon-only: AutomationProperties.Name required (T-17). -->
+    <Style x:Key="SaGhostIconButtonStyle" TargetType="Button" BasedOn="{StaticResource SaButtonBaseStyle}">
+        <Setter Property="Template" Value="{StaticResource SaFlatButtonTemplate}" />
+        <Setter Property="Width" Value="28" />
+        <Setter Property="Height" Value="28" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="CornerRadius" Value="14" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{ThemeResource SaTextSecondaryBrush}" />
+    </Style>
+</ResourceDictionary>

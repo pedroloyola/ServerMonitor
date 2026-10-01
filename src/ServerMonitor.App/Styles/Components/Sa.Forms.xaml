@@ -1,0 +1,755 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:primitives="using:ServerMonitor.App.Controls.Primitives">
+    <!-- UI.2 S4 form controls (Boss B-4), keyed styles on native WinUI controls so input, IME, selection,
+         keyboard and UI Automation stay WinUI's. TextBox / PasswordBox / CheckBox / ToggleSwitch / RadioButton use
+         Sa templates that keep the WinUI template part and visual-state names; ComboBox keeps the Fluent template
+         (it depends on the internal ComboBoxHelper) and is styled through properties plus the F-3 accent-neutral
+         scope for its states and popup. Rest / Error / Checked / On-Off / Selected are MEASURED; hover / pressed /
+         focus / disabled-input are DERIVED (B-4). Non-colour tokens and icon data are merged here (T-2). -->
+    <ResourceDictionary.MergedDictionaries>
+        <ResourceDictionary Source="ms-appx:///Styles/Tokens/Typography.xaml" />
+        <ResourceDictionary Source="ms-appx:///Styles/Tokens/Radius.xaml" />
+        <ResourceDictionary Source="ms-appx:///Styles/Tokens/Borders.xaml" />
+        <ResourceDictionary Source="ms-appx:///Styles/Tokens/Spacing.xaml" />
+        <ResourceDictionary Source="ms-appx:///Styles/Components/Sa.Icons.xaml" />
+        <ResourceDictionary Source="ms-appx:///Styles/Components/Sa.Surfaces.xaml" />
+    </ResourceDictionary.MergedDictionaries>
+
+    <!-- Pill radii are h/2 literals (Figma): a radius above h/2 (SaRadiusPill 99) renders ELLIPTICAL in WinUI. -->
+    <!-- ===== Text fields ===== -->
+    <ControlTemplate x:Key="SaTextFieldTemplate" TargetType="TextBox">
+        <Grid x:Name="RootGrid">
+            <VisualStateManager.VisualStateGroups>
+                <VisualStateGroup x:Name="CommonStates">
+                    <VisualState x:Name="Normal" />
+                    <!-- DERIVED: hover = SaHoverBrush veil over the fill. -->
+                    <VisualState x:Name="PointerOver">
+                        <VisualState.Setters>
+                            <Setter Target="HoverOverlay.Background" Value="{ThemeResource SaHoverBrush}" />
+                        </VisualState.Setters>
+                    </VisualState>
+                    <!-- DERIVED (no Figma focus node): 2px SaFocusRingBrush ring over the border, so an Error border survives. -->
+                    <VisualState x:Name="Focused">
+                        <VisualState.Setters>
+                            <Setter Target="FocusRing.Opacity" Value="1" />
+                        </VisualState.Setters>
+                    </VisualState>
+                    <VisualState x:Name="Disabled">
+                        <VisualState.Setters>
+                            <Setter Target="RootGrid.Opacity" Value="0.58" />
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+            </VisualStateManager.VisualStateGroups>
+            <Border x:Name="BorderElement"
+                    Background="{TemplateBinding Background}"
+                    BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="{TemplateBinding BorderThickness}"
+                    CornerRadius="{TemplateBinding CornerRadius}" />
+            <Border x:Name="HoverOverlay" CornerRadius="{TemplateBinding CornerRadius}" IsHitTestVisible="False" />
+            <Grid Padding="{TemplateBinding Padding}">
+                <ScrollViewer x:Name="ContentElement"
+                              VerticalAlignment="Center"
+                              HorizontalScrollMode="Disabled"
+                              HorizontalScrollBarVisibility="Hidden"
+                              VerticalScrollMode="Disabled"
+                              VerticalScrollBarVisibility="Disabled"
+                              ZoomMode="Disabled"
+                              IsTabStop="False"
+                              AutomationProperties.AccessibilityView="Raw" />
+                <ContentControl x:Name="PlaceholderTextContentPresenter"
+                                VerticalAlignment="Center"
+                                Content="{TemplateBinding PlaceholderText}"
+                                Foreground="{ThemeResource SaTextSecondaryBrush}"
+                                IsHitTestVisible="False"
+                                IsTabStop="False" />
+            </Grid>
+            <Border x:Name="FocusRing"
+                    CornerRadius="{TemplateBinding CornerRadius}"
+                    BorderBrush="{ThemeResource SaFocusRingBrush}"
+                    BorderThickness="{StaticResource SaFocusRingThickness}"
+                    Opacity="0"
+                    IsHitTestVisible="False" />
+        </Grid>
+    </ControlTemplate>
+    <ControlTemplate x:Key="SaPageSearchFieldTemplate" TargetType="TextBox">
+        <Grid x:Name="RootGrid">
+            <VisualStateManager.VisualStateGroups>
+                <VisualStateGroup x:Name="CommonStates">
+                    <VisualState x:Name="Normal" />
+                    <!-- DERIVED: hover = SaHoverBrush veil over the fill. -->
+                    <VisualState x:Name="PointerOver">
+                        <VisualState.Setters>
+                            <Setter Target="HoverOverlay.Background" Value="{ThemeResource SaHoverBrush}" />
+                        </VisualState.Setters>
+                    </VisualState>
+                    <!-- DERIVED (no Figma focus node): 2px SaFocusRingBrush ring over the border, so an Error border survives. -->
+                    <VisualState x:Name="Focused">
+                        <VisualState.Setters>
+                            <Setter Target="FocusRing.Opacity" Value="1" />
+                        </VisualState.Setters>
+                    </VisualState>
+                    <VisualState x:Name="Disabled">
+                        <VisualState.Setters>
+                            <Setter Target="RootGrid.Opacity" Value="0.58" />
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+            </VisualStateManager.VisualStateGroups>
+            <Border x:Name="BorderElement"
+                    Background="{TemplateBinding Background}"
+                    BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="{TemplateBinding BorderThickness}"
+                    CornerRadius="{TemplateBinding CornerRadius}" />
+            <Border x:Name="HoverOverlay" CornerRadius="{TemplateBinding CornerRadius}" IsHitTestVisible="False" />
+            <Grid Padding="{TemplateBinding Padding}"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                    <primitives:SaIcon Data="{StaticResource SaIconSearch01Data}" Size="18" Margin="0,0,10,0" VerticalAlignment="Center" Foreground="{ThemeResource SaTextSecondaryBrush}" />
+                <ScrollViewer x:Name="ContentElement" Grid.Column="1"
+                              VerticalAlignment="Center"
+                              HorizontalScrollMode="Disabled"
+                              HorizontalScrollBarVisibility="Hidden"
+                              VerticalScrollMode="Disabled"
+                              VerticalScrollBarVisibility="Disabled"
+                              ZoomMode="Disabled"
+                              IsTabStop="False"
+                              AutomationProperties.AccessibilityView="Raw" />
+                <ContentControl x:Name="PlaceholderTextContentPresenter" Grid.Column="1"
+                                VerticalAlignment="Center"
+                                Content="{TemplateBinding PlaceholderText}"
+                                Foreground="{ThemeResource SaTextSecondaryBrush}"
+                                IsHitTestVisible="False"
+                                IsTabStop="False" />
+            </Grid>
+            <Border x:Name="FocusRing"
+                    CornerRadius="{TemplateBinding CornerRadius}"
+                    BorderBrush="{ThemeResource SaFocusRingBrush}"
+                    BorderThickness="{StaticResource SaFocusRingThickness}"
+                    Opacity="0"
+                    IsHitTestVisible="False" />
+        </Grid>
+    </ControlTemplate>
+    <ControlTemplate x:Key="SaPillSearchFieldTemplate" TargetType="TextBox">
+        <Grid x:Name="RootGrid">
+            <VisualStateManager.VisualStateGroups>
+                <VisualStateGroup x:Name="CommonStates">
+                    <VisualState x:Name="Normal" />
+                    <!-- DERIVED: hover = SaHoverBrush veil over the fill. -->
+                    <VisualState x:Name="PointerOver">
+                        <VisualState.Setters>
+                            <Setter Target="HoverOverlay.Background" Value="{ThemeResource SaHoverBrush}" />
+                        </VisualState.Setters>
+                    </VisualState>
+                    <!-- DERIVED (no Figma focus node): 2px SaFocusRingBrush ring over the border, so an Error border survives. -->
+                    <VisualState x:Name="Focused">
+                        <VisualState.Setters>
+                            <Setter Target="FocusRing.Opacity" Value="1" />
+                        </VisualState.Setters>
+                    </VisualState>
+                    <VisualState x:Name="Disabled">
+                        <VisualState.Setters>
+                            <Setter Target="RootGrid.Opacity" Value="0.58" />
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+            </VisualStateManager.VisualStateGroups>
+            <Border x:Name="BorderElement"
+                    Background="{TemplateBinding Background}"
+                    BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="{TemplateBinding BorderThickness}"
+                    CornerRadius="{TemplateBinding CornerRadius}" />
+            <Border x:Name="HoverOverlay" CornerRadius="{TemplateBinding CornerRadius}" IsHitTestVisible="False" />
+            <Grid Padding="{TemplateBinding Padding}"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                    <primitives:SaIcon Data="{StaticResource SaIconSearch01Data}" Size="17" Margin="0,0,8,0" VerticalAlignment="Center" Foreground="{ThemeResource SaTextSecondaryBrush}" />
+                <ScrollViewer x:Name="ContentElement" Grid.Column="1"
+                              VerticalAlignment="Center"
+                              HorizontalScrollMode="Disabled"
+                              HorizontalScrollBarVisibility="Hidden"
+                              VerticalScrollMode="Disabled"
+                              VerticalScrollBarVisibility="Disabled"
+                              ZoomMode="Disabled"
+                              IsTabStop="False"
+                              AutomationProperties.AccessibilityView="Raw" />
+                <ContentControl x:Name="PlaceholderTextContentPresenter" Grid.Column="1"
+                                VerticalAlignment="Center"
+                                Content="{TemplateBinding PlaceholderText}"
+                                Foreground="{ThemeResource SaTextSecondaryBrush}"
+                                IsHitTestVisible="False"
+                                IsTabStop="False" />
+            </Grid>
+            <Border x:Name="FocusRing"
+                    CornerRadius="{TemplateBinding CornerRadius}"
+                    BorderBrush="{ThemeResource SaFocusRingBrush}"
+                    BorderThickness="{StaticResource SaFocusRingThickness}"
+                    Opacity="0"
+                    IsHitTestVisible="False" />
+        </Grid>
+    </ControlTemplate>
+    <ControlTemplate x:Key="SaPasswordBoxTemplate" TargetType="PasswordBox">
+        <Grid x:Name="RootGrid">
+            <VisualStateManager.VisualStateGroups>
+                <VisualStateGroup x:Name="CommonStates">
+                    <VisualState x:Name="Normal" />
+                    <!-- DERIVED: hover = SaHoverBrush veil over the fill. -->
+                    <VisualState x:Name="PointerOver">
+                        <VisualState.Setters>
+                            <Setter Target="HoverOverlay.Background" Value="{ThemeResource SaHoverBrush}" />
+                        </VisualState.Setters>
+                    </VisualState>
+                    <!-- DERIVED (no Figma focus node): 2px SaFocusRingBrush ring over the border, so an Error border survives. -->
+                    <VisualState x:Name="Focused">
+                        <VisualState.Setters>
+                            <Setter Target="FocusRing.Opacity" Value="1" />
+                        </VisualState.Setters>
+                    </VisualState>
+                    <VisualState x:Name="Disabled">
+                        <VisualState.Setters>
+                            <Setter Target="RootGrid.Opacity" Value="0.58" />
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+            </VisualStateManager.VisualStateGroups>
+            <Border x:Name="BorderElement"
+                    Background="{TemplateBinding Background}"
+                    BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="{TemplateBinding BorderThickness}"
+                    CornerRadius="{TemplateBinding CornerRadius}" />
+            <Border x:Name="HoverOverlay" CornerRadius="{TemplateBinding CornerRadius}" IsHitTestVisible="False" />
+            <Grid Padding="{TemplateBinding Padding}">
+                <ScrollViewer x:Name="ContentElement"
+                              VerticalAlignment="Center"
+                              HorizontalScrollMode="Disabled"
+                              HorizontalScrollBarVisibility="Hidden"
+                              VerticalScrollMode="Disabled"
+                              VerticalScrollBarVisibility="Disabled"
+                              ZoomMode="Disabled"
+                              IsTabStop="False"
+                              AutomationProperties.AccessibilityView="Raw" />
+                <ContentControl x:Name="PlaceholderTextContentPresenter"
+                                VerticalAlignment="Center"
+                                Content="{TemplateBinding PlaceholderText}"
+                                Foreground="{ThemeResource SaTextSecondaryBrush}"
+                                IsHitTestVisible="False"
+                                IsTabStop="False" />
+            </Grid>
+            <Border x:Name="FocusRing"
+                    CornerRadius="{TemplateBinding CornerRadius}"
+                    BorderBrush="{ThemeResource SaFocusRingBrush}"
+                    BorderThickness="{StaticResource SaFocusRingThickness}"
+                    Opacity="0"
+                    IsHitTestVisible="False" />
+        </Grid>
+    </ControlTemplate>
+
+    <!-- TextField 112:3337 / 112:3498: h40, radius 12, pad-x 14, input fill .65/.34, 1px subtle border, 13 Regular.
+         Placeholder uses SaTextSecondaryBrush (a11y deviation from Figma #808080/#7A7A7A, Boss B-2). -->
+    <Style x:Key="SaTextFieldStyle" TargetType="TextBox">
+        <Setter Property="Template" Value="{StaticResource SaTextFieldTemplate}" />
+        <Setter Property="Height" Value="40" />
+        <Setter Property="Padding" Value="14,0" />
+        <Setter Property="CornerRadius" Value="{StaticResource SaRadiusControl}" />
+        <Setter Property="Background" Value="{ThemeResource SaInputFillBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource SaBorderSubtleBrush}" />
+        <Setter Property="BorderThickness" Value="{StaticResource SaBorderThickness}" />
+        <Setter Property="Foreground" Value="{ThemeResource SaTextBrush}" />
+        <Setter Property="FontFamily" Value="{StaticResource SaFontText}" />
+        <Setter Property="FontSize" Value="{StaticResource SaFontSizeControl}" />
+        <Setter Property="FontWeight" Value="Normal" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <!-- Error 112:16924 / 112:17088: border 1.5 in the danger variable (= SaErrorBrush); the message is SaFormField's. -->
+    <Style x:Key="SaTextFieldErrorStyle" TargetType="TextBox" BasedOn="{StaticResource SaTextFieldStyle}">
+        <Setter Property="BorderBrush" Value="{ThemeResource SaErrorBrush}" />
+        <Setter Property="BorderThickness" Value="{StaticResource SaErrorBorderThickness}" />
+    </Style>
+    <!-- SearchField Page 112:1429 / 112:1611: h44, radius 14, pad-L 16, gap 10, search fill, no border, icon 18. -->
+    <Style x:Key="SaPageSearchFieldStyle" TargetType="TextBox" BasedOn="{StaticResource SaTextFieldStyle}">
+        <Setter Property="Template" Value="{StaticResource SaPageSearchFieldTemplate}" />
+        <Setter Property="Height" Value="44" />
+        <Setter Property="Padding" Value="16,0,14,0" />
+        <Setter Property="CornerRadius" Value="{StaticResource SaRadiusRect}" />
+        <Setter Property="Background" Value="{ThemeResource SaSearchFillBrush}" />
+        <Setter Property="BorderThickness" Value="0" />
+    </Style>
+    <!-- SearchField Pill 112:1051 / 112:1263: h38, radius h/2, pad-L 12, gap 8, Secondary fill, icon 17, 12 text. -->
+    <Style x:Key="SaPillSearchFieldStyle" TargetType="TextBox" BasedOn="{StaticResource SaTextFieldStyle}">
+        <Setter Property="Template" Value="{StaticResource SaPillSearchFieldTemplate}" />
+        <Setter Property="Height" Value="38" />
+        <Setter Property="Padding" Value="12,0,14,0" />
+        <Setter Property="CornerRadius" Value="19" />
+        <Setter Property="Background" Value="{ThemeResource SaSecondaryFillBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource SaSecondaryBorderBrush}" />
+        <Setter Property="BorderThickness" Value="{ThemeResource SaSecondaryBorderThickness}" />
+        <Setter Property="FontSize" Value="{StaticResource SaFontSizeCaption}" />
+    </Style>
+    <!-- PasswordBox inside SaPasswordField 112:3693: TextField metrics + room on the right for the eye (17, 15 from the edge). -->
+    <Style x:Key="SaPasswordBoxStyle" TargetType="PasswordBox">
+        <Setter Property="Template" Value="{StaticResource SaPasswordBoxTemplate}" />
+        <Setter Property="Height" Value="40" />
+        <Setter Property="Padding" Value="14,0,44,0" />
+        <Setter Property="CornerRadius" Value="{StaticResource SaRadiusControl}" />
+        <Setter Property="Background" Value="{ThemeResource SaInputFillBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource SaBorderSubtleBrush}" />
+        <Setter Property="BorderThickness" Value="{StaticResource SaBorderThickness}" />
+        <Setter Property="Foreground" Value="{ThemeResource SaTextBrush}" />
+        <Setter Property="FontFamily" Value="{StaticResource SaFontText}" />
+        <Setter Property="FontSize" Value="{StaticResource SaFontSizeControl}" />
+        <Setter Property="PasswordRevealMode" Value="Hidden" />
+    </Style>
+    <!-- Eye toggle of SaPasswordField: 28x28, no fill, muted icon; checked (revealed) = text colour. DERIVED states. -->
+    <Style x:Key="SaRevealToggleStyle" TargetType="ToggleButton">
+        <Setter Property="Width" Value="28" />
+        <Setter Property="Height" Value="28" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="CornerRadius" Value="14" />
+        <Setter Property="Foreground" Value="{ThemeResource SaTextSecondaryBrush}" />
+        <Setter Property="UseSystemFocusVisuals" Value="True" />
+        <Setter Property="FocusVisualPrimaryBrush" Value="{ThemeResource SaFocusRingBrush}" />
+        <Setter Property="FocusVisualPrimaryThickness" Value="{StaticResource SaFocusRingThickness}" />
+        <Setter Property="FocusVisualSecondaryThickness" Value="0" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <Grid x:Name="RootGrid" Background="Transparent" CornerRadius="{TemplateBinding CornerRadius}">
+                        <VisualStateManager.VisualStateGroups>
+                            <VisualStateGroup x:Name="CommonStates">
+                                <VisualState x:Name="Normal" />
+                                <VisualState x:Name="PointerOver">
+                                    <VisualState.Setters>
+                                        <Setter Target="RootGrid.Background" Value="{ThemeResource SaHoverBrush}" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Pressed">
+                                    <VisualState.Setters>
+                                        <Setter Target="RootGrid.Background" Value="{ThemeResource SaSelectedBrush}" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Disabled">
+                                    <VisualState.Setters>
+                                        <Setter Target="RootGrid.Opacity" Value="0.58" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Checked">
+                                    <VisualState.Setters>
+                                        <Setter Target="ContentPresenter.Foreground" Value="{ThemeResource SaTextBrush}" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="CheckedPointerOver">
+                                    <VisualState.Setters>
+                                        <Setter Target="RootGrid.Background" Value="{ThemeResource SaHoverBrush}" />
+                                        <Setter Target="ContentPresenter.Foreground" Value="{ThemeResource SaTextBrush}" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="CheckedPressed">
+                                    <VisualState.Setters>
+                                        <Setter Target="RootGrid.Background" Value="{ThemeResource SaSelectedBrush}" />
+                                        <Setter Target="ContentPresenter.Foreground" Value="{ThemeResource SaTextBrush}" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="CheckedDisabled">
+                                    <VisualState.Setters>
+                                        <Setter Target="RootGrid.Opacity" Value="0.58" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                            </VisualStateGroup>
+                        </VisualStateManager.VisualStateGroups>
+                        <ContentPresenter x:Name="ContentPresenter"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"
+                                          Content="{TemplateBinding Content}"
+                                          Foreground="{TemplateBinding Foreground}"
+                                          AutomationProperties.AccessibilityView="Raw" />
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ===== Selectors (ComboBox, Fluent template) =====
+         Field 112:3388 / 112:3549: = TextField (h40 r12 input fill + subtle border), value 13 Regular.
+         Pill 112:7944 / 112:8105: h36 radius h/2, Secondary fill, value 12. The chevron stays the Fluent glyph
+         (ACCEPTABLE, Prism §3.3 E70D) - the Hugeicons ArrowDown01 would need a copy of the internal-dependent
+         ComboBox template; recorded as a deviation. Hover/pressed/focus/popup colours come from the F-3 scope. -->
+    <Style x:Key="SaSelectorFieldStyle" TargetType="ComboBox">
+        <Setter Property="Height" Value="40" />
+        <Setter Property="MinWidth" Value="200" />
+        <Setter Property="Padding" Value="14,0,0,0" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="CornerRadius" Value="{StaticResource SaRadiusControl}" />
+        <Setter Property="Background" Value="{ThemeResource SaInputFillBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource SaBorderSubtleBrush}" />
+        <Setter Property="BorderThickness" Value="{StaticResource SaBorderThickness}" />
+        <Setter Property="Foreground" Value="{ThemeResource SaTextBrush}" />
+        <Setter Property="FontFamily" Value="{StaticResource SaFontText}" />
+        <Setter Property="FontSize" Value="{StaticResource SaFontSizeControl}" />
+    </Style>
+    <Style x:Key="SaSelectorPillStyle" TargetType="ComboBox" BasedOn="{StaticResource SaSelectorFieldStyle}">
+        <Setter Property="Height" Value="36" />
+        <Setter Property="CornerRadius" Value="18" />
+        <Setter Property="Background" Value="{ThemeResource SaSecondaryFillBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource SaSecondaryBorderBrush}" />
+        <Setter Property="BorderThickness" Value="{ThemeResource SaSecondaryBorderThickness}" />
+        <Setter Property="FontSize" Value="{StaticResource SaFontSizeCaption}" />
+    </Style>
+
+    <!-- ===== CheckBox 155:240 / 159:394: box 15x15 radius 4; unchecked 1px neutral border, no fill; checked fill =
+         text colour + tick 11 in the input fill colour (exactly the Figma rgba(36,36,36,.65) / rgba(255,255,255,.34)
+         glyph); label 13 Regular muted, gap 8. Indeterminate is DERIVED (a bar). WinUI's CombinedStates names. ===== -->
+    <Style x:Key="SaCheckBoxStyle" TargetType="CheckBox">
+        <Setter Property="Foreground" Value="{ThemeResource SaTextSecondaryBrush}" />
+        <Setter Property="FontFamily" Value="{StaticResource SaFontText}" />
+        <Setter Property="FontSize" Value="{StaticResource SaFontSizeControl}" />
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="MinHeight" Value="20" />
+        <Setter Property="UseSystemFocusVisuals" Value="True" />
+        <Setter Property="FocusVisualPrimaryBrush" Value="{ThemeResource SaFocusRingBrush}" />
+        <Setter Property="FocusVisualPrimaryThickness" Value="{StaticResource SaFocusRingThickness}" />
+        <Setter Property="FocusVisualSecondaryThickness" Value="0" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="CheckBox">
+                    <Grid x:Name="RootGrid" Background="Transparent" ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <VisualStateManager.VisualStateGroups>
+                            <VisualStateGroup x:Name="CombinedStates">
+                                <VisualState x:Name="UncheckedNormal" />
+                                <VisualState x:Name="UncheckedPointerOver">
+                                    <VisualState.Setters>
+                                        <Setter Target="Box.Background" Value="{ThemeResource SaHoverBrush}" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="UncheckedPressed">
+                                    <VisualState.Setters>
+                                        <Setter Target="Box.Background" Value="{ThemeResource SaSelectedBrush}" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="UncheckedDisabled">
+                                    <VisualState.Setters>
+                                        <Setter Target="RootGrid.Opacity" Value="0.58" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="CheckedNormal">
+                                    <VisualState.Setters>
+                                        <Setter Target="Box.Background" Value="{ThemeResource SaTextBrush}" />
+                                        <Setter Target="Box.BorderBrush" Value="{ThemeResource SaTextBrush}" />
+                                        <Setter Target="CheckGlyph.Opacity" Value="1" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="CheckedPointerOver">
+                                    <VisualState.Setters>
+                                        <Setter Target="Box.Background" Value="{ThemeResource SaTextBrush}" />
+                                        <Setter Target="Box.BorderBrush" Value="{ThemeResource SaTextBrush}" />
+                                        <Setter Target="CheckGlyph.Opacity" Value="1" />
+                                        <Setter Target="Box.Opacity" Value="0.86" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="CheckedPressed">
+                                    <VisualState.Setters>
+                                        <Setter Target="Box.Background" Value="{ThemeResource SaTextBrush}" />
+                                        <Setter Target="Box.BorderBrush" Value="{ThemeResource SaTextBrush}" />
+                                        <Setter Target="CheckGlyph.Opacity" Value="1" />
+                                        <Setter Target="Box.Opacity" Value="0.72" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="CheckedDisabled">
+                                    <VisualState.Setters>
+                                        <Setter Target="Box.Background" Value="{ThemeResource SaTextBrush}" />
+                                        <Setter Target="Box.BorderBrush" Value="{ThemeResource SaTextBrush}" />
+                                        <Setter Target="CheckGlyph.Opacity" Value="1" />
+                                        <Setter Target="RootGrid.Opacity" Value="0.58" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="IndeterminateNormal">
+                                    <VisualState.Setters>
+                                        <Setter Target="IndeterminateGlyph.Opacity" Value="1" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="IndeterminatePointerOver">
+                                    <VisualState.Setters>
+                                        <Setter Target="IndeterminateGlyph.Opacity" Value="1" />
+                                        <Setter Target="Box.Background" Value="{ThemeResource SaHoverBrush}" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="IndeterminatePressed">
+                                    <VisualState.Setters>
+                                        <Setter Target="IndeterminateGlyph.Opacity" Value="1" />
+                                        <Setter Target="Box.Background" Value="{ThemeResource SaSelectedBrush}" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="IndeterminateDisabled">
+                                    <VisualState.Setters>
+                                        <Setter Target="IndeterminateGlyph.Opacity" Value="1" />
+                                        <Setter Target="RootGrid.Opacity" Value="0.58" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                            </VisualStateGroup>
+                        </VisualStateManager.VisualStateGroups>
+                        <Grid Width="15" Height="15" VerticalAlignment="Center">
+                            <Border x:Name="Box"
+                                    CornerRadius="{StaticResource SaRadiusSmall}"
+                                    BorderThickness="{StaticResource SaBorderThickness}"
+                                    BorderBrush="{ThemeResource SaBorderNeutralBrush}" />
+                            <primitives:SaIcon x:Name="CheckGlyph" Data="{StaticResource SaIconTick02Data}" Size="11" Opacity="0"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                                               Foreground="{ThemeResource SaInputFillBrush}" />
+                            <Rectangle x:Name="IndeterminateGlyph" Width="7" Height="1.5" Opacity="0"
+                                       Fill="{ThemeResource SaTextBrush}" />
+                        </Grid>
+                        <ContentPresenter x:Name="ContentPresenter"
+                                          Grid.Column="1"
+                                          VerticalAlignment="Center"
+                                          Content="{TemplateBinding Content}"
+                                          ContentTemplate="{TemplateBinding ContentTemplate}"
+                                          Foreground="{TemplateBinding Foreground}"
+                                          FontFamily="{TemplateBinding FontFamily}"
+                                          FontSize="{TemplateBinding FontSize}"
+                                          TextWrapping="Wrap" />
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ===== ToggleSwitch 112:7956 / 112:7982: track 44x26 radius 13, thumb 22 #FCFCFC (margin 2), On = SaToggleOnTrackBrush
+         (Boss B-2: SaHealthy colour in Dark/Light; R1 Cortex R-3: Highlight in HC, Off = WindowText - GrayText is disabled-only), Off = SaToggleOffTrackBrush. Thumb shadow not reproduced. WinUI part names kept (SwitchKnobBounds,
+         SwitchKnob, KnobTranslateTransform, SwitchThumb, OuterBorder) so tap, drag and keyboard behave natively. The
+         setting row (label 14 Medium + description 12) is the consumer's. ===== -->
+    <Style x:Key="SaToggleSwitchStyle" TargetType="ToggleSwitch">
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="ManipulationMode" Value="System,TranslateX" />
+        <Setter Property="UseSystemFocusVisuals" Value="True" />
+        <Setter Property="FocusVisualPrimaryBrush" Value="{ThemeResource SaFocusRingBrush}" />
+        <Setter Property="FocusVisualPrimaryThickness" Value="{StaticResource SaFocusRingThickness}" />
+        <Setter Property="FocusVisualSecondaryThickness" Value="0" />
+        <Setter Property="FocusVisualMargin" Value="-3" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleSwitch">
+                    <Grid x:Name="RootGrid" Background="Transparent">
+                        <VisualStateManager.VisualStateGroups>
+                            <VisualStateGroup x:Name="CommonStates">
+                                <VisualState x:Name="Normal" />
+                                <VisualState x:Name="PointerOver">
+                                    <VisualState.Setters>
+                                        <Setter Target="SwitchAreaGrid.Background" Value="{ThemeResource SaHoverBrush}" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Pressed">
+                                    <VisualState.Setters>
+                                        <Setter Target="SwitchAreaGrid.Background" Value="{ThemeResource SaSelectedBrush}" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Disabled">
+                                    <VisualState.Setters>
+                                        <Setter Target="RootGrid.Opacity" Value="0.58" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                            </VisualStateGroup>
+                            <VisualStateGroup x:Name="ToggleStates">
+                                <VisualState x:Name="Dragging" />
+                                <VisualState x:Name="Off" />
+                                <VisualState x:Name="On">
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="KnobTranslateTransform" Storyboard.TargetProperty="X" To="18" Duration="0" />
+                                        <DoubleAnimation Storyboard.TargetName="SwitchKnobBounds" Storyboard.TargetProperty="Opacity" To="1" Duration="0" />
+                                    </Storyboard>
+                                </VisualState>
+                            </VisualStateGroup>
+                            <VisualStateGroup x:Name="ContentStates">
+                                <VisualState x:Name="OffContent" />
+                                <VisualState x:Name="OnContent" />
+                            </VisualStateGroup>
+                        </VisualStateManager.VisualStateGroups>
+                        <Grid x:Name="SwitchAreaGrid" Width="52" Height="34" CornerRadius="17"
+                              Background="Transparent" Control.IsTemplateFocusTarget="True" HorizontalAlignment="Left">
+                            <Rectangle x:Name="OuterBorder" Width="44" Height="26" RadiusX="13" RadiusY="13"
+                                       Fill="{ThemeResource SaToggleOffTrackBrush}" />
+                            <Rectangle x:Name="SwitchKnobBounds" Width="44" Height="26" RadiusX="13" RadiusY="13" Opacity="0"
+                                       Fill="{ThemeResource SaToggleOnTrackBrush}" />
+                            <Grid x:Name="SwitchKnob" Width="26" Height="26" Margin="4,0,0,0" HorizontalAlignment="Left">
+                                <Ellipse x:Name="SwitchKnobOff" Width="22" Height="22" Fill="{ThemeResource SaToggleThumbBrush}" />
+                                <Grid.RenderTransform>
+                                    <TranslateTransform x:Name="KnobTranslateTransform" />
+                                </Grid.RenderTransform>
+                            </Grid>
+                            <Thumb x:Name="SwitchThumb" AutomationProperties.AccessibilityView="Raw">
+                                <Thumb.Template>
+                                    <ControlTemplate TargetType="Thumb">
+                                        <Rectangle Fill="Transparent" />
+                                    </ControlTemplate>
+                                </Thumb.Template>
+                            </Thumb>
+                        </Grid>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ===== SegmentedControl: RadioButton styles + track host styles (native group semantics / SelectionItem). ===== -->
+    <!-- Rect track 112:2634 / 112:2850: h44 radius 14 pad 4 gap 4 (consumer StackPanel Spacing 4). -->
+    <Style x:Key="SaSegmentedRectTrackStyle" TargetType="Border">
+        <Setter Property="Height" Value="44" />
+        <Setter Property="Padding" Value="4" />
+        <Setter Property="CornerRadius" Value="{StaticResource SaRadiusRect}" />
+        <Setter Property="Background" Value="{ThemeResource SaSegmentedTrackBrush}" />
+        <Setter Property="HorizontalAlignment" Value="Left" />
+    </Style>
+    <!-- Pill track 112:3356 / 112:3517: h42 radius h/2 pad 4 gap 4. -->
+    <Style x:Key="SaSegmentedPillTrackStyle" TargetType="Border">
+        <Setter Property="Height" Value="42" />
+        <Setter Property="Padding" Value="4" />
+        <Setter Property="CornerRadius" Value="21" />
+        <Setter Property="Background" Value="{ThemeResource SaSegmentedPillTrackBrush}" />
+        <Setter Property="HorizontalAlignment" Value="Left" />
+    </Style>
+    <!-- Rect segment 112:2634: h36 radius 11; selected = Secondary fill + highlight, 13 Medium text; unselected no fill, 13 Regular muted. -->
+    <Style x:Key="SaSegmentedRectItemStyle" TargetType="RadioButton">
+        <Setter Property="Height" Value="36" />
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="Padding" Value="16,0" />
+        <Setter Property="CornerRadius" Value="{StaticResource SaRadiusSegment}" />
+        <Setter Property="FontFamily" Value="{StaticResource SaFontText}" />
+        <Setter Property="FontSize" Value="{StaticResource SaFontSizeControl}" />
+        <Setter Property="FontWeight" Value="Normal" />
+        <Setter Property="Foreground" Value="{ThemeResource SaTextSecondaryBrush}" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="UseSystemFocusVisuals" Value="True" />
+        <Setter Property="FocusVisualPrimaryBrush" Value="{ThemeResource SaFocusRingBrush}" />
+        <Setter Property="FocusVisualPrimaryThickness" Value="{StaticResource SaFocusRingThickness}" />
+        <Setter Property="FocusVisualSecondaryThickness" Value="0" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RadioButton">
+                    <Grid x:Name="RootGrid" Background="Transparent">
+                        <VisualStateManager.VisualStateGroups>
+                            <VisualStateGroup x:Name="CommonStates">
+                                <VisualState x:Name="Normal" />
+                                <VisualState x:Name="PointerOver">
+                                    <VisualState.Setters>
+                                        <Setter Target="StateOverlay.Background" Value="{ThemeResource SaHoverBrush}" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Pressed">
+                                    <VisualState.Setters>
+                                        <!-- R1 (Beacon F-5): pressed = overlay only (one step above hover), no content opacity. -->
+                                        <Setter Target="StateOverlay.Background" Value="{ThemeResource SaSelectedBrush}" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Disabled">
+                                    <VisualState.Setters>
+                                        <Setter Target="RootGrid.Opacity" Value="0.58" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                            </VisualStateGroup>
+                            <VisualStateGroup x:Name="CheckStates">
+                                <VisualState x:Name="Unchecked" />
+                                <VisualState x:Name="Indeterminate" />
+                                <VisualState x:Name="Checked">
+                                    <VisualState.Setters>
+                                        <Setter Target="Shell.Background" Value="{ThemeResource SaSelectedBrush}" />
+                                        <Setter Target="ContentPresenter.Foreground" Value="{ThemeResource SaSelectedTextBrush}" />
+                                        <Setter Target="ContentPresenter.FontWeight" Value="Medium" />
+                            <Setter Target="Highlight.Opacity" Value="1" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                            </VisualStateGroup>
+                        </VisualStateManager.VisualStateGroups>
+                        <Border x:Name="Shell" Background="{TemplateBinding Background}" CornerRadius="{TemplateBinding CornerRadius}" />
+            <Border x:Name="Highlight" Opacity="0" CornerRadius="{TemplateBinding CornerRadius}" BorderThickness="0,1,0,0"
+                    BorderBrush="{ThemeResource SaGlassHighlightBrush}" IsHitTestVisible="False" />
+                        <Border x:Name="StateOverlay" CornerRadius="{TemplateBinding CornerRadius}" IsHitTestVisible="False" />
+                        <ContentPresenter x:Name="ContentPresenter"
+                                          Padding="{TemplateBinding Padding}"
+                                          HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                                          Content="{TemplateBinding Content}"
+                                          ContentTemplate="{TemplateBinding ContentTemplate}"
+                                          FontFamily="{TemplateBinding FontFamily}"
+                                          FontSize="{TemplateBinding FontSize}"
+                                          FontWeight="{TemplateBinding FontWeight}"
+                                          Foreground="{TemplateBinding Foreground}"
+                                          AutomationProperties.AccessibilityView="Raw" />
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+    <!-- Pill segment 112:3356: h34 radius h/2; selected rgba(107,107,107,.45)/rgba(255,255,255,.75), 12 Medium; unselected 12 Medium muted; icon 16 gap 7 in content. -->
+    <Style x:Key="SaSegmentedPillItemStyle" TargetType="RadioButton">
+        <Setter Property="Height" Value="34" />
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="Padding" Value="16,0" />
+        <Setter Property="CornerRadius" Value="17" />
+        <Setter Property="FontFamily" Value="{StaticResource SaFontText}" />
+        <Setter Property="FontSize" Value="{StaticResource SaFontSizeCaption}" />
+        <Setter Property="FontWeight" Value="Medium" />
+        <Setter Property="Foreground" Value="{ThemeResource SaTextSecondaryBrush}" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="UseSystemFocusVisuals" Value="True" />
+        <Setter Property="FocusVisualPrimaryBrush" Value="{ThemeResource SaFocusRingBrush}" />
+        <Setter Property="FocusVisualPrimaryThickness" Value="{StaticResource SaFocusRingThickness}" />
+        <Setter Property="FocusVisualSecondaryThickness" Value="0" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RadioButton">
+                    <Grid x:Name="RootGrid" Background="Transparent">
+                        <VisualStateManager.VisualStateGroups>
+                            <VisualStateGroup x:Name="CommonStates">
+                                <VisualState x:Name="Normal" />
+                                <VisualState x:Name="PointerOver">
+                                    <VisualState.Setters>
+                                        <Setter Target="StateOverlay.Background" Value="{ThemeResource SaHoverBrush}" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Pressed">
+                                    <VisualState.Setters>
+                                        <!-- R1 (Beacon F-5): pressed = overlay only (one step above hover), no content opacity. -->
+                                        <Setter Target="StateOverlay.Background" Value="{ThemeResource SaSelectedBrush}" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Disabled">
+                                    <VisualState.Setters>
+                                        <Setter Target="RootGrid.Opacity" Value="0.58" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                            </VisualStateGroup>
+                            <VisualStateGroup x:Name="CheckStates">
+                                <VisualState x:Name="Unchecked" />
+                                <VisualState x:Name="Indeterminate" />
+                                <VisualState x:Name="Checked">
+                                    <VisualState.Setters>
+                                        <Setter Target="Shell.Background" Value="{ThemeResource SaSegmentedPillSelectedBrush}" />
+                                        <Setter Target="ContentPresenter.Foreground" Value="{ThemeResource SaSelectedTextBrush}" />
+                                        <Setter Target="ContentPresenter.FontWeight" Value="Medium" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                            </VisualStateGroup>
+                        </VisualStateManager.VisualStateGroups>
+                        <Border x:Name="Shell" Background="{TemplateBinding Background}" CornerRadius="{TemplateBinding CornerRadius}" />
+                        <Border x:Name="StateOverlay" CornerRadius="{TemplateBinding CornerRadius}" IsHitTestVisible="False" />
+                        <ContentPresenter x:Name="ContentPresenter"
+                                          Padding="{TemplateBinding Padding}"
+                                          HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                                          Content="{TemplateBinding Content}"
+                                          ContentTemplate="{TemplateBinding ContentTemplate}"
+                                          FontFamily="{TemplateBinding FontFamily}"
+                                          FontSize="{TemplateBinding FontSize}"
+                                          FontWeight="{TemplateBinding FontWeight}"
+                                          Foreground="{TemplateBinding Foreground}"
+                                          AutomationProperties.AccessibilityView="Raw" />
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+</ResourceDictionary>
