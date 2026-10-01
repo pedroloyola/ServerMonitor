@@ -72,9 +72,10 @@
          surface (deliberate deviation from 112:1468, a11y over Figma). -->
     <Color x:Key="SaColorAttentionTextDark">#FFB866</Color>
     <Color x:Key="SaColorAttentionTextLight">#8F5318</Color>
-    <!-- destructive text 112:8576 D / 112:8762 L -->
+    <!-- destructive text 112:8576 D / 112:8762 L. R1 (Boss): Light darkened from the Figma #AD4038 (4.38:1 on glass over
+         the darkest reference wallpaper) to #A83E36 - >= 4.5:1 on every Light surface (deliberate deviation, a11y over Figma). -->
     <Color x:Key="SaColorDangerTextDark">#FF9187</Color>
-    <Color x:Key="SaColorDangerTextLight">#AD4038</Color>
+    <Color x:Key="SaColorDangerTextLight">#A83E36</Color>
     <!-- destructive fill .12 D / .07 L, 112:8575 / 112:8761 -->
     <Color x:Key="SaColorDangerFillDark">#1FFF9187</Color>
     <Color x:Key="SaColorDangerFillLight">#12AD4038</Color>
