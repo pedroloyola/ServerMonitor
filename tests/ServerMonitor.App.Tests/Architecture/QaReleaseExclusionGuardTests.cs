@@ -72,7 +72,8 @@ public sealed partial class QaReleaseExclusionGuardTests
     [Fact]
     public void BuiltAssemblyCarriesQaTypesOnlyInDebug()
     {
-        var qaTypes = typeof(App).Assembly.GetTypes().Where(t => t.Namespace == QaNamespace).ToList();
+        // Prefix, not equality: Qa.Gallery (UI.2) is a Qa namespace too (Vigil info i).
+        var qaTypes = typeof(App).Assembly.GetTypes().Where(t => t.Namespace?.StartsWith(QaNamespace, StringComparison.Ordinal) == true).ToList();
 #if DEBUG
         Assert.NotEmpty(qaTypes);
 #else

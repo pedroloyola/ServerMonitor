@@ -118,6 +118,12 @@ public static class QaGalleryPolicy
             return Refuse($"{OutputFlag} needs a directory.");
         }
 
+        // Vigil low: only plain drive-rooted folders. UNC and device-path prefixes (two leading separators) alias local paths past the prefix check.
+        if (outputGiven && (output!.StartsWith(@"\\", StringComparison.Ordinal) || output.StartsWith("//", StringComparison.Ordinal)))
+        {
+            return Refuse($"{OutputFlag} must be a plain drive-rooted folder, not a UNC or device path: {output}");
+        }
+
         string outputDirectory;
         try
         {

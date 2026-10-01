@@ -110,8 +110,17 @@ internal sealed class QaTokenSelfCheck(QaGalleryWindow window)
         await SettleAsync();
         results.AddRange(CheckIconData());
         results.Add(await CheckIconStrokeAsync(page.StrokeProbe16));
+        results.Add(await CheckIconStrokeAsync(page.StrokeProbe20));
         results.Add(await CheckIconStrokeAsync(page.StrokeProbe24));
         results.Add(await CheckIconStrokeAsync(page.StrokeProbe48));
+
+        // Vigil F-2: the gallery never built the application host (no services, tray, notifications, engine, stores).
+        results.Add(CheckGalleryIsolation());
+
+        // Vigil F-3: icon-only parts carry the name their control APPLIES (not just the XAML that sets the DP).
+        results.Add(CheckPartName("SaPasswordField eye (PART_RevealButton)", page.RevealNameProbe, "PART_RevealButton", page.RevealNameProbe.RevealButtonAutomationName));
+        results.Add(CheckPartName("SaToast close (PART_CloseButton)", page.ToastNameProbe, "PART_CloseButton", page.ToastNameProbe.CloseButtonAutomationName));
+        results.Add(CheckName("SaIconButtonStyle button", page.IconButtonNameProbe, "Atualizar tudo"));
 
         // F-4: the C# accessor parses every motion token straight from the live Application.Resources.
         results.AddRange(MotionTokens.TimeKeys.Select(key => CheckMotion(key, () => MotionTokens.GetTime(Application.Current.Resources, key).ToString("c", CultureInfo.InvariantCulture))));
@@ -299,6 +308,30 @@ internal sealed class QaTokenSelfCheck(QaGalleryWindow window)
         {
             return new QaTokenResult("Icons", key, "IconStroke", "1.5 DIP", "<exception>", "FAIL", exception.Message);
         }
+    }
+
+    private static QaTokenResult CheckGalleryIsolation()
+    {
+        // Tray, notification registration, engine and every store are hosted services or container singletons: none can
+        // exist without the host, and the host is built only on the production path the gallery short-circuits.
+        var built = App.ServicesHost is not null;
+        return new QaTokenResult("Isolation", "application host", "Gallery", "null (host never built)",
+            built ? "BUILT" : "null", built ? "FAIL" : "PASS", "gallery short-circuit before Host.CreateDefaultBuilder (Vigil F-2)");
+    }
+
+    private static QaTokenResult CheckPartName(string key, FrameworkElement owner, string partName, string expected)
+    {
+        var part = Descendants(owner).OfType<FrameworkElement>().FirstOrDefault(e => e.Name == partName);
+        var actual = part is null ? "<no part>" : AutomationProperties.GetName(part);
+        var pass = part is not null && !string.IsNullOrWhiteSpace(actual) && actual == expected;
+        return new QaTokenResult("Automation", key, "AutomationName", expected, actual, pass ? "PASS" : "FAIL", "UIA name applied in code to the template part (Vigil F-3)");
+    }
+
+    private static QaTokenResult CheckName(string key, FrameworkElement element, string expected)
+    {
+        var actual = AutomationProperties.GetName(element);
+        return new QaTokenResult("Automation", key, "AutomationName", expected, actual,
+            actual == expected ? "PASS" : "FAIL", "icon-only button named by its consumer");
     }
 
     private static QaTokenResult CheckMotion(string key, Func<string> parse)

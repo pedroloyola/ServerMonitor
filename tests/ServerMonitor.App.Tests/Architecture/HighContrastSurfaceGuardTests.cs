@@ -38,6 +38,38 @@ public sealed class HighContrastSurfaceGuardTests
         Assert.Equal("{ThemeResource SaGlassBorderBrush}", setters["BorderBrush"]);
     }
 
+    /// <summary>
+    /// Vigil F-8: every HighContrast entry of the token layer is a user-selected system colour - never a hex literal or a
+    /// SaColor* primitive (which would ignore the user's contrast theme). Transparent only where explicitly listed.
+    /// </summary>
+    [Fact]
+    public void EveryHighContrastTokenIsASystemColour()
+    {
+        string[] transparentAllowed = ["SaGlassHighlightBrush"];
+        var failures = new List<string>();
+        var entries = 0;
+        foreach (var file in AppSourceTree.Files(".xaml").Where(f => f.StartsWith("Styles/Tokens/", StringComparison.Ordinal)))
+        {
+            foreach (var entry in AppSourceTree.LoadXaml(file).Descendants()
+                         .Where(e => e.Name.LocalName == "ResourceDictionary" && (string?)e.Attribute(AppSourceTree.Xaml + "Key") == "HighContrast")
+                         .Elements())
+            {
+                entries++;
+                var key = (string)entry.Attribute(AppSourceTree.Xaml + "Key")!;
+                var colour = (string?)entry.Attribute("Color");
+                var ok = colour is not null && (System.Text.RegularExpressions.Regex.IsMatch(colour, @"\A\{ThemeResource SystemColor\w+Color\}\z")
+                    || (colour == "Transparent" && transparentAllowed.Contains(key)));
+                if (!ok)
+                {
+                    failures.Add($"{file}: HighContrast {key} = {colour ?? "<no Color attribute>"}");
+                }
+            }
+        }
+
+        Assert.True(entries > 50, "No HighContrast token entries found; the guard would be vacuous.");
+        Assert.True(failures.Count == 0, string.Join(Environment.NewLine, failures));
+    }
+
     [Fact]
     public void HighContrastSmokeAndContourAreOpaqueSystemColours()
     {

@@ -12,6 +12,7 @@ Usage: python tools/ui/vendor-hugeicons.py <path-to-extracted-package-dir>
 The package (MIT, Copyright (c) 2025 Hugeicons) is NOT a dependency of the app; only the path data of these icons is
 vendored, and THIRD-PARTY-NOTICES.md carries the licence text.
 """
+import hashlib
 import json
 import os
 import re
@@ -65,7 +66,10 @@ def main(package_dir):
         key = f"SaIcon{name}Data"
         xaml.append(f'    <x:String x:Key="{key}">{data}</x:String>')
         entries.append({"name": name, "key": key, "source": source.replace(os.sep, "/"),
-                        "elements": len(parts)})
+                        "elements": len(parts),
+                        # SHA-256 of the emitted path data (UTF-8): IconResourceGuardTests recomputes it from
+                        # Sa.Icons.xaml, so a hand edit of a generated icon fails CI (Vigil F-4).
+                        "sha256": hashlib.sha256(data.encode("utf-8")).hexdigest()})
 
     manifest = {
         "package": PACKAGE, "version": VERSION, "integrity": INTEGRITY, "license": "MIT",

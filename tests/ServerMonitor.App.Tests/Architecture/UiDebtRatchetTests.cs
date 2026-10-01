@@ -242,6 +242,22 @@ public sealed partial class UiDebtRatchetTests
         return attributes + setters;
     }
 
+    /// <summary>Vigil F-1: the legacy blue is caught with or without an alpha byte, in any case (RRGGBB / AARRGGBB only).</summary>
+    [Theory]
+    [InlineData("#1846E1", true)]
+    [InlineData("#FF1846E1", true)]
+    [InlineData("#ff1846e1", true)]
+    [InlineData("Color=\"#FF1846E1\"", true)]
+    [InlineData("#401846E1", true)]
+    [InlineData("#1846E1FF", false)]
+    [InlineData("#F5F5F5", false)]
+    public void LegacyAccentHexIsCaughtInEveryValidForm(string value, bool expected)
+    {
+        Assert.Equal(expected, LegacyAccent().IsMatch(value));
+        Assert.Equal(expected, ForbiddenInTokens().IsMatch(value));
+        Assert.Equal(expected, LegacyAccentInComponents().IsMatch(value));
+    }
+
     /// <summary>F-11: the exempt key names must be exactly the legacy-accent-shaped keys the F-3 scope overrides.</summary>
     [Fact]
     public void AccentScopeOverridesExactlyTheExemptKeyNames()
@@ -274,13 +290,13 @@ public sealed partial class UiDebtRatchetTests
     private static bool IsUnderTokens(string relative) =>
         relative.StartsWith("Styles/Tokens/", StringComparison.OrdinalIgnoreCase);
 
-    [GeneratedRegex(@"BrandAccent\w*|AccentSoft\w*|AccentText\w*|AccentPill\w*|AccentFill\w*|SystemAccent\w*|#1846E1\b", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"BrandAccent\w*|AccentSoft\w*|AccentText\w*|AccentPill\w*|AccentFill\w*|SystemAccent\w*|#(?:[0-9A-F]{2})?1846E1\b", RegexOptions.IgnoreCase)]
     private static partial Regex LegacyAccent();
 
-    [GeneratedRegex(@"#1846E1\b|SystemAccent\w*|BrandAccent\w*", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"#(?:[0-9A-F]{2})?1846E1\b|SystemAccent\w*|BrandAccent\w*", RegexOptions.IgnoreCase)]
     private static partial Regex ForbiddenInTokens();
 
-    [GeneratedRegex(@"#1846E1\b|SystemAccent\w*|BrandAccent\w*|AccentFill\w*", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"#(?:[0-9A-F]{2})?1846E1\b|SystemAccent\w*|BrandAccent\w*|AccentFill\w*", RegexOptions.IgnoreCase)]
     private static partial Regex LegacyAccentInComponents();
 
     [GeneratedRegex(@"^Sa[A-Z]\w*Brush$")]

@@ -85,17 +85,26 @@ public sealed class InteractivePrimitivesAutomationTests
     [Fact]
     public void EveryInteractiveGallerySampleHasAnAccessibleName()
     {
-        string[] interactive = ["Button", "ToggleButton", "ToggleSwitch", "CheckBox", "RadioButton", "TextBox", "PasswordBox", "ComboBox", "SaPasswordField"];
+        string[] interactive =
+        [
+            "Button", "ToggleButton", "ToggleSwitch", "CheckBox", "RadioButton", "TextBox", "PasswordBox", "ComboBox",
+            "SaPasswordField", "SaListRow", "SaBreadcrumb", "ListView", "HyperlinkButton"
+        ];
         var failures = new List<string>();
+        var samples = 0;
         foreach (var file in AppSourceTree.Files(".xaml").Where(f => f.StartsWith("Qa/Gallery/", StringComparison.Ordinal)))
         {
             foreach (var element in AppSourceTree.LoadXaml(file).Descendants().Where(e => interactive.Contains(e.Name.LocalName)))
             {
+                samples++;
                 var labelledByField = element.Parent is { } parent && parent.Name.LocalName == "SaFormField"
                     && !string.IsNullOrWhiteSpace((string?)parent.Attribute("Header"));
                 if (string.IsNullOrWhiteSpace(AutomationName(element))
                     && string.IsNullOrWhiteSpace((string?)element.Attribute("Content"))
                     && string.IsNullOrWhiteSpace((string?)element.Attribute("Header"))
+                    // SaListRow names itself from Title; SaBreadcrumb's parent button from ParentText.
+                    && string.IsNullOrWhiteSpace((string?)element.Attribute("Title"))
+                    && string.IsNullOrWhiteSpace((string?)element.Attribute("ParentText"))
                     && !labelledByField)
                 {
                     failures.Add($"{file}: <{element.Name.LocalName}> without an accessible name");
@@ -103,6 +112,7 @@ public sealed class InteractivePrimitivesAutomationTests
             }
         }
 
+        Assert.True(samples > 20, $"Only {samples} interactive gallery samples found; the guard would be (nearly) vacuous.");
         Assert.True(failures.Count == 0, string.Join(Environment.NewLine, failures));
     }
 

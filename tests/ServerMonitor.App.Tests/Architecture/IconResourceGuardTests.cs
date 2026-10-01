@@ -61,6 +61,28 @@ public sealed partial class IconResourceGuardTests
         Assert.Contains("Permission is hereby granted, free of charge", licence, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// Vigil F-4: each icon's path data hashes to the SHA-256 the vendoring script recorded, so a hand edit of a
+    /// "GENERATED - do not edit" icon fails. The script reproduces the same file from the package (report evidence).
+    /// </summary>
+    [Fact]
+    public void IconDataMatchesTheHashRecordedAtVendoring()
+    {
+        using var manifest = JsonDocument.Parse(File.ReadAllText(AppSourceTree.Full(Manifest)));
+        var recorded = manifest.RootElement.GetProperty("icons").EnumerateArray()
+            .ToDictionary(icon => icon.GetProperty("key").GetString()!, icon => icon.GetProperty("sha256").GetString()!, StringComparer.Ordinal);
+        var data = AppSourceTree.LoadXaml(IconsXaml).Root!.Elements()
+            .ToDictionary(e => (string)e.Attribute(AppSourceTree.Xaml + "Key")!, e => e.Value, StringComparer.Ordinal);
+
+        Assert.Equal(recorded.Keys.Order(StringComparer.Ordinal), data.Keys.Order(StringComparer.Ordinal));
+        var mismatches = data
+            .Where(pair => !string.Equals(recorded[pair.Key],
+                Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(pair.Value))), StringComparison.OrdinalIgnoreCase))
+            .Select(pair => pair.Key)
+            .ToList();
+        Assert.True(mismatches.Count == 0, "Icon data differs from the vendored hash (edit the package input, re-run tools/ui/vendor-hugeicons.py): " + string.Join(", ", mismatches));
+    }
+
     /// <summary>No icon data outside the vendored dictionary: a SaIcon*Data key defined anywhere else would bypass the manifest.</summary>
     [Fact]
     public void IconDataIsDefinedOnlyInTheVendoredDictionary()

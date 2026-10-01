@@ -9,7 +9,7 @@ namespace ServerMonitor.App.Tests.Services;
 /// </summary>
 public sealed class QaGalleryPolicyTests
 {
-    private static readonly string RealData = Path.Combine(Path.GetTempPath(), "qa-policy-tests", "LocalAppData", "ServerMonitor");
+    private static readonly string RealData = Path.Combine(Path.GetTempPath(), "qa-policy-tests", "fake-user-data", "ServerMonitor");
     private static readonly string DefaultOut = Path.Combine(Path.GetTempPath(), "ServerMonitor-QA", "components", "1234");
 
     private static QaGalleryRequest Resolve(bool isDebugBuild, params string[] args) =>
@@ -117,6 +117,16 @@ public sealed class QaGalleryPolicyTests
         string[] args = value is null ? ["--qa-components", flag] : ["--qa-components", flag, value];
 
         Assert.Equal(QaGalleryMode.Refused, Resolve(true, args).Mode);
+    }
+
+    [Theory]
+    [InlineData(@"\\localhost\C$\qa")]
+    [InlineData(@"\\.\C:\qa")]
+    [InlineData(@"\\?\C:\qa")]
+    [InlineData("//server/share/qa")]
+    public void UncAndDevicePathReportFoldersAreRefused(string folder)
+    {
+        Assert.Equal(QaGalleryMode.Refused, Resolve(true, "--qa-tokens", "--qa-gallery-out", folder).Mode);
     }
 
     [Fact]

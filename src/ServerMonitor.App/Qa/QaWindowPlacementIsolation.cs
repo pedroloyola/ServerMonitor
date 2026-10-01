@@ -21,7 +21,13 @@ internal static class QaWindowPlacementIsolation
     public const string FileName = "window-placement.json";
 
     /// <summary>The only folder the isolation ever writes or deletes in.</summary>
-    public static string Root => Path.Combine(Path.GetTempPath(), "ServerMonitor-QA");
+    public static string Root => RootOverride ?? Path.Combine(Path.GetTempPath(), "ServerMonitor-QA");
+
+    /// <summary>
+    /// TEST-ONLY (Vigil F-10): the test assembly points this at its own per-process folder, so running the suite never
+    /// deletes the placement of a harness a QA agent is running at the same time under the live root.
+    /// </summary>
+    internal static string? RootOverride { get; set; }
 
     public static string DirectoryFor(string harness) => Path.Combine(Root, harness);
 
@@ -44,6 +50,12 @@ internal static class QaWindowPlacementIsolation
         if (!full.StartsWith(root, StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException($"QA placement isolation refuses to delete outside {root}: {full}");
+        }
+
+        // Cortex R-9: a junction/symlink on the way would let the prefix check pass while the delete lands elsewhere.
+        if (QaPathSafety.CrossesReparsePoint(full))
+        {
+            throw new InvalidOperationException($"QA placement isolation refuses to delete through a reparse point: {full}");
         }
 
         if (File.Exists(full))

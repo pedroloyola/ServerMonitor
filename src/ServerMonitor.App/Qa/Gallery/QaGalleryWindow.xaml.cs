@@ -154,6 +154,12 @@ public sealed partial class QaGalleryWindow : Window
 
     private static void Write(string outputDirectory, QaTokenSelfCheckReport report)
     {
+        // Vigil low: never write the report through a junction/symlink (the policy only sees the string).
+        if (Qa.QaPathSafety.CrossesReparsePoint(outputDirectory))
+        {
+            throw new InvalidOperationException($"Refusing to write the QA report through a reparse point: {outputDirectory}");
+        }
+
         Directory.CreateDirectory(outputDirectory);
         File.WriteAllText(
             Path.Combine(outputDirectory, "tokens-selfcheck.json"),
