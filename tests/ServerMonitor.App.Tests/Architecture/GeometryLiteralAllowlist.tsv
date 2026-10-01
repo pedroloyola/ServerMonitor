@@ -1,7 +1,8 @@
 # UI.3 gate 1B geometry ratchet - AUTHORISED exceptions (not debt). Guarded by GeometryLiteralRatchetTests.
 # Columns (TAB-separated): app-relative file | property | value | exact count | reason (>= 20 chars).
 # One exact key per line, no wildcards. New entries need Boss approval. Ratcheted exactly like the baseline:
-# growth beyond the count fails, a stale count fails.
+# growth beyond the count fails, a stale count fails. Per-property totals are ALSO pinned in
+# GeometryLiteralRatchetTests.PinnedLedgerTotals (raising this file alone fails).
 Qa/Gallery/QaButtonsPage.xaml	Padding	24	3	Debug-only QA gallery (csproj: <Page Remove="Qa\**\*.xaml" /> in Release); page/section inset (24) framing the specimens; not product UI
 Qa/Gallery/QaColorsPage.xaml	Padding	24	1	Debug-only QA gallery (csproj: <Page Remove="Qa\**\*.xaml" /> in Release); page/section inset (24) framing the specimens; not product UI
 Qa/Gallery/QaDataPage.xaml	Padding	24	1	Debug-only QA gallery (csproj: <Page Remove="Qa\**\*.xaml" /> in Release); page/section inset (24) framing the specimens; not product UI
