@@ -60,6 +60,10 @@ public sealed class SaIcon : Control
             ? size / DesignSize
             : throw new ArgumentOutOfRangeException(nameof(size), size, "An icon size must be a positive, finite number of DIPs.");
 
+    /// <summary>R2 (Cortex R-7): a size that can be drawn. Anything else (0, negative, NaN, infinity - e.g. from a binding)
+    /// renders nothing instead of throwing from the property callback.</summary>
+    public static bool IsRenderableSize(double size) => size > 0 && double.IsFinite(size);
+
     /// <summary>True at the design size, where no geometry transform may be applied (an identity transform renders nothing).</summary>
     public static bool IsIdentityScale(double scale) => Math.Abs(scale - 1) < 1e-9;
 
@@ -77,7 +81,7 @@ public sealed class SaIcon : Control
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(Data))
+        if (string.IsNullOrWhiteSpace(Data) || !IsRenderableSize(Size))
         {
             _path.Data = null;
             return;

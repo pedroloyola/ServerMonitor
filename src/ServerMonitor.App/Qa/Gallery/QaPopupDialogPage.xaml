@@ -13,6 +13,7 @@
             <TextBlock x:Name="Description" Style="{StaticResource SaSecondaryBodyTextStyle}" TextWrapping="Wrap" />
             <Button Style="{StaticResource SaSecondaryButtonStyle}" Content="Abrir diálogo" Click="OnOpenDialog" />
             <TextBlock x:Name="InitialFocusText" AutomationProperties.AutomationId="DialogInitialFocus" Style="{StaticResource SaMonoTextStyle}" Text="Dialog initial focus: -" />
+            <TextBlock x:Name="DefaultButtonText" AutomationProperties.AutomationId="DialogDefaultButton" Style="{StaticResource SaMonoTextStyle}" Text="Dialog DefaultButton: -" />
             <TextBlock x:Name="ResultText" AutomationProperties.AutomationId="DialogResult" Style="{StaticResource SaMonoTextStyle}" Text="Dialog result: -" />
         </StackPanel>
     </ScrollViewer>

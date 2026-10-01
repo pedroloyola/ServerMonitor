@@ -122,6 +122,9 @@ internal sealed class QaTokenSelfCheck(QaGalleryWindow window)
         results.Add(CheckPartName("SaToast close (PART_CloseButton)", page.ToastNameProbe, "PART_CloseButton", page.ToastNameProbe.CloseButtonAutomationName));
         results.Add(CheckName("SaIconButtonStyle button", page.IconButtonNameProbe, "Atualizar tudo"));
 
+        // R2 (Cortex C2-1): DefaultButton read from the dialog OBJECT (never shown) for every SaDialog.Kind case.
+        results.AddRange(CheckDialogDefaults());
+
         // F-4: the C# accessor parses every motion token straight from the live Application.Resources.
         results.AddRange(MotionTokens.TimeKeys.Select(key => CheckMotion(key, () => MotionTokens.GetTime(Application.Current.Resources, key).ToString("c", CultureInfo.InvariantCulture))));
         results.AddRange(MotionTokens.KeySplineKeys.Select(key => CheckMotion(key, () => MotionTokens.GetKeySpline(Application.Current.Resources, key).ToString())));
@@ -317,6 +320,29 @@ internal sealed class QaTokenSelfCheck(QaGalleryWindow window)
         var built = App.ServicesHost is not null;
         return new QaTokenResult("Isolation", "application host", "Gallery", "null (host never built)",
             built ? "BUILT" : "null", built ? "FAIL" : "PASS", "gallery short-circuit before Host.CreateDefaultBuilder (Vigil F-2)");
+    }
+
+    private static IEnumerable<QaTokenResult> CheckDialogDefaults()
+    {
+        var style = (Style)Application.Current.Resources["SaDialogStyle"];
+        foreach (var (name, kind, expected) in new (string, SaDialogKind?, ContentDialogButton)[]
+                 {
+                     ("unset", null, ContentDialogButton.Primary),
+                     ("Unspecified", SaDialogKind.Unspecified, ContentDialogButton.Primary),
+                     ("Confirm", SaDialogKind.Confirm, ContentDialogButton.Primary),
+                     ("Destructive", SaDialogKind.Destructive, ContentDialogButton.Close)
+                 })
+        {
+            var dialog = new ContentDialog { Style = style };
+            if (kind is { } value)
+            {
+                SaDialog.SetKind(dialog, value);
+            }
+
+            var actual = dialog.DefaultButton;
+            yield return new QaTokenResult("Dialog", $"SaDialogStyle + Kind {name}", "DefaultButton", expected.ToString(), actual.ToString(),
+                actual == expected ? "PASS" : "FAIL", "read from the ContentDialog object (Cortex C2-1)");
+        }
     }
 
     private static QaTokenResult CheckPartName(string key, FrameworkElement owner, string partName, string expected)

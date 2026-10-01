@@ -13,14 +13,17 @@
       3. brings the window to the foreground and sends ONE real Enter key press (keybd_event),
       4. reads "DialogResult" by UI Automation,
     and stops exactly that PID (image path + start time re-checked). Never stops a process by name.
-    Expected: popup-dialog -> focus "Cancelar", Enter -> None; popup-dialog-confirm -> focus "Guardar", Enter -> Primary.
+    Expected: popup-dialog -> focus "Cancelar", Enter -> None; popup-dialog-confirm -> focus "Guardar", Enter -> Primary;
+    popup-dialog-input (Kind unset, focused text box) -> DefaultButton Primary, Enter -> Primary (R2, Cortex C2-1).
+    R2 (Cortex C2-2): one Tab and one Shift+Tab from the initial focus are recorded (focus moves between the dialog's
+    own controls and comes back) before the Enter.
 
 .EXAMPLE
     pwsh tools/qa/ui2-dialog-probe.ps1 -OutDir C:\path\.boss\evidence\ui2\dialog-probe
 #>
 param(
     [string]$Exe,
-    [string[]]$Pages = @('popup-dialog', 'popup-dialog-confirm'),
+    [string[]]$Pages = @('popup-dialog', 'popup-dialog-confirm', 'popup-dialog-input'),
     [string[]]$Themes = @('dark', 'light', 'hc-sim'),
     [string]$OutDir,
     [int]$SettleSeconds = 4
@@ -39,6 +42,8 @@ using System; using System.Runtime.InteropServices;
 public static class QaDialogNative {
   [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
   [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
+  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, out int pid);
   [DllImport("user32.dll")] public static extern void keybd_event(byte vk, byte scan, uint flags, UIntPtr extra);
   [StructLayout(LayoutKind.Sequential)] public struct RECT { public int L, T, R, B; }
   // Pixels within tol per channel of ANY of the colours (0xRRGGBB), inside the given rectangle.
@@ -123,6 +128,33 @@ foreach ($page in $Pages) {
         $accentPixels = Measure-Accent $handle (Join-Path $OutDir "$page-$theme.png") @('Cancelar', 'Guardar', 'Remover servidor')
         [void][QaDialogNative]::SetForegroundWindow($handle)
         Start-Sleep -Milliseconds 300
+        $defaultButton = Read-Text $handle 'DialogDefaultButton'
+        # Keys go to whatever window is in the foreground: refuse to inject unless it is this gallery (another desktop
+        # session/agent can take the foreground). A dialog popup may be its own window, so compare the owning process.
+        $foregroundOk = $false
+        for ($attempt = 0; $attempt -lt 5 -and -not $foregroundOk; $attempt++) {
+            [void][QaDialogNative]::SetForegroundWindow($handle)
+            Start-Sleep -Milliseconds 300
+            $owner = 0
+            [void][QaDialogNative]::GetWindowThreadProcessId([QaDialogNative]::GetForegroundWindow(), [ref]$owner)
+            $foregroundOk = $owner -eq $process.Id
+        }
+        if (-not $foregroundOk) {
+            $entry = [ordered]@{ page = $page; theme = $theme; pid = $process.Id; initialFocus = $focus; defaultButton = $defaultButton; error = 'foreground owned by another process - keys not sent' }
+            $current = Get-Process -Id $process.Id -ErrorAction SilentlyContinue
+            if ($current -and $current.Path -eq $Exe -and $current.StartTime -eq $started) { Stop-Process -Id $process.Id -Force }
+            $results.Add($entry); ($entry | ConvertTo-Json -Compress); continue
+        }
+        $tabOrder = @()
+        foreach ($shift in @($false, $true)) {
+            if ($shift) { [QaDialogNative]::keybd_event(0x10, 0, 0, [UIntPtr]::Zero) }
+            [QaDialogNative]::keybd_event(0x09, 0, 0, [UIntPtr]::Zero)
+            [QaDialogNative]::keybd_event(0x09, 0, 2, [UIntPtr]::Zero)
+            if ($shift) { [QaDialogNative]::keybd_event(0x10, 0, 2, [UIntPtr]::Zero) }
+            Start-Sleep -Milliseconds 400
+            $focused = [System.Windows.Automation.AutomationElement]::FocusedElement
+            $tabOrder += ('{0}:{1}' -f $(if ($shift) { 'Shift+Tab' } else { 'Tab' }), $focused.Current.Name)
+        }
         [QaDialogNative]::keybd_event(0x0D, 0, 0, [UIntPtr]::Zero)
         [QaDialogNative]::keybd_event(0x0D, 0, 2, [UIntPtr]::Zero)
         Start-Sleep -Milliseconds 1500
@@ -131,7 +163,7 @@ foreach ($page in $Pages) {
         $current = Get-Process -Id $process.Id -ErrorAction SilentlyContinue
         if ($current -and $current.Path -eq $Exe -and $current.StartTime -eq $started) { Stop-Process -Id $process.Id -Force; $stopped = 'stopped' }
         elseif ($current) { $stopped = 'IDENTITY MISMATCH - not stopped' } else { $stopped = 'already exited' }
-        $entry = [ordered]@{ page = $page; theme = $theme; pid = $process.Id; initialFocus = $focus; enterResult = $result; accentPixels = $accentPixels; process = $stopped }
+        $entry = [ordered]@{ page = $page; theme = $theme; pid = $process.Id; initialFocus = $focus; defaultButton = $defaultButton; tabOrder = ($tabOrder -join ' -> '); enterResult = $result; accentPixels = $accentPixels; process = $stopped }
         $results.Add($entry)
         ($entry | ConvertTo-Json -Compress)
     }

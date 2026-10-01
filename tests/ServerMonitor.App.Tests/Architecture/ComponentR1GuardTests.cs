@@ -172,6 +172,32 @@ public sealed class ComponentR1GuardTests
         Assert.True(failures.Count == 0, string.Join(Environment.NewLine, failures));
     }
 
+    /// <summary>
+    /// R2 (Beacon N-1, WCAG 1.4.11): the toggle's Off track is >= 3:1 against every surface of its theme AND the thumb is
+    /// >= 3:1 against the track. Translucent glass is modelled at its measured extremes: Light #DEDEDE (darkest corner of
+    /// the reference wallpaper) .. #EDEDED, Dark #1F1F1F.
+    /// </summary>
+    [Theory]
+    [InlineData("Dark", "#1F1F1F")]
+    [InlineData("Light", "#DEDEDE", "#EDEDED")]
+    public void ToggleOffTrackMeetsNonTextContrast(string theme, params string[] glass)
+    {
+        var colours = AppSourceTree.LoadXaml("Styles/Tokens/Color.Primitives.xaml").Root!.Elements()
+            .Where(e => e.Name.LocalName == "Color").ToDictionary(e => Key(e)!, e => e.Value.Trim(), StringComparer.Ordinal);
+        var track = colours[$"SaColorToggleOffTrack{theme}"];
+        var surfaces = new[] { "Canvas", "Surface", "Interior", "ModalSurface" }.Select(s => colours[$"SaColor{s}{theme}"]).Concat(glass);
+
+        var failures = surfaces.Select(s => (s, Ratio: Contrast(track, s))).Where(r => r.Ratio < 3)
+            .Select(r => $"track {track} on {r.s}: {r.Ratio:0.00}").ToList();
+        var thumb = Contrast(colours[$"SaColorToggleThumb{theme}"], track);
+        if (thumb < 3)
+        {
+            failures.Add($"thumb on track {track}: {thumb:0.00}");
+        }
+
+        Assert.True(failures.Count == 0, string.Join(Environment.NewLine, failures));
+    }
+
     [Fact]
     public void SegmentedSelectionFollowsKeyboardFocusOnly()
     {

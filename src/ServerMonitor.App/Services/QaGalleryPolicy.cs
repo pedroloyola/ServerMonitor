@@ -56,7 +56,7 @@ public static class QaGalleryPolicy
 
     /// <summary>Gallery page ids, in tab order.</summary>
     public static IReadOnlyList<string> Pages { get; } = ["tokens", "typography", "colors", "spacing", "materials", "status", "motion", "icons", "buttons", "forms",
-        "navigation", "data", "feedback", "materials-fallback", "popup-combo", "popup-flyout", "popup-dialog", "popup-dialog-confirm"];
+        "navigation", "data", "feedback", "materials-fallback", "popup-combo", "popup-flyout", "popup-dialog", "popup-dialog-confirm", "popup-dialog-input"];
 
     /// <summary>The only <c>--qa-*</c> switches that may accompany a gallery flag.</summary>
     private static readonly string[] OwnFlags = [ComponentsFlag, TokensFlag, ThemeFlag, PageFlag, OutputFlag, QaUiLanguagePolicy.LaunchFlag];
@@ -118,12 +118,6 @@ public static class QaGalleryPolicy
             return Refuse($"{OutputFlag} needs a directory.");
         }
 
-        // Vigil low: only plain drive-rooted folders. UNC and device-path prefixes (two leading separators) alias local paths past the prefix check.
-        if (outputGiven && (output!.StartsWith(@"\\", StringComparison.Ordinal) || output.StartsWith("//", StringComparison.Ordinal)))
-        {
-            return Refuse($"{OutputFlag} must be a plain drive-rooted folder, not a UNC or device path: {output}");
-        }
-
         string outputDirectory;
         try
         {
@@ -132,6 +126,13 @@ public static class QaGalleryPolicy
         catch (Exception exception) when (exception is ArgumentException or NotSupportedException or PathTooLongException)
         {
             return Refuse($"{OutputFlag} '{output}' is not a valid path.");
+        }
+
+        // Vigil low + R2 N-1: only plain drive-rooted folders. UNC and device paths (two leading separators) alias local
+        // paths past the prefix check; tested AFTER normalisation, so mixed separators cannot slip through.
+        if (outputDirectory.StartsWith(@"\\", StringComparison.Ordinal))
+        {
+            return Refuse($"{OutputFlag} must be a plain drive-rooted folder, not a UNC or device path: {output}");
         }
 
         if (IsSameOrUnder(outputDirectory, Path.GetFullPath(realDataDirectory)))

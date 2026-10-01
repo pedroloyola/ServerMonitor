@@ -14,13 +14,14 @@ namespace ServerMonitor.App.Controls.Primitives;
 public static class SaDialog
 {
     public static readonly DependencyProperty KindProperty = DependencyProperty.RegisterAttached(
-        "Kind", typeof(SaDialogKind), typeof(SaDialog), new PropertyMetadata(SaDialogKind.Confirm, OnKindChanged));
+        "Kind", typeof(SaDialogKind), typeof(SaDialog), new PropertyMetadata(SaDialogKind.Unspecified, OnKindChanged));
 
     public static SaDialogKind GetKind(ContentDialog dialog) => (SaDialogKind)dialog.GetValue(KindProperty);
 
     public static void SetKind(ContentDialog dialog, SaDialogKind value) => dialog.SetValue(KindProperty, value);
 
-    /// <summary>Pure mapping (unit-tested): which button Enter invokes and which template part takes the first focus.</summary>
+    /// <summary>Pure mapping (unit-tested): which button Enter invokes and which template part takes the first focus.
+    /// Unspecified behaves as Confirm (the same DefaultButton the style sets).</summary>
     internal static (ContentDialogButton DefaultButton, string InitialFocusPart, bool DestructivePrimary) BehaviourFor(SaDialogKind kind) =>
         kind == SaDialogKind.Destructive
             ? (ContentDialogButton.Close, "CloseButton", true)

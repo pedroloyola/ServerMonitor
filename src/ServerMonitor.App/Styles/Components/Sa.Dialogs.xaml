@@ -17,6 +17,10 @@
         <ResourceDictionary Source="ms-appx:///Styles/Components/Sa.Buttons.xaml" />
         <ResourceDictionary Source="ms-appx:///Styles/Components/Sa.Surfaces.xaml" />
     </ResourceDictionary.MergedDictionaries>
+    <!-- R2 (Prism): both dialog command buttons are 196 wide in 112:8573 (the standalone dialog button keeps min 168). -->
+    <Style x:Key="SaDialogCommandButtonStyle" TargetType="Button" BasedOn="{StaticResource SaDialogButtonStyle}">
+        <Setter Property="MinWidth" Value="196" />
+    </Style>
     <Style x:Key="SaDialogStyle" TargetType="ContentDialog">
         <Setter Property="Background" Value="{ThemeResource SaModalSurfaceBrush}" />
         <Setter Property="BorderBrush" Value="{ThemeResource SaGlassBorderBrush}" />
@@ -25,9 +29,11 @@
         <Setter Property="Padding" Value="28" />
         <Setter Property="Foreground" Value="{ThemeResource SaTextBrush}" />
         <Setter Property="IsTabStop" Value="False" />
-        <Setter Property="PrimaryButtonStyle" Value="{StaticResource SaDialogButtonStyle}" />
-        <Setter Property="SecondaryButtonStyle" Value="{StaticResource SaDialogButtonStyle}" />
-        <Setter Property="CloseButtonStyle" Value="{StaticResource SaDialogButtonStyle}" />
+        <!-- R2 (Cortex C2-1): Enter confirms even when no SaDialog.Kind is set; Kind=Destructive overrides it (local value). -->
+        <Setter Property="DefaultButton" Value="Primary" />
+        <Setter Property="PrimaryButtonStyle" Value="{StaticResource SaDialogCommandButtonStyle}" />
+        <Setter Property="SecondaryButtonStyle" Value="{StaticResource SaDialogCommandButtonStyle}" />
+        <Setter Property="CloseButtonStyle" Value="{StaticResource SaDialogCommandButtonStyle}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ContentDialog">

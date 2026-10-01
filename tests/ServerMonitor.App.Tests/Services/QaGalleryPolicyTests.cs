@@ -124,6 +124,10 @@ public sealed class QaGalleryPolicyTests
     [InlineData(@"\\.\C:\qa")]
     [InlineData(@"\\?\C:\qa")]
     [InlineData("//server/share/qa")]
+    // R2 (Vigil N-1): mixed separators normalise to UNC / device paths - refused after Path.GetFullPath.
+    [InlineData(@"\/localhost/C$/qa")]
+    [InlineData(@"/\localhost\C$\qa")]
+    [InlineData(@"\/.\C:\qa")]
     public void UncAndDevicePathReportFoldersAreRefused(string folder)
     {
         Assert.Equal(QaGalleryMode.Refused, Resolve(true, "--qa-tokens", "--qa-gallery-out", folder).Mode);

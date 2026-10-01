@@ -79,14 +79,25 @@ public sealed class SaFormField : ContentControl
     protected override void OnContentChanged(object oldContent, object newContent)
     {
         base.OnContentChanged(oldContent, newContent);
+        if (oldContent is FrameworkElement old)
+        {
+            // R2 (Cortex R-11): the replaced input no longer points at this field's label/helper/error.
+            old.Loaded -= OnContentLoaded;
+            var oldInput = old is SaPasswordField password ? (UIElement?)password.PasswordBox ?? password : old;
+            oldInput.ClearValue(AutomationProperties.LabeledByProperty);
+            AutomationProperties.GetDescribedBy(oldInput).Clear();
+        }
+
         if (newContent is FrameworkElement element)
         {
             // A templated input (SaPasswordField) only has its inner control after its own template is applied.
-            element.Loaded += (_, _) => UpdateAutomation();
+            element.Loaded += OnContentLoaded;
         }
 
         UpdateAutomation();
     }
+
+    private void OnContentLoaded(object sender, RoutedEventArgs e) => UpdateAutomation();
 
     private void OnErrorTextChanged(string? oldValue)
     {

@@ -108,6 +108,17 @@ public sealed partial class IconResourceGuardTests
         Assert.Throws<ArgumentOutOfRangeException>(() => SaIcon.ScaleFor(double.NaN));
     }
 
+    /// <summary>R2 (Cortex R-7): an invalid size (e.g. from a binding) renders nothing; only positive finite sizes draw.</summary>
+    [Theory]
+    [InlineData(0, false)]
+    [InlineData(-4, false)]
+    [InlineData(double.NaN, false)]
+    [InlineData(double.PositiveInfinity, false)]
+    [InlineData(0.5, true)]
+    [InlineData(20, true)]
+    public void OnlyPositiveFiniteSizesAreDrawn(double size, bool renderable) =>
+        Assert.Equal(renderable, SaIcon.IsRenderableSize(size));
+
     /// <summary>EMPIRICAL (--qa-tokens): an identity geometry transform renders the icon empty, so 24 px uses none.</summary>
     [Theory]
     [InlineData(24, true)]

@@ -84,6 +84,39 @@ public sealed class DialogTemplateGuardTests
         Assert.All(row.Elements(), button => Assert.Null(button.Attribute("HorizontalAlignment")));
     }
 
+    /// <summary>
+    /// R2 (Cortex C2-1): a property callback only runs when the value changes, so the Kind default is a sentinel
+    /// (Unspecified) - setting Confirm always applies - and SaDialogStyle itself sets DefaultButton=Primary for a dialog
+    /// with no Kind (Enter confirms even from a focused text box). Runtime: --qa-tokens reads DefaultButton per case.
+    /// </summary>
+    [Fact]
+    public void AnUnsetDialogStillConfirmsOnEnter()
+    {
+        Assert.Equal(SaDialogKind.Unspecified, default(SaDialogKind));
+        Assert.Equal(ContentDialogButton.Primary, SaDialog.BehaviourFor(SaDialogKind.Unspecified).DefaultButton);
+
+        var style = AppSourceTree.LoadXaml(DialogsFile).Descendants()
+            .Single(e => e.Name.LocalName == "Style" && (string?)e.Attribute(AppSourceTree.Xaml + "Key") == "SaDialogStyle");
+        var defaultButton = style.Elements().Single(e => e.Name.LocalName == "Setter" && (string?)e.Attribute("Property") == "DefaultButton");
+        Assert.Equal("Primary", (string?)defaultButton.Attribute("Value"));
+    }
+
+    /// <summary>R2 (Prism): both dialog command buttons are 196 wide (112:8573).</summary>
+    [Fact]
+    public void DialogCommandButtonsAre196Wide()
+    {
+        var styles = AppSourceTree.LoadXaml(DialogsFile).Descendants().Where(e => e.Name.LocalName == "Style")
+            .ToDictionary(e => (string)e.Attribute(AppSourceTree.Xaml + "Key")!, StringComparer.Ordinal);
+        string? Setter(string key, string property) => styles[key].Elements()
+            .Where(e => e.Name.LocalName == "Setter" && (string?)e.Attribute("Property") == property).Select(e => (string?)e.Attribute("Value")).SingleOrDefault();
+
+        Assert.Equal("196", Setter("SaDialogCommandButtonStyle", "MinWidth"));
+        foreach (var property in new[] { "PrimaryButtonStyle", "SecondaryButtonStyle", "CloseButtonStyle" })
+        {
+            Assert.Equal("{StaticResource SaDialogCommandButtonStyle}", Setter("SaDialogStyle", property));
+        }
+    }
+
     [Fact]
     public void DestructiveDialogsDefaultToTheSafeButton()
     {

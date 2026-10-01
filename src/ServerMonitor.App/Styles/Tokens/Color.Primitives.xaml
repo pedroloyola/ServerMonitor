@@ -106,9 +106,11 @@
     <!-- pill segment selected rgba(107,107,107,.45) / rgba(255,255,255,.75), 112:3356 / 112:3517 -->
     <Color x:Key="SaColorSegmentedPillSelectedDark">#736B6B6B</Color>
     <Color x:Key="SaColorSegmentedPillSelectedLight">#BFFFFFFF</Color>
-    <!-- toggle off track 112:7982 / 112:8143 (HC GrayText: distinct from the WindowText on-track) -->
-    <Color x:Key="SaColorToggleOffTrackDark">#474747</Color>
-    <Color x:Key="SaColorToggleOffTrackLight">#B8B8B8</Color>
+    <!-- toggle off track 112:7982 / 112:8143. R2 (Beacon N-1, Boss: a11y > Figma, deliberate deviation): the Figma
+         #474747 / #B8B8B8 were 1.40-1.98 / 1.47-1.93:1 (WCAG 1.4.11 needs 3:1). Now >= 3:1 against every surface of its
+         theme AND the #FCFCFC thumb against the track (guard ToggleOffTrackMeetsNonTextContrast). -->
+    <Color x:Key="SaColorToggleOffTrackDark">#7A7A7A</Color>
+    <Color x:Key="SaColorToggleOffTrackLight">#7E7E7E</Color>
     <!-- toggle thumb 112:7956 / 112:8117 -->
     <Color x:Key="SaColorToggleThumbDark">#FCFCFC</Color>
     <Color x:Key="SaColorToggleThumbLight">#FCFCFC</Color>

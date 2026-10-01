@@ -44,9 +44,15 @@ public enum SaNoticeSeverity
     Error
 }
 
-/// <summary><see cref="SaDialog"/> behaviour: Enter confirms, or (destructive) Enter and first focus take the safe button.</summary>
+/// <summary>
+/// <see cref="SaDialog"/> behaviour: Enter confirms, or (destructive) Enter and first focus take the safe button.
+/// <c>Unspecified</c> is the property default (R2, Cortex C2-1): a callback only runs when the value CHANGES, so setting
+/// Confirm must differ from the default; an unset dialog still confirms on Enter through SaDialogStyle's
+/// DefaultButton=Primary setter.
+/// </summary>
 public enum SaDialogKind
 {
+    Unspecified,
     Confirm,
     Destructive
 }

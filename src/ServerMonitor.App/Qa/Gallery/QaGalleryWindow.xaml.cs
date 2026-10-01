@@ -39,7 +39,8 @@ public sealed partial class QaGalleryWindow : Window
             ["materials-fallback"] = ("Materials · fallback (sim)", typeof(QaMaterialsPage), "fallback"),
             ["popup-flyout"] = ("Popup · Flyout", typeof(QaPopupFlyoutPage), null),
             ["popup-dialog"] = ("Popup · Dialog (destructive)", typeof(QaPopupDialogPage), "destructive"),
-            ["popup-dialog-confirm"] = ("Popup · Dialog (confirm)", typeof(QaPopupDialogPage), "confirm")
+            ["popup-dialog-confirm"] = ("Popup · Dialog (confirm)", typeof(QaPopupDialogPage), "confirm"),
+            ["popup-dialog-input"] = ("Popup · Dialog (input, Kind unset)", typeof(QaPopupDialogPage), "input")
         };
 
     private readonly QaGalleryRequest _request;

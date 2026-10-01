@@ -83,7 +83,7 @@ public sealed partial class XamlContractAndResourceGuardTests
             "IconButtonNameProbe", "ToastNameProbe"],
         ["Qa/Gallery/QaColorsPage.xaml"] = ["PrimitiveSwatches"],
         // DialogInitialFocus / DialogResult are also read by AutomationId by tools/qa/ui2-dialog-probe.ps1.
-        ["Qa/Gallery/QaPopupDialogPage.xaml"] = ["Description", "InitialFocusText", "ResultText"],
+        ["Qa/Gallery/QaPopupDialogPage.xaml"] = ["Description", "InitialFocusText", "DefaultButtonText", "ResultText"],
         ["Qa/Gallery/QaMaterialsPage.xaml"] = ["FallbackToggle", "GlassSample", "GlassFallbackSample"],
         // Storyboard.TargetName lanes (G-3) and the C#-path lanes driven by the code-behind.
         ["Qa/Gallery/QaMotionPage.xaml"] =
