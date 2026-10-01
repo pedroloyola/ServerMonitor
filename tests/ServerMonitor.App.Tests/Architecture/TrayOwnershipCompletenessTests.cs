@@ -9,6 +9,7 @@ using ServerMonitor.App;
 using ServerMonitor.App.Services;
 using ServerMonitor.App.Shell.Tray;
 using ServerMonitor.App.Tests.Fakes;
+using ServerMonitor.App.Tests.TestSupport;
 
 namespace ServerMonitor.App.Tests.Architecture;
 
@@ -25,13 +26,11 @@ public sealed class TrayOwnershipCompletenessTests
 {
     private static readonly Assembly AppAssembly = typeof(TrayStateMachine).Assembly;
 
-    /// <summary>Builds the real composition, exactly as <c>App</c> does, without starting a host.</summary>
-    private static ServiceCollection RealComposition()
-    {
-        var services = new ServiceCollection();
-        App.ConfigureApplicationServices(services);
-        return services;
-    }
+    /// <summary>
+    /// The real composition's descriptors, exactly as <c>App</c> produces them, for shape assertions. Never built:
+    /// a test that resolves goes through <see cref="IsolatedAppComposition"/> (TEST-REALDATA-AUDIT).
+    /// </summary>
+    private static ServiceCollection RealComposition() => IsolatedAppComposition.ProductionDescriptors();
 
     // ------------------------------------------------------------------ one owner
 
@@ -77,14 +76,12 @@ public sealed class TrayOwnershipCompletenessTests
         // Two registrations of the same type would be two Shell_NotifyIcon owners with one icon id. The
         // factories must both forward to the one concrete singleton, and this proves they do — by
         // resolving, not by reading the registration shape.
-        var services = RealComposition();
-        services.AddSingleton<IAppLifecycleController>(FakeLifecycle.Instance);
+        // The real composition over a temp data root; the isolation also registers logging, which comes from
+        // ConfigureLogging, a different builder stage the composition root does not own.
+        using var composition = new IsolatedAppComposition();
+        composition.Services.AddSingleton<IAppLifecycleController>(FakeLifecycle.Instance);
 
-        // Logging comes from ConfigureLogging, which is a different builder stage; the composition root
-        // does not register it and is not supposed to.
-        services.AddLogging();
-
-        using var provider = services.BuildServiceProvider();
+        using var provider = composition.BuildProvider();
 
         var byRole = provider.GetRequiredService<ITrayIconAdapter>();
         var byAffordance = provider.GetRequiredService<ITrayAffordanceSource>();
@@ -648,7 +645,7 @@ public sealed class TrayOwnershipCompletenessTests
     [Fact]
     public void A_launch_with_no_affordance_degrades_at_startup_and_not_at_the_first_close()
     {
-        var harness = new StartupHarness(TrayAffordanceState.Unavailable);
+        using var harness = new StartupHarness(TrayAffordanceState.Unavailable);
 
         App.EvaluateStartupAffordance(harness.Services);
 
@@ -664,7 +661,7 @@ public sealed class TrayOwnershipCompletenessTests
     [Fact]
     public void An_affordance_lost_before_any_user_close_degrades_immediately()
     {
-        var harness = new StartupHarness(TrayAffordanceState.Available);
+        using var harness = new StartupHarness(TrayAffordanceState.Available);
 
         App.EvaluateStartupAffordance(harness.Services);
         Assert.False(harness.Notice.Raised);
@@ -678,7 +675,7 @@ public sealed class TrayOwnershipCompletenessTests
     [Fact]
     public void A_healthy_launch_degrades_nothing()
     {
-        var harness = new StartupHarness(TrayAffordanceState.Available);
+        using var harness = new StartupHarness(TrayAffordanceState.Available);
 
         App.EvaluateStartupAffordance(harness.Services);
 
@@ -691,7 +688,7 @@ public sealed class TrayOwnershipCompletenessTests
     {
         // CV-2b: an unauthenticated TaskbarCreated broadcast must not be able to cost the user the
         // session. Evaluating at startup must not turn the bounded recovery window into a degradation.
-        var harness = new StartupHarness(TrayAffordanceState.Recovering);
+        using var harness = new StartupHarness(TrayAffordanceState.Recovering);
 
         App.EvaluateStartupAffordance(harness.Services);
 
@@ -745,8 +742,10 @@ public sealed class TrayOwnershipCompletenessTests
     /// state under test can be chosen), the window and the notice (so degradation is observable), and the
     /// lifecycle controller. <see cref="TrayAffordanceLifecycle"/> itself is the production registration.
     /// </summary>
-    private sealed class StartupHarness
+    private sealed class StartupHarness : IDisposable
     {
+        private readonly IsolatedAppComposition _composition = new();
+
         public FakeAffordanceSource Source { get; }
 
         public FakeDegradationNotice Notice { get; } = new();
@@ -759,14 +758,22 @@ public sealed class TrayOwnershipCompletenessTests
         {
             Source = new FakeAffordanceSource(initial);
 
-            var services = RealComposition();
-            services.AddLogging();
+            // Over a temp data root: TrayAffordanceLifecycle -> BackgroundNoticePresenter constructs the background
+            // settings service, which READS its file on construction (TEST-REALDATA-AUDIT).
+            var services = _composition.Services;
             services.AddSingleton<IAppLifecycleController>(FakeLifecycle.Instance);
             services.AddSingleton<ITrayAffordanceSource>(Source);
             services.AddSingleton<IBackgroundDegradationNotice>(Notice);
             services.AddSingleton<IApplicationWindowController>(Window);
 
-            Services = services.BuildServiceProvider();
+            Services = _composition.BuildProvider();
+        }
+
+        public void Dispose()
+        {
+            // The engine graph is IAsyncDisposable-only.
+            Services.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            _composition.Dispose();
         }
     }
 

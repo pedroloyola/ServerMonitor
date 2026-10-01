@@ -10,6 +10,7 @@ using ServerMonitor.Features;
 using ServerMonitor.Infrastructure.Discovery;
 using ServerMonitor.Infrastructure.Persistence;
 using ServerMonitor.WidgetContract;
+using ServerMonitor.App.Tests.TestSupport;
 
 namespace ServerMonitor.App.Tests.Architecture;
 
@@ -24,12 +25,8 @@ namespace ServerMonitor.App.Tests.Architecture;
 /// </summary>
 public sealed class FeatureCompositionRootTests
 {
-    private static ServiceCollection RealComposition()
-    {
-        var services = new ServiceCollection();
-        App.ConfigureApplicationServices(services);
-        return services;
-    }
+    // Descriptors only, never built (TEST-REALDATA-AUDIT).
+    private static ServiceCollection RealComposition() => IsolatedAppComposition.ProductionDescriptors();
 
     private static ServiceDescriptor[] DescriptorsFor(ServiceCollection services, Type serviceType) =>
         [.. services.Where(descriptor => descriptor.ServiceType == serviceType)];

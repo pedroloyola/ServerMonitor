@@ -3,6 +3,7 @@ using ServerMonitor.App.Qa;
 using ServerMonitor.App.Services;
 using ServerMonitor.App.ViewModels;
 using ServerMonitor.Core.Backup;
+using ServerMonitor.App.Tests.TestSupport;
 
 namespace ServerMonitor.App.Tests.Qa;
 
@@ -18,8 +19,7 @@ public sealed class QaBackupHarnessTests
     [Fact]
     public void WithoutTheFlag_TheCompositionUsesTheRealPickersAndDialogs()
     {
-        var services = new ServiceCollection();
-        App.ConfigureApplicationServices(services);
+        var services = IsolatedAppComposition.ProductionDescriptors(); // descriptors only, never built
 
         Assert.Equal(typeof(BackupFilePicker), Last<IBackupFilePicker>(services).ImplementationType);
         Assert.Equal(typeof(BackupRestoreDialogService), Last<IBackupRestoreInteraction>(services).ImplementationType);
@@ -30,8 +30,7 @@ public sealed class QaBackupHarnessTests
     [Fact]
     public void Apply_ReplacesOnlyTheEngineAndThePickers()
     {
-        var services = new ServiceCollection();
-        App.ConfigureApplicationServices(services);
+        var services = IsolatedAppComposition.ProductionDescriptors(); // descriptors only, never built
         var before = services.Count;
 
         QaBackupScenarioComposition.Apply(services, "ok");

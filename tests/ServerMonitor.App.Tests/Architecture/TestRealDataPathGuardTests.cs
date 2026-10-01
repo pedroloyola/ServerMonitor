@@ -9,15 +9,20 @@ namespace ServerMonitor.App.Tests.Architecture;
 /// <c>%LOCALAPPDATA%</c>/<c>LOCALAPPDATA</c> literal in any case, or <c>RealDataDirectory</c> - is allowed only where an
 /// exact, justified entry says so (comparison-only, no file I/O). (2) INDIRECT reach through
 /// <c>App.ConfigureApplicationServices(</c>, which registers the production <c>*StorageOptions.ForCurrentUser()</c>, is
-/// counted against its own exact allowlist; those pre-UI.2 tests are NOT audited here (backlog TEST-REALDATA-AUDIT).
-/// Both lists fail on a new use AND on a stale entry, so they stay exact. New tests use temp sentinels instead.
+/// counted against its own exact allowlist. Both lists fail on a new use AND on a stale entry, so they stay exact. New
+/// tests use temp sentinels instead.
+/// <para>
+/// TEST-REALDATA-AUDIT (UI.3 gate 1C): this lexical guard is now only the fence. The proof is
+/// <see cref="RealDataIsolationGuardTests"/> - a structural guard over what an isolated provider REALLY holds - and
+/// every test that BUILDS a provider from the root goes through <c>TestSupport/IsolatedAppComposition</c>.
+/// </para>
 /// </summary>
 public sealed partial class TestRealDataPathGuardTests
 {
     /// <summary>Direct real-data-path constructions per file (repo-relative), each comparison-only.</summary>
     private static readonly IReadOnlyDictionary<string, int> DirectAllowlist = new Dictionary<string, int>(StringComparer.Ordinal)
     {
-        // Computes the real root only to assert the harness backup folder is NOT under it. No I/O.
+        // Computes the real root only to assert the PRODUCTION descriptor (never built) targets it. No I/O.
         ["tests/ServerMonitor.App.Tests/Qa/QaBackupCompositionTests.cs"] = 1,
         // Proves QaGalleryComposition.RealDataDirectory equals the app's real folder and that the PURE policy refuses it
         // (and that the default report folder is not under it). No I/O.
@@ -30,21 +35,20 @@ public sealed partial class TestRealDataPathGuardTests
     };
 
     /// <summary>
-    /// Indirect reach: calls of App.ConfigureApplicationServices( per file. Pre-UI.2 composition tests; whether any of them
-    /// performs I/O on a production path is NOT audited by this guard - backlog TEST-REALDATA-AUDIT (Boss). The list only
-    /// stops the number of such tests from growing silently.
+    /// Indirect reach: calls of App.ConfigureApplicationServices( per file. Audited in TEST-REALDATA-AUDIT (UI.3 gate 1C,
+    /// .boss/tmp/ui3/cortex/report.md); each remaining entry says what it resolves.
     /// </summary>
     private static readonly IReadOnlyDictionary<string, int> IndirectAllowlist = new Dictionary<string, int>(StringComparer.Ordinal)
     {
-        ["tests/ServerMonitor.App.Tests/Architecture/CommercialCompositionSeamTests.cs"] = 1,
-        ["tests/ServerMonitor.App.Tests/Architecture/FeatureCompositionRootTests.cs"] = 1,
-        ["tests/ServerMonitor.App.Tests/Architecture/TrayOwnershipCompletenessTests.cs"] = 1,
-        ["tests/ServerMonitor.App.Tests/Qa/QaBackupCompositionTests.cs"] = 1,
-        ["tests/ServerMonitor.App.Tests/Qa/QaBackupHarnessTests.cs"] = 2,
+        // THE entry point: ProductionDescriptors() (never built) and the isolated composition (temp roots + guard).
+        ["tests/ServerMonitor.App.Tests/TestSupport/IsolatedAppComposition.cs"] = 2,
+        // Harness layered on the production root; resolves only options (asserted inside the harness temp dir), the
+        // in-memory credential store and IServerProfileService over harness paths. Constructed only, no real I/O.
         ["tests/ServerMonitor.App.Tests/Qa/QaProxyJumpHarnessTests.cs"] = 1,
-        ["tests/ServerMonitor.App.Tests/Qa/QaSshConfigHarnessTests.cs"] = 3,
-        ["tests/ServerMonitor.App.Tests/Services/BackupSettingsParticipantTests.cs"] = 1,
-        ["tests/ServerMonitor.App.Tests/Services/StartupRestoreRecoveryTests.cs"] = 1
+        // Two of three build the production root on purpose to prove the DEFAULT sources point at the real profile:
+        // SshConfigFileImportSource / LocalSshKeyDiscovery / PrivateKeyFilePicker are constructed (no I/O in their
+        // constructors) and only their path strings compared; no file is opened.
+        ["tests/ServerMonitor.App.Tests/Qa/QaSshConfigHarnessTests.cs"] = 3
     };
 
     [Fact]
