@@ -5,6 +5,7 @@
          (every key here starts with Sa and collides with nothing - ComponentDictionariesDefineOnlyNewSaKeys).
          Sa.AccentNeutralScope.xaml is deliberately NOT merged here: it is a local scope (F-3), never app-wide. -->
     <ResourceDictionary.MergedDictionaries>
+        <ResourceDictionary Source="ms-appx:///Styles/Components/Sa.Icons.xaml" />
         <ResourceDictionary Source="ms-appx:///Styles/Components/Sa.Text.xaml" />
         <ResourceDictionary Source="ms-appx:///Styles/Components/Sa.Surfaces.xaml" />
         <ResourceDictionary Source="ms-appx:///Styles/Components/Sa.Primitives.xaml" />

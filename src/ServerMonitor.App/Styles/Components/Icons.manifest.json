@@ -1,0 +1,145 @@
+{
+  "package": "@hugeicons/core-free-icons",
+  "version": "4.3.5",
+  "integrity": "sha512-Sv+NjHRPnQk+yZsGCMcGznCHdTfJR9PMMOEKcJYAQU4gy90dmlc9PwdtvYOImBZIjiheMsTLL5eMn2DmHxUiUg==",
+  "license": "MIT",
+  "copyright": "Copyright (c) 2025 Hugeicons",
+  "style": "Stroke Rounded (free)",
+  "viewBox": "0 0 24 24",
+  "strokeWidth": 1.5,
+  "generator": "tools/ui/vendor-hugeicons.py",
+  "icons": [
+    {
+      "name": "ServerStack01",
+      "key": "SaIconServerStack01Data",
+      "source": "dist/esm/ServerStack01Icon.js",
+      "elements": 6
+    },
+    {
+      "name": "DashboardSquare01",
+      "key": "SaIconDashboardSquare01Data",
+      "source": "dist/esm/DashboardSquare01Icon.js",
+      "elements": 4
+    },
+    {
+      "name": "Clock01",
+      "key": "SaIconClock01Data",
+      "source": "dist/esm/Clock01Icon.js",
+      "elements": 2
+    },
+    {
+      "name": "Settings01",
+      "key": "SaIconSettings01Data",
+      "source": "dist/esm/Settings01Icon.js",
+      "elements": 2
+    },
+    {
+      "name": "Refresh",
+      "key": "SaIconRefreshData",
+      "source": "dist/esm/RefreshIcon.js",
+      "elements": 1
+    },
+    {
+      "name": "Add01",
+      "key": "SaIconAdd01Data",
+      "source": "dist/esm/Add01Icon.js",
+      "elements": 2
+    },
+    {
+      "name": "Search01",
+      "key": "SaIconSearch01Data",
+      "source": "dist/esm/Search01Icon.js",
+      "elements": 2
+    },
+    {
+      "name": "ArrowRight01",
+      "key": "SaIconArrowRight01Data",
+      "source": "dist/esm/ArrowRight01Icon.js",
+      "elements": 1
+    },
+    {
+      "name": "ArrowDown01",
+      "key": "SaIconArrowDown01Data",
+      "source": "dist/esm/ArrowDown01Icon.js",
+      "elements": 1
+    },
+    {
+      "name": "HardDrive",
+      "key": "SaIconHardDriveData",
+      "source": "dist/esm/HardDriveIcon.js",
+      "elements": 3
+    },
+    {
+      "name": "Key01",
+      "key": "SaIconKey01Data",
+      "source": "dist/esm/Key01Icon.js",
+      "elements": 2
+    },
+    {
+      "name": "LockPassword",
+      "key": "SaIconLockPasswordData",
+      "source": "dist/esm/LockPasswordIcon.js",
+      "elements": 5
+    },
+    {
+      "name": "Folder01",
+      "key": "SaIconFolder01Data",
+      "source": "dist/esm/Folder01Icon.js",
+      "elements": 1
+    },
+    {
+      "name": "Shield01",
+      "key": "SaIconShield01Data",
+      "source": "dist/esm/Shield01Icon.js",
+      "elements": 1
+    },
+    {
+      "name": "View",
+      "key": "SaIconViewData",
+      "source": "dist/esm/ViewIcon.js",
+      "elements": 2
+    },
+    {
+      "name": "InformationCircle",
+      "key": "SaIconInformationCircleData",
+      "source": "dist/esm/InformationCircleIcon.js",
+      "elements": 3
+    },
+    {
+      "name": "Alert02",
+      "key": "SaIconAlert02Data",
+      "source": "dist/esm/Alert02Icon.js",
+      "elements": 3
+    },
+    {
+      "name": "Computer",
+      "key": "SaIconComputerData",
+      "source": "dist/esm/ComputerIcon.js",
+      "elements": 2
+    },
+    {
+      "name": "Sun03",
+      "key": "SaIconSun03Data",
+      "source": "dist/esm/Sun03Icon.js",
+      "elements": 2
+    },
+    {
+      "name": "Moon02",
+      "key": "SaIconMoon02Data",
+      "source": "dist/esm/Moon02Icon.js",
+      "elements": 1
+    },
+    {
+      "name": "Cancel01",
+      "key": "SaIconCancel01Data",
+      "source": "dist/esm/Cancel01Icon.js",
+      "elements": 1
+    },
+    {
+      "name": "Tick02",
+      "key": "SaIconTick02Data",
+      "source": "dist/esm/Tick02Icon.js",
+      "elements": 1
+    }
+  ]
+}

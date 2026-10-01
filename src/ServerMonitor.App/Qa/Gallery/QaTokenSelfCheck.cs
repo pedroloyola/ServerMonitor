@@ -3,10 +3,13 @@ using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Markup;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Media.Imaging;
 using Microsoft.UI.Xaml.Shapes;
 using ServerMonitor.App.Controls.Primitives;
 using ServerMonitor.App.Services.Motion;
+using System.Runtime.InteropServices.WindowsRuntime;
 using Windows.UI;
 
 namespace ServerMonitor.App.Qa.Gallery;
@@ -100,6 +103,14 @@ internal sealed class QaTokenSelfCheck(QaGalleryWindow window)
             results.AddRange(QaTokenManifest.Entries.Select(entry => Check(theme, entry, probes, themeEntries)));
             results.Add(CheckDefaultStyle(theme, page.DefaultStyleProbe, themeEntries));
         }
+
+        // S5 (Boss B-1): every vendored icon parses to a geometry inside the 24x24 grid, and the stroke stays 1.5 DIP
+        // at 16 and 48 px - measured from rendered pixels, not asserted from the template.
+        window.ApplyTheme("dark");
+        await SettleAsync();
+        results.AddRange(CheckIconData());
+        results.Add(await CheckIconStrokeAsync(page.StrokeProbe16));
+        results.Add(await CheckIconStrokeAsync(page.StrokeProbe48));
 
         // F-4: the C# accessor parses every motion token straight from the live Application.Resources.
         results.AddRange(MotionTokens.TimeKeys.Select(key => CheckMotion(key, () => MotionTokens.GetTime(Application.Current.Resources, key).ToString("c", CultureInfo.InvariantCulture))));
@@ -220,6 +231,72 @@ internal sealed class QaTokenSelfCheck(QaGalleryWindow window)
         catch (Exception exception)
         {
             return new QaTokenResult(theme, DefaultStyleProbeKey, "Primitive", "templated", "<exception>", "FAIL", exception.Message);
+        }
+    }
+
+    private static IEnumerable<QaTokenResult> CheckIconData()
+    {
+        var keys = new List<string>();
+        CollectIconKeys(Application.Current.Resources, keys);
+        foreach (var key in keys.Distinct(StringComparer.Ordinal).OrderBy(k => k, StringComparer.Ordinal))
+        {
+            QaTokenResult result;
+            try
+            {
+                Application.Current.Resources.TryGetValue(key, out var data);
+                var geometry = (Geometry)XamlBindingHelper.ConvertValue(typeof(Geometry), data);
+                var bounds = geometry.Bounds;
+                var inside = bounds.Width > 0 && bounds.X >= -0.5 && bounds.Y >= -0.5 && bounds.X + bounds.Width <= 24.5 && bounds.Y + bounds.Height <= 24.5;
+                result = new QaTokenResult("Icons", key, "IconData", "geometry inside 0..24",
+                    string.Create(CultureInfo.InvariantCulture, $"bounds {bounds.X:0.##},{bounds.Y:0.##} {bounds.Width:0.##}x{bounds.Height:0.##}"),
+                    inside ? "PASS" : "FAIL", "vendored Hugeicons path data (B-1)");
+            }
+            catch (Exception exception)
+            {
+                result = new QaTokenResult("Icons", key, "IconData", "geometry inside 0..24", "<exception>", "FAIL", exception.Message);
+            }
+
+            yield return result;
+        }
+    }
+
+    private static void CollectIconKeys(ResourceDictionary dictionary, List<string> keys)
+    {
+        keys.AddRange(dictionary.Keys.OfType<string>().Where(k => k.StartsWith("SaIcon", StringComparison.Ordinal) && k.EndsWith("Data", StringComparison.Ordinal)));
+        foreach (var merged in dictionary.MergedDictionaries)
+        {
+            CollectIconKeys(merged, keys);
+        }
+    }
+
+    /// <summary>Add01's vertical stroke, scanned on a row above the horizontal bar: summed alpha coverage of the row
+    /// in physical pixels divided by the rasterization scale = rendered stroke width in DIPs.</summary>
+    private async Task<QaTokenResult> CheckIconStrokeAsync(SaIcon icon)
+    {
+        var key = string.Create(CultureInfo.InvariantCulture, $"SaIcon stroke @{icon.Size}px");
+        try
+        {
+            var bitmap = new RenderTargetBitmap();
+            await bitmap.RenderAsync(icon);
+            var pixels = (await bitmap.GetPixelsAsync()).ToArray();
+            var row = (int)Math.Round(bitmap.PixelHeight * 8.0 / 24.0);
+            double coverage = 0;
+            for (var x = 0; x < bitmap.PixelWidth; x++)
+            {
+                coverage += pixels[(row * bitmap.PixelWidth + x) * 4 + 3] / 255.0;
+            }
+
+            var pixelsPerDip = bitmap.PixelWidth / icon.Size;
+            var width = coverage / pixelsPerDip;
+            var pass = Math.Abs(width - SaIcon.StrokeWidth) <= 0.35;
+            return new QaTokenResult("Icons", key, "IconStroke", "1.5 DIP (+/-0.35)",
+                string.Create(CultureInfo.InvariantCulture, $"{width:0.00} DIP ({coverage:0.00} px at {pixelsPerDip:0.##} px/DIP)"),
+                pass ? "PASS" : "FAIL",
+                "rendered pixels (RenderTargetBitmap) at the current display scale only; a Viewbox-scaled icon would read 3.0 at 48");
+        }
+        catch (Exception exception)
+        {
+            return new QaTokenResult("Icons", key, "IconStroke", "1.5 DIP", "<exception>", "FAIL", exception.Message);
         }
     }
 

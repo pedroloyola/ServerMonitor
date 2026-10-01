@@ -12,4 +12,32 @@ ServerAlyzer uses the following third-party software:
 - **Microsoft.Windows.SDK.BuildTools / Microsoft.Windows.SDK.BuildTools.MSIX** (build-time MSIX packaging tooling; not redistributed in the app) — Copyright Microsoft Corporation; licensed under the Microsoft Software License Terms. <https://www.nuget.org/packages/Microsoft.Windows.SDK.BuildTools>
 - **Microsoft.WindowsAppSDK 2.3.1** (Windows App SDK / WinUI 3 runtime and framework) — Copyright Microsoft Corporation; licensed under the Microsoft Software License Terms for the Windows App SDK. In the unpackaged self-contained build the runtime is redistributed with the app; in the packaged (MSIX) build it is a framework package dependency provisioned by Windows/the Microsoft Store. <https://github.com/microsoft/WindowsAppSDK>
 
+- **Hugeicons Free (Stroke Rounded), `@hugeicons/core-free-icons` 4.3.5** (path data of 22 icons vendored into `src/ServerMonitor.App/Styles/Components/Sa.Icons.xaml`; provenance in `Icons.manifest.json`; not a package dependency) — Copyright (c) 2025 Hugeicons; licensed under the MIT License (full text below). <https://hugeicons.com>
+
 The corresponding license texts are available from the linked upstream projects and from the NuGet packages restored during the build.
+
+## Hugeicons Free - MIT License
+
+```text
+MIT License
+
+Copyright (c) 2025 Hugeicons
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```

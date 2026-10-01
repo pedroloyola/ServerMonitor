@@ -51,14 +51,14 @@ public sealed partial class XamlContractAndResourceGuardTests
         // HistoryChart parts: the chart draws into these by name.
         ["Controls/HistoryChart.xaml"] = ["RootGrid", "GridCanvas", "PlotCanvas"],
         // UI.2 primitive templates: names resolved at runtime by VisualState setters (G-3).
-        ["Styles/Components/Sa.Primitives.xaml"] = ["PART_Dot"],
+        ["Styles/Components/Sa.Primitives.xaml"] = ["PART_Dot", "PART_Path"],
         // UI.2 Debug-only component gallery (Qa/Gallery/**, excluded from Release).
         ["Qa/Gallery/QaGalleryWindow.xaml"] =
         [
             "GalleryRoot", "DarkThemeOption", "LightThemeOption", "HcSimThemeOption", "HcBannerText", "PageList",
             "ContentHost", "PageFrame"
         ],
-        ["Qa/Gallery/QaTokenProbePage.xaml"] = ["DefaultStyleProbe"],
+        ["Qa/Gallery/QaTokenProbePage.xaml"] = ["DefaultStyleProbe", "StrokeProbe16", "StrokeProbe48"],
         ["Qa/Gallery/QaColorsPage.xaml"] = ["PrimitiveSwatches"],
         // Storyboard.TargetName lanes (G-3) and the C#-path lanes driven by the code-behind.
         ["Qa/Gallery/QaMotionPage.xaml"] =

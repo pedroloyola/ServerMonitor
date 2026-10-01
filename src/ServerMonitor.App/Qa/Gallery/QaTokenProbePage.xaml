@@ -13,6 +13,11 @@
             <TextBlock Style="{StaticResource SaSecondaryBodyTextStyle}" TextWrapping="Wrap"
                        Text="One element per Sa* token (Tag = key). --qa-tokens reads every probe back in Dark and Light and compares it with the theme dictionary entry." />
             <TextBlock Style="{StaticResource SaTableHeaderTextStyle}" Text="Default style via Application.Resources (S1 empirical)" Margin="0,12,0,4" />
+            <TextBlock Style="{StaticResource SaTableHeaderTextStyle}" Text="Icon stroke probes (Boss B-1: 1.5 DIP at every size)" Margin="0,12,0,4" />
+            <StackPanel Orientation="Horizontal" Spacing="24">
+                <primitives:SaIcon x:Name="StrokeProbe16" x:FieldModifier="internal" Data="{StaticResource SaIconAdd01Data}" Size="16" Foreground="{ThemeResource SaTextBrush}" />
+                <primitives:SaIcon x:Name="StrokeProbe48" x:FieldModifier="internal" Data="{StaticResource SaIconAdd01Data}" Size="48" Foreground="{ThemeResource SaTextBrush}" />
+            </StackPanel>
             <primitives:SaStatusIndicator x:Name="DefaultStyleProbe" x:FieldModifier="internal" Status="Healthy" Label="Default style probe" />
             <TextBlock Style="{StaticResource SaTableHeaderTextStyle}" Text="Styles/Tokens/Color.Semantic.xaml" Margin="0,12,0,4" />
             <Grid ColumnSpacing="16"><Grid.ColumnDefinitions><ColumnDefinition Width="280" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><TextBlock Style="{StaticResource SaMonoTextStyle}" Text="SaCanvasBrush" VerticalAlignment="Center" /><ContentControl Grid.Column="1"><Border Tag="SaCanvasBrush" Width="96" Height="24" BorderBrush="{ThemeResource SaBorderNeutralBrush}" BorderThickness="1" Background="{ThemeResource SaCanvasBrush}" /></ContentControl></Grid>

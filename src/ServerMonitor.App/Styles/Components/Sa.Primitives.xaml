@@ -12,6 +12,28 @@
         <ResourceDictionary Source="ms-appx:///Styles/Tokens/Spacing.xaml" />
     </ResourceDictionary.MergedDictionaries>
 
+    <!-- Icon (Boss B-1): one stroke-only path, 1.5 DIP stroke at every size (the geometry is scaled in code, never the
+         element), round caps and joins, no fill, Foreground inherited from the host so it follows theme and HC.
+         Decorative: Raw in UI Automation and not a tab stop. -->
+    <Style TargetType="primitives:SaIcon">
+        <Setter Property="IsTabStop" Value="False" />
+        <Setter Property="AutomationProperties.AccessibilityView" Value="Raw" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="primitives:SaIcon">
+                    <Grid Width="{TemplateBinding Size}" Height="{TemplateBinding Size}" Background="Transparent">
+                        <Path x:Name="PART_Path"
+                              Stroke="{TemplateBinding Foreground}"
+                              StrokeThickness="1.5"
+                              StrokeStartLineCap="Round"
+                              StrokeEndLineCap="Round"
+                              StrokeLineJoin="Round" />
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- Status dot + label (Figma 112:1066 / 112:1448: dot 6, gap 7, 12 Regular muted). Colour is never the only
          signal: the Label is always rendered and is the automation name (the visible text is Raw for UIA so it is
          not read twice). Dot colours are the Manual tokens (D8), per visual state, so a theme change re-resolves
