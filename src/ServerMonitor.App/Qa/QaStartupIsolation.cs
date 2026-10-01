@@ -27,19 +27,8 @@ namespace ServerMonitor.App.Qa;
 /// Nothing is created, read or deleted here; the folder is created lazily by the stores on first write.
 /// Excluded from Release (see ServerMonitor.App.csproj).
 /// </summary>
-internal static class QaStartupIsolation
+internal static partial class QaStartupIsolation
 {
-    /// <summary>True for the launches that select a Debug harness composition (the composition root's qaMode).</summary>
-    public static bool IsHarnessLaunch() =>
-        QaHealthComposition.IsRequested()
-        || QaDiscoveryComposition.IsRequested()
-        || QaNotificationComposition.IsRequested()
-        || QaCompactComposition.IsRequested()
-        || QaHistoryComposition.IsRequested()
-        || QaWorkloadsComposition.IsRequested()
-        || QaStoreScreenshotComposition.IsRequested()
-        || QaProxyJumpComposition.IsRequested();
-
     /// <summary>Exit code of a refused launch (the harness-error code the gallery also uses).</summary>
     public const int RefusedExitCode = 3;
 
@@ -56,11 +45,36 @@ internal static class QaStartupIsolation
         QaProxyJumpPolicy.LaunchFlag
     ];
 
+    /// <summary>The modifiers a harness may carry, each as <c>flag value</c> or <c>flag=value</c>.</summary>
+    public static IReadOnlyList<string> ModifierFlags { get; } =
+    [
+        QaSshConfigProfilePolicy.LaunchFlag,
+        QaUiLanguagePolicy.LaunchFlag,
+        QaBackupPolicy.LaunchFlag,
+        QaProxyJumpPolicy.DirectoryFlag
+    ];
+
     /// <summary>
-    /// Runs in the App constructor before the host is built. A <c>--qa-*</c> modifier (<c>--qa-ssh-config</c>,
-    /// <c>--qa-ui-language</c>, <c>--qa-backup</c>, <c>--qa-proxyjump-dir</c>, or any unknown <c>--qa-*</c>) without an
-    /// isolated harness would run the PRODUCTION composition - real data, Credential Manager, SSH - so the process ends
-    /// here (exit 3) instead.
+    /// THE harness parser (Vigil M-1A-1): the composition root's qaMode, the launch refusal, the launch-time guard and the
+    /// startup markers all use it, so no argument can be "a harness" for one and "production" for another. Exact and
+    /// ordinal: <c>--qa-health=1</c>, <c>--qa-health:x</c>, <c>--QA-HEALTH</c> are not harness flags (and are refused).
+    /// The one documented value form is <c>--qa-compact:&lt;digits&gt;</c>.
+    /// </summary>
+    internal static bool IsHarnessArgument(string argument) =>
+        HarnessFlags.Contains(argument, StringComparer.Ordinal) || CompactCountForm().IsMatch(argument);
+
+    /// <summary>True for the launches that select a Debug harness composition (the composition root's qaMode).</summary>
+    public static bool IsHarnessLaunch() => IsHarnessLaunch(Environment.GetCommandLineArgs());
+
+    internal static bool IsHarnessLaunch(IReadOnlyList<string> commandLineArgs) => commandLineArgs.Any(IsHarnessArgument);
+
+    /// <summary>Any argument that looks like a QA switch, in any case or form (the refusal and the guard key on this).</summary>
+    internal static bool IsQaLike(string argument) => argument.StartsWith("--qa", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Runs in the App constructor before the host is built. A launch whose <c>--qa*</c> arguments are not exactly an
+    /// isolated harness plus well-formed modifiers would run - or might run - the PRODUCTION composition (real data,
+    /// Credential Manager, SSH), so the process ends here (exit 3) instead.
     /// </summary>
     public static void RefuseUnisolatedLaunch()
     {
@@ -73,32 +87,43 @@ internal static class QaStartupIsolation
     }
 
     /// <summary>
-    /// Null when the launch is allowed: no <c>--qa-*</c> argument (production), an isolated harness among them (modifiers
-    /// may accompany it), or a gallery flag/option (the exclusive gallery owns those and refuses its own misuse - see
-    /// QaGalleryPolicy). Otherwise the reason, naming the flag and the harnesses to combine it with.
+    /// Null when the launch is allowed: no <c>--qa*</c> argument at all (production); an exact gallery flag (the exclusive
+    /// gallery owns its options and refuses its own misuse - QaGalleryPolicy - and it short-circuits before this runs); or
+    /// at least one exact harness flag with every other <c>--qa*</c> argument an exact harness flag or a well-formed
+    /// modifier. Anything else - a modifier alone, an unknown switch, a malformed or differently-cased flag - is refused.
     /// </summary>
     internal static string? LaunchRefusal(IReadOnlyList<string> commandLineArgs)
     {
         ArgumentNullException.ThrowIfNull(commandLineArgs);
-        var flags = commandLineArgs
-            .Where(argument => argument.StartsWith("--qa-", StringComparison.OrdinalIgnoreCase))
-            .Select(argument => argument.Split('=', ':')[0])
-            .ToList();
-        if (flags.Count == 0
-            || flags.Any(flag => HarnessFlags.Contains(flag, StringComparer.OrdinalIgnoreCase))
-            || flags.Any(IsGalleryFlag))
+        var qa = commandLineArgs.Where(IsQaLike).ToList();
+        if (qa.Count == 0
+            || qa.Any(argument => argument == QaGalleryPolicy.ComponentsFlag || argument == QaGalleryPolicy.TokensFlag))
         {
             return null;
         }
 
-        return $"{flags[0]} is not an isolated QA harness: on its own it would run the real composition (real user data, " +
-            $"Credential Manager, SSH). Combine it with one of: {string.Join(", ", HarnessFlags)}.";
+        var unknown = qa.FirstOrDefault(argument => !IsHarnessArgument(argument) && !IsModifierArgument(argument));
+        if (unknown is not null)
+        {
+            return $"'{unknown}' is not a recognised QA switch (exact, lower-case: {string.Join(", ", HarnessFlags)}; " +
+                $"modifiers {string.Join(", ", ModifierFlags)} as 'flag value' or 'flag=value'). Refusing rather than " +
+                "risk the real composition.";
+        }
+
+        if (!qa.Any(IsHarnessArgument))
+        {
+            return $"{qa[0].Split('=')[0]} is not an isolated QA harness: on its own it would run the real composition " +
+                $"(real user data, Credential Manager, SSH). Combine it with one of: {string.Join(", ", HarnessFlags)}.";
+        }
+
+        return null;
     }
 
-    private static bool IsGalleryFlag(string flag) =>
-        string.Equals(flag, QaGalleryPolicy.ComponentsFlag, StringComparison.OrdinalIgnoreCase)
-        || string.Equals(flag, QaGalleryPolicy.TokensFlag, StringComparison.OrdinalIgnoreCase)
-        || flag.StartsWith(QaGalleryPolicy.GalleryOptionPrefix, StringComparison.OrdinalIgnoreCase);
+    private static bool IsModifierArgument(string argument) =>
+        ModifierFlags.Any(flag => argument == flag || (argument.StartsWith(flag + "=", StringComparison.Ordinal) && argument.Length > flag.Length + 1));
+
+    [System.Text.RegularExpressions.GeneratedRegex(@"^--qa-compact:\d{1,4}$")]
+    private static partial System.Text.RegularExpressions.Regex CompactCountForm();
 
     /// <summary>The per-process folder every re-rooted path lives in.</summary>
     public static string DefaultRoot() => Path.Combine(
@@ -140,7 +165,9 @@ internal static class QaStartupIsolation
     /// <summary>The launch-time check: a harness launch whose composition reaches real data aborts before the host starts.</summary>
     public static void VerifyOrThrow(IServiceProvider services)
     {
-        if (!IsHarnessLaunch())
+        // Keyed on ANY --qa* argument, not only an exact harness: should the refusal ever be bypassed, a malformed QA
+        // launch that fell through to the production composition still dies here, before the host starts.
+        if (!Environment.GetCommandLineArgs().Any(IsQaLike))
         {
             return;
         }
@@ -168,9 +195,15 @@ internal static class QaStartupIsolation
             }
         }
 
+        // Any store is acceptable except the native Credential Manager one, wherever the composition exposes it.
         if (services.GetService<UngatedCredentialStore>() is { Store: WindowsCredentialStore })
         {
             violations.Add("UngatedCredentialStore = Windows Credential Manager");
+        }
+
+        if (services.GetService<IServerCredentialStore>() is WindowsCredentialStore)
+        {
+            violations.Add("IServerCredentialStore = Windows Credential Manager");
         }
 
         if (violations.Count > 0)
@@ -181,46 +214,88 @@ internal static class QaStartupIsolation
         }
     }
 
-    /// <summary>Every path-bearing registration the production root makes, as the composition resolves it.</summary>
-    internal static IEnumerable<(string Name, string? Path)> ResolvedPaths(IServiceProvider services)
+    /// <summary>The options the production root always registers; a composition missing one is refused.</summary>
+    internal static IReadOnlyList<Type> RequiredOptions { get; } =
+    [
+        typeof(ServerStorageOptions),
+        typeof(HostKeyTrustStorageOptions),
+        typeof(RoutedHostKeyTrustStorageOptions),
+        typeof(BackgroundSettingsStorageOptions),
+        typeof(NotificationSettingsStorageOptions),
+        typeof(WindowPlacementStorageOptions)
+    ];
+
+    /// <summary>
+    /// Every path the composition carries, as it resolves it (no store is constructed). DISCOVERED, not listed (Vigil
+    /// L-1A): every non-generic class named <c>*Options</c> in a ServerMonitor assembly that the container resolves
+    /// contributes each public string property named <c>*Path</c> or <c>*Directory</c>; a new options type is checked
+    /// without anyone remembering to add it here. The SSH sources and the key picker carry their roots elsewhere and are
+    /// read explicitly.
+    /// </summary>
+    internal static IEnumerable<(string Name, string? Path)> ResolvedPaths(IServiceProvider services) =>
+        ResolvedPaths(services, AppDomain.CurrentDomain.GetAssemblies()
+            .Where(assembly => assembly.GetName().Name?.StartsWith("ServerMonitor", StringComparison.Ordinal) == true));
+
+    internal static IEnumerable<(string Name, string? Path)> ResolvedPaths(
+        IServiceProvider services,
+        IEnumerable<System.Reflection.Assembly> assemblies)
     {
-        yield return (nameof(ServerStorageOptions), services.GetRequiredService<ServerStorageOptions>().FilePath);
-        yield return (nameof(HostKeyTrustStorageOptions), services.GetRequiredService<HostKeyTrustStorageOptions>().FilePath);
-        yield return (nameof(RoutedHostKeyTrustStorageOptions), services.GetRequiredService<RoutedHostKeyTrustStorageOptions>().FilePath);
-        yield return (nameof(BackgroundSettingsStorageOptions), services.GetRequiredService<BackgroundSettingsStorageOptions>().FilePath);
-        yield return (nameof(NotificationSettingsStorageOptions), services.GetRequiredService<NotificationSettingsStorageOptions>().FilePath);
-        yield return (nameof(WindowPlacementStorageOptions), services.GetRequiredService<WindowPlacementStorageOptions>().FilePath);
+        var optionTypes = assemblies
+            .SelectMany(LoadableTypes)
+            .Concat(RequiredOptions)
+            .Where(type => type is { IsClass: true, IsAbstract: false, IsGenericTypeDefinition: false, ContainsGenericParameters: false }
+                && type.Name.EndsWith("Options", StringComparison.Ordinal))
+            .Distinct()
+            .OrderBy(type => type.FullName, StringComparer.Ordinal);
 
-        // Registered only by the production feature modules (never in a harness today); checked if one ever appears.
-        if (services.GetService<HistoryStorageOptions>() is { } history)
+        foreach (var type in optionTypes)
         {
-            yield return (nameof(HistoryStorageOptions), history.DatabasePath);
-        }
+            var instance = services.GetService(type);
+            if (instance is null)
+            {
+                if (RequiredOptions.Contains(type))
+                {
+                    yield return ($"{type.Name} (not registered)", null);
+                }
 
-        if (services.GetService<IgnoredDeviceStorageOptions>() is { } ignored)
-        {
-            yield return (nameof(IgnoredDeviceStorageOptions), ignored.FilePath);
-        }
+                continue;
+            }
 
-        if (services.GetService<WidgetStateOptions>() is { } widget)
-        {
-            yield return (nameof(WidgetStateOptions), widget.SnapshotPath);
+            foreach (var property in type.GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
+                .Where(property => property.PropertyType == typeof(string) && property.GetIndexParameters().Length == 0
+                    && (property.Name.EndsWith("Path", StringComparison.Ordinal) || property.Name.EndsWith("Directory", StringComparison.Ordinal)))
+                .OrderBy(property => property.Name, StringComparer.Ordinal))
+            {
+                yield return ($"{type.Name}.{property.Name}", (string?)property.GetValue(instance));
+            }
         }
 
         if (services.GetService<ISshConfigImportSource>() is SshConfigFileImportSource import)
         {
-            yield return (nameof(SshConfigFileImportSource), import.ConfigPath);
+            yield return ($"{nameof(SshConfigFileImportSource)}.{nameof(import.ConfigPath)}", import.ConfigPath);
         }
 
         if (services.GetService<ILocalSshKeyDiscovery>() is LocalSshKeyDiscovery keys)
         {
-            yield return (nameof(LocalSshKeyDiscovery), keys.SshDirectory);
+            yield return ($"{nameof(LocalSshKeyDiscovery)}.{nameof(keys.SshDirectory)}", keys.SshDirectory);
         }
 
         if (services.GetService<IPrivateKeyFilePicker>() is PrivateKeyFilePicker picker)
         {
             // A null profile means the picker opens in the real user profile.
-            yield return (nameof(PrivateKeyFilePicker), picker.UserProfile);
+            yield return ($"{nameof(PrivateKeyFilePicker)}.{nameof(picker.UserProfile)}", picker.UserProfile);
+        }
+    }
+
+    private static IEnumerable<Type> LoadableTypes(System.Reflection.Assembly assembly)
+    {
+        try
+        {
+            return assembly.GetTypes();
+        }
+        catch (System.Reflection.ReflectionTypeLoadException exception)
+        {
+            return exception.Types.Where(type => type is not null)!;
         }
     }
 
