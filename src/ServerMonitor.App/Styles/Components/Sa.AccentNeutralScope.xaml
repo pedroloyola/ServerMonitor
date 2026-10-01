@@ -1,0 +1,113 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- UI.2 S4, gate F-3: LOCAL accent-neutral scope. The legacy global #1846E1 accent override stays app-wide until
+         UI.6 (removing it now would restyle every production CheckBox/ToggleSwitch/ProgressBar - zero drift). This
+         dictionary re-points the WinUI lightweight-styling keys that Fluent templates read to neutral Sa* brushes, and
+         is merged ONLY into the Resources of a container that adopts the primitives (the gallery now; pages from UI.3),
+         NEVER by App.xaml or Sa.Components.xaml (AppXamlMergesComponentsLastAndScopeNever).
+         Per theme because a StaticResource alias inside a theme dictionary resolves in that theme (the idiom of WinUI's
+         own themeresources); HighContrast aliases the same Sa brushes, whose HC entries are SystemColor* already.
+         Its x:Keys are the only non-Sa component keys, and the only legacy-accent NAMES the ratchet exempts - by x:Key
+         name, never by file (Cortex F-11). A popup (ComboBox dropdown) may not inherit the scope: see the gallery
+         popup pages and ui2-components.md. -->
+    <ResourceDictionary.MergedDictionaries>
+        <ResourceDictionary Source="ms-appx:///Styles/Tokens/Color.Semantic.xaml" />
+        <ResourceDictionary Source="ms-appx:///Styles/Tokens/Elevation.xaml" />
+    </ResourceDictionary.MergedDictionaries>
+    <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="Dark">
+            <!-- Generic accent fills (referenced directly by a few templates) -->
+            <StaticResource x:Key="AccentFillColorDefaultBrush" ResourceKey="SaTextBrush" />
+            <StaticResource x:Key="AccentFillColorSecondaryBrush" ResourceKey="SaTextSecondaryBrush" />
+            <StaticResource x:Key="AccentFillColorTertiaryBrush" ResourceKey="SaTextSecondaryBrush" />
+            <StaticResource x:Key="AccentFillColorDisabledBrush" ResourceKey="SaDisabledTextBrush" />
+            <StaticResource x:Key="AccentFillColorSelectedTextBackgroundBrush" ResourceKey="SaBorderNeutralBrush" />
+            <StaticResource x:Key="TextOnAccentFillColorPrimaryBrush" ResourceKey="SaSurfaceBrush" />
+            <!-- Text input selection / focus (Fluent TextBox, PasswordBox, editable ComboBox) -->
+            <StaticResource x:Key="TextControlSelectionHighlightColor" ResourceKey="SaBorderNeutralBrush" />
+            <StaticResource x:Key="TextControlBorderBrushFocused" ResourceKey="SaFocusRingBrush" />
+            <!-- ComboBox (Sa selector styles keep the Fluent template; its states and popup read these keys) -->
+            <StaticResource x:Key="ComboBoxBackgroundPointerOver" ResourceKey="SaSelectedBrush" />
+            <StaticResource x:Key="ComboBoxBackgroundPressed" ResourceKey="SaSelectedBrush" />
+            <StaticResource x:Key="ComboBoxBackgroundFocused" ResourceKey="SaSelectedBrush" />
+            <StaticResource x:Key="ComboBoxBorderBrushPointerOver" ResourceKey="SaBorderNeutralBrush" />
+            <StaticResource x:Key="ComboBoxBorderBrushPressed" ResourceKey="SaBorderNeutralBrush" />
+            <StaticResource x:Key="ComboBoxForegroundFocused" ResourceKey="SaTextBrush" />
+            <StaticResource x:Key="ComboBoxFocusedDropDownBackgroundPointerPressed" ResourceKey="SaSelectedBrush" />
+            <StaticResource x:Key="ComboBoxDropDownGlyphForeground" ResourceKey="SaTextSecondaryBrush" />
+            <StaticResource x:Key="ComboBoxDropDownBackground" ResourceKey="SaModalSurfaceBrush" />
+            <StaticResource x:Key="ComboBoxDropDownBorderBrush" ResourceKey="SaBorderSubtleBrush" />
+            <StaticResource x:Key="ComboBoxItemPillFillBrush" ResourceKey="SaTextBrush" />
+            <StaticResource x:Key="ComboBoxItemBackgroundPointerOver" ResourceKey="SaHoverBrush" />
+            <StaticResource x:Key="ComboBoxItemBackgroundSelected" ResourceKey="SaSelectedBrush" />
+            <StaticResource x:Key="ComboBoxItemBackgroundSelectedPointerOver" ResourceKey="SaSelectedBrush" />
+            <!-- Lists and progress (future pages adopting primitives) -->
+            <StaticResource x:Key="ListViewItemSelectionIndicatorBrush" ResourceKey="SaTextBrush" />
+            <StaticResource x:Key="ListViewItemBackgroundSelected" ResourceKey="SaSelectedBrush" />
+            <StaticResource x:Key="ProgressBarForeground" ResourceKey="SaTextSecondaryBrush" />
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="Light">
+            <!-- Generic accent fills (referenced directly by a few templates) -->
+            <StaticResource x:Key="AccentFillColorDefaultBrush" ResourceKey="SaTextBrush" />
+            <StaticResource x:Key="AccentFillColorSecondaryBrush" ResourceKey="SaTextSecondaryBrush" />
+            <StaticResource x:Key="AccentFillColorTertiaryBrush" ResourceKey="SaTextSecondaryBrush" />
+            <StaticResource x:Key="AccentFillColorDisabledBrush" ResourceKey="SaDisabledTextBrush" />
+            <StaticResource x:Key="AccentFillColorSelectedTextBackgroundBrush" ResourceKey="SaBorderNeutralBrush" />
+            <StaticResource x:Key="TextOnAccentFillColorPrimaryBrush" ResourceKey="SaSurfaceBrush" />
+            <!-- Text input selection / focus (Fluent TextBox, PasswordBox, editable ComboBox) -->
+            <StaticResource x:Key="TextControlSelectionHighlightColor" ResourceKey="SaBorderNeutralBrush" />
+            <StaticResource x:Key="TextControlBorderBrushFocused" ResourceKey="SaFocusRingBrush" />
+            <!-- ComboBox (Sa selector styles keep the Fluent template; its states and popup read these keys) -->
+            <StaticResource x:Key="ComboBoxBackgroundPointerOver" ResourceKey="SaSelectedBrush" />
+            <StaticResource x:Key="ComboBoxBackgroundPressed" ResourceKey="SaSelectedBrush" />
+            <StaticResource x:Key="ComboBoxBackgroundFocused" ResourceKey="SaSelectedBrush" />
+            <StaticResource x:Key="ComboBoxBorderBrushPointerOver" ResourceKey="SaBorderNeutralBrush" />
+            <StaticResource x:Key="ComboBoxBorderBrushPressed" ResourceKey="SaBorderNeutralBrush" />
+            <StaticResource x:Key="ComboBoxForegroundFocused" ResourceKey="SaTextBrush" />
+            <StaticResource x:Key="ComboBoxFocusedDropDownBackgroundPointerPressed" ResourceKey="SaSelectedBrush" />
+            <StaticResource x:Key="ComboBoxDropDownGlyphForeground" ResourceKey="SaTextSecondaryBrush" />
+            <StaticResource x:Key="ComboBoxDropDownBackground" ResourceKey="SaModalSurfaceBrush" />
+            <StaticResource x:Key="ComboBoxDropDownBorderBrush" ResourceKey="SaBorderSubtleBrush" />
+            <StaticResource x:Key="ComboBoxItemPillFillBrush" ResourceKey="SaTextBrush" />
+            <StaticResource x:Key="ComboBoxItemBackgroundPointerOver" ResourceKey="SaHoverBrush" />
+            <StaticResource x:Key="ComboBoxItemBackgroundSelected" ResourceKey="SaSelectedBrush" />
+            <StaticResource x:Key="ComboBoxItemBackgroundSelectedPointerOver" ResourceKey="SaSelectedBrush" />
+            <!-- Lists and progress (future pages adopting primitives) -->
+            <StaticResource x:Key="ListViewItemSelectionIndicatorBrush" ResourceKey="SaTextBrush" />
+            <StaticResource x:Key="ListViewItemBackgroundSelected" ResourceKey="SaSelectedBrush" />
+            <StaticResource x:Key="ProgressBarForeground" ResourceKey="SaTextSecondaryBrush" />
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="HighContrast">
+            <!-- Generic accent fills (referenced directly by a few templates) -->
+            <StaticResource x:Key="AccentFillColorDefaultBrush" ResourceKey="SaTextBrush" />
+            <StaticResource x:Key="AccentFillColorSecondaryBrush" ResourceKey="SaTextSecondaryBrush" />
+            <StaticResource x:Key="AccentFillColorTertiaryBrush" ResourceKey="SaTextSecondaryBrush" />
+            <StaticResource x:Key="AccentFillColorDisabledBrush" ResourceKey="SaDisabledTextBrush" />
+            <StaticResource x:Key="AccentFillColorSelectedTextBackgroundBrush" ResourceKey="SaBorderNeutralBrush" />
+            <StaticResource x:Key="TextOnAccentFillColorPrimaryBrush" ResourceKey="SaSurfaceBrush" />
+            <!-- Text input selection / focus (Fluent TextBox, PasswordBox, editable ComboBox) -->
+            <StaticResource x:Key="TextControlSelectionHighlightColor" ResourceKey="SaBorderNeutralBrush" />
+            <StaticResource x:Key="TextControlBorderBrushFocused" ResourceKey="SaFocusRingBrush" />
+            <!-- ComboBox (Sa selector styles keep the Fluent template; its states and popup read these keys) -->
+            <StaticResource x:Key="ComboBoxBackgroundPointerOver" ResourceKey="SaSelectedBrush" />
+            <StaticResource x:Key="ComboBoxBackgroundPressed" ResourceKey="SaSelectedBrush" />
+            <StaticResource x:Key="ComboBoxBackgroundFocused" ResourceKey="SaSelectedBrush" />
+            <StaticResource x:Key="ComboBoxBorderBrushPointerOver" ResourceKey="SaBorderNeutralBrush" />
+            <StaticResource x:Key="ComboBoxBorderBrushPressed" ResourceKey="SaBorderNeutralBrush" />
+            <StaticResource x:Key="ComboBoxForegroundFocused" ResourceKey="SaTextBrush" />
+            <StaticResource x:Key="ComboBoxFocusedDropDownBackgroundPointerPressed" ResourceKey="SaSelectedBrush" />
+            <StaticResource x:Key="ComboBoxDropDownGlyphForeground" ResourceKey="SaTextSecondaryBrush" />
+            <StaticResource x:Key="ComboBoxDropDownBackground" ResourceKey="SaModalSurfaceBrush" />
+            <StaticResource x:Key="ComboBoxDropDownBorderBrush" ResourceKey="SaBorderSubtleBrush" />
+            <StaticResource x:Key="ComboBoxItemPillFillBrush" ResourceKey="SaTextBrush" />
+            <StaticResource x:Key="ComboBoxItemBackgroundPointerOver" ResourceKey="SaHoverBrush" />
+            <StaticResource x:Key="ComboBoxItemBackgroundSelected" ResourceKey="SaSelectedBrush" />
+            <StaticResource x:Key="ComboBoxItemBackgroundSelectedPointerOver" ResourceKey="SaSelectedBrush" />
+            <!-- Lists and progress (future pages adopting primitives) -->
+            <StaticResource x:Key="ListViewItemSelectionIndicatorBrush" ResourceKey="SaTextBrush" />
+            <StaticResource x:Key="ListViewItemBackgroundSelected" ResourceKey="SaSelectedBrush" />
+            <StaticResource x:Key="ProgressBarForeground" ResourceKey="SaTextSecondaryBrush" />
+        </ResourceDictionary>
+    </ResourceDictionary.ThemeDictionaries>
+</ResourceDictionary>

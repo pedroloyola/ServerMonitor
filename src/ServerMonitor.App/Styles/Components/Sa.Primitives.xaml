@@ -10,7 +10,63 @@
     <ResourceDictionary.MergedDictionaries>
         <ResourceDictionary Source="ms-appx:///Styles/Tokens/Typography.xaml" />
         <ResourceDictionary Source="ms-appx:///Styles/Tokens/Spacing.xaml" />
+        <ResourceDictionary Source="ms-appx:///Styles/Components/Sa.Icons.xaml" />
+        <ResourceDictionary Source="ms-appx:///Styles/Components/Sa.Forms.xaml" />
     </ResourceDictionary.MergedDictionaries>
+
+    <!-- FormField 112:3337 / error 112:16924: label 12 Medium (text), gap 6, input, helper 11 Regular muted (112:3376) or
+         the error 12 Regular in danger text (assertive live region). LabeledBy/DescribedBy are wired in code. -->
+    <Style TargetType="primitives:SaFormField">
+        <Setter Property="IsTabStop" Value="False" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="primitives:SaFormField">
+                    <StackPanel Spacing="6">
+                        <VisualStateManager.VisualStateGroups>
+                            <VisualStateGroup x:Name="ValidationStates">
+                                <VisualState x:Name="Valid" />
+                                <VisualState x:Name="Invalid">
+                                    <VisualState.Setters>
+                                        <Setter Target="PART_Error.Visibility" Value="Visible" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                            </VisualStateGroup>
+                        </VisualStateManager.VisualStateGroups>
+                        <TextBlock x:Name="PART_Header" Style="{StaticResource SaLabelTextStyle}"
+                                   Foreground="{ThemeResource SaTextBrush}" Text="{TemplateBinding Header}" TextWrapping="Wrap" />
+                        <ContentPresenter HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          Content="{TemplateBinding Content}"
+                                          ContentTemplate="{TemplateBinding ContentTemplate}" />
+                        <TextBlock x:Name="PART_Helper" Style="{StaticResource SaHelperTextStyle}"
+                                   Foreground="{ThemeResource SaTextSecondaryBrush}" Text="{TemplateBinding HelperText}" TextWrapping="Wrap" />
+                        <TextBlock x:Name="PART_Error" Style="{StaticResource SaCaptionTextStyle}" Visibility="Collapsed"
+                                   Foreground="{ThemeResource SaDangerTextBrush}" Text="{TemplateBinding ErrorText}" TextWrapping="Wrap"
+                                   AutomationProperties.LiveSetting="Assertive" />
+                    </StackPanel>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- PasswordField 112:3693: TextField metrics + eye toggle (View 17, muted) 15 from the right edge. Never binds Password. -->
+    <Style TargetType="primitives:SaPasswordField">
+        <Setter Property="IsTabStop" Value="False" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="primitives:SaPasswordField">
+                    <Grid>
+                        <PasswordBox x:Name="PART_PasswordBox" Style="{StaticResource SaPasswordBoxStyle}"
+                                     PlaceholderText="{TemplateBinding PlaceholderText}" />
+                        <ToggleButton x:Name="PART_RevealButton" Style="{StaticResource SaRevealToggleStyle}"
+                                      HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,9,0">
+                            <primitives:SaIcon Data="{StaticResource SaIconViewData}" Size="17" />
+                        </ToggleButton>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
 
     <!-- Icon (Boss B-1): one stroke-only path, 1.5 DIP stroke at every size (the geometry is scaled in code, never the
          element), round caps and joins, no fill, Foreground inherited from the host so it follows theme and HC.

@@ -275,9 +275,7 @@ public sealed partial class ComponentLayerGuardTests
             foreach (Match type in TemplatedClass().Matches(code))
             {
                 var typeName = type.Groups[1].Value;
-                var parts = TemplatePartAttribute().Matches(code).Select(m => m.Groups[1].Value)
-                    .Concat(TemplateChildLookup().Matches(code).Select(m => m.Groups[1].Value))
-                    .ToHashSet(StringComparer.Ordinal);
+                var parts = XamlContractAndResourceGuardTests.RuntimeNameLookups(code).ToHashSet(StringComparer.Ordinal);
                 var states = TemplateVisualStateAttribute().Matches(code)
                     .Select(m => (State: m.Groups["name"].Value, Group: m.Groups["group"].Value))
                     .ToList();
@@ -479,12 +477,6 @@ public sealed partial class ComponentLayerGuardTests
 
     [GeneratedRegex(@"\bclass\s+(Sa\w+)\s*:")]
     private static partial Regex TemplatedClass();
-
-    [GeneratedRegex(@"\[\s*TemplatePart\s*\(\s*Name\s*=\s*""([^""]+)""")]
-    private static partial Regex TemplatePartAttribute();
-
-    [GeneratedRegex(@"\bGetTemplateChild\s*\(\s*""([^""]+)""")]
-    private static partial Regex TemplateChildLookup();
 
     [GeneratedRegex(@"\[\s*TemplateVisualState\s*\(\s*(?:Name\s*=\s*""(?<name>[^""]+)""\s*,\s*GroupName\s*=\s*""(?<group>[^""]+)""|GroupName\s*=\s*""(?<group>[^""]+)""\s*,\s*Name\s*=\s*""(?<name>[^""]+)"")")]
     private static partial Regex TemplateVisualStateAttribute();

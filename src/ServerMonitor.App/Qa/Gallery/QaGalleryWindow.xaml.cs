@@ -15,8 +15,8 @@ namespace ServerMonitor.App.Qa.Gallery;
 /// </summary>
 public sealed partial class QaGalleryWindow : Window
 {
-    private const int GalleryWidth = 1280;
-    private const int GalleryHeight = 860;
+    private const int GalleryWidth = 1440;
+    private const int GalleryHeight = 900;
 
     private static readonly IReadOnlyDictionary<string, (string Title, Type PageType)> PageTypes =
         new Dictionary<string, (string, Type)>(StringComparer.Ordinal)
@@ -28,7 +28,12 @@ public sealed partial class QaGalleryWindow : Window
             ["materials"] = ("Materials", typeof(QaMaterialsPage)),
             ["status"] = ("Status", typeof(QaStatusPage)),
             ["motion"] = ("Motion", typeof(QaMotionPage)),
-            ["icons"] = ("Icons", typeof(QaIconsPage))
+            ["icons"] = ("Icons", typeof(QaIconsPage)),
+            ["buttons"] = ("Buttons", typeof(QaButtonsPage)),
+            ["forms"] = ("Forms", typeof(QaFormsPage)),
+            ["navigation"] = ("Navigation", typeof(QaNavigationPage)),
+            ["popup-combo"] = ("Popup · ComboBox", typeof(QaPopupComboPage)),
+            ["popup-flyout"] = ("Popup · Flyout", typeof(QaPopupFlyoutPage))
         };
 
     private readonly QaGalleryRequest _request;
@@ -83,7 +88,7 @@ public sealed partial class QaGalleryWindow : Window
     }
 
     /// <summary>dark / light set GalleryRoot.RequestedTheme. hc-sim keeps the current Dark/Light theme and
-    /// copies every HighContrast token entry into ContentHost's Dark and Light theme dictionaries.</summary>
+    /// copies every HighContrast token entry into SimulationHost's Dark and Light theme dictionaries.</summary>
     internal void ApplyTheme(string theme)
     {
         _theme = theme;
@@ -102,7 +107,7 @@ public sealed partial class QaGalleryWindow : Window
             // Only entering/leaving the simulation recreates the page. A Dark <-> Light switch keeps the SAME page
             // instance, which is what proves runtime ThemeResource re-resolution.
             _simulating = simulate;
-            QaHighContrastSimulation.Apply(ContentHost, simulate);
+            QaHighContrastSimulation.Apply(SimulationHost, simulate);
             if (PageFrame.Content is not null)
             {
                 PageFrame.Navigate(PageTypes[_page].PageType);

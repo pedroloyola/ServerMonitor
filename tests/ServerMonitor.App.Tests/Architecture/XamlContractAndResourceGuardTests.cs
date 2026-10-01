@@ -51,12 +51,23 @@ public sealed partial class XamlContractAndResourceGuardTests
         // HistoryChart parts: the chart draws into these by name.
         ["Controls/HistoryChart.xaml"] = ["RootGrid", "GridCanvas", "PlotCanvas"],
         // UI.2 primitive templates: names resolved at runtime by VisualState setters (G-3).
-        ["Styles/Components/Sa.Primitives.xaml"] = ["PART_Dot", "PART_Path"],
+        ["Styles/Components/Sa.Primitives.xaml"] =
+        [
+            "PART_Dot", "PART_Path", "PART_Header", "PART_Helper", "PART_Error", "PART_PasswordBox", "PART_RevealButton"
+        ],
+        // UI.2 S4 control templates: names targeted by VisualState setters / storyboards (G-3).
+        ["Styles/Components/Sa.Buttons.xaml"] = ["RootGrid", "StateOverlay", "ContentPresenter"],
+        ["Styles/Components/Sa.Forms.xaml"] =
+        [
+            "RootGrid", "HoverOverlay", "FocusRing", "Shell", "Highlight", "StateOverlay", "ContentPresenter", "Box",
+            "CheckGlyph", "IndeterminateGlyph", "SwitchAreaGrid", "SwitchKnobBounds", "KnobTranslateTransform"
+        ],
+        ["Styles/Components/Sa.Navigation.xaml"] = ["RootGrid", "Shell", "Highlight", "StateOverlay", "ContentPresenter"],
         // UI.2 Debug-only component gallery (Qa/Gallery/**, excluded from Release).
         ["Qa/Gallery/QaGalleryWindow.xaml"] =
         [
             "GalleryRoot", "DarkThemeOption", "LightThemeOption", "HcSimThemeOption", "HcBannerText", "PageList",
-            "ContentHost", "PageFrame"
+            "ContentHost", "SimulationHost", "PageFrame"
         ],
         ["Qa/Gallery/QaTokenProbePage.xaml"] = ["DefaultStyleProbe", "StrokeProbe16", "StrokeProbe48"],
         ["Qa/Gallery/QaColorsPage.xaml"] = ["PrimitiveSwatches"],
@@ -136,8 +147,7 @@ public sealed partial class XamlContractAndResourceGuardTests
     public void ContractInventoryCoversEveryNameCodeBehindOrElementNameDependsOn()
     {
         var codeLookups = AppSourceTree.Files(".cs")
-            .SelectMany(file => RuntimeNameLookup().Matches(AppSourceTree.CodeWithoutComments(file)))
-            .Select(match => match.Groups[1].Value)
+            .SelectMany(file => RuntimeNameLookups(AppSourceTree.CodeWithoutComments(file)))
             .ToHashSet(StringComparer.Ordinal);
 
         var missing = new List<string>();
@@ -345,8 +355,33 @@ public sealed partial class XamlContractAndResourceGuardTests
         }
     }
 
-    [GeneratedRegex(@"\b(?:(?:FindName|GetTemplateChild)\s*\(|TemplatePart\s*\(\s*Name\s*=)\s*""([^""]+)""")]
+    /// <summary>Names looked up at runtime: a literal, or a <c>const string</c> declared in the same file (G-3).</summary>
+    internal static IEnumerable<string> RuntimeNameLookups(string code)
+    {
+        var constants = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (Match constant in ConstString().Matches(code))
+        {
+            constants.TryAdd(constant.Groups[1].Value, constant.Groups[2].Value);
+        }
+
+        foreach (Match match in RuntimeNameLookup().Matches(code))
+        {
+            if (match.Groups["literal"].Success)
+            {
+                yield return match.Groups["literal"].Value;
+            }
+            else if (constants.TryGetValue(match.Groups["constant"].Value, out var value))
+            {
+                yield return value;
+            }
+        }
+    }
+
+    [GeneratedRegex(@"\b(?:(?:FindName|GetTemplateChild)\s*\(|TemplatePart\s*\(\s*Name\s*=)\s*(?:""(?<literal>[^""]+)""|(?<constant>[A-Za-z_]\w*))")]
     private static partial Regex RuntimeNameLookup();
+
+    [GeneratedRegex(@"\bconst\s+string\s+([A-Za-z_]\w*)\s*=\s*""([^""]*)""")]
+    private static partial Regex ConstString();
 
     [GeneratedRegex(@"ElementName\s*=\s*([A-Za-z_][A-Za-z0-9_]*)")]
     private static partial Regex ElementNameReference();

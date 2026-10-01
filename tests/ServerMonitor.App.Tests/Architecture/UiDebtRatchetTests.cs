@@ -62,6 +62,23 @@ public sealed partial class UiDebtRatchetTests
         ["Views/HistoryPage.xaml"] = 6
     };
 
+    /// <summary>
+    /// Cortex F-11: the WinUI lightweight-styling key NAMES that the F-3 accent-neutral scope overrides. They contain
+    /// "AccentFill" but are not a use of the legacy blue: they are the keys being neutralised. They are exempt from the
+    /// legacy-accent count ONLY as <c>x:Key</c> attribute values - by name, never by file, never a baseline - so a
+    /// <c>#1846E1</c> / <c>SystemAccent*</c> VALUE anywhere, or any other accent key name, still counts.
+    /// <see cref="AccentScopeOverridesExactlyTheExemptKeyNames"/> keeps this list identical to the scope's keys.
+    /// </summary>
+    internal static readonly IReadOnlySet<string> AccentScopeOverriddenKeyNames = new HashSet<string>(StringComparer.Ordinal)
+    {
+        "AccentFillColorDefaultBrush",
+        "AccentFillColorSecondaryBrush",
+        "AccentFillColorTertiaryBrush",
+        "AccentFillColorDisabledBrush",
+        "AccentFillColorSelectedTextBackgroundBrush",
+        "TextOnAccentFillColorPrimaryBrush"
+    };
+
     [Fact]
     public void LiteralFontSizesOutsideTokens_DoNotGrow()
     {
@@ -96,7 +113,7 @@ public sealed partial class UiDebtRatchetTests
         var counts = new Dictionary<string, int>(StringComparer.Ordinal);
         foreach (var file in AppSourceTree.Files(".xaml").Where(file => !IsUnderTokens(file)))
         {
-            counts[file] = XamlValues(AppSourceTree.LoadXaml(file)).Sum(value => LegacyAccent().Matches(value).Count);
+            counts[file] = XamlValuesExceptExemptAccentKeys(AppSourceTree.LoadXaml(file)).Sum(value => LegacyAccent().Matches(value).Count);
         }
 
         foreach (var file in AppSourceTree.Files(".cs").Where(file => !IsUnderTokens(file)))
@@ -151,13 +168,8 @@ public sealed partial class UiDebtRatchetTests
         var offenders = new List<string>();
         foreach (var file in AppSourceTree.Files(".xaml").Where(IsComponentLayer))
         {
-            var document = AppSourceTree.LoadXaml(file);
-            var values = document.Descendants().Attributes()
-                .Where(a => !(file.EndsWith("/Sa.AccentNeutralScope.xaml", StringComparison.OrdinalIgnoreCase)
-                    && a.Name == AppSourceTree.Xaml + "Key"))
-                .Select(a => a.Value)
-                .Concat(document.DescendantNodes().OfType<XText>().Select(t => t.Value));
-            offenders.AddRange(values.SelectMany(v => LegacyAccentInComponents().Matches(v)).Select(m => $"{file}: {m.Value}"));
+            offenders.AddRange(XamlValuesExceptExemptAccentKeys(AppSourceTree.LoadXaml(file))
+                .SelectMany(v => LegacyAccentInComponents().Matches(v)).Select(m => $"{file}: {m.Value}"));
         }
 
         foreach (var file in AppSourceTree.Files(".cs").Where(IsComponentLayer))
@@ -229,6 +241,24 @@ public sealed partial class UiDebtRatchetTests
             .Count(e => e.Attribute("Value") is { } value && NumericLiteral().IsMatch(value.Value.Trim()));
         return attributes + setters;
     }
+
+    /// <summary>F-11: the exempt key names must be exactly the legacy-accent-shaped keys the F-3 scope overrides.</summary>
+    [Fact]
+    public void AccentScopeOverridesExactlyTheExemptKeyNames()
+    {
+        var scopeKeys = AppSourceTree.LoadXaml("Styles/Components/Sa.AccentNeutralScope.xaml").Descendants()
+            .Attributes(AppSourceTree.Xaml + "Key").Select(a => a.Value)
+            .Where(key => LegacyAccent().IsMatch(key))
+            .ToHashSet(StringComparer.Ordinal);
+
+        Assert.Equal(AccentScopeOverriddenKeyNames.Order(StringComparer.Ordinal), scopeKeys.Order(StringComparer.Ordinal));
+    }
+
+    private static IEnumerable<string> XamlValuesExceptExemptAccentKeys(XDocument document) =>
+        document.Descendants().Attributes()
+            .Where(a => !(a.Name == AppSourceTree.Xaml + "Key" && AccentScopeOverriddenKeyNames.Contains(a.Value)))
+            .Select(a => a.Value)
+            .Concat(document.DescendantNodes().OfType<XText>().Select(t => t.Value));
 
     /// <summary>Attribute values and element text; XML comments are never included.</summary>
     private static IEnumerable<string> XamlValues(XDocument document) =>

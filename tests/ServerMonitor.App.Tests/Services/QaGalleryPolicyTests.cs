@@ -109,7 +109,7 @@ public sealed class QaGalleryPolicyTests
     [Theory]
     [InlineData("--qa-gallery-theme", "high-contrast")]
     [InlineData("--qa-gallery-theme", null)]
-    [InlineData("--qa-gallery-page", "buttons")]
+    [InlineData("--qa-gallery-page", "no-such-page")]
     [InlineData("--qa-gallery-page", null)]
     [InlineData("--qa-gallery-out", null)]
     public void UnknownOrMissingOptionValuesAreRefused(string flag, string? value)

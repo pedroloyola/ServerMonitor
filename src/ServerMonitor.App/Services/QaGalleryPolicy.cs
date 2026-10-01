@@ -55,7 +55,8 @@ public static class QaGalleryPolicy
     public static IReadOnlyList<string> Themes { get; } = ["dark", "light", "hc-sim"];
 
     /// <summary>Gallery page ids, in tab order.</summary>
-    public static IReadOnlyList<string> Pages { get; } = ["tokens", "typography", "colors", "spacing", "materials", "status", "motion", "icons"];
+    public static IReadOnlyList<string> Pages { get; } = ["tokens", "typography", "colors", "spacing", "materials", "status", "motion", "icons", "buttons", "forms",
+        "navigation", "popup-combo", "popup-flyout"];
 
     /// <summary>The only <c>--qa-*</c> switches that may accompany a gallery flag.</summary>
     private static readonly string[] OwnFlags = [ComponentsFlag, TokensFlag, ThemeFlag, PageFlag, OutputFlag, QaUiLanguagePolicy.LaunchFlag];

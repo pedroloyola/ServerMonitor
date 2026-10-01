@@ -1,0 +1,16 @@
+<Page
+    x:Class="ServerMonitor.App.Qa.Gallery.QaPopupFlyoutPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:primitives="using:ServerMonitor.App.Controls.Primitives"
+    xmlns:qa="using:ServerMonitor.App.Qa.Gallery"
+    Foreground="{ThemeResource SaTextBrush}">
+    <!-- QA-ONLY (UI.2 S4): F-3 popup check - a Flyout opened on load, holding an UNSTYLED Fluent CheckBox and ProgressBar to reveal which accent the popup resolves. -->
+    <ScrollViewer qa:QaWallpaper.IsEnabled="True" BringIntoViewOnFocusChange="False">
+        <StackPanel Padding="24" Spacing="{StaticResource SaSpace16}">
+            <TextBlock Style="{StaticResource SaSectionHeaderTextStyle}" Text="Popup check · Flyout" />
+            <TextBlock Style="{StaticResource SaSecondaryBodyTextStyle}" TextWrapping="Wrap" Text="The unstyled Fluent CheckBox/ProgressBar read the accent fill keys: neutral = scope reached the flyout; blue = the legacy global accent (expected until UI.6 if popups do not inherit)." />
+            <Button Style="{StaticResource SaSecondaryButtonStyle}" AutomationProperties.Name="Opções" qa:QaForcedState.State="ShowFlyout"><TextBlock Text="Opções" /><FlyoutBase.AttachedFlyout><Flyout><StackPanel Spacing="12" Width="260"><TextBlock Style="{StaticResource SaButtonTextStyle}" Text="Flyout (light-dismiss)" /><CheckBox Content="Fluent CheckBox (unstyled) - checked fill shows the accent in effect" IsChecked="True" /><CheckBox Style="{StaticResource SaCheckBoxStyle}" Content="SaCheckBox" IsChecked="True" /><ProgressBar Value="60" Width="200" HorizontalAlignment="Left" /></StackPanel></Flyout></FlyoutBase.AttachedFlyout></Button>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

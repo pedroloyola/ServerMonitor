@@ -46,8 +46,20 @@
             </Grid.ColumnDefinitions>
             <ListView x:Name="PageList" Padding="8,16" SelectionMode="Single"
                       AutomationProperties.Name="Gallery pages" SelectionChanged="OnPageSelectionChanged" />
+            <!-- F-3: the accent-neutral scope is merged HERE, on the container that adopts the primitives - never app-wide. -->
             <Grid x:Name="ContentHost" Grid.Column="1" Background="{ThemeResource SaCanvasBrush}">
-                <Frame x:Name="PageFrame" />
+                <Grid.Resources>
+                    <ResourceDictionary>
+                        <ResourceDictionary.MergedDictionaries>
+                            <ResourceDictionary Source="ms-appx:///Styles/Components/Sa.AccentNeutralScope.xaml" />
+                        </ResourceDictionary.MergedDictionaries>
+                    </ResourceDictionary>
+                </Grid.Resources>
+                <!-- HC-sim injects the HighContrast token entries HERE, nearer to the content than the F-3 scope (whose merged
+                     Color.Semantic would otherwise win). -->
+                <Grid x:Name="SimulationHost">
+                    <Frame x:Name="PageFrame" />
+                </Grid>
             </Grid>
         </Grid>
     </Grid>
