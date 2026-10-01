@@ -84,10 +84,12 @@
             <StaticResource x:Key="AccentFillColorSecondaryBrush" ResourceKey="SaTextSecondaryBrush" />
             <StaticResource x:Key="AccentFillColorTertiaryBrush" ResourceKey="SaTextSecondaryBrush" />
             <StaticResource x:Key="AccentFillColorDisabledBrush" ResourceKey="SaDisabledTextBrush" />
-            <StaticResource x:Key="AccentFillColorSelectedTextBackgroundBrush" ResourceKey="SaBorderNeutralBrush" />
+            <StaticResource x:Key="AccentFillColorSelectedTextBackgroundBrush" ResourceKey="SaSelectedBrush" />
             <StaticResource x:Key="TextOnAccentFillColorPrimaryBrush" ResourceKey="SaSurfaceBrush" />
             <!-- Text input selection / focus (Fluent TextBox, PasswordBox, editable ComboBox) -->
-            <StaticResource x:Key="TextControlSelectionHighlightColor" ResourceKey="SaBorderNeutralBrush" />
+            <!-- R1 (Cortex R-1): HC selection background = Highlight (SaSelectedBrush), never WindowText under WindowText. WinUI
+                 has no selected-TEXT foreground key for TextBox; the platform draws selected text in HighlightText. -->
+            <StaticResource x:Key="TextControlSelectionHighlightColor" ResourceKey="SaSelectedBrush" />
             <StaticResource x:Key="TextControlBorderBrushFocused" ResourceKey="SaFocusRingBrush" />
             <!-- ComboBox (Sa selector styles keep the Fluent template; its states and popup read these keys) -->
             <StaticResource x:Key="ComboBoxBackgroundPointerOver" ResourceKey="SaSelectedBrush" />

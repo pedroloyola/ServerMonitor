@@ -43,3 +43,20 @@ public enum SaNoticeSeverity
     Info,
     Error
 }
+
+/// <summary><see cref="SaDialog"/> behaviour: Enter confirms, or (destructive) Enter and first focus take the safe button.</summary>
+public enum SaDialogKind
+{
+    Confirm,
+    Destructive
+}
+
+/// <summary><see cref="SaGroupNavigation"/> keyboard pattern of an item group (one Tab stop + arrows in both modes).</summary>
+public enum SaGroupNavigationMode
+{
+    None,
+    /// <summary>Segmented control: arrows move focus AND select.</summary>
+    SelectionFollowsFocus,
+    /// <summary>Navigation: arrows move focus only; Space/Enter activate.</summary>
+    FocusOnly
+}

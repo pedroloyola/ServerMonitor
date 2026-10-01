@@ -6,7 +6,7 @@
     xmlns:qa="using:ServerMonitor.App.Qa.Gallery"
     Foreground="{ThemeResource SaTextBrush}">
     <!-- QA-ONLY (UI.2 S6): surfaces on the Figma wallpaper gradient so glass reads as designed, text-contrast samples and the opaque-fallback simulation. -->
-    <ScrollViewer qa:QaWallpaper.IsEnabled="True" BringIntoViewOnFocusChange="False">
+    <ScrollViewer AutomationProperties.AutomationId="PageScroll" qa:QaWallpaper.IsEnabled="True" BringIntoViewOnFocusChange="False">
         <StackPanel Padding="24" Spacing="{StaticResource SaSpace16}">
             <TextBlock Style="{StaticResource SaSectionHeaderTextStyle}" Text="Materials" />
             <TextBlock Style="{StaticResource SaSecondaryBodyTextStyle}" TextWrapping="Wrap" Text="Wallpaper = Figma 112:931 / 112:1142 gradient (reference backdrop, not a token). Glass = native in-app Acrylic (D7). Shadows/inner highlights not reproduced (deviation)." />

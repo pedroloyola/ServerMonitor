@@ -39,8 +39,8 @@
                                 </VisualState>
                                 <VisualState x:Name="Pressed">
                                     <VisualState.Setters>
-                                        <Setter Target="StateOverlay.Background" Value="{ThemeResource SaHoverBrush}" />
-                                        <Setter Target="RootGrid.Opacity" Value="0.86" />
+                                        <!-- R1 (Beacon F-5): pressed = overlay only (one step above hover), no content opacity. -->
+                                        <Setter Target="StateOverlay.Background" Value="{ThemeResource SaSelectedBrush}" />
                                     </VisualState.Setters>
                                 </VisualState>
                                 <VisualState x:Name="Disabled">

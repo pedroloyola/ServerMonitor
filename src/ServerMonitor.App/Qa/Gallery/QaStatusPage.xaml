@@ -4,7 +4,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:primitives="using:ServerMonitor.App.Controls.Primitives">
     <!-- QA-ONLY (UI.2 S2): SaStatusIndicator (S1) in every SaStatusKind; the label is always visible and is the automation name. Geometry provisional until the Prism inventory. -->
-    <ScrollViewer Padding="24">
+    <ScrollViewer AutomationProperties.AutomationId="PageScroll" Padding="24">
         <StackPanel Spacing="{StaticResource SaSpace12}">
             <TextBlock Style="{StaticResource SaSectionHeaderTextStyle}" Text="Status" />
             <Grid ColumnSpacing="16">

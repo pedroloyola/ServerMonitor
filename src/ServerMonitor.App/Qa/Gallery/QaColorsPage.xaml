@@ -4,7 +4,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:primitives="using:ServerMonitor.App.Controls.Primitives">
     <!-- QA-ONLY (UI.2 S2): semantic brushes through ThemeResource (theme-switchable) and the raw SaColor* primitives, read in code because SaColor* is private to Styles/Tokens/**. -->
-    <ScrollViewer Padding="24">
+    <ScrollViewer AutomationProperties.AutomationId="PageScroll" Padding="24">
         <StackPanel Spacing="{StaticResource SaSpace12}">
             <TextBlock Style="{StaticResource SaSectionHeaderTextStyle}" Text="Colors" />
             <TextBlock Style="{StaticResource SaSecondaryBodyTextStyle}" Text="Semantic brushes (Color.Semantic.xaml) - follow the gallery theme" />

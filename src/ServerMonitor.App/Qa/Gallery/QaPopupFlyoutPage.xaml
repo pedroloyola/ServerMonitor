@@ -6,7 +6,7 @@
     xmlns:qa="using:ServerMonitor.App.Qa.Gallery"
     Foreground="{ThemeResource SaTextBrush}">
     <!-- QA-ONLY (UI.2 S4): F-3 popup check - a Flyout opened on load, holding an UNSTYLED Fluent CheckBox and ProgressBar to reveal which accent the popup resolves. -->
-    <ScrollViewer qa:QaWallpaper.IsEnabled="True" BringIntoViewOnFocusChange="False">
+    <ScrollViewer AutomationProperties.AutomationId="PageScroll" qa:QaWallpaper.IsEnabled="True" BringIntoViewOnFocusChange="False">
         <StackPanel Padding="24" Spacing="{StaticResource SaSpace16}">
             <TextBlock Style="{StaticResource SaSectionHeaderTextStyle}" Text="Popup check · Flyout" />
             <TextBlock Style="{StaticResource SaSecondaryBodyTextStyle}" TextWrapping="Wrap" Text="The unstyled Fluent CheckBox/ProgressBar read the accent fill keys: neutral = scope reached the flyout; blue = the legacy global accent (expected until UI.6 if popups do not inherit)." />

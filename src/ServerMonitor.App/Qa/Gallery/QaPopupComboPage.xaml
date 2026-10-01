@@ -6,7 +6,7 @@
     xmlns:qa="using:ServerMonitor.App.Qa.Gallery"
     Foreground="{ThemeResource SaTextBrush}">
     <!-- QA-ONLY (UI.2 S4): F-3 popup check - the ComboBox dropdown opened on load; its selection pill must be neutral, not the legacy blue. -->
-    <ScrollViewer qa:QaWallpaper.IsEnabled="True" BringIntoViewOnFocusChange="False">
+    <ScrollViewer AutomationProperties.AutomationId="PageScroll" qa:QaWallpaper.IsEnabled="True" BringIntoViewOnFocusChange="False">
         <StackPanel Padding="24" Spacing="{StaticResource SaSpace16}">
             <TextBlock Style="{StaticResource SaSectionHeaderTextStyle}" Text="Popup check · ComboBox" />
             <TextBlock Style="{StaticResource SaSecondaryBodyTextStyle}" TextWrapping="Wrap" Text="Opened automatically. The selected item's pill and hover come from ComboBoxItem* keys: neutral = the accent-neutral scope reaches the popup; blue = it does not (limitation until UI.6)." />

@@ -67,9 +67,11 @@
     <Color x:Key="SaColorOverlaySmokeDark">#5C000000</Color>
     <Color x:Key="SaColorOverlaySmokeLight">#33000000</Color>
     <!-- UI.2 additive (Boss B-2, D8: the Manual is authority; RAW Figma divergences are not adopted). Alpha rounded to the nearest byte. -->
-    <!-- accessible attention text, Figma 112:1468 D / 112:1650 L (L 4.51:1 on #F7F7F7); SaAttention* unchanged -->
+    <!-- accessible attention text, Figma 112:1468 D / 112:1650 L; SaAttention* unchanged. R1 (Beacon F-2, Boss): Light
+         darkened from the Figma #A6611F (4.51:1 on #F7F7F7, < 4.5 on the glass) to #8F5318 - >= 4.5:1 on every Light
+         surface (deliberate deviation from 112:1468, a11y over Figma). -->
     <Color x:Key="SaColorAttentionTextDark">#FFB866</Color>
-    <Color x:Key="SaColorAttentionTextLight">#A6611F</Color>
+    <Color x:Key="SaColorAttentionTextLight">#8F5318</Color>
     <!-- destructive text 112:8576 D / 112:8762 L -->
     <Color x:Key="SaColorDangerTextDark">#FF9187</Color>
     <Color x:Key="SaColorDangerTextLight">#AD4038</Color>

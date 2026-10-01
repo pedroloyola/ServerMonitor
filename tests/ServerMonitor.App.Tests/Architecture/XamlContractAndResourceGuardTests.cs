@@ -66,6 +66,13 @@ public sealed partial class XamlContractAndResourceGuardTests
             "CheckGlyph", "IndeterminateGlyph", "SwitchAreaGrid", "SwitchKnobBounds", "KnobTranslateTransform"
         ],
         ["Styles/Components/Sa.Navigation.xaml"] = ["RootGrid", "Shell", "Highlight", "StateOverlay", "ContentPresenter"],
+        // UI.2 R1 (Prism MF-3): the Sa ContentDialog template keeps the Fluent PART names - ContentDialog's own code resolves
+        // them (GetTemplateChild) and the VisualState setters target them; SaDialog focuses PrimaryButton/CloseButton by name.
+        ["Styles/Components/Sa.Dialogs.xaml"] =
+        [
+            "Container", "LayoutRoot", "SmokeLayerBackground", "BackgroundElement", "ScaleTransform", "DialogSpace",
+            "ContentScrollViewer", "Title", "Content", "CommandSpace", "PrimaryButton", "SecondaryButton", "CloseButton"
+        ],
         // UI.2 Debug-only component gallery (Qa/Gallery/**, excluded from Release).
         ["Qa/Gallery/QaGalleryWindow.xaml"] =
         [
@@ -75,6 +82,8 @@ public sealed partial class XamlContractAndResourceGuardTests
         ["Qa/Gallery/QaTokenProbePage.xaml"] = ["DefaultStyleProbe", "StrokeProbe16", "StrokeProbe20", "StrokeProbe24", "StrokeProbe48", "RevealNameProbe",
             "IconButtonNameProbe", "ToastNameProbe"],
         ["Qa/Gallery/QaColorsPage.xaml"] = ["PrimitiveSwatches"],
+        // DialogInitialFocus / DialogResult are also read by AutomationId by tools/qa/ui2-dialog-probe.ps1.
+        ["Qa/Gallery/QaPopupDialogPage.xaml"] = ["Description", "InitialFocusText", "ResultText"],
         ["Qa/Gallery/QaMaterialsPage.xaml"] = ["FallbackToggle", "GlassSample", "GlassFallbackSample"],
         // Storyboard.TargetName lanes (G-3) and the C#-path lanes driven by the code-behind.
         ["Qa/Gallery/QaMotionPage.xaml"] =
@@ -108,7 +117,10 @@ public sealed partial class XamlContractAndResourceGuardTests
         "SystemColorHighlightColor",
         "SystemColorHighlightTextColor",
         "SystemColorWindowColor",
-        "SystemColorWindowTextColor"
+        "SystemColorWindowTextColor",
+        // UI.2 R1 (Prism MF-4): HC rest fill/border of secondary controls - the framework's ButtonFace/ButtonText.
+        "SystemColorButtonFaceColor",
+        "SystemColorButtonTextColor"
     };
 
     /// <summary>True for a documented WinUI platform key (shared with the UI.2 component-layer guards).</summary>

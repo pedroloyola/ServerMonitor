@@ -38,7 +38,8 @@ public sealed partial class QaGalleryWindow : Window
             ["feedback"] = ("Feedback", typeof(QaFeedbackPage), null),
             ["materials-fallback"] = ("Materials · fallback (sim)", typeof(QaMaterialsPage), "fallback"),
             ["popup-flyout"] = ("Popup · Flyout", typeof(QaPopupFlyoutPage), null),
-            ["popup-dialog"] = ("Popup · Dialog", typeof(QaPopupDialogPage), null)
+            ["popup-dialog"] = ("Popup · Dialog (destructive)", typeof(QaPopupDialogPage), "destructive"),
+            ["popup-dialog-confirm"] = ("Popup · Dialog (confirm)", typeof(QaPopupDialogPage), "confirm")
         };
 
     private readonly QaGalleryRequest _request;
@@ -113,6 +114,13 @@ public sealed partial class QaGalleryWindow : Window
             // instance, which is what proves runtime ThemeResource re-resolution.
             _simulating = simulate;
             QaHighContrastSimulation.Apply(SimulationHost, simulate);
+            // R1 (Prism MF-4): simulate the canvas too - the HC SaCanvasBrush (system Window colour) behind the page and
+            // no Figma wallpaper - so WindowText is never judged on a dark backdrop.
+            QaWallpaper.Suppressed = simulate;
+            SimulationHost.Background = simulate
+                && QaHighContrastSimulation.ThemeEntries("HighContrast").TryGetValue("SaCanvasBrush", out var canvas)
+                ? canvas as Microsoft.UI.Xaml.Media.Brush
+                : null;
             if (PageFrame.Content is not null)
             {
                 PageFrame.Navigate(PageTypes[_page].PageType, PageTypes[_page].Parameter);
@@ -181,7 +189,7 @@ public sealed partial class QaGalleryWindow : Window
             ? $"REAL system high contrast: ON ({_themeSettings.HighContrastScheme})"
             : "REAL system high contrast: off";
         var mode = _theme == "hc-sim"
-            ? "Gallery theme: HC-sim = RESOURCE SIMULATION (HighContrast token entries with the current system palette; NOT a contrast theme - use Settings > Accessibility > Contrast themes for real HC)."
+            ? "Gallery theme: HC-sim = RESOURCE SIMULATION (HighContrast token entries with the current system palette; page canvas = HC Window colour, wallpaper off; the gallery chrome is not simulated; NOT a contrast theme - use Settings > Accessibility > Contrast themes for real HC)."
             : $"Gallery theme: {_theme}.";
         HcBannerText.Text = real + "  ·  " + mode;
     }

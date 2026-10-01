@@ -2,15 +2,18 @@
     x:Class="ServerMonitor.App.Qa.Gallery.QaPopupDialogPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:primitives="using:ServerMonitor.App.Controls.Primitives"
     xmlns:qa="using:ServerMonitor.App.Qa.Gallery"
     Foreground="{ThemeResource SaTextBrush}">
-    <!-- QA-ONLY (UI.2 S6): SaDialogStyle on a real ContentDialog, opened on load (F-07: 2px WindowText border in HC). -->
-    <ScrollViewer qa:QaWallpaper.IsEnabled="True" BringIntoViewOnFocusChange="False">
+    <!-- QA-ONLY (UI.2 S6, R1): SaDialogStyle on a real ContentDialog, opened on load (F-07: 2px WindowText border in HC).
+         "popup-dialog" = destructive (Enter + first focus = Cancelar), "popup-dialog-confirm" = confirm (Enter = primary).
+         DialogInitialFocus / DialogResult are read by the scripted keyboard probe (tools/qa/ui2-dialog-probe.ps1). -->
+    <ScrollViewer AutomationProperties.AutomationId="PageScroll" qa:QaWallpaper.IsEnabled="True" BringIntoViewOnFocusChange="False">
         <StackPanel Padding="24" Spacing="{StaticResource SaSpace16}">
             <TextBlock Style="{StaticResource SaSectionHeaderTextStyle}" Text="Popup check · Dialog" />
-            <TextBlock Style="{StaticResource SaSecondaryBodyTextStyle}" TextWrapping="Wrap" Text="Opened automatically: SaDialogStyle (opaque modal surface, glass contour, radius 24, padding 28, dialog buttons; destructive primary)." />
+            <TextBlock x:Name="Description" Style="{StaticResource SaSecondaryBodyTextStyle}" TextWrapping="Wrap" />
             <Button Style="{StaticResource SaSecondaryButtonStyle}" Content="Abrir diálogo" Click="OnOpenDialog" />
+            <TextBlock x:Name="InitialFocusText" AutomationProperties.AutomationId="DialogInitialFocus" Style="{StaticResource SaMonoTextStyle}" Text="Dialog initial focus: -" />
+            <TextBlock x:Name="ResultText" AutomationProperties.AutomationId="DialogResult" Style="{StaticResource SaMonoTextStyle}" Text="Dialog result: -" />
         </StackPanel>
     </ScrollViewer>
 </Page>

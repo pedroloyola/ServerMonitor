@@ -16,7 +16,7 @@
         <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
     </Style>
     <x:Double x:Key="SaFontSizeHeading">30</x:Double>
-    <x:Double x:Key="SaLineHeightHeading">40</x:Double>
+    <x:Double x:Key="SaLineHeightHeading">42</x:Double>
     <Style x:Key="SaHeadingTextStyle" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{StaticResource SaFontDisplay}" />
         <Setter Property="FontSize" Value="{StaticResource SaFontSizeHeading}" />

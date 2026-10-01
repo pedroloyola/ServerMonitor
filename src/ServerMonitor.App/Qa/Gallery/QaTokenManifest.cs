@@ -173,6 +173,9 @@ public static class QaTokenManifest
         new("SaBarEmptyBrush", QaTokenKind.Brush),
         new("SaDialogButtonFillBrush", QaTokenKind.Brush),
         new("SaDialogButtonBorderBrush", QaTokenKind.Brush),
+        new("SaSecondaryFillBrush", QaTokenKind.Brush),
+        new("SaSecondaryBorderBrush", QaTokenKind.Brush),
+        new("SaToggleOnTrackBrush", QaTokenKind.Brush),
         // Styles/Tokens/Elevation.xaml
         new("SaNeutralSurfaceBrush", QaTokenKind.Brush),
         new("SaElevatedSurfaceBrush", QaTokenKind.Brush),

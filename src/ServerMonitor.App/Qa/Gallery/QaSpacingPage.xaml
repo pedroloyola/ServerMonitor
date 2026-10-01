@@ -4,7 +4,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:primitives="using:ServerMonitor.App.Controls.Primitives">
     <!-- QA-ONLY (UI.2 S2): spacing scale, radius scale and border/focus thicknesses. -->
-    <ScrollViewer Padding="24">
+    <ScrollViewer AutomationProperties.AutomationId="PageScroll" Padding="24">
         <StackPanel Spacing="{StaticResource SaSpace12}">
             <TextBlock Style="{StaticResource SaSectionHeaderTextStyle}" Text="Spacing &amp; radius" />
             <TextBlock Style="{StaticResource SaSecondaryBodyTextStyle}" Text="Spacing (Spacing.xaml) - bar width = token" Margin="0,0,0,0" />

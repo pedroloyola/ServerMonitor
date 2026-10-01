@@ -9,6 +9,7 @@
         <ResourceDictionary Source="ms-appx:///Styles/Tokens/Typography.xaml" />
         <ResourceDictionary Source="ms-appx:///Styles/Tokens/Radius.xaml" />
         <ResourceDictionary Source="ms-appx:///Styles/Tokens/Borders.xaml" />
+        <ResourceDictionary Source="ms-appx:///Styles/Components/Sa.Surfaces.xaml" />
     </ResourceDictionary.MergedDictionaries>
 
     <!-- Glass families (secondary pill/rect, icon button): inner highlight; hover/pressed text = SaHoverTextBrush (HC: HighlightText on Highlight). -->
@@ -139,16 +140,19 @@
                             <Setter Target="StateOverlay.Background" Value="{ThemeResource SaHoverBrush}" />
                         </VisualState.Setters>
                     </VisualState>
-                    <!-- MEASURED rule 112:3399: the whole button at opacity .58, text in the disabled text colour. -->
+                    <!-- MEASURED rule 112:3399: the whole button at opacity .58. R1 (Prism nit): the primary keeps SaPrimaryText -
+                         the disabled text colour on the Light #303030 fill was illegible; the opacity does the work. -->
                     <VisualState x:Name="Disabled">
                         <VisualState.Setters>
                             <Setter Target="RootGrid.Opacity" Value="0.58" />
-                            <Setter Target="ContentPresenter.Foreground" Value="{ThemeResource SaDisabledTextBrush}" />
                         </VisualState.Setters>
                     </VisualState>
                 </VisualStateGroup>
             </VisualStateManager.VisualStateGroups>
+            <!-- R1 (Prism MF-2): the fill runs under the 1px border (OuterBorderEdge), so the transparent Light border no
+                 longer shrinks the visible shape to 42 - it is 44 as in 112:1216. -->
             <Border x:Name="Shell"
+                    BackgroundSizing="OuterBorderEdge"
                     Background="{TemplateBinding Background}"
                     BorderBrush="{TemplateBinding BorderBrush}"
                     BorderThickness="{TemplateBinding BorderThickness}"
@@ -257,19 +261,23 @@
         <Setter Property="Foreground" Value="{ThemeResource SaPrimaryTextBrush}" />
         <Setter Property="FontSize" Value="{StaticResource SaFontSizeButton}" />
     </Style>
-    <!-- Secondary pill 112:3323 / 112:3484 (also disabled 112:3399): h42, radius h/2, fill rgba(82,82,82,.23) / rgba(255,255,255,.5) = SaSelectedBrush, no border, inner highlight, 13 Medium. -->
+    <!-- Secondary pill 112:3323 / 112:3484 (also disabled 112:3399): h42, radius h/2, fill rgba(82,82,82,.23) / rgba(255,255,255,.5) = SaSecondaryFillBrush (R1 MF-4: ButtonFace + ButtonText border in HC), no border, inner highlight, 13 Medium. -->
     <Style x:Key="SaSecondaryButtonStyle" TargetType="Button" BasedOn="{StaticResource SaButtonBaseStyle}">
         <Setter Property="Height" Value="42" />
         <Setter Property="Padding" Value="18,0" />
         <Setter Property="CornerRadius" Value="21" />
-        <Setter Property="Background" Value="{ThemeResource SaSelectedBrush}" />
+        <Setter Property="Background" Value="{ThemeResource SaSecondaryFillBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource SaSecondaryBorderBrush}" />
+        <Setter Property="BorderThickness" Value="{ThemeResource SaSecondaryBorderThickness}" />
     </Style>
     <!-- Secondary rect 112:1806 / 112:2043 (Atualizar / Editar): h42, radius 14, same fill/highlight as the pill, gap 8, 13 Medium. -->
     <Style x:Key="SaSecondaryRectButtonStyle" TargetType="Button" BasedOn="{StaticResource SaButtonBaseStyle}">
         <Setter Property="Height" Value="42" />
         <Setter Property="Padding" Value="16,0" />
         <Setter Property="CornerRadius" Value="{StaticResource SaRadiusRect}" />
-        <Setter Property="Background" Value="{ThemeResource SaSelectedBrush}" />
+        <Setter Property="Background" Value="{ThemeResource SaSecondaryFillBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource SaSecondaryBorderBrush}" />
+        <Setter Property="BorderThickness" Value="{ThemeResource SaSecondaryBorderThickness}" />
     </Style>
     <!-- Dialog neutral 112:8573 / 112:8759: h42, radius 13, min width 168, fill .14/.12 + 1px border .14/.16, 13 Medium; no highlight. -->
     <Style x:Key="SaDialogButtonStyle" TargetType="Button" BasedOn="{StaticResource SaButtonBaseStyle}">
@@ -312,7 +320,9 @@
         <Setter Property="Height" Value="44" />
         <Setter Property="Padding" Value="0" />
         <Setter Property="CornerRadius" Value="22" />
-        <Setter Property="Background" Value="{ThemeResource SaSelectedBrush}" />
+        <Setter Property="Background" Value="{ThemeResource SaSecondaryFillBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource SaSecondaryBorderBrush}" />
+        <Setter Property="BorderThickness" Value="{ThemeResource SaSecondaryBorderThickness}" />
     </Style>
     <!-- Ghost icon button 112:19619 (toast close): 28x28, no fill, muted glyph 20. Icon-only: AutomationProperties.Name required (T-17). -->
     <Style x:Key="SaGhostIconButtonStyle" TargetType="Button" BasedOn="{StaticResource SaButtonBaseStyle}">

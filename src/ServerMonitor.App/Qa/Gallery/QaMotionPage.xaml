@@ -46,7 +46,7 @@
             </DoubleAnimationUsingKeyFrames>
         </Storyboard>
     </Page.Resources>
-    <ScrollViewer Padding="24">
+    <ScrollViewer AutomationProperties.AutomationId="PageScroll" Padding="24">
         <StackPanel Spacing="{StaticResource SaSpace12}">
             <TextBlock Style="{StaticResource SaSectionHeaderTextStyle}" Text="Motion" />
             <StackPanel Orientation="Horizontal" Spacing="{StaticResource SaSpace16}">

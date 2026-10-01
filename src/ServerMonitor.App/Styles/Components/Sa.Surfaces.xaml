@@ -10,16 +10,21 @@
         <ResourceDictionary Source="ms-appx:///Styles/Tokens/Radius.xaml" />
         <ResourceDictionary Source="ms-appx:///Styles/Tokens/Borders.xaml" />
     </ResourceDictionary.MergedDictionaries>
-    <!-- F-07: the modal/dialog border is 1px glass contour normally, 2px (WindowText via SaGlassBorderBrush) in High Contrast. -->
+    <!-- F-07: the modal/dialog border is 1px glass contour normally, 2px (WindowText via SaGlassBorderBrush) in High Contrast.
+         R1 (Prism MF-4): the secondary/icon/search/selector rest controls draw no border in Dark/Light and a 1px
+         ButtonText border (SaSecondaryBorderBrush) in High Contrast. -->
     <ResourceDictionary.ThemeDictionaries>
         <ResourceDictionary x:Key="Dark">
             <Thickness x:Key="SaModalBorderThickness">1</Thickness>
+            <Thickness x:Key="SaSecondaryBorderThickness">0</Thickness>
         </ResourceDictionary>
         <ResourceDictionary x:Key="Light">
             <Thickness x:Key="SaModalBorderThickness">1</Thickness>
+            <Thickness x:Key="SaSecondaryBorderThickness">0</Thickness>
         </ResourceDictionary>
         <ResourceDictionary x:Key="HighContrast">
             <Thickness x:Key="SaModalBorderThickness">2</Thickness>
+            <Thickness x:Key="SaSecondaryBorderThickness">1</Thickness>
         </ResourceDictionary>
     </ResourceDictionary.ThemeDictionaries>
 

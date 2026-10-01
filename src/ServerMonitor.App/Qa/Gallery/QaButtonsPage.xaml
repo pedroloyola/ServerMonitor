@@ -6,7 +6,7 @@
     xmlns:qa="using:ServerMonitor.App.Qa.Gallery"
     Foreground="{ThemeResource SaTextBrush}">
     <!-- QA-ONLY (UI.2 S4): the eight button styles of Boss B-4 in every state. -->
-    <ScrollViewer qa:QaWallpaper.IsEnabled="True" BringIntoViewOnFocusChange="False">
+    <ScrollViewer AutomationProperties.AutomationId="PageScroll" qa:QaWallpaper.IsEnabled="True" BringIntoViewOnFocusChange="False">
         <StackPanel Padding="24" Spacing="{StaticResource SaSpace16}">
             <TextBlock Style="{StaticResource SaSectionHeaderTextStyle}" Text="Buttons" />
             <TextBlock Style="{StaticResource SaSecondaryBodyTextStyle}" TextWrapping="Wrap" Text="Four Figma families (pill glass, rect 14, dialog 13, Manual 12) + icon buttons. Rest and Disabled (opacity .58, 112:3399) are MEASURED; * = DERIVED (B-4). Drop shadows are not reproduced (deviation)." />

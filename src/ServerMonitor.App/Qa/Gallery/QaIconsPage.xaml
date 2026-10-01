@@ -6,7 +6,7 @@
     Foreground="{ThemeResource SaTextBrush}">
     <!-- QA-ONLY (UI.2 S5): every vendored Hugeicons icon (Boss B-1) at 14/16/20/24/48 in the current theme. The stroke
          must read 1.5 DIP at every size (Figma Manual p.08, 107:613; Prism 3.2). Generated from Icons.manifest.json. -->
-    <ScrollViewer Padding="24">
+    <ScrollViewer AutomationProperties.AutomationId="PageScroll" Padding="24">
         <StackPanel Spacing="0">
             <TextBlock Style="{StaticResource SaSectionHeaderTextStyle}" Text="Icons" />
             <TextBlock Style="{StaticResource SaSecondaryBodyTextStyle}" Margin="0,4,0,12" TextWrapping="Wrap"

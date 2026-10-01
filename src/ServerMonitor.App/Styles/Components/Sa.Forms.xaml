@@ -14,6 +14,7 @@
         <ResourceDictionary Source="ms-appx:///Styles/Tokens/Borders.xaml" />
         <ResourceDictionary Source="ms-appx:///Styles/Tokens/Spacing.xaml" />
         <ResourceDictionary Source="ms-appx:///Styles/Components/Sa.Icons.xaml" />
+        <ResourceDictionary Source="ms-appx:///Styles/Components/Sa.Surfaces.xaml" />
     </ResourceDictionary.MergedDictionaries>
 
     <!-- Pill radii are h/2 literals (Figma): a radius above h/2 (SaRadiusPill 99) renders ELLIPTICAL in WinUI. -->
@@ -277,8 +278,9 @@
         <Setter Property="Height" Value="38" />
         <Setter Property="Padding" Value="12,0,14,0" />
         <Setter Property="CornerRadius" Value="19" />
-        <Setter Property="Background" Value="{ThemeResource SaSelectedBrush}" />
-        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Background" Value="{ThemeResource SaSecondaryFillBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource SaSecondaryBorderBrush}" />
+        <Setter Property="BorderThickness" Value="{ThemeResource SaSecondaryBorderThickness}" />
         <Setter Property="FontSize" Value="{StaticResource SaFontSizeCaption}" />
     </Style>
     <!-- PasswordBox inside SaPasswordField 112:3693: TextField metrics + room on the right for the eye (17, 15 from the edge). -->
@@ -385,8 +387,9 @@
     <Style x:Key="SaSelectorPillStyle" TargetType="ComboBox" BasedOn="{StaticResource SaSelectorFieldStyle}">
         <Setter Property="Height" Value="36" />
         <Setter Property="CornerRadius" Value="18" />
-        <Setter Property="Background" Value="{ThemeResource SaSelectedBrush}" />
-        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Background" Value="{ThemeResource SaSecondaryFillBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource SaSecondaryBorderBrush}" />
+        <Setter Property="BorderThickness" Value="{ThemeResource SaSecondaryBorderThickness}" />
         <Setter Property="FontSize" Value="{StaticResource SaFontSizeCaption}" />
     </Style>
 
@@ -511,8 +514,8 @@
         </Setter>
     </Style>
 
-    <!-- ===== ToggleSwitch 112:7956 / 112:7982: track 44x26 radius 13, thumb 22 #FCFCFC (margin 2), On = SaHealthyBrush
-         (Boss B-2), Off = SaToggleOffTrackBrush. Thumb shadow not reproduced. WinUI part names kept (SwitchKnobBounds,
+    <!-- ===== ToggleSwitch 112:7956 / 112:7982: track 44x26 radius 13, thumb 22 #FCFCFC (margin 2), On = SaToggleOnTrackBrush
+         (Boss B-2: SaHealthy colour in Dark/Light; R1 Cortex R-3: Highlight in HC, Off = WindowText - GrayText is disabled-only), Off = SaToggleOffTrackBrush. Thumb shadow not reproduced. WinUI part names kept (SwitchKnobBounds,
          SwitchKnob, KnobTranslateTransform, SwitchThumb, OuterBorder) so tap, drag and keyboard behave natively. The
          setting row (label 14 Medium + description 12) is the consumer's. ===== -->
     <Style x:Key="SaToggleSwitchStyle" TargetType="ToggleSwitch">
@@ -566,7 +569,7 @@
                             <Rectangle x:Name="OuterBorder" Width="44" Height="26" RadiusX="13" RadiusY="13"
                                        Fill="{ThemeResource SaToggleOffTrackBrush}" />
                             <Rectangle x:Name="SwitchKnobBounds" Width="44" Height="26" RadiusX="13" RadiusY="13" Opacity="0"
-                                       Fill="{ThemeResource SaHealthyBrush}" />
+                                       Fill="{ThemeResource SaToggleOnTrackBrush}" />
                             <Grid x:Name="SwitchKnob" Width="26" Height="26" Margin="4,0,0,0" HorizontalAlignment="Left">
                                 <Ellipse x:Name="SwitchKnobOff" Width="22" Height="22" Fill="{ThemeResource SaToggleThumbBrush}" />
                                 <Grid.RenderTransform>
@@ -635,8 +638,8 @@
                                 </VisualState>
                                 <VisualState x:Name="Pressed">
                                     <VisualState.Setters>
-                                        <Setter Target="StateOverlay.Background" Value="{ThemeResource SaHoverBrush}" />
-                                        <Setter Target="RootGrid.Opacity" Value="0.86" />
+                                        <!-- R1 (Beacon F-5): pressed = overlay only (one step above hover), no content opacity. -->
+                                        <Setter Target="StateOverlay.Background" Value="{ThemeResource SaSelectedBrush}" />
                                     </VisualState.Setters>
                                 </VisualState>
                                 <VisualState x:Name="Disabled">
@@ -709,8 +712,8 @@
                                 </VisualState>
                                 <VisualState x:Name="Pressed">
                                     <VisualState.Setters>
-                                        <Setter Target="StateOverlay.Background" Value="{ThemeResource SaHoverBrush}" />
-                                        <Setter Target="RootGrid.Opacity" Value="0.86" />
+                                        <!-- R1 (Beacon F-5): pressed = overlay only (one step above hover), no content opacity. -->
+                                        <Setter Target="StateOverlay.Background" Value="{ThemeResource SaSelectedBrush}" />
                                     </VisualState.Setters>
                                 </VisualState>
                                 <VisualState x:Name="Disabled">
