@@ -64,6 +64,11 @@ public partial class App : Application
             return;
         }
 #endif
+#if DEBUG
+        // UI.3 gate 1A (fail-closed): a --qa-* modifier without an isolated harness would run the production composition
+        // against real data; the process ends here (exit 3), before anything is composed.
+        Qa.QaStartupIsolation.RefuseUnisolatedLaunch();
+#endif
 
         ServicesHost = Microsoft.Extensions.Hosting.Host
             .CreateDefaultBuilder()

@@ -35,7 +35,8 @@ param(
     [int]$TimeoutSeconds = 45,
     [int]$BootstrapSamples = 10000,
     # Alternate the order inside each pair (AB, BA, AB, ...) so neither build always runs right after the other.
-    [switch]$Counterbalance
+    # On by default (Boss, UI.3); -Counterbalance:$false gives the strict ABAB order of the gate 1A runs 1-4.
+    [switch]$Counterbalance = $true
 )
 
 $ErrorActionPreference = 'Stop'

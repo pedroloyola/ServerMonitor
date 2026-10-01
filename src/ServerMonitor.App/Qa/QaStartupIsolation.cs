@@ -40,6 +40,66 @@ internal static class QaStartupIsolation
         || QaStoreScreenshotComposition.IsRequested()
         || QaProxyJumpComposition.IsRequested();
 
+    /// <summary>Exit code of a refused launch (the harness-error code the gallery also uses).</summary>
+    public const int RefusedExitCode = 3;
+
+    /// <summary>The isolated data harnesses: the only flags that select a QA composition of the application.</summary>
+    public static IReadOnlyList<string> HarnessFlags { get; } =
+    [
+        QaHealthComposition.LaunchFlag,
+        QaDiscoveryComposition.LaunchFlag,
+        QaNotificationComposition.LaunchFlag,
+        QaCompactComposition.LaunchFlag,
+        QaHistoryComposition.LaunchFlag,
+        QaWorkloadsComposition.LaunchFlag,
+        QaStoreScreenshotComposition.LaunchFlag,
+        QaProxyJumpPolicy.LaunchFlag
+    ];
+
+    /// <summary>
+    /// Runs in the App constructor before the host is built. A <c>--qa-*</c> modifier (<c>--qa-ssh-config</c>,
+    /// <c>--qa-ui-language</c>, <c>--qa-backup</c>, <c>--qa-proxyjump-dir</c>, or any unknown <c>--qa-*</c>) without an
+    /// isolated harness would run the PRODUCTION composition - real data, Credential Manager, SSH - so the process ends
+    /// here (exit 3) instead.
+    /// </summary>
+    public static void RefuseUnisolatedLaunch()
+    {
+        if (LaunchRefusal(Environment.GetCommandLineArgs()) is { } refusal)
+        {
+            System.Diagnostics.Debug.WriteLine("QA launch refused: " + refusal);
+            Console.Error.WriteLine("QA launch refused: " + refusal);
+            Environment.Exit(RefusedExitCode);
+        }
+    }
+
+    /// <summary>
+    /// Null when the launch is allowed: no <c>--qa-*</c> argument (production), an isolated harness among them (modifiers
+    /// may accompany it), or a gallery flag/option (the exclusive gallery owns those and refuses its own misuse - see
+    /// QaGalleryPolicy). Otherwise the reason, naming the flag and the harnesses to combine it with.
+    /// </summary>
+    internal static string? LaunchRefusal(IReadOnlyList<string> commandLineArgs)
+    {
+        ArgumentNullException.ThrowIfNull(commandLineArgs);
+        var flags = commandLineArgs
+            .Where(argument => argument.StartsWith("--qa-", StringComparison.OrdinalIgnoreCase))
+            .Select(argument => argument.Split('=', ':')[0])
+            .ToList();
+        if (flags.Count == 0
+            || flags.Any(flag => HarnessFlags.Contains(flag, StringComparer.OrdinalIgnoreCase))
+            || flags.Any(IsGalleryFlag))
+        {
+            return null;
+        }
+
+        return $"{flags[0]} is not an isolated QA harness: on its own it would run the real composition (real user data, " +
+            $"Credential Manager, SSH). Combine it with one of: {string.Join(", ", HarnessFlags)}.";
+    }
+
+    private static bool IsGalleryFlag(string flag) =>
+        string.Equals(flag, QaGalleryPolicy.ComponentsFlag, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(flag, QaGalleryPolicy.TokensFlag, StringComparison.OrdinalIgnoreCase)
+        || flag.StartsWith(QaGalleryPolicy.GalleryOptionPrefix, StringComparison.OrdinalIgnoreCase);
+
     /// <summary>The per-process folder every re-rooted path lives in.</summary>
     public static string DefaultRoot() => Path.Combine(
         QaWindowPlacementIsolation.Root,
