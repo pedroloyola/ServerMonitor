@@ -79,6 +79,9 @@ public sealed partial class XamlContractAndResourceGuardTests
         "SystemColorWindowTextColor"
     };
 
+    /// <summary>True for a documented WinUI platform key (shared with the UI.2 component-layer guards).</summary>
+    internal static bool IsPlatformKey(string key) => PlatformResourceKeys.Contains(key);
+
     [Fact]
     public void NamedElementsUsedByCodeRemainInTheirXamlFiles()
     {
@@ -106,10 +109,21 @@ public sealed partial class XamlContractAndResourceGuardTests
         Assert.True(failures.Count == 0, string.Join(Environment.NewLine, failures));
     }
 
-    /// <summary>Keeps the contract honest: a new code-behind or ElementName dependency must be inventoried.</summary>
+    /// <summary>
+    /// Keeps the contract honest: a new dependency on a named element must be inventoried. Consumers are the
+    /// paired code-behind, runtime <c>ElementName</c> bindings, and (UI.2 G-3) every other name resolved at
+    /// runtime: <c>Storyboard.TargetName</c>/<c>TargetName</c> and VisualState <c>Setter Target="X.Prop"</c> in the
+    /// same file, and <c>FindName("X")</c>/<c>GetTemplateChild("X")</c>/<c>[TemplatePart(Name = "X")]</c> literals in
+    /// any app C# file.
+    /// </summary>
     [Fact]
     public void ContractInventoryCoversEveryNameCodeBehindOrElementNameDependsOn()
     {
+        var codeLookups = AppSourceTree.Files(".cs")
+            .SelectMany(file => RuntimeNameLookup().Matches(AppSourceTree.CodeWithoutComments(file)))
+            .Select(match => match.Groups[1].Value)
+            .ToHashSet(StringComparer.Ordinal);
+
         var missing = new List<string>();
         foreach (var xaml in AppSourceTree.Files(".xaml"))
         {
@@ -132,6 +146,20 @@ public sealed partial class XamlContractAndResourceGuardTests
                 .SelectMany(attribute => ElementNameReference().Matches(attribute.Value))
                 .Select(match => match.Groups[1].Value)
                 .Where(declared.Contains));
+
+            used.UnionWith(document.Descendants().Attributes()
+                .Where(attribute => attribute.Name.LocalName is "Storyboard.TargetName" or "TargetName")
+                .Select(attribute => attribute.Value)
+                .Where(declared.Contains));
+
+            used.UnionWith(document.Descendants()
+                .Where(element => element.Name.LocalName == "Setter")
+                .Select(element => (string?)element.Attribute("Target"))
+                .OfType<string>()
+                .Select(target => target.Split('.')[0])
+                .Where(declared.Contains));
+
+            used.UnionWith(codeLookups.Where(declared.Contains));
 
             var inventoried = Contract.TryGetValue(xaml, out var names) ? names.ToHashSet(StringComparer.Ordinal) : [];
             missing.AddRange(used.Where(name => !inventoried.Contains(name)).OrderBy(n => n, StringComparer.Ordinal)
@@ -191,7 +219,9 @@ public sealed partial class XamlContractAndResourceGuardTests
         string[] themes = ["Dark", "Light", "HighContrast"];
         var failures = new List<string>();
         var blocks = 0;
-        foreach (var file in AppSourceTree.Files(".xaml").Where(f => f.StartsWith("Styles/Tokens/", StringComparison.OrdinalIgnoreCase)))
+        // UI.2 T-4: the component layer (Styles/Components/**, e.g. the F-3 accent-neutral scope) obeys the same parity.
+        foreach (var file in AppSourceTree.Files(".xaml").Where(f => f.StartsWith("Styles/Tokens/", StringComparison.OrdinalIgnoreCase)
+                     || f.StartsWith("Styles/Components/", StringComparison.OrdinalIgnoreCase)))
         {
             foreach (var block in AppSourceTree.LoadXaml(file).Descendants().Where(e => e.Name.LocalName == "ResourceDictionary.ThemeDictionaries"))
             {
@@ -298,6 +328,9 @@ public sealed partial class XamlContractAndResourceGuardTests
             }
         }
     }
+
+    [GeneratedRegex(@"\b(?:(?:FindName|GetTemplateChild)\s*\(|TemplatePart\s*\(\s*Name\s*=)\s*""([^""]+)""")]
+    private static partial Regex RuntimeNameLookup();
 
     [GeneratedRegex(@"ElementName\s*=\s*([A-Za-z_][A-Za-z0-9_]*)")]
     private static partial Regex ElementNameReference();

@@ -125,6 +125,56 @@ public sealed partial class UiDebtRatchetTests
     }
 
     /// <summary>
+    /// UI.2 T-8: the new presentation layer starts at ZERO debt. Styles/Components/**, Controls/Primitives/** and
+    /// the Debug gallery (Qa/**) are scanned by the three ratchets above like any other file, and none of them may
+    /// ever be given a baseline entry - a literal there is a defect to fix, not debt to record.
+    /// </summary>
+    [Fact]
+    public void NewComponentFoldersCarryNoRatchetBaseline()
+    {
+        string[] zeroDebtFolders = ["Styles/Components/", "Controls/Primitives/", "Qa/"];
+        var baselined = FontSizeLiteralBaseline.Keys.Concat(HexColourBaseline.Keys).Concat(LegacyAccentBaseline.Keys)
+            .Where(file => zeroDebtFolders.Any(folder => file.StartsWith(folder, StringComparison.OrdinalIgnoreCase)))
+            .ToList();
+
+        Assert.True(baselined.Count == 0, "Zero-debt folders must not be baselined: " + string.Join(", ", baselined));
+    }
+
+    /// <summary>
+    /// UI.2 T-8 (F-3): component dictionaries and primitives never USE the legacy blue - no <c>#1846E1</c>,
+    /// <c>SystemAccent*</c>, <c>BrandAccent*</c> or <c>AccentFill*</c> value or code reference. The only place such a
+    /// name may appear is as an overridden <c>x:Key</c> in the accent-neutral scope, whose job is to replace it.
+    /// </summary>
+    [Fact]
+    public void ComponentsNeverReferenceTheLegacyAccent()
+    {
+        var offenders = new List<string>();
+        foreach (var file in AppSourceTree.Files(".xaml").Where(IsComponentLayer))
+        {
+            var document = AppSourceTree.LoadXaml(file);
+            var values = document.Descendants().Attributes()
+                .Where(a => !(file.EndsWith("/Sa.AccentNeutralScope.xaml", StringComparison.OrdinalIgnoreCase)
+                    && a.Name == AppSourceTree.Xaml + "Key"))
+                .Select(a => a.Value)
+                .Concat(document.DescendantNodes().OfType<XText>().Select(t => t.Value));
+            offenders.AddRange(values.SelectMany(v => LegacyAccentInComponents().Matches(v)).Select(m => $"{file}: {m.Value}"));
+        }
+
+        foreach (var file in AppSourceTree.Files(".cs").Where(IsComponentLayer))
+        {
+            offenders.AddRange(LegacyAccentInComponents().Matches(AppSourceTree.CodeWithoutComments(file)).Select(m => $"{file}: {m.Value}"));
+        }
+
+        Assert.True(offenders.Count == 0,
+            "The component layer must not use the legacy accent (#1846E1/SystemAccent*/BrandAccent*/AccentFill*):" +
+            Environment.NewLine + string.Join(Environment.NewLine, offenders));
+
+        static bool IsComponentLayer(string file) =>
+            file.StartsWith("Styles/Components/", StringComparison.OrdinalIgnoreCase)
+            || file.StartsWith("Controls/Primitives/", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
     /// UI.2 token layering: raw colour tokens (<c>SaColor*</c>) are private to Styles/Tokens/**, which maps them
     /// to semantic brushes. Everything else consumes <c>Sa*Brush</c> through <c>{ThemeResource}</c> so Light/Dark/HC
     /// re-resolve at runtime; a <c>{StaticResource Sa...Brush}</c> outside Styles/** would freeze the theme.
@@ -199,6 +249,9 @@ public sealed partial class UiDebtRatchetTests
 
     [GeneratedRegex(@"#1846E1\b|SystemAccent\w*|BrandAccent\w*", RegexOptions.IgnoreCase)]
     private static partial Regex ForbiddenInTokens();
+
+    [GeneratedRegex(@"#1846E1\b|SystemAccent\w*|BrandAccent\w*|AccentFill\w*", RegexOptions.IgnoreCase)]
+    private static partial Regex LegacyAccentInComponents();
 
     [GeneratedRegex(@"^Sa[A-Z]\w*Brush$")]
     private static partial Regex SaBrushKey();
