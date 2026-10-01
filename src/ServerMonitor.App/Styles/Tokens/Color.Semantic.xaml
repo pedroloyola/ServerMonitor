@@ -35,6 +35,25 @@
             <SolidColorBrush x:Key="SaBorderInsetBrush" Color="{StaticResource SaColorDividerDark}" />
             <SolidColorBrush x:Key="SaGlassBorderBrush" Color="{StaticResource SaColorGlassBorderDark}" />
             <SolidColorBrush x:Key="SaGlassHighlightBrush" Color="{StaticResource SaColorGlassHighlightDark}" />
+            <SolidColorBrush x:Key="SaAttentionTextBrush" Color="{StaticResource SaColorAttentionTextDark}" />
+            <SolidColorBrush x:Key="SaDangerTextBrush" Color="{StaticResource SaColorDangerTextDark}" />
+            <SolidColorBrush x:Key="SaDangerFillBrush" Color="{StaticResource SaColorDangerFillDark}" />
+            <SolidColorBrush x:Key="SaDangerBorderBrush" Color="{StaticResource SaColorDangerBorderDark}" />
+            <SolidColorBrush x:Key="SaPrimaryFillBrush" Color="{StaticResource SaColorPrimaryFillDark}" />
+            <SolidColorBrush x:Key="SaPrimaryBorderBrush" Color="{StaticResource SaColorPrimaryBorderDark}" />
+            <SolidColorBrush x:Key="SaPrimaryTextBrush" Color="{StaticResource SaColorPrimaryTextDark}" />
+            <SolidColorBrush x:Key="SaInputFillBrush" Color="{StaticResource SaColorInputFillDark}" />
+            <SolidColorBrush x:Key="SaSearchFillBrush" Color="{StaticResource SaColorSearchFillDark}" />
+            <SolidColorBrush x:Key="SaSegmentedTrackBrush" Color="{StaticResource SaColorSegmentedTrackDark}" />
+            <SolidColorBrush x:Key="SaSegmentedPillTrackBrush" Color="{StaticResource SaColorSegmentedPillTrackDark}" />
+            <SolidColorBrush x:Key="SaSegmentedPillSelectedBrush" Color="{StaticResource SaColorSegmentedPillSelectedDark}" />
+            <SolidColorBrush x:Key="SaToggleOffTrackBrush" Color="{StaticResource SaColorToggleOffTrackDark}" />
+            <SolidColorBrush x:Key="SaToggleThumbBrush" Color="{StaticResource SaColorToggleThumbDark}" />
+            <SolidColorBrush x:Key="SaSkeletonBrush" Color="{StaticResource SaColorSkeletonDark}" />
+            <SolidColorBrush x:Key="SaInsetTintedBrush" Color="{StaticResource SaColorInsetTintedDark}" />
+            <SolidColorBrush x:Key="SaBarEmptyBrush" Color="{StaticResource SaColorBarEmptyDark}" />
+            <SolidColorBrush x:Key="SaDialogButtonFillBrush" Color="{StaticResource SaColorDialogButtonFillDark}" />
+            <SolidColorBrush x:Key="SaDialogButtonBorderBrush" Color="{StaticResource SaColorDialogButtonBorderDark}" />
         </ResourceDictionary>
         <ResourceDictionary x:Key="Light">
             <SolidColorBrush x:Key="SaCanvasBrush" Color="{StaticResource SaColorCanvasLight}" />
@@ -63,6 +82,25 @@
             <SolidColorBrush x:Key="SaBorderInsetBrush" Color="{StaticResource SaColorDividerLight}" />
             <SolidColorBrush x:Key="SaGlassBorderBrush" Color="{StaticResource SaColorGlassBorderLight}" />
             <SolidColorBrush x:Key="SaGlassHighlightBrush" Color="{StaticResource SaColorGlassHighlightLight}" />
+            <SolidColorBrush x:Key="SaAttentionTextBrush" Color="{StaticResource SaColorAttentionTextLight}" />
+            <SolidColorBrush x:Key="SaDangerTextBrush" Color="{StaticResource SaColorDangerTextLight}" />
+            <SolidColorBrush x:Key="SaDangerFillBrush" Color="{StaticResource SaColorDangerFillLight}" />
+            <SolidColorBrush x:Key="SaDangerBorderBrush" Color="{StaticResource SaColorDangerBorderLight}" />
+            <SolidColorBrush x:Key="SaPrimaryFillBrush" Color="{StaticResource SaColorPrimaryFillLight}" />
+            <SolidColorBrush x:Key="SaPrimaryBorderBrush" Color="{StaticResource SaColorPrimaryBorderLight}" />
+            <SolidColorBrush x:Key="SaPrimaryTextBrush" Color="{StaticResource SaColorPrimaryTextLight}" />
+            <SolidColorBrush x:Key="SaInputFillBrush" Color="{StaticResource SaColorInputFillLight}" />
+            <SolidColorBrush x:Key="SaSearchFillBrush" Color="{StaticResource SaColorSearchFillLight}" />
+            <SolidColorBrush x:Key="SaSegmentedTrackBrush" Color="{StaticResource SaColorSegmentedTrackLight}" />
+            <SolidColorBrush x:Key="SaSegmentedPillTrackBrush" Color="{StaticResource SaColorSegmentedPillTrackLight}" />
+            <SolidColorBrush x:Key="SaSegmentedPillSelectedBrush" Color="{StaticResource SaColorSegmentedPillSelectedLight}" />
+            <SolidColorBrush x:Key="SaToggleOffTrackBrush" Color="{StaticResource SaColorToggleOffTrackLight}" />
+            <SolidColorBrush x:Key="SaToggleThumbBrush" Color="{StaticResource SaColorToggleThumbLight}" />
+            <SolidColorBrush x:Key="SaSkeletonBrush" Color="{StaticResource SaColorSkeletonLight}" />
+            <SolidColorBrush x:Key="SaInsetTintedBrush" Color="{StaticResource SaColorInsetTintedLight}" />
+            <SolidColorBrush x:Key="SaBarEmptyBrush" Color="{StaticResource SaColorBarEmptyLight}" />
+            <SolidColorBrush x:Key="SaDialogButtonFillBrush" Color="{StaticResource SaColorDialogButtonFillLight}" />
+            <SolidColorBrush x:Key="SaDialogButtonBorderBrush" Color="{StaticResource SaColorDialogButtonBorderLight}" />
         </ResourceDictionary>
         <ResourceDictionary x:Key="HighContrast">
             <SolidColorBrush x:Key="SaCanvasBrush" Color="{ThemeResource SystemColorWindowColor}" />
@@ -91,6 +129,25 @@
             <SolidColorBrush x:Key="SaBorderInsetBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
             <SolidColorBrush x:Key="SaGlassBorderBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
             <SolidColorBrush x:Key="SaGlassHighlightBrush" Color="Transparent" />
+            <SolidColorBrush x:Key="SaAttentionTextBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="SaDangerTextBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="SaDangerFillBrush" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="SaDangerBorderBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="SaPrimaryFillBrush" Color="{ThemeResource SystemColorHighlightColor}" />
+            <SolidColorBrush x:Key="SaPrimaryBorderBrush" Color="{ThemeResource SystemColorHighlightColor}" />
+            <SolidColorBrush x:Key="SaPrimaryTextBrush" Color="{ThemeResource SystemColorHighlightTextColor}" />
+            <SolidColorBrush x:Key="SaInputFillBrush" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="SaSearchFillBrush" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="SaSegmentedTrackBrush" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="SaSegmentedPillTrackBrush" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="SaSegmentedPillSelectedBrush" Color="{ThemeResource SystemColorHighlightColor}" />
+            <SolidColorBrush x:Key="SaToggleOffTrackBrush" Color="{ThemeResource SystemColorGrayTextColor}" />
+            <SolidColorBrush x:Key="SaToggleThumbBrush" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="SaSkeletonBrush" Color="{ThemeResource SystemColorGrayTextColor}" />
+            <SolidColorBrush x:Key="SaInsetTintedBrush" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="SaBarEmptyBrush" Color="{ThemeResource SystemColorGrayTextColor}" />
+            <SolidColorBrush x:Key="SaDialogButtonFillBrush" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="SaDialogButtonBorderBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
         </ResourceDictionary>
     </ResourceDictionary.ThemeDictionaries>
 </ResourceDictionary>
