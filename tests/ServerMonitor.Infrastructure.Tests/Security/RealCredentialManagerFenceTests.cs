@@ -26,6 +26,11 @@ public sealed partial class RealCredentialManagerFenceTests
         ["tests/ServerMonitor.App.Tests/Architecture/RealDataIsolationGuardTests.cs"] = 2,
         // Assert.IsNotType<WindowsCredentialStore>(raw): a type assertion on the harness's in-memory store.
         ["tests/ServerMonitor.App.Tests/Qa/QaProxyJumpHarnessTests.cs"] = 1,
+        // (1) Assert.IsNotType<WindowsCredentialStore>(...): a type assertion on the isolated store. (2)
+        // GetUninitializedObject(typeof(WindowsCredentialStore)): an instance with NO constructor run (no native wrapper),
+        // used only for the QaStartupIsolation type checks to refuse; nothing calls it, so the Credential Manager is
+        // never reached.
+        ["tests/ServerMonitor.App.Tests/Qa/QaStartupIsolationTests.cs"] = 2,
         // typeof(...) x3: the production DESCRIPTOR's ImplementationType, and the type the production factory REQUESTS
         // from a RequestRecordingProvider that constructs nothing.
         ["tests/ServerMonitor.App.Tests/Services/BackupSettingsParticipantTests.cs"] = 3,
