@@ -69,13 +69,10 @@ function Get-State($items) {
 }
 
 function Invoke-Page([string]$page, [scriptblock]$steps) {
-    $process = Start-Process -FilePath $Exe -ArgumentList "--qa-components --qa-gallery-page $page --qa-gallery-theme dark" -PassThru
-    $started = $process.StartTime
-    $info = Get-CimInstance Win32_Process -Filter "ProcessId=$($process.Id)"
-    if ($info.CommandLine -notmatch '--qa-components' -or $info.ExecutablePath -ne $Exe) {
-        Stop-Process -Id $process.Id -Force
-        throw "PID $($process.Id) is not the expected gallery launch: $($info.CommandLine)"
-    }
+    # The only launch path (UI.3 rule): Start-QaApp verifies the PID's image + command line, or stops it and throws.
+    $app = & (Join-Path $PSScriptRoot 'Start-QaApp.ps1') -Exe $Exe -Arguments @('--qa-components', '--qa-gallery-page', $page, '--qa-gallery-theme', 'dark')
+    $process = $app.Process
+    $started = $app.StartTime
     try {
         $deadline = (Get-Date).AddSeconds(30)
         while ((Get-Date) -lt $deadline) { $process.Refresh(); if ($process.MainWindowHandle -ne 0 -or $process.HasExited) { break }; Start-Sleep -Milliseconds 250 }

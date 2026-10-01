@@ -64,6 +64,11 @@ public partial class App : Application
             return;
         }
 #endif
+#if DEBUG
+        // UI.3 gate 1A (fail-closed): a --qa-* modifier without an isolated harness would run the production composition
+        // against real data; the process ends here (exit 3), before anything is composed.
+        Qa.QaStartupIsolation.RefuseUnisolatedLaunch();
+#endif
 
         ServicesHost = Microsoft.Extensions.Hosting.Host
             .CreateDefaultBuilder()
@@ -95,7 +100,16 @@ public partial class App : Application
         // engine, no tray and a frozen snapshot. Every true exit now reaches Application.Exit() exactly
         // once, and a termination watchdog backs it up.
         DispatcherShutdownMode = DispatcherShutdownMode.OnExplicitShutdown;
+#if DEBUG
+        // UI.3 gate 1A (fail-closed): a harness launch whose composition still reaches real user data aborts here,
+        // before the host starts and before OnLaunched touches the trust store.
+        Qa.QaStartupIsolation.VerifyOrThrow(ServicesHost.Services);
+        var resourcesStarted = System.Diagnostics.Stopwatch.GetTimestamp();
+#endif
         InitializeComponent();
+#if DEBUG
+        Qa.QaStartupMarker.ResourcesLoaded(resourcesStarted);
+#endif
     }
 
     /// <summary>
@@ -300,7 +314,13 @@ public partial class App : Application
 
             if (!startsHeadless)
             {
+#if DEBUG
+                Qa.QaStartupMarker.Arm(_mainWindow!);
+#endif
                 _mainWindow!.Activate();
+#if DEBUG
+                Qa.QaStartupMarker.ShellActivated();
+#endif
             }
             else
             {
@@ -621,8 +641,16 @@ public partial class App : Application
         var qaWorkloads = Qa.QaWorkloadsComposition.IsRequested();
         var qaScreenshot = Qa.QaStoreScreenshotComposition.IsRequested();
         var qaProxyJump = Qa.QaProxyJumpComposition.IsRequested();
-        var qaMode = qaHealth || qaDiscovery || qaNotifications || qaCompact || qaHistory || qaWorkloads || qaScreenshot
-            || qaProxyJump;
+        var qaMode = Qa.QaStartupIsolation.IsHarnessLaunch();
+        if (qaMode)
+        {
+            // UI.3 gate 1A: re-root every production data path, the credential store and the SSH sources BEFORE the
+            // harness composition, so a harness that brings its own directory (--qa-proxyjump-dir) still wins.
+            Qa.QaStartupIsolation.Apply(
+                services,
+                Qa.QaStartupIsolation.DefaultRoot(),
+                rerootSshProfile: Qa.QaSshConfigComposition.RequestedProfile() is null);
+        }
 #else
         const bool qaMode = false;
 #endif
