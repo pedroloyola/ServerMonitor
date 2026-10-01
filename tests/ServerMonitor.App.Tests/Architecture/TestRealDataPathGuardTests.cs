@@ -45,7 +45,10 @@ public sealed partial class TestRealDataPathGuardTests
         // SpecialFolder.System: locates the OS's powershell.exe (System32) to start a child process. Not user data.
         ["tests/ServerMonitor.Infrastructure.Tests/SSH/LoopbackOriginatorGateTests.cs"] = 1,
         // SpecialFolder.ProgramFiles: File.Exists on PowerShell 7's pwsh.exe to pick a shell. Not user data.
-        ["tests/ServerMonitor.Infrastructure.Tests/SshConfig/SshConfigQaFixturesScriptTests.cs"] = 1
+        ["tests/ServerMonitor.Infrastructure.Tests/SshConfig/SshConfigQaFixturesScriptTests.cs"] = 1,
+        // SpecialFolder.ProgramFiles: builds an exe path under Program Files only to prove Start-QaApp -ValidateOnly
+        // REFUSES it ("installation folder"); never created, never launched.
+        ["tests/ServerMonitor.App.Tests/Qa/StartQaAppScriptTests.cs"] = 1
     };
 
     /// <summary>
