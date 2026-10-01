@@ -102,6 +102,7 @@ internal sealed class QaTokenSelfCheck(QaGalleryWindow window)
             var probes = Probes(page);
             results.AddRange(QaTokenManifest.Entries.Select(entry => Check(theme, entry, probes, themeEntries)));
             results.Add(CheckDefaultStyle(theme, page.DefaultStyleProbe, themeEntries));
+            results.Add(CheckDotOnlyStyle(theme, page.DotOnlyStyleProbe, themeEntries));
         }
 
         // S5 (Boss B-1): every vendored icon parses to a geometry inside the 24x24 grid, and the stroke stays 1.5 DIP
@@ -244,6 +245,40 @@ internal sealed class QaTokenSelfCheck(QaGalleryWindow window)
         catch (Exception exception)
         {
             return new QaTokenResult(theme, DefaultStyleProbeKey, "Primitive", "templated", "<exception>", "FAIL", exception.Message);
+        }
+    }
+
+    /// <summary>
+    /// UI.3 SaStatusDotOnlyStyle: the SAME template (PART_Dot filled by the Attention state brush of this theme), the
+    /// label collapsed (so the control is only the 6 DIP dot - no stray spacing), Raw in UIA, the Label still set.
+    /// </summary>
+    private static QaTokenResult CheckDotOnlyStyle(string theme, SaStatusIndicator probe, IReadOnlyDictionary<string, object> themeEntries)
+    {
+        const string key = "SaStatusDotOnlyStyle (dot only, label collapsed, Raw)";
+        try
+        {
+            var dot = Descendants(probe).OfType<Ellipse>().FirstOrDefault(e => e.Name == "PART_Dot");
+            var label = Descendants(probe).OfType<TextBlock>().FirstOrDefault(e => e.Name == "PART_Label");
+            var expected = themeEntries.TryGetValue("SaAttentionBrush", out var attention) ? attention : null;
+            var effective = dot?.Fill;
+            var view = AutomationProperties.GetAccessibilityView(probe);
+            var dotSize = Application.Current.Resources.TryGetValue("SaStatusDotSize", out var size) ? (double)size : double.NaN;
+            var pass = dot is not null && label is not null
+                && expected is not null && effective is not null
+                && (ReferenceEquals(expected, effective) || Equivalent(expected, effective))
+                && label.Visibility == Visibility.Collapsed
+                && view == Microsoft.UI.Xaml.Automation.Peers.AccessibilityView.Raw
+                && Math.Abs(probe.ActualWidth - dotSize) < 0.5
+                && !string.IsNullOrEmpty(probe.Label);
+            return new QaTokenResult(theme, key, "Primitive",
+                $"PART_Dot.Fill = SaAttentionBrush {Describe(expected)}; PART_Label Collapsed; Raw; width = SaStatusDotSize {dotSize}",
+                $"PART_Dot.Fill={Describe(effective)}; PART_Label={label?.Visibility}; view={view}; width={probe.ActualWidth}",
+                pass ? "PASS" : "FAIL",
+                pass ? "style variant of the one template; status brush unchanged, only the label rendering hidden" : null);
+        }
+        catch (Exception exception)
+        {
+            return new QaTokenResult(theme, key, "Primitive", "dot only", "<exception>", "FAIL", exception.Message);
         }
     }
 

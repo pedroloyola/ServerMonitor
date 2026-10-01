@@ -455,21 +455,50 @@ public sealed partial class ComponentLayerGuardTests
             && typeName.StartsWith("Sa", StringComparison.Ordinal);
     }
 
-    /// <summary>Implicit default styles of primitives in Styles/Components/**, by type name (e.g. SaStatusIndicator).</summary>
+    /// <summary>
+    /// Implicit default styles of primitives in Styles/Components/**, by type name (e.g. SaStatusIndicator). UI.3: an
+    /// implicit style that is only <c>BasedOn</c> a keyed base (so keyed variants can share the template) resolves to
+    /// that base, so the template it actually gets is the one checked - never an empty implicit shell.
+    /// </summary>
     private static Dictionary<string, XElement> DefaultStyles()
     {
         var styles = new Dictionary<string, XElement>(StringComparer.Ordinal);
+        var keyed = new Dictionary<string, XElement>(StringComparer.Ordinal);
+        var implicitStyles = new List<(string TypeName, XElement Style)>();
         foreach (var file in ComponentFiles())
         {
-            foreach (var style in AppSourceTree.LoadXaml(file).Descendants().Where(e => e.Name.LocalName == "Style"
-                         && e.Attribute(AppSourceTree.Xaml + "Key") is null))
+            foreach (var style in AppSourceTree.LoadXaml(file).Descendants().Where(e => e.Name.LocalName == "Style"))
             {
+                var key = (string?)style.Attribute(AppSourceTree.Xaml + "Key");
+                if (key is not null)
+                {
+                    keyed.TryAdd(key, style);
+                    continue;
+                }
+
                 var targetType = (string?)style.Attribute("TargetType") ?? string.Empty;
                 if (IsSaPrimitiveType(style, targetType))
                 {
-                    styles[targetType[(targetType.IndexOf(':') + 1)..]] = style;
+                    implicitStyles.Add((targetType[(targetType.IndexOf(':') + 1)..], style));
                 }
             }
+        }
+
+        foreach (var (typeName, style) in implicitStyles)
+        {
+            var resolved = style;
+            for (var depth = 0; depth < 4 && !resolved.Descendants().Any(e => e.Name.LocalName == "ControlTemplate"); depth++)
+            {
+                var basedOn = StaticMarkup().Match((string?)resolved.Attribute("BasedOn") ?? string.Empty);
+                if (!basedOn.Success || !keyed.TryGetValue(basedOn.Groups[1].Value, out var baseStyle))
+                {
+                    break;
+                }
+
+                resolved = baseStyle;
+            }
+
+            styles[typeName] = resolved;
         }
 
         return styles;
