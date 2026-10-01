@@ -53,7 +53,10 @@ public sealed partial class XamlContractAndResourceGuardTests
         // UI.2 primitive templates: names resolved at runtime by VisualState setters (G-3).
         ["Styles/Components/Sa.Primitives.xaml"] =
         [
-            "PART_Dot", "PART_Path", "PART_Header", "PART_Helper", "PART_Error", "PART_PasswordBox", "PART_RevealButton"
+            "PART_Dot", "PART_Path", "PART_Header", "PART_Helper", "PART_Error", "PART_PasswordBox", "PART_RevealButton",
+            // S6
+            "RootGrid", "KeyColumn", "PART_Key", "PART_Value", "PART_Fill", "PART_Track", "PART_Text", "PART_Icon", "PART_Chevron",
+            "PART_Detail", "PART_Trailing", "PART_InfoLayout", "PART_ErrorLayout", "PART_CloseButton", "PART_Parent"
         ],
         // UI.2 S4 control templates: names targeted by VisualState setters / storyboards (G-3).
         ["Styles/Components/Sa.Buttons.xaml"] = ["RootGrid", "StateOverlay", "ContentPresenter"],
@@ -71,6 +74,7 @@ public sealed partial class XamlContractAndResourceGuardTests
         ],
         ["Qa/Gallery/QaTokenProbePage.xaml"] = ["DefaultStyleProbe", "StrokeProbe16", "StrokeProbe48"],
         ["Qa/Gallery/QaColorsPage.xaml"] = ["PrimitiveSwatches"],
+        ["Qa/Gallery/QaMaterialsPage.xaml"] = ["FallbackToggle", "GlassSample", "GlassFallbackSample"],
         // Storyboard.TargetName lanes (G-3) and the C#-path lanes driven by the code-behind.
         ["Qa/Gallery/QaMotionPage.xaml"] =
         [

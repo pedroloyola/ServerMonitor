@@ -11,6 +11,7 @@
         <ResourceDictionary Source="ms-appx:///Styles/Components/Sa.Buttons.xaml" />
         <ResourceDictionary Source="ms-appx:///Styles/Components/Sa.Forms.xaml" />
         <ResourceDictionary Source="ms-appx:///Styles/Components/Sa.Navigation.xaml" />
+        <ResourceDictionary Source="ms-appx:///Styles/Components/Sa.Dialogs.xaml" />
         <ResourceDictionary Source="ms-appx:///Styles/Components/Sa.Primitives.xaml" />
     </ResourceDictionary.MergedDictionaries>
 </ResourceDictionary>

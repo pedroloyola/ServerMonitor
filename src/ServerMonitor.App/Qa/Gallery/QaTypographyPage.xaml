@@ -63,6 +63,52 @@
                 <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="SaMonoTextStyle 12/16" VerticalAlignment="Center" />
                 <Border Grid.Column="1" BorderBrush="{ThemeResource SaDividerBrush}" BorderThickness="0,0,0,1"><TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextBrush}" Text="Ágil ç gjpqy ÃÕ · Servidor saudável" /></Border>
             </Grid>
+            <TextBlock Style="{StaticResource SaSecondaryBodyTextStyle}" Text="UI.2 additions (Boss B-3)" Margin="0,16,0,0" />
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="SaPageTitleTextStyle 32/40 · 112:999" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1" Style="{StaticResource SaPageTitleTextStyle}" Foreground="{ThemeResource SaTextBrush}" Text="Servidores" />
+            </Grid>
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="SaMetricValueTextStyle 44/56 Light · 112:1816" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1" Style="{StaticResource SaMetricValueTextStyle}" Foreground="{ThemeResource SaTextBrush}" Text="22" />
+            </Grid>
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="SaEmptyTitleTextStyle 24/30 · 112:14088" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1" Style="{StaticResource SaEmptyTitleTextStyle}" Foreground="{ThemeResource SaTextBrush}" Text="Ainda não há servidores" />
+            </Grid>
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="SaValueTextStyle 17/24 · 112:1906" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1" Style="{StaticResource SaValueTextStyle}" Foreground="{ThemeResource SaTextBrush}" Text="Ubuntu 24.04 · 43 dias" />
+            </Grid>
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="SaHelperTextStyle 11/16 · 112:3376" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1" Style="{StaticResource SaHelperTextStyle}" Foreground="{ThemeResource SaTextBrush}" Text="Ágil ç gjpqy ÃÕ · Como o servidor aparece na lista." />
+            </Grid>
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="SaButtonTextStyle 14/20 · 112:1004" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1" Style="{StaticResource SaButtonTextStyle}" Foreground="{ThemeResource SaTextBrush}" Text="Adicionar servidor" />
+            </Grid>
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="SaTableHeaderTextStyle 10/14 · 112:1434" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1" Style="{StaticResource SaTableHeaderTextStyle}" Foreground="{ThemeResource SaTextBrush}" Text="SERVIDOR · SISTEMA · ESTADO" />
+            </Grid>
+            <TextBlock Style="{StaticResource SaSecondaryBodyTextStyle}" Text="Display / Heading line-height validation for Prism (Boss B-3) - same text as the Figma refs" Margin="0,16,0,0" />
+            <Grid ColumnSpacing="24">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <StackPanel Spacing="4"><TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="Display 44/56 · Manual 107:527 (h57)" />
+                    <Border BorderBrush="{ThemeResource SaDividerBrush}" BorderThickness="0,1,0,1" HorizontalAlignment="Left"><TextBlock Style="{StaticResource SaDisplayTextStyle}" Text="Visão geral" /></Border></StackPanel>
+                <StackPanel Grid.Column="1" Spacing="4"><TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="Heading 30/40 (token) · 112:3319" />
+                    <Border BorderBrush="{ThemeResource SaDividerBrush}" BorderThickness="0,1,0,1" HorizontalAlignment="Left"><TextBlock Style="{StaticResource SaHeadingTextStyle}" Text="Adicionar servidor" /></Border></StackPanel>
+                <StackPanel Grid.Column="2" Spacing="4"><TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="Heading 30/42 candidate (Figma lh 1.4, h42) - gallery-local" />
+                    <Border BorderBrush="{ThemeResource SaDividerBrush}" BorderThickness="0,1,0,1" HorizontalAlignment="Left"><TextBlock Style="{StaticResource SaHeadingTextStyle}" LineHeight="42" Text="Adicionar servidor" /></Border></StackPanel>
+            </Grid>
             <TextBlock Style="{StaticResource SaSecondaryBodyTextStyle}" Text="Text roles (Styles/Components/Sa.Text.xaml)" Margin="0,16,0,0" />
             <Grid ColumnSpacing="16">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>

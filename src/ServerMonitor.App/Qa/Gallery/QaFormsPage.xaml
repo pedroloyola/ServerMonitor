@@ -10,7 +10,7 @@
         <StackPanel Padding="24" Spacing="{StaticResource SaSpace16}">
             <TextBlock Style="{StaticResource SaSectionHeaderTextStyle}" Text="Forms" />
             <TextBlock Style="{StaticResource SaSecondaryBodyTextStyle}" TextWrapping="Wrap" Text="Rest / filled / Error / Checked / On-Off / Selected are MEASURED; * = DERIVED. Placeholder uses SaTextSecondaryBrush (a11y deviation, B-2). Selector chevron = Fluent glyph (deviation)." />
-            <Border Style="{StaticResource SaCardSurfaceStyle}" Padding="24">
+            <Border Style="{StaticResource SaGlassSurfaceStyle}" Padding="24">
                 <StackPanel Spacing="{StaticResource SaSpace24}">
                     <StackPanel Spacing="8" HorizontalAlignment="Left"><TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="TextField · rest (placeholder) · 112:3337 / 112:3498" /><primitives:SaFormField Header="Nome" HelperText="Como o servidor aparece na lista." Width="360"><TextBox Style="{StaticResource SaTextFieldStyle}" PlaceholderText="Ex.: Servidor de casa" /></primitives:SaFormField></StackPanel>
                     <StackPanel Spacing="8" HorizontalAlignment="Left"><TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="TextField · filled · 112:3384" /><primitives:SaFormField Header="Porta" Width="360"><TextBox Style="{StaticResource SaTextFieldStyle}" Text="22" /></primitives:SaFormField></StackPanel>

@@ -14,3 +14,32 @@ public enum SaStatusKind
     Offline,
     Stale
 }
+
+/// <summary>Which Manual metric colour a <see cref="SaMetricBar"/> uses (CPU / memory / disk).</summary>
+public enum SaMetricKind
+{
+    Cpu,
+    Memory,
+    Disk
+}
+
+/// <summary><see cref="SaKeyValueRow"/> layout: label above value (112:1906) or side by side (112:1919).</summary>
+public enum SaKeyValueOrientation
+{
+    Stacked,
+    Inline
+}
+
+/// <summary><see cref="SaListRow"/> density: one line (h48) or two lines (h70) - Figma 112:1057 / 112:1933.</summary>
+public enum SaListRowVariant
+{
+    Simple,
+    Rich
+}
+
+/// <summary><see cref="SaInlineNotice"/> severity. Figma designs only Error (callout) and Info (plain note).</summary>
+public enum SaNoticeSeverity
+{
+    Info,
+    Error
+}

@@ -10,7 +10,7 @@
         <StackPanel Padding="24" Spacing="{StaticResource SaSpace16}">
             <TextBlock Style="{StaticResource SaSectionHeaderTextStyle}" Text="Buttons" />
             <TextBlock Style="{StaticResource SaSecondaryBodyTextStyle}" TextWrapping="Wrap" Text="Four Figma families (pill glass, rect 14, dialog 13, Manual 12) + icon buttons. Rest and Disabled (opacity .58, 112:3399) are MEASURED; * = DERIVED (B-4). Drop shadows are not reproduced (deviation)." />
-            <Border Style="{StaticResource SaCardSurfaceStyle}" Padding="24">
+            <Border Style="{StaticResource SaGlassSurfaceStyle}" Padding="24">
                 <StackPanel Spacing="{StaticResource SaSpace16}">
                     <Grid ColumnSpacing="16"><Grid.ColumnDefinitions><ColumnDefinition Width="250" /><ColumnDefinition Width="200" /><ColumnDefinition Width="200" /><ColumnDefinition Width="200" /><ColumnDefinition Width="200" /></Grid.ColumnDefinitions><TextBlock Grid.Column="1" Style="{StaticResource SaTableHeaderTextStyle}" Text="Rest" /><TextBlock Grid.Column="2" Style="{StaticResource SaTableHeaderTextStyle}" Text="Hover* (DERIVED)" /><TextBlock Grid.Column="3" Style="{StaticResource SaTableHeaderTextStyle}" Text="Pressed* (DERIVED)" /><TextBlock Grid.Column="4" Style="{StaticResource SaTableHeaderTextStyle}" Text="Disabled" /></Grid>
                     <Grid ColumnSpacing="16" MinHeight="48"><Grid.ColumnDefinitions><ColumnDefinition Width="250" /><ColumnDefinition Width="200" /><ColumnDefinition Width="200" /><ColumnDefinition Width="200" /><ColumnDefinition Width="200" /></Grid.ColumnDefinitions>
@@ -32,7 +32,7 @@
                 </StackPanel>
             </Border>
             <TextBlock Style="{StaticResource SaSecondaryBodyTextStyle}" Text="Focus* (DERIVED): system keyboard focus visual, SaFocusRingBrush 2px - live keyboard focus on this sample" />
-            <Border Style="{StaticResource SaCardSurfaceStyle}" Padding="24" HorizontalAlignment="Left">
+            <Border Style="{StaticResource SaGlassSurfaceStyle}" Padding="24" HorizontalAlignment="Left">
                 <Button Style="{StaticResource SaSecondaryButtonStyle}" AutomationProperties.Name="Importar de SSH" qa:QaForcedState.State="Focus"><TextBlock Text="Importar de SSH" /></Button>
             </Border>
         </StackPanel>

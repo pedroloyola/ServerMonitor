@@ -1,0 +1,27 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- UI.2 S6 dialog shell on the native ContentDialog (focus trap, Esc, default button, UIA stay WinUI's). Applied per
+         dialog; instance setters beat the legacy global ContentDialog* overrides only where used. 112:8559 / 112:8745:
+         opaque modal surface, glass contour (2px WindowText in HC, F-07), radius 24, padding 28; buttons = dialog family
+         (a destructive confirmation sets PrimaryButtonStyle = SaDestructiveButtonStyle). The smoke stays the legacy
+         ContentDialogSmokeFill (opaque Window in HC - F-07 decision: keep opaque).
+         LIMITATION: the Fluent template restyles the DefaultButton with AccentButtonStyle (the legacy blue), overriding
+         these button styles, so a Sa dialog keeps DefaultButton = None until UI.6 retires the global accent. -->
+    <ResourceDictionary.MergedDictionaries>
+        <ResourceDictionary Source="ms-appx:///Styles/Tokens/Radius.xaml" />
+        <ResourceDictionary Source="ms-appx:///Styles/Components/Sa.Buttons.xaml" />
+        <ResourceDictionary Source="ms-appx:///Styles/Components/Sa.Surfaces.xaml" />
+    </ResourceDictionary.MergedDictionaries>
+    <Style x:Key="SaDialogStyle" TargetType="ContentDialog" BasedOn="{StaticResource DefaultContentDialogStyle}">
+        <Setter Property="Background" Value="{ThemeResource SaModalSurfaceBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource SaGlassBorderBrush}" />
+        <Setter Property="BorderThickness" Value="{ThemeResource SaModalBorderThickness}" />
+        <Setter Property="CornerRadius" Value="{StaticResource SaRadiusPanel}" />
+        <Setter Property="Padding" Value="28" />
+        <Setter Property="Foreground" Value="{ThemeResource SaTextBrush}" />
+        <Setter Property="PrimaryButtonStyle" Value="{StaticResource SaDialogButtonStyle}" />
+        <Setter Property="SecondaryButtonStyle" Value="{StaticResource SaDialogButtonStyle}" />
+        <Setter Property="CloseButtonStyle" Value="{StaticResource SaDialogButtonStyle}" />
+    </Style>
+</ResourceDictionary>

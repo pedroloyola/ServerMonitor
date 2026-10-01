@@ -126,9 +126,10 @@ public sealed class QaGalleryHarnessTests
     [Fact]
     public void GalleryPagesMatchThePolicyPageIds()
     {
-        var pages = AppSourceTree.Files(".xaml").Where(f => f.StartsWith("Qa/Gallery/", StringComparison.Ordinal) && f.EndsWith("Page.xaml", StringComparison.Ordinal)).ToList();
-
-        // One page per policy id (the probe page backs the "tokens" id).
-        Assert.Equal(QaGalleryPolicy.Pages.Count, pages.Count);
+        // Every id the policy accepts opens a page, and the window offers nothing the policy would refuse.
+        Assert.Equal(QaGalleryPolicy.Pages.Order(StringComparer.Ordinal), QaGalleryWindow.PageTypes.Keys.Order(StringComparer.Ordinal));
+        var pageFiles = AppSourceTree.Files(".xaml").Where(f => f.StartsWith("Qa/Gallery/", StringComparison.Ordinal) && f.EndsWith("Page.xaml", StringComparison.Ordinal))
+            .Select(f => Path.GetFileNameWithoutExtension(f)).ToHashSet(StringComparer.Ordinal);
+        Assert.All(QaGalleryWindow.PageTypes.Values, page => Assert.Contains(page.PageType.Name, pageFiles));
     }
 }

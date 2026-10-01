@@ -18,22 +18,27 @@ public sealed partial class QaGalleryWindow : Window
     private const int GalleryWidth = 1440;
     private const int GalleryHeight = 900;
 
-    private static readonly IReadOnlyDictionary<string, (string Title, Type PageType)> PageTypes =
-        new Dictionary<string, (string, Type)>(StringComparer.Ordinal)
+    /// <summary>Gallery page id -> page; internal so a test proves it matches <see cref="QaGalleryPolicy.Pages"/> exactly.</summary>
+    internal static readonly IReadOnlyDictionary<string, (string Title, Type PageType, string? Parameter)> PageTypes =
+        new Dictionary<string, (string, Type, string?)>(StringComparer.Ordinal)
         {
-            ["tokens"] = ("Tokens", typeof(QaTokenProbePage)),
-            ["typography"] = ("Typography", typeof(QaTypographyPage)),
-            ["colors"] = ("Colors", typeof(QaColorsPage)),
-            ["spacing"] = ("Spacing & radius", typeof(QaSpacingPage)),
-            ["materials"] = ("Materials", typeof(QaMaterialsPage)),
-            ["status"] = ("Status", typeof(QaStatusPage)),
-            ["motion"] = ("Motion", typeof(QaMotionPage)),
-            ["icons"] = ("Icons", typeof(QaIconsPage)),
-            ["buttons"] = ("Buttons", typeof(QaButtonsPage)),
-            ["forms"] = ("Forms", typeof(QaFormsPage)),
-            ["navigation"] = ("Navigation", typeof(QaNavigationPage)),
-            ["popup-combo"] = ("Popup · ComboBox", typeof(QaPopupComboPage)),
-            ["popup-flyout"] = ("Popup · Flyout", typeof(QaPopupFlyoutPage))
+            ["tokens"] = ("Tokens", typeof(QaTokenProbePage), null),
+            ["typography"] = ("Typography", typeof(QaTypographyPage), null),
+            ["colors"] = ("Colors", typeof(QaColorsPage), null),
+            ["spacing"] = ("Spacing & radius", typeof(QaSpacingPage), null),
+            ["materials"] = ("Materials", typeof(QaMaterialsPage), null),
+            ["status"] = ("Status", typeof(QaStatusPage), null),
+            ["motion"] = ("Motion", typeof(QaMotionPage), null),
+            ["icons"] = ("Icons", typeof(QaIconsPage), null),
+            ["buttons"] = ("Buttons", typeof(QaButtonsPage), null),
+            ["forms"] = ("Forms", typeof(QaFormsPage), null),
+            ["navigation"] = ("Navigation", typeof(QaNavigationPage), null),
+            ["popup-combo"] = ("Popup · ComboBox", typeof(QaPopupComboPage), null),
+            ["data"] = ("Data", typeof(QaDataPage), null),
+            ["feedback"] = ("Feedback", typeof(QaFeedbackPage), null),
+            ["materials-fallback"] = ("Materials · fallback (sim)", typeof(QaMaterialsPage), "fallback"),
+            ["popup-flyout"] = ("Popup · Flyout", typeof(QaPopupFlyoutPage), null),
+            ["popup-dialog"] = ("Popup · Dialog", typeof(QaPopupDialogPage), null)
         };
 
     private readonly QaGalleryRequest _request;
@@ -84,7 +89,7 @@ public sealed partial class QaGalleryWindow : Window
             return;
         }
 
-        PageFrame.Navigate(PageTypes[id].PageType);
+        PageFrame.Navigate(PageTypes[id].PageType, PageTypes[id].Parameter);
     }
 
     /// <summary>dark / light set GalleryRoot.RequestedTheme. hc-sim keeps the current Dark/Light theme and
@@ -110,7 +115,7 @@ public sealed partial class QaGalleryWindow : Window
             QaHighContrastSimulation.Apply(SimulationHost, simulate);
             if (PageFrame.Content is not null)
             {
-                PageFrame.Navigate(PageTypes[_page].PageType);
+                PageFrame.Navigate(PageTypes[_page].PageType, PageTypes[_page].Parameter);
             }
         }
 
@@ -188,7 +193,7 @@ public sealed partial class QaGalleryWindow : Window
         if (PageList.SelectedItem is ListViewItem { Tag: string id })
         {
             _page = id;
-            PageFrame.Navigate(PageTypes[id].PageType);
+            PageFrame.Navigate(PageTypes[id].PageType, PageTypes[id].Parameter);
         }
     }
 }

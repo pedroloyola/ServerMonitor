@@ -43,12 +43,23 @@ public sealed class InteractivePrimitivesAutomationTests
             foreach (var element in AppSourceTree.LoadXaml(file).Descendants())
             {
                 var style = (string?)element.Attribute("Style") ?? string.Empty;
-                if (style.Contains("SaIconButtonStyle", StringComparison.Ordinal) || style.Contains("SaGhostIconButtonStyle", StringComparison.Ordinal))
+                // A template part (PART_*) is named in code by its control from a required DP (e.g. SaToast.CloseButtonAutomationName).
+                var isTemplatePart = ((string?)element.Attribute(AppSourceTree.Xaml + "Name"))?.StartsWith("PART_", StringComparison.Ordinal) == true;
+                if (!isTemplatePart && (style.Contains("SaIconButtonStyle", StringComparison.Ordinal) || style.Contains("SaGhostIconButtonStyle", StringComparison.Ordinal)))
                 {
                     uses++;
                     if (string.IsNullOrWhiteSpace(AutomationName(element)))
                     {
                         failures.Add($"{file}: icon-only button without AutomationProperties.Name");
+                    }
+                }
+
+                if (element.Name.LocalName == "SaToast" && element.Name.NamespaceName == PrimitivesNamespace)
+                {
+                    uses++;
+                    if (string.IsNullOrWhiteSpace((string?)element.Attribute("CloseButtonAutomationName")))
+                    {
+                        failures.Add($"{file}: SaToast without CloseButtonAutomationName");
                     }
                 }
 

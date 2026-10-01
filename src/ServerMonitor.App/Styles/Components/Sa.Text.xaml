@@ -25,4 +25,24 @@
         <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
         <Setter Property="Foreground" Value="{ThemeResource SaTextSecondaryBrush}" />
     </Style>
+    <!-- Metric unit "%" 20 Regular muted next to the 44 Light value (112:1816). -->
+    <Style x:Key="SaMetricUnitTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SaTitleTextStyle}">
+        <Setter Property="FontWeight" Value="Normal" />
+        <Setter Property="Foreground" Value="{ThemeResource SaTextSecondaryBrush}" />
+    </Style>
+    <!-- Status badge "1 problema" 11 Medium in the accessible attention text (112:2640). -->
+    <Style x:Key="SaStatusBadgeTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SaHelperTextStyle}">
+        <Setter Property="FontWeight" Value="Medium" />
+        <Setter Property="Foreground" Value="{ThemeResource SaAttentionTextBrush}" />
+    </Style>
+    <!-- DataTable cells 112:1434: name / value 14 Medium text, secondary line 12 muted, attention value in attention text. -->
+    <Style x:Key="SaTableCellTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SaButtonTextStyle}">
+        <Setter Property="Foreground" Value="{ThemeResource SaTextBrush}" />
+    </Style>
+    <Style x:Key="SaTableCellSecondaryTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SaCaptionTextStyle}">
+        <Setter Property="Foreground" Value="{ThemeResource SaTextSecondaryBrush}" />
+    </Style>
+    <Style x:Key="SaTableCellAttentionTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SaButtonTextStyle}">
+        <Setter Property="Foreground" Value="{ThemeResource SaAttentionTextBrush}" />
+    </Style>
 </ResourceDictionary>
