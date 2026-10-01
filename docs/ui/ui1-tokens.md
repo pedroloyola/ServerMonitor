@@ -166,6 +166,8 @@ Contraprova: build Debug e Release e a suite completa verdes **depois** da remo�
 
 ### 7.2 Gates obrigatórios de UI.2 (das revisões Cortex/Prism de UI.1)
 
+> **Fechado em UI.2** → `docs/ui/ui2-components.md` §4 (F-1, F-3, F-4, F-07, Color.Primitives, Default, G-3, G-4, G-5). Texto abaixo mantido como registo histórico.
+
 UI.2 não adota nenhum token `Sa*` em páginas antes de estes gates estarem verdes:
 1. **Resolução runtime (Cortex F-1):** página de galeria Debug / `--qa-tokens` que aplica `RequestedTheme` Dark → Light → HC num host e resolve **todas** as chaves `Sa*Brush`/`Sa*TextStyle` via `{ThemeResource}` em elementos reais; fail-closed se alguma faltar (o merge aninhado de Color.Primitives dentro de ThemeDictionaries ainda não foi instanciado em runtime).
 2. **Accent legado (Cortex F-3):** enquanto os overrides globais `SystemAccentColor*`/`AccentFill*` (#1846E1) vivem (até UI.6), cada primitiva UI.2 que aloje/templatize controlos WinUI (CheckBox, ToggleSwitch, RadioButton, ProgressBar, focus visuals, seleção) sobrepõe localmente os recursos dependentes do accent com `Sa*`; a galeria verifica visualmente "sem #1846E1". Alternativa: antecipar a remoção do override global com scan de zero referências. Registar a decisão aqui.
