@@ -63,6 +63,12 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
     private bool _isRefreshingAll;
     private int _hiddenServerCount;
     private HealthSummary? _healthSummary;
+    private IReadOnlyList<HealthBarSegment>? _healthBarSegments;
+    private IReadOnlyList<HealthChip>? _healthChips;
+    private string? _healthAutomationName;
+    private bool _hasReadings;
+    private bool _overviewDirty;
+    private bool _overviewScheduled;
     private IReadOnlyList<HealthSegment>? _healthSegments;
     private PriorityProblem? _priorityProblem;
     private string? _updatedAgoDisplay;
@@ -213,6 +219,7 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
                 OnPropertyChanged(nameof(ShowOverviewContent));
                 OnPropertyChanged(nameof(ShowEmptyState));
                 OnPropertyChanged(nameof(ShowNoProblems));
+                OnPropertyChanged(nameof(ShowNoReadings));
             }
         }
     }
@@ -313,8 +320,11 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
             if (SetProperty(ref _isLoading, value))
             {
                 OnPropertyChanged(nameof(ShowNoProblems));
+                OnPropertyChanged(nameof(ShowNoReadings));
                 OnPropertyChanged(nameof(ShowOverviewContent));
                 OnPropertyChanged(nameof(ShowEmptyState));
+                OnPropertyChanged(nameof(HeaderContextDisplay));
+                OnPropertyChanged(nameof(HasHeaderContext));
             }
         }
     }
@@ -348,50 +358,44 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
 
     public IReadOnlyList<HealthSegment> HealthSegments => _healthSegments ?? [];
 
+    /// <summary>
+    /// The rendered health bar (Figma 112:1018): one width per segment inside the fixed 213-wide bar; an aggregated
+    /// segment (more than 12 servers) carries its state's count as a tooltip ("496 saudáveis"). Cached per recompute.
+    /// </summary>
+    public IReadOnlyList<HealthBarSegment> HealthBarSegments => _healthBarSegments ?? [];
+
+    /// <summary>The engine's thresholds (the one MonitoringOptions instance), shared with every row that colours a metric.</summary>
+    public ServerMonitor.Core.Monitoring.MonitoringThresholds Thresholds =>
+        _prioritySelector?.Thresholds ?? MonitoringOptions.Default.Thresholds;
+
     /// <summary>"4" of "4 de 6 saudáveis".</summary>
     public string HealthyCountDisplay => HealthSummary.Healthy.ToString(CultureInfo.CurrentUICulture);
 
     /// <summary>"de 6 saudáveis".</summary>
     public string HealthOfTotalDisplay => Format("OverviewHealthOfTotalFormat", HealthSummary.Total);
 
-    /// <summary>The exception chips, in fixed order, only for states with a count &gt; 0 ("1 atenção", "1 sem ligação").</summary>
-    public IReadOnlyList<HealthChip> HealthChips => OverviewPresentation.ChipOrder
-        .Select(health => (health, count: HealthSummary.CountOf(health)))
-        .Where(entry => entry.count > 0)
-        .Select(entry => new HealthChip(
-            entry.health,
-            entry.count,
-            Format(PluralKey($"OverviewHealthChip{entry.health}", entry.count), entry.count)))
-        .ToList();
+    /// <summary>The exception chips, in fixed order, only for states with a count &gt; 0 ("1 atenção", "1 sem ligação").
+    /// Cached per recompute (Cortex r1 SHOULD-2): a binding read never allocates.</summary>
+    public IReadOnlyList<HealthChip> HealthChips => _healthChips ?? [];
 
     /// <summary>"4 de 6 servidores saudáveis, 1 em atenção, 1 sem ligação" — one readable sentence for the whole card.</summary>
-    public string HealthAutomationName
-    {
-        get
-        {
-            var summary = HealthSummary;
-            var parts = new List<string> { Format("OverviewHealthAutomationFormat", summary.Healthy, summary.Total) };
-            foreach (var health in OverviewPresentation.ChipOrder)
-            {
-                var count = summary.CountOf(health);
-                if (count > 0)
-                {
-                    parts.Add(Format(PluralKey($"OverviewHealthAutomation{health}", count), count));
-                }
-            }
-
-            return string.Join(", ", parts);
-        }
-    }
+    public string HealthAutomationName => _healthAutomationName ?? BuildHealthAutomationName(HealthSummary);
 
     public PriorityProblem? PriorityProblem => _priorityProblem;
 
     public bool HasPriorityProblem => _priorityProblem is not null;
 
-    /// <summary>The neutral "Sem problemas" state: loaded, servers present, and no candidate above the engine limits.</summary>
-    // Cortex r1 NIT-3: never "Sem problemas" next to a Warning/Critical count, even if a future cause of attention
-    // ever produced no metric candidate.
-    public bool ShowNoProblems =>
+    /// <summary>
+    /// The neutral "Sem problemas" state: loaded, servers present, at least one current reading, and no candidate above
+    /// the engine limits. Cortex r1 NIT-3: never next to a Warning/Critical count. Prism (e): with NO current reading
+    /// (every server offline or without data) "Sem problemas" would lie — <see cref="ShowNoReadings"/> shows instead.
+    /// </summary>
+    public bool ShowNoProblems => QuietPriority && _hasReadings;
+
+    /// <summary>Prism (e): "Sem leituras" — nothing to judge yet (every server offline or without data).</summary>
+    public bool ShowNoReadings => QuietPriority && !_hasReadings;
+
+    private bool QuietPriority =>
         !IsLoading && HasVisibleServers && _priorityProblem is null && HealthSummary.Warning + HealthSummary.Critical == 0;
 
     /// <summary>"Disco quase cheio" / "CPU elevada" / "Memória quase cheia".</summary>
@@ -404,6 +408,8 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
     public double PriorityPercentValue => _priorityProblem?.Percent ?? 0;
 
     public ServerHealth PrioritySeverity => _priorityProblem?.Severity ?? ServerHealth.Healthy;
+
+    public PriorityMetric PriorityMetric => _priorityProblem?.Metric ?? PriorityMetric.Disk;
 
     public string? PriorityServerName => _priorityProblem?.ServerName;
 
@@ -426,11 +432,21 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
             if (SetProperty(ref _updatedAgoDisplay, value))
             {
                 OnPropertyChanged(nameof(HasUpdatedAgo));
+                OnPropertyChanged(nameof(HeaderContextDisplay));
+                OnPropertyChanged(nameof(HasHeaderContext));
             }
         }
     }
 
     public bool HasUpdatedAgo => _updatedAgoDisplay is not null;
+
+    /// <summary>
+    /// The line under "Visão geral": "A recolher dados…" while loading (Figma §14 112:15583, the RENDERED text), then
+    /// "Atualizado há …" — collapsed when nothing was ever read (Prism h: nothing fabricated).
+    /// </summary>
+    public string? HeaderContextDisplay => IsLoading ? Text("OverviewCollecting") : _updatedAgoDisplay;
+
+    public bool HasHeaderContext => HeaderContextDisplay is not null;
 
     /// <summary>The overview list's search ("Procurar"): name or address, partial, case-insensitive.</summary>
     public string OverviewSearchText
@@ -452,6 +468,9 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
     public int OverviewMoreCount { get; private set; }
 
     public bool HasOverviewMore => OverviewMoreCount > 0;
+
+    /// <summary>Prism r1 (b): the explicit footer of a truncated list, "Mais 12 servidores · Ver todos" (no silent cut).</summary>
+    public string OverviewMoreDisplay => Format(PluralKey("OverviewMoreServers", OverviewMoreCount), OverviewMoreCount);
 
     public bool HasOverviewSearchNoResults =>
         HasVisibleServers && !string.IsNullOrWhiteSpace(OverviewSearchText) && OverviewServers.Count == 0;
@@ -504,7 +523,7 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         finally
         {
             IsRefreshingAll = false;
-            RecomputeOverview();
+            ScheduleOverview();
         }
     }
 
@@ -517,11 +536,63 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>
+    /// TEST/MEASUREMENT SEAM (Cortex r1 SHOULD-2): replaces the UI dispatcher as the place a coalesced recompute is
+    /// queued. Null in production (the dispatcher is used) and in ordinary tests (no dispatcher: recompute at once).
+    /// </summary>
+    internal Func<Action, bool>? OverviewScheduler { get; set; }
+
+    /// <summary>Runs a pending (coalesced) overview recompute now.</summary>
+    internal void FlushOverview()
+    {
+        if (_overviewDirty)
+        {
+            RecomputeOverview();
+        }
+    }
+
+    /// <summary>
+    /// Cortex r1 SHOULD-2: an engine cycle publishes one state per server; the overview is recomputed ONCE per burst
+    /// (a single queued pass on the UI thread), not once per server. Without a dispatcher (unit tests) it runs at once.
+    /// </summary>
+    private void ScheduleOverview()
+    {
+        _overviewDirty = true;
+        if (_overviewScheduled)
+        {
+            return;
+        }
+
+        var scheduler = OverviewScheduler;
+        if (scheduler is not null)
+        {
+            _overviewScheduled = scheduler(RunScheduledOverview);
+        }
+        else if (_dispatcherQueue is not null)
+        {
+            _overviewScheduled = _dispatcherQueue.TryEnqueue(RunScheduledOverview);
+        }
+
+        if (!_overviewScheduled)
+        {
+            RecomputeOverview();
+        }
+    }
+
+    private void RunScheduledOverview()
+    {
+        _overviewScheduled = false;
+        FlushOverview();
+    }
+
+    /// <summary>
     /// Recomputes every overview aggregate from the cards' engine-owned state: health counts and segments, the priority
-    /// problem and "Atualizado há …". Called on load, on each engine state change and after "Atualizar" — never on a timer.
+    /// problem and "Atualizado há …". Runs on load, after a burst of engine state changes and after "Atualizar" — never
+    /// on a timer. Only what actually changed is announced (Cortex r1 SHOULD-2): a routine cycle that re-publishes the
+    /// same states raises nothing.
     /// </summary>
     private void RecomputeOverview()
     {
+        _overviewDirty = false;
         var cards = VisibleServers;
         if (cards is null)
         {
@@ -529,32 +600,89 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         }
 
         var summary = HealthSummary.From(cards.Select(card => card.Health));
-        _healthSummary = summary;
-        _healthSegments = OverviewPresentation.Segments(summary);
-
         var selector = _prioritySelector ?? new PriorityProblemSelector(MonitoringOptions.Default.Thresholds);
-        _priorityProblem = selector.Select(cards
+        var problem = selector.Select(cards
             .Select(card => new PriorityServerInput(card.Server.Id, card.Name, card.Health, card.MetricsSnapshot))
             .ToList());
-
+        var hasReadings = summary.Healthy + summary.Warning + summary.Critical > 0;
         var lastSuccess = cards.Select(card => card.LastSuccessAt).Where(at => at is not null).Max();
-        UpdatedAgoDisplay = lastSuccess is { } at ? FormatUpdatedAgo(at) : null;
 
-        OnPropertyChanged(nameof(HealthSummary));
-        OnPropertyChanged(nameof(HealthSegments));
-        OnPropertyChanged(nameof(HealthyCountDisplay));
-        OnPropertyChanged(nameof(HealthOfTotalDisplay));
-        OnPropertyChanged(nameof(HealthChips));
-        OnPropertyChanged(nameof(HealthAutomationName));
-        OnPropertyChanged(nameof(PriorityProblem));
-        OnPropertyChanged(nameof(HasPriorityProblem));
-        OnPropertyChanged(nameof(ShowNoProblems));
-        OnPropertyChanged(nameof(PriorityTitle));
-        OnPropertyChanged(nameof(PriorityPercentDisplay));
-        OnPropertyChanged(nameof(PriorityPercentValue));
-        OnPropertyChanged(nameof(PrioritySeverity));
-        OnPropertyChanged(nameof(PriorityServerName));
-        OnPropertyChanged(nameof(PriorityAutomationName));
+        var summaryChanged = _healthSummary is null || summary != _healthSummary;
+        var problemChanged = problem != _priorityProblem;
+        var readingsChanged = hasReadings != _hasReadings;
+
+        if (summaryChanged)
+        {
+            _healthSummary = summary;
+            _healthSegments = OverviewPresentation.Segments(summary);
+            _healthBarSegments = BuildBarSegments(summary);
+            _healthChips = BuildHealthChips(summary);
+            _healthAutomationName = BuildHealthAutomationName(summary);
+            OnPropertyChanged(nameof(HealthSummary));
+            OnPropertyChanged(nameof(HealthSegments));
+            OnPropertyChanged(nameof(HealthBarSegments));
+            OnPropertyChanged(nameof(HealthyCountDisplay));
+            OnPropertyChanged(nameof(HealthOfTotalDisplay));
+            OnPropertyChanged(nameof(HealthChips));
+            OnPropertyChanged(nameof(HealthAutomationName));
+        }
+
+        if (problemChanged)
+        {
+            _priorityProblem = problem;
+            OnPropertyChanged(nameof(PriorityProblem));
+            OnPropertyChanged(nameof(HasPriorityProblem));
+            OnPropertyChanged(nameof(PriorityTitle));
+            OnPropertyChanged(nameof(PriorityPercentDisplay));
+            OnPropertyChanged(nameof(PriorityPercentValue));
+            OnPropertyChanged(nameof(PrioritySeverity));
+            OnPropertyChanged(nameof(PriorityMetric));
+            OnPropertyChanged(nameof(PriorityServerName));
+            OnPropertyChanged(nameof(PriorityAutomationName));
+        }
+
+        _hasReadings = hasReadings;
+        if (summaryChanged || problemChanged || readingsChanged)
+        {
+            OnPropertyChanged(nameof(ShowNoProblems));
+            OnPropertyChanged(nameof(ShowNoReadings));
+        }
+
+        UpdatedAgoDisplay = lastSuccess is { } at ? FormatUpdatedAgo(at) : null;
+    }
+
+    private IReadOnlyList<HealthBarSegment> BuildBarSegments(HealthSummary summary)
+    {
+        var aggregated = summary.Total > OverviewPresentation.MaxDiscreteHealthSegments;
+        return OverviewPresentation.BarSegments(summary)
+            .Select(segment => aggregated
+                ? segment with { ToolTip = Format(PluralKey($"OverviewHealthSegment{segment.Health}", segment.Count), segment.Count) }
+                : segment)
+            .ToList();
+    }
+
+    private IReadOnlyList<HealthChip> BuildHealthChips(HealthSummary summary) => OverviewPresentation.ChipOrder
+        .Select(health => (health, count: summary.CountOf(health)))
+        .Where(entry => entry.count > 0)
+        .Select(entry => new HealthChip(
+            entry.health,
+            entry.count,
+            Format(PluralKey($"OverviewHealthChip{entry.health}", entry.count), entry.count)))
+        .ToList();
+
+    private string BuildHealthAutomationName(HealthSummary summary)
+    {
+        var parts = new List<string> { Format("OverviewHealthAutomationFormat", summary.Healthy, summary.Total) };
+        foreach (var health in OverviewPresentation.ChipOrder)
+        {
+            var count = summary.CountOf(health);
+            if (count > 0)
+            {
+                parts.Add(Format(PluralKey($"OverviewHealthAutomation{health}", count), count));
+            }
+        }
+
+        return string.Join(", ", parts);
     }
 
     // D-UI3-9 semantics (same buckets as the Serviços e containers page): <1 s "agora mesmo", then s / min / h / d.
@@ -604,7 +732,8 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
                 .Select(card => new ServerDirectoryRowViewModel(
                     card,
                     localization,
-                    selected => OpenServerDetail(selected.Server.Id, ServerDetailOrigin.Overview)))
+                    selected => OpenServerDetail(selected.Server.Id, ServerDetailOrigin.Overview),
+                    Thresholds))
                 .ToList();
         ApplyOverviewFilter();
     }
@@ -620,6 +749,7 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(OverviewServers));
         OnPropertyChanged(nameof(OverviewMoreCount));
         OnPropertyChanged(nameof(HasOverviewMore));
+        OnPropertyChanged(nameof(OverviewMoreDisplay));
         OnPropertyChanged(nameof(HasOverviewSearchNoResults));
         OnPropertyChanged(nameof(OverviewNoResultsTitle));
     }
@@ -953,7 +1083,7 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         }
 
         card.ApplyMonitoringState(_monitoringStateStore.Get(serverId));
-        RecomputeOverview();
+        ScheduleOverview();
     }
 
     internal void HandleError(Exception exception, string operation)

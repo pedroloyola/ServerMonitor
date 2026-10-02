@@ -33,7 +33,9 @@ public sealed partial class XamlContractAndResourceGuardTests
             "RootLayout", "StandardRoot", "AppTitleBar", "ContentFrame", "ModalOverlayHost",
             "CompactRoot", "CompactCaptionColumn", "CompactDragRegion", "CompactBody"
         ],
-        ["Views/DashboardPage.xaml"] = ["ServersItemsControl"],
+        // UI.4: adaptive VisualState setters reflow these; OverviewSearchBox also takes focus after "Limpar pesquisa".
+        ["Views/DashboardPage.xaml"] = ["PageRoot", "HeaderGrid", "HeaderActions", "HealthRow", "HealthColumn2", "HealthCountRow", "HealthSegments",
+            "PriorityHost", "ServersToolbar", "OverviewSearchBox", "StateOverlay"],
         ["Views/SettingsPage.xaml"] = ["BackupStatusBar", "BackgroundSection"],
         // UI.3: adaptive VisualState setters reflow these (no code-behind dependency).
         ["Views/HistoryPage.xaml"] = ["RangeLast30Days", "UnavailableState", "EmptyState", "PageRoot", "ControlsRow", "ServerSelector", "RangeTrack", "CpuChart", "MemoryChart", "DiskChart", "RetentionText"],
@@ -42,7 +44,8 @@ public sealed partial class XamlContractAndResourceGuardTests
             "ServicesNoResultsText", "ServicesUnsupportedState", "ServicesUnavailableState", "ServicesErrorState", "ServicesEmptyState",
             "UnavailableState", "NothingState", "NoResultsState"],
         // UI.4: "Limpar pesquisa" returns focus to the search box (code-behind FocusAfterAction).
-        ["Views/ServersPage.xaml"] = ["SearchBox"],
+        ["Views/ServersPage.xaml"] = ["SearchBox", "PageRoot", "HeaderGrid", "AddButton", "TableHeader", "HeaderSystemColumn", "HeaderSystemText",
+            "HeaderActionColumn", "ServersRepeater", "RootGrid"],
         ["Views/BackupCreateDialog.xaml"] = ["PassphraseBox", "ConfirmationBox"],
         ["Views/RestoreOpenDialog.xaml"] = ["PassphraseBox"],
         ["Views/AddServerDialog.xaml"] = ["ServerForm"],

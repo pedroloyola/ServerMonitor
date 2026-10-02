@@ -22,11 +22,14 @@ public sealed partial class DashboardPage : Page
 
     public DashboardViewModel ViewModel { get; }
 
-    /// <summary>Backs the discreet "compact mode" entry in the header; server VMs stay mode-agnostic.</summary>
+    /// <summary>Backs the discreet "compact mode" entry in the header (D-UI4-NAV, until UI.6).</summary>
     public WindowModeViewModel WindowMode { get; }
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
         await ViewModel.LoadAsync();
     }
+
+    // "Limpar pesquisa" disappears once it worked; focus returns to the search box (UI.3 pattern).
+    private void OnClearSearchClick(object sender, RoutedEventArgs e) => FocusAfterAction.MoveTo((Control)sender, OverviewSearchBox);
 }

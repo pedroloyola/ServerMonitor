@@ -97,6 +97,55 @@ public static class OverviewPresentation
         return segments;
     }
 
+    /// <summary>Figma 112:1018: the bar is 213 wide, segments h12 radius 6, gap 5; a discrete segment is at most 30 wide.</summary>
+    public const double HealthBarWidth = 213;
+
+    public const double HealthBarGap = 5;
+
+    public const double HealthSegmentMaxWidth = 30;
+
+    /// <summary>A segment never gets narrower than its height (12), so the radius-6 pill stays a pill.</summary>
+    public const double HealthSegmentMinWidth = 12;
+
+    /// <summary>
+    /// The rendered bar: each segment's width inside the fixed 213-wide bar (minus the gaps), proportional to its weight
+    /// and capped at 30 — 6 servers give the Figma's 6 × 30; 12 share the width; above the cap the per-state segments are
+    /// proportional. Pure; the View only binds the widths.
+    /// </summary>
+    public static IReadOnlyList<HealthBarSegment> BarSegments(HealthSummary summary)
+    {
+        var segments = Segments(summary);
+        if (segments.Count == 0)
+        {
+            return [];
+        }
+
+        var available = HealthBarWidth - (HealthBarGap * (segments.Count - 1));
+        if (summary.Total <= MaxDiscreteHealthSegments)
+        {
+            // Discrete (one per server): equal widths, at most 30 (6 servers = the Figma's 6 × 30; 12 ≈ 13 each).
+            var width = Math.Round(Math.Min(HealthSegmentMaxWidth, available / segments.Count), 2);
+            return segments.Select(segment => new HealthBarSegment(segment.Health, width, segment.Weight)).ToList();
+        }
+
+        // Aggregated (one per present state), Prism r1 (a): reserve the minimum for EVERY present state first, then share
+        // the rest by count — so the bar always sums to exactly 213 and no present state can vanish.
+        var total = segments.Sum(segment => segment.Weight);
+        var spare = available - (HealthSegmentMinWidth * segments.Count);
+        return segments
+            .Select(segment => new HealthBarSegment(
+                segment.Health,
+                Math.Round(HealthSegmentMinWidth + (spare * segment.Weight / total), 2),
+                segment.Weight))
+            .ToList();
+    }
+
+    /// <summary>The severity of one metric under the engine's limits (inclusive); Healthy when below or unknown.</summary>
+    public static ServerHealth MetricSeverity(double? percent, double warning, double critical) =>
+        percent is not { } value || double.IsNaN(value) || value < warning
+            ? ServerHealth.Healthy
+            : value >= critical ? ServerHealth.Critical : ServerHealth.Warning;
+
     /// <summary>
     /// "host" for the default SSH port, "host:port" otherwise — the real configured endpoint, never invented. IPv6
     /// literals are bracketed when a port is shown.
@@ -220,6 +269,15 @@ public sealed class PriorityProblemSelector(MonitoringThresholds thresholds)
     }
 
     private static int Rank(ServerHealth health) => health == ServerHealth.Critical ? 2 : 1;
+}
+
+/// <summary>
+/// One rendered segment of the health bar: its state, its width in the 213-wide bar and the number of servers it stands
+/// for (1 when discrete). An aggregated segment carries its count as a tooltip ("496 saudáveis", Prism r1 a).
+/// </summary>
+public sealed record HealthBarSegment(ServerHealth Health, double Width, int Count, string? ToolTip = null)
+{
+    public bool HasToolTip => ToolTip is not null;
 }
 
 /// <summary>One exception chip of the health card ("1 atenção"): the state, its count and the localized text.</summary>

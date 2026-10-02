@@ -515,7 +515,9 @@ public sealed class Ui4OverviewTests
         Assert.Empty(vm.Rows);
         Assert.True(vm.HasNoResults);
         Assert.False(vm.ShowTable);
-        Assert.Equal("Nenhum resultado para “nope”", vm.NoResultsTitle);
+        Assert.Equal("Nenhum servidor encontrado", vm.NoResultsTitle);
+        Assert.Contains("“nope”", vm.NoResultsMessage, StringComparison.Ordinal);
+        Assert.False(vm.ShowHiddenServersNote);
         vm.ClearSearchCommand.Execute(null);
         Assert.Equal(6, vm.Rows.Count);
         Assert.False(vm.HasNoResults);
@@ -534,13 +536,14 @@ public sealed class Ui4OverviewTests
         using (var vm = new ServersViewModel(one.Dashboard, one.Navigation, one.Localization))
         {
             Assert.Equal("1 server · 1 healthy", vm.SummaryDisplay);
-            Assert.False(vm.ShowHiddenServersNote);
+            Assert.True(vm.ShowHiddenServersNote); // Prism r1 (c): always under a table with rows
         }
 
         var empty = Ui4TestKit.Create(new Ui4TestKit.Fleet());
         await empty.Dashboard.LoadAsync();
         using var emptyVm = new ServersViewModel(empty.Dashboard, empty.Navigation, empty.Localization);
         Assert.True(emptyVm.ShowEmptyState);
+        Assert.False(emptyVm.ShowHiddenServersNote);
         Assert.False(emptyVm.HasNoResults);
         emptyVm.SearchText = "x";
         Assert.False(emptyVm.HasNoResults);

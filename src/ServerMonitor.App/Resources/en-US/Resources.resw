@@ -8,14 +8,8 @@
   <data name="AppWindowTitle" xml:space="preserve"><value>ServerAlyzer</value></data>
   <data name="NavigationDashboardItem.Content" xml:space="preserve"><value>Servers</value></data>
   <data name="NavigationSettingsItem.Content" xml:space="preserve"><value>Settings</value></data>
-  <data name="DashboardTitle.Text" xml:space="preserve"><value>Servers</value></data>
-  <data name="DashboardSubtitle.Text" xml:space="preserve"><value>Your servers, organized simply.</value></data>
-  <data name="DashboardAddButton.Content" xml:space="preserve"><value>Add server</value></data>
   <data name="DashboardSettingsButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Open settings</value></data>
   <data name="DashboardSettingsButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Settings</value></data>
-  <data name="DashboardEmptyState.Title" xml:space="preserve"><value>Ready to connect your first server?</value></data>
-  <data name="DashboardEmptyState.Description" xml:space="preserve"><value>Add an SSH connection to follow the server's status, metrics and history.</value></data>
-  <data name="DashboardEmptyState.ActionText" xml:space="preserve"><value>Add server</value></data>
   <data name="SettingsTitle.Text" xml:space="preserve"><value>Settings</value></data>
   <data name="SettingsBackButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Back to servers</value></data>
   <data name="SettingsBackButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Back</value></data>
@@ -446,7 +440,6 @@
   <data name="HostKeySubjectJumpFormat" xml:space="preserve"><value>Jump host {0}</value></data>
   <data name="HostKeySubjectTargetFormat" xml:space="preserve"><value>Target {0} via {1}</value></data>
   <data name="HostKeyMismatchServerLabel.Text" xml:space="preserve"><value>Server</value></data>
-  <data name="DashboardEmptyState.SecondaryActionText" xml:space="preserve"><value>Import from SSH</value></data>
   <data name="DashboardEmptyDiscoverySearching.Text" xml:space="preserve"><value>Looking for SSH servers on your local network…</value></data>
   <data name="DashboardEmptyDiscoveryFoundFormat" xml:space="preserve"><value>Found on your local network: {0}</value></data>
   <data name="ServerFormLocalKeySelector.Header" xml:space="preserve"><value>Keys found in .ssh</value></data>
@@ -771,14 +764,65 @@
   <data name="ServersBreadcrumb.ParentText" xml:space="preserve"><value>Overview</value></data>
   <data name="ServersBreadcrumb.CurrentText" xml:space="preserve"><value>Servers</value></data>
   <data name="ServersPageTitleText.Text" xml:space="preserve"><value>Servers</value></data>
-  <data name="ServersAddButton.Content" xml:space="preserve"><value>Add</value></data>
   <data name="ServersSearch.PlaceholderText" xml:space="preserve"><value>Search by name or address</value></data>
   <data name="ServersSearch.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Search servers by name or address</value></data>
-  <data name="ServersNoResultsState.Message" xml:space="preserve"><value>Try another name or address.</value></data>
   <data name="ServersClearSearchButton.Content" xml:space="preserve"><value>Clear search</value></data>
   <data name="ServersEmptyState.Title" xml:space="preserve"><value>No servers yet</value></data>
-  <data name="ServersEmptyState.Message" xml:space="preserve"><value>Add a server to follow it here.</value></data>
+  <data name="ServersEmptyState.Message" xml:space="preserve"><value>Add your first server to follow the health and resource usage of your machines.</value></data>
   <data name="ServersEmptyAddButton.Content" xml:space="preserve"><value>Add server</value></data>
   <data name="ServersHiddenNote.Text" xml:space="preserve"><value>Hidden servers can be restored in Settings.</value></data>
-  <data name="ServerDetailOpenButton.Content" xml:space="preserve"><value>View details</value></data>
+  <!-- UI.4 phase 2 (views, Prism r1 copy). -->
+  <data name="OverviewTitle.Text" xml:space="preserve"><value>Overview</value></data>
+  <data name="OverviewRefreshButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Refresh all</value></data>
+  <data name="OverviewRefreshButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Refresh</value></data>
+  <data name="OverviewAddButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Add server</value></data>
+  <data name="OverviewAddText.Text" xml:space="preserve"><value>Add</value></data>
+  <data name="OverviewHealthLabel.Text" xml:space="preserve"><value>Overall health</value></data>
+  <data name="OverviewServersTitle.Text" xml:space="preserve"><value>Servers</value></data>
+  <data name="OverviewViewAllButton.Content" xml:space="preserve"><value>View all</value></data>
+  <data name="OverviewViewAllButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>View all servers</value></data>
+  <data name="OverviewSearch.PlaceholderText" xml:space="preserve"><value>Search</value></data>
+  <data name="OverviewSearch.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Search servers by name or address</value></data>
+  <data name="OverviewServerList.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Servers</value></data>
+  <data name="OverviewLoadingLabel.Text" xml:space="preserve"><value>Loading…</value></data>
+  <data name="OverviewCollecting" xml:space="preserve"><value>Collecting data…</value></data>
+  <data name="OverviewNoProblemsPanel.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>No problems. No metric is above the attention limits.</value></data>
+  <data name="OverviewNoProblemsTitleText.Text" xml:space="preserve"><value>No problems</value></data>
+  <data name="OverviewNoProblemsMessageText.Text" xml:space="preserve"><value>No metric is above the attention limits.</value></data>
+  <data name="OverviewNoReadingsPanel.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>No readings. When your servers respond, CPU, memory or disk problems will show here.</value></data>
+  <data name="OverviewNoReadingsTitleText.Text" xml:space="preserve"><value>No readings</value></data>
+  <data name="OverviewNoReadingsMessageText.Text" xml:space="preserve"><value>When your servers respond, CPU, memory or disk problems will show here.</value></data>
+  <data name="OverviewClearSearchButton.Content" xml:space="preserve"><value>Clear search</value></data>
+  <data name="OverviewEmptyState.Title" xml:space="preserve"><value>Ready to connect your first server?</value></data>
+  <data name="OverviewEmptyState.Message" xml:space="preserve"><value>Add an SSH connection to follow the server's status, metrics and history.</value></data>
+  <data name="OverviewEmptyAddButton.Content" xml:space="preserve"><value>Add server</value></data>
+  <data name="OverviewEmptyImportButton.Content" xml:space="preserve"><value>Import from SSH</value></data>
+  <data name="OverviewMoreServersOne" xml:space="preserve"><value>{0} more server · View all</value></data>
+  <data name="OverviewMoreServersOther" xml:space="preserve"><value>{0} more servers · View all</value></data>
+  <data name="OverviewHealthSegmentHealthyOne" xml:space="preserve"><value>{0} healthy</value></data>
+  <data name="OverviewHealthSegmentHealthyOther" xml:space="preserve"><value>{0} healthy</value></data>
+  <data name="OverviewHealthSegmentWarningOne" xml:space="preserve"><value>{0} needs attention</value></data>
+  <data name="OverviewHealthSegmentWarningOther" xml:space="preserve"><value>{0} need attention</value></data>
+  <data name="OverviewHealthSegmentCriticalOne" xml:space="preserve"><value>{0} critical</value></data>
+  <data name="OverviewHealthSegmentCriticalOther" xml:space="preserve"><value>{0} critical</value></data>
+  <data name="OverviewHealthSegmentOfflineOne" xml:space="preserve"><value>{0} without connection</value></data>
+  <data name="OverviewHealthSegmentOfflineOther" xml:space="preserve"><value>{0} without connection</value></data>
+  <data name="OverviewHealthSegmentUnknownOne" xml:space="preserve"><value>{0} without data</value></data>
+  <data name="OverviewHealthSegmentUnknownOther" xml:space="preserve"><value>{0} without data</value></data>
+  <data name="ServersAddButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Add server</value></data>
+  <data name="ServersAddText.Text" xml:space="preserve"><value>Add</value></data>
+  <data name="ServerDetailOpenText.Text" xml:space="preserve"><value>View details</value></data>
+  <data name="ServersColumnServer.Text" xml:space="preserve"><value>SERVER</value></data>
+  <data name="ServersColumnSystem.Text" xml:space="preserve"><value>SYSTEM</value></data>
+  <data name="ServersColumnStatus.Text" xml:space="preserve"><value>STATUS</value></data>
+  <data name="ServersColumnCpu.Text" xml:space="preserve"><value>CPU</value></data>
+  <data name="ServersColumnMemory.Text" xml:space="preserve"><value>RAM</value></data>
+  <data name="ServersColumnDisk.Text" xml:space="preserve"><value>DISK</value></data>
+  <data name="ServersMetricLabelCpu.Text" xml:space="preserve"><value>CPU</value></data>
+  <data name="ServersMetricLabelMemory.Text" xml:space="preserve"><value>RAM</value></data>
+  <data name="ServersMetricLabelDisk.Text" xml:space="preserve"><value>Disk</value></data>
+  <data name="ServersTable.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Servers</value></data>
+  <data name="ServersNoResultsTitle" xml:space="preserve"><value>No servers found</value></data>
+  <data name="ServersNoResultsMessageFormat" xml:space="preserve"><value>There are no servers with the name or address “{0}”. Try another search.</value></data>
+  <data name="ServersLoadingSubtitle" xml:space="preserve"><value>Loading your servers…</value></data>
 </root>

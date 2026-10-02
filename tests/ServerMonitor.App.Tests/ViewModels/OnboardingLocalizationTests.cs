@@ -60,10 +60,11 @@ public sealed class OnboardingLocalizationTests
         "ServerFormChecklistTitle.Text",
         "ConnectionStepCopyCommandButton.Content",
         "ConnectionStepCopyCommandButton" + AutomationName,
-        "DashboardEmptyState.Title",
-        "DashboardEmptyState.Description",
-        "DashboardEmptyState.ActionText",
-        "DashboardEmptyState.SecondaryActionText",
+        // UI.4: the empty dashboard is the SaEmptyState of the Visão geral (Add + Import from SSH + discovery).
+        "OverviewEmptyState.Title",
+        "OverviewEmptyState.Message",
+        "OverviewEmptyAddButton.Content",
+        "OverviewEmptyImportButton.Content",
         "DashboardEmptyDiscoverySearching.Text",
     ];
 

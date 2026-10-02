@@ -5,96 +5,360 @@
     xmlns:converters="using:ServerMonitor.App.Converters"
     xmlns:primitives="using:ServerMonitor.App.Controls.Primitives"
     xmlns:vm="using:ServerMonitor.App.ViewModels">
-    <!-- UI.4 §3 Servidores, Figma 05 · 02: 112:1353 (Dark). PHASE 1 functional skeleton (Cortex architecture review);
-         Figma fidelity, responsive reflow and table semantics land in phase 2. -->
+    <!-- UI.4 §3 Servidores, Figma 05 · 02: 112:1353 (Dark, directory 112:1419) / Light sibling; header 112:1420, search
+         112:1429, table 112:1434, hidden note 112:1533; states 05 §13 112:14007 (empty) / 112:14194 (no results) and §14
+         112:15760 (loading). Responsive (Prism r1): Wide ≥ 1040 (7 columns), Mid 900–1039 (no SISTEMA, icon action),
+         Stacked < 900 (one 3-line target per server). ONE virtualized ItemsRepeater for all three (only the template
+         changes), inside the page's single vertical ScrollViewer: no horizontal scroll at any width. -->
     <Page.Resources>
         <converters:ServerHealthToStatusKindConverter x:Key="ServerHealthToStatusKindConverter" />
 
-        <DataTemplate x:Key="ServerRowTemplate" x:DataType="vm:ServerDirectoryRowViewModel">
-            <primitives:SaDataTableRow AutomationProperties.Name="{x:Bind RowAutomationName, Mode=OneWay}">
-                <Grid ColumnSpacing="{StaticResource SaSpace12}">
+        <!-- Figma 112:1468: a value over the engine's attention limit in the attention text colour; critical in danger. -->
+        <Style x:Key="ServersMetricCriticalTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SaButtonTextStyle}">
+            <Setter Property="Foreground" Value="{ThemeResource SaDangerTextBrush}" />
+        </Style>
+        <converters:ServerHealthToStyleConverter
+            x:Key="MetricValueStyleConverter"
+            HealthyStyle="{StaticResource SaTableCellTextStyle}"
+            WarningStyle="{StaticResource SaTableCellAttentionTextStyle}"
+            CriticalStyle="{StaticResource ServersMetricCriticalTextStyle}"
+            UnknownStyle="{StaticResource SaTableCellTextStyle}" />
+
+        <!-- A row is ONE target (Enter/Space/click → interim page); "Ver detalhe" inside it is its visible affordance, so the
+             action never duplicates the Tab stop. Transparent; hover/pressed veil DERIVED (as SaListRow); ring outset 8. -->
+        <Style x:Key="ServerRowButtonStyle" TargetType="Button" BasedOn="{StaticResource SaButtonBaseStyle}">
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="CornerRadius" Value="{StaticResource SaRadiusControl}" />
+            <Setter Property="FocusVisualMargin" Value="-8,2,-8,2" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Grid x:Name="RootGrid" Background="Transparent" CornerRadius="{TemplateBinding CornerRadius}">
+                            <VisualStateManager.VisualStateGroups>
+                                <VisualStateGroup x:Name="CommonStates">
+                                    <VisualState x:Name="Normal" />
+                                    <VisualState x:Name="PointerOver">
+                                        <VisualState.Setters>
+                                            <Setter Target="RootGrid.Background" Value="{ThemeResource SaHoverBrush}" />
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                    <VisualState x:Name="Pressed">
+                                        <VisualState.Setters>
+                                            <Setter Target="RootGrid.Background" Value="{ThemeResource SaSelectedBrush}" />
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                    <VisualState x:Name="Disabled" />
+                                </VisualStateGroup>
+                            </VisualStateManager.VisualStateGroups>
+                            <ContentPresenter
+                                HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                                Content="{TemplateBinding Content}"
+                                AutomationProperties.AccessibilityView="Raw" />
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Wide 112:1443: SERVIDOR * (min 230) · SISTEMA 110 · ESTADO 150 · CPU/RAM/DISCO 85 · ação 127, gap 10, h78. -->
+        <DataTemplate x:Key="ServerRowWideTemplate" x:DataType="vm:ServerDirectoryRowViewModel">
+            <Button Style="{StaticResource ServerRowButtonStyle}" Command="{x:Bind OpenDetailCommand}"
+                    AutomationProperties.Name="{x:Bind DetailAutomationName}"
+                    AutomationProperties.HelpText="{x:Bind RowAutomationName, Mode=OneWay}">
+                <Border Style="{StaticResource SaDataTableRowStyle}">
+                    <Grid ColumnSpacing="10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" MinWidth="230" />
+                            <ColumnDefinition Width="110" />
+                            <ColumnDefinition Width="150" />
+                            <ColumnDefinition Width="85" />
+                            <ColumnDefinition Width="85" />
+                            <ColumnDefinition Width="85" />
+                            <ColumnDefinition Width="127" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center" Spacing="5">
+                            <TextBlock Style="{StaticResource SaTableCellTextStyle}" Text="{x:Bind Name}" TextTrimming="CharacterEllipsis"
+                                       ToolTipService.ToolTip="{x:Bind Name}" />
+                            <TextBlock Style="{StaticResource SaTableCellSecondaryTextStyle}" Text="{x:Bind Address}" TextTrimming="CharacterEllipsis"
+                                       ToolTipService.ToolTip="{x:Bind Address}" />
+                        </StackPanel>
+                        <TextBlock Grid.Column="1" VerticalAlignment="Center" Style="{StaticResource SaTableCellSecondaryTextStyle}"
+                                   Text="{x:Bind OperatingSystemDisplay}" TextTrimming="CharacterEllipsis" />
+                        <primitives:SaStatusIndicator Grid.Column="2" VerticalAlignment="Center"
+                            Status="{x:Bind Health, Mode=OneWay, Converter={StaticResource ServerHealthToStatusKindConverter}}"
+                            Label="{x:Bind StatusDisplay, Mode=OneWay}" />
+                        <TextBlock Grid.Column="3" VerticalAlignment="Center" Text="{x:Bind CpuDisplay, Mode=OneWay}"
+                                   Style="{x:Bind CpuSeverity, Mode=OneWay, Converter={StaticResource MetricValueStyleConverter}}" />
+                        <TextBlock Grid.Column="4" VerticalAlignment="Center" Text="{x:Bind MemoryDisplay, Mode=OneWay}"
+                                   Style="{x:Bind MemorySeverity, Mode=OneWay, Converter={StaticResource MetricValueStyleConverter}}" />
+                        <TextBlock Grid.Column="5" VerticalAlignment="Center" Text="{x:Bind DiskDisplay, Mode=OneWay}"
+                                   Style="{x:Bind DiskSeverity, Mode=OneWay, Converter={StaticResource MetricValueStyleConverter}}" />
+                        <StackPanel Grid.Column="6" Orientation="Horizontal" VerticalAlignment="Center" Spacing="{StaticResource SaSpace8}">
+                            <TextBlock x:Uid="ServerDetailOpenText" VerticalAlignment="Center" Style="{StaticResource SaTableCellSecondaryTextStyle}" />
+                            <primitives:SaIcon Data="{StaticResource SaIconArrowRight01Data}" Size="16" VerticalAlignment="Center"
+                                               Foreground="{ThemeResource SaTextSecondaryBrush}" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+            </Button>
+        </DataTemplate>
+
+        <!-- Mid (900–1039): no SISTEMA column (the system joins the address line); the action is the chevron alone (44). -->
+        <DataTemplate x:Key="ServerRowMidTemplate" x:DataType="vm:ServerDirectoryRowViewModel">
+            <Button Style="{StaticResource ServerRowButtonStyle}" Command="{x:Bind OpenDetailCommand}"
+                    AutomationProperties.Name="{x:Bind DetailAutomationName}"
+                    AutomationProperties.HelpText="{x:Bind RowAutomationName, Mode=OneWay}"
+                    ToolTipService.ToolTip="{x:Bind DetailAutomationName}">
+                <Border Style="{StaticResource SaDataTableRowStyle}">
+                    <Grid ColumnSpacing="10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" MinWidth="230" />
+                            <ColumnDefinition Width="150" />
+                            <ColumnDefinition Width="85" />
+                            <ColumnDefinition Width="85" />
+                            <ColumnDefinition Width="85" />
+                            <ColumnDefinition Width="44" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center" Spacing="5">
+                            <TextBlock Style="{StaticResource SaTableCellTextStyle}" Text="{x:Bind Name}" TextTrimming="CharacterEllipsis"
+                                       ToolTipService.ToolTip="{x:Bind Name}" />
+                            <TextBlock Style="{StaticResource SaTableCellSecondaryTextStyle}" Text="{x:Bind AddressAndSystemDisplay}"
+                                       TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{x:Bind AddressAndSystemDisplay}" />
+                        </StackPanel>
+                        <primitives:SaStatusIndicator Grid.Column="1" VerticalAlignment="Center"
+                            Status="{x:Bind Health, Mode=OneWay, Converter={StaticResource ServerHealthToStatusKindConverter}}"
+                            Label="{x:Bind StatusDisplay, Mode=OneWay}" />
+                        <TextBlock Grid.Column="2" VerticalAlignment="Center" Text="{x:Bind CpuDisplay, Mode=OneWay}"
+                                   Style="{x:Bind CpuSeverity, Mode=OneWay, Converter={StaticResource MetricValueStyleConverter}}" />
+                        <TextBlock Grid.Column="3" VerticalAlignment="Center" Text="{x:Bind MemoryDisplay, Mode=OneWay}"
+                                   Style="{x:Bind MemorySeverity, Mode=OneWay, Converter={StaticResource MetricValueStyleConverter}}" />
+                        <TextBlock Grid.Column="4" VerticalAlignment="Center" Text="{x:Bind DiskDisplay, Mode=OneWay}"
+                                   Style="{x:Bind DiskSeverity, Mode=OneWay, Converter={StaticResource MetricValueStyleConverter}}" />
+                        <primitives:SaIcon Grid.Column="5" Data="{StaticResource SaIconArrowRight01Data}" Size="16" HorizontalAlignment="Center"
+                                           VerticalAlignment="Center" Foreground="{ThemeResource SaTextSecondaryBrush}" />
+                    </Grid>
+                </Border>
+            </Button>
+        </DataTemplate>
+
+        <!-- Stacked (< 900): L1 name + state, L2 address · system, L3 "CPU 24% · RAM 62% · Disco 48%" (labels visible,
+             there is no header), chevron at the right, no dividers. -->
+        <DataTemplate x:Key="ServerRowStackedTemplate" x:DataType="vm:ServerDirectoryRowViewModel">
+            <Button Style="{StaticResource ServerRowButtonStyle}" Command="{x:Bind OpenDetailCommand}"
+                    AutomationProperties.Name="{x:Bind DetailAutomationName}"
+                    AutomationProperties.HelpText="{x:Bind RowAutomationName, Mode=OneWay}">
+                <Grid MinHeight="88" ColumnSpacing="{StaticResource SaSpace12}">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="3*" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="2*" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <StackPanel VerticalAlignment="Center">
-                        <TextBlock Text="{x:Bind Name}" TextTrimming="CharacterEllipsis" />
-                        <TextBlock Text="{x:Bind Address}" Foreground="{ThemeResource SaTextSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                    <StackPanel VerticalAlignment="Center" Spacing="{StaticResource SaSpace4}">
+                        <Grid ColumnSpacing="{StaticResource SaSpace12}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Style="{StaticResource SaTableCellTextStyle}" Text="{x:Bind Name}" MaxLines="2"
+                                       TextWrapping="Wrap" TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{x:Bind Name}" />
+                            <primitives:SaStatusIndicator Grid.Column="1" VerticalAlignment="Top"
+                                Status="{x:Bind Health, Mode=OneWay, Converter={StaticResource ServerHealthToStatusKindConverter}}"
+                                Label="{x:Bind StatusDisplay, Mode=OneWay}" />
+                        </Grid>
+                        <TextBlock Style="{StaticResource SaTableCellSecondaryTextStyle}" Text="{x:Bind AddressAndSystemDisplay}"
+                                   TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{x:Bind AddressAndSystemDisplay}" />
+                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource SaSpace4}">
+                            <TextBlock x:Uid="ServersMetricLabelCpu" Style="{StaticResource SaTableCellSecondaryTextStyle}" VerticalAlignment="Center" />
+                            <TextBlock Text="{x:Bind CpuDisplay, Mode=OneWay}" VerticalAlignment="Center"
+                                       Style="{x:Bind CpuSeverity, Mode=OneWay, Converter={StaticResource MetricValueStyleConverter}}" />
+                            <TextBlock Text="·" Style="{StaticResource SaTableCellSecondaryTextStyle}" VerticalAlignment="Center" />
+                            <TextBlock x:Uid="ServersMetricLabelMemory" Style="{StaticResource SaTableCellSecondaryTextStyle}" VerticalAlignment="Center" />
+                            <TextBlock Text="{x:Bind MemoryDisplay, Mode=OneWay}" VerticalAlignment="Center"
+                                       Style="{x:Bind MemorySeverity, Mode=OneWay, Converter={StaticResource MetricValueStyleConverter}}" />
+                            <TextBlock Text="·" Style="{StaticResource SaTableCellSecondaryTextStyle}" VerticalAlignment="Center" />
+                            <TextBlock x:Uid="ServersMetricLabelDisk" Style="{StaticResource SaTableCellSecondaryTextStyle}" VerticalAlignment="Center" />
+                            <TextBlock Text="{x:Bind DiskDisplay, Mode=OneWay}" VerticalAlignment="Center"
+                                       Style="{x:Bind DiskSeverity, Mode=OneWay, Converter={StaticResource MetricValueStyleConverter}}" />
+                        </StackPanel>
                     </StackPanel>
-                    <TextBlock Grid.Column="1" VerticalAlignment="Center" Text="{x:Bind OperatingSystemDisplay}" />
-                    <primitives:SaStatusIndicator Grid.Column="2" VerticalAlignment="Center"
-                        Status="{x:Bind Health, Mode=OneWay, Converter={StaticResource ServerHealthToStatusKindConverter}}"
-                        Label="{x:Bind StatusDisplay, Mode=OneWay}" />
-                    <TextBlock Grid.Column="3" VerticalAlignment="Center" Text="{x:Bind CpuDisplay, Mode=OneWay}" />
-                    <TextBlock Grid.Column="4" VerticalAlignment="Center" Text="{x:Bind MemoryDisplay, Mode=OneWay}" />
-                    <TextBlock Grid.Column="5" VerticalAlignment="Center" Text="{x:Bind DiskDisplay, Mode=OneWay}" />
-                    <Button Grid.Column="6" x:Uid="ServerDetailOpenButton" VerticalAlignment="Center"
-                        Style="{StaticResource SaSecondaryRectButtonStyle}"
-                        Command="{x:Bind OpenDetailCommand}"
-                        AutomationProperties.Name="{x:Bind DetailAutomationName}" />
+                    <primitives:SaIcon Grid.Column="1" Data="{StaticResource SaIconArrowRight01Data}" Size="16" VerticalAlignment="Center"
+                                       Foreground="{ThemeResource SaTextSecondaryBrush}" />
                 </Grid>
-            </primitives:SaDataTableRow>
+            </Button>
+        </DataTemplate>
+
+        <!-- §14 112:15604 skeleton row (reused from the overview's geometry). -->
+        <DataTemplate x:Key="LoadingRowTemplate">
+            <Grid Height="44" ColumnSpacing="{StaticResource SaSpace24}" AutomationProperties.AccessibilityView="Raw">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <primitives:SaSkeleton Width="40" Height="40" VerticalAlignment="Top" />
+                <StackPanel Grid.Column="1" Spacing="{StaticResource SaSpace8}">
+                    <primitives:SaSkeleton Width="160" Height="16" HorizontalAlignment="Left" />
+                    <primitives:SaSkeleton Width="110" Height="12" HorizontalAlignment="Left" />
+                </StackPanel>
+                <primitives:SaSkeleton Grid.Column="2" Width="72" Height="16" VerticalAlignment="Top" />
+                <primitives:SaSkeleton Grid.Column="3" Width="72" Height="16" VerticalAlignment="Top" />
+                <primitives:SaSkeleton Grid.Column="4" Width="72" Height="16" VerticalAlignment="Top" />
+            </Grid>
         </DataTemplate>
     </Page.Resources>
 
-    <Grid Padding="{StaticResource SaPagePadding}" RowSpacing="{StaticResource SaSpace20}">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
+    <Grid x:Name="PageHost">
+        <VisualStateManager.VisualStateGroups>
+            <VisualStateGroup x:Name="WidthStates">
+                <VisualState x:Name="Wide">
+                    <VisualState.StateTriggers>
+                        <AdaptiveTrigger MinWindowWidth="1040" />
+                    </VisualState.StateTriggers>
+                </VisualState>
+                <VisualState x:Name="Mid">
+                    <VisualState.StateTriggers>
+                        <AdaptiveTrigger MinWindowWidth="900" />
+                    </VisualState.StateTriggers>
+                    <VisualState.Setters>
+                        <Setter Target="ServersRepeater.ItemTemplate" Value="{StaticResource ServerRowMidTemplate}" />
+                        <Setter Target="HeaderSystemColumn.Width" Value="0" />
+                        <Setter Target="HeaderSystemText.Visibility" Value="Collapsed" />
+                        <Setter Target="HeaderActionColumn.Width" Value="44" />
+                    </VisualState.Setters>
+                </VisualState>
+                <VisualState x:Name="Stacked">
+                    <VisualState.StateTriggers>
+                        <AdaptiveTrigger MinWindowWidth="640" />
+                    </VisualState.StateTriggers>
+                    <VisualState.Setters>
+                        <Setter Target="ServersRepeater.ItemTemplate" Value="{StaticResource ServerRowStackedTemplate}" />
+                        <Setter Target="TableHeader.Visibility" Value="Collapsed" />
+                    </VisualState.Setters>
+                </VisualState>
+                <VisualState x:Name="StackedCompact">
+                    <VisualState.StateTriggers>
+                        <AdaptiveTrigger MinWindowWidth="0" />
+                    </VisualState.StateTriggers>
+                    <VisualState.Setters>
+                        <Setter Target="PageRoot.Padding" Value="{StaticResource SaPagePaddingCompact}" />
+                        <Setter Target="ServersRepeater.ItemTemplate" Value="{StaticResource ServerRowStackedTemplate}" />
+                        <Setter Target="TableHeader.Visibility" Value="Collapsed" />
+                        <Setter Target="AddButton.(Grid.Row)" Value="1" />
+                        <Setter Target="AddButton.(Grid.Column)" Value="0" />
+                        <Setter Target="AddButton.HorizontalAlignment" Value="Left" />
+                        <Setter Target="HeaderGrid.RowSpacing" Value="{StaticResource SaSpace16}" />
+                    </VisualState.Setters>
+                </VisualState>
+            </VisualStateGroup>
+        </VisualStateManager.VisualStateGroups>
 
-        <primitives:SaBreadcrumb x:Name="Breadcrumb" x:Uid="ServersBreadcrumb" ParentInvoked="OnBreadcrumbParentInvoked" />
+        <ScrollViewer x:Name="PageScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel x:Name="PageRoot" Padding="{StaticResource SaPagePadding}" Spacing="{StaticResource SaSpace24}">
+                <primitives:SaBreadcrumb x:Name="Breadcrumb" x:Uid="ServersBreadcrumb" ParentInvoked="OnBreadcrumbParentInvoked" />
 
-        <Grid Grid.Row="1" ColumnSpacing="{StaticResource SaSpace20}">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
-            <StackPanel Spacing="{StaticResource SaSpace4}">
-                <TextBlock x:Uid="ServersPageTitleText" AutomationProperties.HeadingLevel="Level1"
-                           Style="{StaticResource SaPageTitleTextStyle}" Foreground="{ThemeResource SaTextBrush}" />
-                <TextBlock Style="{StaticResource SaPageSubtitleTextStyle}" Text="{Binding SummaryDisplay}" TextWrapping="Wrap"
-                           AutomationProperties.LiveSetting="Polite" />
+                <!-- Header 112:1420: title 32 Semibold + summary 13 muted (or the §14 loading line), Adicionar 156×44. -->
+                <Grid x:Name="HeaderGrid" ColumnSpacing="{StaticResource SaSpace20}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <StackPanel Spacing="6">
+                        <TextBlock x:Uid="ServersPageTitleText" AutomationProperties.HeadingLevel="Level1"
+                                   Style="{StaticResource SaPageTitleTextStyle}" Foreground="{ThemeResource SaTextBrush}" />
+                        <TextBlock Style="{StaticResource SaPageSubtitleTextStyle}" TextWrapping="Wrap"
+                                   Text="{x:Bind ViewModel.HeaderContextDisplay, Mode=OneWay}" AutomationProperties.LiveSetting="Polite" />
+                    </StackPanel>
+                    <Button x:Name="AddButton" x:Uid="ServersAddButton" Grid.Column="1" MinWidth="156" VerticalAlignment="Top"
+                            Style="{StaticResource SaPrimaryButtonStyle}" Command="{x:Bind ViewModel.AddServerCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource SaSpace8}">
+                            <primitives:SaIcon Data="{StaticResource SaIconAdd01Data}" Size="18" VerticalAlignment="Center" />
+                            <TextBlock x:Uid="ServersAddText" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
+
+                <!-- Search 112:1429: 44 high, radius 14, full width; visible while loading too (§14). -->
+                <TextBox x:Name="SearchBox" x:Uid="ServersSearch" HorizontalAlignment="Stretch" Style="{StaticResource SaPageSearchFieldStyle}"
+                         Text="{x:Bind ViewModel.SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+                <!-- Loading §14 112:15760: "A carregar…" + 5 skeleton rows. -->
+                <Border Style="{StaticResource SaSolidSurfaceStyle}" Visibility="{x:Bind ViewModel.IsLoading, Mode=OneWay}">
+                    <StackPanel Spacing="{StaticResource SaSpace20}">
+                        <TextBlock x:Uid="OverviewLoadingLabel" Style="{StaticResource SaPrimaryBodyTextStyle}" />
+                        <ContentControl ContentTemplate="{StaticResource LoadingRowTemplate}" HorizontalContentAlignment="Stretch" IsTabStop="False" />
+                        <ContentControl ContentTemplate="{StaticResource LoadingRowTemplate}" HorizontalContentAlignment="Stretch" IsTabStop="False" />
+                        <ContentControl ContentTemplate="{StaticResource LoadingRowTemplate}" HorizontalContentAlignment="Stretch" IsTabStop="False" />
+                        <ContentControl ContentTemplate="{StaticResource LoadingRowTemplate}" HorizontalContentAlignment="Stretch" IsTabStop="False" />
+                        <ContentControl ContentTemplate="{StaticResource LoadingRowTemplate}" HorizontalContentAlignment="Stretch" IsTabStop="False" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Table 112:1434: header h34 10 Medium muted, rows h78, no dividers; the hidden-servers note under the rows. -->
+                <Border Style="{StaticResource SaGlassSurfaceStyle}" Visibility="{x:Bind ViewModel.ShowTable, Mode=OneWay}">
+                    <StackPanel>
+                        <Border x:Name="TableHeader" Style="{StaticResource SaDataTableHeaderStyle}" AutomationProperties.AccessibilityView="Raw">
+                            <Grid ColumnSpacing="10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" MinWidth="230" />
+                                    <ColumnDefinition x:Name="HeaderSystemColumn" Width="110" />
+                                    <ColumnDefinition Width="150" />
+                                    <ColumnDefinition Width="85" />
+                                    <ColumnDefinition Width="85" />
+                                    <ColumnDefinition Width="85" />
+                                    <ColumnDefinition x:Name="HeaderActionColumn" Width="127" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock x:Uid="ServersColumnServer" Style="{StaticResource SaTableHeaderTextStyle}" />
+                                <TextBlock x:Name="HeaderSystemText" x:Uid="ServersColumnSystem" Grid.Column="1" Style="{StaticResource SaTableHeaderTextStyle}" />
+                                <TextBlock x:Uid="ServersColumnStatus" Grid.Column="2" Style="{StaticResource SaTableHeaderTextStyle}" />
+                                <TextBlock x:Uid="ServersColumnCpu" Grid.Column="3" Style="{StaticResource SaTableHeaderTextStyle}" />
+                                <TextBlock x:Uid="ServersColumnMemory" Grid.Column="4" Style="{StaticResource SaTableHeaderTextStyle}" />
+                                <TextBlock x:Uid="ServersColumnDisk" Grid.Column="5" Style="{StaticResource SaTableHeaderTextStyle}" />
+                            </Grid>
+                        </Border>
+                        <primitives:SaDataTableList x:Uid="ServersTable">
+                            <ItemsRepeater x:Name="ServersRepeater" TabFocusNavigation="Once" XYFocusKeyboardNavigation="Enabled"
+                                           AutomationProperties.AccessibilityView="Raw"
+                                           ItemsSource="{x:Bind ViewModel.Rows, Mode=OneWay}"
+                                           ItemTemplate="{StaticResource ServerRowWideTemplate}" />
+                        </primitives:SaDataTableList>
+                        <TextBlock x:Uid="ServersHiddenNote" Margin="0,8,0,0" Style="{StaticResource SaTableCellSecondaryTextStyle}" TextWrapping="Wrap"
+                                   Visibility="{x:Bind ViewModel.ShowHiddenServersNote, Mode=OneWay}" />
+                    </StackPanel>
+                </Border>
+
+                <!-- No results §13 112:14194: "Nenhum servidor encontrado" + the query + "Limpar pesquisa" (no note). -->
+                <Border Style="{StaticResource SaStatePanelStyle}" Visibility="{x:Bind ViewModel.HasNoResults, Mode=OneWay}">
+                    <primitives:SaEmptyState x:Name="NoResultsState" TitleHeadingLevel="Level2" VerticalAlignment="Center"
+                                             IconData="{StaticResource SaIconSearch01Data}"
+                                             Title="{x:Bind ViewModel.NoResultsTitle, Mode=OneWay}"
+                                             Message="{x:Bind ViewModel.NoResultsMessage, Mode=OneWay}">
+                        <Button x:Uid="ServersClearSearchButton" HorizontalAlignment="Center" Style="{StaticResource SaSolidButtonStyle}"
+                                Command="{x:Bind ViewModel.ClearSearchCommand}" Click="OnClearSearchClick" />
+                    </primitives:SaEmptyState>
+                </Border>
+
+                <!-- Empty §13 112:14007: no visible server; the note only when servers are hidden (Prism r1 c). -->
+                <Border Style="{StaticResource SaStatePanelStyle}" Visibility="{x:Bind ViewModel.ShowEmptyState, Mode=OneWay}">
+                    <StackPanel VerticalAlignment="Center" Spacing="{StaticResource SaSpace16}">
+                        <primitives:SaEmptyState x:Name="EmptyState" x:Uid="ServersEmptyState" TitleHeadingLevel="Level2"
+                                                 IconData="{StaticResource SaIconServerStack01Data}">
+                            <Button x:Uid="ServersEmptyAddButton" HorizontalAlignment="Center" Style="{StaticResource SaSolidButtonStyle}"
+                                    Command="{x:Bind ViewModel.AddServerCommand}" />
+                        </primitives:SaEmptyState>
+                        <TextBlock x:Uid="ServersHiddenNote" HorizontalAlignment="Center" Style="{StaticResource SaTableCellSecondaryTextStyle}"
+                                   TextWrapping="Wrap" TextAlignment="Center"
+                                   Visibility="{x:Bind ViewModel.ShowHiddenServersNote, Mode=OneWay}" />
+                    </StackPanel>
+                </Border>
             </StackPanel>
-            <Button Grid.Column="1" x:Uid="ServersAddButton" VerticalAlignment="Top"
-                    Style="{StaticResource SaPrimaryButtonStyle}" Command="{Binding AddServerCommand}" />
-        </Grid>
-
-        <TextBox x:Name="SearchBox" x:Uid="ServersSearch" Grid.Row="2" HorizontalAlignment="Stretch"
-                 Style="{StaticResource SaPageSearchFieldStyle}"
-                 Text="{Binding SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-
-        <ProgressRing Grid.Row="3" IsActive="{Binding IsLoading}"
-                      Visibility="{Binding IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}" />
-
-        <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
-                      Visibility="{Binding ShowTable, Converter={StaticResource BooleanToVisibilityConverter}}">
-            <ItemsRepeater x:Name="ServersRepeater" ItemsSource="{Binding Rows}" ItemTemplate="{StaticResource ServerRowTemplate}" />
         </ScrollViewer>
-
-        <primitives:SaEmptyState Grid.Row="3" x:Name="NoResultsState" x:Uid="ServersNoResultsState" VerticalAlignment="Center"
-                                 IconData="{StaticResource SaIconSearch01Data}" Title="{Binding NoResultsTitle}"
-                                 Visibility="{Binding HasNoResults, Converter={StaticResource BooleanToVisibilityConverter}}">
-            <Button x:Uid="ServersClearSearchButton" HorizontalAlignment="Center" Style="{StaticResource SaSolidButtonStyle}"
-                    Command="{Binding ClearSearchCommand}" Click="OnClearSearchClick" />
-        </primitives:SaEmptyState>
-
-        <primitives:SaEmptyState Grid.Row="3" x:Name="EmptyState" x:Uid="ServersEmptyState" VerticalAlignment="Center"
-                                 IconData="{StaticResource SaIconServerStack01Data}"
-                                 Visibility="{Binding ShowEmptyState, Converter={StaticResource BooleanToVisibilityConverter}}">
-            <Button x:Uid="ServersEmptyAddButton" HorizontalAlignment="Center" Style="{StaticResource SaSolidButtonStyle}"
-                    Command="{Binding AddServerCommand}" />
-        </primitives:SaEmptyState>
-
-        <TextBlock Grid.Row="4" x:Uid="ServersHiddenNote" Style="{StaticResource SaPageSubtitleTextStyle}" TextWrapping="Wrap"
-                   Visibility="{Binding ShowHiddenServersNote, Converter={StaticResource BooleanToVisibilityConverter}}" />
     </Grid>
 </Page>

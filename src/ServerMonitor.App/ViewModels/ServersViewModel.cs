@@ -72,7 +72,13 @@ public sealed class ServersViewModel : ObservableObject, IDisposable
     /// <summary>A search that matches nothing: the "Sem resultados" state with "Limpar pesquisa".</summary>
     public bool HasNoResults => !IsLoading && HasServers && _rows.Count == 0 && !string.IsNullOrWhiteSpace(_searchText);
 
-    public string NoResultsTitle => Format("ServerSearchNoResultsTitleFormat", _searchText.Trim());
+    /// <summary>Figma §13 112:14283: "Nenhum servidor encontrado" + the query in the message (Prism r1 e).</summary>
+    public string NoResultsTitle => _localization.GetString("ServersNoResultsTitle");
+
+    public string NoResultsMessage => Format("ServersNoResultsMessageFormat", _searchText.Trim());
+
+    /// <summary>The header line: "A carregar os teus servidores…" while loading (Figma §14 112:15760), then the summary.</summary>
+    public string HeaderContextDisplay => IsLoading ? _localization.GetString("ServersLoadingSubtitle") : SummaryDisplay;
 
     /// <summary>
     /// "6 servidores · 4 saudáveis · 1 atenção · 1 sem ligação" (+ crítico / sem dados when &gt; 0). Healthy is always
@@ -102,10 +108,11 @@ public sealed class ServersViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>
-    /// The note "Os servidores ocultos podem ser restaurados nas Definições." DERIVED (pending Prism): shown only when at
-    /// least one server is hidden — the concept is real (Server.IsHidden), but the hint is noise when nothing is hidden.
+    /// The note "Os servidores ocultos podem ser restaurados nas Definições." (Figma 112:1533), Prism r1 (c): always
+    /// under a table that has rows; never on the no-results state nor the plain empty state (§13 draws none); and on the
+    /// empty state when servers are hidden — otherwise the user would think they were lost.
     /// </summary>
-    public bool ShowHiddenServersNote => _dashboard.HiddenServerCount > 0;
+    public bool ShowHiddenServersNote => !IsLoading && (_rows.Count > 0 || (!HasServers && _dashboard.HiddenServerCount > 0));
 
     public void Dispose()
     {
@@ -128,6 +135,7 @@ public sealed class ServersViewModel : ObservableObject, IDisposable
         {
             case nameof(DashboardViewModel.HealthSummary):
                 OnPropertyChanged(nameof(SummaryDisplay));
+                OnPropertyChanged(nameof(HeaderContextDisplay));
                 break;
             case nameof(DashboardViewModel.IsLoading):
                 RaiseStates();
@@ -142,7 +150,7 @@ public sealed class ServersViewModel : ObservableObject, IDisposable
     {
         DisposeRows();
         _allRows = _dashboard.VisibleServers
-            .Select(card => new ServerDirectoryRowViewModel(card, _localization, OpenDetail))
+            .Select(card => new ServerDirectoryRowViewModel(card, _localization, OpenDetail, _dashboard.Thresholds))
             .ToList();
         OnPropertyChanged(nameof(TotalCount));
         OnPropertyChanged(nameof(HasServers));
@@ -156,7 +164,7 @@ public sealed class ServersViewModel : ObservableObject, IDisposable
             .Where(row => OverviewPresentation.MatchesSearch(row.Name, row.Card.Host, row.Card.Port, _searchText))
             .ToList();
         OnPropertyChanged(nameof(Rows));
-        OnPropertyChanged(nameof(NoResultsTitle));
+        OnPropertyChanged(nameof(NoResultsMessage));
         RaiseStates();
     }
 
@@ -166,6 +174,8 @@ public sealed class ServersViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(ShowEmptyState));
         OnPropertyChanged(nameof(ShowTable));
         OnPropertyChanged(nameof(HasNoResults));
+        OnPropertyChanged(nameof(ShowHiddenServersNote));
+        OnPropertyChanged(nameof(HeaderContextDisplay));
     }
 
     private void OpenDetail(ServerCardViewModel card) => _navigation.GoToServerDetail(card.Server.Id, ServerDetailOrigin.Servers);

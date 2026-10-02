@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Windows.Input;
 using ServerMonitor.App.Services;
 using ServerMonitor.Core.Enums;
+using ServerMonitor.Core.Monitoring;
 
 namespace ServerMonitor.App.ViewModels;
 
@@ -14,12 +15,18 @@ namespace ServerMonitor.App.ViewModels;
 public sealed class ServerDirectoryRowViewModel : ObservableObject, IDisposable
 {
     private readonly ILocalizationService _localization;
+    private readonly MonitoringThresholds _thresholds;
     private bool _disposed;
 
-    public ServerDirectoryRowViewModel(ServerCardViewModel card, ILocalizationService localization, Action<ServerCardViewModel> openDetail)
+    public ServerDirectoryRowViewModel(
+        ServerCardViewModel card,
+        ILocalizationService localization,
+        Action<ServerCardViewModel> openDetail,
+        MonitoringThresholds? thresholds = null)
     {
         Card = card ?? throw new ArgumentNullException(nameof(card));
         _localization = localization ?? throw new ArgumentNullException(nameof(localization));
+        _thresholds = thresholds ?? MonitoringThresholds.Default;
         ArgumentNullException.ThrowIfNull(openDetail);
         OpenDetailCommand = new RelayCommand(() => openDetail(Card));
         Card.PropertyChanged += OnCardPropertyChanged;
@@ -36,6 +43,9 @@ public sealed class ServerDirectoryRowViewModel : ObservableObject, IDisposable
 
     /// <summary>The configured system ("Linux" / "macOS"), the same localized value the card shows.</summary>
     public string OperatingSystemDisplay => Card.OperatingSystemDisplayName;
+
+    /// <summary>Mid / stacked table (Prism r1): the system joins the address line, "192.168.1.10 · Linux".</summary>
+    public string AddressAndSystemDisplay => ServerContextPresentation.Join(Address, OperatingSystemDisplay);
 
     public ServerHealth Health => Card.Health;
 
@@ -62,6 +72,23 @@ public sealed class ServerDirectoryRowViewModel : ObservableObject, IDisposable
     public double DiskValue => HasDiskPercent ? Card.DiskUsageValue : 0;
 
     private bool IsOffline => Card.Health == ServerHealth.Offline;
+
+    // Figma 112:1468: a value above the engine's attention limit is drawn in the attention (or critical) text colour,
+    // always next to its number (colour is never the only signal). Same inclusive limits as the engine.
+    public ServerHealth CpuSeverity => HasCpuPercent
+        ? OverviewPresentation.MetricSeverity(Card.CpuUsageValue, _thresholds.CpuWarning, _thresholds.CpuCritical)
+        : ServerHealth.Healthy;
+
+    public ServerHealth MemorySeverity => HasMemoryPercent
+        ? OverviewPresentation.MetricSeverity(Card.MemoryUsageValue, _thresholds.MemoryWarning, _thresholds.MemoryCritical)
+        : ServerHealth.Healthy;
+
+    public ServerHealth DiskSeverity => HasDiskPercent
+        ? OverviewPresentation.MetricSeverity(Card.DiskUsageValue, _thresholds.DiskWarning, _thresholds.DiskCritical)
+        : ServerHealth.Healthy;
+
+    /// <summary>The summary-list row (112:1057) read as "prod-web-01, Saudável".</summary>
+    public string ListAutomationName => string.Join(", ", Name, StatusDisplay);
 
     /// <summary>"Ver detalhe de &lt;servidor&gt;" — the action's accessible name carries the server.</summary>
     public string DetailAutomationName => Format("ServerDetailOpenFor", Name);
@@ -101,6 +128,7 @@ public sealed class ServerDirectoryRowViewModel : ObservableObject, IDisposable
             case nameof(ServerCardViewModel.HasCpuPercent):
             case nameof(ServerCardViewModel.CpuUsageValue):
                 OnPropertyChanged(nameof(CpuDisplay));
+                OnPropertyChanged(nameof(CpuSeverity));
                 OnPropertyChanged(nameof(HasCpuPercent));
                 OnPropertyChanged(nameof(CpuValue));
                 OnPropertyChanged(nameof(RowAutomationName));
@@ -108,6 +136,7 @@ public sealed class ServerDirectoryRowViewModel : ObservableObject, IDisposable
             case nameof(ServerCardViewModel.HasMemoryPercent):
             case nameof(ServerCardViewModel.MemoryUsageValue):
                 OnPropertyChanged(nameof(MemoryDisplay));
+                OnPropertyChanged(nameof(MemorySeverity));
                 OnPropertyChanged(nameof(HasMemoryPercent));
                 OnPropertyChanged(nameof(MemoryValue));
                 OnPropertyChanged(nameof(RowAutomationName));
@@ -115,6 +144,7 @@ public sealed class ServerDirectoryRowViewModel : ObservableObject, IDisposable
             case nameof(ServerCardViewModel.HasDiskPercent):
             case nameof(ServerCardViewModel.DiskUsageValue):
                 OnPropertyChanged(nameof(DiskDisplay));
+                OnPropertyChanged(nameof(DiskSeverity));
                 OnPropertyChanged(nameof(HasDiskPercent));
                 OnPropertyChanged(nameof(DiskValue));
                 OnPropertyChanged(nameof(RowAutomationName));

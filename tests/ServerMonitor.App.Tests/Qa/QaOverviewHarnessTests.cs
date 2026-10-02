@@ -201,7 +201,9 @@ public sealed class QaOverviewHarnessTests
         Assert.Equal(server, vm.PriorityServerName);
         Assert.Equal(metric, vm.PriorityProblem?.Metric);
         Assert.Equal(severity, vm.PriorityProblem?.Severity);
-        Assert.Equal(server is null, vm.ShowNoProblems);
+        // No candidate → the neutral card: "Sem problemas" with readings, "Sem leituras" without (Prism r1 e).
+        Assert.Equal(server is null, vm.ShowNoProblems || vm.ShowNoReadings);
+        Assert.Equal(scenario == "unavailable", vm.ShowNoReadings);
         // Fixed clock: "há 8 s" everywhere something was collected; nothing collected = no freshness line.
         Assert.Equal(scenario == "unavailable" ? null : "OverviewUpdatedSecondsFormat", vm.UpdatedAgoDisplay);
     }

@@ -14,18 +14,27 @@ namespace ServerMonitor.App.Tests.ViewModels;
 /// </summary>
 public sealed partial class Ui4LocalizationTests
 {
-    private static readonly string[] NewKeys =
-    [
-        "ServerMetricUnavailable", "ServerMetricUnavailableAccessible", "ServerDetailOpenFor", "ServerRowAutomationFormat",
-        "OverviewPageTitle", "ServersPageTitle", "OverviewHealthOfTotalFormat", "OverviewHealthAutomationFormat",
-        "OverviewPriorityAutomationFormat", "OverviewNoProblemsTitle", "OverviewNoProblemsMessage",
-        "OverviewUpdatedJustNow", "OverviewUpdatedSecondsFormat", "OverviewUpdatedMinutesFormat",
-        "OverviewUpdatedHoursFormat", "OverviewUpdatedDaysFormat", "ServerSearchNoResultsTitleFormat",
-        "ServersBreadcrumb.ParentText", "ServersBreadcrumb.CurrentText", "ServersPageTitleText.Text", "ServersAddButton.Content",
-        "ServersSearch.PlaceholderText", "ServersSearch.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name",
-        "ServersNoResultsState.Message", "ServersClearSearchButton.Content", "ServersEmptyState.Title",
-        "ServersEmptyState.Message", "ServersEmptyAddButton.Content", "ServersHiddenNote.Text", "ServerDetailOpenButton.Content"
-    ];
+    /// <summary>
+    /// Every UI.4 key, discovered from the pt-PT reference by prefix (so a key added to one culture only, or an x:Uid key
+    /// added for a new element, is checked without anyone remembering to list it here).
+    /// </summary>
+    private static readonly string[] Ui4Prefixes =
+        ["Overview", "Servers", "ServerStatus", "ServerDetail", "ServerMetricUnavailable", "ServerRowAutomation", "ServerSearchNoResults"];
+
+    private static IEnumerable<string> NewKeys => ResWLocalizationService.Load("pt-PT").Keys
+        .Where(key => Ui4Prefixes.Any(prefix => key.StartsWith(prefix, StringComparison.Ordinal)))
+        .Order(StringComparer.Ordinal);
+
+    [Fact]
+    public void TheDiscoveredUi4KeySet_IsComplete()
+    {
+        var keys = NewKeys.ToList();
+        Assert.True(keys.Count >= 100, $"only {keys.Count} UI.4 keys discovered");
+        Assert.Contains("ServersNoResultsMessageFormat", keys);
+        Assert.Contains("OverviewMoreServersOther", keys);
+        Assert.Contains("OverviewNoReadingsTitleText.Text", keys);
+        Assert.DoesNotContain("ServerDetailOpenButton.Content", keys);
+    }
 
     /// <summary>Every key the UI.4 view models build at runtime from enum values or plural forms.</summary>
     private static IEnumerable<string> DynamicKeys()
@@ -93,8 +102,12 @@ public sealed partial class Ui4LocalizationTests
             Assert.DoesNotMatch(YouImperative(), resources[key]);
         }
 
-        Assert.Contains("Experimenta", resources["ServersNoResultsState.Message"], StringComparison.Ordinal);
+        Assert.Contains("Experimenta", resources["ServersNoResultsMessageFormat"], StringComparison.Ordinal);
         Assert.Contains("Adiciona", resources["ServersEmptyState.Message"], StringComparison.Ordinal);
+        Assert.Contains("teus servidores", resources["ServersLoadingSubtitle"], StringComparison.Ordinal);
+        // Prism r1 (e): the pre-existing discovery description moved into the overview and now uses "tu" too.
+        Assert.DoesNotMatch(YouImperative(), resources["DashboardDiscoveryDescription.Text"]);
+        Assert.Contains("tua rede local", resources["DashboardDiscoveryDescription.Text"], StringComparison.Ordinal);
     }
 
     [Fact]
@@ -132,6 +145,6 @@ public sealed partial class Ui4LocalizationTests
     [GeneratedRegex(@"\{(\d+)[^}]*\}")]
     private static partial Regex PlaceholderPattern();
 
-    [GeneratedRegex(@"\b(Verifique|Experimente|Tente|Volte|Remova|Adicione|Restaure)\b")]
+    [GeneratedRegex(@"\b(Verifique|Experimente|Tente|Volte|Remova|Adicione|Restaure|sua|seus|suas)\b")]
     private static partial Regex YouImperative();
 }
