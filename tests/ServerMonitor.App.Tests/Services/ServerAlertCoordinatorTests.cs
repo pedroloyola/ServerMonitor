@@ -12,6 +12,15 @@ namespace ServerMonitor.App.Tests.Services;
 
 public sealed class ServerAlertCoordinatorTests
 {
+    /// <summary>
+    /// Deadlock guard only. Every wait in this class is released by an event the coordinator raises (a delivery, a
+    /// flush barrier through its intent queue, a callback entering), and the coordinator's own clock is a
+    /// FakeTimeProvider, so a working coordinator never reaches this bound however slow the runner. Short bounds used
+    /// as latency expectations (2 s) failed on CI while the delivery worker was merely waiting for the thread pool
+    /// (runs 37057158486, 37069001488).
+    /// </summary>
+    private static readonly TimeSpan DeadlockGuard = TimeSpan.FromSeconds(30);
+
     [Theory]
     [InlineData(ServerHealth.Healthy)]
     [InlineData(ServerHealth.Warning)]
@@ -23,6 +32,7 @@ public sealed class ServerAlertCoordinatorTests
         await using var harness = await Harness.CreateAsync();
 
         harness.SetHealth(health);
+        await harness.SettleAsync();
 
         Assert.Empty(harness.Notifications.Items);
     }
@@ -47,7 +57,7 @@ public sealed class ServerAlertCoordinatorTests
         await using var harness = await Harness.CreateAsync(initial);
 
         harness.SetHealth(current);
-        await harness.Notifications.WaitForCountAsync(1);
+        await harness.WaitForNotificationsAsync(1);
 
         var notification = Assert.Single(harness.Notifications.Items);
         Assert.Equal(expected, notification.Category);
@@ -61,6 +71,7 @@ public sealed class ServerAlertCoordinatorTests
         await using var harness = await Harness.CreateAsync(ServerHealth.Critical);
 
         harness.SetHealth(ServerHealth.Warning);
+        await harness.SettleAsync();
 
         Assert.Empty(harness.Notifications.Items);
     }
@@ -73,13 +84,14 @@ public sealed class ServerAlertCoordinatorTests
     {
         await using var harness = await Harness.CreateAsync(ServerHealth.Healthy);
         harness.SetHealth(health);
-        await harness.Notifications.WaitForCountAsync(1);
+        await harness.WaitForNotificationsAsync(1);
 
         for (var cycle = 0; cycle < 20; cycle++)
         {
             harness.SetHealth(health, isRefreshing: cycle % 2 == 0);
         }
 
+        await harness.SettleAsync();
         Assert.Single(harness.Notifications.Items);
     }
 
@@ -88,18 +100,19 @@ public sealed class ServerAlertCoordinatorTests
     {
         await using var harness = await Harness.CreateAsync(ServerHealth.Healthy);
         harness.SetHealth(ServerHealth.Warning);
-        await harness.Notifications.WaitForCountAsync(1);
+        await harness.WaitForNotificationsAsync(1);
         harness.SetHealth(ServerHealth.Healthy);
-        await harness.Notifications.WaitForCountAsync(2);
+        await harness.WaitForNotificationsAsync(2);
 
         harness.SetHealth(ServerHealth.Warning);
+        await harness.SettleAsync();
         Assert.Single(harness.Notifications.Items, item => item.Category == ServerAlertCategory.Warning);
 
         harness.Time.Advance(ServerAlertCoordinator.DefaultCooldown);
         harness.SetHealth(ServerHealth.Healthy);
-        await harness.Notifications.WaitForCountAsync(3);
+        await harness.WaitForNotificationsAsync(3);
         harness.SetHealth(ServerHealth.Warning);
-        await harness.Notifications.WaitForCountAsync(4);
+        await harness.WaitForNotificationsAsync(4);
 
         Assert.Equal(2, harness.Notifications.Items.Count(item => item.Category == ServerAlertCategory.Warning));
     }
@@ -110,11 +123,11 @@ public sealed class ServerAlertCoordinatorTests
         await using var harness = await Harness.CreateAsync(ServerHealth.Healthy);
 
         harness.SetHealth(ServerHealth.Warning);
-        await harness.Notifications.WaitForCountAsync(1);
+        await harness.WaitForNotificationsAsync(1);
         harness.SetHealth(ServerHealth.Critical);
-        await harness.Notifications.WaitForCountAsync(2);
+        await harness.WaitForNotificationsAsync(2);
         harness.SetHealth(ServerHealth.Offline);
-        await harness.Notifications.WaitForCountAsync(3);
+        await harness.WaitForNotificationsAsync(3);
 
         Assert.Equal(
             [ServerAlertCategory.Warning, ServerAlertCategory.Critical, ServerAlertCategory.Offline],
@@ -126,10 +139,10 @@ public sealed class ServerAlertCoordinatorTests
     {
         await using var harness = await Harness.CreateAsync(ServerHealth.Healthy);
         harness.SetHealth(ServerHealth.Critical);
-        await harness.Notifications.WaitForCountAsync(1);
+        await harness.WaitForNotificationsAsync(1);
         harness.SetHealth(ServerHealth.Warning);
         harness.SetHealth(ServerHealth.Critical);
-        await harness.Notifications.WaitForCountAsync(2);
+        await harness.WaitForNotificationsAsync(2);
 
         Assert.Equal(
             2,
@@ -141,11 +154,11 @@ public sealed class ServerAlertCoordinatorTests
     {
         await using var harness = await Harness.CreateAsync(ServerHealth.Healthy);
         harness.SetHealth(ServerHealth.Offline);
-        await harness.Notifications.WaitForCountAsync(1);
+        await harness.WaitForNotificationsAsync(1);
         harness.SetHealth(ServerHealth.Healthy);
-        await harness.Notifications.WaitForCountAsync(2);
+        await harness.WaitForNotificationsAsync(2);
         harness.SetHealth(ServerHealth.Offline);
-        await harness.Notifications.WaitForCountAsync(3);
+        await harness.WaitForNotificationsAsync(3);
 
         Assert.Equal(
             2,
@@ -160,10 +173,11 @@ public sealed class ServerAlertCoordinatorTests
 
         harness.SetHealth(ServerHealth.Warning);
         harness.Settings.SetNotificationsEnabled(true);
+        await harness.SettleAsync();
         Assert.Empty(harness.Notifications.Items);
 
         harness.SetHealth(ServerHealth.Critical);
-        await harness.Notifications.WaitForCountAsync(1);
+        await harness.WaitForNotificationsAsync(1);
 
         Assert.Equal(ServerAlertCategory.Critical, Assert.Single(harness.Notifications.Items).Category);
     }
@@ -182,19 +196,19 @@ public sealed class ServerAlertCoordinatorTests
         };
 
         harness.SetHealth(ServerHealth.Warning);
-        await entered.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        await entered.Task.WaitAsync(DeadlockGuard);
         harness.Settings.SetNotificationsEnabled(false);
         harness.Settings.SetNotificationsEnabled(true);
         release.TrySetResult();
-        await harness.Coordinator.FlushAsync();
+        await harness.SettleAsync();
 
         Assert.Empty(harness.Notifications.Items);
 
         harness.Servers.GetAllOverride = null;
         harness.SetHealth(ServerHealth.Healthy);
-        await harness.Notifications.WaitForCountAsync(1);
+        await harness.WaitForNotificationsAsync(1);
         harness.SetHealth(ServerHealth.Warning);
-        await harness.Notifications.WaitForCountAsync(2);
+        await harness.WaitForNotificationsAsync(2);
 
         Assert.Contains(
             harness.Notifications.Items,
@@ -206,7 +220,7 @@ public sealed class ServerAlertCoordinatorTests
     {
         await using var harness = await Harness.CreateAsync(ServerHealth.Healthy);
         harness.SetHealth(ServerHealth.Warning);
-        await harness.Notifications.WaitForCountAsync(1);
+        await harness.WaitForNotificationsAsync(1);
 
         harness.States.Remove(harness.Server.Id);
         harness.States.Set(ServerMonitoringState.Initial(harness.Server.Id) with
@@ -214,7 +228,7 @@ public sealed class ServerAlertCoordinatorTests
             Health = ServerHealth.Healthy
         });
         harness.SetHealth(ServerHealth.Warning);
-        await harness.Notifications.WaitForCountAsync(2);
+        await harness.WaitForNotificationsAsync(2);
 
         Assert.Equal(
             2,
@@ -228,7 +242,7 @@ public sealed class ServerAlertCoordinatorTests
         await using var harness = await Harness.CreateAsync(ServerHealth.Healthy, server);
 
         harness.SetHealth(ServerHealth.Offline);
-        await harness.Notifications.WaitForCountAsync(1);
+        await harness.WaitForNotificationsAsync(1);
 
         Assert.Equal(ServerAlertCategory.Offline, Assert.Single(harness.Notifications.Items).Category);
     }
@@ -240,7 +254,7 @@ public sealed class ServerAlertCoordinatorTests
         harness.Servers.Servers.Clear();
 
         harness.SetHealth(ServerHealth.Offline);
-        await harness.Coordinator.FlushAsync();
+        await harness.SettleAsync();
 
         Assert.Empty(harness.Notifications.Items);
     }
@@ -257,7 +271,7 @@ public sealed class ServerAlertCoordinatorTests
         await using var harness = await Harness.CreateAsync(ServerHealth.Healthy, server);
 
         harness.SetHealth(ServerHealth.Offline);
-        await harness.Notifications.WaitForCountAsync(1);
+        await harness.WaitForNotificationsAsync(1);
 
         Assert.Contains(expected, Assert.Single(harness.Notifications.Items).Body, StringComparison.Ordinal);
         Assert.DoesNotContain('\r', harness.Notifications.Items.Single().Body);
@@ -274,7 +288,7 @@ public sealed class ServerAlertCoordinatorTests
         await using var harness = await Harness.CreateAsync(ServerHealth.Healthy, server);
 
         harness.SetHealth(ServerHealth.Offline);
-        await harness.Notifications.WaitForCountAsync(1);
+        await harness.WaitForNotificationsAsync(1);
 
         var body = Assert.Single(harness.Notifications.Items).Body;
         Assert.Equal(NotificationPresentationSanitizer.MaximumTextElements, body.Count(character => char.IsHighSurrogate(character)));
@@ -320,7 +334,7 @@ public sealed class ServerAlertCoordinatorTests
 
         harness.Coordinator.BeginShutdown();
         harness.SetHealth(ServerHealth.Offline);
-        await harness.Coordinator.FlushAsync();
+        await harness.SettleAsync();
 
         Assert.Empty(harness.Notifications.Items);
         Assert.Equal(1, harness.Notifications.BeginShutdownCount);
@@ -345,7 +359,7 @@ public sealed class ServerAlertCoordinatorTests
         states.Set(ServerMonitoringState.Initial(server.Id) with { Health = ServerHealth.Healthy });
         await coordinator.StartAsync(CancellationToken.None);
         states.Set(states.Get(server.Id) with { Health = ServerHealth.Warning });
-        await notifications.Entered.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        await notifications.Entered.Task.WaitAsync(DeadlockGuard);
 
         await coordinator.StopAsync(CancellationToken.None);
 
@@ -392,6 +406,21 @@ public sealed class ServerAlertCoordinatorTests
         public void SetHealth(ServerHealth health, bool isRefreshing = false) =>
             States.Set(States.Get(Server.Id) with { Health = health, IsRefreshing = isRefreshing });
 
+        /// <summary>
+        /// Barrier: completes once the coordinator has processed every intent queued so far (its FIFO flush seam). An
+        /// assertion that something was NOT delivered, or that exactly N were, is only meaningful after it — otherwise
+        /// a wrong delivery still in the queue would land after the assertion and the test would pass anyway.
+        /// </summary>
+        public Task SettleAsync() => Coordinator.FlushAsync().WaitAsync(DeadlockGuard);
+
+        /// <summary>Waits for <paramref name="expected"/> deliveries (signal-driven), then settles, so the count read
+        /// next is final rather than a snapshot taken while further deliveries may still be queued.</summary>
+        public async Task WaitForNotificationsAsync(int expected)
+        {
+            await Notifications.WaitForCountAsync(expected);
+            await SettleAsync();
+        }
+
         public async ValueTask DisposeAsync() => await Coordinator.DisposeAsync();
     }
 
@@ -431,12 +460,8 @@ public sealed class ServerAlertCoordinatorTests
             return Task.CompletedTask;
         }
 
-        /// <summary>
-        /// Waits for the coordinator's worker to deliver <paramref name="expected"/> notifications. Each wake-up is a
-        /// delivery signal; the bound is a deadlock guard only (the coordinator runs on a FakeTimeProvider, so nothing
-        /// here is time-driven). It was 2 s, which a busy CI runner exceeded just scheduling the delivery worker
-        /// (run 37057158486, attempt 3).
-        /// </summary>
+        /// <summary>Waits for the coordinator's worker to deliver <paramref name="expected"/> notifications; each
+        /// wake-up is a delivery signal and the bound is the class's deadlock guard.</summary>
         public async Task WaitForCountAsync(int expected)
         {
             while (_items.Count < expected)
@@ -444,8 +469,6 @@ public sealed class ServerAlertCoordinatorTests
                 Assert.True(await _calls.WaitAsync(DeadlockGuard));
             }
         }
-
-        private static readonly TimeSpan DeadlockGuard = TimeSpan.FromSeconds(30);
     }
 
     private sealed class BlockingNotificationService : IUserNotificationService
