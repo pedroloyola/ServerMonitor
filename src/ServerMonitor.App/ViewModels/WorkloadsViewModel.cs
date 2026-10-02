@@ -284,6 +284,12 @@ public sealed class WorkloadsViewModel : ObservableObject, IDisposable
     public bool ShowAllUnavailable =>
         DockerState == DockerViewState.Error && ServicesState == ServicesViewState.Error;
 
+    /// <summary>Page-level loading panel (112:16645): no collection attempt has completed for either section yet.</summary>
+    public bool ShowPageLoading => DockerState == DockerViewState.Loading && ServicesState == ServicesViewState.Loading;
+
+    /// <summary>The two section cards are shown unless a page-level panel (loading / unavailable / nothing / no results) replaces them.</summary>
+    public bool ShowSectionCards => !ShowPageLoading && !ShowAllUnavailable && !ShowNothingToShow && !ShowGlobalNoResults;
+
     /// <summary>Page panel "Nada para apresentar": both reads succeeded and found nothing.</summary>
     public bool ShowNothingToShow =>
         DockerState == DockerViewState.Empty && ServicesState == ServicesViewState.Empty;
@@ -720,6 +726,8 @@ public sealed class WorkloadsViewModel : ObservableObject, IDisposable
 
     private void RaiseNoResults()
     {
+        OnPropertyChanged(nameof(ShowPageLoading));
+        OnPropertyChanged(nameof(ShowSectionCards));
         OnPropertyChanged(nameof(HasActiveQuery));
         OnPropertyChanged(nameof(ShowGlobalNoResults));
         OnPropertyChanged(nameof(ShowDockerSectionNoResults));

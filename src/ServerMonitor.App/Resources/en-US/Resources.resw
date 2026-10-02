@@ -667,4 +667,54 @@
   <data name="WorkloadRetry" xml:space="preserve"><value>Try again</value></data>
   <data name="WorkloadSearchAllPlaceholder" xml:space="preserve"><value>Search services or containers</value></data>
   <data name="WorkloadReadOnlyNotice" xml:space="preserve"><value>Read-only monitoring · Service actions are done on the server.</value></data>
+  <data name="HistoryPageTitle.Text" xml:space="preserve"><value>History</value></data>
+  <data name="HistoryPageSubtitle.Text" xml:space="preserve"><value>How your server evolves over time.</value></data>
+  <data name="HistoryServerSelector.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Server</value></data>
+  <data name="HistoryLoadingPanel.Text" xml:space="preserve"><value>Loading…</value></data>
+  <data name="WorkloadsPageTitle.Text" xml:space="preserve"><value>Services and containers</value></data>
+  <data name="WorkloadsBreadcrumb.CurrentText" xml:space="preserve"><value>Services and containers</value></data>
+  <data name="WorkloadSearchAll.PlaceholderText" xml:space="preserve"><value>Search services or containers</value></data>
+  <data name="WorkloadSearchAll.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Search services or containers</value></data>
+  <data name="WorkloadGlobalFilter.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Filter services and containers</value></data>
+  <data name="WorkloadContainerColumnName.Text" xml:space="preserve"><value>NAME / IMAGE</value></data>
+  <data name="WorkloadContainerColumnState.Text" xml:space="preserve"><value>STATE / HEALTH</value></data>
+  <data name="WorkloadServiceColumnName.Text" xml:space="preserve"><value>NAME / DESCRIPTION</value></data>
+  <data name="WorkloadServiceColumnState.Text" xml:space="preserve"><value>STATE / STARTUP</value></data>
+  <data name="WorkloadRefreshLabel.Text" xml:space="preserve"><value>Refresh</value></data>
+  <data name="WorkloadLoadingPanel.Text" xml:space="preserve"><value>Loading…</value></data>
+  <data name="WorkloadRetryButton.Content" xml:space="preserve"><value>Try again</value></data>
+  <data name="WorkloadNothingRefreshButton.Content" xml:space="preserve"><value>Refresh</value></data>
+  <data name="WorkloadClearSearchButton.Content" xml:space="preserve"><value>Clear search</value></data>
+  <data name="HistoryUnavailableState.Title" xml:space="preserve"><value>History unavailable</value></data>
+  <data name="HistoryUnavailableState.Message" xml:space="preserve"><value>Local history can't be read right now. Monitoring continues as usual.</value></data>
+  <data name="HistoryOfflineNotice.Title" xml:space="preserve"><value>Offline period</value></data>
+  <data name="HistoryOfflineNotice.Message" xml:space="preserve"><value>This range contains samples from a period when the server was offline. The charts show it as a gap.</value></data>
+  <data name="WorkloadReadOnlyNoticeBox.Message" xml:space="preserve"><value>Read-only monitoring · Service actions are done on the server.</value></data>
+  <data name="WorkloadTruncatedDocker.Message" xml:space="preserve"><value>The list was capped; some items aren't shown.</value></data>
+  <data name="WorkloadTruncatedServices.Message" xml:space="preserve"><value>The list was capped; some items aren't shown.</value></data>
+  <data name="WorkloadDockerNoResults.Text" xml:space="preserve"><value>No results in this section</value></data>
+  <data name="WorkloadServicesNoResults.Text" xml:space="preserve"><value>No results in this section</value></data>
+  <data name="WorkloadNothingState.Title" xml:space="preserve"><value>Nothing to show</value></data>
+  <data name="WorkloadNothingState.Message" xml:space="preserve"><value>The check finished, but no services or containers are available to monitor.</value></data>
+  <data name="WorkloadUnavailableState.Title" xml:space="preserve"><value>Couldn’t get services</value></data>
+  <data name="WorkloadUnavailableState.Message" xml:space="preserve"><value>Check the connection and the SSH user’s permissions. Service and container data isn’t available.</value></data>
+  <data name="WorkloadNoResultsState.Message" xml:space="preserve"><value>Try another name or clear the filters to see all services and containers again.</value></data>
+  <data name="WorkloadDockerNotInstalledState.Title" xml:space="preserve"><value>Docker not installed</value></data>
+  <data name="WorkloadDockerNotInstalledState.Message" xml:space="preserve"><value>Docker isn't available on this server. Only services are shown.</value></data>
+  <data name="WorkloadDockerPermissionState.Title" xml:space="preserve"><value>No permission to access Docker</value></data>
+  <data name="WorkloadDockerPermissionState.Message" xml:space="preserve"><value>This user can't reach the Docker daemon. Add it to the docker group to see containers.</value></data>
+  <data name="WorkloadDockerUnavailableState.Title" xml:space="preserve"><value>Docker unavailable</value></data>
+  <data name="WorkloadDockerUnavailableState.Message" xml:space="preserve"><value>Docker is installed but the daemon isn't responding right now.</value></data>
+  <data name="WorkloadDockerErrorState.Title" xml:space="preserve"><value>Couldn't read Docker</value></data>
+  <data name="WorkloadDockerErrorState.Message" xml:space="preserve"><value>Container status couldn't be read this time. Monitoring continues as usual.</value></data>
+  <data name="WorkloadDockerEmptyState.Title" xml:space="preserve"><value>No containers</value></data>
+  <data name="WorkloadDockerEmptyState.Message" xml:space="preserve"><value>Docker is running but there are no containers on this server.</value></data>
+  <data name="WorkloadServicesUnsupportedState.Title" xml:space="preserve"><value>Service manager not supported</value></data>
+  <data name="WorkloadServicesUnsupportedState.Message" xml:space="preserve"><value>No supported service manager was found on this server.</value></data>
+  <data name="WorkloadServicesUnavailableState.Title" xml:space="preserve"><value>Services unavailable</value></data>
+  <data name="WorkloadServicesUnavailableState.Message" xml:space="preserve"><value>The service manager couldn't be reached right now.</value></data>
+  <data name="WorkloadServicesErrorState.Title" xml:space="preserve"><value>Couldn't read services</value></data>
+  <data name="WorkloadServicesErrorState.Message" xml:space="preserve"><value>Service status couldn't be read this time. Monitoring continues as usual.</value></data>
+  <data name="WorkloadServicesEmptyState.Title" xml:space="preserve"><value>No services</value></data>
+  <data name="WorkloadServicesEmptyState.Message" xml:space="preserve"><value>No managed services were reported on this server.</value></data>
 </root>

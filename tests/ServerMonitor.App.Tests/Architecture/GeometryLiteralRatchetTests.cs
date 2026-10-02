@@ -46,7 +46,7 @@ public sealed partial class GeometryLiteralRatchetTests
         new Dictionary<(string Ledger, string Property), int>
         {
             [("GeometryLiteralBaseline.tsv", "CornerRadius")] = 22,
-            [("GeometryLiteralBaseline.tsv", "Padding")] = 49,
+            [("GeometryLiteralBaseline.tsv", "Padding")] = 43,
             [("GeometryLiteralAllowlist.tsv", "CornerRadius")] = 0,
             [("GeometryLiteralAllowlist.tsv", "Padding")] = 50
         };

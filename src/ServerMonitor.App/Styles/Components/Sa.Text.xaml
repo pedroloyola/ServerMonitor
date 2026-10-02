@@ -72,4 +72,19 @@
         <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
         <Setter Property="Foreground" Value="{ThemeResource SaTextSecondaryBrush}" />
     </Style>
+    <!-- UI.3 Workloads row state lines 112:2650 / 112:2666 (D-UI3-2): line 1 = 12 Medium text, line 2 = 11 Regular muted;
+         a problem (or transient warning) row has BOTH lines in the attention text colour. Selected by
+         WorkloadSeverityToSaTextStyleConverter. -->
+    <Style x:Key="SaWorkloadStateTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SaLabelTextStyle}">
+        <Setter Property="Foreground" Value="{ThemeResource SaTextBrush}" />
+    </Style>
+    <Style x:Key="SaWorkloadStateAttentionTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SaLabelTextStyle}">
+        <Setter Property="Foreground" Value="{ThemeResource SaAttentionTextBrush}" />
+    </Style>
+    <Style x:Key="SaWorkloadDetailTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SaHelperTextStyle}">
+        <Setter Property="Foreground" Value="{ThemeResource SaTextSecondaryBrush}" />
+    </Style>
+    <Style x:Key="SaWorkloadDetailAttentionTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SaHelperTextStyle}">
+        <Setter Property="Foreground" Value="{ThemeResource SaAttentionTextBrush}" />
+    </Style>
 </ResourceDictionary>

@@ -170,9 +170,11 @@ public sealed class HistoryViewModel : ObservableObject, IDisposable
                 return;
             }
 
+            var previous = _selectedServer;
             _selectedServer = value;
             OnPropertyChanged();
             OnPropertyChanged(nameof(SelectedServerSubtitle));
+            UpdateSelectorLoadingLine(previous);
             if (value.Id != _serverId)
             {
                 Load(value.Id, value.Name);
@@ -315,6 +317,7 @@ public sealed class HistoryViewModel : ObservableObject, IDisposable
             {
                 RaiseVisibility();
                 OnPropertyChanged(nameof(SelectedServerSubtitle));
+                UpdateSelectorLoadingLine();
             }
         }
     }
@@ -525,9 +528,25 @@ public sealed class HistoryViewModel : ObservableObject, IDisposable
         }
 
         // Set the backing field directly: this mirrors the page's server, it is not a user selection.
+        var previous = _selectedServer;
         _selectedServer = match;
         OnPropertyChanged(nameof(SelectedServer));
         OnPropertyChanged(nameof(SelectedServerSubtitle));
+        UpdateSelectorLoadingLine(previous);
+    }
+
+    /// <summary>
+    /// The closed selector renders the selected item, so the loading line ("A carregar histórico…", 112:16322) is
+    /// shown by giving that item a transient subtitle while loading; a previously selected item is restored.
+    /// </summary>
+    private void UpdateSelectorLoadingLine(HistoryServerOptionViewModel? previous = null)
+    {
+        if (previous is not null && !ReferenceEquals(previous, _selectedServer))
+        {
+            previous.SetTransientSubtitle(null);
+        }
+
+        _selectedServer?.SetTransientSubtitle(IsLoading ? _localizationService?.GetString("HistorySelectorLoading") : null);
     }
 
     /// <summary>

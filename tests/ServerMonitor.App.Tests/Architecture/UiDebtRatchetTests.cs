@@ -17,7 +17,7 @@ public sealed partial class UiDebtRatchetTests
 {
     /// <summary>Literal <c>FontSize="n"</c> (attribute or <c>Setter Property="FontSize" Value="n"</c>) per file,
     /// for every XAML except App.xaml and Styles/Tokens/** (Views/, Controls/, MainWindow.xaml, legacy Styles/*.xaml,
-    /// any new folder). Files not listed have a baseline of zero. Total today: 191.</summary>
+    /// any new folder). Files not listed have a baseline of zero. Total today: 146 (UI.3 removed HistoryPage 7 + WorkloadsPage 38).</summary>
     private static readonly IReadOnlyDictionary<string, int> FontSizeLiteralBaseline = new Dictionary<string, int>(StringComparer.Ordinal)
     {
         ["Controls/DiscoveredServerCard.xaml"] = 5,
@@ -31,11 +31,9 @@ public sealed partial class UiDebtRatchetTests
         ["Styles/Controls.xaml"] = 7,
         ["Views/BackupCreateDialog.xaml"] = 3,
         ["Views/DashboardPage.xaml"] = 8,
-        ["Views/HistoryPage.xaml"] = 7,
         ["Views/RestoreConfirmDialog.xaml"] = 3,
         ["Views/RestoreOpenDialog.xaml"] = 2,
-        ["Views/SettingsPage.xaml"] = 20,
-        ["Views/WorkloadsPage.xaml"] = 38
+        ["Views/SettingsPage.xaml"] = 20
     };
 
     /// <summary>Hex colour literals per file, outside Styles/Tokens/** (XAML values and C# string literals; comments
@@ -58,8 +56,7 @@ public sealed partial class UiDebtRatchetTests
         ["MainWindow.xaml"] = 4,
         ["Styles/Controls.xaml"] = 4,
         ["Styles/DesignTokens.xaml"] = 92,
-        ["Views/DashboardPage.xaml"] = 1,
-        ["Views/HistoryPage.xaml"] = 6
+        ["Views/DashboardPage.xaml"] = 1
     };
 
     /// <summary>

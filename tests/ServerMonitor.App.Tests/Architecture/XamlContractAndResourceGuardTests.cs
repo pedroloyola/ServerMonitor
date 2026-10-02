@@ -35,6 +35,9 @@ public sealed partial class XamlContractAndResourceGuardTests
         ],
         ["Views/DashboardPage.xaml"] = ["ServersItemsControl"],
         ["Views/SettingsPage.xaml"] = ["BackupStatusBar", "BackgroundSection"],
+        // UI.3: adaptive VisualState setters reflow these (no code-behind dependency).
+        ["Views/HistoryPage.xaml"] = ["PageRoot", "ServerSelector", "RangeTrack", "CpuChart", "MemoryChart", "DiskChart", "RetentionText"],
+        ["Views/WorkloadsPage.xaml"] = ["PageRoot", "SearchBox", "FilterTrack", "ServicesCard", "CardsColumn2", "CardsRow2"],
         ["Views/BackupCreateDialog.xaml"] = ["PassphraseBox", "ConfirmationBox"],
         ["Views/RestoreOpenDialog.xaml"] = ["PassphraseBox"],
         ["Views/AddServerDialog.xaml"] = ["ServerForm"],
@@ -49,7 +52,7 @@ public sealed partial class XamlContractAndResourceGuardTests
             "UnknownHostHeading"
         ],
         // HistoryChart parts: the chart draws into these by name.
-        ["Controls/HistoryChart.xaml"] = ["RootGrid", "GridCanvas", "PlotCanvas"],
+        ["Controls/HistoryChart.xaml"] = ["RootGrid", "PlotHost", "GridCanvas", "PlotCanvas", "YAxisCanvas", "XAxisCanvas"],
         // UI.2 primitive templates: names resolved at runtime by VisualState setters (G-3).
         ["Styles/Components/Sa.Primitives.xaml"] =
         [

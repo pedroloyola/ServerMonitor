@@ -17,4 +17,7 @@ public sealed partial class WorkloadsPage : Page
 
     /// <summary>Binds the page to a server and renders its current workload snapshot.</summary>
     public void Load(Guid serverId, string serverName) => ViewModel.Load(serverId, serverName);
+
+    // The breadcrumb parent (server name) goes where Back goes: the Dashboard until the server Detail exists (D-UI3-5).
+    private void OnBreadcrumbParentInvoked(object? sender, EventArgs e) => ViewModel.BackCommand.Execute(null);
 }

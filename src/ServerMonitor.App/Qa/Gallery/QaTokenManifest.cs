@@ -261,6 +261,8 @@ public static class QaTokenManifest
         new("SaStatusDotSize", QaTokenKind.Double),
         new("SaSpace20", QaTokenKind.Double),
         new("SaSpace40", QaTokenKind.Double),
+        new("SaPagePadding", QaTokenKind.Thickness),
+        new("SaPagePaddingCompact", QaTokenKind.Thickness),
         // Styles/Tokens/Radius.xaml
         new("SaRadiusPanel", QaTokenKind.CornerRadius),
         new("SaRadiusCard", QaTokenKind.CornerRadius),
