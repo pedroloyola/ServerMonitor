@@ -55,8 +55,9 @@ public sealed class Ui4BeaconContractTests
     {
         var code = AppSourceTree.CodeWithoutComments("Views/ServersPage.xaml.cs");
         Assert.Contains("ViewModel.TakeReturnFocusIndex()", code);
-        Assert.Contains("WidthStates.CurrentStateChanging +=", code);
-        Assert.Contains("WidthStates.CurrentStateChanged +=", code);
-        Assert.Contains("RepeaterFocus.FocusedIndex(ServersRepeater)", code);
+        // AdaptiveTrigger changes never raise CurrentStateChanging/Changed (QA r2): the template swap is observed instead.
+        Assert.Contains("ServersRepeater.RegisterPropertyChangedCallback(ItemsRepeater.ItemTemplateProperty, OnRowTemplateChanged)", code);
+        Assert.Contains("ServersRepeater.GotFocus += OnRowGotFocus", code);
+        Assert.DoesNotContain("CurrentStateChanging", code);
     }
 }

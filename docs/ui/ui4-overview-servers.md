@@ -88,7 +88,7 @@ Autoridade visual: Figma `Qvk5dUFgsWf4UOYzfAkiDV`, 05 Free secção 02 "Dashboar
     - o "voltar" e o "Ver servidor" do Histórico e o crumb dos Serviços levam à interina desse servidor (`ReturnToServerDetail`), com a origem com que foi aberta;
     - se o servidor já não estiver listado (ou não houver nenhum), vão para a Visão geral;
     - copy: "Voltar ao servidor" / "Back to server"; o "voltar" das Definições diz "Voltar à visão geral".
-  - **SHOULD-5**: no reflow Wide/Mid/Stacked, a linha focada mantém o foco (`CurrentStateChanging`/`Changed` do grupo `WidthStates`).
+  - **SHOULD-5**: no reflow Wide/Mid/Stacked, a linha focada mantém o foco. Observa-se a troca do `ItemTemplate` do repeater, porque o `AdaptiveTrigger` não dispara os eventos do `VisualStateGroup`. A linha é registada pelo índice no `GotFocus`, porque as linhas x:Bind não têm o item como `DataContext`. Verificado na app real a 1440 → 1000 → 640 → 560 → 1440.
   - **NITs**:
     - anel de foco do cartão prioritário com raio 24;
     - "sem resultados" da Visão geral com a mesma copy §13 dos Servidores.

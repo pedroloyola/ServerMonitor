@@ -15,11 +15,22 @@ public sealed partial class ServersPage : Page, IDisposable
         // Released on Unloaded AND when navigation replaces the page (a page replaced before Loaded never unloads).
         Unloaded += (_, _) => Dispose();
         Loaded += OnLoaded;
-        WidthStates.CurrentStateChanging += OnWidthStateChanging;
-        WidthStates.CurrentStateChanged += OnWidthStateChanged;
+        // AdaptiveTrigger state changes do not raise the VisualStateGroup events, so the reflow is observed where it
+        // happens: the width states swap the repeater's template.
+        ServersRepeater.RegisterPropertyChangedCallback(ItemsRepeater.ItemTemplateProperty, OnRowTemplateChanged);
+        ServersRepeater.GotFocus += OnRowGotFocus;
     }
 
-    private int _reflowFocusIndex = -1;
+    private Guid? _focusedRowId;
+    private bool _reflowPending;
+
+    // By the time the template changes the old rows are already cleared, so the focused server is kept here (by the
+    // repeater's index: x:Bind rows do not carry their item as DataContext).
+    private void OnRowGotFocus(object sender, RoutedEventArgs e)
+    {
+        var index = e.OriginalSource is UIElement row ? ServersRepeater.GetElementIndex(row) : -1;
+        _focusedRowId = index >= 0 && index < ViewModel.Rows.Count ? ViewModel.Rows[index].ServerId : null;
+    }
 
     // Beacon r1 SHOULD-1: back from the interim page, focus returns to the row that opened it; otherwise to the search.
     private void OnLoaded(object sender, RoutedEventArgs e)
@@ -36,14 +47,41 @@ public sealed partial class ServersPage : Page, IDisposable
 
     // Beacon r1 SHOULD-5: Wide/Mid/Stacked swap the row template, which recreates the rows and would drop focus to the
     // top of the window; the focused row keeps focus across the reflow.
-    private void OnWidthStateChanging(object sender, VisualStateChangedEventArgs e) =>
-        _reflowFocusIndex = RepeaterFocus.FocusedIndex(ServersRepeater);
-
-    private void OnWidthStateChanged(object sender, VisualStateChangedEventArgs e)
+    // Only while a row holds focus (the old, cleared row keeps it until the new rows exist).
+    private void OnRowTemplateChanged(DependencyObject sender, DependencyProperty property)
     {
-        var index = _reflowFocusIndex;
-        _reflowFocusIndex = -1;
-        RepeaterFocus.FocusIndexLater(ServersRepeater, index);
+        if (_reflowPending || _focusedRowId is not { } focusedId || XamlRoot is null
+            || Microsoft.UI.Xaml.Input.FocusManager.GetFocusedElement(XamlRoot) is not Controls.ServerTableRowButton)
+        {
+            return;
+        }
+
+        var index = -1;
+        for (var i = 0; i < ViewModel.Rows.Count; i++)
+        {
+            if (ViewModel.Rows[i].ServerId == focusedId)
+            {
+                index = i;
+                break;
+            }
+        }
+
+        if (index < 0)
+        {
+            return;
+        }
+
+        // The new template's rows exist only after the repeater's next layout pass; focusing earlier hits the old,
+        // pinned row (QA r2: focus ended on another server with no position).
+        void OnLayoutUpdated(object? s, object args)
+        {
+            ServersRepeater.LayoutUpdated -= OnLayoutUpdated;
+            _reflowPending = false;
+            RepeaterFocus.FocusIndexLater(ServersRepeater, index);
+        }
+
+        _reflowPending = true;
+        ServersRepeater.LayoutUpdated += OnLayoutUpdated;
     }
 
     public ServersViewModel ViewModel { get; }

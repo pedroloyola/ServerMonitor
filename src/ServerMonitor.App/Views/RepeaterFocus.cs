@@ -1,8 +1,6 @@
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Input;
-using Microsoft.UI.Xaml.Media;
 
 namespace ServerMonitor.App.Views;
 
@@ -37,24 +35,5 @@ internal static class RepeaterFocus
 
         row.StartBringIntoView();
         return row.Focus(state);
-    }
-
-    /// <summary>The index of the repeater row that holds keyboard focus, or -1.</summary>
-    public static int FocusedIndex(ItemsRepeater repeater)
-    {
-        if (repeater.XamlRoot is null || FocusManager.GetFocusedElement(repeater.XamlRoot) is not UIElement focused)
-        {
-            return -1;
-        }
-
-        for (DependencyObject? current = focused; current is not null; current = VisualTreeHelper.GetParent(current))
-        {
-            if (current is UIElement element && VisualTreeHelper.GetParent(element) == repeater)
-            {
-                return repeater.GetElementIndex(element);
-            }
-        }
-
-        return -1;
     }
 }
