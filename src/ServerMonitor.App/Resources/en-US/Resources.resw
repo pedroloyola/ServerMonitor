@@ -717,4 +717,6 @@
   <data name="WorkloadServicesErrorState.Message" xml:space="preserve"><value>Service status couldn't be read this time. Monitoring continues as usual.</value></data>
   <data name="WorkloadServicesEmptyState.Title" xml:space="preserve"><value>No services</value></data>
   <data name="WorkloadServicesEmptyState.Message" xml:space="preserve"><value>No managed services were reported on this server.</value></data>
+  <data name="WorkloadContainersList.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Container list</value></data>
+  <data name="WorkloadServicesList.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Service list</value></data>
 </root>

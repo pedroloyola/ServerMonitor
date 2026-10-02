@@ -325,7 +325,7 @@
                             </Grid>
                         </Border>
                         <Grid Grid.Row="3">
-                            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                            <ScrollViewer x:Uid="WorkloadContainersList" IsTabStop="True" VerticalScrollBarVisibility="Auto"
                                           Visibility="{Binding ShowDockerContainers, Converter={StaticResource BooleanToVisibilityConverter}}">
                                 <ItemsRepeater ItemsSource="{Binding Containers}" ItemTemplate="{StaticResource ContainerRowTemplate}" />
                             </ScrollViewer>
@@ -378,7 +378,7 @@
                             </Grid>
                         </Border>
                         <Grid Grid.Row="3">
-                            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                            <ScrollViewer x:Uid="WorkloadServicesList" IsTabStop="True" VerticalScrollBarVisibility="Auto"
                                           Visibility="{Binding ShowServicesList, Converter={StaticResource BooleanToVisibilityConverter}}">
                                 <ItemsRepeater ItemsSource="{Binding Services}" ItemTemplate="{StaticResource ServiceRowTemplate}" />
                             </ScrollViewer>
