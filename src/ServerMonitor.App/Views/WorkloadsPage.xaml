@@ -36,7 +36,7 @@
                     </StackPanel>
                     <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" Spacing="4">
                         <TextBlock AutomationProperties.AccessibilityView="Raw" HorizontalAlignment="Right"
-                                   Style="{x:Bind StateSeverity, Converter={StaticResource WorkloadSeverityToSaTextStyleConverter}}"
+                                   Style="{x:Bind Severity, Converter={StaticResource WorkloadSeverityToSaTextStyleConverter}}"
                                    Text="{x:Bind StateText}" />
                         <TextBlock AutomationProperties.AccessibilityView="Raw" HorizontalAlignment="Right"
                                    Style="{x:Bind Severity, Converter={StaticResource WorkloadSeverityToSaTextStyleConverter}, ConverterParameter=Detail}"
@@ -96,6 +96,10 @@
                     <VisualState.Setters>
                         <Setter Target="FilterTrack.(Grid.Row)" Value="1" />
                         <Setter Target="FilterTrack.(Grid.Column)" Value="0" />
+                        <Setter Target="SearchBox.(Grid.ColumnSpan)" Value="3" />
+                        <Setter Target="SearchBox.MaxWidth" Value="400" />
+                        <Setter Target="SearchBox.Width" Value="NaN" />
+                        <Setter Target="SearchBox.HorizontalAlignment" Value="Stretch" />
                         <Setter Target="ServicesCard.(Grid.Row)" Value="1" />
                         <Setter Target="ServicesCard.(Grid.Column)" Value="0" />
                         <Setter Target="CardsColumn2.Width" Value="0" />
@@ -112,6 +116,7 @@
                         <Setter Target="FilterTrack.(Grid.Column)" Value="0" />
                         <Setter Target="SearchBox.Width" Value="NaN" />
                         <Setter Target="SearchBox.HorizontalAlignment" Value="Stretch" />
+                        <Setter Target="SearchBox.(Grid.ColumnSpan)" Value="3" />
                         <Setter Target="ServicesCard.(Grid.Row)" Value="1" />
                         <Setter Target="ServicesCard.(Grid.Column)" Value="0" />
                         <Setter Target="CardsColumn2.Width" Value="0" />

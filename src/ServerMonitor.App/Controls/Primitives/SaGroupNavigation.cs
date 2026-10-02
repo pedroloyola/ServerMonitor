@@ -26,6 +26,16 @@ public static class SaGroupNavigation
         mode == SaGroupNavigationMode.SelectionFollowsFocus && focusState == FocusState.Keyboard;
 
     /// <summary>Pure rule (unit-tested): the item index an arrow key moves to, or null when it does not move (ends, other keys).</summary>
+    /// <summary>
+    /// UI.3 (found by the UIA pass): only a Tab/Shift+Tab ENTRY into the group is redirected to the checked item. A
+    /// programmatic or UI Automation focus (Direction None - e.g. SelectionItemPattern.Select from a screen reader) must
+    /// land on the item it targets, otherwise the redirect re-checks the old item and the selection is silently undone.
+    /// </summary>
+    internal static bool RedirectsEntryToChecked(FocusInputDeviceKind device, FocusNavigationDirection direction, bool fromInside) =>
+        device == FocusInputDeviceKind.Keyboard
+        && direction is FocusNavigationDirection.Next or FocusNavigationDirection.Previous
+        && !fromInside;
+
     internal static int? ArrowTarget(Windows.System.VirtualKey key, int current, int count)
     {
         var step = key switch
@@ -65,7 +75,7 @@ public static class SaGroupNavigation
     private static void OnGettingFocus(UIElement sender, GettingFocusEventArgs args)
     {
         var panel = (Panel)sender;
-        if (args.InputDevice != FocusInputDeviceKind.Keyboard || IsInside(panel, args.OldFocusedElement as DependencyObject))
+        if (!RedirectsEntryToChecked(args.InputDevice, args.Direction, IsInside(panel, args.OldFocusedElement as DependencyObject)))
         {
             return;
         }

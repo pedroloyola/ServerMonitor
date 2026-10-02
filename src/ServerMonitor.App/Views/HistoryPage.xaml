@@ -39,6 +39,7 @@
                         <Setter Target="RangeTrack.(Grid.Row)" Value="1" />
                         <Setter Target="RangeTrack.(Grid.Column)" Value="0" />
                         <Setter Target="ServerSelector.Width" Value="NaN" />
+                        <Setter Target="ServerSelector.(Grid.ColumnSpan)" Value="3" />
                         <Setter Target="ServerSelector.HorizontalAlignment" Value="Stretch" />
                         <Setter Target="CpuChart.(Grid.Row)" Value="1" />
                         <Setter Target="CpuChart.(Grid.Column)" Value="0" />
@@ -49,6 +50,9 @@
                         <Setter Target="DiskChart.(Grid.Row)" Value="1" />
                         <Setter Target="DiskChart.(Grid.Column)" Value="0" />
                         <Setter Target="DiskChart.(Grid.ColumnSpan)" Value="2" />
+                        <Setter Target="CpuChart.Margin" Value="0,12,0,0" />
+                        <Setter Target="MemoryChart.Margin" Value="0,12,0,0" />
+                        <Setter Target="DiskChart.Margin" Value="0,12,0,0" />
                         <Setter Target="RetentionText.(Grid.Row)" Value="1" />
                         <Setter Target="RetentionText.(Grid.Column)" Value="0" />
                         <Setter Target="RetentionText.HorizontalAlignment" Value="Left" />
@@ -201,7 +205,7 @@
                 Visibility="{Binding ShowCharts, Converter={StaticResource BooleanToVisibilityConverter}}">
                 <StackPanel Spacing="{StaticResource SaSpace16}">
                     <Border Style="{StaticResource SaChartCardStyle}">
-                        <Grid ColumnSpacing="{StaticResource SaSpace24}" RowSpacing="{StaticResource SaSpace12}">
+                        <Grid ColumnSpacing="{StaticResource SaSpace24}">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
@@ -239,7 +243,7 @@
                     </Border>
 
                     <Border Style="{StaticResource SaChartCardStyle}">
-                        <Grid ColumnSpacing="{StaticResource SaSpace24}" RowSpacing="{StaticResource SaSpace12}">
+                        <Grid ColumnSpacing="{StaticResource SaSpace24}">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
@@ -277,7 +281,7 @@
                     </Border>
 
                     <Border Style="{StaticResource SaChartCardStyle}">
-                        <Grid ColumnSpacing="{StaticResource SaSpace24}" RowSpacing="{StaticResource SaSpace12}">
+                        <Grid ColumnSpacing="{StaticResource SaSpace24}">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />

@@ -1,0 +1,198 @@
+using System.Text.RegularExpressions;
+using System.Xml.Linq;
+
+namespace ServerMonitor.App.Tests.Architecture;
+
+/// <summary>
+/// UI.3 phase 2: structural, accessibility and localization contracts of the migrated History and Workloads pages,
+/// read from the XAML (no XAML runtime). The runtime counterpart is the UIA screenshot pass.
+/// </summary>
+public sealed partial class Ui3PageContractTests
+{
+    private const string History = "Views/HistoryPage.xaml";
+    private const string Workloads = "Views/WorkloadsPage.xaml";
+    private static readonly string[] Cultures = ["pt-PT", "pt-BR", "en-US"];
+
+    private static IEnumerable<XElement> Elements(string file) => AppSourceTree.LoadXaml(file).Descendants();
+
+    private static string? Attr(XElement e, string name) => (string?)e.Attribute(name);
+
+    private static string? Uid(XElement e) => (string?)e.Attribute(AppSourceTree.Xaml + "Uid");
+
+    private static IReadOnlyDictionary<string, string> Resw(string culture) =>
+        XDocument.Load(Path.Combine(AppSourceTree.RepositoryRoot, "src", "ServerMonitor.App", "Resources", culture, "Resources.resw"))
+            .Root!.Elements("data")
+            .ToDictionary(d => (string)d.Attribute("name")!, d => d.Element("value")?.Value ?? string.Empty, StringComparer.Ordinal);
+
+    // --- History -------------------------------------------------------------------------------------------------
+
+    [Fact]
+    public void History_TitleIsTheLevel1Heading_AndEachChartCardHasALevel2Heading()
+    {
+        var title = Assert.Single(Elements(History), e => Uid(e) == "HistoryPageTitle");
+        Assert.Equal("Level1", Attr(title, "AutomationProperties.HeadingLevel"));
+        Assert.Equal(3, Elements(History).Count(e => Attr(e, "AutomationProperties.HeadingLevel") == "Level2"));
+    }
+
+    [Theory]
+    [InlineData("CpuChart", "Cpu", "SaCpuBrush")]
+    [InlineData("MemoryChart", "Memory", "SaMemoryBrush")]
+    [InlineData("DiskChart", "Disk", "SaDiskBrush")]
+    public void History_ChartsAreNamedByTheirTextSummary_AndDrawnInTheMetricColour(string name, string metric, string brush)
+    {
+        var chart = Assert.Single(Elements(History), e => e.Name.LocalName == "HistoryChart" && (string?)e.Attribute(AppSourceTree.Xaml + "Name") == name);
+
+        // Text alternative: current + peak + period (HistoryViewModel.*Summary), never colour alone.
+        Assert.Equal($"{{Binding {metric}Summary}}", Attr(chart, "AutomationProperties.Name"));
+        Assert.Equal($"{{Binding {metric}Series}}", Attr(chart, "Series"));
+        Assert.Equal($"{{ThemeResource {brush}}}", Attr(chart, "LineBrush"));             // D-UI3-1
+        Assert.Equal("{StaticResource SaChartLineThickness}", Attr(chart, "LineThickness"));
+        Assert.Equal("{Binding XAxisLabels}", Attr(chart, "XLabels"));                 // D-UI3-4
+        Assert.Equal("{Binding XAxisLabelsCompact}", Attr(chart, "XLabelsCompact"));
+        Assert.Equal("{Binding YAxisLabels}", Attr(chart, "YLabels"));
+    }
+
+    [Fact]
+    public void History_RangeIsOneKeyboardGroupOfFiveSegments_BoundToTheSelectedIndex()
+    {
+        var group = Assert.Single(Elements(History), e => Uid(e) == "HistoryRangeSelector");
+        Assert.Equal("SelectionFollowsFocus", group.Attributes().First(a => a.Name.LocalName == "SaGroupNavigation.Mode").Value);
+        var segments = group.Elements().Where(e => e.Name.LocalName == "RadioButton").ToList();
+        Assert.Equal(5, segments.Count);
+        for (var i = 0; i < segments.Count; i++)
+        {
+            Assert.Equal("{StaticResource SaSegmentedRectItemStyle}", Attr(segments[i], "Style"));
+            Assert.Contains($"ConverterParameter={i}", Attr(segments[i], "IsChecked"), StringComparison.Ordinal);
+            Assert.Contains("SelectedRangeIndex, Mode=TwoWay", Attr(segments[i], "IsChecked"), StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void History_ServerSelectorIsTheRichSelector_BoundToTheViewModel()
+    {
+        var selector = Assert.Single(Elements(History), e => Uid(e) == "HistoryServerSelector");
+        Assert.Equal("{StaticResource SaSelectorRichStyle}", Attr(selector, "Style"));
+        Assert.Equal("{Binding Servers}", Attr(selector, "ItemsSource"));
+        Assert.Equal("{Binding SelectedServer, Mode=TwoWay}", Attr(selector, "SelectedItem"));
+    }
+
+    // --- Workloads -----------------------------------------------------------------------------------------------
+
+    [Fact]
+    public void Workloads_IsReadOnly_TheOnlyCommandsAreRefreshClearAndBack()
+    {
+        var commands = Elements(Workloads)
+            .Select(e => Attr(e, "Command"))
+            .Where(c => c is not null)
+            .Distinct()
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Equal(new[] { "{Binding ClearSearchCommand}", "{Binding RefreshCommand}" }, commands);
+        Assert.DoesNotContain(Elements(Workloads), e => e.Name.LocalName is "MenuFlyout" or "MenuFlyoutItem" or "AppBarButton");
+    }
+
+    [Fact]
+    public void Workloads_RowsAreCompactRowsWithTheDotOnlyStatus_AndNamedForUiAutomation()
+    {
+        foreach (var template in new[] { "ContainerRowTemplate", "ServiceRowTemplate" })
+        {
+            var root = Assert.Single(Elements(Workloads), e => e.Name.LocalName == "DataTemplate" && (string?)e.Attribute(AppSourceTree.Xaml + "Key") == template);
+            var row = root.Elements().Single();
+            Assert.Equal("{StaticResource SaDataTableCompactRowStyle}", Attr(row, "Style"));
+            Assert.Equal("{x:Bind DisplayAutomationName}", Attr(row, "AutomationProperties.Name"));
+            var dot = Assert.Single(row.Descendants(), e => e.Name.LocalName == "SaStatusIndicator");
+            Assert.Equal("{StaticResource SaStatusDotOnlyStyle}", Attr(dot, "Style"));
+            Assert.False(string.IsNullOrWhiteSpace(Attr(dot, "Label")));
+            // State is always text: the two right-hand lines exist and are styled by severity (never colour only).
+            Assert.Equal(2, row.Descendants().Count(e => Attr(e, "Style")?.Contains("WorkloadSeverityToSaTextStyleConverter", StringComparison.Ordinal) == true));
+        }
+    }
+
+    [Fact]
+    public void Workloads_SearchAndFilter_AreGlobal_Accessible_AndOneKeyboardGroup()
+    {
+        var search = Assert.Single(Elements(Workloads), e => Uid(e) == "WorkloadSearchAll");
+        Assert.Equal("{StaticResource SaPageSearchFieldStyle}", Attr(search, "Style"));
+        Assert.Contains("SearchText, Mode=TwoWay", Attr(search, "Text"), StringComparison.Ordinal);
+
+        var group = Assert.Single(Elements(Workloads), e => Uid(e) == "WorkloadGlobalFilter");
+        Assert.Equal("SelectionFollowsFocus", group.Attributes().First(a => a.Name.LocalName == "SaGroupNavigation.Mode").Value);
+        var segments = group.Elements().Where(e => e.Name.LocalName == "RadioButton").ToList();
+        Assert.Equal(new[] { "{Binding FilterAllLabel}", "{Binding FilterProblemsLabel}" }, segments.Select(s => Attr(s, "Content")));
+        Assert.All(segments, s => Assert.Equal("{StaticResource SaSegmentedRectFilterItemStyle}", Attr(s, "Style")));
+    }
+
+    [Fact]
+    public void Workloads_TitleIsLevel1_AndSectionTitlesAreLevel2()
+    {
+        Assert.Equal("Level1", Attr(Assert.Single(Elements(Workloads), e => Uid(e) == "WorkloadsPageTitle"), "AutomationProperties.HeadingLevel"));
+        Assert.Equal("Level2", Attr(Assert.Single(Elements(Workloads), e => Uid(e) == "WorkloadDockerSectionTitle"), "AutomationProperties.HeadingLevel"));
+        Assert.Equal("Level2", Attr(Assert.Single(Elements(Workloads), e => Uid(e) == "WorkloadServicesSectionTitle"), "AutomationProperties.HeadingLevel"));
+    }
+
+    // --- Both pages ----------------------------------------------------------------------------------------------
+
+    [Theory]
+    [InlineData(History)]
+    [InlineData(Workloads)]
+    public void EveryXUidResolvesInEveryCulture(string file)
+    {
+        var resources = Cultures.ToDictionary(c => c, Resw);
+        var failures = new List<string>();
+        foreach (var uid in Elements(file).Select(Uid).Where(u => u is not null).Distinct())
+        {
+            var keys = resources["pt-PT"].Keys.Where(k => k.StartsWith(uid + ".", StringComparison.Ordinal)).ToList();
+            if (keys.Count == 0)
+            {
+                failures.Add($"{file}: x:Uid '{uid}' has no pt-PT key");
+            }
+
+            foreach (var culture in Cultures)
+            {
+                failures.AddRange(keys
+                    .Where(k => !resources[culture].TryGetValue(k, out var v) || string.IsNullOrWhiteSpace(v))
+                    .Select(k => $"{file}: {culture} lacks '{k}'"));
+            }
+        }
+
+        Assert.True(failures.Count == 0, string.Join(Environment.NewLine, failures));
+    }
+
+    [Theory]
+    [InlineData(History)]
+    [InlineData(Workloads)]
+    public void Pages_UseOnlyTokens_NoLiteralFontSizeHexOrGeometry(string file)
+    {
+        var offenders = Elements(file)
+            .SelectMany(e => e.Attributes())
+            .Where(a => a.Name.LocalName is "FontSize" or "CornerRadius" or "Padding" && !a.Value.StartsWith('{')
+                        || HexColour().IsMatch(a.Value))
+            .Select(a => $"{a.Parent!.Name.LocalName}.{a.Name.LocalName}=\"{a.Value}\"")
+            .ToList();
+        var setterOffenders = Elements(file)
+            .Where(e => e.Name.LocalName == "Setter" && (Attr(e, "Target") ?? Attr(e, "Property") ?? string.Empty) is var t
+                        && (t.EndsWith(".Padding", StringComparison.Ordinal) || t.EndsWith(".CornerRadius", StringComparison.Ordinal) || t.EndsWith(".FontSize", StringComparison.Ordinal))
+                        && !(Attr(e, "Value") ?? string.Empty).StartsWith('{'))
+            .Select(e => $"Setter {Attr(e, "Target")}={Attr(e, "Value")}");
+
+        Assert.Empty(offenders.Concat(setterOffenders));
+    }
+
+    [Fact]
+    public void PtPt_PageCopy_UsesTu()
+    {
+        var ptPt = Resw("pt-PT");
+        var uids = Elements(History).Concat(Elements(Workloads)).Select(Uid).Where(u => u is not null).ToHashSet(StringComparer.Ordinal);
+        var offenders = ptPt.Where(kv => uids.Any(u => kv.Key.StartsWith(u + ".", StringComparison.Ordinal)) && YouImperative().IsMatch(kv.Value))
+            .Select(kv => $"{kv.Key} = {kv.Value}").ToList();
+
+        Assert.True(offenders.Count == 0, string.Join(Environment.NewLine, offenders));
+    }
+
+    [GeneratedRegex(@"#[0-9A-Fa-f]{6,8}\b")]
+    private static partial Regex HexColour();
+
+    [GeneratedRegex(@"\b(Verifique|Experimente|Tente|Volte|Remova|Adicione)\b")]
+    private static partial Regex YouImperative();
+}
