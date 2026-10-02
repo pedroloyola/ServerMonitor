@@ -255,6 +255,9 @@ public sealed class WidgetProviderCoordinatorTests
     {
         // Bounded-shutdown residual: if a synchronous host.Update is genuinely stuck past DrainTimeout,
         // Shutdown returns anyway (the process must be able to revoke). Deterministic via FakeTimeProvider.
+        // The guarantee is functional — Shutdown leaves through its timeout path once ITS clock has passed the
+        // drain bound — and is proven on the fake clock; nothing here asserts a wall-clock latency. The drain-entered
+        // seam fires after the drain's timeout source exists, so the advance always reaches that timer.
         var clock = new FakeTimeProvider(new DateTimeOffset(2026, 8, 30, 12, 0, 0, TimeSpan.Zero));
         var host = new FakeWidgetHost();
         var block = new ManualResetEventSlim(false);
@@ -263,18 +266,18 @@ public sealed class WidgetProviderCoordinatorTests
         var drainEntered = new SemaphoreSlim(0);
         coordinator.DrainWaitEnteredForTesting = () => drainEntered.Release();
 
-        var activate = Task.Run(() => coordinator.OnWidgetActivated(Widget("a")));
-        Assert.True(await host.UpdateEntered.WaitAsync(5000)); // stuck in host.Update
+        var activate = RunOnDedicatedThread(() => coordinator.OnWidgetActivated(Widget("a")));
+        Assert.True(await host.UpdateEntered.WaitAsync(DeadlockGuard)); // stuck in host.Update
 
-        var shutdown = Task.Run(coordinator.Shutdown);
-        Assert.True(await drainEntered.WaitAsync(5000)); // Shutdown has created its timeout and is waiting
-        clock.Advance(TimeSpan.FromSeconds(2));          // fire the bounded-drain timeout
-        await shutdown;                                  // returns despite the update still being stuck
+        var shutdown = RunOnDedicatedThread(coordinator.Shutdown);
+        Assert.True(await drainEntered.WaitAsync(DeadlockGuard)); // Shutdown has created its timeout and is waiting
+        clock.Advance(TimeSpan.FromSeconds(2));                    // fire the bounded-drain timeout
+        await shutdown.WaitAsync(DeadlockGuard);                   // returns despite the update still being stuck
 
         Assert.Empty(host.Updates); // the stuck update has NOT completed — proves the timeout path
 
         block.Set(); // clean up the background task
-        await activate;
+        await activate.WaitAsync(DeadlockGuard);
     }
 
     [Fact]
