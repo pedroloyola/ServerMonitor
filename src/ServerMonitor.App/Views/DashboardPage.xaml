@@ -47,17 +47,6 @@
             WarningStyle="{StaticResource OverviewPriorityTitleWarningStyle}"
             CriticalStyle="{StaticResource OverviewPriorityTitleCriticalStyle}"
             UnknownStyle="{StaticResource OverviewPriorityTitleWarningStyle}" />
-        <Style x:Key="OverviewPriorityIconWarningStyle" TargetType="primitives:SaIcon">
-            <Setter Property="Foreground" Value="{ThemeResource SaAttentionTextBrush}" />
-        </Style>
-        <Style x:Key="OverviewPriorityIconCriticalStyle" TargetType="primitives:SaIcon">
-            <Setter Property="Foreground" Value="{ThemeResource SaDangerTextBrush}" />
-        </Style>
-        <converters:ServerHealthToStyleConverter
-            x:Key="PriorityIconStyleConverter"
-            WarningStyle="{StaticResource OverviewPriorityIconWarningStyle}"
-            CriticalStyle="{StaticResource OverviewPriorityIconCriticalStyle}"
-            UnknownStyle="{StaticResource OverviewPriorityIconWarningStyle}" />
         <!-- Capacity track 112:1040: h5 radius 3 on the empty-bar colour, fill in the severity colour (112:1041). -->
         <Style x:Key="OverviewPriorityFillWarningStyle" TargetType="Border">
             <Setter Property="Background" Value="{ThemeResource SaAttentionBrush}" />
@@ -390,12 +379,18 @@
                                 Visibility="{x:Bind ViewModel.HasPriorityProblem, Mode=OneWay}">
                             <StackPanel Spacing="{StaticResource SaSpace8}">
                                 <StackPanel Orientation="Horizontal" Spacing="7">
-                                    <primitives:SaIcon Size="17" VerticalAlignment="Center" Data="{StaticResource SaIconHardDriveData}"
-                                                       Visibility="{x:Bind converters:OverviewLayout.IsDisk(ViewModel.PriorityMetric), Mode=OneWay}"
-                                                       Style="{x:Bind ViewModel.PrioritySeverity, Mode=OneWay, Converter={StaticResource PriorityIconStyleConverter}}" />
-                                    <primitives:SaIcon Size="17" VerticalAlignment="Center" Data="{StaticResource SaIconComputerData}"
-                                                       Visibility="{x:Bind converters:OverviewLayout.IsNotDisk(ViewModel.PriorityMetric), Mode=OneWay}"
-                                                       Style="{x:Bind ViewModel.PrioritySeverity, Mode=OneWay, Converter={StaticResource PriorityIconStyleConverter}}" />
+                                    <!-- An explicit Style would replace SaIcon's implicit template style: the colour is set directly
+                                         (ThemeResource) on four icons and only their visibility follows metric × severity. -->
+                                    <Grid VerticalAlignment="Center">
+                                        <primitives:SaIcon Size="17" Data="{StaticResource SaIconHardDriveData}" Foreground="{ThemeResource SaAttentionTextBrush}"
+                                                           Visibility="{x:Bind converters:OverviewLayout.PriorityIcon(ViewModel.PriorityMetric, ViewModel.PrioritySeverity, 0), Mode=OneWay}" />
+                                        <primitives:SaIcon Size="17" Data="{StaticResource SaIconHardDriveData}" Foreground="{ThemeResource SaDangerTextBrush}"
+                                                           Visibility="{x:Bind converters:OverviewLayout.PriorityIcon(ViewModel.PriorityMetric, ViewModel.PrioritySeverity, 1), Mode=OneWay}" />
+                                        <primitives:SaIcon Size="17" Data="{StaticResource SaIconComputerData}" Foreground="{ThemeResource SaAttentionTextBrush}"
+                                                           Visibility="{x:Bind converters:OverviewLayout.PriorityIcon(ViewModel.PriorityMetric, ViewModel.PrioritySeverity, 2), Mode=OneWay}" />
+                                        <primitives:SaIcon Size="17" Data="{StaticResource SaIconComputerData}" Foreground="{ThemeResource SaDangerTextBrush}"
+                                                           Visibility="{x:Bind converters:OverviewLayout.PriorityIcon(ViewModel.PriorityMetric, ViewModel.PrioritySeverity, 3), Mode=OneWay}" />
+                                    </Grid>
                                     <TextBlock VerticalAlignment="Center" Text="{x:Bind ViewModel.PriorityTitle, Mode=OneWay}"
                                                Style="{x:Bind ViewModel.PrioritySeverity, Mode=OneWay, Converter={StaticResource PriorityTitleStyleConverter}}" />
                                 </StackPanel>

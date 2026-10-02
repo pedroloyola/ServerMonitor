@@ -11,10 +11,17 @@ public static class OverviewLayout
     /// empty visible container does).</summary>
     public static Visibility Any(bool first, bool second) => first || second ? Visibility.Visible : Visibility.Collapsed;
 
-    /// <summary>Priority card icon (Figma 112:1033): HardDrive for disk, Computer for CPU / memory (no new icon in UI.4).</summary>
-    public static Visibility IsDisk(ViewModels.PriorityMetric metric) => metric == ViewModels.PriorityMetric.Disk ? Visibility.Visible : Visibility.Collapsed;
-
-    public static Visibility IsNotDisk(ViewModels.PriorityMetric metric) => metric == ViewModels.PriorityMetric.Disk ? Visibility.Collapsed : Visibility.Visible;
+    /// <summary>
+    /// Priority card icon (Figma 112:1033): HardDrive for disk, Computer for CPU / memory (no new icon in UI.4), in the
+    /// attention (warning) or danger (critical) text colour. Slot: 0 disk·warning, 1 disk·critical, 2 other·warning,
+    /// 3 other·critical — exactly one is visible.
+    /// </summary>
+    public static Visibility PriorityIcon(ViewModels.PriorityMetric metric, ServerMonitor.Core.Enums.ServerHealth severity, int slot)
+    {
+        var disk = metric == ViewModels.PriorityMetric.Disk;
+        var critical = severity == ServerMonitor.Core.Enums.ServerHealth.Critical;
+        return (disk ? 0 : 2) + (critical ? 1 : 0) == slot ? Visibility.Visible : Visibility.Collapsed;
+    }
 
     public static GridLength UsedStar(double percent) => new(Math.Clamp(double.IsNaN(percent) ? 0 : percent, 0, 100), GridUnitType.Star);
 
