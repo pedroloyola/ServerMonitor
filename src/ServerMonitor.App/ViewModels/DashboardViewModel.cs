@@ -6,6 +6,7 @@ using Microsoft.UI.Dispatching;
 using ServerMonitor.App.Services;
 using ServerMonitor.Core.Backup;
 using ServerMonitor.Core.Discovery;
+using ServerMonitor.Core.Enums;
 using ServerMonitor.Core.Interfaces;
 using ServerMonitor.Core.Models;
 
@@ -53,6 +54,23 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
     // Non-null only when the composed discovery service is the live one (M14.5 empty-state search indicator).
     private readonly IServerDiscoveryActivity? _discoveryActivity;
 
+    // UI.4 overview. Every field below is read null-safely: the runtime-free contract tests build this view model with
+    // RuntimeHelpers.GetUninitializedObject (no constructor, no field initializers) and still call LoadAsync.
+    private readonly IRefreshAllCoordinator? _refreshAllCoordinator;
+    private readonly PriorityProblemSelector? _prioritySelector;
+    private readonly PresentationClock? _clock;
+    private bool _isLoading;
+    private bool _isRefreshingAll;
+    private int _hiddenServerCount;
+    private HealthSummary? _healthSummary;
+    private IReadOnlyList<HealthSegment>? _healthSegments;
+    private PriorityProblem? _priorityProblem;
+    private string? _updatedAgoDisplay;
+    private string? _overviewSearchText;
+    private IReadOnlyList<ServerDirectoryRowViewModel>? _overviewRows;
+    private IReadOnlyList<ServerDirectoryRowViewModel>? _overviewServers;
+    private AsyncRelayCommand? _refreshAllCommand;
+
     public DashboardViewModel(
         IServerService serverService,
         IServerProfileService serverProfileService,
@@ -64,8 +82,16 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         IServerDiscoveryService discoveryService,
         INavigationService navigationService,
         ILocalizationService localizationService,
-        ILogger<DashboardViewModel> logger)
+        ILogger<DashboardViewModel> logger,
+        IRefreshAllCoordinator? refreshAllCoordinator = null,
+        MonitoringOptions? monitoringOptions = null,
+        PresentationClock? clock = null)
     {
+        _refreshAllCoordinator = refreshAllCoordinator;
+        // D-UI4-PRIORITY: the SAME thresholds instance the engine is composed with (App registers one MonitoringOptions).
+        _prioritySelector = new PriorityProblemSelector((monitoringOptions ?? MonitoringOptions.Default).Thresholds);
+        _clock = clock;
+        _isLoading = true;
         _serverService = serverService;
         _serverProfileService = serverProfileService;
         _dialogService = dialogService;
@@ -90,6 +116,9 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         AddServerCommand = new AsyncRelayCommand(AddServerAsync);
         ImportFromSshCommand = new AsyncRelayCommand(ImportFromSshAsync);
         OpenSettingsCommand = new RelayCommand(navigationService.GoToSettings);
+        ViewAllServersCommand = new RelayCommand(navigationService.GoToServers);
+        ClearOverviewSearchCommand = new RelayCommand(() => OverviewSearchText = string.Empty);
+        OpenPriorityProblemCommand = new RelayCommand(OpenPriorityProblem);
     }
 
     public ObservableCollection<ServerCardViewModel> VisibleServers { get; } = [];
@@ -102,13 +131,17 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
     private PendingServerFocus PendingFocus => _pendingFocus ??= new();
 
     /// <summary>
-    /// Raised when a widget deep-link asks to focus a specific server that is present in the list (§H).
-    /// The view scrolls the card into view. If the server is not (yet) loaded the request stays pending
-    /// and is retried after the next load; a removed server simply never resolves (safe fallback, §11).
+    /// Raised at the end of every server-list rebuild (load, add/edit/hide/remove, restore), AFTER the new cards are in
+    /// <see cref="VisibleServers"/>. Consumers (the Servidores directory, the interim server page) re-resolve here and
+    /// never on the collection's own Reset, which fires while the list is momentarily empty.
     /// </summary>
-    public event Action<ServerCardViewModel>? ServerFocusRequested;
+    public event EventHandler? ServersReloaded;
 
-    /// <summary>Requests focus on a server by its opaque id (from a <c>serveralyzer://server/{id}</c> deep-link).</summary>
+    /// <summary>
+    /// A widget "open server" deep-link (<c>serveralyzer://server/{id}</c>, §H). UI.4 D-UI4-DETAIL: it opens the interim
+    /// server page for that server. If the server is not (yet) loaded the request stays pending and is retried after the
+    /// next load; a removed server simply never resolves, so the app stays on the overview without an error (§11).
+    /// </summary>
     public void FocusServer(Guid serverId)
     {
         PendingFocus.Request(serverId);
@@ -128,20 +161,28 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         var currentIds = VisibleServers.Select(card => card.Server.Id).ToArray();
         if (PendingFocus.TryResolve(currentIds) is { } id)
         {
-            var card = VisibleServers.FirstOrDefault(card => card.Server.Id == id);
-            if (card is not null)
-            {
-                // QA-1: make the deep-link's "focus" VISIBLE — the card view pulses an accent ring so the
-                // user can see which server the widget selected, even when it is already on screen. Clearing
-                // the others keeps a single visible target.
-                foreach (var other in VisibleServers)
-                {
-                    other.IsFocusHighlighted = false;
-                }
+            OpenServerDetail(id, ServerDetailOrigin.Overview);
+        }
+    }
 
-                card.IsFocusHighlighted = true;
-                ServerFocusRequested?.Invoke(card);
-            }
+    /// <summary>Opens the interim server page (D-UI4-DETAIL) for a server of the list.</summary>
+    public void OpenServerDetail(Guid serverId, ServerDetailOrigin origin)
+    {
+        var navigation = _navigationService;
+        if (navigation is null)
+        {
+            return;
+        }
+
+        // Deferred when a dispatcher exists: a resolution can happen inside a load triggered by a page's Loaded handler,
+        // and the frame must not be swapped re-entrantly from there.
+        if (_dispatcherQueue is null)
+        {
+            navigation.GoToServerDetail(serverId, origin);
+        }
+        else
+        {
+            _dispatcherQueue.TryEnqueue(() => navigation.GoToServerDetail(serverId, origin));
         }
     }
 
@@ -162,6 +203,9 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
             if (SetProperty(ref _hasVisibleServers, value))
             {
                 OnEmptyStateDiscoveryChanged();
+                OnPropertyChanged(nameof(ShowOverviewContent));
+                OnPropertyChanged(nameof(ShowEmptyState));
+                OnPropertyChanged(nameof(ShowNoProblems));
             }
         }
     }
@@ -240,6 +284,170 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
     public string ConfigurationLockedMessage =>
         _localizationService?.GetString(BackupMessageKeys.ConfigurationLocked) ?? string.Empty;
 
+    // --- UI.4 overview -----------------------------------------------------------------------------------------
+
+    public ICommand ViewAllServersCommand { get; } = null!;
+
+    public ICommand ClearOverviewSearchCommand { get; } = null!;
+
+    public ICommand OpenPriorityProblemCommand { get; } = null!;
+
+    /// <summary>The header's round "Atualizar": the existing Refresh All coordinator (engine facade), never a new path.</summary>
+    public ICommand RefreshAllCommand => _refreshAllCommand ??= new AsyncRelayCommand(
+        RefreshAllAsync,
+        () => _refreshAllCoordinator is not null && !_isRefreshingAll);
+
+    /// <summary>True until the first server load has completed (or failed). Additive: false on a constructor-less instance.</summary>
+    public bool IsLoading
+    {
+        get => _isLoading;
+        private set
+        {
+            if (SetProperty(ref _isLoading, value))
+            {
+                OnPropertyChanged(nameof(ShowNoProblems));
+                OnPropertyChanged(nameof(ShowOverviewContent));
+                OnPropertyChanged(nameof(ShowEmptyState));
+            }
+        }
+    }
+
+    /// <summary>The overview's content (health, priority, list) — only once loaded and with at least one visible server.</summary>
+    public bool ShowOverviewContent => !IsLoading && HasVisibleServers;
+
+    /// <summary>The empty state ("Adicionar" / "Importar do SSH" / discovery) — only once loaded, never during loading.</summary>
+    public bool ShowEmptyState => !IsLoading && !HasVisibleServers;
+
+    public bool IsRefreshingAll
+    {
+        get => _isRefreshingAll;
+        private set
+        {
+            if (SetProperty(ref _isRefreshingAll, value))
+            {
+                _refreshAllCommand?.NotifyCanExecuteChanged();
+            }
+        }
+    }
+
+    /// <summary>Configured but hidden servers (restorable in Definições). Drives the Servidores page's note.</summary>
+    public int HiddenServerCount
+    {
+        get => _hiddenServerCount;
+        private set => SetProperty(ref _hiddenServerCount, value);
+    }
+
+    public HealthSummary HealthSummary => _healthSummary ?? HealthSummary.Empty;
+
+    public IReadOnlyList<HealthSegment> HealthSegments => _healthSegments ?? [];
+
+    /// <summary>"4" of "4 de 6 saudáveis".</summary>
+    public string HealthyCountDisplay => HealthSummary.Healthy.ToString(CultureInfo.CurrentUICulture);
+
+    /// <summary>"de 6 saudáveis".</summary>
+    public string HealthOfTotalDisplay => Format("OverviewHealthOfTotalFormat", HealthSummary.Total);
+
+    /// <summary>The exception chips, in fixed order, only for states with a count &gt; 0 ("1 atenção", "1 sem ligação").</summary>
+    public IReadOnlyList<HealthChip> HealthChips => OverviewPresentation.ChipOrder
+        .Select(health => (health, count: HealthSummary.CountOf(health)))
+        .Where(entry => entry.count > 0)
+        .Select(entry => new HealthChip(
+            entry.health,
+            entry.count,
+            Format(PluralKey($"OverviewHealthChip{entry.health}", entry.count), entry.count)))
+        .ToList();
+
+    /// <summary>"4 de 6 servidores saudáveis, 1 em atenção, 1 sem ligação" — one readable sentence for the whole card.</summary>
+    public string HealthAutomationName
+    {
+        get
+        {
+            var summary = HealthSummary;
+            var parts = new List<string> { Format("OverviewHealthAutomationFormat", summary.Healthy, summary.Total) };
+            foreach (var health in OverviewPresentation.ChipOrder)
+            {
+                var count = summary.CountOf(health);
+                if (count > 0)
+                {
+                    parts.Add(Format(PluralKey($"OverviewHealthAutomation{health}", count), count));
+                }
+            }
+
+            return string.Join(", ", parts);
+        }
+    }
+
+    public PriorityProblem? PriorityProblem => _priorityProblem;
+
+    public bool HasPriorityProblem => _priorityProblem is not null;
+
+    /// <summary>The neutral "Sem problemas" state: loaded, servers present, and no candidate above the engine limits.</summary>
+    public bool ShowNoProblems => !IsLoading && HasVisibleServers && _priorityProblem is null;
+
+    /// <summary>"Disco quase cheio" / "CPU elevada" / "Memória quase cheia".</summary>
+    public string? PriorityTitle => _priorityProblem is { } problem ? Text($"OverviewPriorityTitle{problem.Metric}") : null;
+
+    public string? PriorityPercentDisplay => _priorityProblem is { } problem
+        ? string.Format(CultureInfo.CurrentUICulture, "{0:0}%", problem.Percent)
+        : null;
+
+    public double PriorityPercentValue => _priorityProblem?.Percent ?? 0;
+
+    public ServerHealth PrioritySeverity => _priorityProblem?.Severity ?? ServerHealth.Healthy;
+
+    public string? PriorityServerName => _priorityProblem?.ServerName;
+
+    /// <summary>"Disco quase cheio: 92% em prod-db-01, crítico. Abrir servidor."</summary>
+    public string? PriorityAutomationName => _priorityProblem is { } problem
+        ? Format(
+            "OverviewPriorityAutomationFormat",
+            PriorityTitle ?? string.Empty,
+            PriorityPercentDisplay ?? string.Empty,
+            problem.ServerName,
+            Text($"ServerStatus{problem.Severity}"))
+        : null;
+
+    /// <summary>"Atualizado há 8 s" from the most recent successful collection; null (hidden) when nothing was collected yet.</summary>
+    public string? UpdatedAgoDisplay
+    {
+        get => _updatedAgoDisplay;
+        private set
+        {
+            if (SetProperty(ref _updatedAgoDisplay, value))
+            {
+                OnPropertyChanged(nameof(HasUpdatedAgo));
+            }
+        }
+    }
+
+    public bool HasUpdatedAgo => _updatedAgoDisplay is not null;
+
+    /// <summary>The overview list's search ("Procurar"): name or address, partial, case-insensitive.</summary>
+    public string OverviewSearchText
+    {
+        get => _overviewSearchText ?? string.Empty;
+        set
+        {
+            if (SetProperty(ref _overviewSearchText, value ?? string.Empty))
+            {
+                ApplyOverviewFilter();
+            }
+        }
+    }
+
+    /// <summary>The summary list: the filtered servers, at most <see cref="OverviewPresentation.OverviewListLimit"/>.</summary>
+    public IReadOnlyList<ServerDirectoryRowViewModel> OverviewServers => _overviewServers ?? [];
+
+    /// <summary>Matches beyond the list limit, reachable through "Ver todos".</summary>
+    public int OverviewMoreCount { get; private set; }
+
+    public bool HasOverviewMore => OverviewMoreCount > 0;
+
+    public bool HasOverviewSearchNoResults =>
+        HasVisibleServers && !string.IsNullOrWhiteSpace(OverviewSearchText) && OverviewServers.Count == 0;
+
+    public string OverviewNoResultsTitle => Format("ServerSearchNoResultsTitleFormat", OverviewSearchText.Trim());
+
     public async Task LoadAsync()
     {
         try
@@ -247,6 +455,7 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
             var servers = await _serverService.GetAllAsync();
             var all = servers.ToList();
             _configuredEndpoints = BuildConfiguredEndpoints(all);
+            HiddenServerCount = all.Count(server => server.IsHidden);
             SetServers(all.Where(server => !server.IsHidden));
             RebuildDiscovered();
         }
@@ -254,7 +463,159 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         {
             HandleError(exception, "load servers");
         }
+        finally
+        {
+            IsLoading = false;
+        }
     }
+
+    private async Task RefreshAllAsync()
+    {
+        if (_refreshAllCoordinator is null)
+        {
+            return;
+        }
+
+        IsRefreshingAll = true;
+        try
+        {
+            await _refreshAllCoordinator.RefreshAllAsync();
+        }
+        catch (Exception exception) when (exception is not OutOfMemoryException)
+        {
+            // The engine records each server's outcome in the monitoring-state store; a cancelled batch (shutdown) or a
+            // per-server failure is reflected there, never as a dashboard error.
+            _logger?.LogInformation("Refresh all ended early. Exception type: {ExceptionType}.", exception.GetType().Name);
+        }
+        finally
+        {
+            IsRefreshingAll = false;
+            RecomputeOverview();
+        }
+    }
+
+    private void OpenPriorityProblem()
+    {
+        if (_priorityProblem is { } problem)
+        {
+            OpenServerDetail(problem.ServerId, ServerDetailOrigin.Overview);
+        }
+    }
+
+    /// <summary>
+    /// Recomputes every overview aggregate from the cards' engine-owned state: health counts and segments, the priority
+    /// problem and "Atualizado há …". Called on load, on each engine state change and after "Atualizar" — never on a timer.
+    /// </summary>
+    private void RecomputeOverview()
+    {
+        var cards = VisibleServers;
+        if (cards is null)
+        {
+            return;
+        }
+
+        var summary = HealthSummary.From(cards.Select(card => card.Health));
+        _healthSummary = summary;
+        _healthSegments = OverviewPresentation.Segments(summary);
+
+        var selector = _prioritySelector ?? new PriorityProblemSelector(MonitoringOptions.Default.Thresholds);
+        _priorityProblem = selector.Select(cards
+            .Select(card => new PriorityServerInput(card.Server.Id, card.Name, card.Health, card.MetricsSnapshot))
+            .ToList());
+
+        var lastSuccess = cards.Select(card => card.LastSuccessAt).Where(at => at is not null).Max();
+        UpdatedAgoDisplay = lastSuccess is { } at ? FormatUpdatedAgo(at) : null;
+
+        OnPropertyChanged(nameof(HealthSummary));
+        OnPropertyChanged(nameof(HealthSegments));
+        OnPropertyChanged(nameof(HealthyCountDisplay));
+        OnPropertyChanged(nameof(HealthOfTotalDisplay));
+        OnPropertyChanged(nameof(HealthChips));
+        OnPropertyChanged(nameof(HealthAutomationName));
+        OnPropertyChanged(nameof(PriorityProblem));
+        OnPropertyChanged(nameof(HasPriorityProblem));
+        OnPropertyChanged(nameof(ShowNoProblems));
+        OnPropertyChanged(nameof(PriorityTitle));
+        OnPropertyChanged(nameof(PriorityPercentDisplay));
+        OnPropertyChanged(nameof(PriorityPercentValue));
+        OnPropertyChanged(nameof(PrioritySeverity));
+        OnPropertyChanged(nameof(PriorityServerName));
+        OnPropertyChanged(nameof(PriorityAutomationName));
+    }
+
+    // D-UI3-9 semantics (same buckets as the Serviços e containers page): <1 s "agora mesmo", then s / min / h / d.
+    private string FormatUpdatedAgo(DateTimeOffset lastSuccessUtc)
+    {
+        var now = (_clock ?? PresentationClock.System).UtcNow;
+        var age = now - lastSuccessUtc;
+        if (age < TimeSpan.Zero)
+        {
+            age = TimeSpan.Zero;
+        }
+
+        if (age.TotalSeconds < 1)
+        {
+            return Text("OverviewUpdatedJustNow");
+        }
+
+        if (age.TotalMinutes < 1)
+        {
+            return Format("OverviewUpdatedSecondsFormat", (int)age.TotalSeconds);
+        }
+
+        if (age.TotalHours < 1)
+        {
+            return Format("OverviewUpdatedMinutesFormat", (int)age.TotalMinutes);
+        }
+
+        return age.TotalDays < 1
+            ? Format("OverviewUpdatedHoursFormat", (int)age.TotalHours)
+            : Format("OverviewUpdatedDaysFormat", (int)age.TotalDays);
+    }
+
+    private void RebuildOverviewRows()
+    {
+        if (_overviewRows is { } previous)
+        {
+            foreach (var row in previous)
+            {
+                row.Dispose();
+            }
+        }
+
+        var localization = _localizationService;
+        _overviewRows = localization is null
+            ? []
+            : VisibleServers
+                .Select(card => new ServerDirectoryRowViewModel(
+                    card,
+                    localization,
+                    selected => OpenServerDetail(selected.Server.Id, ServerDetailOrigin.Overview)))
+                .ToList();
+        ApplyOverviewFilter();
+    }
+
+    private void ApplyOverviewFilter()
+    {
+        var query = OverviewSearchText;
+        var matches = (_overviewRows ?? [])
+            .Where(row => OverviewPresentation.MatchesSearch(row.Name, row.Card.Host, row.Card.Port, query))
+            .ToList();
+        _overviewServers = matches.Take(OverviewPresentation.OverviewListLimit).ToList();
+        OverviewMoreCount = Math.Max(0, matches.Count - OverviewPresentation.OverviewListLimit);
+        OnPropertyChanged(nameof(OverviewServers));
+        OnPropertyChanged(nameof(OverviewMoreCount));
+        OnPropertyChanged(nameof(HasOverviewMore));
+        OnPropertyChanged(nameof(HasOverviewSearchNoResults));
+        OnPropertyChanged(nameof(OverviewNoResultsTitle));
+    }
+
+    private string Text(string key) => _localizationService?.GetString(key) ?? key;
+
+    private string Format(string key, params object[] args) =>
+        string.Format(CultureInfo.CurrentUICulture, Text(key), args);
+
+    private static string PluralKey(string baseKey, int count) => WorkloadPresentation.PluralKey(baseKey, count);
 
     public void Dispose()
     {
@@ -443,8 +804,11 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         }
 
         HasVisibleServers = VisibleServers.Count > 0;
+        RebuildOverviewRows();
+        RecomputeOverview();
+        ServersReloaded?.Invoke(this, EventArgs.Empty);
 
-        // A widget deep-link may have asked to focus a server before it was loaded — retry now (§18).
+        // A widget deep-link may have asked to open a server before it was loaded — retry now (§18).
         TryApplyPendingFocus();
     }
 
@@ -565,7 +929,13 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
     private void ApplyMonitoringState(Guid serverId)
     {
         var card = VisibleServers.FirstOrDefault(card => card.Server.Id == serverId);
-        card?.ApplyMonitoringState(_monitoringStateStore.Get(serverId));
+        if (card is null)
+        {
+            return;
+        }
+
+        card.ApplyMonitoringState(_monitoringStateStore.Get(serverId));
+        RecomputeOverview();
     }
 
     internal void HandleError(Exception exception, string operation)

@@ -70,4 +70,30 @@ public sealed class NavigationService(
         _frame.Content = page;
         logger.LogInformation("Navigated to Workloads for a server.");
     }
+
+    public void GoToServers()
+    {
+        if (_frame is null)
+        {
+            throw new InvalidOperationException("Navigation has not been initialized.");
+        }
+
+        // Fresh page/VM per visit (disposed on Unloaded), like History: the directory holds per-row subscriptions to
+        // the shared server cards that must not outlive the visit.
+        _frame.Content = serviceProvider.GetRequiredService<ServersPage>();
+        logger.LogInformation("Navigated to Servers.");
+    }
+
+    public void GoToServerDetail(Guid serverId, ServerDetailOrigin origin)
+    {
+        if (_frame is null)
+        {
+            throw new InvalidOperationException("Navigation has not been initialized.");
+        }
+
+        var page = serviceProvider.GetRequiredService<ServerDetailPage>();
+        page.Load(serverId, origin);
+        _frame.Content = page;
+        logger.LogInformation("Navigated to the interim server page from {Origin}.", origin);
+    }
 }

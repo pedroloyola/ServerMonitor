@@ -284,16 +284,16 @@
   <data name="HistoryResetConfirmMessage" xml:space="preserve"><value>This removes the unavailable history database and creates a new one. Servers, credentials, and settings are not affected. This action cannot be undone.</value></data>
   <data name="HistoryResetConfirmPrimary" xml:space="preserve"><value>Reset history</value></data>
   <!-- M11 Workloads (Docker + Services), read-only -->
-  <data name="ServerCardWorkloadsMenuItem.Text" xml:space="preserve"><value>Workloads</value></data>
+  <data name="ServerCardWorkloadsMenuItem.Text" xml:space="preserve"><value>Services and containers</value></data>
   <data name="WorkloadsBackButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Back to servers</value></data>
   <data name="WorkloadsBackButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Back</value></data>
-  <data name="WorkloadsSubtitle.Text" xml:space="preserve"><value>Workloads</value></data>
-  <data name="WorkloadStaleBadge.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>These workloads may be outdated</value></data>
+  <data name="WorkloadsSubtitle.Text" xml:space="preserve"><value>Services and containers</value></data>
+  <data name="WorkloadStaleBadge.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>These services and containers may be outdated</value></data>
   <data name="WorkloadStaleBadgeText.Text" xml:space="preserve"><value>Outdated</value></data>
-  <data name="WorkloadRefreshButton" xml:space="preserve"><value>Refresh workloads</value></data>
+  <data name="WorkloadRefreshButton" xml:space="preserve"><value>Refresh services and containers</value></data>
   <data name="WorkloadDockerSectionTitle.Text" xml:space="preserve"><value>Containers</value></data>
   <data name="WorkloadServicesSectionTitle.Text" xml:space="preserve"><value>Services</value></data>
-  <data name="WorkloadLoading.Text" xml:space="preserve"><value>Loading workloads…</value></data>
+  <data name="WorkloadLoading.Text" xml:space="preserve"><value>Loading services and containers…</value></data>
   <data name="WorkloadDockerNotInstalledTitle.Text" xml:space="preserve"><value>Docker not installed</value></data>
   <data name="WorkloadDockerNotInstalledDescription.Text" xml:space="preserve"><value>Docker isn't available on this server. Only services are shown.</value></data>
   <data name="WorkloadDockerPermissionTitle.Text" xml:space="preserve"><value>No permission to access Docker</value></data>
@@ -722,4 +722,63 @@
   <data name="WorkloadServicesList.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Service list</value></data>
   <data name="WorkloadContainerRowAccessibleFormat" xml:space="preserve"><value>{0}, image {1}, container {2}, health {3}</value></data>
   <data name="WorkloadServiceRowAccessibleFormat" xml:space="preserve"><value>{0}, {1}, {2}, startup {3}</value></data>
+  <!-- UI.4 Visao geral + Servidores (overview, directory, interim server page). -->
+  <data name="ServerStatusHealthy" xml:space="preserve"><value>Healthy</value></data>
+  <data name="ServerStatusWarning" xml:space="preserve"><value>Attention</value></data>
+  <data name="ServerStatusCritical" xml:space="preserve"><value>Critical</value></data>
+  <data name="ServerStatusOffline" xml:space="preserve"><value>No connection</value></data>
+  <data name="ServerStatusUnknown" xml:space="preserve"><value>No data</value></data>
+  <data name="ServerMetricUnavailable" xml:space="preserve"><value>—</value></data>
+  <data name="ServerMetricUnavailableAccessible" xml:space="preserve"><value>no data</value></data>
+  <data name="ServerDetailOpenFor" xml:space="preserve"><value>View details for {0}</value></data>
+  <data name="ServerRowAutomationFormat" xml:space="preserve"><value>{0}, {1}, CPU {2}, RAM {3}, disk {4}, {5}, {6}</value></data>
+  <data name="OverviewPageTitle" xml:space="preserve"><value>Overview</value></data>
+  <data name="ServersPageTitle" xml:space="preserve"><value>Servers</value></data>
+  <data name="OverviewHealthOfTotalFormat" xml:space="preserve"><value>of {0} healthy</value></data>
+  <data name="OverviewHealthChipWarningOne" xml:space="preserve"><value>{0} attention</value></data>
+  <data name="OverviewHealthChipWarningOther" xml:space="preserve"><value>{0} attention</value></data>
+  <data name="OverviewHealthChipCriticalOne" xml:space="preserve"><value>{0} critical</value></data>
+  <data name="OverviewHealthChipCriticalOther" xml:space="preserve"><value>{0} critical</value></data>
+  <data name="OverviewHealthChipOfflineOne" xml:space="preserve"><value>{0} no connection</value></data>
+  <data name="OverviewHealthChipOfflineOther" xml:space="preserve"><value>{0} no connection</value></data>
+  <data name="OverviewHealthChipUnknownOne" xml:space="preserve"><value>{0} no data</value></data>
+  <data name="OverviewHealthChipUnknownOther" xml:space="preserve"><value>{0} no data</value></data>
+  <data name="OverviewHealthAutomationFormat" xml:space="preserve"><value>{0} of {1} servers healthy</value></data>
+  <data name="OverviewHealthAutomationWarningOne" xml:space="preserve"><value>{0} needs attention</value></data>
+  <data name="OverviewHealthAutomationWarningOther" xml:space="preserve"><value>{0} need attention</value></data>
+  <data name="OverviewHealthAutomationCriticalOne" xml:space="preserve"><value>{0} critical</value></data>
+  <data name="OverviewHealthAutomationCriticalOther" xml:space="preserve"><value>{0} critical</value></data>
+  <data name="OverviewHealthAutomationOfflineOne" xml:space="preserve"><value>{0} without connection</value></data>
+  <data name="OverviewHealthAutomationOfflineOther" xml:space="preserve"><value>{0} without connection</value></data>
+  <data name="OverviewHealthAutomationUnknownOne" xml:space="preserve"><value>{0} without data</value></data>
+  <data name="OverviewHealthAutomationUnknownOther" xml:space="preserve"><value>{0} without data</value></data>
+  <data name="OverviewPriorityTitleCpu" xml:space="preserve"><value>High CPU</value></data>
+  <data name="OverviewPriorityTitleMemory" xml:space="preserve"><value>Memory almost full</value></data>
+  <data name="OverviewPriorityTitleDisk" xml:space="preserve"><value>Disk almost full</value></data>
+  <data name="OverviewPriorityAutomationFormat" xml:space="preserve"><value>{0}: {1} on {2}, {3}. Open server.</value></data>
+  <data name="OverviewNoProblemsTitle" xml:space="preserve"><value>No problems</value></data>
+  <data name="OverviewNoProblemsMessage" xml:space="preserve"><value>No metric is above the attention limits.</value></data>
+  <data name="OverviewUpdatedJustNow" xml:space="preserve"><value>Updated just now</value></data>
+  <data name="OverviewUpdatedSecondsFormat" xml:space="preserve"><value>Updated {0} s ago</value></data>
+  <data name="OverviewUpdatedMinutesFormat" xml:space="preserve"><value>Updated {0} min ago</value></data>
+  <data name="OverviewUpdatedHoursFormat" xml:space="preserve"><value>Updated {0} h ago</value></data>
+  <data name="OverviewUpdatedDaysFormat" xml:space="preserve"><value>Updated {0} d ago</value></data>
+  <data name="ServerSearchNoResultsTitleFormat" xml:space="preserve"><value>No results for “{0}”</value></data>
+  <data name="ServersSummaryTotalOne" xml:space="preserve"><value>{0} server</value></data>
+  <data name="ServersSummaryTotalOther" xml:space="preserve"><value>{0} servers</value></data>
+  <data name="ServersSummaryHealthyOne" xml:space="preserve"><value>{0} healthy</value></data>
+  <data name="ServersSummaryHealthyOther" xml:space="preserve"><value>{0} healthy</value></data>
+  <data name="ServersBreadcrumb.ParentText" xml:space="preserve"><value>Overview</value></data>
+  <data name="ServersBreadcrumb.CurrentText" xml:space="preserve"><value>Servers</value></data>
+  <data name="ServersPageTitleText.Text" xml:space="preserve"><value>Servers</value></data>
+  <data name="ServersAddButton.Content" xml:space="preserve"><value>Add</value></data>
+  <data name="ServersSearch.PlaceholderText" xml:space="preserve"><value>Search by name or address</value></data>
+  <data name="ServersSearch.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Search servers by name or address</value></data>
+  <data name="ServersNoResultsState.Message" xml:space="preserve"><value>Try another name or address.</value></data>
+  <data name="ServersClearSearchButton.Content" xml:space="preserve"><value>Clear search</value></data>
+  <data name="ServersEmptyState.Title" xml:space="preserve"><value>No servers yet</value></data>
+  <data name="ServersEmptyState.Message" xml:space="preserve"><value>Add a server to follow it here.</value></data>
+  <data name="ServersEmptyAddButton.Content" xml:space="preserve"><value>Add server</value></data>
+  <data name="ServersHiddenNote.Text" xml:space="preserve"><value>Hidden servers can be restored in Settings.</value></data>
+  <data name="ServerDetailOpenButton.Content" xml:space="preserve"><value>View details</value></data>
 </root>

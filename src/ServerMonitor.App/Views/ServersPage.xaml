@@ -1,0 +1,100 @@
+<Page
+    x:Class="ServerMonitor.App.Views.ServersPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:converters="using:ServerMonitor.App.Converters"
+    xmlns:primitives="using:ServerMonitor.App.Controls.Primitives"
+    xmlns:vm="using:ServerMonitor.App.ViewModels">
+    <!-- UI.4 §3 Servidores, Figma 05 · 02: 112:1353 (Dark). PHASE 1 functional skeleton (Cortex architecture review);
+         Figma fidelity, responsive reflow and table semantics land in phase 2. -->
+    <Page.Resources>
+        <converters:ServerHealthToStatusKindConverter x:Key="ServerHealthToStatusKindConverter" />
+
+        <DataTemplate x:Key="ServerRowTemplate" x:DataType="vm:ServerDirectoryRowViewModel">
+            <primitives:SaDataTableRow AutomationProperties.Name="{x:Bind RowAutomationName, Mode=OneWay}">
+                <Grid ColumnSpacing="{StaticResource SaSpace12}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="3*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="2*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="{x:Bind Name}" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{x:Bind Address}" Foreground="{ThemeResource SaTextSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                    <TextBlock Grid.Column="1" VerticalAlignment="Center" Text="{x:Bind OperatingSystemDisplay}" />
+                    <primitives:SaStatusIndicator Grid.Column="2" VerticalAlignment="Center"
+                        Status="{x:Bind Health, Mode=OneWay, Converter={StaticResource ServerHealthToStatusKindConverter}}"
+                        Label="{x:Bind StatusDisplay, Mode=OneWay}" />
+                    <TextBlock Grid.Column="3" VerticalAlignment="Center" Text="{x:Bind CpuDisplay, Mode=OneWay}" />
+                    <TextBlock Grid.Column="4" VerticalAlignment="Center" Text="{x:Bind MemoryDisplay, Mode=OneWay}" />
+                    <TextBlock Grid.Column="5" VerticalAlignment="Center" Text="{x:Bind DiskDisplay, Mode=OneWay}" />
+                    <Button Grid.Column="6" x:Uid="ServerDetailOpenButton" VerticalAlignment="Center"
+                        Style="{StaticResource SaSecondaryRectButtonStyle}"
+                        Command="{x:Bind OpenDetailCommand}"
+                        AutomationProperties.Name="{x:Bind DetailAutomationName}" />
+                </Grid>
+            </primitives:SaDataTableRow>
+        </DataTemplate>
+    </Page.Resources>
+
+    <Grid Padding="{StaticResource SaPagePadding}" RowSpacing="{StaticResource SaSpace20}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <primitives:SaBreadcrumb x:Name="Breadcrumb" x:Uid="ServersBreadcrumb" ParentInvoked="OnBreadcrumbParentInvoked" />
+
+        <Grid Grid.Row="1" ColumnSpacing="{StaticResource SaSpace20}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Spacing="{StaticResource SaSpace4}">
+                <TextBlock x:Uid="ServersPageTitleText" AutomationProperties.HeadingLevel="Level1"
+                           Style="{StaticResource SaPageTitleTextStyle}" Foreground="{ThemeResource SaTextBrush}" />
+                <TextBlock Style="{StaticResource SaPageSubtitleTextStyle}" Text="{Binding SummaryDisplay}" TextWrapping="Wrap"
+                           AutomationProperties.LiveSetting="Polite" />
+            </StackPanel>
+            <Button Grid.Column="1" x:Uid="ServersAddButton" VerticalAlignment="Top"
+                    Style="{StaticResource SaPrimaryButtonStyle}" Command="{Binding AddServerCommand}" />
+        </Grid>
+
+        <TextBox x:Name="SearchBox" x:Uid="ServersSearch" Grid.Row="2" HorizontalAlignment="Stretch"
+                 Style="{StaticResource SaPageSearchFieldStyle}"
+                 Text="{Binding SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+        <ProgressRing Grid.Row="3" IsActive="{Binding IsLoading}"
+                      Visibility="{Binding IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
+        <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                      Visibility="{Binding ShowTable, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <ItemsRepeater x:Name="ServersRepeater" ItemsSource="{Binding Rows}" ItemTemplate="{StaticResource ServerRowTemplate}" />
+        </ScrollViewer>
+
+        <primitives:SaEmptyState Grid.Row="3" x:Name="NoResultsState" x:Uid="ServersNoResultsState" VerticalAlignment="Center"
+                                 IconData="{StaticResource SaIconSearch01Data}" Title="{Binding NoResultsTitle}"
+                                 Visibility="{Binding HasNoResults, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <Button x:Uid="ServersClearSearchButton" HorizontalAlignment="Center" Style="{StaticResource SaSolidButtonStyle}"
+                    Command="{Binding ClearSearchCommand}" Click="OnClearSearchClick" />
+        </primitives:SaEmptyState>
+
+        <primitives:SaEmptyState Grid.Row="3" x:Name="EmptyState" x:Uid="ServersEmptyState" VerticalAlignment="Center"
+                                 IconData="{StaticResource SaIconServerStack01Data}"
+                                 Visibility="{Binding ShowEmptyState, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <Button x:Uid="ServersEmptyAddButton" HorizontalAlignment="Center" Style="{StaticResource SaSolidButtonStyle}"
+                    Command="{Binding AddServerCommand}" />
+        </primitives:SaEmptyState>
+
+        <TextBlock Grid.Row="4" x:Uid="ServersHiddenNote" Style="{StaticResource SaPageSubtitleTextStyle}" TextWrapping="Wrap"
+                   Visibility="{Binding ShowHiddenServersNote, Converter={StaticResource BooleanToVisibilityConverter}}" />
+    </Grid>
+</Page>

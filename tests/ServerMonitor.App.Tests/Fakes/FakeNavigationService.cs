@@ -44,4 +44,12 @@ internal sealed class FakeNavigationService : INavigationService
     public void GoToHistory(Guid serverId, string serverName) => LastHistoryServerId = serverId;
 
     public void GoToWorkloads(Guid serverId, string serverName) => LastWorkloadsServerId = serverId;
+
+    public int ServersCount { get; private set; }
+
+    public void GoToServers() => ServersCount++;
+
+    public List<(Guid ServerId, ServerDetailOrigin Origin)> ServerDetailRequests { get; } = [];
+
+    public void GoToServerDetail(Guid serverId, ServerDetailOrigin origin) => ServerDetailRequests.Add((serverId, origin));
 }

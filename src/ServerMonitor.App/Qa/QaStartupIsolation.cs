@@ -42,7 +42,8 @@ internal static partial class QaStartupIsolation
         QaHistoryComposition.LaunchFlag,
         QaWorkloadsComposition.LaunchFlag,
         QaStoreScreenshotComposition.LaunchFlag,
-        QaProxyJumpPolicy.LaunchFlag
+        QaProxyJumpPolicy.LaunchFlag,
+        QaOverviewComposition.LaunchFlag
     ];
 
     /// <summary>The modifiers a harness may carry, each as <c>flag value</c> or <c>flag=value</c>.</summary>
@@ -51,7 +52,8 @@ internal static partial class QaStartupIsolation
         QaSshConfigProfilePolicy.LaunchFlag,
         QaUiLanguagePolicy.LaunchFlag,
         QaBackupPolicy.LaunchFlag,
-        QaProxyJumpPolicy.DirectoryFlag
+        QaProxyJumpPolicy.DirectoryFlag,
+        QaOverviewScenarioPolicy.LaunchFlag
     ];
 
     /// <summary>

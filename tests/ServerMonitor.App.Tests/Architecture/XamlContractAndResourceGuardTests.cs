@@ -41,6 +41,8 @@ public sealed partial class XamlContractAndResourceGuardTests
             "DockerNoResultsText", "DockerNotInstalledState", "DockerPermissionState", "DockerUnavailableState", "DockerErrorState", "DockerEmptyState",
             "ServicesNoResultsText", "ServicesUnsupportedState", "ServicesUnavailableState", "ServicesErrorState", "ServicesEmptyState",
             "UnavailableState", "NothingState", "NoResultsState"],
+        // UI.4: "Limpar pesquisa" returns focus to the search box (code-behind FocusAfterAction).
+        ["Views/ServersPage.xaml"] = ["SearchBox"],
         ["Views/BackupCreateDialog.xaml"] = ["PassphraseBox", "ConfirmationBox"],
         ["Views/RestoreOpenDialog.xaml"] = ["PassphraseBox"],
         ["Views/AddServerDialog.xaml"] = ["ServerForm"],

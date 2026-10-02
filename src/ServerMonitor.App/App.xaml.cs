@@ -628,6 +628,10 @@ public partial class App : Application
         // that records what was ACTUALLY registered.
         services.AddSingleton<IFeatureCatalog>(FeatureCatalog.Empty);
 
+        // UI.4 D-UI4-PRIORITY: ONE MonitoringOptions for the engine and the overview, so the priority problem uses
+        // exactly the engine's thresholds (no second copy of the rule). Same values as the previous options: null.
+        services.AddSingleton(MonitoringOptions.Default);
+
         // Automatic monitoring. One instance backs the IMonitoringEngine facade and
         // the hosted-service lifecycle, so the app starts/stops a single engine.
         // The Debug-only QA harnesses (--qa-health, --qa-discovery) replace the data plane
@@ -641,6 +645,7 @@ public partial class App : Application
         var qaWorkloads = Qa.QaWorkloadsComposition.IsRequested();
         var qaScreenshot = Qa.QaStoreScreenshotComposition.IsRequested();
         var qaProxyJump = Qa.QaProxyJumpComposition.IsRequested();
+        var qaOverview = Qa.QaOverviewComposition.IsRequested();
         var qaMode = Qa.QaStartupIsolation.IsHarnessLaunch();
         if (qaMode)
         {
@@ -696,7 +701,9 @@ public partial class App : Application
                 sp.GetRequiredService<IServerMonitoringStateStore>(),
                 sp.GetRequiredService<ILogger<MonitoringEngine>>(),
                 timeProvider: null,
-                options: null,
+                // The one MonitoringOptions instance (registered above): the overview's priority rule reads the very
+                // thresholds the engine derives health from (D-UI4-PRIORITY).
+                options: sp.GetRequiredService<MonitoringOptions>(),
                 cycleObserver: sp.GetRequiredService<IMonitoringCycleObserver>()));
             services.AddSingleton<IMonitoringEngine>(sp => sp.GetRequiredService<MonitoringEngine>());
         }
@@ -724,6 +731,11 @@ public partial class App : Application
         else if (qaScreenshot)
         {
             Qa.QaStoreScreenshotComposition.Apply(services);
+        }
+        else if (qaOverview)
+        {
+            // UI.4 Visão geral / Servidores; throws for an unknown --qa-overview-scenario (refused, never another one).
+            Qa.QaOverviewComposition.Apply(services);
         }
         else if (qaProxyJump)
         {
@@ -781,6 +793,12 @@ public partial class App : Application
         services.AddSingleton<SettingsViewModel>();
         services.AddSingleton<DashboardPage>();
         services.AddSingleton<SettingsPage>();
+        // UI.4: the Servidores directory and the interim server page (D-UI4-DETAIL) are per-visit views over the
+        // singleton dashboard's cards: fresh page/VM each navigation, disposed on Unloaded.
+        services.AddTransient<ServersViewModel>();
+        services.AddTransient<ServersPage>();
+        services.AddTransient<ServerDetailViewModel>();
+        services.AddTransient<ServerDetailPage>();
         // History is opened per-server, so a fresh page/VM each navigation (disposed on Unloaded).
         services.AddTransient<HistoryViewModel>();
         services.AddTransient<HistoryPage>();

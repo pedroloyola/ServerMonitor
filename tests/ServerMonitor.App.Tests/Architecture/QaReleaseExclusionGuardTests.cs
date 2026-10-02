@@ -81,6 +81,27 @@ public sealed partial class QaReleaseExclusionGuardTests
 #endif
     }
 
+    /// <summary>UI.4 §6: the Visão geral / Servidores harness ships only in Debug; its modifier is inert in Release.</summary>
+    [Theory]
+    [InlineData("ServerMonitor.App.Qa.QaOverviewComposition")]
+    [InlineData("ServerMonitor.App.Qa.QaOverviewCatalog")]
+    [InlineData("ServerMonitor.App.Qa.QaOverviewServerService")]
+    [InlineData("ServerMonitor.App.Qa.QaFixedTimeProvider")]
+    public void TheUi4OverviewHarness_ShipsOnlyInDebug(string typeName)
+    {
+        var type = typeof(App).Assembly.GetType(typeName, throwOnError: false);
+#if DEBUG
+        Assert.NotNull(type);
+#else
+        Assert.Null(type);
+#endif
+    }
+
+    [Fact]
+    public void TheUi4ScenarioModifier_IsIgnoredOutsideDebug() =>
+        Assert.Null(ServerMonitor.App.Services.QaOverviewScenarioPolicy.ResolveScenario(
+            ["ServerMonitor.App.exe", "--qa-overview", "--qa-overview-scenario", "mixed"], isDebugBuild: false));
+
     [GeneratedRegex(@"\bQa\.[A-Z]")]
     private static partial Regex QaReference();
 }

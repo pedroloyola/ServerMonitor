@@ -25,4 +25,13 @@ public interface INavigationService
     void GoToHistory(Guid serverId, string serverName);
 
     void GoToWorkloads(Guid serverId, string serverName);
+
+    /// <summary>UI.4 D-UI4-NAV: the Servidores directory (temporary entry "Ver todos" until UI.6).</summary>
+    void GoToServers();
+
+    /// <summary>
+    /// UI.4 D-UI4-DETAIL: the interim page hosting the current <c>ServerFullCard</c> of one server, with a breadcrumb back
+    /// to <paramref name="origin"/>. Replaced in UI.5.
+    /// </summary>
+    void GoToServerDetail(Guid serverId, ServerDetailOrigin origin);
 }
