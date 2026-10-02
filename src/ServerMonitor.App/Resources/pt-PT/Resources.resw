@@ -36,7 +36,7 @@
   <data name="SettingsAboutLicense.Text" xml:space="preserve"><value>Código aberto · Licença MIT</value></data>
   <data name="SettingsAboutGitHub.Content" xml:space="preserve"><value>Ver no GitHub</value></data>
   <data name="ServerOperationError.Title" xml:space="preserve"><value>Não foi possível concluir a operação</value></data>
-  <data name="ServerOperationError.Message" xml:space="preserve"><value>Tente novamente. Os dados existentes permanecem seguros.</value></data>
+  <data name="ServerOperationError.Message" xml:space="preserve"><value>Tenta novamente. Os dados existentes permanecem seguros.</value></data>
   <data name="ServerCardEditMenuItem.Text" xml:space="preserve"><value>Editar</value></data>
   <data name="ServerCardHideMenuItem.Text" xml:space="preserve"><value>Ocultar</value></data>
   <data name="ServerCardRemoveMenuItem.Text" xml:space="preserve"><value>Remover</value></data>
