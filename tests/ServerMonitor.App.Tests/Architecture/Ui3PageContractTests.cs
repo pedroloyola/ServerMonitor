@@ -157,6 +157,34 @@ public sealed partial class Ui3PageContractTests
     }
 
     [Fact]
+    public void PrismR2_ColumnHeadersSitAtTheTop_AndStackedSectionStatesGetRoomUnderTheTitle()
+    {
+        // R2-2: 112:2647/112:2648 put the header text at y 0 of the h28 band.
+        var headers = Elements(Workloads).Where(e => Attr(e, "Style") == "{StaticResource SaTableHeaderTextStyle}").ToList();
+        Assert.Equal(4, headers.Count);
+        Assert.All(headers, h => Assert.Equal("Top", Attr(h, "VerticalAlignment")));
+
+        // R2-3: every section state (5 Docker + 4 services + 2 section no-results) gets 16 above / 8 below ONLY when stacked.
+        var sectionStates = Elements(Workloads)
+            .Where(e => Uid(e) is { } uid && uid.StartsWith("Workload", StringComparison.Ordinal)
+                        && (uid.StartsWith("WorkloadDocker", StringComparison.Ordinal) || uid.StartsWith("WorkloadServices", StringComparison.Ordinal))
+                        && (uid.EndsWith("State", StringComparison.Ordinal) || uid.EndsWith("NoResults", StringComparison.Ordinal)))
+            .Select(e => (string?)e.Attribute(AppSourceTree.Xaml + "Name"))
+            .ToList();
+        Assert.Equal(11, sectionStates.Count);
+        Assert.DoesNotContain(null, sectionStates);
+        var states = Elements(Workloads).Where(e => e.Name.LocalName == "VisualState").ToDictionary(s => (string)s.Attribute(AppSourceTree.Xaml + "Name")!);
+        foreach (var state in new[] { "Medium", "Narrow" })
+        {
+            var setters = states[state].Descendants().Where(e => e.Name.LocalName == "Setter")
+                .ToDictionary(s => (string)s.Attribute("Target")!, s => (string)s.Attribute("Value")!);
+            Assert.All(sectionStates, name => Assert.Equal("0,16,0,8", setters[$"{name}.Margin"]));
+        }
+
+        Assert.All(sectionStates, name => Assert.Null(Attr(Elements(Workloads).Single(e => (string?)e.Attribute(AppSourceTree.Xaml + "Name") == name), "Margin")));
+    }
+
+    [Fact]
     public void Workloads_SearchAndFilter_AreGlobal_Accessible_AndOneKeyboardGroup()
     {
         var search = Assert.Single(Elements(Workloads), e => Uid(e) == "WorkloadSearchAll");

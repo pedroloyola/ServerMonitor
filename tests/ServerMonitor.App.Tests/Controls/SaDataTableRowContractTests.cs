@@ -43,7 +43,22 @@ public sealed class SaDataTableRowContractTests
         Assert.Equal("True", setters["IsTabStop"]);
         Assert.Equal("True", setters["UseSystemFocusVisuals"]);
         Assert.Equal("64", setters["MinHeight"]);
+        // Prism R2-1: the ring goes OUT 8 horizontally (never over the dot or the last glyph) and IN 2 vertically.
+        Assert.Equal("-8,2,-8,2", setters["FocusVisualMargin"]);
+        Assert.Equal("{ThemeResource SaFocusRingBrush}", setters["FocusVisualPrimaryBrush"]);
         Assert.DoesNotContain(style.Descendants(), e => e.Name.LocalName == "VisualState");   // no hover/pressed: not a button
+    }
+
+    [Fact]
+    public void FocusedRow_IsBroughtIntoView_ForKeyboardAndProgrammaticFocus()
+    {
+        // Prism R2 / Cortex M-3: in the stacked layouts a row focused off-screen (UIA SetFocus or Tab/arrows) must scroll
+        // the page to it. WinUI does not do that for programmatic focus, so the row asks on every GotFocus.
+        var gotFocus = typeof(SaDataTableRow).GetMethod("OnGotFocus", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.Equal(typeof(SaDataTableRow), gotFocus!.DeclaringType);
+        var code = AppSourceTree.CodeWithoutComments("Controls/Primitives/SaDataTableRow.cs");
+        var body = code[code.IndexOf("OnGotFocus", StringComparison.Ordinal)..];
+        Assert.Contains("StartBringIntoView(", body[..body.IndexOf('}')], StringComparison.Ordinal);
     }
 
     [Fact]

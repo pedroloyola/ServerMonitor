@@ -189,8 +189,9 @@
         <Setter Property="FocusVisualPrimaryBrush" Value="{ThemeResource SaFocusRingBrush}" />
         <Setter Property="FocusVisualPrimaryThickness" Value="{StaticResource SaFocusRingThickness}" />
         <Setter Property="FocusVisualSecondaryThickness" Value="0" />
-        <!-- Prism R1 (M-2 visual): ring = SaFocusRingBrush 2 px, control radius 12, inset 2 (DERIVED, Figma has no focus). -->
-        <Setter Property="FocusVisualMargin" Value="2" />
+        <!-- Prism R2-1: ring = SaFocusRingBrush 2 px, control radius 12; OUTSET 8 horizontally (the dot and the last glyph
+             touch the row edges and must stay clear; card pad 24 leaves 16), inset 2 vertically (rows are 64 apart). -->
+        <Setter Property="FocusVisualMargin" Value="-8,2,-8,2" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="primitives:SaDataTableRow">

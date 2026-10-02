@@ -21,6 +21,17 @@ public sealed class SaDataTableRow : ContentControl
     }
 
     protected override AutomationPeer OnCreateAutomationPeer() => new SaDataTableRowAutomationPeer(this);
+
+    /// <summary>
+    /// A focused row is always brought into view - by keyboard (Tab/arrows) AND by programmatic/UIA focus, which WinUI does
+    /// not scroll to on its own. In the stacked layouts the request bubbles through the disabled card ScrollViewer to the
+    /// page ScrollViewer (Cortex M-3 / Prism R2).
+    /// </summary>
+    protected override void OnGotFocus(RoutedEventArgs e)
+    {
+        base.OnGotFocus(e);
+        StartBringIntoView();
+    }
 }
 
 /// <summary>A ListItem with no control patterns: rows are read and walked, never invoked.</summary>

@@ -28,7 +28,7 @@
                         VerticalAlignment="Center"
                         Status="{x:Bind Severity, Converter={StaticResource WorkloadSeverityToStatusKindConverter}}"
                         Label="{x:Bind StateText}" />
-                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4">
+                    <StackPanel Grid.Column="1" Height="40" VerticalAlignment="Center" Spacing="4">
                         <TextBlock AutomationProperties.AccessibilityView="Raw" Style="{StaticResource SaControlTextStyle}" Foreground="{ThemeResource SaTextBrush}"
                                    Text="{x:Bind Name}" TextTrimming="CharacterEllipsis" MaxLines="1" />
                         <TextBlock AutomationProperties.AccessibilityView="Raw" Style="{StaticResource SaWorkloadDetailTextStyle}"
@@ -60,7 +60,7 @@
                         VerticalAlignment="Center"
                         Status="{x:Bind Severity, Converter={StaticResource WorkloadSeverityToStatusKindConverter}}"
                         Label="{x:Bind StateDisplay}" />
-                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4">
+                    <StackPanel Grid.Column="1" Height="40" VerticalAlignment="Center" Spacing="4">
                         <TextBlock AutomationProperties.AccessibilityView="Raw" Style="{StaticResource SaControlTextStyle}" Foreground="{ThemeResource SaTextBrush}"
                                    Text="{x:Bind Name}" TextTrimming="CharacterEllipsis" MaxLines="1" />
                         <TextBlock AutomationProperties.AccessibilityView="Raw" Style="{StaticResource SaWorkloadDetailTextStyle}"
@@ -114,6 +114,18 @@
                         <Setter Target="CardsRow2.Height" Value="Auto" />
                         <Setter Target="CardsGrid.ColumnSpacing" Value="0" />
                         <Setter Target="CardsGrid.RowSpacing" Value="{StaticResource SaSpace24}" />
+                        <!-- Prism R2-3: stacked (Auto) cards give a section state no height to centre in. -->
+                        <Setter Target="DockerNoResultsText.Margin" Value="0,16,0,8" />
+                        <Setter Target="DockerNotInstalledState.Margin" Value="0,16,0,8" />
+                        <Setter Target="DockerPermissionState.Margin" Value="0,16,0,8" />
+                        <Setter Target="DockerUnavailableState.Margin" Value="0,16,0,8" />
+                        <Setter Target="DockerErrorState.Margin" Value="0,16,0,8" />
+                        <Setter Target="DockerEmptyState.Margin" Value="0,16,0,8" />
+                        <Setter Target="ServicesNoResultsText.Margin" Value="0,16,0,8" />
+                        <Setter Target="ServicesUnsupportedState.Margin" Value="0,16,0,8" />
+                        <Setter Target="ServicesUnavailableState.Margin" Value="0,16,0,8" />
+                        <Setter Target="ServicesErrorState.Margin" Value="0,16,0,8" />
+                        <Setter Target="ServicesEmptyState.Margin" Value="0,16,0,8" />
                     </VisualState.Setters>
                 </VisualState>
                 <VisualState x:Name="Narrow">
@@ -141,6 +153,18 @@
                         <Setter Target="CardsRow2.Height" Value="Auto" />
                         <Setter Target="CardsGrid.ColumnSpacing" Value="0" />
                         <Setter Target="CardsGrid.RowSpacing" Value="{StaticResource SaSpace24}" />
+                        <!-- Prism R2-3: stacked (Auto) cards give a section state no height to centre in. -->
+                        <Setter Target="DockerNoResultsText.Margin" Value="0,16,0,8" />
+                        <Setter Target="DockerNotInstalledState.Margin" Value="0,16,0,8" />
+                        <Setter Target="DockerPermissionState.Margin" Value="0,16,0,8" />
+                        <Setter Target="DockerUnavailableState.Margin" Value="0,16,0,8" />
+                        <Setter Target="DockerErrorState.Margin" Value="0,16,0,8" />
+                        <Setter Target="DockerEmptyState.Margin" Value="0,16,0,8" />
+                        <Setter Target="ServicesNoResultsText.Margin" Value="0,16,0,8" />
+                        <Setter Target="ServicesUnsupportedState.Margin" Value="0,16,0,8" />
+                        <Setter Target="ServicesUnavailableState.Margin" Value="0,16,0,8" />
+                        <Setter Target="ServicesErrorState.Margin" Value="0,16,0,8" />
+                        <Setter Target="ServicesEmptyState.Margin" Value="0,16,0,8" />
                     </VisualState.Setters>
                 </VisualState>
             </VisualStateGroup>
@@ -348,8 +372,8 @@
                                 Visibility="{Binding ShowDockerContainers, Converter={StaticResource BooleanToVisibilityConverter}}">
                             <Grid ColumnSpacing="10">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="6" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                                <TextBlock x:Uid="WorkloadContainerColumnName" Grid.ColumnSpan="2" Style="{StaticResource SaTableHeaderTextStyle}" VerticalAlignment="Center" />
-                                <TextBlock x:Uid="WorkloadContainerColumnState" Grid.Column="2" Style="{StaticResource SaTableHeaderTextStyle}" VerticalAlignment="Center" HorizontalAlignment="Right" />
+                                <TextBlock x:Uid="WorkloadContainerColumnName" Grid.ColumnSpan="2" Style="{StaticResource SaTableHeaderTextStyle}" VerticalAlignment="Top" />
+                                <TextBlock x:Uid="WorkloadContainerColumnState" Grid.Column="2" Style="{StaticResource SaTableHeaderTextStyle}" VerticalAlignment="Top" HorizontalAlignment="Right" />
                             </Grid>
                         </Border>
                         <Grid Grid.Row="3">
@@ -360,19 +384,19 @@
                                                    ItemsSource="{Binding Containers}" ItemTemplate="{StaticResource ContainerRowTemplate}" />
                                 </primitives:SaDataTableList>
                             </ScrollViewer>
-                            <TextBlock x:Uid="WorkloadDockerNoResults" HorizontalAlignment="Center" VerticalAlignment="Center"
+                            <TextBlock x:Name="DockerNoResultsText" x:Uid="WorkloadDockerNoResults" HorizontalAlignment="Center" VerticalAlignment="Center"
                                        Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}"
                                        Visibility="{Binding ShowDockerSectionNoResults, Converter={StaticResource BooleanToVisibilityConverter}}" />
                             <!-- Independent section states (§38): compact empty state inside the card. -->
-                            <primitives:SaEmptyState x:Uid="WorkloadDockerNotInstalledState" VerticalAlignment="Center" IconData="{StaticResource SaIconServerStack01Data}"
+                            <primitives:SaEmptyState x:Name="DockerNotInstalledState" x:Uid="WorkloadDockerNotInstalledState" VerticalAlignment="Center" IconData="{StaticResource SaIconServerStack01Data}"
                                                      Visibility="{Binding ShowDockerNotInstalled, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                            <primitives:SaEmptyState x:Uid="WorkloadDockerPermissionState" VerticalAlignment="Center" IconData="{StaticResource SaIconLockPasswordData}"
+                            <primitives:SaEmptyState x:Name="DockerPermissionState" x:Uid="WorkloadDockerPermissionState" VerticalAlignment="Center" IconData="{StaticResource SaIconLockPasswordData}"
                                                      Visibility="{Binding ShowDockerPermissionDenied, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                            <primitives:SaEmptyState x:Uid="WorkloadDockerUnavailableState" VerticalAlignment="Center" IconData="{StaticResource SaIconAlert02Data}"
+                            <primitives:SaEmptyState x:Name="DockerUnavailableState" x:Uid="WorkloadDockerUnavailableState" VerticalAlignment="Center" IconData="{StaticResource SaIconAlert02Data}"
                                                      Visibility="{Binding ShowDockerUnavailable, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                            <primitives:SaEmptyState x:Uid="WorkloadDockerErrorState" VerticalAlignment="Center" IconData="{StaticResource SaIconAlert02Data}"
+                            <primitives:SaEmptyState x:Name="DockerErrorState" x:Uid="WorkloadDockerErrorState" VerticalAlignment="Center" IconData="{StaticResource SaIconAlert02Data}"
                                                      Visibility="{Binding ShowDockerError, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                            <primitives:SaEmptyState x:Uid="WorkloadDockerEmptyState" VerticalAlignment="Center" IconData="{StaticResource SaIconServerStack01Data}"
+                            <primitives:SaEmptyState x:Name="DockerEmptyState" x:Uid="WorkloadDockerEmptyState" VerticalAlignment="Center" IconData="{StaticResource SaIconServerStack01Data}"
                                                      Visibility="{Binding ShowDockerEmpty, Converter={StaticResource BooleanToVisibilityConverter}}" />
                         </Grid>
                         <primitives:SaInlineNotice Grid.Row="4" Margin="0,12,0,0" x:Uid="WorkloadTruncatedDocker" Severity="Info"
@@ -404,8 +428,8 @@
                                 Visibility="{Binding ShowServicesList, Converter={StaticResource BooleanToVisibilityConverter}}">
                             <Grid ColumnSpacing="10">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="6" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                                <TextBlock x:Uid="WorkloadServiceColumnName" Grid.ColumnSpan="2" Style="{StaticResource SaTableHeaderTextStyle}" VerticalAlignment="Center" />
-                                <TextBlock x:Uid="WorkloadServiceColumnState" Grid.Column="2" Style="{StaticResource SaTableHeaderTextStyle}" VerticalAlignment="Center" HorizontalAlignment="Right" />
+                                <TextBlock x:Uid="WorkloadServiceColumnName" Grid.ColumnSpan="2" Style="{StaticResource SaTableHeaderTextStyle}" VerticalAlignment="Top" />
+                                <TextBlock x:Uid="WorkloadServiceColumnState" Grid.Column="2" Style="{StaticResource SaTableHeaderTextStyle}" VerticalAlignment="Top" HorizontalAlignment="Right" />
                             </Grid>
                         </Border>
                         <Grid Grid.Row="3">
@@ -416,16 +440,16 @@
                                                    ItemsSource="{Binding Services}" ItemTemplate="{StaticResource ServiceRowTemplate}" />
                                 </primitives:SaDataTableList>
                             </ScrollViewer>
-                            <TextBlock x:Uid="WorkloadServicesNoResults" HorizontalAlignment="Center" VerticalAlignment="Center"
+                            <TextBlock x:Name="ServicesNoResultsText" x:Uid="WorkloadServicesNoResults" HorizontalAlignment="Center" VerticalAlignment="Center"
                                        Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}"
                                        Visibility="{Binding ShowServicesSectionNoResults, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                            <primitives:SaEmptyState x:Uid="WorkloadServicesUnsupportedState" VerticalAlignment="Center" IconData="{StaticResource SaIconServerStack01Data}"
+                            <primitives:SaEmptyState x:Name="ServicesUnsupportedState" x:Uid="WorkloadServicesUnsupportedState" VerticalAlignment="Center" IconData="{StaticResource SaIconServerStack01Data}"
                                                      Visibility="{Binding ShowServicesUnsupported, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                            <primitives:SaEmptyState x:Uid="WorkloadServicesUnavailableState" VerticalAlignment="Center" IconData="{StaticResource SaIconAlert02Data}"
+                            <primitives:SaEmptyState x:Name="ServicesUnavailableState" x:Uid="WorkloadServicesUnavailableState" VerticalAlignment="Center" IconData="{StaticResource SaIconAlert02Data}"
                                                      Visibility="{Binding ShowServicesUnavailable, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                            <primitives:SaEmptyState x:Uid="WorkloadServicesErrorState" VerticalAlignment="Center" IconData="{StaticResource SaIconAlert02Data}"
+                            <primitives:SaEmptyState x:Name="ServicesErrorState" x:Uid="WorkloadServicesErrorState" VerticalAlignment="Center" IconData="{StaticResource SaIconAlert02Data}"
                                                      Visibility="{Binding ShowServicesError, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                            <primitives:SaEmptyState x:Uid="WorkloadServicesEmptyState" VerticalAlignment="Center" IconData="{StaticResource SaIconServerStack01Data}"
+                            <primitives:SaEmptyState x:Name="ServicesEmptyState" x:Uid="WorkloadServicesEmptyState" VerticalAlignment="Center" IconData="{StaticResource SaIconServerStack01Data}"
                                                      Visibility="{Binding ShowServicesEmpty, Converter={StaticResource BooleanToVisibilityConverter}}" />
                         </Grid>
                         <primitives:SaInlineNotice Grid.Row="4" Margin="0,12,0,0" x:Uid="WorkloadTruncatedServices" Severity="Info"
