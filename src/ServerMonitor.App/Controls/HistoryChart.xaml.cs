@@ -13,8 +13,8 @@ namespace ServerMonitor.App.Controls;
 
 /// <summary>
 /// A minimal, glass-friendly line chart for one 0–100% metric over time (ADR-015 §10). It renders an
-/// already-downsampled <see cref="HistorySeries"/> — never SQL, never raw samples — as polylines in the metric colour
-/// (D-UI3-1) over a vertical gradient area, with three dashed grid lines (100/50/0), an end marker on the last point
+/// already-downsampled <see cref="HistorySeries"/> — never SQL, never raw samples — as polylines in the neutral chart line colour
+/// (D-UI3-1, SaChartLineBrush) over a vertical gradient area, with three dashed grid lines (100/50/0), an end marker on the last point
 /// and the axes laid out OUTSIDE the plot canvases (UI.3, Figma 112:2298). Gaps (null values, offline periods,
 /// app-closed windows) break the line; nothing is interpolated across them (spec §38/§91). The fixed 0–100 scale keeps
 /// the charts comparable (spec §45). Purely presentational: no view-model knowledge, no domain logic.
@@ -89,7 +89,7 @@ public sealed partial class HistoryChart : UserControl
         set => SetValue(RangeEndProperty, value);
     }
 
-    /// <summary>Line, area and marker colour (the metric colour). A solid colour also derives the area gradient.</summary>
+    /// <summary>Line, area and marker colour (History: the neutral SaChartLineBrush). A solid colour also derives the area gradient.</summary>
     public Brush? LineBrush
     {
         get => (Brush?)GetValue(LineBrushProperty);

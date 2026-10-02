@@ -247,7 +247,7 @@
                                     XTicksCompact="{Binding XAxisTicksCompact}"
                                     YLabels="{Binding YAxisLabels}"
                                     LineThickness="{StaticResource SaChartLineThickness}"
-                                    LineBrush="{ThemeResource SaCpuBrush}"
+                                    LineBrush="{ThemeResource SaChartLineBrush}"
                                     GridLineBrush="{ThemeResource SaTextBrush}" />
                             </Grid>
                         </Border>
@@ -288,7 +288,7 @@
                                     XTicksCompact="{Binding XAxisTicksCompact}"
                                     YLabels="{Binding YAxisLabels}"
                                     LineThickness="{StaticResource SaChartLineThickness}"
-                                    LineBrush="{ThemeResource SaMemoryBrush}"
+                                    LineBrush="{ThemeResource SaChartLineBrush}"
                                     GridLineBrush="{ThemeResource SaTextBrush}" />
                             </Grid>
                         </Border>
@@ -329,7 +329,7 @@
                                     XTicksCompact="{Binding XAxisTicksCompact}"
                                     YLabels="{Binding YAxisLabels}"
                                     LineThickness="{StaticResource SaChartLineThickness}"
-                                    LineBrush="{ThemeResource SaDiskBrush}"
+                                    LineBrush="{ThemeResource SaChartLineBrush}"
                                     GridLineBrush="{ThemeResource SaTextBrush}" />
                             </Grid>
                         </Border>

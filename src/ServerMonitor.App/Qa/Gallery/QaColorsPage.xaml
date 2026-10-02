@@ -50,6 +50,11 @@
             </Grid>
             <Grid ColumnSpacing="16">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="SaChartLineBrush" VerticalAlignment="Center" />
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="{StaticResource SaSpace12}"><Border Width="120" Height="28" CornerRadius="{StaticResource SaRadiusSmall}" BorderThickness="1" BorderBrush="{ThemeResource SaBorderNeutralBrush}" Background="{ThemeResource SaChartLineBrush}" /><TextBlock Style="{StaticResource SaBodyTextStyle}" Foreground="{ThemeResource SaChartLineBrush}" Text="Aa texto" VerticalAlignment="Center" /></StackPanel>
+            </Grid>
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                 <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="SaAttentionBrush" VerticalAlignment="Center" />
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="{StaticResource SaSpace12}"><Border Width="120" Height="28" CornerRadius="{StaticResource SaRadiusSmall}" BorderThickness="1" BorderBrush="{ThemeResource SaBorderNeutralBrush}" Background="{ThemeResource SaAttentionBrush}" /><TextBlock Style="{StaticResource SaBodyTextStyle}" Foreground="{ThemeResource SaAttentionBrush}" Text="Aa texto" VerticalAlignment="Center" /></StackPanel>
             </Grid>

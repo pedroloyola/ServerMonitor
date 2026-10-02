@@ -38,7 +38,7 @@ public sealed partial class Ui3PageContractTests
     [InlineData("CpuChart", "Cpu", "SaCpuBrush")]
     [InlineData("MemoryChart", "Memory", "SaMemoryBrush")]
     [InlineData("DiskChart", "Disk", "SaDiskBrush")]
-    public void History_ChartsAreNamedByTheirTextSummary_AndDrawnInTheMetricColour(string name, string metric, string brush)
+    public void History_ChartsAreNamedByTheirTextSummary_AndDrawnInTheNeutralLine(string name, string metric, string metricBrush)
     {
         var chart = Assert.Single(Elements(History), e => e.Name.LocalName == "HistoryChart" && (string?)e.Attribute(AppSourceTree.Xaml + "Name") == name);
 
@@ -50,11 +50,49 @@ public sealed partial class Ui3PageContractTests
         Assert.Equal("Raw", Attr(chart, "AutomationProperties.AccessibilityView"));
         Assert.Null(Attr(chart, "AutomationProperties.Name"));
         Assert.Equal($"{{Binding {metric}Series}}", Attr(chart, "Series"));
-        Assert.Equal($"{{ThemeResource {brush}}}", Attr(chart, "LineBrush"));             // D-UI3-1
+        // D-UI3-1 (human decision, 05 Free 112:2299 / 112:2476): neutral line, never the metric colour; the visible
+        // "CPU/Memória/Disco" title names the series. Area gradient and end marker derive from LineBrush.
+        Assert.Equal("{ThemeResource SaChartLineBrush}", Attr(chart, "LineBrush"));
+        Assert.NotEqual($"{{ThemeResource {metricBrush}}}", Attr(chart, "LineBrush"));
         Assert.Equal("{StaticResource SaChartLineThickness}", Attr(chart, "LineThickness"));
         Assert.Equal("{Binding XAxisTicks}", Attr(chart, "XTicks"));                   // D-UI3-4 (round marks, real X)
         Assert.Equal("{Binding XAxisTicksCompact}", Attr(chart, "XTicksCompact"));
         Assert.Equal("{Binding YAxisLabels}", Attr(chart, "YLabels"));
+    }
+
+    [Fact]
+    public void History_NoChartUsesAMetricColour()
+    {
+        var brushes = Elements(History).Where(e => e.Name.LocalName == "HistoryChart").Select(c => Attr(c, "LineBrush")).ToList();
+        Assert.Equal(3, brushes.Count);
+        Assert.All(brushes, b => Assert.Equal("{ThemeResource SaChartLineBrush}", b));
+    }
+
+    [Theory]
+    [InlineData("Dark", "{StaticResource SaColorChartLineDark}")]
+    [InlineData("Light", "{StaticResource SaColorChartLineLight}")]
+    [InlineData("HighContrast", "{ThemeResource SystemColorWindowTextColor}")]
+    public void ChartLineToken_HasTheFigmaValueInEveryTheme_AndTheMetricColoursAreUntouched(string theme, string expected)
+    {
+        var semantic = AppSourceTree.LoadXaml("Styles/Tokens/Color.Semantic.xaml").Descendants()
+            .Single(e => e.Name.LocalName == "ResourceDictionary" && (string?)e.Attribute(AppSourceTree.Xaml + "Key") == theme)
+            .Elements().ToDictionary(e => (string)e.Attribute(AppSourceTree.Xaml + "Key")!, e => Attr(e, "Color"), StringComparer.Ordinal);
+        Assert.Equal(expected, semantic["SaChartLineBrush"]);
+
+        var colours = AppSourceTree.LoadXaml("Styles/Tokens/Color.Primitives.xaml").Root!.Elements()
+            .Where(e => e.Name.LocalName == "Color").ToDictionary(e => (string)e.Attribute(AppSourceTree.Xaml + "Key")!, e => e.Value.Trim(), StringComparer.Ordinal);
+        Assert.Equal("#D2D6D4", colours["SaColorChartLineDark"]);
+        Assert.Equal("#565C59", colours["SaColorChartLineLight"]);
+
+        // The metric brushes keep their Manual values and stay available for the design system / other contexts.
+        foreach (var metric in new[] { "Cpu", "Memory", "Disk" })
+        {
+            Assert.Equal(theme == "HighContrast" ? "{ThemeResource SystemColorWindowTextColor}" : $"{{StaticResource SaColor{metric}{theme}}}", semantic[$"Sa{metric}Brush"]);
+        }
+
+        Assert.Equal(("#B69AF8", "#8668CA"), (colours["SaColorCpuDark"], colours["SaColorCpuLight"]));
+        Assert.Equal(("#7DB8FF", "#427EC5"), (colours["SaColorMemoryDark"], colours["SaColorMemoryLight"]));
+        Assert.Equal(("#FFC16E", "#B87B2F"), (colours["SaColorDiskDark"], colours["SaColorDiskLight"]));
     }
 
     [Fact]

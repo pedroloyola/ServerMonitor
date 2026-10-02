@@ -127,6 +127,8 @@ public static class QaTokenManifest
         new("SaColorDialogButtonFillLight", QaTokenKind.Color),
         new("SaColorDialogButtonBorderDark", QaTokenKind.Color),
         new("SaColorDialogButtonBorderLight", QaTokenKind.Color),
+        new("SaColorChartLineDark", QaTokenKind.Color),
+        new("SaColorChartLineLight", QaTokenKind.Color),
         // Styles/Tokens/Color.Semantic.xaml
         new("SaCanvasBrush", QaTokenKind.Brush),
         new("SaSurfaceBrush", QaTokenKind.Brush),
@@ -136,6 +138,7 @@ public static class QaTokenManifest
         new("SaCpuBrush", QaTokenKind.Brush),
         new("SaMemoryBrush", QaTokenKind.Brush),
         new("SaDiskBrush", QaTokenKind.Brush),
+        new("SaChartLineBrush", QaTokenKind.Brush),
         new("SaAttentionBrush", QaTokenKind.Brush),
         new("SaHealthyBrush", QaTokenKind.Brush),
         new("SaSuccessBrush", QaTokenKind.Brush),
