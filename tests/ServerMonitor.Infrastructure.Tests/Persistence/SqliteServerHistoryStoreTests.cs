@@ -8,6 +8,19 @@ namespace ServerMonitor.Infrastructure.Tests.Persistence;
 
 public sealed class SqliteServerHistoryStoreTests : IDisposable
 {
+    /// <summary>
+    /// Deadlock guard only: the concurrency tests below wait on signals they control (a reader opening, a gate
+    /// releasing), never on elapsed time, so a working store never reaches this bound however slow the runner.
+    /// </summary>
+    private static readonly TimeSpan DeadlockGuard = TimeSpan.FromSeconds(30);
+
+    /// <summary>
+    /// Runs a query on its own thread: the reader hooks below park the calling thread, and two parked thread-pool
+    /// threads on a busy runner can delay the next query (or the test's own continuation) by seconds.
+    /// </summary>
+    private static Task<T> RunOnDedicatedThread<T>(Func<Task<T>> query) =>
+        Task.Factory.StartNew(query, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default).Unwrap();
+
     private readonly string _dbPath;
     private readonly List<SqliteServerHistoryStore> _stores = [];
 
@@ -405,8 +418,6 @@ public sealed class SqliteServerHistoryStoreTests : IDisposable
     [Fact]
     public async Task QueryCancellation_AfterRealReaderOpened_SurfacesCancellation_AndReleasesTheReadGate()
     {
-        // Deadlock guard only: each wait is released by a signal this test controls, never by elapsed time.
-        var deadlockGuard = TimeSpan.FromSeconds(30);
         var readerOpened = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         using var releaseReader = new ManualResetEventSlim();
         var store = NewStore(queryReaderOpened: () =>
@@ -422,25 +433,21 @@ public sealed class SqliteServerHistoryStoreTests : IDisposable
         using var cancellation = new CancellationTokenSource();
         // A dedicated thread: the reader hook parks this thread, and the query must not wait for the thread pool to
         // even start on a busy runner.
-        var query = Task.Factory.StartNew(
-            () => store.QueryAsync(
-                serverId,
-                now - TimeSpan.FromHours(1),
-                now + TimeSpan.FromHours(1),
-                cancellation.Token),
-            CancellationToken.None,
-            TaskCreationOptions.LongRunning,
-            TaskScheduler.Default).Unwrap();
+        var query = RunOnDedicatedThread(() => store.QueryAsync(
+            serverId,
+            now - TimeSpan.FromHours(1),
+            now + TimeSpan.FromHours(1),
+            cancellation.Token));
 
-        await readerOpened.Task.WaitAsync(deadlockGuard); // the real reader is open, parked before its first read
+        await readerOpened.Task.WaitAsync(DeadlockGuard); // the real reader is open, parked before its first read
         cancellation.Cancel();
         releaseReader.Set();
 
         // Rows exist and the reader is open: anything but a cancellation means the token was not honoured.
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => query.WaitAsync(deadlockGuard));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => query.WaitAsync(DeadlockGuard));
 
         // The cancelled query left the read gate: a reset (which waits for all active queries) completes.
-        Assert.True(await store.ResetAsync().WaitAsync(deadlockGuard));
+        Assert.True(await store.ResetAsync().WaitAsync(DeadlockGuard));
     }
 
     [Fact]
@@ -464,17 +471,19 @@ public sealed class SqliteServerHistoryStoreTests : IDisposable
         var secondId = Guid.NewGuid();
         await store.WriteAsync([Sample(firstId, now), Sample(secondId, now)]);
 
-        var firstQuery = Task.Run(() => store.QueryAsync(firstId, now - TimeSpan.FromMinutes(1), now + TimeSpan.FromMinutes(1)));
-        var secondQuery = Task.Run(() => store.QueryAsync(secondId, now - TimeSpan.FromMinutes(1), now + TimeSpan.FromMinutes(1)));
-        await bothOpened.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        // Both queries park inside their open readers (dedicated threads, so neither waits on the pool to start). The
+        // reset then cannot complete until both leave the read gate: a deterministic "not yet", not a timing guess.
+        var firstQuery = RunOnDedicatedThread(() => store.QueryAsync(firstId, now - TimeSpan.FromMinutes(1), now + TimeSpan.FromMinutes(1)));
+        var secondQuery = RunOnDedicatedThread(() => store.QueryAsync(secondId, now - TimeSpan.FromMinutes(1), now + TimeSpan.FromMinutes(1)));
+        await bothOpened.Task.WaitAsync(DeadlockGuard);
 
         var reset = store.ResetAsync();
         Assert.False(reset.IsCompleted);
         releaseReaders.Set();
 
-        Assert.Single(await firstQuery);
-        Assert.Single(await secondQuery);
-        Assert.True(await reset.WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.Single(await firstQuery.WaitAsync(DeadlockGuard));
+        Assert.Single(await secondQuery.WaitAsync(DeadlockGuard));
+        Assert.True(await reset.WaitAsync(DeadlockGuard));
         Assert.True(store.IsAvailable);
     }
 
