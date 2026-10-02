@@ -23,9 +23,31 @@ public sealed class SaFocusableCard : ContentControl
     protected override void OnGotFocus(RoutedEventArgs e)
     {
         base.OnGotFocus(e);
+        if (!ScrollsOnFocus())
+        {
+            return;
+        }
+
         // Top-aligned: in a short window a card can be taller than the viewport, and its heading must stay visible
         // (a minimal scroll would show the bottom of the card and hide its title).
         StartBringIntoView(new BringIntoViewOptions { VerticalAlignmentRatio = 0 });
+    }
+
+    /// <summary>
+    /// The nearest ScrollViewer decides, as for any WinUI focus change: a host that opts out with
+    /// BringIntoViewOnFocusChange=False (e.g. the QA gallery pages, which force one focused sample per page) is not scrolled.
+    /// </summary>
+    private bool ScrollsOnFocus()
+    {
+        for (var current = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetParent(this); current is not null; current = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetParent(current))
+        {
+            if (current is ScrollViewer scrollViewer)
+            {
+                return scrollViewer.BringIntoViewOnFocusChange;
+            }
+        }
+
+        return true;
     }
 }
 

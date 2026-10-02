@@ -69,8 +69,8 @@ public sealed class SaDataTableRowContractTests
         Assert.Equal(typeof(SaFocusableCardAutomationPeer), typeof(SaFocusableCardAutomationPeer).GetMethod("GetPatternCore", BindingFlags.Instance | BindingFlags.NonPublic)!.DeclaringType);
         Assert.Equal(typeof(SaFocusableCard), typeof(SaFocusableCard).GetMethod("OnGotFocus", BindingFlags.Instance | BindingFlags.NonPublic)!.DeclaringType);
         var code = AppSourceTree.CodeWithoutComments("Controls/Primitives/SaFocusableCard.cs");
-        var body = code[code.IndexOf("OnGotFocus", StringComparison.Ordinal)..];
-        Assert.Contains("StartBringIntoView(", body[..body.IndexOf('}')], StringComparison.Ordinal);
+        var body = code[code.IndexOf("OnGotFocus", StringComparison.Ordinal)..code.IndexOf("private bool ScrollsOnFocus", StringComparison.Ordinal)];
+        Assert.Contains("StartBringIntoView(", body, StringComparison.Ordinal);
 
         var style = Assert.Single(AppSourceTree.LoadXaml("Styles/Components/Sa.Primitives.xaml").Descendants(),
             e => e.Name.LocalName == "Style" && (string?)e.Attribute("TargetType") == "primitives:SaFocusableCard");
@@ -81,6 +81,17 @@ public sealed class SaDataTableRowContractTests
         Assert.Equal("{ThemeResource SaFocusRingBrush}", setters["FocusVisualPrimaryBrush"]);
         Assert.Equal("{StaticResource SaFocusRingThickness}", setters["FocusVisualPrimaryThickness"]);
         Assert.DoesNotContain(style.Descendants(), e => e.Name.LocalName == "VisualState");
+        // a host ScrollViewer that opts out of focus scrolling (gallery pages) is respected
+        Assert.Contains("scrollViewer.BringIntoViewOnFocusChange", code, StringComparison.Ordinal);
+
+        // Prism R4-1: a labelled gallery sample, the forced-Focus sample of the Data page (ring in D / L / HC-sim).
+        var data = AppSourceTree.LoadXaml("Qa/Gallery/QaDataPage.xaml").Descendants().ToList();
+        var sample = Assert.Single(data, e => e.Name.LocalName == "SaFocusableCard");
+        Assert.Equal("Focus", sample.Attributes().Single(a => a.Name.LocalName == "QaForcedState.State").Value);
+        Assert.Equal("{StaticResource SaChartCardStyle}", (string?)sample.Elements().Single().Attribute("Style"));
+        Assert.False(string.IsNullOrWhiteSpace((string?)sample.Attribute("AutomationProperties.Name")));
+        Assert.Single(data, e => e.Attributes().Any(a => a.Name.LocalName == "QaForcedState.State" && a.Value == "Focus"));   // one focus per page
+        Assert.StartsWith("SaFocusableCard · UI.3", (string?)sample.Parent!.Elements().First().Attribute("Text"), StringComparison.Ordinal);
     }
 
     [Fact]
