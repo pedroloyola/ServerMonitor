@@ -53,7 +53,8 @@ public sealed class Ui4OverviewCycleMeasurementTests(ITestOutputHelper output)
         output.WriteLine($"500-server cycle: {stopwatch.Elapsed.TotalMilliseconds:0.0} ms, dashboard notifications {dashboardNotifications}, directory notifications {directoryNotifications}");
 
         // Nothing visible changed in this cycle: the overview must not re-announce its aggregates per server.
-        Assert.True(dashboardNotifications <= 20, $"dashboard raised {dashboardNotifications} notifications");
-        Assert.True(directoryNotifications <= 5, $"directory raised {directoryNotifications} notifications");
+        // (P3 counterproof: announcing every aggregate once per burst would still pass a loose budget - so it is exact.)
+        Assert.Equal(0, dashboardNotifications);
+        Assert.Equal(0, directoryNotifications);
     }
 }
