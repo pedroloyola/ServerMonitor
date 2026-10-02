@@ -17,8 +17,9 @@ namespace ServerMonitor.App.Tests.Services;
 /// </summary>
 public sealed class MonitoringEngineTests
 {
-    // A generous real-time safety net so a logic bug fails the test instead of hanging the run.
-    private static CancellationToken TestTimeout => new CancellationTokenSource(TimeSpan.FromSeconds(10)).Token;
+    // Deadlock guard only (the class-wide bound below): a logic bug fails the test instead of hanging the run. Nothing
+    // waits for it to elapse; every wait in this class is released by an engine event.
+    private static CancellationToken TestTimeout => new CancellationTokenSource(DeadlockGuard).Token;
 
     private static MonitoringOptions ManualDrive(IReadOnlyList<TimeSpan>? retryDelays = null) => new()
     {
@@ -155,7 +156,7 @@ public sealed class MonitoringEngineTests
         h.Service.RaiseChanged();
 
         // Reconcile runs on the change event; wait for the new monitor's initial state.
-        await WaitUntilAsync(() => h.State.GetAll().Any(s => s.ServerId == server.Id));
+        await WaitForStoreAsync(h.State, () => h.State.GetAll().Any(s => s.ServerId == server.Id));
 
         var result = await h.Engine.RefreshNowAsync(server.Id, TestTimeout);
         Assert.True(result.IsSuccess);
@@ -167,12 +168,12 @@ public sealed class MonitoringEngineTests
     {
         var server = TestData.LinuxServer();
         await using var h = await StartAsync(ManualDrive(), server);
-        await WaitUntilAsync(() => h.State.GetAll().Any(s => s.ServerId == server.Id));
+        await WaitForStoreAsync(h.State, () => h.State.GetAll().Any(s => s.ServerId == server.Id));
 
         h.Service.Servers.Clear();
         h.Service.RaiseChanged();
 
-        await WaitUntilAsync(() => h.State.GetAll().All(s => s.ServerId != server.Id));
+        await WaitForStoreAsync(h.State, () => h.State.GetAll().All(s => s.ServerId != server.Id));
     }
 
     [Fact]
@@ -234,17 +235,25 @@ public sealed class MonitoringEngineTests
         // are the manual ones. After each manual refresh the loop reparks a fresh interval, so
         // advancing the clock by less than one interval past a manual never produces an auto
         // cycle — even once the total elapsed time exceeds a single interval.
+        //
+        // Each advance is made only once the loop is parked on the interval timer that manual refresh armed
+        // (RefreshNowAsync returns when the collection completes, a moment BEFORE the loop re-arms its timer). An
+        // advance in that window would arm the timer after the advanced clock and the "no auto cycle" checks below
+        // would pass vacuously.
         var server = TestData.LinuxServer(refreshIntervalSeconds: 10);
+        var interval = TimeSpan.FromSeconds(10);
         await using var h = await StartAsync(ManualDrive(), server);
 
         await h.Engine.RefreshNowAsync(server.Id, TestTimeout);
         Assert.Equal(1, h.Store.CallCount);
+        await h.Time.TimerCreatedAsync(interval, occurrence: 1).WaitAsync(DeadlockGuard);
 
         h.Time.Advance(TimeSpan.FromSeconds(9)); // < interval since the manual refresh
         Assert.Equal(1, h.Store.CallCount);
 
         await h.Engine.RefreshNowAsync(server.Id, TestTimeout); // manual again resets the countdown
         Assert.Equal(2, h.Store.CallCount);
+        await h.Time.TimerCreatedAsync(interval, occurrence: 2).WaitAsync(DeadlockGuard);
 
         h.Time.Advance(TimeSpan.FromSeconds(9)); // total elapsed now 18 s > interval, but < interval since manual
         Assert.Equal(2, h.Store.CallCount); // no stray auto cycle: the manual reset the schedule
@@ -258,7 +267,7 @@ public sealed class MonitoringEngineTests
         service.Servers.Add(server);
         var store = new ScriptedMetricsStore();
         var state = new ServerMonitoringStateStore();
-        var time = new SignalingTimeProvider(TimeSpan.FromSeconds(10));
+        var time = new TimerRecordingTimeProvider();
         using var collecting = new SemaphoreSlim(0);
         using var release = new SemaphoreSlim(0);
         store.ResultFactory = (current, index) =>
@@ -281,7 +290,7 @@ public sealed class MonitoringEngineTests
         await using var engine = new MonitoringEngine(
             service, store, state, NullLogger<MonitoringEngine>.Instance, time, options);
         await engine.StartMonitoringAsync();
-        Assert.True(await collecting.WaitAsync(TimeSpan.FromSeconds(10)));
+        Assert.True(await collecting.WaitAsync(DeadlockGuard));
 
         // The scheduled cycle is already inside the collector. Manual refresh must join this
         // single flight and must not leave its wake signal armed for a second immediate cycle.
@@ -289,35 +298,44 @@ public sealed class MonitoringEngineTests
         release.Release();
 
         Assert.True((await manual).IsSuccess);
-        await time.ExpectedDelayScheduled.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        // Parked on its 10 s interval timer. The signal is raised AFTER the timer is registered (the old signalling
+        // provider raised it before, so an advance could land before the timer existed and never reach it).
+        await time.TimerCreatedAsync(TimeSpan.FromSeconds(10)).WaitAsync(DeadlockGuard);
         Assert.Equal(1, store.CallCount);
 
         time.Advance(TimeSpan.FromSeconds(9));
         Assert.Equal(1, store.CallCount);
 
         time.Advance(TimeSpan.FromSeconds(1));
-        await WaitUntilAsync(() => store.CallCount == 2);
+        await WaitForStoreAsync(state, () => store.CallCount == 2); // the cycle's state is applied after the call
         Assert.Equal(2, store.CallCount);
     }
 
     [Fact]
-    public async Task LongClockJump_ProducesAtMostOneCatchUpCycle()
+    public async Task LongClockJump_ProducesExactlyOneCatchUpCycle()
     {
         // Simulates system sleep/resume: the scheduler uses a single one-shot delay per cycle
-        // (via TimeProvider), so one large clock jump fires that one timer at most once rather
-        // than replaying every interval that elapsed while suspended.
+        // (via TimeProvider), so one large clock jump fires that one timer once rather than
+        // replaying every interval that elapsed while suspended - and it DOES fire it, so
+        // monitoring resumes.
+        //
+        // Deterministic: no sleeps. The old version slept 50 ms / 150 ms and asserted "<= 1",
+        // which a slow runner turned into a false pass (nothing had run yet, so 0 <= 1). Here
+        // the clock is advanced only once the loop is parked on its interval timer, and the
+        // count is read only once the loop has re-parked on a FRESH interval timer: after
+        // that, with the clock frozen, no further cycle can run, so the count is final.
         var server = TestData.LinuxServer(refreshIntervalSeconds: 10);
+        var interval = TimeSpan.FromSeconds(10);
         await using var h = await StartAsync(ManualDrive(), server);
 
         await h.Engine.RefreshNowAsync(server.Id, TestTimeout);
-        await Task.Delay(50); // let the loop repark on its next interval timer
+        await h.Time.TimerCreatedAsync(interval, occurrence: 1).WaitAsync(DeadlockGuard); // parked
         var before = h.Store.CallCount;
 
         h.Time.Advance(TimeSpan.FromHours(1)); // a whole hour "missed" while asleep
-        await Task.Delay(150); // allow any catch-up cycle to run
+        await h.Time.TimerCreatedAsync(interval, occurrence: 2).WaitAsync(DeadlockGuard); // re-parked
 
-        var catchUp = h.Store.CallCount - before;
-        Assert.True(catchUp <= 1, $"a single resume must not replay missed ticks; ran {catchUp} cycles");
+        Assert.Equal(before + 1, h.Store.CallCount); // exactly one catch-up: no replay, no stall
     }
 
     [Fact]
@@ -344,7 +362,10 @@ public sealed class MonitoringEngineTests
             store,
             new ServerMonitoringStateStore(),
             NullLogger<MonitoringEngine>.Instance,
-            TimeProvider.System,
+            // A fake clock that is never advanced: the engine's bounded drain (5 s on its clock) can then never expire,
+            // so StopMonitoringAsync can only return by actually draining the cancelled collection. With the system
+            // clock a slow runner could hit that bound and return before the collection observed its cancellation.
+            new FakeTimeProvider(),
             new MonitoringOptions
             {
                 InitialDelay = TimeSpan.Zero,
@@ -354,9 +375,9 @@ public sealed class MonitoringEngineTests
             });
         await using var lifetime = engine;
         await engine.StartMonitoringAsync();
-        await store.Entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await store.Entered.Task.WaitAsync(DeadlockGuard);
 
-        await engine.StopMonitoringAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await engine.StopMonitoringAsync().WaitAsync(DeadlockGuard);
 
         Assert.True(store.Cancelled.Task.IsCompletedSuccessfully);
     }
@@ -370,24 +391,24 @@ public sealed class MonitoringEngineTests
         // always completes it — the caller (and the card's refresh spinner) never hangs.
         var server = TestData.LinuxServer();
         await using var h = await StartAsync(ManualDrive(), server);
-        await WaitUntilAsync(() => h.State.GetAll().Any(s => s.ServerId == server.Id));
+        await WaitForStoreAsync(h.State, () => h.State.GetAll().Any(s => s.ServerId == server.Id));
 
         var collecting = new SemaphoreSlim(0);
         var proceed = new SemaphoreSlim(0);
         h.Store.ResultFactory = (s, _) =>
         {
             collecting.Release();                    // a collection is now in flight
-            proceed.Wait(TimeSpan.FromSeconds(10));  // hold it open until the test removes the server
+            proceed.Wait(DeadlockGuard);             // hold it open until the test removes the server
             return TestData.Success(TestData.Snapshot(s.Id, cpu: 5));
         };
 
         var manual = h.Engine.RefreshNowAsync(server.Id, TestTimeout);
-        Assert.True(await collecting.WaitAsync(TimeSpan.FromSeconds(10))); // the loop picked up the manual
+        Assert.True(await collecting.WaitAsync(DeadlockGuard)); // the loop picked up the manual
 
         // Remove the server mid-collection: reconcile cancels and removes the monitor.
         h.Service.Servers.Clear();
         h.Service.RaiseChanged();
-        await WaitUntilAsync(() => h.State.GetAll().All(s => s.ServerId != server.Id));
+        await WaitForStoreAsync(h.State, () => h.State.GetAll().All(s => s.ServerId != server.Id));
 
         proceed.Release(); // let the now-cancelled cycle finish and the loop unwind
 
@@ -401,27 +422,11 @@ public sealed class MonitoringEngineTests
         service.Servers.AddRange(servers);
         var store = new ScriptedMetricsStore();
         var state = new ServerMonitoringStateStore();
-        var time = new FakeTimeProvider();
+        var time = new TimerRecordingTimeProvider();
         var engine = new MonitoringEngine(
             service, store, state, NullLogger<MonitoringEngine>.Instance, time, options);
         await engine.StartMonitoringAsync();
         return new Harness(engine, service, store, state, time);
-    }
-
-    private static async Task WaitUntilAsync(Func<bool> condition)
-    {
-        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
-        while (DateTime.UtcNow < deadline)
-        {
-            if (condition())
-            {
-                return;
-            }
-
-            await Task.Delay(10);
-        }
-
-        Assert.Fail("Condition was not met within the timeout.");
     }
 
     /// <summary>
@@ -462,46 +467,43 @@ public sealed class MonitoringEngineTests
         }
     }
 
+    /// <summary>Completes when <paramref name="condition"/> holds, re-checked on every state-store change event
+    /// (monitors are added, updated and removed through the store), plus once up front.</summary>
+    private static async Task WaitForStoreAsync(ServerMonitoringStateStore states, Func<bool> condition)
+    {
+        var reached = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        void OnChanged(object? sender, Guid changed)
+        {
+            if (condition())
+            {
+                reached.TrySetResult();
+            }
+        }
+
+        states.StateChanged += OnChanged;
+        try
+        {
+            if (condition())
+            {
+                reached.TrySetResult();
+            }
+
+            await reached.Task.WaitAsync(DeadlockGuard);
+        }
+        finally
+        {
+            states.StateChanged -= OnChanged;
+        }
+    }
+
     private sealed record Harness(
         MonitoringEngine Engine,
         FakeServerService Service,
         ScriptedMetricsStore Store,
         ServerMonitoringStateStore State,
-        FakeTimeProvider Time) : IAsyncDisposable
+        TimerRecordingTimeProvider Time) : IAsyncDisposable
     {
         public ValueTask DisposeAsync() => Engine.DisposeAsync();
-    }
-
-    private sealed class SignalingTimeProvider(TimeSpan expectedDelay) : TimeProvider
-    {
-        private readonly FakeTimeProvider _inner = new();
-
-        public TaskCompletionSource ExpectedDelayScheduled { get; } =
-            new(TaskCreationOptions.RunContinuationsAsynchronously);
-
-        public override DateTimeOffset GetUtcNow() => _inner.GetUtcNow();
-
-        public override TimeZoneInfo LocalTimeZone => _inner.LocalTimeZone;
-
-        public override long TimestampFrequency => _inner.TimestampFrequency;
-
-        public override long GetTimestamp() => _inner.GetTimestamp();
-
-        public override ITimer CreateTimer(
-            TimerCallback callback,
-            object? state,
-            TimeSpan dueTime,
-            TimeSpan period)
-        {
-            if (dueTime == expectedDelay)
-            {
-                ExpectedDelayScheduled.TrySetResult();
-            }
-
-            return _inner.CreateTimer(callback, state, dueTime, period);
-        }
-
-        public void Advance(TimeSpan delta) => _inner.Advance(delta);
     }
 
     private sealed class CancellationAwareMetricsStore : IServerMetricsStore
