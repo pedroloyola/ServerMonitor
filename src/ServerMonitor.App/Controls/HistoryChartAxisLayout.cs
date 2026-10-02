@@ -11,18 +11,17 @@ public static class HistoryChartAxisLayout
         plotHeight <= 0 ? [] : [0, plotHeight / 2, plotHeight];
 
     /// <summary>
-    /// Left edge of X label <paramref name="index"/> of <paramref name="count"/>: centred on its quartile tick and
-    /// clamped inside the plot, so the first label starts at the left edge and the last ends at the right edge.
+    /// Left edge of an X label centred on its mark at <paramref name="fraction"/> of the plot width (D-UI3-4 revised: the
+    /// REAL position of a round time), clamped inside the plot so edge labels never overflow it.
     /// </summary>
-    public static double XLabelLeft(int index, int count, double labelWidth, double plotWidth)
+    public static double XLabelLeft(double fraction, double labelWidth, double plotWidth)
     {
-        if (count <= 1 || plotWidth <= 0)
+        if (plotWidth <= 0)
         {
             return 0;
         }
 
-        var tick = plotWidth * index / (count - 1);
-        var left = tick - labelWidth / 2;
+        var left = plotWidth * Math.Clamp(fraction, 0, 1) - labelWidth / 2;
         return Math.Clamp(left, 0, Math.Max(0, plotWidth - labelWidth));
     }
 
@@ -34,14 +33,16 @@ public static class HistoryChartAxisLayout
             return 0;
         }
 
-        return plotHeight * index / (count - 1) - labelHeight / 2;
+        // Figma 112:2306: "100" sits BELOW the top grid line (inside the plot); "50" and "0" are centred on theirs.
+        var top = plotHeight * index / (count - 1) - labelHeight / 2;
+        return index == 0 ? Math.Max(0, top) : top;
     }
 
     /// <summary>The compact (3-label) X axis below <paramref name="threshold"/> DIPs of plot width (D-UI3-4), else the full one.</summary>
-    public static IReadOnlyList<string> ChooseXLabels(
+    public static IReadOnlyList<T> ChooseXLabels<T>(
         double plotWidth,
-        IReadOnlyList<string>? full,
-        IReadOnlyList<string>? compact,
+        IReadOnlyList<T>? full,
+        IReadOnlyList<T>? compact,
         double threshold) =>
         plotWidth < threshold && compact is { Count: > 0 }
             ? compact

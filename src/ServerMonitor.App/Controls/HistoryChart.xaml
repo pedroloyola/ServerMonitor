@@ -3,9 +3,9 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     MinHeight="96">
-    <!-- UI.3 (D-UI3-13, Figma 112:2298): plot area + Y axis to the right (gap 14) + X axis below. The axes live OUTSIDE
+    <!-- UI.3 (D-UI3-13, Figma 112:2298): plot area (98) + Y axis to the right (gap 14) + X axis 16 below. The axes live OUTSIDE
          the plot canvases (UI.0 §3); HistoryChartGeometry.BuildSegments still maps the series into PlotHost only. -->
-    <Grid x:Name="RootGrid" ColumnSpacing="14" RowSpacing="6">
+    <Grid x:Name="RootGrid" ColumnSpacing="14" RowSpacing="16">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" />
             <ColumnDefinition Width="Auto" />

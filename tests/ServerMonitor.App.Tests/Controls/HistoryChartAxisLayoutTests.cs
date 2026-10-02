@@ -13,23 +13,22 @@ public sealed class HistoryChartAxisLayoutTests
     }
 
     [Fact]
-    public void XLabels_SitOnTheQuartiles_AndStayInsideThePlot()
+    public void XLabels_AreCentredOnTheirRealPosition_AndStayInsideThePlot()
     {
         const double plot = 774;
         const double label = 30;
 
-        Assert.Equal(0, HistoryChartAxisLayout.XLabelLeft(0, 5, label, plot));                    // first: left edge
-        Assert.Equal(plot / 4 - label / 2, HistoryChartAxisLayout.XLabelLeft(1, 5, label, plot));  // centred on the tick
-        Assert.Equal(plot / 2 - label / 2, HistoryChartAxisLayout.XLabelLeft(2, 5, label, plot));
-        Assert.Equal(plot - label, HistoryChartAxisLayout.XLabelLeft(4, 5, label, plot));          // last: ends at right edge
-        Assert.Equal(0, HistoryChartAxisLayout.XLabelLeft(0, 1, label, plot));
-        Assert.Equal(0, HistoryChartAxisLayout.XLabelLeft(3, 5, label, 0));
+        Assert.Equal(0, HistoryChartAxisLayout.XLabelLeft(0, label, plot));                          // start: left edge
+        Assert.Equal(plot * 0.375 - label / 2, HistoryChartAxisLayout.XLabelLeft(0.375, label, plot)); // centred on the mark
+        Assert.Equal(plot - label, HistoryChartAxisLayout.XLabelLeft(1, label, plot));                // end: right edge
+        Assert.Equal(plot - label, HistoryChartAxisLayout.XLabelLeft(1.4, label, plot));              // clamped
+        Assert.Equal(0, HistoryChartAxisLayout.XLabelLeft(0.5, label, 0));
     }
 
     [Fact]
     public void YLabels_AreCentredOnTheirGridLine()
     {
-        Assert.Equal(-7, HistoryChartAxisLayout.YLabelTop(0, 3, 14, 98));
+        Assert.Equal(0, HistoryChartAxisLayout.YLabelTop(0, 3, 14, 98));   // "100" below the top line (Figma 112:2306)
         Assert.Equal(42, HistoryChartAxisLayout.YLabelTop(1, 3, 14, 98));
         Assert.Equal(91, HistoryChartAxisLayout.YLabelTop(2, 3, 14, 98));
     }
@@ -43,6 +42,6 @@ public sealed class HistoryChartAxisLayoutTests
         Assert.Same(compact, HistoryChartAxisLayout.ChooseXLabels(400, full, compact, 480));
         Assert.Same(full, HistoryChartAxisLayout.ChooseXLabels(480, full, compact, 480));
         Assert.Same(full, HistoryChartAxisLayout.ChooseXLabels(400, full, [], 480));
-        Assert.Empty(HistoryChartAxisLayout.ChooseXLabels(400, null, null, 480));
+        Assert.Empty(HistoryChartAxisLayout.ChooseXLabels<string>(400, null, null, 480));
     }
 }

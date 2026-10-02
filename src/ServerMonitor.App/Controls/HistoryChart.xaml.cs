@@ -6,6 +6,7 @@ using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Shapes;
 using Windows.Foundation;
 using Windows.UI;
+using ServerMonitor.App.ViewModels;
 using ServerMonitor.Core.History;
 
 namespace ServerMonitor.App.Controls;
@@ -58,11 +59,11 @@ public sealed partial class HistoryChart : UserControl
     public static readonly DependencyProperty ShowEndMarkerProperty = DependencyProperty.Register(
         nameof(ShowEndMarker), typeof(bool), typeof(HistoryChart), new PropertyMetadata(true, OnChanged));
 
-    public static readonly DependencyProperty XLabelsProperty = DependencyProperty.Register(
-        nameof(XLabels), typeof(IReadOnlyList<string>), typeof(HistoryChart), new PropertyMetadata(null, OnChanged));
+    public static readonly DependencyProperty XTicksProperty = DependencyProperty.Register(
+        nameof(XTicks), typeof(IReadOnlyList<HistoryAxisTick>), typeof(HistoryChart), new PropertyMetadata(null, OnChanged));
 
-    public static readonly DependencyProperty XLabelsCompactProperty = DependencyProperty.Register(
-        nameof(XLabelsCompact), typeof(IReadOnlyList<string>), typeof(HistoryChart), new PropertyMetadata(null, OnChanged));
+    public static readonly DependencyProperty XTicksCompactProperty = DependencyProperty.Register(
+        nameof(XTicksCompact), typeof(IReadOnlyList<HistoryAxisTick>), typeof(HistoryChart), new PropertyMetadata(null, OnChanged));
 
     public static readonly DependencyProperty YLabelsProperty = DependencyProperty.Register(
         nameof(YLabels), typeof(IReadOnlyList<string>), typeof(HistoryChart), new PropertyMetadata(null, OnChanged));
@@ -121,18 +122,18 @@ public sealed partial class HistoryChart : UserControl
         set => SetValue(ShowEndMarkerProperty, value);
     }
 
-    /// <summary>X labels at the quartiles of the range (D-UI3-4), left to right.</summary>
-    public IReadOnlyList<string>? XLabels
+    /// <summary>X marks on round boundaries, each at its real position (D-UI3-4 revised), left to right.</summary>
+    public IReadOnlyList<HistoryAxisTick>? XTicks
     {
-        get => (IReadOnlyList<string>?)GetValue(XLabelsProperty);
-        set => SetValue(XLabelsProperty, value);
+        get => (IReadOnlyList<HistoryAxisTick>?)GetValue(XTicksProperty);
+        set => SetValue(XTicksProperty, value);
     }
 
-    /// <summary>Three X labels used when the plot is narrower than <see cref="CompactLabelsBelow"/>.</summary>
-    public IReadOnlyList<string>? XLabelsCompact
+    /// <summary>At most three X marks, used when the plot is narrower than <see cref="CompactLabelsBelow"/>.</summary>
+    public IReadOnlyList<HistoryAxisTick>? XTicksCompact
     {
-        get => (IReadOnlyList<string>?)GetValue(XLabelsCompactProperty);
-        set => SetValue(XLabelsCompactProperty, value);
+        get => (IReadOnlyList<HistoryAxisTick>?)GetValue(XTicksCompactProperty);
+        set => SetValue(XTicksCompactProperty, value);
     }
 
     /// <summary>Y labels top to bottom (100 / 50 / 0), one per grid line.</summary>
@@ -173,8 +174,8 @@ public sealed partial class HistoryChart : UserControl
 
         var width = PlotHost.ActualWidth;
         var height = PlotHost.ActualHeight;
-        var xLabels = HistoryChartAxisLayout.ChooseXLabels(width, XLabels, XLabelsCompact, CompactLabelsBelow);
-        var xBlocks = xLabels.Select(text => MeasuredLabel(text, axisStyle)).ToList();
+        var xTicks = HistoryChartAxisLayout.ChooseXLabels(width, XTicks, XTicksCompact, CompactLabelsBelow);
+        var xBlocks = xTicks.Select(tick => MeasuredLabel(tick.Label, axisStyle)).ToList();
         XAxisCanvas.Height = xBlocks.Count == 0 ? 0 : xBlocks.Max(block => block.DesiredSize.Height);
 
         if (width <= 0 || height <= 0)
@@ -190,7 +191,7 @@ public sealed partial class HistoryChart : UserControl
 
         for (var i = 0; i < xBlocks.Count; i++)
         {
-            Canvas.SetLeft(xBlocks[i], HistoryChartAxisLayout.XLabelLeft(i, xBlocks.Count, xBlocks[i].DesiredSize.Width, width));
+            Canvas.SetLeft(xBlocks[i], HistoryChartAxisLayout.XLabelLeft(xTicks[i].Fraction, xBlocks[i].DesiredSize.Width, width));
             XAxisCanvas.Children.Add(xBlocks[i]);
         }
 

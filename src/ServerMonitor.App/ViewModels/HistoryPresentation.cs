@@ -3,6 +3,9 @@ using ServerMonitor.Core.History;
 
 namespace ServerMonitor.App.ViewModels;
 
+/// <summary>One X-axis mark: where it sits along the range (0 = start, 1 = end) and its text.</summary>
+public sealed record HistoryAxisTick(double Fraction, string Label);
+
 /// <summary>
 /// Pure, deterministic text helpers for the History screen (UI.3): axis labels (D-UI3-4), the period
 /// footer and the culture used to format them. Every format string comes from the caller (resw), so the
@@ -111,6 +114,90 @@ public static class HistoryPresentation
             : crossYearFormat;
 
         return string.Format(culture, format, start, end);
+    }
+
+    /// <summary>
+    /// D-UI3-4 (revised, Prism R1 F6): X marks on ROUND local-time boundaries drawn at their REAL position - never the
+    /// text of a rounded time on an exact quartile. Base step per range: 1 h -> 15 min, 6 h -> 90 min, 24 h -> 6 h,
+    /// 7 days -> 1 day, 30 days -> 7 days (weeks start on Monday); the step is multiplied (x2, x3, ...) until at most
+    /// <paramref name="maxTicks"/> marks fit (5, or 3 on narrow layouts). Sub-day steps align to local midnight.
+    /// </summary>
+    public static IReadOnlyList<HistoryAxisTick> RoundTicks(
+        DateTimeOffset startUtc,
+        DateTimeOffset endUtc,
+        HistoryTimeRange range,
+        int maxTicks,
+        TimeZoneInfo timeZone,
+        CultureInfo culture,
+        string timeFormat,
+        string dayFormat)
+    {
+        if (endUtc <= startUtc || maxTicks < 1)
+        {
+            return [];
+        }
+
+        var baseStep = range switch
+        {
+            HistoryTimeRange.LastHour => TimeSpan.FromMinutes(15),
+            HistoryTimeRange.Last6Hours => TimeSpan.FromMinutes(90),
+            HistoryTimeRange.Last24Hours => TimeSpan.FromHours(6),
+            HistoryTimeRange.Last7Days => TimeSpan.FromDays(1),
+            _ => TimeSpan.FromDays(7)
+        };
+        var format = UsesTimeOfDayAxis(range) ? timeFormat : dayFormat;
+        var span = (endUtc - startUtc).Ticks;
+
+        for (var multiplier = 1; multiplier <= 64; multiplier++)
+        {
+            var step = TimeSpan.FromTicks(baseStep.Ticks * multiplier);
+            var ticks = new List<HistoryAxisTick>();
+            var localStart = TimeZoneInfo.ConvertTime(startUtc, timeZone).DateTime;
+            var localEnd = TimeZoneInfo.ConvertTime(endUtc, timeZone).DateTime;
+            for (var local = FirstBoundary(localStart, step, range); local <= localEnd && ticks.Count <= maxTicks; local += step)
+            {
+                if (timeZone.IsInvalidTime(local))
+                {
+                    continue; // skipped by a DST jump: no such local time
+                }
+
+                var utc = new DateTimeOffset(local, timeZone.GetUtcOffset(local));
+                if (utc < startUtc || utc > endUtc)
+                {
+                    continue;
+                }
+
+                ticks.Add(new HistoryAxisTick((double)(utc - startUtc).Ticks / span, local.ToString(format, culture)));
+            }
+
+            if (ticks.Count <= maxTicks)
+            {
+                return ticks;
+            }
+        }
+
+        return [];
+    }
+
+    private static DateTime FirstBoundary(DateTime localStart, TimeSpan step, HistoryTimeRange range)
+    {
+        var midnight = localStart.Date;
+        if (range == HistoryTimeRange.Last30Days)
+        {
+            // Weeks: the first Monday 00:00 at or after the start.
+            var daysToMonday = ((int)DayOfWeek.Monday - (int)midnight.DayOfWeek + 7) % 7;
+            var monday = midnight.AddDays(daysToMonday);
+            return monday < localStart ? monday.AddDays(7) : monday;
+        }
+
+        if (step >= TimeSpan.FromDays(1))
+        {
+            return midnight < localStart ? midnight.AddDays(1) : midnight;
+        }
+
+        var sinceMidnight = (localStart - midnight).Ticks;
+        var steps = (sinceMidnight + step.Ticks - 1) / step.Ticks;   // ceiling: the first boundary at or after the start
+        return midnight.AddTicks(steps * step.Ticks);
     }
 
     private static string[] TrimDots(string[] names) =>

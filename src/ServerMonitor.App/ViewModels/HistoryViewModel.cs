@@ -106,8 +106,8 @@ public sealed class HistoryViewModel : ObservableObject, IDisposable
     private string? _memoryPeakDisplay;
     private string? _diskPeakDisplay;
     private string? _periodFooter;
-    private IReadOnlyList<string>? _xAxisLabels;
-    private IReadOnlyList<string>? _xAxisLabelsCompact;
+    private IReadOnlyList<HistoryAxisTick>? _xAxisTicks;
+    private IReadOnlyList<HistoryAxisTick>? _xAxisTicksCompact;
     private CultureInfo? _formatCulture;
     private string? _formatCultureKey;
 
@@ -225,10 +225,16 @@ public sealed class HistoryViewModel : ObservableObject, IDisposable
     public string PeriodFooter => _periodFooter ?? string.Empty;
 
     /// <summary>Five X-axis labels at the quartiles of the loaded range (D-UI3-4).</summary>
-    public IReadOnlyList<string> XAxisLabels => _xAxisLabels ?? [];
+    public IReadOnlyList<string> XAxisLabels => XAxisTicks.Select(tick => tick.Label).ToArray();
+
+    /// <summary>Up to five X marks on round boundaries at their real position (D-UI3-4 revised).</summary>
+    public IReadOnlyList<HistoryAxisTick> XAxisTicks => _xAxisTicks ?? [];
+
+    /// <summary>Up to three X marks for narrow layouts (D-UI3-4).</summary>
+    public IReadOnlyList<HistoryAxisTick> XAxisTicksCompact => _xAxisTicksCompact ?? [];
 
     /// <summary>Three X-axis labels (start/middle/end) for narrow layouts (D-UI3-4).</summary>
-    public IReadOnlyList<string> XAxisLabelsCompact => _xAxisLabelsCompact ?? [];
+    public IReadOnlyList<string> XAxisLabelsCompact => XAxisTicksCompact.Select(tick => tick.Label).ToArray();
 
     /// <summary>Fixed Y axis "100", "50", "0" (top to bottom).</summary>
     public IReadOnlyList<string> YAxisLabels { get; } = [];
@@ -708,10 +714,9 @@ public sealed class HistoryViewModel : ObservableObject, IDisposable
         SetText(ref _memoryPeakDisplay, string.Empty, nameof(MemoryPeakDisplay));
         SetText(ref _diskPeakDisplay, string.Empty, nameof(DiskPeakDisplay));
         SetText(ref _periodFooter, string.Empty, nameof(PeriodFooter));
-        _xAxisLabels = null;
-        _xAxisLabelsCompact = null;
-        OnPropertyChanged(nameof(XAxisLabels));
-        OnPropertyChanged(nameof(XAxisLabelsCompact));
+        _xAxisTicks = null;
+        _xAxisTicksCompact = null;
+        RaiseAxis();
     }
 
     private void ClearSeries()
@@ -787,10 +792,17 @@ public sealed class HistoryViewModel : ObservableObject, IDisposable
                 dates),
             nameof(PeriodFooter));
 
-        _xAxisLabels = HistoryPresentation.XAxisLabels(
+        _xAxisTicks = HistoryPresentation.RoundTicks(
             RangeStartUtc, RangeEndUtc, range, 5, timeZone, culture, timeFormat, dayFormat);
-        _xAxisLabelsCompact = HistoryPresentation.XAxisLabels(
+        _xAxisTicksCompact = HistoryPresentation.RoundTicks(
             RangeStartUtc, RangeEndUtc, range, 3, timeZone, culture, timeFormat, dayFormat);
+        RaiseAxis();
+    }
+
+    private void RaiseAxis()
+    {
+        OnPropertyChanged(nameof(XAxisTicks));
+        OnPropertyChanged(nameof(XAxisTicksCompact));
         OnPropertyChanged(nameof(XAxisLabels));
         OnPropertyChanged(nameof(XAxisLabelsCompact));
     }

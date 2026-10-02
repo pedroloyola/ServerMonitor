@@ -407,8 +407,10 @@ public sealed class HistoryViewModelUi3Tests
 
         await h.Vm.LoadRangeAsync(HistoryTimeRange.Last24Hours);
 
-        Assert.Equal(new[] { "15:00", "21:00", "03:00", "09:00", "15:00" }, h.Vm.XAxisLabels);
-        Assert.Equal(new[] { "15:00", "03:00", "15:00" }, h.Vm.XAxisLabelsCompact);
+        // D-UI3-4 revised (Prism F6): round 6 h boundaries at their real position, not the quartiles of 15:00..15:00.
+        Assert.Equal(new[] { "18:00", "00:00", "06:00", "12:00" }, h.Vm.XAxisLabels);
+        Assert.Equal(new[] { "00:00", "12:00" }, h.Vm.XAxisLabelsCompact);
+        Assert.Equal(new[] { 3 / 24d, 9 / 24d, 15 / 24d, 21 / 24d }, h.Vm.XAxisTicks.Select(t => t.Fraction));
         Assert.Equal(new[] { "100", "50", "0" }, h.Vm.YAxisLabels);
     }
 
@@ -425,9 +427,9 @@ public sealed class HistoryViewModelUi3Tests
     }
 
     [Theory]
-    [InlineData("pt-PT", new[] { "22 set", "24 set", "26 set", "27 set", "29 set" })]
-    [InlineData("pt-BR", new[] { "22 set", "24 set", "26 set", "27 set", "29 set" })]
-    [InlineData("en-US", new[] { "Sep 22", "Sep 24", "Sep 26", "Sep 27", "Sep 29" })]
+    [InlineData("pt-PT", new[] { "23 set", "25 set", "27 set", "29 set" })]
+    [InlineData("pt-BR", new[] { "23 set", "25 set", "27 set", "29 set" })]
+    [InlineData("en-US", new[] { "Sep 23", "Sep 25", "Sep 27", "Sep 29" })]
     public async Task XAxis_7Days_UsesDayLabelsInTheCulture(string culture, string[] expected)
     {
         var h = New(culture);
