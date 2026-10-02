@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using ServerMonitor.App.Services;
+using ServerMonitor.App.Tests.TestSupport;
 using ServerMonitor.Core.Backup;
 using ServerMonitor.Core.Interfaces;
 using ServerMonitor.Infrastructure.Backup;
@@ -148,15 +149,26 @@ public sealed class BackupSettingsParticipantTests : IDisposable
     [Fact]
     public async Task CompositionRoot_WiresTheGateAndTheBackupService()
     {
-        var services = new ServiceCollection();
-        services.AddLogging();
-        App.ConfigureApplicationServices(services);
-        await using var provider = services.BuildServiceProvider();
+        // TEST-REALDATA-AUDIT: resolved over a temp data root with the Credential Manager replaced; the two
+        // settings services read their files on construction.
+        using var composition = new IsolatedAppComposition();
+        await using var provider = composition.BuildProvider();
 
         var gate = provider.GetRequiredService<IConfigurationWriteGate>();
         Assert.Same(gate, provider.GetRequiredService<ConfigurationWriteGate>());
         Assert.IsType<GatedCredentialStore>(provider.GetRequiredService<IServerCredentialStore>());
-        Assert.IsType<WindowsCredentialStore>(provider.GetRequiredService<UngatedCredentialStore>().Store);
+        Assert.Same(composition.Credentials, provider.GetRequiredService<UngatedCredentialStore>().Store);
+
+        // In production the raw store behind UngatedCredentialStore is the Credential Manager one. Proven by running
+        // the PRODUCTION factory against a provider that only records what it is asked for - nothing is constructed.
+        var production = IsolatedAppComposition.ProductionDescriptors();
+        Assert.Equal(
+            typeof(WindowsCredentialStore),
+            production.Last(descriptor => descriptor.ServiceType == typeof(WindowsCredentialStore)).ImplementationType);
+        var factory = production.Last(descriptor => descriptor.ServiceType == typeof(UngatedCredentialStore)).ImplementationFactory!;
+        var recorder = new RequestRecordingProvider();
+        Assert.Throws<RequestRecordingProvider.Stop>(() => factory(recorder));
+        Assert.Equal([typeof(WindowsCredentialStore)], recorder.Requested);
         Assert.IsType<ConfigurationBackupService>(provider.GetRequiredService<IConfigurationBackupService>());
         Assert.Same(
             provider.GetRequiredService<JsonNotificationSettingsService>(),

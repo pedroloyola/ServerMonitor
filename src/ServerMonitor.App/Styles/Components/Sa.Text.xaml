@@ -25,6 +25,10 @@
         <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
         <Setter Property="Foreground" Value="{ThemeResource SaTextSecondaryBrush}" />
     </Style>
+    <!-- UI.3 additive (human decision): Workloads column headers 10/14 REGULAR muted, 112:2647 / 112:2648. Servers keep Medium. -->
+    <Style x:Key="SaTableHeaderRegularTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SaTableHeaderTextStyle}">
+        <Setter Property="FontWeight" Value="Normal" />
+    </Style>
     <!-- Metric unit "%" 20 Regular muted next to the 44 Light value (112:1816). -->
     <Style x:Key="SaMetricUnitTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SaTitleTextStyle}">
         <Setter Property="FontWeight" Value="Normal" />
@@ -43,6 +47,48 @@
         <Setter Property="Foreground" Value="{ThemeResource SaTextSecondaryBrush}" />
     </Style>
     <Style x:Key="SaTableCellAttentionTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SaButtonTextStyle}">
+        <Setter Property="Foreground" Value="{ThemeResource SaAttentionTextBrush}" />
+    </Style>
+    <!-- UI.3 additive (D-UI3-8). Page subtitle 13 Regular muted, 112:2262 / 112:2437 (SaControlTextStyle is Medium). -->
+    <Style x:Key="SaPageSubtitleTextStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource SaFontText}" />
+        <Setter Property="FontSize" Value="{StaticResource SaFontSizeControl}" />
+        <Setter Property="FontWeight" Value="Normal" />
+        <Setter Property="LineHeight" Value="{StaticResource SaLineHeightControl}" />
+        <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
+        <Setter Property="Foreground" Value="{ThemeResource SaTextSecondaryBrush}" />
+    </Style>
+    <!-- Chart axis labels 10 Regular muted, 112:2298 (SaMicroTextStyle is SemiBold). -->
+    <Style x:Key="SaChartAxisTextStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource SaFontText}" />
+        <Setter Property="FontSize" Value="{StaticResource SaFontSizeMicro}" />
+        <Setter Property="FontWeight" Value="Normal" />
+        <Setter Property="LineHeight" Value="{StaticResource SaLineHeightMicro}" />
+        <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
+        <Setter Property="Foreground" Value="{ThemeResource SaTextSecondaryBrush}" />
+    </Style>
+    <!-- Chart value unit "%" 19 Regular muted next to the 38 Light SaChartValueTextStyle, 112:2291. -->
+    <Style x:Key="SaChartUnitTextStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource SaFontText}" />
+        <Setter Property="FontSize" Value="{StaticResource SaFontSizeChartUnit}" />
+        <Setter Property="FontWeight" Value="Normal" />
+        <Setter Property="LineHeight" Value="{StaticResource SaLineHeightChartUnit}" />
+        <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
+        <Setter Property="Foreground" Value="{ThemeResource SaTextSecondaryBrush}" />
+    </Style>
+    <!-- UI.3 Workloads row state lines 112:2650 / 112:2666 (D-UI3-2): line 1 = 12 Medium text, line 2 = 11 Regular muted;
+         a problem (or transient warning) row has BOTH lines in the attention text colour. Selected by
+         WorkloadSeverityToSaTextStyleConverter. -->
+    <Style x:Key="SaWorkloadStateTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SaLabelTextStyle}">
+        <Setter Property="Foreground" Value="{ThemeResource SaTextBrush}" />
+    </Style>
+    <Style x:Key="SaWorkloadStateAttentionTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SaLabelTextStyle}">
+        <Setter Property="Foreground" Value="{ThemeResource SaAttentionTextBrush}" />
+    </Style>
+    <Style x:Key="SaWorkloadDetailTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SaHelperTextStyle}">
+        <Setter Property="Foreground" Value="{ThemeResource SaTextSecondaryBrush}" />
+    </Style>
+    <Style x:Key="SaWorkloadDetailAttentionTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SaHelperTextStyle}">
         <Setter Property="Foreground" Value="{ThemeResource SaAttentionTextBrush}" />
     </Style>
 </ResourceDictionary>

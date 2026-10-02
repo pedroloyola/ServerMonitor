@@ -125,5 +125,35 @@ public sealed class InteractivePrimitivesAutomationTests
         Assert.Equal("Assertive", (string?)error.Attribute("AutomationProperties.LiveSetting"));
     }
 
-    private static string? AutomationName(XElement element) => (string?)element.Attribute("AutomationProperties.Name");
+    /// <summary>
+    /// The literal AutomationProperties.Name, or - for a localized element - its x:Uid, but only when every culture's
+    /// resw defines a non-empty "{uid}.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" (UI.3 pages).
+    /// </summary>
+    private static string? AutomationName(XElement element)
+    {
+        var literal = (string?)element.Attribute("AutomationProperties.Name");
+        if (!string.IsNullOrWhiteSpace(literal))
+        {
+            return literal;
+        }
+
+        var uid = (string?)element.Attribute(AppSourceTree.Xaml + "Uid");
+        if (string.IsNullOrWhiteSpace(uid))
+        {
+            return null;
+        }
+
+        var key = uid + ".[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name";
+        foreach (var culture in new[] { "pt-PT", "pt-BR", "en-US" })
+        {
+            var resw = XDocument.Load(Path.Combine(AppSourceTree.RepositoryRoot, "src", "ServerMonitor.App", "Resources", culture, "Resources.resw"));
+            var value = resw.Root!.Elements("data").FirstOrDefault(d => (string?)d.Attribute("name") == key)?.Element("value")?.Value;
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return null;
+            }
+        }
+
+        return uid;
+    }
 }

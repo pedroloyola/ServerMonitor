@@ -284,14 +284,11 @@ public sealed class WindowsCredentialStoreTests
         Assert.Throws<ObjectDisposedException>(() => buffer.DangerousGetArray());
     }
 
-    [Fact]
+    // Writes, reads and deletes in the REAL Credential Manager: opt-in only (RealCredentialManagerFactAttribute). CI enables
+    // it on the ephemeral debug-test runner; a developer machine skips it, visibly, unless asked.
+    [RealCredentialManagerFact]
     public async Task RealCredentialManager_RoundTripsInIsolatedTargetAndCleansUp()
     {
-        if (!OperatingSystem.IsWindows())
-        {
-            return;
-        }
-
         var store = new WindowsCredentialStore();
         var reference = CredentialReference.Create(Guid.NewGuid(), ServerCredentialKind.Password);
         var secretText = $"ServerMonitor integration {Guid.NewGuid():N} 密碼";

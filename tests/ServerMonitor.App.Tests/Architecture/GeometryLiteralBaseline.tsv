@@ -1,0 +1,53 @@
+# UI.3 gate 1B geometry ratchet - baseline of hardcoded CornerRadius/Padding literals in src/ServerMonitor.App XAML
+# (outside Styles/Tokens/**, Styles/Components/**, bin/, obj/; incl. legacy Styles/Controls.xaml + DesignTokens.xaml) recorded at UI.3 start (main 358fa68). Guarded by GeometryLiteralRatchetTests.
+# Columns (TAB-separated): app-relative file | property | value (whitespace removed) | exact count in that file.
+# THIS FILE ONLY SHRINKS. When you remove debt, lower or delete the entry in the same PR (a stale entry fails).
+# Never add or raise an entry; never baseline Qa/** or Controls/Primitives/** (UI.2 T-8 zero-debt).
+# Per-property totals are ALSO pinned in GeometryLiteralRatchetTests.PinnedLedgerTotals (raising this file alone fails).
+# Total at UI.3 start: 71 (22 CornerRadius, 49 Padding) in 14 files, 50 entries.
+Controls/DiscoveredServerCard.xaml	Padding	14,10	1
+Controls/DiscoveredServerCard.xaml	Padding	6,1	1
+Controls/EmptyStateControl.xaml	CornerRadius	26	1
+Controls/ServerCompactCard.xaml	CornerRadius	1	6
+Controls/ServerCompactCard.xaml	CornerRadius	4	1
+Controls/ServerCompactCard.xaml	Padding	13,11	1
+Controls/ServerEditorModal.xaml	Padding	24,24,24,20	1
+Controls/ServerFormControl.xaml	Padding	0	1
+Controls/ServerFormControl.xaml	Padding	0,4	1
+Controls/ServerFormControl.xaml	Padding	0,6	1
+Controls/ServerFormControl.xaml	Padding	10,7	6
+Controls/ServerFormControl.xaml	Padding	12	1
+Controls/ServerFormControl.xaml	Padding	14,12	1
+Controls/ServerFormControl.xaml	Padding	16	2
+Controls/ServerFormControl.xaml	Padding	2,2,10,2	1
+Controls/ServerFormControl.xaml	Padding	6,2	1
+Controls/ServerFullCard.xaml	CornerRadius	1.5	3
+Controls/ServerFullCard.xaml	CornerRadius	4	1
+Controls/ServerFullCard.xaml	Padding	14,10	1
+Controls/ServerFullCard.xaml	Padding	7,2	1
+MainWindow.xaml	CornerRadius	6	1
+MainWindow.xaml	CornerRadius	7	1
+MainWindow.xaml	Padding	0	2
+MainWindow.xaml	Padding	0,0,2,0	1
+MainWindow.xaml	Padding	12,4,12,12	1
+MainWindow.xaml	Padding	14,0,0,0	1
+MainWindow.xaml	Padding	20,0,144,0	1
+Styles/Controls.xaml	CornerRadius	15	1
+Styles/Controls.xaml	CornerRadius	18	3
+Styles/Controls.xaml	Padding	0	1
+Styles/Controls.xaml	Padding	14,7	1
+Styles/Controls.xaml	Padding	18,7	4
+Styles/DesignTokens.xaml	CornerRadius	12	1
+Styles/DesignTokens.xaml	CornerRadius	16	1
+Styles/DesignTokens.xaml	CornerRadius	20	1
+Styles/DesignTokens.xaml	CornerRadius	8	1
+Styles/DesignTokens.xaml	Padding	20,18,20,18	1
+Styles/DesignTokens.xaml	Padding	28,24,28,28	1
+Views/DashboardPage.xaml	Padding	0,0,2,0	1
+Views/DashboardPage.xaml	Padding	14,10	1
+Views/DashboardPage.xaml	Padding	7,1	1
+Views/RestoreConfirmDialog.xaml	Padding	0,0,12,0	1
+Views/RestoreConfirmDialog.xaml	Padding	12,10,12,2	1
+Views/SettingsPage.xaml	Padding	0	1
+Views/SettingsPage.xaml	Padding	12,10	1
+Views/SettingsPage.xaml	Padding	6,2	1

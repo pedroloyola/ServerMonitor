@@ -199,12 +199,13 @@ public sealed class ComponentR1GuardTests
     }
 
     [Fact]
-    public void SegmentedSelectionFollowsKeyboardFocusOnly()
+    public void SegmentedSelectionFollowsTheArrowsOnly()
     {
-        Assert.True(SaGroupNavigation.SelectsOnFocus(SaGroupNavigationMode.SelectionFollowsFocus, FocusState.Keyboard));
-        Assert.False(SaGroupNavigation.SelectsOnFocus(SaGroupNavigationMode.SelectionFollowsFocus, FocusState.Pointer));
-        Assert.False(SaGroupNavigation.SelectsOnFocus(SaGroupNavigationMode.SelectionFollowsFocus, FocusState.Programmatic));
-        Assert.False(SaGroupNavigation.SelectsOnFocus(SaGroupNavigationMode.FocusOnly, FocusState.Keyboard));
+        // UI.3 Beacon F1: selection follows an arrow move inside the group; a focus entry never selects
+        // (SaGroupNavigationEntryTests holds the full matrix).
+        Assert.True(SaGroupNavigation.SelectsOnFocusMove(SaGroupNavigationMode.SelectionFollowsFocus, arrowInsideGroup: true));
+        Assert.False(SaGroupNavigation.SelectsOnFocusMove(SaGroupNavigationMode.SelectionFollowsFocus, arrowInsideGroup: false));
+        Assert.False(SaGroupNavigation.SelectsOnFocusMove(SaGroupNavigationMode.FocusOnly, arrowInsideGroup: true));
     }
 
     [Theory]

@@ -35,6 +35,12 @@ public sealed partial class XamlContractAndResourceGuardTests
         ],
         ["Views/DashboardPage.xaml"] = ["ServersItemsControl"],
         ["Views/SettingsPage.xaml"] = ["BackupStatusBar", "BackgroundSection"],
+        // UI.3: adaptive VisualState setters reflow these (no code-behind dependency).
+        ["Views/HistoryPage.xaml"] = ["RangeLast30Days", "UnavailableState", "EmptyState", "PageRoot", "ControlsRow", "ServerSelector", "RangeTrack", "CpuChart", "MemoryChart", "DiskChart", "RetentionText"],
+        ["Views/WorkloadsPage.xaml"] = ["PageHost", "PageScroll", "PageRoot", "QueryRow", "SearchBox", "FilterTrack", "ServicesCard", "CardsGrid", "CardsColumn2", "CardsRow1", "CardsRow2", "ContainersScroll", "ServicesScroll",
+            "DockerNoResultsText", "DockerNotInstalledState", "DockerPermissionState", "DockerUnavailableState", "DockerErrorState", "DockerEmptyState",
+            "ServicesNoResultsText", "ServicesUnsupportedState", "ServicesUnavailableState", "ServicesErrorState", "ServicesEmptyState",
+            "UnavailableState", "NothingState", "NoResultsState"],
         ["Views/BackupCreateDialog.xaml"] = ["PassphraseBox", "ConfirmationBox"],
         ["Views/RestoreOpenDialog.xaml"] = ["PassphraseBox"],
         ["Views/AddServerDialog.xaml"] = ["ServerForm"],
@@ -49,11 +55,11 @@ public sealed partial class XamlContractAndResourceGuardTests
             "UnknownHostHeading"
         ],
         // HistoryChart parts: the chart draws into these by name.
-        ["Controls/HistoryChart.xaml"] = ["RootGrid", "GridCanvas", "PlotCanvas"],
+        ["Controls/HistoryChart.xaml"] = ["RootGrid", "PlotHost", "GridCanvas", "PlotCanvas", "YAxisCanvas", "XAxisCanvas"],
         // UI.2 primitive templates: names resolved at runtime by VisualState setters (G-3).
         ["Styles/Components/Sa.Primitives.xaml"] =
         [
-            "PART_Dot", "PART_Path", "PART_Header", "PART_Helper", "PART_Error", "PART_PasswordBox", "PART_RevealButton",
+            "PART_Dot", "PART_Label", "PART_Path", "PART_Header", "PART_Helper", "PART_Error", "PART_PasswordBox", "PART_RevealButton",
             // S6
             "RootGrid", "KeyColumn", "PART_Key", "PART_Value", "PART_Fill", "PART_Track", "PART_Text", "PART_Icon", "PART_Chevron",
             "PART_Detail", "PART_Trailing", "PART_InfoLayout", "PART_ErrorLayout", "PART_CloseButton", "PART_Parent"
@@ -79,7 +85,7 @@ public sealed partial class XamlContractAndResourceGuardTests
             "GalleryRoot", "DarkThemeOption", "LightThemeOption", "HcSimThemeOption", "HcBannerText", "PageList",
             "ContentHost", "SimulationHost", "PageFrame"
         ],
-        ["Qa/Gallery/QaTokenProbePage.xaml"] = ["DefaultStyleProbe", "StrokeProbe16", "StrokeProbe20", "StrokeProbe24", "StrokeProbe48", "RevealNameProbe",
+        ["Qa/Gallery/QaTokenProbePage.xaml"] = ["DefaultStyleProbe", "DotOnlyStyleProbe", "StrokeProbe16", "StrokeProbe20", "StrokeProbe24", "StrokeProbe48", "RevealNameProbe",
             "IconButtonNameProbe", "ToastNameProbe"],
         ["Qa/Gallery/QaColorsPage.xaml"] = ["PrimitiveSwatches"],
         // DialogInitialFocus / DialogResult are also read by AutomationId by tools/qa/ui2-dialog-probe.ps1.

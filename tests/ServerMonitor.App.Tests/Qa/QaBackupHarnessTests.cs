@@ -3,6 +3,7 @@ using ServerMonitor.App.Qa;
 using ServerMonitor.App.Services;
 using ServerMonitor.App.ViewModels;
 using ServerMonitor.Core.Backup;
+using ServerMonitor.App.Tests.TestSupport;
 
 namespace ServerMonitor.App.Tests.Qa;
 
@@ -18,8 +19,7 @@ public sealed class QaBackupHarnessTests
     [Fact]
     public void WithoutTheFlag_TheCompositionUsesTheRealPickersAndDialogs()
     {
-        var services = new ServiceCollection();
-        App.ConfigureApplicationServices(services);
+        var services = IsolatedAppComposition.ProductionDescriptors(); // read-only descriptors
 
         Assert.Equal(typeof(BackupFilePicker), Last<IBackupFilePicker>(services).ImplementationType);
         Assert.Equal(typeof(BackupRestoreDialogService), Last<IBackupRestoreInteraction>(services).ImplementationType);
@@ -30,8 +30,9 @@ public sealed class QaBackupHarnessTests
     [Fact]
     public void Apply_ReplacesOnlyTheEngineAndThePickers()
     {
-        var services = new ServiceCollection();
-        App.ConfigureApplicationServices(services);
+        // Composed on the isolated root (the production descriptors are read-only); never built.
+        using var composition = new IsolatedAppComposition();
+        var services = composition.Services;
         var before = services.Count;
 
         QaBackupScenarioComposition.Apply(services, "ok");
@@ -56,6 +57,6 @@ public sealed class QaBackupHarnessTests
         Assert.False(File.Exists(open));
     }
 
-    private static ServiceDescriptor Last<TService>(IServiceCollection services) =>
+    private static ServiceDescriptor Last<TService>(IEnumerable<ServiceDescriptor> services) =>
         services.Last(descriptor => descriptor.ServiceType == typeof(TService));
 }

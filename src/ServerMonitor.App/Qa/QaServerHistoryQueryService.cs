@@ -32,6 +32,12 @@ internal sealed class QaServerHistoryQueryService : IServerHistoryQueryService
             throw new InvalidOperationException("QA: history store unavailable.");
         }
 
+        if (scenario.Kind == QaHistoryKind.Loading)
+        {
+            // Never completes, so the loading state (112:16322) can be inspected; a newer selection supersedes it.
+            return new TaskCompletionSource<ServerHistoryResult>().Task;
+        }
+
         var samples = QaHistoryCatalog.Generate(scenario, start, end);
         return Task.FromResult(new ServerHistoryResult
         {

@@ -19,7 +19,14 @@ internal enum QaHistoryKind
     Recovery,
     RamNull,
     Empty,
-    Unavailable
+    Unavailable,
+    // UI.3 phase 2 (Figma/QA shapes, selectable with the in-page server selector):
+    Figma,
+    EmptyPeriod,
+    Loading,
+    Extremes,
+    SinglePoint,
+    FewPoints
 }
 
 internal sealed record QaHistoryScenario
@@ -66,9 +73,33 @@ internal static class QaHistoryCatalog
         DateTimeOffset startUtc,
         DateTimeOffset endUtc)
     {
-        if (scenario.Kind is QaHistoryKind.Empty or QaHistoryKind.Unavailable)
+        if (scenario.Kind is QaHistoryKind.Empty or QaHistoryKind.Unavailable or QaHistoryKind.Loading)
         {
             return Array.Empty<ServerHistorySample>();
+        }
+
+        if (scenario.Kind == QaHistoryKind.SinglePoint)
+        {
+            var single = startUtc + TimeSpan.FromTicks((long)((endUtc - startUtc).Ticks * 0.7));
+            return [Value(QaHistoryKind.Normal, scenario.Server.Id, single, 0.7)];
+        }
+
+        if (scenario.Kind == QaHistoryKind.FewPoints)
+        {
+            // Six samples across the range: each sits alone between gaps wider than the connect gap.
+            return Enumerable.Range(0, 6)
+                .Select(i => Value(QaHistoryKind.Normal, scenario.Server.Id, startUtc + TimeSpan.FromTicks((endUtc - startUtc).Ticks / 6 * i + 1), i / 6.0))
+                .ToArray();
+        }
+
+        if (scenario.Kind == QaHistoryKind.EmptyPeriod)
+        {
+            // Readings exist only older than two days: 1 h / 6 h / 24 h are empty, 7 / 30 days are not (D-UI3-10).
+            endUtc = endUtc < Now.AddDays(-2) ? endUtc : Now.AddDays(-2);
+            if (endUtc <= startUtc)
+            {
+                return Array.Empty<ServerHistorySample>();
+            }
         }
 
         var samples = new List<ServerHistorySample>(PointsPerQuery);
@@ -132,6 +163,22 @@ internal static class QaHistoryCatalog
                 (cpu, mem, disk, health) = Steady(f);
                 break;
 
+            case QaHistoryKind.Figma:
+                // Figma 112:2290: flat CPU with one spike ~78 %, memory drifting 52 -> 66 %, disk flat ~48 %.
+                cpu = Clamp(24 + 3 * Math.Sin(f * 2 * Math.PI * 9) + (f is > 0.45 and < 0.52 ? 54 * (1 - Math.Abs(f - 0.485) / 0.035) : 0), 2, 100);
+                mem = Clamp(52 + 14 * f + 2 * Math.Sin(f * 2 * Math.PI * 4), 0, 100);
+                disk = Clamp(47 + 2 * f, 0, 100);
+                health = ServerHealth.Healthy;
+                break;
+
+            case QaHistoryKind.Extremes:
+                // 0 / 100 edges: CPU saturates then drops to idle, memory pinned at 100, disk at 0.
+                cpu = f < 0.25 ? 0 : f < 0.5 ? 100 : f < 0.75 ? 50 + 50 * Math.Sin(f * 2 * Math.PI * 12) : 0;
+                mem = 100;
+                disk = 0;
+                health = ServerHealth.Critical;
+                break;
+
             case QaHistoryKind.RamNull:
                 (cpu, _, disk, health) = Steady(f);
                 mem = null; // memory unknown — the memory chart must show a gap, never 0.
@@ -186,7 +233,13 @@ internal static class QaHistoryCatalog
             Make("Recovery", QaHistoryKind.Recovery, ref order, Snapshot(24, 50, 60), ServerHealth.Healthy),
             Make("RAM null", QaHistoryKind.RamNull, ref order, Snapshot(24, null, 60), ServerHealth.Healthy),
             Make("Empty", QaHistoryKind.Empty, ref order, snapshot: null, ServerHealth.Unknown),
-            Make("DB unavailable", QaHistoryKind.Unavailable, ref order, snapshot: null, ServerHealth.Unknown)
+            Make("DB unavailable", QaHistoryKind.Unavailable, ref order, snapshot: null, ServerHealth.Unknown),
+            Make("Figma", QaHistoryKind.Figma, ref order, Snapshot(24, 62, 48), ServerHealth.Healthy),
+            Make("Empty period", QaHistoryKind.EmptyPeriod, ref order, Snapshot(24, 50, 60), ServerHealth.Healthy),
+            Make("Loading", QaHistoryKind.Loading, ref order, Snapshot(24, 50, 60), ServerHealth.Healthy),
+            Make("Extremes 0-100", QaHistoryKind.Extremes, ref order, Snapshot(0, 100, 0), ServerHealth.Critical),
+            Make("Single point", QaHistoryKind.SinglePoint, ref order, Snapshot(24, 50, 60), ServerHealth.Healthy),
+            Make("Few points", QaHistoryKind.FewPoints, ref order, Snapshot(24, 50, 60), ServerHealth.Healthy)
         };
 
         return scenarios;
@@ -234,6 +287,8 @@ internal static class QaHistoryCatalog
         CollectedAt = Now,
         CpuUsagePercent = cpu,
         MemoryUsagePercent = mem,
-        DiskUsagePercent = disk
+        DiskUsagePercent = disk,
+        OperatingSystemName = "Ubuntu",
+        OperatingSystemVersion = "24.04 LTS"
     };
 }

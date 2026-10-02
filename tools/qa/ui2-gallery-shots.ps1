@@ -75,14 +75,11 @@ function Save-Window([IntPtr]$handle, [string]$path, [bool]$fromScreen) {
 $log = [System.Collections.Generic.List[string]]::new()
 foreach ($page in $Pages) {
     foreach ($theme in $Themes) {
-        $arguments = "--qa-components --qa-gallery-page $page --qa-gallery-theme $theme"
-        $process = Start-Process -FilePath $Exe -ArgumentList $arguments -PassThru
-        $started = $process.StartTime
-        $info = Get-CimInstance Win32_Process -Filter "ProcessId=$($process.Id)"
-        if ($info.CommandLine -notmatch '--qa-components' -or $info.ExecutablePath -ne $Exe) {
-            Stop-Process -Id $process.Id -Force
-            throw "PID $($process.Id) is not the expected gallery launch: $($info.CommandLine)"
-        }
+        $arguments = @('--qa-components', '--qa-gallery-page', $page, '--qa-gallery-theme', $theme)
+        # The only launch path (UI.3 rule): Start-QaApp verifies the PID's image + command line, or stops it and throws.
+        $app = & (Join-Path $PSScriptRoot 'Start-QaApp.ps1') -Exe $Exe -Arguments $arguments
+        $process = $app.Process
+        $started = $app.StartTime
 
         $deadline = (Get-Date).AddSeconds(30)
         while ((Get-Date) -lt $deadline) { $process.Refresh(); if ($process.MainWindowHandle -ne 0 -or $process.HasExited) { break }; Start-Sleep -Milliseconds 250 }

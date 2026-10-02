@@ -129,4 +129,7 @@
     <!-- dialog button border rgba(255,255,255,.14) / rgba(128,128,128,.16), 112:8573 / 112:8759 -->
     <Color x:Key="SaColorDialogButtonBorderDark">#24FFFFFF</Color>
     <Color x:Key="SaColorDialogButtonBorderLight">#29808080</Color>
+    <!-- UI.3 final fidelity (human decision, replaces D-UI3-1): neutral History chart line 2.4, 05 Free 112:2299 / 112:2476. -->
+    <Color x:Key="SaColorChartLineDark">#D2D6D4</Color>
+    <Color x:Key="SaColorChartLineLight">#565C59</Color>
 </ResourceDictionary>

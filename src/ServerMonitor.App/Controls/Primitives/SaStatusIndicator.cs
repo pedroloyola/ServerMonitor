@@ -21,6 +21,8 @@ namespace ServerMonitor.App.Controls.Primitives;
 [TemplateVisualState(Name = "Error", GroupName = "StatusStates")]
 [TemplateVisualState(Name = "Offline", GroupName = "StatusStates")]
 [TemplateVisualState(Name = "Stale", GroupName = "StatusStates")]
+[TemplateVisualState(Name = "LabelVisible", GroupName = "LabelStates")]
+[TemplateVisualState(Name = "LabelHidden", GroupName = "LabelStates")]
 public sealed class SaStatusIndicator : Control
 {
     public static readonly DependencyProperty StatusProperty = DependencyProperty.Register(
@@ -34,6 +36,19 @@ public sealed class SaStatusIndicator : Control
         typeof(string),
         typeof(SaStatusIndicator),
         new PropertyMetadata(string.Empty, (d, e) => ((SaStatusIndicator)d).ApplyAutomationName(e.NewValue as string ?? string.Empty)));
+
+    /// <summary>
+    /// UI.3: false only for the dot-only presentation (SaStatusDotOnlyStyle), where the row next to the dot already
+    /// states the status in text. The Label stays required and stays the automation name; only its rendering hides.
+    /// </summary>
+    public static readonly DependencyProperty IsLabelVisibleProperty = DependencyProperty.Register(
+        nameof(IsLabelVisible),
+        typeof(bool),
+        typeof(SaStatusIndicator),
+        new PropertyMetadata(true, (d, _) => ((SaStatusIndicator)d).UpdateLabelState(useTransitions: false)));
+
+    internal const string LabelVisibleState = "LabelVisible";
+    internal const string LabelHiddenState = "LabelHidden";
 
     // The name this control last applied. An explicit AutomationProperties.Name set by a consumer is never
     // overwritten (Cortex F-2): only an empty name or the one this control set itself is replaced.
@@ -57,6 +72,12 @@ public sealed class SaStatusIndicator : Control
         set => SetValue(LabelProperty, value);
     }
 
+    public bool IsLabelVisible
+    {
+        get => (bool)GetValue(IsLabelVisibleProperty);
+        set => SetValue(IsLabelVisibleProperty, value);
+    }
+
     /// <summary>The visual state that represents <paramref name="status"/>; an undefined value is Unknown.</summary>
     public static string StateName(SaStatusKind status) =>
         Enum.IsDefined(status) ? status.ToString() : nameof(SaStatusKind.Unknown);
@@ -65,6 +86,7 @@ public sealed class SaStatusIndicator : Control
     {
         base.OnApplyTemplate();
         UpdateStatusState(useTransitions: false);
+        UpdateLabelState(useTransitions: false);
     }
 
     private void ApplyAutomationName(string label)
@@ -79,4 +101,7 @@ public sealed class SaStatusIndicator : Control
 
     private void UpdateStatusState(bool useTransitions) =>
         VisualStateManager.GoToState(this, StateName(Status), useTransitions);
+
+    private void UpdateLabelState(bool useTransitions) =>
+        VisualStateManager.GoToState(this, IsLabelVisible ? LabelVisibleState : LabelHiddenState, useTransitions);
 }

@@ -44,6 +44,15 @@
         <Setter Property="CornerRadius" Value="{StaticResource SaRadiusPanel}" />
         <Setter Property="Padding" Value="24" />
     </Style>
+    <!-- UI.3 chart card 112:2290 / 112:2468: the glass surface with pad 22 top/bottom, 24 left/right. -->
+    <Style x:Key="SaChartCardStyle" TargetType="Border" BasedOn="{StaticResource SaGlassSurfaceStyle}">
+        <Setter Property="Padding" Value="24,22" />
+    </Style>
+    <!-- UI.3 page state panel 112:14478 / 112:14711 / 112:16419 / 112:14939 / 112:15160 / 112:15381: the solid Manual
+         surface that replaces the content area for empty / unavailable / loading / no-results (pad 24). -->
+    <Style x:Key="SaStatePanelStyle" TargetType="Border" BasedOn="{StaticResource SaSolidSurfaceStyle}">
+        <Setter Property="MinHeight" Value="320" />
+    </Style>
     <!-- Inset Manual 112:22183: #313131 / #E8E8E8, border #484848 / #D3D3D3, radius 12. -->
     <Style x:Key="SaInsetSurfaceStyle" TargetType="Border">
         <Setter Property="Background" Value="{ThemeResource SaInteriorBrush}" />
@@ -81,5 +90,14 @@
     <Style x:Key="SaDataTableRowStyle" TargetType="Border">
         <Setter Property="MinHeight" Value="78" />
         <Setter Property="Padding" Value="0" />
+    </Style>
+    <!-- UI.3 additive (D-UI3-8): compact row h64 for the Workloads tables, 112:2650 (container) / 112:2708 (service).
+         Same contract as the server row (no dividers, cells laid out by the consumer); only the height differs. -->
+    <Style x:Key="SaDataTableCompactRowStyle" TargetType="Border" BasedOn="{StaticResource SaDataTableRowStyle}">
+        <Setter Property="MinHeight" Value="64" />
+    </Style>
+    <!-- UI.3 (Prism R1 F5): the Workloads column header is h28 (112:2647), not the server table's 34. -->
+    <Style x:Key="SaDataTableCompactHeaderStyle" TargetType="Border" BasedOn="{StaticResource SaDataTableHeaderStyle}">
+        <Setter Property="MinHeight" Value="28" />
     </Style>
 </ResourceDictionary>

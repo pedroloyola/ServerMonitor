@@ -12,7 +12,10 @@ internal static partial class AppSourceTree
 {
     public static readonly XNamespace Xaml = "http://schemas.microsoft.com/winfx/2006/xaml";
 
-    public static string AppRoot { get; } = Path.Combine(FindRepositoryRoot(), "src", "ServerMonitor.App");
+    /// <summary>The checkout root (the folder holding ServerMonitor.slnx), for versioned guard ledgers under tests/.</summary>
+    public static string RepositoryRoot { get; } = FindRepositoryRoot();
+
+    public static string AppRoot { get; } = Path.Combine(RepositoryRoot, "src", "ServerMonitor.App");
 
     public static string Full(string relative) => Path.Combine(AppRoot, relative.Replace('/', Path.DirectorySeparatorChar));
 

@@ -130,7 +130,8 @@ public sealed class QaUncoveredHarnessTests
         var scenarios = QaHistoryCatalog.Scenarios;
 
         Assert.Equal(
-            ["Normal", "CPU spike", "Warning", "Critical", "Offline gap", "Recovery", "RAM null", "Empty", "DB unavailable"],
+            ["Normal", "CPU spike", "Warning", "Critical", "Offline gap", "Recovery", "RAM null", "Empty", "DB unavailable",
+             "Figma", "Empty period", "Loading", "Extremes 0-100", "Single point", "Few points"],
             scenarios.Select(s => s.Label));
         Assert.Equal(Enum.GetValues<QaHistoryKind>(), scenarios.Select(s => s.Kind));
         Assert.Equal(scenarios.Count, scenarios.Select(s => s.Server.Id).Distinct().Count());
@@ -146,7 +147,13 @@ public sealed class QaUncoveredHarnessTests
             ["Recovery"] = (ServerHealth.Healthy, 24, 50, 60, true),
             ["RAM null"] = (ServerHealth.Healthy, 24, null, 60, true),
             ["Empty"] = (ServerHealth.Unknown, null, null, null, false),
-            ["DB unavailable"] = (ServerHealth.Unknown, null, null, null, false)
+            ["DB unavailable"] = (ServerHealth.Unknown, null, null, null, false),
+            ["Figma"] = (ServerHealth.Healthy, 24, 62, 48, true),
+            ["Empty period"] = (ServerHealth.Healthy, 24, 50, 60, true),
+            ["Loading"] = (ServerHealth.Healthy, 24, 50, 60, true),
+            ["Extremes 0-100"] = (ServerHealth.Critical, 0, 100, 0, true),
+            ["Single point"] = (ServerHealth.Healthy, 24, 50, 60, true),
+            ["Few points"] = (ServerHealth.Healthy, 24, 50, 60, true)
         };
 
         for (var i = 0; i < scenarios.Count; i++)
@@ -180,9 +187,18 @@ public sealed class QaUncoveredHarnessTests
             var twice = QaHistoryCatalog.Generate(scenario, start, end);
             Assert.Equal(once, twice);
 
-            if (scenario.Kind is QaHistoryKind.Empty or QaHistoryKind.Unavailable)
+            if (scenario.Kind is QaHistoryKind.Empty or QaHistoryKind.Unavailable or QaHistoryKind.Loading or QaHistoryKind.EmptyPeriod)
             {
+                // EmptyPeriod only has readings older than two days, so a 24 h window is empty by design (UI.3).
                 Assert.Empty(once);
+                continue;
+            }
+
+            if (scenario.Kind is QaHistoryKind.SinglePoint or QaHistoryKind.FewPoints)
+            {
+                // Sparse shapes (UI.3): inside the window, never at its edges.
+                Assert.Equal(scenario.Kind == QaHistoryKind.SinglePoint ? 1 : 6, once.Count);
+                Assert.All(once, sample => Assert.InRange(sample.CapturedAtUtc, start, end));
                 continue;
             }
 
@@ -207,6 +223,13 @@ public sealed class QaUncoveredHarnessTests
             if (scenario.Kind == QaHistoryKind.Unavailable)
             {
                 await Assert.ThrowsAsync<InvalidOperationException>(() => service.GetHistoryAsync(scenario.Server.Id, HistoryTimeRange.Last24Hours));
+                continue;
+            }
+
+            if (scenario.Kind == QaHistoryKind.Loading)
+            {
+                // UI.3: the loading scenario never completes by design - never await it (that hung the suite).
+                Assert.False(service.GetHistoryAsync(scenario.Server.Id, HistoryTimeRange.Last24Hours).IsCompleted);
                 continue;
             }
 

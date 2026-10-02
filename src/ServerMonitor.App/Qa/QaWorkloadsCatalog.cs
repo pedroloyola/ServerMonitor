@@ -219,9 +219,10 @@ internal static class QaWorkloadsCatalog
             DockerSnapshot docker,
             ServiceSnapshot services,
             ServerOperatingSystem os = ServerOperatingSystem.Linux,
-            bool stale = false)
+            bool stale = false,
+            bool loading = false)
         {
-            list!.Add(Make(label, docker, services, ref order, os, stale));
+            list!.Add(Make(label, docker, services, ref order, os, stale, loading));
         }
 
         // Docker-focused (services = normal systemd)
@@ -272,7 +273,26 @@ internal static class QaWorkloadsCatalog
         Add("Hostile names (sanitized)", Docker(DockerAvailability.Available, MaliciousContainers()), Services(ServiceManager.Systemd, WorkloadServiceAvailability.Available, MaliciousServices()));
         Add("Stale (carried over)", Docker(DockerAvailability.Available, HealthyFew()), Services(ServiceManager.Systemd, WorkloadServiceAvailability.Available, SystemdNormal()), stale: true);
         Add("All unknown (probe failed)", Docker(DockerAvailability.Unknown), Services(ServiceManager.Systemd, WorkloadServiceAvailability.Unknown));
-
+        // UI.3 phase 2: the Figma frame (112:2547 / 112:2978) and the page-level states.
+        Add("Figma (problems)", Docker(DockerAvailability.Available,
+        [
+            Container("aa11bb22cc33", "nginx", "nginx:1.27", ContainerState.Running, ContainerHealth.Healthy, "Up 3 days"),
+            Container("bb22cc33dd44", "api", "serveralyzer/api:1.4", ContainerState.Running, ContainerHealth.Healthy, "Up 3 days"),
+            Container("cc33dd44ee55", "worker", "serveralyzer/worker:1.4", ContainerState.Running, ContainerHealth.Unhealthy, "Up 3 days (unhealthy)"),
+            Container("dd44ee55ff66", "redis", "redis:7-alpine", ContainerState.Running, ContainerHealth.None, "Up 3 days"),
+            Container("ee55ff66aa77", "postgres", "postgres:16", ContainerState.Running, ContainerHealth.Healthy, "Up 3 days"),
+            Container("ff66aa77bb88", "backup", "restic/restic:0.17", ContainerState.Exited, ContainerHealth.None, "Exited (0) 2 hours ago")
+        ]), Services(ServiceManager.Systemd, WorkloadServiceAvailability.Available,
+        [
+            Service("nginx.service", ServiceState.Running, "Servidor web", "running", ServiceStartupState.Enabled),
+            Service("ssh.service", ServiceState.Running, "Acesso remoto", "running", ServiceStartupState.Enabled),
+            Service("cron.service", ServiceState.Running, "Tarefas agendadas", "running", ServiceStartupState.Enabled),
+            Service("docker.service", ServiceState.Running, "Motor de containers", "running", ServiceStartupState.Enabled),
+            Service("systemd-journald.service", ServiceState.Running, "Registos do sistema", "running", ServiceStartupState.Static),
+            Service("backup.service", ServiceState.Failed, "Cópia de segurança", "failed", ServiceStartupState.Enabled)
+        ]));
+        Add("Nothing (both empty)", Docker(DockerAvailability.Available, []), Services(ServiceManager.Systemd, WorkloadServiceAvailability.Available, []));
+        Add("Loading (no attempt yet)", Docker(DockerAvailability.Unknown), Services(ServiceManager.Systemd, WorkloadServiceAvailability.Unknown), loading: true);
         return list;
     }
 
@@ -282,7 +302,8 @@ internal static class QaWorkloadsCatalog
         ServiceSnapshot services,
         ref int order,
         ServerOperatingSystem os,
-        bool stale)
+        bool stale,
+        bool loading = false)
     {
         var id = Guid.NewGuid();
         var server = new Server
@@ -305,7 +326,7 @@ internal static class QaWorkloadsCatalog
             {
                 ServerId = id,
                 CapturedAtUtc = stale ? Now.AddMinutes(-12) : Now,
-                LastAttemptAtUtc = Now,
+                LastAttemptAtUtc = loading ? null : Now,
                 IsStale = stale,
                 Docker = docker,
                 Services = services
@@ -318,7 +339,9 @@ internal static class QaWorkloadsCatalog
                 MemoryUsagePercent = 48,
                 DiskUsagePercent = 61,
                 Uptime = TimeSpan.FromDays(9),
-                Hostname = server.Host
+                Hostname = server.Host,
+                OperatingSystemName = os == ServerOperatingSystem.MacOS ? "macOS" : "Ubuntu",
+                OperatingSystemVersion = os == ServerOperatingSystem.MacOS ? "15.0" : "24.04 LTS"
             },
             State = new ServerMonitoringState
             {
