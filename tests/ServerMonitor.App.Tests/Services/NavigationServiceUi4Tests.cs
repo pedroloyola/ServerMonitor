@@ -120,6 +120,52 @@ public sealed class NavigationServiceUi4Tests
         Assert.Same(Assert.Single(world.DetailViews), world.Host.Content);
     }
 
+    /// <summary>Beacon r1 SHOULD-4 (Boss): back from Histórico / Serviços reopens THAT server's interim page with the
+    /// origin it was opened from, so its own breadcrumb still leads where the user came from.</summary>
+    [Theory]
+    [InlineData(ServerDetailOrigin.Overview)]
+    [InlineData(ServerDetailOrigin.Servers)]
+    public async Task ReturningToAServer_ReopensItsInterimPage_WithTheRememberedOrigin(ServerDetailOrigin origin)
+    {
+        var world = await World.CreateAsync();
+        var id = world.Fleet.IdOf("web");
+        world.Navigation.GoToServerDetail(id, origin);
+        world.Navigation.GoToSettings(); // stands in for Histórico / Serviços
+
+        world.Navigation.ReturnToServerDetail(id);
+
+        Assert.Equal(2, world.DetailViews.Count);
+        var view = world.DetailViews[^1];
+        Assert.Same(view, world.Host.Content);
+        Assert.Equal(origin, view.ViewModel.Origin);
+        Assert.Equal(id, view.ViewModel.Card?.Server.Id);
+    }
+
+    [Fact]
+    public async Task ReturningToAServerNeverOpenedHere_UsesTheOverviewOrigin()
+    {
+        var world = await World.CreateAsync();
+
+        world.Navigation.ReturnToServerDetail(world.Fleet.IdOf("web"));
+
+        Assert.Equal(ServerDetailOrigin.Overview, Assert.Single(world.DetailViews).ViewModel.Origin);
+    }
+
+    /// <summary>A server that is gone (removed / hidden meanwhile), or none at all, lands on the Visão geral.</summary>
+    [Fact]
+    public async Task ReturningToAServerThatIsGone_LandsOnTheOverview()
+    {
+        var world = await World.CreateAsync();
+
+        world.Navigation.ReturnToServerDetail(Guid.NewGuid());
+        Assert.Equal(typeof(DashboardPage), Assert.IsType<PageSentinel>(world.Host.Content).PageType);
+
+        world.Navigation.GoToSettings();
+        world.Navigation.ReturnToServerDetail(Guid.Empty);
+        Assert.Equal(typeof(DashboardPage), Assert.IsType<PageSentinel>(world.Host.Content).PageType);
+        Assert.Empty(world.DetailViews);
+    }
+
     private sealed class World
     {
         private Ui4TestKit.Harness _kit = null!;

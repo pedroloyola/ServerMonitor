@@ -2,6 +2,7 @@
     x:Class="ServerMonitor.App.Views.ServersPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:ServerMonitor.App.Controls"
     xmlns:converters="using:ServerMonitor.App.Converters"
     xmlns:primitives="using:ServerMonitor.App.Controls.Primitives"
     xmlns:vm="using:ServerMonitor.App.ViewModels">
@@ -65,7 +66,7 @@
 
         <!-- Wide 112:1443: SERVIDOR * (min 230) · SISTEMA 110 · ESTADO 150 · CPU/RAM/DISCO 85 · ação 127, gap 10, h78. -->
         <DataTemplate x:Key="ServerRowWideTemplate" x:DataType="vm:ServerDirectoryRowViewModel">
-            <Button Style="{StaticResource ServerRowButtonStyle}" Command="{x:Bind OpenDetailCommand}"
+            <controls:ServerTableRowButton Style="{StaticResource ServerRowButtonStyle}" Command="{x:Bind OpenDetailCommand}"
                     AutomationProperties.Name="{x:Bind DetailAutomationName}"
                     AutomationProperties.HelpText="{x:Bind RowAutomationName, Mode=OneWay}">
                 <Border Style="{StaticResource SaDataTableRowStyle}">
@@ -103,12 +104,12 @@
                         </StackPanel>
                     </Grid>
                 </Border>
-            </Button>
+            </controls:ServerTableRowButton>
         </DataTemplate>
 
         <!-- Mid (900–1039): no SISTEMA column (the system joins the address line); the action is the chevron alone (44). -->
         <DataTemplate x:Key="ServerRowMidTemplate" x:DataType="vm:ServerDirectoryRowViewModel">
-            <Button Style="{StaticResource ServerRowButtonStyle}" Command="{x:Bind OpenDetailCommand}"
+            <controls:ServerTableRowButton Style="{StaticResource ServerRowButtonStyle}" Command="{x:Bind OpenDetailCommand}"
                     AutomationProperties.Name="{x:Bind DetailAutomationName}"
                     AutomationProperties.HelpText="{x:Bind RowAutomationName, Mode=OneWay}"
                     ToolTipService.ToolTip="{x:Bind DetailAutomationName}">
@@ -141,13 +142,13 @@
                                            VerticalAlignment="Center" Foreground="{ThemeResource SaTextSecondaryBrush}" />
                     </Grid>
                 </Border>
-            </Button>
+            </controls:ServerTableRowButton>
         </DataTemplate>
 
         <!-- Stacked (< 900): L1 name + state, L2 address · system, L3 "CPU 24% · RAM 62% · Disco 48%" (labels visible,
              there is no header), chevron at the right, no dividers. -->
         <DataTemplate x:Key="ServerRowStackedTemplate" x:DataType="vm:ServerDirectoryRowViewModel">
-            <Button Style="{StaticResource ServerRowButtonStyle}" Command="{x:Bind OpenDetailCommand}"
+            <controls:ServerTableRowButton Style="{StaticResource ServerRowButtonStyle}" Command="{x:Bind OpenDetailCommand}"
                     AutomationProperties.Name="{x:Bind DetailAutomationName}"
                     AutomationProperties.HelpText="{x:Bind RowAutomationName, Mode=OneWay}">
                 <Grid MinHeight="88" ColumnSpacing="{StaticResource SaSpace12}">
@@ -186,7 +187,7 @@
                     <primitives:SaIcon Grid.Column="1" Data="{StaticResource SaIconArrowRight01Data}" Size="16" VerticalAlignment="Center"
                                        Foreground="{ThemeResource SaTextSecondaryBrush}" />
                 </Grid>
-            </Button>
+            </controls:ServerTableRowButton>
         </DataTemplate>
 
         <!-- §14 112:15604 skeleton row (reused from the overview's geometry). -->

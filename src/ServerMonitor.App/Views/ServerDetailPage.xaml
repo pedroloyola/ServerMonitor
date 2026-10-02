@@ -13,6 +13,12 @@
                 ParentText="{Binding ParentText}"
                 CurrentText="{Binding Title}"
                 ParentInvoked="OnBreadcrumbParentInvoked" />
+            <!-- Beacon r1 SHOULD-3: a failed Ocultar/Remover started here is reported here (same source as the Visão geral). -->
+            <InfoBar x:Uid="ServerOperationError" IsClosable="True" Severity="Error"
+                     IsOpen="{Binding IsOperationErrorOpen, Mode=TwoWay}" />
+            <InfoBar IsClosable="True" Severity="Warning"
+                     IsOpen="{Binding IsConfigurationLockedOpen, Mode=TwoWay}"
+                     Message="{Binding ConfigurationLockedMessage}" />
             <controls:ServerFullCard DataContext="{Binding Card}" />
         </StackPanel>
     </ScrollViewer>

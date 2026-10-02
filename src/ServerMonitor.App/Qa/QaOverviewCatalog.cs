@@ -16,7 +16,8 @@ internal sealed record QaOverviewScenario(
     string Name,
     IReadOnlyList<QaOverviewServer> Servers,
     IReadOnlyList<DiscoveredService> Discovered,
-    bool NeverLoads);
+    bool NeverLoads,
+    TimeSpan? VanishAfter = null);
 
 /// <summary>
 /// UI.4 §6: deterministic, synthetic data for the Visão geral and Servidores screens. A FIXED clock (<see cref="Now"/>)
@@ -89,6 +90,9 @@ internal static class QaOverviewCatalog
         "many-100" => Scenario(name, [.. Many(100)]),
 
         "many-500" => Scenario(name, [.. Many(500)]),
+
+        // Beacon r1 / Prism C4: the Servidores empty state only appears when the servers go away WITH the page open.
+        "vanishing" => Build("mixed") with { Name = name, VanishAfter = TimeSpan.FromSeconds(30) },
 
         _ => throw new ArgumentOutOfRangeException(nameof(name), name,
             $"Unknown overview scenario. Known: {string.Join(", ", QaOverviewScenarioPolicy.Scenarios)}.")

@@ -28,6 +28,55 @@ public sealed partial class DashboardPage : Page
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
         await ViewModel.LoadAsync();
+        DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, RestoreFocus);
+    }
+
+    /// <summary>
+    /// Beacon r1 SHOULD-1: focus lands on the content, never on the window-mode button the window would pick by default
+    /// (an Enter there flips the app to the compact window). Coming back from the interim page or Servidores, it lands on
+    /// the row, the priority card or "Ver todos" that was used to leave.
+    /// </summary>
+    private void RestoreFocus()
+    {
+        var (target, serverId) = ViewModel.TakeReturnFocus();
+        var focused = target switch
+        {
+            OverviewReturnTarget.ServerRow => FocusOverviewRow(serverId),
+            OverviewReturnTarget.Priority => PriorityButton.Focus(FocusState.Programmatic),
+            OverviewReturnTarget.ViewAll => ViewAllButton.Focus(FocusState.Programmatic),
+            _ => false,
+        };
+
+        if (!focused)
+        {
+            FocusContent();
+        }
+    }
+
+    private bool FocusOverviewRow(Guid serverId)
+    {
+        var rows = ViewModel.OverviewServers;
+        for (var i = 0; i < rows.Count; i++)
+        {
+            if (rows[i].ServerId == serverId)
+            {
+                return RepeaterFocus.FocusIndex(OverviewRepeater, i);
+            }
+        }
+
+        return false;
+    }
+
+    private void FocusContent()
+    {
+        if (ViewModel.ShowOverviewContent)
+        {
+            HealthCard.Focus(FocusState.Programmatic);
+        }
+        else if (ViewModel.ShowEmptyState)
+        {
+            EmptyAddButton.Focus(FocusState.Programmatic);
+        }
     }
 
     // "Limpar pesquisa" disappears once it worked; focus returns to the search box (UI.3 pattern).

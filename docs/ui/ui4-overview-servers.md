@@ -77,9 +77,26 @@ Autoridade visual: Figma `Qvk5dUFgsWf4UOYzfAkiDV`, 05 Free secção 02 "Dashboar
   - Teste com orçamento exato de 0 notificações.
 - **`PresentationClock`**: relógio só da Visão geral. O harness congela-o; não há `TimeProvider` de contentor.
 
+- **Beacon QA r1** (`.boss/tmp/ui4/beacon/qa-r1.md`):
+  - **SHOULD-1 foco**:
+    - a Visão geral põe o foco no conteúdo (cartão Saúde geral; no vazio, "Adicionar servidor"), nunca no "Modo compacto";
+    - ao voltar da interina ou dos Servidores, o foco vai para a linha, o cartão prioritário ou o "Ver todos" de onde se saiu (`TakeReturnFocus`, consumido uma vez);
+    - os Servidores voltam a focar a linha que abriu a interina (`TakeReturnFocusIndex`); sem origem, o foco vai para a pesquisa.
+  - **SHOULD-2**: as linhas das duas listas dizem "x de N" sobre a lista inteira virtualizada (`SaRepeaterPosition`, partilhado com o `SaDataTableRow` do UI.3; `SaListRowAutomationPeer`; `ServerTableRowButton`).
+  - **SHOULD-3**: a página interina mostra as InfoBars de erro e de configuração bloqueada. A fonte é a mesma do dashboard, e fechar lá fecha a origem.
+  - **SHOULD-4 (decisão Boss)**:
+    - o "voltar" e o "Ver servidor" do Histórico e o crumb dos Serviços levam à interina desse servidor (`ReturnToServerDetail`), com a origem com que foi aberta;
+    - se o servidor já não estiver listado (ou não houver nenhum), vão para a Visão geral;
+    - copy: "Voltar ao servidor" / "Back to server"; o "voltar" das Definições diz "Voltar à visão geral".
+  - **SHOULD-5**: no reflow Wide/Mid/Stacked, a linha focada mantém o foco (`CurrentStateChanging`/`Changed` do grupo `WidthStates`).
+  - **NITs**:
+    - anel de foco do cartão prioritário com raio 24;
+    - "sem resultados" da Visão geral com a mesma copy §13 dos Servidores.
+
 ## 5. QA harness (Debug-only)
 
-- `--qa-overview` + `--qa-overview-scenario <healthy|mixed|attention|critical|offline|empty|loading|unavailable|discovery|many-100|many-500>`, por defeito `mixed`.
+- `--qa-overview` + `--qa-overview-scenario <healthy|mixed|attention|critical|offline|empty|loading|unavailable|discovery|many-100|many-500|vanishing>`, por defeito `mixed`.
+- `vanishing` = `mixed` cujos servidores desaparecem (em memória, no thread de UI) 30 s depois do primeiro load. É a única forma de ver o vazio §13 dos Servidores sem diálogo, porque esse estado só existe com a página aberta.
 - Registado no parser estrito e em `tools/qa/Start-QaApp.ps1`.
 - O modificador é ordinal e é recusado sem `--qa-overview`; um cenário desconhecido termina com exit 3 antes da composição.
 - Dados sintéticos: hosts `.local` ou RFC 5737; a saúde segue o `HealthEvaluator`.

@@ -81,6 +81,21 @@ public sealed class WorkloadsViewModelUi3Tests
         }
     };
 
+    /// <summary>UI.4 (Boss, Beacon r1 SHOULD-4): the server crumb leads to that server's interim page, not the Dashboard.</summary>
+    [Fact]
+    public void Back_ReturnsToTheServersInterimPage()
+    {
+        var navigation = new FakeNavigationService();
+        using var vm = new WorkloadsViewModel(new InMemoryServerWorkloadStore(), new NoOpCoordinator(), new FakeServerMetricsStore(), navigation,
+            new ResWLocalizationService("pt-PT"), NullLogger<WorkloadsViewModel>.Instance, new FakeTimeProvider(Now));
+        vm.Load(ServerId, "prod-web-01");
+
+        vm.BackCommand.Execute(null);
+
+        Assert.Equal([ServerId], navigation.ServerDetailReturns);
+        Assert.Equal(0, navigation.DashboardCount);
+    }
+
     private static (WorkloadsViewModel Vm, InMemoryServerWorkloadStore Store, FakeServerMetricsStore Metrics) New(
         ServerWorkloadSnapshot? snapshot,
         string culture = "pt-PT",

@@ -37,6 +37,9 @@ public sealed class SaListRow : Button
         DefaultStyleKey = typeof(SaListRow);
     }
 
+    /// <summary>UI.4 (Beacon r1 SHOULD-2): a Button that also says "x of N" when it is a row of a list.</summary>
+    protected override AutomationPeer OnCreateAutomationPeer() => new SaListRowAutomationPeer(this);
+
     /// <summary>Path data of the leading icon (a SaIcon*Data resource).</summary>
     public string? IconData
     {
@@ -78,4 +81,17 @@ public sealed class SaListRow : Button
 
     private void UpdateVariant() =>
         VisualStateManager.GoToState(this, Variant == SaListRowVariant.Rich ? "Rich" : "Simple", useTransitions: false);
+}
+
+/// <summary>
+/// SaListRow stays a Button for UI Automation (invokable, announced as a button); inside an ItemsRepeater it adds its
+/// position and the list total (Beacon r1 SHOULD-2: the overview summary list had -1/-1).
+/// </summary>
+public sealed class SaListRowAutomationPeer(SaListRow owner) : ButtonAutomationPeer(owner)
+{
+    protected override int GetPositionInSetCore() =>
+        SaRepeaterPosition.PositionInSet((UIElement)Owner) is var position and > 0 ? position : base.GetPositionInSetCore();
+
+    protected override int GetSizeOfSetCore() =>
+        SaRepeaterPosition.SizeOfSet((UIElement)Owner) is var size and > 0 ? size : base.GetSizeOfSetCore();
 }

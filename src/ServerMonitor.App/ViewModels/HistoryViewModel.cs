@@ -129,9 +129,10 @@ public sealed class HistoryViewModel : ObservableObject, IDisposable
         _localizationService = localizationService ?? throw new ArgumentNullException(nameof(localizationService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _timeProvider = timeProvider ?? TimeProvider.System;
-        BackCommand = new RelayCommand(navigationService.GoToDashboard);
-        // D-UI3-5: no server Detail page until UI.5, so "Ver servidor" lands on the Dashboard.
-        ViewServerCommand = new RelayCommand(navigationService.GoToDashboard);
+        // UI.4 (Boss, Beacon r1 SHOULD-4): back / "Ver servidor" lead to the interim page of the server shown here
+        // (the Visão geral when it is no longer listed). Replaced by the server Detail in UI.5.
+        BackCommand = new RelayCommand(() => navigationService.ReturnToServerDetail(_serverId));
+        ViewServerCommand = new RelayCommand(() => navigationService.ReturnToServerDetail(_serverId));
         ViewLast30DaysCommand = new RelayCommand(() => SelectedRangeIndex = Ranges.Length - 1);
 
         CpuTitle = localizationService.GetString("HistoryMetricCpu");

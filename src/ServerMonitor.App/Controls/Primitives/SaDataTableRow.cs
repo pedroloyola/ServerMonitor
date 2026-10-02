@@ -1,7 +1,6 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Media;
 
 namespace ServerMonitor.App.Controls.Primitives;
 
@@ -48,21 +47,8 @@ public sealed class SaDataTableRowAutomationPeer(SaDataTableRow owner) : Framewo
 
     /// <summary>1-based position among the list's items (not only the realized ones), so a reader says "x of N".</summary>
     protected override int GetPositionInSetCore() =>
-        Repeater() is { } repeater && repeater.GetElementIndex((UIElement)Owner) is var index and >= 0 ? index + 1 : base.GetPositionInSetCore();
+        SaRepeaterPosition.PositionInSet((UIElement)Owner) is var position and > 0 ? position : base.GetPositionInSetCore();
 
     protected override int GetSizeOfSetCore() =>
-        Repeater()?.ItemsSourceView?.Count is { } count and > 0 ? count : base.GetSizeOfSetCore();
-
-    private ItemsRepeater? Repeater()
-    {
-        for (var current = VisualTreeHelper.GetParent(Owner); current is not null; current = VisualTreeHelper.GetParent(current))
-        {
-            if (current is ItemsRepeater repeater)
-            {
-                return repeater;
-            }
-        }
-
-        return null;
-    }
+        SaRepeaterPosition.SizeOfSet((UIElement)Owner) is var size and > 0 ? size : base.GetSizeOfSetCore();
 }

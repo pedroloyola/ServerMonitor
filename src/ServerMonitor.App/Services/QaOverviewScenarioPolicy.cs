@@ -5,7 +5,9 @@ namespace ServerMonitor.App.Services;
 /// modifier <c>--qa-overview-scenario &lt;name&gt;</c> or <c>--qa-overview-scenario=&lt;name&gt;</c>. Compiled in every
 /// configuration so a test can prove the Release guard: with <c>isDebugBuild: false</c> the modifier is always ignored.
 /// The Servidores states (search / no results) are interactions over <c>mixed</c> and <c>many-100</c>; empty is
-/// <c>empty</c>; 100 / 500 rows are <c>many-100</c> / <c>many-500</c>.
+/// <c>empty</c>; 100 / 500 rows are <c>many-100</c> / <c>many-500</c>. <c>vanishing</c> is <c>mixed</c> whose servers
+/// all disappear 30 s after the first load, so the Servidores empty state (§13, reachable only with the page open) can
+/// be seen without a dialog.
 /// </summary>
 public static class QaOverviewScenarioPolicy
 {
@@ -17,7 +19,7 @@ public static class QaOverviewScenarioPolicy
     public static readonly IReadOnlyList<string> Scenarios =
     [
         "healthy", "mixed", "attention", "critical", "offline", "empty", "loading", "unavailable", "discovery",
-        "many-100", "many-500"
+        "many-100", "many-500", "vanishing"
     ];
 
     /// <summary>True when the modifier is present at all (whatever its value).</summary>

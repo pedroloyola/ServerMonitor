@@ -31,6 +31,33 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
         _navigation = navigation ?? throw new ArgumentNullException(nameof(navigation));
         _localization = localization ?? throw new ArgumentNullException(nameof(localization));
         GoBackCommand = new RelayCommand(GoBack);
+        _dashboard.PropertyChanged += OnDashboardPropertyChanged;
+    }
+
+    /// <summary>
+    /// Beacon r1 SHOULD-3: a failed Ocultar/Remover started here is reported HERE - the same error the Visão geral shows
+    /// (one source: the dashboard view model), not only after going back.
+    /// </summary>
+    public bool IsOperationErrorOpen
+    {
+        get => _dashboard.IsOperationErrorOpen;
+        set => _dashboard.IsOperationErrorOpen = value;
+    }
+
+    public bool IsConfigurationLockedOpen
+    {
+        get => _dashboard.IsConfigurationLockedOpen;
+        set => _dashboard.IsConfigurationLockedOpen = value;
+    }
+
+    public string ConfigurationLockedMessage => _dashboard.ConfigurationLockedMessage;
+
+    private void OnDashboardPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(DashboardViewModel.IsOperationErrorOpen) or nameof(DashboardViewModel.IsConfigurationLockedOpen))
+        {
+            OnPropertyChanged(e.PropertyName);
+        }
     }
 
     public ServerDetailOrigin Origin { get; private set; }
@@ -74,6 +101,7 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
 
     public void Dispose()
     {
+        _dashboard.PropertyChanged -= OnDashboardPropertyChanged;
         // A deferred Resolve queued before the page was replaced must not navigate afterwards.
         _disposed = true;
         if (_subscribed)

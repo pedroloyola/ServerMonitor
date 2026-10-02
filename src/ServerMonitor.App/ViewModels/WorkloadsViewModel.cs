@@ -120,7 +120,8 @@ public sealed class WorkloadsViewModel : ObservableObject, IDisposable
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _timeProvider = timeProvider ?? TimeProvider.System;
 
-        BackCommand = new RelayCommand(navigationService.GoToDashboard);
+        // UI.4 (Boss, Beacon r1 SHOULD-4): the server crumb leads to that server's interim page (Visão geral if gone).
+        BackCommand = new RelayCommand(() => navigationService.ReturnToServerDetail(_serverId));
         _refreshCommand = new AsyncRelayCommand(RefreshAsync, () => !IsRefreshing);
         _clearSearchCommand = new RelayCommand(ClearSearch);
 

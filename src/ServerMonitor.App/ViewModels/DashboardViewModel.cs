@@ -76,6 +76,8 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
     private IReadOnlyList<ServerDirectoryRowViewModel>? _overviewRows;
     private IReadOnlyList<ServerDirectoryRowViewModel>? _overviewServers;
     private AsyncRelayCommand? _refreshAllCommand;
+    private (OverviewReturnTarget Target, Guid ServerId) _returnFocus;
+    private Guid? _directoryReturnFocus;
 
     public DashboardViewModel(
         IServerService serverService,
@@ -122,7 +124,11 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         AddServerCommand = new AsyncRelayCommand(AddServerAsync);
         ImportFromSshCommand = new AsyncRelayCommand(ImportFromSshAsync);
         OpenSettingsCommand = new RelayCommand(navigationService.GoToSettings);
-        ViewAllServersCommand = new RelayCommand(navigationService.GoToServers);
+        ViewAllServersCommand = new RelayCommand(() =>
+        {
+            RememberReturnFocus(OverviewReturnTarget.ViewAll, Guid.Empty);
+            navigationService.GoToServers();
+        });
         // Cortex r1 SHOULD-1: the user moving to another page cancels a deep-link still waiting for its server.
         navigationService.NavigatedAwayFromOverview += OnNavigatedAwayFromOverview;
         ClearOverviewSearchCommand = new RelayCommand(() => OverviewSearchText = string.Empty);
@@ -177,6 +183,30 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
             OpenServerDetail(id, ServerDetailOrigin.Overview);
         }
     }
+
+    /// <summary>
+    /// Beacon r1 SHOULD-1: where keyboard focus returns when the user comes back to the Visão geral - the row, the
+    /// priority card or "Ver todos" that opened the page they come from. Taken once by the view on its next Loaded; when
+    /// there is none the view focuses the content (never the window-mode button).
+    /// </summary>
+    public (OverviewReturnTarget Target, Guid ServerId) TakeReturnFocus()
+    {
+        var target = _returnFocus;
+        _returnFocus = (OverviewReturnTarget.None, Guid.Empty);
+        return target;
+    }
+
+    /// <summary>The Servidores row that opened the interim page, for the next Servidores page to refocus (taken once).</summary>
+    public Guid? TakeDirectoryReturnFocus()
+    {
+        var id = _directoryReturnFocus;
+        _directoryReturnFocus = null;
+        return id;
+    }
+
+    internal void RememberDirectoryReturnFocus(Guid serverId) => _directoryReturnFocus = serverId;
+
+    private void RememberReturnFocus(OverviewReturnTarget target, Guid serverId) => _returnFocus = (target, serverId);
 
     /// <summary>Opens the interim server page (D-UI4-DETAIL) for a server of the list.</summary>
     public void OpenServerDetail(Guid serverId, ServerDetailOrigin origin)
@@ -475,7 +505,10 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
     public bool HasOverviewSearchNoResults =>
         HasVisibleServers && !string.IsNullOrWhiteSpace(OverviewSearchText) && OverviewServers.Count == 0;
 
-    public string OverviewNoResultsTitle => Format("ServerSearchNoResultsTitleFormat", OverviewSearchText.Trim());
+    // Beacon r1 NIT-4: the same §13 copy as the Servidores page (title + the query in the message).
+    public string OverviewNoResultsTitle => Text("ServersNoResultsTitle");
+
+    public string OverviewNoResultsMessage => Format("ServersNoResultsMessageFormat", OverviewSearchText.Trim());
 
     public async Task LoadAsync()
     {
@@ -531,6 +564,7 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
     {
         if (_priorityProblem is { } problem)
         {
+            RememberReturnFocus(OverviewReturnTarget.Priority, problem.ServerId);
             OpenServerDetail(problem.ServerId, ServerDetailOrigin.Overview);
         }
     }
@@ -732,7 +766,11 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
                 .Select(card => new ServerDirectoryRowViewModel(
                     card,
                     localization,
-                    selected => OpenServerDetail(selected.Server.Id, ServerDetailOrigin.Overview),
+                    selected =>
+                    {
+                        RememberReturnFocus(OverviewReturnTarget.ServerRow, selected.Server.Id);
+                        OpenServerDetail(selected.Server.Id, ServerDetailOrigin.Overview);
+                    },
                     Thresholds))
                 .ToList();
         ApplyOverviewFilter();
@@ -752,6 +790,7 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(OverviewMoreDisplay));
         OnPropertyChanged(nameof(HasOverviewSearchNoResults));
         OnPropertyChanged(nameof(OverviewNoResultsTitle));
+        OnPropertyChanged(nameof(OverviewNoResultsMessage));
     }
 
     private string Text(string key) => _localizationService?.GetString(key) ?? key;

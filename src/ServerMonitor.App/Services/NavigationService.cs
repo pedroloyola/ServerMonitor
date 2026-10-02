@@ -12,6 +12,7 @@ public sealed class NavigationService : INavigationService
     private readonly ILogger<NavigationService> _logger;
     private readonly Func<Type, object> _pageFactory;
     private INavigationHost? _host;
+    private readonly Dictionary<Guid, ServerDetailOrigin> _detailOrigins = [];
 
     public NavigationService(IServiceProvider serviceProvider, ILogger<NavigationService> logger)
         : this(serviceProvider, logger, pageFactory: null)
@@ -109,10 +110,23 @@ public sealed class NavigationService : INavigationService
 
         // Content BEFORE Load: if the page has to leave during Load (the server vanished in between), that navigation
         // runs after this one and wins, instead of being overwritten by it.
+        _detailOrigins[serverId] = origin;
         var page = (IServerDetailView)_pageFactory(typeof(ServerDetailPage));
         Show(page, isOverview: false);
         page.Load(serverId, origin);
         _logger.LogInformation("Navigated to the interim server page from {Origin}.", origin);
+    }
+
+    public void ReturnToServerDetail(Guid serverId)
+    {
+        if (serverId == Guid.Empty)
+        {
+            GoToDashboard();
+            return;
+        }
+
+        // GoToServerDetail itself falls back to the origin when the server is no longer listed.
+        GoToServerDetail(serverId, _detailOrigins.GetValueOrDefault(serverId, ServerDetailOrigin.Overview));
     }
 
     private void GoToOrigin(ServerDetailOrigin origin)

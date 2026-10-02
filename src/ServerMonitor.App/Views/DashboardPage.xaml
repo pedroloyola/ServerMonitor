@@ -68,10 +68,12 @@
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
             <Setter Property="VerticalContentAlignment" Value="Stretch" />
             <Setter Property="FocusVisualMargin" Value="0" />
+            <!-- Beacon r1 NIT-2: the focus ring follows the card's radius 24 (like the Saúde card). -->
+            <Setter Property="CornerRadius" Value="{StaticResource SaRadiusCard}" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Grid x:Name="RootGrid">
+                        <Grid x:Name="RootGrid" CornerRadius="{TemplateBinding CornerRadius}">
                             <VisualStateManager.VisualStateGroups>
                                 <VisualStateGroup x:Name="CommonStates">
                                     <VisualState x:Name="Normal" />
@@ -357,7 +359,7 @@
                     </Grid.RowDefinitions>
 
                     <!-- Fleet health 112:1010: read-only, one Tab stop named by the full sentence (Beacon F3 pattern). -->
-                    <primitives:SaFocusableCard AutomationProperties.Name="{x:Bind ViewModel.HealthAutomationName, Mode=OneWay}">
+                    <primitives:SaFocusableCard x:Name="HealthCard" AutomationProperties.Name="{x:Bind ViewModel.HealthAutomationName, Mode=OneWay}">
                         <!-- 156 high (B6): label 20 · count row 47 · chips 23, gap 8, inside pad 24 + border. -->
                         <Border Style="{StaticResource SaGlassSurfaceStyle}" MinHeight="156">
                             <StackPanel Spacing="{StaticResource SaSpace8}" AutomationProperties.AccessibilityView="Raw">
@@ -403,7 +405,7 @@
 
                     <Grid x:Name="PriorityHost" Grid.Column="1">
                         <!-- Priority 112:1031: icon + label in the severity colour, value 32 Light + capacity bar, server + chevron. -->
-                        <Button Style="{StaticResource OverviewCardButtonStyle}" MinHeight="156"
+                        <Button x:Name="PriorityButton" Style="{StaticResource OverviewCardButtonStyle}" MinHeight="156"
                                 Command="{x:Bind ViewModel.OpenPriorityProblemCommand}"
                                 AutomationProperties.Name="{x:Bind ViewModel.PriorityAutomationName, Mode=OneWay}"
                                 Visibility="{x:Bind ViewModel.HasPriorityProblem, Mode=OneWay}">
@@ -499,7 +501,7 @@
                         <StackPanel Orientation="Horizontal" Spacing="{StaticResource SaSpace16}" VerticalAlignment="Center">
                             <TextBlock x:Uid="OverviewServersTitle" AutomationProperties.HeadingLevel="Level2" VerticalAlignment="Center"
                                        Style="{StaticResource SaSectionTitleTextStyle}" Foreground="{ThemeResource SaTextBrush}" />
-                            <Button x:Uid="OverviewViewAllButton" VerticalAlignment="Center" Style="{StaticResource SaBreadcrumbParentButtonStyle}"
+                            <Button x:Name="ViewAllButton" x:Uid="OverviewViewAllButton" VerticalAlignment="Center" Style="{StaticResource SaBreadcrumbParentButtonStyle}"
                                     Command="{x:Bind ViewModel.ViewAllServersCommand}" />
                         </StackPanel>
                         <TextBox x:Name="OverviewSearchBox" x:Uid="OverviewSearch" Grid.Column="1" Width="214"
@@ -510,7 +512,7 @@
                     <Border Style="{StaticResource SaGlassSurfaceStyle}">
                         <StackPanel>
                             <primitives:SaDataTableList x:Uid="OverviewServerList">
-                                <ItemsRepeater TabFocusNavigation="Once" XYFocusKeyboardNavigation="Enabled" AutomationProperties.AccessibilityView="Raw"
+                                <ItemsRepeater x:Name="OverviewRepeater" TabFocusNavigation="Once" XYFocusKeyboardNavigation="Enabled" AutomationProperties.AccessibilityView="Raw"
                                                ItemsSource="{x:Bind ViewModel.OverviewServers, Mode=OneWay}"
                                                ItemTemplate="{StaticResource OverviewServerRowTemplate}" />
                             </primitives:SaDataTableList>
@@ -522,6 +524,7 @@
                                     Visibility="{x:Bind ViewModel.HasOverviewMore, Mode=OneWay}" />
                             <primitives:SaEmptyState x:Name="OverviewNoResultsState" TitleHeadingLevel="Level3" IconData="{StaticResource SaIconSearch01Data}"
                                                      Title="{x:Bind ViewModel.OverviewNoResultsTitle, Mode=OneWay}"
+                                                     Message="{x:Bind ViewModel.OverviewNoResultsMessage, Mode=OneWay}"
                                                      Visibility="{x:Bind ViewModel.HasOverviewSearchNoResults, Mode=OneWay}">
                                 <Button x:Uid="OverviewClearSearchButton" HorizontalAlignment="Center" Style="{StaticResource SaSolidButtonStyle}"
                                         Command="{x:Bind ViewModel.ClearOverviewSearchCommand}" Click="OnClearSearchClick" />
@@ -550,7 +553,7 @@
                     <primitives:SaEmptyState x:Uid="OverviewEmptyState" TitleHeadingLevel="Level2" IconData="{StaticResource SaIconServerStack01Data}">
                         <StackPanel Spacing="{StaticResource SaSpace16}">
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="{StaticResource SaSpace12}">
-                                <Button x:Uid="OverviewEmptyAddButton" Style="{StaticResource SaSolidButtonStyle}" Command="{x:Bind ViewModel.AddServerCommand}" />
+                                <Button x:Name="EmptyAddButton" x:Uid="OverviewEmptyAddButton" Style="{StaticResource SaSolidButtonStyle}" Command="{x:Bind ViewModel.AddServerCommand}" />
                                 <Button x:Uid="OverviewEmptyImportButton" Style="{StaticResource SaSecondaryButtonStyle}" Command="{x:Bind ViewModel.ImportFromSshCommand}" />
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="{StaticResource SaSpace8}"

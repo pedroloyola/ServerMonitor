@@ -142,7 +142,7 @@ public sealed partial class Ui4PageContractTests
         Assert.Contains("{StaticResource ServerRowMidTemplate}", templateSetters);
         Assert.Contains("{StaticResource ServerRowStackedTemplate}", templateSetters);
 
-        var rowButtons = elements.Where(e => e.Name.LocalName == "Button" && Attr(e, "Style") == "{StaticResource ServerRowButtonStyle}").ToList();
+        var rowButtons = elements.Where(e => e.Name.LocalName == "ServerTableRowButton" && Attr(e, "Style") == "{StaticResource ServerRowButtonStyle}").ToList();
         Assert.Equal(3, rowButtons.Count);
         Assert.All(rowButtons, b =>
         {

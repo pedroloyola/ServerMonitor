@@ -334,6 +334,10 @@ public sealed class SettingsNotificationViewModelTests
         public void GoToServerDetail(Guid serverId, ServerDetailOrigin origin)
         {
         }
+
+        public void ReturnToServerDetail(Guid serverId)
+        {
+        }
     }
 
     private sealed class EmptyDiscoveryService : IServerDiscoveryService

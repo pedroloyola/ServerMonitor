@@ -393,7 +393,8 @@ public sealed class Ui4OverviewTests
         kit.Dashboard.OverviewSearchText = "zzz";
         Assert.Empty(kit.Dashboard.OverviewServers);
         Assert.True(kit.Dashboard.HasOverviewSearchNoResults);
-        Assert.Equal("Nenhum resultado para “zzz”", kit.Dashboard.OverviewNoResultsTitle);
+        Assert.Equal("Nenhum servidor encontrado", kit.Dashboard.OverviewNoResultsTitle);
+        Assert.Equal("Não há servidores com o nome ou endereço “zzz”. Experimenta outra pesquisa.", kit.Dashboard.OverviewNoResultsMessage);
 
         kit.Dashboard.ClearOverviewSearchCommand.Execute(null);
         Assert.Equal(string.Empty, kit.Dashboard.OverviewSearchText);

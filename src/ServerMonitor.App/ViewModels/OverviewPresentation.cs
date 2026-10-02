@@ -283,3 +283,12 @@ public sealed record HealthBarSegment(ServerHealth Health, double Width, int Cou
 
 /// <summary>One exception chip of the health card ("1 atenção"): the state, its count and the localized text.</summary>
 public sealed record HealthChip(ServerHealth Health, int Count, string Text);
+
+/// <summary>Where keyboard focus returns on the Visão geral (Beacon r1 SHOULD-1).</summary>
+public enum OverviewReturnTarget
+{
+    None,
+    ServerRow,
+    Priority,
+    ViewAll
+}

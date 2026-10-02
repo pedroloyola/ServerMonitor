@@ -43,4 +43,11 @@ public interface INavigationService
     /// to <paramref name="origin"/>. Replaced in UI.5.
     /// </summary>
     void GoToServerDetail(Guid serverId, ServerDetailOrigin origin);
+
+    /// <summary>
+    /// UI.4 Beacon r1 SHOULD-4 (Boss decision): the way back from Histórico / Serviços e containers leads to the interim
+    /// page of THAT server (where its card lives now), with the origin it was last opened from; a server that is no longer
+    /// listed (or none) lands on the Visão geral.
+    /// </summary>
+    void ReturnToServerDetail(Guid serverId);
 }

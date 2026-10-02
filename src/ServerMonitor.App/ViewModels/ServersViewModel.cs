@@ -178,7 +178,31 @@ public sealed class ServersViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(HeaderContextDisplay));
     }
 
-    private void OpenDetail(ServerCardViewModel card) => _navigation.GoToServerDetail(card.Server.Id, ServerDetailOrigin.Servers);
+    private void OpenDetail(ServerCardViewModel card)
+    {
+        // Beacon r1 SHOULD-1: coming back, the next Servidores page puts focus back on this row.
+        _dashboard.RememberDirectoryReturnFocus(card.Server.Id);
+        _navigation.GoToServerDetail(card.Server.Id, ServerDetailOrigin.Servers);
+    }
+
+    /// <summary>The row to refocus when this page opens after the interim page (taken once), with its index in <see cref="Rows"/>.</summary>
+    public int TakeReturnFocusIndex()
+    {
+        if (_dashboard.TakeDirectoryReturnFocus() is not { } id)
+        {
+            return -1;
+        }
+
+        for (var i = 0; i < _rows.Count; i++)
+        {
+            if (_rows[i].ServerId == id)
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
 
     private void DisposeRows()
     {

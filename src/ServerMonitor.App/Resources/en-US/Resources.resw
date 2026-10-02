@@ -11,7 +11,7 @@
   <data name="DashboardSettingsButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Open settings</value></data>
   <data name="DashboardSettingsButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Settings</value></data>
   <data name="SettingsTitle.Text" xml:space="preserve"><value>Settings</value></data>
-  <data name="SettingsBackButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Back to servers</value></data>
+  <data name="SettingsBackButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Back to overview</value></data>
   <data name="SettingsBackButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Back</value></data>
   <data name="SettingsSubtitle.Text" xml:space="preserve"><value>Customize appearance and language.</value></data>
   <data name="SettingsAppearanceTitle.Text" xml:space="preserve"><value>Appearance</value></data>
@@ -230,7 +230,7 @@
   <data name="SettingsAlwaysOnTopToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Keep the compact widget always on top</value></data>
   <!-- M10 Local History + Charts -->
   <data name="ServerCardHistoryMenuItem.Text" xml:space="preserve"><value>History</value></data>
-  <data name="HistoryBackButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Back to servers</value></data>
+  <data name="HistoryBackButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Back to server</value></data>
   <data name="HistoryBackButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Back</value></data>
   <data name="HistorySubtitle.Text" xml:space="preserve"><value>History</value></data>
   <data name="HistoryRangeSelector.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Time range</value></data>
@@ -279,7 +279,7 @@
   <data name="HistoryResetConfirmPrimary" xml:space="preserve"><value>Reset history</value></data>
   <!-- M11 Workloads (Docker + Services), read-only -->
   <data name="ServerCardWorkloadsMenuItem.Text" xml:space="preserve"><value>Services and containers</value></data>
-  <data name="WorkloadsBackButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Back to servers</value></data>
+  <data name="WorkloadsBackButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Back to server</value></data>
   <data name="WorkloadsBackButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Back</value></data>
   <data name="WorkloadsSubtitle.Text" xml:space="preserve"><value>Services and containers</value></data>
   <data name="WorkloadStaleBadge.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>These services and containers may be outdated</value></data>

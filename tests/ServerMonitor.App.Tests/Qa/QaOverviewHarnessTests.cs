@@ -161,6 +161,26 @@ public sealed class QaOverviewHarnessTests
         });
     }
 
+    /// <summary>vanishing: once its servers go, the change is announced and every later load is empty (in memory).</summary>
+    [Fact]
+    public async Task Vanishing_AnnouncesTheChange_AndLaterLoadsAreEmpty()
+    {
+        var scheduled = new List<(TimeSpan Delay, Action Run)>();
+        var service = new QaOverviewServerService(QaOverviewCatalog.Build("vanishing"), (delay, run) => scheduled.Add((delay, run)));
+        Assert.NotEmpty(await service.GetAllAsync());
+        Assert.NotEmpty(await service.GetAllAsync());
+        var (delay, run) = Assert.Single(scheduled); // scheduled once, by the first load
+        Assert.Equal(TimeSpan.FromSeconds(30), delay);
+        var raised = 0;
+        service.ServersChanged += (_, _) => raised++;
+
+        run();
+
+        Assert.Equal(1, raised);
+        Assert.Empty(await service.GetAllAsync());
+        Assert.Single(scheduled);
+    }
+
     [Fact]
     public async Task TheScenarios_HaveTheIntendedShape()
     {
@@ -180,6 +200,11 @@ public sealed class QaOverviewHarnessTests
         Assert.NotEmpty(QaOverviewCatalog.Build("discovery").Discovered);
         Assert.All(QaOverviewCatalog.Build("unavailable").Servers, s => Assert.Null(s.Snapshot));
         Assert.All(QaOverviewCatalog.Build("healthy").Servers, s => Assert.Equal(ServerHealth.Healthy, s.State.Health));
+
+        var vanishing = QaOverviewCatalog.Build("vanishing");
+        Assert.Equal(mixed.Servers.Select(s => s.Server.Name), vanishing.Servers.Select(s => s.Server.Name));
+        Assert.Equal(TimeSpan.FromSeconds(30), vanishing.VanishAfter);
+        Assert.Null(mixed.VanishAfter);
 
         var loading = new QaOverviewServerService(QaOverviewCatalog.Build("loading")).GetAllAsync();
         await Task.Delay(50);

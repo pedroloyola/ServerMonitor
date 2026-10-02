@@ -600,13 +600,15 @@ public sealed class HistoryViewModelUi3Tests
     }
 
     [Fact]
-    public void ViewServer_GoesToTheDashboard_UntilUi5()
+    public void ViewServer_GoesToTheServersInterimPage_UntilUi5()
     {
         var h = New();
 
         h.Vm.ViewServerCommand.Execute(null);
 
-        Assert.Equal(1, h.Navigation.DashboardCount);
+        // UI.4 (Boss): the interim page is where the server's card lives now.
+        Assert.Single(h.Navigation.ServerDetailReturns);
+        Assert.Equal(0, h.Navigation.DashboardCount);
     }
 
     [Fact]

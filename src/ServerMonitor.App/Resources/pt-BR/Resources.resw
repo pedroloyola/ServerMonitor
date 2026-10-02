@@ -16,7 +16,7 @@
   <data name="DashboardSettingsButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Abrir configurações</value></data>
   <data name="DashboardSettingsButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Configurações</value></data>
   <data name="SettingsTitle.Text" xml:space="preserve"><value>Configurações</value></data>
-  <data name="SettingsBackButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Voltar para servidores</value></data>
+  <data name="SettingsBackButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Voltar à visão geral</value></data>
   <data name="SettingsBackButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Voltar</value></data>
   <data name="SettingsSubtitle.Text" xml:space="preserve"><value>Personalize a aparência e o idioma.</value></data>
   <data name="SettingsAppearanceTitle.Text" xml:space="preserve"><value>Aparência</value></data>
@@ -235,7 +235,7 @@
   <data name="SettingsAlwaysOnTopToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Manter o widget compacto sempre no topo</value></data>
   <!-- M10 Local History + Charts -->
   <data name="ServerCardHistoryMenuItem.Text" xml:space="preserve"><value>Histórico</value></data>
-  <data name="HistoryBackButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Voltar aos servidores</value></data>
+  <data name="HistoryBackButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Voltar ao servidor</value></data>
   <data name="HistoryBackButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Voltar</value></data>
   <data name="HistorySubtitle.Text" xml:space="preserve"><value>Histórico</value></data>
   <data name="HistoryRangeSelector.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Intervalo de tempo</value></data>
@@ -284,7 +284,7 @@
   <data name="HistoryResetConfirmPrimary" xml:space="preserve"><value>Repor histórico</value></data>
   <!-- M11 Workloads (Docker + Serviços), somente leitura -->
   <data name="ServerCardWorkloadsMenuItem.Text" xml:space="preserve"><value>Serviços e containers</value></data>
-  <data name="WorkloadsBackButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Voltar aos servidores</value></data>
+  <data name="WorkloadsBackButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Voltar ao servidor</value></data>
   <data name="WorkloadsBackButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Voltar</value></data>
   <data name="WorkloadsSubtitle.Text" xml:space="preserve"><value>Serviços e containers</value></data>
   <data name="WorkloadStaleBadge.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Estes serviços e containers podem estar desatualizados</value></data>

@@ -71,6 +71,14 @@ internal sealed class FakeNavigationService : INavigationService
 
     public List<(Guid ServerId, ServerDetailOrigin Origin)> ServerDetailRequests { get; } = [];
 
+    public List<Guid> ServerDetailReturns { get; } = [];
+
+    public void ReturnToServerDetail(Guid serverId)
+    {
+        ServerDetailReturns.Add(serverId);
+        Raise();
+    }
+
     public void GoToServerDetail(Guid serverId, ServerDetailOrigin origin)
     {
         ServerDetailRequests.Add((serverId, origin));
