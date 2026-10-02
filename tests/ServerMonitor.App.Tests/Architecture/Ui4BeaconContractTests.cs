@@ -60,4 +60,18 @@ public sealed class Ui4BeaconContractTests
         Assert.Contains("ServersRepeater.GotFocus += OnRowGotFocus", code);
         Assert.DoesNotContain("CurrentStateChanging", code);
     }
+
+    /// <summary>
+    /// QA r2 (Light after a runtime switch): a ThemeResource in an active visual state's setter is not re-resolved, so the
+    /// status dot must re-enter its state when the effective theme changes — also on Loaded (a cached page is out of the
+    /// tree while the theme changes in Definições).
+    /// </summary>
+    [Fact]
+    public void StatusIndicator_ReappliesItsStateOnThemeChange()
+    {
+        var code = AppSourceTree.CodeWithoutComments("Controls/Primitives/SaStatusIndicator.cs");
+        Assert.Contains("ActualThemeChanged += (_, _) => RefreshStatusStateForTheme();", code);
+        Assert.Contains("Loaded += (_, _) => RefreshStatusStateForTheme();", code);
+        Assert.Contains("_stateTheme = ActualTheme;", code);
+    }
 }

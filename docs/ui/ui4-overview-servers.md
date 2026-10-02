@@ -89,6 +89,7 @@ Autoridade visual: Figma `Qvk5dUFgsWf4UOYzfAkiDV`, 05 Free secção 02 "Dashboar
     - se o servidor já não estiver listado (ou não houver nenhum), vão para a Visão geral;
     - copy: "Voltar ao servidor" / "Back to server"; o "voltar" das Definições diz "Voltar à visão geral".
   - **SHOULD-5**: no reflow Wide/Mid/Stacked, a linha focada mantém o foco. Observa-se a troca do `ItemTemplate` do repeater, porque o `AdaptiveTrigger` não dispara os eventos do `VisualStateGroup`. A linha é registada pelo índice no `GotFocus`, porque as linhas x:Bind não têm o item como `DataContext`. Verificado na app real a 1440 → 1000 → 640 → 560 → 1440.
+  - **Achado da QA r2 (corrigido)**: depois de trocar o tema em runtime, alguns pontos de estado (`SaStatusIndicator`, UI.2) ficavam com a cor do tema anterior. Causa: o WinUI não reavalia um `{ThemeResource}` no setter de um VisualState ativo. Correção: o primitivo reentra no estado quando o tema efetivo muda (`ActualThemeChanged` e `Loaded`, porque a Visão geral em cache está fora da árvore enquanto se muda o tema). Verificado em Light após Escuro → Claro.
   - **NITs**:
     - anel de foco do cartão prioritário com raio 24;
     - "sem resultados" da Visão geral com a mesma copy §13 dos Servidores.

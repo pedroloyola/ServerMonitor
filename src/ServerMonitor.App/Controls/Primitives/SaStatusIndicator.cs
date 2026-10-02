@@ -53,10 +53,17 @@ public sealed class SaStatusIndicator : Control
     // The name this control last applied. An explicit AutomationProperties.Name set by a consumer is never
     // overwritten (Cortex F-2): only an empty name or the one this control set itself is replaced.
     private string? _appliedAutomationName;
+    private ElementTheme? _stateTheme;
 
     public SaStatusIndicator()
     {
         DefaultStyleKey = typeof(SaStatusIndicator);
+        // UI.4 QA r2: a {ThemeResource} in an ACTIVE visual state's setter is not re-resolved on a runtime theme change
+        // (WinUI), so the dot kept the previous theme's colour until the row was recycled. Re-enter the state when the
+        // effective theme differs from the one it was applied under - also on Loaded, because a cached page (the Visão
+        // geral) is out of the tree while the theme is changed in Definições.
+        ActualThemeChanged += (_, _) => RefreshStatusStateForTheme();
+        Loaded += (_, _) => RefreshStatusStateForTheme();
     }
 
     public SaStatusKind Status
@@ -86,6 +93,7 @@ public sealed class SaStatusIndicator : Control
     {
         base.OnApplyTemplate();
         UpdateStatusState(useTransitions: false);
+        _stateTheme = ActualTheme;
         UpdateLabelState(useTransitions: false);
     }
 
@@ -97,6 +105,20 @@ public sealed class SaStatusIndicator : Control
             AutomationProperties.SetName(this, label);
             _appliedAutomationName = label;
         }
+    }
+
+    private void RefreshStatusStateForTheme()
+    {
+        if (_stateTheme is null || _stateTheme == ActualTheme)
+        {
+            return;
+        }
+
+        // GoToState to the state already active is a no-op; pass through another one to re-apply the setters.
+        var current = StateName(Status);
+        VisualStateManager.GoToState(this, current == nameof(SaStatusKind.Unknown) ? nameof(SaStatusKind.Healthy) : nameof(SaStatusKind.Unknown), false);
+        VisualStateManager.GoToState(this, current, false);
+        _stateTheme = ActualTheme;
     }
 
     private void UpdateStatusState(bool useTransitions) =>
