@@ -149,7 +149,11 @@ public sealed partial class Ui3PageContractTests
             Assert.Equal("Disabled", setters["ServicesScroll.VerticalScrollMode"]);
             Assert.Equal("Auto", setters["CardsRow1.Height"]);
             Assert.Equal("Auto", setters["CardsRow2.Height"]);
+            Assert.Equal("0", setters["CardsGrid.ColumnSpacing"]);          // stacked: no phantom column gap
         }
+
+        var cards = Assert.Single(Elements(Workloads), e => (string?)e.Attribute(AppSourceTree.Xaml + "Name") == "CardsGrid");
+        Assert.Null(Attr(cards, "RowSpacing"));                                // side by side: no phantom row gap
     }
 
     [Fact]
@@ -158,6 +162,7 @@ public sealed partial class Ui3PageContractTests
         var search = Assert.Single(Elements(Workloads), e => Uid(e) == "WorkloadSearchAll");
         Assert.Equal("{StaticResource SaPageSearchFieldStyle}", Attr(search, "Style"));
         Assert.Contains("SearchText, Mode=TwoWay", Attr(search, "Text"), StringComparison.Ordinal);
+        Assert.Equal("Left", Attr(search, "HorizontalAlignment"));   // Prism R1 F2: never centred when it spans < 900
 
         var group = Assert.Single(Elements(Workloads), e => Uid(e) == "WorkloadGlobalFilter");
         Assert.Equal("SelectionFollowsFocus", group.Attributes().First(a => a.Name.LocalName == "SaGroupNavigation.Mode").Value);

@@ -112,6 +112,8 @@
                         <Setter Target="ServicesScroll.VerticalScrollBarVisibility" Value="Disabled" />
                         <Setter Target="CardsRow1.Height" Value="Auto" />
                         <Setter Target="CardsRow2.Height" Value="Auto" />
+                        <Setter Target="CardsGrid.ColumnSpacing" Value="0" />
+                        <Setter Target="CardsGrid.RowSpacing" Value="{StaticResource SaSpace24}" />
                     </VisualState.Setters>
                 </VisualState>
                 <VisualState x:Name="Narrow">
@@ -137,6 +139,8 @@
                         <Setter Target="ServicesScroll.VerticalScrollBarVisibility" Value="Disabled" />
                         <Setter Target="CardsRow1.Height" Value="Auto" />
                         <Setter Target="CardsRow2.Height" Value="Auto" />
+                        <Setter Target="CardsGrid.ColumnSpacing" Value="0" />
+                        <Setter Target="CardsGrid.RowSpacing" Value="{StaticResource SaSpace24}" />
                     </VisualState.Setters>
                 </VisualState>
             </VisualStateGroup>
@@ -211,6 +215,7 @@
                 x:Name="SearchBox"
                 x:Uid="WorkloadSearchAll"
                 Width="400"
+                HorizontalAlignment="Left"
                 Style="{StaticResource SaPageSearchFieldStyle}"
                 Text="{Binding SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
             <Border x:Name="FilterTrack" Grid.Column="2" Style="{StaticResource SaSegmentedRectTrackStyle}">
@@ -305,9 +310,10 @@
             </Border>
 
             <!-- Cards 112:2640 / 112:2698: two glass columns 508 + gap 24. -->
+            <!-- Column spacing only side by side, row spacing only stacked: a zero-size column/row must add no gap. -->
             <Grid
+                x:Name="CardsGrid"
                 ColumnSpacing="{StaticResource SaSpace24}"
-                RowSpacing="{StaticResource SaSpace24}"
                 Visibility="{Binding ShowSectionCards, Converter={StaticResource BooleanToVisibilityConverter}}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
