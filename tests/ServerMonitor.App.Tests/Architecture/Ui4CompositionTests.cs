@@ -32,6 +32,8 @@ public sealed class Ui4CompositionTests
         var selector = (PriorityProblemSelector)typeof(DashboardViewModel)
             .GetField("_prioritySelector", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(dashboard)!;
         Assert.Same(options.Thresholds, selector.Thresholds);
+        // Atlas r1 SHOULD-2: the rows' metric colouring reads the same instance.
+        Assert.Same(options.Thresholds, dashboard.Thresholds);
     }
 
     [Fact]
