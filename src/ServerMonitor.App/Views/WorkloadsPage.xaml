@@ -100,9 +100,7 @@
                         <Setter Target="FilterTrack.(Grid.Row)" Value="1" />
                         <Setter Target="FilterTrack.(Grid.Column)" Value="0" />
                         <Setter Target="SearchBox.(Grid.ColumnSpan)" Value="3" />
-                        <Setter Target="SearchBox.MaxWidth" Value="400" />
-                        <Setter Target="SearchBox.Width" Value="NaN" />
-                        <Setter Target="SearchBox.HorizontalAlignment" Value="Stretch" />
+                        <Setter Target="QueryRow.RowSpacing" Value="{StaticResource SaSpace12}" />
                         <Setter Target="ServicesCard.(Grid.Row)" Value="1" />
                         <Setter Target="ServicesCard.(Grid.Column)" Value="0" />
                         <Setter Target="CardsColumn2.Width" Value="0" />
@@ -127,6 +125,7 @@
                         <Setter Target="SearchBox.Width" Value="NaN" />
                         <Setter Target="SearchBox.HorizontalAlignment" Value="Stretch" />
                         <Setter Target="SearchBox.(Grid.ColumnSpan)" Value="3" />
+                        <Setter Target="QueryRow.RowSpacing" Value="{StaticResource SaSpace12}" />
                         <Setter Target="ServicesCard.(Grid.Row)" Value="1" />
                         <Setter Target="ServicesCard.(Grid.Column)" Value="0" />
                         <Setter Target="CardsColumn2.Width" Value="0" />
@@ -180,6 +179,7 @@
             <Button
                 Grid.Column="1"
                 VerticalAlignment="Top"
+                MinWidth="134"
                 Style="{StaticResource SaSecondaryRectButtonStyle}"
                 Command="{Binding RefreshCommand}"
                 AutomationProperties.Name="{Binding RefreshAutomationName}">
@@ -196,7 +196,8 @@
         </Grid>
 
         <!-- Search 112:2628 (400x44) + global filter 112:2634 ("Todos · N" / "Com problemas · N", D-UI3-3). -->
-        <Grid Grid.Row="2" ColumnSpacing="{StaticResource SaSpace20}" RowSpacing="{StaticResource SaSpace12}">
+        <!-- RowSpacing only when the filter wraps under the search (Prism R1 F4). -->
+        <Grid x:Name="QueryRow" Grid.Row="2" ColumnSpacing="{StaticResource SaSpace20}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
@@ -234,37 +235,39 @@
             <Border Style="{StaticResource SaStatePanelStyle}"
                     Visibility="{Binding ShowPageLoading, Converter={StaticResource BooleanToVisibilityConverter}}">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <StackPanel Spacing="{StaticResource SaSpace24}">
+                    <!-- Measured 112:16645-16649: label -> rows 20, rows h44 gap 20, tile -> identity 24, bars 160x16 / 110x12
+                         gap 8, pills 72x16 gap 24 top-aligned. -->
+                    <StackPanel Spacing="{StaticResource SaSpace20}">
                         <TextBlock x:Uid="WorkloadLoadingPanel" Style="{StaticResource SaBodyTextStyle}" Foreground="{ThemeResource SaTextBrush}" />
-                        <Grid ColumnSpacing="{StaticResource SaSpace16}">
+                        <Grid Height="44" ColumnSpacing="{StaticResource SaSpace24}">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="40" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                            <primitives:SaSkeleton Width="40" Height="40" />
-                            <StackPanel Grid.Column="1" Spacing="8" VerticalAlignment="Center"><primitives:SaSkeleton Width="180" Height="12" HorizontalAlignment="Left" /><primitives:SaSkeleton Width="120" Height="10" HorizontalAlignment="Left" /></StackPanel>
-                            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center"><primitives:SaSkeleton Width="72" Height="16" /><primitives:SaSkeleton Width="72" Height="16" /><primitives:SaSkeleton Width="72" Height="16" /></StackPanel>
+                            <primitives:SaSkeleton Width="40" Height="40" VerticalAlignment="Top" />
+                            <StackPanel Grid.Column="1" Spacing="8" VerticalAlignment="Top"><primitives:SaSkeleton Width="160" Height="16" HorizontalAlignment="Left" /><primitives:SaSkeleton Width="110" Height="12" HorizontalAlignment="Left" /></StackPanel>
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="24" VerticalAlignment="Top"><primitives:SaSkeleton Width="72" Height="16" /><primitives:SaSkeleton Width="72" Height="16" /><primitives:SaSkeleton Width="72" Height="16" /></StackPanel>
                         </Grid>
-                        <Grid ColumnSpacing="{StaticResource SaSpace16}">
+                        <Grid Height="44" ColumnSpacing="{StaticResource SaSpace24}">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="40" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                            <primitives:SaSkeleton Width="40" Height="40" />
-                            <StackPanel Grid.Column="1" Spacing="8" VerticalAlignment="Center"><primitives:SaSkeleton Width="180" Height="12" HorizontalAlignment="Left" /><primitives:SaSkeleton Width="120" Height="10" HorizontalAlignment="Left" /></StackPanel>
-                            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center"><primitives:SaSkeleton Width="72" Height="16" /><primitives:SaSkeleton Width="72" Height="16" /><primitives:SaSkeleton Width="72" Height="16" /></StackPanel>
+                            <primitives:SaSkeleton Width="40" Height="40" VerticalAlignment="Top" />
+                            <StackPanel Grid.Column="1" Spacing="8" VerticalAlignment="Top"><primitives:SaSkeleton Width="160" Height="16" HorizontalAlignment="Left" /><primitives:SaSkeleton Width="110" Height="12" HorizontalAlignment="Left" /></StackPanel>
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="24" VerticalAlignment="Top"><primitives:SaSkeleton Width="72" Height="16" /><primitives:SaSkeleton Width="72" Height="16" /><primitives:SaSkeleton Width="72" Height="16" /></StackPanel>
                         </Grid>
-                        <Grid ColumnSpacing="{StaticResource SaSpace16}">
+                        <Grid Height="44" ColumnSpacing="{StaticResource SaSpace24}">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="40" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                            <primitives:SaSkeleton Width="40" Height="40" />
-                            <StackPanel Grid.Column="1" Spacing="8" VerticalAlignment="Center"><primitives:SaSkeleton Width="180" Height="12" HorizontalAlignment="Left" /><primitives:SaSkeleton Width="120" Height="10" HorizontalAlignment="Left" /></StackPanel>
-                            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center"><primitives:SaSkeleton Width="72" Height="16" /><primitives:SaSkeleton Width="72" Height="16" /><primitives:SaSkeleton Width="72" Height="16" /></StackPanel>
+                            <primitives:SaSkeleton Width="40" Height="40" VerticalAlignment="Top" />
+                            <StackPanel Grid.Column="1" Spacing="8" VerticalAlignment="Top"><primitives:SaSkeleton Width="160" Height="16" HorizontalAlignment="Left" /><primitives:SaSkeleton Width="110" Height="12" HorizontalAlignment="Left" /></StackPanel>
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="24" VerticalAlignment="Top"><primitives:SaSkeleton Width="72" Height="16" /><primitives:SaSkeleton Width="72" Height="16" /><primitives:SaSkeleton Width="72" Height="16" /></StackPanel>
                         </Grid>
-                        <Grid ColumnSpacing="{StaticResource SaSpace16}">
+                        <Grid Height="44" ColumnSpacing="{StaticResource SaSpace24}">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="40" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                            <primitives:SaSkeleton Width="40" Height="40" />
-                            <StackPanel Grid.Column="1" Spacing="8" VerticalAlignment="Center"><primitives:SaSkeleton Width="180" Height="12" HorizontalAlignment="Left" /><primitives:SaSkeleton Width="120" Height="10" HorizontalAlignment="Left" /></StackPanel>
-                            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center"><primitives:SaSkeleton Width="72" Height="16" /><primitives:SaSkeleton Width="72" Height="16" /><primitives:SaSkeleton Width="72" Height="16" /></StackPanel>
+                            <primitives:SaSkeleton Width="40" Height="40" VerticalAlignment="Top" />
+                            <StackPanel Grid.Column="1" Spacing="8" VerticalAlignment="Top"><primitives:SaSkeleton Width="160" Height="16" HorizontalAlignment="Left" /><primitives:SaSkeleton Width="110" Height="12" HorizontalAlignment="Left" /></StackPanel>
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="24" VerticalAlignment="Top"><primitives:SaSkeleton Width="72" Height="16" /><primitives:SaSkeleton Width="72" Height="16" /><primitives:SaSkeleton Width="72" Height="16" /></StackPanel>
                         </Grid>
-                        <Grid ColumnSpacing="{StaticResource SaSpace16}">
+                        <Grid Height="44" ColumnSpacing="{StaticResource SaSpace24}">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="40" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                            <primitives:SaSkeleton Width="40" Height="40" />
-                            <StackPanel Grid.Column="1" Spacing="8" VerticalAlignment="Center"><primitives:SaSkeleton Width="180" Height="12" HorizontalAlignment="Left" /><primitives:SaSkeleton Width="120" Height="10" HorizontalAlignment="Left" /></StackPanel>
-                            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center"><primitives:SaSkeleton Width="72" Height="16" /><primitives:SaSkeleton Width="72" Height="16" /><primitives:SaSkeleton Width="72" Height="16" /></StackPanel>
+                            <primitives:SaSkeleton Width="40" Height="40" VerticalAlignment="Top" />
+                            <StackPanel Grid.Column="1" Spacing="8" VerticalAlignment="Top"><primitives:SaSkeleton Width="160" Height="16" HorizontalAlignment="Left" /><primitives:SaSkeleton Width="110" Height="12" HorizontalAlignment="Left" /></StackPanel>
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="24" VerticalAlignment="Top"><primitives:SaSkeleton Width="72" Height="16" /><primitives:SaSkeleton Width="72" Height="16" /><primitives:SaSkeleton Width="72" Height="16" /></StackPanel>
                         </Grid>
                     </StackPanel>
                 </ScrollViewer>
@@ -317,7 +320,7 @@
 
                 <!-- Containers -->
                 <Border Style="{StaticResource SaGlassSurfaceStyle}">
-                    <Grid RowSpacing="{StaticResource SaSpace4}">
+                    <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
@@ -333,13 +336,13 @@
                                        Visibility="{Binding HasDockerProblems, Converter={StaticResource BooleanToVisibilityConverter}}" />
                         </Grid>
                         <TextBlock Grid.Row="1" Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}"
-                                   Text="{Binding DockerLifecycleSummary}" TextWrapping="Wrap"
+                                   Margin="0,4,0,0" Text="{Binding DockerLifecycleSummary}" TextWrapping="Wrap"
                                    Visibility="{Binding ShowDockerContainers, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                        <Border Grid.Row="2" Margin="0,16,0,0" Style="{StaticResource SaDataTableHeaderStyle}"
+                        <Border Grid.Row="2" Margin="0,20,0,0" Style="{StaticResource SaDataTableCompactHeaderStyle}"
                                 Visibility="{Binding ShowDockerContainers, Converter={StaticResource BooleanToVisibilityConverter}}">
                             <Grid ColumnSpacing="10">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="6" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                                <TextBlock x:Uid="WorkloadContainerColumnName" Grid.Column="1" Style="{StaticResource SaTableHeaderTextStyle}" VerticalAlignment="Center" />
+                                <TextBlock x:Uid="WorkloadContainerColumnName" Grid.ColumnSpan="2" Style="{StaticResource SaTableHeaderTextStyle}" VerticalAlignment="Center" />
                                 <TextBlock x:Uid="WorkloadContainerColumnState" Grid.Column="2" Style="{StaticResource SaTableHeaderTextStyle}" VerticalAlignment="Center" HorizontalAlignment="Right" />
                             </Grid>
                         </Border>
@@ -366,14 +369,14 @@
                             <primitives:SaEmptyState x:Uid="WorkloadDockerEmptyState" VerticalAlignment="Center" IconData="{StaticResource SaIconServerStack01Data}"
                                                      Visibility="{Binding ShowDockerEmpty, Converter={StaticResource BooleanToVisibilityConverter}}" />
                         </Grid>
-                        <primitives:SaInlineNotice Grid.Row="4" x:Uid="WorkloadTruncatedDocker" Severity="Info"
+                        <primitives:SaInlineNotice Grid.Row="4" Margin="0,12,0,0" x:Uid="WorkloadTruncatedDocker" Severity="Info"
                                                    Visibility="{Binding ShowDockerTruncatedNotice, Converter={StaticResource BooleanToVisibilityConverter}}" />
                     </Grid>
                 </Border>
 
                 <!-- Services -->
                 <Border x:Name="ServicesCard" Grid.Column="1" Style="{StaticResource SaGlassSurfaceStyle}">
-                    <Grid RowSpacing="{StaticResource SaSpace4}">
+                    <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
@@ -389,13 +392,13 @@
                                        Visibility="{Binding HasServicesProblems, Converter={StaticResource BooleanToVisibilityConverter}}" />
                         </Grid>
                         <TextBlock Grid.Row="1" Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}"
-                                   Text="{Binding ServicesLifecycleSummary}" TextWrapping="Wrap"
+                                   Margin="0,4,0,0" Text="{Binding ServicesLifecycleSummary}" TextWrapping="Wrap"
                                    Visibility="{Binding ShowServicesList, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                        <Border Grid.Row="2" Margin="0,16,0,0" Style="{StaticResource SaDataTableHeaderStyle}"
+                        <Border Grid.Row="2" Margin="0,20,0,0" Style="{StaticResource SaDataTableCompactHeaderStyle}"
                                 Visibility="{Binding ShowServicesList, Converter={StaticResource BooleanToVisibilityConverter}}">
                             <Grid ColumnSpacing="10">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="6" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                                <TextBlock x:Uid="WorkloadServiceColumnName" Grid.Column="1" Style="{StaticResource SaTableHeaderTextStyle}" VerticalAlignment="Center" />
+                                <TextBlock x:Uid="WorkloadServiceColumnName" Grid.ColumnSpan="2" Style="{StaticResource SaTableHeaderTextStyle}" VerticalAlignment="Center" />
                                 <TextBlock x:Uid="WorkloadServiceColumnState" Grid.Column="2" Style="{StaticResource SaTableHeaderTextStyle}" VerticalAlignment="Center" HorizontalAlignment="Right" />
                             </Grid>
                         </Border>
@@ -419,7 +422,7 @@
                             <primitives:SaEmptyState x:Uid="WorkloadServicesEmptyState" VerticalAlignment="Center" IconData="{StaticResource SaIconServerStack01Data}"
                                                      Visibility="{Binding ShowServicesEmpty, Converter={StaticResource BooleanToVisibilityConverter}}" />
                         </Grid>
-                        <primitives:SaInlineNotice Grid.Row="4" x:Uid="WorkloadTruncatedServices" Severity="Info"
+                        <primitives:SaInlineNotice Grid.Row="4" Margin="0,12,0,0" x:Uid="WorkloadTruncatedServices" Severity="Info"
                                                    Visibility="{Binding ShowServicesTruncatedNotice, Converter={StaticResource BooleanToVisibilityConverter}}" />
                     </Grid>
                 </Border>

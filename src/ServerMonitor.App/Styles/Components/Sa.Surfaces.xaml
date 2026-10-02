@@ -96,4 +96,8 @@
     <Style x:Key="SaDataTableCompactRowStyle" TargetType="Border" BasedOn="{StaticResource SaDataTableRowStyle}">
         <Setter Property="MinHeight" Value="64" />
     </Style>
+    <!-- UI.3 (Prism R1 F5): the Workloads column header is h28 (112:2647), not the server table's 34. -->
+    <Style x:Key="SaDataTableCompactHeaderStyle" TargetType="Border" BasedOn="{StaticResource SaDataTableHeaderStyle}">
+        <Setter Property="MinHeight" Value="28" />
+    </Style>
 </ResourceDictionary>

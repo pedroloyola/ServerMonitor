@@ -47,8 +47,8 @@ public sealed partial class Ui3PageContractTests
         Assert.Equal($"{{Binding {metric}Series}}", Attr(chart, "Series"));
         Assert.Equal($"{{ThemeResource {brush}}}", Attr(chart, "LineBrush"));             // D-UI3-1
         Assert.Equal("{StaticResource SaChartLineThickness}", Attr(chart, "LineThickness"));
-        Assert.Equal("{Binding XAxisLabels}", Attr(chart, "XLabels"));                 // D-UI3-4
-        Assert.Equal("{Binding XAxisLabelsCompact}", Attr(chart, "XLabelsCompact"));
+        Assert.Equal("{Binding XAxisTicks}", Attr(chart, "XTicks"));                   // D-UI3-4 (round marks, real X)
+        Assert.Equal("{Binding XAxisTicksCompact}", Attr(chart, "XTicksCompact"));
         Assert.Equal("{Binding YAxisLabels}", Attr(chart, "YLabels"));
     }
 
@@ -172,6 +172,31 @@ public sealed partial class Ui3PageContractTests
         Assert.Equal("Level1", Attr(Assert.Single(Elements(Workloads), e => Uid(e) == "WorkloadsPageTitle"), "AutomationProperties.HeadingLevel"));
         Assert.Equal("Level2", Attr(Assert.Single(Elements(Workloads), e => Uid(e) == "WorkloadDockerSectionTitle"), "AutomationProperties.HeadingLevel"));
         Assert.Equal("Level2", Attr(Assert.Single(Elements(Workloads), e => Uid(e) == "WorkloadServicesSectionTitle"), "AutomationProperties.HeadingLevel"));
+    }
+
+    [Fact]
+    public void PrismR1_VerticalRhythm_MatchesTheFigma()
+    {
+        // F4: a two-row control/query grid adds its RowSpacing only when the 2nd row is used (< 900).
+        foreach (var (file, grid) in new[] { (History, "ControlsRow"), (Workloads, "QueryRow") })
+        {
+            var element = Assert.Single(Elements(file), e => (string?)e.Attribute(AppSourceTree.Xaml + "Name") == grid);
+            Assert.Null(Attr(element, "RowSpacing"));
+            var targets = Elements(file).Where(e => e.Name.LocalName == "Setter").Select(s => Attr(s, "Target")).ToList();
+            Assert.Equal(2, targets.Count(t => t == grid + ".RowSpacing"));   // Medium + Narrow
+        }
+
+        // F3: plot 98 + 16 + axis label (14) = 128; the chart's own row spacing is the 16.
+        Assert.All(Elements(History).Where(e => e.Name.LocalName == "HistoryChart"), c => Assert.Equal("128", Attr(c, "Height")));
+        var chartRoot = Assert.Single(AppSourceTree.LoadXaml("Controls/HistoryChart.xaml").Descendants(),
+            e => (string?)e.Attribute(AppSourceTree.Xaml + "Name") == "RootGrid");
+        Assert.Equal("16", Attr(chartRoot, "RowSpacing"));
+
+        // F5: workloads card = explicit spacers, compact h28 column header.
+        var headers = Elements(Workloads).Where(e => Attr(e, "Style") == "{StaticResource SaDataTableCompactHeaderStyle}").ToList();
+        Assert.Equal(2, headers.Count);
+        Assert.All(headers, h => Assert.Equal("0,20,0,0", Attr(h, "Margin")));
+        Assert.DoesNotContain(Elements(Workloads), e => e.Name.LocalName == "Grid" && Attr(e, "RowSpacing") == "{StaticResource SaSpace4}");
     }
 
     // --- Both pages ----------------------------------------------------------------------------------------------

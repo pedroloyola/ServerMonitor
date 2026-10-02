@@ -718,6 +718,8 @@
          geometry/states as SaSegmentedRectItemStyle, but 12 Medium in the TEXT colour in both states (the unselected
          item is not muted). Selected keeps the rect segment fill + highlight. -->
     <Style x:Key="SaSegmentedRectFilterItemStyle" TargetType="RadioButton" BasedOn="{StaticResource SaSegmentedRectItemStyle}">
+        <!-- Prism R1 S2: items 124 / 176 -> track 308 (112:2634) = text + 32 each side. -->
+        <Setter Property="Padding" Value="32,0" />
         <Setter Property="FontSize" Value="{StaticResource SaFontSizeCaption}" />
         <Setter Property="FontWeight" Value="Medium" />
         <Setter Property="Foreground" Value="{ThemeResource SaTextBrush}" />

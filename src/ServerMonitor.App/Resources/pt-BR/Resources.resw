@@ -609,10 +609,10 @@
   <data name="HistoryServerStatusConnected" xml:space="preserve"><value>Conectado</value></data>
   <data name="HistoryServerStatusOffline" xml:space="preserve"><value>Sem conexão</value></data>
   <data name="HistoryEmptyNeverTitle" xml:space="preserve"><value>O histórico começa aqui</value></data>
-  <data name="HistoryEmptyNeverMessage" xml:space="preserve"><value>Ainda não há leituras salvas para este servidor. Os gráficos aparecem à medida que as métricas são coletadas.</value></data>
+  <data name="HistoryEmptyNeverMessage" xml:space="preserve"><value>Ainda não há leituras salvas para este servidor.&#10;Os gráficos aparecem à medida que as métricas são coletadas.</value></data>
   <data name="HistoryEmptyNeverAction" xml:space="preserve"><value>Ver servidor</value></data>
   <data name="HistoryEmptyPeriodTitle" xml:space="preserve"><value>Sem leituras neste período</value></data>
-  <data name="HistoryEmptyPeriodMessage" xml:space="preserve"><value>Nenhuma métrica foi salva no intervalo selecionado. Tente consultar um período maior.</value></data>
+  <data name="HistoryEmptyPeriodMessage" xml:space="preserve"><value>Nenhuma métrica foi salva no intervalo selecionado.&#10;Tente consultar um período maior.</value></data>
   <data name="HistoryEmptyPeriodAction" xml:space="preserve"><value>Ver últimos 30 dias</value></data>
   <data name="WorkloadContextLoading" xml:space="preserve"><value>Consultando serviços e containers…</value></data>
   <data name="WorkloadContextLastQueryFailed" xml:space="preserve"><value>Falha na última consulta</value></data>
@@ -662,13 +662,13 @@
   <data name="WorkloadServiceDisplayAccessibleFormat" xml:space="preserve"><value>{0}, {1}, inicialização {2}</value></data>
   <data name="WorkloadNoResultsTitleFormat" xml:space="preserve"><value>Nenhum resultado para “{0}”</value></data>
   <data name="WorkloadNoProblemsTitle" xml:space="preserve"><value>Nenhum problema encontrado</value></data>
-  <data name="WorkloadNoResultsMessage" xml:space="preserve"><value>Tente outro nome ou remova os filtros para voltar a ver todos os serviços e containers.</value></data>
+  <data name="WorkloadNoResultsMessage" xml:space="preserve"><value>Tente outro nome ou remova os filtros&#10;para voltar a ver todos os serviços e containers.</value></data>
   <data name="WorkloadClearSearch" xml:space="preserve"><value>Limpar pesquisa</value></data>
   <data name="WorkloadSectionNoResults" xml:space="preserve"><value>Sem resultados nesta seção</value></data>
   <data name="WorkloadNothingTitle" xml:space="preserve"><value>Nada para exibir</value></data>
-  <data name="WorkloadNothingMessage" xml:space="preserve"><value>A consulta terminou, mas não foram encontrados serviços ou containers disponíveis para monitoramento.</value></data>
+  <data name="WorkloadNothingMessage" xml:space="preserve"><value>A consulta terminou, mas não foram encontrados&#10;serviços ou containers disponíveis para monitoramento.</value></data>
   <data name="WorkloadUnavailableTitle" xml:space="preserve"><value>Não foi possível obter os serviços</value></data>
-  <data name="WorkloadUnavailableMessage" xml:space="preserve"><value>Verifique a conexão e as permissões do usuário SSH. Os dados de serviços e containers não estão disponíveis.</value></data>
+  <data name="WorkloadUnavailableMessage" xml:space="preserve"><value>Verifique a conexão e as permissões do usuário SSH.&#10;Os dados de serviços e containers não estão disponíveis.</value></data>
   <data name="WorkloadRetry" xml:space="preserve"><value>Tentar novamente</value></data>
   <data name="WorkloadSearchAllPlaceholder" xml:space="preserve"><value>Pesquisar serviços ou containers</value></data>
   <data name="WorkloadReadOnlyNotice" xml:space="preserve"><value>Monitoramento somente leitura · As ações nos serviços são feitas no servidor.</value></data>
@@ -700,10 +700,10 @@
   <data name="WorkloadDockerNoResults.Text" xml:space="preserve"><value>Sem resultados nesta seção</value></data>
   <data name="WorkloadServicesNoResults.Text" xml:space="preserve"><value>Sem resultados nesta seção</value></data>
   <data name="WorkloadNothingState.Title" xml:space="preserve"><value>Nada para exibir</value></data>
-  <data name="WorkloadNothingState.Message" xml:space="preserve"><value>A consulta terminou, mas não foram encontrados serviços ou containers disponíveis para monitoramento.</value></data>
+  <data name="WorkloadNothingState.Message" xml:space="preserve"><value>A consulta terminou, mas não foram encontrados&#10;serviços ou containers disponíveis para monitoramento.</value></data>
   <data name="WorkloadUnavailableState.Title" xml:space="preserve"><value>Não foi possível obter os serviços</value></data>
-  <data name="WorkloadUnavailableState.Message" xml:space="preserve"><value>Verifique a conexão e as permissões do usuário SSH. Os dados de serviços e containers não estão disponíveis.</value></data>
-  <data name="WorkloadNoResultsState.Message" xml:space="preserve"><value>Tente outro nome ou remova os filtros para voltar a ver todos os serviços e containers.</value></data>
+  <data name="WorkloadUnavailableState.Message" xml:space="preserve"><value>Verifique a conexão e as permissões do usuário SSH.&#10;Os dados de serviços e containers não estão disponíveis.</value></data>
+  <data name="WorkloadNoResultsState.Message" xml:space="preserve"><value>Tente outro nome ou remova os filtros&#10;para voltar a ver todos os serviços e containers.</value></data>
   <data name="WorkloadDockerNotInstalledState.Title" xml:space="preserve"><value>Docker não instalado</value></data>
   <data name="WorkloadDockerNotInstalledState.Message" xml:space="preserve"><value>O Docker não está disponível neste servidor. São mostrados apenas os serviços.</value></data>
   <data name="WorkloadDockerPermissionState.Title" xml:space="preserve"><value>Sem permissão para acessar o Docker</value></data>
