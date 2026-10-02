@@ -292,6 +292,8 @@ public sealed class SettingsNotificationViewModelTests
     {
         public int SettingsCount { get; private set; }
 
+        public event EventHandler? NavigatedAwayFromOverview { add { } remove { } }
+
         public void Initialize(Frame frame) => throw new NotSupportedException();
 
         public void NavigateTo<TPage>() where TPage : Page => throw new NotSupportedException();
@@ -322,6 +324,18 @@ public sealed class SettingsNotificationViewModelTests
         }
 
         public void GoToWorkloads(Guid serverId, string serverName)
+        {
+        }
+
+        public void GoToServers()
+        {
+        }
+
+        public void GoToServerDetail(Guid serverId, ServerDetailOrigin origin)
+        {
+        }
+
+        public void ReturnToServerDetail(Guid serverId)
         {
         }
     }

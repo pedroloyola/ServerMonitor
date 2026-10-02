@@ -196,6 +196,9 @@ public sealed class ServerCardViewModel : ObservableObject
 
     public bool HasMetrics => _metrics is not null;
 
+    /// <summary>The retained snapshot the card shows (null = no data yet). Read by the UI.4 priority rule; never altered.</summary>
+    public ServerMetricsSnapshot? MetricsSnapshot => _metrics;
+
     public bool IsMetricsPending =>
         SupportsMetrics && !HasMetrics && !IsRefreshingMetrics && !HasMetricsError;
 

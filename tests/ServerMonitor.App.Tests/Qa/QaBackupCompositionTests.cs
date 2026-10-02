@@ -49,7 +49,7 @@ public sealed class QaBackupCompositionTests : IDisposable
     }
 
     public static TheoryData<string> IsolatedHarnesses() =>
-        ["health", "notifications", "compact", "history", "workloads", "screenshot", "discovery", "ssh-config"];
+        ["health", "notifications", "compact", "history", "workloads", "screenshot", "discovery", "overview", "ssh-config"];
 
     [Theory]
     [MemberData(nameof(IsolatedHarnesses))]
@@ -65,6 +65,7 @@ public sealed class QaBackupCompositionTests : IDisposable
             case "workloads": QaWorkloadsComposition.Apply(services); break;
             case "screenshot": QaStoreScreenshotComposition.Apply(services); break;
             case "discovery": QaDiscoveryComposition.Apply(services); break;
+            case "overview": QaOverviewComposition.Apply(services, "mixed"); break;
             default: QaSshConfigComposition.Apply(services, HarnessDirectory); break;
         }
 

@@ -42,7 +42,8 @@ internal static partial class QaStartupIsolation
         QaHistoryComposition.LaunchFlag,
         QaWorkloadsComposition.LaunchFlag,
         QaStoreScreenshotComposition.LaunchFlag,
-        QaProxyJumpPolicy.LaunchFlag
+        QaProxyJumpPolicy.LaunchFlag,
+        QaOverviewComposition.LaunchFlag
     ];
 
     /// <summary>The modifiers a harness may carry, each as <c>flag value</c> or <c>flag=value</c>.</summary>
@@ -51,7 +52,8 @@ internal static partial class QaStartupIsolation
         QaSshConfigProfilePolicy.LaunchFlag,
         QaUiLanguagePolicy.LaunchFlag,
         QaBackupPolicy.LaunchFlag,
-        QaProxyJumpPolicy.DirectoryFlag
+        QaProxyJumpPolicy.DirectoryFlag,
+        QaOverviewScenarioPolicy.LaunchFlag
     ];
 
     /// <summary>
@@ -114,6 +116,20 @@ internal static partial class QaStartupIsolation
         {
             return $"{qa[0].Split('=')[0]} is not an isolated QA harness: on its own it would run the real composition " +
                 $"(real user data, Credential Manager, SSH). Combine it with one of: {string.Join(", ", HarnessFlags)}.";
+        }
+
+        // UI.4 (Cortex r1 NIT-4): the scenario modifier belongs to --qa-overview only; next to another harness it would be
+        // silently ignored, so it is refused.
+        if (QaOverviewScenarioPolicy.IsPresent(commandLineArgs) && !commandLineArgs.Contains(QaOverviewComposition.LaunchFlag, StringComparer.Ordinal))
+        {
+            return $"{QaOverviewScenarioPolicy.LaunchFlag} only applies to {QaOverviewComposition.LaunchFlag}.";
+        }
+
+        // UI.4: an unknown overview scenario is refused here (exit 3), before anything is composed - never another scenario.
+        if (QaOverviewScenarioPolicy.IsPresent(commandLineArgs)
+            && QaOverviewScenarioPolicy.ResolveScenario(commandLineArgs, isDebugBuild: true) is null)
+        {
+            return $"{QaOverviewScenarioPolicy.LaunchFlag} needs one of: {string.Join(", ", QaOverviewScenarioPolicy.Scenarios)}.";
         }
 
         return null;

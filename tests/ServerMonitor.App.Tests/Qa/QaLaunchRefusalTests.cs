@@ -158,10 +158,11 @@ public sealed partial class QaLaunchRefusalTests
     {
         Assert.Equal(
             ["--qa-health", "--qa-discovery", "--qa-notifications", "--qa-compact", "--qa-history", "--qa-workloads",
-                "--qa-store-screenshot", QaProxyJumpPolicy.LaunchFlag],
+                "--qa-store-screenshot", QaProxyJumpPolicy.LaunchFlag, "--qa-overview"],
             QaStartupIsolation.HarnessFlags);
         Assert.Equal(
-            [QaSshConfigProfilePolicy.LaunchFlag, QaUiLanguagePolicy.LaunchFlag, QaBackupPolicy.LaunchFlag, QaProxyJumpPolicy.DirectoryFlag],
+            [QaSshConfigProfilePolicy.LaunchFlag, QaUiLanguagePolicy.LaunchFlag, QaBackupPolicy.LaunchFlag, QaProxyJumpPolicy.DirectoryFlag,
+                "--qa-overview-scenario"],
             QaStartupIsolation.ModifierFlags);
         Assert.True(QaProxyJumpPolicy.IsRequested([Exe, QaProxyJumpPolicy.LaunchFlag], isDebugBuild: true));
     }

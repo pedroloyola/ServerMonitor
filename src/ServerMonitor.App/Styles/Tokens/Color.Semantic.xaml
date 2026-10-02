@@ -18,6 +18,7 @@
             <SolidColorBrush x:Key="SaMemoryBrush" Color="{StaticResource SaColorMemoryDark}" />
             <SolidColorBrush x:Key="SaDiskBrush" Color="{StaticResource SaColorDiskDark}" />
             <SolidColorBrush x:Key="SaChartLineBrush" Color="{StaticResource SaColorChartLineDark}" />
+            <SolidColorBrush x:Key="SaHealthLabelDotBrush" Color="{StaticResource SaColorHealthLabelDot}" />
             <SolidColorBrush x:Key="SaAttentionBrush" Color="{StaticResource SaColorAttentionDark}" />
             <SolidColorBrush x:Key="SaHealthyBrush" Color="{StaticResource SaColorHealthyDark}" />
             <SolidColorBrush x:Key="SaSuccessBrush" Color="{StaticResource SaColorSuccessDark}" />
@@ -70,6 +71,7 @@
             <SolidColorBrush x:Key="SaMemoryBrush" Color="{StaticResource SaColorMemoryLight}" />
             <SolidColorBrush x:Key="SaDiskBrush" Color="{StaticResource SaColorDiskLight}" />
             <SolidColorBrush x:Key="SaChartLineBrush" Color="{StaticResource SaColorChartLineLight}" />
+            <SolidColorBrush x:Key="SaHealthLabelDotBrush" Color="{StaticResource SaColorHealthLabelDot}" />
             <SolidColorBrush x:Key="SaAttentionBrush" Color="{StaticResource SaColorAttentionLight}" />
             <SolidColorBrush x:Key="SaHealthyBrush" Color="{StaticResource SaColorHealthyLight}" />
             <SolidColorBrush x:Key="SaSuccessBrush" Color="{StaticResource SaColorSuccessLight}" />
@@ -121,6 +123,7 @@
             <SolidColorBrush x:Key="SaMemoryBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
             <SolidColorBrush x:Key="SaDiskBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
             <SolidColorBrush x:Key="SaChartLineBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="SaHealthLabelDotBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
             <SolidColorBrush x:Key="SaAttentionBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
             <SolidColorBrush x:Key="SaHealthyBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
             <SolidColorBrush x:Key="SaSuccessBrush" Color="{ThemeResource SystemColorWindowTextColor}" />

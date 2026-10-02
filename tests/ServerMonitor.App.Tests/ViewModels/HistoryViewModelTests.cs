@@ -207,13 +207,15 @@ public sealed class HistoryViewModelTests
     }
 
     [Fact]
-    public void BackCommand_NavigatesToDashboard()
+    public void BackCommand_ReturnsToTheServersInterimPage()
     {
         var (vm, _, _, nav) = New();
 
         vm.BackCommand.Execute(null);
 
-        Assert.Equal(1, nav.DashboardCount);
+        // UI.4 (Boss, Beacon r1 SHOULD-4): back leads to the interim page of the shown server (none loaded here).
+        Assert.Equal([Guid.Empty], nav.ServerDetailReturns);
+        Assert.Equal(0, nav.DashboardCount);
     }
 
     [Fact]

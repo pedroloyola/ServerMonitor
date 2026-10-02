@@ -39,6 +39,7 @@ public sealed class SingleInstancePolicyTests
     [InlineData("--qa-compact")]
     [InlineData("--qa-history")]
     [InlineData("--qa-workloads")]
+    [InlineData("--qa-overview")]
     [InlineData("--QA-Health")]
     public void ResolveInstanceKey_DebugQaHarness_BypassesSingleInstancing(string qaArgument)
     {
