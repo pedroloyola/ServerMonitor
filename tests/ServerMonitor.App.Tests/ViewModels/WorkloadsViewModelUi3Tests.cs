@@ -491,6 +491,69 @@ public sealed class WorkloadsViewModelUi3Tests
         Assert.Equal("prod-web-01 · Ubuntu 24.04 LTS · Atualizado há 3 min", vm.ContextDisplay);
     }
 
+    // --- "Atualizado há" with seconds, no timer (D-UI3-9, final fidelity) --------------------------------------
+
+    [Theory]
+    [InlineData(0, "Atualizado agora mesmo")]
+    [InlineData(900, "Atualizado agora mesmo")]
+    [InlineData(1_000, "Atualizado há 1 s")]
+    [InlineData(8_000, "Atualizado há 8 s")]
+    [InlineData(59_900, "Atualizado há 59 s")]
+    [InlineData(60_000, "Atualizado há 1 min")]
+    [InlineData(59 * 60_000, "Atualizado há 59 min")]
+    [InlineData(60 * 60_000, "Atualizado há 1 h")]
+    [InlineData(24 * 60 * 60_000, "Atualizado há 1 d")]
+    [InlineData(-5_000, "Atualizado agora mesmo")]     // clock skew: a capture "in the future" never reads as negative
+    public void UpdatedAgo_SecondsUnderAMinute_ThenMinutesHoursDays(long ageMilliseconds, string expected)
+    {
+        var (vm, _, _) = New(Snapshot(capturedAt: Now.AddMilliseconds(-ageMilliseconds)));
+
+        Assert.Equal(expected, vm.UpdatedAgoDisplay);
+        Assert.Equal($"prod-web-01 · {expected}", vm.ContextDisplay);
+    }
+
+    [Theory]
+    [InlineData("pt-PT", "Atualizado há 8 s")]
+    [InlineData("pt-BR", "Atualizado há 8 s")]
+    [InlineData("en-US", "Updated 8 s ago")]
+    public void UpdatedAgo_Seconds_IsLocalized(string culture, string expected)
+    {
+        var (vm, _, _) = New(Snapshot(capturedAt: Now.AddSeconds(-8)), culture);
+
+        Assert.Equal(expected, vm.UpdatedAgoDisplay);
+    }
+
+    [Fact]
+    public void UpdatedAgo_HasNoTimer_TheTextOnlyChangesOnANewApply()
+    {
+        var store = new InMemoryServerWorkloadStore();
+        store.Set(Snapshot(capturedAt: Now.AddSeconds(-8)));
+        var time = new FakeTimeProvider(Now);
+        using var vm = new WorkloadsViewModel(store, new NoOpCoordinator(), new FakeServerMetricsStore(), new FakeNavigationService(),
+            new ResWLocalizationService("pt-PT"), NullLogger<WorkloadsViewModel>.Instance, time);
+        vm.Load(ServerId, "prod-web-01");
+        var changes = 0;
+        vm.PropertyChanged += (_, e) => changes += e.PropertyName is nameof(WorkloadsViewModel.UpdatedAgoDisplay) or nameof(WorkloadsViewModel.ContextDisplay) ? 1 : 0;
+
+        // Time passes (FakeTimeProvider fires any timer created through it); nothing re-renders the label.
+        time.Advance(TimeSpan.FromSeconds(30));
+        time.Advance(TimeSpan.FromMinutes(5));
+        Assert.Equal("Atualizado há 8 s", vm.UpdatedAgoDisplay);
+        Assert.Equal(0, changes);
+
+        // A new snapshot (store change -> Apply) is what recomputes it.
+        store.Set(Snapshot(capturedAt: Now.AddSeconds(-8)));
+        Assert.Equal("Atualizado há 5 min", vm.UpdatedAgoDisplay);
+
+        // And the view model holds no timer of its own (source guard: no tick-driven label).
+        var code = ServerMonitor.App.Tests.Architecture.AppSourceTree.CodeWithoutComments("ViewModels/WorkloadsViewModel.cs");
+        Assert.DoesNotContain("DispatcherTimer", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("DispatcherQueueTimer", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("PeriodicTimer", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("CreateTimer", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("System.Threading.Timer", code, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void Context_UnknownOs_IsOmitted()
     {

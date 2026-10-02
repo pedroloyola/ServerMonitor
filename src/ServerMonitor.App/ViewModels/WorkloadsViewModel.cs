@@ -235,7 +235,7 @@ public sealed class WorkloadsViewModel : ObservableObject, IDisposable
     // --- UI.3 header context + section summaries --------------------------------------------------------
 
     /// <summary>
-    /// "prod-web-01 · Ubuntu 24.04 LTS · Atualizado há 3 min" (D-UI3-9: minutes, no timer). The OS is
+    /// "prod-web-01 · Ubuntu 24.04 LTS · Atualizado há 8 s" (D-UI3-9: seconds/minutes, no timer). The OS is
     /// omitted when unknown; "Falha na última consulta" is appended when the list is stale and replaces the
     /// freshness when nothing could be read; "A consultar serviços e containers…" before the first attempt.
     /// </summary>
@@ -609,9 +609,16 @@ public sealed class WorkloadsViewModel : ObservableObject, IDisposable
             age = TimeSpan.Zero;
         }
 
-        if (age.TotalMinutes < 1)
+        if (age.TotalSeconds < 1)
         {
             return _localization.GetString("WorkloadUpdatedJustNow");
+        }
+
+        // D-UI3-9: whole seconds under a minute ("Atualizado há 8 s", Figma 112:2613). Still no timer: the label is
+        // recomputed only when a new snapshot / refresh arrives (Apply), never on a tick.
+        if (age.TotalMinutes < 1)
+        {
+            return Format("WorkloadUpdatedSecondsFormat", (int)age.TotalSeconds);
         }
 
         if (age.TotalHours < 1)

@@ -327,6 +327,7 @@
   <data name="WorkloadNoResults.Text" xml:space="preserve"><value>Sem resultados</value></data>
   <data name="WorkloadTruncatedNotice.Text" xml:space="preserve"><value>A lista foi limitada; alguns itens não são mostrados.</value></data>
   <data name="WorkloadUpdatedJustNow" xml:space="preserve"><value>Atualizado agora mesmo</value></data>
+  <data name="WorkloadUpdatedSecondsFormat" xml:space="preserve"><value>Atualizado há {0} s</value></data>
   <data name="WorkloadUpdatedMinutesFormat" xml:space="preserve"><value>Atualizado há {0} min</value></data>
   <data name="WorkloadUpdatedHoursFormat" xml:space="preserve"><value>Atualizado há {0} h</value></data>
   <data name="WorkloadUpdatedDaysFormat" xml:space="preserve"><value>Atualizado há {0} d</value></data>

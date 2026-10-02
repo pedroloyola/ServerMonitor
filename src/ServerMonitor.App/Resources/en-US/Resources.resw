@@ -327,6 +327,7 @@
   <data name="WorkloadNoResults.Text" xml:space="preserve"><value>No results</value></data>
   <data name="WorkloadTruncatedNotice.Text" xml:space="preserve"><value>The list was capped; some items aren't shown.</value></data>
   <data name="WorkloadUpdatedJustNow" xml:space="preserve"><value>Updated just now</value></data>
+  <data name="WorkloadUpdatedSecondsFormat" xml:space="preserve"><value>Updated {0} s ago</value></data>
   <data name="WorkloadUpdatedMinutesFormat" xml:space="preserve"><value>Updated {0} min ago</value></data>
   <data name="WorkloadUpdatedHoursFormat" xml:space="preserve"><value>Updated {0} h ago</value></data>
   <data name="WorkloadUpdatedDaysFormat" xml:space="preserve"><value>Updated {0} d ago</value></data>
