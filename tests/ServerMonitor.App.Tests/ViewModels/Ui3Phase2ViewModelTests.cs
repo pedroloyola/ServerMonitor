@@ -135,6 +135,32 @@ public sealed class Ui3Phase2ViewModelTests
         Assert.True(vm.ShowSectionCards);
     }
 
+    [Fact]
+    public void UpdatedAgo_IsRecomputedOnLoad_SoReturningToThePageNeverShowsAFrozenAge()
+    {
+        // Cortex NIT-4 / D-UI3-9 (minutes, no timer): every navigation creates a fresh VM and calls Load, which
+        // re-applies the stored snapshot against the current time.
+        var id = Guid.NewGuid();
+        var captured = new DateTimeOffset(2026, 10, 1, 12, 0, 0, TimeSpan.Zero);
+        var time = new FakeTimeProvider(captured);
+        var store = new InMemoryServerWorkloadStore();
+        store.Set(new ServerWorkloadSnapshot
+        {
+            ServerId = id, CapturedAtUtc = captured, LastAttemptAtUtc = captured,
+            Docker = new DockerSnapshot { Availability = DockerAvailability.NotInstalled },
+            Services = new ServiceSnapshot { Manager = ServiceManager.Systemd, Availability = WorkloadServiceAvailability.Available }
+        });
+        using var vm = new WorkloadsViewModel(store, new NoOp(), new FakeServerMetricsStore(), new FakeNavigationService(),
+            new ResWLocalizationService("pt-PT"), NullLogger<WorkloadsViewModel>.Instance, time);
+
+        vm.Load(id, "web-01");
+        Assert.Equal("web-01 · Atualizado agora mesmo", vm.ContextDisplay);
+
+        time.Advance(TimeSpan.FromMinutes(7));
+        vm.Load(id, "web-01");
+        Assert.Equal("web-01 · Atualizado há 7 min", vm.ContextDisplay);
+    }
+
     private sealed class NoOp : IWorkloadRefreshCoordinator
     {
         public Task RefreshNowAsync(Guid serverId, CancellationToken cancellationToken = default) => Task.CompletedTask;

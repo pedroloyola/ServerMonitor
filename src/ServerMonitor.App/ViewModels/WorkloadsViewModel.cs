@@ -32,14 +32,6 @@ public enum ServicesViewState
     Error
 }
 
-/// <summary>Optional in-memory list filter (§51), expressed in the shared severity legend (§52).</summary>
-public enum WorkloadFilter
-{
-    All,
-    Running,
-    Failed
-}
-
 /// <summary>
 /// UI.3 page-wide filter (D-UI3-3) over both lists: "Todos" or "Com problemas" (Negative severity only —
 /// transient Warning states such as "A iniciar"/"A reiniciar" are not problems).
@@ -85,16 +77,6 @@ public sealed class WorkloadsViewModel : ObservableObject, IDisposable
     private bool _servicesTruncated;
     private bool _isStale;
     private string? _updatedAgoDisplay;
-    private string _dockerSummary = string.Empty;
-    private string _servicesSummary = string.Empty;
-    private string? _dockerFailureBadge;
-    private string? _servicesFailureBadge;
-
-    private string _containerSearchText = string.Empty;
-    private string _serviceSearchText = string.Empty;
-    private WorkloadFilter _containerFilter = WorkloadFilter.All;
-    private WorkloadFilter _serviceFilter = WorkloadFilter.All;
-
     // UI.3 additions. Null-safe so a runtime-free host that skips field initializers can still read them.
     private readonly IServerMetricsStore? _metricsStore;
     private readonly RelayCommand? _clearSearchCommand;
@@ -148,8 +130,7 @@ public sealed class WorkloadsViewModel : ObservableObject, IDisposable
     // --- UI.3 page-wide search + filter (D-UI3-3) ------------------------------------------------------
 
     /// <summary>
-    /// One search over both lists (container name + image, service name + description). Setting it also
-    /// drives the legacy per-section texts, so the pre-UI.3 page keeps working until phase 2 rebinds.
+    /// One search over both lists (container name + image, service name + description), D-UI3-3.
     /// </summary>
     public string SearchText
     {
@@ -164,10 +145,6 @@ public sealed class WorkloadsViewModel : ObservableObject, IDisposable
 
             _searchText = value;
             OnPropertyChanged();
-            _containerSearchText = value;
-            _serviceSearchText = value;
-            OnPropertyChanged(nameof(ContainerSearchText));
-            OnPropertyChanged(nameof(ServiceSearchText));
             ApplyContainerView();
             ApplyServiceView();
         }
@@ -247,8 +224,8 @@ public sealed class WorkloadsViewModel : ObservableObject, IDisposable
         {
             var search = SearchText.Trim();
             return search.Length > 0
-                ? string.Format(CultureInfo.CurrentUICulture, _localization.GetString("WorkloadNoResultsTitleFormat"), search)
-                : _localization.GetString("WorkloadNoProblemsTitle");
+                ? string.Format(CultureInfo.CurrentUICulture, _localization?.GetString("WorkloadNoResultsTitleFormat") ?? "{0}", search)
+                : _localization?.GetString("WorkloadNoProblemsTitle") ?? string.Empty;
         }
     }
 
@@ -391,67 +368,6 @@ public sealed class WorkloadsViewModel : ObservableObject, IDisposable
 
     public bool ShowDockerTruncatedNotice => ShowDockerContainers && _dockerTruncated;
 
-    /// <summary>Per-section stat line at the header — surfaces failures without scrolling (§43, H-02).</summary>
-    public string DockerSummary
-    {
-        get => _dockerSummary;
-        private set => SetProperty(ref _dockerSummary, value);
-    }
-
-    /// <summary>"N com falha" shown as a red pill in the header when any container is failing; else null (H-02).</summary>
-    public string? DockerFailureBadge
-    {
-        get => _dockerFailureBadge;
-        private set
-        {
-            if (SetProperty(ref _dockerFailureBadge, value))
-            {
-                OnPropertyChanged(nameof(DockerHasFailures));
-            }
-        }
-    }
-
-    public bool DockerHasFailures => _dockerFailureBadge is not null;
-
-    public bool ShowDockerSummary => ShowDockerContainers;
-
-    public string ContainerSearchText
-    {
-        get => _containerSearchText;
-        set
-        {
-            if (SetProperty(ref _containerSearchText, value ?? string.Empty))
-            {
-                ApplyContainerView();
-            }
-        }
-    }
-
-    public WorkloadFilter ContainerFilter
-    {
-        get => _containerFilter;
-        set
-        {
-            if (SetProperty(ref _containerFilter, value))
-            {
-                ApplyContainerView();
-            }
-        }
-    }
-
-    /// <summary>0/1/2 → All/Running/Failed, two-way bound to the container filter selector.</summary>
-    public int ContainerFilterIndex
-    {
-        get => (int)_containerFilter;
-        set
-        {
-            if (value >= 0 && value <= 2)
-            {
-                ContainerFilter = (WorkloadFilter)value;
-            }
-        }
-    }
-
     // --- Services section (§45) --------------------------------------------------------------------
 
     public ServicesViewState ServicesState
@@ -481,67 +397,6 @@ public sealed class WorkloadsViewModel : ObservableObject, IDisposable
     public bool ShowServicesNoResults => ShowServicesList && Services.Count == 0;
 
     public bool ShowServicesTruncatedNotice => ShowServicesList && _servicesTruncated;
-
-    /// <summary>Per-section stat line at the header — surfaces failures without scrolling (§43, H-02).</summary>
-    public string ServicesSummary
-    {
-        get => _servicesSummary;
-        private set => SetProperty(ref _servicesSummary, value);
-    }
-
-    /// <summary>"N com falha" shown as a red pill in the header when any service is failing; else null (H-02).</summary>
-    public string? ServicesFailureBadge
-    {
-        get => _servicesFailureBadge;
-        private set
-        {
-            if (SetProperty(ref _servicesFailureBadge, value))
-            {
-                OnPropertyChanged(nameof(ServicesHasFailures));
-            }
-        }
-    }
-
-    public bool ServicesHasFailures => _servicesFailureBadge is not null;
-
-    public bool ShowServicesSummary => ShowServicesList;
-
-    public string ServiceSearchText
-    {
-        get => _serviceSearchText;
-        set
-        {
-            if (SetProperty(ref _serviceSearchText, value ?? string.Empty))
-            {
-                ApplyServiceView();
-            }
-        }
-    }
-
-    public WorkloadFilter ServiceFilter
-    {
-        get => _serviceFilter;
-        set
-        {
-            if (SetProperty(ref _serviceFilter, value))
-            {
-                ApplyServiceView();
-            }
-        }
-    }
-
-    /// <summary>0/1/2 → All/Running/Failed, two-way bound to the service filter selector.</summary>
-    public int ServiceFilterIndex
-    {
-        get => (int)_serviceFilter;
-        set
-        {
-            if (value >= 0 && value <= 2)
-            {
-                ServiceFilter = (WorkloadFilter)value;
-            }
-        }
-    }
 
     /// <summary>
     /// Binds the VM to a server and renders its current snapshot. Called on the UI thread. Each call
@@ -718,10 +573,6 @@ public sealed class WorkloadsViewModel : ObservableObject, IDisposable
     {
         SearchText = string.Empty;
         GlobalFilter = WorkloadGlobalFilter.All;
-        ContainerFilter = WorkloadFilter.All;
-        ServiceFilter = WorkloadFilter.All;
-        ContainerSearchText = string.Empty;
-        ServiceSearchText = string.Empty;
     }
 
     private void RaiseNoResults()
@@ -813,7 +664,6 @@ public sealed class WorkloadsViewModel : ObservableObject, IDisposable
                 .Select(c => new ContainerRowViewModel(c, _localization)));
         }
 
-        UpdateDockerSummary();
         ApplyContainerView();
         RaiseDockerVisibility();
     }
@@ -864,82 +714,14 @@ public sealed class WorkloadsViewModel : ObservableObject, IDisposable
                 .Select(s => new ServiceRowViewModel(s, _localization)));
         }
 
-        UpdateServicesSummary();
         ApplyServiceView();
         RaiseServicesVisibility();
     }
 
-    private void UpdateDockerSummary()
-    {
-        if (DockerState != DockerViewState.Containers)
-        {
-            DockerSummary = string.Empty;
-            DockerFailureBadge = null;
-            return;
-        }
-
-        var (running, failed, warning, stopped) = CountBySeverity(_allContainers.Select(c => c.Severity));
-        var segments = new List<string> { Format("WorkloadSummaryContainersFormat", _allContainers.Count) };
-        AppendCountSegments(segments, running, failed, warning, stopped);
-        DockerSummary = string.Join(" · ", segments);
-        DockerFailureBadge = failed > 0 ? Format("WorkloadSummaryFailedFormat", failed) : null;
-    }
-
-    private void UpdateServicesSummary()
-    {
-        if (ServicesState != ServicesViewState.List)
-        {
-            ServicesSummary = string.Empty;
-            ServicesFailureBadge = null;
-            return;
-        }
-
-        var (running, failed, warning, stopped) = CountBySeverity(_allServices.Select(s => s.Severity));
-        var segments = new List<string>();
-        AppendCountSegments(segments, running, failed, warning, stopped);
-        ServicesSummary = string.Join(" · ", segments);
-        ServicesFailureBadge = failed > 0 ? Format("WorkloadSummaryFailedFormat", failed) : null;
-    }
-
-    private static (int Running, int Failed, int Warning, int Stopped) CountBySeverity(
-        IEnumerable<WorkloadSeverity> severities)
-    {
-        int running = 0, failed = 0, warning = 0, stopped = 0;
-        foreach (var severity in severities)
-        {
-            switch (severity)
-            {
-                case WorkloadSeverity.Positive: running++; break;
-                case WorkloadSeverity.Negative: failed++; break;
-                case WorkloadSeverity.Warning: warning++; break;
-                default: stopped++; break;
-            }
-        }
-
-        return (running, failed, warning, stopped);
-    }
-
-    // Failed is placed right after running so a failure is never the last thing read (H-02).
-    private void AppendCountSegments(List<string> segments, int running, int failed, int warning, int stopped)
-    {
-        if (running > 0) { segments.Add(Format("WorkloadSummaryRunningFormat", running)); }
-        if (failed > 0) { segments.Add(Format("WorkloadSummaryFailedFormat", failed)); }
-        if (warning > 0) { segments.Add(Format("WorkloadSummaryWarningFormat", warning)); }
-        if (stopped > 0) { segments.Add(Format("WorkloadSummaryStoppedFormat", stopped)); }
-    }
-
     private void ApplyContainerView()
     {
-        var search = _containerSearchText.Trim();
+        var search = SearchText.Trim();
         IEnumerable<ContainerRowViewModel> view = _allContainers;
-
-        if (_containerFilter != WorkloadFilter.All)
-        {
-            var wanted = _containerFilter == WorkloadFilter.Running
-                ? WorkloadSeverity.Positive
-                : WorkloadSeverity.Negative;
-            view = view.Where(c => c.Severity == wanted);
-        }
 
         if (_globalFilter == WorkloadGlobalFilter.Problems)
         {
@@ -958,16 +740,8 @@ public sealed class WorkloadsViewModel : ObservableObject, IDisposable
 
     private void ApplyServiceView()
     {
-        var search = _serviceSearchText.Trim();
+        var search = SearchText.Trim();
         IEnumerable<ServiceRowViewModel> view = _allServices;
-
-        if (_serviceFilter != WorkloadFilter.All)
-        {
-            var wanted = _serviceFilter == WorkloadFilter.Running
-                ? WorkloadSeverity.Positive
-                : WorkloadSeverity.Negative;
-            view = view.Where(s => s.Severity == wanted);
-        }
 
         if (_globalFilter == WorkloadGlobalFilter.Problems)
         {
@@ -1004,7 +778,6 @@ public sealed class WorkloadsViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(ShowDockerError));
         OnPropertyChanged(nameof(ShowDockerNoResults));
         OnPropertyChanged(nameof(ShowDockerTruncatedNotice));
-        OnPropertyChanged(nameof(ShowDockerSummary));
     }
 
     private void RaiseServicesVisibility()
@@ -1017,11 +790,10 @@ public sealed class WorkloadsViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(ShowServicesError));
         OnPropertyChanged(nameof(ShowServicesNoResults));
         OnPropertyChanged(nameof(ShowServicesTruncatedNotice));
-        OnPropertyChanged(nameof(ShowServicesSummary));
     }
 
     private string Format(string key, int value) =>
-        string.Format(CultureInfo.CurrentUICulture, _localization.GetString(key), value);
+        string.Format(CultureInfo.CurrentUICulture, _localization?.GetString(key) ?? "{0}", value);
 
     public void Dispose()
     {

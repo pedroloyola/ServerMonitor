@@ -121,8 +121,6 @@ public sealed class WorkloadsViewModelUi3Tests
         Assert.Equal(new[] { "web" }, vm.Containers.Select(c => c.Name));
         Assert.Equal(new[] { "nginx" }, vm.Services.Select(s => s.Name));
         Assert.False(vm.ShowGlobalNoResults);
-        Assert.Equal("NGINX", vm.ContainerSearchText);
-        Assert.Equal("NGINX", vm.ServiceSearchText);
     }
 
     [Fact]
@@ -317,13 +315,11 @@ public sealed class WorkloadsViewModelUi3Tests
         var (vm, _, _) = New(Snapshot());
         vm.SearchText = "zzz";
         vm.GlobalFilter = WorkloadGlobalFilter.Problems;
-        vm.ContainerFilterIndex = 2;
 
         vm.ClearSearchCommand.Execute(null);
 
         Assert.Equal(string.Empty, vm.SearchText);
         Assert.Equal(WorkloadGlobalFilter.All, vm.GlobalFilter);
-        Assert.Equal(WorkloadFilter.All, vm.ContainerFilter);
         Assert.False(vm.HasActiveQuery);
         Assert.False(vm.ShowGlobalNoResults);
         Assert.Equal(12, Names(vm).Length);
