@@ -719,4 +719,6 @@
   <data name="WorkloadServicesEmptyState.Message" xml:space="preserve"><value>Não foram reportados serviços geridos neste servidor.</value></data>
   <data name="WorkloadContainersList.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Lista de containers</value></data>
   <data name="WorkloadServicesList.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Lista de serviços</value></data>
+  <data name="WorkloadContainerRowAccessibleFormat" xml:space="preserve"><value>{0}, imagem {1}, container {2}, saúde {3}</value></data>
+  <data name="WorkloadServiceRowAccessibleFormat" xml:space="preserve"><value>{0}, {1}, {2}, arranque {3}</value></data>
 </root>

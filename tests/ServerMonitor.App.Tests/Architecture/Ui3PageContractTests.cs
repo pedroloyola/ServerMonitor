@@ -99,14 +99,32 @@ public sealed partial class Ui3PageContractTests
         {
             var root = Assert.Single(Elements(Workloads), e => e.Name.LocalName == "DataTemplate" && (string?)e.Attribute(AppSourceTree.Xaml + "Key") == template);
             var row = root.Elements().Single();
-            Assert.Equal("{StaticResource SaDataTableCompactRowStyle}", Attr(row, "Style"));
+            // Difference 14 (Boss): a focusable, read-only SaDataTableRow (UIA ListItem, no pattern) named by the full row.
+            Assert.Equal("SaDataTableRow", row.Name.LocalName);
             Assert.Equal("{x:Bind DisplayAutomationName}", Attr(row, "AutomationProperties.Name"));
+            Assert.DoesNotContain(row.DescendantsAndSelf().SelectMany(e => e.Attributes()),
+                a => a.Name.LocalName is "Command" or "Tapped" or "Click" or "DoubleTapped" or "IsItemClickEnabled");
             var dot = Assert.Single(row.Descendants(), e => e.Name.LocalName == "SaStatusIndicator");
             Assert.Equal("{StaticResource SaStatusDotOnlyStyle}", Attr(dot, "Style"));
             Assert.False(string.IsNullOrWhiteSpace(Attr(dot, "Label")));
             // State is always text: the two right-hand lines exist and are styled by severity (never colour only).
             Assert.Equal(2, row.Descendants().Count(e => Attr(e, "Style")?.Contains("WorkloadSeverityToSaTextStyleConverter", StringComparison.Ordinal) == true));
         }
+    }
+
+    [Theory]
+    [InlineData("WorkloadContainersList", "{Binding Containers}", "{StaticResource ContainerRowTemplate}")]
+    [InlineData("WorkloadServicesList", "{Binding Services}", "{StaticResource ServiceRowTemplate}")]
+    public void Workloads_ListsAreOneTabStop_AndTheArrowsWalkTheRows(string uid, string items, string template)
+    {
+        // Difference 14 (Boss): Tab enters the list once, the arrows move between rows (no tab stop per row).
+        var list = Assert.Single(Elements(Workloads), e => Uid(e) == uid);
+        Assert.Equal("ItemsRepeater", list.Name.LocalName);   // virtualized: 2000 rows stay cheap
+        Assert.Equal("Once", Attr(list, "TabFocusNavigation"));
+        Assert.Equal("Enabled", Attr(list, "XYFocusKeyboardNavigation"));
+        Assert.Equal(items, Attr(list, "ItemsSource"));
+        Assert.Equal(template, Attr(list, "ItemTemplate"));
+        Assert.All(Cultures, c => Assert.False(string.IsNullOrWhiteSpace(Resw(c)[uid + ".[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name"])));
     }
 
     [Fact]

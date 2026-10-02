@@ -45,10 +45,9 @@ public sealed class ServiceRowViewModel
         IsProblem = Severity == WorkloadSeverity.Negative;
         DisplayAutomationName = string.Format(
             CultureInfo.CurrentUICulture,
-            localization.GetString("WorkloadServiceDisplayAccessibleFormat"),
-            Name,
-            StateDisplay,
-            startupKey is null ? localization.GetString("WorkloadValueUnknownAccessible") : StartupDisplay);
+            localization.GetString(HasDescription ? "WorkloadServiceRowAccessibleFormat" : "WorkloadServiceDisplayAccessibleFormat"),
+            HasDescription ? new object[] { Name, Description!, StateDisplay, startupKey is null ? localization.GetString("WorkloadValueUnknownAccessible") : StartupDisplay }
+                           : new object[] { Name, StateDisplay, startupKey is null ? localization.GetString("WorkloadValueUnknownAccessible") : StartupDisplay });
     }
 
     /// <summary>UI.3 state column: Running → "Ativo", Stopped → "Inativo", others as <see cref="StateText"/>.</summary>
@@ -60,7 +59,7 @@ public sealed class ServiceRowViewModel
     /// <summary>Counts toward "Com problemas" (D-UI3-3): Negative severity only.</summary>
     public bool IsProblem { get; }
 
-    /// <summary>Spoken summary matching the UI.3 columns (name, state, startup).</summary>
+    /// <summary>Full spoken row (UI.3 keyboard list): name, description (when known), state, startup.</summary>
     public string DisplayAutomationName { get; } = string.Empty;
 
     public string Name { get; }

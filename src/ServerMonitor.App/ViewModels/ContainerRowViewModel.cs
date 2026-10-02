@@ -37,8 +37,9 @@ public sealed class ContainerRowViewModel
         IsProblem = Severity == WorkloadSeverity.Negative;
         DisplayAutomationName = string.Format(
             CultureInfo.CurrentUICulture,
-            localization.GetString("WorkloadContainerAccessibleWithHealthFormat"),
+            localization.GetString("WorkloadContainerRowAccessibleFormat"),
             Name,
+            Image,
             StateText,
             healthKey is null ? localization.GetString("WorkloadValueUnknownAccessible") : HealthDisplay);
 
@@ -91,6 +92,6 @@ public sealed class ContainerRowViewModel
     /// <summary>Counts toward "Com problemas" (D-UI3-3): Negative severity only.</summary>
     public bool IsProblem { get; }
 
-    /// <summary>Spoken summary matching the UI.3 columns (name, state, health — "unknown" spoken, not "—").</summary>
+    /// <summary>Full spoken row (UI.3 keyboard list): name, image, state, health — "unknown" spoken, never "—".</summary>
     public string DisplayAutomationName { get; } = string.Empty;
 }

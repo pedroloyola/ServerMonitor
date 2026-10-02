@@ -16,7 +16,7 @@
         <!-- Container row 112:2650 / problem 112:2666: dot 6 · name 13 Medium + image 11 muted (w250) · state 12 Medium +
              health 11 right-aligned; no dividers; h64 (SaDataTableCompactRowStyle). -->
         <DataTemplate x:Key="ContainerRowTemplate" x:DataType="vm:ContainerRowViewModel">
-            <Border Style="{StaticResource SaDataTableCompactRowStyle}" AutomationProperties.Name="{x:Bind DisplayAutomationName}">
+            <primitives:SaDataTableRow AutomationProperties.Name="{x:Bind DisplayAutomationName}">
                 <Grid ColumnSpacing="10">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="6" />
@@ -43,12 +43,12 @@
                                    Text="{x:Bind HealthDisplay}" />
                     </StackPanel>
                 </Grid>
-            </Border>
+            </primitives:SaDataTableRow>
         </DataTemplate>
 
         <!-- Service row 112:2708 / problem 112:2740 / static 112:2748: name + description · state + startup (D-UI3-6). -->
         <DataTemplate x:Key="ServiceRowTemplate" x:DataType="vm:ServiceRowViewModel">
-            <Border Style="{StaticResource SaDataTableCompactRowStyle}" AutomationProperties.Name="{x:Bind DisplayAutomationName}">
+            <primitives:SaDataTableRow AutomationProperties.Name="{x:Bind DisplayAutomationName}">
                 <Grid ColumnSpacing="10">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="6" />
@@ -76,7 +76,7 @@
                                    Text="{x:Bind StartupDisplay}" />
                     </StackPanel>
                 </Grid>
-            </Border>
+            </primitives:SaDataTableRow>
         </DataTemplate>
     </Page.Resources>
 
@@ -325,9 +325,9 @@
                             </Grid>
                         </Border>
                         <Grid Grid.Row="3">
-                            <ScrollViewer x:Uid="WorkloadContainersList" IsTabStop="True" VerticalScrollBarVisibility="Auto"
+                            <ScrollViewer VerticalScrollBarVisibility="Auto"
                                           Visibility="{Binding ShowDockerContainers, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                <ItemsRepeater ItemsSource="{Binding Containers}" ItemTemplate="{StaticResource ContainerRowTemplate}" />
+                                <ItemsRepeater x:Uid="WorkloadContainersList" TabFocusNavigation="Once" XYFocusKeyboardNavigation="Enabled" ItemsSource="{Binding Containers}" ItemTemplate="{StaticResource ContainerRowTemplate}" />
                             </ScrollViewer>
                             <TextBlock x:Uid="WorkloadDockerNoResults" HorizontalAlignment="Center" VerticalAlignment="Center"
                                        Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}"
@@ -378,9 +378,9 @@
                             </Grid>
                         </Border>
                         <Grid Grid.Row="3">
-                            <ScrollViewer x:Uid="WorkloadServicesList" IsTabStop="True" VerticalScrollBarVisibility="Auto"
+                            <ScrollViewer VerticalScrollBarVisibility="Auto"
                                           Visibility="{Binding ShowServicesList, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                <ItemsRepeater ItemsSource="{Binding Services}" ItemTemplate="{StaticResource ServiceRowTemplate}" />
+                                <ItemsRepeater x:Uid="WorkloadServicesList" TabFocusNavigation="Once" XYFocusKeyboardNavigation="Enabled" ItemsSource="{Binding Services}" ItemTemplate="{StaticResource ServiceRowTemplate}" />
                             </ScrollViewer>
                             <TextBlock x:Uid="WorkloadServicesNoResults" HorizontalAlignment="Center" VerticalAlignment="Center"
                                        Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}"
