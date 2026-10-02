@@ -265,7 +265,7 @@ public sealed partial class Ui3PageContractTests
     public void PrismR2_ColumnHeadersSitAtTheTop_AndStackedSectionStatesGetRoomUnderTheTitle()
     {
         // R2-2: 112:2647/112:2648 put the header text at y 0 of the h28 band.
-        var headers = Elements(Workloads).Where(e => Attr(e, "Style") == "{StaticResource SaTableHeaderTextStyle}").ToList();
+        var headers = Elements(Workloads).Where(e => Attr(e, "Style") == "{StaticResource SaTableHeaderRegularTextStyle}").ToList();
         Assert.Equal(4, headers.Count);
         Assert.All(headers, h => Assert.Equal("Top", Attr(h, "VerticalAlignment")));
 
@@ -287,6 +287,30 @@ public sealed partial class Ui3PageContractTests
         }
 
         Assert.All(sectionStates, name => Assert.Null(Attr(Elements(Workloads).Single(e => (string?)e.Attribute(AppSourceTree.Xaml + "Name") == name), "Margin")));
+    }
+
+    [Fact]
+    public void Workloads_ColumnHeadersAre10Regular_WhileTheServersTableHeaderStaysMedium()
+    {
+        // Human decision (Figma 112:2647 / 112:2648): the four Workloads column headers are 10 Regular muted; the
+        // servers/Dashboard header style (112:1434) keeps Medium and is not used on this page.
+        Assert.Equal(4, Elements(Workloads).Count(e => Attr(e, "Style") == "{StaticResource SaTableHeaderRegularTextStyle}"));
+        Assert.DoesNotContain(Elements(Workloads), e => Attr(e, "Style") == "{StaticResource SaTableHeaderTextStyle}");
+
+        var styles = AppSourceTree.LoadXaml("Styles/Components/Sa.Text.xaml").Descendants().Where(e => e.Name.LocalName == "Style")
+            .ToDictionary(e => (string)e.Attribute(AppSourceTree.Xaml + "Key")!, StringComparer.Ordinal);
+        string? Setter(string style, string property) =>
+            styles[style].Elements().Where(e => e.Name.LocalName == "Setter" && Attr(e, "Property") == property).Select(e => Attr(e, "Value")).SingleOrDefault();
+
+        Assert.Equal("Medium", Setter("SaTableHeaderTextStyle", "FontWeight"));
+        Assert.Equal("{StaticResource SaFontSizeTableHeader}", Setter("SaTableHeaderTextStyle", "FontSize"));
+        Assert.Equal("{ThemeResource SaTextSecondaryBrush}", Setter("SaTableHeaderTextStyle", "Foreground"));
+        Assert.Equal("{StaticResource SaTableHeaderTextStyle}", Attr(styles["SaTableHeaderRegularTextStyle"], "BasedOn"));
+        Assert.Equal("Normal", Setter("SaTableHeaderRegularTextStyle", "FontWeight"));
+        Assert.Single(styles["SaTableHeaderRegularTextStyle"].Elements());   // only the weight differs (size, line height, colour inherited)
+        Assert.All(Cultures, c => Assert.All(
+            new[] { "WorkloadContainerColumnName", "WorkloadContainerColumnState", "WorkloadServiceColumnName", "WorkloadServiceColumnState" },
+            uid => { var v = Resw(c)[uid + ".Text"]; Assert.Equal(v.ToUpper(new System.Globalization.CultureInfo(c)), v); }));
     }
 
     [Fact]

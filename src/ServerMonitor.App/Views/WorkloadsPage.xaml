@@ -376,8 +376,8 @@
                                 Visibility="{Binding ShowDockerContainers, Converter={StaticResource BooleanToVisibilityConverter}}">
                             <Grid ColumnSpacing="10">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="6" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                                <TextBlock x:Uid="WorkloadContainerColumnName" Grid.ColumnSpan="2" Style="{StaticResource SaTableHeaderTextStyle}" VerticalAlignment="Top" />
-                                <TextBlock x:Uid="WorkloadContainerColumnState" Grid.Column="2" Style="{StaticResource SaTableHeaderTextStyle}" VerticalAlignment="Top" HorizontalAlignment="Right" />
+                                <TextBlock x:Uid="WorkloadContainerColumnName" Grid.ColumnSpan="2" Style="{StaticResource SaTableHeaderRegularTextStyle}" VerticalAlignment="Top" />
+                                <TextBlock x:Uid="WorkloadContainerColumnState" Grid.Column="2" Style="{StaticResource SaTableHeaderRegularTextStyle}" VerticalAlignment="Top" HorizontalAlignment="Right" />
                             </Grid>
                         </Border>
                         <Grid Grid.Row="3">
@@ -432,8 +432,8 @@
                                 Visibility="{Binding ShowServicesList, Converter={StaticResource BooleanToVisibilityConverter}}">
                             <Grid ColumnSpacing="10">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="6" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                                <TextBlock x:Uid="WorkloadServiceColumnName" Grid.ColumnSpan="2" Style="{StaticResource SaTableHeaderTextStyle}" VerticalAlignment="Top" />
-                                <TextBlock x:Uid="WorkloadServiceColumnState" Grid.Column="2" Style="{StaticResource SaTableHeaderTextStyle}" VerticalAlignment="Top" HorizontalAlignment="Right" />
+                                <TextBlock x:Uid="WorkloadServiceColumnName" Grid.ColumnSpan="2" Style="{StaticResource SaTableHeaderRegularTextStyle}" VerticalAlignment="Top" />
+                                <TextBlock x:Uid="WorkloadServiceColumnState" Grid.Column="2" Style="{StaticResource SaTableHeaderRegularTextStyle}" VerticalAlignment="Top" HorizontalAlignment="Right" />
                             </Grid>
                         </Border>
                         <Grid Grid.Row="3">

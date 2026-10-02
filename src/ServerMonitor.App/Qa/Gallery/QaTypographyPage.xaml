@@ -101,6 +101,11 @@
             </Grid>
             <Grid ColumnSpacing="16">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="SaTableHeaderRegularTextStyle 10/14 Regular · 112:2647" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1" Style="{StaticResource SaTableHeaderRegularTextStyle}" Text="NOME / IMAGEM · ESTADO / SAÚDE" />
+            </Grid>
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                 <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="SaChartValue+UnitTextStyle 112:2291" VerticalAlignment="Center" />
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2"><TextBlock Style="{StaticResource SaChartValueTextStyle}" Foreground="{ThemeResource SaTextBrush}" Text="24" VerticalAlignment="Center" /><TextBlock Style="{StaticResource SaChartUnitTextStyle}" Text="%" VerticalAlignment="Center" /></StackPanel>
             </Grid>

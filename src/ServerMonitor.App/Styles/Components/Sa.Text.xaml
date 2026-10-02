@@ -25,6 +25,10 @@
         <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
         <Setter Property="Foreground" Value="{ThemeResource SaTextSecondaryBrush}" />
     </Style>
+    <!-- UI.3 additive (human decision): Workloads column headers 10/14 REGULAR muted, 112:2647 / 112:2648. Servers keep Medium. -->
+    <Style x:Key="SaTableHeaderRegularTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SaTableHeaderTextStyle}">
+        <Setter Property="FontWeight" Value="Normal" />
+    </Style>
     <!-- Metric unit "%" 20 Regular muted next to the 44 Light value (112:1816). -->
     <Style x:Key="SaMetricUnitTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SaTitleTextStyle}">
         <Setter Property="FontWeight" Value="Normal" />
