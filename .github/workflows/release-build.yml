@@ -60,7 +60,7 @@ jobs:
 
       # Full history and tags, so the tag can be resolved to a commit and compared.
       - name: Checkout the exact tag
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ steps.resolve.outputs.tag }}
           fetch-depth: 0
