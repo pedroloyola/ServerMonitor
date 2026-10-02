@@ -94,11 +94,24 @@ Autoridade visual: Figma `Qvk5dUFgsWf4UOYzfAkiDV`, 05 Free secção 02 "Dashboar
   - em `DashboardDiscoveryDescription`;
   - em `ServerOperationError.Message`.
 
-## 7. Diferenças deliberadas / dívida
-
-- Não há sidebar (UI.6).
-- A sombra projetada das superfícies não é reproduzida (desvio UI.2 existente).
-- Contagem "4" em 38 Light em vez de 36, e "de 6 saudáveis" em 20 Regular em vez de 22: não existe token para estes tamanhos e criar um exigiria Prism + manifesto.
-- O ícone CPU/Memória é o `SaIconComputerData` existente (não há asset novo).
-- O título "Servidores" da secção usa `SaSectionHeaderTextStyle` (20) em vez de 19.
-- Backlog (Boss): código morto `IsFocusHighlighted`; listas de harness em `tools/perf/*.ps1`.
+## 7. Fidelidade, diferenças deliberadas e dívida
+- **Corrigido na ronda de fidelidade (Prism fidelity-r1 + decisão Boss):**
+  - contagem 36 Light (`SaHealthCountTextStyle`) e "de 6 saudáveis" 22 Regular (`SaHealthTotalTextStyle`);
+  - títulos de secção UI.4 a 19 Semibold (estilo **novo** `SaSectionTitleTextStyle`; o partilhado `SaSectionHeaderTextStyle` = 20 fica como o UI.3 aceitou para os Serviços);
+  - ponto "Saúde geral" neutro `#A6A6A6` nos dois temas (`SaHealthLabelDotBrush`);
+  - segmentos logo após o texto (espaçador 75);
+  - cartões de saúde/prioritário com 156;
+  - estado da lista resumida a 13 e nome a 15 Medium (`SaListRowProminentStyle`; o `SaListRow` por omissão continua a 14);
+  - "Adicionar" dos Servidores ao lado do título em todas as larguras;
+  - chevron do prioritário, espaçamento estado→chevron e header 600–639.
+- **DERIVED aceite:** ícone CPU/Memória = `SaIconComputerData` (o Figma não tem ícone para essas métricas; o título por extenso desambigua).
+- **Diferenças deliberadas que ficam:**
+  - sem sidebar (UI.6);
+  - sombra projetada não reproduzida (desvio UI.2 existente);
+  - cor dos segmentos teal (tokens do Manual, decisão UI.1).
+- **Backlog:**
+  - código morto `IsFocusHighlighted`;
+  - listas de harness em `tools/perf/*.ps1`;
+  - ratchet automático de virtualização (hoje medição manual UIA 22/500, Atlas NIT-4);
+  - raiz QA isolada por lançamento (placement partilhado entre corridas paralelas, Prism r1 risco 1);
+  - `ServerHealthOffline` = "Offline" no cartão interino (UI.5).

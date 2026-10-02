@@ -215,7 +215,6 @@ public sealed class PriorityProblemSelector(MonitoringThresholds thresholds)
     {
         ArgumentNullException.ThrowIfNull(servers);
         PriorityProblem? best = null;
-        var bestIndex = int.MaxValue;
         for (var index = 0; index < servers.Count; index++)
         {
             var server = servers[index];
@@ -232,17 +231,17 @@ public sealed class PriorityProblemSelector(MonitoringThresholds thresholds)
                          (PriorityMetric.Disk, snapshot.DiskUsagePercent, _thresholds.DiskWarning, _thresholds.DiskCritical)
                      })
             {
-                if (value is not { } percent || double.IsNaN(percent) || percent < warning)
+                // Cortex r3 NIT-1: the ONE inclusive comparison of the App (parity with the Core HealthEvaluator is tested).
+                var severity = OverviewPresentation.MetricSeverity(value, warning, critical);
+                if (severity == ServerHealth.Healthy)
                 {
                     continue;
                 }
 
-                var severity = percent >= critical ? ServerHealth.Critical : ServerHealth.Warning;
-                var candidate = new PriorityProblem(server.ServerId, server.Name, metric, severity, percent);
-                if (best is null || IsMoreUrgent(candidate, index, best, bestIndex))
+                var candidate = new PriorityProblem(server.ServerId, server.Name, metric, severity, value!.Value);
+                if (best is null || IsMoreUrgent(candidate, best))
                 {
                     best = candidate;
-                    bestIndex = index;
                 }
             }
         }
@@ -251,7 +250,7 @@ public sealed class PriorityProblemSelector(MonitoringThresholds thresholds)
     }
 
     // Strictly more urgent only: on a full tie the earlier candidate (lower server index, then earlier metric) is kept.
-    private static bool IsMoreUrgent(PriorityProblem candidate, int candidateIndex, PriorityProblem best, int bestIndex)
+    private static bool IsMoreUrgent(PriorityProblem candidate, PriorityProblem best)
     {
         var bySeverity = Rank(candidate.Severity).CompareTo(Rank(best.Severity));
         if (bySeverity != 0)
@@ -265,7 +264,9 @@ public sealed class PriorityProblemSelector(MonitoringThresholds thresholds)
             return byPercent > 0;
         }
 
-        return candidateIndex < bestIndex;
+        // Atlas r1 NIT-2: the list order is the loop order (indices only grow), so a full tie keeps the earlier
+        // candidate by returning false; comparing the indices here could never be true.
+        return false;
     }
 
     private static int Rank(ServerHealth health) => health == ServerHealth.Critical ? 2 : 1;

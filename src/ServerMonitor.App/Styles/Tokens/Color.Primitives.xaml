@@ -132,4 +132,7 @@
     <!-- UI.3 final fidelity (human decision, replaces D-UI3-1): neutral History chart line 2.4, 05 Free 112:2299 / 112:2476. -->
     <Color x:Key="SaColorChartLineDark">#D2D6D4</Color>
     <Color x:Key="SaColorChartLineLight">#565C59</Color>
+    <!-- UI.4 fidelity r1 (B4): the "Saúde geral" label dot 112:1012 is neutral #A6A6A6 in Dark AND Light (layer name
+         "Status / green" is misleading; the SVG fill is the truth). -->
+    <Color x:Key="SaColorHealthLabelDot">#A6A6A6</Color>
 </ResourceDictionary>

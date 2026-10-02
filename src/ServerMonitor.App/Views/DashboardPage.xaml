@@ -105,14 +105,17 @@
         <!-- Summary list row 112:1057: SaListRow Simple (icon 20, name, state at the right before the chevron). -->
         <DataTemplate x:Key="OverviewServerRowTemplate" x:DataType="vm:ServerDirectoryRowViewModel">
             <primitives:SaListRow
+                Style="{StaticResource SaListRowProminentStyle}"
                 IconData="{StaticResource SaIconServerStack01Data}"
                 Title="{x:Bind Name}"
                 Command="{x:Bind OpenDetailCommand}"
                 AutomationProperties.Name="{x:Bind ListAutomationName, Mode=OneWay}"
                 ToolTipService.ToolTip="{x:Bind Name}">
                 <primitives:SaListRow.Trailing>
+                    <!-- 112:1066: state 13 (B7); 198 from its start to the chevron (C2: 186 + the row's 12 gap). -->
                     <primitives:SaStatusIndicator
-                        MinWidth="160"
+                        MinWidth="186"
+                        FontSize="{StaticResource SaFontSizeControl}"
                         Status="{x:Bind Health, Mode=OneWay, Converter={StaticResource ServerHealthToStatusKindConverter}}"
                         Label="{x:Bind StatusDisplay, Mode=OneWay}" />
                 </primitives:SaListRow.Trailing>
@@ -205,7 +208,31 @@
                         <Setter Target="HealthRow.RowSpacing" Value="{StaticResource SaSpace24}" />
                     </VisualState.Setters>
                 </VisualState>
-                <!-- < 640: compact padding; segments on their own line under the count; search on its own line; header
+                <!-- 600-639 (Prism C3): as Narrow, but the header actions still fit beside the title. -->
+                <VisualState x:Name="NarrowWide">
+                    <VisualState.StateTriggers>
+                        <AdaptiveTrigger MinWindowWidth="600" />
+                    </VisualState.StateTriggers>
+                    <VisualState.Setters>
+                        <Setter Target="PageRoot.Padding" Value="{StaticResource SaPagePaddingCompact}" />
+                        <Setter Target="PriorityHost.(Grid.Row)" Value="1" />
+                        <Setter Target="PriorityHost.(Grid.Column)" Value="0" />
+                        <Setter Target="HealthColumn2.Width" Value="0" />
+                        <Setter Target="HealthRow.ColumnSpacing" Value="0" />
+                        <Setter Target="HealthRow.RowSpacing" Value="{StaticResource SaSpace24}" />
+                        <Setter Target="HealthSegments.(Grid.Row)" Value="1" />
+                        <Setter Target="HealthSegments.(Grid.Column)" Value="0" />
+                        <Setter Target="HealthSegments.(Grid.ColumnSpan)" Value="4" />
+                        <Setter Target="HealthCountRow.RowSpacing" Value="{StaticResource SaSpace12}" />
+                        <Setter Target="OverviewSearchBox.(Grid.Row)" Value="1" />
+                        <Setter Target="OverviewSearchBox.(Grid.Column)" Value="0" />
+                        <Setter Target="OverviewSearchBox.(Grid.ColumnSpan)" Value="2" />
+                        <Setter Target="OverviewSearchBox.Width" Value="NaN" />
+                        <Setter Target="OverviewSearchBox.HorizontalAlignment" Value="Stretch" />
+                        <Setter Target="ServersToolbar.RowSpacing" Value="{StaticResource SaSpace12}" />
+                    </VisualState.Setters>
+                </VisualState>
+                <!-- < 600: compact padding; segments on their own line under the count; search on its own line; header
                      actions on a second line, left-aligned. -->
                 <VisualState x:Name="Narrow">
                     <VisualState.StateTriggers>
@@ -220,8 +247,7 @@
                         <Setter Target="HealthRow.RowSpacing" Value="{StaticResource SaSpace24}" />
                         <Setter Target="HealthSegments.(Grid.Row)" Value="1" />
                         <Setter Target="HealthSegments.(Grid.Column)" Value="0" />
-                        <Setter Target="HealthSegments.(Grid.ColumnSpan)" Value="3" />
-                        <Setter Target="HealthSegments.HorizontalAlignment" Value="Left" />
+                        <Setter Target="HealthSegments.(Grid.ColumnSpan)" Value="4" />
                         <Setter Target="HealthCountRow.RowSpacing" Value="{StaticResource SaSpace12}" />
                         <Setter Target="HeaderActions.(Grid.Row)" Value="1" />
                         <Setter Target="HeaderActions.(Grid.Column)" Value="0" />
@@ -332,29 +358,33 @@
 
                     <!-- Fleet health 112:1010: read-only, one Tab stop named by the full sentence (Beacon F3 pattern). -->
                     <primitives:SaFocusableCard AutomationProperties.Name="{x:Bind ViewModel.HealthAutomationName, Mode=OneWay}">
-                        <Border Style="{StaticResource SaGlassSurfaceStyle}">
+                        <!-- 156 high (B6): label 20 · count row 47 · chips 23, gap 8, inside pad 24 + border. -->
+                        <Border Style="{StaticResource SaGlassSurfaceStyle}" MinHeight="156">
                             <StackPanel Spacing="{StaticResource SaSpace8}" AutomationProperties.AccessibilityView="Raw">
-                                <StackPanel Orientation="Horizontal" Spacing="7">
+                                <StackPanel Orientation="Horizontal" Spacing="7" Height="20">
+                                    <!-- 112:1012: neutral #A6A6A6 in both themes (B4); decorative, never a state. -->
                                     <Ellipse Width="{StaticResource SaStatusDotSize}" Height="{StaticResource SaStatusDotSize}"
-                                             VerticalAlignment="Center" Fill="{ThemeResource SaHealthyBrush}" />
-                                    <TextBlock x:Uid="OverviewHealthLabel" Style="{StaticResource SaPageSubtitleTextStyle}" />
+                                             VerticalAlignment="Center" Fill="{ThemeResource SaHealthLabelDotBrush}" />
+                                    <TextBlock x:Uid="OverviewHealthLabel" Style="{StaticResource SaPageSubtitleTextStyle}" VerticalAlignment="Center" />
                                 </StackPanel>
-                                <Grid x:Name="HealthCountRow" ColumnSpacing="{StaticResource SaSpace8}">
+                                <!-- 112:1014: "4" + 8 + "de 6 saudáveis" + 8 + spacer 75 + 8 + the 213 bar, left-aligned (B5). -->
+                                <Grid x:Name="HealthCountRow" MinHeight="47" ColumnSpacing="{StaticResource SaSpace8}">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition x:Name="HealthSpacerColumn" Width="75" />
+                                        <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="Auto" />
                                         <RowDefinition Height="Auto" />
                                     </Grid.RowDefinitions>
-                                    <TextBlock VerticalAlignment="Center" Style="{StaticResource SaChartValueTextStyle}" Foreground="{ThemeResource SaTextBrush}"
+                                    <TextBlock VerticalAlignment="Center" Style="{StaticResource SaHealthCountTextStyle}" Foreground="{ThemeResource SaTextBrush}"
                                                Text="{x:Bind ViewModel.HealthyCountDisplay, Mode=OneWay}" />
-                                    <TextBlock Grid.Column="1" VerticalAlignment="Center" FontFamily="{StaticResource SaFontText}"
-                                               FontSize="{StaticResource SaFontSizeTitle}" Foreground="{ThemeResource SaTextBrush}"
+                                    <TextBlock Grid.Column="1" VerticalAlignment="Center" Style="{StaticResource SaHealthTotalTextStyle}"
+                                               Foreground="{ThemeResource SaTextBrush}"
                                                Text="{x:Bind ViewModel.HealthOfTotalDisplay, Mode=OneWay}" />
-                                    <ItemsRepeater x:Name="HealthSegments" Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                    <ItemsRepeater x:Name="HealthSegments" Grid.Column="3" HorizontalAlignment="Left" VerticalAlignment="Center"
                                                    Width="213" ItemsSource="{x:Bind ViewModel.HealthBarSegments, Mode=OneWay}"
                                                    ItemTemplate="{StaticResource HealthSegmentTemplate}">
                                         <ItemsRepeater.Layout>
@@ -362,7 +392,7 @@
                                         </ItemsRepeater.Layout>
                                     </ItemsRepeater>
                                 </Grid>
-                                <ItemsRepeater ItemsSource="{x:Bind ViewModel.HealthChips, Mode=OneWay}" ItemTemplate="{StaticResource HealthChipTemplate}">
+                                <ItemsRepeater MinHeight="23" ItemsSource="{x:Bind ViewModel.HealthChips, Mode=OneWay}" ItemTemplate="{StaticResource HealthChipTemplate}">
                                     <ItemsRepeater.Layout>
                                         <StackLayout Orientation="Horizontal" Spacing="{StaticResource SaSpace20}" />
                                     </ItemsRepeater.Layout>
@@ -373,7 +403,7 @@
 
                     <Grid x:Name="PriorityHost" Grid.Column="1">
                         <!-- Priority 112:1031: icon + label in the severity colour, value 32 Light + capacity bar, server + chevron. -->
-                        <Button Style="{StaticResource OverviewCardButtonStyle}"
+                        <Button Style="{StaticResource OverviewCardButtonStyle}" MinHeight="156"
                                 Command="{x:Bind ViewModel.OpenPriorityProblemCommand}"
                                 AutomationProperties.Name="{x:Bind ViewModel.PriorityAutomationName, Mode=OneWay}"
                                 Visibility="{x:Bind ViewModel.HasPriorityProblem, Mode=OneWay}">
@@ -413,17 +443,18 @@
                                                 Style="{x:Bind ViewModel.PrioritySeverity, Mode=OneWay, Converter={StaticResource PriorityFillStyleConverter}}" />
                                     </Grid>
                                 </Grid>
-                                <Grid>
+                                <!-- 112:1042: server 13 muted, chevron 17 at 18 from the content edge (C1). -->
+                                <Grid MinHeight="24">
                                     <TextBlock Style="{StaticResource SaPageSubtitleTextStyle}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
                                                Text="{x:Bind ViewModel.PriorityServerName, Mode=OneWay}" />
-                                    <primitives:SaIcon HorizontalAlignment="Right" VerticalAlignment="Center" Size="17"
+                                    <primitives:SaIcon HorizontalAlignment="Right" VerticalAlignment="Center" Size="17" Margin="0,0,18,0"
                                                        Data="{StaticResource SaIconArrowRight01Data}" Foreground="{ThemeResource SaTextSecondaryBrush}" />
                                 </Grid>
                             </StackPanel>
                         </Button>
 
                         <!-- "Sem problemas" (DERIVED, Prism r1 e): green dot + label, message; not interactive. -->
-                        <Border Style="{StaticResource SaGlassSurfaceStyle}" x:Uid="OverviewNoProblemsPanel"
+                        <Border Style="{StaticResource SaGlassSurfaceStyle}" x:Uid="OverviewNoProblemsPanel" MinHeight="156"
                                 Visibility="{x:Bind ViewModel.ShowNoProblems, Mode=OneWay}">
                             <StackPanel Spacing="{StaticResource SaSpace8}">
                                 <StackPanel Orientation="Horizontal" Spacing="7">
@@ -438,7 +469,7 @@
                         </Border>
 
                         <!-- "Sem leituras" (Prism r1 e): nothing to judge yet — grey dot, never "Sem problemas". -->
-                        <Border Style="{StaticResource SaGlassSurfaceStyle}" x:Uid="OverviewNoReadingsPanel"
+                        <Border Style="{StaticResource SaGlassSurfaceStyle}" x:Uid="OverviewNoReadingsPanel" MinHeight="156"
                                 Visibility="{x:Bind ViewModel.ShowNoReadings, Mode=OneWay}">
                             <StackPanel Spacing="{StaticResource SaSpace8}">
                                 <StackPanel Orientation="Horizontal" Spacing="7">
@@ -467,7 +498,7 @@
                         </Grid.RowDefinitions>
                         <StackPanel Orientation="Horizontal" Spacing="{StaticResource SaSpace16}" VerticalAlignment="Center">
                             <TextBlock x:Uid="OverviewServersTitle" AutomationProperties.HeadingLevel="Level2" VerticalAlignment="Center"
-                                       Style="{StaticResource SaSectionHeaderTextStyle}" />
+                                       Style="{StaticResource SaSectionTitleTextStyle}" Foreground="{ThemeResource SaTextBrush}" />
                             <Button x:Uid="OverviewViewAllButton" VerticalAlignment="Center" Style="{StaticResource SaBreadcrumbParentButtonStyle}"
                                     Command="{x:Bind ViewModel.ViewAllServersCommand}" />
                         </StackPanel>
@@ -502,7 +533,8 @@
                 <!-- Encontrados na rede (M14.5) — its own section BELOW the Servers card (Prism r1), only with suggestions. -->
                 <StackPanel Spacing="{StaticResource SaSpace12}" Visibility="{x:Bind ViewModel.ShowDiscoverySection, Mode=OneWay}">
                     <StackPanel Spacing="{StaticResource SaSpace4}">
-                        <TextBlock x:Uid="DashboardDiscoveryTitle" AutomationProperties.HeadingLevel="Level2" Style="{StaticResource SaSectionHeaderTextStyle}" />
+                        <TextBlock x:Uid="DashboardDiscoveryTitle" AutomationProperties.HeadingLevel="Level2"
+                                   Style="{StaticResource SaSectionTitleTextStyle}" Foreground="{ThemeResource SaTextBrush}" />
                         <TextBlock x:Uid="DashboardDiscoveryDescription" Style="{StaticResource SaCaptionTextStyle}"
                                    Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap" />
                     </StackPanel>

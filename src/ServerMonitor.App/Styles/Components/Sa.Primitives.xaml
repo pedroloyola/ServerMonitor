@@ -100,6 +100,9 @@
          them. Stale is DERIVED: secondary text colour, never the disabled brush (HC GrayText = disabled; Cortex F-3). -->
     <Style x:Key="SaStatusIndicatorStyle" TargetType="primitives:SaStatusIndicator">
         <Setter Property="IsTabStop" Value="False" />
+        <!-- UI.4 fidelity r1 (B7): the label size is the control's FontSize - 12 by default (112:1448); the overview's
+             summary list passes 13 (112:1068). -->
+        <Setter Property="FontSize" Value="{StaticResource SaFontSizeCaption}" />
         <Setter Property="Foreground" Value="{ThemeResource SaTextSecondaryBrush}" />
         <Setter Property="Template">
             <Setter.Value>
@@ -159,6 +162,7 @@
                                    VerticalAlignment="Center"
                                    AutomationProperties.AccessibilityView="Raw"
                                    Style="{StaticResource SaCaptionTextStyle}"
+                                   FontSize="{TemplateBinding FontSize}"
                                    Foreground="{TemplateBinding Foreground}"
                                    Text="{TemplateBinding Label}" />
                     </StackPanel>
@@ -338,8 +342,10 @@
 
     <!-- ListRow simple 112:1057 (icon 20, name 14 Medium [Figma 15 - no token, deviation], trailing, chevron 18, h48, gap 12)
          / rich 112:1933 (icon 22, 14 Medium + 12 muted, chevron 16, h70, gap 14). Hover/pressed/focus DERIVED. -->
-    <Style TargetType="primitives:SaListRow">
+    <Style x:Key="SaListRowStyle" TargetType="primitives:SaListRow">
         <Setter Property="Foreground" Value="{ThemeResource SaTextBrush}" />
+        <!-- UI.4 fidelity r1 (B9): the title size is the control's FontSize - 14 by default (UI.2). -->
+        <Setter Property="FontSize" Value="{StaticResource SaFontSizeButton}" />
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="HorizontalAlignment" Value="Stretch" />
         <Setter Property="HorizontalContentAlignment" Value="Stretch" />
@@ -395,7 +401,7 @@
                         </VisualStateManager.VisualStateGroups>
                         <primitives:SaIcon x:Name="PART_Icon" Data="{TemplateBinding IconData}" Size="20" VerticalAlignment="Center" />
                         <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
-                            <TextBlock Style="{StaticResource SaButtonTextStyle}" Text="{TemplateBinding Title}" TextTrimming="CharacterEllipsis"
+                            <TextBlock Style="{StaticResource SaButtonTextStyle}" FontSize="{TemplateBinding FontSize}" Text="{TemplateBinding Title}" TextTrimming="CharacterEllipsis"
                                        AutomationProperties.AccessibilityView="Raw" />
                             <TextBlock x:Name="PART_Detail" Visibility="Collapsed" Style="{StaticResource SaCaptionTextStyle}"
                                        Foreground="{ThemeResource SaTextSecondaryBrush}" Text="{TemplateBinding Detail}" TextTrimming="CharacterEllipsis" />
@@ -407,6 +413,12 @@
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
+    </Style>
+    <!-- Implicit default = the keyed base (WinUI BasedOn needs a key). -->
+    <Style TargetType="primitives:SaListRow" BasedOn="{StaticResource SaListRowStyle}" />
+    <!-- UI.4 fidelity r1 (B9): the overview summary list row 112:1057 - name 15 Medium (112:1065). -->
+    <Style x:Key="SaListRowProminentStyle" TargetType="primitives:SaListRow" BasedOn="{StaticResource SaListRowStyle}">
+        <Setter Property="FontSize" Value="{StaticResource SaFontSizeListRowTitle}" />
     </Style>
 
     <!-- InlineNotice Error 112:18273 / 112:18441: Manual inset (interior + inset border, radius 12), pad-x 16, gap 16, min h72;
