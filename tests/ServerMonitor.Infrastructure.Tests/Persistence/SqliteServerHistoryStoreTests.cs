@@ -396,13 +396,14 @@ public sealed class SqliteServerHistoryStoreTests : IDisposable
     /// Formerly <c>QueryCancellation_AfterRealReaderOpened_CompletesWithinBound</c>. Its stopwatch started BEFORE the
     /// query was scheduled, so it timed thread-pool scheduling, the SQLite open and the read setup — not the
     /// cancellation — and failed on slow CI runners ("Cancellation took 00:00:04.14", run 37057158486). The guarantee
-    /// is functional and is now asserted without the clock: a token cancelled once the real reader is open is observed
-    /// at the very next read (it is cancelled BEFORE the reader may continue, so a single row is never returned), the
-    /// query surfaces the cancellation instead of a partial or empty result, and it gives the read gate back, so a
-    /// reset — which waits for every active query — proceeds.
+    /// is functional and is now asserted without the clock: with rows present and the real reader open, a token
+    /// cancelled before the reader may continue makes the query surface the cancellation — never a partial or empty
+    /// result — and the query gives the read gate back, so a reset (which waits for every active query) proceeds.
+    /// It does NOT prove WHICH read observes the token (a store that only checked it after the scan would also pass;
+    /// independent review r1, SHOULD-1), so the name claims only what is proven.
     /// </summary>
     [Fact]
-    public async Task QueryCancellation_AfterRealReaderOpened_IsObservedAtTheNextRead_AndReleasesTheReadGate()
+    public async Task QueryCancellation_AfterRealReaderOpened_SurfacesCancellation_AndReleasesTheReadGate()
     {
         // Deadlock guard only: each wait is released by a signal this test controls, never by elapsed time.
         var deadlockGuard = TimeSpan.FromSeconds(30);

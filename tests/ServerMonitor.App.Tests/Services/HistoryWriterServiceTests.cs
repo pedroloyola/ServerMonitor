@@ -20,11 +20,11 @@ public sealed class HistoryWriterServiceTests
         CpuPercent = 10
     };
 
-    private static (HistoryWriterService writer, HistorySampleChannel channel, FakeServerHistoryStore store, FakeTimeProvider time) New()
+    private static (HistoryWriterService writer, HistorySampleChannel channel, FakeServerHistoryStore store, TimerRecordingTimeProvider time) New()
     {
         var channel = new HistorySampleChannel();
         var store = new FakeServerHistoryStore();
-        var time = new FakeTimeProvider();
+        var time = new TimerRecordingTimeProvider();
         time.SetUtcNow(Now);
         var options = new HistoryStorageOptions { DatabasePath = "unused.db", RetentionPeriod = TimeSpan.FromDays(30) };
         var writer = new HistoryWriterService(channel, store, options, NullLogger<HistoryWriterService>.Instance, time);
@@ -84,11 +84,13 @@ public sealed class HistoryWriterServiceTests
     [Fact]
     public async Task Retention_RunsAgainAfterDailyInterval()
     {
-        // Deterministic: each wait is released by the store's retention-call signal, and the 24 h is a single
-        // FakeTimeProvider advance. The retention loop keeps an ABSOLUTE next-run time (set before it calls the store),
-        // so the advance is observed whether the loop is still inside the first call or already parked on its timer.
-        // The bound is a deadlock guard only. It used to be 5 s, which a busy runner exceeded just scheduling the
-        // retention worker onto the thread pool (Cortex CI-flakes repetitions, TimeoutException).
+        // Deterministic: each wait is released by a signal (the store's retention call, the loop arming its 24 h
+        // timer), and the 24 h is a single FakeTimeProvider advance made only AFTER that timer exists. Advancing any
+        // earlier is a real race: the loop reads the clock, computes "24 h from now", and only then creates the timer,
+        // so an advance in that window arms the timer 24 h after the ALREADY-advanced clock (+48 h) and it never fires
+        // (independent review r1, MUST-2). The bound is a deadlock guard only; it used to be 5 s.
+        // TimerRecordingTimeProvider matches the exact 24 h due time: the clock is frozen until the advance, so the
+        // loop's delay is exactly nextRunUtc - now = 24 h.
         var deadlockGuard = TimeSpan.FromSeconds(30);
         var (writer, _, store, time) = New();
         await writer.StartAsync(CancellationToken.None);
@@ -97,6 +99,7 @@ public sealed class HistoryWriterServiceTests
             await store.WaitForRetentionCallsAsync(1).WaitAsync(deadlockGuard);
             Assert.Equal(Now - TimeSpan.FromDays(30), store.LastRetentionCutoff);
 
+            await time.TimerCreatedAsync(TimeSpan.FromHours(24)).WaitAsync(deadlockGuard); // parked on its daily timer
             time.Advance(TimeSpan.FromHours(24));
             await store.WaitForRetentionCallsAsync(2).WaitAsync(deadlockGuard);
 
