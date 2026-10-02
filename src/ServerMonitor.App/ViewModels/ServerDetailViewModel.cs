@@ -1,4 +1,5 @@
 using System.Windows.Input;
+using Microsoft.UI.Dispatching;
 using ServerMonitor.App.Services;
 
 namespace ServerMonitor.App.ViewModels;
@@ -19,6 +20,10 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
     private Guid _serverId;
     private bool _subscribed;
     private bool _left;
+    private bool _disposed;
+
+    // Null in unit tests (no WinUI dispatcher): the exit then runs inline.
+    private readonly DispatcherQueue? _dispatcherQueue = TryGetDispatcher();
 
     public ServerDetailViewModel(DashboardViewModel dashboard, INavigationService navigation, ILocalizationService localization)
     {
@@ -69,6 +74,8 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
 
     public void Dispose()
     {
+        // A deferred Resolve queued before the page was replaced must not navigate afterwards.
+        _disposed = true;
         if (_subscribed)
         {
             _dashboard.ServersReloaded -= OnServersReloaded;
@@ -76,10 +83,34 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
         }
     }
 
-    private void OnServersReloaded(object? sender, EventArgs e) => Resolve();
+    // Cortex r1 NIT-1: raised inside the dashboard's list rebuild; never swap the frame re-entrantly from there.
+    private void OnServersReloaded(object? sender, EventArgs e)
+    {
+        if (_dispatcherQueue is null || !_dispatcherQueue.TryEnqueue(Resolve))
+        {
+            Resolve();
+        }
+    }
+
+    private static DispatcherQueue? TryGetDispatcher()
+    {
+        try
+        {
+            return DispatcherQueue.GetForCurrentThread();
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
 
     private void Resolve()
     {
+        if (_left || _disposed)
+        {
+            return;
+        }
+
         var card = _dashboard.VisibleServers.FirstOrDefault(candidate => candidate.Server.Id == _serverId);
         if (card is null)
         {

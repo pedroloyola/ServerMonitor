@@ -22,8 +22,8 @@ public static class QaOverviewScenarioPolicy
 
     /// <summary>True when the modifier is present at all (whatever its value).</summary>
     public static bool IsPresent(IReadOnlyList<string> commandLineArgs) =>
-        commandLineArgs.Any(argument => string.Equals(argument, LaunchFlag, StringComparison.OrdinalIgnoreCase)
-            || argument.StartsWith(LaunchFlag + "=", StringComparison.OrdinalIgnoreCase));
+        commandLineArgs.Any(argument => string.Equals(argument, LaunchFlag, StringComparison.Ordinal)
+            || argument.StartsWith(LaunchFlag + "=", StringComparison.Ordinal));
 
     /// <summary>
     /// The canonical scenario, or <see langword="null"/> in Release, without the modifier, or for any unknown value
@@ -40,11 +40,11 @@ public static class QaOverviewScenarioPolicy
         {
             var argument = commandLineArgs[index];
             string? value;
-            if (string.Equals(argument, LaunchFlag, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(argument, LaunchFlag, StringComparison.Ordinal))
             {
                 value = index + 1 < commandLineArgs.Count ? commandLineArgs[index + 1] : null;
             }
-            else if (argument.StartsWith(LaunchFlag + "=", StringComparison.OrdinalIgnoreCase))
+            else if (argument.StartsWith(LaunchFlag + "=", StringComparison.Ordinal))
             {
                 value = argument[(LaunchFlag.Length + 1)..];
             }
@@ -54,7 +54,7 @@ public static class QaOverviewScenarioPolicy
             }
 
             return Scenarios.FirstOrDefault(
-                scenario => string.Equals(scenario, value, StringComparison.OrdinalIgnoreCase));
+                scenario => string.Equals(scenario, value, StringComparison.Ordinal));
         }
 
         return null;

@@ -262,6 +262,22 @@ public sealed class Ui4OverviewTests
         Assert.True(kit.Dashboard.ShowNoProblems);
     }
 
+    /// <summary>Cortex r1 NIT-3: "Sem problemas" never shows next to a Warning/Critical count, even when no metric
+    /// candidate exists (here: attention reported without a snapshot).</summary>
+    [Fact]
+    public async Task NoProblems_IsNeverShown_WhileAnyServerIsInAttentionOrCritical()
+    {
+        var kit = Ui4TestKit.Create(new Ui4TestKit.Fleet()
+            .Add("web", ServerHealth.Healthy, 10, 10, 10)
+            .Add("odd", ServerHealth.Warning, snapshot: false));
+
+        await kit.Dashboard.LoadAsync();
+
+        Assert.Null(kit.Dashboard.PriorityProblem);
+        Assert.False(kit.Dashboard.ShowNoProblems);
+        Assert.Equal(1, kit.Dashboard.HealthSummary.Warning);
+    }
+
     [Fact]
     public async Task Overview_NothingCollectedYet_HidesFreshness_AndEmptyListShowsTheEmptyState()
     {

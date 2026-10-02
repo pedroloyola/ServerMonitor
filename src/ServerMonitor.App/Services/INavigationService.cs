@@ -6,6 +6,15 @@ public interface INavigationService
 {
     void Initialize(Frame frame);
 
+    /// <summary>
+    /// Raised after every navigation to a page OTHER than the Visão geral (UI.4 Cortex r1 SHOULD-1): the user moving
+    /// elsewhere is newer than a widget deep-link still waiting for its server, so the dashboard drops that pending
+    /// request instead of yanking the user away later (e.g. after a restore or an unhide brings the server back).
+    /// Navigating TO the overview never raises it: the shell's own startup navigation and a widget activation both land
+    /// there, and must not cancel the deep-link they carry.
+    /// </summary>
+    event EventHandler? NavigatedAwayFromOverview;
+
     void NavigateTo<TPage>() where TPage : Page;
 
     void GoToDashboard();

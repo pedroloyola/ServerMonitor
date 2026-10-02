@@ -118,6 +118,13 @@ internal static partial class QaStartupIsolation
                 $"(real user data, Credential Manager, SSH). Combine it with one of: {string.Join(", ", HarnessFlags)}.";
         }
 
+        // UI.4 (Cortex r1 NIT-4): the scenario modifier belongs to --qa-overview only; next to another harness it would be
+        // silently ignored, so it is refused.
+        if (QaOverviewScenarioPolicy.IsPresent(commandLineArgs) && !commandLineArgs.Contains(QaOverviewComposition.LaunchFlag, StringComparer.Ordinal))
+        {
+            return $"{QaOverviewScenarioPolicy.LaunchFlag} only applies to {QaOverviewComposition.LaunchFlag}.";
+        }
+
         // UI.4: an unknown overview scenario is refused here (exit 3), before anything is composed - never another scenario.
         if (QaOverviewScenarioPolicy.IsPresent(commandLineArgs)
             && QaOverviewScenarioPolicy.ResolveScenario(commandLineArgs, isDebugBuild: true) is null)

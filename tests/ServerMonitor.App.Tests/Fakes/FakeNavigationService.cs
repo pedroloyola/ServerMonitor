@@ -20,6 +20,10 @@ internal sealed class FakeNavigationService : INavigationService
     {
     }
 
+    public event EventHandler? NavigatedAwayFromOverview;
+
+    private void Raise() => NavigatedAwayFromOverview?.Invoke(this, EventArgs.Empty);
+
     public void GoToDashboard() => DashboardCount++;
 
     public void RequestBackgroundSettingsFocus() => BackgroundSettingsFocusRequests++;
@@ -39,17 +43,37 @@ internal sealed class FakeNavigationService : INavigationService
 
     public int SettingsCount { get; private set; }
 
-    public void GoToSettings() => SettingsCount++;
+    public void GoToSettings()
+    {
+        SettingsCount++;
+        Raise();
+    }
 
-    public void GoToHistory(Guid serverId, string serverName) => LastHistoryServerId = serverId;
+    public void GoToHistory(Guid serverId, string serverName)
+    {
+        LastHistoryServerId = serverId;
+        Raise();
+    }
 
-    public void GoToWorkloads(Guid serverId, string serverName) => LastWorkloadsServerId = serverId;
+    public void GoToWorkloads(Guid serverId, string serverName)
+    {
+        LastWorkloadsServerId = serverId;
+        Raise();
+    }
 
     public int ServersCount { get; private set; }
 
-    public void GoToServers() => ServersCount++;
+    public void GoToServers()
+    {
+        ServersCount++;
+        Raise();
+    }
 
     public List<(Guid ServerId, ServerDetailOrigin Origin)> ServerDetailRequests { get; } = [];
 
-    public void GoToServerDetail(Guid serverId, ServerDetailOrigin origin) => ServerDetailRequests.Add((serverId, origin));
+    public void GoToServerDetail(Guid serverId, ServerDetailOrigin origin)
+    {
+        ServerDetailRequests.Add((serverId, origin));
+        Raise();
+    }
 }

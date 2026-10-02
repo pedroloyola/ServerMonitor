@@ -117,6 +117,8 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         ImportFromSshCommand = new AsyncRelayCommand(ImportFromSshAsync);
         OpenSettingsCommand = new RelayCommand(navigationService.GoToSettings);
         ViewAllServersCommand = new RelayCommand(navigationService.GoToServers);
+        // Cortex r1 SHOULD-1: the user moving to another page cancels a deep-link still waiting for its server.
+        navigationService.NavigatedAwayFromOverview += OnNavigatedAwayFromOverview;
         ClearOverviewSearchCommand = new RelayCommand(() => OverviewSearchText = string.Empty);
         OpenPriorityProblemCommand = new RelayCommand(OpenPriorityProblem);
     }
@@ -150,6 +152,11 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
 
     /// <summary>Clears any pending server focus (a dashboard deep-link supersedes an older server one, §M-3).</summary>
     public void ClearServerFocus() => PendingFocus.Clear();
+
+    /// <summary>True when the server is in the current (visible) list — the interim page is only opened for such a server.</summary>
+    public bool HasVisibleServer(Guid serverId) => VisibleServers?.Any(card => card.Server.Id == serverId) == true;
+
+    private void OnNavigatedAwayFromOverview(object? sender, EventArgs e) => ClearServerFocus();
 
     private void TryApplyPendingFocus()
     {
@@ -382,7 +389,10 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
     public bool HasPriorityProblem => _priorityProblem is not null;
 
     /// <summary>The neutral "Sem problemas" state: loaded, servers present, and no candidate above the engine limits.</summary>
-    public bool ShowNoProblems => !IsLoading && HasVisibleServers && _priorityProblem is null;
+    // Cortex r1 NIT-3: never "Sem problemas" next to a Warning/Critical count, even if a future cause of attention
+    // ever produced no metric candidate.
+    public bool ShowNoProblems =>
+        !IsLoading && HasVisibleServers && _priorityProblem is null && HealthSummary.Warning + HealthSummary.Critical == 0;
 
     /// <summary>"Disco quase cheio" / "CPU elevada" / "Memória quase cheia".</summary>
     public string? PriorityTitle => _priorityProblem is { } problem ? Text($"OverviewPriorityTitle{problem.Metric}") : null;
@@ -481,11 +491,15 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         {
             await _refreshAllCoordinator.RefreshAllAsync();
         }
+        catch (OperationCanceledException)
+        {
+            // Shutdown cancelled the batch: expected, nothing to report.
+        }
         catch (Exception exception) when (exception is not OutOfMemoryException)
         {
-            // The engine records each server's outcome in the monitoring-state store; a cancelled batch (shutdown) or a
-            // per-server failure is reflected there, never as a dashboard error.
-            _logger?.LogInformation("Refresh all ended early. Exception type: {ExceptionType}.", exception.GetType().Name);
+            // The engine records each server's outcome in the monitoring-state store; a failure is reflected there,
+            // never as a dashboard error (Cortex r1 NIT-5: Warning, it is not a cancellation).
+            _logger?.LogWarning("Refresh all ended early. Exception type: {ExceptionType}.", exception.GetType().Name);
         }
         finally
         {
@@ -620,6 +634,10 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
     public void Dispose()
     {
         _serverService.ServersChanged -= OnServersChanged;
+        if (_navigationService is not null)
+        {
+            _navigationService.NavigatedAwayFromOverview -= OnNavigatedAwayFromOverview;
+        }
         _connectionStateStore.StateChanged -= OnConnectionStateChanged;
         _monitoringStateStore.StateChanged -= OnMonitoringStateChanged;
         _discoveryService.DiscoveredChanged -= OnDiscoveredChanged;

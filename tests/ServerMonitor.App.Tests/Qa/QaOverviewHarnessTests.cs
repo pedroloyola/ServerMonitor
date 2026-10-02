@@ -49,6 +49,11 @@ public sealed class QaOverviewHarnessTests
         Assert.NotNull(unknown);
         Assert.Contains("many-500", unknown);
         Assert.NotNull(QaStartupIsolation.LaunchRefusal([Exe, "--qa-overview", "--qa-overview-scenario"]));
+
+        // Next to another harness the modifier would be silently ignored: refused (Cortex r1 NIT-4).
+        var foreign = QaStartupIsolation.LaunchRefusal([Exe, "--qa-health", "--qa-overview-scenario", "mixed"]);
+        Assert.NotNull(foreign);
+        Assert.Contains("--qa-overview", foreign);
     }
 
     [Fact]
@@ -63,7 +68,10 @@ public sealed class QaOverviewHarnessTests
     [Fact]
     public void ScenarioPolicy_ResolvesKnownNames_IgnoresReleaseAndUnknown()
     {
-        Assert.Equal("many-500", QaOverviewScenarioPolicy.ResolveScenario([Exe, "--qa-overview-scenario", "MANY-500"], isDebugBuild: true));
+        Assert.Equal("many-500", QaOverviewScenarioPolicy.ResolveScenario([Exe, "--qa-overview-scenario", "many-500"], isDebugBuild: true));
+        // Ordinal, like the strict parser (Cortex r1 NIT-4): neither the flag nor the value is case-folded.
+        Assert.Null(QaOverviewScenarioPolicy.ResolveScenario([Exe, "--qa-overview-scenario", "MANY-500"], isDebugBuild: true));
+        Assert.False(QaOverviewScenarioPolicy.IsPresent([Exe, "--QA-OVERVIEW-SCENARIO", "mixed"]));
         Assert.Equal("empty", QaOverviewScenarioPolicy.ResolveScenario([Exe, "--qa-overview-scenario=empty"], isDebugBuild: true));
         Assert.Null(QaOverviewScenarioPolicy.ResolveScenario([Exe, "--qa-overview-scenario", "mixed"], isDebugBuild: false));
         Assert.Null(QaOverviewScenarioPolicy.ResolveScenario([Exe, "--qa-overview-scenario", "made-up"], isDebugBuild: true));

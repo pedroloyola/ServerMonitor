@@ -5,17 +5,21 @@ using ServerMonitor.App.ViewModels;
 namespace ServerMonitor.App.Views;
 
 /// <summary>UI.4 §3: the Servidores directory. Fresh per navigation; the view model is disposed on Unloaded.</summary>
-public sealed partial class ServersPage : Page
+public sealed partial class ServersPage : Page, IDisposable
 {
     public ServersPage(ServersViewModel viewModel)
     {
         InitializeComponent();
         ViewModel = viewModel;
         DataContext = viewModel;
-        Unloaded += (_, _) => ViewModel.Dispose();
+        // Released on Unloaded AND when navigation replaces the page (a page replaced before Loaded never unloads).
+        Unloaded += (_, _) => Dispose();
     }
 
     public ServersViewModel ViewModel { get; }
+
+    /// <summary>Idempotent: the view model unsubscribes once.</summary>
+    public void Dispose() => ViewModel.Dispose();
 
     private void OnBreadcrumbParentInvoked(object? sender, EventArgs e) => ViewModel.BackToOverviewCommand.Execute(null);
 

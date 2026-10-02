@@ -85,7 +85,11 @@ internal static class Ui4TestKit
         public required ILocalizationService Localization { get; init; }
     }
 
-    public static Harness Create(Fleet fleet, ILocalizationService? localization = null, MonitoringOptions? options = null)
+    public static Harness Create(
+        Fleet fleet,
+        ILocalizationService? localization = null,
+        MonitoringOptions? options = null,
+        INavigationService? navigationOverride = null)
     {
         var servers = new FakeServerService();
         servers.Servers.AddRange(fleet.Entries.Select(entry => entry.Server));
@@ -112,7 +116,7 @@ internal static class Ui4TestKit
             states,
             new FakeMonitoringEngine(),
             new InertDiscoveryService(),
-            navigation,
+            navigationOverride ?? navigation,
             localizer,
             NullLogger<DashboardViewModel>.Instance,
             refreshAllCoordinator: null,
