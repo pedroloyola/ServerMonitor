@@ -47,7 +47,7 @@ public sealed partial class XamlContractAndResourceGuardTests
             "UnavailableState", "NothingState", "NoResultsState"],
         // UI.4: "Limpar pesquisa" returns focus to the search box (code-behind FocusAfterAction).
         ["Views/ServersPage.xaml"] = ["SearchBox", "PageRoot", "HeaderGrid", "AddButton", "TableHeader", "HeaderSystemColumn", "HeaderSystemText",
-            "HeaderActionColumn", "ServersRepeater", "RootGrid"],
+            "HeaderActionColumn", "ServersRepeater", "RootGrid", "EmptyAddButton"],
         ["Views/BackupCreateDialog.xaml"] = ["PassphraseBox", "ConfirmationBox"],
         ["Views/RestoreOpenDialog.xaml"] = ["PassphraseBox"],
         ["Views/AddServerDialog.xaml"] = ["ServerForm"],

@@ -529,6 +529,21 @@ public sealed class Ui4OverviewTests
         Assert.Equal(1, kit.Navigation.DashboardCount);
     }
 
+    /// <summary>Prism r2 R2-B2 (Figma 112:14077): with no server the summary is only the total.</summary>
+    [Theory]
+    [InlineData("pt-PT", "0 servidores")]
+    [InlineData("pt-BR", "0 servidores")]
+    [InlineData("en-US", "0 servers")]
+    public async Task Directory_WithNoServers_SummaryIsOnlyTheTotal(string culture, string expected)
+    {
+        var kit = Ui4TestKit.Create(new Ui4TestKit.Fleet(), new ResWLocalizationService(culture));
+        await kit.Dashboard.LoadAsync();
+        using var vm = new ServersViewModel(kit.Dashboard, kit.Navigation, kit.Localization);
+
+        Assert.Equal(expected, vm.SummaryDisplay);
+        Assert.Equal(expected, vm.HeaderContextDisplay);
+    }
+
     [Fact]
     public async Task Directory_SingularSummary_EmptyState_AndNoHiddenNote()
     {

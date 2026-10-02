@@ -381,7 +381,10 @@
                                         <RowDefinition Height="Auto" />
                                         <RowDefinition Height="Auto" />
                                     </Grid.RowDefinitions>
-                                    <TextBlock VerticalAlignment="Center" Style="{StaticResource SaHealthCountTextStyle}" Foreground="{ThemeResource SaTextBrush}"
+                                    <!-- Prism r2 R2-B1: the 50-high line overflows the 47 row by 1.5 above and below (Figma 112:1015
+                                         y -1.5), so the row stays 47 and the cards 156. -->
+                                    <TextBlock x:Name="HealthCountText" VerticalAlignment="Center" Margin="0,-1.5,0,-1.5"
+                                               Style="{StaticResource SaHealthCountTextStyle}" Foreground="{ThemeResource SaTextBrush}"
                                                Text="{x:Bind ViewModel.HealthyCountDisplay, Mode=OneWay}" />
                                     <TextBlock Grid.Column="1" VerticalAlignment="Center" Style="{StaticResource SaHealthTotalTextStyle}"
                                                Foreground="{ThemeResource SaTextBrush}"

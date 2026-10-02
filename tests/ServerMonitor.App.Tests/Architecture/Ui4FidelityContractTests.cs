@@ -89,6 +89,29 @@ public sealed class Ui4FidelityContractTests
         Assert.All(cards, c => Assert.Equal("156", Attr(c, "MinHeight")));
     }
 
+    /// <summary>
+    /// Prism r2 R2-B1: the health card is EXACTLY 156 (it was 159): its count row is 47 and nothing in it may be taller —
+    /// the 50-high count line overflows 1.5 above and below (Figma 112:1015), the "de N" line (31) and the bar fit.
+    /// 24 + 20 + 8 + 47 + 8 + 23 + 24 + 2 = 156.
+    /// </summary>
+    [Fact]
+    public void TheHealthCountRow_Is47_SoTheHealthCardIsExactly156()
+    {
+        var elements = Elements(Overview);
+        var typography = Elements("Styles/Tokens/Typography.xaml");
+        double Token(string key) => double.Parse(Assert.Single(typography, e => Key(e) == key).Value, System.Globalization.CultureInfo.InvariantCulture);
+
+        var row = Assert.Single(elements, e => Name(e) == "HealthCountRow");
+        Assert.Equal("47", Attr(row, "MinHeight"));
+        Assert.Null(Attr(row, "Height"));
+
+        var count = Assert.Single(elements, e => Name(e) == "HealthCountText");
+        Assert.Equal("{StaticResource SaHealthCountTextStyle}", Attr(count, "Style"));
+        var margin = Attr(count, "Margin")!.Split(',').Select(v => double.Parse(v, System.Globalization.CultureInfo.InvariantCulture)).ToArray();
+        Assert.Equal(47, Token("SaLineHeightHealthCount") + margin[1] + margin[3]);
+        Assert.True(Token("SaLineHeightHealthTotal") <= 47);
+    }
+
     /// <summary>B7 + B9: the summary list uses the prominent row (15) and its state at 13; the table keeps 12.</summary>
     [Fact]
     public void SummaryList_RowTitle15_State13()

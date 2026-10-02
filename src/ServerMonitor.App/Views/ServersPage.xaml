@@ -347,7 +347,7 @@
                     <StackPanel VerticalAlignment="Center" Spacing="{StaticResource SaSpace16}">
                         <primitives:SaEmptyState x:Name="EmptyState" x:Uid="ServersEmptyState" TitleHeadingLevel="Level2"
                                                  IconData="{StaticResource SaIconServerStack01Data}">
-                            <Button x:Uid="ServersEmptyAddButton" HorizontalAlignment="Center" Style="{StaticResource SaSolidButtonStyle}"
+                            <Button x:Name="EmptyAddButton" x:Uid="ServersEmptyAddButton" HorizontalAlignment="Center" Style="{StaticResource SaSolidButtonStyle}"
                                     Command="{x:Bind ViewModel.AddServerCommand}" />
                         </primitives:SaEmptyState>
                         <TextBlock x:Uid="ServersHiddenNote" HorizontalAlignment="Center" Style="{StaticResource SaTableCellSecondaryTextStyle}"

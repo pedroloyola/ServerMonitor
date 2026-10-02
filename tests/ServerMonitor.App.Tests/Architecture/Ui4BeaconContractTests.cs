@@ -55,6 +55,9 @@ public sealed class Ui4BeaconContractTests
     {
         var code = AppSourceTree.CodeWithoutComments("Views/ServersPage.xaml.cs");
         Assert.Contains("ViewModel.TakeReturnFocusIndex()", code);
+        // Prism r2 C-R2-1: with no server, "Adicionar servidor" rather than an empty search.
+        Assert.Contains("if (ViewModel.ShowEmptyState)", code);
+        Assert.Contains("EmptyAddButton.Focus(FocusState.Programmatic);", code);
         // AdaptiveTrigger changes never raise CurrentStateChanging/Changed (QA r2): the template swap is observed instead.
         Assert.Contains("ServersRepeater.RegisterPropertyChangedCallback(ItemsRepeater.ItemTemplateProperty, OnRowTemplateChanged)", code);
         Assert.Contains("ServersRepeater.GotFocus += OnRowGotFocus", code);

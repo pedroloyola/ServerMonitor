@@ -122,6 +122,10 @@ Autoridade visual: Figma `Qvk5dUFgsWf4UOYzfAkiDV`, 05 Free secção 02 "Dashboar
   - estado da lista resumida a 13 e nome a 15 Medium (`SaListRowProminentStyle`; o `SaListRow` por omissão continua a 14);
   - "Adicionar" dos Servidores ao lado do título em todas as larguras;
   - chevron do prioritário, espaçamento estado→chevron e header 600–639.
+- **Prism fidelity-r2:**
+  - **R2-B1:** cartão de saúde com exatamente 156 (estava 159). A linha da contagem fica com 47 e o texto de 50 transborda 1,5 px em cima e em baixo (Margin −1,5), como o `112:1015`.
+  - **R2-B2:** com 0 servidores, o resumo dos Servidores diz só "0 servidores" (`112:14077`).
+  - **C-R2-1:** com 0 servidores, o foco inicial dos Servidores vai para "Adicionar servidor".
 - **DERIVED aceite:** ícone CPU/Memória = `SaIconComputerData` (o Figma não tem ícone para essas métricas; o título por extenso desambigua).
 - **Diferenças deliberadas que ficam:**
   - sem sidebar (UI.6);

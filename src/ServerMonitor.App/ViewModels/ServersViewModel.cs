@@ -89,9 +89,15 @@ public sealed class ServersViewModel : ObservableObject, IDisposable
         get
         {
             var summary = _dashboard.HealthSummary;
+            var total = Format(WorkloadPresentation.PluralKey("ServersSummaryTotal", summary.Total), summary.Total);
+            if (summary.Total == 0)
+            {
+                return total; // Prism r2 R2-B2: Figma 112:14077 "0 servidores", nothing else.
+            }
+
             var parts = new List<string>
             {
-                Format(WorkloadPresentation.PluralKey("ServersSummaryTotal", summary.Total), summary.Total),
+                total,
                 Format(WorkloadPresentation.PluralKey("ServersSummaryHealthy", summary.Healthy), summary.Healthy)
             };
             foreach (var health in OverviewPresentation.ChipOrder)

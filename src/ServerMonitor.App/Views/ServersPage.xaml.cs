@@ -32,13 +32,23 @@ public sealed partial class ServersPage : Page, IDisposable
         _focusedRowId = index >= 0 && index < ViewModel.Rows.Count ? ViewModel.Rows[index].ServerId : null;
     }
 
-    // Beacon r1 SHOULD-1: back from the interim page, focus returns to the row that opened it; otherwise to the search.
+    // Beacon r1 SHOULD-1: back from the interim page, focus returns to the row that opened it; otherwise to the search -
+    // or, with no server at all, to "Adicionar servidor" (Prism r2 C-R2-1: nothing to search for).
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
         var index = ViewModel.TakeReturnFocusIndex();
         DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
         {
-            if (!RepeaterFocus.FocusIndex(ServersRepeater, index))
+            if (RepeaterFocus.FocusIndex(ServersRepeater, index))
+            {
+                return;
+            }
+
+            if (ViewModel.ShowEmptyState)
+            {
+                EmptyAddButton.Focus(FocusState.Programmatic);
+            }
+            else
             {
                 SearchBox.Focus(FocusState.Programmatic);
             }
