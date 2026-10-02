@@ -392,9 +392,20 @@ public sealed class SqliteServerHistoryStoreTests : IDisposable
         Assert.False(second.CanRetryInitialization);
     }
 
+    /// <summary>
+    /// Formerly <c>QueryCancellation_AfterRealReaderOpened_CompletesWithinBound</c>. Its stopwatch started BEFORE the
+    /// query was scheduled, so it timed thread-pool scheduling, the SQLite open and the read setup — not the
+    /// cancellation — and failed on slow CI runners ("Cancellation took 00:00:04.14", run 37057158486). The guarantee
+    /// is functional and is now asserted without the clock: a token cancelled once the real reader is open is observed
+    /// at the very next read (it is cancelled BEFORE the reader may continue, so a single row is never returned), the
+    /// query surfaces the cancellation instead of a partial or empty result, and it gives the read gate back, so a
+    /// reset — which waits for every active query — proceeds.
+    /// </summary>
     [Fact]
-    public async Task QueryCancellation_AfterRealReaderOpened_CompletesWithinBound()
+    public async Task QueryCancellation_AfterRealReaderOpened_IsObservedAtTheNextRead_AndReleasesTheReadGate()
     {
+        // Deadlock guard only: each wait is released by a signal this test controls, never by elapsed time.
+        var deadlockGuard = TimeSpan.FromSeconds(30);
         var readerOpened = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         using var releaseReader = new ManualResetEventSlim();
         var store = NewStore(queryReaderOpened: () =>
@@ -405,22 +416,30 @@ public sealed class SqliteServerHistoryStoreTests : IDisposable
         await store.InitializeAsync();
         var serverId = Guid.NewGuid();
         var now = DateTimeOffset.UtcNow;
-        await store.WriteAsync([Sample(serverId, now)]);
+        await store.WriteAsync([Sample(serverId, now), Sample(serverId, now + TimeSpan.FromSeconds(10))]);
 
         using var cancellation = new CancellationTokenSource();
-        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-        var query = Task.Run(() => store.QueryAsync(
-            serverId,
-            now - TimeSpan.FromHours(1),
-            now + TimeSpan.FromHours(1),
-            cancellation.Token));
+        // A dedicated thread: the reader hook parks this thread, and the query must not wait for the thread pool to
+        // even start on a busy runner.
+        var query = Task.Factory.StartNew(
+            () => store.QueryAsync(
+                serverId,
+                now - TimeSpan.FromHours(1),
+                now + TimeSpan.FromHours(1),
+                cancellation.Token),
+            CancellationToken.None,
+            TaskCreationOptions.LongRunning,
+            TaskScheduler.Default).Unwrap();
 
-        await readerOpened.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await readerOpened.Task.WaitAsync(deadlockGuard); // the real reader is open, parked before its first read
         cancellation.Cancel();
         releaseReader.Set();
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await query);
-        Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(2), $"Cancellation took {stopwatch.Elapsed}.");
+        // Rows exist and the reader is open: anything but a cancellation means the token was not honoured.
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => query.WaitAsync(deadlockGuard));
+
+        // The cancelled query left the read gate: a reset (which waits for all active queries) completes.
+        Assert.True(await store.ResetAsync().WaitAsync(deadlockGuard));
     }
 
     [Fact]

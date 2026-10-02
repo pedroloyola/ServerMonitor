@@ -178,9 +178,14 @@ public sealed class MonitoringEngineTests
     [Fact]
     public async Task ScheduledFailureLongAfterLastSuccess_MarksStale()
     {
-        // The first (and only) success stamps LastSuccessAt at the fake start time; every
-        // later scheduled cycle fails. Once the clock has advanced past twice the interval,
-        // a failing cycle must report the prior reading as stale without moving LastSuccessAt.
+        // The first (and only) success stamps LastSuccessAt at the fake start time; the next scheduled
+        // cycle fails. With the clock exactly 30 s on (past twice the 10 s interval, i.e. past the 20 s
+        // stale bound), a failing cycle must report the prior reading as stale without moving LastSuccessAt.
+        //
+        // Deterministic: no polling and no "nudge until it happens". The test waits on the state store's
+        // own change events and on the engine actually parking on its 10 s interval timer, then advances
+        // the fake clock ONCE. (The previous wall-clock polling loop failed on a slow CI runner before the
+        // first cycle had even been scheduled — run 37057158486, attempt 1.)
         var server = TestData.LinuxServer(refreshIntervalSeconds: 10);
         var options = new MonitoringOptions
         {
@@ -189,28 +194,37 @@ public sealed class MonitoringEngineTests
             AttentionInterval = TimeSpan.FromSeconds(10),
             RetryDelays = [],
         };
-        await using var h = await StartAsync(options, server);
-        var startedAt = h.Time.GetUtcNow();
-        h.Store.ResultFactory = (s, index) => index == 0
-            ? TestData.Success(TestData.Snapshot(s.Id, cpu: 5))
-            : TestData.Failure(MetricsCollectionErrorCode.TimedOut);
-
-        // Wait for the immediate first cycle to record success (clock is frozen meanwhile).
-        await WaitUntilAsync(() => h.State.Get(server.Id).LastSuccessAt is not null);
-        Assert.Equal(startedAt, h.State.Get(server.Id).LastSuccessAt);
-
-        // Nudge the clock forward until a scheduled failing cycle runs. Each nudge exceeds
-        // the interval, so once the loop has parked on its timer the next advance fires it;
-        // repeating absorbs the register-then-advance window deterministically.
-        await WaitUntilAsync(() =>
+        var service = new FakeServerService();
+        service.Servers.Add(server);
+        // Scripted BEFORE the engine starts, so the immediate first cycle can never see another script.
+        var store = new ScriptedMetricsStore
         {
-            h.Time.Advance(TimeSpan.FromSeconds(30));
-            return h.State.Get(server.Id).Health == ServerHealth.Offline;
-        });
+            ResultFactory = (s, index) => index == 0
+                ? TestData.Success(TestData.Snapshot(s.Id, cpu: 5))
+                : TestData.Failure(MetricsCollectionErrorCode.TimedOut)
+        };
+        var states = new ServerMonitoringStateStore();
+        var time = new TimerRecordingTimeProvider();
+        var startedAt = time.GetUtcNow();
+        var engine = new MonitoringEngine(service, store, states, NullLogger<MonitoringEngine>.Instance, time, options);
+        await using var h = new Harness(engine, service, store, states, time);
 
-        var state = h.State.Get(server.Id);
+        var firstSuccess = WaitForStateAsync(states, server.Id, state => state.LastSuccessAt is not null);
+        var intervalTimer = time.TimerCreatedAsync(TimeSpan.FromSeconds(10));
+        await engine.StartMonitoringAsync();
+
+        await firstSuccess; // the immediate first cycle succeeded (the clock is frozen meanwhile)
+        Assert.Equal(startedAt, states.Get(server.Id).LastSuccessAt);
+
+        await intervalTimer.WaitAsync(DeadlockGuard); // the loop is parked on its 10 s interval timer
+        var offline = WaitForStateAsync(states, server.Id, state => state.Health == ServerHealth.Offline);
+        time.Advance(TimeSpan.FromSeconds(30));        // fires that timer once: one scheduled, failing cycle
+        await offline;
+
+        var state = states.Get(server.Id);
         Assert.True(state.IsStale);
         Assert.Equal(startedAt, state.LastSuccessAt); // never moved backwards by a failure
+        Assert.Equal(2, store.CallCount);             // exactly the success and the one scheduled failure
     }
 
     [Fact]
@@ -408,6 +422,88 @@ public sealed class MonitoringEngineTests
         }
 
         Assert.Fail("Condition was not met within the timeout.");
+    }
+
+    /// <summary>
+    /// Deadlock guard only: waits below are released by engine events (state changes, timer registration),
+    /// never by elapsed time, so a working engine never reaches it, however slow the runner.
+    /// </summary>
+    private static readonly TimeSpan DeadlockGuard = TimeSpan.FromSeconds(30);
+
+    /// <summary>Completes when the server's state satisfies <paramref name="condition"/>, observed through the store's
+    /// own change event (and the current value, so an already-true condition completes at once).</summary>
+    private static async Task WaitForStateAsync(
+        ServerMonitoringStateStore states,
+        Guid serverId,
+        Func<ServerMonitoringState, bool> condition)
+    {
+        var reached = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        void OnChanged(object? sender, Guid changed)
+        {
+            if (changed == serverId && states.TryGet(serverId, out var state) && condition(state))
+            {
+                reached.TrySetResult();
+            }
+        }
+
+        states.StateChanged += OnChanged;
+        try
+        {
+            if (states.TryGet(serverId, out var current) && condition(current))
+            {
+                reached.TrySetResult();
+            }
+
+            await reached.Task.WaitAsync(DeadlockGuard);
+        }
+        finally
+        {
+            states.StateChanged -= OnChanged;
+        }
+    }
+
+    /// <summary>
+    /// A <see cref="FakeTimeProvider"/> that reports when a timer with a given due time has been registered, so a test
+    /// can advance the clock exactly once AFTER the engine is parked on that timer (instead of advancing repeatedly
+    /// until something happens).
+    /// </summary>
+    private sealed class TimerRecordingTimeProvider : FakeTimeProvider
+    {
+        private readonly object _sync = new();
+        private readonly List<TimeSpan> _created = [];
+        private readonly List<(TimeSpan DueTime, TaskCompletionSource Signal)> _waiters = [];
+
+        public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
+        {
+            var timer = base.CreateTimer(callback, state, dueTime, period); // registered before anyone is told
+            lock (_sync)
+            {
+                _created.Add(dueTime);
+                foreach (var waiter in _waiters.Where(waiter => waiter.DueTime == dueTime).ToArray())
+                {
+                    waiter.Signal.TrySetResult();
+                    _waiters.Remove(waiter);
+                }
+            }
+
+            return timer;
+        }
+
+        /// <summary>Completes once a timer with <paramref name="dueTime"/> has been created (including earlier ones).</summary>
+        public Task TimerCreatedAsync(TimeSpan dueTime)
+        {
+            lock (_sync)
+            {
+                if (_created.Contains(dueTime))
+                {
+                    return Task.CompletedTask;
+                }
+
+                var signal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                _waiters.Add((dueTime, signal));
+                return signal.Task;
+            }
+        }
     }
 
     private sealed record Harness(

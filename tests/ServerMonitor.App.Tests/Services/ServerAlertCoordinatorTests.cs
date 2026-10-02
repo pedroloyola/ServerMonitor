@@ -431,13 +431,21 @@ public sealed class ServerAlertCoordinatorTests
             return Task.CompletedTask;
         }
 
+        /// <summary>
+        /// Waits for the coordinator's worker to deliver <paramref name="expected"/> notifications. Each wake-up is a
+        /// delivery signal; the bound is a deadlock guard only (the coordinator runs on a FakeTimeProvider, so nothing
+        /// here is time-driven). It was 2 s, which a busy CI runner exceeded just scheduling the delivery worker
+        /// (run 37057158486, attempt 3).
+        /// </summary>
         public async Task WaitForCountAsync(int expected)
         {
             while (_items.Count < expected)
             {
-                Assert.True(await _calls.WaitAsync(TimeSpan.FromSeconds(2)));
+                Assert.True(await _calls.WaitAsync(DeadlockGuard));
             }
         }
+
+        private static readonly TimeSpan DeadlockGuard = TimeSpan.FromSeconds(30);
     }
 
     private sealed class BlockingNotificationService : IUserNotificationService

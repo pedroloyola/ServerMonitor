@@ -188,19 +188,24 @@ public sealed class HistoryWriterServiceTests
     [Fact]
     public async Task Shutdown_WithClearPending_CompletesBarrierFalse_AndDoesNotDisposeActiveWorkerState()
     {
+        // Every wait here is released by an event (the store's WriteEntered signal, the clear barrier's completion);
+        // the writer's own timeouts run on the FakeTimeProvider and StopAsync gets an already-cancelled token, so no
+        // step depends on elapsed time. The bound is a deadlock guard only. It used to be 5 s, which a busy CI runner
+        // exceeded just scheduling the consumer worker onto the thread pool (TimeoutException, run 37057158486).
+        var deadlockGuard = TimeSpan.FromSeconds(30);
         var (writer, channel, store, _) = New();
         var blocker = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         store.WriteBlocker = blocker;
         await writer.StartAsync(CancellationToken.None);
         Assert.True(channel.TryWrite(Sample(Guid.NewGuid(), Now)));
-        await store.WriteEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await store.WriteEntered.Task.WaitAsync(deadlockGuard);
         var clear = writer.ClearAsync();
 
         using var cancelled = new CancellationTokenSource();
         cancelled.Cancel();
         await writer.StopAsync(cancelled.Token);
 
-        Assert.False(await clear.WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.False(await clear.WaitAsync(deadlockGuard));
         blocker.TrySetResult(true);
     }
 
