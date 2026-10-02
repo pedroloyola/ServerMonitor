@@ -25,6 +25,8 @@ public sealed class Ui4CompositionTests
         var engineOptions = typeof(MonitoringEngine).GetField("_options", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(engine);
 
         Assert.Same(options, engineOptions);
+        Assert.NotSame(MonitoringOptions.Default, options);
+        Assert.Equal(MonitoringOptions.Default.Thresholds, options.Thresholds);
 
         var dashboard = provider.GetRequiredService<DashboardViewModel>();
         var selector = (PriorityProblemSelector)typeof(DashboardViewModel)

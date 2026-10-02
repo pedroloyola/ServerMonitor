@@ -118,6 +118,13 @@ internal static partial class QaStartupIsolation
                 $"(real user data, Credential Manager, SSH). Combine it with one of: {string.Join(", ", HarnessFlags)}.";
         }
 
+        // UI.4: an unknown overview scenario is refused here (exit 3), before anything is composed - never another scenario.
+        if (QaOverviewScenarioPolicy.IsPresent(commandLineArgs)
+            && QaOverviewScenarioPolicy.ResolveScenario(commandLineArgs, isDebugBuild: true) is null)
+        {
+            return $"{QaOverviewScenarioPolicy.LaunchFlag} needs one of: {string.Join(", ", QaOverviewScenarioPolicy.Scenarios)}.";
+        }
+
         return null;
     }
 

@@ -629,8 +629,10 @@ public partial class App : Application
         services.AddSingleton<IFeatureCatalog>(FeatureCatalog.Empty);
 
         // UI.4 D-UI4-PRIORITY: ONE MonitoringOptions for the engine and the overview, so the priority problem uses
-        // exactly the engine's thresholds (no second copy of the rule). Same values as the previous options: null.
-        services.AddSingleton(MonitoringOptions.Default);
+        // exactly the engine's thresholds (no second copy of the rule). Same values as the previous options: null, but a
+        // distinct instance from MonitoringOptions.Default, so a consumer that silently falls back to the default is
+        // detectable (counterproof M8, Ui4CompositionTests).
+        services.AddSingleton(new MonitoringOptions());
 
         // Automatic monitoring. One instance backs the IMonitoringEngine facade and
         // the hosted-service lifecycle, so the app starts/stops a single engine.

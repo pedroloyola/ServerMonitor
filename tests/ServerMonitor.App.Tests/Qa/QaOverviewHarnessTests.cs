@@ -43,6 +43,12 @@ public sealed class QaOverviewHarnessTests
         Assert.NotNull(QaStartupIsolation.LaunchRefusal([Exe, "--qa-overview=1"]));
         Assert.NotNull(QaStartupIsolation.LaunchRefusal([Exe, "--qa-overview", "--qa-overview-scenario="]));
         Assert.NotNull(QaStartupIsolation.LaunchRefusal([Exe, "--qa-overview", "--Qa-Overview-Scenario=mixed"]));
+
+        // An unknown scenario is refused at launch (exit 3), before composition - not by a crash inside it.
+        var unknown = QaStartupIsolation.LaunchRefusal([Exe, "--qa-overview", "--qa-overview-scenario", "bogus"]);
+        Assert.NotNull(unknown);
+        Assert.Contains("many-500", unknown);
+        Assert.NotNull(QaStartupIsolation.LaunchRefusal([Exe, "--qa-overview", "--qa-overview-scenario"]));
     }
 
     [Fact]
@@ -116,7 +122,7 @@ public sealed class QaOverviewHarnessTests
         Assert.IsType<QaDiscoveryService>(provider.GetRequiredService<IServerDiscoveryService>());
         Assert.Equal(QaOverviewCatalog.Now, provider.GetRequiredService<PresentationClock>().UtcNow);
         // The production root registers ONE MonitoringOptions, the instance the engine is built with.
-        Assert.Same(MonitoringOptions.Default, provider.GetRequiredService<MonitoringOptions>());
+        Assert.Equal(MonitoringOptions.Default.Thresholds, provider.GetRequiredService<MonitoringOptions>().Thresholds);
     }
 
     // ---- catalogue ---------------------------------------------------------------------------------------------
