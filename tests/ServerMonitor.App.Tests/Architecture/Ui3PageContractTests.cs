@@ -42,8 +42,13 @@ public sealed partial class Ui3PageContractTests
     {
         var chart = Assert.Single(Elements(History), e => e.Name.LocalName == "HistoryChart" && (string?)e.Attribute(AppSourceTree.Xaml + "Name") == name);
 
-        // Text alternative: current + peak + period (HistoryViewModel.*Summary), never colour alone.
-        Assert.Equal($"{{Binding {metric}Summary}}", Attr(chart, "AutomationProperties.Name"));
+        // Beacon F3: the CARD around the chart is the keyboard stop and carries the text alternative - current + peak +
+        // period (HistoryViewModel.*Summary), never colour alone; the drawing itself is Raw (no duplicate announcement).
+        var card = chart.Ancestors().First(e => e.Name.LocalName == "SaFocusableCard");
+        Assert.Equal($"{{Binding {metric}Summary}}", Attr(card, "AutomationProperties.Name"));
+        Assert.Equal("{StaticResource SaChartCardStyle}", Attr(card.Elements().Single(), "Style"));
+        Assert.Equal("Raw", Attr(chart, "AutomationProperties.AccessibilityView"));
+        Assert.Null(Attr(chart, "AutomationProperties.Name"));
         Assert.Equal($"{{Binding {metric}Series}}", Attr(chart, "Series"));
         Assert.Equal($"{{ThemeResource {brush}}}", Attr(chart, "LineBrush"));             // D-UI3-1
         Assert.Equal("{StaticResource SaChartLineThickness}", Attr(chart, "LineThickness"));
@@ -154,6 +159,68 @@ public sealed partial class Ui3PageContractTests
 
         var cards = Assert.Single(Elements(Workloads), e => (string?)e.Attribute(AppSourceTree.Xaml + "Name") == "CardsGrid");
         Assert.Null(Attr(cards, "RowSpacing"));                                // side by side: no phantom row gap
+    }
+
+    [Fact]
+    public void BeaconL1_CtasThatDisappear_MoveFocusToWhatTheyChanged()
+    {
+        var thirtyDays = Assert.Single(Elements(History), e => Attr(e, "Command") == "{Binding ViewLast30DaysCommand}");
+        Assert.Equal("OnViewLast30DaysClick", Attr(thirtyDays, "Click"));
+        Assert.Contains("FocusAfterAction.MoveTo((Control)sender, RangeLast30Days)", AppSourceTree.CodeWithoutComments("Views/HistoryPage.xaml.cs"), StringComparison.Ordinal);
+        var range = Assert.Single(Elements(History), e => (string?)e.Attribute(AppSourceTree.Xaml + "Name") == "RangeLast30Days");
+        Assert.Equal("4", Attr(range, "IsChecked")!.Split("ConverterParameter=")[1].TrimEnd('}'));
+
+        var clear = Assert.Single(Elements(Workloads), e => Uid(e) == "WorkloadClearSearchButton");
+        Assert.Equal("OnClearSearchClick", Attr(clear, "Click"));
+        Assert.Contains("FocusAfterAction.MoveTo((Control)sender, SearchBox)", AppSourceTree.CodeWithoutComments("Views/WorkloadsPage.xaml.cs"), StringComparison.Ordinal);
+
+        // keyboard activation keeps a visible ring; pointer / UIA activation moves focus without one
+        Assert.Equal(Microsoft.UI.Xaml.FocusState.Keyboard, ServerMonitor.App.Views.FocusAfterAction.FocusStateFor(Microsoft.UI.Xaml.FocusState.Keyboard));
+        Assert.Equal(Microsoft.UI.Xaml.FocusState.Programmatic, ServerMonitor.App.Views.FocusAfterAction.FocusStateFor(Microsoft.UI.Xaml.FocusState.Pointer));
+        Assert.Equal(Microsoft.UI.Xaml.FocusState.Programmatic, ServerMonitor.App.Views.FocusAfterAction.FocusStateFor(Microsoft.UI.Xaml.FocusState.Unfocused));
+    }
+
+    [Fact]
+    public void BeaconL3_StateTitlesAreHeadings_PageLevel2_SectionLevel3()
+    {
+        var template = Assert.Single(AppSourceTree.LoadXaml("Styles/Components/Sa.Primitives.xaml").Descendants(),
+            e => e.Name.LocalName == "ControlTemplate" && Attr(e, "TargetType") == "primitives:SaEmptyState");
+        Assert.Contains(template.Descendants(), e => Attr(e, "AutomationProperties.HeadingLevel") == "{TemplateBinding TitleHeadingLevel}");
+
+        var workloads = Elements(Workloads).ToList();   // one document: Except compares element instances
+        var sectionStates = workloads.Where(e => e.Name.LocalName == "SaEmptyState"
+                                                            && (Uid(e)!.StartsWith("WorkloadDocker", StringComparison.Ordinal) || Uid(e)!.StartsWith("WorkloadServices", StringComparison.Ordinal))).ToList();
+        Assert.Equal(9, sectionStates.Count);
+        Assert.All(sectionStates, s => Assert.Equal("Level3", Attr(s, "TitleHeadingLevel")));
+        var pageStates = workloads.Concat(Elements(History)).Where(e => e.Name.LocalName == "SaEmptyState").Except(sectionStates).ToList();
+        Assert.Equal(5, pageStates.Count);                                         // unavailable/nothing/no-results + History unavailable/empty
+        Assert.All(pageStates, s => Assert.Null(Attr(s, "TitleHeadingLevel")));   // default Level2 under the page H1
+    }
+
+    [Theory]
+    [InlineData(History, 2)]
+    [InlineData(Workloads, 3)]
+    public void BeaconL2_PageStatePanes_AreNamedByTheStateTitle(string file, int count)
+    {
+        // The ScrollViewer around a page state derived its UIA name from the action inside ("Limpar pesquisa").
+        var panes = Elements(file).Where(e => e.Name.LocalName == "ScrollViewer" && e.Elements().SingleOrDefault()?.Name.LocalName == "SaEmptyState").ToList();
+        Assert.Equal(count, panes.Count);
+        Assert.All(panes, pane =>
+        {
+            var state = pane.Elements().Single();
+            Assert.Equal($"{{Binding Title, ElementName={(string)state.Attribute(AppSourceTree.Xaml + "Name")!}}}", Attr(pane, "AutomationProperties.Name"));
+        });
+    }
+
+    [Fact]
+    public void BeaconN3_ChartNameUsesTheVisibleTerm_PeakInPeriod()
+    {
+        foreach (var culture in Cultures)
+        {
+            var resw = Resw(culture);
+            var peakTerm = resw["HistoryPeakFormat"].Replace("{0}", string.Empty, StringComparison.Ordinal).Trim();
+            Assert.Contains($"{peakTerm} {{3}}", resw["HistoryChartSummaryFormat"], StringComparison.Ordinal);
+        }
     }
 
     [Fact]

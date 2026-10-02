@@ -262,7 +262,7 @@
   <data name="HistoryRangeNameLast24Hours" xml:space="preserve"><value>Últimas 24 horas</value></data>
   <data name="HistoryRangeNameLast7Days" xml:space="preserve"><value>Últimos 7 dias</value></data>
   <data name="HistoryRangeNameLast30Days" xml:space="preserve"><value>Últimos 30 dias</value></data>
-  <data name="HistoryChartSummaryFormat" xml:space="preserve"><value>{0}. {1}. Atual {2}. Máximo {3}.</value></data>
+  <data name="HistoryChartSummaryFormat" xml:space="preserve"><value>{0}. {1}. Atual {2}. Pico no período {3}.</value></data>
   <data name="HistoryChartSummaryOfflineSuffix" xml:space="preserve"><value> Contém um período offline apresentado como uma lacuna.</value></data>
   <data name="SettingsHistoryTitle.Text" xml:space="preserve"><value>Histórico</value></data>
   <data name="SettingsHistoryDescription.Text" xml:space="preserve"><value>O histórico de métricas é guardado localmente durante 30 dias. Nada sai do seu dispositivo.</value></data>

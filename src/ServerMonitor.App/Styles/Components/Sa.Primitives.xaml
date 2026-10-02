@@ -175,6 +175,31 @@
         <Setter Property="IsLabelVisible" Value="False" />
         <Setter Property="AutomationProperties.AccessibilityView" Value="Raw" />
     </Style>
+    <!-- UI.3 (Beacon F3) read-only card reachable by keyboard: one Tab stop, ring ON the card edge (margin 0: never clipped
+         when the card is brought into view top-aligned), the card radius; no background of its own (the content is the
+         card surface), no interactive states. -->
+    <Style TargetType="primitives:SaFocusableCard">
+        <Setter Property="IsTabStop" Value="True" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="VerticalContentAlignment" Value="Stretch" />
+        <Setter Property="CornerRadius" Value="{StaticResource SaRadiusCard}" />
+        <Setter Property="UseSystemFocusVisuals" Value="True" />
+        <Setter Property="FocusVisualPrimaryBrush" Value="{ThemeResource SaFocusRingBrush}" />
+        <Setter Property="FocusVisualPrimaryThickness" Value="{StaticResource SaFocusRingThickness}" />
+        <Setter Property="FocusVisualSecondaryThickness" Value="0" />
+        <Setter Property="FocusVisualMargin" Value="0" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="primitives:SaFocusableCard">
+                    <ContentPresenter
+                        HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                        VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                        Content="{TemplateBinding Content}"
+                        ContentTemplate="{TemplateBinding ContentTemplate}" />
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
     <!-- UI.3 read-only, keyboard-reachable data-table row (h64 compact, 112:2650 / 112:2708): no background/hover/pressed
          state (it is not interactive), only the system focus ring when the arrows land on it. -->
     <Style TargetType="primitives:SaDataTableRow">
@@ -502,7 +527,9 @@
                     <StackPanel Spacing="16" HorizontalAlignment="Center" MaxWidth="560">
                         <primitives:SaIcon Data="{TemplateBinding IconData}" Size="40" HorizontalAlignment="Center"
                                            Foreground="{ThemeResource SaTextSecondaryBrush}" />
+                        <!-- Beacon L3: the state title is a heading (level set by the consumer: page 2, card section 3). -->
                         <TextBlock Style="{StaticResource SaEmptyTitleTextStyle}" Foreground="{ThemeResource SaTextBrush}"
+                                   AutomationProperties.HeadingLevel="{TemplateBinding TitleHeadingLevel}"
                                    Text="{TemplateBinding Title}" TextAlignment="Center" TextWrapping="Wrap" HorizontalAlignment="Center" />
                         <TextBlock Style="{StaticResource SaSecondaryBodyTextStyle}" Text="{TemplateBinding Message}"
                                    TextAlignment="Center" TextWrapping="Wrap" HorizontalAlignment="Center" />
@@ -518,6 +545,8 @@
     <Style x:Key="SaBreadcrumbParentButtonStyle" TargetType="Button" BasedOn="{StaticResource SaButtonBaseStyle}">
         <Setter Property="Template" Value="{StaticResource SaFlatButtonTemplate}" />
         <Setter Property="Padding" Value="0" />
+        <!-- Beacon N5: Padding 0, so the ring stands 4/2 px off the text instead of touching it. -->
+        <Setter Property="FocusVisualMargin" Value="-4,-2,-4,-2" />
         <Setter Property="MinHeight" Value="0" />
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="FontSize" Value="{StaticResource SaFontSizeCaption}" />

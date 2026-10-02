@@ -134,7 +134,7 @@
                                  IsChecked="{Binding SelectedRangeIndex, Mode=TwoWay, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=2}" />
                     <RadioButton x:Uid="HistoryRangeLast7Days" GroupName="HistoryRange" MinWidth="82" Style="{StaticResource SaSegmentedRectItemStyle}"
                                  IsChecked="{Binding SelectedRangeIndex, Mode=TwoWay, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=3}" />
-                    <RadioButton x:Uid="HistoryRangeLast30Days" GroupName="HistoryRange" MinWidth="82" Style="{StaticResource SaSegmentedRectItemStyle}"
+                    <RadioButton x:Name="RangeLast30Days" x:Uid="HistoryRangeLast30Days" GroupName="HistoryRange" MinWidth="82" Style="{StaticResource SaSegmentedRectItemStyle}"
                                  IsChecked="{Binding SelectedRangeIndex, Mode=TwoWay, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=4}" />
                 </StackPanel>
             </Border>
@@ -167,8 +167,10 @@
             <!-- Unavailable (store degraded; not drawn in Figma -> same panel family, no action). -->
             <Border Style="{StaticResource SaStatePanelStyle}"
                     Visibility="{Binding ShowUnavailable, Converter={StaticResource BooleanToVisibilityConverter}}">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" VerticalContentAlignment="Center">
+                <!-- Beacon L2: the pane is named by the state title, never by the action inside it. -->
+                <ScrollViewer VerticalScrollBarVisibility="Auto" VerticalContentAlignment="Center" AutomationProperties.Name="{Binding Title, ElementName=UnavailableState}">
                     <primitives:SaEmptyState
+                        x:Name="UnavailableState"
                         x:Uid="HistoryUnavailableState"
                         VerticalAlignment="Center"
                         IconData="{StaticResource SaIconServerStack01Data}" />
@@ -178,8 +180,10 @@
             <!-- Empty-ever 112:14478 / empty-period 112:14711 (D-UI3-10). -->
             <Border Style="{StaticResource SaStatePanelStyle}"
                     Visibility="{Binding ShowEmpty, Converter={StaticResource BooleanToVisibilityConverter}}">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" VerticalContentAlignment="Center">
+                <!-- Beacon L2: the pane is named by the state title, never by the action inside it. -->
+                <ScrollViewer VerticalScrollBarVisibility="Auto" VerticalContentAlignment="Center" AutomationProperties.Name="{Binding Title, ElementName=EmptyState}">
                     <primitives:SaEmptyState
+                        x:Name="EmptyState"
                         VerticalAlignment="Center"
                         IconData="{StaticResource SaIconServerStack01Data}"
                         Title="{Binding EmptyTitle}"
@@ -196,6 +200,7 @@
                                 Style="{StaticResource SaSolidButtonStyle}"
                                 Content="{Binding EmptyActionText}"
                                 Command="{Binding ViewLast30DaysCommand}"
+                                Click="OnViewLast30DaysClick"
                                 Visibility="{Binding ShowViewLast30Days, Converter={StaticResource BooleanToVisibilityConverter}}" />
                         </StackPanel>
                     </primitives:SaEmptyState>
@@ -207,119 +212,128 @@
                 VerticalScrollBarVisibility="Auto"
                 Visibility="{Binding ShowCharts, Converter={StaticResource BooleanToVisibilityConverter}}">
                 <StackPanel Spacing="{StaticResource SaSpace16}">
-                    <Border Style="{StaticResource SaChartCardStyle}">
-                        <Grid ColumnSpacing="{StaticResource SaSpace24}">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                            </Grid.RowDefinitions>
-                            <StackPanel MinWidth="154" Spacing="6" VerticalAlignment="Top">
-                                <TextBlock Style="{StaticResource SaButtonTextStyle}" Foreground="{ThemeResource SaTextBrush}" Text="{Binding CpuTitle}"
-                                           AutomationProperties.HeadingLevel="Level2" />
-                                <StackPanel Orientation="Horizontal" Spacing="2">
-                                    <TextBlock Style="{StaticResource SaChartValueTextStyle}" Foreground="{ThemeResource SaTextBrush}" Text="{Binding CpuCurrentValue}" />
-                                    <TextBlock Style="{StaticResource SaChartUnitTextStyle}" VerticalAlignment="Center" Text="{Binding PercentUnit}"
-                                               Visibility="{Binding HasCpuCurrent, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    <!-- Beacon F3: the card is one read-only Tab stop named by the full chart summary (brought into view on focus). -->
+                    <primitives:SaFocusableCard AutomationProperties.Name="{Binding CpuSummary}">
+                        <Border Style="{StaticResource SaChartCardStyle}">
+                            <Grid ColumnSpacing="{StaticResource SaSpace24}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <StackPanel MinWidth="154" Spacing="6" VerticalAlignment="Top">
+                                    <TextBlock Style="{StaticResource SaButtonTextStyle}" Foreground="{ThemeResource SaTextBrush}" Text="{Binding CpuTitle}"
+                                               AutomationProperties.HeadingLevel="Level2" />
+                                    <StackPanel Orientation="Horizontal" Spacing="2">
+                                        <TextBlock Style="{StaticResource SaChartValueTextStyle}" Foreground="{ThemeResource SaTextBrush}" Text="{Binding CpuCurrentValue}" />
+                                        <TextBlock Style="{StaticResource SaChartUnitTextStyle}" VerticalAlignment="Center" Text="{Binding PercentUnit}"
+                                                   Visibility="{Binding HasCpuCurrent, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                    </StackPanel>
+                                    <TextBlock Style="{StaticResource SaHelperTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="{Binding CurrentLabel}" />
+                                    <TextBlock Style="{StaticResource SaHelperTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="{Binding CpuPeakDisplay}" />
                                 </StackPanel>
-                                <TextBlock Style="{StaticResource SaHelperTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="{Binding CurrentLabel}" />
-                                <TextBlock Style="{StaticResource SaHelperTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="{Binding CpuPeakDisplay}" />
-                            </StackPanel>
-                            <controls:HistoryChart
-                                x:Name="CpuChart"
-                                Grid.Column="1"
-                                Height="128"
-                                AutomationProperties.Name="{Binding CpuSummary}"
-                                Series="{Binding CpuSeries}"
-                                RangeStart="{Binding RangeStartUtc}"
-                                RangeEnd="{Binding RangeEndUtc}"
-                                XTicks="{Binding XAxisTicks}"
-                                XTicksCompact="{Binding XAxisTicksCompact}"
-                                YLabels="{Binding YAxisLabels}"
-                                LineThickness="{StaticResource SaChartLineThickness}"
-                                LineBrush="{ThemeResource SaCpuBrush}"
-                                GridLineBrush="{ThemeResource SaTextBrush}" />
-                        </Grid>
-                    </Border>
+                                <controls:HistoryChart
+                                    x:Name="CpuChart"
+                                    Grid.Column="1"
+                                    Height="128"
+                                    AutomationProperties.AccessibilityView="Raw"
+                                    Series="{Binding CpuSeries}"
+                                    RangeStart="{Binding RangeStartUtc}"
+                                    RangeEnd="{Binding RangeEndUtc}"
+                                    XTicks="{Binding XAxisTicks}"
+                                    XTicksCompact="{Binding XAxisTicksCompact}"
+                                    YLabels="{Binding YAxisLabels}"
+                                    LineThickness="{StaticResource SaChartLineThickness}"
+                                    LineBrush="{ThemeResource SaCpuBrush}"
+                                    GridLineBrush="{ThemeResource SaTextBrush}" />
+                            </Grid>
+                        </Border>
+                    </primitives:SaFocusableCard>
 
-                    <Border Style="{StaticResource SaChartCardStyle}">
-                        <Grid ColumnSpacing="{StaticResource SaSpace24}">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                            </Grid.RowDefinitions>
-                            <StackPanel MinWidth="154" Spacing="6" VerticalAlignment="Top">
-                                <TextBlock Style="{StaticResource SaButtonTextStyle}" Foreground="{ThemeResource SaTextBrush}" Text="{Binding MemoryTitle}"
-                                           AutomationProperties.HeadingLevel="Level2" />
-                                <StackPanel Orientation="Horizontal" Spacing="2">
-                                    <TextBlock Style="{StaticResource SaChartValueTextStyle}" Foreground="{ThemeResource SaTextBrush}" Text="{Binding MemoryCurrentValue}" />
-                                    <TextBlock Style="{StaticResource SaChartUnitTextStyle}" VerticalAlignment="Center" Text="{Binding PercentUnit}"
-                                               Visibility="{Binding HasMemoryCurrent, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    <!-- Beacon F3: the card is one read-only Tab stop named by the full chart summary (brought into view on focus). -->
+                    <primitives:SaFocusableCard AutomationProperties.Name="{Binding MemorySummary}">
+                        <Border Style="{StaticResource SaChartCardStyle}">
+                            <Grid ColumnSpacing="{StaticResource SaSpace24}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <StackPanel MinWidth="154" Spacing="6" VerticalAlignment="Top">
+                                    <TextBlock Style="{StaticResource SaButtonTextStyle}" Foreground="{ThemeResource SaTextBrush}" Text="{Binding MemoryTitle}"
+                                               AutomationProperties.HeadingLevel="Level2" />
+                                    <StackPanel Orientation="Horizontal" Spacing="2">
+                                        <TextBlock Style="{StaticResource SaChartValueTextStyle}" Foreground="{ThemeResource SaTextBrush}" Text="{Binding MemoryCurrentValue}" />
+                                        <TextBlock Style="{StaticResource SaChartUnitTextStyle}" VerticalAlignment="Center" Text="{Binding PercentUnit}"
+                                                   Visibility="{Binding HasMemoryCurrent, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                    </StackPanel>
+                                    <TextBlock Style="{StaticResource SaHelperTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="{Binding CurrentLabel}" />
+                                    <TextBlock Style="{StaticResource SaHelperTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="{Binding MemoryPeakDisplay}" />
                                 </StackPanel>
-                                <TextBlock Style="{StaticResource SaHelperTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="{Binding CurrentLabel}" />
-                                <TextBlock Style="{StaticResource SaHelperTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="{Binding MemoryPeakDisplay}" />
-                            </StackPanel>
-                            <controls:HistoryChart
-                                x:Name="MemoryChart"
-                                Grid.Column="1"
-                                Height="128"
-                                AutomationProperties.Name="{Binding MemorySummary}"
-                                Series="{Binding MemorySeries}"
-                                RangeStart="{Binding RangeStartUtc}"
-                                RangeEnd="{Binding RangeEndUtc}"
-                                XTicks="{Binding XAxisTicks}"
-                                XTicksCompact="{Binding XAxisTicksCompact}"
-                                YLabels="{Binding YAxisLabels}"
-                                LineThickness="{StaticResource SaChartLineThickness}"
-                                LineBrush="{ThemeResource SaMemoryBrush}"
-                                GridLineBrush="{ThemeResource SaTextBrush}" />
-                        </Grid>
-                    </Border>
+                                <controls:HistoryChart
+                                    x:Name="MemoryChart"
+                                    Grid.Column="1"
+                                    Height="128"
+                                    AutomationProperties.AccessibilityView="Raw"
+                                    Series="{Binding MemorySeries}"
+                                    RangeStart="{Binding RangeStartUtc}"
+                                    RangeEnd="{Binding RangeEndUtc}"
+                                    XTicks="{Binding XAxisTicks}"
+                                    XTicksCompact="{Binding XAxisTicksCompact}"
+                                    YLabels="{Binding YAxisLabels}"
+                                    LineThickness="{StaticResource SaChartLineThickness}"
+                                    LineBrush="{ThemeResource SaMemoryBrush}"
+                                    GridLineBrush="{ThemeResource SaTextBrush}" />
+                            </Grid>
+                        </Border>
+                    </primitives:SaFocusableCard>
 
-                    <Border Style="{StaticResource SaChartCardStyle}">
-                        <Grid ColumnSpacing="{StaticResource SaSpace24}">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                            </Grid.RowDefinitions>
-                            <StackPanel MinWidth="154" Spacing="6" VerticalAlignment="Top">
-                                <TextBlock Style="{StaticResource SaButtonTextStyle}" Foreground="{ThemeResource SaTextBrush}" Text="{Binding DiskTitle}"
-                                           AutomationProperties.HeadingLevel="Level2" />
-                                <StackPanel Orientation="Horizontal" Spacing="2">
-                                    <TextBlock Style="{StaticResource SaChartValueTextStyle}" Foreground="{ThemeResource SaTextBrush}" Text="{Binding DiskCurrentValue}" />
-                                    <TextBlock Style="{StaticResource SaChartUnitTextStyle}" VerticalAlignment="Center" Text="{Binding PercentUnit}"
-                                               Visibility="{Binding HasDiskCurrent, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    <!-- Beacon F3: the card is one read-only Tab stop named by the full chart summary (brought into view on focus). -->
+                    <primitives:SaFocusableCard AutomationProperties.Name="{Binding DiskSummary}">
+                        <Border Style="{StaticResource SaChartCardStyle}">
+                            <Grid ColumnSpacing="{StaticResource SaSpace24}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <StackPanel MinWidth="154" Spacing="6" VerticalAlignment="Top">
+                                    <TextBlock Style="{StaticResource SaButtonTextStyle}" Foreground="{ThemeResource SaTextBrush}" Text="{Binding DiskTitle}"
+                                               AutomationProperties.HeadingLevel="Level2" />
+                                    <StackPanel Orientation="Horizontal" Spacing="2">
+                                        <TextBlock Style="{StaticResource SaChartValueTextStyle}" Foreground="{ThemeResource SaTextBrush}" Text="{Binding DiskCurrentValue}" />
+                                        <TextBlock Style="{StaticResource SaChartUnitTextStyle}" VerticalAlignment="Center" Text="{Binding PercentUnit}"
+                                                   Visibility="{Binding HasDiskCurrent, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                    </StackPanel>
+                                    <TextBlock Style="{StaticResource SaHelperTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="{Binding CurrentLabel}" />
+                                    <TextBlock Style="{StaticResource SaHelperTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="{Binding DiskPeakDisplay}" />
                                 </StackPanel>
-                                <TextBlock Style="{StaticResource SaHelperTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="{Binding CurrentLabel}" />
-                                <TextBlock Style="{StaticResource SaHelperTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="{Binding DiskPeakDisplay}" />
-                            </StackPanel>
-                            <controls:HistoryChart
-                                x:Name="DiskChart"
-                                Grid.Column="1"
-                                Height="128"
-                                AutomationProperties.Name="{Binding DiskSummary}"
-                                Series="{Binding DiskSeries}"
-                                RangeStart="{Binding RangeStartUtc}"
-                                RangeEnd="{Binding RangeEndUtc}"
-                                XTicks="{Binding XAxisTicks}"
-                                XTicksCompact="{Binding XAxisTicksCompact}"
-                                YLabels="{Binding YAxisLabels}"
-                                LineThickness="{StaticResource SaChartLineThickness}"
-                                LineBrush="{ThemeResource SaDiskBrush}"
-                                GridLineBrush="{ThemeResource SaTextBrush}" />
-                        </Grid>
-                    </Border>
+                                <controls:HistoryChart
+                                    x:Name="DiskChart"
+                                    Grid.Column="1"
+                                    Height="128"
+                                    AutomationProperties.AccessibilityView="Raw"
+                                    Series="{Binding DiskSeries}"
+                                    RangeStart="{Binding RangeStartUtc}"
+                                    RangeEnd="{Binding RangeEndUtc}"
+                                    XTicks="{Binding XAxisTicks}"
+                                    XTicksCompact="{Binding XAxisTicksCompact}"
+                                    YLabels="{Binding YAxisLabels}"
+                                    LineThickness="{StaticResource SaChartLineThickness}"
+                                    LineBrush="{ThemeResource SaDiskBrush}"
+                                    GridLineBrush="{ThemeResource SaTextBrush}" />
+                            </Grid>
+                        </Border>
+                    </primitives:SaFocusableCard>
 
                     <!-- Offline periods (not drawn in Figma): info notice under the charts, never a gap shown as 0. -->
                     <primitives:SaInlineNotice

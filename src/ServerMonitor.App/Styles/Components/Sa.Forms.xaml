@@ -372,6 +372,11 @@
          (ACCEPTABLE, Prism §3.3 E70D) - the Hugeicons ArrowDown01 would need a copy of the internal-dependent
          ComboBox template; recorded as a deviation. Hover/pressed/focus/popup colours come from the F-3 scope. -->
     <Style x:Key="SaSelectorFieldStyle" TargetType="ComboBox">
+        <!-- Beacon F2 (WCAG 2.4.7): the same 2 px SaFocusRing as every other Sa control (Field, Pill and Rich inherit it). -->
+        <Setter Property="UseSystemFocusVisuals" Value="True" />
+        <Setter Property="FocusVisualPrimaryBrush" Value="{ThemeResource SaFocusRingBrush}" />
+        <Setter Property="FocusVisualPrimaryThickness" Value="{StaticResource SaFocusRingThickness}" />
+        <Setter Property="FocusVisualSecondaryThickness" Value="0" />
         <Setter Property="Height" Value="40" />
         <Setter Property="MinWidth" Value="200" />
         <Setter Property="Padding" Value="14,0,0,0" />

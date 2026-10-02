@@ -262,7 +262,7 @@
   <data name="HistoryRangeNameLast24Hours" xml:space="preserve"><value>Last 24 hours</value></data>
   <data name="HistoryRangeNameLast7Days" xml:space="preserve"><value>Last 7 days</value></data>
   <data name="HistoryRangeNameLast30Days" xml:space="preserve"><value>Last 30 days</value></data>
-  <data name="HistoryChartSummaryFormat" xml:space="preserve"><value>{0}. {1}. Current {2}. Maximum {3}.</value></data>
+  <data name="HistoryChartSummaryFormat" xml:space="preserve"><value>{0}. {1}. Current {2}. Peak in period {3}.</value></data>
   <data name="HistoryChartSummaryOfflineSuffix" xml:space="preserve"><value> Contains an offline period shown as a gap.</value></data>
   <data name="SettingsHistoryTitle.Text" xml:space="preserve"><value>History</value></data>
   <data name="SettingsHistoryDescription.Text" xml:space="preserve"><value>Metric history is stored locally for 30 days. Nothing leaves your device.</value></data>

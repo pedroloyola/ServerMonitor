@@ -62,6 +62,59 @@ public sealed class SaDataTableRowContractTests
     }
 
     [Fact]
+    public void FocusableCard_IsAReadOnlyNamedGroup_OneTabStop_BroughtIntoViewOnFocus()
+    {
+        // Beacon F3: History chart cards are reachable by keyboard in short windows, without becoming interactive.
+        Assert.Equal(AutomationControlType.Group, SaFocusableCardAutomationPeer.ControlType);
+        Assert.Equal(typeof(SaFocusableCardAutomationPeer), typeof(SaFocusableCardAutomationPeer).GetMethod("GetPatternCore", BindingFlags.Instance | BindingFlags.NonPublic)!.DeclaringType);
+        Assert.Equal(typeof(SaFocusableCard), typeof(SaFocusableCard).GetMethod("OnGotFocus", BindingFlags.Instance | BindingFlags.NonPublic)!.DeclaringType);
+        var code = AppSourceTree.CodeWithoutComments("Controls/Primitives/SaFocusableCard.cs");
+        var body = code[code.IndexOf("OnGotFocus", StringComparison.Ordinal)..];
+        Assert.Contains("StartBringIntoView(", body[..body.IndexOf('}')], StringComparison.Ordinal);
+
+        var style = Assert.Single(AppSourceTree.LoadXaml("Styles/Components/Sa.Primitives.xaml").Descendants(),
+            e => e.Name.LocalName == "Style" && (string?)e.Attribute("TargetType") == "primitives:SaFocusableCard");
+        var setters = style.Elements().Where(e => e.Name.LocalName == "Setter")
+            .ToDictionary(s => (string)s.Attribute("Property")!, s => (string?)s.Attribute("Value") ?? string.Empty);
+        Assert.Equal("True", setters["IsTabStop"]);
+        Assert.Equal("True", setters["UseSystemFocusVisuals"]);
+        Assert.Equal("{ThemeResource SaFocusRingBrush}", setters["FocusVisualPrimaryBrush"]);
+        Assert.Equal("{StaticResource SaFocusRingThickness}", setters["FocusVisualPrimaryThickness"]);
+        Assert.DoesNotContain(style.Descendants(), e => e.Name.LocalName == "VisualState");
+    }
+
+    [Fact]
+    public void Selectors_ShowTheSaFocusRing()
+    {
+        // Beacon F2 (WCAG 2.4.7): SaSelectorFieldStyle (base of Pill and Rich) draws the 2 px SaFocusRing.
+        var forms = AppSourceTree.LoadXaml("Styles/Components/Sa.Forms.xaml").Descendants().Where(e => e.Name.LocalName == "Style").ToList();
+        var field = forms.Single(s => (string?)s.Attribute(Architecture.AppSourceTree.Xaml + "Key") == "SaSelectorFieldStyle");
+        var setters = field.Elements().Where(e => e.Name.LocalName == "Setter")
+            .ToDictionary(s => (string)s.Attribute("Property")!, s => (string?)s.Attribute("Value") ?? string.Empty);
+        Assert.Equal("True", setters["UseSystemFocusVisuals"]);
+        Assert.Equal("{ThemeResource SaFocusRingBrush}", setters["FocusVisualPrimaryBrush"]);
+        Assert.Equal("{StaticResource SaFocusRingThickness}", setters["FocusVisualPrimaryThickness"]);
+        Assert.Equal("0", setters["FocusVisualSecondaryThickness"]);
+        foreach (var key in new[] { "SaSelectorPillStyle", "SaSelectorRichStyle" })
+        {
+            var derived = forms.Single(s => (string?)s.Attribute(Architecture.AppSourceTree.Xaml + "Key") == key);
+            Assert.Equal("{StaticResource SaSelectorFieldStyle}", (string?)derived.Attribute("BasedOn"));
+            Assert.DoesNotContain(derived.Elements(), s => ((string?)s.Attribute("Property"))?.StartsWith("FocusVisual", StringComparison.Ordinal) == true
+                                                              || (string?)s.Attribute("Property") == "UseSystemFocusVisuals");
+        }
+    }
+
+    [Fact]
+    public void EmptyState_IsNamedByItsTitle_NotByItsAction()
+    {
+        // Beacon L2: the no-results panel was announced as "Limpar pesquisa" (name derived from the button).
+        Assert.Equal(AutomationControlType.Group, SaEmptyStateAutomationPeer.ControlType);
+        Assert.Equal(typeof(SaEmptyStateAutomationPeer), typeof(SaEmptyStateAutomationPeer).GetMethod("GetNameCore", BindingFlags.Instance | BindingFlags.NonPublic)!.DeclaringType);
+        var code = AppSourceTree.CodeWithoutComments("Controls/Primitives/SaEmptyState.cs");
+        Assert.Contains(").Title", code[code.IndexOf("GetNameCore", StringComparison.Ordinal)..], StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void RowNames_AreTheFullRow_NameDetailStateAndHealthOrStartup()
     {
         var pt = new ResWLocalizationService("pt-PT");

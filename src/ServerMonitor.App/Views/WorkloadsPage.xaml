@@ -305,8 +305,9 @@
             <!-- Unavailable 112:15160: both sections failed to be read. -->
             <Border Style="{StaticResource SaStatePanelStyle}"
                     Visibility="{Binding ShowAllUnavailable, Converter={StaticResource BooleanToVisibilityConverter}}">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" VerticalContentAlignment="Center">
-                    <primitives:SaEmptyState x:Uid="WorkloadUnavailableState" VerticalAlignment="Center" IconData="{StaticResource SaIconServerStack01Data}">
+                <!-- Beacon L2: the pane is named by the state title, never by the action inside it. -->
+                <ScrollViewer VerticalScrollBarVisibility="Auto" VerticalContentAlignment="Center" AutomationProperties.Name="{Binding Title, ElementName=UnavailableState}">
+                    <primitives:SaEmptyState x:Name="UnavailableState" x:Uid="WorkloadUnavailableState" VerticalAlignment="Center" IconData="{StaticResource SaIconServerStack01Data}">
                         <Button x:Uid="WorkloadRetryButton" Width="200" HorizontalAlignment="Center" Style="{StaticResource SaSolidButtonStyle}" Command="{Binding RefreshCommand}" />
                     </primitives:SaEmptyState>
                 </ScrollViewer>
@@ -315,8 +316,9 @@
             <!-- Nothing 112:14939: both reads succeeded and found nothing. -->
             <Border Style="{StaticResource SaStatePanelStyle}"
                     Visibility="{Binding ShowNothingToShow, Converter={StaticResource BooleanToVisibilityConverter}}">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" VerticalContentAlignment="Center">
-                    <primitives:SaEmptyState x:Uid="WorkloadNothingState" VerticalAlignment="Center" IconData="{StaticResource SaIconServerStack01Data}">
+                <!-- Beacon L2: the pane is named by the state title, never by the action inside it. -->
+                <ScrollViewer VerticalScrollBarVisibility="Auto" VerticalContentAlignment="Center" AutomationProperties.Name="{Binding Title, ElementName=NothingState}">
+                    <primitives:SaEmptyState x:Name="NothingState" x:Uid="WorkloadNothingState" VerticalAlignment="Center" IconData="{StaticResource SaIconServerStack01Data}">
                         <Button x:Uid="WorkloadNothingRefreshButton" Width="200" HorizontalAlignment="Center" Style="{StaticResource SaSolidButtonStyle}" Command="{Binding RefreshCommand}" />
                     </primitives:SaEmptyState>
                 </ScrollViewer>
@@ -325,10 +327,12 @@
             <!-- No results 112:15381: the query hid every row in both lists. -->
             <Border Style="{StaticResource SaStatePanelStyle}"
                     Visibility="{Binding ShowGlobalNoResults, Converter={StaticResource BooleanToVisibilityConverter}}">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" VerticalContentAlignment="Center">
-                    <primitives:SaEmptyState x:Uid="WorkloadNoResultsState" VerticalAlignment="Center" IconData="{StaticResource SaIconSearch01Data}"
+                <!-- Beacon L2: the pane is named by the state title, never by the action inside it. -->
+                <ScrollViewer VerticalScrollBarVisibility="Auto" VerticalContentAlignment="Center" AutomationProperties.Name="{Binding Title, ElementName=NoResultsState}">
+                    <primitives:SaEmptyState x:Name="NoResultsState" x:Uid="WorkloadNoResultsState" VerticalAlignment="Center" IconData="{StaticResource SaIconSearch01Data}"
                                              Title="{Binding NoResultsTitle}">
-                        <Button x:Uid="WorkloadClearSearchButton" Width="200" HorizontalAlignment="Center" Style="{StaticResource SaSolidButtonStyle}" Command="{Binding ClearSearchCommand}" />
+                        <Button x:Uid="WorkloadClearSearchButton" Width="200" HorizontalAlignment="Center" Style="{StaticResource SaSolidButtonStyle}" Command="{Binding ClearSearchCommand}"
+                                Click="OnClearSearchClick" />
                     </primitives:SaEmptyState>
                 </ScrollViewer>
             </Border>
@@ -388,15 +392,15 @@
                                        Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}"
                                        Visibility="{Binding ShowDockerSectionNoResults, Converter={StaticResource BooleanToVisibilityConverter}}" />
                             <!-- Independent section states (§38): compact empty state inside the card. -->
-                            <primitives:SaEmptyState x:Name="DockerNotInstalledState" x:Uid="WorkloadDockerNotInstalledState" VerticalAlignment="Center" IconData="{StaticResource SaIconServerStack01Data}"
+                            <primitives:SaEmptyState x:Name="DockerNotInstalledState" x:Uid="WorkloadDockerNotInstalledState" TitleHeadingLevel="Level3" VerticalAlignment="Center" IconData="{StaticResource SaIconServerStack01Data}"
                                                      Visibility="{Binding ShowDockerNotInstalled, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                            <primitives:SaEmptyState x:Name="DockerPermissionState" x:Uid="WorkloadDockerPermissionState" VerticalAlignment="Center" IconData="{StaticResource SaIconLockPasswordData}"
+                            <primitives:SaEmptyState x:Name="DockerPermissionState" x:Uid="WorkloadDockerPermissionState" TitleHeadingLevel="Level3" VerticalAlignment="Center" IconData="{StaticResource SaIconLockPasswordData}"
                                                      Visibility="{Binding ShowDockerPermissionDenied, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                            <primitives:SaEmptyState x:Name="DockerUnavailableState" x:Uid="WorkloadDockerUnavailableState" VerticalAlignment="Center" IconData="{StaticResource SaIconAlert02Data}"
+                            <primitives:SaEmptyState x:Name="DockerUnavailableState" x:Uid="WorkloadDockerUnavailableState" TitleHeadingLevel="Level3" VerticalAlignment="Center" IconData="{StaticResource SaIconAlert02Data}"
                                                      Visibility="{Binding ShowDockerUnavailable, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                            <primitives:SaEmptyState x:Name="DockerErrorState" x:Uid="WorkloadDockerErrorState" VerticalAlignment="Center" IconData="{StaticResource SaIconAlert02Data}"
+                            <primitives:SaEmptyState x:Name="DockerErrorState" x:Uid="WorkloadDockerErrorState" TitleHeadingLevel="Level3" VerticalAlignment="Center" IconData="{StaticResource SaIconAlert02Data}"
                                                      Visibility="{Binding ShowDockerError, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                            <primitives:SaEmptyState x:Name="DockerEmptyState" x:Uid="WorkloadDockerEmptyState" VerticalAlignment="Center" IconData="{StaticResource SaIconServerStack01Data}"
+                            <primitives:SaEmptyState x:Name="DockerEmptyState" x:Uid="WorkloadDockerEmptyState" TitleHeadingLevel="Level3" VerticalAlignment="Center" IconData="{StaticResource SaIconServerStack01Data}"
                                                      Visibility="{Binding ShowDockerEmpty, Converter={StaticResource BooleanToVisibilityConverter}}" />
                         </Grid>
                         <primitives:SaInlineNotice Grid.Row="4" Margin="0,12,0,0" x:Uid="WorkloadTruncatedDocker" Severity="Info"
@@ -443,13 +447,13 @@
                             <TextBlock x:Name="ServicesNoResultsText" x:Uid="WorkloadServicesNoResults" HorizontalAlignment="Center" VerticalAlignment="Center"
                                        Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}"
                                        Visibility="{Binding ShowServicesSectionNoResults, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                            <primitives:SaEmptyState x:Name="ServicesUnsupportedState" x:Uid="WorkloadServicesUnsupportedState" VerticalAlignment="Center" IconData="{StaticResource SaIconServerStack01Data}"
+                            <primitives:SaEmptyState x:Name="ServicesUnsupportedState" x:Uid="WorkloadServicesUnsupportedState" TitleHeadingLevel="Level3" VerticalAlignment="Center" IconData="{StaticResource SaIconServerStack01Data}"
                                                      Visibility="{Binding ShowServicesUnsupported, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                            <primitives:SaEmptyState x:Name="ServicesUnavailableState" x:Uid="WorkloadServicesUnavailableState" VerticalAlignment="Center" IconData="{StaticResource SaIconAlert02Data}"
+                            <primitives:SaEmptyState x:Name="ServicesUnavailableState" x:Uid="WorkloadServicesUnavailableState" TitleHeadingLevel="Level3" VerticalAlignment="Center" IconData="{StaticResource SaIconAlert02Data}"
                                                      Visibility="{Binding ShowServicesUnavailable, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                            <primitives:SaEmptyState x:Name="ServicesErrorState" x:Uid="WorkloadServicesErrorState" VerticalAlignment="Center" IconData="{StaticResource SaIconAlert02Data}"
+                            <primitives:SaEmptyState x:Name="ServicesErrorState" x:Uid="WorkloadServicesErrorState" TitleHeadingLevel="Level3" VerticalAlignment="Center" IconData="{StaticResource SaIconAlert02Data}"
                                                      Visibility="{Binding ShowServicesError, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                            <primitives:SaEmptyState x:Name="ServicesEmptyState" x:Uid="WorkloadServicesEmptyState" VerticalAlignment="Center" IconData="{StaticResource SaIconServerStack01Data}"
+                            <primitives:SaEmptyState x:Name="ServicesEmptyState" x:Uid="WorkloadServicesEmptyState" TitleHeadingLevel="Level3" VerticalAlignment="Center" IconData="{StaticResource SaIconServerStack01Data}"
                                                      Visibility="{Binding ShowServicesEmpty, Converter={StaticResource BooleanToVisibilityConverter}}" />
                         </Grid>
                         <primitives:SaInlineNotice Grid.Row="4" Margin="0,12,0,0" x:Uid="WorkloadTruncatedServices" Severity="Info"

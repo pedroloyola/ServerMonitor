@@ -1,3 +1,4 @@
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using ServerMonitor.App.ViewModels;
 
@@ -20,4 +21,7 @@ public sealed partial class WorkloadsPage : Page
 
     // The breadcrumb parent (server name) goes where Back goes: the Dashboard until the server Detail exists (D-UI3-5).
     private void OnBreadcrumbParentInvoked(object? sender, EventArgs e) => ViewModel.BackCommand.Execute(null);
+
+    // Beacon L1: "Clear search" disappears once it worked; focus goes back to the search box, not to the top of the page.
+    private void OnClearSearchClick(object sender, RoutedEventArgs e) => FocusAfterAction.MoveTo((Control)sender, SearchBox);
 }
