@@ -1,6 +1,6 @@
 # UI.3 — Histórico + Serviços e containers (primeira adoção em produção)
 
-Estado: **IMPLEMENTADO no branch `ui/ui3-history-services`** (base `main` 358fa688940ca3f873122e6193d7f3b31413cc73), PR #16 (draft). Merge **não autorizado** — aguarda GO humano. UI.4 não iniciado.
+Estado: **COMPLETE** (2026-10-02). PR #16 merged por merge commit → `main` = `9ad1db6f147904e812b933f9539daadaf09b9a5f` (pais `358fa68` + `99a0a1f`; árvore == head final validado `99a0a1f96ac6698189bee5567c64e8c51577d776`, branch `ui/ui3-history-services`). CI do PR e pós-merge verdes. Testes no head final: Debug 4302 + 1 skip, Release 4095 + 1 skip, 0 falhas. Gates PERF-UI2-DICT, UI-RATCHET-GEOMETRY e TEST-REALDATA-AUDIT: **CLOSED** (secção 1). UI.4 não iniciado.
 Data: 2026-10-01 → 2026-10-02. Autoridade visual: Figma `Qvk5dUFgsWf4UOYzfAkiDV` (04 Manual da marca; 05 Free secção 03 "Detalhe, histórico e serviços"; 06 Pro só extensibilidade). Precedência UI.0 §0.3: invariantes/segurança > a11y/plataforma > Figma.
 
 ## 1. Gates obrigatórios (fechados ANTES de qualquer migração de ecrã)
@@ -39,6 +39,7 @@ Restantes notas (não alteram elementos desenhados): eixo X em limites redondos 
 
 ## 6. Reviews e QA
 Prism (fidelidade): R1 CHANGES_REQUIRED → R2 → **R3 APPROVED**; R4 primitivos §7 → **APPROVED** (9a00731). Cortex (arquitetura): R1 CHANGES_REQUIRED → **R2 APPROVED**, R3 APPROVED. Beacon (runtime/teclado/a11y): R1 CHANGES_REQUIRED (3 MUST WCAG 3.2.1 / 2.4.7 / 2.1.1) → **R2 APPROVED_WITH_NITS**, re-check F3 em 9a00731 PASS. Vigil: gates 1A/1B/1C (alteração fora da apresentação e risco de dados reais). Relay §15: sem regressão perceptível; 1.º frame da página +20–100 ms e 1 frame de ~60 ms no 1.º salto de scroll de lista grande (causas identificadas, não bloqueantes); 2048 serviços em Narrow realizam 43 linhas.
+Ronda final de fidelidade (d0f0787, 99a0a1f): Prism **APPROVED** (linha neutra e "Atualizado há N s") e **APPROVED** (cabeçalhos 10 Regular); Beacon **PASS_WITH_NITS** (N-F1 relógio fixo no harness para "8 s" determinístico; N-F2 `LiveSetting` só verificável em XAML).
 
 ## 7. NOT_RUN
 High Contrast real, DPI 150/200 %, Narrator real (UIA verificado), troca de tema com a página aberta, arranque a frio (perf).
