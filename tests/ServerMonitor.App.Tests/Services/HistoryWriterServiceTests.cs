@@ -10,6 +10,15 @@ namespace ServerMonitor.App.Tests.Services;
 
 public sealed class HistoryWriterServiceTests
 {
+    /// <summary>
+    /// Deadlock guard only. Every wait in this class is released by an event (a store call, a barrier completing, a
+    /// worker arming its timer); the writer's own timeouts run on the FakeTimeProvider, which a test advances only once
+    /// the worker is parked on the timer it needs. So a working writer never reaches this bound, however slow the
+    /// runner. The former 5 s bounds were latency expectations over thread-pool workers (CI-flakes, runs 37057158486
+    /// and later repetitions).
+    /// </summary>
+    private static readonly TimeSpan DeadlockGuard = TimeSpan.FromSeconds(30);
+
     private static readonly DateTimeOffset Now = new(2026, 8, 26, 12, 0, 0, TimeSpan.Zero);
 
     private static ServerHistorySample Sample(Guid id, DateTimeOffset at) => new()
@@ -56,7 +65,7 @@ public sealed class HistoryWriterServiceTests
         await writer.StartAsync(CancellationToken.None);
         try
         {
-            await store.WaitForWrittenCountAsync(1).WaitAsync(TimeSpan.FromSeconds(5));
+            await store.WaitForWrittenCountAsync(1).WaitAsync(DeadlockGuard);
             Assert.Equal(id, store.Written[0].ServerId);
         }
         finally
@@ -72,7 +81,7 @@ public sealed class HistoryWriterServiceTests
         await writer.StartAsync(CancellationToken.None);
         try
         {
-            await store.WaitForRetentionCallsAsync(1).WaitAsync(TimeSpan.FromSeconds(5));
+            await store.WaitForRetentionCallsAsync(1).WaitAsync(DeadlockGuard);
             Assert.Equal(Now - TimeSpan.FromDays(30), store.LastRetentionCutoff);
         }
         finally
@@ -91,17 +100,16 @@ public sealed class HistoryWriterServiceTests
         // (independent review r1, MUST-2). The bound is a deadlock guard only; it used to be 5 s.
         // TimerRecordingTimeProvider matches the exact 24 h due time: the clock is frozen until the advance, so the
         // loop's delay is exactly nextRunUtc - now = 24 h.
-        var deadlockGuard = TimeSpan.FromSeconds(30);
         var (writer, _, store, time) = New();
         await writer.StartAsync(CancellationToken.None);
         try
         {
-            await store.WaitForRetentionCallsAsync(1).WaitAsync(deadlockGuard);
+            await store.WaitForRetentionCallsAsync(1).WaitAsync(DeadlockGuard);
             Assert.Equal(Now - TimeSpan.FromDays(30), store.LastRetentionCutoff);
 
-            await time.TimerCreatedAsync(TimeSpan.FromHours(24)).WaitAsync(deadlockGuard); // parked on its daily timer
+            await time.TimerCreatedAsync(TimeSpan.FromHours(24)).WaitAsync(DeadlockGuard); // parked on its daily timer
             time.Advance(TimeSpan.FromHours(24));
-            await store.WaitForRetentionCallsAsync(2).WaitAsync(deadlockGuard);
+            await store.WaitForRetentionCallsAsync(2).WaitAsync(DeadlockGuard);
 
             // The second run is the daily one, on the advanced clock — and exactly one run per elapsed interval.
             Assert.Equal(Now + TimeSpan.FromHours(24) - TimeSpan.FromDays(30), store.LastRetentionCutoff);
@@ -146,13 +154,13 @@ public sealed class HistoryWriterServiceTests
         await writer.StartAsync(CancellationToken.None);
         try
         {
-            Assert.True(await clearTask.WaitAsync(TimeSpan.FromSeconds(5)));
+            Assert.True(await clearTask.WaitAsync(DeadlockGuard));
             Assert.Equal(1, store.WriteBatchCount);
             Assert.Equal(1, store.ClearCallCount);
             Assert.Empty(store.Written);
 
             Assert.True(channel.TryWrite(Sample(Guid.NewGuid(), Now + TimeSpan.FromSeconds(30))));
-            await store.WaitForWrittenCountAsync(1).WaitAsync(TimeSpan.FromSeconds(5));
+            await store.WaitForWrittenCountAsync(1).WaitAsync(DeadlockGuard);
         }
         finally
         {
@@ -168,7 +176,7 @@ public sealed class HistoryWriterServiceTests
         await writer.StartAsync(CancellationToken.None);
         try
         {
-            Assert.False(await writer.ClearAsync().WaitAsync(TimeSpan.FromSeconds(5)));
+            Assert.False(await writer.ClearAsync().WaitAsync(DeadlockGuard));
             Assert.Equal(1, store.ClearCallCount);
         }
         finally
@@ -189,8 +197,12 @@ public sealed class HistoryWriterServiceTests
         try
         {
             Assert.Equal(1, store.InitializeCount);
+            // Same read-clock-then-arm-timer window as the retention loop: advancing before the recovery loop has
+            // armed its 5 s timer would arm it after the advanced clock and the retry would never come. The clock is
+            // frozen until the advance, so the loop's delay is exactly the 5 s initial backoff.
+            await time.TimerCreatedAsync(TimeSpan.FromSeconds(5)).WaitAsync(DeadlockGuard);
             time.Advance(TimeSpan.FromSeconds(5));
-            await store.WaitForInitializeCallsAsync(2).WaitAsync(TimeSpan.FromSeconds(5));
+            await store.WaitForInitializeCallsAsync(2).WaitAsync(DeadlockGuard);
             Assert.True(store.IsAvailable);
             Assert.False(store.CanRetryInitialization);
         }
@@ -207,20 +219,19 @@ public sealed class HistoryWriterServiceTests
         // the writer's own timeouts run on the FakeTimeProvider and StopAsync gets an already-cancelled token, so no
         // step depends on elapsed time. The bound is a deadlock guard only. It used to be 5 s, which a busy CI runner
         // exceeded just scheduling the consumer worker onto the thread pool (TimeoutException, run 37057158486).
-        var deadlockGuard = TimeSpan.FromSeconds(30);
         var (writer, channel, store, _) = New();
         var blocker = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         store.WriteBlocker = blocker;
         await writer.StartAsync(CancellationToken.None);
         Assert.True(channel.TryWrite(Sample(Guid.NewGuid(), Now)));
-        await store.WriteEntered.Task.WaitAsync(deadlockGuard);
+        await store.WriteEntered.Task.WaitAsync(DeadlockGuard);
         var clear = writer.ClearAsync();
 
         using var cancelled = new CancellationTokenSource();
         cancelled.Cancel();
         await writer.StopAsync(cancelled.Token);
 
-        Assert.False(await clear.WaitAsync(deadlockGuard));
+        Assert.False(await clear.WaitAsync(DeadlockGuard));
         blocker.TrySetResult(true);
     }
 
@@ -235,13 +246,13 @@ public sealed class HistoryWriterServiceTests
         await writer.StartAsync(CancellationToken.None);
         try
         {
-            Assert.True(await reset.WaitAsync(TimeSpan.FromSeconds(5)));
+            Assert.True(await reset.WaitAsync(DeadlockGuard));
             Assert.True(store.IsAvailable);
             Assert.Equal(1, store.ResetCallCount);
             Assert.Empty(store.Written);
 
             Assert.True(channel.TryWrite(Sample(Guid.NewGuid(), Now + TimeSpan.FromSeconds(30))));
-            await store.WaitForWrittenCountAsync(1).WaitAsync(TimeSpan.FromSeconds(5));
+            await store.WaitForWrittenCountAsync(1).WaitAsync(DeadlockGuard);
         }
         finally
         {
