@@ -1,6 +1,6 @@
 # UI.4 — Visão geral + Servidores
 
-Estado: **EM CURSO** (2026-10-02): Fase 1 aceite para review; Cortex r1 corrigido (`3d42bfe`); Fase 2 com as Views no branch `ui/ui4-overview-servers`. Falta a QA visual completa (Light/Dark nas larguras do Prism, 3 línguas, 500 servidores realizados via UIA). Não há merge.
+Estado: **READY_TO_MERGE, à espera do GO humano** (2026-10-02). Branch `ui/ui4-overview-servers`, código fechado em `95b4daa` (este commit só toca em docs). Reviews finais: Prism r3 APPROVED, Cortex r3 APPROVED_WITH_NITS, Atlas r1 fechado, Beacon r2 PASS. Gates no §8. Não há merge.
 Autoridade visual: Figma `Qvk5dUFgsWf4UOYzfAkiDV`, 05 Free secção 02 "Dashboard e servidores" (Visão geral D `112:930` / L `112:1141`; Servidores D `112:1353`, directory `112:1419`, tabela `112:1434`), §13 `112:14006` (estados vazios), §14 `112:15512` (carregamento). Precedência: invariantes/segurança > a11y/plataforma > Figma.
 
 ## 1. Decisões humanas (vinculativas)
@@ -128,12 +128,50 @@ Autoridade visual: Figma `Qvk5dUFgsWf4UOYzfAkiDV`, 05 Free secção 02 "Dashboar
   - **C-R2-1:** com 0 servidores, o foco inicial dos Servidores vai para "Adicionar servidor".
 - **DERIVED aceite:** ícone CPU/Memória = `SaIconComputerData` (o Figma não tem ícone para essas métricas; o título por extenso desambigua).
 - **Diferenças deliberadas que ficam:**
+  - **Disco 92%:** o Figma mostra 92% como "Atenção", mas no motor 92% é Crítico (≥ 90). O harness usa 88% para manter os estados do frame (Prism g); a app não inventa nada.
+  - **Títulos de secção:** a 19 Semibold só no UI.4 (`SaSectionTitleTextStyle`). Os Serviços e containers mantêm o 20 que o UI.3 aceitou (`SaSectionHeaderTextStyle`, decisão Boss).
+  - **"Sem ligação":** é a copy nova das linhas UI.4. O `ServerFullCard` da página interina mantém "Offline" até ao UI.5.
+  - **Temporários:** D-UI4-NAV (header com Modo compacto, Definições, Atualizar e Adicionar; "Ver todos"; breadcrumb, até ao UI.6) e D-UI4-DETAIL (página interina com o cartão atual, até ao UI.5).
   - sem sidebar (UI.6);
   - sombra projetada não reproduzida (desvio UI.2 existente);
   - cor dos segmentos teal (tokens do Manual, decisão UI.1).
-- **Backlog:**
-  - código morto `IsFocusHighlighted`;
-  - listas de harness em `tools/perf/*.ps1`;
-  - ratchet automático de virtualização (hoje medição manual UIA 22/500, Atlas NIT-4);
-  - raiz QA isolada por lançamento (placement partilhado entre corridas paralelas, Prism r1 risco 1);
-  - `ServerHealthOffline` = "Offline" no cartão interino (UI.5).
+
+## 8. Reviews e gates finais
+
+| Review | Percurso | Final |
+|---|---|---|
+| Prism (fidelidade) | r1 (DERIVED + fidelidade, CHANGES) → r2 (2 B triviais) → r3 | **APPROVED**, sem A/B/C abertos |
+| Cortex (arquitetura) | r1 CHANGES_REQUIRED (MUST-1 navegação, SHOULD-1/2/3) → r2 → r3 | **APPROVED_WITH_NITS**. O NIT-r3-1 (comparação inclusiva única + paridade com o Core) foi aplicado em `356017d`. |
+| Atlas (testes) | r1 CHANGES_REQUIRED (coalescência com 2.ª rajada, load falhado, singletons, `Assert.Same` dos limites) → `234659a` | **Fechado**. O review foi feito por um subagente interno no papel do Atlas, porque o canvas Atlas estava indisponível. |
+| Beacon (QA na app real) | r1 PASS_WITH_NITS (SHOULD-1..5) → `0e760dc`, `94c82ff`, `ad69155`, `95b4daa` → r2 | **PASS**, com 0 regressões. Ficam abertos o NIT-1 e o NIT-5 (backlog). |
+
+Gates em `95b4daa`:
+- **Suites:**
+  - Debug: 4490 passam, 0 falham, 1 skip.
+  - Release: 4243 passam, 0 falham, 1 skip.
+  - Incluem os ratchets (geometria, dívida de UI, contrato XAML/recursos) e os testes de arquitetura UI.4.
+- **`--qa-tokens` runtime** (via `Start-QaApp`): 649 PASS / 0 FAIL, exit 0 (medido em `ad69155`, antes do `95b4daa`, que não toca em tokens).
+- **Contraprovas:** cada invariante nova tem uma mutação que faz falhar a suite, e o ficheiro é reposto byte a byte. Rondas Fase 1/2, Cortex, fidelidade, Atlas (A1–A4), Beacon (B1–B18) e Prism r2 (R2-B1/B2/C): todas apanhadas.
+- **Dados reais:** o Beacon r2 comparou `%LOCALAPPDATA%\ServerMonitor` antes e depois. Resultado IDENTICAL: 17 ficheiros e 0 desvios.
+- **Medição SHOULD-2** (Cortex): ciclo de 500 servidores 73,0 → 8,2 ms, com 0 notificações (teste de orçamento exato).
+
+## 9. NOT_RUN
+
+Estas verificações não foram corridas no UI.4 e ficam declaradas:
+- deep-link real do widget até à interina (só testes de VM/navegação);
+- sucesso real de Ocultar/Remover (o harness devolve falha; só o caminho de erro foi visto na app);
+- Narrator;
+- Alto Contraste real do sistema (só a pré-visualização HC do `--qa-tokens`);
+- DPI 150% e 200%;
+- cold start (tempo até à 1.ª pintura).
+
+## 10. Backlog
+
+- **Raiz QA partilhada** entre instâncias simultâneas: o placement e as definições são partilhados entre corridas paralelas (Prism r1 risco 1). Falta uma raiz isolada por lançamento.
+- **Código morto** `IsFocusHighlighted`.
+- **Listas em `tools/perf/*.ps1`** sem `--qa-overview`.
+- **NIT-1:** a página interina não tem H1. O foco de chegada no breadcrumb anuncia o contexto. Fica para o UI.5 (página de servidor).
+- **NIT-5:** a InfoBar de erro de operação tem nome UIA vazio (anterior ao UI.4).
+- **Enter no foco inicial do header:** até o foco passar para o conteúdo, o primeiro foco da janela é o "Modo compacto" do header, e um Enter "solto" muda a janela de modo. O Beacon r2 mediu um Enter a 1,5 s do arranque e a app fica em Standard; o resto da janela não foi medido. Fica para o header do UI.6.
+- **Ratchet automático de virtualização:** hoje é uma medição manual UIA (22 de 500 linhas realizadas, Atlas NIT-4).
+- **`ServerHealthOffline` = "Offline"** no cartão interino (UI.5).
