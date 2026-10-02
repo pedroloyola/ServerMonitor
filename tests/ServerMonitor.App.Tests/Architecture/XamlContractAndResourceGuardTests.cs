@@ -37,7 +37,7 @@ public sealed partial class XamlContractAndResourceGuardTests
         ["Views/SettingsPage.xaml"] = ["BackupStatusBar", "BackgroundSection"],
         // UI.3: adaptive VisualState setters reflow these (no code-behind dependency).
         ["Views/HistoryPage.xaml"] = ["PageRoot", "ServerSelector", "RangeTrack", "CpuChart", "MemoryChart", "DiskChart", "RetentionText"],
-        ["Views/WorkloadsPage.xaml"] = ["PageRoot", "SearchBox", "FilterTrack", "ServicesCard", "CardsColumn2", "CardsRow2"],
+        ["Views/WorkloadsPage.xaml"] = ["PageHost", "PageScroll", "PageRoot", "SearchBox", "FilterTrack", "ServicesCard", "CardsColumn2", "CardsRow1", "CardsRow2", "ContainersScroll", "ServicesScroll"],
         ["Views/BackupCreateDialog.xaml"] = ["PassphraseBox", "ConfirmationBox"],
         ["Views/RestoreOpenDialog.xaml"] = ["PassphraseBox"],
         ["Views/AddServerDialog.xaml"] = ["ServerForm"],

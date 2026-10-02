@@ -80,7 +80,10 @@
         </DataTemplate>
     </Page.Resources>
 
-    <Grid x:Name="PageRoot" Padding="{StaticResource SaPagePadding}" RowSpacing="{StaticResource SaSpace20}">
+    <!-- Cortex M-3: one page ScrollViewer. Wide (>= 900, Figma): disabled, the cards fill the window and their lists scroll
+         inside. Medium/Narrow (stacked): the PAGE scrolls, the cards take their content height, no nested scrolling
+         (the virtualized lists then realize against this viewport; a focused row is brought into view). -->
+    <Grid x:Name="PageHost">
         <VisualStateManager.VisualStateGroups>
             <VisualStateGroup x:Name="WidthStates">
                 <VisualState x:Name="Wide">
@@ -103,7 +106,14 @@
                         <Setter Target="ServicesCard.(Grid.Row)" Value="1" />
                         <Setter Target="ServicesCard.(Grid.Column)" Value="0" />
                         <Setter Target="CardsColumn2.Width" Value="0" />
-                        <Setter Target="CardsRow2.Height" Value="*" />
+                        <Setter Target="PageScroll.VerticalScrollMode" Value="Enabled" />
+                        <Setter Target="PageScroll.VerticalScrollBarVisibility" Value="Auto" />
+                        <Setter Target="ContainersScroll.VerticalScrollMode" Value="Disabled" />
+                        <Setter Target="ContainersScroll.VerticalScrollBarVisibility" Value="Disabled" />
+                        <Setter Target="ServicesScroll.VerticalScrollMode" Value="Disabled" />
+                        <Setter Target="ServicesScroll.VerticalScrollBarVisibility" Value="Disabled" />
+                        <Setter Target="CardsRow1.Height" Value="Auto" />
+                        <Setter Target="CardsRow2.Height" Value="Auto" />
                     </VisualState.Setters>
                 </VisualState>
                 <VisualState x:Name="Narrow">
@@ -120,11 +130,20 @@
                         <Setter Target="ServicesCard.(Grid.Row)" Value="1" />
                         <Setter Target="ServicesCard.(Grid.Column)" Value="0" />
                         <Setter Target="CardsColumn2.Width" Value="0" />
-                        <Setter Target="CardsRow2.Height" Value="*" />
+                        <Setter Target="PageScroll.VerticalScrollMode" Value="Enabled" />
+                        <Setter Target="PageScroll.VerticalScrollBarVisibility" Value="Auto" />
+                        <Setter Target="ContainersScroll.VerticalScrollMode" Value="Disabled" />
+                        <Setter Target="ContainersScroll.VerticalScrollBarVisibility" Value="Disabled" />
+                        <Setter Target="ServicesScroll.VerticalScrollMode" Value="Disabled" />
+                        <Setter Target="ServicesScroll.VerticalScrollBarVisibility" Value="Disabled" />
+                        <Setter Target="CardsRow1.Height" Value="Auto" />
+                        <Setter Target="CardsRow2.Height" Value="Auto" />
                     </VisualState.Setters>
                 </VisualState>
             </VisualStateGroup>
         </VisualStateManager.VisualStateGroups>
+        <ScrollViewer x:Name="PageScroll" VerticalScrollMode="Disabled" VerticalScrollBarVisibility="Disabled" HorizontalScrollBarVisibility="Disabled">
+        <Grid x:Name="PageRoot" Padding="{StaticResource SaPagePadding}" RowSpacing="{StaticResource SaSpace20}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -292,7 +311,7 @@
                     <ColumnDefinition x:Name="CardsColumn2" Width="*" />
                 </Grid.ColumnDefinitions>
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="*" />
+                    <RowDefinition x:Name="CardsRow1" Height="*" />
                     <RowDefinition x:Name="CardsRow2" Height="0" />
                 </Grid.RowDefinitions>
 
@@ -325,9 +344,12 @@
                             </Grid>
                         </Border>
                         <Grid Grid.Row="3">
-                            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                            <ScrollViewer x:Name="ContainersScroll" VerticalScrollBarVisibility="Auto"
                                           Visibility="{Binding ShowDockerContainers, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                <ItemsRepeater x:Uid="WorkloadContainersList" TabFocusNavigation="Once" XYFocusKeyboardNavigation="Enabled" ItemsSource="{Binding Containers}" ItemTemplate="{StaticResource ContainerRowTemplate}" />
+                                <primitives:SaDataTableList x:Uid="WorkloadContainersList">
+                                    <ItemsRepeater TabFocusNavigation="Once" XYFocusKeyboardNavigation="Enabled" AutomationProperties.AccessibilityView="Raw"
+                                                   ItemsSource="{Binding Containers}" ItemTemplate="{StaticResource ContainerRowTemplate}" />
+                                </primitives:SaDataTableList>
                             </ScrollViewer>
                             <TextBlock x:Uid="WorkloadDockerNoResults" HorizontalAlignment="Center" VerticalAlignment="Center"
                                        Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}"
@@ -378,9 +400,12 @@
                             </Grid>
                         </Border>
                         <Grid Grid.Row="3">
-                            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                            <ScrollViewer x:Name="ServicesScroll" VerticalScrollBarVisibility="Auto"
                                           Visibility="{Binding ShowServicesList, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                <ItemsRepeater x:Uid="WorkloadServicesList" TabFocusNavigation="Once" XYFocusKeyboardNavigation="Enabled" ItemsSource="{Binding Services}" ItemTemplate="{StaticResource ServiceRowTemplate}" />
+                                <primitives:SaDataTableList x:Uid="WorkloadServicesList">
+                                    <ItemsRepeater TabFocusNavigation="Once" XYFocusKeyboardNavigation="Enabled" AutomationProperties.AccessibilityView="Raw"
+                                                   ItemsSource="{Binding Services}" ItemTemplate="{StaticResource ServiceRowTemplate}" />
+                                </primitives:SaDataTableList>
                             </ScrollViewer>
                             <TextBlock x:Uid="WorkloadServicesNoResults" HorizontalAlignment="Center" VerticalAlignment="Center"
                                        Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}"
@@ -403,5 +428,7 @@
 
         <!-- Read-only note 112:2756. -->
         <primitives:SaInlineNotice Grid.Row="4" x:Uid="WorkloadReadOnlyNoticeBox" Severity="Info" />
+        </Grid>
+        </ScrollViewer>
     </Grid>
 </Page>

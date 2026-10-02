@@ -22,6 +22,14 @@ public sealed class SaDataTableRowContractTests
         Assert.NotNull(patterns);
         Assert.Equal(typeof(SaDataTableRowAutomationPeer), patterns!.DeclaringType);   // overridden: returns no pattern
         Assert.Equal(typeof(SaDataTableRow), typeof(SaDataTableRow).GetMethod("OnCreateAutomationPeer", BindingFlags.Instance | BindingFlags.NonPublic)!.DeclaringType);
+        // "x of N": position and size come from the hosting ItemsRepeater (Cortex M-2).
+        foreach (var core in new[] { "GetPositionInSetCore", "GetSizeOfSetCore" })
+        {
+            Assert.Equal(typeof(SaDataTableRowAutomationPeer), typeof(SaDataTableRowAutomationPeer).GetMethod(core, BindingFlags.Instance | BindingFlags.NonPublic)!.DeclaringType);
+        }
+
+        Assert.Equal(AutomationControlType.List, SaDataTableListAutomationPeer.ControlType);
+        Assert.Equal(typeof(SaDataTableListAutomationPeer), typeof(SaDataTableListAutomationPeer).GetMethod("GetPatternCore", BindingFlags.Instance | BindingFlags.NonPublic)!.DeclaringType);
     }
 
     [Fact]

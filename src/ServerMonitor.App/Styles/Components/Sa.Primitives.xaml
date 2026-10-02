@@ -204,6 +204,22 @@
             </Setter.Value>
         </Setter>
     </Style>
+    <!-- UI.3 read-only data-table list (Cortex M-2): UIA List around the virtualized rows; not a tab stop itself. -->
+    <Style TargetType="primitives:SaDataTableList">
+        <Setter Property="IsTabStop" Value="False" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="VerticalContentAlignment" Value="Stretch" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="primitives:SaDataTableList">
+                    <ContentPresenter
+                        HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                        VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                        Content="{TemplateBinding Content}" />
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
     <!-- ===================== UI.2 S6: data and feedback primitives ===================== -->
 
     <!-- MetricBar mini 112:1040 / 112:1252: track h5 radius 3 (SaRadiusMiniBar), empty-bar colour, fill = Manual metric

@@ -115,16 +115,41 @@ public sealed partial class Ui3PageContractTests
     [Theory]
     [InlineData("WorkloadContainersList", "{Binding Containers}", "{StaticResource ContainerRowTemplate}")]
     [InlineData("WorkloadServicesList", "{Binding Services}", "{StaticResource ServiceRowTemplate}")]
-    public void Workloads_ListsAreOneTabStop_AndTheArrowsWalkTheRows(string uid, string items, string template)
+    public void Workloads_ListsAreNamedUiaLists_OneTabStop_ArrowsWalkTheRows(string uid, string items, string template)
     {
-        // Difference 14 (Boss): Tab enters the list once, the arrows move between rows (no tab stop per row).
+        // Difference 14 (Boss) / Cortex M-2: a named UIA List (SaDataTableList, not a tab stop) around the virtualized
+        // ItemsRepeater; Tab enters once, the arrows move between the focusable rows; the repeater adds no UIA level.
         var list = Assert.Single(Elements(Workloads), e => Uid(e) == uid);
-        Assert.Equal("ItemsRepeater", list.Name.LocalName);   // virtualized: 2000 rows stay cheap
-        Assert.Equal("Once", Attr(list, "TabFocusNavigation"));
-        Assert.Equal("Enabled", Attr(list, "XYFocusKeyboardNavigation"));
-        Assert.Equal(items, Attr(list, "ItemsSource"));
-        Assert.Equal(template, Attr(list, "ItemTemplate"));
+        Assert.Equal("SaDataTableList", list.Name.LocalName);
+        var repeater = Assert.Single(list.Elements());
+        Assert.Equal("ItemsRepeater", repeater.Name.LocalName);   // virtualized: 2000 rows stay cheap
+        Assert.Equal("Once", Attr(repeater, "TabFocusNavigation"));
+        Assert.Equal("Enabled", Attr(repeater, "XYFocusKeyboardNavigation"));
+        Assert.Equal("Raw", Attr(repeater, "AutomationProperties.AccessibilityView"));
+        Assert.Equal(items, Attr(repeater, "ItemsSource"));
+        Assert.Equal(template, Attr(repeater, "ItemTemplate"));
         Assert.All(Cultures, c => Assert.False(string.IsNullOrWhiteSpace(Resw(c)[uid + ".[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name"])));
+    }
+
+    [Fact]
+    public void Workloads_StackedLayoutsScrollThePage_NeverTheCards()
+    {
+        // Cortex M-3 (difference 11 not accepted): Medium/Narrow = one page ScrollViewer, cards Height=Auto, no inner
+        // scrolling; Wide (Figma) keeps the page fixed and the lists scrolling inside their cards.
+        var page = Assert.Single(Elements(Workloads), e => (string?)e.Attribute(AppSourceTree.Xaml + "Name") == "PageScroll");
+        Assert.Equal("Disabled", Attr(page, "VerticalScrollMode"));
+        var states = Elements(Workloads).Where(e => e.Name.LocalName == "VisualState").ToDictionary(s => (string)s.Attribute(AppSourceTree.Xaml + "Name")!);
+        Assert.Empty(states["Wide"].Descendants().Where(e => e.Name.LocalName == "Setter"));
+        foreach (var state in new[] { "Medium", "Narrow" })
+        {
+            var setters = states[state].Descendants().Where(e => e.Name.LocalName == "Setter")
+                .ToDictionary(s => (string)s.Attribute("Target")!, s => (string)s.Attribute("Value")!);
+            Assert.Equal("Enabled", setters["PageScroll.VerticalScrollMode"]);
+            Assert.Equal("Disabled", setters["ContainersScroll.VerticalScrollMode"]);
+            Assert.Equal("Disabled", setters["ServicesScroll.VerticalScrollMode"]);
+            Assert.Equal("Auto", setters["CardsRow1.Height"]);
+            Assert.Equal("Auto", setters["CardsRow2.Height"]);
+        }
     }
 
     [Fact]
