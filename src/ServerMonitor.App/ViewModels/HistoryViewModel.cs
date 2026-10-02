@@ -108,6 +108,8 @@ public sealed class HistoryViewModel : ObservableObject, IDisposable
     private string? _periodFooter;
     private IReadOnlyList<string>? _xAxisLabels;
     private IReadOnlyList<string>? _xAxisLabelsCompact;
+    private CultureInfo? _formatCulture;
+    private string? _formatCultureKey;
 
     public HistoryViewModel(
         IServerHistoryQueryService queryService,
@@ -184,7 +186,7 @@ public sealed class HistoryViewModel : ObservableObject, IDisposable
 
     /// <summary>The selector's second line: "A carregar histórico…" while loading, else the server subtitle.</summary>
     public string SelectedServerSubtitle => IsLoading
-        ? _localizationService.GetString("HistorySelectorLoading")
+        ? Text("HistorySelectorLoading")
         : _selectedServer?.Subtitle ?? string.Empty;
 
     // --- Chart text (UI.3) -----------------------------------------------------------------------------
@@ -256,29 +258,44 @@ public sealed class HistoryViewModel : ObservableObject, IDisposable
 
     public string EmptyTitle => EmptyKind switch
     {
-        HistoryEmptyKind.NeverRecorded => _localizationService.GetString("HistoryEmptyNeverTitle"),
-        HistoryEmptyKind.Period => _localizationService.GetString("HistoryEmptyPeriodTitle"),
+        HistoryEmptyKind.NeverRecorded => Text("HistoryEmptyNeverTitle"),
+        HistoryEmptyKind.Period => Text("HistoryEmptyPeriodTitle"),
         _ => string.Empty
     };
 
     public string EmptyMessage => EmptyKind switch
     {
-        HistoryEmptyKind.NeverRecorded => _localizationService.GetString("HistoryEmptyNeverMessage"),
-        HistoryEmptyKind.Period => _localizationService.GetString("HistoryEmptyPeriodMessage"),
+        HistoryEmptyKind.NeverRecorded => Text("HistoryEmptyNeverMessage"),
+        HistoryEmptyKind.Period => Text("HistoryEmptyPeriodMessage"),
         _ => string.Empty
     };
 
     public string EmptyActionText => EmptyKind switch
     {
-        HistoryEmptyKind.NeverRecorded => _localizationService.GetString("HistoryEmptyNeverAction"),
-        HistoryEmptyKind.Period => _localizationService.GetString("HistoryEmptyPeriodAction"),
+        HistoryEmptyKind.NeverRecorded => Text("HistoryEmptyNeverAction"),
+        HistoryEmptyKind.Period => Text("HistoryEmptyPeriodAction"),
         _ => string.Empty
     };
 
     private string Unknown => _localizationService?.GetString("HistoryValueUnknown") ?? "—";
 
+    // Cortex L-3: every UI.3 text reader goes through here, so a runtime-free host (field initializers skipped) never
+    // dereferences a null service.
+    private string Text(string key) => _localizationService?.GetString(key) ?? string.Empty;
+
+    // Cortex L-4: ONE culture for every History text - numbers, peaks, summaries, axes and footer - the explicit UI
+    // language when set (so it matches the resw copy), else the current UI culture. Cached per language.
     private CultureInfo FormatCulture =>
-        HistoryPresentation.FormatCulture(_localizationService?.CurrentLanguageOverride);
+        _formatCulture is { } cached && string.Equals(_formatCultureKey, _localizationService?.CurrentLanguageOverride, StringComparison.Ordinal)
+            ? cached
+            : CacheFormatCulture();
+
+    private CultureInfo CacheFormatCulture()
+    {
+        _formatCultureKey = _localizationService?.CurrentLanguageOverride;
+        _formatCulture = HistoryPresentation.FormatCulture(_formatCultureKey);
+        return _formatCulture;
+    }
 
     public string CpuTitle { get; }
 
@@ -352,7 +369,11 @@ public sealed class HistoryViewModel : ObservableObject, IDisposable
 
     public bool ShowEmpty => !IsUnavailable && IsEmpty && !IsLoading;
 
-    public bool ShowCharts => !IsUnavailable && !IsEmpty;
+    /// <summary>
+    /// Exactly one of <see cref="ShowLoading"/> / <see cref="ShowUnavailable"/> / <see cref="ShowEmpty"/> / ShowCharts is
+    /// true (Cortex M-1): the solid loading panel (112:16419) replaces the charts, it never hides behind stale ones.
+    /// </summary>
+    public bool ShowCharts => !IsLoading && !IsUnavailable && !IsEmpty;
 
     public bool HasOfflinePeriods
     {
@@ -437,6 +458,12 @@ public sealed class HistoryViewModel : ObservableObject, IDisposable
     /// <summary>Binds the VM to a server and starts loading its history. Called on the UI thread.</summary>
     public void Load(Guid serverId, string serverName)
     {
+        // Cortex M-1: switching servers must never show server A's series, peaks, summaries or period while B loads.
+        if (serverId != _serverId)
+        {
+            ClearPresentedRange();
+        }
+
         _serverId = serverId;
         Title = serverName;
 
@@ -666,6 +693,27 @@ public sealed class HistoryViewModel : ObservableObject, IDisposable
         RebuildRangeText(result.Range);
     }
 
+    /// <summary>Forgets everything derived from the previously loaded range (series, peaks, summaries, axes, footer).</summary>
+    private void ClearPresentedRange()
+    {
+        ClearSeries();
+        IsEmpty = false;
+        EmptyKind = HistoryEmptyKind.None;
+        RangeStartUtc = default;
+        RangeEndUtc = default;
+        CpuSummary = string.Empty;
+        MemorySummary = string.Empty;
+        DiskSummary = string.Empty;
+        SetText(ref _cpuPeakDisplay, string.Empty, nameof(CpuPeakDisplay));
+        SetText(ref _memoryPeakDisplay, string.Empty, nameof(MemoryPeakDisplay));
+        SetText(ref _diskPeakDisplay, string.Empty, nameof(DiskPeakDisplay));
+        SetText(ref _periodFooter, string.Empty, nameof(PeriodFooter));
+        _xAxisLabels = null;
+        _xAxisLabelsCompact = null;
+        OnPropertyChanged(nameof(XAxisLabels));
+        OnPropertyChanged(nameof(XAxisLabelsCompact));
+    }
+
     private void ClearSeries()
     {
         CpuSeries = null;
@@ -689,7 +737,7 @@ public sealed class HistoryViewModel : ObservableObject, IDisposable
     private void SetCurrentValue(ref string? field, double? value, string valueProperty, string hasProperty)
     {
         var text = value is { } percent
-            ? string.Format(CultureInfo.CurrentUICulture, "{0:0}", percent)
+            ? string.Format(FormatCulture, "{0:0}", percent)
             : null;
         if (string.Equals(field, text, StringComparison.Ordinal))
         {
@@ -748,10 +796,10 @@ public sealed class HistoryViewModel : ObservableObject, IDisposable
     }
 
     private string FormatPeak(double? maximum) => string.Format(
-        CultureInfo.CurrentUICulture,
+        FormatCulture,
         _localizationService.GetString("HistoryPeakFormat"),
         maximum is { } max
-            ? string.Format(CultureInfo.CurrentUICulture, "{0:0}%", max)
+            ? string.Format(FormatCulture, "{0:0}%", max)
             : Unknown);
 
     private void SetText(ref string? field, string value, string propertyName)
@@ -773,11 +821,11 @@ public sealed class HistoryViewModel : ObservableObject, IDisposable
             ? unknownAccessible
             : current;
         var maxText = maximum is { } max
-            ? string.Format(CultureInfo.CurrentUICulture, "{0:0}%", max)
+            ? string.Format(FormatCulture, "{0:0}%", max)
             : unknownAccessible;
 
         var summary = string.Format(
-            CultureInfo.CurrentUICulture,
+            FormatCulture,
             _localizationService.GetString("HistoryChartSummaryFormat"),
             metric,
             rangeLabel,
@@ -790,7 +838,7 @@ public sealed class HistoryViewModel : ObservableObject, IDisposable
     }
 
     private string FormatCurrent(double? value) => value is { } percent
-        ? string.Format(CultureInfo.CurrentUICulture, "{0:0}%", percent)
+        ? string.Format(FormatCulture, "{0:0}%", percent)
         : _localizationService.GetString("HistoryValueUnknown");
 
     private void OnMonitoringStateChanged(object? sender, Guid serverId)
