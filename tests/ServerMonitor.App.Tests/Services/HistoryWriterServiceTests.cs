@@ -84,13 +84,25 @@ public sealed class HistoryWriterServiceTests
     [Fact]
     public async Task Retention_RunsAgainAfterDailyInterval()
     {
+        // Deterministic: each wait is released by the store's retention-call signal, and the 24 h is a single
+        // FakeTimeProvider advance. The retention loop keeps an ABSOLUTE next-run time (set before it calls the store),
+        // so the advance is observed whether the loop is still inside the first call or already parked on its timer.
+        // The bound is a deadlock guard only. It used to be 5 s, which a busy runner exceeded just scheduling the
+        // retention worker onto the thread pool (Cortex CI-flakes repetitions, TimeoutException).
+        var deadlockGuard = TimeSpan.FromSeconds(30);
         var (writer, _, store, time) = New();
         await writer.StartAsync(CancellationToken.None);
         try
         {
-            await store.WaitForRetentionCallsAsync(1).WaitAsync(TimeSpan.FromSeconds(5));
+            await store.WaitForRetentionCallsAsync(1).WaitAsync(deadlockGuard);
+            Assert.Equal(Now - TimeSpan.FromDays(30), store.LastRetentionCutoff);
+
             time.Advance(TimeSpan.FromHours(24));
-            await store.WaitForRetentionCallsAsync(2).WaitAsync(TimeSpan.FromSeconds(5));
+            await store.WaitForRetentionCallsAsync(2).WaitAsync(deadlockGuard);
+
+            // The second run is the daily one, on the advanced clock — and exactly one run per elapsed interval.
+            Assert.Equal(Now + TimeSpan.FromHours(24) - TimeSpan.FromDays(30), store.LastRetentionCutoff);
+            Assert.Equal(2, store.RetentionCallCount);
         }
         finally
         {
