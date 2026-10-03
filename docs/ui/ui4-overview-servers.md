@@ -100,6 +100,7 @@ Autoridade visual: Figma `Qvk5dUFgsWf4UOYzfAkiDV`, 05 Free secção 02 "Dashboar
 - `vanishing` = `mixed` cujos servidores desaparecem (em memória, no thread de UI) 30 s depois do primeiro load. É a única forma de ver o vazio §13 dos Servidores sem diálogo, porque esse estado só existe com a página aberta.
 - Registado no parser estrito e em `tools/qa/Start-QaApp.ps1`.
 - O modificador é ordinal e é recusado sem `--qa-overview`; um cenário desconhecido termina com exit 3 antes da composição.
+- UI.5 (Boss, fail-closed): todo o lançamento `--qa-overview` exige também `--qa-backup <cenário>` (os doubles do backup e dos pickers), senão exit 3 e a composição recusa; ex.: `--qa-overview --qa-overview-scenario mixed --qa-backup ok`.
 - Dados sintéticos: hosts `.local` ou RFC 5737; a saúde segue o `HealthEvaluator`.
 - Diferença de dados (Prism g): o Figma mostra disco 92% "Atenção", mas pelos limites do motor 92% é Crítico, por isso o harness usa 88%.
 

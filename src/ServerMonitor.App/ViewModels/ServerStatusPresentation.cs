@@ -34,4 +34,16 @@ public static class ServerStatusPresentation
     /// </summary>
     public static bool ShowsRetainedReadingAsStale(ServerHealth health, bool isStale, bool hasMetrics) =>
         hasMetrics && (isStale || health == ServerHealth.Offline);
+
+    /// <summary>
+    /// Cortex B1 N-5: the accessible value of one metric, shared by the rows and the Detail ("22%", or the "sem dados"
+    /// text when the percentage is unknown - never 0).
+    /// </summary>
+    public static string AccessiblePercent(bool known, double value, ILocalizationService localization)
+    {
+        ArgumentNullException.ThrowIfNull(localization);
+        return known
+            ? string.Format(System.Globalization.CultureInfo.CurrentUICulture, "{0:0}%", value)
+            : localization.GetString("ServerMetricUnavailableAccessible");
+    }
 }

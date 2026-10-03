@@ -30,6 +30,9 @@ public sealed partial class SettingsDataPage : Page, ISettingsNavigationTarget
     /// <summary>Cortex #6: navigated to while already shown (no Loaded) — honour a pending About request now.</summary>
     public void OnNavigatedToAgain() => BringRequestedSectionIntoView();
 
+    /// <summary>Cortex B1 M-1: Loaded has run (the request can be honoured now); before that, Loaded consumes it.</summary>
+    public bool IsReadyForSectionRequest => IsLoaded;
+
     private async void OnLoaded(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
     {
         BringRequestedSectionIntoView();

@@ -296,13 +296,17 @@ public sealed class Ui5B2Tests
     public void TheMeter_DrawsTheLitCount_UnknownDrawsNone(int lit, int count, int expected) =>
         Assert.Equal(expected, SaSegmentMeter.EffectiveLit(lit, count));
 
+    /// <summary>
+    /// Boss decision (fix round 1): ABSOLUTE scale - 0–100 % maps to the track height (auto-ranging misrepresents load).
+    /// DERIVED: a sample above 0 keeps the minimum visible height; a measured 0 draws no bar.
+    /// </summary>
     [Fact]
-    public void ThePulse_RightAlignsFewSamples_RampsOpacity_AndAutoRangesTheTrack()
+    public void ThePulse_RightAlignsFewSamples_RampsOpacity_OnAnAbsoluteScale()
     {
-        var bars = SaPulseBars.Layout([50, 100, 0], capacity: 30, trackHeight: 40, minimumHeight: 3);
+        var bars = SaPulseBars.Layout([50, 100, 0, 1], capacity: 30, trackHeight: 40, minimumHeight: 3);
 
-        Assert.Equal(new[] { 27, 28, 29 }, bars.Select(bar => bar.Slot));
-        Assert.Equal(new[] { 21.5, 40d, 3d }, bars.Select(bar => bar.Height)); // range 100; 0% keeps the 3px sliver
+        Assert.Equal(new[] { 26, 27, 28, 29 }, bars.Select(bar => bar.Slot));
+        Assert.Equal(new[] { 20d, 40d, 0d, 3d }, bars.Select(bar => bar.Height)); // 1% keeps the 3px minimum; 0% none
         Assert.Equal(1d, bars[^1].Opacity);
         Assert.All(bars, bar => Assert.InRange(bar.Opacity, SaPulseBars.OldestOpacity, 1));
         Assert.Empty(SaPulseBars.Layout([], 30, 40, 3)); // no samples: no bars
@@ -311,17 +315,95 @@ public sealed class Ui5B2Tests
         Assert.Equal(30, full.Count);
         Assert.Equal(SaPulseBars.OldestOpacity, full[0].Opacity);
         Assert.Equal(0, full[0].Slot);
-        Assert.Equal(Math.Round(3 + (37 * 16 / 50d), 2), full[0].Height); // the 30 most recent (16…45): range 50
+        Assert.Equal(Math.Round(40 * 16 / 100d, 2), full[0].Height); // the 30 most recent (16…45), absolute: 16% of 40
     }
 
     [Theory]
-    [InlineData(new double[] { 22, 31 }, 50)]
-    [InlineData(new double[] { 5, 25 }, 25)]
-    [InlineData(new double[] { 76 }, 100)]
-    [InlineData(new double[] { 51, 75 }, 75)]
-    [InlineData(new double[] { }, 25)]
-    public void ThePulseRange_IsTheSmallestStepHoldingTheMax(double[] samples, double range) =>
-        Assert.Equal(range, SaPulseBars.RangeFor(samples));
+    [InlineData(22, 8.8)]
+    [InlineData(24, 9.6)]
+    [InlineData(100, 40)]
+    [InlineData(150, 40)]
+    [InlineData(0.2, 3)]
+    public void ThePulseHeight_IsTheAbsoluteShareOfTheTrack(double sample, double height) =>
+        Assert.Equal(height, Assert.Single(SaPulseBars.Layout([sample], 30, 40, 3)).Height);
+
+    // ---- Cortex B1 N-1 / N-7 / N-2 ------------------------------------------------------------------------------------
+
+    /// <summary>N-1: a cancelled Remover leaves no intent behind once a later rebuild still lists the server.</summary>
+    [Fact]
+    public async Task ACancelledRemove_ThenAnUnrelatedRebuild_ThenAnOutsideHide_ReturnsToTheOrigin_WithoutNotice()
+    {
+        var fleet = new Ui4TestKit.Fleet().Add("web", ServerHealth.Healthy, 1, 2, 3);
+        var kit = Ui4TestKit.Create(fleet, dialogs: new ConfirmingDialogs { Confirm = false });
+        await kit.Dashboard.LoadAsync();
+        var notice = new ServersReturnNotice();
+        using var detail = Open(kit, "web", ServerDetailOrigin.Overview, notice: notice);
+
+        await ((AsyncRelayCommand)detail.RemoveCommand).ExecuteAsync(); // cancelled in its confirmation
+        await kit.Dashboard.LoadAsync();                                // an unrelated rebuild: still listed
+        await HideIn(kit)(fleet.IdOf("web"));                           // hidden elsewhere afterwards
+
+        Assert.Null(notice.Take());
+        Assert.Equal(1, kit.Navigation.DashboardCount); // the origin
+        Assert.Equal(0, kit.Navigation.ServersCount);
+    }
+
+    /// <summary>N-7: an unexpected failure inside the load is logged and surfaced, never a silent success.</summary>
+    [Fact]
+    public async Task AnUnexpectedLoadFailure_IsSurfaced_NotSwallowed()
+    {
+        var servers = new FakeServerService();
+        var viewModel = new SettingsViewModel(
+            new Ui5SettingsTests.RecordingTheme(AppThemePreference.System),
+            new FakeLocalizationService(),
+            new FakeNavigationService(),
+            servers,
+            new Ui5SettingsTests.RecordingDiscovery(),
+            new InertNotifications(),
+            new FakeBackgroundMonitoringSettingsService(enabled: true),
+            new BackgroundDegradationNotice(),
+            new ThrowingMaintenance(),
+            new AppVersionProvider(),
+            NullLogger<SettingsViewModel>.Instance);
+
+        await viewModel.LoadAsync().WaitAsync(TimeSpan.FromSeconds(30));
+
+        Assert.True(viewModel.IsServerOperationErrorOpen);
+        await viewModel.LoadAsync().WaitAsync(TimeSpan.FromSeconds(30)); // and a later load still runs (not stuck)
+    }
+
+    [Theory]
+    [InlineData("::1", 2222, "[::1]:2222")]
+    [InlineData("::1", 22, "::1")]
+    [InlineData("web.local", 2222, "web.local:2222")]
+    [InlineData("[::1]", 2222, "[::1]:2222")]
+    public void N2_TheRowAddress_UsesTheEndpointRule_WhenAPortIsShown(string host, int port, string expected) =>
+        Assert.Equal(expected, OverviewPresentation.Address(host, port));
+
+    /// <summary>A-12 (Boss): every pt-PT string the three UI.5 pages show uses "tu", never the formal "você" forms.</summary>
+    [Fact]
+    public void ThePtPtCopyOfTheUi5Pages_UsesTu()
+    {
+        var resources = ResWLocalizationService.Load("pt-PT");
+        var uids = new[] { "Views/ServerDetailPage.xaml", "Views/SettingsPage.xaml", "Views/SettingsDataPage.xaml" }
+            .SelectMany(file => AppSourceTree.LoadXaml(file).Descendants())
+            .Select(e => (string?)e.Attribute(AppSourceTree.Xaml + "Uid")).OfType<string>().ToHashSet();
+        var formal = new System.Text.RegularExpressions.Regex(
+            @"\b(você|Tente|Guarde|Escolha|Utilize|Receba|Reponha|Abra|Selecione|Introduza)\b|\b(A|a) sua\b|\bos seus\b|\bque pode\b");
+        var offenders = resources.Where(entry => uids.Contains(entry.Key.Split('.')[0]) && formal.IsMatch(entry.Value))
+            .Select(entry => $"{entry.Key} = {entry.Value}").ToList();
+
+        Assert.Empty(offenders);
+    }
+
+    private sealed class ThrowingMaintenance : IHistoryMaintenanceService
+    {
+        public bool IsAvailable => throw new InvalidOperationException("synthetic");
+
+        public Task<HistoryClearOutcome> ClearHistoryWithConfirmationAsync() => throw new NotSupportedException();
+
+        public Task<HistoryResetOutcome> ResetHistoryWithConfirmationAsync() => throw new NotSupportedException();
+    }
 
     // ---- XAML contracts of the three pages ----------------------------------------------------------------------------
 

@@ -32,6 +32,9 @@ public sealed partial class SettingsPage : Page, ISettingsNavigationTarget
     /// </summary>
     public void OnNavigatedToAgain() => BringRequestedSectionIntoView();
 
+    /// <summary>Cortex B1 M-1: Loaded has run (the request can be honoured now); before that, Loaded consumes it.</summary>
+    public bool IsReadyForSectionRequest => IsLoaded;
+
     private async void OnLoaded(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
     {
         // Consume any pending "land on the Background section" request FIRST (M13 S2 §11): it is set by

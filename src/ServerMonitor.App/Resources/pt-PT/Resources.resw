@@ -171,7 +171,7 @@
   <data name="SettingsResetIgnoredSuccess.Title" xml:space="preserve"><value>Dispositivos repostos</value></data>
   <data name="SettingsResetIgnoredSuccess.Message" xml:space="preserve"><value>Os dispositivos presentes na rede podem voltar a aparecer.</value></data>
   <data name="SettingsResetIgnoredError.Title" xml:space="preserve"><value>Não foi possível repor os dispositivos ignorados</value></data>
-  <data name="SettingsResetIgnoredError.Message" xml:space="preserve"><value>Tente novamente dentro de momentos.</value></data>
+  <data name="SettingsResetIgnoredError.Message" xml:space="preserve"><value>Tenta novamente dentro de momentos.</value></data>
   <data name="SettingsNotificationsTitle.Text" xml:space="preserve"><value>Alertas de estado</value></data>
   <data name="SettingsNotificationsDescription.Text" xml:space="preserve"><value>Recebe notificações quando a saúde de um servidor muda.</value></data>
   <data name="SettingsNotificationsToggle.Header" xml:space="preserve"><value>Notificações de estado</value></data>
@@ -252,7 +252,7 @@
   <data name="SettingsHistoryClearedSuccess.Title" xml:space="preserve"><value>Histórico limpo</value></data>
   <data name="SettingsHistoryClearedSuccess.Message" xml:space="preserve"><value>As métricas guardadas neste dispositivo foram eliminadas.</value></data>
   <data name="SettingsHistoryClearError.Title" xml:space="preserve"><value>Não foi possível limpar o histórico</value></data>
-  <data name="SettingsHistoryClearError.Message" xml:space="preserve"><value>O histórico está indisponível agora. Tente novamente mais tarde.</value></data>
+  <data name="SettingsHistoryClearError.Message" xml:space="preserve"><value>O histórico está indisponível agora. Tenta novamente mais tarde.</value></data>
   <data name="HistoryClearConfirmTitle" xml:space="preserve"><value>Limpar todo o histórico?</value></data>
   <data name="HistoryClearConfirmMessage" xml:space="preserve"><value>Isto remove permanentemente todo o histórico de métricas guardado. Servidores, credenciais e definições não são afetados. Esta ação não pode ser anulada.</value></data>
   <data name="HistoryClearConfirmPrimary" xml:space="preserve"><value>Limpar histórico</value></data>
@@ -261,7 +261,7 @@
   <data name="SettingsHistoryResetSuccess.Title" xml:space="preserve"><value>Histórico reposto</value></data>
   <data name="SettingsHistoryResetSuccess.Message" xml:space="preserve"><value>A base local foi recriada e está pronta para novas amostras.</value></data>
   <data name="SettingsHistoryResetError.Title" xml:space="preserve"><value>Não foi possível repor o histórico</value></data>
-  <data name="SettingsHistoryResetError.Message" xml:space="preserve"><value>A base local não pôde ser recriada. Tente novamente mais tarde.</value></data>
+  <data name="SettingsHistoryResetError.Message" xml:space="preserve"><value>A base local não pôde ser recriada. Tenta novamente mais tarde.</value></data>
   <data name="HistoryResetConfirmTitle" xml:space="preserve"><value>Repor a base de histórico?</value></data>
   <data name="HistoryResetConfirmMessage" xml:space="preserve"><value>Isto remove a base de histórico indisponível e cria uma nova. Servidores, credenciais e definições não são afetados. Esta ação não pode ser anulada.</value></data>
   <data name="HistoryResetConfirmPrimary" xml:space="preserve"><value>Repor histórico</value></data>
@@ -351,8 +351,8 @@
   <data name="SettingsBackgroundToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Continuar em segundo plano ao fechar a janela</value></data>
   <data name="SettingsBackgroundToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.HelpText" xml:space="preserve"><value>Quando desativado, fechar a janela encerra o ServerAlyzer e para a monitorização e o widget.</value></data>
   <data name="BackgroundDegradedNotice.Title" xml:space="preserve"><value>Segundo plano indisponível nesta sessão</value></data>
-  <data name="BackgroundDegradedNotice.Message" xml:space="preserve"><value>O ServerAlyzer abriu esta janela porque não conseguiu colocar ou manter o seu ícone na área de notificação da barra de tarefas. Sem esse ícone não há forma de reabrir ou encerrar a app em segundo plano, por isso fechar esta janela agora encerra o ServerAlyzer. A sua preferência não foi alterada: abra o ServerAlyzer de novo mais tarde para tentar outra vez.</value></data>
-  <data name="SettingsBackgroundDegradedCaption.Text" xml:space="preserve"><value>Indisponível nesta sessão: o ícone da área de notificação não pôde ser criado ou mantido. Fechar a janela encerra o ServerAlyzer. A sua preferência foi mantida e será usada na próxima abertura.</value></data>
+  <data name="BackgroundDegradedNotice.Message" xml:space="preserve"><value>O ServerAlyzer abriu esta janela porque não conseguiu colocar ou manter o seu ícone na área de notificação da barra de tarefas. Sem esse ícone não há forma de reabrir ou encerrar a app em segundo plano, por isso fechar esta janela agora encerra o ServerAlyzer. A tua preferência não foi alterada: abre o ServerAlyzer de novo mais tarde para tentares outra vez.</value></data>
+  <data name="SettingsBackgroundDegradedCaption.Text" xml:space="preserve"><value>Indisponível nesta sessão: o ícone da área de notificação não pôde ser criado ou mantido. Fechar a janela encerra o ServerAlyzer. A tua preferência foi mantida e será usada na próxima abertura.</value></data>
   <data name="ServerFormImportSshConfigButton.Content" xml:space="preserve"><value>Importar da configuração SSH</value></data>
   <data name="ServerFormSshConfigTitle.Text" xml:space="preserve"><value>Anfitriões em ~/.ssh/config</value></data>
   <data name="ServerFormSshConfigCloseButton.Content" xml:space="preserve"><value>Fechar</value></data>
@@ -500,7 +500,7 @@
   <data name="ConnectionHintLocalTunnelFailed" xml:space="preserve"><value>Não foi possível abrir neste computador o túnel local para o anfitrião de salto. Não é um problema do servidor: testa de novo.</value></data>
   <!-- M14.6 Cópia de segurança e restauro encriptados -->
   <data name="BackupSectionTitle.Text" xml:space="preserve"><value>Cópia de segurança e restauro</value></data>
-  <data name="BackupSectionDescription.Text" xml:space="preserve"><value>Guarde os seus servidores, rotas, chaves de anfitrião confiáveis e palavras-passe guardadas num ficheiro encriptado que pode restaurar neste ou noutro computador. O ficheiro é protegido por uma frase-passe à sua escolha. Os ficheiros de chave privada nunca são incluídos, apenas os caminhos.</value></data>
+  <data name="BackupSectionDescription.Text" xml:space="preserve"><value>Guarda os teus servidores, rotas, chaves de anfitrião confiáveis e palavras-passe guardadas num ficheiro encriptado que podes restaurar neste ou noutro computador. O ficheiro é protegido por uma frase-passe à tua escolha. Os ficheiros de chave privada nunca são incluídos, apenas os caminhos.</value></data>
   <data name="BackupCreateButton.Content" xml:space="preserve"><value>Criar cópia de segurança…</value></data>
   <data name="BackupRestoreButton.Content" xml:space="preserve"><value>Restaurar a partir de cópia…</value></data>
   <data name="BackupFileTypeLabel" xml:space="preserve"><value>Cópia de segurança do ServerAlyzer</value></data>

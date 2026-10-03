@@ -21,8 +21,16 @@ public enum SettingsSection
 /// A singleton Settings sub-page that must react when navigation targets it while it is ALREADY the frame content
 /// (Cortex #6): such a navigation swaps nothing, so the page gets no Loaded and a pending section request (Background,
 /// About) would otherwise wait until the next visit.
+/// <para>
+/// Cortex B1 M-1: only a LOADED page is told. Just after a cold <c>GoToSettings</c> the page is the content but its Loaded
+/// has not run yet; telling it then would consume the request on an element that cannot scroll, and Loaded would find it
+/// gone. While not loaded, the request stays pending and Loaded consumes it (the M13 S2 §D.1 path).
+/// </para>
 /// </summary>
 public interface ISettingsNavigationTarget
 {
+    /// <summary>True once the page has run Loaded and is in the live tree (and false again after Unloaded).</summary>
+    bool IsReadyForSectionRequest { get; }
+
     void OnNavigatedToAgain();
 }

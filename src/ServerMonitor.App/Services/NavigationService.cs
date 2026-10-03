@@ -68,7 +68,10 @@ public sealed class NavigationService : INavigationService
         if (ReferenceEquals(Host.Content, page))
         {
             // Cortex #6: no content swap means no Loaded — notify the page so a pending section request is honoured now.
-            (page as ISettingsNavigationTarget)?.OnNavigatedToAgain();
+            if (page is ISettingsNavigationTarget { IsReadyForSectionRequest: true } shown)
+            {
+                shown.OnNavigatedToAgain();
+            }
             return;
         }
 
@@ -86,7 +89,8 @@ public sealed class NavigationService : INavigationService
         // Cortex #6: the General sub-page may already be the content (ApplicationWindowController navigates first, then
         // requests). It then gets no Loaded, so it is told now; otherwise its next Loaded consumes the request. (The Data
         // sub-page only consumes the About request, so this one stays pending for General.)
-        if (_host?.Content is ISettingsNavigationTarget target)
+        // Cortex B1 M-1: never a page whose Loaded has not run yet (cold path) - its Loaded consumes the request instead.
+        if (_host?.Content is ISettingsNavigationTarget { IsReadyForSectionRequest: true } target)
         {
             target.OnNavigatedToAgain();
         }

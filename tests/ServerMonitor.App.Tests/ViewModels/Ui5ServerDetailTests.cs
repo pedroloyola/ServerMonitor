@@ -53,8 +53,38 @@ public sealed class Ui5ServerDetailTests
         Assert.Equal("—", row.CpuDisplay);
         Assert.True(detail.IsReadingStale);
         Assert.True(detail.IsWithoutConnection);
-        Assert.Equal("Última atualização há 41 min", detail.StaleText); // StaleAgeDisplay semantics: attempt − success
+        // Boss B2 decision: the stale text and "Última atualização" share one timestamp and one clock read (42, not 41).
+        Assert.Equal("Última atualização há 42 min", detail.StaleText);
+        Assert.Equal("Há 42 minutos", detail.LastUpdatedValue);
         Assert.Contains(detail.StaleText!, detail.AutomationSummary, StringComparison.Ordinal); // legible without colour
+    }
+
+    /// <summary>
+    /// Boss B2 decision (single source): at a minute boundary the stale text and the "Última atualização" value cannot
+    /// disagree - both come from the engine's last success and ONE clock read per reading. The engine's attempt timestamp
+    /// (which StaleAgeDisplay used, 42 min) is deliberately not a second source; a later clock tick changes nothing until
+    /// the next reading.
+    /// </summary>
+    [Fact]
+    public async Task StaleText_AndLastUpdated_ShareOneTimestamp_AndOneClockRead()
+    {
+        var success = Now.AddMinutes(-42).AddMilliseconds(1); // 41 min 59.999 s before the clock
+        var fleet = new Ui4TestKit.Fleet().Add("nas", ServerHealth.Offline, 12, 33, 61, lastSuccess: success);
+        var kit = await LoadedAsync(fleet, new ResWLocalizationService("pt-PT"));
+        kit.States.Set(kit.States.Get(fleet.IdOf("nas")) with { IsStale = true, LastAttemptAt = success.AddMinutes(42) });
+        var clock = new FakeTimeProvider(Now);
+        using var detail = Open(kit, "nas", clock: new PresentationClock(clock));
+
+        Assert.Equal("Última atualização há 41 min", detail.StaleText);
+        Assert.Equal("Há 41 minutos", detail.LastUpdatedValue);
+
+        clock.Advance(TimeSpan.FromMilliseconds(5)); // crosses the minute boundary, but no new reading arrived
+        Assert.Equal("Última atualização há 41 min", detail.StaleText);
+        Assert.Equal("Há 41 minutos", detail.LastUpdatedValue);
+
+        kit.States.Set(kit.States.Get(fleet.IdOf("nas")) with { ConsecutiveFailures = 5 }); // the next reading: one new read
+        Assert.Equal("Última atualização há 42 min", detail.StaleText);
+        Assert.Equal("Há 42 minutos", detail.LastUpdatedValue);
     }
 
     [Fact]
@@ -65,7 +95,8 @@ public sealed class Ui5ServerDetailTests
         using var detail = Open(kit, "nas");
 
         Assert.True(detail.IsReadingStale);
-        Assert.Equal("Leitura desatualizada", detail.StaleText);
+        Assert.Equal("Leitura desatualizada", detail.StaleText); // under a minute: never a rounded-up "há 1 min"
+        Assert.Equal("Há 8 segundos", detail.LastUpdatedValue);
     }
 
     [Fact]
@@ -454,40 +485,86 @@ public sealed class Ui5ServerDetailTests
     }
 
     /// <summary>
-    /// SPEC §5 perf (measured, not guessed): with the Detail attached, an engine cycle allocates nothing more than the card
-    /// already does (UI.4's interim page bound the card directly). Cached event arguments, a cached flush delegate and no
-    /// per-tick query make the Detail's per-tick cost zero bytes when nothing is bound to it.
+    /// SPEC §5 perf (measured, not guessed) - Cortex B1 N-6: robust against tiered JIT. Both Detail paths are warmed first
+    /// (inline flush, and the production-like coalesced flush with an available history), each configuration is measured
+    /// three times and the MINIMUM kept, and a small explicit tolerance absorbs runtime noise. The coalesced variant also
+    /// proves the per-tick path makes no history query when the last success does not move.
     /// </summary>
     [Fact]
-    public async Task ACycle_AllocatesNothingExtra_ForTheDetail()
+    public async Task ACycle_AllocatesNothingExtra_ForTheDetail_InlineAndCoalesced()
     {
+        const int cycles = 200;
+        const long tolerance = 256; // bytes per 200 cycles - far below one allocation per tick (200 × 24 B)
         var fleet = new Ui4TestKit.Fleet().Add("web", ServerHealth.Healthy, 1, 2, 3);
         var kit = await LoadedAsync(fleet);
         var id = fleet.IdOf("web");
         var card = kit.Dashboard.VisibleServers.Single();
         var state = kit.States.Get(id);
-
-        long Measure()
+        Action? pending = null;
+        Func<Action, bool> scheduler = action =>
         {
-            for (var i = 0; i < 20; i++)
-            {
-                card.ApplyMonitoringState(state); // warm-up (JIT, first-time paths)
-            }
+            pending = action;
+            return true;
+        };
 
-            var before = GC.GetAllocatedBytesForCurrentThread();
-            for (var i = 0; i < 200; i++)
-            {
-                card.ApplyMonitoringState(state);
-            }
-
-            return GC.GetAllocatedBytesForCurrentThread() - before;
+        void Cycle()
+        {
+            card.ApplyMonitoringState(state);
+            var flush = pending;
+            pending = null;
+            flush?.Invoke();
         }
 
-        var withoutDetail = Measure();
-        using var detail = Open(kit, "web");
-        var withDetail = Measure();
+        long Min3()
+        {
+            var best = long.MaxValue;
+            for (var round = 0; round < 3; round++)
+            {
+                for (var i = 0; i < 20; i++)
+                {
+                    Cycle(); // warm-up of this exact configuration
+                }
 
-        Assert.True(withDetail <= withoutDetail, $"card alone {withoutDetail} B / 200 cycles; with the Detail {withDetail} B");
+                var before = GC.GetAllocatedBytesForCurrentThread();
+                for (var i = 0; i < cycles; i++)
+                {
+                    Cycle();
+                }
+
+                best = Math.Min(best, GC.GetAllocatedBytesForCurrentThread() - before);
+            }
+
+            return best;
+        }
+
+        // Warm both Detail code paths once, then release them.
+        using (var warm = Open(kit, "web"))
+        {
+            Min3();
+            warm.Scheduler = scheduler;
+            Min3();
+        }
+
+        var withoutDetail = Min3();
+
+        long inline;
+        using (var detail = Open(kit, "web"))
+        {
+            inline = Min3();
+        }
+
+        var history = new ScriptedHistory();
+        long coalesced;
+        using (var detail = Open(kit, "web", history: history))
+        {
+            detail.Scheduler = scheduler;
+            var queriesAfterOpen = history.Queries;
+            coalesced = Min3();
+            Assert.Equal(queriesAfterOpen, history.Queries); // no per-tick query while the last success does not move
+        }
+
+        Assert.True(inline - withoutDetail <= tolerance, $"card alone {withoutDetail} B; with the Detail (inline flush) {inline} B / {cycles} cycles");
+        Assert.True(coalesced - withoutDetail <= tolerance, $"card alone {withoutDetail} B; with the Detail (coalesced) {coalesced} B / {cycles} cycles");
     }
 
     // ---- H-UI5-3 CPU pulse ---------------------------------------------------------------------------------------

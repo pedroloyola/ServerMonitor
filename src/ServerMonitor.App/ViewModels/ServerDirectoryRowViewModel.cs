@@ -158,9 +158,7 @@ public sealed class ServerDirectoryRowViewModel : ObservableObject, IDisposable
         ? string.Format(CultureInfo.CurrentUICulture, "{0:0}%", value)
         : _localization.GetString("ServerMetricUnavailable");
 
-    private string AccessiblePercent(bool known, double value) => known
-        ? string.Format(CultureInfo.CurrentUICulture, "{0:0}%", value)
-        : _localization.GetString("ServerMetricUnavailableAccessible");
+    private string AccessiblePercent(bool known, double value) => ServerStatusPresentation.AccessiblePercent(known, value, _localization);
 
     private string Format(string key, params object[] args) =>
         string.Format(CultureInfo.CurrentUICulture, _localization.GetString(key), args);

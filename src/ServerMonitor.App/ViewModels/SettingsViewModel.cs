@@ -424,7 +424,18 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
         {
             while (true)
             {
-                await LoadOnceAsync();
+                try
+                {
+                    await LoadOnceAsync();
+                }
+                catch (Exception exception) when (exception is not OutOfMemoryException)
+                {
+                    // Cortex B1 N-7: never a silent success. LoadOnceAsync reports its own failures; anything that escapes
+                    // it is logged and surfaced through the same notice, and the next pass (if requested) still runs.
+                    _logger.LogError(exception, "Settings could not be loaded.");
+                    IsServerOperationErrorOpen = true;
+                }
+
                 lock (_loadGate)
                 {
                     if (!_reloadRequested)

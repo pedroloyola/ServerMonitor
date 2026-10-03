@@ -42,6 +42,8 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
     private bool _left;
     private bool _disposed;
     private ServersNoticeKind? _exitOperation;
+    private bool _exitOperationCompleted;
+    private DateTimeOffset _readingNow;
     private Change _dirty;
     private bool _flushScheduled;
     private IReadOnlyList<double> _cpuPulse = [];
@@ -263,10 +265,12 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
     public bool IsReadingStale => _card is not null
         && ServerStatusPresentation.ShowsRetainedReadingAsStale(_card.Health, _card.IsStale, _card.HasMetrics);
 
-    /// <summary>"Última atualização há N min" when the engine timed it, else the plain "Leitura desatualizada" text.</summary>
-    public string? StaleText => IsReadingStale
-        ? _card!.StaleAgeDisplay ?? _localization.GetString("ServerDetailStaleReading")
-        : null;
+    /// <summary>
+    /// "Última atualização há N min", else the plain "Leitura desatualizada" text. Boss B2 decision (single source): the age
+    /// is the SAME one the "Última atualização" value shows - one timestamp (the engine's last success) and one clock read
+    /// per reading (ReadClock) - so the two never disagree at a minute boundary.
+    /// </summary>
+    public string? StaleText => IsReadingStale ? StaleAge() : null;
 
     public bool HasReading => _card?.HasMetrics == true;
 
@@ -282,6 +286,26 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
     /// reading arrives or the page loads — no timer. Null when there was never a reading.
     /// </summary>
     public string? LastUpdatedValue => _card?.LastSuccessAt is { } success ? FormatUpdatedAgo(success) : null;
+
+    /// <summary>The page's single clock read for the reading it shows: taken when a reading arrives or the card changes.</summary>
+    private void ReadClock() => _readingNow = _clock.UtcNow;
+
+    private TimeSpan AgeOf(DateTimeOffset lastSuccessUtc) =>
+        _readingNow - lastSuccessUtc is var age && age > TimeSpan.Zero ? age : TimeSpan.Zero;
+
+    // The card's StaleAgeDisplay buckets (d / h / min), over the shared age. Under one minute (or with no last success) the
+    // generic "Leitura desatualizada" is shown: a rounded-up "1 min" would contradict "Há 8 segundos" beside it.
+    private string StaleAge()
+    {
+        if (_card?.LastSuccessAt is not { } success || AgeOf(success) is var age && age.TotalMinutes < 1)
+        {
+            return _localization.GetString("ServerDetailStaleReading");
+        }
+
+        return age.TotalDays >= 1 ? Format("ServerMetricsStaleDaysFormat", (int)age.TotalDays)
+            : age.TotalHours >= 1 ? Format("ServerMetricsStaleHoursFormat", (int)age.TotalHours)
+            : Format("ServerMetricsStaleMinutesFormat", (int)age.TotalMinutes);
+    }
 
     // --- Connection (read-only; M14 semantics untouched) ------------------------------------------------------------
 
@@ -441,6 +465,7 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
             if (_dashboard.IsOperationErrorOpen || _dashboard.IsConfigurationLockedOpen)
             {
                 _exitOperation = null;
+                _exitOperationCompleted = false;
             }
         }
     }
@@ -479,6 +504,14 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
             // Hidden or removed (here or elsewhere): leave exactly once.
             Leave(serverGone: true);
             return;
+        }
+
+        // Cortex B1 N-1: a rebuild AFTER the operation finished that still lists the server means it did not leave because
+        // of it (Remover cancelled in its confirmation, or nothing changed): a later, unrelated disappearance is not "ours".
+        if (_exitOperationCompleted)
+        {
+            _exitOperation = null;
+            _exitOperationCompleted = false;
         }
 
         Card = card;
@@ -523,6 +556,7 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
         }
 
         _exitOperation = kind;
+        _exitOperationCompleted = false;
         if (operation is AsyncRelayCommand asyncOperation)
         {
             await asyncOperation.ExecuteAsync().ConfigureAwait(true);
@@ -530,6 +564,12 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
         else
         {
             operation.Execute(null);
+        }
+
+        // The rebuild the operation triggers may still be on its way: the NEXT rebuild decides (gone = ours, listed = not).
+        if (_exitOperation is not null)
+        {
+            _exitOperationCompleted = true;
         }
     }
 
@@ -712,6 +752,7 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
 
         if ((dirty & Change.Reading) != 0)
         {
+            ReadClock();
             Raise(Args.IsReadingStale);
             Raise(Args.StaleText);
             Raise(Args.HasReading);
@@ -759,6 +800,8 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
     /// at the 30 s sampling policy that range is returned raw, not bucketed). Read on load / card swap, then again only
     /// when the engine's last success has moved at least one history sampling interval past the previous read, so an
     /// open page costs at most one query per persisted sample. No new collection, no new persistence.
+    /// Cortex B1 N-3 (accepted): the history writer persists asynchronously, so the read made right after a new reading may
+    /// not contain that reading yet - the pulse can lag by one sample until the next read. Still only real samples.
     /// </summary>
     private void RequestCpuPulse(bool force)
     {
@@ -868,9 +911,7 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
     private static ServerHealth Severity(bool known, double? value, double warning, double critical) =>
         known ? OverviewPresentation.MetricSeverity(value, warning, critical) : ServerHealth.Healthy;
 
-    private string AccessiblePercent(bool known, double value) => known
-        ? string.Format(CultureInfo.CurrentUICulture, "{0:0}%", value)
-        : _localization.GetString("ServerMetricUnavailableAccessible");
+    private string AccessiblePercent(bool known, double value) => ServerStatusPresentation.AccessiblePercent(known, value, _localization);
 
     private string NameFor(string key) => _card is null ? string.Empty : Format(key, _card.Name);
 
@@ -881,11 +922,7 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
     // seconds / minutes / hours / days, plural-aware. Recomputed only on a new reading (no timer).
     private string FormatUpdatedAgo(DateTimeOffset lastSuccessUtc)
     {
-        var age = _clock.UtcNow - lastSuccessUtc;
-        if (age < TimeSpan.Zero)
-        {
-            age = TimeSpan.Zero;
-        }
+        var age = AgeOf(lastSuccessUtc);
 
         if (age.TotalSeconds < 1)
         {

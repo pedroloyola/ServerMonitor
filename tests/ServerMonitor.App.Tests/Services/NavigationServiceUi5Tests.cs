@@ -58,6 +58,7 @@ public sealed class NavigationServiceUi5Tests
         var world = new World();
         world.Navigation.GoToSettings(SettingsSection.Data);
         var data = world.Shown;
+        data.SimulateLoaded();
         var awayCount = world.NavigatedAway;
 
         world.Navigation.GoToSettings(SettingsSection.About);
@@ -78,6 +79,7 @@ public sealed class NavigationServiceUi5Tests
         var world = new World();
         world.Navigation.GoToSettings();
         var general = world.Shown;
+        general.SimulateLoaded();
         Assert.False(general.BackgroundConsumed);
 
         world.Navigation.GoToSettings();
@@ -85,6 +87,42 @@ public sealed class NavigationServiceUi5Tests
 
         Assert.True(general.BackgroundConsumed);
         Assert.False(world.Navigation.ConsumeBackgroundSettingsFocus()); // consumed once, by the page
+    }
+
+    /// <summary>
+    /// Cortex B1 M-1: the PRODUCTION order on the cold path (ApplicationWindowController.OpenBackgroundSettings with the
+    /// window in the tray): GoToSettings swaps the content, THEN the request arrives - before the page's Loaded. The page
+    /// must not be told yet (it would consume the request on an element that cannot scroll); its Loaded consumes it.
+    /// </summary>
+    [Fact]
+    public void ColdPath_GoToThenRequest_BeforeLoaded_IsConsumedByLoaded()
+    {
+        var world = new World();
+
+        world.Navigation.GoToSettings();
+        var general = world.Shown;
+        world.Navigation.RequestBackgroundSettingsFocus();
+
+        Assert.Equal(0, general.NotifiedAgain);
+        Assert.False(general.BackgroundConsumed);
+        general.SimulateLoaded();
+        Assert.True(general.BackgroundConsumed);
+        Assert.False(world.Navigation.ConsumeBackgroundSettingsFocus()); // consumed exactly once, by Loaded
+    }
+
+    /// <summary>The same rule for an About request aimed at a Data page that is shown but not loaded yet.</summary>
+    [Fact]
+    public void ColdPath_AboutBeforeLoaded_IsConsumedByLoaded()
+    {
+        var world = new World();
+
+        world.Navigation.GoToSettings(SettingsSection.Data);
+        var data = world.Shown;
+        world.Navigation.GoToSettings(SettingsSection.About); // same page, not loaded yet
+
+        Assert.Equal(0, data.NotifiedAgain);
+        data.SimulateLoaded();
+        Assert.True(data.AboutConsumed);
     }
 
     [Fact]
@@ -185,13 +223,21 @@ public sealed class NavigationServiceUi5Tests
 
             public bool AboutConsumed { get; private set; }
 
+            /// <summary>Models the page's Loaded (production: IsReadyForSectionRequest => IsLoaded).</summary>
+            public bool IsReadyForSectionRequest { get; private set; }
+
             public void OnNavigatedToAgain()
             {
                 NotifiedAgain++;
                 Consume();
             }
 
-            public void SimulateLoaded() => Consume();
+            /// <summary>The page's Loaded: it becomes ready and consumes what is pending (as the code-behind does).</summary>
+            public void SimulateLoaded()
+            {
+                IsReadyForSectionRequest = true;
+                Consume();
+            }
 
             private void Consume()
             {

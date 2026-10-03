@@ -209,6 +209,31 @@ public sealed partial class QaLaunchRefusalTests
         });
     }
 
+    /// <summary>
+    /// Cortex B1 M-2 / Boss B2 answer 5: a tools/** launch line for the overview harness WITHOUT the backup doubles would be
+    /// refused by the same lexical pipeline as the real lines above (here the 'mixed' scenario); with them it is allowed.
+    /// </summary>
+    [Theory]
+    [InlineData("& tools/qa/Start-QaApp.ps1 -Exe $AppExe -Arguments '--qa-overview', '--qa-overview-scenario', 'mixed'", false)]
+    [InlineData("$arguments = @('--qa-overview', '--qa-overview-scenario=mixed')", false)]
+    [InlineData("& tools/qa/Start-QaApp.ps1 -Exe $AppExe -Arguments '--qa-overview', '--qa-overview-scenario', 'mixed', '--qa-backup', 'ok'", true)]
+    [InlineData("$arguments = @('--qa-overview', '--qa-overview-scenario=mixed', '--qa-backup=ok')", true)]
+    public void AnOverviewLaunchLine_IsAllowedOnlyWithTheBackupDoubles(string line, bool allowed)
+    {
+        Assert.Matches(LaunchContext(), line);
+        // The quoted PowerShell tokens are the arguments the app receives ('mixed' and 'ok' are separate tokens).
+        var tokens = Regex.Matches(line, "'([^']+)'").Select(match => match.Groups[1].Value).ToArray();
+        var arguments = tokens;
+
+        var refusal = QaStartupIsolation.LaunchRefusal([Exe, .. arguments]);
+
+        Assert.Equal(allowed, refusal is null);
+        if (!allowed)
+        {
+            Assert.Contains(QaBackupPolicy.LaunchFlag, refusal!, StringComparison.Ordinal);
+        }
+    }
+
     // A flag with its glued value when it has one ('--qa-proxyjump-dir=`"...' keeps '--qa-proxyjump-dir=' + value).
     [GeneratedRegex(@"--qa[a-z-]*(:\d+)?(=[^\s""'`]+|=`""[^`]*`"")?", RegexOptions.IgnoreCase)]
     private static partial Regex QaFlag();

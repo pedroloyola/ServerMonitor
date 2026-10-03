@@ -152,12 +152,8 @@ public static class OverviewPresentation
     /// </summary>
     public static string Address(string host, int port)
     {
-        if (port == 22)
-        {
-            return host;
-        }
-
-        return host.Contains(':', StringComparison.Ordinal) && !host.StartsWith('[') ? $"[{host}]:{port}" : $"{host}:{port}";
+        // Cortex B1 N-2: one IPv6-bracket rule - the Endpoint format whenever a port is shown.
+        return port == 22 ? host : Endpoint(host, port);
     }
 
     /// <summary>
