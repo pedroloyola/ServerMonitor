@@ -12,10 +12,14 @@ namespace ServerMonitor.App.Controls.Primitives;
 /// REAL SAMPLES ONLY (H-UI5-3): <see cref="Samples"/> are percentages, oldest first. Fewer than <see cref="Capacity"/>
 /// fill the RIGHTMOST slots and the others stay empty — nothing is padded or invented; no samples draw no bars.
 /// <para>
-/// Scale (Boss decision, fix round 1): ABSOLUTE - 0–100 % maps to the full track height, because an auto-ranged track
-/// misrepresents load. DERIVED (no Figma rule): a sample above 0 keeps at least <see cref="MinimumBarHeight"/> so it reads
-/// as measured, not missing; a measured 0 draws no bar in its slot. Decorative for UI Automation: the card's text carries
-/// the value.
+/// Scale (Boss decision, fix round 2 - a deliberate DERIVATION, revising the round-1 absolute scale): a CEILING in steps
+/// of 25 / 50 / 75 / 100 % - the smallest step at or above the highest visible sample, computed by the view model
+/// (MetricVisualPresentation.PulseCeiling) and given here as <see cref="Ceiling"/>; each bar is track height × sample /
+/// ceiling. The quantised
+/// ceiling keeps the Figma shape (112:1818: a ~24 % pulse fills the 40 px track) while staying honest: the step is
+/// deterministic and the card's accessible name states the current value AND the ceiling. DERIVED (no Figma rule): a
+/// sample above 0 keeps at least <see cref="MinimumBarHeight"/> so it reads as measured, not missing; a measured 0 draws
+/// no bar. Decorative for UI Automation (the CPU value's accessible name carries the values).
 /// </para>
 /// </para>
 /// </summary>
@@ -37,6 +41,9 @@ public sealed class SaPulseBars : Control
 
     public static readonly DependencyProperty BarSpacingProperty = DependencyProperty.Register(
         nameof(BarSpacing), typeof(double), typeof(SaPulseBars), new PropertyMetadata(4d, (d, _) => ((SaPulseBars)d).Rebuild()));
+
+    public static readonly DependencyProperty CeilingProperty = DependencyProperty.Register(
+        nameof(Ceiling), typeof(double), typeof(SaPulseBars), new PropertyMetadata(100d, (d, _) => ((SaPulseBars)d).Rebuild()));
 
     public static readonly DependencyProperty MinimumBarHeightProperty = DependencyProperty.Register(
         nameof(MinimumBarHeight), typeof(double), typeof(SaPulseBars), new PropertyMetadata(3d, (d, _) => ((SaPulseBars)d).Rebuild()));
@@ -69,6 +76,13 @@ public sealed class SaPulseBars : Control
         set => SetValue(BarSpacingProperty, value);
     }
 
+    /// <summary>The percentage the full track height stands for (the view model's quantised ceiling; 100 by default).</summary>
+    public double Ceiling
+    {
+        get => (double)GetValue(CeilingProperty);
+        set => SetValue(CeilingProperty, value);
+    }
+
     public double MinimumBarHeight
     {
         get => (double)GetValue(MinimumBarHeightProperty);
@@ -77,10 +91,10 @@ public sealed class SaPulseBars : Control
 
     /// <summary>The bars to draw: (slot, height, opacity) for each kept sample, right-aligned (pure, tested).</summary>
     public static IReadOnlyList<(int Slot, double Height, double Opacity)> Layout(
-        IReadOnlyList<double> samples, int capacity, double trackHeight, double minimumHeight)
+        IReadOnlyList<double> samples, int capacity, double trackHeight, double minimumHeight, double ceiling = 100)
     {
         ArgumentNullException.ThrowIfNull(samples);
-        if (capacity <= 0 || samples.Count == 0 || trackHeight <= 0)
+        if (capacity <= 0 || samples.Count == 0 || trackHeight <= 0 || !(ceiling > 0))
         {
             return [];
         }
@@ -91,8 +105,8 @@ public sealed class SaPulseBars : Control
         var bars = new List<(int, double, double)>(kept.Count);
         for (var index = 0; index < kept.Count; index++)
         {
-            var value = double.IsNaN(kept[index]) ? 0 : Math.Clamp(kept[index], 0, 100);
-            var height = value <= 0 ? 0 : Math.Max(floor, trackHeight * value / 100);
+            var value = double.IsNaN(kept[index]) ? 0 : Math.Clamp(kept[index], 0, ceiling);
+            var height = value <= 0 ? 0 : Math.Max(floor, trackHeight * value / ceiling);
             var slot = first + index;
             var opacity = capacity == 1 ? 1 : OldestOpacity + ((1 - OldestOpacity) * slot / (capacity - 1));
             bars.Add((slot, Math.Round(height, 2), Math.Round(opacity, 3)));
@@ -127,7 +141,7 @@ public sealed class SaPulseBars : Control
             _host.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         }
 
-        foreach (var (slot, height, opacity) in Layout(samples, capacity, track, MinimumBarHeight))
+        foreach (var (slot, height, opacity) in Layout(samples, capacity, track, MinimumBarHeight, Ceiling))
         {
             var bar = new Border
             {

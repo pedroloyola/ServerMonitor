@@ -53,20 +53,21 @@ public sealed class Ui5ServerDetailTests
         Assert.Equal("—", row.CpuDisplay);
         Assert.True(detail.IsReadingStale);
         Assert.True(detail.IsWithoutConnection);
-        // Boss B2 decision: the stale text and "Última atualização" share one timestamp and one clock read (42, not 41).
-        Assert.Equal("Última atualização há 42 min", detail.StaleText);
+        // Prism C1 N-6: the chip says "Leitura desatualizada"; the age is said once, by "Última atualização" (one timestamp,
+        // the last success - 42 min, not the attempt's 8 s).
+        Assert.Equal("Leitura desatualizada", detail.StaleText);
         Assert.Equal("Há 42 minutos", detail.LastUpdatedValue);
         Assert.Contains(detail.StaleText!, detail.AutomationSummary, StringComparison.Ordinal); // legible without colour
+        Assert.Contains("Última atualização: Há 42 minutos", detail.AutomationSummary, StringComparison.Ordinal);
     }
 
     /// <summary>
-    /// Boss B2 decision (single source): at a minute boundary the stale text and the "Última atualização" value cannot
-    /// disagree - both come from the engine's last success and ONE clock read per reading. The engine's attempt timestamp
-    /// (which StaleAgeDisplay used, 42 min) is deliberately not a second source; a later clock tick changes nothing until
-    /// the next reading.
+    /// Boss B2 decision (single source), kept with Prism C1 N-6: the age is said ONCE ("Última atualização"), from the
+    /// engine's last success and ONE clock read per reading - never the attempt timestamp. At a minute boundary a later
+    /// clock tick changes nothing until the next reading; the stale chip is the plain "Leitura desatualizada" throughout.
     /// </summary>
     [Fact]
-    public async Task StaleText_AndLastUpdated_ShareOneTimestamp_AndOneClockRead()
+    public async Task TheAge_IsOneTimestamp_AndOneClockRead_TheChipNeverRepeatsIt()
     {
         var success = Now.AddMinutes(-42).AddMilliseconds(1); // 41 min 59.999 s before the clock
         var fleet = new Ui4TestKit.Fleet().Add("nas", ServerHealth.Offline, 12, 33, 61, lastSuccess: success);
@@ -75,16 +76,16 @@ public sealed class Ui5ServerDetailTests
         var clock = new FakeTimeProvider(Now);
         using var detail = Open(kit, "nas", clock: new PresentationClock(clock));
 
-        Assert.Equal("Última atualização há 41 min", detail.StaleText);
+        Assert.Equal("Leitura desatualizada", detail.StaleText);
         Assert.Equal("Há 41 minutos", detail.LastUpdatedValue);
 
         clock.Advance(TimeSpan.FromMilliseconds(5)); // crosses the minute boundary, but no new reading arrived
-        Assert.Equal("Última atualização há 41 min", detail.StaleText);
         Assert.Equal("Há 41 minutos", detail.LastUpdatedValue);
 
         kit.States.Set(kit.States.Get(fleet.IdOf("nas")) with { ConsecutiveFailures = 5 }); // the next reading: one new read
-        Assert.Equal("Última atualização há 42 min", detail.StaleText);
         Assert.Equal("Há 42 minutos", detail.LastUpdatedValue);
+        Assert.Equal("Leitura desatualizada", detail.StaleText);
+        Assert.DoesNotContain("min", detail.StaleText!, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -95,7 +96,7 @@ public sealed class Ui5ServerDetailTests
         using var detail = Open(kit, "nas");
 
         Assert.True(detail.IsReadingStale);
-        Assert.Equal("Leitura desatualizada", detail.StaleText); // under a minute: never a rounded-up "há 1 min"
+        Assert.Equal("Leitura desatualizada", detail.StaleText);
         Assert.Equal("Há 8 segundos", detail.LastUpdatedValue);
     }
 
@@ -155,8 +156,12 @@ public sealed class Ui5ServerDetailTests
         Assert.Equal(0, detail.MemoryLitSegments);
     }
 
+    /// <summary>
+    /// Prism C1 N-4 decision (+ N-13, Cortex N-C5): the Detail paints no severity colour - its metric colours are identity,
+    /// stale or not - so it exposes no *Severity property a future view could bind without that rule.
+    /// </summary>
     [Fact]
-    public async Task Segments_AndSeverity_FollowA4_AndTheEngineThresholds()
+    public async Task Segments_FollowA4_AndTheDetailExposesNoSeverity()
     {
         var fleet = new Ui4TestKit.Fleet().Add("db", ServerHealth.Critical, cpu: 97, mem: 62, disk: 48);
         var kit = await LoadedAsync(fleet);
@@ -164,8 +169,7 @@ public sealed class Ui5ServerDetailTests
 
         Assert.Equal(17, detail.MemoryLitSegments); // Figma 112:1855: 62% → 17/28
         Assert.Equal(7, detail.DiskLitSegments);    // Figma 112:1890: 48% → 7/14
-        Assert.Equal(ServerHealth.Critical, detail.CpuSeverity);
-        Assert.Equal(ServerHealth.Healthy, detail.DiskSeverity);
+        Assert.Empty(typeof(ServerDetailViewModel).GetProperties().Where(property => property.Name.EndsWith("Severity", StringComparison.Ordinal)));
     }
 
     // ---- derived states -------------------------------------------------------------------------------------------
@@ -647,8 +651,41 @@ public sealed class Ui5ServerDetailTests
         kit.States.Set(kit.States.Get(id) with { LastSuccessAt = Now.AddMinutes(5) });
         Assert.Equal(new double[] { 1, 2, 3 }, detail.CpuPulseSamples);
 
+        // Atlas C1 finding 1: release the OLD read and wait until the view model has finished processing it (the
+        // normative "settled" event, raised after the discard), with 30 s only as a deadlock guard - then check.
+        var settled = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        detail.PulseReadSettled += applied => settled.TrySetResult(applied);
         slow.SetResult(Result(Series(30)));
+        var oldReadApplied = await settled.Task.WaitAsync(TimeSpan.FromSeconds(30));
+
+        Assert.False(oldReadApplied);
         Assert.Equal(new double[] { 1, 2, 3 }, detail.CpuPulseSamples);
+    }
+
+    /// <summary>
+    /// Boss fix round 2 decision 1: the bars are relative to a quantised ceiling (25 / 50 / 75 / 100 %), so the CPU
+    /// value's accessible name states the real values - the sample count and that ceiling.
+    /// </summary>
+    [Fact]
+    public async Task ThePulseCeiling_IsQuantised_AndSaidInWords()
+    {
+        var fleet = new Ui4TestKit.Fleet().Add("web", ServerHealth.Healthy, 24, 2, 3);
+        var kit = await LoadedAsync(fleet, new ResWLocalizationService("pt-PT"));
+        var history = new ScriptedHistory();
+        history.Next(Series(3)); // 1, 2, 3 %
+        using var detail = Open(kit, "web", history: history);
+
+        Assert.Equal(25, detail.CpuPulseCeiling);
+        Assert.Equal("CPU: 24%. Pulso das últimas 3 amostras, escala até 25%", detail.CpuAccessibleName);
+
+        history.Next(new HistorySeries
+        {
+            Points = [new HistoryChartPoint { TimestampUtc = Now, Value = 60 }, new HistoryChartPoint { TimestampUtc = Now.AddSeconds(30), Value = 24 }],
+            MaxConnectGap = TimeSpan.FromSeconds(90)
+        });
+        kit.States.Set(kit.States.Get(fleet.IdOf("web")) with { LastSuccessAt = Now.AddMinutes(5) });
+        Assert.Equal(75, detail.CpuPulseCeiling);
+        Assert.EndsWith("2 amostras, escala até 75%", detail.CpuAccessibleName, StringComparison.Ordinal);
     }
 
     // ---- helpers --------------------------------------------------------------------------------------------------

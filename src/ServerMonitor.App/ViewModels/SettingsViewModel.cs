@@ -49,8 +49,10 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
         IBackgroundDegradationNotice backgroundDegradationNotice,
         IHistoryMaintenanceService historyMaintenance,
         IAppVersionProvider appVersionProvider,
-        ILogger<SettingsViewModel> logger)
+        ILogger<SettingsViewModel> logger,
+        PresentationClock? clock = null)
     {
+        _toastTimer = new TransientNoticeTimer((clock ?? PresentationClock.System).TimeProvider);
         _themeService = themeService;
         AppVersion = appVersionProvider.DisplayVersion;
         _localizationService = localizationService;
@@ -95,11 +97,14 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
 
     private string? _toastTitle;
     private string? _toastMessage;
+    private readonly TransientNoticeTimer _toastTimer;
 
     /// <summary>
     /// UI.5 (Figma §3.2 112:20712 / 112:21538 / 112:21293): the "Dados e servidores" page's transient success notice —
-    /// one at a time, the latest success wins, dismissed by the user. Page-local (not a global toast system); errors stay
-    /// inline next to their setting.
+    /// one at a time, the latest success wins. Fix round 2 (Boss decision 2, Cortex C1 N-C2): it closes itself after
+    /// <see cref="TransientNoticeTimer.Duration"/>, when the user closes it, and when the page is left
+    /// (<see cref="NotifyDataNavigatedFrom"/>) - a later visit never shows it again. Page-local (not a global toast
+    /// system); errors stay inline next to their setting.
     /// </summary>
     public bool IsToastOpen => _toastTitle is not null;
 
@@ -115,6 +120,19 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
 
     private void ShowToast(string? titleKey, string? messageKey)
     {
+        if (titleKey is null)
+        {
+            _toastTimer.Cancel();
+            if (_toastTitle is null)
+            {
+                return;
+            }
+        }
+        else
+        {
+            _toastTimer.Start(() => ShowToast(null, null));
+        }
+
         _toastTitle = titleKey is null ? null : _localizationService.GetString(titleKey);
         _toastMessage = messageKey is null ? null : _localizationService.GetString(messageKey);
         OnPropertyChanged(nameof(IsToastOpen));
@@ -123,6 +141,9 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
     }
 
     public ObservableCollection<HiddenServerItemViewModel> HiddenServers { get; } = [];
+
+    /// <summary>Beacon C1 M2: the hidden-servers list's accessible name (its card title).</summary>
+    public string HiddenServersListName => _localizationService.GetString("SettingsHiddenServersTitle.Text");
 
     public ICommand BackCommand { get; }
 
@@ -264,6 +285,9 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
     /// <summary>Called by the Data sub-page when it is navigated to (Loaded, or again while shown): consumes the About request.</summary>
     public void NotifyDataNavigatedTo() =>
         IsAboutSectionRequested = _navigationService.ConsumeAboutSettingsFocus();
+
+    /// <summary>Called by the Data sub-page when it is left (Unloaded): its transient toast ends with the visit.</summary>
+    public void NotifyDataNavigatedFrom() => ShowToast(null, null);
 
     /// <summary>
     /// Whether closing the window keeps ServerAlyzer monitoring in the background (M13 S2). This is the
@@ -432,7 +456,7 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
                 {
                     // Cortex B1 N-7: never a silent success. LoadOnceAsync reports its own failures; anything that escapes
                     // it is logged and surfaced through the same notice, and the next pass (if requested) still runs.
-                    _logger.LogError(exception, "Settings could not be loaded.");
+                    _logger.LogError("Settings could not be loaded. Exception type: {ExceptionType}.", exception.GetType().Name);
                     IsServerOperationErrorOpen = true;
                 }
 
@@ -590,12 +614,16 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
     private void SetHiddenServers(IEnumerable<Server> servers)
     {
         HiddenServers.Clear();
-        foreach (var server in servers.OrderBy(server => server.CreatedAt))
+        var ordered = servers.OrderBy(server => server.CreatedAt).ToList();
+        for (var index = 0; index < ordered.Count; index++)
         {
+            var server = ordered[index];
             HiddenServers.Add(new HiddenServerItemViewModel(
                 server,
                 _localizationService,
-                () => RestoreAsync(server)));
+                () => RestoreAsync(server),
+                positionInSet: index + 1,
+                sizeOfSet: ordered.Count));
         }
 
         HasHiddenServers = HiddenServers.Count > 0;

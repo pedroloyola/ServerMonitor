@@ -49,6 +49,8 @@
             <SolidColorBrush x:Key="SaSegmentedTrackBrush" Color="{StaticResource SaColorSegmentedTrackDark}" />
             <SolidColorBrush x:Key="SaSegmentedPillTrackBrush" Color="{StaticResource SaColorSegmentedPillTrackDark}" />
             <SolidColorBrush x:Key="SaSegmentedPillSelectedBrush" Color="{StaticResource SaColorSegmentedPillSelectedDark}" />
+            <SolidColorBrush x:Key="SaSegmentedThemeTrackBrush" Color="{StaticResource SaColorSegmentedThemeTrackDark}" />
+            <SolidColorBrush x:Key="SaSegmentedThemeSelectedBrush" Color="{StaticResource SaColorSegmentedThemeSelectedDark}" />
             <SolidColorBrush x:Key="SaToggleOffTrackBrush" Color="{StaticResource SaColorToggleOffTrackDark}" />
             <SolidColorBrush x:Key="SaToggleThumbBrush" Color="{StaticResource SaColorToggleThumbDark}" />
             <SolidColorBrush x:Key="SaSkeletonBrush" Color="{StaticResource SaColorSkeletonDark}" />
@@ -103,6 +105,8 @@
             <SolidColorBrush x:Key="SaSegmentedTrackBrush" Color="{StaticResource SaColorSegmentedTrackLight}" />
             <SolidColorBrush x:Key="SaSegmentedPillTrackBrush" Color="{StaticResource SaColorSegmentedPillTrackLight}" />
             <SolidColorBrush x:Key="SaSegmentedPillSelectedBrush" Color="{StaticResource SaColorSegmentedPillSelectedLight}" />
+            <SolidColorBrush x:Key="SaSegmentedThemeTrackBrush" Color="{StaticResource SaColorSegmentedThemeTrackLight}" />
+            <SolidColorBrush x:Key="SaSegmentedThemeSelectedBrush" Color="{StaticResource SaColorSegmentedThemeSelectedLight}" />
             <SolidColorBrush x:Key="SaToggleOffTrackBrush" Color="{StaticResource SaColorToggleOffTrackLight}" />
             <SolidColorBrush x:Key="SaToggleThumbBrush" Color="{StaticResource SaColorToggleThumbLight}" />
             <SolidColorBrush x:Key="SaSkeletonBrush" Color="{StaticResource SaColorSkeletonLight}" />
@@ -156,6 +160,8 @@
             <SolidColorBrush x:Key="SaSegmentedTrackBrush" Color="{ThemeResource SystemColorWindowColor}" />
             <SolidColorBrush x:Key="SaSegmentedPillTrackBrush" Color="{ThemeResource SystemColorWindowColor}" />
             <SolidColorBrush x:Key="SaSegmentedPillSelectedBrush" Color="{ThemeResource SystemColorHighlightColor}" />
+            <SolidColorBrush x:Key="SaSegmentedThemeTrackBrush" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="SaSegmentedThemeSelectedBrush" Color="{ThemeResource SystemColorHighlightColor}" />
             <SolidColorBrush x:Key="SaToggleOffTrackBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
             <SolidColorBrush x:Key="SaToggleThumbBrush" Color="{ThemeResource SystemColorWindowColor}" />
             <SolidColorBrush x:Key="SaSkeletonBrush" Color="{ThemeResource SystemColorGrayTextColor}" />

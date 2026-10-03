@@ -1,4 +1,6 @@
+using System.ComponentModel;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Controls;
 using ServerMonitor.App.Services;
 using ServerMonitor.App.ViewModels;
@@ -19,6 +21,7 @@ public sealed partial class ServerDetailPage : Page, IServerDetailView, IDisposa
         ViewModel = viewModel;
         DataContext = viewModel;
         Loaded += OnLoaded;
+        viewModel.PropertyChanged += OnViewModelPropertyChanged;
         // Released on Unloaded AND when navigation replaces the page (a page replaced before Loaded never unloads).
         Unloaded += (_, _) => Dispose();
     }
@@ -28,7 +31,25 @@ public sealed partial class ServerDetailPage : Page, IServerDetailView, IDisposa
     public void Load(Guid serverId, ServerDetailOrigin origin) => ViewModel.Load(serverId, origin);
 
     /// <summary>Idempotent: the view model unsubscribes once.</summary>
-    public void Dispose() => ViewModel.Dispose();
+    public void Dispose()
+    {
+        ViewModel.PropertyChanged -= OnViewModelPropertyChanged;
+        ViewModel.Dispose();
+    }
+
+    // Beacon C1 N2: "A atualizar..." is announced when a refresh starts (the text is the live region; it becomes visible
+    // with the refresh, so the event is raised after that layout pass).
+    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(ServerDetailViewModel.IsRefreshing) || !ViewModel.IsRefreshing)
+        {
+            return;
+        }
+
+        DispatcherQueue?.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+            (FrameworkElementAutomationPeer.FromElement(RefreshingText) ?? FrameworkElementAutomationPeer.CreatePeerForElement(RefreshingText))
+                ?.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged));
+    }
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {

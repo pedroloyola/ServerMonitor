@@ -1,0 +1,37 @@
+<ContentDialog
+    x:Class="ServerMonitor.App.Views.DestructiveConfirmDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:primitives="using:ServerMonitor.App.Controls.Primitives"
+    primitives:SaDialog.Kind="Destructive">
+    <!-- UI.5 fix round 2 (Prism C1 M-3): the destructive confirmation of Figma section 11 (112:8559 "Remover este
+         servidor?", 112:8876 "Limpar todo o histórico?"; "Repor histórico" reuses it): SaDialogStyle shell, body, the
+         "affected data" row 564×42 r11 (112:8562, icon 18 + 13 Medium), the note 12. Kind=Destructive: the primary button
+         wears the danger style, Enter and the first focus stay on Cancelar (the UI.4/M14 confirmation semantics: what is
+         affected is said, the safe answer is the default). -->
+    <ContentDialog.Style>
+        <StaticResource ResourceKey="SaDialogStyle" />
+    </ContentDialog.Style>
+    <StackPanel Spacing="{StaticResource SaSpace16}">
+        <TextBlock
+            x:Name="BodyText"
+            Text="{x:Bind Body, Mode=OneTime}"
+            Style="{StaticResource SaSecondaryBodyTextStyle}"
+            TextWrapping="Wrap" />
+        <Border x:Name="AffectedRow" Style="{StaticResource SaInsetTintedSurfaceStyle}" MinHeight="42"
+                AutomationProperties.Name="{x:Bind Affected, Mode=OneTime}">
+            <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                <primitives:SaIcon Data="{x:Bind AffectedIconData, Mode=OneTime}" Size="18" VerticalAlignment="Center"
+                                   Foreground="{ThemeResource SaTextSecondaryBrush}" />
+                <TextBlock Text="{x:Bind Affected, Mode=OneTime}" Style="{StaticResource SaControlTextStyle}"
+                           VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+        </Border>
+        <TextBlock
+            x:Name="NoteText"
+            Text="{x:Bind Note, Mode=OneTime}"
+            Style="{StaticResource SaCaptionTextStyle}"
+            Foreground="{ThemeResource SaTextSecondaryBrush}"
+            TextWrapping="Wrap" />
+    </StackPanel>
+</ContentDialog>

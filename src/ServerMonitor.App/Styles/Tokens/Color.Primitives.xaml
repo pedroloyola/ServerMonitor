@@ -106,6 +106,12 @@
     <!-- pill segment selected rgba(107,107,107,.45) / rgba(255,255,255,.75), 112:3356 / 112:3517 -->
     <Color x:Key="SaColorSegmentedPillSelectedDark">#736B6B6B</Color>
     <Color x:Key="SaColorSegmentedPillSelectedLight">#BFFFFFFF</Color>
+    <!-- UI.5 theme selector 112:7924 / 112:7935 (Prism C1 N-1, measured): track rgba(97,97,97,.20) / rgba(255,255,255,.28),
+         selected rgba(122,122,122,.40) / rgba(255,255,255,.90) -->
+    <Color x:Key="SaColorSegmentedThemeTrackDark">#33616161</Color>
+    <Color x:Key="SaColorSegmentedThemeTrackLight">#47FFFFFF</Color>
+    <Color x:Key="SaColorSegmentedThemeSelectedDark">#667A7A7A</Color>
+    <Color x:Key="SaColorSegmentedThemeSelectedLight">#E6FFFFFF</Color>
     <!-- toggle off track 112:7982 / 112:8143. R2 (Beacon N-1, Boss: a11y > Figma, deliberate deviation): the Figma
          #474747 / #B8B8B8 were 1.40-1.98 / 1.47-1.93:1 (WCAG 1.4.11 needs 3:1). Now >= 3:1 against every surface of its
          theme AND the #FCFCFC thumb against the track (guard ToggleOffTrackMeetsNonTextContrast). -->

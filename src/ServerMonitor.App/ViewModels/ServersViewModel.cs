@@ -22,12 +22,14 @@ public sealed class ServersViewModel : ObservableObject, IDisposable
     private string _searchText = string.Empty;
     private bool _disposed;
     private ServersNotice? _notice;
+    private readonly TransientNoticeTimer _noticeTimer;
 
     public ServersViewModel(
         DashboardViewModel dashboard,
         INavigationService navigation,
         ILocalizationService localization,
-        ServersReturnNotice? returnNotice = null)
+        ServersReturnNotice? returnNotice = null,
+        PresentationClock? clock = null)
     {
         _dashboard = dashboard ?? throw new ArgumentNullException(nameof(dashboard));
         _navigation = navigation ?? throw new ArgumentNullException(nameof(navigation));
@@ -35,12 +37,14 @@ public sealed class ServersViewModel : ObservableObject, IDisposable
 
         ClearSearchCommand = new RelayCommand(() => SearchText = string.Empty);
         // UI.5 Boss B2 answer 1: the one-shot notice the Server Detail left for this visit (taken once, never re-shown).
+        // Fix round 2 (Boss decision 2): it closes itself after TransientNoticeTimer.Duration, or when the visit ends.
+        _noticeTimer = new TransientNoticeTimer((clock ?? PresentationClock.System).TimeProvider);
         _notice = returnNotice?.Take();
-        DismissNoticeCommand = new RelayCommand(() =>
+        DismissNoticeCommand = new RelayCommand(DismissNotice);
+        if (_notice is not null)
         {
-            _notice = null;
-            OnPropertyChanged(nameof(IsNoticeOpen));
-        });
+            _noticeTimer.Start(DismissNotice);
+        }
         BackToOverviewCommand = new RelayCommand(navigation.GoToDashboard);
 
         _dashboard.ServersReloaded += OnServersReloaded;
@@ -155,12 +159,25 @@ public sealed class ServersViewModel : ObservableObject, IDisposable
         }
 
         _disposed = true;
+        _noticeTimer.Dispose();
         _dashboard.ServersReloaded -= OnServersReloaded;
         _dashboard.PropertyChanged -= OnDashboardPropertyChanged;
         DisposeRows();
     }
 
     private void OnServersReloaded(object? sender, EventArgs e) => RebuildRows();
+
+    private void DismissNotice()
+    {
+        _noticeTimer.Cancel();
+        if (_notice is null)
+        {
+            return;
+        }
+
+        _notice = null;
+        OnPropertyChanged(nameof(IsNoticeOpen));
+    }
 
     private void OnDashboardPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {

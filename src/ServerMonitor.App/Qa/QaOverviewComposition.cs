@@ -78,6 +78,12 @@ internal static class QaOverviewComposition
         services.AddSingleton<IServerMonitoringStateStore>(stateStore);
         // UI.5: synthetic CPU history for the Detail pulse (in memory; the real history stack is never composed in qaMode).
         services.AddSingleton<Core.History.IServerHistoryQueryService>(new QaOverviewHistoryQueryService(scenario));
+        // UI.5 fix round 2 (Beacon C1 N9): the data scenarios reach the REAL history confirmations over an in-memory double.
+        if (scenarioName is "data" or "data-failing")
+        {
+            services.AddSingleton(new QaHistoryMaintenanceMode(scenario.OperationsSucceed));
+            services.AddSingleton<IHistoryMaintenanceService, QaHistoryMaintenanceService>();
+        }
 
         // UI.5: auth / host-key results live only in the connection-state store (the monitoring state collapses them to
         // Unknown + ConnectionFailed), so the harness seeds that store. Synthetic results: no key, no fingerprint.

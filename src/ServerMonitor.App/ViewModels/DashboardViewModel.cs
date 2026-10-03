@@ -312,7 +312,37 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
     public bool IsOperationErrorOpen
     {
         get => _isOperationErrorOpen;
-        set => SetProperty(ref _isOperationErrorOpen, value);
+        set
+        {
+            if (!value)
+            {
+                OperationErrorServerId = null;
+            }
+
+            SetProperty(ref _isOperationErrorOpen, value);
+        }
+    }
+
+    /// <summary>
+    /// UI.5 fix round 2 (Boss decision 3): the server a failed per-server operation (Editar / Ocultar / Remover) was about,
+    /// or null for a global error (load, add, discovery). Set together with <see cref="IsOperationErrorOpen"/>, so a Server
+    /// Detail shows a server-scoped error only on THAT server's page; global errors keep the UI.4 SHOULD-3 behaviour
+    /// (shown everywhere). App-layer bookkeeping only - nothing in Core changes.
+    /// </summary>
+    public Guid? OperationErrorServerId { get; private set; }
+
+    /// <summary>Opens the shared operation error, scoped to <paramref name="serverId"/> (null = global).</summary>
+    internal void ReportOperationError(Guid? serverId)
+    {
+        OperationErrorServerId = serverId;
+        if (_isOperationErrorOpen)
+        {
+            OnPropertyChanged(nameof(IsOperationErrorOpen)); // the scope changed: listeners re-read it
+            return;
+        }
+
+        IsOperationErrorOpen = true;
+        OperationErrorServerId = serverId;
     }
 
     /// <summary>
@@ -880,7 +910,7 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         var result = await _serverProfileService.AddAsync(editorResult.Profile);
         if (!result.Succeeded)
         {
-            IsOperationErrorOpen = true;
+            ReportOperationError(serverId: null);
         }
         else if (editorResult.ConnectionResult is not null)
         {
@@ -901,7 +931,7 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
             var result = await _serverProfileService.UpdateAsync(server, editorResult.Profile);
             if (!result.Succeeded)
             {
-                IsOperationErrorOpen = true;
+                ReportOperationError(server.Id);
             }
             else
             {
@@ -918,7 +948,7 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         }
         catch (Exception exception)
         {
-            HandleError(exception, "edit server");
+            HandleError(exception, "edit server", server.Id);
         }
     }
 
@@ -928,12 +958,12 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         {
             if (!await _serverService.HideAsync(server.Id))
             {
-                IsOperationErrorOpen = true;
+                ReportOperationError(server.Id);
             }
         }
         catch (Exception exception)
         {
-            HandleError(exception, "hide server");
+            HandleError(exception, "hide server", server.Id);
         }
     }
 
@@ -948,7 +978,7 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
 
             if (!await _serverProfileService.RemoveAsync(server))
             {
-                IsOperationErrorOpen = true;
+                ReportOperationError(server.Id);
             }
             else
             {
@@ -958,7 +988,7 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         }
         catch (Exception exception)
         {
-            HandleError(exception, "remove server");
+            HandleError(exception, "remove server", server.Id);
         }
     }
 
@@ -1125,7 +1155,7 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         ScheduleOverview();
     }
 
-    internal void HandleError(Exception exception, string operation)
+    internal void HandleError(Exception exception, string operation, Guid? serverId = null)
     {
         if (exception is ConfigurationLockedException)
         {
@@ -1137,6 +1167,6 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
             "Could not {Operation}. Exception type: {ExceptionType}.",
             operation,
             exception.GetType().Name);
-        IsOperationErrorOpen = true;
+        ReportOperationError(serverId);
     }
 }

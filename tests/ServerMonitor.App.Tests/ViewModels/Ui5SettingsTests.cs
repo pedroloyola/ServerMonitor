@@ -190,11 +190,35 @@ public sealed class Ui5SettingsTests
         };
         await world.ViewModel.LoadAsync().WaitAsync(DeadlockGuard);
 
-        world.ViewModel.HiddenServers[0].RestoreCommand.Execute(null);
-        await world.ViewModel.LoadAsync().WaitAsync(DeadlockGuard);
+        // Atlas C1 finding 3: from IDLE, the reload must come from ServersChanged (production), never from the test. The
+        // reload's query is gated: it must have STARTED by the time the command finished, and the list is awaited through
+        // its own change - no extra LoadAsync here.
+        var reloadStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        world.Servers.GetAllOverride = async _ =>
+        {
+            reloadStarted.TrySetResult();
+            await release.Task;
+            return world.Servers.Servers.ToList();
+        };
+        var restored = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        world.ViewModel.HiddenServers.CollectionChanged += (_, _) =>
+        {
+            if (world.ViewModel.HiddenServers.Select(item => item.Name).SequenceEqual(["b"]))
+            {
+                restored.TrySetResult();
+            }
+        };
+
+        await ((AsyncRelayCommand)world.ViewModel.HiddenServers[0].RestoreCommand).ExecuteAsync().WaitAsync(DeadlockGuard);
+        Assert.True(reloadStarted.Task.IsCompleted, "the restore did not trigger the event-driven reload");
+        release.SetResult();
+        await restored.Task.WaitAsync(DeadlockGuard);
 
         Assert.Equal(new[] { "b" }, world.ViewModel.HiddenServers.Select(item => item.Name));
+        Assert.Equal(new[] { 1 }, world.ViewModel.HiddenServers.Select(item => item.SizeOfSet));
         Assert.False(world.ViewModel.IsServerOperationErrorOpen);
+        Assert.True(world.ViewModel.HasHiddenServers);
     }
 
     [Fact]

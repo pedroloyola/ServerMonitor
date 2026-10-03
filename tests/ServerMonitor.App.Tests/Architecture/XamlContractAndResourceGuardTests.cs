@@ -40,11 +40,15 @@ public sealed partial class XamlContractAndResourceGuardTests
             "HealthCard", "PriorityButton", "ViewAllButton", "OverviewRepeater", "EmptyAddButton"],
         // UI.5: BackgroundSection is brought into view from code-behind; the rest are reflowed by the WidthStates setters.
         ["Views/SettingsPage.xaml"] = ["BackgroundSection", "PageRoot", "AutosaveText", "ThemeControl", "LanguageControl", "BackgroundControl",
-            "NotificationsControl", "CompactControl", "TopmostControl", "DisclosureColumn2", "DisclosureGrid", "AboutDisclosure"],
+            "NotificationsControl", "CompactControl", "TopmostControl", "DisclosureColumn2", "DisclosureGrid", "AboutDisclosure",
+            // UI.5 fix round 2 (Prism C1 M-8): the Narrow state spaces these rows.
+            "ThemeRow", "CompactRow"],
         // UI.5 Server Detail: WidthStates setters + code-behind focus (HistoryRow / WorkloadsRow / RefreshButton).
         ["Views/ServerDetailPage.xaml"] = ["PageScroll", "PageRoot", "IdentityGrid", "IdentityActions", "ServerNameHeading", "RefreshButton",
             "CollectingColumns", "MetricsGrid", "MetricsColumn2", "MetricsColumn3", "MemoryCard", "DiskCard", "DeeperGrid", "DeeperColumn2",
-            "ExploreCard", "HistoryRow", "WorkloadsRow"],
+            "ExploreCard", "HistoryRow", "WorkloadsRow",
+            // UI.5 fix round 2 (Beacon C1 N2): the live "A atualizar…" text announced from code-behind.
+            "RefreshingText"],
         // UI.5 §4: the Data sub-page brings the backup status and (H-UI5-4) the About card into view from code-behind.
         ["Views/SettingsDataPage.xaml"] = ["BackupStatusBar", "AboutSection", "PageRoot", "ResetIgnoredButton", "HistoryActions", "BackupActions",
             "GitHubButton", "SuccessToast"],

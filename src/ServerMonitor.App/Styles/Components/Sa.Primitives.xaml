@@ -373,6 +373,7 @@
                                         <Setter Target="KeyColumn.Width" Value="190" />
                                         <Setter Target="RootGrid.ColumnSpacing" Value="10" />
                                         <Setter Target="RootGrid.RowSpacing" Value="0" />
+                                        <Setter Target="RootGrid.MinHeight" Value="23" />
                                         <Setter Target="PART_Value.(Grid.Row)" Value="0" />
                                         <Setter Target="PART_Value.(Grid.Column)" Value="1" />
                                         <Setter Target="PART_Key.Style" Value="{StaticResource SaPrimaryBodyTextStyle}" />

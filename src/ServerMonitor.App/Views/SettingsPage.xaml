@@ -3,7 +3,8 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:converters="using:ServerMonitor.App.Converters"
-    xmlns:primitives="using:ServerMonitor.App.Controls.Primitives">
+    xmlns:primitives="using:ServerMonitor.App.Controls.Primitives"
+    primitives:SaThemeRefresh.IsEnabled="True">
     <!-- UI.5 "Definições", Figma 112:7909 (D) / 112:8003 (L): header, three sections (title 17 + glass card of setting
          rows: label 14 Medium + description 12 | control at the right), two disclosures, local-preferences footer.
          Below 700 the control of each row moves under its text (SPEC §5). -->
@@ -47,6 +48,10 @@
                         <Setter Target="TopmostControl.(Grid.Row)" Value="1" />
                         <Setter Target="TopmostControl.(Grid.Column)" Value="0" />
                         <Setter Target="TopmostControl.HorizontalAlignment" Value="Left" />
+                        <!-- Prism C1 M-8: once the control sits under its text, the next row starts 16 below it. -->
+                        <Setter Target="ThemeRow.Margin" Value="0,0,0,16" />
+                        <Setter Target="BackgroundSection.Margin" Value="0,0,0,16" />
+                        <Setter Target="CompactRow.Margin" Value="0,0,0,16" />
                         <Setter Target="DisclosureColumn2.Width" Value="0" />
                         <Setter Target="DisclosureGrid.ColumnSpacing" Value="0" />
                         <Setter Target="DisclosureGrid.RowSpacing" Value="{StaticResource SaSpace12}" />
@@ -102,7 +107,7 @@
                 <Border Style="{StaticResource SaGlassSurfaceStyle}">
                     <StackPanel>
                         <!-- Setting / Tema 112:7919: small theme selector 112:7924 (ThemeService, not persisted - THEME-1). -->
-                        <Grid MinHeight="54" ColumnSpacing="{StaticResource SaSpace16}" RowSpacing="{StaticResource SaSpace8}">
+                        <Grid x:Name="ThemeRow" MinHeight="54" ColumnSpacing="{StaticResource SaSpace16}" RowSpacing="{StaticResource SaSpace8}">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
@@ -112,12 +117,15 @@
                                 <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
                             <StackPanel Spacing="{StaticResource SaSpace4}" VerticalAlignment="Center">
-                                <TextBlock x:Uid="SettingsThemeTitle" Style="{StaticResource SaPrimaryBodyTextStyle}" FontWeight="Medium" />
+                                <TextBlock x:Uid="SettingsThemeTitle" AutomationProperties.HeadingLevel="Level3" Style="{StaticResource SaPrimaryBodyTextStyle}" FontWeight="Medium" />
                                 <TextBlock x:Uid="SettingsAppearanceDescription" Style="{StaticResource SaCaptionTextStyle}"
                                            Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap" />
                             </StackPanel>
                             <Border x:Name="ThemeControl" Grid.Column="1" Style="{StaticResource SaSegmentedThemeTrackStyle}" VerticalAlignment="Center">
-                                <StackPanel x:Uid="SettingsThemeGroup" Orientation="Horizontal" Spacing="{StaticResource SaSpace4}">
+                                <!-- Beacon C1 N1: the UI.2 segmented keyboard contract - one Tab stop, entry on the selected item,
+                                     the arrows move AND select (SaGroupNavigation). -->
+                                <StackPanel x:Uid="SettingsThemeGroup" Orientation="Horizontal" Spacing="{StaticResource SaSpace4}"
+                                            primitives:SaGroupNavigation.Mode="SelectionFollowsFocus">
                                     <RadioButton x:Uid="ThemeSystemOption" GroupName="SettingsTheme" Style="{StaticResource SaSegmentedThemeItemStyle}"
                                                  IsChecked="{Binding SelectedThemeIndex, Mode=TwoWay, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=0}">
                                         <StackPanel Orientation="Horizontal" Spacing="5">
@@ -154,7 +162,7 @@
                                 <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
                             <StackPanel Spacing="{StaticResource SaSpace4}" VerticalAlignment="Center">
-                                <TextBlock x:Uid="SettingsLanguageTitle" Style="{StaticResource SaPrimaryBodyTextStyle}" FontWeight="Medium" />
+                                <TextBlock x:Uid="SettingsLanguageTitle" AutomationProperties.HeadingLevel="Level3" Style="{StaticResource SaPrimaryBodyTextStyle}" FontWeight="Medium" />
                                 <TextBlock x:Uid="SettingsLanguageDescription" Style="{StaticResource SaCaptionTextStyle}"
                                            Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap" />
                             </StackPanel>
@@ -229,7 +237,7 @@
                                 <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
                             <StackPanel Spacing="{StaticResource SaSpace4}" VerticalAlignment="Center">
-                                <TextBlock x:Uid="SettingsNotificationsTitle" Style="{StaticResource SaPrimaryBodyTextStyle}" FontWeight="Medium" />
+                                <TextBlock x:Uid="SettingsNotificationsTitle" AutomationProperties.HeadingLevel="Level3" Style="{StaticResource SaPrimaryBodyTextStyle}" FontWeight="Medium" />
                                 <TextBlock x:Uid="SettingsNotificationsDescription" Style="{StaticResource SaCaptionTextStyle}"
                                            Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap" />
                             </StackPanel>
@@ -252,7 +260,7 @@
                 <TextBlock x:Uid="SettingsWindowTitle" AutomationProperties.HeadingLevel="Level2" Style="{StaticResource SaCardTitleTextStyle}" />
                 <Border Style="{StaticResource SaGlassSurfaceStyle}">
                     <StackPanel>
-                        <Grid MinHeight="44" ColumnSpacing="{StaticResource SaSpace16}" RowSpacing="{StaticResource SaSpace8}">
+                        <Grid x:Name="CompactRow" MinHeight="44" ColumnSpacing="{StaticResource SaSpace16}" RowSpacing="{StaticResource SaSpace8}">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
@@ -262,7 +270,7 @@
                                 <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
                             <StackPanel Spacing="{StaticResource SaSpace4}" VerticalAlignment="Center">
-                                <TextBlock x:Uid="SettingsCompactTitle" Style="{StaticResource SaPrimaryBodyTextStyle}" FontWeight="Medium" />
+                                <TextBlock x:Uid="SettingsCompactTitle" AutomationProperties.HeadingLevel="Level3" Style="{StaticResource SaPrimaryBodyTextStyle}" FontWeight="Medium" />
                                 <TextBlock x:Uid="SettingsCompactDescription" Style="{StaticResource SaCaptionTextStyle}"
                                            Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap" />
                             </StackPanel>
@@ -272,7 +280,8 @@
                                     Command="{x:Bind WindowMode.EnterCompactCommand}">
                                 <StackPanel Orientation="Horizontal" Spacing="6">
                                     <TextBlock x:Uid="SettingsEnterCompactButtonText" VerticalAlignment="Center" />
-                                    <primitives:SaIcon Data="{StaticResource SaIconArrowRight01Data}" Size="15" VerticalAlignment="Center" />
+                                    <primitives:SaIcon Data="{StaticResource SaIconArrowRight01Data}" Size="15" VerticalAlignment="Center"
+                                                       Foreground="{ThemeResource SaTextSecondaryBrush}" />
                                 </StackPanel>
                             </Button>
                         </Grid>
@@ -286,7 +295,7 @@
                                 <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
                             <StackPanel Spacing="{StaticResource SaSpace4}" VerticalAlignment="Center">
-                                <TextBlock x:Uid="SettingsAlwaysOnTopTitle" Style="{StaticResource SaPrimaryBodyTextStyle}" FontWeight="Medium" />
+                                <TextBlock x:Uid="SettingsAlwaysOnTopTitle" AutomationProperties.HeadingLevel="Level3" Style="{StaticResource SaPrimaryBodyTextStyle}" FontWeight="Medium" />
                                 <TextBlock x:Uid="SettingsAlwaysOnTopDescription" Style="{StaticResource SaCaptionTextStyle}"
                                            Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap" />
                             </StackPanel>
@@ -316,9 +325,9 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <primitives:SaIcon Data="{StaticResource SaIconHardDriveData}" Size="18" VerticalAlignment="Center" />
+                        <primitives:SaIcon Data="{StaticResource SaIconHardDriveData}" Size="18" VerticalAlignment="Center" Foreground="{ThemeResource SaTextSecondaryBrush}" />
                         <TextBlock x:Uid="SettingsOpenDataText" Grid.Column="1" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                        <primitives:SaIcon Grid.Column="2" Data="{StaticResource SaIconArrowRight01Data}" Size="17" VerticalAlignment="Center" />
+                        <primitives:SaIcon Grid.Column="2" Data="{StaticResource SaIconArrowRight01Data}" Size="17" VerticalAlignment="Center" Foreground="{ThemeResource SaTextSecondaryBrush}" />
                     </Grid>
                 </Button>
                 <Button x:Name="AboutDisclosure" x:Uid="SettingsOpenAboutButton" Grid.Column="1" Style="{StaticResource SaDisclosureButtonStyle}" Command="{Binding OpenAboutCommand}">
@@ -328,9 +337,9 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <primitives:SaIcon Data="{StaticResource SaIconInformationCircleData}" Size="18" VerticalAlignment="Center" />
+                        <primitives:SaIcon Data="{StaticResource SaIconInformationCircleData}" Size="18" VerticalAlignment="Center" Foreground="{ThemeResource SaTextSecondaryBrush}" />
                         <TextBlock x:Uid="SettingsOpenAboutText" Grid.Column="1" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                        <primitives:SaIcon Grid.Column="2" Data="{StaticResource SaIconArrowRight01Data}" Size="17" VerticalAlignment="Center" />
+                        <primitives:SaIcon Grid.Column="2" Data="{StaticResource SaIconArrowRight01Data}" Size="17" VerticalAlignment="Center" Foreground="{ThemeResource SaTextSecondaryBrush}" />
                     </Grid>
                 </Button>
             </Grid>

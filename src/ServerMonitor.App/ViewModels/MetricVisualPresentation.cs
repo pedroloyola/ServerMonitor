@@ -59,6 +59,26 @@ public static class MetricVisualPresentation
     }
 
     /// <summary>
+    /// Boss decision (fix round 2), a deliberate derivation: the pulse's scale ceiling - the smallest of 25 / 50 / 75 / 100 %
+    /// at or above the highest visible sample (NaN ignored; no samples → 25). Quantised so the scale is deterministic and
+    /// can be stated in words ("escala até 25 %").
+    /// </summary>
+    public static int PulseCeiling(IReadOnlyList<double> samples)
+    {
+        ArgumentNullException.ThrowIfNull(samples);
+        var max = 0d;
+        foreach (var sample in samples)
+        {
+            if (!double.IsNaN(sample) && sample > max)
+            {
+                max = sample;
+            }
+        }
+
+        return max <= 25 ? 25 : max <= 50 ? 50 : max <= 75 ? 75 : 100;
+    }
+
+    /// <summary>
     /// H-UI5-3: the CPU pulse bars — REAL samples only. Takes the most recent measured CPU values of an existing history
     /// series (oldest → newest, at most <see cref="CpuPulseSampleCount"/>). Unmeasured points (offline: null) are not
     /// drawn and nothing is padded: fewer than 30 samples give fewer bars (the View right-aligns them), none give none.

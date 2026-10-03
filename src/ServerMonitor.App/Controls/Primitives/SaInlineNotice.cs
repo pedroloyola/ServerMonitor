@@ -56,11 +56,28 @@ public sealed class SaInlineNotice : ContentControl
         Update();
     }
 
+    /// <summary>
+    /// Pure rule (unit-tested; UI.5 Beacon C1 N3): the non-empty parts joined as sentences, never a doubled stop or a
+    /// trailing separator ("Não foi possível atualizar as métricas.", not "…métricas.. ").
+    /// </summary>
+    internal static string AccessibleName(string? title, string? message)
+    {
+        var parts = new[] { title, message }.Where(part => !string.IsNullOrWhiteSpace(part)).Select(part => part!.Trim()).ToList();
+        return parts.Count switch
+        {
+            0 => string.Empty,
+            1 => parts[0],
+            _ => string.Join(" ", parts[0].EndsWith('.') || parts[0].EndsWith('?') || parts[0].EndsWith('!') || parts[0].EndsWith('…')
+                ? parts[0]
+                : parts[0] + ".", parts[1])
+        };
+    }
+
     private void Update()
     {
         var error = Severity == SaNoticeSeverity.Error;
         AutomationProperties.SetLiveSetting(this, error ? AutomationLiveSetting.Assertive : AutomationLiveSetting.Polite);
-        AutomationProperties.SetName(this, string.IsNullOrWhiteSpace(Title) ? Message : $"{Title}. {Message}");
+        AutomationProperties.SetName(this, AccessibleName(Title, Message));
         VisualStateManager.GoToState(this, error ? "Error" : "Info", useTransitions: false);
         if (IsLoaded)
         {

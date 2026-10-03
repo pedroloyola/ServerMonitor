@@ -65,10 +65,6 @@
   <data name="EditServerDialog.Title" xml:space="preserve"><value>Edit server</value></data>
   <data name="EditServerDialog.PrimaryButtonText" xml:space="preserve"><value>Save changes</value></data>
   <data name="EditServerDialog.CloseButtonText" xml:space="preserve"><value>Cancel</value></data>
-  <data name="RemoveServerDialog.Title" xml:space="preserve"><value>Remove server?</value></data>
-  <data name="RemoveServerDialog.PrimaryButtonText" xml:space="preserve"><value>Remove</value></data>
-  <data name="RemoveServerDialog.CloseButtonText" xml:space="preserve"><value>Cancel</value></data>
-  <data name="RemoveServerDialogMessage.Text" xml:space="preserve"><value>This configuration will be permanently removed from this device:</value></data>
   <data name="SettingsHiddenServersTitle.Text" xml:space="preserve"><value>Hidden servers</value></data>
   <data name="SettingsHiddenServersDescription.Text" xml:space="preserve"><value>They stay saved but don't appear on the dashboard.</value></data>
   <data name="SettingsHiddenServersEmpty.Text" xml:space="preserve"><value>No hidden servers.</value></data>
@@ -166,7 +162,7 @@
   <data name="DiscoveredServerIgnoreFor" xml:space="preserve"><value>Ignore {0}</value></data>
   <data name="DiscoveredServerAutomationSummary" xml:space="preserve"><value>{0}, SSH, {1}, found on the network</value></data>
   <data name="SettingsIgnoredDiscoveriesTitle.Text" xml:space="preserve"><value>Ignored devices</value></data>
-  <data name="SettingsIgnoredDiscoveriesDescription.Text" xml:space="preserve"><value>Shows again the devices that are still on the network.</value></data>
+  <data name="SettingsIgnoredDiscoveriesDescription.Text" xml:space="preserve"><value>Shows devices still on the network again.</value></data>
   <data name="SettingsResetIgnoredButton.Content" xml:space="preserve"><value>Reset devices</value></data>
   <data name="SettingsResetIgnoredSuccess.Title" xml:space="preserve"><value>Devices reset</value></data>
   <data name="SettingsResetIgnoredSuccess.Message" xml:space="preserve"><value>Devices on the network can appear again.</value></data>
@@ -254,16 +250,15 @@
   <data name="SettingsHistoryClearError.Title" xml:space="preserve"><value>Couldn't clear history</value></data>
   <data name="SettingsHistoryClearError.Message" xml:space="preserve"><value>History is unavailable right now. Try again later.</value></data>
   <data name="HistoryClearConfirmTitle" xml:space="preserve"><value>Clear all history?</value></data>
-  <data name="HistoryClearConfirmMessage" xml:space="preserve"><value>This permanently removes all stored metric history. Servers, credentials and settings are not affected. This can't be undone.</value></data>
+  <data name="HistoryClearConfirmMessage" xml:space="preserve"><value>All metric records stored on this device will be deleted.</value></data>
   <data name="HistoryClearConfirmPrimary" xml:space="preserve"><value>Clear history</value></data>
-  <data name="HistoryClearConfirmClose" xml:space="preserve"><value>Cancel</value></data>
   <data name="SettingsResetHistoryButton.Content" xml:space="preserve"><value>Reset history</value></data>
   <data name="SettingsHistoryResetSuccess.Title" xml:space="preserve"><value>History reset</value></data>
   <data name="SettingsHistoryResetSuccess.Message" xml:space="preserve"><value>The local database was recreated and is ready for new samples.</value></data>
   <data name="SettingsHistoryResetError.Title" xml:space="preserve"><value>History could not be reset</value></data>
   <data name="SettingsHistoryResetError.Message" xml:space="preserve"><value>The local database could not be recreated. Try again later.</value></data>
   <data name="HistoryResetConfirmTitle" xml:space="preserve"><value>Reset the history database?</value></data>
-  <data name="HistoryResetConfirmMessage" xml:space="preserve"><value>This removes the unavailable history database and creates a new one. Servers, credentials, and settings are not affected. This action cannot be undone.</value></data>
+  <data name="HistoryResetConfirmMessage" xml:space="preserve"><value>The unavailable history database will be removed and replaced with a new one.</value></data>
   <data name="HistoryResetConfirmPrimary" xml:space="preserve"><value>Reset history</value></data>
   <!-- M11 Workloads (Docker + Services), read-only -->
   <data name="WorkloadsBackButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Back to server</value></data>
@@ -817,7 +812,7 @@
   <data name="ServerDetailRemoveFor" xml:space="preserve"><value>Remove {0}</value></data>
   <data name="ServerDetailHistoryFor" xml:space="preserve"><value>History for {0}</value></data>
   <data name="ServerDetailWorkloadsFor" xml:space="preserve"><value>Services and containers for {0}</value></data>
-  <data name="ServerDetailStaleReading" xml:space="preserve"><value>Reading out of date</value></data>
+  <data name="ServerDetailStaleReading" xml:space="preserve"><value>Out-of-date reading</value></data>
   <data name="ServerDetailLastUpdatedLabel" xml:space="preserve"><value>Last updated</value></data>
   <data name="ServerDetailUpdatedJustNow" xml:space="preserve"><value>Just now</value></data>
   <data name="SettingsDataTitle.Text" xml:space="preserve"><value>Data and servers</value></data>
@@ -894,4 +889,15 @@
   <data name="ServerDetailMetricUnit.Text" xml:space="preserve"><value>%</value></data>
   <data name="SettingsOpenDataButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Data and servers</value></data>
   <data name="SettingsOpenAboutButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>About ServerAlyzer</value></data>
+  <data name="ServerDetailCpuPulseAccessibleFormat" xml:space="preserve"><value>Pulse of the last {0} samples, scale up to {1}%</value></data>
+  <data name="ServerDetailHeaderSubtitleFormat" xml:space="preserve"><value>{0}   ·   {1}</value></data>
+  <data name="RemoveServerConfirmTitle" xml:space="preserve"><value>Remove this server?</value></data>
+  <data name="RemoveServerConfirmBodyFormat" xml:space="preserve"><value>The configuration of {0} will be permanently removed from this device.</value></data>
+  <data name="RemoveServerConfirmNote" xml:space="preserve"><value>The remote server is not changed. This can't be undone.</value></data>
+  <data name="RemoveServerConfirmPrimary" xml:space="preserve"><value>Remove server</value></data>
+  <data name="DestructiveConfirmClose" xml:space="preserve"><value>Cancel</value></data>
+  <data name="HistoryClearConfirmAffected" xml:space="preserve"><value>Local history · All servers</value></data>
+  <data name="HistoryClearConfirmNote" xml:space="preserve"><value>Servers, credentials and settings are kept. This can't be undone.</value></data>
+  <data name="HistoryResetConfirmAffected" xml:space="preserve"><value>Local history · unavailable database</value></data>
+  <data name="HistoryResetConfirmNote" xml:space="preserve"><value>Servers, credentials and settings are kept. This can't be undone.</value></data>
 </root>

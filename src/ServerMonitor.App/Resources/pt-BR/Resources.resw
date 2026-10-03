@@ -70,10 +70,6 @@
   <data name="EditServerDialog.Title" xml:space="preserve"><value>Editar servidor</value></data>
   <data name="EditServerDialog.PrimaryButtonText" xml:space="preserve"><value>Salvar alterações</value></data>
   <data name="EditServerDialog.CloseButtonText" xml:space="preserve"><value>Cancelar</value></data>
-  <data name="RemoveServerDialog.Title" xml:space="preserve"><value>Remover servidor?</value></data>
-  <data name="RemoveServerDialog.PrimaryButtonText" xml:space="preserve"><value>Remover</value></data>
-  <data name="RemoveServerDialog.CloseButtonText" xml:space="preserve"><value>Cancelar</value></data>
-  <data name="RemoveServerDialogMessage.Text" xml:space="preserve"><value>Esta configuração será removida permanentemente deste dispositivo:</value></data>
   <data name="SettingsHiddenServersTitle.Text" xml:space="preserve"><value>Servidores ocultos</value></data>
   <data name="SettingsHiddenServersDescription.Text" xml:space="preserve"><value>Continuam salvos, mas não aparecem no painel.</value></data>
   <data name="SettingsHiddenServersEmpty.Text" xml:space="preserve"><value>Nenhum servidor oculto.</value></data>
@@ -259,17 +255,16 @@
   <data name="SettingsHistoryClearError.Title" xml:space="preserve"><value>Não foi possível limpar o histórico</value></data>
   <data name="SettingsHistoryClearError.Message" xml:space="preserve"><value>O histórico está indisponível agora. Tente novamente mais tarde.</value></data>
   <data name="HistoryClearConfirmTitle" xml:space="preserve"><value>Limpar todo o histórico?</value></data>
-  <data name="HistoryClearConfirmMessage" xml:space="preserve"><value>Isto remove permanentemente todo o histórico de métricas armazenado. Servidores, credenciais e configurações não são afetados. Esta ação não pode ser desfeita.</value></data>
+  <data name="HistoryClearConfirmMessage" xml:space="preserve"><value>Todos os registros de métricas armazenados neste dispositivo serão excluídos.</value></data>
   <data name="HistoryClearConfirmPrimary" xml:space="preserve"><value>Limpar histórico</value></data>
-  <data name="HistoryClearConfirmClose" xml:space="preserve"><value>Cancelar</value></data>
-  <data name="SettingsResetHistoryButton.Content" xml:space="preserve"><value>Repor histórico</value></data>
-  <data name="SettingsHistoryResetSuccess.Title" xml:space="preserve"><value>Histórico reposto</value></data>
+  <data name="SettingsResetHistoryButton.Content" xml:space="preserve"><value>Redefinir histórico</value></data>
+  <data name="SettingsHistoryResetSuccess.Title" xml:space="preserve"><value>Histórico redefinido</value></data>
   <data name="SettingsHistoryResetSuccess.Message" xml:space="preserve"><value>A base local foi recriada e está pronta para novas amostras.</value></data>
-  <data name="SettingsHistoryResetError.Title" xml:space="preserve"><value>Não foi possível repor o histórico</value></data>
+  <data name="SettingsHistoryResetError.Title" xml:space="preserve"><value>Não foi possível redefinir o histórico</value></data>
   <data name="SettingsHistoryResetError.Message" xml:space="preserve"><value>A base local não pôde ser recriada. Tente novamente mais tarde.</value></data>
-  <data name="HistoryResetConfirmTitle" xml:space="preserve"><value>Repor a base de histórico?</value></data>
-  <data name="HistoryResetConfirmMessage" xml:space="preserve"><value>Isto remove a base de histórico indisponível e cria uma nova. Servidores, credenciais e configurações não são afetados. Esta ação não pode ser desfeita.</value></data>
-  <data name="HistoryResetConfirmPrimary" xml:space="preserve"><value>Repor histórico</value></data>
+  <data name="HistoryResetConfirmTitle" xml:space="preserve"><value>Redefinir a base de histórico?</value></data>
+  <data name="HistoryResetConfirmMessage" xml:space="preserve"><value>A base de histórico indisponível será removida e substituída por uma nova.</value></data>
+  <data name="HistoryResetConfirmPrimary" xml:space="preserve"><value>Redefinir histórico</value></data>
   <!-- M11 Workloads (Docker + Serviços), somente leitura -->
   <data name="WorkloadsBackButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Voltar ao servidor</value></data>
   <data name="WorkloadsBackButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Voltar</value></data>
@@ -850,7 +845,7 @@
   <data name="ServerDetailUserRow.Key" xml:space="preserve"><value>Usuário</value></data>
   <data name="ServerDetailAuthenticationRow.Key" xml:space="preserve"><value>Autenticação</value></data>
   <data name="ServerDetailSystemRow.Key" xml:space="preserve"><value>Sistema operacional</value></data>
-  <data name="ServerDetailConnectionStateRow.Key" xml:space="preserve"><value>Estado da conexão</value></data>
+  <data name="ServerDetailConnectionStateRow.Key" xml:space="preserve"><value>Status da conexão</value></data>
   <data name="ServerDetailRouteRow.Key" xml:space="preserve"><value>Rota</value></data>
   <data name="ServerDetailRouteRow.Value" xml:space="preserve"><value>Por meio de um jump host</value></data>
   <data name="ServerDetailAuthenticationSshKey" xml:space="preserve"><value>Chave SSH</value></data>
@@ -889,7 +884,7 @@
   <data name="SettingsAlwaysOnTopDescription.Text" xml:space="preserve"><value>Aplicado ao modo compacto.</value></data>
   <data name="SettingsOpenDataText.Text" xml:space="preserve"><value>Dados e servidores</value></data>
   <data name="SettingsOpenAboutText.Text" xml:space="preserve"><value>Sobre o ServerAlyzer</value></data>
-  <data name="SettingsLocalPreferences.Text" xml:space="preserve"><value>Estas preferências ficam salvas neste dispositivo.</value></data>
+  <data name="SettingsLocalPreferences.Text" xml:space="preserve"><value>Essas preferências ficam salvas neste dispositivo.</value></data>
   <data name="SettingsDataParent.Text" xml:space="preserve"><value>Configurações</value></data>
   <data name="SettingsServerRestoredTitle" xml:space="preserve"><value>Servidor restaurado</value></data>
   <data name="SettingsServerRestoredMessage" xml:space="preserve"><value>O servidor está visível na lista novamente.</value></data>
@@ -899,4 +894,15 @@
   <data name="ServerDetailMetricUnit.Text" xml:space="preserve"><value>%</value></data>
   <data name="SettingsOpenDataButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Dados e servidores</value></data>
   <data name="SettingsOpenAboutButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Sobre o ServerAlyzer</value></data>
+  <data name="ServerDetailCpuPulseAccessibleFormat" xml:space="preserve"><value>Pulso das últimas {0} amostras, escala até {1}%</value></data>
+  <data name="ServerDetailHeaderSubtitleFormat" xml:space="preserve"><value>{0}   ·   {1}</value></data>
+  <data name="RemoveServerConfirmTitle" xml:space="preserve"><value>Remover este servidor?</value></data>
+  <data name="RemoveServerConfirmBodyFormat" xml:space="preserve"><value>A configuração de {0} será removida permanentemente deste dispositivo.</value></data>
+  <data name="RemoveServerConfirmNote" xml:space="preserve"><value>O servidor remoto não é alterado. Esta ação não pode ser desfeita.</value></data>
+  <data name="RemoveServerConfirmPrimary" xml:space="preserve"><value>Remover servidor</value></data>
+  <data name="DestructiveConfirmClose" xml:space="preserve"><value>Cancelar</value></data>
+  <data name="HistoryClearConfirmAffected" xml:space="preserve"><value>Histórico local · Todos os servidores</value></data>
+  <data name="HistoryClearConfirmNote" xml:space="preserve"><value>Servidores, credenciais e configurações são mantidos. Esta ação não pode ser desfeita.</value></data>
+  <data name="HistoryResetConfirmAffected" xml:space="preserve"><value>Histórico local · base indisponível</value></data>
+  <data name="HistoryResetConfirmNote" xml:space="preserve"><value>Servidores, credenciais e configurações são mantidos. Esta ação não pode ser desfeita.</value></data>
 </root>

@@ -15,7 +15,10 @@ public enum SaStatusKind
     Stale
 }
 
-/// <summary>Which Manual metric colour a <see cref="SaMetricBar"/> uses (CPU / memory / disk).</summary>
+/// <summary>
+/// Which Manual metric colour a <see cref="SaMetricBar"/> / <see cref="SaSegmentMeter"/> uses (CPU / memory / disk).
+/// UI.5 Cortex C1 N-C6: a colour selector only - the identity tones of the Manual - never a domain rule or a severity.
+/// </summary>
 public enum SaMetricKind
 {
     Cpu,

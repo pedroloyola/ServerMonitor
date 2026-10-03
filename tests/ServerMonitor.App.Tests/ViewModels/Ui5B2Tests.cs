@@ -22,9 +22,12 @@ public sealed class Ui5B2Tests
 
     // ---- Boss B2 answer 4: metric text exactly as the rows (no % derived from bytes) ---------------------------------
 
+    /// <summary>Atlas C1 finding 2: the number format is pinned (pt-PT) whatever the runner's culture (here en-US around it).</summary>
     [Fact]
     public async Task BytesWithoutAPercent_ShowADash_LikeTheRows_ButTheBytesStayAsTheCaption()
     {
+        using var runner = new CultureScope("en-US");
+        using var culture = new CultureScope("pt-PT");
         var fleet = new Ui4TestKit.Fleet().Add("web", ServerHealth.Healthy, cpu: 10, mem: null, disk: null);
         var kit = Ui4TestKit.Create(fleet, new ResWLocalizationService("pt-PT"));
         var id = fleet.IdOf("web");
@@ -91,7 +94,7 @@ public sealed class Ui5B2Tests
         await kit.Dashboard.LoadAsync();
         using var detail = Open(kit, "web");
 
-        Assert.Equal("Ubuntu 24.04 LTS · 192.0.2.10", detail.HeaderSubtitle);
+        Assert.Equal("Ubuntu 24.04 LTS   ·   192.0.2.10", detail.HeaderSubtitle); // Prism C1 N-3: Figma 112:1802 spacing
         Assert.Equal("192.0.2.10:22", detail.Address);
         Assert.Equal("monitor", detail.Username);
         Assert.Equal("Chave SSH", detail.AuthenticationDisplay);
@@ -297,35 +300,49 @@ public sealed class Ui5B2Tests
         Assert.Equal(expected, SaSegmentMeter.EffectiveLit(lit, count));
 
     /// <summary>
-    /// Boss decision (fix round 1): ABSOLUTE scale - 0–100 % maps to the track height (auto-ranging misrepresents load).
-    /// DERIVED: a sample above 0 keeps the minimum visible height; a measured 0 draws no bar.
+    /// Boss decision (fix round 2, revising the round-1 absolute scale): the bars are relative to a CEILING of 25 / 50 / 75
+    /// / 100 % - the smallest step at or above the highest visible sample. DERIVED: a sample above 0 keeps the minimum
+    /// visible height; a measured 0 draws no bar.
     /// </summary>
+    [Theory]
+    [InlineData(new double[0], 25)]
+    [InlineData(new double[] { 24 }, 25)]
+    [InlineData(new double[] { 25 }, 25)]
+    [InlineData(new double[] { 25.1 }, 50)]
+    [InlineData(new double[] { 3, 51, 10 }, 75)]
+    [InlineData(new double[] { 76 }, 100)]
+    [InlineData(new double[] { 150 }, 100)]
+    [InlineData(new double[] { double.NaN, 10 }, 25)]
+    public void ThePulseCeiling_IsTheSmallestStepHoldingTheMax(double[] samples, int ceiling) =>
+        Assert.Equal(ceiling, MetricVisualPresentation.PulseCeiling(samples));
+
     [Fact]
-    public void ThePulse_RightAlignsFewSamples_RampsOpacity_OnAnAbsoluteScale()
+    public void ThePulse_RightAlignsFewSamples_RampsOpacity_RelativeToTheCeiling()
     {
-        var bars = SaPulseBars.Layout([50, 100, 0, 1], capacity: 30, trackHeight: 40, minimumHeight: 3);
+        var bars = SaPulseBars.Layout([12.5, 24, 0, 0.2], capacity: 30, trackHeight: 40, minimumHeight: 3, ceiling: 25);
 
         Assert.Equal(new[] { 26, 27, 28, 29 }, bars.Select(bar => bar.Slot));
-        Assert.Equal(new[] { 20d, 40d, 0d, 3d }, bars.Select(bar => bar.Height)); // 1% keeps the 3px minimum; 0% none
+        Assert.Equal(new[] { 20d, 38.4, 0d, 3d }, bars.Select(bar => bar.Height)); // 24 of 25 fills the track (Figma 112:1818)
         Assert.Equal(1d, bars[^1].Opacity);
         Assert.All(bars, bar => Assert.InRange(bar.Opacity, SaPulseBars.OldestOpacity, 1));
-        Assert.Empty(SaPulseBars.Layout([], 30, 40, 3)); // no samples: no bars
+        Assert.Empty(SaPulseBars.Layout([], 30, 40, 3, 25)); // no samples: no bars
 
-        var full = SaPulseBars.Layout(Enumerable.Range(1, 45).Select(i => (double)i).ToList(), 30, 40, 3);
+        var full = SaPulseBars.Layout(Enumerable.Range(1, 45).Select(i => (double)i).ToList(), 30, 40, 3, ceiling: 50);
         Assert.Equal(30, full.Count);
         Assert.Equal(SaPulseBars.OldestOpacity, full[0].Opacity);
         Assert.Equal(0, full[0].Slot);
-        Assert.Equal(Math.Round(40 * 16 / 100d, 2), full[0].Height); // the 30 most recent (16…45), absolute: 16% of 40
+        Assert.Equal(Math.Round(40 * 16 / 50d, 2), full[0].Height); // the 30 most recent (16…45), ceiling 50
     }
 
     [Theory]
-    [InlineData(22, 8.8)]
-    [InlineData(24, 9.6)]
-    [InlineData(100, 40)]
-    [InlineData(150, 40)]
-    [InlineData(0.2, 3)]
-    public void ThePulseHeight_IsTheAbsoluteShareOfTheTrack(double sample, double height) =>
-        Assert.Equal(height, Assert.Single(SaPulseBars.Layout([sample], 30, 40, 3)).Height);
+    [InlineData(22, 25, 35.2)]
+    [InlineData(24, 25, 38.4)]
+    [InlineData(25, 25, 40)]
+    [InlineData(60, 75, 32)]
+    [InlineData(150, 100, 40)]
+    [InlineData(0.2, 25, 3)]
+    public void ThePulseHeight_IsTheShareOfTheCeiling(double sample, double ceiling, double height) =>
+        Assert.Equal(height, Assert.Single(SaPulseBars.Layout([sample], 30, 40, 3, ceiling)).Height);
 
     // ---- Cortex B1 N-1 / N-7 / N-2 ------------------------------------------------------------------------------------
 
@@ -380,21 +397,56 @@ public sealed class Ui5B2Tests
     public void N2_TheRowAddress_UsesTheEndpointRule_WhenAPortIsShown(string host, int port, string expected) =>
         Assert.Equal(expected, OverviewPresentation.Address(host, port));
 
-    /// <summary>A-12 (Boss): every pt-PT string the three UI.5 pages show uses "tu", never the formal "você" forms.</summary>
+    /// <summary>
+    /// A-12 (Boss): every pt-PT string the three UI.5 pages show uses "tu", never the formal forms. Atlas C1 finding 4: the
+    /// markers are case-insensitive and the scan covers the x:Uid copy of the three pages AND the dynamic copy their view
+    /// models put on them (toasts, notices, dialogs, accessible formats) - listed explicitly below. Prism C1 N-8 added
+    /// "Reinicie". The M14.6 backup copy is outside A-12 (Prism N-14: backlog) and is not scanned.
+    /// </summary>
     [Fact]
     public void ThePtPtCopyOfTheUi5Pages_UsesTu()
+    {
+        var offenders = TonedOffenders(Ui5PtPtKeys());
+
+        Assert.Empty(offenders);
+    }
+
+    /// <summary>The tone scan's own counterproof: a formal string in either case, static or dynamic, is caught.</summary>
+    [Theory]
+    [InlineData("Tente novamente mais tarde.")]
+    [InlineData("tente novamente mais tarde.")]
+    [InlineData("VOCÊ pode restaurar o servidor.")]
+    [InlineData("Reinicie a aplicação.")]
+    [InlineData("Guarde os seus servidores.")]
+    public void TheToneScan_CatchesFormalCopy_InAnyCase(string formal) =>
+        Assert.True(FormalPtPt.IsMatch(formal), formal);
+
+    private static readonly System.Text.RegularExpressions.Regex FormalPtPt = new(
+        @"\b(você|tente|guarde|escolha|utilize|receba|reponha|abra|selecione|introduza|reinicie|confirme|verifique|aguarde)\b|\ba sua\b|\bos seus\b|\bque pode\b",
+        System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+    // The dynamic copy the three pages show (resource-key prefixes read by their view models / dialogs).
+    private static readonly string[] Ui5DynamicPrefixes =
+    [
+        "ServerDetail", "ServersNotice", "SettingsServerRestored", "SettingsResetIgnored", "SettingsHistory", "SettingsToast",
+        "SettingsAboutVersion", "RemoveServerConfirm", "HistoryClearConfirm", "HistoryResetConfirm", "DestructiveConfirm",
+        "ServerOperationError", "ServerStatus", "ServerMetric", "HiddenServerRestore", "SettingsRestartNotice"
+    ];
+
+    private static Dictionary<string, string> Ui5PtPtKeys()
     {
         var resources = ResWLocalizationService.Load("pt-PT");
         var uids = new[] { "Views/ServerDetailPage.xaml", "Views/SettingsPage.xaml", "Views/SettingsDataPage.xaml" }
             .SelectMany(file => AppSourceTree.LoadXaml(file).Descendants())
             .Select(e => (string?)e.Attribute(AppSourceTree.Xaml + "Uid")).OfType<string>().ToHashSet();
-        var formal = new System.Text.RegularExpressions.Regex(
-            @"\b(você|Tente|Guarde|Escolha|Utilize|Receba|Reponha|Abra|Selecione|Introduza)\b|\b(A|a) sua\b|\bos seus\b|\bque pode\b");
-        var offenders = resources.Where(entry => uids.Contains(entry.Key.Split('.')[0]) && formal.IsMatch(entry.Value))
-            .Select(entry => $"{entry.Key} = {entry.Value}").ToList();
-
-        Assert.Empty(offenders);
+        return resources
+            .Where(entry => (uids.Contains(entry.Key.Split('.')[0]) || Ui5DynamicPrefixes.Any(prefix => entry.Key.StartsWith(prefix, StringComparison.Ordinal)))
+                && !entry.Key.StartsWith("Backup", StringComparison.Ordinal)) // M14.6: Prism N-14 backlog, outside A-12
+            .ToDictionary(entry => entry.Key, entry => entry.Value);
     }
+
+    private static List<string> TonedOffenders(Dictionary<string, string> keys) =>
+        keys.Where(entry => FormalPtPt.IsMatch(entry.Value)).Select(entry => $"{entry.Key} = {entry.Value}").ToList();
 
     private sealed class ThrowingMaintenance : IHistoryMaintenanceService
     {
@@ -528,13 +580,23 @@ public sealed class Ui5B2Tests
         return Task.FromResult(true);
     };
 
-    private sealed class CultureScope : IDisposable
+    /// <summary>Atlas C1 finding 2: pins BOTH the UI culture and the formatting culture, then restores them.</summary>
+    internal sealed class CultureScope : IDisposable
     {
-        private readonly System.Globalization.CultureInfo _previous = System.Globalization.CultureInfo.CurrentUICulture;
+        private readonly System.Globalization.CultureInfo _previousUi = System.Globalization.CultureInfo.CurrentUICulture;
+        private readonly System.Globalization.CultureInfo _previous = System.Globalization.CultureInfo.CurrentCulture;
 
-        public CultureScope(string culture) => System.Globalization.CultureInfo.CurrentUICulture = new System.Globalization.CultureInfo(culture);
+        public CultureScope(string culture)
+        {
+            System.Globalization.CultureInfo.CurrentUICulture = new System.Globalization.CultureInfo(culture);
+            System.Globalization.CultureInfo.CurrentCulture = new System.Globalization.CultureInfo(culture);
+        }
 
-        public void Dispose() => System.Globalization.CultureInfo.CurrentUICulture = _previous;
+        public void Dispose()
+        {
+            System.Globalization.CultureInfo.CurrentUICulture = _previousUi;
+            System.Globalization.CultureInfo.CurrentCulture = _previous;
+        }
     }
 
     private sealed class ConfirmingDialogs : IServerDialogService

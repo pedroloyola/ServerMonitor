@@ -41,15 +41,25 @@ public sealed partial class SettingsDataPage : Page, ISettingsNavigationTarget
         await ViewModel.LoadAsync();
     }
 
-    private void OnUnloaded(object sender, Microsoft.UI.Xaml.RoutedEventArgs e) =>
+    private void OnUnloaded(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    {
         Backup.PropertyChanged -= OnBackupPropertyChanged;
+        ViewModel.NotifyDataNavigatedFrom(); // Boss fix round 2 decision 2: the toast never outlives the visit
+    }
 
     private void BringRequestedSectionIntoView()
     {
         ViewModel.NotifyDataNavigatedTo();
         if (ViewModel.IsAboutSectionRequested)
         {
+            // H-UI5-4 / Beacon C1 M4: the About card is brought into view AND focused (its action, "Ver no GitHub"), so the
+            // next Tab continues from there - cold (Loaded) and warm (already shown). After the layout pass: realized.
             AboutSection.StartBringIntoView();
+            DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+            {
+                GitHubButton.Focus(Microsoft.UI.Xaml.FocusState.Programmatic);
+                AboutSection.StartBringIntoView();
+            });
         }
     }
 

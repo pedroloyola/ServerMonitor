@@ -34,13 +34,15 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
     private readonly ServerDetailReturnFocus? _returnFocus;
     private readonly ServersReturnNotice? _serversNotice;
     private readonly PresentationClock _clock;
-    private readonly MonitoringThresholds _thresholds;
     private readonly Action _flushAction;
     private ServerCardViewModel? _card;
     private Guid _serverId;
     private bool _subscribed;
     private bool _left;
     private bool _disposed;
+    // Cortex C1 N-C7 (accepted, documented): a rebuild unrelated to the operation that lands after it completed but before
+    // the operation's own rebuild would clear this intent, so the page would leave for the origin without the notice.
+    // Every ServersChanged comes from a user action today, so the window is practically unreachable.
     private ServersNoticeKind? _exitOperation;
     private bool _exitOperationCompleted;
     private DateTimeOffset _readingNow;
@@ -70,8 +72,9 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
         _returnFocus = returnFocus;
         _serversNotice = serversNotice;
         _clock = clock ?? PresentationClock.System;
-        // The same thresholds instance the engine is composed with (App registers one MonitoringOptions).
-        _thresholds = (monitoringOptions ?? MonitoringOptions.Default).Thresholds;
+        // Prism C1 N-4 decision: the Detail shows no severity colour (its metric colours are identity), so the engine's
+        // thresholds are not read here; the parameter stays for the composition root's constructor shape.
+        _ = monitoringOptions;
         _flushAction = Flush;
         GoBackCommand = new RelayCommand(() => Leave(serverGone: false));
         RefreshCommand = new RelayCommand(
@@ -89,10 +92,15 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
 
     // --- Shared InfoBars (SHOULD-3: one source, the dashboard) -------------------------------------------------------
 
-    /// <summary>A failed Ocultar/Remover started here is reported HERE — the same error the Visão geral shows.</summary>
+    /// <summary>
+    /// A failed Ocultar/Remover started here is reported HERE — the same error the Visão geral shows. Boss fix round 2
+    /// decision 3: an error about ANOTHER server never appears on this page; a global error (no server) still does
+    /// (UI.4 SHOULD-3). Closing it here closes the shared notice.
+    /// </summary>
     public bool IsOperationErrorOpen
     {
-        get => _dashboard.IsOperationErrorOpen;
+        get => _dashboard.IsOperationErrorOpen
+            && (_dashboard.OperationErrorServerId is not { } scope || scope == _serverId);
         set => _dashboard.IsOperationErrorOpen = value;
     }
 
@@ -157,10 +165,23 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
     /// <summary>The detected system from the last snapshot ("Ubuntu 24.04 LTS"), or null — omitted, never invented.</summary>
     public string? DetectedSystemDisplay => ServerContextPresentation.OperatingSystemDisplay(_card?.MetricsSnapshot);
 
-    /// <summary>Figma 112:1802 "Ubuntu 24.04 LTS · 192.168.1.10": the system shown in Ligação, then the address as the rows show it.</summary>
-    public string HeaderSubtitle => _card is null
-        ? string.Empty
-        : ServerContextPresentation.Join(SystemDisplay, OverviewPresentation.Address(_card.Host, _card.Port));
+    /// <summary>
+    /// Figma 112:1802 "Ubuntu 24.04 LTS   ·   192.168.1.10" (Prism C1 N-3: three spaces each side, a format key): the
+    /// system shown in Ligação, then the address as the rows show it; the address alone when no system is known.
+    /// </summary>
+    public string HeaderSubtitle
+    {
+        get
+        {
+            if (_card is null)
+            {
+                return string.Empty;
+            }
+
+            var address = OverviewPresentation.Address(_card.Host, _card.Port);
+            return string.IsNullOrWhiteSpace(SystemDisplay) ? address : Format("ServerDetailHeaderSubtitleFormat", SystemDisplay, address);
+        }
+    }
 
     /// <summary>The detected system when the collector reported one, else the configured one (never invented).</summary>
     public string SystemDisplay => DetectedSystemDisplay ?? ConfiguredSystemDisplay;
@@ -170,7 +191,9 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
 
     /// <summary>Ligação · Autenticação: the configured method (Chave SSH / Palavra-passe / Não configurada). Never a secret.</summary>
     public string AuthenticationDisplay => _localization.GetString(
-        "ServerDetailAuthentication" + (_card?.Server.AuthenticationMethod ?? AuthenticationMethod.NotConfigured));
+        "ServerDetailAuthentication" + (_card?.Server.AuthenticationMethod is { } method && Enum.IsDefined(method)
+            ? method
+            : AuthenticationMethod.NotConfigured)); // Cortex C1 N-C3: an undefined value never builds a missing key
 
     /// <summary>Intervalo: the server's refresh interval ("30 segundos", "5 minutos").</summary>
     public string IntervalDisplay
@@ -223,7 +246,9 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
                 AccessiblePercent(_card.HasDiskPercent, _card.DiskUsageValue),
                 Address,
                 ConfiguredSystemDisplay);
-            return IsReadingStale ? string.Join(", ", summary, StaleText) : summary;
+            return IsReadingStale
+                ? string.Join(", ", summary, StaleText, Format("ServerDetailMetricAccessibleFormat", LastUpdatedLabel, LastUpdatedOrDash))
+                : summary;
         }
     }
 
@@ -256,6 +281,9 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
     /// <summary>A collection failed and there is no snapshot to fall back on.</summary>
     public bool HasCollectionError => _card?.HasMetricsError == true;
 
+    /// <summary>Prism C1 N-7: one notice, the most specific - a connection problem replaces the generic collection error.</summary>
+    public bool ShowsCollectionError => HasCollectionError && !HasConnectionProblem;
+
     public string? CollectionErrorText => _card?.MetricsErrorDisplay;
 
     /// <summary>"Sem ligação" (engine health Offline) — a derived notice, not a new state.</summary>
@@ -266,11 +294,11 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
         && ServerStatusPresentation.ShowsRetainedReadingAsStale(_card.Health, _card.IsStale, _card.HasMetrics);
 
     /// <summary>
-    /// "Última atualização há N min", else the plain "Leitura desatualizada" text. Boss B2 decision (single source): the age
-    /// is the SAME one the "Última atualização" value shows - one timestamp (the engine's last success) and one clock read
-    /// per reading (ReadClock) - so the two never disagree at a minute boundary.
+    /// Prism C1 N-6: the stale chip always says "Leitura desatualizada"; the age is said once, by the "Última atualização"
+    /// value beside it (one timestamp, one clock read per reading - the Boss B2 single-source decision), so the header
+    /// never repeats the same datum.
     /// </summary>
-    public string? StaleText => IsReadingStale ? StaleAge() : null;
+    public string? StaleText => IsReadingStale ? _localization.GetString("ServerDetailStaleReading") : null;
 
     public bool HasReading => _card?.HasMetrics == true;
 
@@ -293,20 +321,6 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
     private TimeSpan AgeOf(DateTimeOffset lastSuccessUtc) =>
         _readingNow - lastSuccessUtc is var age && age > TimeSpan.Zero ? age : TimeSpan.Zero;
 
-    // The card's StaleAgeDisplay buckets (d / h / min), over the shared age. Under one minute (or with no last success) the
-    // generic "Leitura desatualizada" is shown: a rounded-up "1 min" would contradict "Há 8 segundos" beside it.
-    private string StaleAge()
-    {
-        if (_card?.LastSuccessAt is not { } success || AgeOf(success) is var age && age.TotalMinutes < 1)
-        {
-            return _localization.GetString("ServerDetailStaleReading");
-        }
-
-        return age.TotalDays >= 1 ? Format("ServerMetricsStaleDaysFormat", (int)age.TotalDays)
-            : age.TotalHours >= 1 ? Format("ServerMetricsStaleHoursFormat", (int)age.TotalHours)
-            : Format("ServerMetricsStaleMinutesFormat", (int)age.TotalMinutes);
-    }
-
     // --- Connection (read-only; M14 semantics untouched) ------------------------------------------------------------
 
     public ServerConnectionState ConnectionState => _card?.ConnectionState ?? ServerConnectionState.NeverConnected;
@@ -318,6 +332,12 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
     public bool HasConnectionProblem => ConnectionState is ServerConnectionState.AuthenticationFailed
         or ServerConnectionState.HostKeyUnknown
         or ServerConnectionState.HostKeyMismatch;
+
+    /// <summary>
+    /// Prism C1 M-6: the Ligação card has the Figma's 4 rows; the DERIVED "Estado da ligação" row appears only when the
+    /// state is something other than a verified connection (not yet tested, testing, failed) - never repeating "Saudável".
+    /// </summary>
+    public bool ShowsConnectionStateRow => _card is not null && ConnectionState != ServerConnectionState.Connected;
 
     /// <summary>Reached through a jump host (ProxyJump). Presence only — never its credentials, key paths or fingerprints.</summary>
     public bool IsRouted => _card?.Server.Route?.Jump is not null;
@@ -333,11 +353,25 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
     public string CpuValueText => Number(HasCpuPercent, _card?.CpuUsageValue ?? 0);
 
     /// <summary>The whole card as one accessible sentence ("CPU: 24%").</summary>
-    public string CpuAccessibleName => Format("ServerDetailMetricAccessibleFormat", _localization.GetString("ServerMetricsCpuLabel.Text"), CpuAccessibleValue);
+    /// <summary>
+    /// "CPU: 24%", plus - when the pulse shows samples - its real values in words (Boss fix round 2: the bars are relative
+    /// to a quantised ceiling, so the name states the sample count and that ceiling, "escala até 25%").
+    /// </summary>
+    public string CpuAccessibleName
+    {
+        get
+        {
+            var name = Format("ServerDetailMetricAccessibleFormat", _localization.GetString("ServerMetricsCpuLabel.Text"), CpuAccessibleValue);
+            return _cpuPulse.Count == 0
+                ? name
+                : string.Join(". ", name, Format("ServerDetailCpuPulseAccessibleFormat", _cpuPulse.Count, CpuPulseCeiling));
+        }
+    }
+
+    /// <summary>The pulse's scale ceiling (25 / 50 / 75 / 100 %), the one the bars use.</summary>
+    public int CpuPulseCeiling => MetricVisualPresentation.PulseCeiling(_cpuPulse);
 
     public string CpuAccessibleValue => AccessiblePercent(HasCpuPercent, _card?.CpuUsageValue ?? 0);
-
-    public ServerHealth CpuSeverity => Severity(HasCpuPercent, _card?.CpuUsageValue, _thresholds.CpuWarning, _thresholds.CpuCritical);
 
     /// <summary>H-UI5-3: real CPU samples from local history (oldest → newest, ≤ 30). Empty draws no bars.</summary>
     public IReadOnlyList<double> CpuPulseSamples => _cpuPulse;
@@ -357,9 +391,6 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
 
     public string MemoryAccessibleValue => AccessiblePercent(HasMemoryPercent, _card?.MemoryUsageValue ?? 0);
 
-    public ServerHealth MemorySeverity =>
-        Severity(HasMemoryPercent, _card?.MemoryUsageValue, _thresholds.MemoryWarning, _thresholds.MemoryCritical);
-
     /// <summary>A-4: lit memory segments out of 28; null = unknown (empty track + "—").</summary>
     public int? MemoryLitSegments => MetricVisualPresentation.LitSegments(
         HasMemoryPercent ? _card!.MemoryUsageValue : null, MetricVisualPresentation.MemorySegmentCount);
@@ -378,8 +409,6 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
     public string? DiskLegend => BytesOf(_card?.MetricsSnapshot?.DiskUsedBytes, _card?.MetricsSnapshot?.DiskTotalBytes);
 
     public string DiskAccessibleValue => AccessiblePercent(HasDiskPercent, _card?.DiskUsageValue ?? 0);
-
-    public ServerHealth DiskSeverity => Severity(HasDiskPercent, _card?.DiskUsageValue, _thresholds.DiskWarning, _thresholds.DiskCritical);
 
     /// <summary>A-4: lit disk segments out of 14; null = unknown (empty track + "—").</summary>
     public int? DiskLitSegments => MetricVisualPresentation.LitSegments(
@@ -462,7 +491,7 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
             OnPropertyChanged(e.PropertyName);
 
             // An operation that failed here leaves the server in place: a later, unrelated disappearance goes to the origin.
-            if (_dashboard.IsOperationErrorOpen || _dashboard.IsConfigurationLockedOpen)
+            if (IsOperationErrorOpen || _dashboard.IsConfigurationLockedOpen)
             {
                 _exitOperation = null;
                 _exitOperationCompleted = false;
@@ -721,7 +750,6 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
             Raise(Args.CpuValueText);
             Raise(Args.CpuAccessibleName);
             Raise(Args.CpuAccessibleValue);
-            Raise(Args.CpuSeverity);
         }
 
         if ((dirty & Change.Memory) != 0)
@@ -732,7 +760,6 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
             Raise(Args.MemoryAccessibleName);
             Raise(Args.MemoryLegend);
             Raise(Args.MemoryAccessibleValue);
-            Raise(Args.MemorySeverity);
             Raise(Args.MemoryLitSegments);
             Raise(Args.MemoryLitCount);
         }
@@ -745,7 +772,6 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
             Raise(Args.DiskAccessibleName);
             Raise(Args.DiskLegend);
             Raise(Args.DiskAccessibleValue);
-            Raise(Args.DiskSeverity);
             Raise(Args.DiskLitSegments);
             Raise(Args.DiskLitCount);
         }
@@ -774,6 +800,7 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
             Raise(Args.StatusLabel);
             Raise(Args.IsRefreshing);
             Raise(Args.HasCollectionError);
+            Raise(Args.ShowsCollectionError);
             Raise(Args.CollectionErrorText);
             ((RelayCommand)RefreshCommand).NotifyCanExecuteChanged();
         }
@@ -783,6 +810,8 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
             Raise(Args.ConnectionState);
             Raise(Args.ConnectionStateDisplay);
             Raise(Args.HasConnectionProblem);
+            Raise(Args.ShowsCollectionError);
+            Raise(Args.ShowsConnectionStateRow);
         }
 
         if ((dirty & (Change.Status | Change.Cpu | Change.Memory | Change.Disk | Change.Reading)) != 0)
@@ -832,8 +861,16 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
         _ = LoadCpuPulseAsync(_card.Server.Id, _pulseCancellation.Token);
     }
 
+    /// <summary>
+    /// Test seam (Atlas C1 finding 1): raised once per pulse read when the view model has FINISHED processing it - true
+    /// when it set the samples, false when it discarded them (superseded, cancelled, page gone, failed). Tests wait on
+    /// this normative event instead of the history double's task.
+    /// </summary>
+    internal event Action<bool>? PulseReadSettled;
+
     private async Task LoadCpuPulseAsync(Guid serverId, CancellationToken cancellationToken)
     {
+        var applied = false;
         try
         {
             var result = await _history!.GetHistoryAsync(serverId, HistoryTimeRange.LastHour, cancellationToken).ConfigureAwait(true);
@@ -843,6 +880,7 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
             }
 
             SetCpuPulse(MetricVisualPresentation.CpuPulse(result.Cpu));
+            applied = true;
         }
         catch (OperationCanceledException)
         {
@@ -856,6 +894,10 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
                 SetCpuPulse([]);
             }
         }
+        finally
+        {
+            PulseReadSettled?.Invoke(applied);
+        }
     }
 
     private void SetCpuPulse(IReadOnlyList<double> samples)
@@ -868,6 +910,8 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
         _cpuPulse = samples;
         Raise(Args.CpuPulseSamples);
         Raise(Args.HasCpuPulse);
+        Raise(Args.CpuPulseCeiling);
+        Raise(Args.CpuAccessibleName);
     }
 
     // --- Formatting ------------------------------------------------------------------------------------------------
@@ -907,9 +951,6 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
         string Join(string first, string? second) =>
             second is null ? first : string.Join(_localization.GetString("ServerDetailDurationSeparator"), first, second);
     }
-
-    private static ServerHealth Severity(bool known, double? value, double warning, double critical) =>
-        known ? OverviewPresentation.MetricSeverity(value, warning, critical) : ServerHealth.Healthy;
 
     private string AccessiblePercent(bool known, double value) => ServerStatusPresentation.AccessiblePercent(known, value, _localization);
 
@@ -957,6 +998,8 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
         public static readonly PropertyChangedEventArgs IsRefreshing = new(nameof(ServerDetailViewModel.IsRefreshing));
         public static readonly PropertyChangedEventArgs IsMetricsUnsupported = new(nameof(ServerDetailViewModel.IsMetricsUnsupported));
         public static readonly PropertyChangedEventArgs HasCollectionError = new(nameof(ServerDetailViewModel.HasCollectionError));
+        public static readonly PropertyChangedEventArgs ShowsCollectionError = new(nameof(ServerDetailViewModel.ShowsCollectionError));
+        public static readonly PropertyChangedEventArgs ShowsConnectionStateRow = new(nameof(ServerDetailViewModel.ShowsConnectionStateRow));
         public static readonly PropertyChangedEventArgs CollectionErrorText = new(nameof(ServerDetailViewModel.CollectionErrorText));
         public static readonly PropertyChangedEventArgs IsWithoutConnection = new(nameof(ServerDetailViewModel.IsWithoutConnection));
         public static readonly PropertyChangedEventArgs IsReadingStale = new(nameof(ServerDetailViewModel.IsReadingStale));
@@ -972,18 +1015,16 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
         public static readonly PropertyChangedEventArgs HasCpuPercent = new(nameof(ServerDetailViewModel.HasCpuPercent));
         public static readonly PropertyChangedEventArgs CpuDisplay = new(nameof(ServerDetailViewModel.CpuDisplay));
         public static readonly PropertyChangedEventArgs CpuAccessibleValue = new(nameof(ServerDetailViewModel.CpuAccessibleValue));
-        public static readonly PropertyChangedEventArgs CpuSeverity = new(nameof(ServerDetailViewModel.CpuSeverity));
         public static readonly PropertyChangedEventArgs CpuPulseSamples = new(nameof(ServerDetailViewModel.CpuPulseSamples));
         public static readonly PropertyChangedEventArgs HasCpuPulse = new(nameof(ServerDetailViewModel.HasCpuPulse));
+        public static readonly PropertyChangedEventArgs CpuPulseCeiling = new(nameof(ServerDetailViewModel.CpuPulseCeiling));
         public static readonly PropertyChangedEventArgs HasMemoryPercent = new(nameof(ServerDetailViewModel.HasMemoryPercent));
         public static readonly PropertyChangedEventArgs MemoryDisplay = new(nameof(ServerDetailViewModel.MemoryDisplay));
         public static readonly PropertyChangedEventArgs MemoryAccessibleValue = new(nameof(ServerDetailViewModel.MemoryAccessibleValue));
-        public static readonly PropertyChangedEventArgs MemorySeverity = new(nameof(ServerDetailViewModel.MemorySeverity));
         public static readonly PropertyChangedEventArgs MemoryLitSegments = new(nameof(ServerDetailViewModel.MemoryLitSegments));
         public static readonly PropertyChangedEventArgs HasDiskPercent = new(nameof(ServerDetailViewModel.HasDiskPercent));
         public static readonly PropertyChangedEventArgs DiskDisplay = new(nameof(ServerDetailViewModel.DiskDisplay));
         public static readonly PropertyChangedEventArgs DiskAccessibleValue = new(nameof(ServerDetailViewModel.DiskAccessibleValue));
-        public static readonly PropertyChangedEventArgs DiskSeverity = new(nameof(ServerDetailViewModel.DiskSeverity));
         public static readonly PropertyChangedEventArgs DiskLitSegments = new(nameof(ServerDetailViewModel.DiskLitSegments));
         public static readonly PropertyChangedEventArgs CpuValueText = new(nameof(ServerDetailViewModel.CpuValueText));
         public static readonly PropertyChangedEventArgs CpuAccessibleName = new(nameof(ServerDetailViewModel.CpuAccessibleName));

@@ -49,7 +49,13 @@ public sealed partial class SettingsPage : Page, ISettingsNavigationTarget
         ViewModel.NotifyNavigatedTo();
         if (ViewModel.IsBackgroundSectionRequested)
         {
+            // M13 S2 §11 / Beacon C1 M4 (same pattern as About): in view AND focused on its toggle, after the layout pass.
             BackgroundSection.StartBringIntoView();
+            DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+            {
+                BackgroundControl.Focus(Microsoft.UI.Xaml.FocusState.Programmatic);
+                BackgroundSection.StartBringIntoView();
+            });
         }
     }
 }
