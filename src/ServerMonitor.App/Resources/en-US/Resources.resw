@@ -892,4 +892,6 @@
   <data name="SettingsCredentialsCaption.Text" xml:space="preserve"><value>Passwords and passphrases are protected by Windows Credential Manager.</value></data>
   <data name="SettingsToastCloseName" xml:space="preserve"><value>Close notice</value></data>
   <data name="ServerDetailMetricUnit.Text" xml:space="preserve"><value>%</value></data>
+  <data name="SettingsOpenDataButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Data and servers</value></data>
+  <data name="SettingsOpenAboutButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>About ServerAlyzer</value></data>
 </root>

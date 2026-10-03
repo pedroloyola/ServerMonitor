@@ -12,66 +12,66 @@
     </Page.Resources>
 
     <ScrollViewer x:Name="PageScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-        <StackPanel x:Name="PageRoot" Padding="{StaticResource SaPagePadding}" Spacing="{StaticResource SaSpace24}" MaxWidth="1120">
-            <VisualStateManager.VisualStateGroups>
-                <VisualStateGroup x:Name="WidthStates">
-                    <VisualState x:Name="Wide">
-                        <VisualState.StateTriggers>
-                            <AdaptiveTrigger MinWindowWidth="1040" />
-                        </VisualState.StateTriggers>
-                    </VisualState>
-                    <!-- 700-1039: metric cards and Ligação / Explorar one per row; actions stay beside the name. -->
-                    <VisualState x:Name="Medium">
-                        <VisualState.StateTriggers>
-                            <AdaptiveTrigger MinWindowWidth="700" />
-                        </VisualState.StateTriggers>
-                        <VisualState.Setters>
-                            <Setter Target="MetricsColumn2.Width" Value="0" />
-                            <Setter Target="MetricsColumn3.Width" Value="0" />
-                            <Setter Target="MetricsGrid.ColumnSpacing" Value="0" />
-                            <Setter Target="MetricsGrid.RowSpacing" Value="{StaticResource SaSpace16}" />
-                            <Setter Target="MemoryCard.(Grid.Column)" Value="0" />
-                            <Setter Target="MemoryCard.(Grid.Row)" Value="1" />
-                            <Setter Target="DiskCard.(Grid.Column)" Value="0" />
-                            <Setter Target="DiskCard.(Grid.Row)" Value="2" />
-                            <Setter Target="CollectingColumns.ColumnSpacing" Value="{StaticResource SaSpace16}" />
-                            <Setter Target="DeeperColumn2.Width" Value="0" />
-                            <Setter Target="DeeperGrid.ColumnSpacing" Value="0" />
-                            <Setter Target="DeeperGrid.RowSpacing" Value="{StaticResource SaSpace24}" />
-                            <Setter Target="ExploreCard.(Grid.Column)" Value="0" />
-                            <Setter Target="ExploreCard.(Grid.Row)" Value="1" />
-                        </VisualState.Setters>
-                    </VisualState>
-                    <!-- < 700: compact padding; the actions move under the identity, left-aligned. -->
-                    <VisualState x:Name="Narrow">
-                        <VisualState.StateTriggers>
-                            <AdaptiveTrigger MinWindowWidth="0" />
-                        </VisualState.StateTriggers>
-                        <VisualState.Setters>
-                            <Setter Target="PageRoot.Padding" Value="{StaticResource SaPagePaddingCompact}" />
-                            <Setter Target="MetricsColumn2.Width" Value="0" />
-                            <Setter Target="MetricsColumn3.Width" Value="0" />
-                            <Setter Target="MetricsGrid.ColumnSpacing" Value="0" />
-                            <Setter Target="MetricsGrid.RowSpacing" Value="{StaticResource SaSpace16}" />
-                            <Setter Target="MemoryCard.(Grid.Column)" Value="0" />
-                            <Setter Target="MemoryCard.(Grid.Row)" Value="1" />
-                            <Setter Target="DiskCard.(Grid.Column)" Value="0" />
-                            <Setter Target="DiskCard.(Grid.Row)" Value="2" />
-                            <Setter Target="CollectingColumns.ColumnSpacing" Value="{StaticResource SaSpace12}" />
-                            <Setter Target="DeeperColumn2.Width" Value="0" />
-                            <Setter Target="DeeperGrid.ColumnSpacing" Value="0" />
-                            <Setter Target="DeeperGrid.RowSpacing" Value="{StaticResource SaSpace24}" />
-                            <Setter Target="ExploreCard.(Grid.Column)" Value="0" />
-                            <Setter Target="ExploreCard.(Grid.Row)" Value="1" />
-                            <Setter Target="IdentityActions.(Grid.Row)" Value="1" />
-                            <Setter Target="IdentityActions.(Grid.Column)" Value="0" />
-                            <Setter Target="IdentityActions.(Grid.ColumnSpan)" Value="3" />
-                            <Setter Target="IdentityActions.HorizontalAlignment" Value="Left" />
-                            <Setter Target="IdentityGrid.RowSpacing" Value="{StaticResource SaSpace16}" />
-                        </VisualState.Setters>
-                    </VisualState>
-                </VisualStateGroup>
-            </VisualStateManager.VisualStateGroups>
+        <VisualStateManager.VisualStateGroups>
+            <VisualStateGroup x:Name="WidthStates">
+                <VisualState x:Name="Wide">
+                    <VisualState.StateTriggers>
+                        <AdaptiveTrigger MinWindowWidth="1040" />
+                    </VisualState.StateTriggers>
+                </VisualState>
+                <!-- 700-1039: metric cards and Ligação / Explorar one per row; actions stay beside the name. -->
+                <VisualState x:Name="Medium">
+                    <VisualState.StateTriggers>
+                        <AdaptiveTrigger MinWindowWidth="700" />
+                    </VisualState.StateTriggers>
+                    <VisualState.Setters>
+                        <Setter Target="MetricsColumn2.Width" Value="0" />
+                        <Setter Target="MetricsColumn3.Width" Value="0" />
+                        <Setter Target="MetricsGrid.ColumnSpacing" Value="0" />
+                        <Setter Target="MetricsGrid.RowSpacing" Value="{StaticResource SaSpace16}" />
+                        <Setter Target="MemoryCard.(Grid.Column)" Value="0" />
+                        <Setter Target="MemoryCard.(Grid.Row)" Value="1" />
+                        <Setter Target="DiskCard.(Grid.Column)" Value="0" />
+                        <Setter Target="DiskCard.(Grid.Row)" Value="2" />
+                        <Setter Target="CollectingColumns.ColumnSpacing" Value="{StaticResource SaSpace16}" />
+                        <Setter Target="DeeperColumn2.Width" Value="0" />
+                        <Setter Target="DeeperGrid.ColumnSpacing" Value="0" />
+                        <Setter Target="DeeperGrid.RowSpacing" Value="{StaticResource SaSpace24}" />
+                        <Setter Target="ExploreCard.(Grid.Column)" Value="0" />
+                        <Setter Target="ExploreCard.(Grid.Row)" Value="1" />
+                    </VisualState.Setters>
+                </VisualState>
+                <!-- < 700: compact padding; the actions move under the identity, left-aligned. -->
+                <VisualState x:Name="Narrow">
+                    <VisualState.StateTriggers>
+                        <AdaptiveTrigger MinWindowWidth="0" />
+                    </VisualState.StateTriggers>
+                    <VisualState.Setters>
+                        <Setter Target="PageRoot.Padding" Value="{StaticResource SaPagePaddingCompact}" />
+                        <Setter Target="MetricsColumn2.Width" Value="0" />
+                        <Setter Target="MetricsColumn3.Width" Value="0" />
+                        <Setter Target="MetricsGrid.ColumnSpacing" Value="0" />
+                        <Setter Target="MetricsGrid.RowSpacing" Value="{StaticResource SaSpace16}" />
+                        <Setter Target="MemoryCard.(Grid.Column)" Value="0" />
+                        <Setter Target="MemoryCard.(Grid.Row)" Value="1" />
+                        <Setter Target="DiskCard.(Grid.Column)" Value="0" />
+                        <Setter Target="DiskCard.(Grid.Row)" Value="2" />
+                        <Setter Target="CollectingColumns.ColumnSpacing" Value="{StaticResource SaSpace12}" />
+                        <Setter Target="DeeperColumn2.Width" Value="0" />
+                        <Setter Target="DeeperGrid.ColumnSpacing" Value="0" />
+                        <Setter Target="DeeperGrid.RowSpacing" Value="{StaticResource SaSpace24}" />
+                        <Setter Target="ExploreCard.(Grid.Column)" Value="0" />
+                        <Setter Target="ExploreCard.(Grid.Row)" Value="1" />
+                        <Setter Target="IdentityActions.(Grid.Row)" Value="1" />
+                        <Setter Target="IdentityActions.(Grid.Column)" Value="0" />
+                        <Setter Target="IdentityActions.(Grid.ColumnSpan)" Value="3" />
+                        <Setter Target="IdentityActions.HorizontalAlignment" Value="Left" />
+                        <Setter Target="IdentityGrid.RowSpacing" Value="{StaticResource SaSpace16}" />
+                    </VisualState.Setters>
+                </VisualState>
+            </VisualStateGroup>
+        </VisualStateManager.VisualStateGroups>
+        <StackPanel x:Name="PageRoot" Padding="{StaticResource SaPagePadding}" Spacing="{StaticResource SaSpace24}">
 
             <!-- Breadcrumb 112:1786: the origin (A-2), then the server. -->
             <primitives:SaBreadcrumb
@@ -127,8 +127,7 @@
                         x:Name="RefreshButton"
                         Style="{StaticResource SaSecondaryRectButtonStyle}"
                         Command="{Binding RefreshCommand}"
-                        AutomationProperties.Name="{Binding RefreshAutomationName}"
-                        ToolTipService.ToolTip="{Binding RefreshAutomationName}">
+                        AutomationProperties.Name="{Binding RefreshAutomationName}">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <primitives:SaIcon Data="{StaticResource SaIconRefreshData}" Size="18" VerticalAlignment="Center" />
                             <TextBlock x:Uid="ServerDetailRefreshButtonText" VerticalAlignment="Center" />
@@ -160,11 +159,13 @@
             <!-- Shared notices (SHOULD-3: one source, the dashboard). NIT-5: named. -->
             <InfoBar x:Uid="ServerOperationError" IsClosable="True" Severity="Error"
                      AutomationProperties.Name="{Binding OperationErrorAutomationName}"
-                     IsOpen="{Binding IsOperationErrorOpen, Mode=TwoWay}" />
+                     IsOpen="{Binding IsOperationErrorOpen, Mode=TwoWay}"
+                     Visibility="{Binding IsOperationErrorOpen, Converter={StaticResource BooleanToVisibilityConverter}}" />
             <InfoBar IsClosable="True" Severity="Warning"
                      IsOpen="{Binding IsConfigurationLockedOpen, Mode=TwoWay}"
                      Message="{Binding ConfigurationLockedMessage}"
-                     AutomationProperties.Name="{Binding ConfigurationLockedMessage}" />
+                     AutomationProperties.Name="{Binding ConfigurationLockedMessage}"
+                     Visibility="{Binding IsConfigurationLockedOpen, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
             <!-- Derived notices (no Figma frame): connection problem from the connection-state store (M14 semantics
                  untouched — review it in Editar), collection error without a snapshot, unsupported system. -->

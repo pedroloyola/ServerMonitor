@@ -6,39 +6,39 @@
     <!-- UI.5 "Dados e servidores", Figma 112:8230 (D) / 112:8276 (L): back + title, glass cards (hidden servers, ignored
          devices, history, Backup/Restore - DERIVED, H-UI5-4, between History and About - and About), footer. Successes
          show the page-local toast (Figma §3.2); errors stay inline next to their card. -->
-    <Grid>
+    <Grid x:Name="PageHost">
+            <VisualStateManager.VisualStateGroups>
+                <VisualStateGroup x:Name="WidthStates">
+                    <VisualState x:Name="Wide">
+                        <VisualState.StateTriggers>
+                            <AdaptiveTrigger MinWindowWidth="700" />
+                        </VisualState.StateTriggers>
+                    </VisualState>
+                    <!-- < 700: compact padding; each card's action moves under its title. -->
+                    <VisualState x:Name="Narrow">
+                        <VisualState.StateTriggers>
+                            <AdaptiveTrigger MinWindowWidth="0" />
+                        </VisualState.StateTriggers>
+                        <VisualState.Setters>
+                            <Setter Target="PageRoot.Padding" Value="{StaticResource SaPagePaddingCompact}" />
+                            <Setter Target="ResetIgnoredButton.(Grid.Row)" Value="1" />
+                            <Setter Target="ResetIgnoredButton.(Grid.Column)" Value="0" />
+                            <Setter Target="ResetIgnoredButton.HorizontalAlignment" Value="Left" />
+                            <Setter Target="HistoryActions.(Grid.Row)" Value="1" />
+                            <Setter Target="HistoryActions.(Grid.Column)" Value="0" />
+                            <Setter Target="HistoryActions.HorizontalAlignment" Value="Left" />
+                            <Setter Target="BackupActions.(Grid.Row)" Value="1" />
+                            <Setter Target="BackupActions.(Grid.Column)" Value="0" />
+                            <Setter Target="BackupActions.HorizontalAlignment" Value="Left" />
+                            <Setter Target="GitHubButton.(Grid.Row)" Value="1" />
+                            <Setter Target="GitHubButton.(Grid.Column)" Value="0" />
+                            <Setter Target="GitHubButton.HorizontalAlignment" Value="Left" />
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+            </VisualStateManager.VisualStateGroups>
         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-            <StackPanel x:Name="PageRoot" Padding="{StaticResource SaPagePadding}" Spacing="{StaticResource SaSpace20}" MaxWidth="1120">
-                <VisualStateManager.VisualStateGroups>
-                    <VisualStateGroup x:Name="WidthStates">
-                        <VisualState x:Name="Wide">
-                            <VisualState.StateTriggers>
-                                <AdaptiveTrigger MinWindowWidth="700" />
-                            </VisualState.StateTriggers>
-                        </VisualState>
-                        <!-- < 700: compact padding; each card's action moves under its title. -->
-                        <VisualState x:Name="Narrow">
-                            <VisualState.StateTriggers>
-                                <AdaptiveTrigger MinWindowWidth="0" />
-                            </VisualState.StateTriggers>
-                            <VisualState.Setters>
-                                <Setter Target="PageRoot.Padding" Value="{StaticResource SaPagePaddingCompact}" />
-                                <Setter Target="ResetIgnoredButton.(Grid.Row)" Value="1" />
-                                <Setter Target="ResetIgnoredButton.(Grid.Column)" Value="0" />
-                                <Setter Target="ResetIgnoredButton.HorizontalAlignment" Value="Left" />
-                                <Setter Target="HistoryActions.(Grid.Row)" Value="1" />
-                                <Setter Target="HistoryActions.(Grid.Column)" Value="0" />
-                                <Setter Target="HistoryActions.HorizontalAlignment" Value="Left" />
-                                <Setter Target="BackupActions.(Grid.Row)" Value="1" />
-                                <Setter Target="BackupActions.(Grid.Column)" Value="0" />
-                                <Setter Target="BackupActions.HorizontalAlignment" Value="Left" />
-                                <Setter Target="GitHubButton.(Grid.Row)" Value="1" />
-                                <Setter Target="GitHubButton.(Grid.Column)" Value="0" />
-                                <Setter Target="GitHubButton.HorizontalAlignment" Value="Left" />
-                            </VisualState.Setters>
-                        </VisualState>
-                    </VisualStateGroup>
-                </VisualStateManager.VisualStateGroups>
+            <StackPanel x:Name="PageRoot" Padding="{StaticResource SaPagePadding}" Spacing="{StaticResource SaSpace20}">
 
                 <!-- Data settings header 112:8231: back 36 ("‹" = ArrowRight01 turned 180°, as the Figma) + title 30 + parent. -->
                 <Grid ColumnSpacing="{StaticResource SaSpace16}">
@@ -211,7 +211,8 @@
                             IsClosable="{x:Bind Backup.IsStatusClosable, Mode=OneWay}"
                             IsOpen="{x:Bind Backup.IsStatusOpen, Mode=TwoWay}"
                             Message="{x:Bind Backup.StatusMessage, Mode=OneWay}"
-                            Severity="{x:Bind Backup.StatusSeverity, Mode=OneWay}">
+                            Severity="{x:Bind Backup.StatusSeverity, Mode=OneWay}"
+                            Visibility="{x:Bind Backup.IsStatusOpen, Mode=OneWay}">
                             <TextBlock
                                 Margin="0,0,0,12"
                                 Style="{StaticResource SaCaptionTextStyle}"

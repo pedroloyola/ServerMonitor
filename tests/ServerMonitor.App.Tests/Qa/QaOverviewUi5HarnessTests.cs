@@ -202,6 +202,27 @@ public sealed class QaOverviewUi5HarnessTests
         Assert.Contains(servers, e => e.Server.IsHidden);
     }
 
+    /// <summary>H-UI5-3 harness: deterministic synthetic CPU history (in memory) so the pulse can be seen; &gt; 30, &lt; 30 and none.</summary>
+    [Fact]
+    public async Task TheDetailScenario_ServesDeterministicSyntheticCpuHistory()
+    {
+        var scenario = QaOverviewCatalog.Build("detail");
+        var service = new QaOverviewHistoryQueryService(scenario);
+
+        var web = await service.GetHistoryAsync(QaOverviewCatalog.StableId("prod-web-01"), Core.History.HistoryTimeRange.LastHour);
+        var db = await service.GetHistoryAsync(QaOverviewCatalog.StableId("prod-db-01"), Core.History.HistoryTimeRange.LastHour);
+        var other = await service.GetHistoryAsync(QaOverviewCatalog.StableId("cache-01"), Core.History.HistoryTimeRange.LastHour);
+
+        Assert.Equal(40, web.Cpu.Points.Count);
+        Assert.Single(web.Cpu.Points, point => point.Value is null); // one unmeasured gap, never drawn
+        Assert.All(web.Cpu.Points.Where(p => p.Value is not null), p => Assert.InRange(p.Value!.Value, 0, 100));
+        Assert.Equal(12, db.Cpu.Points.Count);
+        Assert.Empty(other.Cpu.Points);
+        Assert.Equal(QaOverviewCatalog.CpuHistory("detail", QaOverviewCatalog.StableId("prod-web-01")),
+            QaOverviewCatalog.CpuHistory("detail", QaOverviewCatalog.StableId("prod-web-01")));
+        Assert.Empty(QaOverviewCatalog.CpuHistory("mixed", QaOverviewCatalog.StableId("prod-web-01")));
+    }
+
     [Fact]
     public void TheDataScenario_HasHiddenServersToRestore()
     {

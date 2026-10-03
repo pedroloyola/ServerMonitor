@@ -202,3 +202,32 @@ internal sealed class QaOverviewMonitoringEngine(
             new SshConnectionResult { State = ServerConnectionState.Connected }));
     }
 }
+
+/// <summary>
+/// QA-ONLY <see cref="Core.History.IServerHistoryQueryService"/> for --qa-overview: serves the scenario's synthetic CPU
+/// history (<see cref="QaOverviewCatalog.CpuHistory"/>) raw, the way the real service returns an hour at the 30 s policy.
+/// In memory; nothing is read from or written to a database.
+/// </summary>
+internal sealed class QaOverviewHistoryQueryService(QaOverviewScenario scenario) : Core.History.IServerHistoryQueryService
+{
+    public bool IsAvailable => true;
+
+    public Task<Core.History.ServerHistoryResult> GetHistoryAsync(Guid serverId, Core.History.HistoryTimeRange range, CancellationToken cancellationToken = default)
+    {
+        var samples = QaOverviewCatalog.CpuHistory(scenario.Name, serverId);
+        var points = samples.Select(sample => new Core.History.HistoryChartPoint { TimestampUtc = sample.At, Value = sample.Cpu }).ToList();
+        var cpu = points.Count == 0
+            ? Core.History.HistorySeries.Empty
+            : new Core.History.HistorySeries { Points = points, MaxConnectGap = TimeSpan.FromSeconds(90) };
+        return Task.FromResult(new Core.History.ServerHistoryResult
+        {
+            ServerId = serverId,
+            Range = range,
+            StartUtc = QaOverviewCatalog.Now - Core.History.HistoryTimeRangeExtensions.ToDuration(range),
+            EndUtc = QaOverviewCatalog.Now,
+            Cpu = cpu,
+            Memory = Core.History.HistorySeries.Empty,
+            Disk = Core.History.HistorySeries.Empty
+        });
+    }
+}

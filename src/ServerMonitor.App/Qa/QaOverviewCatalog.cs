@@ -118,7 +118,20 @@ internal static class QaOverviewCatalog
     {
         var scenario = Scenario(name,
             Healthy("prod-web-01", "prod-web-01.local", cpu: 22, mem: 41, disk: 52) is var web
-                ? web with { Snapshot = web.Snapshot! with { Uptime = TimeSpan.FromDays(12).Add(TimeSpan.FromHours(4)), OperatingSystemName = "Ubuntu", OperatingSystemVersion = "24.04 LTS" } }
+                ? web with
+                {
+                    // Byte counts consistent with the percentages (41% of 16 GB, 52% of 500 GB): the cards' captions.
+                    Snapshot = web.Snapshot! with
+                    {
+                        Uptime = TimeSpan.FromDays(12).Add(TimeSpan.FromHours(4)),
+                        OperatingSystemName = "Ubuntu",
+                        OperatingSystemVersion = "24.04 LTS",
+                        MemoryUsedBytes = (long)(16L * 1024 * 1024 * 1024 * 0.41),
+                        MemoryTotalBytes = 16L * 1024 * 1024 * 1024,
+                        DiskUsedBytes = (long)(500L * 1024 * 1024 * 1024 * 0.52),
+                        DiskTotalBytes = 500L * 1024 * 1024 * 1024
+                    }
+                }
                 : throw new InvalidOperationException(),
             Make("prod-db-01", "prod-db-01.local", cpu: 46, mem: 71, disk: 88, ServerHealth.Warning),
             Make("cache-01", "cache-01.local", cpu: 97, mem: 70, disk: 30, ServerHealth.Critical),
@@ -150,6 +163,30 @@ internal static class QaOverviewCatalog
                 [StableId("internal-01")] = ServerConnectionState.Connected
             }
         };
+    }
+
+    /// <summary>
+    /// UI.5 H-UI5-3 harness: deterministic SYNTHETIC CPU history for the Detail pulse (the real app reads its local history;
+    /// the harness has none). prod-web-01 has more than 30 samples (one hour at the 30 s policy, with one unmeasured gap),
+    /// prod-db-01 has 12 (fewer than 30: right-aligned, never padded); every other server has none (no bars).
+    /// </summary>
+    public static IReadOnlyList<(DateTimeOffset At, double? Cpu)> CpuHistory(string scenario, Guid serverId)
+    {
+        if (scenario is not ("detail" or "detail-failing"))
+        {
+            return [];
+        }
+
+        var count = serverId == StableId("prod-web-01") ? 40 : serverId == StableId("prod-db-01") ? 12 : 0;
+        var samples = new List<(DateTimeOffset, double?)>(count);
+        for (var i = 0; i < count; i++)
+        {
+            // A smooth, bounded wave around the snapshot's value; one offline gap (null) in the longer series.
+            double? value = count == 40 && i == 17 ? null : Math.Round(22 + (9 * Math.Sin(i * 0.7)) + (i % 5), 1);
+            samples.Add((LastSuccess.AddSeconds(-30 * (count - 1 - i)), value));
+        }
+
+        return samples;
     }
 
     private static QaOverviewScenario Data(string name, bool operationsSucceed) =>

@@ -12,51 +12,51 @@
     </Page.Resources>
 
     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-        <StackPanel x:Name="PageRoot" Padding="{StaticResource SaPagePadding}" Spacing="{StaticResource SaSpace20}" MaxWidth="1120">
-            <VisualStateManager.VisualStateGroups>
-                <VisualStateGroup x:Name="WidthStates">
-                    <VisualState x:Name="Wide">
-                        <VisualState.StateTriggers>
-                            <AdaptiveTrigger MinWindowWidth="700" />
-                        </VisualState.StateTriggers>
-                    </VisualState>
-                    <!-- < 700: compact padding; each control under its text; the disclosures stacked; autosave under the title. -->
-                    <VisualState x:Name="Narrow">
-                        <VisualState.StateTriggers>
-                            <AdaptiveTrigger MinWindowWidth="0" />
-                        </VisualState.StateTriggers>
-                        <VisualState.Setters>
-                            <Setter Target="PageRoot.Padding" Value="{StaticResource SaPagePaddingCompact}" />
-                            <Setter Target="AutosaveText.(Grid.Row)" Value="1" />
-                            <Setter Target="AutosaveText.(Grid.Column)" Value="1" />
-                            <Setter Target="AutosaveText.HorizontalAlignment" Value="Left" />
-                            <Setter Target="ThemeControl.(Grid.Row)" Value="1" />
-                            <Setter Target="ThemeControl.(Grid.Column)" Value="0" />
-                            <Setter Target="ThemeControl.HorizontalAlignment" Value="Left" />
-                            <Setter Target="LanguageControl.(Grid.Row)" Value="1" />
-                            <Setter Target="LanguageControl.(Grid.Column)" Value="0" />
-                            <Setter Target="LanguageControl.HorizontalAlignment" Value="Left" />
-                            <Setter Target="BackgroundControl.(Grid.Row)" Value="1" />
-                            <Setter Target="BackgroundControl.(Grid.Column)" Value="0" />
-                            <Setter Target="BackgroundControl.HorizontalAlignment" Value="Left" />
-                            <Setter Target="NotificationsControl.(Grid.Row)" Value="1" />
-                            <Setter Target="NotificationsControl.(Grid.Column)" Value="0" />
-                            <Setter Target="NotificationsControl.HorizontalAlignment" Value="Left" />
-                            <Setter Target="CompactControl.(Grid.Row)" Value="1" />
-                            <Setter Target="CompactControl.(Grid.Column)" Value="0" />
-                            <Setter Target="CompactControl.HorizontalAlignment" Value="Left" />
-                            <Setter Target="TopmostControl.(Grid.Row)" Value="1" />
-                            <Setter Target="TopmostControl.(Grid.Column)" Value="0" />
-                            <Setter Target="TopmostControl.HorizontalAlignment" Value="Left" />
-                            <Setter Target="DisclosureColumn2.Width" Value="0" />
-                            <Setter Target="DisclosureGrid.ColumnSpacing" Value="0" />
-                            <Setter Target="DisclosureGrid.RowSpacing" Value="{StaticResource SaSpace12}" />
-                            <Setter Target="AboutDisclosure.(Grid.Column)" Value="0" />
-                            <Setter Target="AboutDisclosure.(Grid.Row)" Value="1" />
-                        </VisualState.Setters>
-                    </VisualState>
-                </VisualStateGroup>
-            </VisualStateManager.VisualStateGroups>
+        <VisualStateManager.VisualStateGroups>
+            <VisualStateGroup x:Name="WidthStates">
+                <VisualState x:Name="Wide">
+                    <VisualState.StateTriggers>
+                        <AdaptiveTrigger MinWindowWidth="700" />
+                    </VisualState.StateTriggers>
+                </VisualState>
+                <!-- < 700: compact padding; each control under its text; the disclosures stacked; autosave under the title. -->
+                <VisualState x:Name="Narrow">
+                    <VisualState.StateTriggers>
+                        <AdaptiveTrigger MinWindowWidth="0" />
+                    </VisualState.StateTriggers>
+                    <VisualState.Setters>
+                        <Setter Target="PageRoot.Padding" Value="{StaticResource SaPagePaddingCompact}" />
+                        <Setter Target="AutosaveText.(Grid.Row)" Value="1" />
+                        <Setter Target="AutosaveText.(Grid.Column)" Value="1" />
+                        <Setter Target="AutosaveText.HorizontalAlignment" Value="Left" />
+                        <Setter Target="ThemeControl.(Grid.Row)" Value="1" />
+                        <Setter Target="ThemeControl.(Grid.Column)" Value="0" />
+                        <Setter Target="ThemeControl.HorizontalAlignment" Value="Left" />
+                        <Setter Target="LanguageControl.(Grid.Row)" Value="1" />
+                        <Setter Target="LanguageControl.(Grid.Column)" Value="0" />
+                        <Setter Target="LanguageControl.HorizontalAlignment" Value="Left" />
+                        <Setter Target="BackgroundControl.(Grid.Row)" Value="1" />
+                        <Setter Target="BackgroundControl.(Grid.Column)" Value="0" />
+                        <Setter Target="BackgroundControl.HorizontalAlignment" Value="Left" />
+                        <Setter Target="NotificationsControl.(Grid.Row)" Value="1" />
+                        <Setter Target="NotificationsControl.(Grid.Column)" Value="0" />
+                        <Setter Target="NotificationsControl.HorizontalAlignment" Value="Left" />
+                        <Setter Target="CompactControl.(Grid.Row)" Value="1" />
+                        <Setter Target="CompactControl.(Grid.Column)" Value="0" />
+                        <Setter Target="CompactControl.HorizontalAlignment" Value="Left" />
+                        <Setter Target="TopmostControl.(Grid.Row)" Value="1" />
+                        <Setter Target="TopmostControl.(Grid.Column)" Value="0" />
+                        <Setter Target="TopmostControl.HorizontalAlignment" Value="Left" />
+                        <Setter Target="DisclosureColumn2.Width" Value="0" />
+                        <Setter Target="DisclosureGrid.ColumnSpacing" Value="0" />
+                        <Setter Target="DisclosureGrid.RowSpacing" Value="{StaticResource SaSpace12}" />
+                        <Setter Target="AboutDisclosure.(Grid.Column)" Value="0" />
+                        <Setter Target="AboutDisclosure.(Grid.Row)" Value="1" />
+                    </VisualState.Setters>
+                </VisualState>
+            </VisualStateGroup>
+        </VisualStateManager.VisualStateGroups>
+        <StackPanel x:Name="PageRoot" Padding="{StaticResource SaPagePadding}" Spacing="{StaticResource SaSpace20}">
 
             <!-- Settings header 112:7910: [back, DERIVED until UI.6's sidebar] title 32 + "À tua medida." | autosave 11. -->
             <Grid ColumnSpacing="{StaticResource SaSpace16}" RowSpacing="{StaticResource SaSpace4}">
@@ -217,6 +217,7 @@
                             Margin="0,8,0,0"
                             IsClosable="True"
                             IsOpen="{Binding IsBackgroundDegradedNoticeOpen, Mode=TwoWay}"
+                            Visibility="{Binding IsBackgroundDegradedNoticeOpen, Converter={StaticResource BooleanToVisibilityConverter}}"
                             Severity="Warning" />
                         <Grid MinHeight="50" ColumnSpacing="{StaticResource SaSpace16}" RowSpacing="{StaticResource SaSpace8}">
                             <Grid.ColumnDefinitions>
@@ -308,7 +309,7 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
-                <Button Style="{StaticResource SaDisclosureButtonStyle}" Command="{Binding OpenDataCommand}">
+                <Button x:Uid="SettingsOpenDataButton" Style="{StaticResource SaDisclosureButtonStyle}" Command="{Binding OpenDataCommand}">
                     <Grid ColumnSpacing="{StaticResource SaSpace12}">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
@@ -320,7 +321,7 @@
                         <primitives:SaIcon Grid.Column="2" Data="{StaticResource SaIconArrowRight01Data}" Size="17" VerticalAlignment="Center" />
                     </Grid>
                 </Button>
-                <Button x:Name="AboutDisclosure" Grid.Column="1" Style="{StaticResource SaDisclosureButtonStyle}" Command="{Binding OpenAboutCommand}">
+                <Button x:Name="AboutDisclosure" x:Uid="SettingsOpenAboutButton" Grid.Column="1" Style="{StaticResource SaDisclosureButtonStyle}" Command="{Binding OpenAboutCommand}">
                     <Grid ColumnSpacing="{StaticResource SaSpace12}">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
