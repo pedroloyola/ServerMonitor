@@ -297,12 +297,12 @@ public sealed class Ui5B2Tests
         Assert.Equal(expected, SaSegmentMeter.EffectiveLit(lit, count));
 
     [Fact]
-    public void ThePulse_RightAlignsFewSamples_RampsOpacity_AndUsesAnAbsoluteScale()
+    public void ThePulse_RightAlignsFewSamples_RampsOpacity_AndAutoRangesTheTrack()
     {
-        var bars = SaPulseBars.Layout([50, 100, 0.5], capacity: 30, trackHeight: 40, minimumHeight: 3);
+        var bars = SaPulseBars.Layout([50, 100, 0], capacity: 30, trackHeight: 40, minimumHeight: 3);
 
         Assert.Equal(new[] { 27, 28, 29 }, bars.Select(bar => bar.Slot));
-        Assert.Equal(new[] { 20d, 40d, 3d }, bars.Select(bar => bar.Height)); // 0.5% keeps the 3px sliver
+        Assert.Equal(new[] { 21.5, 40d, 3d }, bars.Select(bar => bar.Height)); // range 100; 0% keeps the 3px sliver
         Assert.Equal(1d, bars[^1].Opacity);
         Assert.All(bars, bar => Assert.InRange(bar.Opacity, SaPulseBars.OldestOpacity, 1));
         Assert.Empty(SaPulseBars.Layout([], 30, 40, 3)); // no samples: no bars
@@ -311,8 +311,17 @@ public sealed class Ui5B2Tests
         Assert.Equal(30, full.Count);
         Assert.Equal(SaPulseBars.OldestOpacity, full[0].Opacity);
         Assert.Equal(0, full[0].Slot);
-        Assert.Equal(Math.Round(40 * 16 / 100d, 2), full[0].Height); // the 30 most recent (16…45)
+        Assert.Equal(Math.Round(3 + (37 * 16 / 50d), 2), full[0].Height); // the 30 most recent (16…45): range 50
     }
+
+    [Theory]
+    [InlineData(new double[] { 22, 31 }, 50)]
+    [InlineData(new double[] { 5, 25 }, 25)]
+    [InlineData(new double[] { 76 }, 100)]
+    [InlineData(new double[] { 51, 75 }, 75)]
+    [InlineData(new double[] { }, 25)]
+    public void ThePulseRange_IsTheSmallestStepHoldingTheMax(double[] samples, double range) =>
+        Assert.Equal(range, SaPulseBars.RangeFor(samples));
 
     // ---- XAML contracts of the three pages ----------------------------------------------------------------------------
 

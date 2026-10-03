@@ -10,9 +10,11 @@ namespace ServerMonitor.App.Controls.Primitives;
 /// opacity ramping .30 → 1.0 from the oldest slot to the newest). The slots share the width equally.
 /// <para>
 /// REAL SAMPLES ONLY (H-UI5-3): <see cref="Samples"/> are percentages, oldest first. Fewer than <see cref="Capacity"/>
-/// fill the RIGHTMOST slots and the others stay empty — nothing is padded or invented; no samples draw no bars. A bar's
-/// height is the sample on an absolute 0–100 % scale of the track (a 1 % sample keeps a <see cref="MinimumBarHeight"/>
-/// sliver so it reads as measured, not missing). Decorative for UI Automation: the card's text carries the value.
+/// fill the RIGHTMOST slots and the others stay empty — nothing is padded or invented; no samples draw no bars. The track
+/// is auto-ranged to the smallest of 25 / 50 / 75 / 100 % that holds the window's highest sample (Figma 112:1818 draws a
+/// ~24 % pulse with 13–35 px bars; an absolute 0–100 % scale would flatten it to dots). Each bar is
+/// <see cref="MinimumBarHeight"/> + the rest of the track × sample / range. The shape is relative; the card's number is
+/// the reading. Decorative for UI Automation: the card's text carries the value.
 /// </para>
 /// </summary>
 [TemplatePart(Name = HostPartName, Type = typeof(Grid))]
@@ -83,17 +85,26 @@ public sealed class SaPulseBars : Control
 
         var kept = samples.Count > capacity ? samples.Skip(samples.Count - capacity).ToList() : samples.ToList();
         var first = capacity - kept.Count;
+        var range = RangeFor(kept);
+        var floor = Math.Min(minimumHeight, trackHeight);
         var bars = new List<(int, double, double)>(kept.Count);
         for (var index = 0; index < kept.Count; index++)
         {
-            var value = double.IsNaN(kept[index]) ? 0 : Math.Clamp(kept[index], 0, 100);
-            var height = Math.Max(Math.Min(minimumHeight, trackHeight), trackHeight * value / 100);
+            var value = double.IsNaN(kept[index]) ? 0 : Math.Clamp(kept[index], 0, range);
+            var height = floor + ((trackHeight - floor) * value / range);
             var slot = first + index;
             var opacity = capacity == 1 ? 1 : OldestOpacity + ((1 - OldestOpacity) * slot / (capacity - 1));
             bars.Add((slot, Math.Round(height, 2), Math.Round(opacity, 3)));
         }
 
         return bars;
+    }
+
+    /// <summary>The auto range: the smallest of 25 / 50 / 75 / 100 % that holds the highest sample.</summary>
+    public static double RangeFor(IReadOnlyList<double> samples)
+    {
+        var max = samples.Where(value => !double.IsNaN(value)).DefaultIfEmpty(0).Max();
+        return max <= 25 ? 25 : max <= 50 ? 50 : max <= 75 ? 75 : 100;
     }
 
     protected override void OnApplyTemplate()

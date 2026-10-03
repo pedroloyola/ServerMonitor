@@ -112,6 +112,13 @@
                             Status="{Binding Health, Converter={StaticResource ServerHealthToStatusKindConverter}}"
                             Label="{Binding StatusLabel}"
                             AutomationProperties.LiveSetting="Polite" />
+                        <!-- DERIVED: a refresh in flight is said in words, next to the status (the button is disabled meanwhile). -->
+                        <StackPanel Orientation="Horizontal" Spacing="6" AutomationProperties.LiveSetting="Polite"
+                                    Visibility="{Binding IsRefreshing, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <ProgressRing Width="12" Height="12" IsActive="{Binding IsRefreshing}" AutomationProperties.AccessibilityView="Raw" />
+                            <TextBlock x:Uid="ServerMetricsRefreshingLabel" Style="{StaticResource SaCaptionTextStyle}"
+                                       Foreground="{ThemeResource SaTextSecondaryBrush}" VerticalAlignment="Center" />
+                        </StackPanel>
                         <!-- H-UI5-2: a retained reading is marked stale in words (StaleAgeDisplay semantics). -->
                         <primitives:SaStatusIndicator
                             Status="Stale"
