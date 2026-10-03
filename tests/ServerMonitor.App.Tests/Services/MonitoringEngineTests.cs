@@ -503,7 +503,9 @@ public sealed class MonitoringEngineTests
         ServerMonitoringStateStore State,
         TimerRecordingTimeProvider Time) : IAsyncDisposable
     {
-        public ValueTask DisposeAsync() => Engine.DisposeAsync();
+        // Deadlock guard only: the engine's 5 s stop drain runs on the never-advanced fake clock, so a loop that stopped
+        // observing cancellation would otherwise hang the whole run instead of failing this test by name.
+        public ValueTask DisposeAsync() => new(Engine.DisposeAsync().AsTask().WaitAsync(DeadlockGuard));
     }
 
     private sealed class CancellationAwareMetricsStore : IServerMetricsStore
