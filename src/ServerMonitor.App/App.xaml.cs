@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.UI.Dispatching;
@@ -794,8 +795,9 @@ public partial class App : Application
         services.AddSingleton<BackupRestoreViewModel>();
 
         // UI.5 fix round 4 (Boss): the notice / toast owners REQUIRE a clock; production passes the system clock
-        // explicitly, here. A QA harness that fixes the presentation clock registers its own afterwards (last wins).
-        services.AddSingleton(PresentationClock.System);
+        // explicitly, here. TRY-add: a QA harness that fixed the presentation clock has already registered it above
+        // (QaOverviewComposition runs earlier in this method) and must keep winning (runtime smoke: "Há 8 segundos").
+        services.TryAddSingleton(PresentationClock.System);
         services.AddSingleton<DashboardViewModel>();
         services.AddSingleton<SettingsViewModel>();
         services.AddSingleton<DashboardPage>();
