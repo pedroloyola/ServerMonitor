@@ -32,7 +32,9 @@ public sealed partial class UiDebtRatchetTests
         ["Views/BackupCreateDialog.xaml"] = 3,
         ["Views/RestoreConfirmDialog.xaml"] = 3,
         ["Views/RestoreOpenDialog.xaml"] = 2,
-        ["Views/SettingsPage.xaml"] = 20
+        // UI.5 B1: the Data sections moved verbatim to SettingsDataPage (20 = 8 + 12; relocated, not new); B2 re-skins them.
+        ["Views/SettingsDataPage.xaml"] = 12,
+        ["Views/SettingsPage.xaml"] = 8
     };
 
     /// <summary>Hex colour literals per file, outside Styles/Tokens/** (XAML values and C# string literals; comments

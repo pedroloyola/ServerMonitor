@@ -4,8 +4,8 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:controls="using:ServerMonitor.App.Controls"
     xmlns:primitives="using:ServerMonitor.App.Controls.Primitives">
-    <!-- UI.4 D-UI4-DETAIL: INTERIM page (replaced in UI.5). The current ServerFullCard of one server, unchanged, plus a
-         breadcrumb back to where it was opened from (Visão geral or Servidores). -->
+    <!-- UI.5 B1: the Server Detail view model is in place; this XAML is the minimum to host it (H1 + named notice) and
+         still shows the UI.4 ServerFullCard over the same live card. The Figma layout replaces the card in B2. -->
     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
         <StackPanel Padding="{StaticResource SaPagePadding}" Spacing="{StaticResource SaSpace20}">
             <primitives:SaBreadcrumb
@@ -13,8 +13,15 @@
                 ParentText="{Binding ParentText}"
                 CurrentText="{Binding Title}"
                 ParentInvoked="OnBreadcrumbParentInvoked" />
-            <!-- Beacon r1 SHOULD-3: a failed Ocultar/Remover started here is reported here (same source as the Visão geral). -->
+            <!-- UI.4 NIT-1: a real H1 with the server name. -->
+            <TextBlock
+                Text="{Binding Title}"
+                AutomationProperties.HeadingLevel="Level1"
+                Style="{StaticResource SaPageTitleTextStyle}" />
+            <!-- Beacon r1 SHOULD-3: a failed Ocultar/Remover started here is reported here (same source as the Visão geral).
+                 UI.4 NIT-5: the notice has an accessible name. -->
             <InfoBar x:Uid="ServerOperationError" IsClosable="True" Severity="Error"
+                     AutomationProperties.Name="{Binding OperationErrorAutomationName}"
                      IsOpen="{Binding IsOperationErrorOpen, Mode=TwoWay}" />
             <InfoBar IsClosable="True" Severity="Warning"
                      IsOpen="{Binding IsConfigurationLockedOpen, Mode=TwoWay}"

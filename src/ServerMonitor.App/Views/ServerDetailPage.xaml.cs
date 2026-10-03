@@ -5,8 +5,10 @@ using ServerMonitor.App.ViewModels;
 namespace ServerMonitor.App.Views;
 
 /// <summary>
-/// UI.4 D-UI4-DETAIL: the interim page that hosts the current <c>ServerFullCard</c> of one server (no redesign) with a
-/// breadcrumb back to its origin. Replaced in UI.5. Fresh per navigation; the view model is disposed on Unloaded.
+/// UI.5: the Server Detail page of one server over its live card, with a breadcrumb back to its origin. Fresh per
+/// navigation; the view model is disposed on Unloaded (and when navigation replaces the page). B1: minimal hosting XAML;
+/// initial focus and the History/Workloads return focus (<see cref="ServerDetailViewModel.TakeReturnFocus"/>) are wired
+/// to the Figma controls in B2.
 /// </summary>
 public sealed partial class ServerDetailPage : Page, IServerDetailView, IDisposable
 {

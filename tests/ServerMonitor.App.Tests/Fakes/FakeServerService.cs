@@ -36,9 +36,15 @@ internal sealed class FakeServerService : IServerService
     public Task<bool> RemoveAsync(Guid id, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException();
 
+    /// <summary>UI.5: opt-in Hide behaviour; without it Hide throws (the UI.4 error-path tests rely on that).</summary>
+    public Func<Guid, Task<bool>>? HideOverride { get; set; }
+
     public Task<bool> HideAsync(Guid id, CancellationToken cancellationToken = default) =>
-        throw new NotSupportedException();
+        HideOverride?.Invoke(id) ?? throw new NotSupportedException();
+
+    /// <summary>UI.5: opt-in Restore behaviour; without it Restore throws.</summary>
+    public Func<Guid, Task<bool>>? RestoreOverride { get; set; }
 
     public Task<bool> RestoreAsync(Guid id, CancellationToken cancellationToken = default) =>
-        throw new NotSupportedException();
+        RestoreOverride?.Invoke(id) ?? throw new NotSupportedException();
 }

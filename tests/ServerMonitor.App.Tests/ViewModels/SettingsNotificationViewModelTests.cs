@@ -157,17 +157,16 @@ public sealed class SettingsNotificationViewModelTests
     {
         var degradation = new BackgroundDegradationNotice();
         var viewModel = CreateWithDegradation(degradation);
-        Assert.Equal(Visibility.Collapsed, viewModel.IsBackgroundDegraded);
+        // UI.5: a bool (the view collapses the caption through the converter); view models expose no Visibility.
+        Assert.False(viewModel.IsBackgroundDegraded);
 
         degradation.Raise();
-        Assert.Equal(Visibility.Visible, viewModel.IsBackgroundDegraded);
+        Assert.True(viewModel.IsBackgroundDegraded);
         Assert.True(viewModel.IsBackgroundDegradedNoticeOpen);
 
         viewModel.IsBackgroundDegradedNoticeOpen = false; // the user closes the InfoBar
 
-        Assert.Equal(
-            Visibility.Visible,
-            viewModel.IsBackgroundDegraded);
+        Assert.True(viewModel.IsBackgroundDegraded);
     }
 
     /// <summary>
@@ -318,6 +317,10 @@ public sealed class SettingsNotificationViewModelTests
         }
 
         public void GoToSettings() => SettingsCount++;
+
+        public void GoToSettings(SettingsSection section) => SettingsCount++;
+
+        public bool ConsumeAboutSettingsFocus() => false;
 
         public void GoToHistory(Guid serverId, string serverName)
         {

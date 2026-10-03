@@ -1,7 +1,9 @@
 using Microsoft.Extensions.DependencyInjection;
 using ServerMonitor.App.Services;
 using ServerMonitor.App.ViewModels;
+using ServerMonitor.Core.Enums;
 using ServerMonitor.Core.Interfaces;
+using ServerMonitor.Core.Models;
 
 namespace ServerMonitor.App.Qa;
 
@@ -38,20 +40,26 @@ internal static class QaOverviewComposition
                 $"{QaOverviewScenarioPolicy.LaunchFlag}: unknown scenario. Known: {string.Join(", ", QaOverviewScenarioPolicy.Scenarios)}.");
     }
 
-    public static void Apply(IServiceCollection services) => Apply(services, RequestedScenario());
+    public static void Apply(IServiceCollection services) =>
+        Apply(services, RequestedScenario(), QaBackupScenarioComposition.RequestedScenario() is not null);
 
-    public static void Apply(IServiceCollection services, string scenarioName)
+    /// <param name="backupDoublesRequested">
+    /// UI.5 Cortex 4 (fail-closed, second line behind the launch refusal): whether <c>--qa-backup</c> is on the launch. A
+    /// Settings / Data scenario without it throws - the real backup engine and its native picker are never composed.
+    /// </param>
+    public static void Apply(IServiceCollection services, string scenarioName, bool backupDoublesRequested = false)
     {
         ArgumentNullException.ThrowIfNull(services);
+        if (QaOverviewScenarioPolicy.RequiresBackupDouble(scenarioName) && !backupDoublesRequested)
+        {
+            throw new InvalidOperationException(
+                $"{QaOverviewScenarioPolicy.LaunchFlag} {scenarioName} requires {QaBackupPolicy.LaunchFlag} <scenario>: " +
+                "Settings must never reach the real backup picker.");
+        }
+
         var scenario = QaOverviewCatalog.Build(scenarioName);
 
         QaWindowPlacementIsolation.Apply(services, "overview");
-        // Registered last so they win over the real registrations for every resolve.
-        services.AddSingleton<IServerService>(new QaOverviewServerService(scenario));
-        services.AddSingleton<IServerMetricsStore>(new QaOverviewMetricsStore(scenario));
-        services.AddSingleton<IMonitoringEngine>(new QaMonitoringEngine());
-        services.AddSingleton<IServerDiscoveryService>(new QaDiscoveryService(scenario.Discovered));
-        services.AddSingleton(new PresentationClock(new QaFixedTimeProvider(QaOverviewCatalog.Now)));
 
         var stateStore = new ServerMonitoringStateStore();
         foreach (var entry in scenario.Servers)
@@ -59,6 +67,24 @@ internal static class QaOverviewComposition
             stateStore.Set(entry.State);
         }
 
+        var metrics = new QaOverviewMetricsStore(scenario);
+
+        // Registered last so they win over the real registrations for every resolve.
+        services.AddSingleton<IServerService>(new QaOverviewServerService(scenario));
+        services.AddSingleton<IServerMetricsStore>(metrics);
+        services.AddSingleton<IMonitoringEngine>(new QaOverviewMonitoringEngine(scenario, metrics, stateStore));
+        services.AddSingleton<IServerDiscoveryService>(new QaDiscoveryService(scenario.Discovered));
+        services.AddSingleton(new PresentationClock(new QaFixedTimeProvider(QaOverviewCatalog.Now)));
         services.AddSingleton<IServerMonitoringStateStore>(stateStore);
+
+        // UI.5: auth / host-key results live only in the connection-state store (the monitoring state collapses them to
+        // Unknown + ConnectionFailed), so the harness seeds that store. Synthetic results: no key, no fingerprint.
+        var connections = new ServerConnectionStateStore();
+        foreach (var (serverId, state) in scenario.ConnectionStates ?? new Dictionary<Guid, ServerConnectionState>())
+        {
+            connections.Set(serverId, new SshConnectionResult { State = state });
+        }
+
+        services.AddSingleton<IServerConnectionStateStore>(connections);
     }
 }

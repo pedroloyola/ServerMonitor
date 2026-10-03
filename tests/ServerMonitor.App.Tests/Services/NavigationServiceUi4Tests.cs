@@ -141,14 +141,16 @@ public sealed class NavigationServiceUi4Tests
         Assert.Equal(id, view.ViewModel.Card?.Server.Id);
     }
 
+    /// <summary>UI.5 A-2 (Boss): with no remembered origin the breadcrumb falls back to "Servidores" (UI.4 used the
+    /// Visão geral). A server that is gone still lands on the Visão geral (next test).</summary>
     [Fact]
-    public async Task ReturningToAServerNeverOpenedHere_UsesTheOverviewOrigin()
+    public async Task ReturningToAServerNeverOpenedHere_FallsBackToTheServersOrigin()
     {
         var world = await World.CreateAsync();
 
         world.Navigation.ReturnToServerDetail(world.Fleet.IdOf("web"));
 
-        Assert.Equal(ServerDetailOrigin.Overview, Assert.Single(world.DetailViews).ViewModel.Origin);
+        Assert.Equal(ServerDetailOrigin.Servers, Assert.Single(world.DetailViews).ViewModel.Origin);
     }
 
     /// <summary>A server that is gone (removed / hidden meanwhile), or none at all, lands on the Visão geral.</summary>

@@ -46,7 +46,35 @@ internal sealed class FakeNavigationService : INavigationService
     public void GoToSettings()
     {
         SettingsCount++;
+        SettingsSections.Add(SettingsSection.General);
         Raise();
+    }
+
+    public List<SettingsSection> SettingsSections { get; } = [];
+
+    public void GoToSettings(SettingsSection section)
+    {
+        SettingsCount++;
+        SettingsSections.Add(section);
+        if (section == SettingsSection.About)
+        {
+            AboutSettingsFocusRequests++;
+        }
+
+        Raise();
+    }
+
+    public int AboutSettingsFocusRequests { get; private set; }
+
+    public bool ConsumeAboutSettingsFocus()
+    {
+        if (AboutSettingsFocusRequests == 0)
+        {
+            return false;
+        }
+
+        AboutSettingsFocusRequests--;
+        return true;
     }
 
     public void GoToHistory(Guid serverId, string serverName)

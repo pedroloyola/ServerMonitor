@@ -49,7 +49,8 @@ public sealed class ServerDirectoryRowViewModel : ObservableObject, IDisposable
 
     public ServerHealth Health => Card.Health;
 
-    public string StatusDisplay => _localization.GetString($"ServerStatus{Health}");
+    /// <summary>UI.5: the shared status copy (<see cref="ServerStatusPresentation"/>), the same function the Detail page reads.</summary>
+    public string StatusDisplay => ServerStatusPresentation.StatusText(Health, _localization);
 
     public string CpuDisplay => Percent(HasCpuPercent, Card.CpuUsageValue);
 
@@ -57,8 +58,9 @@ public sealed class ServerDirectoryRowViewModel : ObservableObject, IDisposable
 
     public string DiskDisplay => Percent(HasDiskPercent, Card.DiskUsageValue);
 
-    // DERIVED (pending Prism): an Offline server shows "—", not its retained (stale) snapshot — the table has no
-    // staleness cue, so an old value would read as current. The interim page keeps the card's stale presentation.
+    // An Offline server shows "—", not its retained (stale) snapshot — the table has no staleness cue, so an old value
+    // would read as current. The Detail page shows that reading marked stale instead (H-UI5-2); both rules live in
+    // ServerStatusPresentation.
     public bool HasCpuPercent => Card.HasCpuPercent && !IsOffline;
 
     public bool HasMemoryPercent => Card.HasMemoryPercent && !IsOffline;
@@ -71,7 +73,7 @@ public sealed class ServerDirectoryRowViewModel : ObservableObject, IDisposable
 
     public double DiskValue => HasDiskPercent ? Card.DiskUsageValue : 0;
 
-    private bool IsOffline => Card.Health == ServerHealth.Offline;
+    private bool IsOffline => ServerStatusPresentation.RowHidesRetainedMetrics(Card.Health);
 
     // Figma 112:1468: a value above the engine's attention limit is drawn in the attention (or critical) text colour,
     // always next to its number (colour is never the only signal). Same inclusive limits as the engine.

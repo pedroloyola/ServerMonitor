@@ -68,6 +68,10 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
         _serverService.ServersChanged += OnServersChanged;
         _notificationSettingsService.NotificationsEnabledChanged += OnNotificationsEnabledChanged;
         BackCommand = new RelayCommand(navigationService.GoToDashboard);
+        // UI.5 Cortex 2: the in-page links between the two sub-pages (no sidebar until UI.6).
+        OpenDataCommand = new RelayCommand(() => navigationService.GoToSettings(SettingsSection.Data));
+        OpenAboutCommand = new RelayCommand(() => navigationService.GoToSettings(SettingsSection.About));
+        BackToGeneralCommand = new RelayCommand(() => navigationService.GoToSettings(SettingsSection.General));
         ResetIgnoredCommand = new AsyncRelayCommand(ResetIgnoredAsync);
         ClearHistoryCommand = new AsyncRelayCommand(ClearHistoryAsync);
         ResetHistoryCommand = new AsyncRelayCommand(ResetHistoryAsync);
@@ -88,6 +92,15 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
     public ObservableCollection<HiddenServerItemViewModel> HiddenServers { get; } = [];
 
     public ICommand BackCommand { get; }
+
+    /// <summary>"Definições" → "Dados e servidores".</summary>
+    public ICommand OpenDataCommand { get; }
+
+    /// <summary>H-UI5-4: the "Sobre" disclosure in General opens Data with its About card in view.</summary>
+    public ICommand OpenAboutCommand { get; }
+
+    /// <summary>"Dados e servidores" → "Definições" (the Data page's breadcrumb parent).</summary>
+    public ICommand BackToGeneralCommand { get; }
 
     public ICommand ResetIgnoredCommand { get; }
 
@@ -175,13 +188,11 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>
-    /// The persistent half of the degradation UX: visible for as long as the session is degraded, even
-    /// after the InfoBar is dismissed. Bound to Visibility, so it is simply absent otherwise.
+    /// The persistent half of the degradation UX: true for as long as the session is degraded, even
+    /// after the InfoBar is dismissed; the view collapses the caption otherwise. (UI.5: a bool — view
+    /// models expose no WinUI Visibility.)
     /// </summary>
-    public Microsoft.UI.Xaml.Visibility IsBackgroundDegraded =>
-        _backgroundDegradationNotice.IsDegraded
-            ? Microsoft.UI.Xaml.Visibility.Visible
-            : Microsoft.UI.Xaml.Visibility.Collapsed;
+    public bool IsBackgroundDegraded => _backgroundDegradationNotice.IsDegraded;
 
     private void OnBackgroundDegradationChanged(object? sender, EventArgs args)
     {
@@ -207,6 +218,19 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
     /// </summary>
     public void NotifyNavigatedTo() =>
         IsBackgroundSectionRequested = _navigationService.ConsumeBackgroundSettingsFocus();
+
+    private bool _isAboutSectionRequested;
+
+    /// <summary>H-UI5-4: true when this visit of "Dados e servidores" was asked to bring the About card into view.</summary>
+    public bool IsAboutSectionRequested
+    {
+        get => _isAboutSectionRequested;
+        private set => SetProperty(ref _isAboutSectionRequested, value);
+    }
+
+    /// <summary>Called by the Data sub-page when it is navigated to (Loaded, or again while shown): consumes the About request.</summary>
+    public void NotifyDataNavigatedTo() =>
+        IsAboutSectionRequested = _navigationService.ConsumeAboutSettingsFocus();
 
     /// <summary>
     /// Whether closing the window keeps ServerAlyzer monitoring in the background (M13 S2). This is the
@@ -331,7 +355,72 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
         set => SetProperty(ref _isHistoryResetErrorOpen, value);
     }
 
-    public async Task LoadAsync()
+    private readonly Lock _loadGate = new();
+    private Task? _loadTask;
+    private bool _reloadRequested;
+
+    /// <summary>
+    /// UI.5 §4: idempotent and safe under concurrency. Both sub-pages call it on Loaded and a ServersChanged can arrive
+    /// meanwhile; overlapping calls share ONE running load (single-flight) and a call made while it runs schedules exactly
+    /// one more pass afterwards, so the hidden-servers list is rebuilt from the newest data and never twice at once (no
+    /// duplicated or flickering rows). Ordering is established under one lock, never by timing.
+    /// </summary>
+    public Task LoadAsync()
+    {
+        TaskCompletionSource done;
+        lock (_loadGate)
+        {
+            if (_loadTask is { } running)
+            {
+                _reloadRequested = true;
+                return running;
+            }
+
+            _reloadRequested = false;
+            done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            _loadTask = done.Task;
+        }
+
+        _ = RunLoadsAsync(done);
+        return done.Task;
+    }
+
+    private async Task RunLoadsAsync(TaskCompletionSource done)
+    {
+        try
+        {
+            while (true)
+            {
+                await LoadOnceAsync();
+                lock (_loadGate)
+                {
+                    if (!_reloadRequested)
+                    {
+                        // Released under the same lock a new caller checks, so a request can never be lost in between.
+                        _loadTask = null;
+                        break;
+                    }
+
+                    _reloadRequested = false;
+                }
+            }
+        }
+        finally
+        {
+            lock (_loadGate)
+            {
+                // Defensive: an unexpected exception must not leave a finished load registered as running forever.
+                if (ReferenceEquals(_loadTask, done.Task))
+                {
+                    _loadTask = null;
+                }
+            }
+
+            done.TrySetResult();
+        }
+    }
+
+    private async Task LoadOnceAsync()
     {
         IsHistoryResetAvailable = !_historyMaintenance.IsAvailable;
         try

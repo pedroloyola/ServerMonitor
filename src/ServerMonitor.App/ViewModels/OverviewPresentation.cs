@@ -161,6 +161,16 @@ public static class OverviewPresentation
     }
 
     /// <summary>
+    /// UI.5 A-13: the Detail page's address — the current <c>Endpoint</c> format, always "host:port" with no spaces, an
+    /// IPv6 literal bracketed (<c>[::1]:22</c>). The real configured endpoint, never invented.
+    /// </summary>
+    public static string Endpoint(string host, int port)
+    {
+        var value = host ?? string.Empty;
+        return value.Contains(':', StringComparison.Ordinal) && !value.StartsWith('[') ? $"[{value}]:{port}" : $"{value}:{port}";
+    }
+
+    /// <summary>
     /// The servers directory search: name or address (host, and host:port), partial, case-insensitive
     /// (OrdinalIgnoreCase, as the UI.3 workloads search). A blank query matches everything.
     /// </summary>

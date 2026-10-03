@@ -51,15 +51,52 @@ public sealed class NavigationService : INavigationService
 
     public void GoToDashboard() => NavigateTo<DashboardPage>();
 
-    public void GoToSettings() => NavigateTo<SettingsPage>();
+    public void GoToSettings() => GoToSettings(SettingsSection.General);
+
+    public void GoToSettings(SettingsSection section)
+    {
+        _ = Host;
+        if (section == SettingsSection.About)
+        {
+            Interlocked.Exchange(ref _aboutSettingsFocusRequested, 1);
+        }
+
+        var pageType = section == SettingsSection.General ? typeof(SettingsPage) : typeof(SettingsDataPage);
+
+        // Both sub-pages are singletons: the factory hands back the very instance already shown, if it is.
+        var page = _pageFactory(pageType);
+        if (ReferenceEquals(Host.Content, page))
+        {
+            // Cortex #6: no content swap means no Loaded — notify the page so a pending section request is honoured now.
+            (page as ISettingsNavigationTarget)?.OnNavigatedToAgain();
+            return;
+        }
+
+        Show(page, isOverview: false);
+        _logger.LogInformation("Navigated to Settings ({Section}).", section);
+    }
 
     private int _backgroundSettingsFocusRequested;
+    private int _aboutSettingsFocusRequested;
 
-    public void RequestBackgroundSettingsFocus() =>
+    public void RequestBackgroundSettingsFocus()
+    {
         Interlocked.Exchange(ref _backgroundSettingsFocusRequested, 1);
+
+        // Cortex #6: the General sub-page may already be the content (ApplicationWindowController navigates first, then
+        // requests). It then gets no Loaded, so it is told now; otherwise its next Loaded consumes the request. (The Data
+        // sub-page only consumes the About request, so this one stays pending for General.)
+        if (_host?.Content is ISettingsNavigationTarget target)
+        {
+            target.OnNavigatedToAgain();
+        }
+    }
 
     public bool ConsumeBackgroundSettingsFocus() =>
         Interlocked.Exchange(ref _backgroundSettingsFocusRequested, 0) == 1;
+
+    public bool ConsumeAboutSettingsFocus() =>
+        Interlocked.Exchange(ref _aboutSettingsFocusRequested, 0) == 1;
 
     public void GoToHistory(Guid serverId, string serverName)
     {
@@ -100,10 +137,10 @@ public sealed class NavigationService : INavigationService
         _ = Host;
 
         // Cortex r1 MUST-1: a server that is no longer in the list (removed/hidden between a click or a deep-link and
-        // this call) never gets the interim page — the user lands on the origin instead of a dead page with no way out.
-        if (_serviceProvider.GetService<DashboardViewModel>() is not { } dashboard || !dashboard.HasVisibleServer(serverId))
+        // this call) never gets the Detail page — the user lands on the origin instead of a dead page with no way out.
+        if (!IsListed(serverId))
         {
-            _logger.LogInformation("The interim server page was not opened: the server is no longer listed.");
+            _logger.LogInformation("The Server Detail page was not opened: the server is no longer listed.");
             GoToOrigin(origin);
             return;
         }
@@ -114,7 +151,7 @@ public sealed class NavigationService : INavigationService
         var page = (IServerDetailView)_pageFactory(typeof(ServerDetailPage));
         Show(page, isOverview: false);
         page.Load(serverId, origin);
-        _logger.LogInformation("Navigated to the interim server page from {Origin}.", origin);
+        _logger.LogInformation("Navigated to the Server Detail page from {Origin}.", origin);
     }
 
     public void ReturnToServerDetail(Guid serverId)
@@ -125,9 +162,16 @@ public sealed class NavigationService : INavigationService
             return;
         }
 
-        // GoToServerDetail itself falls back to the origin when the server is no longer listed.
-        GoToServerDetail(serverId, _detailOrigins.GetValueOrDefault(serverId, ServerDetailOrigin.Overview));
+        // GoToServerDetail itself falls back to the origin when the server is no longer listed. UI.5 A-2: a listed server
+        // without a remembered origin gets "Servidores" as its breadcrumb parent; a gone one still lands on the overview.
+        var origin = _detailOrigins.TryGetValue(serverId, out var remembered)
+            ? remembered
+            : IsListed(serverId) ? ServerDetailOrigin.Servers : ServerDetailOrigin.Overview;
+        GoToServerDetail(serverId, origin);
     }
+
+    private bool IsListed(Guid serverId) =>
+        _serviceProvider.GetService<DashboardViewModel>() is { } dashboard && dashboard.HasVisibleServer(serverId);
 
     private void GoToOrigin(ServerDetailOrigin origin)
     {
@@ -179,7 +223,7 @@ internal interface INavigationHost
     object? Content { get; set; }
 }
 
-/// <summary>The interim server page as navigation sees it (D-UI4-DETAIL).</summary>
+/// <summary>The Server Detail page as navigation sees it (D-UI4-DETAIL, UI.5).</summary>
 public interface IServerDetailView
 {
     void Load(Guid serverId, ServerDetailOrigin origin);

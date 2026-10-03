@@ -38,7 +38,9 @@ public sealed partial class XamlContractAndResourceGuardTests
         ["Views/DashboardPage.xaml"] = ["PageRoot", "HeaderGrid", "HeaderActions", "HealthRow", "HealthColumn2", "HealthCountRow", "HealthSegments",
             "PriorityHost", "ServersToolbar", "OverviewSearchBox", "StateOverlay",
             "HealthCard", "PriorityButton", "ViewAllButton", "OverviewRepeater", "EmptyAddButton"],
-        ["Views/SettingsPage.xaml"] = ["BackupStatusBar", "BackgroundSection"],
+        ["Views/SettingsPage.xaml"] = ["BackgroundSection"],
+        // UI.5 §4: the Data sub-page brings the backup status and (H-UI5-4) the About card into view from code-behind.
+        ["Views/SettingsDataPage.xaml"] = ["BackupStatusBar", "AboutSection"],
         // UI.3: adaptive VisualState setters reflow these (no code-behind dependency).
         ["Views/HistoryPage.xaml"] = ["RangeLast30Days", "UnavailableState", "EmptyState", "PageRoot", "ControlsRow", "ServerSelector", "RangeTrack", "CpuChart", "MemoryChart", "DiskChart", "RetentionText"],
         ["Views/WorkloadsPage.xaml"] = ["PageHost", "PageScroll", "PageRoot", "QueryRow", "SearchBox", "FilterTrack", "ServicesCard", "CardsGrid", "CardsColumn2", "CardsRow1", "CardsRow2", "ContainersScroll", "ServicesScroll",

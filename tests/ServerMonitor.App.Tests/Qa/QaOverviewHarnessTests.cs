@@ -97,7 +97,8 @@ public sealed class QaOverviewHarnessTests
     public void TheHarnessDelta_RegistersOnlyInMemoryDoubles(string scenario)
     {
         var services = new ServiceCollection();
-        QaOverviewComposition.Apply(services, scenario);
+        // UI.5: the Settings / Data scenarios compose only next to the --qa-backup doubles (refusal tested separately).
+        QaOverviewComposition.Apply(services, scenario, backupDoublesRequested: QaOverviewScenarioPolicy.RequiresBackupDouble(scenario));
 
         Assert.All(services, descriptor =>
         {
@@ -106,6 +107,8 @@ public sealed class QaOverviewHarnessTests
             Assert.True(
                 implementation!.Namespace == typeof(QaOverviewComposition).Namespace
                     || implementation == typeof(ServerMonitoringStateStore)
+                    // UI.5: the in-memory connection-state store, seeded with synthetic auth / host-key results.
+                    || implementation == typeof(ServerConnectionStateStore)
                     || implementation == typeof(WindowPlacementStorageOptions)
                     || implementation == typeof(PresentationClock),
                 $"{scenario}: {descriptor.ServiceType.Name} -> {implementation.FullName} is not a QA double");
@@ -126,7 +129,8 @@ public sealed class QaOverviewHarnessTests
 
         Assert.IsType<QaOverviewServerService>(provider.GetRequiredService<IServerService>());
         Assert.IsType<QaOverviewMetricsStore>(provider.GetRequiredService<IServerMetricsStore>());
-        Assert.IsType<QaMonitoringEngine>(provider.GetRequiredService<IMonitoringEngine>());
+        Assert.IsType<QaOverviewMonitoringEngine>(provider.GetRequiredService<IMonitoringEngine>());
+        Assert.IsType<ServerConnectionStateStore>(provider.GetRequiredService<IServerConnectionStateStore>());
         Assert.IsType<QaDiscoveryService>(provider.GetRequiredService<IServerDiscoveryService>());
         Assert.Equal(QaOverviewCatalog.Now, provider.GetRequiredService<PresentationClock>().UtcNow);
         // The production root registers ONE MonitoringOptions, the instance the engine is built with.
@@ -146,7 +150,16 @@ public sealed class QaOverviewHarnessTests
         Assert.Equal(first.Servers.Count, first.Servers.Select(s => s.Server.Id).Distinct().Count());
         Assert.All(first.Servers, entry =>
         {
-            Assert.True(entry.Server.Host.EndsWith(".local", StringComparison.Ordinal) || entry.Server.Host.StartsWith("192.0.2.", StringComparison.Ordinal), entry.Server.Host);
+            // .local names or documentation addresses only (RFC 5737 192.0.2.0/24; UI.5 adds RFC 3849 2001:db8::/32 for A-13).
+            Assert.True(entry.Server.Host.EndsWith(".local", StringComparison.Ordinal)
+                || entry.Server.Host.StartsWith("192.0.2.", StringComparison.Ordinal)
+                || entry.Server.Host.StartsWith("2001:db8:", StringComparison.Ordinal), entry.Server.Host);
+            if (entry.Server.Route?.Jump is { } jump)
+            {
+                Assert.EndsWith(".local", jump.Host, StringComparison.Ordinal);
+                Assert.Null(jump.PrivateKeyPath);
+                Assert.Null(jump.CredentialReferenceId);
+            }
             Assert.Equal(entry.Server.Id, entry.State.ServerId);
             if (entry.Snapshot is { } snapshot)
             {

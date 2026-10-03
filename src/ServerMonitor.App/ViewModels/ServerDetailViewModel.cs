@@ -1,43 +1,90 @@
+using System.ComponentModel;
+using System.Globalization;
 using System.Windows.Input;
 using Microsoft.UI.Dispatching;
 using ServerMonitor.App.Services;
+using ServerMonitor.Core.Enums;
+using ServerMonitor.Core.History;
+using ServerMonitor.Core.Monitoring;
 
 namespace ServerMonitor.App.ViewModels;
 
 /// <summary>
-/// UI.4 D-UI4-DETAIL: the INTERIM server page (replaced in UI.5). It hosts the current <see cref="ServerCardViewModel"/>
-/// of one server — the very instance the dashboard keeps up to date — so refresh, Histórico, Serviços e containers,
-/// Editar, Ocultar and Remover behave exactly as on the card today. After every list rebuild it re-resolves the card by
-/// id (an edit produces a new card instance); when the server is gone (hidden or removed, from here or elsewhere) it
-/// returns to the origin once. Per-visit: disposed with its page.
+/// UI.5 §3: the Server Detail page of one server. It COMPOSES the live <see cref="ServerCardViewModel"/> the dashboard
+/// keeps up to date (never a copy, never a subclass) and exposes read-only presentation over it; every action passes
+/// straight through to that card, so Atualizar, Editar (current modal until UI.7), Ocultar, Remover, Histórico and Serviços
+/// e containers behave exactly as everywhere else.
+/// <para>
+/// UI.4 invariants kept: re-find by id after every list rebuild (an edit makes a new card instance); leave exactly once,
+/// deferred, when the server is gone; shared InfoBars with the dashboard as the one source (SHOULD-3); MUST-1 (content
+/// before Load) lives in the navigation; per visit, disposed with its page.
+/// </para>
+/// <para>
+/// Update path: the card raises ~31 notifications per engine cycle. This view model maps them per property to dirty
+/// groups and flushes ONCE per burst (one queued pass on the UI thread, like the overview), raising each affected
+/// property once with cached arguments — never <c>OnPropertyChanged(string.Empty)</c>.
+/// </para>
 /// </summary>
 public sealed class ServerDetailViewModel : ObservableObject, IDisposable
 {
     private readonly DashboardViewModel _dashboard;
     private readonly INavigationService _navigation;
     private readonly ILocalizationService _localization;
+    private readonly IServerHistoryQueryService? _history;
+    private readonly ServerDetailReturnFocus? _returnFocus;
+    private readonly PresentationClock _clock;
+    private readonly MonitoringThresholds _thresholds;
+    private readonly Action _flushAction;
     private ServerCardViewModel? _card;
     private Guid _serverId;
     private bool _subscribed;
     private bool _left;
     private bool _disposed;
+    private bool _exitToServers;
+    private Change _dirty;
+    private bool _flushScheduled;
+    private IReadOnlyList<double> _cpuPulse = [];
+    private DateTimeOffset? _pulseAnchor;
+    private CancellationTokenSource? _pulseCancellation;
 
-    // Null in unit tests (no WinUI dispatcher): the exit then runs inline.
+    // Null in unit tests (no WinUI dispatcher): the exit and the flush then run inline.
     private readonly DispatcherQueue? _dispatcherQueue = TryGetDispatcher();
 
-    public ServerDetailViewModel(DashboardViewModel dashboard, INavigationService navigation, ILocalizationService localization)
+    public ServerDetailViewModel(
+        DashboardViewModel dashboard,
+        INavigationService navigation,
+        ILocalizationService localization,
+        IServerHistoryQueryService? history = null,
+        ServerDetailReturnFocus? returnFocus = null,
+        MonitoringOptions? monitoringOptions = null,
+        PresentationClock? clock = null)
     {
         _dashboard = dashboard ?? throw new ArgumentNullException(nameof(dashboard));
         _navigation = navigation ?? throw new ArgumentNullException(nameof(navigation));
         _localization = localization ?? throw new ArgumentNullException(nameof(localization));
+        _history = history;
+        _returnFocus = returnFocus;
+        _clock = clock ?? PresentationClock.System;
+        // The same thresholds instance the engine is composed with (App registers one MonitoringOptions).
+        _thresholds = (monitoringOptions ?? MonitoringOptions.Default).Thresholds;
+        _flushAction = Flush;
         GoBackCommand = new RelayCommand(GoBack);
+        RefreshCommand = new RelayCommand(
+            () => _card?.RefreshMetricsCommand.Execute(null),
+            () => _card?.RefreshMetricsCommand.CanExecute(null) == true);
+        EditCommand = new RelayCommand(() => _card?.EditCommand.Execute(null), () => _card is not null);
+        HideCommand = new AsyncRelayCommand(() => ExitingOperationAsync(_card?.HideCommand), () => _card is not null);
+        RemoveCommand = new AsyncRelayCommand(() => ExitingOperationAsync(_card?.RemoveCommand), () => _card is not null);
+        ViewHistoryCommand = new RelayCommand(
+            () => Explore(ServerDetailReturnTarget.History, _card?.ViewHistoryCommand), () => _card is not null);
+        ViewWorkloadsCommand = new RelayCommand(
+            () => Explore(ServerDetailReturnTarget.Workloads, _card?.ViewWorkloadsCommand), () => _card is not null);
         _dashboard.PropertyChanged += OnDashboardPropertyChanged;
     }
 
-    /// <summary>
-    /// Beacon r1 SHOULD-3: a failed Ocultar/Remover started here is reported HERE - the same error the Visão geral shows
-    /// (one source: the dashboard view model), not only after going back.
-    /// </summary>
+    // --- Shared InfoBars (SHOULD-3: one source, the dashboard) -------------------------------------------------------
+
+    /// <summary>A failed Ocultar/Remover started here is reported HERE — the same error the Visão geral shows.</summary>
     public bool IsOperationErrorOpen
     {
         get => _dashboard.IsOperationErrorOpen;
@@ -52,36 +99,226 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
 
     public string ConfigurationLockedMessage => _dashboard.ConfigurationLockedMessage;
 
-    private void OnDashboardPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
-    {
-        if (e.PropertyName is nameof(DashboardViewModel.IsOperationErrorOpen) or nameof(DashboardViewModel.IsConfigurationLockedOpen))
-        {
-            OnPropertyChanged(e.PropertyName);
-        }
-    }
+    /// <summary>The error notice's accessible name (UI.4 NIT-5): its title, so it is never announced unnamed.</summary>
+    public string OperationErrorAutomationName => _localization.GetString("ServerOperationError.Title");
+
+    // --- Identity / header ----------------------------------------------------------------------------------------
 
     public ServerDetailOrigin Origin { get; private set; }
 
-    /// <summary>The hosted card (null only before <see cref="Load"/> or after the server disappeared).</summary>
+    /// <summary>The hosted live card (null only before <see cref="Load"/> or after the server disappeared).</summary>
     public ServerCardViewModel? Card
     {
         get => _card;
         private set
         {
-            if (SetProperty(ref _card, value))
+            if (ReferenceEquals(_card, value))
             {
-                OnPropertyChanged(nameof(Title));
+                return;
             }
+
+            if (_card is not null)
+            {
+                _card.PropertyChanged -= OnCardPropertyChanged;
+            }
+
+            _card = value;
+            if (_card is not null && !_disposed)
+            {
+                _card.PropertyChanged += OnCardPropertyChanged;
+            }
+
+            OnPropertyChanged(nameof(Card));
+            RequestCpuPulse(force: true);
+            _dirty = Change.All;
+            Flush();
+            NotifyCommands();
         }
     }
 
+    /// <summary>The H1 (UI.4 NIT-1): the server's name.</summary>
     public string Title => _card?.Name ?? string.Empty;
 
-    /// <summary>The breadcrumb's parent: "Visão geral" or "Servidores", where the page was opened from.</summary>
+    /// <summary>The breadcrumb's parent: where the page was opened from (A-2: "Servidores" when none is known).</summary>
     public string ParentText => _localization.GetString(
-        Origin == ServerDetailOrigin.Servers ? "ServersPageTitle" : "OverviewPageTitle");
+        Origin == ServerDetailOrigin.Overview ? "OverviewPageTitle" : "ServersPageTitle");
+
+    /// <summary>A-13: "host:port", IPv6 bracketed, the current Endpoint format.</summary>
+    public string Address => _card is null ? string.Empty : OverviewPresentation.Endpoint(_card.Host, _card.Port);
+
+    /// <summary>The configured system ("Linux" / "macOS"), the same localized value the rows show.</summary>
+    public string ConfiguredSystemDisplay => _card?.OperatingSystemDisplayName ?? string.Empty;
+
+    /// <summary>The detected system from the last snapshot ("Ubuntu 24.04 LTS"), or null — omitted, never invented.</summary>
+    public string? DetectedSystemDisplay => ServerContextPresentation.OperatingSystemDisplay(_card?.MetricsSnapshot);
+
+    public ServerHealth Health => _card?.Health ?? ServerHealth.Unknown;
+
+    /// <summary>The shared status copy ("Sem ligação", …) — the same function the rows use. "Offline" is never shown.</summary>
+    public string StatusText => ServerStatusPresentation.StatusText(Health, _localization);
+
+    /// <summary>Live accessible summary (recomputed per burst; the FullCard's was computed once and went stale).</summary>
+    public string AutomationSummary
+    {
+        get
+        {
+            if (_card is null)
+            {
+                return string.Empty;
+            }
+
+            var summary = Format(
+                "ServerRowAutomationFormat",
+                _card.Name,
+                StatusText,
+                AccessiblePercent(_card.HasCpuPercent, _card.CpuUsageValue),
+                AccessiblePercent(_card.HasMemoryPercent, _card.MemoryUsageValue),
+                AccessiblePercent(_card.HasDiskPercent, _card.DiskUsageValue),
+                Address,
+                ConfiguredSystemDisplay);
+            return IsReadingStale ? string.Join(", ", summary, StaleText) : summary;
+        }
+    }
+
+    // --- Action names carry the server (UI.4 a11y debt) -----------------------------------------------------------
+
+    public string RefreshAutomationName => NameFor("ServerMetricsRefreshFor");
+
+    public string EditAutomationName => NameFor("ServerDetailEditFor");
+
+    public string MoreActionsAutomationName => NameFor("ServerCardMoreOptionsFor");
+
+    public string HideAutomationName => NameFor("ServerDetailHideFor");
+
+    public string RemoveAutomationName => NameFor("ServerDetailRemoveFor");
+
+    public string ViewHistoryAutomationName => NameFor("ServerDetailHistoryFor");
+
+    public string ViewWorkloadsAutomationName => NameFor("ServerDetailWorkloadsFor");
+
+    // --- States ----------------------------------------------------------------------------------------------------
+
+    /// <summary>Figma "Primeira leitura": a metrics-capable server still waiting for its first snapshot.</summary>
+    public bool IsFirstReading => _card?.IsMetricsPending == true;
+
+    public bool IsRefreshing => _card?.IsRefreshingMetrics == true;
+
+    /// <summary>Windows / unknown OS: no metrics story — the header only, never a 0% card.</summary>
+    public bool IsMetricsUnsupported => _card is not null && !_card.SupportsMetrics;
+
+    /// <summary>A collection failed and there is no snapshot to fall back on.</summary>
+    public bool HasCollectionError => _card?.HasMetricsError == true;
+
+    public string? CollectionErrorText => _card?.MetricsErrorDisplay;
+
+    /// <summary>"Sem ligação" (engine health Offline) — a derived notice, not a new state.</summary>
+    public bool IsWithoutConnection => Health == ServerHealth.Offline;
+
+    /// <summary>H-UI5-2: a retained reading is shown, marked stale (StaleAgeDisplay semantics), legible without colour.</summary>
+    public bool IsReadingStale => _card is not null
+        && ServerStatusPresentation.ShowsRetainedReadingAsStale(_card.Health, _card.IsStale, _card.HasMetrics);
+
+    /// <summary>"Última atualização há N min" when the engine timed it, else the plain "Leitura desatualizada" text.</summary>
+    public string? StaleText => IsReadingStale
+        ? _card!.StaleAgeDisplay ?? _localization.GetString("ServerDetailStaleReading")
+        : null;
+
+    public bool HasReading => _card?.HasMetrics == true;
+
+    public bool HasUptime => _card?.HasUptime == true;
+
+    public string? UptimeDisplay => _card?.UptimeDisplay;
+
+    /// <summary>A-5: "Última atualização" — the label of the label + value pair.</summary>
+    public string LastUpdatedLabel => _localization.GetString("ServerDetailLastUpdatedLabel");
+
+    /// <summary>
+    /// A-5 / D-UI3-9: the value ("há 8 s", "agora mesmo") from the engine's last success, recomputed only when a new
+    /// reading arrives or the page loads — no timer. Null when there was never a reading.
+    /// </summary>
+    public string? LastUpdatedValue => _card?.LastSuccessAt is { } success ? FormatUpdatedAgo(success) : null;
+
+    // --- Connection (read-only; M14 semantics untouched) ------------------------------------------------------------
+
+    public ServerConnectionState ConnectionState => _card?.ConnectionState ?? ServerConnectionState.NeverConnected;
+
+    /// <summary>The existing localized connection-state name (also used by the editor). Nothing new is classified.</summary>
+    public string ConnectionStateDisplay => _card?.ConnectionStateDisplayName ?? string.Empty;
+
+    /// <summary>Authentication / host-key problems recorded by the connection-state store: shown as a notice, fixed in Editar.</summary>
+    public bool HasConnectionProblem => ConnectionState is ServerConnectionState.AuthenticationFailed
+        or ServerConnectionState.HostKeyUnknown
+        or ServerConnectionState.HostKeyMismatch;
+
+    /// <summary>Reached through a jump host (ProxyJump). Presence only — never its credentials, key paths or fingerprints.</summary>
+    public bool IsRouted => _card?.Server.Route?.Jump is not null;
+
+    // --- Metrics ---------------------------------------------------------------------------------------------------
+
+    public bool HasCpuPercent => _card?.HasCpuPercent == true;
+
+    public string CpuDisplay => _card?.CpuUsageDisplay ?? Unavailable;
+
+    public string CpuAccessibleValue => AccessiblePercent(HasCpuPercent, _card?.CpuUsageValue ?? 0);
+
+    public ServerHealth CpuSeverity => Severity(HasCpuPercent, _card?.CpuUsageValue, _thresholds.CpuWarning, _thresholds.CpuCritical);
+
+    /// <summary>H-UI5-3: real CPU samples from local history (oldest → newest, ≤ 30). Empty draws no bars.</summary>
+    public IReadOnlyList<double> CpuPulseSamples => _cpuPulse;
+
+    public bool HasCpuPulse => _cpuPulse.Count > 0;
+
+    public bool HasMemoryPercent => _card?.HasMemoryPercent == true;
+
+    public string MemoryDisplay => _card?.MemoryUsageDisplay ?? Unavailable;
+
+    public string MemoryAccessibleValue => AccessiblePercent(HasMemoryPercent, _card?.MemoryUsageValue ?? 0);
+
+    public ServerHealth MemorySeverity =>
+        Severity(HasMemoryPercent, _card?.MemoryUsageValue, _thresholds.MemoryWarning, _thresholds.MemoryCritical);
+
+    /// <summary>A-4: lit memory segments out of 28; null = unknown (empty track + "—").</summary>
+    public int? MemoryLitSegments => MetricVisualPresentation.LitSegments(
+        HasMemoryPercent ? _card!.MemoryUsageValue : null, MetricVisualPresentation.MemorySegmentCount);
+
+    public bool HasDiskPercent => _card?.HasDiskPercent == true;
+
+    public string DiskDisplay => _card?.DiskUsageDisplay ?? Unavailable;
+
+    public string DiskAccessibleValue => AccessiblePercent(HasDiskPercent, _card?.DiskUsageValue ?? 0);
+
+    public ServerHealth DiskSeverity => Severity(HasDiskPercent, _card?.DiskUsageValue, _thresholds.DiskWarning, _thresholds.DiskCritical);
+
+    /// <summary>A-4: lit disk segments out of 14; null = unknown (empty track + "—").</summary>
+    public int? DiskLitSegments => MetricVisualPresentation.LitSegments(
+        HasDiskPercent ? _card!.DiskUsageValue : null, MetricVisualPresentation.DiskSegmentCount);
+
+    // --- Commands (pass-through to the live card) -----------------------------------------------------------------
 
     public ICommand GoBackCommand { get; }
+
+    public ICommand RefreshCommand { get; }
+
+    /// <summary>Editar: the current editor modal until UI.7.</summary>
+    public ICommand EditCommand { get; }
+
+    /// <summary>H-UI5-1: from the "…" menu; no confirmation (as today). Afterwards the page returns to Servidores.</summary>
+    public ICommand HideCommand { get; }
+
+    /// <summary>H-UI5-1: from the "…" menu; the existing confirmation dialog. Afterwards the page returns to Servidores.</summary>
+    public ICommand RemoveCommand { get; }
+
+    public ICommand ViewHistoryCommand { get; }
+
+    public ICommand ViewWorkloadsCommand { get; }
+
+    // --- Lifecycle -------------------------------------------------------------------------------------------------
+
+    /// <summary>
+    /// TEST/MEASUREMENT SEAM: replaces the UI dispatcher as the place a coalesced flush is queued. Null in production (the
+    /// dispatcher is used) and in ordinary tests (no dispatcher: the flush runs at once).
+    /// </summary>
+    internal Func<Action, bool>? Scheduler { get; set; }
 
     /// <summary>Binds the page to one server. A server that is not in the list (anymore) returns to the origin at once.</summary>
     public void Load(Guid serverId, ServerDetailOrigin origin)
@@ -99,6 +336,9 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
         Resolve();
     }
 
+    /// <summary>Where focus returns after Histórico / Serviços e containers (taken once, for this server only).</summary>
+    public ServerDetailReturnTarget TakeReturnFocus() => _returnFocus?.Take(_serverId) ?? ServerDetailReturnTarget.None;
+
     public void Dispose()
     {
         _dashboard.PropertyChanged -= OnDashboardPropertyChanged;
@@ -108,6 +348,29 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
         {
             _dashboard.ServersReloaded -= OnServersReloaded;
             _subscribed = false;
+        }
+
+        if (_card is not null)
+        {
+            _card.PropertyChanged -= OnCardPropertyChanged;
+        }
+
+        _pulseCancellation?.Cancel();
+        _pulseCancellation?.Dispose();
+        _pulseCancellation = null;
+    }
+
+    private void OnDashboardPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(DashboardViewModel.IsOperationErrorOpen) or nameof(DashboardViewModel.IsConfigurationLockedOpen))
+        {
+            OnPropertyChanged(e.PropertyName);
+
+            // An operation that failed here leaves the server in place: a later, unrelated disappearance goes to the origin.
+            if (_dashboard.IsOperationErrorOpen || _dashboard.IsConfigurationLockedOpen)
+            {
+                _exitToServers = false;
+            }
         }
     }
 
@@ -142,7 +405,7 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
         var card = _dashboard.VisibleServers.FirstOrDefault(candidate => candidate.Server.Id == _serverId);
         if (card is null)
         {
-            // Hidden or removed (here or elsewhere): back to where the user came from, exactly once.
+            // Hidden or removed (here or elsewhere): leave exactly once.
             GoBack();
             return;
         }
@@ -158,8 +421,9 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
         }
 
         _left = true;
+        var toServers = _exitToServers || Origin == ServerDetailOrigin.Servers;
         Dispose();
-        if (Origin == ServerDetailOrigin.Servers)
+        if (toServers)
         {
             _navigation.GoToServers();
         }
@@ -167,5 +431,394 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
         {
             _navigation.GoToDashboard();
         }
+    }
+
+    // H-UI5-1: Ocultar / Remover started HERE return to Servidores once the server is gone (its toasts live there).
+    private async Task ExitingOperationAsync(ICommand? operation)
+    {
+        if (operation is null)
+        {
+            return;
+        }
+
+        _exitToServers = true;
+        if (operation is AsyncRelayCommand asyncOperation)
+        {
+            await asyncOperation.ExecuteAsync().ConfigureAwait(true);
+        }
+        else
+        {
+            operation.Execute(null);
+        }
+    }
+
+    private void Explore(ServerDetailReturnTarget target, ICommand? open)
+    {
+        if (_card is null || open is null)
+        {
+            return;
+        }
+
+        _returnFocus?.Remember(_serverId, target);
+        open.Execute(null);
+    }
+
+    private void NotifyCommands()
+    {
+        ((RelayCommand)RefreshCommand).NotifyCanExecuteChanged();
+        ((RelayCommand)EditCommand).NotifyCanExecuteChanged();
+        ((RelayCommand)ViewHistoryCommand).NotifyCanExecuteChanged();
+        ((RelayCommand)ViewWorkloadsCommand).NotifyCanExecuteChanged();
+        ((AsyncRelayCommand)HideCommand).NotifyCanExecuteChanged();
+        ((AsyncRelayCommand)RemoveCommand).NotifyCanExecuteChanged();
+    }
+
+    // --- Coalesced update path -------------------------------------------------------------------------------------
+
+    [Flags]
+    private enum Change
+    {
+        None = 0,
+        Status = 1,
+        Cpu = 2,
+        Memory = 4,
+        Disk = 8,
+        Reading = 16,
+        State = 32,
+        Connection = 64,
+        All = Status | Cpu | Memory | Disk | Reading | State | Connection
+    }
+
+    private static Change Map(string? cardProperty) => cardProperty switch
+    {
+        nameof(ServerCardViewModel.Health) or nameof(ServerCardViewModel.HealthDisplayName)
+            => Change.Status | Change.Reading | Change.State,
+        nameof(ServerCardViewModel.CpuUsageDisplay) or nameof(ServerCardViewModel.HasCpuPercent)
+            or nameof(ServerCardViewModel.CpuUsageValue) or nameof(ServerCardViewModel.HasCpuUsage) => Change.Cpu,
+        nameof(ServerCardViewModel.MemoryUsageDisplay) or nameof(ServerCardViewModel.HasMemoryPercent)
+            or nameof(ServerCardViewModel.MemoryUsageValue) or nameof(ServerCardViewModel.HasMemoryUsage) => Change.Memory,
+        nameof(ServerCardViewModel.DiskUsageDisplay) or nameof(ServerCardViewModel.HasDiskPercent)
+            or nameof(ServerCardViewModel.DiskUsageValue) or nameof(ServerCardViewModel.HasDiskUsage) => Change.Disk,
+        nameof(ServerCardViewModel.IsStale) or nameof(ServerCardViewModel.StaleAgeDisplay)
+            or nameof(ServerCardViewModel.HasStaleIndicator) or nameof(ServerCardViewModel.HasMetrics)
+            or nameof(ServerCardViewModel.UptimeDisplay) or nameof(ServerCardViewModel.HasUptime)
+            or nameof(ServerCardViewModel.DetectedOperatingSystemDisplay) or nameof(ServerCardViewModel.HasDetectedOperatingSystem)
+            or nameof(ServerCardViewModel.LastSuccessAt) or nameof(ServerCardViewModel.MetricsTimestampDisplay) => Change.Reading,
+        nameof(ServerCardViewModel.IsRefreshingMetrics) or nameof(ServerCardViewModel.IsMetricsPending)
+            or nameof(ServerCardViewModel.HasMetricsError) or nameof(ServerCardViewModel.MetricsErrorDisplay) => Change.State,
+        nameof(ServerCardViewModel.ConnectionState) or nameof(ServerCardViewModel.ConnectionStateDisplayName) => Change.Connection,
+        _ => Change.None
+    };
+
+    private void OnCardPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (_disposed || !ReferenceEquals(sender, _card))
+        {
+            return;
+        }
+
+        var change = Map(e.PropertyName);
+        if (change == Change.None)
+        {
+            return;
+        }
+
+        _dirty |= change;
+        if (_flushScheduled)
+        {
+            return;
+        }
+
+        var scheduler = Scheduler;
+        if (scheduler is not null)
+        {
+            _flushScheduled = scheduler(_flushAction);
+        }
+        else if (_dispatcherQueue is not null)
+        {
+            _flushScheduled = _dispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, FlushFromDispatcher);
+        }
+
+        if (!_flushScheduled)
+        {
+            Flush();
+        }
+    }
+
+    private void FlushFromDispatcher() => Flush();
+
+    /// <summary>Runs a pending (coalesced) flush now (tests/measurements, like the overview's FlushOverview).</summary>
+    internal void FlushPending()
+    {
+        if (_dirty != Change.None)
+        {
+            Flush();
+        }
+    }
+
+    private void Flush()
+    {
+        _flushScheduled = false;
+        var dirty = _dirty;
+        _dirty = Change.None;
+        if (dirty == Change.None || _disposed)
+        {
+            return;
+        }
+
+        if (dirty == Change.All)
+        {
+            Raise(Args.Title);
+            Raise(Args.Address);
+            Raise(Args.ConfiguredSystemDisplay);
+            Raise(Args.RefreshAutomationName);
+            Raise(Args.EditAutomationName);
+            Raise(Args.MoreActionsAutomationName);
+            Raise(Args.HideAutomationName);
+            Raise(Args.RemoveAutomationName);
+            Raise(Args.ViewHistoryAutomationName);
+            Raise(Args.ViewWorkloadsAutomationName);
+            Raise(Args.IsRouted);
+            Raise(Args.IsMetricsUnsupported);
+        }
+
+        if ((dirty & Change.Status) != 0)
+        {
+            Raise(Args.Health);
+            Raise(Args.StatusText);
+            Raise(Args.IsWithoutConnection);
+        }
+
+        if ((dirty & Change.Cpu) != 0)
+        {
+            Raise(Args.HasCpuPercent);
+            Raise(Args.CpuDisplay);
+            Raise(Args.CpuAccessibleValue);
+            Raise(Args.CpuSeverity);
+        }
+
+        if ((dirty & Change.Memory) != 0)
+        {
+            Raise(Args.HasMemoryPercent);
+            Raise(Args.MemoryDisplay);
+            Raise(Args.MemoryAccessibleValue);
+            Raise(Args.MemorySeverity);
+            Raise(Args.MemoryLitSegments);
+        }
+
+        if ((dirty & Change.Disk) != 0)
+        {
+            Raise(Args.HasDiskPercent);
+            Raise(Args.DiskDisplay);
+            Raise(Args.DiskAccessibleValue);
+            Raise(Args.DiskSeverity);
+            Raise(Args.DiskLitSegments);
+        }
+
+        if ((dirty & Change.Reading) != 0)
+        {
+            Raise(Args.IsReadingStale);
+            Raise(Args.StaleText);
+            Raise(Args.HasReading);
+            Raise(Args.HasUptime);
+            Raise(Args.UptimeDisplay);
+            Raise(Args.DetectedSystemDisplay);
+            Raise(Args.LastUpdatedValue);
+            RequestCpuPulse(force: false);
+        }
+
+        if ((dirty & Change.State) != 0)
+        {
+            Raise(Args.IsFirstReading);
+            Raise(Args.IsRefreshing);
+            Raise(Args.HasCollectionError);
+            Raise(Args.CollectionErrorText);
+            ((RelayCommand)RefreshCommand).NotifyCanExecuteChanged();
+        }
+
+        if ((dirty & Change.Connection) != 0)
+        {
+            Raise(Args.ConnectionState);
+            Raise(Args.ConnectionStateDisplay);
+            Raise(Args.HasConnectionProblem);
+        }
+
+        if ((dirty & (Change.Status | Change.Cpu | Change.Memory | Change.Disk | Change.Reading)) != 0)
+        {
+            Raise(Args.AutomationSummary);
+        }
+    }
+
+    private void Raise(PropertyChangedEventArgs args) => OnPropertyChanged(args);
+
+    // --- CPU pulse (H-UI5-3) ---------------------------------------------------------------------------------------
+
+    /// <summary>
+    /// H-UI5-3 source: the LOCAL HISTORY the app already records (<see cref="IServerHistoryQueryService"/>, last hour —
+    /// at the 30 s sampling policy that range is returned raw, not bucketed). Read on load / card swap, then again only
+    /// when the engine's last success has moved at least one history sampling interval past the previous read, so an
+    /// open page costs at most one query per persisted sample. No new collection, no new persistence.
+    /// </summary>
+    private void RequestCpuPulse(bool force)
+    {
+        if (_disposed || _card is null || _history is null || !_history.IsAvailable)
+        {
+            SetCpuPulse([]);
+            return;
+        }
+
+        var success = _card.LastSuccessAt;
+        if (!force)
+        {
+            if (success is not { } current)
+            {
+                return;
+            }
+
+            if (_pulseAnchor is { } anchor && current - anchor < HistorySamplingPolicy.DefaultMinInterval)
+            {
+                return;
+            }
+        }
+
+        _pulseAnchor = success;
+        _pulseCancellation?.Cancel();
+        _pulseCancellation?.Dispose();
+        _pulseCancellation = new CancellationTokenSource();
+        _ = LoadCpuPulseAsync(_card.Server.Id, _pulseCancellation.Token);
+    }
+
+    private async Task LoadCpuPulseAsync(Guid serverId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _history!.GetHistoryAsync(serverId, HistoryTimeRange.LastHour, cancellationToken).ConfigureAwait(true);
+            if (cancellationToken.IsCancellationRequested || _disposed || _card?.Server.Id != serverId)
+            {
+                return;
+            }
+
+            SetCpuPulse(MetricVisualPresentation.CpuPulse(result.Cpu));
+        }
+        catch (OperationCanceledException)
+        {
+            // Superseded by a newer read or the page went away.
+        }
+        catch (Exception exception) when (exception is not OutOfMemoryException)
+        {
+            // History is degradable: no bars rather than invented ones.
+            if (!cancellationToken.IsCancellationRequested && !_disposed)
+            {
+                SetCpuPulse([]);
+            }
+        }
+    }
+
+    private void SetCpuPulse(IReadOnlyList<double> samples)
+    {
+        if (_cpuPulse.Count == 0 && samples.Count == 0)
+        {
+            return;
+        }
+
+        _cpuPulse = samples;
+        Raise(Args.CpuPulseSamples);
+        Raise(Args.HasCpuPulse);
+    }
+
+    // --- Formatting ------------------------------------------------------------------------------------------------
+
+    private string Unavailable => _localization.GetString("ServerMetricUnavailable");
+
+    private static ServerHealth Severity(bool known, double? value, double warning, double critical) =>
+        known ? OverviewPresentation.MetricSeverity(value, warning, critical) : ServerHealth.Healthy;
+
+    private string AccessiblePercent(bool known, double value) => known
+        ? string.Format(CultureInfo.CurrentUICulture, "{0:0}%", value)
+        : _localization.GetString("ServerMetricUnavailableAccessible");
+
+    private string NameFor(string key) => _card is null ? string.Empty : Format(key, _card.Name);
+
+    private string Format(string key, params object[] args) =>
+        string.Format(CultureInfo.CurrentUICulture, _localization.GetString(key), args);
+
+    // D-UI3-9 buckets, in Figma's "label + value" form (A-5): <1 s "agora mesmo", then s / min / h / d.
+    private string FormatUpdatedAgo(DateTimeOffset lastSuccessUtc)
+    {
+        var age = _clock.UtcNow - lastSuccessUtc;
+        if (age < TimeSpan.Zero)
+        {
+            age = TimeSpan.Zero;
+        }
+
+        if (age.TotalSeconds < 1)
+        {
+            return _localization.GetString("ServerDetailUpdatedJustNow");
+        }
+
+        if (age.TotalMinutes < 1)
+        {
+            return Format("ServerDetailUpdatedSecondsFormat", (int)age.TotalSeconds);
+        }
+
+        if (age.TotalHours < 1)
+        {
+            return Format("ServerDetailUpdatedMinutesFormat", (int)age.TotalMinutes);
+        }
+
+        return age.TotalDays < 1
+            ? Format("ServerDetailUpdatedHoursFormat", (int)age.TotalHours)
+            : Format("ServerDetailUpdatedDaysFormat", (int)age.TotalDays);
+    }
+
+    /// <summary>Cached arguments: the per-burst flush allocates no event arguments.</summary>
+    private static class Args
+    {
+        public static readonly PropertyChangedEventArgs Title = new(nameof(ServerDetailViewModel.Title));
+        public static readonly PropertyChangedEventArgs Address = new(nameof(ServerDetailViewModel.Address));
+        public static readonly PropertyChangedEventArgs ConfiguredSystemDisplay = new(nameof(ServerDetailViewModel.ConfiguredSystemDisplay));
+        public static readonly PropertyChangedEventArgs DetectedSystemDisplay = new(nameof(ServerDetailViewModel.DetectedSystemDisplay));
+        public static readonly PropertyChangedEventArgs Health = new(nameof(ServerDetailViewModel.Health));
+        public static readonly PropertyChangedEventArgs StatusText = new(nameof(ServerDetailViewModel.StatusText));
+        public static readonly PropertyChangedEventArgs AutomationSummary = new(nameof(ServerDetailViewModel.AutomationSummary));
+        public static readonly PropertyChangedEventArgs RefreshAutomationName = new(nameof(ServerDetailViewModel.RefreshAutomationName));
+        public static readonly PropertyChangedEventArgs EditAutomationName = new(nameof(ServerDetailViewModel.EditAutomationName));
+        public static readonly PropertyChangedEventArgs MoreActionsAutomationName = new(nameof(ServerDetailViewModel.MoreActionsAutomationName));
+        public static readonly PropertyChangedEventArgs HideAutomationName = new(nameof(ServerDetailViewModel.HideAutomationName));
+        public static readonly PropertyChangedEventArgs RemoveAutomationName = new(nameof(ServerDetailViewModel.RemoveAutomationName));
+        public static readonly PropertyChangedEventArgs ViewHistoryAutomationName = new(nameof(ServerDetailViewModel.ViewHistoryAutomationName));
+        public static readonly PropertyChangedEventArgs ViewWorkloadsAutomationName = new(nameof(ServerDetailViewModel.ViewWorkloadsAutomationName));
+        public static readonly PropertyChangedEventArgs IsFirstReading = new(nameof(ServerDetailViewModel.IsFirstReading));
+        public static readonly PropertyChangedEventArgs IsRefreshing = new(nameof(ServerDetailViewModel.IsRefreshing));
+        public static readonly PropertyChangedEventArgs IsMetricsUnsupported = new(nameof(ServerDetailViewModel.IsMetricsUnsupported));
+        public static readonly PropertyChangedEventArgs HasCollectionError = new(nameof(ServerDetailViewModel.HasCollectionError));
+        public static readonly PropertyChangedEventArgs CollectionErrorText = new(nameof(ServerDetailViewModel.CollectionErrorText));
+        public static readonly PropertyChangedEventArgs IsWithoutConnection = new(nameof(ServerDetailViewModel.IsWithoutConnection));
+        public static readonly PropertyChangedEventArgs IsReadingStale = new(nameof(ServerDetailViewModel.IsReadingStale));
+        public static readonly PropertyChangedEventArgs StaleText = new(nameof(ServerDetailViewModel.StaleText));
+        public static readonly PropertyChangedEventArgs HasReading = new(nameof(ServerDetailViewModel.HasReading));
+        public static readonly PropertyChangedEventArgs HasUptime = new(nameof(ServerDetailViewModel.HasUptime));
+        public static readonly PropertyChangedEventArgs UptimeDisplay = new(nameof(ServerDetailViewModel.UptimeDisplay));
+        public static readonly PropertyChangedEventArgs LastUpdatedValue = new(nameof(ServerDetailViewModel.LastUpdatedValue));
+        public static readonly PropertyChangedEventArgs ConnectionState = new(nameof(ServerDetailViewModel.ConnectionState));
+        public static readonly PropertyChangedEventArgs ConnectionStateDisplay = new(nameof(ServerDetailViewModel.ConnectionStateDisplay));
+        public static readonly PropertyChangedEventArgs HasConnectionProblem = new(nameof(ServerDetailViewModel.HasConnectionProblem));
+        public static readonly PropertyChangedEventArgs IsRouted = new(nameof(ServerDetailViewModel.IsRouted));
+        public static readonly PropertyChangedEventArgs HasCpuPercent = new(nameof(ServerDetailViewModel.HasCpuPercent));
+        public static readonly PropertyChangedEventArgs CpuDisplay = new(nameof(ServerDetailViewModel.CpuDisplay));
+        public static readonly PropertyChangedEventArgs CpuAccessibleValue = new(nameof(ServerDetailViewModel.CpuAccessibleValue));
+        public static readonly PropertyChangedEventArgs CpuSeverity = new(nameof(ServerDetailViewModel.CpuSeverity));
+        public static readonly PropertyChangedEventArgs CpuPulseSamples = new(nameof(ServerDetailViewModel.CpuPulseSamples));
+        public static readonly PropertyChangedEventArgs HasCpuPulse = new(nameof(ServerDetailViewModel.HasCpuPulse));
+        public static readonly PropertyChangedEventArgs HasMemoryPercent = new(nameof(ServerDetailViewModel.HasMemoryPercent));
+        public static readonly PropertyChangedEventArgs MemoryDisplay = new(nameof(ServerDetailViewModel.MemoryDisplay));
+        public static readonly PropertyChangedEventArgs MemoryAccessibleValue = new(nameof(ServerDetailViewModel.MemoryAccessibleValue));
+        public static readonly PropertyChangedEventArgs MemorySeverity = new(nameof(ServerDetailViewModel.MemorySeverity));
+        public static readonly PropertyChangedEventArgs MemoryLitSegments = new(nameof(ServerDetailViewModel.MemoryLitSegments));
+        public static readonly PropertyChangedEventArgs HasDiskPercent = new(nameof(ServerDetailViewModel.HasDiskPercent));
+        public static readonly PropertyChangedEventArgs DiskDisplay = new(nameof(ServerDetailViewModel.DiskDisplay));
+        public static readonly PropertyChangedEventArgs DiskAccessibleValue = new(nameof(ServerDetailViewModel.DiskAccessibleValue));
+        public static readonly PropertyChangedEventArgs DiskSeverity = new(nameof(ServerDetailViewModel.DiskSeverity));
+        public static readonly PropertyChangedEventArgs DiskLitSegments = new(nameof(ServerDetailViewModel.DiskLitSegments));
     }
 }
