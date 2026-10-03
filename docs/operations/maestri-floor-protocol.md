@@ -14,7 +14,8 @@ Não altera autorização, fronteiras de segurança, gates de review nem regras 
 
 ## 2. Floor principal
 
-- **1 milestone/feature material = 1 Floor principal**, com branch própria (`maestri floor create "Nome" --branch <tipo>/<slug>`).
+- **1 milestone/feature material = 1 Floor principal**, com branch própria `<tipo>/<slug>`, criado **só pela UI**
+  "New Floor" (§5.1; `maestri floor create` é proibido para criar Floors neste workspace).
 - **Um owner de implementação por superfície.** Outros agentes no mesmo Floor só leem.
 - Floors nativos são o mecanismo preferido. `git worktree` manual é **fallback**, apenas quando um Floor não serve a
   tarefa com segurança (registar porquê). Mudança trivial pode continuar na branch atual sem Floor.
@@ -24,13 +25,13 @@ Não altera autorização, fronteiras de segurança, gates de review nem regras 
 O Git só permite uma branch num worktree: enquanto o Floor principal detém a branch do candidato, nem
 `maestri floor create --pull-request <n>` (medido: recusado) nem outro Floor nessa branch são possíveis. Por isso:
 
-- **Normativo:** o **orquestrador** (não o reviewer) cria um Floor de review numa branch local descartável
-  `review/<slug>-rN` e aponta-a ao **SHA exato** do candidato (`maestri floor create "Review …" --branch
-  review/<slug>-rN`, depois `git merge --ff-only <sha>` nesse Floor). Registar o SHA revisto; nova ronda = novo SHA.
-  Nunca push, nunca commit.
+- **Normativo:** o **orquestrador** (não o reviewer) faz criar pela UI (§5.1) um Floor de review numa branch local
+  descartável `review/<slug>-rN` e aponta-a ao **SHA exato** do candidato (`git merge --ff-only <sha>` nesse Floor).
+  Registar o SHA revisto; nova ronda = novo SHA. Nunca push, nunca commit.
 - Se o `--ff-only` falhar (ex.: `main` avançou depois da base do candidato): **nunca** `reset --hard`; criar novo Floor
   `-rN+1` a partir de uma base de que o candidato descenda, ou reportar BLOCKED.
-- `--pull-request <n>` só quando nenhum Floor detém a branch do PR.
+- Um Floor de PR só quando nenhum Floor detém a branch do PR, e só pela UI (§5.1; a verificação das 5 pastas
+  aplica-se igualmente — este caminho da UI ainda não foi medido).
 - O reviewer **só lê**: não escreve no Floor principal nem em nenhuma branch. Findings voltam ao implementador, que
   corrige no Floor principal; segunda ronda quando houver findings materiais.
 - Trabalho material: reviewer ≠ implementer.
@@ -52,19 +53,39 @@ Antes de criar um Floor, verificar e registar:
 2. working tree do Térreo limpa;
 3. untracked/ignored relevantes no Térreo.
 
-O Floor é um `git worktree` real (em `<pai do repo>\.maestri\floors\…`), criado a partir do `HEAD` atual, e
-**copia** para ele o conteúdo untracked/ignored do Térreo, exceto saída de build (`bin/`, `obj/`, `dist/`,
-`__pycache__/`, `artifacts/`…). Medido em 0.49, sem `--copy-ground` (que só copia o layout do canvas): chegaram
-`.boss/`, `.private/`, `.claude/settings.local.json`, `CONTEXT.md`. Consequências:
+O Floor é um `git worktree` real (em `<pai do repo>\.maestri\floors\…`, raiz **não configurável** em 0.49), criado
+a partir do `HEAD` atual, e **copia** para ele o conteúdo untracked/ignored do Térreo, exceto saída de build (`bin/`,
+`obj/`, `dist/`, `__pycache__/`, `artifacts/`…) e as pastas em `floorCloneExclusions` do workspace. Base suja ⇒
+decisão explícita antes de criar; nunca herdar alterações por omissão.
 
-- Base suja ⇒ decisão explícita antes de criar; nunca herdar alterações por omissão.
-- Material local/privado é **duplicado** no Floor (caminho também sincronizado se o pai do repo o for): continua
-  ignorado pelo Git, mas conta para o cleanup (§10) e para a verificação de histórico antes do primeiro push.
-  Decidir por Floor se `.private/` é necessário; se não for, remover a cópia logo após a criação (com GO).
-- Ficheiros locais não versionados (ex.: `.boss/`) chegam como **snapshot sem valor normativo**. Ver §12.
-- Com árvores ignoradas grandes, `maestri floor create` pode expirar no CLI enquanto a criação continua (medido).
-  **Não repetir** o comando (pode criar segundo worktree/branch): confirmar `git worktree list` + branch e esperar
-  que `maestri floor list` mostre o Floor; se não aparecer em ~15 min, reportar BLOCKED.
+### 5.1 Criação: só pela UI (Maestri 0.49)
+
+O workspace ServerAlyzer tem `floorCloneExclusions` = `.private`, `.maestri`, `.boss`, `AppPackages`, `TestResults`
+(definição do workspace; só nomes de **pasta**, a qualquer profundidade). Medido em 0.49:
+
+- a definição fica persistida no workspace;
+- Floor criado pela UI "New Floor" **respeita** as exclusões (só `CONTEXT.md` e `.claude/settings.local.json`
+  copiados, classificados benignos);
+- Floor criado com `maestri floor create` **não as respeita** (copiou `.private`, `.boss`, `.maestri`, `AppPackages`,
+  `TestResults`, incl. um `.dmp`), com a mesma definição persistida.
+
+Por isso, até uma versão do Maestri corrigir isto **e** isso ser medido de novo:
+
+1. **`maestri floor create` é PROIBIDO para criar Floors neste workspace** — incluindo `--pull-request`. Um Floor
+   criado pelo CLI é tratado como contendo material privado/sensível até prova em contrário.
+2. Criar Floors **só pela UI "New Floor"**: confirmar que "Excluded folders" mostra exatamente as 5 pastas; "copy
+   ground" OFF salvo decisão explícita.
+3. **Antes de qualquer agente trabalhar no Floor**, provar que nenhuma das 5 pastas existe nele (a qualquer
+   profundidade). Se existir: nenhum trabalho no Floor; remover (§10) e reportar.
+4. As exclusões só afetam Floors **novos**; Floors já existentes mantêm o que copiaram.
+5. O CLI continua permitido para o que não cria Floors: `floor list`, `floor status`, `recruit --floor`, `ask`/`check`.
+6. Se a UI não estiver disponível, o fallback é `git worktree add` manual (não copia ficheiros ignorados), registando porquê.
+
+Outras consequências da cópia:
+
+- `.boss/` não chega a Floors novos; se existir num Floor (ex.: antigo), é **snapshot sem valor normativo**. Ver §12.
+- A criação pode demorar com árvores ignoradas grandes: esperar que `maestri floor list` e `git worktree list` mostrem
+  o Floor antes de trabalhar nele; nunca repetir a criação (pode criar segundo worktree/branch).
 
 ## 6. Autoridade
 
@@ -114,9 +135,19 @@ Antes de remover um Floor (`maestri floor delete`/`git worktree remove`), provar
 
 `maestri floor delete` **apaga a branch** salvo `--keep-branch`: apagar branch é decisão separada, sujeita a autorização.
 
-Depois de remover, provar: o caminho do Floor já não existe; ausente de `git worktree list` e `maestri floor list`;
-`git worktree prune --dry-run` sem saída. Se o diretório ficar (ex.: cópias ignoradas como `.private/`), GO explícito
-antes de o apagar. (Comportamento de `floor delete` sobre conteúdo ignorado: ainda não medido em 0.49.)
+**A mensagem "Deleted" não é prova.** Medido em 0.49: `floor delete` corre sempre `git worktree remove --force` e
+reporta sucesso assim que o worktree sai da lista do Git — uma vez deixou um diretório de 2,16 GB (incl. `.private/` e
+um `.dmp`), por caminhos ≥ 260 caracteres sem `core.longpaths`. Cleanup só é COMPLETE com **três provas independentes**:
+
+1. `maestri floor list` — Floor ausente;
+2. `git worktree list` — worktree ausente;
+3. filesystem — o diretório físico do Floor **não existe**.
+
+Se o diretório ficar: nenhum outro delete; GO explícito e remoção só desse caminho exato (sem wildcard, sem seguir
+junctions, sem tocar em siblings), depois repetir as três provas.
+
+O repositório usa `core.longpaths=true` **só na config local** (`.git/config`, partilhada pelos worktrees; nunca
+global/system): com ele, os deletes medidos a seguir terminaram fisicamente limpos. Não substitui as três provas.
 
 ## 11. Relatório
 
@@ -127,7 +158,7 @@ autorização, nomear a decisão exata necessária.
 
 `.boss/` é local e ignorado pelo Git: não viaja em PR. A cópia **canónica é a do Térreo**:
 
-- Agentes num Floor leem `.boss/**` (incl. `BOSS.md`, `team/`, `OWNERSHIP.md`) pelo **caminho absoluto do Térreo**;
-  a cópia do Floor é snapshot sem valor normativo.
+- Agentes num Floor leem `.boss/**` (incl. `BOSS.md`, `team/`, `OWNERSHIP.md`) pelo **caminho absoluto do Térreo**.
+  Floors novos não têm `.boss/` (exclusão §5.1); qualquer cópia num Floor é snapshot sem valor normativo.
 - Alterações a `BOSS.md`/runbooks fazem-se na cópia do Térreo (são operação, não implementação de produto) e ficam
   registadas no relatório; nunca na cópia herdada por um Floor.
