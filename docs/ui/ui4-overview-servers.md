@@ -1,6 +1,6 @@
 # UI.4 — Visão geral + Servidores
 
-Estado: **READY_TO_MERGE, à espera do GO humano** (2026-10-02). Branch `ui/ui4-overview-servers`, código fechado em `95b4daa` (este commit só toca em docs). Reviews finais: Prism r3 APPROVED, Cortex r3 APPROVED_WITH_NITS, Atlas r1 fechado, Beacon r2 PASS. Gates no §8. Não há merge.
+Estado: **COMPLETE** (2026-10-03). PR #18 merged por merge commit (GO humano) → `main` = `7c37462b4fd701bfd3588cbc380a8cbbaf0e2274` (pais `cba8b0b` + `99c8890`; árvore == head final validado `99c88906a25fad6e35c2d8ef64383a16f3682a55`, branch `ui/ui4-overview-servers`). Reviews finais: Prism r3 APPROVED, Cortex r3 APPROVED_WITH_NITS, Atlas r1 fechado, Beacon r2 PASS. CI do PR verde; CI pós-merge verde depois do PR #19 de fiabilidade (§11). UI.5 não iniciado.
 Autoridade visual: Figma `Qvk5dUFgsWf4UOYzfAkiDV`, 05 Free secção 02 "Dashboard e servidores" (Visão geral D `112:930` / L `112:1141`; Servidores D `112:1353`, directory `112:1419`, tabela `112:1434`), §13 `112:14006` (estados vazios), §14 `112:15512` (carregamento). Precedência: invariantes/segurança > a11y/plataforma > Figma.
 
 ## 1. Decisões humanas (vinculativas)
@@ -157,7 +157,7 @@ Gates em `95b4daa`:
 
 ## 9. NOT_RUN
 
-Estas verificações não foram corridas no UI.4 e ficam declaradas:
+Estas verificações não foram corridas no UI.4 e ficam declaradas (aceites pelo humano como não bloqueantes, 2026-10-02):
 - deep-link real do widget até à interina (só testes de VM/navegação);
 - sucesso real de Ocultar/Remover (o harness devolve falha; só o caminho de erro foi visto na app);
 - Narrator;
@@ -175,3 +175,11 @@ Estas verificações não foram corridas no UI.4 e ficam declaradas:
 - **Enter no foco inicial do header:** até o foco passar para o conteúdo, o primeiro foco da janela é o "Modo compacto" do header, e um Enter "solto" muda a janela de modo. O Beacon r2 mediu um Enter a 1,5 s do arranque e a app fica em Standard; o resto da janela não foi medido. Fica para o header do UI.6.
 - **Ratchet automático de virtualização:** hoje é uma medição manual UIA (22 de 500 linhas realizadas, Atlas NIT-4).
 - **`ServerHealthOffline` = "Offline"** no cartão interino (UI.5).
+
+## 11. Merge e CI pós-merge
+
+- **PR #18** merged por merge commit, fixado ao head `99c8890` → `main` = `7c37462`. CI do PR verde (run 37056206686).
+- **CI pós-merge de `7c37462`** (run 37057158486) falhou 3× no job Debug, cada tentativa com testes de relógio real diferentes, em código que o UI.4 não tocou (Release sempre verde). Medição A/B: a árvore pré-UI.4 (`ef4af29` == `cba8b0b`) também falhou no mesmo dia nos mesmos testes (run 37058982750) → runners lentos expunham esperas de relógio real usadas como sincronização; não é regressão do UI.4.
+- **PR #19** (test-only, decisão humana): sincronização determinística nas 5 classes que falharam (`ServerAlertCoordinatorTests`, `MonitoringEngineTests`, `HistoryWriterServiceTests`, `SqliteServerHistoryStoreTests`, `WidgetProviderCoordinatorTests`); `src/` inalterado; review independente r1 CHANGES_REQUIRED → r2 APPROVED; CI do PR verde (run 37086050280); merged por merge commit fixado ao head `6217835` → `main` = `fdd527f`.
+- **CI pós-merge de `fdd527f`** (run 37087572009): **verde** (Debug build + tests, Release build + vulnerability scan) à primeira tentativa. Com isto o gate de conclusão do UI.4 fecha.
+- **Transferido para o UI.5** (decisão humana): heading principal acessível na página temporária; nome acessível do aviso de erro; substituir completamente o `ServerFullCard` pela nova página Server Detail; uniformizar a copy "Offline" → linguagem nova.
