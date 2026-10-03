@@ -169,7 +169,7 @@ public sealed class Ui5ServerDetailTests
 
         Assert.Equal(17, detail.MemoryLitSegments); // Figma 112:1855: 62% → 17/28
         Assert.Equal(7, detail.DiskLitSegments);    // Figma 112:1890: 48% → 7/14
-        Assert.Empty(typeof(ServerDetailViewModel).GetProperties().Where(property => property.Name.EndsWith("Severity", StringComparison.Ordinal)));
+        Assert.DoesNotContain(typeof(ServerDetailViewModel).GetProperties(), property => property.Name.EndsWith("Severity", StringComparison.Ordinal));
     }
 
     // ---- derived states -------------------------------------------------------------------------------------------
