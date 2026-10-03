@@ -1,98 +1,199 @@
 # UI.5 — Server Detail, Definições, Dados e servidores
 
-Figma `Qvk5dUFgsWf4UOYzfAkiDV`:
+**Estado: READY_TO_MERGE**, a aguardar GO humano.
+- **Branch:** `ui/ui5-server-detail-settings`, base `5168662`.
+- **HEAD de código validado:** `e9fcfab`; este commit é só de documentação.
+- **PR:** #23.
+- **Reviews finais:** Cortex c5 APPROVED, Prism c3 APPROVED, Beacon c3 APPROVED, Atlas c6 APPROVED.
 
-| Page | Dark | Light | First reading |
+**Autoridade visual:** Figma `Qvk5dUFgsWf4UOYzfAkiDV`. Precedência: invariantes/segurança > a11y/plataforma > Figma.
+
+| Página | Escuro | Claro | Primeira leitura |
 |---|---|---|---|
 | Server Detail | `112:1785` | `112:2022` | `112:16007` / `112:16164` |
 | Definições | `112:7909` | `112:8003` | — |
 | Dados e servidores | `112:8230` | `112:8276` | — |
 
-This file records the **deliberate deviations and derivations** of the implementation. The Figma values themselves are not repeated here: they live in the XAML comments next to each element.
+Os valores do Figma ficam nos comentários XAML junto de cada elemento. Este documento regista decisões, derivações e desvios.
 
-## Breakpoints
+## 1. Decisões humanas (vinculativas)
 
-| Window width | Detail | Definições / Dados |
+- **H-UI5-1 — Menu "…":** Ocultar e Remover ficam num menu "…" (DERIVED) junto de Editar. Ambos mantêm as confirmações existentes. Depois da ação própria, a app volta a Servidores com o aviso do Figma.
+- **H-UI5-2 — Offline com leitura retida:** a última leitura continua visível, marcada como desatualizada e legível sem cor. Não há classificação de saúde nova.
+- **H-UI5-3 — Pulso de CPU:** só amostras reais, do histórico local já gravado. Com menos de 30, mostram-se essas, alinhadas à direita; sem nenhuma, não há barras. Não há recolha nem persistência novas, nem enchimento com dados falsos.
+- **H-UI5-4 — Backup/Restauro:** passa a ser um cartão em "Dados e servidores", entre Histórico e Sobre. A ligação "Sobre o ServerAlyzer" das Definições navega para Dados e dá o foco ao cartão Sobre. Não há página nova.
+
+## 2. Decisões do Boss que mudaram comportamento
+
+- **Escala do pulso:** teto de 25/50/75/100 %, o menor degrau ≥ ao máximo visível (`MetricVisualPresentation.PulseCeiling`).
+  - Revê a escala absoluta 0–100 % da ronda 1.
+  - O nome acessível diz os valores reais: "CPU: 24%. Pulso das últimas 12 amostras, escala até 25%".
+  - Mínimo de 3 px para valores > 0 (DERIVED); um 0 medido não desenha barra.
+- **Avisos transitórios** (aviso de Servidores e toast de Dados):
+  - fecham sozinhos ao fim de **8 s** (DERIVED), ao fechar e ao sair da página;
+  - nunca reaparecem numa visita posterior;
+  - live polite;
+  - ficam numa **linha própria** por baixo do conteúdo.
+- **Erros com âmbito de servidor:** um Editar/Ocultar/Remover falhado regista o servidor (`DashboardViewModel.OperationErrorServerId`, camada App).
+  - Só aparece no Detail desse servidor.
+  - Os erros globais e a configuração bloqueada continuam em todo o lado (UI.4 SHOULD-3).
+  - O âmbito é "o último ganha": há um único aviso partilhado.
+- **Sem cor de severidade no Detail:** as cores das métricas são de identidade, estejam desatualizadas ou não. Não há propriedades `*Severity`.
+- **Diálogos destrutivos:** `DestructiveConfirmDialog` = `SaDialogStyle` + `SaDialog.Kind="Destructive"`, com corpo, linha de dados afetados (564 × 42, r11) e nota.
+  - Usado em Remover servidor (todos os pontos de entrada), Limpar histórico e Repor histórico.
+  - Cancelar é o botão por defeito e recebe o primeiro foco, por isso Enter nunca apaga.
+- **`--qa-backup` obrigatório em todos os cenários `--qa-overview`:** recusa no arranque (exit 3) e a composição lança exceção.
+- **Relógio:** é um parâmetro obrigatório de `SettingsViewModel`, `ServersViewModel` e `TransientNoticeTimer`. A raiz faz `TryAddSingleton(PresentationClock.System)`; um harness regista antes e ganha.
+  - **Guarda em runtime (a prova):** nos testes, `TransientNoticeTimer.Start` recusa o relógio de sistema. A recusa é registada por teste e falha-o; fora do corpo de um teste, faz `FailFast`.
+  - A análise léxica (`SystemClockGuardTests`) é só consultiva. Aplicou-se o BOSS §16 (não convergência): o mecanismo foi substituído em vez de afinar mais o tokenizer.
+
+## 3. Arquitetura e testabilidade
+
+- **`ServerDetailViewModel`:**
+  - lê o `ServerCardViewModel` do dashboard, sem recolha nova;
+  - agrega as notificações num flush por rajada, sem alocações extra por tick;
+  - lê o relógio uma vez por leitura (`ReadClock`);
+  - pulso a partir do histórico local, com uma leitura por amostra persistida; uma leitura ultrapassada nunca escreve por cima (evento `PulseReadSettled`);
+  - saída e aviso pela intenção própria (Ocultar/Remover), devolve o foco a "…" quando não sai, e trata o retorno de foco de Histórico/Serviços.
+- **`ServerStatusPresentation`:** a fonte única do texto de estado e do valor acessível, partilhada pelas linhas e pelo Detail.
+- **Definições divididas:**
+  - `SettingsPage` (Geral) e `SettingsDataPage` (Dados e servidores), com o mesmo `SettingsViewModel` singleton;
+  - carga em single-flight;
+  - pedidos de secção (Segundo plano / Sobre) atendidos a frio e a quente, só com a página `Loaded`.
+- **Navegação:**
+  - `GoToServerDetail` com origem e breadcrumb (A-2);
+  - `GoToSettings(General|Data|About)`;
+  - `ServersReturnNotice` é um slot one-shot.
+- **Primitivas:**
+  - `SaPulseBars` e `SaSegmentMeter`: pista fixa de 288, cor por template part com `ThemeResource`;
+  - `SaListHost`: lista UIA com nome;
+  - `SaThemeRefresh`: remount na troca de tema ao vivo, com foco e scroll repostos;
+  - `SaInlineNotice`: nome sem ponto duplicado;
+  - `SaListRow`: o nome explícito ganha ao título.
+- **Harness Debug `--qa-overview`:**
+  - cenários UI.4, mais `detail`/`detail-failing` (um servidor por estado; operações com sucesso ou falha) e `data`/`data-failing` (ocultos, histórico disponível/indisponível com o diálogo real, doubles de backup);
+  - relógio de apresentação fixo;
+  - só no Debug.
+
+## 4. Breakpoints
+
+| Largura da janela | Detail | Definições / Dados |
 |---|---|---|
-| ≥ 1120 | Three metric cards side by side. The content is ≥ 1040 and each card ≥ 336, which is the Figma geometry. | Controls at the right of each row. |
-| 700–1119 | Metric cards stacked, then Ligação / Explorar stacked. The actions stay beside the name. | Controls at the right of each row. |
-| < 700 | Compact padding. The actions move under the identity. | Each control moves under its text, and the next row starts 16 below it. |
+| ≥ 1120 | 3 cartões de métrica (conteúdo ≥ 1040, cartão ≥ 336 = geometria Figma) | Controlo à direita da linha |
+| 700–1119 | Métricas empilhadas, depois Ligação/Explorar empilhados; ações ao lado do nome | Controlo à direita |
+| < 700 | Padding compacto; ações por baixo da identidade | Controlo por baixo do texto; 16 de ar até à linha seguinte |
 
-The window at 1040 is **Medium**: its content is about 960, so it is stacked. The B2 report said "Wide ≥ 1040"; that was wrong (Prism C1 N-10).
+## 5. Detalhes técnicos
 
-## Metric visuals
+- **Medidores:** pista fixa de **288 × 40**, alinhada à esquerda e nunca esticada.
+  - Pulso: 30 × 5,73, gap 4.
+  - Memória: 28 × 6,43, gap 4.
+  - Disco: 14 × 15,93, gap 5.
+- **Cabeçalho:** "{sistema}   ·   {endereço}" (`112:1802`); só o endereço quando não há sistema. O chip de leitura desatualizada diz sempre "Leitura desatualizada"; a idade aparece uma vez, em "Última atualização".
+- **Primeira leitura:** cartão de 216; faixa de info em cartão sólido p24 / g32 com skeletons. O "Intervalo" fica visível (é configuração conhecida).
+- **Ligação:**
+  - 4 linhas h23 com gap 17.
+  - A linha "Estado da ligação" só aparece quando a ligação não está verificada.
+  - A linha "Rota" só aparece com jump host.
+  - Um problema de ligação substitui o aviso genérico de recolha.
+- **Teclado e leitores de ecrã:**
+  - Seletor de tema: uma paragem de Tab, e as setas selecionam.
+  - Sobre e Segundo plano: trazem a secção à vista e dão-lhe o foco.
+  - Lista de ocultos: cada Restaurar é uma paragem de Tab e anuncia "n de N".
+  - "A atualizar…" é live polite.
+  - Depois de Limpar/Repor histórico, o foco volta ao botão que abriu o diálogo.
+- **Tema ao vivo:**
+  - Medido: a página aberta não recebia `ActualThemeChanged`, e trocar o estilo/brush no lugar dava outra mistura (Claro 223 vs 247).
+  - O remount pela raiz iguala a reentrada (247 = 247, 37 = 37).
 
-- **Fixed track.** All three meters keep the fixed Figma track of **288 × 40**, left-aligned, in every state:
-  - pulse: 30 × 5.73, gap 4;
-  - memory: 28 × 6.43, gap 4;
-  - disk: 14 × 15.93, gap 5.
+## 6. Diferenças deliberadas face ao Figma
 
-  They never stretch with the card.
-- **CPU pulse scale** (Boss, fix round 2). This is a **deliberate derivation**: it revises the round-1 absolute 0–100 % scale.
-  - The bars are relative to a **ceiling**: the smallest of 25 / 50 / 75 / 100 % that is at or above the highest visible sample. The pure rule is `MetricVisualPresentation.PulseCeiling`.
-  - Why:
-    - Figma fidelity: `112:1818` draws a ~24 % pulse with 13–35 px bars.
-    - Quantisation keeps it honest: the step is deterministic.
-  - The CPU value's accessible name states the real values, for example "CPU: 24%. Pulso das últimas 12 amostras, escala até 25%".
-  - DERIVED: a sample above 0 keeps a 3 px minimum height, and a measured 0 draws no bar.
-  - Only real samples from local history are drawn (H-UI5-3).
-- **No severity colour on the Detail** (Prism C1 N-4 decision). The metric colours are identity colours, stale or not. The view model therefore exposes no `*Severity` property.
+| Diferença | Razão |
+|---|---|
+| Avisos numa linha própria por baixo do conteúdo (o Figma §3.2 põe-nos por cima); enquanto visíveis, a área de scroll fica ~128 px mais curta | a11y: nunca tapar ações (0 controlos tapados a 900×700 e 560×640) |
+| Faixa da primeira leitura com ~97 px (Figma 86) | Funcional: o "Intervalo" mostra o valor real em vez de skeleton |
+| Wide a partir de uma janela de 1120 (o Figma desenha 1040 de conteúdo) | Plataforma: sem a sidebar do UI.6, é a largura em que as pistas de 288 cabem em 3 colunas |
+| Menu "…" com Ocultar/Remover (H-UI5-1); glifo Segoe `E712` | Funcionalidade preservada; o set de ícones não tem "more" |
+| Cartão Backup/Restauro (H-UI5-4) e "Repor histórico" | Funcionalidade preservada, sem nó Figma |
+| A ligação "Sobre" navega para Dados e foca o cartão Sobre (H-UI5-4) | Funcionalidade preservada |
+| "Estado da ligação" (quando não verificado) e "Rota" (jump host) | Funcionalidade preservada |
+| Escala do pulso por degraus e mínimo de 3 px | Funcional: derivação documentada (§2) |
+| Botão voltar das Definições | Funcional: D-UI4-NAV, até ao UI.6 |
+| Ordem dos botões dos diálogos à moda Windows | Plataforma: UI.2 B-10 |
+| Endereço no formato A-13 (`host:porta`, `[IPv6]:porta`) | Funcional |
+| Versão real no "Sobre" | Funcional: o número do Figma é ilustrativo |
 
-## Header, info strip, Ligação
+## 7. Remoções com prova de zero usos
 
-- **Subtitle.** The format is `"{system}   ·   {address}"`, with three spaces each side, as in Figma `112:1802`. With no known system it is the address alone.
-- **Stale chip.** It always says "Leitura desatualizada". The age is said once, by "Última atualização". That age is one timestamp (the engine's last success) read with one clock read per reading.
-- **First reading.**
-  - The collecting card is 216 high, the metric cards' height.
-  - The info strip is a solid card 86 high, padding 24, gap 32, with skeleton values.
-  - **Intervalo stays shown** during the first reading (Prism C1 N-12, accepted exception). It is known configuration, and a skeleton there would hide real information.
-  - Accepted consequence (Prism C2 n-1): that strip measures ~97 instead of 86, because the interval value (17/24) is taller than a 12 px skeleton.
-- **Ligação.**
-  - The 4 Figma rows are 23 high, with a gap of 17.
-  - The DERIVED "Estado da ligação" row appears only when the connection is not verified: not yet tested, testing, or failed.
-  - The "Rota" row appears only with a jump host.
-- **One notice at a time.** A connection problem replaces the generic "Não foi possível atualizar as métricas".
+- **Prova:** grep em `src`, `tests` e `tools`, seguido das suites completas Debug e Release verdes.
+- **Removidos:**
+  - `ServerFullCard`, `ServerActionsButton` e `RemoveServerDialog` (substituído pelo diálogo destrutivo);
+  - `IsFocusHighlighted`, `MoreOptionsAutomationName`, `RefreshMetricsAutomationName`;
+  - as chaves de recurso mortas desses controlos e das Definições antigas;
+  - `Cpu/Memory/DiskSeverity` do Detail;
+  - o método `ConfigureDialog`, sem uso.
+- **Mantidos com prova negativa:**
+  - `ServerHealthOffline`/`ServerHealth*`, usados pelo Compact;
+  - as chaves Ocultar/Remover, reutilizadas pelo menu "…";
+  - `ServerMetricsRefreshingLabel`, usado pelo Compact e pelo Detail.
 
-## Notices and errors
+## 8. Reviews e rondas
 
-- **Transient notices auto-dismiss** (Boss decision 2). This covers the Servidores return notice and the Dados success toast.
-  - They close after **8 s** (`TransientNoticeTimer.Duration`, DERIVED), when the user closes them, or when the page is left.
-  - A later visit never shows them again.
-  - They are polite live regions.
-  - They sit in **their own row under the content**, so they never cover an action at any size. This is a deliberate deviation from Figma §3.2, which draws them over the content.
-  - Accepted cost (Prism C2 n-2): while a notice is visible, the scrolling area is ~128 px shorter. At 560×640 little room is left, but only for the 8 s. To be revisited in UI.6, when the shell gets its own notice area.
-- **Server-scoped errors** (Boss decision 3). A failed Editar / Ocultar / Remover is reported with the server it was about.
-  - **Last-wins** (Cortex C2 R-2, accepted): there is ONE shared notice. An error about X followed by one about Y moves the scope to Y; X's Detail then stops showing it, while the Visão geral (unscoped) still does.
-  - A locked configuration (M14.6) is never server-scoped: it shows everywhere.
-  - It shows only on that server's Detail.
-  - Global errors (load, add, discovery) still show everywhere (UI.4 SHOULD-3).
-  - The scope is App-layer bookkeeping (`DashboardViewModel.OperationErrorServerId`). Nothing in Core changed.
+| Review | Percurso | Final |
+|---|---|---|
+| Cortex (arquitetura) | B1 CHANGES_REQUIRED (M-1/M-2) → c1, c2 e c4 APPROVED_WITH_NITS | **c5 APPROVED** |
+| Prism (fidelidade) | c1 CHANGES_REQUIRED (M-1..M-8) → c2 APPROVED_WITH_NITS | **c3 APPROVED** |
+| Beacon (QA na app real) | c1 CHANGES_REQUIRED (M1–M5) → c2 CHANGES_REQUIRED (R2-M1) | **c3 APPROVED** |
+| Atlas (testes) | c1 a c5 CHANGES_REQUIRED (barreiras, cultura, relógio real, guarda do relógio) | **c6 APPROVED** |
 
-## Confirmations
+**Rondas de correções:**
+1. **Ronda 1:** prontidão de navegação a frio, `--qa-backup` para todos, single-source da idade, pt-PT em "tu".
+2. **Ronda 2:** decisões do Boss (pulso, avisos, âmbito do erro, sem severidade, diálogos), materiais de Prism/Beacon/Atlas e remount do tema.
+3. **Ronda 3:** foco depois dos diálogos de histórico, relógio injetado nos testes, lista UIA com nome, corrida do callback em fila, scroll no remount.
+4. **Ronda 4:** relógio como parâmetro obrigatório; TryAdd na raiz (achado do smoke).
+5. **Ronda 5:** guarda em runtime no ponto de perigo, registada por teste; o lint passa a consultivo.
+6. **Ronda 6:** `FailFast` para recusas fora do corpo de um teste; teste desarmado sem janela de 8 s.
 
-Remover servidor, Limpar histórico and Repor histórico all use `DestructiveConfirmDialog`.
+## 9. Testes e contraprovas
 
-- **Style.** `SaDialogStyle` + `SaDialog.Kind="Destructive"` (Figma section 11: `112:8559`, `112:8876`).
-- **Content.**
-  - Body.
-  - The "affected data" row, 564 × 42, r11.
-  - A note.
-- **Behaviour.** Cancelar is the default button and takes the first focus, so Enter never deletes. This keeps the UI.4/M14 semantics.
-- **Button order.** The Windows order, as accepted in UI.2 B-10.
-- **Repor histórico.** It has no Figma frame and reuses the pattern: "Histórico local · base indisponível".
+- **Canónico em `e9fcfab`** (`ServerMonitor.slnx`, `--no-incremental`, `test --no-build`):
+  - Debug: **4847 passam / 0 falham / 1 skip** (pré-existente).
+  - Release: **4531 / 0 / 1**.
+  - Incluem ratchets (geometria, dívida UI, contrato XAML), guards de tokens e de arquitetura.
+- **Contraprovas P-008:** cada invariante nova tem uma mutação que faz falhar a suite, com restauro byte a byte e hash = HEAD.
+  - Grupos A–J ao longo das rondas, todos KILLED, incluindo o tema ao vivo em runtime (build mutado: 223/56 vs 247/37).
+  - Omitir o relógio dá erro de compilação CS7036.
+  - As vias interpolação, `using static`, alias e helper real com o relógio de sistema fazem falhar o teste.
+  - Uma recusa no construtor ou no `Dispose` aborta o host com a causa.
+- **Sem relógio real nos testes:** FakeTimeProvider em todos os donos de avisos; os 30 s existentes servem só de proteção contra deadlocks.
 
-## Keyboard and screen readers
+## 10. NOT_RUN
 
-- **Theme selector.** One Tab stop, entry on the selected item, and the arrows move and select (UI.2 `SaGroupNavigation`).
-- **Section requests.** "Sobre o ServerAlyzer" and the Background request bring their section into view **and** focus its control, cold or warm.
-- **Hidden-servers list.** Every Restaurar is a Tab stop and says "n of N". The list is named by its card title.
-- **List rows.** An explicit accessible name on an `SaListRow` (for example "Histórico de prod-web-01") is never overwritten by its title.
-- **Refreshing.** "A atualizar…" is a polite live region, raised when a refresh starts.
-- **Glass on a live theme switch** (`SaThemeRefresh`).
-  - Measured at runtime: the open page never receives `ActualThemeChanged`. Re-applying the style or the brush in place still rendered a different blend from a page entering the tree (Light 223 vs 247, Dark 56 vs 37).
-  - The page therefore listens to its window root and remounts its own content after a theme change. That is the same objects leaving and re-entering the tree, with focus and the page scroller's vertical offset restored (Cortex C2 R-1).
-  - Backlog for UI.6 (Cortex C2 R-4): the UI.4 pages (Visão geral, Servidores, Histórico, Serviços) do not opt in yet; in the shell the fix can move to the Frame or the root.
-  - Result: live switch = re-entry, in both directions.
-- **After a cancelled or failed Ocultar / Remover,** focus returns to "…": the menu item that started it no longer exists.
-- **After a Limpar / Repor histórico dialog** (cancelled, done or failed), focus returns to the button that opened it (Beacon C2 R2-M1). While the dialog was open the command had disabled that button, so the dialog could not hand focus back. If a successful reset hides "Repor histórico", focus goes to "Limpar histórico".
-- **The hidden-servers list** is a named List for UI Automation. `SaListHost` hosts the `ItemsRepeater` (which has no automation peer), and the repeater keeps its virtualization and per-item Tab stops (Beacon C2 R2-N1).
+- Narrator.
+- Alto Contraste real do sistema.
+- DPI 150 % e 200 %.
+- Hover real das primitivas: só o disclosure em Claro registou hover com movimento sintético do ponteiro.
+- Deep-link real do widget até ao Detail.
+- Foco no "Segundo plano" em runtime: o gatilho é uma notificação do SO ou a degradação do tray.
+- Foco depois de um Repor histórico com sucesso em runtime: coberto por teste.
+
+## 11. Dados reais e Firewall
+
+- **Dados reais:** em todas as corridas de QA, metadados e SHA-256 dos dados reais do utilizador antes e depois: **0 diferenças**. Nenhum caminho real foi passado à app nem aos testes.
+- **Firewall:**
+  - As 4 regras do `testhost` deste Floor estão em **Allow**, a aguardar GO humano. Não foram removidas.
+  - Nenhum prompt foi respondido por agentes.
+  - Não existe regra para a app.
+
+## 12. Backlog
+
+- **N-R4-2:** `DashboardViewModel` e `ServerDetailViewModel` com relógio obrigatório (hoje opcional, com fallback para System).
+- **R-4 (UI.6):** acrílico desatualizado na troca de tema ao vivo nas páginas UI.4 (Visão geral, Servidores, Histórico, Serviços). A correção pode passar para o Frame ou a raiz do shell.
+- **M14.6:** mensagens e diálogos de backup ainda em "você" (pt-PT).
+- **Hover em Claro** das primitivas, na galeria (UI.6).
+- **`TrayOwnershipCompletenessTests`:** o único uso de `TimeProvider.System` nos testes (tray, sem avisos), na allowlist do lint.
+- **UI.6:**
+  - sidebar/shell, que substitui o botão voltar das Definições (D-UI4-NAV);
+  - área própria para avisos;
+  - retorno de foco das Definições para a Visão geral (Beacon N7).
+- **UI.7:** redesign do Editar e "Descartar alterações?".
