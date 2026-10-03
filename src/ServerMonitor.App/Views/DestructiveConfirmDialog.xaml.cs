@@ -30,4 +30,27 @@ public sealed partial class DestructiveConfirmDialog : ContentDialog
     public string AffectedIconData { get; }
 
     public string Note { get; }
+
+    /// <summary>
+    /// The smoke layer covers the whole window (Figma backdrop #000@.36 / @.20): the dialog is sized to its XamlRoot and
+    /// follows it while open - the same rule the previous Remover dialog and the backup dialogs use. Call after XamlRoot.
+    /// </summary>
+    public void FillWindow()
+    {
+        if (XamlRoot is not { } root)
+        {
+            return;
+        }
+
+        void UpdateBounds()
+        {
+            Width = root.Size.Width;
+            Height = root.Size.Height;
+        }
+
+        void OnRootChanged(Microsoft.UI.Xaml.XamlRoot sender, Microsoft.UI.Xaml.XamlRootChangedEventArgs args) => UpdateBounds();
+        UpdateBounds();
+        root.Changed += OnRootChanged;
+        Closed += (_, _) => root.Changed -= OnRootChanged;
+    }
 }

@@ -600,7 +600,17 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
         {
             _exitOperationCompleted = true;
         }
+
+        // UI.5 fix round 2 (runtime QA): cancelled in its confirmation or failed - the page stays, and focus goes back to
+        // "…" (the menu item that started it is gone), never to the top of the page.
+        if (!_left && !_disposed && _card is not null)
+        {
+            ActionsFocusRequested?.Invoke(this, EventArgs.Empty);
+        }
     }
+
+    /// <summary>Raised when an Ocultar / Remover started here ended without leaving the page: the view refocuses "…".</summary>
+    public event EventHandler? ActionsFocusRequested;
 
     private void Explore(ServerDetailReturnTarget target, ICommand? open)
     {

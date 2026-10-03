@@ -84,4 +84,8 @@ Remover servidor, Limpar histórico and Repor histórico all use `DestructiveCon
 - **Hidden-servers list.** Every Restaurar is a Tab stop and says "n of N". The list is named by its card title.
 - **List rows.** An explicit accessible name on an `SaListRow` (for example "Histórico de prod-web-01") is never overwritten by its title.
 - **Refreshing.** "A atualizar…" is a polite live region, raised when a refresh starts.
-- **Glass on a live theme switch.** The glass surfaces of an open page re-resolve their theme on a live theme switch (`SaThemeRefresh`). Before this, the previous theme's acrylic was left in place.
+- **Glass on a live theme switch** (`SaThemeRefresh`).
+  - Measured at runtime: the open page never receives `ActualThemeChanged`. Re-applying the style or the brush in place still rendered a different blend from a page entering the tree (Light 223 vs 247, Dark 56 vs 37).
+  - The page therefore listens to its window root and remounts its own content after a theme change. That is the same objects leaving and re-entering the tree, with focus restored.
+  - Result: live switch = re-entry, in both directions.
+- **After a cancelled or failed Ocultar / Remover,** focus returns to "…": the menu item that started it no longer exists.

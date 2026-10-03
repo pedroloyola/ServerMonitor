@@ -178,6 +178,45 @@ public sealed class Ui5R2Tests
         Assert.False(web.IsOperationErrorOpen);
     }
 
+    // ---- runtime QA: focus goes back to "…" when Ocultar / Remover does not leave the page ------------------------------
+
+    [Fact]
+    public async Task ACancelledRemove_AsksTheViewToRefocusTheActions_ASuccessDoesNot()
+    {
+        var fleet = new Ui4TestKit.Fleet().Add("web", ServerHealth.Healthy, 1, 2, 3).Add("db", ServerHealth.Healthy, 1, 2, 3);
+        var dialogs = new DecidingDialogs();
+        var kit = Ui4TestKit.Create(fleet, dialogs: dialogs);
+        kit.Servers.HideOverride = id =>
+        {
+            var index = kit.Servers.Servers.FindIndex(server => server.Id == id);
+            kit.Servers.Servers[index] = kit.Servers.Servers[index] with { IsHidden = true };
+            kit.Servers.RaiseChanged();
+            return Task.FromResult(true);
+        };
+        await kit.Dashboard.LoadAsync();
+        using var detail = Open(kit, "web");
+        var requests = 0;
+        detail.ActionsFocusRequested += (_, _) => requests++;
+
+        await ((AsyncRelayCommand)detail.RemoveCommand).ExecuteAsync(); // cancelled in its confirmation
+        Assert.Equal(1, requests);
+
+        await ((AsyncRelayCommand)detail.HideCommand).ExecuteAsync(); // succeeds: the page leaves, no refocus
+        Assert.Equal(1, requests);
+        Assert.Equal(1, kit.Navigation.ServersCount); // its own Ocultar: to Servidores, with the notice
+    }
+
+    [Fact]
+    public void TheThemeRefresh_ListensToTheWindowRoot_AndRemountsThePage()
+    {
+        var code = AppSourceTree.CodeWithoutComments("Controls/Primitives/SaThemeRefresh.cs");
+
+        Assert.Contains("XamlRoot?.Content is FrameworkElement root", code, StringComparison.Ordinal);
+        Assert.Contains("root.ActualThemeChanged += OnRootThemeChanged", code, StringComparison.Ordinal);
+        Assert.Contains("page.Content = null;", code, StringComparison.Ordinal);
+        Assert.Contains("page.Content = content;", code, StringComparison.Ordinal);
+    }
+
     // ---- Prism C1 M-3: the Figma section-11 destructive confirmation ------------------------------------------------------
 
     [Fact]
@@ -562,6 +601,17 @@ public sealed class Ui5R2Tests
         var raised = new List<string>();
         source.PropertyChanged += (_, e) => raised.Add(e.PropertyName ?? string.Empty);
         return raised;
+    }
+
+    private sealed class DecidingDialogs : IServerDialogService
+    {
+        public Task<ServerEditorResult?> ShowEditorAsync(Server? server) => Task.FromResult<ServerEditorResult?>(null);
+
+        public Task<ServerEditorResult?> ShowEditorForDiscoveryAsync(ServerDiscoveryPrefill prefill) => Task.FromResult<ServerEditorResult?>(null);
+
+        public Task<ServerEditorResult?> ShowEditorForSshImportAsync() => Task.FromResult<ServerEditorResult?>(null);
+
+        public Task<bool> ConfirmRemoveAsync(Server server) => Task.FromResult(false);
     }
 
     private sealed record SettingsHarness(SettingsViewModel ViewModel, FakeServerService Servers);

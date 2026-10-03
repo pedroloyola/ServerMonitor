@@ -22,6 +22,7 @@ public sealed partial class ServerDetailPage : Page, IServerDetailView, IDisposa
         DataContext = viewModel;
         Loaded += OnLoaded;
         viewModel.PropertyChanged += OnViewModelPropertyChanged;
+        viewModel.ActionsFocusRequested += OnActionsFocusRequested;
         // Released on Unloaded AND when navigation replaces the page (a page replaced before Loaded never unloads).
         Unloaded += (_, _) => Dispose();
     }
@@ -34,8 +35,13 @@ public sealed partial class ServerDetailPage : Page, IServerDetailView, IDisposa
     public void Dispose()
     {
         ViewModel.PropertyChanged -= OnViewModelPropertyChanged;
+        ViewModel.ActionsFocusRequested -= OnActionsFocusRequested;
         ViewModel.Dispose();
     }
+
+    // An Ocultar / Remover that did not leave the page (cancelled, failed): back to "…", after the dialog / menu closed.
+    private void OnActionsFocusRequested(object? sender, EventArgs e) =>
+        DispatcherQueue?.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () => MoreActionsButton.Focus(FocusState.Programmatic));
 
     // Beacon C1 N2: "A atualizar..." is announced when a refresh starts (the text is the live region; it becomes visible
     // with the refresh, so the event is raised after that layout pass).

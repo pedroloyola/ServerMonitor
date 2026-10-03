@@ -152,6 +152,7 @@
                         Command="{Binding EditCommand}"
                         AutomationProperties.Name="{Binding EditAutomationName}" />
                     <Button
+                        x:Name="MoreActionsButton"
                         Style="{StaticResource SaIconButtonStyle}"
                         AutomationProperties.Name="{Binding MoreActionsAutomationName}"
                         ToolTipService.ToolTip="{Binding MoreActionsAutomationName}">

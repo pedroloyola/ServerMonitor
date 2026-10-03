@@ -83,6 +83,7 @@ public sealed class ServerDialogService(
             XamlRoot = windowContext.XamlRoot,
             RequestedTheme = windowContext.ActualTheme
         };
+        dialog.FillWindow();
         return await dialog.ShowAsync() == ContentDialogResult.Primary;
     }
 }

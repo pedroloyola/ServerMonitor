@@ -48,7 +48,9 @@ public sealed partial class XamlContractAndResourceGuardTests
             "CollectingColumns", "MetricsGrid", "MetricsColumn2", "MetricsColumn3", "MemoryCard", "DiskCard", "DeeperGrid", "DeeperColumn2",
             "ExploreCard", "HistoryRow", "WorkloadsRow",
             // UI.5 fix round 2 (Beacon C1 N2): the live "A atualizar…" text announced from code-behind.
-            "RefreshingText"],
+            "RefreshingText",
+            // UI.5 fix round 2: focus returns to "…" after a cancelled / failed Ocultar or Remover.
+            "MoreActionsButton"],
         // UI.5 §4: the Data sub-page brings the backup status and (H-UI5-4) the About card into view from code-behind.
         ["Views/SettingsDataPage.xaml"] = ["BackupStatusBar", "AboutSection", "PageRoot", "ResetIgnoredButton", "HistoryActions", "BackupActions",
             "GitHubButton", "SuccessToast"],

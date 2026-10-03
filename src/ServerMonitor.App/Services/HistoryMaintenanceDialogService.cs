@@ -30,6 +30,7 @@ public sealed class HistoryMaintenanceDialogService(
             XamlRoot = windowContext.XamlRoot,
             RequestedTheme = windowContext.ActualTheme
         };
+        dialog.FillWindow();
 
         return await dialog.ShowAsync() == Microsoft.UI.Xaml.Controls.ContentDialogResult.Primary;
     }

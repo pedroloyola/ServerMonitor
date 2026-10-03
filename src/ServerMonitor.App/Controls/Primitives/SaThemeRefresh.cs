@@ -1,67 +1,109 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Input;
 
 namespace ServerMonitor.App.Controls.Primitives;
 
 /// <summary>
 /// UI.5 fix round 2 (Beacon C1 M3): a live theme switch (Escuro → Claro with the page open) left the glass cards of the
-/// open page painted with the previous theme's acrylic until the page was recreated. The <c>SaGlassSurfaceBrush</c> is
-/// an <see cref="AcrylicBrush"/> per theme dictionary, but the acrylic already applied through the style is not swapped
-/// on a live RequestedTheme change. Re-applying the style of the affected surfaces (only <see cref="Border"/>s whose
-/// background is an acrylic brush; never a Control, whose template a style swap would rebuild) makes the
-/// ThemeResource resolve again for the new theme. Attached once per page; idempotent.
+/// open page with the previous theme's acrylic until the page was recreated. Measured at runtime: the page itself never
+/// receives ActualThemeChanged (only the window root, whose RequestedTheme the ThemeService sets, does), and re-applying
+/// the style or the brush on the live elements still rendered a different blend than a page entering the tree. So the
+/// page listens to its window root and, after a theme change, REMOUNTS its content (out of the tree and back in, the
+/// same objects: bindings, scroll position and view model untouched) - exactly what re-entering the page does - and
+/// gives focus back to the element that had it. Attached once per page; idempotent.
 /// </summary>
 public static class SaThemeRefresh
 {
     public static readonly DependencyProperty IsEnabledProperty = DependencyProperty.RegisterAttached(
         "IsEnabled", typeof(bool), typeof(SaThemeRefresh), new PropertyMetadata(false, OnIsEnabledChanged));
 
-    public static bool GetIsEnabled(FrameworkElement element) => (bool)element.GetValue(IsEnabledProperty);
+    private static readonly DependencyProperty SubscriptionProperty = DependencyProperty.RegisterAttached(
+        "Subscription", typeof(object), typeof(SaThemeRefresh), new PropertyMetadata(null));
 
-    public static void SetIsEnabled(FrameworkElement element, bool value) => element.SetValue(IsEnabledProperty, value);
+    public static bool GetIsEnabled(Page element) => (bool)element.GetValue(IsEnabledProperty);
 
+    public static void SetIsEnabled(Page element, bool value) => element.SetValue(IsEnabledProperty, value);
+
+    // Set on a Page: the refresh remounts the page's own Content.
     private static void OnIsEnabledChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
-        if (d is not FrameworkElement element)
+        if (d is not Page page)
         {
             return;
         }
 
-        element.ActualThemeChanged -= OnActualThemeChanged;
+        page.Loaded -= OnLoaded;
+        page.Unloaded -= OnUnloaded;
         if (e.NewValue is true)
         {
-            element.ActualThemeChanged += OnActualThemeChanged;
+            page.Loaded += OnLoaded;
+            page.Unloaded += OnUnloaded;
         }
     }
 
-    private static void OnActualThemeChanged(FrameworkElement sender, object args) =>
-        sender.DispatcherQueue?.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () => ReapplyAcrylicSurfaces(sender));
-
-    /// <summary>Re-applies the style of every acrylic-backed Border under <paramref name="root"/>; returns how many.</summary>
-    public static int ReapplyAcrylicSurfaces(DependencyObject root)
+    private static void OnLoaded(object sender, RoutedEventArgs e)
     {
-        ArgumentNullException.ThrowIfNull(root);
-        var count = 0;
-        var pending = new Stack<DependencyObject>();
-        pending.Push(root);
-        while (pending.Count > 0)
+        var page = (Page)sender;
+        (page.GetValue(SubscriptionProperty) as RootSubscription)?.Dispose();
+        if (page.XamlRoot?.Content is FrameworkElement root)
         {
-            var current = pending.Pop();
-            if (current is Border { Background: AcrylicBrush, Style: { } style } border)
-            {
-                border.Style = null;
-                border.Style = style;
-                count++;
-            }
+            page.SetValue(SubscriptionProperty, new RootSubscription(page, root));
+        }
+    }
 
-            var children = VisualTreeHelper.GetChildrenCount(current);
-            for (var index = 0; index < children; index++)
-            {
-                pending.Push(VisualTreeHelper.GetChild(current, index));
-            }
+    private static void OnUnloaded(object sender, RoutedEventArgs e)
+    {
+        var page = (Page)sender;
+        (page.GetValue(SubscriptionProperty) as RootSubscription)?.Dispose();
+        page.ClearValue(SubscriptionProperty);
+    }
+
+    /// <summary>Takes the page's content out of the tree and puts the same object back, keeping the focused element.</summary>
+    public static bool Remount(Page page)
+    {
+        ArgumentNullException.ThrowIfNull(page);
+        if (page.Content is not UIElement content || page.XamlRoot is null)
+        {
+            return false;
         }
 
-        return count;
+        var focused = FocusManager.GetFocusedElement(page.XamlRoot) as Control;
+        page.Content = null;
+        page.Content = content;
+        if (focused is not null)
+        {
+            page.DispatcherQueue?.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () => focused.Focus(FocusState.Programmatic));
+        }
+
+        return true;
+    }
+
+    private sealed class RootSubscription : IDisposable
+    {
+        private readonly Page _page;
+        private readonly FrameworkElement _root;
+        private ElementTheme _theme;
+
+        public RootSubscription(Page page, FrameworkElement root)
+        {
+            _page = page;
+            _root = root;
+            _theme = root.ActualTheme;
+            root.ActualThemeChanged += OnRootThemeChanged;
+        }
+
+        public void Dispose() => _root.ActualThemeChanged -= OnRootThemeChanged;
+
+        private void OnRootThemeChanged(FrameworkElement sender, object args)
+        {
+            if (sender.ActualTheme == _theme)
+            {
+                return;
+            }
+
+            _theme = sender.ActualTheme;
+            _page.DispatcherQueue?.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () => Remount(_page));
+        }
     }
 }
