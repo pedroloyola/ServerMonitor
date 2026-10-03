@@ -1,9 +1,10 @@
 # UI.5 — Server Detail, Definições, Dados e servidores
 
-**Estado: READY_TO_MERGE**, a aguardar GO humano.
-- **Branch:** `ui/ui5-server-detail-settings`, base `5168662`.
-- **HEAD de código validado:** `e9fcfab`; este commit é só de documentação.
-- **PR:** #23.
+**Estado: COMPLETE** (2026-10-04).
+- **Merge:** PR #23 integrado por merge commit (GO humano), fixado ao head `b0a4130` → `main` = `4abed58` (pais `5168662` + `b0a4130`).
+- **CI pós-merge:** verde à primeira tentativa (run 37162051830).
+- **Branch:** `ui/ui5-server-detail-settings` (mantida), base `5168662`. HEAD de código validado `e9fcfab`; `b0a4130` é só de documentação.
+- **Floor UI.5:** removido depois do merge (sem branch apagada). Confirmado nas três provas: `maestri floor list`, `git worktree list` e diretório inexistente.
 - **Reviews finais:** Cortex c5 APPROVED, Prism c3 APPROVED, Beacon c3 APPROVED, Atlas c6 APPROVED.
 
 **Autoridade visual:** Figma `Qvk5dUFgsWf4UOYzfAkiDV`. Precedência: invariantes/segurança > a11y/plataforma > Figma.
@@ -181,7 +182,7 @@ Os valores do Figma ficam nos comentários XAML junto de cada elemento. Este doc
 
 - **Dados reais:** em todas as corridas de QA, metadados e SHA-256 dos dados reais do utilizador antes e depois: **0 diferenças**. Nenhum caminho real foi passado à app nem aos testes.
 - **Firewall:**
-  - As 4 regras do `testhost` deste Floor estão em **Allow**, a aguardar GO humano. Não foram removidas.
+  - As 4 regras "Query User" do `testhost` deste Floor (Infrastructure.Tests, Debug e Release, TCP e UDP, em **Allow**) foram removidas depois do merge, com GO humano, por `Name` exato e com elevação: 716 → 712 regras, 0 removidas a mais, 0 novas.
   - Nenhum prompt foi respondido por agentes.
   - Não existe regra para a app.
 
