@@ -37,6 +37,8 @@ public sealed class SystemClockRuntimeGuardTests
         var direct = Assert.Throws<InvalidOperationException>(() => new TransientNoticeTimer(system).Start(() => { }));
         Assert.Contains("SYSTEM clock", direct.Message, StringComparison.Ordinal);
         Assert.Throws<InvalidOperationException>(() => new TransientNoticeTimer(viaPresentationClock).Start(() => { }));
+        // Both refusals were also RECORDED for this test (a swallowing caller cannot hide them); taken here on purpose.
+        Assert.Equal(2, SystemClockTestGuard.TakeViolations().Count);
         using var fake = new TransientNoticeTimer(TestClock.Fake().TimeProvider);
         fake.Start(() => { }); // a fake is fine
         Assert.True(fake.IsRunning);
@@ -71,8 +73,9 @@ public sealed class SystemClockRuntimeGuardTests
             .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
             .Select(path => (Path: path, Text: File.ReadAllText(path))).ToList();
 
-        Assert.DoesNotContain(sources, source => Regex.IsMatch(source.Text, @"RejectSystemTimeProvider\s*=[^=]"));
+        Assert.DoesNotContain(sources, source => Regex.IsMatch(source.Text, @"(RejectSystemTimeProvider|SystemClockRejected)\s*=[^=>]"));
         var declaration = sources.Single(source => source.Path.EndsWith("TransientNoticeTimer.cs", StringComparison.Ordinal)).Text;
         Assert.Contains("internal static bool RejectSystemTimeProvider { get; set; }\n", declaration.Replace("\r\n", "\n"), StringComparison.Ordinal);
+        Assert.Contains("internal static Action<string>? SystemClockRejected { get; set; }\n", declaration.Replace("\r\n", "\n"), StringComparison.Ordinal);
     }
 }

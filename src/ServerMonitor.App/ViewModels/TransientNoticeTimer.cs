@@ -44,6 +44,12 @@ public sealed class TransientNoticeTimer : IDisposable
     /// </summary>
     internal static bool RejectSystemTimeProvider { get; set; }
 
+    /// <summary>
+    /// Told about every refusal before it throws (the test assembly records it per test, so a caller that swallows the
+    /// exception cannot hide it). Null in production.
+    /// </summary>
+    internal static Action<string>? SystemClockRejected { get; set; }
+
     /// <summary>True while a notice is counting down.</summary>
     public bool IsRunning => _timer is not null;
 
@@ -53,8 +59,10 @@ public sealed class TransientNoticeTimer : IDisposable
         ArgumentNullException.ThrowIfNull(onElapsed);
         if (RejectSystemTimeProvider && ReferenceEquals(_timeProvider, TimeProvider.System))
         {
-            throw new InvalidOperationException(
-                "TransientNoticeTimer: a notice countdown was started on the SYSTEM clock while the test guard is armed - pass a fake TimeProvider / PresentationClock.");
+            const string message =
+                "TransientNoticeTimer: a notice countdown was started on the SYSTEM clock while the test guard is armed - pass a fake TimeProvider / PresentationClock.";
+            SystemClockRejected?.Invoke(message);
+            throw new InvalidOperationException(message);
         }
 
         Cancel();
