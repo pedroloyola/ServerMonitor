@@ -38,9 +38,16 @@ public sealed partial class XamlContractAndResourceGuardTests
         ["Views/DashboardPage.xaml"] = ["PageRoot", "HeaderGrid", "HeaderActions", "HealthRow", "HealthColumn2", "HealthCountRow", "HealthSegments",
             "PriorityHost", "ServersToolbar", "OverviewSearchBox", "StateOverlay",
             "HealthCard", "PriorityButton", "ViewAllButton", "OverviewRepeater", "EmptyAddButton"],
-        ["Views/SettingsPage.xaml"] = ["BackgroundSection"],
+        // UI.5: BackgroundSection is brought into view from code-behind; the rest are reflowed by the WidthStates setters.
+        ["Views/SettingsPage.xaml"] = ["BackgroundSection", "PageRoot", "AutosaveText", "ThemeControl", "LanguageControl", "BackgroundControl",
+            "NotificationsControl", "CompactControl", "TopmostControl", "DisclosureColumn2", "DisclosureGrid", "AboutDisclosure"],
+        // UI.5 Server Detail: WidthStates setters + code-behind focus (HistoryRow / WorkloadsRow / RefreshButton).
+        ["Views/ServerDetailPage.xaml"] = ["PageScroll", "PageRoot", "IdentityGrid", "IdentityActions", "ServerNameHeading", "RefreshButton",
+            "CollectingColumns", "MetricsGrid", "MetricsColumn2", "MetricsColumn3", "MemoryCard", "DiskCard", "DeeperGrid", "DeeperColumn2",
+            "ExploreCard", "HistoryRow", "WorkloadsRow"],
         // UI.5 §4: the Data sub-page brings the backup status and (H-UI5-4) the About card into view from code-behind.
-        ["Views/SettingsDataPage.xaml"] = ["BackupStatusBar", "AboutSection"],
+        ["Views/SettingsDataPage.xaml"] = ["BackupStatusBar", "AboutSection", "PageRoot", "ResetIgnoredButton", "HistoryActions", "BackupActions",
+            "GitHubButton", "SuccessToast"],
         // UI.3: adaptive VisualState setters reflow these (no code-behind dependency).
         ["Views/HistoryPage.xaml"] = ["RangeLast30Days", "UnavailableState", "EmptyState", "PageRoot", "ControlsRow", "ServerSelector", "RangeTrack", "CpuChart", "MemoryChart", "DiskChart", "RetentionText"],
         ["Views/WorkloadsPage.xaml"] = ["PageHost", "PageScroll", "PageRoot", "QueryRow", "SearchBox", "FilterTrack", "ServicesCard", "CardsGrid", "CardsColumn2", "CardsRow1", "CardsRow2", "ContainersScroll", "ServicesScroll",
@@ -49,13 +56,12 @@ public sealed partial class XamlContractAndResourceGuardTests
             "UnavailableState", "NothingState", "NoResultsState"],
         // UI.4: "Limpar pesquisa" returns focus to the search box (code-behind FocusAfterAction).
         ["Views/ServersPage.xaml"] = ["SearchBox", "PageRoot", "HeaderGrid", "AddButton", "TableHeader", "HeaderSystemColumn", "HeaderSystemText",
-            "HeaderActionColumn", "ServersRepeater", "RootGrid", "EmptyAddButton"],
+            "HeaderActionColumn", "ServersRepeater", "RootGrid", "EmptyAddButton", "ReturnNotice"],
         ["Views/BackupCreateDialog.xaml"] = ["PassphraseBox", "ConfirmationBox"],
         ["Views/RestoreOpenDialog.xaml"] = ["PassphraseBox"],
         ["Views/AddServerDialog.xaml"] = ["ServerForm"],
         ["Views/EditServerDialog.xaml"] = ["ServerForm"],
         ["Controls/ServerEditorModal.xaml"] = ["ServerForm", "ModalTitleText", "PrimaryActionButton", "CancelActionButton"],
-        ["Controls/ServerFullCard.xaml"] = ["FocusRing"],
         ["Controls/ServerFormControl.xaml"] =
         [
             "NameField", "PrepHelpLink", "PrepHelpContent", "PrepKeygenText", "PrepCopyKeygenButton",
@@ -71,7 +77,9 @@ public sealed partial class XamlContractAndResourceGuardTests
             "PART_Dot", "PART_Label", "PART_Path", "PART_Header", "PART_Helper", "PART_Error", "PART_PasswordBox", "PART_RevealButton",
             // S6
             "RootGrid", "KeyColumn", "PART_Key", "PART_Value", "PART_Fill", "PART_Track", "PART_Text", "PART_Icon", "PART_Chevron",
-            "PART_Detail", "PART_Trailing", "PART_InfoLayout", "PART_ErrorLayout", "PART_CloseButton", "PART_Parent"
+            "PART_Detail", "PART_Trailing", "PART_InfoLayout", "PART_ErrorLayout", "PART_CloseButton", "PART_Parent",
+            // UI.5 SaSegmentMeter / SaPulseBars: the host the code fills and the theme-aware brush sources it binds to.
+            "PART_Host", "PART_LitBrush", "PART_EmptyBrush", "PART_BarBrush"
         ],
         // UI.2 S4 control templates: names targeted by VisualState setters / storyboards (G-3).
         ["Styles/Components/Sa.Buttons.xaml"] = ["RootGrid", "StateOverlay", "ContentPresenter"],

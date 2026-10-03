@@ -334,4 +334,43 @@
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="Foreground" Value="{ThemeResource SaTextSecondaryBrush}" />
     </Style>
+    <!-- UI.5 small pill 112:8252 / 112:8257 / 112:8269 ("Restaurar", "Repor dispositivos", "Ver no GitHub"): h36, radius h/2,
+         Secondary fill + inner highlight, 12 Medium (lh 1.4). Widths are the consumer's (150 / 180 in the Figma). -->
+    <Style x:Key="SaPillButtonSmallStyle" TargetType="Button" BasedOn="{StaticResource SaSecondaryButtonStyle}">
+        <Setter Property="Height" Value="36" />
+        <Setter Property="Padding" Value="16,0" />
+        <Setter Property="CornerRadius" Value="18" />
+        <Setter Property="FontSize" Value="{StaticResource SaFontSizeLabel}" />
+    </Style>
+    <!-- UI.5 compact pill 112:7973 ("Entrar ›"): h34 (Figma r18 is above h/2 and would render elliptical - h/2 = 17). -->
+    <Style x:Key="SaPillButtonXSmallStyle" TargetType="Button" BasedOn="{StaticResource SaPillButtonSmallStyle}">
+        <Setter Property="Height" Value="34" />
+        <Setter Property="CornerRadius" Value="17" />
+    </Style>
+    <!-- UI.5 112:8263 "Limpar histórico": the small pill with the danger text (#FF8A96 / #AB404D measured; SaDangerTextBrush,
+         Light a11y deviation accepted in UI.2). The text colour is kept in every state, like the destructive button. -->
+    <Style x:Key="SaPillButtonSmallDangerStyle" TargetType="Button" BasedOn="{StaticResource SaPillButtonSmallStyle}">
+        <Setter Property="Template" Value="{StaticResource SaKeepForegroundButtonTemplate}" />
+        <Setter Property="Foreground" Value="{ThemeResource SaDangerTextBrush}" />
+    </Style>
+    <!-- UI.5 icon button 36 112:8232 ("‹" back of Dados e servidores; also the Detail "…" menu, H-UI5-1): 36x36 circle,
+         Secondary fill + highlight. Icon-only: the consumer MUST set AutomationProperties.Name (T-17). -->
+    <Style x:Key="SaIconButtonSmallStyle" TargetType="Button" BasedOn="{StaticResource SaIconButtonStyle}">
+        <Setter Property="Width" Value="36" />
+        <Setter Property="Height" Value="36" />
+        <Setter Property="CornerRadius" Value="18" />
+    </Style>
+    <!-- UI.5 disclosure 112:7985 / 112:7993 ("Dados e servidores", "Sobre o ServerAlyzer"): h56 radius 20 (SaRadiusToast, the
+         token recorded for this node), glass card fill + border + highlight, padding-left 20, content = icon 18 · text 13 Medium
+         · chevron 17 at the right (the consumer's Grid). Hover/pressed veil DERIVED. -->
+    <Style x:Key="SaDisclosureButtonStyle" TargetType="Button" BasedOn="{StaticResource SaButtonBaseStyle}">
+        <Setter Property="Height" Value="56" />
+        <Setter Property="Padding" Value="20,0,20,0" />
+        <Setter Property="CornerRadius" Value="{StaticResource SaRadiusToast}" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="Background" Value="{ThemeResource SaGlassSurfaceBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource SaGlassBorderBrush}" />
+        <Setter Property="BorderThickness" Value="{StaticResource SaBorderThickness}" />
+    </Style>
 </ResourceDictionary>

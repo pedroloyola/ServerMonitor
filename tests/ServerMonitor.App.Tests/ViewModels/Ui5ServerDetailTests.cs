@@ -230,14 +230,14 @@ public sealed class Ui5ServerDetailTests
         var raised = Recorder(detail);
 
         Assert.Equal("Última atualização", detail.LastUpdatedLabel);
-        Assert.Equal("há 8 s", detail.LastUpdatedValue);
+        Assert.Equal("Há 8 segundos", detail.LastUpdatedValue); // Figma 112:1912 long form
 
         clock.Advance(TimeSpan.FromMinutes(5));
         Assert.DoesNotContain(nameof(ServerDetailViewModel.LastUpdatedValue), raised); // nothing ticks
 
         kit.States.Set(kit.States.Get(fleet.IdOf("web")) with { LastSuccessAt = clock.GetUtcNow(), LastAttemptAt = clock.GetUtcNow() });
         Assert.Contains(nameof(ServerDetailViewModel.LastUpdatedValue), raised);
-        Assert.Equal("agora mesmo", detail.LastUpdatedValue);
+        Assert.Equal("Agora mesmo", detail.LastUpdatedValue);
     }
 
     // ---- pass-through commands, H-UI5-1 exit, return focus ---------------------------------------------------------

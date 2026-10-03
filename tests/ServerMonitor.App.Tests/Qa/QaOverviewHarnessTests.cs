@@ -34,9 +34,10 @@ public sealed class QaOverviewHarnessTests
         Assert.False(QaStartupIsolation.IsHarnessArgument("--qa-overview-scenario"));
         Assert.False(QaStartupIsolation.IsHarnessArgument("--QA-OVERVIEW"));
 
-        Assert.Null(QaStartupIsolation.LaunchRefusal([Exe, "--qa-overview"]));
-        Assert.Null(QaStartupIsolation.LaunchRefusal([Exe, "--qa-overview", "--qa-overview-scenario", "many-500", "--qa-ui-language", "pt-PT"]));
-        Assert.Null(QaStartupIsolation.LaunchRefusal([Exe, "--qa-overview-scenario=empty", "--qa-overview"]));
+        // UI.5 (Boss B2 answer 5): every overview launch carries the backup doubles.
+        Assert.Null(QaStartupIsolation.LaunchRefusal([Exe, "--qa-overview", "--qa-backup", "ok"]));
+        Assert.Null(QaStartupIsolation.LaunchRefusal([Exe, "--qa-overview", "--qa-overview-scenario", "many-500", "--qa-ui-language", "pt-PT", "--qa-backup", "ok"]));
+        Assert.Null(QaStartupIsolation.LaunchRefusal([Exe, "--qa-overview-scenario=empty", "--qa-overview", "--qa-backup=ok"]));
 
         // The modifier alone would run production: refused. Malformed forms are refused next to the harness too.
         Assert.NotNull(QaStartupIsolation.LaunchRefusal([Exe, "--qa-overview-scenario", "mixed"]));
@@ -97,8 +98,8 @@ public sealed class QaOverviewHarnessTests
     public void TheHarnessDelta_RegistersOnlyInMemoryDoubles(string scenario)
     {
         var services = new ServiceCollection();
-        // UI.5: the Settings / Data scenarios compose only next to the --qa-backup doubles (refusal tested separately).
-        QaOverviewComposition.Apply(services, scenario, backupDoublesRequested: QaOverviewScenarioPolicy.RequiresBackupDouble(scenario));
+        // UI.5 (Boss B2 answer 5): every scenario composes only next to the --qa-backup doubles (refusal tested separately).
+        QaOverviewComposition.Apply(services, scenario, backupDoublesRequested: true);
 
         Assert.All(services, descriptor =>
         {
@@ -124,7 +125,7 @@ public sealed class QaOverviewHarnessTests
     public void OverTheRealCompositionRoot_TheHarnessWinsForEveryDataPlaneService()
     {
         using var composition = new TestSupport.IsolatedAppComposition();
-        QaOverviewComposition.Apply(composition.Services, "mixed");
+        QaOverviewComposition.Apply(composition.Services, "mixed", backupDoublesRequested: true);
         using var provider = composition.BuildProvider();
 
         Assert.IsType<QaOverviewServerService>(provider.GetRequiredService<IServerService>());
@@ -249,7 +250,7 @@ public sealed class QaOverviewHarnessTests
     private static DashboardViewModel Dashboard(string name)
     {
         var services = new ServiceCollection();
-        QaOverviewComposition.Apply(services, name);
+        QaOverviewComposition.Apply(services, name, backupDoublesRequested: true);
         var provider = services.BuildServiceProvider();
         return new DashboardViewModel(
             provider.GetRequiredService<IServerService>(),

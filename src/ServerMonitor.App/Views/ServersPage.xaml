@@ -357,5 +357,22 @@
                 </Border>
             </StackPanel>
         </ScrollViewer>
+
+        <!-- UI.5 H-UI5-1 / Boss B2 answer 1: the one-shot notice the Server Detail left after its own Ocultar / Remover
+             (Figma 112:21833 / 112:20994, toast anatomy §3.2: bottom-right, 40 from the content edge, 36 from the bottom).
+             Announced politely; closed by the user; never re-shown (taken once by the view model). -->
+        <primitives:SaToast
+            x:Name="ReturnNotice"
+            Margin="40,0,40,36"
+            MaxWidth="600"
+            Width="NaN"
+            HorizontalAlignment="Right"
+            VerticalAlignment="Bottom"
+            Title="{x:Bind ViewModel.NoticeTitle, Mode=OneWay}"
+            Message="{x:Bind ViewModel.NoticeMessage, Mode=OneWay}"
+            CloseButtonAutomationName="{x:Bind ViewModel.NoticeCloseAutomationName}"
+            CloseRequested="OnReturnNoticeCloseRequested"
+            AutomationProperties.LiveSetting="Polite"
+            Visibility="{x:Bind ViewModel.IsNoticeOpen, Mode=OneWay}" />
     </Grid>
 </Page>

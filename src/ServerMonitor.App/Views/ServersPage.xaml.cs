@@ -103,4 +103,6 @@ public sealed partial class ServersPage : Page, IDisposable
 
     // "Limpar pesquisa" disappears once it worked; focus returns to the search box (UI.3 pattern).
     private void OnClearSearchClick(object sender, RoutedEventArgs e) => FocusAfterAction.MoveTo((Control)sender, SearchBox);
+
+    private void OnReturnNoticeCloseRequested(object? sender, EventArgs e) => ViewModel.DismissNoticeCommand.Execute(null);
 }

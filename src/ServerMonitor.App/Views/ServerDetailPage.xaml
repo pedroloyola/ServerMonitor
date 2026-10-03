@@ -2,31 +2,350 @@
     x:Class="ServerMonitor.App.Views.ServerDetailPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:controls="using:ServerMonitor.App.Controls"
+    xmlns:converters="using:ServerMonitor.App.Converters"
     xmlns:primitives="using:ServerMonitor.App.Controls.Primitives">
-    <!-- UI.5 B1: the Server Detail view model is in place; this XAML is the minimum to host it (H1 + named notice) and
-         still shows the UI.4 ServerFullCard over the same live card. The Figma layout replaces the card in B2. -->
-    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-        <StackPanel Padding="{StaticResource SaPagePadding}" Spacing="{StaticResource SaSpace20}">
+    <!-- UI.5 Server Detail, Figma 112:1785 (D) / 112:2022 (L), first reading 112:16007 / 112:16164. Content 1040 wide at
+         ≥ 1040 (the Figma); below that the metric cards and Ligação / Explorar stack (SPEC §5). Derived states (no Figma
+         frame) use SaStatusIndicator / SaInlineNotice; nothing classifies health here (the VM reads the engine). -->
+    <Page.Resources>
+        <converters:ServerHealthToStatusKindConverter x:Key="ServerHealthToStatusKindConverter" />
+    </Page.Resources>
+
+    <ScrollViewer x:Name="PageScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel x:Name="PageRoot" Padding="{StaticResource SaPagePadding}" Spacing="{StaticResource SaSpace24}" MaxWidth="1120">
+            <VisualStateManager.VisualStateGroups>
+                <VisualStateGroup x:Name="WidthStates">
+                    <VisualState x:Name="Wide">
+                        <VisualState.StateTriggers>
+                            <AdaptiveTrigger MinWindowWidth="1040" />
+                        </VisualState.StateTriggers>
+                    </VisualState>
+                    <!-- 700-1039: metric cards and Ligação / Explorar one per row; actions stay beside the name. -->
+                    <VisualState x:Name="Medium">
+                        <VisualState.StateTriggers>
+                            <AdaptiveTrigger MinWindowWidth="700" />
+                        </VisualState.StateTriggers>
+                        <VisualState.Setters>
+                            <Setter Target="MetricsColumn2.Width" Value="0" />
+                            <Setter Target="MetricsColumn3.Width" Value="0" />
+                            <Setter Target="MetricsGrid.ColumnSpacing" Value="0" />
+                            <Setter Target="MetricsGrid.RowSpacing" Value="{StaticResource SaSpace16}" />
+                            <Setter Target="MemoryCard.(Grid.Column)" Value="0" />
+                            <Setter Target="MemoryCard.(Grid.Row)" Value="1" />
+                            <Setter Target="DiskCard.(Grid.Column)" Value="0" />
+                            <Setter Target="DiskCard.(Grid.Row)" Value="2" />
+                            <Setter Target="CollectingColumns.ColumnSpacing" Value="{StaticResource SaSpace16}" />
+                            <Setter Target="DeeperColumn2.Width" Value="0" />
+                            <Setter Target="DeeperGrid.ColumnSpacing" Value="0" />
+                            <Setter Target="DeeperGrid.RowSpacing" Value="{StaticResource SaSpace24}" />
+                            <Setter Target="ExploreCard.(Grid.Column)" Value="0" />
+                            <Setter Target="ExploreCard.(Grid.Row)" Value="1" />
+                        </VisualState.Setters>
+                    </VisualState>
+                    <!-- < 700: compact padding; the actions move under the identity, left-aligned. -->
+                    <VisualState x:Name="Narrow">
+                        <VisualState.StateTriggers>
+                            <AdaptiveTrigger MinWindowWidth="0" />
+                        </VisualState.StateTriggers>
+                        <VisualState.Setters>
+                            <Setter Target="PageRoot.Padding" Value="{StaticResource SaPagePaddingCompact}" />
+                            <Setter Target="MetricsColumn2.Width" Value="0" />
+                            <Setter Target="MetricsColumn3.Width" Value="0" />
+                            <Setter Target="MetricsGrid.ColumnSpacing" Value="0" />
+                            <Setter Target="MetricsGrid.RowSpacing" Value="{StaticResource SaSpace16}" />
+                            <Setter Target="MemoryCard.(Grid.Column)" Value="0" />
+                            <Setter Target="MemoryCard.(Grid.Row)" Value="1" />
+                            <Setter Target="DiskCard.(Grid.Column)" Value="0" />
+                            <Setter Target="DiskCard.(Grid.Row)" Value="2" />
+                            <Setter Target="CollectingColumns.ColumnSpacing" Value="{StaticResource SaSpace12}" />
+                            <Setter Target="DeeperColumn2.Width" Value="0" />
+                            <Setter Target="DeeperGrid.ColumnSpacing" Value="0" />
+                            <Setter Target="DeeperGrid.RowSpacing" Value="{StaticResource SaSpace24}" />
+                            <Setter Target="ExploreCard.(Grid.Column)" Value="0" />
+                            <Setter Target="ExploreCard.(Grid.Row)" Value="1" />
+                            <Setter Target="IdentityActions.(Grid.Row)" Value="1" />
+                            <Setter Target="IdentityActions.(Grid.Column)" Value="0" />
+                            <Setter Target="IdentityActions.(Grid.ColumnSpan)" Value="3" />
+                            <Setter Target="IdentityActions.HorizontalAlignment" Value="Left" />
+                            <Setter Target="IdentityGrid.RowSpacing" Value="{StaticResource SaSpace16}" />
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+            </VisualStateManager.VisualStateGroups>
+
+            <!-- Breadcrumb 112:1786: the origin (A-2), then the server. -->
             <primitives:SaBreadcrumb
-                x:Name="Breadcrumb"
                 ParentText="{Binding ParentText}"
                 CurrentText="{Binding Title}"
                 ParentInvoked="OnBreadcrumbParentInvoked" />
-            <!-- UI.4 NIT-1: a real H1 with the server name. -->
-            <TextBlock
-                Text="{Binding Title}"
-                AutomationProperties.HeadingLevel="Level1"
-                Style="{StaticResource SaPageTitleTextStyle}" />
-            <!-- Beacon r1 SHOULD-3: a failed Ocultar/Remover started here is reported here (same source as the Visão geral).
-                 UI.4 NIT-5: the notice has an accessible name. -->
+
+            <!-- Server identity 112:1791: tile 64 · name (H1) / system · address / status · actions. -->
+            <Grid x:Name="IdentityGrid" ColumnSpacing="{StaticResource SaSpace16}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Border Style="{StaticResource SaIconTileStyle}" VerticalAlignment="Center">
+                    <primitives:SaIcon Data="{StaticResource SaIconServerStack01Data}" Size="30" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+                <StackPanel Grid.Column="1" Spacing="6" VerticalAlignment="Center">
+                    <TextBlock
+                        x:Name="ServerNameHeading"
+                        Text="{Binding Title}"
+                        AutomationProperties.HeadingLevel="Level1"
+                        Style="{StaticResource SaPageTitleTextStyle}"
+                        TextTrimming="CharacterEllipsis" />
+                    <TextBlock
+                        Text="{Binding HeaderSubtitle}"
+                        Style="{StaticResource SaControlTextStyle}"
+                        FontWeight="Normal"
+                        Foreground="{ThemeResource SaTextSecondaryBrush}"
+                        TextTrimming="CharacterEllipsis"
+                        IsTextSelectionEnabled="True" />
+                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SaSpace12}">
+                        <primitives:SaStatusIndicator
+                            Status="{Binding Health, Converter={StaticResource ServerHealthToStatusKindConverter}}"
+                            Label="{Binding StatusLabel}"
+                            AutomationProperties.LiveSetting="Polite" />
+                        <!-- H-UI5-2: a retained reading is marked stale in words (StaleAgeDisplay semantics). -->
+                        <primitives:SaStatusIndicator
+                            Status="Stale"
+                            Label="{Binding StaleText}"
+                            AutomationProperties.LiveSetting="Polite"
+                            Visibility="{Binding IsReadingStale, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    </StackPanel>
+                </StackPanel>
+                <!-- Atualizar 112:1806 · Editar 112:1810 · "…" (H-UI5-1, DERIVED: Ocultar / Remover). -->
+                <StackPanel x:Name="IdentityActions" Grid.Column="2" Orientation="Horizontal" Spacing="{StaticResource SaSpace12}"
+                            VerticalAlignment="Center" HorizontalAlignment="Right">
+                    <Button
+                        x:Name="RefreshButton"
+                        Style="{StaticResource SaSecondaryRectButtonStyle}"
+                        Command="{Binding RefreshCommand}"
+                        AutomationProperties.Name="{Binding RefreshAutomationName}"
+                        ToolTipService.ToolTip="{Binding RefreshAutomationName}">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <primitives:SaIcon Data="{StaticResource SaIconRefreshData}" Size="18" VerticalAlignment="Center" />
+                            <TextBlock x:Uid="ServerDetailRefreshButtonText" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Button
+                        x:Uid="ServerDetailEditButton"
+                        MinWidth="104"
+                        Style="{StaticResource SaSecondaryRectButtonStyle}"
+                        Command="{Binding EditCommand}"
+                        AutomationProperties.Name="{Binding EditAutomationName}" />
+                    <Button
+                        Style="{StaticResource SaIconButtonStyle}"
+                        AutomationProperties.Name="{Binding MoreActionsAutomationName}"
+                        ToolTipService.ToolTip="{Binding MoreActionsAutomationName}">
+                        <FontIcon Glyph="&#xE712;" FontSize="{StaticResource SaFontSizeTitleCompact}" AutomationProperties.AccessibilityView="Raw" />
+                        <Button.Flyout>
+                            <MenuFlyout Placement="BottomEdgeAlignedRight">
+                                <MenuFlyoutItem x:Uid="ServerCardHideMenuItem" Command="{Binding HideCommand}"
+                                                AutomationProperties.Name="{Binding HideAutomationName}" />
+                                <MenuFlyoutItem x:Uid="ServerCardRemoveMenuItem" Command="{Binding RemoveCommand}"
+                                                AutomationProperties.Name="{Binding RemoveAutomationName}" />
+                            </MenuFlyout>
+                        </Button.Flyout>
+                    </Button>
+                </StackPanel>
+            </Grid>
+
+            <!-- Shared notices (SHOULD-3: one source, the dashboard). NIT-5: named. -->
             <InfoBar x:Uid="ServerOperationError" IsClosable="True" Severity="Error"
                      AutomationProperties.Name="{Binding OperationErrorAutomationName}"
                      IsOpen="{Binding IsOperationErrorOpen, Mode=TwoWay}" />
             <InfoBar IsClosable="True" Severity="Warning"
                      IsOpen="{Binding IsConfigurationLockedOpen, Mode=TwoWay}"
-                     Message="{Binding ConfigurationLockedMessage}" />
-            <controls:ServerFullCard DataContext="{Binding Card}" />
+                     Message="{Binding ConfigurationLockedMessage}"
+                     AutomationProperties.Name="{Binding ConfigurationLockedMessage}" />
+
+            <!-- Derived notices (no Figma frame): connection problem from the connection-state store (M14 semantics
+                 untouched — review it in Editar), collection error without a snapshot, unsupported system. -->
+            <primitives:SaInlineNotice
+                Severity="Error"
+                Title="{Binding ConnectionStateDisplay}"
+                Message="{Binding ConnectionProblemMessage}"
+                Visibility="{Binding HasConnectionProblem, Converter={StaticResource BooleanToVisibilityConverter}}" />
+            <primitives:SaInlineNotice
+                Severity="Error"
+                Title="{Binding CollectionErrorText}"
+                Visibility="{Binding HasCollectionError, Converter={StaticResource BooleanToVisibilityConverter}}" />
+            <primitives:SaInlineNotice
+                x:Uid="ServerDetailMetricsUnsupportedNotice"
+                Severity="Info"
+                Visibility="{Binding IsMetricsUnsupported, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
+            <!-- First reading 112:16100: one solid card, "A recolher métricas…" + three skeleton columns. -->
+            <Border Style="{StaticResource SaSolidSurfaceStyle}"
+                    Visibility="{Binding IsFirstReading, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <StackPanel Spacing="{StaticResource SaSpace20}">
+                    <TextBlock x:Uid="ServerDetailCollectingTitle" Style="{StaticResource SaPrimaryBodyTextStyle}" />
+                    <Grid x:Name="CollectingColumns" ColumnSpacing="{StaticResource SaSpace24}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Spacing="{StaticResource SaSpace12}">
+                            <TextBlock x:Uid="ServerMetricsCpuLabel" Style="{StaticResource SaPrimaryBodyTextStyle}" />
+                            <primitives:SaSkeleton Width="80" Height="28" HorizontalAlignment="Left" />
+                            <primitives:SaSkeleton Height="12" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Spacing="{StaticResource SaSpace12}">
+                            <TextBlock x:Uid="ServerMetricsMemoryLabel" Style="{StaticResource SaPrimaryBodyTextStyle}" />
+                            <primitives:SaSkeleton Width="80" Height="28" HorizontalAlignment="Left" />
+                            <primitives:SaSkeleton Height="12" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Spacing="{StaticResource SaSpace12}">
+                            <TextBlock x:Uid="ServerMetricsDiskLabel" Style="{StaticResource SaPrimaryBodyTextStyle}" />
+                            <primitives:SaSkeleton Width="80" Height="28" HorizontalAlignment="Left" />
+                            <primitives:SaSkeleton Height="12" />
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- Current metrics 112:1812: 3 glass cards 216 high, gap 16 (stacked below 1040). -->
+            <Grid x:Name="MetricsGrid" ColumnSpacing="{StaticResource SaSpace16}"
+                  Visibility="{Binding HasReading, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition x:Name="MetricsColumn2" Width="*" />
+                    <ColumnDefinition x:Name="MetricsColumn3" Width="*" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <!-- CPU 112:1813: title 14 Medium, value 44 Light + "%" 20, pulse of real samples, caption 12. -->
+                <Border Style="{StaticResource SaGlassSurfaceStyle}" Height="216">
+                    <StackPanel Spacing="10">
+                        <TextBlock x:Uid="ServerMetricsCpuLabel" Style="{StaticResource SaPrimaryBodyTextStyle}" FontWeight="Medium" />
+                        <StackPanel Orientation="Horizontal" Spacing="3" Height="56">
+                            <TextBlock Text="{Binding CpuValueText}" Style="{StaticResource SaMetricValueTextStyle}" VerticalAlignment="Center"
+                                       AutomationProperties.Name="{Binding CpuAccessibleName}" />
+                            <TextBlock x:Uid="ServerDetailMetricUnit" Style="{StaticResource SaMetricUnitTextStyle}" VerticalAlignment="Center"
+                                       AutomationProperties.AccessibilityView="Raw"
+                                       Visibility="{Binding HasCpuPercent, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                        </StackPanel>
+                        <primitives:SaPulseBars Samples="{Binding CpuPulseSamples}" />
+                        <TextBlock x:Uid="ServerDetailCpuCaption" Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" />
+                    </StackPanel>
+                </Border>
+                <!-- Memória 112:1850: 28 segments (A-4), caption "used de total" when both are known. -->
+                <Border x:Name="MemoryCard" Grid.Column="1" Style="{StaticResource SaGlassSurfaceStyle}" Height="216">
+                    <StackPanel Spacing="10">
+                        <TextBlock x:Uid="ServerMetricsMemoryLabel" Style="{StaticResource SaPrimaryBodyTextStyle}" FontWeight="Medium" />
+                        <StackPanel Orientation="Horizontal" Spacing="3" Height="56">
+                            <TextBlock Text="{Binding MemoryValueText}" Style="{StaticResource SaMetricValueTextStyle}" VerticalAlignment="Center"
+                                       AutomationProperties.Name="{Binding MemoryAccessibleName}" />
+                            <TextBlock x:Uid="ServerDetailMetricUnit" Style="{StaticResource SaMetricUnitTextStyle}" VerticalAlignment="Center"
+                                       AutomationProperties.AccessibilityView="Raw"
+                                       Visibility="{Binding HasMemoryPercent, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                        </StackPanel>
+                        <primitives:SaSegmentMeter Metric="Memory" SegmentCount="28" SegmentHeight="29" SegmentSpacing="4"
+                                                   SegmentCornerRadius="{StaticResource SaRadiusMiniBar}" LitCount="{Binding MemoryLitCount}" />
+                        <TextBlock Text="{Binding MemoryLegend}" Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" />
+                    </StackPanel>
+                </Border>
+                <!-- Disco 112:1885: 14 segments 18 high r5 gap 5 (A-4). -->
+                <Border x:Name="DiskCard" Grid.Column="2" Style="{StaticResource SaGlassSurfaceStyle}" Height="216">
+                    <StackPanel Spacing="10">
+                        <TextBlock x:Uid="ServerMetricsDiskLabel" Style="{StaticResource SaPrimaryBodyTextStyle}" FontWeight="Medium" />
+                        <StackPanel Orientation="Horizontal" Spacing="3" Height="56">
+                            <TextBlock Text="{Binding DiskValueText}" Style="{StaticResource SaMetricValueTextStyle}" VerticalAlignment="Center"
+                                       AutomationProperties.Name="{Binding DiskAccessibleName}" />
+                            <TextBlock x:Uid="ServerDetailMetricUnit" Style="{StaticResource SaMetricUnitTextStyle}" VerticalAlignment="Center"
+                                       AutomationProperties.AccessibilityView="Raw"
+                                       Visibility="{Binding HasDiskPercent, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                        </StackPanel>
+                        <primitives:SaSegmentMeter Metric="Disk" SegmentCount="14" SegmentHeight="18" SegmentSpacing="5"
+                                                   SegmentCornerRadius="{StaticResource SaRadiusDiskSegment}" LitCount="{Binding DiskLitCount}" />
+                        <TextBlock Text="{Binding DiskLegend}" Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- Server information 112:1906: three stacked key/values (padding 0,4). During the first reading the values
+                 are skeletons 100×12 r4 (112:16115, A-7). Unknown is "—", never 0. -->
+            <Grid Margin="4,0" ColumnSpacing="{StaticResource SaSpace16}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Spacing="8">
+                    <TextBlock x:Uid="ServerDetailUptimeLabel" Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" />
+                    <TextBlock Text="{Binding UptimeDisplayOrDash}" Style="{StaticResource SaValueTextStyle}" TextTrimming="CharacterEllipsis"
+                               Visibility="{Binding IsFirstReading, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Invert}" />
+                    <primitives:SaSkeleton Width="100" Height="12" HorizontalAlignment="Left" CornerRadius="{StaticResource SaRadiusSmall}"
+                                           Visibility="{Binding IsFirstReading, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                </StackPanel>
+                <StackPanel Grid.Column="1" Spacing="8">
+                    <TextBlock Text="{Binding LastUpdatedLabel}" Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" />
+                    <TextBlock Text="{Binding LastUpdatedOrDash}" Style="{StaticResource SaValueTextStyle}" TextTrimming="CharacterEllipsis"
+                               Visibility="{Binding IsFirstReading, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Invert}" />
+                    <primitives:SaSkeleton Width="100" Height="12" HorizontalAlignment="Left" CornerRadius="{StaticResource SaRadiusSmall}"
+                                           Visibility="{Binding IsFirstReading, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                </StackPanel>
+                <StackPanel Grid.Column="2" Spacing="8">
+                    <TextBlock x:Uid="ServerDetailIntervalLabel" Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" />
+                    <TextBlock Text="{Binding IntervalDisplay}" Style="{StaticResource SaValueTextStyle}" TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+            </Grid>
+
+            <!-- Connection and deeper views 112:1916: Ligação | Explorar, 2 × glass cards, gap 24 (stacked below 1040). -->
+            <Grid x:Name="DeeperGrid" ColumnSpacing="{StaticResource SaSpace24}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition x:Name="DeeperColumn2" Width="*" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <!-- Ligação 112:1917: title 17 Semibold (A-6), inline rows (label 190). DERIVED rows: connection state, route. -->
+                <Border Style="{StaticResource SaGlassSurfaceStyle}" MinHeight="244">
+                    <StackPanel Spacing="17">
+                        <TextBlock x:Uid="ServerDetailConnectionTitle" Style="{StaticResource SaCardTitleTextStyle}" AutomationProperties.HeadingLevel="Level2" />
+                        <primitives:SaKeyValueRow x:Uid="ServerDetailAddressRow" Orientation="Inline" Value="{Binding Address}" />
+                        <primitives:SaKeyValueRow x:Uid="ServerDetailUserRow" Orientation="Inline" Value="{Binding Username}" />
+                        <primitives:SaKeyValueRow x:Uid="ServerDetailAuthenticationRow" Orientation="Inline" Value="{Binding AuthenticationDisplay}" />
+                        <primitives:SaKeyValueRow x:Uid="ServerDetailSystemRow" Orientation="Inline" Value="{Binding SystemDisplay}" />
+                        <primitives:SaKeyValueRow x:Uid="ServerDetailConnectionStateRow" Orientation="Inline" Value="{Binding ConnectionStateDisplay}" />
+                        <primitives:SaKeyValueRow x:Uid="ServerDetailRouteRow" Orientation="Inline"
+                                                  Visibility="{Binding IsRouted, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    </StackPanel>
+                </Border>
+                <!-- Explorar 112:1931: two rich rows (icon 22, title 14 Medium + detail 12, chevron). -->
+                <Border x:Name="ExploreCard" Grid.Column="1" Style="{StaticResource SaGlassSurfaceStyle}" MinHeight="244">
+                    <StackPanel Spacing="16">
+                        <TextBlock x:Uid="ServerDetailExploreTitle" Style="{StaticResource SaCardTitleTextStyle}" AutomationProperties.HeadingLevel="Level2" />
+                        <primitives:SaListRow
+                            x:Name="HistoryRow"
+                            x:Uid="ServerDetailHistoryRow"
+                            Variant="Rich"
+                            IconData="{StaticResource SaIconClock01Data}"
+                            Command="{Binding ViewHistoryCommand}"
+                            AutomationProperties.Name="{Binding ViewHistoryAutomationName}" />
+                        <primitives:SaListRow
+                            x:Name="WorkloadsRow"
+                            x:Uid="ServerDetailWorkloadsRow"
+                            Variant="Rich"
+                            IconData="{StaticResource SaIconServerStack01Data}"
+                            Command="{Binding ViewWorkloadsCommand}"
+                            AutomationProperties.Name="{Binding ViewWorkloadsAutomationName}" />
+                    </StackPanel>
+                </Border>
+            </Grid>
         </StackPanel>
     </ScrollViewer>
 </Page>

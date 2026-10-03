@@ -12,8 +12,9 @@ namespace ServerMonitor.App.Services;
 /// UI.5: <c>detail</c> / <c>detail-failing</c> hold one server per Server Detail state (incl. the connection-state store's
 /// auth / host-key results and a ProxyJump server) over MUTATING in-memory doubles — hide / restore / remove / refresh
 /// succeed in <c>detail</c> and fail in <c>detail-failing</c>. <c>data</c> / <c>data-failing</c> are the Settings
-/// "Dados e servidores" states (hidden servers, restore succeeding / failing); they REQUIRE <c>--qa-backup</c>
-/// (<see cref="RequiresBackupDouble"/>), so the real backup engine and its native file picker can never be reached.
+/// "Dados e servidores" states (hidden servers, restore succeeding / failing). Every <c>--qa-overview</c> launch, whatever
+/// its scenario, REQUIRES <c>--qa-backup</c> (UI.5 Boss B2 answer 5): Settings is one click away from any scenario, so the
+/// real backup engine and its native file picker can never be reached from this harness.
 /// </para>
 /// </summary>
 public static class QaOverviewScenarioPolicy
@@ -29,15 +30,6 @@ public static class QaOverviewScenarioPolicy
         "many-100", "many-500", "vanishing", "detail", "detail-failing", "data", "data-failing"
     ];
 
-    /// <summary>
-    /// UI.5 Cortex 4 (fail-closed): the scenarios that exist to exercise Settings / "Dados e servidores". They are refused
-    /// unless the launch also carries <c>--qa-backup &lt;scenario&gt;</c>, whose in-memory doubles replace the backup engine
-    /// AND both file pickers — so a QA run there can never open the native picker or write a real file.
-    /// </summary>
-    public static readonly IReadOnlyList<string> BackupIsolatedScenarios = ["data", "data-failing"];
-
-    public static bool RequiresBackupDouble(string? scenario) =>
-        scenario is not null && BackupIsolatedScenarios.Contains(scenario, StringComparer.Ordinal);
 
     /// <summary>True when the modifier is present at all (whatever its value).</summary>
     public static bool IsPresent(IReadOnlyList<string> commandLineArgs) =>

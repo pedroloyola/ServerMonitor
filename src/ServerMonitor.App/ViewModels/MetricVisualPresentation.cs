@@ -1,3 +1,4 @@
+using System.Globalization;
 using ServerMonitor.Core.History;
 
 namespace ServerMonitor.App.ViewModels;
@@ -37,6 +38,24 @@ public static class MetricVisualPresentation
 
         var lit = (int)Math.Round(total * clamped / 100, MidpointRounding.AwayFromZero);
         return Math.Clamp(lit, 1, total);
+    }
+
+    /// <summary>
+    /// Figma legend "9,9 GB de 16 GB" / "240 GB de 500 GB": a byte count in the same binary units the card has always used
+    /// (GB = 1024³), one decimal below 10 GB and whole numbers above, a trailing ",0" dropped; MB below 1 GB. Display only:
+    /// nothing here derives a percentage.
+    /// </summary>
+    public static string FormatBytes(long bytes)
+    {
+        const double gib = 1024d * 1024 * 1024;
+        const double mib = 1024d * 1024;
+        if (bytes >= gib)
+        {
+            var value = bytes / gib;
+            return string.Format(CultureInfo.CurrentUICulture, value < 10 ? "{0:0.#} GB" : "{0:0} GB", value);
+        }
+
+        return string.Format(CultureInfo.CurrentUICulture, "{0:0} MB", Math.Max(0, bytes) / mib);
     }
 
     /// <summary>

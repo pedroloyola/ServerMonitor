@@ -89,6 +89,39 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
     /// <summary>Real product version for the About section (packaged identity or assembly fallback).</summary>
     public string AppVersion { get; }
 
+    /// <summary>Figma 112:8271 "Versão 1.1.1" with the REAL version (the Figma number is illustrative).</summary>
+    public string AboutVersionText => string.Format(
+        System.Globalization.CultureInfo.CurrentUICulture, _localizationService.GetString("SettingsAboutVersionFormat"), AppVersion);
+
+    private string? _toastTitle;
+    private string? _toastMessage;
+
+    /// <summary>
+    /// UI.5 (Figma §3.2 112:20712 / 112:21538 / 112:21293): the "Dados e servidores" page's transient success notice —
+    /// one at a time, the latest success wins, dismissed by the user. Page-local (not a global toast system); errors stay
+    /// inline next to their setting.
+    /// </summary>
+    public bool IsToastOpen => _toastTitle is not null;
+
+    public string ToastTitle => _toastTitle ?? string.Empty;
+
+    public string ToastMessage => _toastMessage ?? string.Empty;
+
+    public string ToastCloseAutomationName => _localizationService.GetString("SettingsToastCloseName");
+
+    public ICommand DismissToastCommand => _dismissToastCommand ??= new RelayCommand(() => ShowToast(null, null));
+
+    private RelayCommand? _dismissToastCommand;
+
+    private void ShowToast(string? titleKey, string? messageKey)
+    {
+        _toastTitle = titleKey is null ? null : _localizationService.GetString(titleKey);
+        _toastMessage = messageKey is null ? null : _localizationService.GetString(messageKey);
+        OnPropertyChanged(nameof(IsToastOpen));
+        OnPropertyChanged(nameof(ToastTitle));
+        OnPropertyChanged(nameof(ToastMessage));
+    }
+
     public ObservableCollection<HiddenServerItemViewModel> HiddenServers { get; } = [];
 
     public ICommand BackCommand { get; }
@@ -452,6 +485,7 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
         {
             await _discoveryService.ResetIgnoredAsync();
             IsResetIgnoredSuccessOpen = true;
+            ShowToast("SettingsResetIgnoredSuccess.Title", "SettingsResetIgnoredSuccess.Message");
         }
         catch (Exception exception)
         {
@@ -473,6 +507,8 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
             {
                 case HistoryClearOutcome.Cleared:
                     IsHistoryClearedOpen = true;
+                    // A-10: the feedback stays here, where the user acted (no implicit navigation to Histórico).
+                    ShowToast("SettingsHistoryClearedSuccess.Title", "SettingsHistoryClearedSuccess.Message");
                     break;
                 case HistoryClearOutcome.Unavailable:
                     IsHistoryClearErrorOpen = true;
@@ -501,6 +537,7 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
             {
                 case HistoryResetOutcome.Reset:
                     IsHistoryResetOpen = true;
+                    ShowToast("SettingsHistoryResetSuccess.Title", "SettingsHistoryResetSuccess.Message");
                     IsHistoryResetAvailable = false;
                     IsHistoryClearErrorOpen = false;
                     break;
@@ -527,6 +564,10 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
             if (!await _serverService.RestoreAsync(server.Id))
             {
                 IsServerOperationErrorOpen = true;
+            }
+            else
+            {
+                ShowToast("SettingsServerRestoredTitle", "SettingsServerRestoredMessage");
             }
         }
         catch (Exception exception)

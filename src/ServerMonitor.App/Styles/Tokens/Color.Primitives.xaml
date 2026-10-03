@@ -135,4 +135,7 @@
     <!-- UI.4 fidelity r1 (B4): the "Saúde geral" label dot 112:1012 is neutral #A6A6A6 in Dark AND Light (layer name
          "Status / green" is misleading; the SVG fill is the truth). -->
     <Color x:Key="SaColorHealthLabelDot">#A6A6A6</Color>
+    <!-- UI.5: server symbol tile rgba(153,153,153,.15) / rgba(255,255,255,.15), 112:1792 / 112:2028. -->
+    <Color x:Key="SaColorIconTileDark">#26999999</Color>
+    <Color x:Key="SaColorIconTileLight">#26FFFFFF</Color>
 </ResourceDictionary>

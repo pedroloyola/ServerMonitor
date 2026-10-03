@@ -21,10 +21,6 @@ Controls/ServerFormControl.xaml	Padding	14,12	1
 Controls/ServerFormControl.xaml	Padding	16	2
 Controls/ServerFormControl.xaml	Padding	2,2,10,2	1
 Controls/ServerFormControl.xaml	Padding	6,2	1
-Controls/ServerFullCard.xaml	CornerRadius	1.5	3
-Controls/ServerFullCard.xaml	CornerRadius	4	1
-Controls/ServerFullCard.xaml	Padding	14,10	1
-Controls/ServerFullCard.xaml	Padding	7,2	1
 MainWindow.xaml	CornerRadius	6	1
 MainWindow.xaml	CornerRadius	7	1
 MainWindow.xaml	Padding	0	2
@@ -45,6 +41,3 @@ Styles/DesignTokens.xaml	Padding	20,18,20,18	1
 Styles/DesignTokens.xaml	Padding	28,24,28,28	1
 Views/RestoreConfirmDialog.xaml	Padding	0,0,12,0	1
 Views/RestoreConfirmDialog.xaml	Padding	12,10,12,2	1
-Views/SettingsDataPage.xaml	Padding	0	1
-Views/SettingsDataPage.xaml	Padding	12,10	1
-Views/SettingsDataPage.xaml	Padding	6,2	1

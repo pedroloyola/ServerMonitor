@@ -21,14 +21,26 @@ public sealed class ServersViewModel : ObservableObject, IDisposable
     private IReadOnlyList<ServerDirectoryRowViewModel> _rows = [];
     private string _searchText = string.Empty;
     private bool _disposed;
+    private ServersNotice? _notice;
 
-    public ServersViewModel(DashboardViewModel dashboard, INavigationService navigation, ILocalizationService localization)
+    public ServersViewModel(
+        DashboardViewModel dashboard,
+        INavigationService navigation,
+        ILocalizationService localization,
+        ServersReturnNotice? returnNotice = null)
     {
         _dashboard = dashboard ?? throw new ArgumentNullException(nameof(dashboard));
         _navigation = navigation ?? throw new ArgumentNullException(nameof(navigation));
         _localization = localization ?? throw new ArgumentNullException(nameof(localization));
 
         ClearSearchCommand = new RelayCommand(() => SearchText = string.Empty);
+        // UI.5 Boss B2 answer 1: the one-shot notice the Server Detail left for this visit (taken once, never re-shown).
+        _notice = returnNotice?.Take();
+        DismissNoticeCommand = new RelayCommand(() =>
+        {
+            _notice = null;
+            OnPropertyChanged(nameof(IsNoticeOpen));
+        });
         BackToOverviewCommand = new RelayCommand(navigation.GoToDashboard);
 
         _dashboard.ServersReloaded += OnServersReloaded;
@@ -52,6 +64,21 @@ public sealed class ServersViewModel : ObservableObject, IDisposable
     }
 
     public ICommand ClearSearchCommand { get; }
+
+    /// <summary>H-UI5-1 / Figma 112:21833 · 112:20994: "Servidor ocultado" / "Servidor removido" after the Detail's own action.</summary>
+    public bool IsNoticeOpen => _notice is not null;
+
+    public string NoticeTitle => _notice is null
+        ? string.Empty
+        : _localization.GetString(_notice.Kind == ServersNoticeKind.Hidden ? "ServersNoticeHiddenTitle" : "ServersNoticeRemovedTitle");
+
+    public string NoticeMessage => _notice is null
+        ? string.Empty
+        : Format(_notice.Kind == ServersNoticeKind.Hidden ? "ServersNoticeHiddenMessageFormat" : "ServersNoticeRemovedMessageFormat", _notice.ServerName);
+
+    public string NoticeCloseAutomationName => _localization.GetString("ServersNoticeCloseName");
+
+    public ICommand DismissNoticeCommand { get; }
 
     public ICommand BackToOverviewCommand { get; }
 

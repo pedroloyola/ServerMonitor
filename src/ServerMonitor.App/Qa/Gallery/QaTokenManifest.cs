@@ -130,6 +130,8 @@ public static class QaTokenManifest
         new("SaColorChartLineDark", QaTokenKind.Color),
         new("SaColorChartLineLight", QaTokenKind.Color),
         new("SaColorHealthLabelDot", QaTokenKind.Color),
+        new("SaColorIconTileDark", QaTokenKind.Color),
+        new("SaColorIconTileLight", QaTokenKind.Color),
         // Styles/Tokens/Color.Semantic.xaml
         new("SaCanvasBrush", QaTokenKind.Brush),
         new("SaSurfaceBrush", QaTokenKind.Brush),
@@ -176,6 +178,7 @@ public static class QaTokenManifest
         new("SaSkeletonBrush", QaTokenKind.Brush),
         new("SaInsetTintedBrush", QaTokenKind.Brush),
         new("SaBarEmptyBrush", QaTokenKind.Brush),
+        new("SaIconTileBrush", QaTokenKind.Brush),
         new("SaDialogButtonFillBrush", QaTokenKind.Brush),
         new("SaDialogButtonBorderBrush", QaTokenKind.Brush),
         new("SaSecondaryFillBrush", QaTokenKind.Brush),
@@ -263,6 +266,9 @@ public static class QaTokenManifest
         new("SaSectionTitleTextStyle", QaTokenKind.Style),
         new("SaFontSizeListRowTitle", QaTokenKind.Double),
         new("SaLineHeightListRowTitle", QaTokenKind.Double),
+        new("SaFontSizeCardTitle", QaTokenKind.Double),
+        new("SaLineHeightCardTitle", QaTokenKind.Double),
+        new("SaCardTitleTextStyle", QaTokenKind.Style),
         // Styles/Tokens/Spacing.xaml
         new("SaSpace4", QaTokenKind.Double),
         new("SaSpace8", QaTokenKind.Double),
@@ -293,6 +299,7 @@ public static class QaTokenManifest
         new("SaRadiusSegment", QaTokenKind.CornerRadius),
         new("SaRadiusSkeleton", QaTokenKind.CornerRadius),
         new("SaRadiusSelector", QaTokenKind.CornerRadius),
+        new("SaRadiusDiskSegment", QaTokenKind.CornerRadius),
         // Styles/Tokens/Borders.xaml
         new("SaBorderThickness", QaTokenKind.Thickness),
         new("SaDividerThickness", QaTokenKind.Thickness),

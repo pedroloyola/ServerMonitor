@@ -84,8 +84,12 @@ public sealed partial class QaLaunchRefusalTests
     {
         foreach (var harness in QaStartupIsolation.HarnessFlags)
         {
-            string[] before = [Exe, harness, .. arguments];
-            string[] after = [Exe, .. arguments, harness];
+            // UI.5 (Boss B2 answer 5): the overview harness always carries the backup doubles.
+            string[] extra = harness == QaOverviewComposition.LaunchFlag && !arguments.Any(a => a.StartsWith("--qa-backup", StringComparison.Ordinal))
+                ? ["--qa-backup", "ok"]
+                : [];
+            string[] before = [Exe, harness, .. arguments, .. extra];
+            string[] after = [Exe, .. arguments, .. extra, harness];
             Assert.Null(QaStartupIsolation.LaunchRefusal(before));
             Assert.Null(QaStartupIsolation.LaunchRefusal(after));
             Assert.True(QaStartupIsolation.IsHarnessLaunch(before));

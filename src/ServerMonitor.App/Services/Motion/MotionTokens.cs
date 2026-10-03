@@ -21,7 +21,7 @@ public readonly record struct MotionKeySpline(double X1, double Y1, double X2, d
 /// silently becoming zero.
 /// <para>
 /// Consumers must honour <c>UISettings.AnimationsEnabled</c>; this type only turns tokens into values.
-/// Compiled in every configuration. Production adoption (e.g. ServerFullCard) is UI.3+, not UI.2.
+/// Compiled in every configuration. No production consumer since UI.5 removed the FullCard focus pulse; the tokens stay.
 /// </para>
 /// </summary>
 public static partial class MotionTokens

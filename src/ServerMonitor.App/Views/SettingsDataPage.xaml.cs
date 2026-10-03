@@ -50,6 +50,14 @@ public sealed partial class SettingsDataPage : Page, ISettingsNavigationTarget
         }
     }
 
+    /// <summary>The project page (the same URI the About section always opened).</summary>
+    internal static readonly Uri GitHubUri = new("https://github.com/pedroloyola/ServerMonitor");
+
+    private async void OnGitHubClick(object sender, Microsoft.UI.Xaml.RoutedEventArgs e) =>
+        await Windows.System.Launcher.LaunchUriAsync(GitHubUri);
+
+    private void OnToastCloseRequested(object? sender, EventArgs e) => ViewModel.DismissToastCommand.Execute(null);
+
     // The outcome of a backup or restore appears below the buttons: bring it into view so it is never reported
     // off-screen (unchanged from the single Settings page, M14.6).
     private void OnBackupPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)

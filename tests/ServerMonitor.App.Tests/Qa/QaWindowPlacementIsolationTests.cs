@@ -189,7 +189,7 @@ public sealed class QaWindowPlacementIsolationTests
             case "workloads": QaWorkloadsComposition.Apply(services); break;
             case "screenshot": QaStoreScreenshotComposition.Apply(services); break;
             case "compact": QaCompactComposition.Apply(services); break;
-            case "overview": QaOverviewComposition.Apply(services, "mixed"); break;
+            case "overview": QaOverviewComposition.Apply(services, "mixed", backupDoublesRequested: true); break;
             case "proxyjump":
                 QaProxyJumpComposition.Apply(services, Path.Combine(Path.GetTempPath(), "ServerMonitor-QA-tests", "proxyjump"));
                 break;

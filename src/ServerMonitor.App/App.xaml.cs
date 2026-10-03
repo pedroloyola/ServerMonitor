@@ -806,6 +806,8 @@ public partial class App : Application
         services.AddTransient<ServerDetailViewModel>();
         // UI.5: where focus returns on the next Detail page after Histórico / Serviços e containers (taken once).
         services.AddSingleton<ServerDetailReturnFocus>();
+        // UI.5 Boss B2 answer 1: the one-shot "Servidor ocultado / removido" notice the Detail hands to Servidores.
+        services.AddSingleton<ServersReturnNotice>();
         services.AddTransient<ServerDetailPage>();
         // History is opened per-server, so a fresh page/VM each navigation (disposed on Unloaded).
         services.AddTransient<HistoryViewModel>();

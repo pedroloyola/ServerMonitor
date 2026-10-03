@@ -32,6 +32,7 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
     private readonly ILocalizationService _localization;
     private readonly IServerHistoryQueryService? _history;
     private readonly ServerDetailReturnFocus? _returnFocus;
+    private readonly ServersReturnNotice? _serversNotice;
     private readonly PresentationClock _clock;
     private readonly MonitoringThresholds _thresholds;
     private readonly Action _flushAction;
@@ -40,7 +41,7 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
     private bool _subscribed;
     private bool _left;
     private bool _disposed;
-    private bool _exitToServers;
+    private ServersNoticeKind? _exitOperation;
     private Change _dirty;
     private bool _flushScheduled;
     private IReadOnlyList<double> _cpuPulse = [];
@@ -57,24 +58,26 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
         IServerHistoryQueryService? history = null,
         ServerDetailReturnFocus? returnFocus = null,
         MonitoringOptions? monitoringOptions = null,
-        PresentationClock? clock = null)
+        PresentationClock? clock = null,
+        ServersReturnNotice? serversNotice = null)
     {
         _dashboard = dashboard ?? throw new ArgumentNullException(nameof(dashboard));
         _navigation = navigation ?? throw new ArgumentNullException(nameof(navigation));
         _localization = localization ?? throw new ArgumentNullException(nameof(localization));
         _history = history;
         _returnFocus = returnFocus;
+        _serversNotice = serversNotice;
         _clock = clock ?? PresentationClock.System;
         // The same thresholds instance the engine is composed with (App registers one MonitoringOptions).
         _thresholds = (monitoringOptions ?? MonitoringOptions.Default).Thresholds;
         _flushAction = Flush;
-        GoBackCommand = new RelayCommand(GoBack);
+        GoBackCommand = new RelayCommand(() => Leave(serverGone: false));
         RefreshCommand = new RelayCommand(
             () => _card?.RefreshMetricsCommand.Execute(null),
             () => _card?.RefreshMetricsCommand.CanExecute(null) == true);
         EditCommand = new RelayCommand(() => _card?.EditCommand.Execute(null), () => _card is not null);
-        HideCommand = new AsyncRelayCommand(() => ExitingOperationAsync(_card?.HideCommand), () => _card is not null);
-        RemoveCommand = new AsyncRelayCommand(() => ExitingOperationAsync(_card?.RemoveCommand), () => _card is not null);
+        HideCommand = new AsyncRelayCommand(() => ExitingOperationAsync(_card?.HideCommand, ServersNoticeKind.Hidden), () => _card is not null);
+        RemoveCommand = new AsyncRelayCommand(() => ExitingOperationAsync(_card?.RemoveCommand, ServersNoticeKind.Removed), () => _card is not null);
         ViewHistoryCommand = new RelayCommand(
             () => Explore(ServerDetailReturnTarget.History, _card?.ViewHistoryCommand), () => _card is not null);
         ViewWorkloadsCommand = new RelayCommand(
@@ -151,6 +154,48 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
 
     /// <summary>The detected system from the last snapshot ("Ubuntu 24.04 LTS"), or null — omitted, never invented.</summary>
     public string? DetectedSystemDisplay => ServerContextPresentation.OperatingSystemDisplay(_card?.MetricsSnapshot);
+
+    /// <summary>Figma 112:1802 "Ubuntu 24.04 LTS · 192.168.1.10": the system shown in Ligação, then the address as the rows show it.</summary>
+    public string HeaderSubtitle => _card is null
+        ? string.Empty
+        : ServerContextPresentation.Join(SystemDisplay, OverviewPresentation.Address(_card.Host, _card.Port));
+
+    /// <summary>The detected system when the collector reported one, else the configured one (never invented).</summary>
+    public string SystemDisplay => DetectedSystemDisplay ?? ConfiguredSystemDisplay;
+
+    /// <summary>Ligação · Utilizador: the configured SSH user.</summary>
+    public string Username => _card?.Server.Username ?? string.Empty;
+
+    /// <summary>Ligação · Autenticação: the configured method (Chave SSH / Palavra-passe / Não configurada). Never a secret.</summary>
+    public string AuthenticationDisplay => _localization.GetString(
+        "ServerDetailAuthentication" + (_card?.Server.AuthenticationMethod ?? AuthenticationMethod.NotConfigured));
+
+    /// <summary>Intervalo: the server's refresh interval ("30 segundos", "5 minutos").</summary>
+    public string IntervalDisplay
+    {
+        get
+        {
+            var seconds = _card?.Server.RefreshIntervalSeconds ?? 0;
+            return seconds >= 60 && seconds % 60 == 0
+                ? Format(WorkloadPresentation.PluralKey("ServerDetailDurationMinutes", seconds / 60), seconds / 60)
+                : Format(WorkloadPresentation.PluralKey("ServerDetailDurationSeconds", seconds), seconds);
+        }
+    }
+
+    /// <summary>Tempo de atividade in Figma's long form ("12 dias, 8 horas"), or null when the collector has none.</summary>
+    public string? UptimeLongDisplay => _card?.MetricsSnapshot?.Uptime is { } uptime ? LongDuration(uptime) : null;
+
+    /// <summary>The info-strip value: the long uptime, or "—" when the collector reported none (never 0).</summary>
+    public string UptimeDisplayOrDash => UptimeLongDisplay ?? Unavailable;
+
+    /// <summary>The info-strip value: "Há 8 segundos", or "—" when there was never a reading.</summary>
+    public string LastUpdatedOrDash => LastUpdatedValue ?? Unavailable;
+
+    /// <summary>The status label: "A ligar…" while waiting for the first reading (Figma 112:16093), else the shared copy.</summary>
+    public string StatusLabel => IsFirstReading ? _localization.GetString("ServerDetailConnecting") : StatusText;
+
+    /// <summary>The connection-problem notice text: points to Editar, where trust and credentials are reviewed (M14 untouched).</summary>
+    public string ConnectionProblemMessage => _localization.GetString("ServerDetailConnectionProblemMessage");
 
     public ServerHealth Health => _card?.Health ?? ServerHealth.Unknown;
 
@@ -257,7 +302,14 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
 
     public bool HasCpuPercent => _card?.HasCpuPercent == true;
 
-    public string CpuDisplay => _card?.CpuUsageDisplay ?? Unavailable;
+    /// <summary>"24%", or "—" when unknown — the rows' rule exactly (percent only, never bytes, never 0).</summary>
+    public string CpuDisplay => Percent(HasCpuPercent, _card?.CpuUsageValue ?? 0);
+
+    /// <summary>The big number of the card ("24"; the "%" unit is drawn only when known), or "—".</summary>
+    public string CpuValueText => Number(HasCpuPercent, _card?.CpuUsageValue ?? 0);
+
+    /// <summary>The whole card as one accessible sentence ("CPU: 24%").</summary>
+    public string CpuAccessibleName => Format("ServerDetailMetricAccessibleFormat", _localization.GetString("ServerMetricsCpuLabel.Text"), CpuAccessibleValue);
 
     public string CpuAccessibleValue => AccessiblePercent(HasCpuPercent, _card?.CpuUsageValue ?? 0);
 
@@ -270,7 +322,14 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
 
     public bool HasMemoryPercent => _card?.HasMemoryPercent == true;
 
-    public string MemoryDisplay => _card?.MemoryUsageDisplay ?? Unavailable;
+    public string MemoryDisplay => Percent(HasMemoryPercent, _card?.MemoryUsageValue ?? 0);
+
+    public string MemoryValueText => Number(HasMemoryPercent, _card?.MemoryUsageValue ?? 0);
+
+    public string MemoryAccessibleName => Format("ServerDetailMetricAccessibleFormat", _localization.GetString("ServerMetricsMemoryLabel.Text"), MemoryAccessibleValue);
+
+    /// <summary>Figma "9,9 GB de 16 GB": the snapshot's own byte counts, shown only when both are known (no % derived).</summary>
+    public string? MemoryLegend => BytesOf(_card?.MetricsSnapshot?.MemoryUsedBytes, _card?.MetricsSnapshot?.MemoryTotalBytes);
 
     public string MemoryAccessibleValue => AccessiblePercent(HasMemoryPercent, _card?.MemoryUsageValue ?? 0);
 
@@ -281,9 +340,18 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
     public int? MemoryLitSegments => MetricVisualPresentation.LitSegments(
         HasMemoryPercent ? _card!.MemoryUsageValue : null, MetricVisualPresentation.MemorySegmentCount);
 
+    /// <summary>The meter's lit count: <see cref="MemoryLitSegments"/>, or -1 for unknown (an empty track).</summary>
+    public int MemoryLitCount => MemoryLitSegments ?? -1;
+
     public bool HasDiskPercent => _card?.HasDiskPercent == true;
 
-    public string DiskDisplay => _card?.DiskUsageDisplay ?? Unavailable;
+    public string DiskDisplay => Percent(HasDiskPercent, _card?.DiskUsageValue ?? 0);
+
+    public string DiskValueText => Number(HasDiskPercent, _card?.DiskUsageValue ?? 0);
+
+    public string DiskAccessibleName => Format("ServerDetailMetricAccessibleFormat", _localization.GetString("ServerMetricsDiskLabel.Text"), DiskAccessibleValue);
+
+    public string? DiskLegend => BytesOf(_card?.MetricsSnapshot?.DiskUsedBytes, _card?.MetricsSnapshot?.DiskTotalBytes);
 
     public string DiskAccessibleValue => AccessiblePercent(HasDiskPercent, _card?.DiskUsageValue ?? 0);
 
@@ -292,6 +360,9 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
     /// <summary>A-4: lit disk segments out of 14; null = unknown (empty track + "—").</summary>
     public int? DiskLitSegments => MetricVisualPresentation.LitSegments(
         HasDiskPercent ? _card!.DiskUsageValue : null, MetricVisualPresentation.DiskSegmentCount);
+
+    /// <summary>The meter's lit count: <see cref="DiskLitSegments"/>, or -1 for unknown (an empty track).</summary>
+    public int DiskLitCount => DiskLitSegments ?? -1;
 
     // --- Commands (pass-through to the live card) -----------------------------------------------------------------
 
@@ -369,7 +440,7 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
             // An operation that failed here leaves the server in place: a later, unrelated disappearance goes to the origin.
             if (_dashboard.IsOperationErrorOpen || _dashboard.IsConfigurationLockedOpen)
             {
-                _exitToServers = false;
+                _exitOperation = null;
             }
         }
     }
@@ -406,14 +477,18 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
         if (card is null)
         {
             // Hidden or removed (here or elsewhere): leave exactly once.
-            GoBack();
+            Leave(serverGone: true);
             return;
         }
 
         Card = card;
     }
 
-    private void GoBack()
+    /// <param name="serverGone">
+    /// True when the server left the list. If THIS page's Ocultar/Remover caused it (H-UI5-1) the page returns to
+    /// Servidores and hands it a one-shot notice; the breadcrumb (false) always returns to the origin, never with a notice.
+    /// </param>
+    private void Leave(bool serverGone)
     {
         if (_left)
         {
@@ -421,9 +496,15 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
         }
 
         _left = true;
-        var toServers = _exitToServers || Origin == ServerDetailOrigin.Servers;
+        var ownOperation = serverGone ? _exitOperation : null;
+        var name = _card?.Name;
         Dispose();
-        if (toServers)
+        if (ownOperation is { } kind && name is not null)
+        {
+            _serversNotice?.Post(new ServersNotice(kind, name));
+        }
+
+        if (ownOperation is not null || Origin == ServerDetailOrigin.Servers)
         {
             _navigation.GoToServers();
         }
@@ -434,14 +515,14 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
     }
 
     // H-UI5-1: Ocultar / Remover started HERE return to Servidores once the server is gone (its toasts live there).
-    private async Task ExitingOperationAsync(ICommand? operation)
+    private async Task ExitingOperationAsync(ICommand? operation, ServersNoticeKind kind)
     {
         if (operation is null)
         {
             return;
         }
 
-        _exitToServers = true;
+        _exitOperation = kind;
         if (operation is AsyncRelayCommand asyncOperation)
         {
             await asyncOperation.ExecuteAsync().ConfigureAwait(true);
@@ -580,12 +661,16 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
             Raise(Args.ViewWorkloadsAutomationName);
             Raise(Args.IsRouted);
             Raise(Args.IsMetricsUnsupported);
+            Raise(Args.Username);
+            Raise(Args.AuthenticationDisplay);
+            Raise(Args.IntervalDisplay);
         }
 
         if ((dirty & Change.Status) != 0)
         {
             Raise(Args.Health);
             Raise(Args.StatusText);
+            Raise(Args.StatusLabel);
             Raise(Args.IsWithoutConnection);
         }
 
@@ -593,6 +678,8 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
         {
             Raise(Args.HasCpuPercent);
             Raise(Args.CpuDisplay);
+            Raise(Args.CpuValueText);
+            Raise(Args.CpuAccessibleName);
             Raise(Args.CpuAccessibleValue);
             Raise(Args.CpuSeverity);
         }
@@ -601,18 +688,26 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
         {
             Raise(Args.HasMemoryPercent);
             Raise(Args.MemoryDisplay);
+            Raise(Args.MemoryValueText);
+            Raise(Args.MemoryAccessibleName);
+            Raise(Args.MemoryLegend);
             Raise(Args.MemoryAccessibleValue);
             Raise(Args.MemorySeverity);
             Raise(Args.MemoryLitSegments);
+            Raise(Args.MemoryLitCount);
         }
 
         if ((dirty & Change.Disk) != 0)
         {
             Raise(Args.HasDiskPercent);
             Raise(Args.DiskDisplay);
+            Raise(Args.DiskValueText);
+            Raise(Args.DiskAccessibleName);
+            Raise(Args.DiskLegend);
             Raise(Args.DiskAccessibleValue);
             Raise(Args.DiskSeverity);
             Raise(Args.DiskLitSegments);
+            Raise(Args.DiskLitCount);
         }
 
         if ((dirty & Change.Reading) != 0)
@@ -623,13 +718,19 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
             Raise(Args.HasUptime);
             Raise(Args.UptimeDisplay);
             Raise(Args.DetectedSystemDisplay);
+            Raise(Args.SystemDisplay);
+            Raise(Args.HeaderSubtitle);
+            Raise(Args.UptimeLongDisplay);
+            Raise(Args.UptimeDisplayOrDash);
             Raise(Args.LastUpdatedValue);
+            Raise(Args.LastUpdatedOrDash);
             RequestCpuPulse(force: false);
         }
 
         if ((dirty & Change.State) != 0)
         {
             Raise(Args.IsFirstReading);
+            Raise(Args.StatusLabel);
             Raise(Args.IsRefreshing);
             Raise(Args.HasCollectionError);
             Raise(Args.CollectionErrorText);
@@ -730,6 +831,40 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
 
     private string Unavailable => _localization.GetString("ServerMetricUnavailable");
 
+    private string Percent(bool known, double value) => known
+        ? string.Format(CultureInfo.CurrentUICulture, "{0:0}%", value)
+        : Unavailable;
+
+    private string Number(bool known, double value) => known
+        ? string.Format(CultureInfo.CurrentUICulture, "{0:0}", value)
+        : Unavailable;
+
+    private string? BytesOf(long? used, long? total) =>
+        used is { } usedBytes && total is { } totalBytes && totalBytes > 0 && usedBytes >= 0
+            ? Format("ServerDetailBytesOfFormat", MetricVisualPresentation.FormatBytes(usedBytes), MetricVisualPresentation.FormatBytes(totalBytes))
+            : null;
+
+    // "12 dias, 8 horas" / "3 horas, 5 minutos" / "7 minutos": the two most significant units, plural-aware.
+    private string LongDuration(TimeSpan uptime)
+    {
+        if (uptime.TotalDays >= 1)
+        {
+            return Join(Unit("Days", (int)uptime.TotalDays), uptime.Hours > 0 ? Unit("Hours", uptime.Hours) : null);
+        }
+
+        if (uptime.TotalHours >= 1)
+        {
+            return Join(Unit("Hours", (int)uptime.TotalHours), uptime.Minutes > 0 ? Unit("Minutes", uptime.Minutes) : null);
+        }
+
+        return Unit("Minutes", Math.Max(1, (int)uptime.TotalMinutes));
+
+        string Unit(string unit, int count) => Format(WorkloadPresentation.PluralKey("ServerDetailDuration" + unit, count), count);
+
+        string Join(string first, string? second) =>
+            second is null ? first : string.Join(_localization.GetString("ServerDetailDurationSeparator"), first, second);
+    }
+
     private static ServerHealth Severity(bool known, double? value, double warning, double critical) =>
         known ? OverviewPresentation.MetricSeverity(value, warning, critical) : ServerHealth.Healthy;
 
@@ -742,7 +877,8 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
     private string Format(string key, params object[] args) =>
         string.Format(CultureInfo.CurrentUICulture, _localization.GetString(key), args);
 
-    // D-UI3-9 buckets, in Figma's "label + value" form (A-5): <1 s "agora mesmo", then s / min / h / d.
+    // D-UI3-9 buckets, in Figma's "label + value" long form (A-5, 112:1912 "Há 8 segundos"): <1 s "Agora mesmo", then
+    // seconds / minutes / hours / days, plural-aware. Recomputed only on a new reading (no timer).
     private string FormatUpdatedAgo(DateTimeOffset lastSuccessUtc)
     {
         var age = _clock.UtcNow - lastSuccessUtc;
@@ -756,19 +892,11 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
             return _localization.GetString("ServerDetailUpdatedJustNow");
         }
 
-        if (age.TotalMinutes < 1)
-        {
-            return Format("ServerDetailUpdatedSecondsFormat", (int)age.TotalSeconds);
-        }
-
-        if (age.TotalHours < 1)
-        {
-            return Format("ServerDetailUpdatedMinutesFormat", (int)age.TotalMinutes);
-        }
-
-        return age.TotalDays < 1
-            ? Format("ServerDetailUpdatedHoursFormat", (int)age.TotalHours)
-            : Format("ServerDetailUpdatedDaysFormat", (int)age.TotalDays);
+        var (unit, count) = age.TotalMinutes < 1 ? ("Seconds", (int)age.TotalSeconds)
+            : age.TotalHours < 1 ? ("Minutes", (int)age.TotalMinutes)
+            : age.TotalDays < 1 ? ("Hours", (int)age.TotalHours)
+            : ("Days", (int)age.TotalDays);
+        return Format("ServerDetailUpdatedAgoFormat", Format(WorkloadPresentation.PluralKey("ServerDetailDuration" + unit, count), count));
     }
 
     /// <summary>Cached arguments: the per-burst flush allocates no event arguments.</summary>
@@ -820,5 +948,24 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
         public static readonly PropertyChangedEventArgs DiskAccessibleValue = new(nameof(ServerDetailViewModel.DiskAccessibleValue));
         public static readonly PropertyChangedEventArgs DiskSeverity = new(nameof(ServerDetailViewModel.DiskSeverity));
         public static readonly PropertyChangedEventArgs DiskLitSegments = new(nameof(ServerDetailViewModel.DiskLitSegments));
+        public static readonly PropertyChangedEventArgs CpuValueText = new(nameof(ServerDetailViewModel.CpuValueText));
+        public static readonly PropertyChangedEventArgs CpuAccessibleName = new(nameof(ServerDetailViewModel.CpuAccessibleName));
+        public static readonly PropertyChangedEventArgs MemoryValueText = new(nameof(ServerDetailViewModel.MemoryValueText));
+        public static readonly PropertyChangedEventArgs MemoryAccessibleName = new(nameof(ServerDetailViewModel.MemoryAccessibleName));
+        public static readonly PropertyChangedEventArgs MemoryLegend = new(nameof(ServerDetailViewModel.MemoryLegend));
+        public static readonly PropertyChangedEventArgs DiskValueText = new(nameof(ServerDetailViewModel.DiskValueText));
+        public static readonly PropertyChangedEventArgs DiskAccessibleName = new(nameof(ServerDetailViewModel.DiskAccessibleName));
+        public static readonly PropertyChangedEventArgs DiskLegend = new(nameof(ServerDetailViewModel.DiskLegend));
+        public static readonly PropertyChangedEventArgs HeaderSubtitle = new(nameof(ServerDetailViewModel.HeaderSubtitle));
+        public static readonly PropertyChangedEventArgs SystemDisplay = new(nameof(ServerDetailViewModel.SystemDisplay));
+        public static readonly PropertyChangedEventArgs Username = new(nameof(ServerDetailViewModel.Username));
+        public static readonly PropertyChangedEventArgs AuthenticationDisplay = new(nameof(ServerDetailViewModel.AuthenticationDisplay));
+        public static readonly PropertyChangedEventArgs IntervalDisplay = new(nameof(ServerDetailViewModel.IntervalDisplay));
+        public static readonly PropertyChangedEventArgs UptimeLongDisplay = new(nameof(ServerDetailViewModel.UptimeLongDisplay));
+        public static readonly PropertyChangedEventArgs StatusLabel = new(nameof(ServerDetailViewModel.StatusLabel));
+        public static readonly PropertyChangedEventArgs UptimeDisplayOrDash = new(nameof(ServerDetailViewModel.UptimeDisplayOrDash));
+        public static readonly PropertyChangedEventArgs LastUpdatedOrDash = new(nameof(ServerDetailViewModel.LastUpdatedOrDash));
+        public static readonly PropertyChangedEventArgs MemoryLitCount = new(nameof(ServerDetailViewModel.MemoryLitCount));
+        public static readonly PropertyChangedEventArgs DiskLitCount = new(nameof(ServerDetailViewModel.DiskLitCount));
     }
 }

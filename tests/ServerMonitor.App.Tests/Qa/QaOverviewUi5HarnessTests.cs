@@ -16,45 +16,53 @@ public sealed class QaOverviewUi5HarnessTests
 {
     private const string Exe = @"C:\fixture\ServerMonitor.App.exe";
 
-    // ---- fail-closed Settings/Data isolation (Cortex 4) -------------------------------------------------------------
+    // ---- fail-closed backup isolation for EVERY overview scenario (Cortex 4, Boss B2 answer 5) ---------------------
 
-    [Theory]
-    [InlineData("data")]
-    [InlineData("data-failing")]
-    public void ADataScenario_WithoutTheBackupDoubles_IsRefusedAtLaunch(string scenario)
+    public static TheoryData<string?> AllScenarios()
     {
-        var refusal = QaStartupIsolation.LaunchRefusal([Exe, "--qa-overview", "--qa-overview-scenario", scenario]);
+        var data = new TheoryData<string?> { (string?)null }; // no modifier = the default scenario
+        foreach (var scenario in QaOverviewScenarioPolicy.Scenarios)
+        {
+            data.Add(scenario);
+        }
 
-        Assert.NotNull(refusal);
-        Assert.Contains(QaBackupPolicy.LaunchFlag, refusal, StringComparison.Ordinal);
-        Assert.Null(QaStartupIsolation.LaunchRefusal([Exe, "--qa-overview", "--qa-overview-scenario", scenario, "--qa-backup", "ok"]));
-        Assert.Null(QaStartupIsolation.LaunchRefusal([Exe, "--qa-overview", $"--qa-overview-scenario={scenario}", "--qa-backup=stuck"]));
-        // An unknown backup scenario is not "the doubles": still refused.
-        Assert.NotNull(QaStartupIsolation.LaunchRefusal([Exe, "--qa-overview", "--qa-overview-scenario", scenario, "--qa-backup", "bogus"]));
+        return data;
     }
 
     [Theory]
-    [InlineData("data")]
-    [InlineData("data-failing")]
-    public void ADataScenario_WithoutTheBackupDoubles_IsNeverComposed(string scenario)
+    [MemberData(nameof(AllScenarios))]
+    public void AnyOverviewLaunch_WithoutTheBackupDoubles_IsRefused(string? scenario)
+    {
+        string[] Launch(params string[] extra) =>
+            [Exe, "--qa-overview", .. scenario is null ? Array.Empty<string>() : ["--qa-overview-scenario", scenario], .. extra];
+
+        var refusal = QaStartupIsolation.LaunchRefusal(Launch());
+
+        Assert.NotNull(refusal);
+        Assert.Contains(QaBackupPolicy.LaunchFlag, refusal, StringComparison.Ordinal);
+        Assert.Null(QaStartupIsolation.LaunchRefusal(Launch("--qa-backup", "ok")));
+        Assert.Null(QaStartupIsolation.LaunchRefusal(Launch("--qa-backup=stuck")));
+        // An unknown backup scenario is not "the doubles": still refused.
+        Assert.NotNull(QaStartupIsolation.LaunchRefusal(Launch("--qa-backup", "bogus")));
+    }
+
+    [Theory]
+    [MemberData(nameof(AllScenarios))]
+    public void AnyOverviewScenario_WithoutTheBackupDoubles_IsNeverComposed(string? scenario)
     {
         var services = new ServiceCollection();
 
-        var refused = Assert.Throws<InvalidOperationException>(() => QaOverviewComposition.Apply(services, scenario, backupDoublesRequested: false));
+        var refused = Assert.Throws<InvalidOperationException>(() =>
+            QaOverviewComposition.Apply(services, scenario ?? QaOverviewScenarioPolicy.DefaultScenario, backupDoublesRequested: false));
 
         Assert.Contains(QaBackupPolicy.LaunchFlag, refused.Message, StringComparison.Ordinal);
         Assert.Empty(services); // nothing composed before the refusal
     }
 
-    [Theory]
-    [InlineData("mixed")]
-    [InlineData("detail")]
-    [InlineData("detail-failing")]
-    public void TheOtherScenarios_DoNotNeedTheBackupDoubles(string scenario)
-    {
-        Assert.False(QaOverviewScenarioPolicy.RequiresBackupDouble(scenario));
-        Assert.Null(QaStartupIsolation.LaunchRefusal([Exe, "--qa-overview", "--qa-overview-scenario", scenario]));
-    }
+    /// <summary>The rule belongs to --qa-overview: the other harnesses keep their own (UI.3/M14.6) backup wiring.</summary>
+    [Fact]
+    public void OtherHarnesses_AreUnaffected() =>
+        Assert.Null(QaStartupIsolation.LaunchRefusal([Exe, "--qa-health"]));
 
     /// <summary>With the doubles, the composed picker is the in-memory one: the native picker cannot open.</summary>
     [Fact]
@@ -156,7 +164,7 @@ public sealed class QaOverviewUi5HarnessTests
     public void TheDetailScenario_SeedsAuthHostKeyAndRoutedServers_Synthetically()
     {
         var services = new ServiceCollection();
-        QaOverviewComposition.Apply(services, "detail");
+        QaOverviewComposition.Apply(services, "detail", backupDoublesRequested: true);
         var connections = (IServerConnectionStateStore)services.Last(d => d.ServiceType == typeof(IServerConnectionStateStore)).ImplementationInstance!;
 
         Assert.Equal(ServerConnectionState.AuthenticationFailed, connections.Get(QaOverviewCatalog.StableId("auth-01"))!.State);

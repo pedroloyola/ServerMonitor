@@ -54,6 +54,7 @@
             <SolidColorBrush x:Key="SaSkeletonBrush" Color="{StaticResource SaColorSkeletonDark}" />
             <SolidColorBrush x:Key="SaInsetTintedBrush" Color="{StaticResource SaColorInsetTintedDark}" />
             <SolidColorBrush x:Key="SaBarEmptyBrush" Color="{StaticResource SaColorBarEmptyDark}" />
+            <SolidColorBrush x:Key="SaIconTileBrush" Color="{StaticResource SaColorIconTileDark}" />
             <SolidColorBrush x:Key="SaDialogButtonFillBrush" Color="{StaticResource SaColorDialogButtonFillDark}" />
             <SolidColorBrush x:Key="SaDialogButtonBorderBrush" Color="{StaticResource SaColorDialogButtonBorderDark}" />
             <!-- UI.2 R1 (Prism MF-4, Cortex R-3): REST fill of secondary/icon/search/selector controls, separate from SaSelectedBrush so High Contrast paints ButtonFace + ButtonText border at rest (Highlight only for selected/pressed); the toggle On track = state colour in Dark/Light, Highlight in HC. -->
@@ -107,6 +108,7 @@
             <SolidColorBrush x:Key="SaSkeletonBrush" Color="{StaticResource SaColorSkeletonLight}" />
             <SolidColorBrush x:Key="SaInsetTintedBrush" Color="{StaticResource SaColorInsetTintedLight}" />
             <SolidColorBrush x:Key="SaBarEmptyBrush" Color="{StaticResource SaColorBarEmptyLight}" />
+            <SolidColorBrush x:Key="SaIconTileBrush" Color="{StaticResource SaColorIconTileLight}" />
             <SolidColorBrush x:Key="SaDialogButtonFillBrush" Color="{StaticResource SaColorDialogButtonFillLight}" />
             <SolidColorBrush x:Key="SaDialogButtonBorderBrush" Color="{StaticResource SaColorDialogButtonBorderLight}" />
             <SolidColorBrush x:Key="SaSecondaryFillBrush" Color="{StaticResource SaColorSelectedLight}" />
@@ -159,6 +161,7 @@
             <SolidColorBrush x:Key="SaSkeletonBrush" Color="{ThemeResource SystemColorGrayTextColor}" />
             <SolidColorBrush x:Key="SaInsetTintedBrush" Color="{ThemeResource SystemColorWindowColor}" />
             <SolidColorBrush x:Key="SaBarEmptyBrush" Color="{ThemeResource SystemColorGrayTextColor}" />
+            <SolidColorBrush x:Key="SaIconTileBrush" Color="{ThemeResource SystemColorWindowColor}" />
             <SolidColorBrush x:Key="SaDialogButtonFillBrush" Color="{ThemeResource SystemColorWindowColor}" />
             <SolidColorBrush x:Key="SaDialogButtonBorderBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
             <SolidColorBrush x:Key="SaSecondaryFillBrush" Color="{ThemeResource SystemColorButtonFaceColor}" />

@@ -4,7 +4,7 @@
     <!-- Definition only. Consumers must honour UISettings.AnimationsEnabled.
          Stored as x:String exactly like WinUI's own ControlFastAnimationDuration / ControlFastOutSlowInKeySpline
          resources, so they convert wherever a KeyTime, Duration or KeySpline attribute consumes them.
-         Focus timings preserve ServerFullCard's existing keyframe times (not three phase lengths).
+         Focus timings preserve the former ServerFullCard keyframe times (not three phase lengths); kept after UI.5.
          Fluent: https://learn.microsoft.com/windows/apps/design/motion/ -->
     <x:String x:Key="SaMotionFocusPeakTime">0:0:0.180</x:String>
     <x:String x:Key="SaMotionFocusFadeEndTime">0:0:1.600</x:String>

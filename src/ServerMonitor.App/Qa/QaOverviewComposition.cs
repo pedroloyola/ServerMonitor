@@ -44,13 +44,13 @@ internal static class QaOverviewComposition
         Apply(services, RequestedScenario(), QaBackupScenarioComposition.RequestedScenario() is not null);
 
     /// <param name="backupDoublesRequested">
-    /// UI.5 Cortex 4 (fail-closed, second line behind the launch refusal): whether <c>--qa-backup</c> is on the launch. A
-    /// Settings / Data scenario without it throws - the real backup engine and its native picker are never composed.
+    /// UI.5 Cortex 4 / Boss B2 answer 5 (fail-closed, second line behind the launch refusal): whether <c>--qa-backup</c>
+    /// is on the launch. Without it ANY scenario throws - the real backup engine and its native picker are never composed.
     /// </param>
-    public static void Apply(IServiceCollection services, string scenarioName, bool backupDoublesRequested = false)
+    public static void Apply(IServiceCollection services, string scenarioName, bool backupDoublesRequested)
     {
         ArgumentNullException.ThrowIfNull(services);
-        if (QaOverviewScenarioPolicy.RequiresBackupDouble(scenarioName) && !backupDoublesRequested)
+        if (!backupDoublesRequested)
         {
             throw new InvalidOperationException(
                 $"{QaOverviewScenarioPolicy.LaunchFlag} {scenarioName} requires {QaBackupPolicy.LaunchFlag} <scenario>: " +
