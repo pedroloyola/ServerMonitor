@@ -36,6 +36,14 @@ public sealed class TransientNoticeTimer : IDisposable
     /// </summary>
     internal Func<Action, bool>? EnqueueOverride { get; set; }
 
+    /// <summary>
+    /// UI.5 fix round 5 (Boss, Atlas C4): the runtime guard at the hazard point. When ARMED, <see cref="Start"/> - the
+    /// one place a real countdown is created - refuses the system clock (<see cref="TimeProvider.System"/>, which is also
+    /// <see cref="PresentationClock.System"/>'s provider), however the caller obtained it. Armed only by the App test
+    /// assembly (a module initializer); never set in production, where it stays false and nothing changes.
+    /// </summary>
+    internal static bool RejectSystemTimeProvider { get; set; }
+
     /// <summary>True while a notice is counting down.</summary>
     public bool IsRunning => _timer is not null;
 
@@ -43,6 +51,12 @@ public sealed class TransientNoticeTimer : IDisposable
     public void Start(Action onElapsed)
     {
         ArgumentNullException.ThrowIfNull(onElapsed);
+        if (RejectSystemTimeProvider && ReferenceEquals(_timeProvider, TimeProvider.System))
+        {
+            throw new InvalidOperationException(
+                "TransientNoticeTimer: a notice countdown was started on the SYSTEM clock while the test guard is armed - pass a fake TimeProvider / PresentationClock.");
+        }
+
         Cancel();
         _enqueue = EnqueueOverride;
         if (_enqueue is null && TryGetDispatcher() is { } dispatcher)

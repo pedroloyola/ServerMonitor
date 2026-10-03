@@ -4,15 +4,16 @@ using System.Text.RegularExpressions;
 namespace ServerMonitor.App.Tests.Architecture;
 
 /// <summary>
-/// UI.5 fix round 4 (Boss, Atlas C3 finding 1). The clock of every notice / toast owner (SettingsViewModel,
-/// ServersViewModel, TransientNoticeTimer) is a REQUIRED constructor parameter, so OMITTING it does not compile. This
-/// guard covers the remaining bypass - passing the real clock explicitly: <c>PresentationClock.System</c> and
-/// <c>TimeProvider.System</c> are banned from the App test project's CODE.
+/// ADVISORY LINT ONLY (UI.5 fix round 5, Boss §16 non-convergence gate) - NOT the proof. The proof is the runtime guard:
+/// <c>TransientNoticeTimer.RejectSystemTimeProvider</c>, armed for every App test run by <c>SystemClockTestGuard</c>
+/// (a module initializer), makes any notice / toast countdown on the system clock throw, however the clock was obtained.
+/// Omitting the clock does not compile (fix round 4).
 /// <para>
-/// Tokenizer (documented; the test project has no Roslyn reference): before matching, comments (<c>//</c>, <c>/* */</c>)
-/// and literals (regular, verbatim <c>@"…"</c>, interpolated <c>$"…"</c> including its holes, raw <c>"""…"""</c> and
-/// char literals) are blanked, so a mention in a comment or a string never counts and never hides a real use next to it.
-/// Member access tolerates whitespace around the dot; the type may be qualified (<c>ViewModels.PresentationClock</c>).
+/// This lint flags the obvious spelling - <c>PresentationClock.System</c> / <c>TimeProvider.System</c> in the App test
+/// project's code - with a small tokenizer (no Roslyn in the test project): comments, plain / verbatim / raw literals
+/// and char literals are blanked; the HOLES of interpolated strings are code and stay (Atlas C4: <c>$"{clock =
+/// PresentationClock.System}"</c> counts). Known, accepted limits (no further investment): <c>using static</c>, aliases,
+/// reflection, raw interpolated literals and a string literal nested inside a hole - all caught at run time instead.
 /// </para>
 /// </summary>
 public sealed class SystemClockGuardTests
@@ -66,7 +67,10 @@ public sealed class SystemClockGuardTests
     [InlineData("var c = PresentationClock.System; // new PresentationClock(new FakeTimeProvider())", 1)]
     [InlineData("var s = \"PresentationClock.System\"; var c = TestClock.Fake();", 0)]
     [InlineData("var s = @\"TimeProvider.System \"\" quoted\"; var c = TestClock.Fake();", 0)]
-    [InlineData("var s = $\"{PresentationClock.System}\"; var c = TestClock.Fake();", 0)]
+    [InlineData("var s = $\"{PresentationClock.System}\"; var c = TestClock.Fake();", 1)] // a hole is code (Atlas C4)
+    [InlineData("var clock = TestClock.Fake(); _ = $\"{clock = PresentationClock.System}\";", 1)]
+    [InlineData("var s = $\"PresentationClock.System {{not a hole}}\";", 0)]
+    [InlineData("var s = $@\"{TimeProvider.System} \"\" quoted\";", 1)]
     [InlineData("var s = \"\"\"\n PresentationClock.System\n \"\"\"; var c = TestClock.Fake();", 0)]
     [InlineData("var ch = '\"'; var c = PresentationClock.System;", 1)]
     [InlineData("var c = MyPresentationClock.System; var d = TimeProvider.SystemTime;", 0)]
@@ -116,7 +120,7 @@ public sealed class SystemClockGuardTests
                     i += source[i] == '"' ? 2 : 1; // "" is an escaped quote in a verbatim literal
                 }
 
-                i = Blank(source, output, start, Math.Min(source.Length, i + 1));
+                i = Blank(source, output, start, Math.Min(source.Length, i + 1), interpolated: c == '$' || next == '$');
             }
             else if (c == '"' || c == '$' && next == '"')
             {
@@ -127,7 +131,7 @@ public sealed class SystemClockGuardTests
                     i += source[i] == '\\' ? 2 : 1;
                 }
 
-                i = Blank(source, output, start, Math.Min(source.Length, i + 1));
+                i = Blank(source, output, start, Math.Min(source.Length, i + 1), interpolated: c == '$');
             }
             else if (c == '\'')
             {
@@ -150,11 +154,35 @@ public sealed class SystemClockGuardTests
         return output.ToString();
     }
 
-    private static int Blank(string source, StringBuilder output, int start, int end)
+    // Blanks [start, end); in an interpolated literal the holes ({...}, not {{) are kept as code.
+    private static int Blank(string source, StringBuilder output, int start, int end, bool interpolated = false)
     {
+        var depth = 0;
         for (var index = start; index < end; index++)
         {
-            output.Append(source[index] == '\n' ? '\n' : ' ');
+            var ch = source[index];
+            if (interpolated && depth == 0 && ch == '{' && index + 1 < end && source[index + 1] == '{')
+            {
+                output.Append("  ");
+                index++;
+                continue;
+            }
+
+            if (interpolated && ch == '{')
+            {
+                depth++;
+                output.Append(depth == 1 ? ' ' : ch);
+                continue;
+            }
+
+            if (interpolated && depth > 0 && ch == '}')
+            {
+                depth--;
+                output.Append(depth == 0 ? ' ' : ch);
+                continue;
+            }
+
+            output.Append(depth > 0 ? ch : ch == '\n' ? '\n' : ' ');
         }
 
         return end;
