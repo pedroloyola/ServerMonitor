@@ -20,12 +20,14 @@ public sealed class SystemClockGuardTests
     private static readonly Regex SystemClock = new(@"\b(PresentationClock|TimeProvider)\s*\.\s*System\b", RegexOptions.CultureInvariant);
 
     /// <summary>
-    /// The ONE documented exception: a tray state-machine test (another workstream, not a notice owner) that needs the
-    /// real clock for its gate. Exact count per file, so a stale or a new use fails.
+    /// The documented exceptions - neither builds a notice owner. Exact count per file, so a stale or a new use fails.
     /// </summary>
     private static readonly Dictionary<string, int> Allowed = new(StringComparer.Ordinal)
     {
-        ["Architecture/TrayOwnershipCompletenessTests.cs"] = 1
+        // A tray state-machine test (another workstream) that needs the real clock for its gate.
+        ["Architecture/TrayOwnershipCompletenessTests.cs"] = 1,
+        // The composition-order test: it must name the root's system clock to prove the harness clock still wins.
+        ["Qa/QaPresentationClockOrderTests.cs"] = 3
     };
 
     [Fact]
