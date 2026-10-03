@@ -23,7 +23,8 @@ Não altera autorização, fronteiras de segurança, gates de review nem regras 
 ## 3. Reviews
 
 O Git só permite uma branch num worktree: enquanto o Floor principal detém a branch do candidato, nem
-`maestri floor create --pull-request <n>` (medido: recusado) nem outro Floor nessa branch são possíveis. Por isso:
+`maestri floor create --pull-request <n>` (medido: recusado; e, de qualquer forma, proibido — §5.1) nem outro Floor
+nessa branch são possíveis. Por isso:
 
 - **Normativo:** o **orquestrador** (não o reviewer) faz criar pela UI (§5.1) um Floor de review numa branch local
   descartável `review/<slug>-rN` e aponta-a ao **SHA exato** do candidato (`git merge --ff-only <sha>` nesse Floor).
@@ -77,15 +78,19 @@ Por isso, até uma versão do Maestri corrigir isto **e** isso ser medido de nov
    ground" OFF salvo decisão explícita.
 3. **Antes de qualquer agente trabalhar no Floor**, provar que nenhuma das 5 pastas existe nele (a qualquer
    profundidade). Se existir: nenhum trabalho no Floor; remover (§10) e reportar.
-4. As exclusões só afetam Floors **novos**; Floors já existentes mantêm o que copiaram.
-5. O CLI continua permitido para o que não cria Floors: `floor list`, `floor status`, `recruit --floor`, `ask`/`check`.
-6. Se a UI não estiver disponível, o fallback é `git worktree add` manual (não copia ficheiros ignorados), registando porquê.
+4. As exclusões só afetam Floors **novos**; Floors já existentes mantêm o que copiaram. Floors pré-existentes criados
+   pelo CLI ou antes das exclusões: inventariar e tratar como sensíveis até serem removidos (§10, com GO).
+5. O CLI continua permitido para o que não cria Floors: `floor list`, `floor status`, `recruit --floor`, `ask`/`check`,
+   e `floor delete` **apenas** com GO, as provas prévias e o triple-check de §10.
+6. Se a UI não estiver disponível, o fallback é `git worktree add` manual (não copia ficheiros ignorados), registando
+   porquê. Convenção: irmão do repo, `..\ServerMonitor-<slug>` (fora de `.maestri\floors`); §7 e §10 aplicam-se igual.
 
 Outras consequências da cópia:
 
 - `.boss/` não chega a Floors novos; se existir num Floor (ex.: antigo), é **snapshot sem valor normativo**. Ver §12.
 - A criação pode demorar com árvores ignoradas grandes: esperar que `maestri floor list` e `git worktree list` mostrem
-  o Floor antes de trabalhar nele; nunca repetir a criação (pode criar segundo worktree/branch).
+  o Floor antes de trabalhar nele; nunca repetir a criação (pode criar segundo worktree/branch); se não aparecer em
+  ~15 min, reportar BLOCKED.
 
 ## 6. Autoridade
 
@@ -131,7 +136,10 @@ Antes de remover um Floor (`maestri floor delete`/`git worktree remove`), provar
 - sem untracked/ignored valiosos (incluindo evidência sob cópias locais como `.boss/`);
 - nenhum processo, harness ou sessão a usar o caminho;
 - alvo exato (caminho do Floor confirmado em `maestri floor list` / `git worktree list`);
-- sem `--force` por omissão.
+- `git worktree remove` manual: sem `--force` por omissão.
+
+`maestri floor delete` é **intrinsecamente forçado** (corre sempre `git worktree remove --force`, sem recusar árvore
+suja ou untracked): as provas acima são a **única** proteção e são obrigatórias antes de o invocar.
 
 `maestri floor delete` **apaga a branch** salvo `--keep-branch`: apagar branch é decisão separada, sujeita a autorização.
 
@@ -142,6 +150,9 @@ um `.dmp`), por caminhos ≥ 260 caracteres sem `core.longpaths`. Cleanup só é
 1. `maestri floor list` — Floor ausente;
 2. `git worktree list` — worktree ausente;
 3. filesystem — o diretório físico do Floor **não existe**.
+
+Para o fallback `git worktree` manual a prova 1 não se aplica: `git worktree list` + filesystem +
+`git worktree prune --dry-run` sem saída.
 
 Se o diretório ficar: nenhum outro delete; GO explícito e remoção só desse caminho exato (sem wildcard, sem seguir
 junctions, sem tocar em siblings), depois repetir as três provas.
