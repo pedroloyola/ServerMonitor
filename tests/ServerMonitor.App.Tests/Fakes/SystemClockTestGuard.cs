@@ -14,7 +14,8 @@ namespace ServerMonitor.App.Tests.Fakes;
 /// so <see cref="TransientNoticeTimer.Start"/> refuses a <see cref="TimeProvider.System"/> provider, however the clock
 /// was obtained (named, interpolation hole, <c>using static</c>, alias, reflection). The refusal throws AND is recorded
 /// for the running test; <see cref="FailOnSystemClockAttribute"/> (assembly-wide) fails that test afterwards - so a view
-/// model that swallows the exception (the history commands catch everything) cannot hide it. The lexical
+/// model that swallows the exception (the history commands catch everything) cannot hide it. A refusal outside a test
+/// body (constructor, fixture, Dispose, after the last test) fails the test host fast with the cause. The lexical
 /// SystemClockGuardTests is only an advisory lint.
 /// </summary>
 internal static class SystemClockTestGuard
@@ -53,7 +54,14 @@ internal static class SystemClockTestGuard
             {
                 violations.Add(message);
             }
+
+            return;
         }
+
+        // UI.5 fix round 6 (Atlas C5 #1): a refusal OUTSIDE a test body - class constructor, fixture, Dispose /
+        // DisposeAsync, or after the last test - has no per-test record to land in. It is never dropped: the test host
+        // is failed fast with the cause, so the run (and CI) fails, independent of test order.
+        Environment.FailFast("SystemClockTestGuard: refusal outside a test body (constructor / fixture / dispose). " + message);
     }
 
     /// <summary>Opens a per-test record before every App test and fails the test if anything was refused.</summary>

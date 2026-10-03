@@ -45,22 +45,25 @@ public sealed class SystemClockRuntimeGuardTests
     }
 
     /// <summary>
-    /// Production (never armed): the system clock starts a real countdown exactly as before. The ONLY narrow disarm in the
-    /// test project, scoped to this statement and in a non-parallel collection; the timer is cancelled at once (no wait).
+    /// Production (never armed): the system clock is accepted exactly as before. The ONLY narrow disarm in the test
+    /// project, scoped to this test and in a non-parallel collection; the timer is disposed and the guard re-armed in
+    /// finally.
     /// </summary>
     [Fact]
     public void Unarmed_AsInProduction_TheSystemClockStartsTheCountdownAsBefore()
     {
         TransientNoticeTimer.RejectSystemTimeProvider = false;
+        var timer = new TransientNoticeTimer(SystemProviderByReflection());
         try
         {
-            using var timer = new TransientNoticeTimer(SystemProviderByReflection());
-            timer.Start(() => { });
-            Assert.True(timer.IsRunning);
-            timer.Cancel();
+            // Atlas C5 #2: only that Start ACCEPTS the real provider (no refusal) - nothing that depends on staying
+            // inside the real 8 s.
+            Assert.Null(Record.Exception(() => timer.Start(() => { })));
+            Assert.Empty(SystemClockTestGuard.TakeViolations());
         }
         finally
         {
+            timer.Dispose();
             TransientNoticeTimer.RejectSystemTimeProvider = true;
         }
     }
