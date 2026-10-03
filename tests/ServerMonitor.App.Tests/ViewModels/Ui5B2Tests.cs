@@ -184,7 +184,7 @@ public sealed class Ui5B2Tests
 
         // Atlas C2 finding 1: never the system clock - and the recording fake proves the countdown went through it.
         var clock = new TimerRecordingTimeProvider();
-        using var servers = new ServersViewModel(kit.Dashboard, kit.Navigation, kit.Localization, notice, new PresentationClock(clock));
+        using var servers = new ServersViewModel(kit.Dashboard, kit.Navigation, kit.Localization, new PresentationClock(clock), notice);
         Assert.Equal(1, clock.CreatedCount(TransientNoticeTimer.Duration));
         Assert.True(servers.IsNoticeOpen);
         Assert.Equal("Servidor ocultado", servers.NoticeTitle);
@@ -192,7 +192,7 @@ public sealed class Ui5B2Tests
         servers.DismissNoticeCommand.Execute(null);
         Assert.False(servers.IsNoticeOpen);
 
-        using var again = new ServersViewModel(kit.Dashboard, kit.Navigation, kit.Localization, notice, new PresentationClock(clock));
+        using var again = new ServersViewModel(kit.Dashboard, kit.Navigation, kit.Localization, new PresentationClock(clock), notice);
         Assert.False(again.IsNoticeOpen); // never re-shown
     }
 

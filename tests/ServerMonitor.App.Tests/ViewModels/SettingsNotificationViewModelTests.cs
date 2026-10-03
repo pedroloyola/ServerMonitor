@@ -209,7 +209,8 @@ public sealed class SettingsNotificationViewModelTests
         new BackgroundDegradationNotice(),
         new NullHistoryMaintenanceService(),
         new AppVersionProvider(),
-        NullLogger<SettingsViewModel>.Instance);
+        NullLogger<SettingsViewModel>.Instance,
+        TestClock.Fake()); // UI.5 fix round 4: the clock is required - a fake, never the system clock
 
     private static SettingsViewModel CreateWithDegradation(IBackgroundDegradationNotice degradation) => new(
         new FakeThemeService(),
@@ -222,7 +223,8 @@ public sealed class SettingsNotificationViewModelTests
         degradation,
         new NullHistoryMaintenanceService(),
         new AppVersionProvider(),
-        NullLogger<SettingsViewModel>.Instance);
+        NullLogger<SettingsViewModel>.Instance,
+        TestClock.Fake()); // UI.5 fix round 4: the clock is required - a fake, never the system clock
 
     private static SettingsViewModel Create(
         INotificationSettingsService settings,
@@ -237,7 +239,8 @@ public sealed class SettingsNotificationViewModelTests
         new BackgroundDegradationNotice(),
         new NullHistoryMaintenanceService(),
         new AppVersionProvider(),
-        NullLogger<SettingsViewModel>.Instance);
+        NullLogger<SettingsViewModel>.Instance,
+        TestClock.Fake()); // UI.5 fix round 4: the clock is required - a fake, never the system clock
 
     private sealed class FakeNotificationSettingsService(bool enabled) : INotificationSettingsService
     {

@@ -1,4 +1,3 @@
-using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using ServerMonitor.App.Services;
@@ -56,36 +55,8 @@ public sealed class Ui5R3Tests
         Assert.Contains("FocusTargetFor(action, ResetHistoryButton, ClearHistoryButton).Focus(", code, StringComparison.Ordinal);
     }
 
-    // ---- Atlas C2 finding 1: no system clock behind a notice or toast in any test ------------------------------------------
-
-    /// <summary>
-    /// Guard: every test construction of the two notice owners passes an injected clock (a FakeTimeProvider-based
-    /// PresentationClock): SettingsViewModel always (any success can publish a toast), ServersViewModel whenever it is given
-    /// a return notice. The countdowns are proven to run on the fake by TimerRecordingTimeProvider in the B2 tests.
-    /// </summary>
-    [Fact]
-    public void NoTest_BuildsANoticeOwner_OnTheSystemClock()
-    {
-        var root = Path.Combine(AppSourceTree.RepositoryRoot, "tests", "ServerMonitor.App.Tests");
-        var offenders = new List<string>();
-        foreach (var file in Directory.EnumerateFiles(root, "*.cs", SearchOption.AllDirectories)
-                     .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
-                         && !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal)))
-        {
-            var text = File.ReadAllText(file);
-            foreach (Match match in Regex.Matches(text, @"new (SettingsViewModel|ServersViewModel)\("))
-            {
-                var arguments = Arguments(text, match.Index + match.Length);
-                var needsClock = match.Groups[1].Value == "SettingsViewModel" || arguments.Count(c => c == ',') >= 3; // + notice
-                if (needsClock && !arguments.Contains("PresentationClock", StringComparison.Ordinal))
-                {
-                    offenders.Add($"{Path.GetFileName(file)}:{text[..match.Index].Count(c => c == '\n') + 1} {match.Value}");
-                }
-            }
-        }
-
-        Assert.Empty(offenders);
-    }
+    // ---- Atlas C2 finding 1 / C3 finding 1: the clock is a required constructor parameter (an omission does not
+    //      compile) and SystemClockGuardTests bans the system clock from test code (Architecture/SystemClockGuardTests.cs).
 
     // ---- Atlas C2 finding 2: a callback already queued for the UI never closes a newer notice ------------------------------
 
@@ -244,19 +215,6 @@ public sealed class Ui5R3Tests
     }
 
     // ---- helpers ------------------------------------------------------------------------------------------------------------
-
-    private static string Arguments(string text, int start)
-    {
-        var depth = 1;
-        var index = start;
-        while (index < text.Length && depth > 0)
-        {
-            depth += text[index] switch { '(' => 1, ')' => -1, _ => 0 };
-            index++;
-        }
-
-        return text[start..Math.Max(start, index - 1)];
-    }
 
     private static void Drain(Queue<Action> queue)
     {

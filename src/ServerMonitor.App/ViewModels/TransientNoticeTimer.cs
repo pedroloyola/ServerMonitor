@@ -23,8 +23,12 @@ public sealed class TransientNoticeTimer : IDisposable
     private ITimer? _timer;
     private int _generation;
 
-    public TransientNoticeTimer(TimeProvider? timeProvider = null) =>
-        _timeProvider = timeProvider ?? TimeProvider.System;
+    /// <param name="timeProvider">
+    /// REQUIRED (UI.5 fix round 4, Boss): no default to the system clock - production passes it explicitly at the
+    /// composition root, tests pass a fake; an omission does not compile.
+    /// </param>
+    public TransientNoticeTimer(TimeProvider timeProvider) =>
+        _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
 
     /// <summary>
     /// Test seam (Atlas C2 finding 2): how the elapsed callback reaches the UI thread. Null in production: Start captures

@@ -793,6 +793,9 @@ public partial class App : Application
         services.AddSingleton<IBackupRestoreInteraction, BackupRestoreDialogService>();
         services.AddSingleton<BackupRestoreViewModel>();
 
+        // UI.5 fix round 4 (Boss): the notice / toast owners REQUIRE a clock; production passes the system clock
+        // explicitly, here. A QA harness that fixes the presentation clock registers its own afterwards (last wins).
+        services.AddSingleton(PresentationClock.System);
         services.AddSingleton<DashboardViewModel>();
         services.AddSingleton<SettingsViewModel>();
         services.AddSingleton<DashboardPage>();

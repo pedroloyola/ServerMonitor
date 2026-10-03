@@ -50,9 +50,10 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
         IHistoryMaintenanceService historyMaintenance,
         IAppVersionProvider appVersionProvider,
         ILogger<SettingsViewModel> logger,
-        PresentationClock? clock = null)
+        PresentationClock clock)
     {
-        _toastTimer = new TransientNoticeTimer((clock ?? PresentationClock.System).TimeProvider);
+        ArgumentNullException.ThrowIfNull(clock); // UI.5 fix round 4: required - the toast countdown never defaults to the system clock
+        _toastTimer = new TransientNoticeTimer(clock.TimeProvider);
         _themeService = themeService;
         AppVersion = appVersionProvider.DisplayVersion;
         _localizationService = localizationService;

@@ -33,7 +33,7 @@ public sealed class Ui5R2Tests
     {
         var (kit, notice) = await HiddenFromTheDetailAsync();
         var clock = new FakeTimeProvider(Now);
-        using var servers = new ServersViewModel(kit.Dashboard, kit.Navigation, kit.Localization, notice, new PresentationClock(clock));
+        using var servers = new ServersViewModel(kit.Dashboard, kit.Navigation, kit.Localization, new PresentationClock(clock), notice);
         var raised = Recorder(servers);
 
         Assert.True(servers.IsNoticeOpen);
@@ -51,14 +51,14 @@ public sealed class Ui5R2Tests
     {
         var (kit, notice) = await HiddenFromTheDetailAsync();
         var clock = new FakeTimeProvider(Now);
-        var servers = new ServersViewModel(kit.Dashboard, kit.Navigation, kit.Localization, notice, new PresentationClock(clock));
+        var servers = new ServersViewModel(kit.Dashboard, kit.Navigation, kit.Localization, new PresentationClock(clock), notice);
         var raised = Recorder(servers);
 
         servers.Dispose(); // the page is left before the notice closed itself
         clock.Advance(TransientNoticeTimer.Duration * 2);
 
         Assert.Empty(raised); // the countdown died with the visit: nothing fires into a disposed view model
-        using var again = new ServersViewModel(kit.Dashboard, kit.Navigation, kit.Localization, notice, new PresentationClock(clock));
+        using var again = new ServersViewModel(kit.Dashboard, kit.Navigation, kit.Localization, new PresentationClock(clock), notice);
         Assert.False(again.IsNoticeOpen);
     }
 
@@ -67,7 +67,7 @@ public sealed class Ui5R2Tests
     {
         var (kit, notice) = await HiddenFromTheDetailAsync();
         var clock = new FakeTimeProvider(Now);
-        using var servers = new ServersViewModel(kit.Dashboard, kit.Navigation, kit.Localization, notice, new PresentationClock(clock));
+        using var servers = new ServersViewModel(kit.Dashboard, kit.Navigation, kit.Localization, new PresentationClock(clock), notice);
 
         servers.DismissNoticeCommand.Execute(null);
         var raised = Recorder(servers);

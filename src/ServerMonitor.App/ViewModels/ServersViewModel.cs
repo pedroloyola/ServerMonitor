@@ -28,9 +28,10 @@ public sealed class ServersViewModel : ObservableObject, IDisposable
         DashboardViewModel dashboard,
         INavigationService navigation,
         ILocalizationService localization,
-        ServersReturnNotice? returnNotice = null,
-        PresentationClock? clock = null)
+        PresentationClock clock,
+        ServersReturnNotice? returnNotice = null)
     {
+        ArgumentNullException.ThrowIfNull(clock); // UI.5 fix round 4: required - the notice countdown never defaults to the system clock
         _dashboard = dashboard ?? throw new ArgumentNullException(nameof(dashboard));
         _navigation = navigation ?? throw new ArgumentNullException(nameof(navigation));
         _localization = localization ?? throw new ArgumentNullException(nameof(localization));
@@ -38,7 +39,7 @@ public sealed class ServersViewModel : ObservableObject, IDisposable
         ClearSearchCommand = new RelayCommand(() => SearchText = string.Empty);
         // UI.5 Boss B2 answer 1: the one-shot notice the Server Detail left for this visit (taken once, never re-shown).
         // Fix round 2 (Boss decision 2): it closes itself after TransientNoticeTimer.Duration, or when the visit ends.
-        _noticeTimer = new TransientNoticeTimer((clock ?? PresentationClock.System).TimeProvider);
+        _noticeTimer = new TransientNoticeTimer(clock.TimeProvider);
         _notice = returnNotice?.Take();
         DismissNoticeCommand = new RelayCommand(DismissNotice);
         if (_notice is not null)
