@@ -21,37 +21,47 @@ Não altera autorização, fronteiras de segurança, gates de review nem regras 
 
 ## 3. Reviews
 
-- Review independente pode usar um Floor próprio (ex.: `maestri floor create --pull-request <n>`, ou Floor na branch
-  do candidato em modo leitura).
-- O reviewer **não escreve** no Floor principal nem na sua branch. Findings voltam ao implementador, que corrige no
-  Floor principal; segunda ronda quando houver findings materiais.
+O Git só permite uma branch num worktree: enquanto o Floor principal detém a branch do candidato, nem
+`maestri floor create --pull-request <n>` (medido: recusado) nem outro Floor nessa branch são possíveis. Por isso:
+
+- **Normativo:** Floor de review numa branch local descartável `review/<slug>-rN`, apontada ao **SHA exato** do
+  candidato (`maestri floor create "Review …" --branch review/<slug>-rN`, depois `git merge --ff-only <sha>` nesse
+  Floor). Registar o SHA revisto; nova ronda = novo SHA (ou nova branch `-rN+1`). Nunca push, nunca commit.
+- `--pull-request <n>` só quando nenhum Floor detém a branch do PR.
+- O reviewer **não escreve** no Floor principal nem em nenhuma branch. Findings voltam ao implementador, que corrige
+  no Floor principal; segunda ronda quando houver findings materiais.
 - Trabalho material: reviewer ≠ implementer.
+- `review/*` é descartável: removida com o Floor de review (`floor delete` sem `--keep-branch`), com a autorização de
+  cleanup aplicável (§10).
 
 ## 4. Paralelismo
 
-- Paralelizar eixos **independentes**: review, QA, investigação.
+- Paralelizar eixos **independentes** de leitura: review, investigação. Instâncias de QA da app ficam **serializadas** (§8).
+- `dotnet test` concorrente em Floors diferentes partilha `%TEMP%`/`%LOCALAPPDATA%`: só em paralelo quando as suites
+  não usarem raízes fixas partilhadas; em dúvida, serializar.
 - Sem swarms. Nunca dois writers na mesma superfície, mesmo que haja Floors suficientes para isso.
 
 ## 5. Base e herança
 
 Antes de criar um Floor, verificar e registar:
 
-1. SHA exato da base e `main == origin/main` (quando é o esperado);
+1. `git fetch`, depois SHA exato da base e `main == origin/main` (quando é o esperado);
 2. working tree do Térreo limpa;
 3. untracked/ignored relevantes no Térreo.
 
 O Floor é um `git worktree` real (em `<pai do repo>\.maestri\floors\…`), criado a partir do `HEAD` atual, e
 **copia** para ele o conteúdo untracked/ignored do Térreo, exceto saída de build (`bin/`, `obj/`, `dist/`,
-`__pycache__/`, `artifacts/`…). Medido em 0.49: chegaram `.boss/`, `.private/`, `.claude/settings.local.json`,
-`CONTEXT.md`. Consequências:
+`__pycache__/`, `artifacts/`…). Medido em 0.49, sem `--copy-ground` (que só copia o layout do canvas): chegaram
+`.boss/`, `.private/`, `.claude/settings.local.json`, `CONTEXT.md`. Consequências:
 
 - Base suja ⇒ decisão explícita antes de criar; nunca herdar alterações por omissão.
-- Material local/privado é **duplicado** no Floor: continua ignorado pelo Git, mas conta para o cleanup (§10) e para a
-  verificação de histórico antes do primeiro push.
-- Ficheiros locais não versionados (ex.: `.boss/`) chegam como **cópia divergente**. A canónica fica no Térreo; editar
-  a cópia do Floor **não** altera a canónica. Ver §12.
-- Com árvores ignoradas grandes, `maestri floor create` pode expirar no CLI enquanto a criação continua. **Não repetir**
-  o comando: esperar até `maestri floor list` mostrar o Floor e só então trabalhar nele.
+- Material local/privado é **duplicado** no Floor (caminho também sincronizado se o pai do repo o for): continua
+  ignorado pelo Git, mas conta para o cleanup (§10) e para a verificação de histórico antes do primeiro push.
+  Decidir por Floor se `.private/` é necessário; se não for, remover a cópia logo após a criação (com GO).
+- Ficheiros locais não versionados (ex.: `.boss/`) chegam como **snapshot sem valor normativo**. Ver §12.
+- Com árvores ignoradas grandes, `maestri floor create` pode expirar no CLI enquanto a criação continua (medido).
+  **Não repetir** o comando (pode criar segundo worktree/branch): confirmar `git worktree list` + branch e esperar
+  que `maestri floor list` mostre o Floor; se não aparecer em ~15 min, reportar BLOCKED.
 
 ## 6. Autoridade
 
@@ -71,21 +81,26 @@ apenas por `Name` exato, com GO humano.
 
 ## 8. QA
 
-- A app é lançada por agentes **apenas** via `tools/qa/Start-QaApp.ps1` (exige o executável Debug x64 do próprio
-  Floor/worktree); nunca `dotnet run` nem o `.exe` diretamente.
+- A app é lançada por agentes **apenas** via `tools/qa/Start-QaApp.ps1`; nunca `dotnet run` nem o `.exe` diretamente.
+- Floors não herdam `bin/`/`obj/`: primeiro build Debug x64 da `ServerMonitor.slnx` **do próprio Floor**; build e
+  teste pela mesma `.slnx` (P-008); nunca um dll do Térreo ou de outro Floor. O `Start-QaApp` impõe
+  `<worktree>\src\ServerMonitor.App\bin\x64\Debug\…` — é o guard, não o substitui.
 - Parser `--qa*` estrito e fail-closed; só dados sintéticos; nunca dados reais.
 - Enquanto a raiz de QA for partilhada (backlog): **uma instância QA de cada vez** em toda a máquina, não por Floor.
 - Proveniência por lançamento: `HEAD` + árvore limpa + dll/output correto do Floor em causa.
 
-## 9. Ciclo de PR
+## 9. Ciclo de PR e integração
 
 - O owner do Floor pode fazer push e abrir PR **quando autorizado**; descrição segundo o template do repositório, se existir.
 - Acompanhar checks, reviews e conflitos; correções voltam ao owner do Floor.
-- Merge/Land apenas com autorização aplicável. Landing não substitui a verificação pós-merge (CI de `main`).
+- **Integração só por merge do PR no GitHub**, com autorização aplicável; depois, no Térreo: `git fetch` +
+  `git pull --ff-only` e verificação pós-merge (CI de `main`).
+- **`maestri floor land` não é usado** até a sua semântica (merge local? push? delete de branch?) estar medida e
+  documentada: um Land local em `main` contornaria PR/CI e quebraria `main == origin/main`.
 
 ## 10. Cleanup
 
-Antes de remover um Floor (`maestri floor delete`/Land/`git worktree remove`), provar:
+Antes de remover um Floor (`maestri floor delete`/`git worktree remove`), provar:
 
 - working tree limpa e trabalho preservado/reachable a partir de `main` ou de outro ref seguro;
 - sem commits únicos que se percam;
@@ -96,6 +111,10 @@ Antes de remover um Floor (`maestri floor delete`/Land/`git worktree remove`), p
 
 `maestri floor delete` **apaga a branch** salvo `--keep-branch`: apagar branch é decisão separada, sujeita a autorização.
 
+Depois de remover, provar: o caminho do Floor já não existe; ausente de `git worktree list` e `maestri floor list`;
+`git worktree prune --dry-run` sem saída. Se o diretório ficar (ex.: cópias ignoradas como `.private/`), GO explícito
+antes de o apagar. (Comportamento de `floor delete` sobre conteúdo ignorado: ainda não medido em 0.49.)
+
 ## 11. Relatório
 
 `STATUS · WHAT CHANGED · EVIDENCE · RISKS/BLOCKERS · NEXT DECISION`. `NOT_RUN ≠ PASS`. Ao parar numa fronteira de
@@ -103,5 +122,9 @@ autorização, nomear a decisão exata necessária.
 
 ## 12. Ficheiros operacionais não versionados
 
-`.boss/` é local e ignorado pelo Git: não viaja em PR. Alterações a `BOSS.md`/runbooks são feitas na cópia canónica do
-Térreo (são operação, não implementação de produto) e registadas no relatório; nunca na cópia herdada por um Floor.
+`.boss/` é local e ignorado pelo Git: não viaja em PR. A cópia **canónica é a do Térreo**:
+
+- Agentes num Floor leem `.boss/**` (incl. `BOSS.md`, `team/`, `OWNERSHIP.md`) pelo **caminho absoluto do Térreo**;
+  a cópia do Floor é snapshot sem valor normativo.
+- Alterações a `BOSS.md`/runbooks fazem-se na cópia do Térreo (são operação, não implementação de produto) e ficam
+  registadas no relatório; nunca na cópia herdada por um Floor.
