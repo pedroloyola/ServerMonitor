@@ -24,12 +24,15 @@ Não altera autorização, fronteiras de segurança, gates de review nem regras 
 O Git só permite uma branch num worktree: enquanto o Floor principal detém a branch do candidato, nem
 `maestri floor create --pull-request <n>` (medido: recusado) nem outro Floor nessa branch são possíveis. Por isso:
 
-- **Normativo:** Floor de review numa branch local descartável `review/<slug>-rN`, apontada ao **SHA exato** do
-  candidato (`maestri floor create "Review …" --branch review/<slug>-rN`, depois `git merge --ff-only <sha>` nesse
-  Floor). Registar o SHA revisto; nova ronda = novo SHA (ou nova branch `-rN+1`). Nunca push, nunca commit.
+- **Normativo:** o **orquestrador** (não o reviewer) cria um Floor de review numa branch local descartável
+  `review/<slug>-rN` e aponta-a ao **SHA exato** do candidato (`maestri floor create "Review …" --branch
+  review/<slug>-rN`, depois `git merge --ff-only <sha>` nesse Floor). Registar o SHA revisto; nova ronda = novo SHA.
+  Nunca push, nunca commit.
+- Se o `--ff-only` falhar (ex.: `main` avançou depois da base do candidato): **nunca** `reset --hard`; criar novo Floor
+  `-rN+1` a partir de uma base de que o candidato descenda, ou reportar BLOCKED.
 - `--pull-request <n>` só quando nenhum Floor detém a branch do PR.
-- O reviewer **não escreve** no Floor principal nem em nenhuma branch. Findings voltam ao implementador, que corrige
-  no Floor principal; segunda ronda quando houver findings materiais.
+- O reviewer **só lê**: não escreve no Floor principal nem em nenhuma branch. Findings voltam ao implementador, que
+  corrige no Floor principal; segunda ronda quando houver findings materiais.
 - Trabalho material: reviewer ≠ implementer.
 - `review/*` é descartável: removida com o Floor de review (`floor delete` sem `--keep-branch`), com a autorização de
   cleanup aplicável (§10).
