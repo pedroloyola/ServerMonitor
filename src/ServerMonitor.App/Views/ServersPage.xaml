@@ -213,6 +213,12 @@
     </Page.Resources>
 
     <Grid x:Name="PageHost">
+        <!-- Boss fix round 2 decision 2: the transient notice has its own row under the scrolling content, so it never
+             covers an actionable control at any size (Figma §3.2 draws it over the content; deliberate deviation). -->
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
         <VisualStateManager.VisualStateGroups>
             <VisualStateGroup x:Name="WidthStates">
                 <VisualState x:Name="Wide">
@@ -357,5 +363,24 @@
                 </Border>
             </StackPanel>
         </ScrollViewer>
+
+        <!-- UI.5 H-UI5-1 / Boss B2 answer 1: the one-shot notice the Server Detail left after its own Ocultar / Remover
+             (Figma 112:21833 / 112:20994, toast anatomy §3.2: bottom-right, 40 from the content edge, 36 from the bottom).
+             Announced politely; closed by the user or after TransientNoticeTimer.Duration; never re-shown (taken once by
+             the view model). In its own row: it never covers the table. -->
+        <primitives:SaToast
+            x:Name="ReturnNotice"
+            Grid.Row="1"
+            Margin="40,12,40,36"
+            MaxWidth="600"
+            Width="NaN"
+            HorizontalAlignment="Right"
+            VerticalAlignment="Bottom"
+            Title="{x:Bind ViewModel.NoticeTitle, Mode=OneWay}"
+            Message="{x:Bind ViewModel.NoticeMessage, Mode=OneWay}"
+            CloseButtonAutomationName="{x:Bind ViewModel.NoticeCloseAutomationName}"
+            CloseRequested="OnReturnNoticeCloseRequested"
+            AutomationProperties.LiveSetting="Polite"
+            Visibility="{x:Bind ViewModel.IsNoticeOpen, Mode=OneWay}" />
     </Grid>
 </Page>

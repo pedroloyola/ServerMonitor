@@ -106,7 +106,7 @@ public sealed class Ui4Phase2Tests
     {
         var withRows = Ui4TestKit.Create(Fleet(2, _ => ServerHealth.Healthy));
         await withRows.Dashboard.LoadAsync();
-        using (var directory = new ServersViewModel(withRows.Dashboard, withRows.Navigation, withRows.Localization))
+        using (var directory = new ServersViewModel(withRows.Dashboard, withRows.Navigation, withRows.Localization, TestClock.Fake()))
         {
             Assert.True(directory.ShowHiddenServersNote); // rows, 0 hidden: always (Figma 112:1533)
             directory.SearchText = "nothing-matches";
@@ -115,7 +115,7 @@ public sealed class Ui4Phase2Tests
 
         var onlyHidden = Ui4TestKit.Create(new Ui4TestKit.Fleet().Add("gone", ServerHealth.Healthy, 1, 1, 1, hidden: true));
         await onlyHidden.Dashboard.LoadAsync();
-        using (var directory = new ServersViewModel(onlyHidden.Dashboard, onlyHidden.Navigation, onlyHidden.Localization))
+        using (var directory = new ServersViewModel(onlyHidden.Dashboard, onlyHidden.Navigation, onlyHidden.Localization, TestClock.Fake()))
         {
             Assert.True(directory.ShowEmptyState);
             Assert.True(directory.ShowHiddenServersNote); // empty + hidden: the note, or the user thinks they are lost
@@ -123,7 +123,7 @@ public sealed class Ui4Phase2Tests
 
         var empty = Ui4TestKit.Create(new Ui4TestKit.Fleet());
         await empty.Dashboard.LoadAsync();
-        using var none = new ServersViewModel(empty.Dashboard, empty.Navigation, empty.Localization);
+        using var none = new ServersViewModel(empty.Dashboard, empty.Navigation, empty.Localization, TestClock.Fake());
         Assert.False(none.ShowHiddenServersNote); // §13 112:14007: no note
     }
 
@@ -181,7 +181,7 @@ public sealed class Ui4Phase2Tests
         var gate = new TaskCompletionSource<IReadOnlyList<Server>>();
         kit.Servers.GetAllOverride = _ => gate.Task;
         var load = kit.Dashboard.LoadAsync();
-        using var directory = new ServersViewModel(kit.Dashboard, kit.Navigation, kit.Localization);
+        using var directory = new ServersViewModel(kit.Dashboard, kit.Navigation, kit.Localization, TestClock.Fake());
         Assert.Equal("A carregar os teus servidores…", directory.HeaderContextDisplay);
         gate.SetResult(kit.Servers.Servers.ToList());
         await load;

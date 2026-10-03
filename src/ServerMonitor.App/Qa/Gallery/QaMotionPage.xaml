@@ -30,7 +30,7 @@
                 <SplineDoubleKeyFrame KeyTime="{StaticResource SaMotionSlowDuration}" KeySpline="{StaticResource SaMotionDirectKeySpline}" Value="320" />
             </DoubleAnimationUsingKeyFrames>
         </Storyboard>
-        <!-- ServerFullCard's focus pulse shape (not migrated): ring up at FocusPeakTime, faded by FocusFadeEndTime. -->
+        <!-- The focus-pulse token shape (its UI.4 consumer was removed in UI.5): up at FocusPeakTime, faded by FocusFadeEndTime. -->
         <Storyboard x:Key="XamlFocusStoryboard">
             <DoubleAnimationUsingKeyFrames Storyboard.TargetName="XamlFocusBox" Storyboard.TargetProperty="Opacity">
                 <DiscreteDoubleKeyFrame KeyTime="0:0:0" Value="0" />

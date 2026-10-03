@@ -61,7 +61,7 @@ public sealed class Ui4AtlasTests
     {
         var kit = Ui4TestKit.Create(new Ui4TestKit.Fleet(), new ResWLocalizationService("pt-PT"));
         kit.Servers.GetAllOverride = _ => Task.FromException<IReadOnlyList<Server>>(new IOException("disk"));
-        using var directory = new ServersViewModel(kit.Dashboard, kit.Navigation, kit.Localization);
+        using var directory = new ServersViewModel(kit.Dashboard, kit.Navigation, kit.Localization, TestClock.Fake());
         Assert.True(kit.Dashboard.IsLoading);
         Assert.Equal("A carregar os teus servidores…", directory.HeaderContextDisplay);
 
@@ -91,7 +91,7 @@ public sealed class Ui4AtlasTests
         var options = new MonitoringOptions { Thresholds = MonitoringThresholds.Default with { DiskWarning = 50, DiskCritical = 60 } };
         var kit = Ui4TestKit.Create(new Ui4TestKit.Fleet().Add("db", ServerHealth.Critical, 10, 10, 55), options: options);
         await kit.Dashboard.LoadAsync();
-        using var directory = new ServersViewModel(kit.Dashboard, kit.Navigation, kit.Localization);
+        using var directory = new ServersViewModel(kit.Dashboard, kit.Navigation, kit.Localization, TestClock.Fake());
 
         Assert.Same(options.Thresholds, kit.Dashboard.Thresholds);
         Assert.Equal(ServerHealth.Warning, kit.Dashboard.OverviewServers.Single().DiskSeverity);

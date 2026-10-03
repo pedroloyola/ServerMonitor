@@ -152,12 +152,18 @@ public static class OverviewPresentation
     /// </summary>
     public static string Address(string host, int port)
     {
-        if (port == 22)
-        {
-            return host;
-        }
+        // Cortex B1 N-2: one IPv6-bracket rule - the Endpoint format whenever a port is shown.
+        return port == 22 ? host : Endpoint(host, port);
+    }
 
-        return host.Contains(':', StringComparison.Ordinal) && !host.StartsWith('[') ? $"[{host}]:{port}" : $"{host}:{port}";
+    /// <summary>
+    /// UI.5 A-13: the Detail page's address — the current <c>Endpoint</c> format, always "host:port" with no spaces, an
+    /// IPv6 literal bracketed (<c>[::1]:22</c>). The real configured endpoint, never invented.
+    /// </summary>
+    public static string Endpoint(string host, int port)
+    {
+        var value = host ?? string.Empty;
+        return value.Contains(':', StringComparison.Ordinal) && !value.StartsWith('[') ? $"[{value}]:{port}" : $"{value}:{port}";
     }
 
     /// <summary>

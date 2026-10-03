@@ -49,8 +49,11 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
         IBackgroundDegradationNotice backgroundDegradationNotice,
         IHistoryMaintenanceService historyMaintenance,
         IAppVersionProvider appVersionProvider,
-        ILogger<SettingsViewModel> logger)
+        ILogger<SettingsViewModel> logger,
+        PresentationClock clock)
     {
+        ArgumentNullException.ThrowIfNull(clock); // UI.5 fix round 4: required - the toast countdown never defaults to the system clock
+        _toastTimer = new TransientNoticeTimer(clock.TimeProvider);
         _themeService = themeService;
         AppVersion = appVersionProvider.DisplayVersion;
         _localizationService = localizationService;
@@ -68,6 +71,10 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
         _serverService.ServersChanged += OnServersChanged;
         _notificationSettingsService.NotificationsEnabledChanged += OnNotificationsEnabledChanged;
         BackCommand = new RelayCommand(navigationService.GoToDashboard);
+        // UI.5 Cortex 2: the in-page links between the two sub-pages (no sidebar until UI.6).
+        OpenDataCommand = new RelayCommand(() => navigationService.GoToSettings(SettingsSection.Data));
+        OpenAboutCommand = new RelayCommand(() => navigationService.GoToSettings(SettingsSection.About));
+        BackToGeneralCommand = new RelayCommand(() => navigationService.GoToSettings(SettingsSection.General));
         ResetIgnoredCommand = new AsyncRelayCommand(ResetIgnoredAsync);
         ClearHistoryCommand = new AsyncRelayCommand(ClearHistoryAsync);
         ResetHistoryCommand = new AsyncRelayCommand(ResetHistoryAsync);
@@ -85,9 +92,70 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
     /// <summary>Real product version for the About section (packaged identity or assembly fallback).</summary>
     public string AppVersion { get; }
 
+    /// <summary>Figma 112:8271 "Versão 1.1.1" with the REAL version (the Figma number is illustrative).</summary>
+    public string AboutVersionText => string.Format(
+        System.Globalization.CultureInfo.CurrentUICulture, _localizationService.GetString("SettingsAboutVersionFormat"), AppVersion);
+
+    private string? _toastTitle;
+    private string? _toastMessage;
+    private readonly TransientNoticeTimer _toastTimer;
+
+    /// <summary>
+    /// UI.5 (Figma §3.2 112:20712 / 112:21538 / 112:21293): the "Dados e servidores" page's transient success notice —
+    /// one at a time, the latest success wins. Fix round 2 (Boss decision 2, Cortex C1 N-C2): it closes itself after
+    /// <see cref="TransientNoticeTimer.Duration"/>, when the user closes it, and when the page is left
+    /// (<see cref="NotifyDataNavigatedFrom"/>) - a later visit never shows it again. Page-local (not a global toast
+    /// system); errors stay inline next to their setting.
+    /// </summary>
+    public bool IsToastOpen => _toastTitle is not null;
+
+    public string ToastTitle => _toastTitle ?? string.Empty;
+
+    public string ToastMessage => _toastMessage ?? string.Empty;
+
+    public string ToastCloseAutomationName => _localizationService.GetString("SettingsToastCloseName");
+
+    public ICommand DismissToastCommand => _dismissToastCommand ??= new RelayCommand(() => ShowToast(null, null));
+
+    private RelayCommand? _dismissToastCommand;
+
+    private void ShowToast(string? titleKey, string? messageKey)
+    {
+        if (titleKey is null)
+        {
+            _toastTimer.Cancel();
+            if (_toastTitle is null)
+            {
+                return;
+            }
+        }
+        else
+        {
+            _toastTimer.Start(() => ShowToast(null, null));
+        }
+
+        _toastTitle = titleKey is null ? null : _localizationService.GetString(titleKey);
+        _toastMessage = messageKey is null ? null : _localizationService.GetString(messageKey);
+        OnPropertyChanged(nameof(IsToastOpen));
+        OnPropertyChanged(nameof(ToastTitle));
+        OnPropertyChanged(nameof(ToastMessage));
+    }
+
     public ObservableCollection<HiddenServerItemViewModel> HiddenServers { get; } = [];
 
+    /// <summary>Beacon C1 M2: the hidden-servers list's accessible name (its card title).</summary>
+    public string HiddenServersListName => _localizationService.GetString("SettingsHiddenServersTitle.Text");
+
     public ICommand BackCommand { get; }
+
+    /// <summary>"Definições" → "Dados e servidores".</summary>
+    public ICommand OpenDataCommand { get; }
+
+    /// <summary>H-UI5-4: the "Sobre" disclosure in General opens Data with its About card in view.</summary>
+    public ICommand OpenAboutCommand { get; }
+
+    /// <summary>"Dados e servidores" → "Definições" (the Data page's breadcrumb parent).</summary>
+    public ICommand BackToGeneralCommand { get; }
 
     public ICommand ResetIgnoredCommand { get; }
 
@@ -175,13 +243,11 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>
-    /// The persistent half of the degradation UX: visible for as long as the session is degraded, even
-    /// after the InfoBar is dismissed. Bound to Visibility, so it is simply absent otherwise.
+    /// The persistent half of the degradation UX: true for as long as the session is degraded, even
+    /// after the InfoBar is dismissed; the view collapses the caption otherwise. (UI.5: a bool — view
+    /// models expose no WinUI Visibility.)
     /// </summary>
-    public Microsoft.UI.Xaml.Visibility IsBackgroundDegraded =>
-        _backgroundDegradationNotice.IsDegraded
-            ? Microsoft.UI.Xaml.Visibility.Visible
-            : Microsoft.UI.Xaml.Visibility.Collapsed;
+    public bool IsBackgroundDegraded => _backgroundDegradationNotice.IsDegraded;
 
     private void OnBackgroundDegradationChanged(object? sender, EventArgs args)
     {
@@ -207,6 +273,22 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
     /// </summary>
     public void NotifyNavigatedTo() =>
         IsBackgroundSectionRequested = _navigationService.ConsumeBackgroundSettingsFocus();
+
+    private bool _isAboutSectionRequested;
+
+    /// <summary>H-UI5-4: true when this visit of "Dados e servidores" was asked to bring the About card into view.</summary>
+    public bool IsAboutSectionRequested
+    {
+        get => _isAboutSectionRequested;
+        private set => SetProperty(ref _isAboutSectionRequested, value);
+    }
+
+    /// <summary>Called by the Data sub-page when it is navigated to (Loaded, or again while shown): consumes the About request.</summary>
+    public void NotifyDataNavigatedTo() =>
+        IsAboutSectionRequested = _navigationService.ConsumeAboutSettingsFocus();
+
+    /// <summary>Called by the Data sub-page when it is left (Unloaded): its transient toast ends with the visit.</summary>
+    public void NotifyDataNavigatedFrom() => ShowToast(null, null);
 
     /// <summary>
     /// Whether closing the window keeps ServerAlyzer monitoring in the background (M13 S2). This is the
@@ -331,7 +413,83 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
         set => SetProperty(ref _isHistoryResetErrorOpen, value);
     }
 
-    public async Task LoadAsync()
+    private readonly Lock _loadGate = new();
+    private Task? _loadTask;
+    private bool _reloadRequested;
+
+    /// <summary>
+    /// UI.5 §4: idempotent and safe under concurrency. Both sub-pages call it on Loaded and a ServersChanged can arrive
+    /// meanwhile; overlapping calls share ONE running load (single-flight) and a call made while it runs schedules exactly
+    /// one more pass afterwards, so the hidden-servers list is rebuilt from the newest data and never twice at once (no
+    /// duplicated or flickering rows). Ordering is established under one lock, never by timing.
+    /// </summary>
+    public Task LoadAsync()
+    {
+        TaskCompletionSource done;
+        lock (_loadGate)
+        {
+            if (_loadTask is { } running)
+            {
+                _reloadRequested = true;
+                return running;
+            }
+
+            _reloadRequested = false;
+            done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            _loadTask = done.Task;
+        }
+
+        _ = RunLoadsAsync(done);
+        return done.Task;
+    }
+
+    private async Task RunLoadsAsync(TaskCompletionSource done)
+    {
+        try
+        {
+            while (true)
+            {
+                try
+                {
+                    await LoadOnceAsync();
+                }
+                catch (Exception exception) when (exception is not OutOfMemoryException)
+                {
+                    // Cortex B1 N-7: never a silent success. LoadOnceAsync reports its own failures; anything that escapes
+                    // it is logged and surfaced through the same notice, and the next pass (if requested) still runs.
+                    _logger.LogError("Settings could not be loaded. Exception type: {ExceptionType}.", exception.GetType().Name);
+                    IsServerOperationErrorOpen = true;
+                }
+
+                lock (_loadGate)
+                {
+                    if (!_reloadRequested)
+                    {
+                        // Released under the same lock a new caller checks, so a request can never be lost in between.
+                        _loadTask = null;
+                        break;
+                    }
+
+                    _reloadRequested = false;
+                }
+            }
+        }
+        finally
+        {
+            lock (_loadGate)
+            {
+                // Defensive: an unexpected exception must not leave a finished load registered as running forever.
+                if (ReferenceEquals(_loadTask, done.Task))
+                {
+                    _loadTask = null;
+                }
+            }
+
+            done.TrySetResult();
+        }
+    }
+
+    private async Task LoadOnceAsync()
     {
         IsHistoryResetAvailable = !_historyMaintenance.IsAvailable;
         try
@@ -363,6 +521,7 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
         {
             await _discoveryService.ResetIgnoredAsync();
             IsResetIgnoredSuccessOpen = true;
+            ShowToast("SettingsResetIgnoredSuccess.Title", "SettingsResetIgnoredSuccess.Message");
         }
         catch (Exception exception)
         {
@@ -384,6 +543,8 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
             {
                 case HistoryClearOutcome.Cleared:
                     IsHistoryClearedOpen = true;
+                    // A-10: the feedback stays here, where the user acted (no implicit navigation to Histórico).
+                    ShowToast("SettingsHistoryClearedSuccess.Title", "SettingsHistoryClearedSuccess.Message");
                     break;
                 case HistoryClearOutcome.Unavailable:
                     IsHistoryClearErrorOpen = true;
@@ -399,7 +560,18 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
                 exception.GetType().Name);
             IsHistoryClearErrorOpen = true;
         }
+        finally
+        {
+            HistoryFocusRequested?.Invoke(this, HistoryAction.Clear);
+        }
     }
+
+    /// <summary>
+    /// Beacon C2 R2-M1: raised when a Limpar / Repor histórico ends - cancelled, done or failed. The command disabled its
+    /// button while the dialog was open, so the dialog could not hand focus back to it; the page refocuses it (or, after a
+    /// successful reset hid "Repor histórico", "Limpar histórico") - never the top of the page.
+    /// </summary>
+    public event EventHandler<HistoryAction>? HistoryFocusRequested;
 
     private async Task ResetHistoryAsync()
     {
@@ -412,6 +584,7 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
             {
                 case HistoryResetOutcome.Reset:
                     IsHistoryResetOpen = true;
+                    ShowToast("SettingsHistoryResetSuccess.Title", "SettingsHistoryResetSuccess.Message");
                     IsHistoryResetAvailable = false;
                     IsHistoryClearErrorOpen = false;
                     break;
@@ -429,6 +602,10 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
             IsHistoryResetErrorOpen = true;
             IsHistoryResetAvailable = true;
         }
+        finally
+        {
+            HistoryFocusRequested?.Invoke(this, HistoryAction.Reset);
+        }
     }
 
     private async Task RestoreAsync(Server server)
@@ -438,6 +615,10 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
             if (!await _serverService.RestoreAsync(server.Id))
             {
                 IsServerOperationErrorOpen = true;
+            }
+            else
+            {
+                ShowToast("SettingsServerRestoredTitle", "SettingsServerRestoredMessage");
             }
         }
         catch (Exception exception)
@@ -449,12 +630,16 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
     private void SetHiddenServers(IEnumerable<Server> servers)
     {
         HiddenServers.Clear();
-        foreach (var server in servers.OrderBy(server => server.CreatedAt))
+        var ordered = servers.OrderBy(server => server.CreatedAt).ToList();
+        for (var index = 0; index < ordered.Count; index++)
         {
+            var server = ordered[index];
             HiddenServers.Add(new HiddenServerItemViewModel(
                 server,
                 _localizationService,
-                () => RestoreAsync(server)));
+                () => RestoreAsync(server),
+                positionInSet: index + 1,
+                sizeOfSet: ordered.Count));
         }
 
         HasHiddenServers = HiddenServers.Count > 0;

@@ -800,4 +800,78 @@
             </Setter.Value>
         </Setter>
     </Style>
+    <!-- UI.5 small theme selector 112:7924: track 280x36 radius h/2, padding 0,4, gap 4 (consumer StackPanel Spacing 4),
+         its own measured SaSegmentedThemeTrackBrush (#616161@.20 / #FFF@.28; Prism C1 N-1). -->
+    <Style x:Key="SaSegmentedThemeTrackStyle" TargetType="Border">
+        <Setter Property="Height" Value="36" />
+        <Setter Property="Padding" Value="4,0" />
+        <Setter Property="CornerRadius" Value="18" />
+        <Setter Property="Background" Value="{ThemeResource SaSegmentedThemeTrackBrush}" />
+        <Setter Property="HorizontalAlignment" Value="Right" />
+    </Style>
+    <!-- UI.5 theme item 112:7925 / 112:7935: 88x28 radius h/2, icon 14 + text 11 (gap 5, the consumer's content); unselected
+         11 Regular muted, selected 11 Medium on SaSegmentedThemeSelectedBrush (#7A7A7A@.40 / #FFF@.90 measured, Prism C1
+         N-1), drop shadow not reproduced. The pill segment's template and states, with that selection brush. -->
+    <Style x:Key="SaSegmentedThemeItemStyle" TargetType="RadioButton" BasedOn="{StaticResource SaSegmentedPillItemStyle}">
+        <Setter Property="Height" Value="28" />
+        <Setter Property="Width" Value="88" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="CornerRadius" Value="14" />
+        <Setter Property="FontSize" Value="{StaticResource SaFontSizeHelper}" />
+        <Setter Property="FontWeight" Value="Normal" />
+        <!-- Prism C1 N-1: the pill template, painting the selection with the theme selector's own measured brush. -->
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RadioButton">
+                    <Grid x:Name="RootGrid" Background="Transparent">
+                        <VisualStateManager.VisualStateGroups>
+                            <VisualStateGroup x:Name="CommonStates">
+                                <VisualState x:Name="Normal" />
+                                <VisualState x:Name="PointerOver">
+                                    <VisualState.Setters>
+                                        <Setter Target="StateOverlay.Background" Value="{ThemeResource SaHoverBrush}" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Pressed">
+                                    <VisualState.Setters>
+                                        <!-- R1 (Beacon F-5): pressed = overlay only (one step above hover), no content opacity. -->
+                                        <Setter Target="StateOverlay.Background" Value="{ThemeResource SaSelectedBrush}" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Disabled">
+                                    <VisualState.Setters>
+                                        <Setter Target="RootGrid.Opacity" Value="0.58" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                            </VisualStateGroup>
+                            <VisualStateGroup x:Name="CheckStates">
+                                <VisualState x:Name="Unchecked" />
+                                <VisualState x:Name="Indeterminate" />
+                                <VisualState x:Name="Checked">
+                                    <VisualState.Setters>
+                                        <Setter Target="Shell.Background" Value="{ThemeResource SaSegmentedThemeSelectedBrush}" />
+                                        <Setter Target="ContentPresenter.Foreground" Value="{ThemeResource SaSelectedTextBrush}" />
+                                        <Setter Target="ContentPresenter.FontWeight" Value="Medium" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                            </VisualStateGroup>
+                        </VisualStateManager.VisualStateGroups>
+                        <Border x:Name="Shell" Background="{TemplateBinding Background}" CornerRadius="{TemplateBinding CornerRadius}" />
+                        <Border x:Name="StateOverlay" CornerRadius="{TemplateBinding CornerRadius}" IsHitTestVisible="False" />
+                        <ContentPresenter x:Name="ContentPresenter"
+                                          Padding="{TemplateBinding Padding}"
+                                          HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                                          Content="{TemplateBinding Content}"
+                                          ContentTemplate="{TemplateBinding ContentTemplate}"
+                                          FontFamily="{TemplateBinding FontFamily}"
+                                          FontSize="{TemplateBinding FontSize}"
+                                          FontWeight="{TemplateBinding FontWeight}"
+                                          Foreground="{TemplateBinding Foreground}"
+                                          AutomationProperties.AccessibilityView="Raw" />
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
 </ResourceDictionary>

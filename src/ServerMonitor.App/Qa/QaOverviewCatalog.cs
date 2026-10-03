@@ -11,13 +11,21 @@ namespace ServerMonitor.App.Qa;
 /// <summary>One synthetic server of an overview scenario: configuration, retained snapshot (null = no data) and state.</summary>
 internal sealed record QaOverviewServer(Server Server, ServerMetricsSnapshot? Snapshot, ServerMonitoringState State);
 
-/// <summary>A whole overview scenario: the servers (hidden ones included), the discovery seed and whether the load hangs.</summary>
+/// <summary>
+/// A whole overview scenario: the servers (hidden ones included), the discovery seed and whether the load hangs. UI.5:
+/// <see cref="Mutable"/> makes hide / restore / remove really change the in-memory list and a refresh really produce a
+/// fresh reading (<see cref="OperationsSucceed"/>), or fail on request; <see cref="ConnectionStates"/> seeds the
+/// connection-state store (auth / host-key results, which the monitoring state cannot represent).
+/// </summary>
 internal sealed record QaOverviewScenario(
     string Name,
     IReadOnlyList<QaOverviewServer> Servers,
     IReadOnlyList<DiscoveredService> Discovered,
     bool NeverLoads,
-    TimeSpan? VanishAfter = null);
+    TimeSpan? VanishAfter = null,
+    bool Mutable = false,
+    bool OperationsSucceed = false,
+    IReadOnlyDictionary<Guid, ServerConnectionState>? ConnectionStates = null);
 
 /// <summary>
 /// UI.4 §6: deterministic, synthetic data for the Visão geral and Servidores screens. A FIXED clock (<see cref="Now"/>)
@@ -94,9 +102,109 @@ internal static class QaOverviewCatalog
         // Beacon r1 / Prism C4: the Servidores empty state only appears when the servers go away WITH the page open.
         "vanishing" => Build("mixed") with { Name = name, VanishAfter = TimeSpan.FromSeconds(30) },
 
+        // UI.5 Server Detail: one server per state, over mutating doubles (operations succeed / fail on request).
+        "detail" => Detail(name, operationsSucceed: true),
+        "detail-failing" => Detail(name, operationsSucceed: false),
+
+        // UI.5 Settings "Dados e servidores": hidden servers to restore (succeeding / failing). Requires --qa-backup.
+        "data" => Data(name, operationsSucceed: true),
+        "data-failing" => Data(name, operationsSucceed: false),
+
         _ => throw new ArgumentOutOfRangeException(nameof(name), name,
             $"Unknown overview scenario. Known: {string.Join(", ", QaOverviewScenarioPolicy.Scenarios)}.")
     };
+
+    private static QaOverviewScenario Detail(string name, bool operationsSucceed)
+    {
+        var scenario = Scenario(name,
+            Healthy("prod-web-01", "prod-web-01.local", cpu: 22, mem: 41, disk: 52) is var web
+                ? web with
+                {
+                    // Byte counts consistent with the percentages (41% of 16 GB, 52% of 500 GB): the cards' captions.
+                    Snapshot = web.Snapshot! with
+                    {
+                        Uptime = TimeSpan.FromDays(12).Add(TimeSpan.FromHours(4)),
+                        OperatingSystemName = "Ubuntu",
+                        OperatingSystemVersion = "24.04 LTS",
+                        MemoryUsedBytes = (long)(16L * 1024 * 1024 * 1024 * 0.41),
+                        MemoryTotalBytes = 16L * 1024 * 1024 * 1024,
+                        DiskUsedBytes = (long)(500L * 1024 * 1024 * 1024 * 0.52),
+                        DiskTotalBytes = 500L * 1024 * 1024 * 1024
+                    }
+                }
+                : throw new InvalidOperationException(),
+            Make("prod-db-01", "prod-db-01.local", cpu: 46, mem: 71, disk: 88, ServerHealth.Warning),
+            Make("cache-01", "cache-01.local", cpu: 97, mem: 70, disk: 30, ServerHealth.Critical),
+            Offline("backup-nas", "backup-nas.local", withPriorSnapshot: true),
+            Offline("lab-pi", "lab-pi.local", withPriorSnapshot: false),
+            Unknown("new-01", "new-01.local", lastError: null),
+            Unknown("broken-01", "broken-01.local", lastError: MetricsCollectionErrorCode.NoMetricsAvailable),
+            Make("partial-01", "partial-01.local", cpu: null, mem: 64, disk: null, ServerHealth.Healthy),
+            Unknown("win-01", "win-01.local", lastError: null, os: ServerOperatingSystem.Unknown),
+            Make("busy-01", "busy-01.local", cpu: 35, mem: 40, disk: 45, ServerHealth.Healthy) is var busy
+                ? busy with { State = busy.State with { IsRefreshing = true } }
+                : throw new InvalidOperationException(),
+            Unknown("auth-01", "auth-01.local", lastError: MetricsCollectionErrorCode.ConnectionFailed),
+            Unknown("hostkey-new-01", "hostkey-new-01.local", lastError: MetricsCollectionErrorCode.ConnectionFailed),
+            Unknown("hostkey-changed-01", "hostkey-changed-01.local", lastError: MetricsCollectionErrorCode.ConnectionFailed),
+            Routed("internal-01", "internal-01.local", jumpHost: "bastion.local", cpu: 18, mem: 33, disk: 47),
+            Ipv6("v6-01", "2001:db8::10", cpu: 14, mem: 29, disk: 36),
+            Hidden("old-build-01", "old-build-01.local"));
+        return scenario with
+        {
+            Mutable = true,
+            OperationsSucceed = operationsSucceed,
+            ConnectionStates = new Dictionary<Guid, ServerConnectionState>
+            {
+                [StableId("auth-01")] = ServerConnectionState.AuthenticationFailed,
+                [StableId("hostkey-new-01")] = ServerConnectionState.HostKeyUnknown,
+                [StableId("hostkey-changed-01")] = ServerConnectionState.HostKeyMismatch,
+                [StableId("prod-web-01")] = ServerConnectionState.Connected,
+                [StableId("internal-01")] = ServerConnectionState.Connected
+            }
+        };
+    }
+
+    /// <summary>
+    /// UI.5 H-UI5-3 harness: deterministic SYNTHETIC CPU history for the Detail pulse (the real app reads its local history;
+    /// the harness has none). prod-web-01 has more than 30 samples (one hour at the 30 s policy, with one unmeasured gap),
+    /// prod-db-01 has 12 (fewer than 30: right-aligned, never padded); every other server has none (no bars).
+    /// </summary>
+    public static IReadOnlyList<(DateTimeOffset At, double? Cpu)> CpuHistory(string scenario, Guid serverId)
+    {
+        if (scenario is not ("detail" or "detail-failing"))
+        {
+            return [];
+        }
+
+        var count = serverId == StableId("prod-web-01") ? 40 : serverId == StableId("prod-db-01") ? 12 : 0;
+        var samples = new List<(DateTimeOffset, double?)>(count);
+        for (var i = 0; i < count; i++)
+        {
+            // A smooth, bounded wave around the snapshot's value; one offline gap (null) in the longer series.
+            double? value = count == 40 && i == 17 ? null : Math.Round(22 + (9 * Math.Sin(i * 0.7)) + (i % 5), 1);
+            samples.Add((LastSuccess.AddSeconds(-30 * (count - 1 - i)), value));
+        }
+
+        return samples;
+    }
+
+    private static QaOverviewScenario Data(string name, bool operationsSucceed) =>
+        Scenario(name,
+            Healthy("prod-web-01", "prod-web-01.local", cpu: 22, mem: 41, disk: 52),
+            Healthy("prod-db-01", "prod-db-01.local", cpu: 31, mem: 63, disk: 71),
+            Hidden("old-build-01", "old-build-01.local"),
+            Hidden("legacy-mail", "legacy-mail.local"),
+            Hidden("test-vm-03", "192.0.2.33")) with { Mutable = true, OperationsSucceed = operationsSucceed };
+
+    private static QaOverviewServer Routed(string name, string host, string jumpHost, double cpu, double mem, double disk) =>
+        Make(name, host, cpu, mem, disk, ServerHealth.Healthy) is var routed
+            ? routed with { Server = routed.Server with { Route = new ServerRoute { Jump = new JumpHop { Host = jumpHost, Username = "qa" } } } }
+            : throw new InvalidOperationException();
+
+    // RFC 3849 documentation prefix, non-default port so the A-13 "[host]:port" form is visible.
+    private static QaOverviewServer Ipv6(string name, string host, double cpu, double mem, double disk) =>
+        Make(name, host, cpu, mem, disk, ServerHealth.Healthy, port: 2222);
 
     private static QaOverviewScenario Scenario(string name, params QaOverviewServer[] servers)
     {
@@ -222,7 +330,7 @@ internal static class QaOverviewCatalog
         RefreshIntervalSeconds = 30
     };
 
-    private static Guid StableId(string name)
+    internal static Guid StableId(string name)
     {
         var bytes = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes("qa-overview:" + name))[..16];
         return new Guid(bytes);

@@ -2,460 +2,351 @@
     x:Class="ServerMonitor.App.Views.SettingsPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:controls="using:ServerMonitor.App.Controls">
-    <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <StackPanel
-            Padding="{StaticResource PagePadding}"
-            Spacing="20">
-            <!-- Header -->
-            <Grid ColumnSpacing="12">
+    xmlns:converters="using:ServerMonitor.App.Converters"
+    xmlns:primitives="using:ServerMonitor.App.Controls.Primitives"
+    primitives:SaThemeRefresh.IsEnabled="True">
+    <!-- UI.5 "Definições", Figma 112:7909 (D) / 112:8003 (L): header, three sections (title 17 + glass card of setting
+         rows: label 14 Medium + description 12 | control at the right), two disclosures, local-preferences footer.
+         Below 700 the control of each row moves under its text (SPEC §5). -->
+    <Page.Resources>
+        <converters:IndexToBooleanConverter x:Key="IndexToBooleanConverter" />
+    </Page.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <VisualStateManager.VisualStateGroups>
+            <VisualStateGroup x:Name="WidthStates">
+                <VisualState x:Name="Wide">
+                    <VisualState.StateTriggers>
+                        <AdaptiveTrigger MinWindowWidth="700" />
+                    </VisualState.StateTriggers>
+                </VisualState>
+                <!-- < 700: compact padding; each control under its text; the disclosures stacked; autosave under the title. -->
+                <VisualState x:Name="Narrow">
+                    <VisualState.StateTriggers>
+                        <AdaptiveTrigger MinWindowWidth="0" />
+                    </VisualState.StateTriggers>
+                    <VisualState.Setters>
+                        <Setter Target="PageRoot.Padding" Value="{StaticResource SaPagePaddingCompact}" />
+                        <Setter Target="AutosaveText.(Grid.Row)" Value="1" />
+                        <Setter Target="AutosaveText.(Grid.Column)" Value="1" />
+                        <Setter Target="AutosaveText.HorizontalAlignment" Value="Left" />
+                        <Setter Target="ThemeControl.(Grid.Row)" Value="1" />
+                        <Setter Target="ThemeControl.(Grid.Column)" Value="0" />
+                        <Setter Target="ThemeControl.HorizontalAlignment" Value="Left" />
+                        <Setter Target="LanguageControl.(Grid.Row)" Value="1" />
+                        <Setter Target="LanguageControl.(Grid.Column)" Value="0" />
+                        <Setter Target="LanguageControl.HorizontalAlignment" Value="Left" />
+                        <Setter Target="BackgroundControl.(Grid.Row)" Value="1" />
+                        <Setter Target="BackgroundControl.(Grid.Column)" Value="0" />
+                        <Setter Target="BackgroundControl.HorizontalAlignment" Value="Left" />
+                        <Setter Target="NotificationsControl.(Grid.Row)" Value="1" />
+                        <Setter Target="NotificationsControl.(Grid.Column)" Value="0" />
+                        <Setter Target="NotificationsControl.HorizontalAlignment" Value="Left" />
+                        <Setter Target="CompactControl.(Grid.Row)" Value="1" />
+                        <Setter Target="CompactControl.(Grid.Column)" Value="0" />
+                        <Setter Target="CompactControl.HorizontalAlignment" Value="Left" />
+                        <Setter Target="TopmostControl.(Grid.Row)" Value="1" />
+                        <Setter Target="TopmostControl.(Grid.Column)" Value="0" />
+                        <Setter Target="TopmostControl.HorizontalAlignment" Value="Left" />
+                        <!-- Prism C1 M-8: once the control sits under its text, the next row starts 16 below it. -->
+                        <Setter Target="ThemeRow.Margin" Value="0,0,0,16" />
+                        <Setter Target="BackgroundSection.Margin" Value="0,0,0,16" />
+                        <Setter Target="CompactRow.Margin" Value="0,0,0,16" />
+                        <Setter Target="DisclosureColumn2.Width" Value="0" />
+                        <Setter Target="DisclosureGrid.ColumnSpacing" Value="0" />
+                        <Setter Target="DisclosureGrid.RowSpacing" Value="{StaticResource SaSpace12}" />
+                        <Setter Target="AboutDisclosure.(Grid.Column)" Value="0" />
+                        <Setter Target="AboutDisclosure.(Grid.Row)" Value="1" />
+                    </VisualState.Setters>
+                </VisualState>
+            </VisualStateGroup>
+        </VisualStateManager.VisualStateGroups>
+        <StackPanel x:Name="PageRoot" Padding="{StaticResource SaPagePadding}" Spacing="{StaticResource SaSpace20}">
+
+            <!-- Settings header 112:7910: [back, DERIVED until UI.6's sidebar] title 32 + "À tua medida." | autosave 11. -->
+            <Grid ColumnSpacing="{StaticResource SaSpace16}" RowSpacing="{StaticResource SaSpace4}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
                 <Button
                     x:Uid="SettingsBackButton"
                     VerticalAlignment="Center"
                     Command="{Binding BackCommand}"
-                    Style="{StaticResource SubtleIconButtonStyle}">
-                    <SymbolIcon Symbol="Back" />
+                    Style="{StaticResource SaIconButtonSmallStyle}">
+                    <primitives:SaIcon Data="{StaticResource SaIconArrowRight01Data}" Size="18" RenderTransformOrigin="0.5,0.5">
+                        <primitives:SaIcon.RenderTransform>
+                            <RotateTransform Angle="180" />
+                        </primitives:SaIcon.RenderTransform>
+                    </primitives:SaIcon>
                 </Button>
-                <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
-                    <TextBlock
-                        x:Uid="SettingsTitle"
-                        AutomationProperties.HeadingLevel="Level1"
-                        Style="{StaticResource PageTitleTextStyle}" />
-                    <TextBlock
-                        x:Uid="SettingsSubtitle"
-                        FontSize="13"
-                        Foreground="{ThemeResource TextSecondaryBrush}" />
+                <StackPanel Grid.Column="1" Spacing="{StaticResource SaSpace4}" VerticalAlignment="Center">
+                    <TextBlock x:Uid="SettingsTitle" AutomationProperties.HeadingLevel="Level1" Style="{StaticResource SaPageTitleTextStyle}" />
+                    <TextBlock x:Uid="SettingsSubtitle" Style="{StaticResource SaControlTextStyle}" FontWeight="Normal"
+                               Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap" />
                 </StackPanel>
+                <!-- A-9: a fixed label; a failed save shows its own notice next to the setting (the label never claims success). -->
+                <TextBlock x:Name="AutosaveText" x:Uid="SettingsAutosave" Grid.Column="2" VerticalAlignment="Center"
+                           Style="{StaticResource SaHelperTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" />
             </Grid>
 
             <!-- A configuration write was refused because a restore holds the configuration (M14.6). -->
-            <InfoBar
-                IsClosable="True"
-                IsOpen="{Binding IsConfigurationLockedOpen, Mode=TwoWay}"
+            <primitives:SaInlineNotice
+                Severity="Error"
                 Message="{Binding ConfigurationLockedMessage}"
-                Severity="Warning" />
+                Visibility="{Binding IsConfigurationLockedOpen, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
-            <!-- Main Glass Settings Card -->
-            <controls:GlassCard>
-                <StackPanel Spacing="20">
-                    <!-- Appearance Section -->
-                    <StackPanel Spacing="10">
-                        <StackPanel Spacing="2">
-                            <TextBlock
-                                x:Uid="SettingsAppearanceTitle"
-                                AutomationProperties.HeadingLevel="Level2"
-                                Style="{StaticResource SectionTitleTextStyle}" />
-                            <TextBlock
-                                x:Uid="SettingsAppearanceDescription"
-                                FontSize="12"
-                                Foreground="{ThemeResource TextSecondaryBrush}"
-                                TextWrapping="Wrap" />
-                        </StackPanel>
-                        <ComboBox
-                            x:Uid="SettingsThemePicker"
-                            HorizontalAlignment="Stretch"
-                            MaxWidth="400"
-                            CornerRadius="{StaticResource RadiusSmall}"
-                            SelectedIndex="{Binding SelectedThemeIndex, Mode=TwoWay}">
-                            <ComboBoxItem x:Uid="ThemeSystemOption" />
-                            <ComboBoxItem x:Uid="ThemeLightOption" />
-                            <ComboBoxItem x:Uid="ThemeDarkOption" />
-                        </ComboBox>
-                    </StackPanel>
-
-                    <Border Height="1" Background="{ThemeResource GlassBorderBrush}" />
-
-                    <!-- Language Section -->
-                    <StackPanel Spacing="10">
-                        <StackPanel Spacing="2">
-                            <TextBlock
-                                x:Uid="SettingsLanguageTitle"
-                                AutomationProperties.HeadingLevel="Level2"
-                                Style="{StaticResource SectionTitleTextStyle}" />
-                            <TextBlock
-                                x:Uid="SettingsLanguageDescription"
-                                FontSize="12"
-                                Foreground="{ThemeResource TextSecondaryBrush}"
-                                TextWrapping="Wrap" />
-                        </StackPanel>
-                        <ComboBox
-                            x:Uid="SettingsLanguagePicker"
-                            HorizontalAlignment="Stretch"
-                            MaxWidth="400"
-                            CornerRadius="{StaticResource RadiusSmall}"
-                            SelectedIndex="{Binding SelectedLanguageIndex, Mode=TwoWay}">
-                            <ComboBoxItem x:Uid="LanguageSystemOption" />
-                            <ComboBoxItem x:Uid="LanguageBrazilianPortugueseOption" />
-                            <ComboBoxItem x:Uid="LanguageEuropeanPortugueseOption" />
-                            <ComboBoxItem x:Uid="LanguageEnglishOption" />
-                        </ComboBox>
-                        <InfoBar
+            <!-- Section / Aparência 112:7916 -->
+            <StackPanel Spacing="10">
+                <TextBlock x:Uid="SettingsAppearanceTitle" AutomationProperties.HeadingLevel="Level2" Style="{StaticResource SaCardTitleTextStyle}" />
+                <Border Style="{StaticResource SaGlassSurfaceStyle}">
+                    <StackPanel>
+                        <!-- Setting / Tema 112:7919: small theme selector 112:7924 (ThemeService, not persisted - THEME-1). -->
+                        <Grid x:Name="ThemeRow" MinHeight="54" ColumnSpacing="{StaticResource SaSpace16}" RowSpacing="{StaticResource SaSpace8}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <StackPanel Spacing="{StaticResource SaSpace4}" VerticalAlignment="Center">
+                                <TextBlock x:Uid="SettingsThemeTitle" AutomationProperties.HeadingLevel="Level3" Style="{StaticResource SaPrimaryBodyTextStyle}" FontWeight="Medium" />
+                                <TextBlock x:Uid="SettingsAppearanceDescription" Style="{StaticResource SaCaptionTextStyle}"
+                                           Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <Border x:Name="ThemeControl" Grid.Column="1" Style="{StaticResource SaSegmentedThemeTrackStyle}" VerticalAlignment="Center">
+                                <!-- Beacon C1 N1: the UI.2 segmented keyboard contract - one Tab stop, entry on the selected item,
+                                     the arrows move AND select (SaGroupNavigation). -->
+                                <StackPanel x:Uid="SettingsThemeGroup" Orientation="Horizontal" Spacing="{StaticResource SaSpace4}"
+                                            primitives:SaGroupNavigation.Mode="SelectionFollowsFocus">
+                                    <RadioButton x:Uid="ThemeSystemOption" GroupName="SettingsTheme" Style="{StaticResource SaSegmentedThemeItemStyle}"
+                                                 IsChecked="{Binding SelectedThemeIndex, Mode=TwoWay, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=0}">
+                                        <StackPanel Orientation="Horizontal" Spacing="5">
+                                            <primitives:SaIcon Data="{StaticResource SaIconComputerData}" Size="14" VerticalAlignment="Center" />
+                                            <TextBlock x:Uid="ThemeSystemOptionText" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </RadioButton>
+                                    <RadioButton x:Uid="ThemeLightOption" GroupName="SettingsTheme" Style="{StaticResource SaSegmentedThemeItemStyle}"
+                                                 IsChecked="{Binding SelectedThemeIndex, Mode=TwoWay, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=1}">
+                                        <StackPanel Orientation="Horizontal" Spacing="5">
+                                            <primitives:SaIcon Data="{StaticResource SaIconSun03Data}" Size="14" VerticalAlignment="Center" />
+                                            <TextBlock x:Uid="ThemeLightOptionText" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </RadioButton>
+                                    <RadioButton x:Uid="ThemeDarkOption" GroupName="SettingsTheme" Style="{StaticResource SaSegmentedThemeItemStyle}"
+                                                 IsChecked="{Binding SelectedThemeIndex, Mode=TwoWay, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=2}">
+                                        <StackPanel Orientation="Horizontal" Spacing="5">
+                                            <primitives:SaIcon Data="{StaticResource SaIconMoon02Data}" Size="14" VerticalAlignment="Center" />
+                                            <TextBlock x:Uid="ThemeDarkOptionText" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </RadioButton>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                        <!-- Setting / Idioma 112:7939: selector pill 250×36 with the 4 options (A-14); fixed description (A-15),
+                             and the restart notice still appears after a change. -->
+                        <Grid MinHeight="54" ColumnSpacing="{StaticResource SaSpace16}" RowSpacing="{StaticResource SaSpace8}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <StackPanel Spacing="{StaticResource SaSpace4}" VerticalAlignment="Center">
+                                <TextBlock x:Uid="SettingsLanguageTitle" AutomationProperties.HeadingLevel="Level3" Style="{StaticResource SaPrimaryBodyTextStyle}" FontWeight="Medium" />
+                                <TextBlock x:Uid="SettingsLanguageDescription" Style="{StaticResource SaCaptionTextStyle}"
+                                           Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <ComboBox x:Name="LanguageControl" x:Uid="SettingsLanguagePicker" Grid.Column="1" Width="250" VerticalAlignment="Center"
+                                      Style="{StaticResource SaSelectorPillStyle}"
+                                      SelectedIndex="{Binding SelectedLanguageIndex, Mode=TwoWay}">
+                                <ComboBoxItem x:Uid="LanguageSystemOption" />
+                                <ComboBoxItem x:Uid="LanguageBrazilianPortugueseOption" />
+                                <ComboBoxItem x:Uid="LanguageEuropeanPortugueseOption" />
+                                <ComboBoxItem x:Uid="LanguageEnglishOption" />
+                            </ComboBox>
+                        </Grid>
+                        <primitives:SaInlineNotice
                             x:Uid="SettingsRestartNotice"
-                            IsClosable="True"
-                            IsOpen="{Binding IsRestartNoticeOpen, Mode=TwoWay}"
-                            Severity="Informational" />
+                            Margin="0,8,0,0"
+                            Severity="Info"
+                            AutomationProperties.LiveSetting="Polite"
+                            Visibility="{Binding IsRestartNoticeOpen, Converter={StaticResource BooleanToVisibilityConverter}}" />
                     </StackPanel>
+                </Border>
+            </StackPanel>
 
-                    <Border Height="1" Background="{ThemeResource GlassBorderBrush}" />
-
-                    <!-- Background Section. The durable explanation of the background lifecycle: the
-                         one-time toast is a courtesy that may never arrive (notifications can be off),
-                         so this is what the user can always come back to (M13 S2 D.1). -->
-                    <StackPanel x:Name="BackgroundSection" Spacing="10">
-                        <StackPanel Spacing="2">
-                            <TextBlock
-                                x:Uid="SettingsBackgroundTitle"
-                                AutomationProperties.HeadingLevel="Level2"
-                                Style="{StaticResource SectionTitleTextStyle}" />
-                            <TextBlock
-                                x:Uid="SettingsBackgroundDescription"
-                                FontSize="12"
-                                Foreground="{ThemeResource TextSecondaryBrush}"
-                                TextWrapping="Wrap" />
-                        </StackPanel>
-
-                        <ToggleSwitch
-                            x:Uid="SettingsBackgroundToggle"
-                            HorizontalAlignment="Left"
-                            MinHeight="36"
-                            IsOn="{Binding BackgroundMonitoringEnabled, Mode=TwoWay}" />
-
-                        <!-- STATE, not event: a short caption that survives closing the InfoBar, so the
-                             answer is still there when the user comes back asking why X quits the app.
-                             The toggle above stays enabled and keeps the persisted value: the preference
-                             did not change, it just has no effect this session. -->
+            <!-- Section / Monitorização 112:7948. The Background row keeps the durable explanation of the background
+                 lifecycle (M13 S2 D.1): the toggle's HelpText, the degraded caption and notice. -->
+            <StackPanel Spacing="10">
+                <TextBlock x:Uid="SettingsMonitoringTitle" AutomationProperties.HeadingLevel="Level2" Style="{StaticResource SaCardTitleTextStyle}" />
+                <Border Style="{StaticResource SaGlassSurfaceStyle}">
+                    <StackPanel>
+                        <Grid x:Name="BackgroundSection" MinHeight="50" ColumnSpacing="{StaticResource SaSpace16}" RowSpacing="{StaticResource SaSpace8}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <StackPanel Spacing="{StaticResource SaSpace4}" VerticalAlignment="Center">
+                                <TextBlock x:Uid="SettingsBackgroundTitle" AutomationProperties.HeadingLevel="Level3" Style="{StaticResource SaPrimaryBodyTextStyle}" FontWeight="Medium" />
+                                <TextBlock x:Uid="SettingsBackgroundDescription" Style="{StaticResource SaCaptionTextStyle}"
+                                           Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <ToggleSwitch x:Name="BackgroundControl" x:Uid="SettingsBackgroundToggle" Grid.Column="1" VerticalAlignment="Center"
+                                          Style="{StaticResource SaToggleSwitchStyle}"
+                                          IsOn="{Binding BackgroundMonitoringEnabled, Mode=TwoWay}" />
+                        </Grid>
+                        <!-- STATE, not event: the caption survives closing the notice. -->
                         <TextBlock
                             x:Uid="SettingsBackgroundDegradedCaption"
+                            Margin="0,4,0,0"
                             AutomationProperties.LiveSetting="Polite"
-                            FontSize="12"
-                            Foreground="{ThemeResource TextSecondaryBrush}"
+                            Style="{StaticResource SaCaptionTextStyle}"
+                            Foreground="{ThemeResource SaTextSecondaryBrush}"
                             TextWrapping="Wrap"
-                            Visibility="{Binding IsBackgroundDegraded, Mode=OneWay}" />
-
-                        <!-- EVENT: the same closable warning for both moments — the icon failing at
-                             startup and the icon being lost later. The user needs the same understanding
-                             and the same action in both, so there is one text, not two. -->
+                            Visibility="{Binding IsBackgroundDegraded, Mode=OneWay, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                        <!-- EVENT: the closable warning for both moments (icon failed at startup / lost later). Kept as the
+                             M13 InfoBar: it is dismissable by design (Is…NoticeOpen two-way). -->
                         <InfoBar
                             x:Uid="BackgroundDegradedNotice"
+                            Margin="0,8,0,0"
                             IsClosable="True"
                             IsOpen="{Binding IsBackgroundDegradedNoticeOpen, Mode=TwoWay}"
+                            Visibility="{Binding IsBackgroundDegradedNoticeOpen, Converter={StaticResource BooleanToVisibilityConverter}}"
                             Severity="Warning" />
-                    </StackPanel>
-
-                    <Border Height="1" Background="{ThemeResource GlassBorderBrush}" />
-
-                    <!-- Health Notifications Section -->
-                    <StackPanel Spacing="10">
-                        <StackPanel Spacing="2">
-                            <TextBlock
-                                x:Uid="SettingsNotificationsTitle"
-                                AutomationProperties.HeadingLevel="Level2"
-                                Style="{StaticResource SectionTitleTextStyle}" />
-                            <TextBlock
-                                x:Uid="SettingsNotificationsDescription"
-                                FontSize="12"
-                                Foreground="{ThemeResource TextSecondaryBrush}"
-                                TextWrapping="Wrap" />
-                        </StackPanel>
-
-                        <ToggleSwitch
-                            x:Uid="SettingsNotificationsToggle"
-                            HorizontalAlignment="Left"
-                            MinHeight="36"
-                            IsOn="{Binding NotificationsEnabled, Mode=TwoWay}" />
-
-                        <InfoBar
+                        <Grid MinHeight="50" ColumnSpacing="{StaticResource SaSpace16}" RowSpacing="{StaticResource SaSpace8}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <StackPanel Spacing="{StaticResource SaSpace4}" VerticalAlignment="Center">
+                                <TextBlock x:Uid="SettingsNotificationsTitle" AutomationProperties.HeadingLevel="Level3" Style="{StaticResource SaPrimaryBodyTextStyle}" FontWeight="Medium" />
+                                <TextBlock x:Uid="SettingsNotificationsDescription" Style="{StaticResource SaCaptionTextStyle}"
+                                           Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <ToggleSwitch x:Name="NotificationsControl" x:Uid="SettingsNotificationsToggle" Grid.Column="1" VerticalAlignment="Center"
+                                          Style="{StaticResource SaToggleSwitchStyle}"
+                                          IsOn="{Binding NotificationsEnabled, Mode=TwoWay}" />
+                        </Grid>
+                        <!-- A-9: a failed save is reported next to the setting. -->
+                        <primitives:SaInlineNotice
                             x:Uid="SettingsNotificationsSaveError"
-                            IsClosable="True"
-                            IsOpen="{Binding IsNotificationSettingsErrorOpen, Mode=TwoWay}"
-                            Severity="Error" />
+                            Margin="0,8,0,0"
+                            Severity="Error"
+                            Visibility="{Binding IsNotificationSettingsErrorOpen, Converter={StaticResource BooleanToVisibilityConverter}}" />
                     </StackPanel>
+                </Border>
+            </StackPanel>
 
-                    <Border Height="1" Background="{ThemeResource GlassBorderBrush}" />
-
-                    <!-- Compact Mode Section -->
-                    <StackPanel Spacing="10">
-                        <StackPanel Spacing="2">
-                            <TextBlock
-                                x:Uid="SettingsCompactTitle"
-                                AutomationProperties.HeadingLevel="Level2"
-                                Style="{StaticResource SectionTitleTextStyle}" />
-                            <TextBlock
-                                x:Uid="SettingsCompactDescription"
-                                FontSize="12"
-                                Foreground="{ThemeResource TextSecondaryBrush}"
-                                TextWrapping="Wrap" />
-                        </StackPanel>
-
-                        <Button
-                            x:Uid="SettingsEnterCompactButton"
-                            HorizontalAlignment="Left"
-                            Command="{x:Bind WindowMode.EnterCompactCommand}"
-                            Style="{StaticResource QuietPillButtonStyle}" />
-
-                        <ToggleSwitch
-                            x:Uid="SettingsAlwaysOnTopToggle"
-                            HorizontalAlignment="Left"
-                            MinHeight="36"
-                            IsOn="{x:Bind WindowMode.CompactAlwaysOnTop, Mode=TwoWay}" />
+            <!-- Section / Janela 112:7965 -->
+            <StackPanel Spacing="10">
+                <TextBlock x:Uid="SettingsWindowTitle" AutomationProperties.HeadingLevel="Level2" Style="{StaticResource SaCardTitleTextStyle}" />
+                <Border Style="{StaticResource SaGlassSurfaceStyle}">
+                    <StackPanel>
+                        <Grid x:Name="CompactRow" MinHeight="44" ColumnSpacing="{StaticResource SaSpace16}" RowSpacing="{StaticResource SaSpace8}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <StackPanel Spacing="{StaticResource SaSpace4}" VerticalAlignment="Center">
+                                <TextBlock x:Uid="SettingsCompactTitle" AutomationProperties.HeadingLevel="Level3" Style="{StaticResource SaPrimaryBodyTextStyle}" FontWeight="Medium" />
+                                <TextBlock x:Uid="SettingsCompactDescription" Style="{StaticResource SaCaptionTextStyle}"
+                                           Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <!-- "Entrar ›" 112:7973: compact pill 152×34. -->
+                            <Button x:Name="CompactControl" x:Uid="SettingsEnterCompactButton" Grid.Column="1" Width="152" VerticalAlignment="Center"
+                                    Style="{StaticResource SaPillButtonXSmallStyle}"
+                                    Command="{x:Bind WindowMode.EnterCompactCommand}">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <TextBlock x:Uid="SettingsEnterCompactButtonText" VerticalAlignment="Center" />
+                                    <primitives:SaIcon Data="{StaticResource SaIconArrowRight01Data}" Size="15" VerticalAlignment="Center"
+                                                       Foreground="{ThemeResource SaTextSecondaryBrush}" />
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+                        <Grid MinHeight="44" ColumnSpacing="{StaticResource SaSpace16}" RowSpacing="{StaticResource SaSpace8}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <StackPanel Spacing="{StaticResource SaSpace4}" VerticalAlignment="Center">
+                                <TextBlock x:Uid="SettingsAlwaysOnTopTitle" AutomationProperties.HeadingLevel="Level3" Style="{StaticResource SaPrimaryBodyTextStyle}" FontWeight="Medium" />
+                                <TextBlock x:Uid="SettingsAlwaysOnTopDescription" Style="{StaticResource SaCaptionTextStyle}"
+                                           Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <ToggleSwitch x:Name="TopmostControl" x:Uid="SettingsAlwaysOnTopToggle" Grid.Column="1" VerticalAlignment="Center"
+                                          Style="{StaticResource SaToggleSwitchStyle}"
+                                          IsOn="{x:Bind WindowMode.CompactAlwaysOnTop, Mode=TwoWay}" />
+                        </Grid>
                     </StackPanel>
+                </Border>
+            </StackPanel>
 
-                    <Border Height="1" Background="{ThemeResource GlassBorderBrush}" />
+            <!-- Additional settings 112:7984: two disclosures 56 high r20 (Cortex 2: in-page links until UI.6; H-UI5-4:
+                 "Sobre" lands on Dados e servidores with its About card in view). -->
+            <Grid x:Name="DisclosureGrid" ColumnSpacing="{StaticResource SaSpace24}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition x:Name="DisclosureColumn2" Width="*" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Button x:Uid="SettingsOpenDataButton" Style="{StaticResource SaDisclosureButtonStyle}" Command="{Binding OpenDataCommand}">
+                    <Grid ColumnSpacing="{StaticResource SaSpace12}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <primitives:SaIcon Data="{StaticResource SaIconHardDriveData}" Size="18" VerticalAlignment="Center" Foreground="{ThemeResource SaTextSecondaryBrush}" />
+                        <TextBlock x:Uid="SettingsOpenDataText" Grid.Column="1" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                        <primitives:SaIcon Grid.Column="2" Data="{StaticResource SaIconArrowRight01Data}" Size="17" VerticalAlignment="Center" Foreground="{ThemeResource SaTextSecondaryBrush}" />
+                    </Grid>
+                </Button>
+                <Button x:Name="AboutDisclosure" x:Uid="SettingsOpenAboutButton" Grid.Column="1" Style="{StaticResource SaDisclosureButtonStyle}" Command="{Binding OpenAboutCommand}">
+                    <Grid ColumnSpacing="{StaticResource SaSpace12}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <primitives:SaIcon Data="{StaticResource SaIconInformationCircleData}" Size="18" VerticalAlignment="Center" Foreground="{ThemeResource SaTextSecondaryBrush}" />
+                        <TextBlock x:Uid="SettingsOpenAboutText" Grid.Column="1" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                        <primitives:SaIcon Grid.Column="2" Data="{StaticResource SaIconArrowRight01Data}" Size="17" VerticalAlignment="Center" Foreground="{ThemeResource SaTextSecondaryBrush}" />
+                    </Grid>
+                </Button>
+            </Grid>
 
-                    <!-- Hidden Servers Section -->
-                    <StackPanel Spacing="10">
-                        <StackPanel Spacing="2">
-                            <TextBlock
-                                x:Uid="SettingsHiddenServersTitle"
-                                AutomationProperties.HeadingLevel="Level2"
-                                Style="{StaticResource SectionTitleTextStyle}" />
-                            <TextBlock
-                                x:Uid="SettingsHiddenServersDescription"
-                                FontSize="12"
-                                Foreground="{ThemeResource TextSecondaryBrush}"
-                                TextWrapping="Wrap" />
-                        </StackPanel>
-
-                        <InfoBar
-                            x:Uid="ServerOperationError"
-                            IsClosable="True"
-                            IsOpen="{Binding IsServerOperationErrorOpen, Mode=TwoWay}"
-                            Severity="Error" />
-
-                        <TextBlock
-                            x:Uid="SettingsHiddenServersEmpty"
-                            FontSize="12"
-                            Foreground="{ThemeResource TextTertiaryBrush}"
-                            Visibility="{Binding HasHiddenServers, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Invert}" />
-
-                        <ItemsControl
-                            ItemsSource="{Binding HiddenServers}"
-                            Visibility="{Binding HasHiddenServers, Converter={StaticResource BooleanToVisibilityConverter}}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <Border
-                                        Margin="0,0,0,8"
-                                        Padding="12,10"
-                                        Background="{ThemeResource MutedSurfaceBrush}"
-                                        BorderBrush="{ThemeResource GlassBorderBrush}"
-                                        BorderThickness="1"
-                                        CornerRadius="{StaticResource RadiusSmall}">
-                                        <Grid ColumnSpacing="12">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="Auto" />
-                                            </Grid.ColumnDefinitions>
-                                            <StackPanel Spacing="2" VerticalAlignment="Center">
-                                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                                    <TextBlock FontWeight="SemiBold" Text="{Binding Name}" VerticalAlignment="Center" />
-                                                    <Border
-                                                        Padding="6,2"
-                                                        Background="{ThemeResource MutedSurfaceBrush}"
-                                                        BorderBrush="{ThemeResource GlassBorderBrush}"
-                                                        BorderThickness="1"
-                                                        CornerRadius="{StaticResource RadiusSmall}"
-                                                        VerticalAlignment="Center">
-                                                        <TextBlock
-                                                            FontSize="10"
-                                                            Foreground="{ThemeResource TextSecondaryBrush}"
-                                                            Text="{Binding OperatingSystemDisplayName}" />
-                                                    </Border>
-                                                </StackPanel>
-                                                <TextBlock
-                                                    Foreground="{ThemeResource TextTertiaryBrush}"
-                                                    FontSize="12"
-                                                    Text="{Binding Endpoint}" />
-                                            </StackPanel>
-                                            <Button
-                                                x:Uid="HiddenServerRestoreButton"
-                                                Grid.Column="1"
-                                                VerticalAlignment="Center"
-                                                AutomationProperties.Name="{Binding RestoreAutomationName}"
-                                                Command="{Binding RestoreCommand}"
-                                                Style="{StaticResource QuietPillButtonStyle}" />
-                                        </Grid>
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </StackPanel>
-
-                    <Border Height="1" Background="{ThemeResource GlassBorderBrush}" />
-
-                    <!-- Ignored Discoveries Section -->
-                    <StackPanel Spacing="10">
-                        <StackPanel Spacing="2">
-                            <TextBlock
-                                x:Uid="SettingsIgnoredDiscoveriesTitle"
-                                AutomationProperties.HeadingLevel="Level2"
-                                Style="{StaticResource SectionTitleTextStyle}" />
-                            <TextBlock
-                                x:Uid="SettingsIgnoredDiscoveriesDescription"
-                                FontSize="12"
-                                Foreground="{ThemeResource TextSecondaryBrush}"
-                                TextWrapping="Wrap" />
-                        </StackPanel>
-
-                        <Button
-                            x:Uid="SettingsResetIgnoredButton"
-                            HorizontalAlignment="Left"
-                            Command="{Binding ResetIgnoredCommand}"
-                            Style="{StaticResource QuietPillButtonStyle}" />
-
-                        <InfoBar
-                            x:Uid="SettingsResetIgnoredSuccess"
-                            IsClosable="True"
-                            IsOpen="{Binding IsResetIgnoredSuccessOpen, Mode=TwoWay}"
-                            Severity="Success" />
-                        <InfoBar
-                            x:Uid="SettingsResetIgnoredError"
-                            IsClosable="True"
-                            IsOpen="{Binding IsResetIgnoredErrorOpen, Mode=TwoWay}"
-                            Severity="Error" />
-                    </StackPanel>
-
-                    <Border Height="1" Background="{ThemeResource GlassBorderBrush}" />
-
-                    <!-- History Section -->
-                    <StackPanel Spacing="10">
-                        <StackPanel Spacing="2">
-                            <TextBlock
-                                x:Uid="SettingsHistoryTitle"
-                                AutomationProperties.HeadingLevel="Level2"
-                                Style="{StaticResource SectionTitleTextStyle}" />
-                            <TextBlock
-                                x:Uid="SettingsHistoryDescription"
-                                FontSize="12"
-                                Foreground="{ThemeResource TextSecondaryBrush}"
-                                TextWrapping="Wrap" />
-                        </StackPanel>
-
-                        <Button
-                            x:Uid="SettingsClearHistoryButton"
-                            HorizontalAlignment="Left"
-                            Command="{Binding ClearHistoryCommand}"
-                            Style="{StaticResource QuietPillButtonStyle}" />
-
-                        <Button
-                            x:Uid="SettingsResetHistoryButton"
-                            HorizontalAlignment="Left"
-                            Command="{Binding ResetHistoryCommand}"
-                            Style="{StaticResource QuietPillButtonStyle}"
-                            Visibility="{Binding IsHistoryResetAvailable, Converter={StaticResource BooleanToVisibilityConverter}}" />
-
-                        <InfoBar
-                            x:Uid="SettingsHistoryClearedSuccess"
-                            IsClosable="True"
-                            IsOpen="{Binding IsHistoryClearedOpen, Mode=TwoWay}"
-                            Severity="Success" />
-                        <InfoBar
-                            x:Uid="SettingsHistoryClearError"
-                            IsClosable="True"
-                            IsOpen="{Binding IsHistoryClearErrorOpen, Mode=TwoWay}"
-                            Severity="Error" />
-                        <InfoBar
-                            x:Uid="SettingsHistoryResetSuccess"
-                            IsClosable="True"
-                            IsOpen="{Binding IsHistoryResetOpen, Mode=TwoWay}"
-                            Severity="Success" />
-                        <InfoBar
-                            x:Uid="SettingsHistoryResetError"
-                            IsClosable="True"
-                            IsOpen="{Binding IsHistoryResetErrorOpen, Mode=TwoWay}"
-                            Severity="Error" />
-                    </StackPanel>
-
-                    <Border Height="1" Background="{ThemeResource GlassBorderBrush}" />
-
-                    <!-- Backup and restore Section (M14.6). One status surface for both flows; its
-                         detail line is selectable so the stuck-journal folder can be copied. -->
-                    <StackPanel Spacing="10">
-                        <StackPanel Spacing="2">
-                            <TextBlock
-                                x:Uid="BackupSectionTitle"
-                                AutomationProperties.HeadingLevel="Level2"
-                                Style="{StaticResource SectionTitleTextStyle}" />
-                            <TextBlock
-                                x:Uid="BackupSectionDescription"
-                                FontSize="12"
-                                Foreground="{ThemeResource TextSecondaryBrush}"
-                                TextWrapping="Wrap" />
-                        </StackPanel>
-
-                        <Button
-                            x:Uid="BackupCreateButton"
-                            HorizontalAlignment="Left"
-                            Command="{x:Bind Backup.CreateBackupCommand}"
-                            Style="{StaticResource QuietPillButtonStyle}" />
-
-                        <Button
-                            x:Uid="BackupRestoreButton"
-                            HorizontalAlignment="Left"
-                            Command="{x:Bind Backup.RestoreCommand}"
-                            Style="{StaticResource QuietPillButtonStyle}" />
-
-                        <InfoBar
-                            x:Name="BackupStatusBar"
-                            Title="{x:Bind Backup.StatusTitle, Mode=OneWay}"
-                            IsClosable="{x:Bind Backup.IsStatusClosable, Mode=OneWay}"
-                            IsOpen="{x:Bind Backup.IsStatusOpen, Mode=TwoWay}"
-                            Message="{x:Bind Backup.StatusMessage, Mode=OneWay}"
-                            Severity="{x:Bind Backup.StatusSeverity, Mode=OneWay}">
-                            <TextBlock
-                                Margin="0,0,0,12"
-                                FontSize="12"
-                                IsTextSelectionEnabled="True"
-                                Text="{x:Bind Backup.StatusDetail, Mode=OneWay}"
-                                TextWrapping="Wrap"
-                                Visibility="{x:Bind Backup.HasStatusDetail, Mode=OneWay}" />
-                        </InfoBar>
-                    </StackPanel>
-                </StackPanel>
-            </controls:GlassCard>
-
-            <!-- About -->
-            <controls:GlassCard>
-                <StackPanel Spacing="6">
-                    <TextBlock
-                        x:Uid="SettingsAboutTitle"
-                        AutomationProperties.HeadingLevel="Level2"
-                        Style="{StaticResource SectionTitleTextStyle}" />
-                    <TextBlock
-                        x:Uid="SettingsAboutAppName"
-                        FontSize="13" />
-                    <StackPanel Orientation="Horizontal" Spacing="4">
-                        <TextBlock
-                            x:Uid="SettingsAboutVersionLabel"
-                            FontSize="12"
-                            Foreground="{ThemeResource TextSecondaryBrush}" />
-                        <TextBlock
-                            FontSize="12"
-                            Foreground="{ThemeResource TextSecondaryBrush}"
-                            Text="{Binding AppVersion}" />
-                    </StackPanel>
-                    <TextBlock
-                        x:Uid="SettingsAboutLicense"
-                        FontSize="12"
-                        Foreground="{ThemeResource TextSecondaryBrush}"
-                        TextWrapping="Wrap" />
-                    <HyperlinkButton
-                        x:Uid="SettingsAboutGitHub"
-                        Padding="0"
-                        NavigateUri="https://github.com/pedroloyola/ServerMonitor" />
-                </StackPanel>
-            </controls:GlassCard>
-
-            <!-- Bottom Caption -->
-            <TextBlock
-                x:Uid="SettingsMilestoneCaption"
-                Foreground="{ThemeResource TextTertiaryBrush}"
-                FontSize="11"
-                TextAlignment="Center"
-                TextWrapping="Wrap" />
+            <!-- Local preferences 112:8001 -->
+            <TextBlock x:Uid="SettingsLocalPreferences" Style="{StaticResource SaHelperTextStyle}"
+                       Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap" />
         </StackPanel>
     </ScrollViewer>
 </Page>

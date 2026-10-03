@@ -100,4 +100,12 @@
     <Style x:Key="SaDataTableCompactHeaderStyle" TargetType="Border" BasedOn="{StaticResource SaDataTableHeaderStyle}">
         <Setter Property="MinHeight" Value="28" />
     </Style>
+    <!-- UI.5 server symbol tile 112:1792: 64x64 radius 20 (SaRadiusToast), SaIconTileBrush (#999@.15 / #FFF@.15); the
+         consumer puts ServerStack01 30 inside. -->
+    <Style x:Key="SaIconTileStyle" TargetType="Border">
+        <Setter Property="Width" Value="64" />
+        <Setter Property="Height" Value="64" />
+        <Setter Property="CornerRadius" Value="{StaticResource SaRadiusToast}" />
+        <Setter Property="Background" Value="{ThemeResource SaIconTileBrush}" />
+    </Style>
 </ResourceDictionary>

@@ -10,9 +10,13 @@ public sealed class HiddenServerItemViewModel
     public HiddenServerItemViewModel(
         Server server,
         ILocalizationService localizationService,
-        Func<Task> restore)
+        Func<Task> restore,
+        int positionInSet = 0,
+        int sizeOfSet = 0)
     {
         Server = server;
+        PositionInSet = positionInSet;
+        SizeOfSet = sizeOfSet;
         OperatingSystemDisplayName = localizationService.GetString(
             $"OperatingSystem{server.OperatingSystem}");
         RestoreAutomationName = string.Format(
@@ -33,4 +37,9 @@ public sealed class HiddenServerItemViewModel
     public string RestoreAutomationName { get; }
 
     public ICommand RestoreCommand { get; }
+
+    /// <summary>UI.5 Beacon C1 M2: "1 of 3" for the item's Restaurar (the list is a list for UI Automation too).</summary>
+    public int PositionInSet { get; }
+
+    public int SizeOfSet { get; }
 }

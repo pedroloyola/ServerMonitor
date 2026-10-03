@@ -27,7 +27,6 @@ public sealed class ServerCardViewModel : ObservableObject
     private string _connectionStateDisplayName;
     private ServerMonitoringState _monitoringState;
     private ServerMetricsSnapshot? _metrics;
-    private bool _isFocusHighlighted;
 
     public ServerCardViewModel(
         Server server,
@@ -54,14 +53,6 @@ public sealed class ServerCardViewModel : ObservableObject
             $"OperatingSystem{server.OperatingSystem}");
         _connectionState = connectionResult?.State ?? ServerConnectionState.NeverConnected;
         _connectionStateDisplayName = localizationService.GetString($"ConnectionState{_connectionState}");
-        MoreOptionsAutomationName = string.Format(
-            CultureInfo.CurrentUICulture,
-            localizationService.GetString("ServerCardMoreOptionsFor"),
-            server.Name);
-        RefreshMetricsAutomationName = string.Format(
-            CultureInfo.CurrentUICulture,
-            localizationService.GetString("ServerMetricsRefreshFor"),
-            server.Name);
         AutomationSummary = string.Format(
             CultureInfo.CurrentUICulture,
             localizationService.GetString("ServerCardAutomationSummary"),
@@ -105,10 +96,6 @@ public sealed class ServerCardViewModel : ObservableObject
         private set => SetProperty(ref _connectionState, value);
     }
 
-    public string MoreOptionsAutomationName { get; }
-
-    public string RefreshMetricsAutomationName { get; }
-
     public string AutomationSummary { get; }
 
     public ICommand EditCommand { get; }
@@ -132,17 +119,6 @@ public sealed class ServerCardViewModel : ObservableObject
     public ServerHealth Health => _monitoringState.Health;
 
     public string HealthDisplayName => _localizationService.GetString($"ServerHealth{Health}");
-
-    /// <summary>
-    /// True while this card is the target of a widget "open server" deep-link (QA-1). The card view shows a
-    /// brief accent focus pulse so the user can see WHICH server the widget selected — the deep-link's
-    /// "focus" was previously invisible (bring-into-view is a no-op when the card is already on screen).
-    /// </summary>
-    public bool IsFocusHighlighted
-    {
-        get => _isFocusHighlighted;
-        set => SetProperty(ref _isFocusHighlighted, value);
-    }
 
     public bool IsRefreshingMetrics => _monitoringState.IsRefreshing;
 

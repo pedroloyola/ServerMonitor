@@ -132,6 +132,16 @@ internal static partial class QaStartupIsolation
             return $"{QaOverviewScenarioPolicy.LaunchFlag} needs one of: {string.Join(", ", QaOverviewScenarioPolicy.Scenarios)}.";
         }
 
+        // UI.5 Cortex 4 / Boss B2 answer 5 (fail-closed): EVERY --qa-overview launch runs with the backup doubles
+        // (--qa-backup <scenario>), never next to the real backup engine and its native file picker: Settings is reachable
+        // from any scenario.
+        if (commandLineArgs.Contains(QaOverviewComposition.LaunchFlag, StringComparer.Ordinal)
+            && QaBackupPolicy.ResolveScenario(commandLineArgs, isDebugBuild: true) is null)
+        {
+            return $"{QaOverviewComposition.LaunchFlag} requires {QaBackupPolicy.LaunchFlag} " +
+                $"<{string.Join("|", QaBackupPolicy.Scenarios)}>: Settings must never reach the real backup picker.";
+        }
+
         return null;
     }
 

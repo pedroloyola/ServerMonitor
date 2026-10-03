@@ -70,40 +70,20 @@ public sealed class ServerDialogService(
 
     public async Task<bool> ConfirmRemoveAsync(Server server)
     {
-        var dialog = new RemoveServerDialog(server.Name);
-        ConfigureDialog(dialog);
-        return await dialog.ShowAsync() == ContentDialogResult.Primary;
-    }
-
-    private void ConfigureDialog(ContentDialog dialog)
-    {
+        // UI.5 fix round 2 (Prism C1 M-3): the Figma section-11 confirmation (every caller: Visão geral, Servidores, Detail).
+        // Kind=Destructive keeps the M14/UI.4 semantics: what is removed is named, Cancelar is the default and first focus.
         if (windowContext.XamlRoot is null)
         {
-            return;
+            return false;
         }
 
-        dialog.XamlRoot = windowContext.XamlRoot;
-        dialog.RequestedTheme = windowContext.ActualTheme;
-
-        void UpdateBounds()
+        var dialog = new DestructiveConfirmDialog(DestructiveConfirmation.RemoveServer(
+            server, localizationService, DestructiveConfirmation.IconData("SaIconServerStack01Data")))
         {
-            if (dialog.XamlRoot is not null)
-            {
-                dialog.Width = dialog.XamlRoot.Size.Width;
-                dialog.Height = dialog.XamlRoot.Size.Height;
-            }
-        }
-
-        UpdateBounds();
-
-        void OnRootChanged(XamlRoot sender, XamlRootChangedEventArgs args) => UpdateBounds();
-        dialog.XamlRoot.Changed += OnRootChanged;
-        dialog.Closed += (_, _) =>
-        {
-            if (dialog.XamlRoot is not null)
-            {
-                dialog.XamlRoot.Changed -= OnRootChanged;
-            }
+            XamlRoot = windowContext.XamlRoot,
+            RequestedTheme = windowContext.ActualTheme
         };
+        dialog.FillWindow();
+        return await dialog.ShowAsync() == ContentDialogResult.Primary;
     }
 }

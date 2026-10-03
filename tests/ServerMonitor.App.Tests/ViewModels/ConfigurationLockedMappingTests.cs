@@ -113,7 +113,8 @@ public sealed class ConfigurationLockedMappingTests
         new BackgroundDegradationNotice(),
         new NullHistoryMaintenanceService(),
         new AppVersionProvider(),
-        NullLogger<SettingsViewModel>.Instance);
+        NullLogger<SettingsViewModel>.Instance,
+        TestClock.Fake()); // UI.5 fix round 4: the clock is required - a fake, never the system clock
 
     private sealed class ThrowingNotificationSettings(Exception? failure) : INotificationSettingsService
     {

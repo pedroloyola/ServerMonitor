@@ -500,7 +500,7 @@ public sealed class Ui4OverviewTests
     {
         var kit = Ui4TestKit.Create(FigmaFleet(), new ResWLocalizationService("pt-PT"));
         await kit.Dashboard.LoadAsync();
-        using var vm = new ServersViewModel(kit.Dashboard, kit.Navigation, kit.Localization);
+        using var vm = new ServersViewModel(kit.Dashboard, kit.Navigation, kit.Localization, TestClock.Fake());
 
         Assert.Equal("6 servidores · 4 saudáveis · 1 atenção · 1 sem ligação", vm.SummaryDisplay);
         Assert.Equal(6, vm.Rows.Count);
@@ -538,7 +538,7 @@ public sealed class Ui4OverviewTests
     {
         var kit = Ui4TestKit.Create(new Ui4TestKit.Fleet(), new ResWLocalizationService(culture));
         await kit.Dashboard.LoadAsync();
-        using var vm = new ServersViewModel(kit.Dashboard, kit.Navigation, kit.Localization);
+        using var vm = new ServersViewModel(kit.Dashboard, kit.Navigation, kit.Localization, TestClock.Fake());
 
         Assert.Equal(expected, vm.SummaryDisplay);
         Assert.Equal(expected, vm.HeaderContextDisplay);
@@ -549,7 +549,7 @@ public sealed class Ui4OverviewTests
     {
         var one = Ui4TestKit.Create(new Ui4TestKit.Fleet().Add("solo", ServerHealth.Healthy, 1, 1, 1), new ResWLocalizationService("en-US"));
         await one.Dashboard.LoadAsync();
-        using (var vm = new ServersViewModel(one.Dashboard, one.Navigation, one.Localization))
+        using (var vm = new ServersViewModel(one.Dashboard, one.Navigation, one.Localization, TestClock.Fake()))
         {
             Assert.Equal("1 server · 1 healthy", vm.SummaryDisplay);
             Assert.True(vm.ShowHiddenServersNote); // Prism r1 (c): always under a table with rows
@@ -557,7 +557,7 @@ public sealed class Ui4OverviewTests
 
         var empty = Ui4TestKit.Create(new Ui4TestKit.Fleet());
         await empty.Dashboard.LoadAsync();
-        using var emptyVm = new ServersViewModel(empty.Dashboard, empty.Navigation, empty.Localization);
+        using var emptyVm = new ServersViewModel(empty.Dashboard, empty.Navigation, empty.Localization, TestClock.Fake());
         Assert.True(emptyVm.ShowEmptyState);
         Assert.False(emptyVm.ShowHiddenServersNote);
         Assert.False(emptyVm.HasNoResults);
@@ -576,7 +576,7 @@ public sealed class Ui4OverviewTests
 
         var kit = Ui4TestKit.Create(fleet);
         await kit.Dashboard.LoadAsync();
-        using var vm = new ServersViewModel(kit.Dashboard, kit.Navigation, kit.Localization);
+        using var vm = new ServersViewModel(kit.Dashboard, kit.Navigation, kit.Localization, TestClock.Fake());
         var rowsChanged = 0;
         vm.PropertyChanged += (_, e) => rowsChanged += e.PropertyName == nameof(ServersViewModel.Rows) ? 1 : 0;
 
@@ -595,7 +595,7 @@ public sealed class Ui4OverviewTests
     {
         var kit = Ui4TestKit.Create(FigmaFleet());
         await kit.Dashboard.LoadAsync();
-        var vm = new ServersViewModel(kit.Dashboard, kit.Navigation, kit.Localization);
+        var vm = new ServersViewModel(kit.Dashboard, kit.Navigation, kit.Localization, TestClock.Fake());
         var row = vm.Rows[0];
         vm.Dispose();
         var raised = 0;

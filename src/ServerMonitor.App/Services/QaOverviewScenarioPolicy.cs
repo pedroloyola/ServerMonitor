@@ -8,6 +8,14 @@ namespace ServerMonitor.App.Services;
 /// <c>empty</c>; 100 / 500 rows are <c>many-100</c> / <c>many-500</c>. <c>vanishing</c> is <c>mixed</c> whose servers
 /// all disappear 30 s after the first load, so the Servidores empty state (§13, reachable only with the page open) can
 /// be seen without a dialog.
+/// <para>
+/// UI.5: <c>detail</c> / <c>detail-failing</c> hold one server per Server Detail state (incl. the connection-state store's
+/// auth / host-key results and a ProxyJump server) over MUTATING in-memory doubles — hide / restore / remove / refresh
+/// succeed in <c>detail</c> and fail in <c>detail-failing</c>. <c>data</c> / <c>data-failing</c> are the Settings
+/// "Dados e servidores" states (hidden servers, restore succeeding / failing). Every <c>--qa-overview</c> launch, whatever
+/// its scenario, REQUIRES <c>--qa-backup</c> (UI.5 Boss B2 answer 5): Settings is one click away from any scenario, so the
+/// real backup engine and its native file picker can never be reached from this harness.
+/// </para>
 /// </summary>
 public static class QaOverviewScenarioPolicy
 {
@@ -19,8 +27,9 @@ public static class QaOverviewScenarioPolicy
     public static readonly IReadOnlyList<string> Scenarios =
     [
         "healthy", "mixed", "attention", "critical", "offline", "empty", "loading", "unavailable", "discovery",
-        "many-100", "many-500", "vanishing"
+        "many-100", "many-500", "vanishing", "detail", "detail-failing", "data", "data-failing"
     ];
+
 
     /// <summary>True when the modifier is present at all (whatever its value).</summary>
     public static bool IsPresent(IReadOnlyList<string> commandLineArgs) =>

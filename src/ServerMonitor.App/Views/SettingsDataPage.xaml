@@ -1,0 +1,291 @@
+<Page
+    x:Class="ServerMonitor.App.Views.SettingsDataPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:primitives="using:ServerMonitor.App.Controls.Primitives"
+    primitives:SaThemeRefresh.IsEnabled="True">
+    <!-- UI.5 "Dados e servidores", Figma 112:8230 (D) / 112:8276 (L): back + title, glass cards (hidden servers, ignored
+         devices, history, Backup/Restore - DERIVED, H-UI5-4, between History and About - and About), footer. Successes
+         show the page-local toast (Figma §3.2); errors stay inline next to their card. -->
+    <Grid x:Name="PageHost">
+        <!-- Boss fix round 2 decision 2: the transient notice has its own row under the scrolling content, so it never
+             covers an actionable control at any size (Figma §3.2 draws it over the content; deliberate deviation). -->
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+            <VisualStateManager.VisualStateGroups>
+                <VisualStateGroup x:Name="WidthStates">
+                    <VisualState x:Name="Wide">
+                        <VisualState.StateTriggers>
+                            <AdaptiveTrigger MinWindowWidth="700" />
+                        </VisualState.StateTriggers>
+                    </VisualState>
+                    <!-- < 700: compact padding; each card's action moves under its title. -->
+                    <VisualState x:Name="Narrow">
+                        <VisualState.StateTriggers>
+                            <AdaptiveTrigger MinWindowWidth="0" />
+                        </VisualState.StateTriggers>
+                        <VisualState.Setters>
+                            <Setter Target="PageRoot.Padding" Value="{StaticResource SaPagePaddingCompact}" />
+                            <Setter Target="ResetIgnoredButton.(Grid.Row)" Value="1" />
+                            <Setter Target="ResetIgnoredButton.(Grid.Column)" Value="0" />
+                            <Setter Target="ResetIgnoredButton.HorizontalAlignment" Value="Left" />
+                            <Setter Target="HistoryActions.(Grid.Row)" Value="1" />
+                            <Setter Target="HistoryActions.(Grid.Column)" Value="0" />
+                            <Setter Target="HistoryActions.HorizontalAlignment" Value="Left" />
+                            <Setter Target="BackupActions.(Grid.Row)" Value="1" />
+                            <Setter Target="BackupActions.(Grid.Column)" Value="0" />
+                            <Setter Target="BackupActions.HorizontalAlignment" Value="Left" />
+                            <Setter Target="GitHubButton.(Grid.Row)" Value="1" />
+                            <Setter Target="GitHubButton.(Grid.Column)" Value="0" />
+                            <Setter Target="GitHubButton.HorizontalAlignment" Value="Left" />
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+            </VisualStateManager.VisualStateGroups>
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel x:Name="PageRoot" Padding="{StaticResource SaPagePadding}" Spacing="{StaticResource SaSpace20}">
+
+                <!-- Data settings header 112:8231: back 36 ("‹" = ArrowRight01 turned 180°, as the Figma) + title 30 + parent. -->
+                <Grid ColumnSpacing="{StaticResource SaSpace16}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Button
+                        x:Uid="SettingsDataBackButton"
+                        VerticalAlignment="Center"
+                        Command="{Binding BackToGeneralCommand}"
+                        Style="{StaticResource SaIconButtonSmallStyle}">
+                        <primitives:SaIcon Data="{StaticResource SaIconArrowRight01Data}" Size="18" RenderTransformOrigin="0.5,0.5">
+                            <primitives:SaIcon.RenderTransform>
+                                <RotateTransform Angle="180" />
+                            </primitives:SaIcon.RenderTransform>
+                        </primitives:SaIcon>
+                    </Button>
+                    <StackPanel Grid.Column="1" Spacing="{StaticResource SaSpace4}">
+                        <TextBlock x:Uid="SettingsDataTitle" AutomationProperties.HeadingLevel="Level1" Style="{StaticResource SaHeadingTextStyle}" TextWrapping="Wrap" />
+                        <TextBlock x:Uid="SettingsDataParent" Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" />
+                    </StackPanel>
+                </Grid>
+
+                <!-- A configuration write was refused because a restore holds the configuration (M14.6). -->
+                <primitives:SaInlineNotice
+                    Severity="Error"
+                    Message="{Binding ConfigurationLockedMessage}"
+                    Visibility="{Binding IsConfigurationLockedOpen, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
+                <!-- Hidden servers 112:8238: title, description (or the empty text, 112:20687), rows 48 high (icon 20 · name 14
+                     Medium + system 11 · "Restaurar" 150×36). An ItemsRepeater: virtualized against the page scroll. -->
+                <Border Style="{StaticResource SaGlassSurfaceStyle}">
+                    <StackPanel Spacing="10">
+                        <TextBlock x:Uid="SettingsHiddenServersTitle" AutomationProperties.HeadingLevel="Level2" Style="{StaticResource SaCardTitleTextStyle}" />
+                        <TextBlock x:Uid="SettingsHiddenServersDescription" Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}"
+                                   TextWrapping="Wrap"
+                                   Visibility="{Binding HasHiddenServers, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                        <TextBlock x:Uid="SettingsHiddenServersEmpty" Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}"
+                                   TextWrapping="Wrap"
+                                   Visibility="{Binding HasHiddenServers, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Invert}" />
+                        <primitives:SaInlineNotice
+                            x:Uid="ServerOperationError"
+                            Severity="Error"
+                            Visibility="{Binding IsServerOperationErrorOpen, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                        <!-- Beacon C1 M2: every Restaurar is a Tab stop (TabFocusNavigation Local) and says its position in the
+                             list ("1 of 3"); the list is named by its card title. -->
+                        <!-- Beacon C2 R2-N1: the ItemsRepeater has no automation peer; SaListHost is the named List. -->
+                        <primitives:SaListHost AutomationProperties.Name="{Binding HiddenServersListName}"
+                                               Visibility="{Binding HasHiddenServers, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <ItemsRepeater x:Name="HiddenServersList" ItemsSource="{Binding HiddenServers}"
+                                       TabFocusNavigation="Local">
+                            <ItemsRepeater.Layout>
+                                <StackLayout Spacing="0" />
+                            </ItemsRepeater.Layout>
+                            <ItemsRepeater.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid MinHeight="48" ColumnSpacing="{StaticResource SaSpace12}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <!-- Prism C1 M-7: the secondary text colour (#666666 L / #A3A3A3 D), never the inherited one. -->
+                                        <primitives:SaIcon Data="{StaticResource SaIconServerStack01Data}" Size="20" VerticalAlignment="Center"
+                                                           Foreground="{ThemeResource SaTextSecondaryBrush}" />
+                                        <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Name}" Style="{StaticResource SaPrimaryBodyTextStyle}" FontWeight="Medium" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{Binding OperatingSystemDisplayName}" Style="{StaticResource SaHelperTextStyle}"
+                                                       Foreground="{ThemeResource SaTextSecondaryBrush}" />
+                                        </StackPanel>
+                                        <Button
+                                            x:Uid="HiddenServerRestoreButton"
+                                            Grid.Column="2"
+                                            Width="150"
+                                            VerticalAlignment="Center"
+                                            AutomationProperties.Name="{Binding RestoreAutomationName}"
+                                            AutomationProperties.PositionInSet="{Binding PositionInSet}"
+                                            AutomationProperties.SizeOfSet="{Binding SizeOfSet}"
+                                            Command="{Binding RestoreCommand}"
+                                            Style="{StaticResource SaPillButtonSmallStyle}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsRepeater.ItemTemplate>
+                        </ItemsRepeater>
+                        </primitives:SaListHost>
+                    </StackPanel>
+                </Border>
+
+                <!-- Ignored discoveries 112:8254: header (title | "Repor dispositivos" 180×36) + description. -->
+                <Border Style="{StaticResource SaGlassSurfaceStyle}">
+                    <StackPanel Spacing="10">
+                        <Grid MinHeight="36" ColumnSpacing="{StaticResource SaSpace16}" RowSpacing="{StaticResource SaSpace8}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <TextBlock x:Uid="SettingsIgnoredDiscoveriesTitle" VerticalAlignment="Center" AutomationProperties.HeadingLevel="Level2"
+                                       Style="{StaticResource SaCardTitleTextStyle}" TextWrapping="Wrap" />
+                            <Button x:Name="ResetIgnoredButton" x:Uid="SettingsResetIgnoredButton" Grid.Column="1" MinWidth="180"
+                                    Style="{StaticResource SaPillButtonSmallStyle}" Command="{Binding ResetIgnoredCommand}" />
+                        </Grid>
+                        <TextBlock x:Uid="SettingsIgnoredDiscoveriesDescription" Style="{StaticResource SaCaptionTextStyle}"
+                                   Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap" />
+                        <primitives:SaInlineNotice
+                            x:Uid="SettingsResetIgnoredError"
+                            Severity="Error"
+                            Visibility="{Binding IsResetIgnoredErrorOpen, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Local history 112:8260: "Limpar histórico" in the danger text; "Repor histórico" (product, no Figma) only
+                     when the database needs the explicit repair. Both keep their confirmation (behind the interaction). -->
+                <Border Style="{StaticResource SaGlassSurfaceStyle}">
+                    <StackPanel Spacing="10">
+                        <Grid MinHeight="36" ColumnSpacing="{StaticResource SaSpace16}" RowSpacing="{StaticResource SaSpace8}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <TextBlock x:Uid="SettingsHistoryTitle" VerticalAlignment="Center" AutomationProperties.HeadingLevel="Level2"
+                                       Style="{StaticResource SaCardTitleTextStyle}" TextWrapping="Wrap" />
+                            <StackPanel x:Name="HistoryActions" Grid.Column="1" Orientation="Horizontal" Spacing="{StaticResource SaSpace12}">
+                                <Button x:Name="ResetHistoryButton" x:Uid="SettingsResetHistoryButton" MinWidth="180" Style="{StaticResource SaPillButtonSmallStyle}"
+                                        Command="{Binding ResetHistoryCommand}"
+                                        Visibility="{Binding IsHistoryResetAvailable, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                <Button x:Name="ClearHistoryButton" x:Uid="SettingsClearHistoryButton" MinWidth="180" Style="{StaticResource SaPillButtonSmallDangerStyle}"
+                                        Command="{Binding ClearHistoryCommand}" />
+                            </StackPanel>
+                        </Grid>
+                        <TextBlock x:Uid="SettingsHistoryDescription" Style="{StaticResource SaCaptionTextStyle}"
+                                   Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap" />
+                        <primitives:SaInlineNotice
+                            x:Uid="SettingsHistoryClearError"
+                            Severity="Error"
+                            Visibility="{Binding IsHistoryClearErrorOpen, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                        <primitives:SaInlineNotice
+                            x:Uid="SettingsHistoryResetError"
+                            Severity="Error"
+                            Visibility="{Binding IsHistoryResetErrorOpen, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Backup and restore (M14.6, D2; DERIVED card per H-UI5-4 / A-11). Re-skin only: the status bar keeps its
+                     M14.6 contract (blocked state not closable, Severity from the VM) and the dialogs are unchanged. -->
+                <Border Style="{StaticResource SaGlassSurfaceStyle}">
+                    <StackPanel Spacing="10">
+                        <Grid MinHeight="36" ColumnSpacing="{StaticResource SaSpace16}" RowSpacing="{StaticResource SaSpace8}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <TextBlock x:Uid="BackupSectionTitle" VerticalAlignment="Center" AutomationProperties.HeadingLevel="Level2"
+                                       Style="{StaticResource SaCardTitleTextStyle}" TextWrapping="Wrap" />
+                            <StackPanel x:Name="BackupActions" Grid.Column="1" Orientation="Horizontal" Spacing="{StaticResource SaSpace12}">
+                                <Button x:Uid="BackupCreateButton" MinWidth="180" Style="{StaticResource SaPillButtonSmallStyle}"
+                                        Command="{x:Bind Backup.CreateBackupCommand}" />
+                                <Button x:Uid="BackupRestoreButton" MinWidth="180" Style="{StaticResource SaPillButtonSmallStyle}"
+                                        Command="{x:Bind Backup.RestoreCommand}" />
+                            </StackPanel>
+                        </Grid>
+                        <TextBlock x:Uid="BackupSectionDescription" Style="{StaticResource SaCaptionTextStyle}"
+                                   Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap" />
+                        <InfoBar
+                            x:Name="BackupStatusBar"
+                            Title="{x:Bind Backup.StatusTitle, Mode=OneWay}"
+                            IsClosable="{x:Bind Backup.IsStatusClosable, Mode=OneWay}"
+                            IsOpen="{x:Bind Backup.IsStatusOpen, Mode=TwoWay}"
+                            Message="{x:Bind Backup.StatusMessage, Mode=OneWay}"
+                            Severity="{x:Bind Backup.StatusSeverity, Mode=OneWay}"
+                            Visibility="{x:Bind Backup.IsStatusOpen, Mode=OneWay}">
+                            <TextBlock
+                                Margin="0,0,0,12"
+                                Style="{StaticResource SaCaptionTextStyle}"
+                                IsTextSelectionEnabled="True"
+                                Text="{x:Bind Backup.StatusDetail, Mode=OneWay}"
+                                TextWrapping="Wrap"
+                                Visibility="{x:Bind Backup.HasStatusDetail, Mode=OneWay}" />
+                        </InfoBar>
+                    </StackPanel>
+                </Border>
+
+                <!-- About ServerAlyzer 112:8266: header (title | "Ver no GitHub" 180×36), the REAL version, licence. -->
+                <Border x:Name="AboutSection" Style="{StaticResource SaGlassSurfaceStyle}">
+                    <StackPanel Spacing="10">
+                        <Grid MinHeight="36" ColumnSpacing="{StaticResource SaSpace16}" RowSpacing="{StaticResource SaSpace8}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <TextBlock x:Uid="SettingsAboutTitle" VerticalAlignment="Center" AutomationProperties.HeadingLevel="Level2"
+                                       Style="{StaticResource SaCardTitleTextStyle}" TextWrapping="Wrap" />
+                            <Button x:Name="GitHubButton" x:Uid="SettingsAboutGitHub" Grid.Column="1" MinWidth="180"
+                                    Style="{StaticResource SaPillButtonSmallStyle}" Click="OnGitHubClick" />
+                        </Grid>
+                        <TextBlock Text="{Binding AboutVersionText}" Style="{StaticResource SaControlTextStyle}" FontWeight="Normal" IsTextSelectionEnabled="True" />
+                        <TextBlock x:Uid="SettingsAboutLicense" Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Credential privacy 112:8273: two footer lines 11. -->
+                <StackPanel Spacing="2">
+                    <TextBlock x:Uid="SettingsMilestoneCaption" Style="{StaticResource SaHelperTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap" />
+                    <TextBlock x:Uid="SettingsCredentialsCaption" Style="{StaticResource SaHelperTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap" />
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Figma §3.2 toast (600×80, bottom-right, 40 from the content edge, 36 from the bottom): the latest success of
+             this page, announced politely, closed by the user, after TransientNoticeTimer.Duration or when the page is
+             left. In its own row: it never covers "Ver no GitHub", "Limpar histórico" or any other action. -->
+        <primitives:SaToast
+            x:Name="SuccessToast"
+            Grid.Row="1"
+            Margin="40,12,40,36"
+            MaxWidth="600"
+            Width="NaN"
+            HorizontalAlignment="Right"
+            VerticalAlignment="Bottom"
+            Title="{Binding ToastTitle}"
+            Message="{Binding ToastMessage}"
+            CloseButtonAutomationName="{Binding ToastCloseAutomationName}"
+            CloseRequested="OnToastCloseRequested"
+            AutomationProperties.LiveSetting="Polite"
+            Visibility="{Binding IsToastOpen, Converter={StaticResource BooleanToVisibilityConverter}}" />
+    </Grid>
+</Page>

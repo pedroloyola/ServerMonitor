@@ -5,7 +5,7 @@ O M4 implementa recolha exclusivamente manual para servidores configurados como 
 ## Pipeline
 
 ```text
-ServerFullCard
+ServerDetailPage (UI.5)
   → IServerMetricsCollector
   → LinuxMetricsCollector
   → ILinuxMetricsRemoteSource
@@ -48,7 +48,7 @@ Falhas de trust, autenticação, transporte, timeout ou cancelamento encerram a 
 
 ## Apresentação
 
-O `ServerFullCard` mostra apenas valores disponíveis de CPU, RAM, disco, uptime e sistema operativo, com refresh manual e timestamp. Antes da primeira recolha apresenta “Aguardando dados”. Durante a recolha o comando fica indisponível e um estado discreto é anunciado por acessibilidade. O último snapshot válido é preservado se uma atualização posterior falhar. A apresentação é idêntica para Linux e macOS: o card é agnóstico do OS de origem.
+A página Server Detail (UI.5) mostra apenas valores disponíveis de CPU, RAM, disco, uptime e sistema operativo, com refresh manual e "Última atualização"; um valor desconhecido é "—", nunca 0. Antes da primeira recolha apresenta "A recolher métricas…". Durante a recolha o comando fica indisponível e um estado discreto é anunciado por acessibilidade. O último snapshot válido é preservado se uma atualização posterior falhar. A apresentação é idêntica para Linux e macOS: o card é agnóstico do OS de origem.
 
 ## macOS — Milestone 5
 

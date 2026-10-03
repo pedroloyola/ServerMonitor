@@ -6,7 +6,7 @@ namespace ServerMonitor.App.Qa;
 
 // QA-ONLY. This whole folder is excluded from Release builds (see ServerMonitor.App.csproj)
 // and is only wired into DI when the app is launched with the --qa-health flag. It exists so
-// the real ServerFullCard / DashboardPage can be inspected in every monitoring state without
+// the real DashboardPage / Server Detail can be inspected in every monitoring state without
 // touching real servers, SSH, persistence or credentials. Nothing here is shipped.
 
 /// <summary>One deterministic health scenario: a QA server plus the exact snapshot and

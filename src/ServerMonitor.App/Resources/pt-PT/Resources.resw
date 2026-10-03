@@ -13,34 +13,25 @@
   <data name="SettingsTitle.Text" xml:space="preserve"><value>Definições</value></data>
   <data name="SettingsBackButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Voltar à visão geral</value></data>
   <data name="SettingsBackButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Voltar</value></data>
-  <data name="SettingsSubtitle.Text" xml:space="preserve"><value>Personalize o aspeto e o idioma.</value></data>
-  <data name="SettingsAppearanceTitle.Text" xml:space="preserve"><value>Aspeto</value></data>
-  <data name="SettingsAppearanceDescription.Text" xml:space="preserve"><value>Escolha um tema ou acompanhe automaticamente o Windows.</value></data>
-  <data name="SettingsThemePicker.Header" xml:space="preserve"><value>Tema</value></data>
-  <data name="ThemeSystemOption.Content" xml:space="preserve"><value>Sistema</value></data>
-  <data name="ThemeLightOption.Content" xml:space="preserve"><value>Claro</value></data>
-  <data name="ThemeDarkOption.Content" xml:space="preserve"><value>Escuro</value></data>
+  <data name="SettingsSubtitle.Text" xml:space="preserve"><value>À tua medida.</value></data>
+  <data name="SettingsAppearanceTitle.Text" xml:space="preserve"><value>Aparência</value></data>
+  <data name="SettingsAppearanceDescription.Text" xml:space="preserve"><value>Escolhe como preferes ver o ServerAlyzer.</value></data>
   <data name="SettingsLanguageTitle.Text" xml:space="preserve"><value>Idioma</value></data>
-  <data name="SettingsLanguageDescription.Text" xml:space="preserve"><value>Utilize o idioma do Windows ou selecione uma opção suportada.</value></data>
-  <data name="SettingsLanguagePicker.Header" xml:space="preserve"><value>Idioma da interface</value></data>
+  <data name="SettingsLanguageDescription.Text" xml:space="preserve"><value>A alteração é aplicada ao reiniciar.</value></data>
   <data name="LanguageSystemOption.Content" xml:space="preserve"><value>Utilizar idioma do sistema</value></data>
   <data name="LanguageBrazilianPortugueseOption.Content" xml:space="preserve"><value>Português (Brasil)</value></data>
   <data name="LanguageEuropeanPortugueseOption.Content" xml:space="preserve"><value>Português (Portugal)</value></data>
   <data name="LanguageEnglishOption.Content" xml:space="preserve"><value>English</value></data>
   <data name="SettingsRestartNotice.Title" xml:space="preserve"><value>Idioma atualizado</value></data>
-  <data name="SettingsRestartNotice.Message" xml:space="preserve"><value>Reinicie a aplicação para aplicar o idioma em toda a interface.</value></data>
-  <data name="SettingsMilestoneCaption.Text" xml:space="preserve"><value>Apenas configurações não sensíveis são guardadas localmente. Palavras-passe e frases-passe são protegidas pelo Gestor de Credenciais do Windows.</value></data>
-  <data name="SettingsAboutTitle.Text" xml:space="preserve"><value>Sobre</value></data>
-  <data name="SettingsAboutAppName.Text" xml:space="preserve"><value>ServerAlyzer</value></data>
-  <data name="SettingsAboutVersionLabel.Text" xml:space="preserve"><value>Versão</value></data>
+  <data name="SettingsRestartNotice.Message" xml:space="preserve"><value>Reinicia a aplicação para aplicar o idioma em toda a interface.</value></data>
+  <data name="SettingsMilestoneCaption.Text" xml:space="preserve"><value>Apenas preferências não sensíveis são guardadas localmente.</value></data>
+  <data name="SettingsAboutTitle.Text" xml:space="preserve"><value>Sobre o ServerAlyzer</value></data>
   <data name="SettingsAboutLicense.Text" xml:space="preserve"><value>Código aberto · Licença MIT</value></data>
   <data name="SettingsAboutGitHub.Content" xml:space="preserve"><value>Ver no GitHub</value></data>
   <data name="ServerOperationError.Title" xml:space="preserve"><value>Não foi possível concluir a operação</value></data>
   <data name="ServerOperationError.Message" xml:space="preserve"><value>Tenta novamente. Os dados existentes permanecem seguros.</value></data>
-  <data name="ServerCardEditMenuItem.Text" xml:space="preserve"><value>Editar</value></data>
   <data name="ServerCardHideMenuItem.Text" xml:space="preserve"><value>Ocultar</value></data>
   <data name="ServerCardRemoveMenuItem.Text" xml:space="preserve"><value>Remover</value></data>
-  <data name="ServerCardMoreButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Mais opções</value></data>
   <data name="ServerCardMoreOptionsFor" xml:space="preserve"><value>Mais opções para {0}</value></data>
   <data name="ServerCardAutomationSummary" xml:space="preserve"><value>{0}, {1}, {2}, {3}</value></data>
   <data name="ServerStatusNotConnected" xml:space="preserve"><value>Ainda não ligado</value></data>
@@ -74,13 +65,9 @@
   <data name="EditServerDialog.Title" xml:space="preserve"><value>Editar servidor</value></data>
   <data name="EditServerDialog.PrimaryButtonText" xml:space="preserve"><value>Guardar alterações</value></data>
   <data name="EditServerDialog.CloseButtonText" xml:space="preserve"><value>Cancelar</value></data>
-  <data name="RemoveServerDialog.Title" xml:space="preserve"><value>Remover servidor?</value></data>
-  <data name="RemoveServerDialog.PrimaryButtonText" xml:space="preserve"><value>Remover</value></data>
-  <data name="RemoveServerDialog.CloseButtonText" xml:space="preserve"><value>Cancelar</value></data>
-  <data name="RemoveServerDialogMessage.Text" xml:space="preserve"><value>Esta configuração será removida permanentemente deste dispositivo:</value></data>
   <data name="SettingsHiddenServersTitle.Text" xml:space="preserve"><value>Servidores ocultos</value></data>
-  <data name="SettingsHiddenServersDescription.Text" xml:space="preserve"><value>Os servidores ocultos continuam guardados, mas não aparecem no painel principal.</value></data>
-  <data name="SettingsHiddenServersEmpty.Text" xml:space="preserve"><value>Não existem servidores ocultos.</value></data>
+  <data name="SettingsHiddenServersDescription.Text" xml:space="preserve"><value>Continuam guardados, mas não aparecem no painel.</value></data>
+  <data name="SettingsHiddenServersEmpty.Text" xml:space="preserve"><value>Não há servidores ocultos.</value></data>
   <data name="HiddenServerRestoreButton.Content" xml:space="preserve"><value>Restaurar</value></data>
   <data name="HiddenServerRestoreFor" xml:space="preserve"><value>Restaurar {0}</value></data>
   <data name="ServerFormAuthenticationTitle.Text" xml:space="preserve"><value>Autenticação</value></data>
@@ -151,7 +138,6 @@
   <data name="ServerMetricsCpuLabel.Text" xml:space="preserve"><value>CPU</value></data>
   <data name="ServerMetricsMemoryLabel.Text" xml:space="preserve"><value>Memória</value></data>
   <data name="ServerMetricsDiskLabel.Text" xml:space="preserve"><value>Disco</value></data>
-  <data name="ServerMetricsUptimeLabel.Text" xml:space="preserve"><value>Tempo em atividade</value></data>
   <data name="ServerMetricsDetectedOperatingSystemFormat" xml:space="preserve"><value>SO detetado: {0}</value></data>
   <data name="ServerMetricsUpdatedAtFormat" xml:space="preserve"><value>Atualizado às {0}</value></data>
   <data name="ServerMetricsUptimeDaysHoursFormat" xml:space="preserve"><value>{0}d {1}h</value></data>
@@ -176,14 +162,14 @@
   <data name="DiscoveredServerIgnoreFor" xml:space="preserve"><value>Ignorar {0}</value></data>
   <data name="DiscoveredServerAutomationSummary" xml:space="preserve"><value>{0}, SSH, {1}, encontrado na rede</value></data>
   <data name="SettingsIgnoredDiscoveriesTitle.Text" xml:space="preserve"><value>Dispositivos ignorados</value></data>
-  <data name="SettingsIgnoredDiscoveriesDescription.Text" xml:space="preserve"><value>Os dispositivos ignorados ficam ocultos no painel. Reponha para que os que ainda estão presentes voltem a aparecer.</value></data>
-  <data name="SettingsResetIgnoredButton.Content" xml:space="preserve"><value>Repor dispositivos ignorados</value></data>
-  <data name="SettingsResetIgnoredSuccess.Title" xml:space="preserve"><value>Dispositivos ignorados repostos</value></data>
-  <data name="SettingsResetIgnoredSuccess.Message" xml:space="preserve"><value>Os dispositivos ainda presentes na rede serão sugeridos novamente.</value></data>
+  <data name="SettingsIgnoredDiscoveriesDescription.Text" xml:space="preserve"><value>Volta a mostrar os dispositivos que ainda estão presentes na rede.</value></data>
+  <data name="SettingsResetIgnoredButton.Content" xml:space="preserve"><value>Repor dispositivos</value></data>
+  <data name="SettingsResetIgnoredSuccess.Title" xml:space="preserve"><value>Dispositivos repostos</value></data>
+  <data name="SettingsResetIgnoredSuccess.Message" xml:space="preserve"><value>Os dispositivos presentes na rede podem voltar a aparecer.</value></data>
   <data name="SettingsResetIgnoredError.Title" xml:space="preserve"><value>Não foi possível repor os dispositivos ignorados</value></data>
-  <data name="SettingsResetIgnoredError.Message" xml:space="preserve"><value>Tente novamente dentro de momentos.</value></data>
-  <data name="SettingsNotificationsTitle.Text" xml:space="preserve"><value>Notificações</value></data>
-  <data name="SettingsNotificationsDescription.Text" xml:space="preserve"><value>Receba alertas do Windows quando o estado de um servidor monitorizado mudar.</value></data>
+  <data name="SettingsResetIgnoredError.Message" xml:space="preserve"><value>Tenta novamente dentro de momentos.</value></data>
+  <data name="SettingsNotificationsTitle.Text" xml:space="preserve"><value>Alertas de estado</value></data>
+  <data name="SettingsNotificationsDescription.Text" xml:space="preserve"><value>Recebe notificações quando a saúde de um servidor muda.</value></data>
   <data name="SettingsNotificationsToggle.Header" xml:space="preserve"><value>Notificações de estado</value></data>
   <data name="SettingsNotificationsToggle.OnContent" xml:space="preserve"><value>Ativadas</value></data>
   <data name="SettingsNotificationsToggle.OffContent" xml:space="preserve"><value>Desativadas</value></data>
@@ -222,14 +208,12 @@
   <data name="CompactEmptyAction.Content" xml:space="preserve"><value>Abrir o ServerAlyzer</value></data>
   <data name="CompactMetricsUnavailable.Text" xml:space="preserve"><value>Offline</value></data>
   <data name="SettingsCompactTitle.Text" xml:space="preserve"><value>Modo compacto</value></data>
-  <data name="SettingsCompactDescription.Text" xml:space="preserve"><value>Mostre um pequeno widget sempre disponível com o estado essencial dos seus servidores.</value></data>
-  <data name="SettingsEnterCompactButton.Content" xml:space="preserve"><value>Abrir o modo compacto</value></data>
+  <data name="SettingsCompactDescription.Text" xml:space="preserve"><value>Uma vista reduzida dos teus servidores.</value></data>
   <data name="SettingsAlwaysOnTopToggle.Header" xml:space="preserve"><value>Sempre no topo</value></data>
   <data name="SettingsAlwaysOnTopToggle.OnContent" xml:space="preserve"><value>Ligado</value></data>
   <data name="SettingsAlwaysOnTopToggle.OffContent" xml:space="preserve"><value>Desligado</value></data>
   <data name="SettingsAlwaysOnTopToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Manter o widget compacto sempre no topo</value></data>
   <!-- M10 Local History + Charts -->
-  <data name="ServerCardHistoryMenuItem.Text" xml:space="preserve"><value>Histórico</value></data>
   <data name="HistoryBackButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Voltar ao servidor</value></data>
   <data name="HistoryBackButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Voltar</value></data>
   <data name="HistorySubtitle.Text" xml:space="preserve"><value>Histórico</value></data>
@@ -259,26 +243,24 @@
   <data name="HistoryChartSummaryFormat" xml:space="preserve"><value>{0}. {1}. Atual {2}. Pico no período {3}.</value></data>
   <data name="HistoryChartSummaryOfflineSuffix" xml:space="preserve"><value> Contém um período offline apresentado como uma lacuna.</value></data>
   <data name="SettingsHistoryTitle.Text" xml:space="preserve"><value>Histórico</value></data>
-  <data name="SettingsHistoryDescription.Text" xml:space="preserve"><value>O histórico de métricas é guardado localmente durante 30 dias. Nada sai do seu dispositivo.</value></data>
+  <data name="SettingsHistoryDescription.Text" xml:space="preserve"><value>Métricas guardadas neste dispositivo durante 30 dias.</value></data>
   <data name="SettingsClearHistoryButton.Content" xml:space="preserve"><value>Limpar histórico</value></data>
   <data name="SettingsHistoryClearedSuccess.Title" xml:space="preserve"><value>Histórico limpo</value></data>
-  <data name="SettingsHistoryClearedSuccess.Message" xml:space="preserve"><value>Todo o histórico local foi removido.</value></data>
+  <data name="SettingsHistoryClearedSuccess.Message" xml:space="preserve"><value>As métricas guardadas neste dispositivo foram eliminadas.</value></data>
   <data name="SettingsHistoryClearError.Title" xml:space="preserve"><value>Não foi possível limpar o histórico</value></data>
-  <data name="SettingsHistoryClearError.Message" xml:space="preserve"><value>O histórico está indisponível agora. Tente novamente mais tarde.</value></data>
+  <data name="SettingsHistoryClearError.Message" xml:space="preserve"><value>O histórico está indisponível agora. Tenta novamente mais tarde.</value></data>
   <data name="HistoryClearConfirmTitle" xml:space="preserve"><value>Limpar todo o histórico?</value></data>
-  <data name="HistoryClearConfirmMessage" xml:space="preserve"><value>Isto remove permanentemente todo o histórico de métricas guardado. Servidores, credenciais e definições não são afetados. Esta ação não pode ser anulada.</value></data>
+  <data name="HistoryClearConfirmMessage" xml:space="preserve"><value>Todos os registos de métricas guardados neste dispositivo serão eliminados.</value></data>
   <data name="HistoryClearConfirmPrimary" xml:space="preserve"><value>Limpar histórico</value></data>
-  <data name="HistoryClearConfirmClose" xml:space="preserve"><value>Cancelar</value></data>
   <data name="SettingsResetHistoryButton.Content" xml:space="preserve"><value>Repor histórico</value></data>
   <data name="SettingsHistoryResetSuccess.Title" xml:space="preserve"><value>Histórico reposto</value></data>
   <data name="SettingsHistoryResetSuccess.Message" xml:space="preserve"><value>A base local foi recriada e está pronta para novas amostras.</value></data>
   <data name="SettingsHistoryResetError.Title" xml:space="preserve"><value>Não foi possível repor o histórico</value></data>
-  <data name="SettingsHistoryResetError.Message" xml:space="preserve"><value>A base local não pôde ser recriada. Tente novamente mais tarde.</value></data>
+  <data name="SettingsHistoryResetError.Message" xml:space="preserve"><value>A base local não pôde ser recriada. Tenta novamente mais tarde.</value></data>
   <data name="HistoryResetConfirmTitle" xml:space="preserve"><value>Repor a base de histórico?</value></data>
-  <data name="HistoryResetConfirmMessage" xml:space="preserve"><value>Isto remove a base de histórico indisponível e cria uma nova. Servidores, credenciais e definições não são afetados. Esta ação não pode ser anulada.</value></data>
+  <data name="HistoryResetConfirmMessage" xml:space="preserve"><value>A base de histórico indisponível será removida e substituída por uma nova.</value></data>
   <data name="HistoryResetConfirmPrimary" xml:space="preserve"><value>Repor histórico</value></data>
   <!-- M11 Workloads (Docker + Serviços), só leitura -->
-  <data name="ServerCardWorkloadsMenuItem.Text" xml:space="preserve"><value>Serviços e containers</value></data>
   <data name="WorkloadsBackButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Voltar ao servidor</value></data>
   <data name="WorkloadsBackButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Voltar</value></data>
   <data name="WorkloadsSubtitle.Text" xml:space="preserve"><value>Serviços e containers</value></data>
@@ -356,16 +338,16 @@
   <data name="WorkloadSummaryStoppedFormat" xml:space="preserve"><value>{0} parados</value></data>
   <data name="BackgroundNoticeTitle" xml:space="preserve"><value>O ServerAlyzer continua a monitorizar</value></data>
   <data name="BackgroundNoticeBody" xml:space="preserve"><value>A janela foi fechada, mas a monitorização e o widget continuam ativos. Para sair mesmo, use "Sair do ServerAlyzer" no ícone da área de notificação da barra de tarefas — pode estar nos ícones ocultos (^). Pode alterar isto nas Definições.</value></data>
-  <data name="SettingsBackgroundTitle.Text" xml:space="preserve"><value>Segundo plano</value></data>
-  <data name="SettingsBackgroundDescription.Text" xml:space="preserve"><value>Fechar a janela mantém o ServerAlyzer a monitorizar e o widget atualizado. Para encerrar, use "Sair do ServerAlyzer" no ícone da área de notificação — pode estar nos ícones ocultos (^).</value></data>
+  <data name="SettingsBackgroundTitle.Text" xml:space="preserve"><value>Continuar em segundo plano</value></data>
+  <data name="SettingsBackgroundDescription.Text" xml:space="preserve"><value>Ao fechar a janela, a app fica na área de notificação.</value></data>
   <data name="SettingsBackgroundToggle.Header" xml:space="preserve"><value>Continuar em segundo plano ao fechar a janela</value></data>
   <data name="SettingsBackgroundToggle.OnContent" xml:space="preserve"><value>Ativado</value></data>
   <data name="SettingsBackgroundToggle.OffContent" xml:space="preserve"><value>Desativado</value></data>
   <data name="SettingsBackgroundToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Continuar em segundo plano ao fechar a janela</value></data>
   <data name="SettingsBackgroundToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.HelpText" xml:space="preserve"><value>Quando desativado, fechar a janela encerra o ServerAlyzer e para a monitorização e o widget.</value></data>
   <data name="BackgroundDegradedNotice.Title" xml:space="preserve"><value>Segundo plano indisponível nesta sessão</value></data>
-  <data name="BackgroundDegradedNotice.Message" xml:space="preserve"><value>O ServerAlyzer abriu esta janela porque não conseguiu colocar ou manter o seu ícone na área de notificação da barra de tarefas. Sem esse ícone não há forma de reabrir ou encerrar a app em segundo plano, por isso fechar esta janela agora encerra o ServerAlyzer. A sua preferência não foi alterada: abra o ServerAlyzer de novo mais tarde para tentar outra vez.</value></data>
-  <data name="SettingsBackgroundDegradedCaption.Text" xml:space="preserve"><value>Indisponível nesta sessão: o ícone da área de notificação não pôde ser criado ou mantido. Fechar a janela encerra o ServerAlyzer. A sua preferência foi mantida e será usada na próxima abertura.</value></data>
+  <data name="BackgroundDegradedNotice.Message" xml:space="preserve"><value>O ServerAlyzer abriu esta janela porque não conseguiu colocar ou manter o seu ícone na área de notificação da barra de tarefas. Sem esse ícone não há forma de reabrir ou encerrar a app em segundo plano, por isso fechar esta janela agora encerra o ServerAlyzer. A tua preferência não foi alterada: abre o ServerAlyzer de novo mais tarde para tentares outra vez.</value></data>
+  <data name="SettingsBackgroundDegradedCaption.Text" xml:space="preserve"><value>Indisponível nesta sessão: o ícone da área de notificação não pôde ser criado ou mantido. Fechar a janela encerra o ServerAlyzer. A tua preferência foi mantida e será usada na próxima abertura.</value></data>
   <data name="ServerFormImportSshConfigButton.Content" xml:space="preserve"><value>Importar da configuração SSH</value></data>
   <data name="ServerFormSshConfigTitle.Text" xml:space="preserve"><value>Anfitriões em ~/.ssh/config</value></data>
   <data name="ServerFormSshConfigCloseButton.Content" xml:space="preserve"><value>Fechar</value></data>
@@ -513,7 +495,7 @@
   <data name="ConnectionHintLocalTunnelFailed" xml:space="preserve"><value>Não foi possível abrir neste computador o túnel local para o anfitrião de salto. Não é um problema do servidor: testa de novo.</value></data>
   <!-- M14.6 Cópia de segurança e restauro encriptados -->
   <data name="BackupSectionTitle.Text" xml:space="preserve"><value>Cópia de segurança e restauro</value></data>
-  <data name="BackupSectionDescription.Text" xml:space="preserve"><value>Guarde os seus servidores, rotas, chaves de anfitrião confiáveis e palavras-passe guardadas num ficheiro encriptado que pode restaurar neste ou noutro computador. O ficheiro é protegido por uma frase-passe à sua escolha. Os ficheiros de chave privada nunca são incluídos, apenas os caminhos.</value></data>
+  <data name="BackupSectionDescription.Text" xml:space="preserve"><value>Guarda os teus servidores, rotas, chaves de anfitrião confiáveis e palavras-passe guardadas num ficheiro encriptado que podes restaurar neste ou noutro computador. O ficheiro é protegido por uma frase-passe à tua escolha. Os ficheiros de chave privada nunca são incluídos, apenas os caminhos.</value></data>
   <data name="BackupCreateButton.Content" xml:space="preserve"><value>Criar cópia de segurança…</value></data>
   <data name="BackupRestoreButton.Content" xml:space="preserve"><value>Restaurar a partir de cópia…</value></data>
   <data name="BackupFileTypeLabel" xml:space="preserve"><value>Cópia de segurança do ServerAlyzer</value></data>
@@ -825,4 +807,97 @@
   <data name="ServersNoResultsTitle" xml:space="preserve"><value>Nenhum servidor encontrado</value></data>
   <data name="ServersNoResultsMessageFormat" xml:space="preserve"><value>Não há servidores com o nome ou endereço “{0}”. Experimenta outra pesquisa.</value></data>
   <data name="ServersLoadingSubtitle" xml:space="preserve"><value>A carregar os teus servidores…</value></data>
+  <data name="ServerDetailEditFor" xml:space="preserve"><value>Editar {0}</value></data>
+  <data name="ServerDetailHideFor" xml:space="preserve"><value>Ocultar {0}</value></data>
+  <data name="ServerDetailRemoveFor" xml:space="preserve"><value>Remover {0}</value></data>
+  <data name="ServerDetailHistoryFor" xml:space="preserve"><value>Histórico de {0}</value></data>
+  <data name="ServerDetailWorkloadsFor" xml:space="preserve"><value>Serviços e containers de {0}</value></data>
+  <data name="ServerDetailStaleReading" xml:space="preserve"><value>Leitura desatualizada</value></data>
+  <data name="ServerDetailLastUpdatedLabel" xml:space="preserve"><value>Última atualização</value></data>
+  <data name="ServerDetailUpdatedJustNow" xml:space="preserve"><value>Agora mesmo</value></data>
+  <data name="SettingsDataTitle.Text" xml:space="preserve"><value>Dados e servidores</value></data>
+  <data name="SettingsDataBackButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Voltar às Definições</value></data>
+  <data name="SettingsDataBackButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Voltar</value></data>
+  <data name="ServerDetailRefreshButtonText.Text" xml:space="preserve"><value>Atualizar</value></data>
+  <data name="ServerDetailEditButton.Content" xml:space="preserve"><value>Editar</value></data>
+  <data name="ServerDetailCpuCaption.Text" xml:space="preserve"><value>Utilização do processador</value></data>
+  <data name="ServerDetailMetricAccessibleFormat" xml:space="preserve"><value>{0}: {1}</value></data>
+  <data name="ServerDetailBytesOfFormat" xml:space="preserve"><value>{0} de {1}</value></data>
+  <data name="ServerDetailUptimeLabel.Text" xml:space="preserve"><value>Tempo de atividade</value></data>
+  <data name="ServerDetailIntervalLabel.Text" xml:space="preserve"><value>Intervalo</value></data>
+  <data name="ServerDetailDurationSecondsOne" xml:space="preserve"><value>{0} segundo</value></data>
+  <data name="ServerDetailDurationSecondsOther" xml:space="preserve"><value>{0} segundos</value></data>
+  <data name="ServerDetailDurationMinutesOne" xml:space="preserve"><value>{0} minuto</value></data>
+  <data name="ServerDetailDurationMinutesOther" xml:space="preserve"><value>{0} minutos</value></data>
+  <data name="ServerDetailDurationHoursOne" xml:space="preserve"><value>{0} hora</value></data>
+  <data name="ServerDetailDurationHoursOther" xml:space="preserve"><value>{0} horas</value></data>
+  <data name="ServerDetailDurationDaysOne" xml:space="preserve"><value>{0} dia</value></data>
+  <data name="ServerDetailDurationDaysOther" xml:space="preserve"><value>{0} dias</value></data>
+  <data name="ServerDetailDurationSeparator" xml:space="preserve"><value>, </value></data>
+  <data name="ServerDetailUpdatedAgoFormat" xml:space="preserve"><value>Há {0}</value></data>
+  <data name="ServerDetailConnectionTitle.Text" xml:space="preserve"><value>Ligação</value></data>
+  <data name="ServerDetailAddressRow.Key" xml:space="preserve"><value>Endereço</value></data>
+  <data name="ServerDetailUserRow.Key" xml:space="preserve"><value>Utilizador</value></data>
+  <data name="ServerDetailAuthenticationRow.Key" xml:space="preserve"><value>Autenticação</value></data>
+  <data name="ServerDetailSystemRow.Key" xml:space="preserve"><value>Sistema operativo</value></data>
+  <data name="ServerDetailConnectionStateRow.Key" xml:space="preserve"><value>Estado da ligação</value></data>
+  <data name="ServerDetailRouteRow.Key" xml:space="preserve"><value>Rota</value></data>
+  <data name="ServerDetailRouteRow.Value" xml:space="preserve"><value>Através de um jump host</value></data>
+  <data name="ServerDetailAuthenticationSshKey" xml:space="preserve"><value>Chave SSH</value></data>
+  <data name="ServerDetailAuthenticationPassword" xml:space="preserve"><value>Palavra-passe</value></data>
+  <data name="ServerDetailAuthenticationNotConfigured" xml:space="preserve"><value>Não configurada</value></data>
+  <data name="ServerDetailExploreTitle.Text" xml:space="preserve"><value>Explorar</value></data>
+  <data name="ServerDetailHistoryRow.Title" xml:space="preserve"><value>Histórico</value></data>
+  <data name="ServerDetailHistoryRow.Detail" xml:space="preserve"><value>CPU, memória e disco ao longo do tempo</value></data>
+  <data name="ServerDetailWorkloadsRow.Title" xml:space="preserve"><value>Serviços e containers</value></data>
+  <data name="ServerDetailWorkloadsRow.Detail" xml:space="preserve"><value>Estado dos serviços e containers Docker</value></data>
+  <data name="ServerDetailConnecting" xml:space="preserve"><value>A ligar…</value></data>
+  <data name="ServerDetailCollectingTitle.Text" xml:space="preserve"><value>A recolher métricas…</value></data>
+  <data name="ServerDetailConnectionProblemMessage" xml:space="preserve"><value>Abre Editar para rever a ligação.</value></data>
+  <data name="ServerDetailMetricsUnsupportedNotice.Title" xml:space="preserve"><value>Sem métricas para este sistema</value></data>
+  <data name="ServerDetailMetricsUnsupportedNotice.Message" xml:space="preserve"><value>As métricas estão disponíveis para servidores Linux e macOS.</value></data>
+  <data name="ServersNoticeHiddenTitle" xml:space="preserve"><value>Servidor ocultado</value></data>
+  <data name="ServersNoticeHiddenMessageFormat" xml:space="preserve"><value>Podes restaurar {0} nas Definições.</value></data>
+  <data name="ServersNoticeRemovedTitle" xml:space="preserve"><value>Servidor removido</value></data>
+  <data name="ServersNoticeRemovedMessageFormat" xml:space="preserve"><value>{0} foi removido do ServerAlyzer.</value></data>
+  <data name="ServersNoticeCloseName" xml:space="preserve"><value>Fechar aviso</value></data>
+  <data name="SettingsAutosave.Text" xml:space="preserve"><value>Guardado automaticamente</value></data>
+  <data name="SettingsThemeTitle.Text" xml:space="preserve"><value>Tema</value></data>
+  <data name="SettingsThemeGroup.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Tema</value></data>
+  <data name="ThemeSystemOption.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Sistema</value></data>
+  <data name="ThemeLightOption.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Claro</value></data>
+  <data name="ThemeDarkOption.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Escuro</value></data>
+  <data name="ThemeSystemOptionText.Text" xml:space="preserve"><value>Sistema</value></data>
+  <data name="ThemeLightOptionText.Text" xml:space="preserve"><value>Claro</value></data>
+  <data name="ThemeDarkOptionText.Text" xml:space="preserve"><value>Escuro</value></data>
+  <data name="SettingsLanguagePicker.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Idioma da interface</value></data>
+  <data name="SettingsMonitoringTitle.Text" xml:space="preserve"><value>Monitorização</value></data>
+  <data name="SettingsWindowTitle.Text" xml:space="preserve"><value>Janela</value></data>
+  <data name="SettingsEnterCompactButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Entrar no modo compacto</value></data>
+  <data name="SettingsEnterCompactButtonText.Text" xml:space="preserve"><value>Entrar</value></data>
+  <data name="SettingsAlwaysOnTopTitle.Text" xml:space="preserve"><value>Sempre no topo</value></data>
+  <data name="SettingsAlwaysOnTopDescription.Text" xml:space="preserve"><value>Aplicado ao modo compacto.</value></data>
+  <data name="SettingsOpenDataText.Text" xml:space="preserve"><value>Dados e servidores</value></data>
+  <data name="SettingsOpenAboutText.Text" xml:space="preserve"><value>Sobre o ServerAlyzer</value></data>
+  <data name="SettingsLocalPreferences.Text" xml:space="preserve"><value>Estas preferências ficam guardadas neste dispositivo.</value></data>
+  <data name="SettingsDataParent.Text" xml:space="preserve"><value>Definições</value></data>
+  <data name="SettingsServerRestoredTitle" xml:space="preserve"><value>Servidor restaurado</value></data>
+  <data name="SettingsServerRestoredMessage" xml:space="preserve"><value>O servidor está novamente visível na lista.</value></data>
+  <data name="SettingsAboutVersionFormat" xml:space="preserve"><value>Versão {0}</value></data>
+  <data name="SettingsCredentialsCaption.Text" xml:space="preserve"><value>Palavras-passe e frases-passe ficam protegidas pelo Gestor de Credenciais do Windows.</value></data>
+  <data name="SettingsToastCloseName" xml:space="preserve"><value>Fechar aviso</value></data>
+  <data name="ServerDetailMetricUnit.Text" xml:space="preserve"><value>%</value></data>
+  <data name="SettingsOpenDataButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Dados e servidores</value></data>
+  <data name="SettingsOpenAboutButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Sobre o ServerAlyzer</value></data>
+  <data name="ServerDetailCpuPulseAccessibleFormat" xml:space="preserve"><value>Pulso das últimas {0} amostras, escala até {1}%</value></data>
+  <data name="ServerDetailHeaderSubtitleFormat" xml:space="preserve"><value>{0}   ·   {1}</value></data>
+  <data name="RemoveServerConfirmTitle" xml:space="preserve"><value>Remover este servidor?</value></data>
+  <data name="RemoveServerConfirmBodyFormat" xml:space="preserve"><value>A configuração de {0} será removida permanentemente deste dispositivo.</value></data>
+  <data name="RemoveServerConfirmNote" xml:space="preserve"><value>O servidor remoto não é alterado. Esta ação não pode ser anulada.</value></data>
+  <data name="RemoveServerConfirmPrimary" xml:space="preserve"><value>Remover servidor</value></data>
+  <data name="DestructiveConfirmClose" xml:space="preserve"><value>Cancelar</value></data>
+  <data name="HistoryClearConfirmAffected" xml:space="preserve"><value>Histórico local · Todos os servidores</value></data>
+  <data name="HistoryClearConfirmNote" xml:space="preserve"><value>Servidores, credenciais e definições são mantidos. Esta ação não pode ser anulada.</value></data>
+  <data name="HistoryResetConfirmAffected" xml:space="preserve"><value>Histórico local · base indisponível</value></data>
+  <data name="HistoryResetConfirmNote" xml:space="preserve"><value>Servidores, credenciais e definições são mantidos. Esta ação não pode ser anulada.</value></data>
 </root>

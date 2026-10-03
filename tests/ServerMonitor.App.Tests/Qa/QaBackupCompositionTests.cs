@@ -65,7 +65,7 @@ public sealed class QaBackupCompositionTests : IDisposable
             case "workloads": QaWorkloadsComposition.Apply(services); break;
             case "screenshot": QaStoreScreenshotComposition.Apply(services); break;
             case "discovery": QaDiscoveryComposition.Apply(services); break;
-            case "overview": QaOverviewComposition.Apply(services, "mixed"); break;
+            case "overview": QaOverviewComposition.Apply(services, "mixed", backupDoublesRequested: true); break;
             default: QaSshConfigComposition.Apply(services, HarnessDirectory); break;
         }
 

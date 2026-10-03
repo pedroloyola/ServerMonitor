@@ -3,6 +3,7 @@ using ServerMonitor.App.ViewModels;
 using ServerMonitor.Core.Enums;
 using Xunit.Abstractions;
 
+using ServerMonitor.App.Tests.Fakes;
 namespace ServerMonitor.App.Tests.ViewModels;
 
 /// <summary>
@@ -23,7 +24,7 @@ public sealed class Ui4OverviewCycleMeasurementTests(ITestOutputHelper output)
 
         var kit = Ui4TestKit.Create(fleet);
         await kit.Dashboard.LoadAsync();
-        using var directory = new ServersViewModel(kit.Dashboard, kit.Navigation, kit.Localization);
+        using var directory = new ServersViewModel(kit.Dashboard, kit.Navigation, kit.Localization, TestClock.Fake());
         // The UI dispatcher's role in production: queue the coalesced recompute; run it once after the burst.
         var queued = new List<Action>();
         kit.Dashboard.OverviewScheduler = action =>

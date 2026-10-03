@@ -17,22 +17,20 @@ public sealed partial class UiDebtRatchetTests
 {
     /// <summary>Literal <c>FontSize="n"</c> (attribute or <c>Setter Property="FontSize" Value="n"</c>) per file,
     /// for every XAML except App.xaml and Styles/Tokens/** (Views/, Controls/, MainWindow.xaml, legacy Styles/*.xaml,
-    /// any new folder). Files not listed have a baseline of zero. Total today: 138 (UI.3 removed HistoryPage 7 + WorkloadsPage 38; UI.4 DashboardPage 8).</summary>
+    /// any new folder). Files not listed have a baseline of zero. Total today: 96 (UI.3 removed HistoryPage 7 + WorkloadsPage 38; UI.4 DashboardPage 8; UI.5 ServerFullCard 21 + ServerActionsButton 1 + SettingsPage 20).</summary>
     private static readonly IReadOnlyDictionary<string, int> FontSizeLiteralBaseline = new Dictionary<string, int>(StringComparer.Ordinal)
     {
         ["Controls/DiscoveredServerCard.xaml"] = 5,
         ["Controls/EmptyStateControl.xaml"] = 3,
-        ["Controls/ServerActionsButton.xaml"] = 1,
         ["Controls/ServerCompactCard.xaml"] = 15,
         ["Controls/ServerEditorModal.xaml"] = 1,
         ["Controls/ServerFormControl.xaml"] = 50,
-        ["Controls/ServerFullCard.xaml"] = 21,
         ["MainWindow.xaml"] = 7,
         ["Styles/Controls.xaml"] = 7,
         ["Views/BackupCreateDialog.xaml"] = 3,
         ["Views/RestoreConfirmDialog.xaml"] = 3,
-        ["Views/RestoreOpenDialog.xaml"] = 2,
-        ["Views/SettingsPage.xaml"] = 20
+        ["Views/RestoreOpenDialog.xaml"] = 2
+        // UI.5 B2: SettingsPage / SettingsDataPage were rebuilt on the type ramp - their 20 literals are gone (win locked).
     };
 
     /// <summary>Hex colour literals per file, outside Styles/Tokens/** (XAML values and C# string literals; comments
@@ -51,7 +49,6 @@ public sealed partial class UiDebtRatchetTests
         ["Controls/EmptyStateControl.xaml"] = 3,
         ["Controls/ServerCompactCard.xaml"] = 3,
         ["Controls/ServerFormControl.xaml"] = 1,
-        ["Controls/ServerFullCard.xaml"] = 4,
         ["MainWindow.xaml"] = 4,
         ["Styles/Controls.xaml"] = 4,
         ["Styles/DesignTokens.xaml"] = 92

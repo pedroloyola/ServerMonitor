@@ -18,4 +18,6 @@
     <CornerRadius x:Key="SaRadiusSkeleton">6</CornerRadius>
     <!-- UI.3 additive (D-UI3-8): rich server selector 330x52 r16, 112:2264 / 112:2442. -->
     <CornerRadius x:Key="SaRadiusSelector">16</CornerRadius>
+    <!-- UI.5: disk "segmented capacity" segment 16x18 r5, 112:1891 (the memory segments / CPU bars use SaRadiusMiniBar 3). -->
+    <CornerRadius x:Key="SaRadiusDiskSegment">5</CornerRadius>
 </ResourceDictionary>

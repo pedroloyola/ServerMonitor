@@ -83,13 +83,19 @@ internal static class Ui4TestKit
         public required ServerMonitoringStateStore States { get; init; }
 
         public required ILocalizationService Localization { get; init; }
+
+        public required FakeMonitoringEngine Engine { get; init; }
+
+        public required FakeConnectionStateStore Connections { get; init; }
     }
 
     public static Harness Create(
         Fleet fleet,
         ILocalizationService? localization = null,
         MonitoringOptions? options = null,
-        INavigationService? navigationOverride = null)
+        INavigationService? navigationOverride = null,
+        IServerDialogService? dialogs = null,
+        IServerProfileService? profiles = null)
     {
         var servers = new FakeServerService();
         servers.Servers.AddRange(fleet.Entries.Select(entry => entry.Server));
@@ -107,14 +113,16 @@ internal static class Ui4TestKit
 
         var navigation = new FakeNavigationService();
         var localizer = localization ?? new FakeLocalizationService();
+        var engine = new FakeMonitoringEngine();
+        var connections = new FakeConnectionStateStore();
         var dashboard = new DashboardViewModel(
             servers,
-            new InertProfileService(),
-            new InertDialogService(),
-            new FakeConnectionStateStore(),
+            profiles ?? new InertProfileService(),
+            dialogs ?? new InertDialogService(),
+            connections,
             metrics,
             states,
-            new FakeMonitoringEngine(),
+            engine,
             new InertDiscoveryService(),
             navigationOverride ?? navigation,
             localizer,
@@ -129,7 +137,9 @@ internal static class Ui4TestKit
             Servers = servers,
             Metrics = metrics,
             States = states,
-            Localization = localizer
+            Localization = localizer,
+            Engine = engine,
+            Connections = connections
         };
     }
 

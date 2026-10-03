@@ -24,7 +24,7 @@ ServerMonitor.Collectors     ──→ ServerMonitor.Core
 - recursos RESW externos e `pt-BR` como idioma padrão/fallback;
 - `DesktopAcrylicBackdrop` para o backdrop da janela, Acrylic interno com tint subtil e fallback opaco/alto contraste;
 - shell leve com `Frame`, sem sidebar permanente;
-- `ServerFullCard` e `ServerCompactCard` partilham `ServerCardViewModel` e o controlo de ações; apenas a apresentação standard está exposta.
+- A página Server Detail (`ServerDetailViewModel`, UI.5) e o `ServerCompactCard` partilham o mesmo `ServerCardViewModel` vivo; o Detail compõe-no e só acrescenta apresentação.
 
 `DesktopAcrylicKind.Thin` foi avaliado através de `DesktopAcrylicController`. Na combinação validada de Windows 11 e Windows App SDK 2.3.1, a ligação direta do controller causou uma falha nativa durante o arranque; por isso a implementação utiliza o `DesktopAcrylicBackdrop` suportado pela shell. `SystemBackdropElement` também não é aplicado a cada card: repetir backdrops de sistema em superfícies adjacentes aumentaria custo e sobreposição de materiais, enquanto o Acrylic interno já fornece a separação necessária.
 
@@ -60,7 +60,7 @@ Detalhes de transporte, política criptográfica e credenciais constam das ADR-0
 ## Pipeline manual de métricas Linux e macOS
 
 ```text
-ServerFullCard → ServerCardViewModel → IServerMetricsCollector
+ServerDetailPage → ServerDetailViewModel → ServerCardViewModel → IServerMetricsCollector
                                       │
                                       ▼
                             MetricsCollectorRouter

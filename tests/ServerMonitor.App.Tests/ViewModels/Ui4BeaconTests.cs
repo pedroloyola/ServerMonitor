@@ -61,12 +61,12 @@ public sealed class Ui4BeaconTests
     public async Task ADirectoryRow_IsRefocusedByTheNextServersPage_Once()
     {
         var kit = await LoadedAsync(Mixed());
-        using (var first = new ServersViewModel(kit.Dashboard, kit.Navigation, kit.Localization))
+        using (var first = new ServersViewModel(kit.Dashboard, kit.Navigation, kit.Localization, TestClock.Fake()))
         {
             first.Rows[1].OpenDetailCommand.Execute(null);
         }
 
-        using var second = new ServersViewModel(kit.Dashboard, kit.Navigation, kit.Localization);
+        using var second = new ServersViewModel(kit.Dashboard, kit.Navigation, kit.Localization, TestClock.Fake());
 
         Assert.Equal(1, second.TakeReturnFocusIndex());
         Assert.Equal(-1, second.TakeReturnFocusIndex());

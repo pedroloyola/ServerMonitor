@@ -9,8 +9,10 @@ namespace ServerMonitor.App.Controls.Primitives;
 
 /// <summary>
 /// UI.2 navigable list row (Figma 112:1057 simple: icon 20 + name + trailing + chevron 18, h48; 112:1933 rich: icon
-/// 22 + title/detail + chevron 16, h70). A Button, so it is focusable, invokable and announced as a button; the
-/// automation name is the title. Hover / pressed / focus are DERIVED.
+/// 22 + title/detail + chevron 16, h70). A Button, so it is focusable, invokable and announced as a button. The
+/// automation name is an explicit AutomationProperties.Name when one is set (UI.5 Beacon C1 M1: "Histórico de
+/// prod-web-01" - the title must never overwrite it), else the title (<see cref="SaListRowAutomationPeer"/>).
+/// Hover / pressed / focus are DERIVED.
 /// </summary>
 [TemplateVisualState(Name = "Simple", GroupName = "VariantStates")]
 [TemplateVisualState(Name = "Rich", GroupName = "VariantStates")]
@@ -20,7 +22,7 @@ public sealed class SaListRow : Button
         nameof(IconData), typeof(string), typeof(SaListRow), new PropertyMetadata(null));
 
     public static readonly DependencyProperty TitleProperty = DependencyProperty.Register(
-        nameof(Title), typeof(string), typeof(SaListRow), new PropertyMetadata(string.Empty, (d, e) => AutomationProperties.SetName(d, e.NewValue as string ?? string.Empty)));
+        nameof(Title), typeof(string), typeof(SaListRow), new PropertyMetadata(string.Empty));
 
     public static readonly DependencyProperty DetailProperty = DependencyProperty.Register(
         nameof(Detail), typeof(string), typeof(SaListRow), new PropertyMetadata(string.Empty));
@@ -89,6 +91,13 @@ public sealed class SaListRow : Button
 /// </summary>
 public sealed class SaListRowAutomationPeer(SaListRow owner) : ButtonAutomationPeer(owner)
 {
+    /// <summary>An explicit AutomationProperties.Name wins; otherwise the row is named by its title.</summary>
+    protected override string GetNameCore() => NameFor(AutomationProperties.GetName(Owner), ((SaListRow)Owner).Title, base.GetNameCore);
+
+    /// <summary>Pure rule (unit-tested): explicit name, else title, else whatever the button peer would say.</summary>
+    internal static string NameFor(string? explicitName, string? title, Func<string> fallback) =>
+        !string.IsNullOrEmpty(explicitName) ? explicitName : !string.IsNullOrEmpty(title) ? title : fallback();
+
     protected override int GetPositionInSetCore() =>
         SaRepeaterPosition.PositionInSet((UIElement)Owner) is var position and > 0 ? position : base.GetPositionInSetCore();
 

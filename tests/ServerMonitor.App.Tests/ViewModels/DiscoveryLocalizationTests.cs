@@ -48,12 +48,13 @@ public sealed class DiscoveryLocalizationTests
         var europeanPortuguese = LoadResources("pt-PT");
         var english = LoadResources("en-US");
 
-        Assert.Equal("Redefinir dispositivos ignorados", brazilianPortuguese["SettingsResetIgnoredButton.Content"]);
-        Assert.Equal("Dispositivos ignorados redefinidos", brazilianPortuguese["SettingsResetIgnoredSuccess.Title"]);
-        Assert.Equal("Repor dispositivos ignorados", europeanPortuguese["SettingsResetIgnoredButton.Content"]);
-        Assert.Equal("Dispositivos ignorados repostos", europeanPortuguese["SettingsResetIgnoredSuccess.Title"]);
-        Assert.Equal("Reset ignored devices", english["SettingsResetIgnoredButton.Content"]);
-        Assert.Equal("Ignored devices reset", english["SettingsResetIgnoredSuccess.Title"]);
+        // UI.5 (Figma 112:8257 / 112:21538): shorter Data-page copy, still about DEVICES (never "servidores").
+        Assert.Equal("Redefinir dispositivos", brazilianPortuguese["SettingsResetIgnoredButton.Content"]);
+        Assert.Equal("Dispositivos redefinidos", brazilianPortuguese["SettingsResetIgnoredSuccess.Title"]);
+        Assert.Equal("Repor dispositivos", europeanPortuguese["SettingsResetIgnoredButton.Content"]);
+        Assert.Equal("Dispositivos repostos", europeanPortuguese["SettingsResetIgnoredSuccess.Title"]);
+        Assert.Equal("Reset devices", english["SettingsResetIgnoredButton.Content"]);
+        Assert.Equal("Devices reset", english["SettingsResetIgnoredSuccess.Title"]);
 
         foreach (var culture in Cultures)
         {

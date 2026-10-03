@@ -157,17 +157,16 @@ public sealed class SettingsNotificationViewModelTests
     {
         var degradation = new BackgroundDegradationNotice();
         var viewModel = CreateWithDegradation(degradation);
-        Assert.Equal(Visibility.Collapsed, viewModel.IsBackgroundDegraded);
+        // UI.5: a bool (the view collapses the caption through the converter); view models expose no Visibility.
+        Assert.False(viewModel.IsBackgroundDegraded);
 
         degradation.Raise();
-        Assert.Equal(Visibility.Visible, viewModel.IsBackgroundDegraded);
+        Assert.True(viewModel.IsBackgroundDegraded);
         Assert.True(viewModel.IsBackgroundDegradedNoticeOpen);
 
         viewModel.IsBackgroundDegradedNoticeOpen = false; // the user closes the InfoBar
 
-        Assert.Equal(
-            Visibility.Visible,
-            viewModel.IsBackgroundDegraded);
+        Assert.True(viewModel.IsBackgroundDegraded);
     }
 
     /// <summary>
@@ -190,7 +189,8 @@ public sealed class SettingsNotificationViewModelTests
             degradation,
             new NullHistoryMaintenanceService(),
             new AppVersionProvider(),
-            NullLogger<SettingsViewModel>.Instance);
+            NullLogger<SettingsViewModel>.Instance,
+            new PresentationClock(new Microsoft.Extensions.Time.Testing.FakeTimeProvider())); // UI.5 Atlas C2 1: no system clock
 
         degradation.Raise();
 
@@ -209,7 +209,8 @@ public sealed class SettingsNotificationViewModelTests
         new BackgroundDegradationNotice(),
         new NullHistoryMaintenanceService(),
         new AppVersionProvider(),
-        NullLogger<SettingsViewModel>.Instance);
+        NullLogger<SettingsViewModel>.Instance,
+        TestClock.Fake()); // UI.5 fix round 4: the clock is required - a fake, never the system clock
 
     private static SettingsViewModel CreateWithDegradation(IBackgroundDegradationNotice degradation) => new(
         new FakeThemeService(),
@@ -222,7 +223,8 @@ public sealed class SettingsNotificationViewModelTests
         degradation,
         new NullHistoryMaintenanceService(),
         new AppVersionProvider(),
-        NullLogger<SettingsViewModel>.Instance);
+        NullLogger<SettingsViewModel>.Instance,
+        TestClock.Fake()); // UI.5 fix round 4: the clock is required - a fake, never the system clock
 
     private static SettingsViewModel Create(
         INotificationSettingsService settings,
@@ -237,7 +239,8 @@ public sealed class SettingsNotificationViewModelTests
         new BackgroundDegradationNotice(),
         new NullHistoryMaintenanceService(),
         new AppVersionProvider(),
-        NullLogger<SettingsViewModel>.Instance);
+        NullLogger<SettingsViewModel>.Instance,
+        TestClock.Fake()); // UI.5 fix round 4: the clock is required - a fake, never the system clock
 
     private sealed class FakeNotificationSettingsService(bool enabled) : INotificationSettingsService
     {
@@ -318,6 +321,10 @@ public sealed class SettingsNotificationViewModelTests
         }
 
         public void GoToSettings() => SettingsCount++;
+
+        public void GoToSettings(SettingsSection section) => SettingsCount++;
+
+        public bool ConsumeAboutSettingsFocus() => false;
 
         public void GoToHistory(Guid serverId, string serverName)
         {

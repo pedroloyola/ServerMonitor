@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.UI.Dispatching;
@@ -608,6 +609,8 @@ public partial class App : Application
         // these so the History UI degrades to "unavailable" gracefully.
         services.AddSingleton<IServerHistoryQueryService, NullServerHistoryQueryService>();
         services.AddSingleton<IHistoryMaintenanceService, NullHistoryMaintenanceService>();
+        // UI.5: the history confirmations are a view service, separate from the (UI-free) maintenance service.
+        services.AddSingleton<IHistoryMaintenanceInteraction, HistoryMaintenanceDialogService>();
 
         // M11 workloads. Default: an empty store + inert refresh, so the Workloads UI resolves
         // in every composition. The real collector service (non-QA branch) or the QA harness
@@ -791,15 +794,25 @@ public partial class App : Application
         services.AddSingleton<IBackupRestoreInteraction, BackupRestoreDialogService>();
         services.AddSingleton<BackupRestoreViewModel>();
 
+        // UI.5 fix round 4 (Boss): the notice / toast owners REQUIRE a clock; production passes the system clock
+        // explicitly, here. TRY-add: a QA harness that fixed the presentation clock has already registered it above
+        // (QaOverviewComposition runs earlier in this method) and must keep winning (runtime smoke: "Há 8 segundos").
+        services.TryAddSingleton(PresentationClock.System);
         services.AddSingleton<DashboardViewModel>();
         services.AddSingleton<SettingsViewModel>();
         services.AddSingleton<DashboardPage>();
         services.AddSingleton<SettingsPage>();
-        // UI.4: the Servidores directory and the interim server page (D-UI4-DETAIL) are per-visit views over the
+        // UI.5 §4: "Dados e servidores", the second Settings sub-page; a singleton like SettingsPage, sharing its VMs.
+        services.AddSingleton<SettingsDataPage>();
+        // UI.4/UI.5: the Servidores directory and the Server Detail page (D-UI4-DETAIL) are per-visit views over the
         // singleton dashboard's cards: fresh page/VM each navigation, disposed on Unloaded.
         services.AddTransient<ServersViewModel>();
         services.AddTransient<ServersPage>();
         services.AddTransient<ServerDetailViewModel>();
+        // UI.5: where focus returns on the next Detail page after Histórico / Serviços e containers (taken once).
+        services.AddSingleton<ServerDetailReturnFocus>();
+        // UI.5 Boss B2 answer 1: the one-shot "Servidor ocultado / removido" notice the Detail hands to Servidores.
+        services.AddSingleton<ServersReturnNotice>();
         services.AddTransient<ServerDetailPage>();
         // History is opened per-server, so a fresh page/VM each navigation (disposed on Unloaded).
         services.AddTransient<HistoryViewModel>();

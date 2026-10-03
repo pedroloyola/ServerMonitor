@@ -117,7 +117,7 @@ public sealed partial class Ui4LocalizationTests
         {
             var resources = ResWLocalizationService.Load(culture);
             var english = culture == "en-US";
-            Assert.Equal(english ? "Services and containers" : "Serviços e containers", resources["ServerCardWorkloadsMenuItem.Text"]);
+            Assert.Equal(english ? "Services and containers" : "Serviços e containers", resources["ServerDetailWorkloadsRow.Title"]);
             Assert.Equal(english ? "Services and containers" : "Serviços e containers", resources["WorkloadsSubtitle.Text"]);
             Assert.DoesNotContain(resources, entry => entry.Value.Contains("workload", StringComparison.OrdinalIgnoreCase));
         }
