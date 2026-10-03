@@ -182,14 +182,17 @@ public sealed class Ui5B2Tests
 
         await ((AsyncRelayCommand)detail.HideCommand).ExecuteAsync();
 
-        using var servers = new ServersViewModel(kit.Dashboard, kit.Navigation, kit.Localization, notice);
+        // Atlas C2 finding 1: never the system clock - and the recording fake proves the countdown went through it.
+        var clock = new TimerRecordingTimeProvider();
+        using var servers = new ServersViewModel(kit.Dashboard, kit.Navigation, kit.Localization, notice, new PresentationClock(clock));
+        Assert.Equal(1, clock.CreatedCount(TransientNoticeTimer.Duration));
         Assert.True(servers.IsNoticeOpen);
         Assert.Equal("Servidor ocultado", servers.NoticeTitle);
         Assert.Equal("Podes restaurar web nas Definições.", servers.NoticeMessage); // A-12 "tu"
         servers.DismissNoticeCommand.Execute(null);
         Assert.False(servers.IsNoticeOpen);
 
-        using var again = new ServersViewModel(kit.Dashboard, kit.Navigation, kit.Localization, notice);
+        using var again = new ServersViewModel(kit.Dashboard, kit.Navigation, kit.Localization, notice, new PresentationClock(clock));
         Assert.False(again.IsNoticeOpen); // never re-shown
     }
 
@@ -257,6 +260,7 @@ public sealed class Ui5B2Tests
     {
         var settings = SettingsWorld.Create(new ResWLocalizationService("pt-PT"));
         settings.Servers.Servers.Add(new Server { Id = Guid.NewGuid(), Name = "old", Host = "old.local", IsHidden = true });
+        var timersBefore = settings.Clock.CreatedCount(TransientNoticeTimer.Duration);
         settings.Servers.RestoreOverride = _ => Task.FromResult(true);
         await settings.ViewModel.LoadAsync();
 
@@ -267,6 +271,7 @@ public sealed class Ui5B2Tests
 
         settings.ViewModel.ResetIgnoredCommand.Execute(null);
         Assert.Equal("Dispositivos repostos", settings.ViewModel.ToastTitle);
+        Assert.Equal(timersBefore + 2, settings.Clock.CreatedCount(TransientNoticeTimer.Duration)); // both on the fake
 
         settings.ViewModel.DismissToastCommand.Execute(null);
         Assert.False(settings.ViewModel.IsToastOpen);
@@ -381,7 +386,8 @@ public sealed class Ui5B2Tests
             new BackgroundDegradationNotice(),
             new ThrowingMaintenance(),
             new AppVersionProvider(),
-            NullLogger<SettingsViewModel>.Instance);
+            NullLogger<SettingsViewModel>.Instance,
+            new PresentationClock(new FakeTimeProvider(Now)));
 
         await viewModel.LoadAsync().WaitAsync(TimeSpan.FromSeconds(30));
 
@@ -635,9 +641,13 @@ public sealed class Ui5B2Tests
 
         public required FakeServerService Servers { get; init; }
 
+        /// <summary>Atlas C2 finding 1: the toast's countdown runs on this fake, never on the system clock.</summary>
+        public required TimerRecordingTimeProvider Clock { get; init; }
+
         public static SettingsWorld Create(ILocalizationService localization)
         {
             var servers = new FakeServerService();
+            var clock = new TimerRecordingTimeProvider();
             var viewModel = new SettingsViewModel(
                 new Ui5SettingsTests.RecordingTheme(AppThemePreference.System),
                 localization,
@@ -649,8 +659,9 @@ public sealed class Ui5B2Tests
                 new BackgroundDegradationNotice(),
                 new NullHistoryMaintenanceService(),
                 new AppVersionProvider(),
-                NullLogger<SettingsViewModel>.Instance);
-            return new SettingsWorld { ViewModel = viewModel, Servers = servers };
+                NullLogger<SettingsViewModel>.Instance,
+                new PresentationClock(clock));
+            return new SettingsWorld { ViewModel = viewModel, Servers = servers, Clock = clock };
         }
     }
 

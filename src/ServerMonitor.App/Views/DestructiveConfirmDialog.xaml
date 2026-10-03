@@ -18,8 +18,8 @@
             Text="{x:Bind Body, Mode=OneTime}"
             Style="{StaticResource SaSecondaryBodyTextStyle}"
             TextWrapping="Wrap" />
-        <Border x:Name="AffectedRow" Style="{StaticResource SaInsetTintedSurfaceStyle}" MinHeight="42"
-                AutomationProperties.Name="{x:Bind Affected, Mode=OneTime}">
+        <!-- Beacon C2 R2-N2: read once - by its text; the row itself carries no second name. -->
+        <Border x:Name="AffectedRow" Style="{StaticResource SaInsetTintedSurfaceStyle}" MinHeight="42">
             <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
                 <primitives:SaIcon Data="{x:Bind AffectedIconData, Mode=OneTime}" Size="18" VerticalAlignment="Center"
                                    Foreground="{ThemeResource SaTextSecondaryBrush}" />

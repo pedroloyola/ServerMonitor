@@ -189,7 +189,8 @@ public sealed class SettingsNotificationViewModelTests
             degradation,
             new NullHistoryMaintenanceService(),
             new AppVersionProvider(),
-            NullLogger<SettingsViewModel>.Instance);
+            NullLogger<SettingsViewModel>.Instance,
+            new PresentationClock(new Microsoft.Extensions.Time.Testing.FakeTimeProvider())); // UI.5 Atlas C2 1: no system clock
 
         degradation.Raise();
 

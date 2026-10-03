@@ -46,6 +46,7 @@ The window at 1040 is **Medium**: its content is about 960, so it is stacked. Th
   - The collecting card is 216 high, the metric cards' height.
   - The info strip is a solid card 86 high, padding 24, gap 32, with skeleton values.
   - **Intervalo stays shown** during the first reading (Prism C1 N-12, accepted exception). It is known configuration, and a skeleton there would hide real information.
+  - Accepted consequence (Prism C2 n-1): that strip measures ~97 instead of 86, because the interval value (17/24) is taller than a 12 px skeleton.
 - **Ligação.**
   - The 4 Figma rows are 23 high, with a gap of 17.
   - The DERIVED "Estado da ligação" row appears only when the connection is not verified: not yet tested, testing, or failed.
@@ -59,7 +60,10 @@ The window at 1040 is **Medium**: its content is about 960, so it is stacked. Th
   - A later visit never shows them again.
   - They are polite live regions.
   - They sit in **their own row under the content**, so they never cover an action at any size. This is a deliberate deviation from Figma §3.2, which draws them over the content.
+  - Accepted cost (Prism C2 n-2): while a notice is visible, the scrolling area is ~128 px shorter. At 560×640 little room is left, but only for the 8 s. To be revisited in UI.6, when the shell gets its own notice area.
 - **Server-scoped errors** (Boss decision 3). A failed Editar / Ocultar / Remover is reported with the server it was about.
+  - **Last-wins** (Cortex C2 R-2, accepted): there is ONE shared notice. An error about X followed by one about Y moves the scope to Y; X's Detail then stops showing it, while the Visão geral (unscoped) still does.
+  - A locked configuration (M14.6) is never server-scoped: it shows everywhere.
   - It shows only on that server's Detail.
   - Global errors (load, add, discovery) still show everywhere (UI.4 SHOULD-3).
   - The scope is App-layer bookkeeping (`DashboardViewModel.OperationErrorServerId`). Nothing in Core changed.
@@ -86,6 +90,9 @@ Remover servidor, Limpar histórico and Repor histórico all use `DestructiveCon
 - **Refreshing.** "A atualizar…" is a polite live region, raised when a refresh starts.
 - **Glass on a live theme switch** (`SaThemeRefresh`).
   - Measured at runtime: the open page never receives `ActualThemeChanged`. Re-applying the style or the brush in place still rendered a different blend from a page entering the tree (Light 223 vs 247, Dark 56 vs 37).
-  - The page therefore listens to its window root and remounts its own content after a theme change. That is the same objects leaving and re-entering the tree, with focus restored.
+  - The page therefore listens to its window root and remounts its own content after a theme change. That is the same objects leaving and re-entering the tree, with focus and the page scroller's vertical offset restored (Cortex C2 R-1).
+  - Backlog for UI.6 (Cortex C2 R-4): the UI.4 pages (Visão geral, Servidores, Histórico, Serviços) do not opt in yet; in the shell the fix can move to the Frame or the root.
   - Result: live switch = re-entry, in both directions.
 - **After a cancelled or failed Ocultar / Remover,** focus returns to "…": the menu item that started it no longer exists.
+- **After a Limpar / Repor histórico dialog** (cancelled, done or failed), focus returns to the button that opened it (Beacon C2 R2-M1). While the dialog was open the command had disabled that button, so the dialog could not hand focus back. If a successful reset hides "Repor histórico", focus goes to "Limpar histórico".
+- **The hidden-servers list** is a named List for UI Automation. `SaListHost` hosts the `ItemsRepeater` (which has no automation peer), and the repeater keeps its virtualization and per-item Tab stops (Beacon C2 R2-N1).

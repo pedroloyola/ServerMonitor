@@ -411,7 +411,8 @@ public sealed class Ui5R2Tests
             new BackgroundDegradationNotice(),
             new ThrowingMaintenance(),
             new AppVersionProvider(),
-            logger);
+            logger,
+            new PresentationClock(new FakeTimeProvider(Now)));
 
         await viewModel.LoadAsync().WaitAsync(TimeSpan.FromSeconds(30));
 

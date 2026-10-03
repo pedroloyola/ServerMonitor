@@ -559,7 +559,18 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
                 exception.GetType().Name);
             IsHistoryClearErrorOpen = true;
         }
+        finally
+        {
+            HistoryFocusRequested?.Invoke(this, HistoryAction.Clear);
+        }
     }
+
+    /// <summary>
+    /// Beacon C2 R2-M1: raised when a Limpar / Repor histórico ends - cancelled, done or failed. The command disabled its
+    /// button while the dialog was open, so the dialog could not hand focus back to it; the page refocuses it (or, after a
+    /// successful reset hid "Repor histórico", "Limpar histórico") - never the top of the page.
+    /// </summary>
+    public event EventHandler<HistoryAction>? HistoryFocusRequested;
 
     private async Task ResetHistoryAsync()
     {
@@ -589,6 +600,10 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
                 exception.GetType().Name);
             IsHistoryResetErrorOpen = true;
             IsHistoryResetAvailable = true;
+        }
+        finally
+        {
+            HistoryFocusRequested?.Invoke(this, HistoryAction.Reset);
         }
     }
 

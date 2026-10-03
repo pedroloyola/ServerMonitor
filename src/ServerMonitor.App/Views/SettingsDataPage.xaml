@@ -93,10 +93,11 @@
                             Visibility="{Binding IsServerOperationErrorOpen, Converter={StaticResource BooleanToVisibilityConverter}}" />
                         <!-- Beacon C1 M2: every Restaurar is a Tab stop (TabFocusNavigation Local) and says its position in the
                              list ("1 of 3"); the list is named by its card title. -->
+                        <!-- Beacon C2 R2-N1: the ItemsRepeater has no automation peer; SaListHost is the named List. -->
+                        <primitives:SaListHost AutomationProperties.Name="{Binding HiddenServersListName}"
+                                               Visibility="{Binding HasHiddenServers, Converter={StaticResource BooleanToVisibilityConverter}}">
                         <ItemsRepeater x:Name="HiddenServersList" ItemsSource="{Binding HiddenServers}"
-                                       TabFocusNavigation="Local"
-                                       AutomationProperties.Name="{Binding HiddenServersListName}"
-                                       Visibility="{Binding HasHiddenServers, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                       TabFocusNavigation="Local">
                             <ItemsRepeater.Layout>
                                 <StackLayout Spacing="0" />
                             </ItemsRepeater.Layout>
@@ -130,6 +131,7 @@
                                 </DataTemplate>
                             </ItemsRepeater.ItemTemplate>
                         </ItemsRepeater>
+                        </primitives:SaListHost>
                     </StackPanel>
                 </Border>
 
@@ -175,10 +177,10 @@
                             <TextBlock x:Uid="SettingsHistoryTitle" VerticalAlignment="Center" AutomationProperties.HeadingLevel="Level2"
                                        Style="{StaticResource SaCardTitleTextStyle}" TextWrapping="Wrap" />
                             <StackPanel x:Name="HistoryActions" Grid.Column="1" Orientation="Horizontal" Spacing="{StaticResource SaSpace12}">
-                                <Button x:Uid="SettingsResetHistoryButton" MinWidth="180" Style="{StaticResource SaPillButtonSmallStyle}"
+                                <Button x:Name="ResetHistoryButton" x:Uid="SettingsResetHistoryButton" MinWidth="180" Style="{StaticResource SaPillButtonSmallStyle}"
                                         Command="{Binding ResetHistoryCommand}"
                                         Visibility="{Binding IsHistoryResetAvailable, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                                <Button x:Uid="SettingsClearHistoryButton" MinWidth="180" Style="{StaticResource SaPillButtonSmallDangerStyle}"
+                                <Button x:Name="ClearHistoryButton" x:Uid="SettingsClearHistoryButton" MinWidth="180" Style="{StaticResource SaPillButtonSmallDangerStyle}"
                                         Command="{Binding ClearHistoryCommand}" />
                             </StackPanel>
                         </Grid>

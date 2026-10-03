@@ -328,6 +328,8 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
     /// or null for a global error (load, add, discovery). Set together with <see cref="IsOperationErrorOpen"/>, so a Server
     /// Detail shows a server-scoped error only on THAT server's page; global errors keep the UI.4 SHOULD-3 behaviour
     /// (shown everywhere). App-layer bookkeeping only - nothing in Core changes.
+    /// Cortex C2 R-2 (accepted): ONE shared notice, so the scope is last-wins - an error about X followed by one about Y
+    /// moves the scope to Y; X's Detail then stops showing it while the Visão geral (unscoped) still does.
     /// </summary>
     public Guid? OperationErrorServerId { get; private set; }
 

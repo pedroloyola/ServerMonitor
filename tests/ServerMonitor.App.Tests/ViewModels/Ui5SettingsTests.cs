@@ -442,8 +442,11 @@ public sealed class Ui5SettingsTests
                 new BackgroundDegradationNotice(),
                 maintenance ?? new NullHistoryMaintenanceService(),
                 new AppVersionProvider(),
-                NullLogger<SettingsViewModel>.Instance);
+                NullLogger<SettingsViewModel>.Instance,
+                new PresentationClock(Clock)); // Atlas C2 finding 1: the toast countdown never uses the system clock
         }
+
+        public TimerRecordingTimeProvider Clock { get; } = new();
 
         public SettingsViewModel ViewModel { get; }
 
