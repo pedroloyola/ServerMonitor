@@ -924,7 +924,7 @@ with clear metrics and direct SSH access.</value></data>
   <data name="OnboardingIdentityBody.Text" xml:space="preserve"><value>On the first connection, confirm the SSH key fingerprint.</value></data>
   <data name="OnboardingDeviceTitle.Text" xml:space="preserve"><value>Keep your data with you</value></data>
   <data name="OnboardingDeviceBody.Text" xml:space="preserve"><value>Local history and credentials protected by Windows. No account required.</value></data>
-  <data name="OnboardingReadOnly.Text" xml:space="preserve"><value>Monitoring reads information from the server.</value></data>
+  <data name="OnboardingReadOnly.Text" xml:space="preserve"><value>Monitoring only reads from the server (read-only).</value></data>
   <data name="OnboardingManualTitle.Text" xml:space="preserve"><value>Add manually</value></data>
   <data name="OnboardingManualBody.Text" xml:space="preserve"><value>Enter the address, username and SSH authentication method.</value></data>
   <data name="OnboardingImportTitle.Text" xml:space="preserve"><value>Import from SSH</value></data>

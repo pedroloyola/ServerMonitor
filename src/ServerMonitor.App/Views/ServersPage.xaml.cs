@@ -36,8 +36,8 @@ public sealed partial class ServersPage : Page, IDisposable
     // or, with no server at all, to "Adicionar servidor" (Prism r2 C-R2-1: nothing to search for).
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
-        if (ShellPageFocus.GetKeepSidebar(this)) return;
         var index = ViewModel.TakeReturnFocusIndex();
+        if (ShellPageFocus.GetKeepSidebar(this)) return;
         DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
         {
             if (RepeaterFocus.FocusIndex(ServersRepeater, index))

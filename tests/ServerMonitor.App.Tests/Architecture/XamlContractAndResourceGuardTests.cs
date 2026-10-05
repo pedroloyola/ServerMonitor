@@ -87,7 +87,7 @@ public sealed partial class XamlContractAndResourceGuardTests
             "PART_Dot", "PART_Label", "PART_Path", "PART_Header", "PART_Helper", "PART_Error", "PART_PasswordBox", "PART_RevealButton",
             // S6
             "RootGrid", "KeyColumn", "PART_Key", "PART_Value", "PART_Fill", "PART_Track", "PART_Text", "PART_Icon", "PART_Chevron",
-            "PART_Detail", "PART_Trailing", "PART_InfoLayout", "PART_ErrorLayout", "PART_CloseButton", "PART_Parent",
+            "PART_Detail", "PART_Trailing", "PART_InfoLayout", "PART_ErrorLayout", "PART_ErrorTitle", "PART_CloseButton", "PART_Parent",
             // UI.5 SaSegmentMeter / SaPulseBars: the host the code fills and the theme-aware brush sources it binds to.
             "PART_Host", "PART_LitBrush", "PART_EmptyBrush", "PART_BarBrush"
         ],

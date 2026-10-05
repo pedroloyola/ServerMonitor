@@ -195,6 +195,11 @@ public static class QaTokenManifest
         new("SaElevatedSurfaceBrush", QaTokenKind.Brush),
         new("SaGlassSurfaceBrush", QaTokenKind.Brush),
         new("SaSidebarMaterialBrush", QaTokenKind.Brush),
+        new("SaSidebarEdgeBrush", QaTokenKind.Brush),
+        new("SaOnboardingSecondaryFillBrush", QaTokenKind.Brush),
+        new("SaOnboardingButtonBorderBrush", QaTokenKind.Brush),
+        new("SaOnboardingCardBorderBrush", QaTokenKind.Brush),
+
         new("SaModalSurfaceBrush", QaTokenKind.Brush),
         new("SaOpaqueFallbackBrush", QaTokenKind.Brush),
         new("SaOverlaySmokeBrush", QaTokenKind.Brush),

@@ -10,25 +10,25 @@
  <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" x:Name="Brand"><p:SaBrandMark/><TextBlock x:Name="BrandText" Text="ServerAlyzer" Style="{StaticResource SaBrandTextStyle}" VerticalAlignment="Center"/></StackPanel>
  <!-- Figma 112:1392: 160x46 r23, icon20 + gap10; label area106. -->
  <RadioButton x:Name="OverviewItem" x:Uid="ShellOverview" Grid.Row="1" GroupName="ShellDestinations" Style="{StaticResource SaNavItemStyle}" Height="46"
-   IsChecked="{Binding IsOverviewSelected, Mode=OneWay}" Tag="Overview" Click="OnItemClick" AutomationProperties.PositionInSet="1" AutomationProperties.SizeOfSet="4">
+   Tag="Overview" Click="OnItemClick" KeyDown="OnItemKeyDown" AutomationProperties.PositionInSet="1" AutomationProperties.SizeOfSet="4">
    <Grid ColumnSpacing="10"><Grid.ColumnDefinitions><ColumnDefinition Width="20"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
    <p:SaIcon Data="{StaticResource SaIconDashboardSquare01Data}" Size="20"/><TextBlock x:Name="OverviewLabel" x:Uid="ShellOverviewLabel" Grid.Column="1" MaxWidth="106" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/></Grid>
  </RadioButton>
  <!-- Figma 112:1399: 160x46 r23, icon20 + gap10; label area106. -->
  <RadioButton x:Name="ServersItem" x:Uid="ShellServers" Grid.Row="2" GroupName="ShellDestinations" Style="{StaticResource SaNavItemStyle}" Height="46"
-   IsChecked="{Binding IsServersSelected, Mode=OneWay}" Tag="Servers" Click="OnItemClick" AutomationProperties.PositionInSet="2" AutomationProperties.SizeOfSet="4">
+   Tag="Servers" Click="OnItemClick" KeyDown="OnItemKeyDown" AutomationProperties.PositionInSet="2" AutomationProperties.SizeOfSet="4">
    <Grid ColumnSpacing="10"><Grid.ColumnDefinitions><ColumnDefinition Width="20"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
    <p:SaIcon Data="{StaticResource SaIconServerStack01Data}" Size="20"/><TextBlock x:Name="ServersLabel" x:Uid="ShellServersLabel" Grid.Column="1" MaxWidth="106" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/></Grid>
  </RadioButton>
  <!-- Figma 112:1408: 160x46 r23, icon20 + gap10; label area106. -->
  <RadioButton x:Name="HistoryItem" x:Uid="ShellHistory" Grid.Row="3" GroupName="ShellDestinations" Style="{StaticResource SaNavItemStyle}" Height="46"
-   IsChecked="{Binding IsHistorySelected, Mode=OneWay}" Tag="History" Click="OnItemClick" AutomationProperties.PositionInSet="3" AutomationProperties.SizeOfSet="4">
+   Tag="History" Click="OnItemClick" KeyDown="OnItemKeyDown" AutomationProperties.PositionInSet="3" AutomationProperties.SizeOfSet="4">
    <Grid ColumnSpacing="10"><Grid.ColumnDefinitions><ColumnDefinition Width="20"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
    <p:SaIcon Data="{StaticResource SaIconClock01Data}" Size="20"/><TextBlock x:Name="HistoryLabel" x:Uid="ShellHistoryLabel" Grid.Column="1" MaxWidth="106" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/></Grid>
  </RadioButton>
  <!-- Figma 112:1414: 160x44 r23, icon20 + gap10; label area106. -->
  <RadioButton x:Name="SettingsItem" x:Uid="ShellSettings" Grid.Row="5" GroupName="ShellDestinations" Style="{StaticResource SaNavItemStyle}" Height="44"
-   IsChecked="{Binding IsSettingsSelected, Mode=OneWay}" Tag="Settings" Click="OnItemClick" AutomationProperties.PositionInSet="4" AutomationProperties.SizeOfSet="4">
+   Tag="Settings" Click="OnItemClick" KeyDown="OnItemKeyDown" AutomationProperties.PositionInSet="4" AutomationProperties.SizeOfSet="4">
    <Grid ColumnSpacing="10"><Grid.ColumnDefinitions><ColumnDefinition Width="20"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
    <p:SaIcon Data="{StaticResource SaIconSettings01Data}" Size="20"/><TextBlock x:Name="SettingsLabel" x:Uid="ShellSettingsLabel" Grid.Column="1" MaxWidth="106" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/></Grid>
  </RadioButton>

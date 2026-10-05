@@ -141,6 +141,7 @@ public sealed class Ui6LoadStatusTests : IDisposable
         if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException();
         var directory = new DirectoryInfo(_root);
         var original = directory.GetAccessControl().GetSecurityDescriptorSddlForm(AccessControlSections.Access);
+        var originalSecurity = directory.GetAccessControl();
         var denied = directory.GetAccessControl();
         var rule = new FileSystemAccessRule(WindowsIdentity.GetCurrent().User!,
             FileSystemRights.ReadData | FileSystemRights.ReadAttributes | FileSystemRights.ExecuteFile,
@@ -163,9 +164,32 @@ public sealed class Ui6LoadStatusTests : IDisposable
             restore.SetSecurityDescriptorSddlForm(original, AccessControlSections.Access);
             directory.SetAccessControl(restore);
         }
-        Assert.Equal(original, directory.GetAccessControl().GetSecurityDescriptorSddlForm(AccessControlSections.Access));
-        Assert.Equal("[]", await File.ReadAllTextAsync(Direct));
+        try
+        {
+            var restored = directory.GetAccessControl();
+            Assert.DoesNotContain(restored.GetAccessRules(true, true, typeof(SecurityIdentifier)).Cast<FileSystemAccessRule>(),
+                candidate => candidate.AccessControlType == AccessControlType.Deny && candidate.IdentityReference.Equals(rule.IdentityReference));
+            Assert.Equal(AccessRules(originalSecurity), AccessRules(restored));
+            var originalDescriptor = new RawSecurityDescriptor(original);
+            var restoredDescriptor = new RawSecurityDescriptor(restored.GetSecurityDescriptorSddlForm(AccessControlSections.Access));
+            Assert.Equal(originalDescriptor.ControlFlags & ~ControlFlags.DiscretionaryAclAutoInherited,
+                restoredDescriptor.ControlFlags & ~ControlFlags.DiscretionaryAclAutoInherited);
+            Assert.Equal("[]", await File.ReadAllTextAsync(Direct));
+        }
+        finally
+        {
+            // The counterproof deliberately leaves the deny ACE; always clean the temporary directory's ACL.
+            var cleanup = new DirectorySecurity();
+            cleanup.SetSecurityDescriptorSddlForm(original, AccessControlSections.Access);
+            directory.SetAccessControl(cleanup);
+        }
     }
+
+    [System.Runtime.Versioning.SupportedOSPlatform("windows")]
+    private static string[] AccessRules(DirectorySecurity security) => security
+        .GetAccessRules(true, true, typeof(SecurityIdentifier)).Cast<FileSystemAccessRule>()
+        .Select(rule => $"{rule.IdentityReference.Value}|{rule.FileSystemRights}|{rule.AccessControlType}|{rule.IsInherited}|{rule.InheritanceFlags}|{rule.PropagationFlags}")
+        .OrderBy(rule => rule, StringComparer.Ordinal).ToArray();
 
     public sealed class WindowsAclFactAttribute : FactAttribute
     {

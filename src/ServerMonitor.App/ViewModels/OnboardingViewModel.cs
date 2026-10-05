@@ -14,6 +14,7 @@ public sealed class OnboardingViewModel : ObservableObject, IDisposable
     private readonly ActivationLatch _activation;
     private readonly ILogger<OnboardingViewModel> _logger;
     private bool _normalStart;
+    private bool _windowShown;
     private bool _standard = true;
     private bool _visible;
     private int _step = 1;
@@ -39,6 +40,7 @@ public sealed class OnboardingViewModel : ObservableObject, IDisposable
 
     public async Task OnMainWindowShownAsync(bool normalStart)
     {
+        _windowShown = true;
         _normalStart = normalStart;
         try
         {
@@ -65,7 +67,7 @@ public sealed class OnboardingViewModel : ObservableObject, IDisposable
 
     private void OnNavigated(object? sender, EventArgs args)
     {
-        if (IsVisible && _navigation.CurrentDestination != NavigationDestination.Overview) Dismiss();
+        if (_windowShown && _navigation.CurrentDestination != NavigationDestination.Overview) Dismiss();
     }
 
     public void Dispose()

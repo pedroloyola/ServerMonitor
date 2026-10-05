@@ -38,8 +38,8 @@ public sealed partial class DashboardPage : Page
     /// </summary>
     private void RestoreFocus()
     {
-        if (ShellPageFocus.GetKeepSidebar(this)) return;
         var (target, serverId) = ViewModel.TakeReturnFocus();
+        if (ShellPageFocus.GetKeepSidebar(this)) return;
         var focused = target switch
         {
             OverviewReturnTarget.ServerRow => FocusOverviewRow(serverId),

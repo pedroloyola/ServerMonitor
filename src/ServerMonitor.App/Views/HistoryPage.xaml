@@ -70,7 +70,7 @@
         </Grid.RowDefinitions>
 
         <!-- Header 112:2259: title 32 Semibold + subtitle 13 Regular muted, gap 5. -->
-        <Grid ColumnSpacing="{StaticResource SaSpace12}">
+        <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
@@ -78,7 +78,7 @@
             <Button
                 x:Uid="HistoryBackButton" Visibility="{Binding ShowDetailBack, Converter={StaticResource BooleanToVisibilityConverter}}"
                 VerticalAlignment="Top"
-                Margin="0,6,0,0"
+                Margin="0,6,12,0"
                 Command="{Binding BackCommand}"
                 Style="{StaticResource SaBreadcrumbParentButtonStyle}">
                 <StackPanel Orientation="Horizontal" Spacing="8"><primitives:SaIcon Data="{StaticResource SaIconArrowRight01Data}" Size="16" RenderTransformOrigin="0.5,0.5"><primitives:SaIcon.RenderTransform><RotateTransform Angle="180"/></primitives:SaIcon.RenderTransform></primitives:SaIcon><TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" MaxWidth="160"/></StackPanel>

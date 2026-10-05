@@ -516,7 +516,7 @@
                                 <TextBlock Style="{StaticResource SaTitleTextStyle}" Foreground="{ThemeResource SaDangerTextBrush}" Text="!"
                                            VerticalAlignment="Center" AutomationProperties.AccessibilityView="Raw" />
                                 <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4">
-                                    <TextBlock Style="{StaticResource SaPrimaryBodyTextStyle}" FontWeight="SemiBold" Text="{TemplateBinding Title}" TextWrapping="Wrap"
+                                    <TextBlock x:Name="PART_ErrorTitle" Style="{StaticResource SaPrimaryBodyTextStyle}" FontWeight="SemiBold" Text="{TemplateBinding Title}" TextWrapping="Wrap"
                                                AutomationProperties.AccessibilityView="Raw" />
                                     <TextBlock Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}"
                                                Text="{TemplateBinding Message}" TextWrapping="Wrap" AutomationProperties.AccessibilityView="Raw" />

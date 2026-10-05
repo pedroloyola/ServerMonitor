@@ -10,6 +10,24 @@ namespace ServerMonitor.App.Tests.ViewModels;
 
 public sealed class Ui6OnboardingTests
 {
+    [Fact]
+    public async Task NavigationAwayAndBackDuringDiagnosis_DismissesForProcess()
+    {
+        var kit = Ui4TestKit.Create(new Ui4TestKit.Fleet());
+        using var dashboard = kit.Dashboard;
+        kit.Navigation.CurrentDestination = NavigationDestination.Overview;
+        var pending = new TaskCompletionSource<ServerLoadStatus>();
+        kit.Servers.LoadStatusOverride = () => pending.Task;
+        using var vm = new OnboardingViewModel(kit.Servers, kit.Navigation,
+            new OnboardingActions(dashboard.AddServerCommand, dashboard.ImportFromSshCommand), new ActivationLatch(), NullLogger<OnboardingViewModel>.Instance);
+        var load = vm.OnMainWindowShownAsync(true);
+        kit.Navigation.GoToSettings();
+        kit.Navigation.GoToDashboard();
+        pending.SetResult(ServerLoadStatus.NotFound);
+        await load;
+        Assert.False(vm.IsVisible);
+    }
+
     [Theory]
     [InlineData(ServerLoadStatus.NotFound, true, false, true)]
     [InlineData(ServerLoadStatus.Loaded, true, false, false)]

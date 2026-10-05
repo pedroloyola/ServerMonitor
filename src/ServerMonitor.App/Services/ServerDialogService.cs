@@ -35,6 +35,7 @@ public sealed class ServerDialogService(
         bool isEdit,
         bool openSshConfigImport = false)
     {
+        var returnFocus = DialogReturnFocus.Capture(windowContext.XamlRoot);
         var viewModel = new ServerEditorViewModel(
             validator,
             sshConnectionService,
@@ -64,7 +65,8 @@ public sealed class ServerDialogService(
         }
         finally
         {
-            viewModel.Dispose();
+            try { viewModel.Dispose(); }
+            finally { returnFocus(); }
         }
     }
 

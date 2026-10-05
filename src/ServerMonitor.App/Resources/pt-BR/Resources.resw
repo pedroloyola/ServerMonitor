@@ -773,7 +773,7 @@
   <data name="OverviewNoReadingsMessageText.Text" xml:space="preserve"><value>Quando os servidores responderem, os problemas de CPU, memória ou disco aparecem aqui.</value></data>
   <data name="OverviewClearSearchButton.Content" xml:space="preserve"><value>Limpar pesquisa</value></data>
   <data name="OverviewEmptyAddButton.Content" xml:space="preserve"><value>Adicionar servidor</value></data>
-  <data name="OverviewEmptyImportButton.Content" xml:space="preserve"><value>Importar do SSH</value></data>
+  <data name="OverviewEmptyImportButton.Content" xml:space="preserve"><value>Importar de SSH</value></data>
   <data name="OverviewMoreServersOne" xml:space="preserve"><value>Mais {0} servidor · Ver todos</value></data>
   <data name="OverviewMoreServersOther" xml:space="preserve"><value>Mais {0} servidores · Ver todos</value></data>
   <data name="OverviewHealthSegmentHealthyOne" xml:space="preserve"><value>{0} saudável</value></data>
@@ -910,14 +910,14 @@
   <data name="ShellNavigation.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Navegação principal</value></data>
   <data name="ShellNavigationList.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Navegação principal</value></data>
   <data name="OnboardingWelcomeTitle.Text" xml:space="preserve"><value>Seus servidores.
-Num só lugar.</value></data>
+Em um só lugar.</value></data>
   <data name="OnboardingWelcomeBody.Text" xml:space="preserve"><value>Acompanhe o estado dos seus servidores Linux e macOS,
 com métricas claras e acesso direto por SSH.</value></data>
   <data name="OnboardingLocalTitle.Text" xml:space="preserve"><value>O controle fica com você.</value></data>
   <data name="OnboardingLocalBody.Text" xml:space="preserve"><value>Uma conexão direta. Dados salvos no seu dispositivo.</value></data>
   <data name="OnboardingSetupTitle.Text" xml:space="preserve"><value>Comece pelo primeiro servidor.</value></data>
   <data name="OnboardingSetupBody.Text" xml:space="preserve"><value>Escolha como deseja configurar a conexão.</value></data>
-  <data name="OnboardingStatusTitle.Text" xml:space="preserve"><value>Estado num relance</value></data>
+  <data name="OnboardingStatusTitle.Text" xml:space="preserve"><value>Estado em um relance</value></data>
   <data name="OnboardingStatusBody.Text" xml:space="preserve"><value>Veja o que precisa de atenção.</value></data>
   <data name="OnboardingHistoryTitle.Text" xml:space="preserve"><value>Histórico local</value></data>
   <data name="OnboardingHistoryBody.Text" xml:space="preserve"><value>Acompanhe a evolução das métricas.</value></data>

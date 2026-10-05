@@ -7,6 +7,24 @@ namespace ServerMonitor.App.Tests.ViewModels;
 public sealed class Ui6EmptyStateTests
 {
     [Theory]
+    [InlineData(false)] [InlineData(true)]
+    public async Task DiagnosisFailure_FailsClosedWithoutLosingList_AndCachesResolvedStatus(bool populated)
+    {
+        var fleet = new Ui4TestKit.Fleet();
+        if (populated) fleet.Add("web", ServerHealth.Healthy);
+        var kit = Ui4TestKit.Create(fleet);
+        using var vm = kit.Dashboard;
+        var reads = 0;
+        kit.Servers.LoadStatusOverride = () => { reads++; throw new InvalidOperationException("synthetic"); };
+        await vm.LoadAsync();
+        await vm.LoadAsync();
+        Assert.Equal(1, reads);
+        Assert.Equal(populated, vm.HasVisibleServers);
+        Assert.False(vm.ShowFirstServerState);
+        Assert.True(vm.ShowConfigurationUnavailable);
+    }
+
+    [Theory]
     [InlineData(ServerLoadStatus.NotFound)]
     [InlineData(ServerLoadStatus.Loaded)]
     public async Task EmptyAndHiddenStates_FollowLiveList_NotStartupSnapshot(ServerLoadStatus status)

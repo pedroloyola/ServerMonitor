@@ -46,7 +46,6 @@ public sealed class ServersViewModel : ObservableObject, IDisposable
         {
             _noticeTimer.Start(DismissNotice);
         }
-        BackToOverviewCommand = new RelayCommand(navigation.GoToDashboard);
 
         _dashboard.ServersReloaded += OnServersReloaded;
         _dashboard.PropertyChanged += OnDashboardPropertyChanged;
@@ -85,7 +84,6 @@ public sealed class ServersViewModel : ObservableObject, IDisposable
 
     public ICommand DismissNoticeCommand { get; }
 
-    public ICommand BackToOverviewCommand { get; }
 
     /// <summary>The current add flow (modal) — until UI.7.</summary>
     public ICommand AddServerCommand => _dashboard.AddServerCommand;

@@ -15,6 +15,7 @@
             <Grid x:Name="ShellSurface">
                 <Grid.ColumnDefinitions><ColumnDefinition x:Name="SidebarColumn" Width="208"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                 <controls:SaSidebar x:Name="Sidebar" Background="{ThemeResource SaSidebarMaterialBrush}" />
+                <Border Width="1" HorizontalAlignment="Right" Background="{ThemeResource SaSidebarEdgeBrush}" IsHitTestVisible="False" />
                 <Frame x:Name="ContentFrame" Grid.Column="1" Background="Transparent" />
             </Grid>
             <!-- Figma 112:247: same window, no sidebar; panel1040x780. Modal remains above both hosts. -->

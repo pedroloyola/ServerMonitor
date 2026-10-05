@@ -28,7 +28,7 @@
                     <VisualState.Setters>
                         <Setter Target="PageRoot.Padding" Value="{StaticResource SaPagePaddingCompact}" />
                         <Setter Target="AutosaveText.(Grid.Row)" Value="1" />
-                        <Setter Target="AutosaveText.(Grid.Column)" Value="1" />
+                        <Setter Target="AutosaveText.(Grid.Column)" Value="0" />
                         <Setter Target="AutosaveText.HorizontalAlignment" Value="Left" />
                         <Setter Target="ThemeControl.(Grid.Row)" Value="1" />
                         <Setter Target="ThemeControl.(Grid.Column)" Value="0" />
@@ -66,7 +66,6 @@
             <!-- Settings header 112:7910: [back, DERIVED until UI.6's sidebar] title 32 + "À tua medida." | autosave 11. -->
             <Grid ColumnSpacing="{StaticResource SaSpace16}" RowSpacing="{StaticResource SaSpace4}">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
@@ -74,7 +73,7 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
-                <StackPanel Grid.Column="1" Spacing="{StaticResource SaSpace4}" VerticalAlignment="Center">
+                <StackPanel Grid.Column="0" Spacing="{StaticResource SaSpace4}" VerticalAlignment="Center">
                     <primitives:SaHeadingHost AutomationProperties.HeadingLevel="Level1" IsTabStop="False">
                         <TextBlock x:Uid="SettingsTitle" AutomationProperties.AccessibilityView="Raw" IsTextSelectionEnabled="False" IsTabStop="False" Style="{StaticResource SaPageTitleTextStyle}" />
                     </primitives:SaHeadingHost>
@@ -82,7 +81,7 @@
                                Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap" />
                 </StackPanel>
                 <!-- A-9: a fixed label; a failed save shows its own notice next to the setting (the label never claims success). -->
-                <TextBlock x:Name="AutosaveText" x:Uid="SettingsAutosave" Grid.Column="2" VerticalAlignment="Center"
+                <TextBlock x:Name="AutosaveText" x:Uid="SettingsAutosave" Grid.Column="1" VerticalAlignment="Center"
                            Style="{StaticResource SaHelperTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" />
             </Grid>
 

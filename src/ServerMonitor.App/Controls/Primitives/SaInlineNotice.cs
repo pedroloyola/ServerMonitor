@@ -78,6 +78,7 @@ public sealed class SaInlineNotice : ContentControl
 
     private void Update()
     {
+        if (GetTemplateChild("PART_ErrorTitle") is TextBlock title) title.Visibility = string.IsNullOrWhiteSpace(Title) ? Visibility.Collapsed : Visibility.Visible;
         var error = Severity == SaNoticeSeverity.Error;
         AutomationProperties.SetLiveSetting(this, error && !AnnouncePolitely ? AutomationLiveSetting.Assertive : AutomationLiveSetting.Polite);
         AutomationProperties.SetName(this, AccessibleName(Title, Message));

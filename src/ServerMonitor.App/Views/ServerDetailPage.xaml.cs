@@ -59,8 +59,9 @@ public sealed partial class ServerDetailPage : Page, IServerDetailView, IDisposa
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
+        var returnTarget = ViewModel.TakeReturnFocus();
         if (ShellPageFocus.GetKeepSidebar(this)) return;
-        Control? target = ViewModel.TakeReturnFocus() switch
+        Control? target = returnTarget switch
         {
             ServerDetailReturnTarget.History => HistoryRow,
             ServerDetailReturnTarget.Workloads => WorkloadsRow,

@@ -44,7 +44,8 @@ public sealed class Ui6ViewContractTests
         for(var i=0;i<4;i++)
         {
             Assert.Equal(names[i], A(items[i],"Tag"));
-            Assert.Equal("{Binding Is"+names[i]+"Selected, Mode=OneWay}",A(items[i],"IsChecked"));
+            Assert.Null(A(items[i],"IsChecked"));
+            Assert.Equal("OnItemKeyDown", A(items[i],"KeyDown"));
             Assert.Equal((i+1).ToString(),A(items[i],"AutomationProperties.PositionInSet"));
             Assert.Equal("4",A(items[i],"AutomationProperties.SizeOfSet"));
             Assert.Equal(i==3?"44":"46",A(items[i],"Height"));

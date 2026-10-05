@@ -19,13 +19,13 @@
     <!-- UI.3 additive (D-UI3-8): History/Workloads content pad 40 and block gap 20, 112:2258 / 112:2613. -->
     <x:Double x:Key="SaSpace20">20</x:Double>
     <x:Double x:Key="SaSpace40">40</x:Double>
-    <!-- UI.3 page padding: 40 (Figma 112:2258 / 112:2613, >= 640 wide) and 24 on narrow windows (< 640, DERIVED). -->
+    <!-- UI.3 page padding: 40 (Figma 112:2258 / 112:2613, >= 640 wide) and 24 horizontally on narrow windows; top 40 clears native captions (UI.6 c1, DERIVED). -->
     <Thickness x:Key="SaPagePadding">40</Thickness>
-    <Thickness x:Key="SaPagePaddingCompact">24</Thickness>
+    <Thickness x:Key="SaPagePaddingCompact">24,40,24,24</Thickness>
     <!-- UI.6 112:1359 p24, Settings bottom 40. Rail and narrow onboarding are DERIVED. -->
     <Thickness x:Key="SaSidebarPadding">24,24,24,40</Thickness>
     <Thickness x:Key="SaRailPadding">16,24,16,40</Thickness>
-    <Thickness x:Key="SaOnboardingPadding">48,36,48,36</Thickness>
+    <Thickness x:Key="SaOnboardingPadding">48,40,48,36</Thickness>
     <Thickness x:Key="SaOnboardingBenefitPadding">18</Thickness>
     <Thickness x:Key="SaOnboardingCardPadding">24</Thickness>
     <x:Double x:Key="SaOnboardingButtonHeight">46</x:Double>

@@ -10,7 +10,8 @@ public sealed class SaHeadingHost : ContentControl
     public SaHeadingHost()
     {
         DefaultStyleKey = typeof(ContentControl);
-        HorizontalContentAlignment = HorizontalAlignment.Stretch;
+        HorizontalAlignment = HorizontalAlignment.Left;
+        HorizontalContentAlignment = HorizontalAlignment.Left;
         UseSystemFocusVisuals = true;
         IsTabStop = false;
         LostFocus += (_, _) => IsTabStop = false;
@@ -29,11 +30,13 @@ public sealed class SaHeadingHost : ContentControl
 
     protected override AutomationPeer OnCreateAutomationPeer() => new HeadingPeer(this);
 
+    internal static string NormalizeName(string text) => string.Join(" ", text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+
     private sealed class HeadingPeer(SaHeadingHost owner) : FrameworkElementAutomationPeer(owner)
     {
         protected override AutomationControlType GetAutomationControlTypeCore() => AutomationControlType.Group;
         protected override string GetClassNameCore() => nameof(SaHeadingHost);
-        protected override string GetNameCore() => (owner.Content as TextBlock)?.Text ?? base.GetNameCore();
+        protected override string GetNameCore() => NormalizeName((owner.Content as TextBlock)?.Text ?? base.GetNameCore());
         protected override bool IsControlElementCore() => true;
         protected override bool IsContentElementCore() => true;
     }

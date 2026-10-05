@@ -376,6 +376,9 @@
     </Style>
     <!-- UI.6 112:665/112:672/112:837: h46 r15; native button behaviour, no new animations. -->
     <Style x:Key="SaOnboardingSecondaryButtonStyle" TargetType="Button" BasedOn="{StaticResource SaSecondaryRectButtonStyle}">
+        <Setter Property="Background" Value="{ThemeResource SaOnboardingSecondaryFillBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource SaOnboardingButtonBorderBrush}" />
+        <Setter Property="BorderThickness" Value="{StaticResource SaBorderThickness}" />
         <Setter Property="Height" Value="{StaticResource SaOnboardingButtonHeight}" />
         <Setter Property="CornerRadius" Value="{StaticResource SaRadiusOnboardingButton}" />
     </Style>

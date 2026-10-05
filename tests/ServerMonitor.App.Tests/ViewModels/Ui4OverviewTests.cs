@@ -525,7 +525,8 @@ public sealed class Ui4OverviewTests
 
         vm.Rows[1].OpenDetailCommand.Execute(null);
         Assert.Equal(ServerDetailOrigin.Servers, kit.Navigation.ServerDetailRequests.Single().Origin);
-        vm.BackToOverviewCommand.Execute(null);
+        using var shell = new ShellViewModel(kit.Navigation);
+        shell.Navigate(ShellDestination.Overview);
         Assert.Equal(1, kit.Navigation.DashboardCount);
     }
 

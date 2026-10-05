@@ -402,7 +402,8 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
     public bool ShowConfigurationUnavailable => !_configurationChanged && _configurationUnavailable;
     public bool ShowFirstServerState => ShowEmptyState && HiddenServerCount == 0 && !ShowConfigurationUnavailable;
     public bool ShowAllHiddenState => ShowEmptyState && HiddenServerCount > 0 && !ShowConfigurationUnavailable;
-    public ICommand RestoreHiddenServersCommand => new RelayCommand(() => _navigationService.GoToSettings(SettingsSection.Data));
+    private ICommand? _restoreHiddenServersCommand;
+    public ICommand RestoreHiddenServersCommand => _restoreHiddenServersCommand ??= new RelayCommand(() => _navigationService.GoToSettings(SettingsSection.Data));
     private void NotifyEmptyStates()
     {
         OnPropertyChanged(nameof(ShowConfigurationUnavailable));
@@ -567,7 +568,7 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
             RebuildDiscovered();
             if (!_configurationChanged && _serverService is IServerLoadStatusSource source)
             {
-                _startupDiagnosis ??= source.GetLoadStatusAsync();
+                _startupDiagnosis ??= DiagnoseConfigurationAsync(source);
                 _configurationUnavailable = await _startupDiagnosis == ServerLoadStatus.Unavailable;
                 NotifyEmptyStates();
             }
@@ -579,6 +580,16 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         finally
         {
             IsLoading = false;
+        }
+    }
+
+    private async Task<ServerLoadStatus> DiagnoseConfigurationAsync(IServerLoadStatusSource source)
+    {
+        try { return await source.GetLoadStatusAsync(); }
+        catch (Exception exception)
+        {
+            _logger?.LogWarning("Configuration diagnosis failed. Type: {Type}.", exception.GetType().Name);
+            return ServerLoadStatus.Unavailable;
         }
     }
 

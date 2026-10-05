@@ -8,6 +8,11 @@
     </ResourceDictionary.MergedDictionaries>
     <ResourceDictionary.ThemeDictionaries>
         <ResourceDictionary x:Key="Dark">
+            <!-- UI.6 Prism c1: sidebar edge, h46 buttons and method cards. -->
+            <SolidColorBrush x:Key="SaSidebarEdgeBrush" Color="#1CFFFFFF" />
+            <SolidColorBrush x:Key="SaOnboardingSecondaryFillBrush" Color="{StaticResource SaColorSelectedDark}" />
+            <SolidColorBrush x:Key="SaOnboardingButtonBorderBrush" Color="#1FFFFFFF" />
+            <SolidColorBrush x:Key="SaOnboardingCardBorderBrush" Color="#1AFFFFFF" />
             <!-- UI.6 Figma 112:1358 window, 112:665/112:837 primary, 112:317 benefit. HC platform colours. -->
             <SolidColorBrush x:Key="SaWindowMaterialBrush" Color="#9E0E0E0E" />
             <SolidColorBrush x:Key="SaOnboardingPrimaryBrush" Color="#59808080" />
@@ -16,12 +21,17 @@
             <SolidColorBrush x:Key="SaNeutralSurfaceBrush" Color="{StaticResource SaColorSurfaceDark}" />
             <SolidColorBrush x:Key="SaElevatedSurfaceBrush" Color="{StaticResource SaColorElevatedSurfaceDark}" />
             <AcrylicBrush x:Key="SaGlassSurfaceBrush" TintColor="{StaticResource SaColorGlassTintDark}" TintOpacity=".43" TintLuminosityOpacity=".18" FallbackColor="{StaticResource SaColorSurfaceDark}" />
-            <AcrylicBrush x:Key="SaSidebarMaterialBrush" TintColor="{StaticResource SaColorSidebarTintDark}" TintOpacity=".28" TintLuminosityOpacity=".18" FallbackColor="{StaticResource SaColorCanvasDark}" />
+            <SolidColorBrush x:Key="SaSidebarMaterialBrush" Color="#18000000" />
             <SolidColorBrush x:Key="SaModalSurfaceBrush" Color="{StaticResource SaColorModalSurfaceDark}" />
             <SolidColorBrush x:Key="SaOpaqueFallbackBrush" Color="{StaticResource SaColorSurfaceDark}" />
             <SolidColorBrush x:Key="SaOverlaySmokeBrush" Color="{StaticResource SaColorOverlaySmokeDark}" />
         </ResourceDictionary>
         <ResourceDictionary x:Key="Light">
+            <!-- UI.6 Prism c1: sidebar edge, h46 buttons and method cards. -->
+            <SolidColorBrush x:Key="SaSidebarEdgeBrush" Color="#B3FFFFFF" />
+            <SolidColorBrush x:Key="SaOnboardingSecondaryFillBrush" Color="#1FFFFFFF" />
+            <SolidColorBrush x:Key="SaOnboardingButtonBorderBrush" Color="#1F808080" />
+            <SolidColorBrush x:Key="SaOnboardingCardBorderBrush" Color="#1A808080" />
             <!-- UI.6 Figma 112:1358 window, 112:665/112:837 primary, 112:317 benefit. HC platform colours. -->
             <SolidColorBrush x:Key="SaWindowMaterialBrush" Color="#59FFFFFF" />
             <SolidColorBrush x:Key="SaOnboardingPrimaryBrush" Color="#FF2B2B2B" />
@@ -31,14 +41,19 @@
             <SolidColorBrush x:Key="SaElevatedSurfaceBrush" Color="{StaticResource SaColorElevatedSurfaceLight}" />
             <!-- R1 (Prism MF-1): Light calibrated on the Figma 112:1142 wallpaper to card +3 levels over the backdrop (112:1222:
                  229 over 226; measured 236.7 over 233.4). Was TintOpacity .42 / TintLuminosityOpacity .9 (+17: white on white).
-                 Sidebar: same luminosity, tint scaled by the same ratio (.27 -> .06). Dark unchanged. -->
+                 UI.6 c1: sidebar uses a separate translucent tint over the shell, calibrated in the QA matrix. -->
             <AcrylicBrush x:Key="SaGlassSurfaceBrush" TintColor="{StaticResource SaColorGlassTintLight}" TintOpacity=".1" TintLuminosityOpacity=".2" FallbackColor="{StaticResource SaColorSurfaceLight}" />
-            <AcrylicBrush x:Key="SaSidebarMaterialBrush" TintColor="{StaticResource SaColorSidebarTintLight}" TintOpacity=".06" TintLuminosityOpacity=".2" FallbackColor="{StaticResource SaColorCanvasLight}" />
+            <SolidColorBrush x:Key="SaSidebarMaterialBrush" Color="#4DFFFFFF" />
             <SolidColorBrush x:Key="SaModalSurfaceBrush" Color="{StaticResource SaColorModalSurfaceLight}" />
             <SolidColorBrush x:Key="SaOpaqueFallbackBrush" Color="{StaticResource SaColorSurfaceLight}" />
             <SolidColorBrush x:Key="SaOverlaySmokeBrush" Color="{StaticResource SaColorOverlaySmokeLight}" />
         </ResourceDictionary>
         <ResourceDictionary x:Key="HighContrast">
+            <!-- UI.6 Prism c1: sidebar edge, h46 buttons and method cards. -->
+            <SolidColorBrush x:Key="SaSidebarEdgeBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="SaOnboardingSecondaryFillBrush" Color="{ThemeResource SystemColorButtonFaceColor}" />
+            <SolidColorBrush x:Key="SaOnboardingButtonBorderBrush" Color="{ThemeResource SystemColorButtonTextColor}" />
+            <SolidColorBrush x:Key="SaOnboardingCardBorderBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
             <!-- UI.6 Figma 112:1358 window, 112:665/112:837 primary, 112:317 benefit. HC platform colours. -->
             <SolidColorBrush x:Key="SaWindowMaterialBrush" Color="{ThemeResource SystemColorWindowColor}" />
             <SolidColorBrush x:Key="SaOnboardingPrimaryBrush" Color="{ThemeResource SystemColorButtonFaceColor}" />

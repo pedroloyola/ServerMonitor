@@ -768,7 +768,7 @@
   <data name="OverviewNoReadingsMessageText.Text" xml:space="preserve"><value>Quando os servidores responderem, os problemas de CPU, memória ou disco aparecem aqui.</value></data>
   <data name="OverviewClearSearchButton.Content" xml:space="preserve"><value>Limpar pesquisa</value></data>
   <data name="OverviewEmptyAddButton.Content" xml:space="preserve"><value>Adicionar servidor</value></data>
-  <data name="OverviewEmptyImportButton.Content" xml:space="preserve"><value>Importar do SSH</value></data>
+  <data name="OverviewEmptyImportButton.Content" xml:space="preserve"><value>Importar de SSH</value></data>
   <data name="OverviewMoreServersOne" xml:space="preserve"><value>Mais {0} servidor · Ver todos</value></data>
   <data name="OverviewMoreServersOther" xml:space="preserve"><value>Mais {0} servidores · Ver todos</value></data>
   <data name="OverviewHealthSegmentHealthyOne" xml:space="preserve"><value>{0} saudável</value></data>

@@ -549,8 +549,9 @@
                 </StackPanel>
 
                 <!-- UI.6 112:822/826: no card, centred block h620, icon48, title28, gap20; buttons202x46 r15. -->
-                <StackPanel MinHeight="620" VerticalAlignment="Center" Spacing="{StaticResource SaSpace20}" Visibility="{x:Bind ViewModel.ShowFirstServerState, Mode=OneWay}">
-                    <primitives:SaIcon Data="{StaticResource SaIconServerStack01Data}" Size="48" HorizontalAlignment="Center"/>
+                <Grid MinHeight="620" Visibility="{x:Bind ViewModel.ShowFirstServerState, Mode=OneWay}">
+                <StackPanel VerticalAlignment="Center" Spacing="{StaticResource SaSpace20}">
+                    <primitives:SaIcon Data="{StaticResource SaIconServerStack01Data}" Size="48" Foreground="{ThemeResource SaTextBrush}" HorizontalAlignment="Center"/>
                     <TextBlock x:Uid="FirstServerTitle" Style="{StaticResource SaFirstServerTitleTextStyle}" AutomationProperties.HeadingLevel="Level2" TextAlignment="Center"/>
                     <TextBlock x:Uid="FirstServerBody" Style="{StaticResource SaOnboardingBodyTextStyle}" MaxWidth="640" Foreground="{ThemeResource SaTextSecondaryBrush}" TextAlignment="Center"/>
                     <VariableSizedWrapGrid Orientation="Horizontal" HorizontalAlignment="Center" ItemWidth="218" ItemHeight="62" MaximumRowsOrColumns="2">
@@ -567,13 +568,15 @@
                                            ItemsSource="{x:Bind ViewModel.DiscoveredServers}" ItemTemplate="{StaticResource DiscoveredRowTemplate}"
                                            Visibility="{x:Bind ViewModel.ShowEmptyStateDiscoveries, Mode=OneWay}" />
 
-                </StackPanel>
+                </StackPanel></Grid>
                 <!-- G-15 derived: live hidden list, never first-server copy. -->
-                <StackPanel Spacing="{StaticResource SaSpace20}" Visibility="{x:Bind ViewModel.ShowAllHiddenState, Mode=OneWay}">
+                <Grid MinHeight="620" Visibility="{x:Bind ViewModel.ShowAllHiddenState, Mode=OneWay}">
+                <StackPanel VerticalAlignment="Center" Spacing="{StaticResource SaSpace20}">
+                    <primitives:SaIcon Data="{StaticResource SaIconViewData}" Size="48" Foreground="{ThemeResource SaTextBrush}" HorizontalAlignment="Center"/>
                     <TextBlock x:Uid="HiddenOverviewTitle" Style="{StaticResource SaFirstServerTitleTextStyle}" AutomationProperties.HeadingLevel="Level2" TextAlignment="Center"/>
-                    <TextBlock x:Uid="HiddenOverviewBody" Style="{StaticResource SaSecondaryBodyTextStyle}" TextAlignment="Center" TextWrapping="Wrap"/>
+                    <TextBlock x:Uid="HiddenOverviewBody" Style="{StaticResource SaOnboardingBodyTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" TextAlignment="Center" TextWrapping="Wrap"/>
                     <Button x:Uid="HiddenOverviewAction" HorizontalAlignment="Center" Style="{StaticResource SaOnboardingPrimaryButtonStyle}" Command="{x:Bind ViewModel.RestoreHiddenServersCommand}"/>
-                </StackPanel>
+                </StackPanel></Grid>
                 <!-- Derived D: startup diagnosis only; removed on next ServersChanged. -->
                 <primitives:SaInlineNotice x:Uid="ConfigurationUnavailableNotice" Severity="Error" AnnouncePolitely="True" AutomationProperties.LiveSetting="Polite" Visibility="{x:Bind ViewModel.ShowConfigurationUnavailable, Mode=OneWay}"/>
             </StackPanel>
