@@ -32,7 +32,7 @@ public sealed partial class XamlContractAndResourceGuardTests
         ["Controls/SaSidebar.xaml"] = ["Scroller", "NavGrid", "Brand", "BrandText", "OverviewItem", "OverviewLabel", "ServersItem", "ServersLabel", "HistoryItem", "HistoryLabel", "SettingsItem", "SettingsLabel"],
         ["MainWindow.xaml"] =
         [
-            "RootLayout", "StandardRoot", "ShellDragRegion", "ShellSurface", "Sidebar", "FirstRunView", "SidebarColumn", "ContentFrame", "ModalOverlayHost",
+            "RootLayout", "WindowBackground", "StandardRoot", "ShellDragRegion", "ShellSurface", "Sidebar", "FirstRunView", "SidebarColumn", "ContentFrame", "ModalOverlayHost",
             "CompactRoot", "CompactCaptionColumn", "CompactDragRegion", "CompactBody"
         ],
         // UI.4: adaptive VisualState setters reflow these; OverviewSearchBox also takes focus after "Limpar pesquisa";

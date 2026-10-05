@@ -236,10 +236,10 @@ public sealed partial class MainWindow : Window
 
     private void ApplyShellBackground()
     {
-        // The new material belongs to Standard only; Compact retains its original opaque background.
-        var key = _usesOpaqueFallback || _modeCoordinator.CurrentMode == WindowMode.Compact
-            ? "AppBackgroundBrush" : "SaWindowMaterialBrush";
-        RootLayout.Background = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[key];
+        // Styles keep ThemeResource live on this root; Compact uses its exact pre-UI.6 backdrop.
+        var key = _usesOpaqueFallback ? "SaOpaqueWindowBackgroundStyle"
+            : _modeCoordinator.CurrentMode == WindowMode.Compact ? "SaLegacyWindowBackgroundStyle" : "SaShellWindowBackgroundStyle";
+        WindowBackground.Style = (Style)Application.Current.Resources[key];
     }
 
     private void OnActualThemeChanged(FrameworkElement sender, object args)

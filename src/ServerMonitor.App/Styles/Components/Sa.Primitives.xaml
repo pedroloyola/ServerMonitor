@@ -652,4 +652,9 @@
             </Viewbox>
         </ControlTemplate></Setter.Value></Setter>
     </Style>
+
+            <Style x:Key="SaShellWindowBackgroundStyle" TargetType="Border"><Setter Property="Background" Value="{ThemeResource SaWindowMaterialBrush}"/></Style>
+            <Style x:Key="SaLegacyWindowBackgroundStyle" TargetType="Border"><Setter Property="Background" Value="{ThemeResource WindowBackdropTintBrush}"/></Style>
+            <Style x:Key="SaOpaqueWindowBackgroundStyle" TargetType="Border"><Setter Property="Background" Value="{ThemeResource AppBackgroundBrush}"/></Style>
+
 </ResourceDictionary>

@@ -54,6 +54,8 @@ public sealed partial class OnboardingView : UserControl
     private void Reflow()
     {
         var wide = Panel.ActualWidth >= 900;
+        Benefits.RowSpacing = wide ? 0 : 16;
+        Methods.RowSpacing = wide ? 0 : 24;
         Panel.Padding = (Thickness)Application.Current.Resources[Panel.ActualWidth < 700 ? "SaPagePaddingCompact" : "SaOnboardingPadding"];
         var benefits = new[] { Benefit0, Benefit1, Benefit2 };
         for (var i=0;i<benefits.Length;i++) { Grid.SetColumn(benefits[i],wide ? i : 0); Grid.SetRow(benefits[i],wide ? 0 : i); Grid.SetColumnSpan(benefits[i],wide ? 1 : 3); }

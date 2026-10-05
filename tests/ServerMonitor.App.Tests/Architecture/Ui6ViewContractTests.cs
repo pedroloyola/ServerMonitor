@@ -24,7 +24,8 @@ public sealed class Ui6ViewContractTests
         Assert.Null(frame.Attribute("Padding")); Assert.Null(frame.Attribute("Margin"));
         Assert.Equal("208", A(Named(doc,"SidebarColumn"),"Width"));
         Assert.Equal("{ThemeResource SaSidebarMaterialBrush}", A(Named(doc,"Sidebar"),"Background"));
-        Assert.Equal("{ThemeResource SaWindowMaterialBrush}", A(Named(doc,"RootLayout"),"Background"));
+        Assert.Equal("{StaticResource SaShellWindowBackgroundStyle}", A(Named(doc,"WindowBackground"),"Style"));
+        Assert.Contains(AppSourceTree.LoadXaml("Styles/Components/Sa.Primitives.xaml").Descendants(), e => A(e,"Value")=="{ThemeResource WindowBackdropTintBrush}");
         Assert.Same(Named(doc,"RootLayout"), Named(doc,"ModalOverlayHost").Parent);
         Assert.Same(Named(doc,"StandardRoot"), Named(doc,"FirstRunView").Parent);
         Assert.Equal("24", A(Named(doc,"ShellDragRegion"),"Height"));

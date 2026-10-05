@@ -13,7 +13,11 @@ public sealed partial class SaSidebar : UserControl
     public void SetRail(bool rail)
     {
         NavGrid.Padding = (Thickness)Application.Current.Resources[rail ? "SaRailPadding" : "SaSidebarPadding"];
-        foreach (var item in new[] { OverviewItem, ServersItem, HistoryItem, SettingsItem }) item.Width = rail ? 48 : 160;
+        foreach (var item in new[] { OverviewItem, ServersItem, HistoryItem, SettingsItem })
+        {
+            item.Width = rail ? 48 : 160;
+            if (item.Content is Grid grid) grid.ColumnSpacing = rail ? 0 : 10;
+        }
         foreach (var label in new[] { OverviewLabel, ServersLabel, HistoryLabel, SettingsLabel, BrandText }) label.Visibility = rail ? Visibility.Collapsed : Visibility.Visible;
         Brand.HorizontalAlignment = rail ? HorizontalAlignment.Center : HorizontalAlignment.Left;
     }

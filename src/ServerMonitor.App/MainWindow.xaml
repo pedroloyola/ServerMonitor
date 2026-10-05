@@ -5,7 +5,9 @@
     xmlns:controls="using:ServerMonitor.App.Controls">
     <Grid
         x:Name="RootLayout"
-        Background="{ThemeResource SaWindowMaterialBrush}">
+        Background="Transparent">
+
+        <Border x:Name="WindowBackground" Style="{StaticResource SaShellWindowBackgroundStyle}" IsHitTestVisible="False"/>
 
         <!-- ============================ STANDARD PRESENTATION ============================ -->
         <!-- UI.6 112:1358: native window, sidebar208 + content; each page owns p40 exactly once. -->
