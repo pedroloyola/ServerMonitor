@@ -12,7 +12,9 @@
  <p:SaBrandMark x:Name="HeroBrand" Size="58" HorizontalAlignment="Center"/>
  <p:SaIcon x:Name="HeroShield" Data="{StaticResource SaIconShield01Data}" Size="48" HorizontalAlignment="Center" Visibility="Collapsed"/>
  <!-- 112:314 42/53; 112:500/656 36/45. Exactly one active H1 across all steps. -->
- <p:SaHeadingHost x:Name="HeadingHost" AutomationProperties.HeadingLevel="Level1" IsTabStop="False"><TextBlock x:Name="Heading" Foreground="{ThemeResource SaTextBrush}" HorizontalAlignment="Stretch" Style="{StaticResource SaOnboardingHeroTextStyle}" TextAlignment="Center" AutomationProperties.AccessibilityView="Raw" IsTextSelectionEnabled="False" IsTabStop="False"/></p:SaHeadingHost>
+ <p:SaHeadingHost x:Name="HeadingHost" AutomationProperties.HeadingLevel="Level1" IsTabStop="False">
+                        <TextBlock x:Name="Heading" Foreground="{ThemeResource SaTextBrush}" HorizontalAlignment="Stretch" Style="{StaticResource SaOnboardingHeroTextStyle}" TextAlignment="Center" AutomationProperties.AccessibilityView="Raw" IsTextSelectionEnabled="False" IsTabStop="False"/>
+                    </p:SaHeadingHost>
  <TextBlock x:Name="Subtitle" Style="{StaticResource SaOnboardingBodyTextStyle}" MaxWidth="800" TextAlignment="Center" Foreground="{ThemeResource SaTextSecondaryBrush}"/>
  <Grid x:Name="Benefits" ColumnSpacing="16" RowSpacing="16"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition/><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
 <!-- Figma 112:317: 304x128 r18 p18 g10; responsive stacking is DERIVED. -->

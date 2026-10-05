@@ -75,7 +75,9 @@
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
                 <StackPanel Grid.Column="1" Spacing="{StaticResource SaSpace4}" VerticalAlignment="Center">
-                    <primitives:SaHeadingHost AutomationProperties.HeadingLevel="Level1" IsTabStop="False"><TextBlock x:Uid="SettingsTitle" AutomationProperties.AccessibilityView="Raw" IsTextSelectionEnabled="False" IsTabStop="False" Style="{StaticResource SaPageTitleTextStyle}" /></primitives:SaHeadingHost>
+                    <primitives:SaHeadingHost AutomationProperties.HeadingLevel="Level1" IsTabStop="False">
+                        <TextBlock x:Uid="SettingsTitle" AutomationProperties.AccessibilityView="Raw" IsTextSelectionEnabled="False" IsTabStop="False" Style="{StaticResource SaPageTitleTextStyle}" />
+                    </primitives:SaHeadingHost>
                     <TextBlock x:Uid="SettingsSubtitle" Style="{StaticResource SaControlTextStyle}" FontWeight="Normal"
                                Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap" />
                 </StackPanel>

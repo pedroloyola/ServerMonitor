@@ -282,8 +282,10 @@
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
                     <StackPanel VerticalAlignment="Center" Spacing="{StaticResource SaSpace4}">
-                        <primitives:SaHeadingHost AutomationProperties.HeadingLevel="Level1" IsTabStop="False"><TextBlock x:Uid="OverviewTitle" AutomationProperties.AccessibilityView="Raw" IsTextSelectionEnabled="False" IsTabStop="False"
-                                   Style="{StaticResource SaPageTitleTextStyle}" Foreground="{ThemeResource SaTextBrush}" /></primitives:SaHeadingHost>
+                        <primitives:SaHeadingHost AutomationProperties.HeadingLevel="Level1" IsTabStop="False">
+                        <TextBlock x:Uid="OverviewTitle" AutomationProperties.AccessibilityView="Raw" IsTextSelectionEnabled="False" IsTabStop="False"
+                                   Style="{StaticResource SaPageTitleTextStyle}" Foreground="{ThemeResource SaTextBrush}" />
+                    </primitives:SaHeadingHost>
                         <TextBlock x:Uid="FirstServerSubtitle" Style="{StaticResource SaPageSubtitleTextStyle}" Visibility="{x:Bind ViewModel.ShowEmptyState, Mode=OneWay}"/>
                         <TextBlock Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}"
                                    Text="{x:Bind ViewModel.HeaderContextDisplay, Mode=OneWay}"

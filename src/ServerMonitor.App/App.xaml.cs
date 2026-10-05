@@ -110,7 +110,6 @@ public partial class App : Application
         // UI.3 gate 1A (fail-closed): a harness launch whose composition still reaches real user data aborts here,
         // before the host starts and before OnLaunched touches the trust store.
         Qa.QaStartupIsolation.VerifyOrThrow(ServicesHost.Services);
-        Qa.Ui6DetailFirstChanceDiagnostic.Install();
         var resourcesStarted = System.Diagnostics.Stopwatch.GetTimestamp();
 #endif
         InitializeComponent();

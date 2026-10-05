@@ -96,12 +96,14 @@
                     <primitives:SaIcon Data="{StaticResource SaIconServerStack01Data}" Size="30" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Border>
                 <StackPanel Grid.Column="1" Spacing="6" VerticalAlignment="Center">
-                    <primitives:SaHeadingHost AutomationProperties.HeadingLevel="Level1" IsTabStop="False"><TextBlock
+                    <primitives:SaHeadingHost AutomationProperties.HeadingLevel="Level1" IsTabStop="False">
+                        <TextBlock
                         x:Name="ServerNameHeading"
                         Text="{Binding Title}"
                         AutomationProperties.AccessibilityView="Raw" IsTextSelectionEnabled="False" IsTabStop="False"
                         Style="{StaticResource SaPageTitleTextStyle}"
-                        TextTrimming="CharacterEllipsis" /></primitives:SaHeadingHost>
+                        TextTrimming="CharacterEllipsis" />
+                    </primitives:SaHeadingHost>
                     <TextBlock
                         Text="{Binding HeaderSubtitle}"
                         Style="{StaticResource SaControlTextStyle}"
