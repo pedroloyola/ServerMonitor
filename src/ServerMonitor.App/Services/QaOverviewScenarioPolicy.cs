@@ -27,7 +27,7 @@ public static class QaOverviewScenarioPolicy
     public static readonly IReadOnlyList<string> Scenarios =
     [
         "healthy", "mixed", "attention", "critical", "offline", "empty", "loading", "unavailable", "discovery",
-        "many-100", "many-500", "vanishing", "detail", "detail-failing", "data", "data-failing"
+        "first-run", "all-hidden", "config-unavailable", "many-100", "many-500", "vanishing", "detail", "detail-failing", "data", "data-failing"
     ];
 
 

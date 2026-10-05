@@ -14,6 +14,7 @@ public sealed class HistoryViewModelTests
     {
         private readonly Dictionary<HistoryTimeRange, TaskCompletionSource<ServerHistoryResult>> _pending = new();
 
+        public List<Guid> RequestedIds { get; } = [];
         public bool Available { get; set; } = true;
 
         public bool ThrowOnQuery { get; set; }
@@ -24,6 +25,7 @@ public sealed class HistoryViewModelTests
 
         public Task<ServerHistoryResult> GetHistoryAsync(Guid serverId, HistoryTimeRange range, CancellationToken cancellationToken)
         {
+            RequestedIds.Add(serverId);
             if (ThrowOnQuery)
             {
                 throw new InvalidOperationException("QA boom");
@@ -40,6 +42,45 @@ public sealed class HistoryViewModelTests
         }
 
         public void Complete(HistoryTimeRange range, ServerHistoryResult result) => _pending[range].SetResult(result);
+    }
+
+    [Fact]
+    public async Task Ui6_NoServer_NeverQueriesEmptyGuid_EvenAfterRangeChange()
+    {
+        var (vm, query, _, _) = New();
+        using (vm)
+        {
+            query.ThrowOnQuery = true;
+            vm.Load(null, string.Empty, fromDetail: false);
+            await vm.LoadRangeAsync(HistoryTimeRange.Last30Days);
+            Assert.False(vm.HasServer);
+            Assert.False(vm.ShowDetailBack);
+            Assert.True(vm.ShowEmpty);
+            Assert.Equal(HistoryEmptyKind.NoServer, vm.EmptyKind);
+            Assert.False(vm.IsUnavailable);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Ui6_SidebarHistory_UsesLastVisibleDetailOtherwiseCreatedOrder(bool rememberLast)
+    {
+        var fleet = new Ui4TestKit.Fleet().Add("first", ServerMonitor.Core.Enums.ServerHealth.Healthy)
+            .Add("second", ServerMonitor.Core.Enums.ServerHealth.Healthy)
+            .Add("hidden", ServerMonitor.Core.Enums.ServerHealth.Healthy, hidden: true);
+        var kit = Ui4TestKit.Create(fleet);
+        using var dashboard = kit.Dashboard;
+        var query = new ControllableHistoryQueryService { Immediate = range => Result(range, empty: true) };
+        using var vm = new HistoryViewModel(query, kit.Metrics, kit.States, kit.Servers,
+            kit.Navigation, kit.Localization, NullLogger<HistoryViewModel>.Instance, new FakeTimeProvider());
+        await vm.LoadSidebarAsync(rememberLast ? fleet.IdOf("second") : fleet.IdOf("hidden"));
+        Assert.Equal(rememberLast ? fleet.IdOf("second") : fleet.IdOf("first"), vm.SelectedServer!.Id);
+        Assert.False(vm.ShowDetailBack);
+        Assert.DoesNotContain(Guid.Empty, query.RequestedIds);
+        Assert.NotEmpty(query.RequestedIds);
+        vm.Load(fleet.IdOf("first"), "first", fromDetail: true);
+        Assert.True(vm.ShowDetailBack);
     }
 
     private static ServerHistoryResult Result(HistoryTimeRange range, bool empty)
@@ -68,7 +109,7 @@ public sealed class HistoryViewModelTests
         };
     }
 
-    private static (HistoryViewModel vm, ControllableHistoryQueryService query, FakeServerMetricsStore metrics, FakeNavigationService nav) New()
+    private static (HistoryViewModel vm, ControllableHistoryQueryService query, FakeServerMetricsStore metrics, FakeNavigationService nav) New(bool loadServer = true)
     {
         var query = new ControllableHistoryQueryService();
         var metrics = new FakeServerMetricsStore();
@@ -82,6 +123,12 @@ public sealed class HistoryViewModelTests
             new FakeLocalizationService(),
             NullLogger<HistoryViewModel>.Instance,
             new FakeTimeProvider());
+        if (loadServer)
+        {
+            query.Immediate = range => Result(range, empty: true);
+            vm.Load(Guid.Parse("d8c9b70e-1c06-4010-9857-991b9f60eab1"), "test");
+            query.Immediate = null;
+        }
         return (vm, query, metrics, nav);
     }
 
@@ -209,7 +256,7 @@ public sealed class HistoryViewModelTests
     [Fact]
     public void BackCommand_ReturnsToTheServersInterimPage()
     {
-        var (vm, _, _, nav) = New();
+        var (vm, _, _, nav) = New(loadServer: false);
 
         vm.BackCommand.Execute(null);
 
@@ -222,14 +269,16 @@ public sealed class HistoryViewModelTests
     public async Task Dispose_InvalidatesNonCooperativeInFlightQuery()
     {
         var (vm, query, _, _) = New();
+        var previousSeries = vm.CpuSeries;
+        var previousStart = vm.RangeStartUtc;
         var pending = vm.LoadRangeAsync(HistoryTimeRange.Last30Days);
 
         vm.Dispose();
         query.Complete(HistoryTimeRange.Last30Days, Result(HistoryTimeRange.Last30Days, empty: false));
         await pending;
 
-        Assert.Null(vm.CpuSeries);
-        Assert.Equal(default, vm.RangeStartUtc);
+        Assert.Same(previousSeries, vm.CpuSeries);
+        Assert.Equal(previousStart, vm.RangeStartUtc);
         Assert.False(vm.IsLoading);
     }
 }

@@ -6,6 +6,8 @@ namespace ServerMonitor.App.Tests.Fakes;
 /// <summary>Inert <see cref="INavigationService"/> for ViewModel tests. Records the last navigation.</summary>
 internal sealed class FakeNavigationService : INavigationService
 {
+    public NavigationDestination? CurrentDestination { get; set; }
+
     public int DashboardCount { get; private set; }
 
     public Guid? LastHistoryServerId { get; private set; }

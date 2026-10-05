@@ -7,10 +7,34 @@ namespace ServerMonitor.Core.Domain;
 public sealed class ServerService(
     IServerRepository repository,
     IServerValidator validator,
-    IConfigurationWriteGate writeGate) : IServerService, IDisposable
+    IConfigurationWriteGate writeGate) : IServerService, IServerLoadStatusSource, IDisposable
 {
     private readonly SemaphoreSlim _gate = new(1, 1);
     private List<Server>? _servers;
+    private ServerLoadStatus? _loadStatus;
+
+    public async Task<ServerLoadStatus> GetLoadStatusAsync(CancellationToken cancellationToken = default)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            if (_loadStatus is { } cached) return cached;
+            try
+            {
+                await EnsureLoadedAsync(cancellationToken);
+                var status = repository is IServerLoadStatusSource source
+                    ? await source.GetLoadStatusAsync(cancellationToken) : ServerLoadStatus.Loaded;
+                _loadStatus = _servers!.Count == 0 && _quarantined.Count > 0
+                    ? ServerLoadStatus.Unavailable : status;
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                _loadStatus = ServerLoadStatus.Unavailable;
+            }
+            return _loadStatus.Value;
+        }
+        finally { _gate.Release(); }
+    }
 
     // Persisted servers the validator rejects (including every invalid route). Never exposed to
     // monitoring or the UI, never treated as direct, and written back verbatim on every save so a

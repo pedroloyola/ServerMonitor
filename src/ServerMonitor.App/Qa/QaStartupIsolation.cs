@@ -53,7 +53,9 @@ internal static partial class QaStartupIsolation
         QaUiLanguagePolicy.LaunchFlag,
         QaBackupPolicy.LaunchFlag,
         QaProxyJumpPolicy.DirectoryFlag,
-        QaOverviewScenarioPolicy.LaunchFlag
+        QaOverviewScenarioPolicy.LaunchFlag,
+        QaShellStartup.StartFlag,
+        QaShellStartup.ActivationFlag
     ];
 
     /// <summary>
@@ -117,6 +119,8 @@ internal static partial class QaStartupIsolation
             return $"{qa[0].Split('=')[0]} is not an isolated QA harness: on its own it would run the real composition " +
                 $"(real user data, Credential Manager, SSH). Combine it with one of: {string.Join(", ", HarnessFlags)}.";
         }
+
+        if (QaShellStartup.Refusal(commandLineArgs) is { } shellRefusal) return shellRefusal;
 
         // UI.4 (Cortex r1 NIT-4): the scenario modifier belongs to --qa-overview only; next to another harness it would be
         // silently ignored, so it is refused.

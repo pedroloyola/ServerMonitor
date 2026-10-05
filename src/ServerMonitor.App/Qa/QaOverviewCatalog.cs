@@ -83,7 +83,8 @@ internal static class QaOverviewCatalog
             Offline("lab-pi", "lab-pi.local", withPriorSnapshot: false),
             Healthy("web-02", "web-02.local", cpu: 33, mem: 47, disk: 58)),
 
-        "empty" => Scenario(name),
+        "empty" or "first-run" or "config-unavailable" => Scenario(name),
+        "all-hidden" => Scenario(name, Hidden("hidden-01", "hidden-01.local")),
 
         "loading" => new QaOverviewScenario(name, [], [], NeverLoads: true),
 

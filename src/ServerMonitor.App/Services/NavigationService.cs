@@ -13,6 +13,14 @@ public sealed class NavigationService : INavigationService
     private readonly Func<Type, object> _pageFactory;
     private INavigationHost? _host;
     private readonly Dictionary<Guid, ServerDetailOrigin> _detailOrigins = [];
+    private Guid? _lastDetailServer;
+    public NavigationDestination? CurrentDestination { get; private set; }
+    public event EventHandler? Navigated;
+
+    public void EnsureInitialNavigation()
+    {
+        if (Host.Content is null) GoToDashboard();
+    }
 
     public NavigationService(IServiceProvider serviceProvider, ILogger<NavigationService> logger)
         : this(serviceProvider, logger, pageFactory: null)
@@ -40,12 +48,12 @@ public sealed class NavigationService : INavigationService
 
     public void NavigateTo<TPage>() where TPage : Page
     {
-        if (Host.Content is TPage)
+        if (Host.Content is TPage || CurrentDestination == DestinationFor(typeof(TPage)))
         {
             return;
         }
 
-        Show(_pageFactory(typeof(TPage)), isOverview: typeof(TPage) == typeof(DashboardPage));
+        Show(_pageFactory(typeof(TPage)), DestinationFor(typeof(TPage)));
         _logger.LogInformation("Navigated to {Page}.", typeof(TPage).Name);
     }
 
@@ -75,7 +83,7 @@ public sealed class NavigationService : INavigationService
             return;
         }
 
-        Show(page, isOverview: false);
+        Show(page, DestinationFor(pageType));
         _logger.LogInformation("Navigated to Settings ({Section}).", section);
     }
 
@@ -108,9 +116,9 @@ public sealed class NavigationService : INavigationService
 
         // A fresh page per navigation so each visit starts clean and disposes on Unloaded — the
         // target server is a runtime argument, so this cannot use the type-only NavigateTo cache.
-        var page = (HistoryPage)_pageFactory(typeof(HistoryPage));
-        page.Load(serverId, serverName);
-        Show(page, isOverview: false);
+        var page = (IHistoryView)_pageFactory(typeof(HistoryPage));
+        Show(page, NavigationDestination.History);
+        page.Load(serverId, serverName, fromDetail: true);
         _logger.LogInformation("Navigated to History for a server.");
     }
 
@@ -122,7 +130,7 @@ public sealed class NavigationService : INavigationService
         // target server is a runtime argument, so this cannot use the type-only NavigateTo cache.
         var page = (WorkloadsPage)_pageFactory(typeof(WorkloadsPage));
         page.Load(serverId, serverName);
-        Show(page, isOverview: false);
+        Show(page, NavigationDestination.Workloads);
         _logger.LogInformation("Navigated to Workloads for a server.");
     }
 
@@ -132,7 +140,8 @@ public sealed class NavigationService : INavigationService
 
         // Fresh page/VM per visit: the directory holds per-row subscriptions to the shared server cards that must not
         // outlive the visit (released by Show when the page is replaced, and on Unloaded).
-        Show(_pageFactory(typeof(ServersPage)), isOverview: false);
+        if (CurrentDestination == NavigationDestination.Servers) return;
+        Show(_pageFactory(typeof(ServersPage)), NavigationDestination.Servers);
         _logger.LogInformation("Navigated to Servers.");
     }
 
@@ -152,8 +161,9 @@ public sealed class NavigationService : INavigationService
         // Content BEFORE Load: if the page has to leave during Load (the server vanished in between), that navigation
         // runs after this one and wins, instead of being overwritten by it.
         _detailOrigins[serverId] = origin;
+        _lastDetailServer = serverId;
         var page = (IServerDetailView)_pageFactory(typeof(ServerDetailPage));
-        Show(page, isOverview: false);
+        Show(page, NavigationDestination.Detail);
         page.Load(serverId, origin);
         _logger.LogInformation("Navigated to the Server Detail page from {Origin}.", origin);
     }
@@ -173,6 +183,23 @@ public sealed class NavigationService : INavigationService
             : IsListed(serverId) ? ServerDetailOrigin.Servers : ServerDetailOrigin.Overview;
         GoToServerDetail(serverId, origin);
     }
+
+    public void GoToHistory()
+    {
+        if (CurrentDestination == NavigationDestination.History) return;
+        var page = (IHistoryView)_pageFactory(typeof(HistoryPage));
+        Show(page, NavigationDestination.History);
+        page.LoadSidebar(_lastDetailServer);
+    }
+
+    private static NavigationDestination DestinationFor(Type type) => type == typeof(DashboardPage)
+        ? NavigationDestination.Overview : type == typeof(ServersPage) ? NavigationDestination.Servers
+        : type == typeof(ServerDetailPage) ? NavigationDestination.Detail
+        : type == typeof(HistoryPage) ? NavigationDestination.History
+        : type == typeof(WorkloadsPage) ? NavigationDestination.Workloads
+        : type == typeof(SettingsPage) ? NavigationDestination.Settings
+        : type == typeof(SettingsDataPage) ? NavigationDestination.SettingsData
+        : throw new ArgumentException("Unknown navigation page.", nameof(type));
 
     private bool IsListed(Guid serverId) =>
         _serviceProvider.GetService<DashboardViewModel>() is { } dashboard && dashboard.HasVisibleServer(serverId);
@@ -196,16 +223,18 @@ public sealed class NavigationService : INavigationService
     /// SHOULD-3): a page replaced before it was ever Loaded never gets Unloaded, so Unloaded alone could leak it. The
     /// singleton pages (Visão geral, Definições) are not disposable and are never released here.
     /// </summary>
-    private void Show(object page, bool isOverview)
+    private void Show(object page, NavigationDestination destination)
     {
         var previous = Host.Content;
         Host.Content = page;
+        CurrentDestination = destination;
+        Navigated?.Invoke(this, EventArgs.Empty);
         if (!ReferenceEquals(previous, page) && previous is IDisposable disposable)
         {
             disposable.Dispose();
         }
 
-        if (!isOverview)
+        if (destination != NavigationDestination.Overview)
         {
             NavigatedAwayFromOverview?.Invoke(this, EventArgs.Empty);
         }
@@ -231,4 +260,10 @@ internal interface INavigationHost
 public interface IServerDetailView
 {
     void Load(Guid serverId, ServerDetailOrigin origin);
+}
+
+public interface IHistoryView
+{
+    void Load(Guid? serverId, string serverName, bool fromDetail);
+    void LoadSidebar(Guid? lastDetailServer);
 }

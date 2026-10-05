@@ -112,6 +112,14 @@ public sealed class HistoryViewModelUi3Tests
         return new Harness(vm, query, metrics, servers, states, navigation);
     }
 
+    // UI.6: range tests explicitly select a server; no query is allowed for Guid.Empty.
+    private static void PrepareQuery(Harness h)
+    {
+        if (h.Vm.HasServer) return;
+        h.Vm.Load(Guid.Parse("b99e20d0-0555-452c-a267-a719c620fa47"), "fixture");
+        h.Query.Calls.Clear();
+    }
+
     private static Server Server(string name, int order, bool hidden = false) => new()
     {
         Id = Guid.NewGuid(),
@@ -147,6 +155,7 @@ public sealed class HistoryViewModelUi3Tests
         var h = New();
         h.Query.RangesWithData.Add(expected);
         h.Vm.SelectedRangeIndex = index == 0 ? 1 : 0;
+        PrepareQuery(h);
         h.Query.Calls.Clear();
 
         h.Vm.SelectedRangeIndex = index;
@@ -162,6 +171,7 @@ public sealed class HistoryViewModelUi3Tests
     {
         var h = New();
 
+        PrepareQuery(h);
         await h.Vm.LoadRangeAsync(HistoryTimeRange.Last24Hours);
 
         Assert.Equal(HistoryEmptyKind.NeverRecorded, h.Vm.EmptyKind);
@@ -182,6 +192,7 @@ public sealed class HistoryViewModelUi3Tests
         var h = New();
         h.Query.RangesWithData.Add(HistoryTimeRange.Last30Days);
 
+        PrepareQuery(h);
         await h.Vm.LoadRangeAsync(HistoryTimeRange.Last24Hours);
 
         Assert.Equal(HistoryEmptyKind.Period, h.Vm.EmptyKind);
@@ -214,6 +225,7 @@ public sealed class HistoryViewModelUi3Tests
     {
         var h = New();
 
+        PrepareQuery(h);
         await h.Vm.LoadRangeAsync(HistoryTimeRange.Last30Days);
 
         Assert.Equal(HistoryEmptyKind.NeverRecorded, h.Vm.EmptyKind);
@@ -226,6 +238,7 @@ public sealed class HistoryViewModelUi3Tests
         var h = New();
         h.Query.RangesWithData.Add(HistoryTimeRange.Last24Hours);
 
+        PrepareQuery(h);
         await h.Vm.LoadRangeAsync(HistoryTimeRange.Last24Hours);
 
         Assert.Equal(HistoryEmptyKind.None, h.Vm.EmptyKind);
@@ -238,6 +251,7 @@ public sealed class HistoryViewModelUi3Tests
         var h = New();
         h.Query.ThrowOn30DayProbe = true;
 
+        PrepareQuery(h);
         await h.Vm.LoadRangeAsync(HistoryTimeRange.Last24Hours);
 
         Assert.Equal(HistoryEmptyKind.Period, h.Vm.EmptyKind);
@@ -250,6 +264,7 @@ public sealed class HistoryViewModelUi3Tests
         var h = New();
         h.Query.IsAvailable = false;
 
+        PrepareQuery(h);
         await h.Vm.LoadRangeAsync(HistoryTimeRange.Last24Hours);
 
         Assert.True(h.Vm.ShowUnavailable);
@@ -266,6 +281,7 @@ public sealed class HistoryViewModelUi3Tests
         var h = New();
         h.Query.RangesWithData.Add(HistoryTimeRange.Last24Hours);
 
+        PrepareQuery(h);
         await h.Vm.LoadRangeAsync(HistoryTimeRange.Last24Hours);
 
         Assert.Equal("—", h.Vm.CpuCurrentValue);
@@ -288,6 +304,7 @@ public sealed class HistoryViewModelUi3Tests
         };
         h.Query.RangesWithData.Add(HistoryTimeRange.Last24Hours);
 
+        PrepareQuery(h);
         await h.Vm.LoadRangeAsync(HistoryTimeRange.Last24Hours);
 
         Assert.Equal("24", h.Vm.CpuCurrentValue);
@@ -308,6 +325,7 @@ public sealed class HistoryViewModelUi3Tests
         var h = New(culture);
         h.Query.RangesWithData.Add(HistoryTimeRange.Last24Hours);
 
+        PrepareQuery(h);
         await h.Vm.LoadRangeAsync(HistoryTimeRange.Last24Hours);
 
         Assert.Equal(expected, h.Vm.CpuPeakDisplay);
@@ -321,6 +339,7 @@ public sealed class HistoryViewModelUi3Tests
         h.Query.RangesWithData.Add(HistoryTimeRange.Last24Hours);
         h.Query.Maximum = null;
 
+        PrepareQuery(h);
         await h.Vm.LoadRangeAsync(HistoryTimeRange.Last24Hours);
 
         Assert.Equal("Pico no período —", h.Vm.CpuPeakDisplay);
@@ -337,6 +356,7 @@ public sealed class HistoryViewModelUi3Tests
         var h = New(culture);
         h.Query.RangesWithData.Add(HistoryTimeRange.Last24Hours);
 
+        PrepareQuery(h);
         await h.Vm.LoadRangeAsync(HistoryTimeRange.Last24Hours);
 
         Assert.Equal(expected, h.Vm.PeriodFooter);
@@ -353,6 +373,7 @@ public sealed class HistoryViewModelUi3Tests
         var h = New(culture);
         h.Query.RangesWithData.Add(range);
 
+        PrepareQuery(h);
         await h.Vm.LoadRangeAsync(range);
 
         Assert.Equal(expected, h.Vm.PeriodFooter);
@@ -405,6 +426,7 @@ public sealed class HistoryViewModelUi3Tests
         var h = New();
         h.Query.RangesWithData.Add(HistoryTimeRange.Last24Hours);
 
+        PrepareQuery(h);
         await h.Vm.LoadRangeAsync(HistoryTimeRange.Last24Hours);
 
         // D-UI3-4 revised (Prism F6): round 6 h boundaries at their real position, not the quartiles of 15:00..15:00.
@@ -421,6 +443,7 @@ public sealed class HistoryViewModelUi3Tests
         var h = New(timeZone: lisbonSummer);
         h.Query.RangesWithData.Add(HistoryTimeRange.LastHour);
 
+        PrepareQuery(h);
         await h.Vm.LoadRangeAsync(HistoryTimeRange.LastHour);
 
         Assert.Equal(new[] { "15:00", "15:15", "15:30", "15:45", "16:00" }, h.Vm.XAxisLabels);
@@ -435,6 +458,7 @@ public sealed class HistoryViewModelUi3Tests
         var h = New(culture);
         h.Query.RangesWithData.Add(HistoryTimeRange.Last7Days);
 
+        PrepareQuery(h);
         await h.Vm.LoadRangeAsync(HistoryTimeRange.Last7Days);
 
         Assert.Equal(expected, h.Vm.XAxisLabels);
@@ -500,6 +524,7 @@ public sealed class HistoryViewModelUi3Tests
         h.Servers.Servers.AddRange([a, b]);
         h.Query.RangesWithData.Add(HistoryTimeRange.Last24Hours);
         h.Vm.Load(a.Id, a.Name);
+        PrepareQuery(h);
         h.Query.Calls.Clear();
 
         h.Vm.SelectedServer = h.Vm.Servers.Single(option => option.Id == b.Id);

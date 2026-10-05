@@ -13,6 +13,8 @@ namespace ServerMonitor.App;
 public sealed partial class MainWindow : Window
 {
     private readonly INavigationService _navigationService;
+    public ShellViewModel Shell { get; }
+    public OnboardingViewModel Onboarding { get; }
     private readonly WindowCloseCoordinator _closeCoordinator;
     private readonly IApplicationWindowController _windowController;
     private readonly AppWindowPlacementAdapter _placementAdapter;
@@ -29,6 +31,8 @@ public sealed partial class MainWindow : Window
 
     public MainWindow(
         INavigationService navigationService,
+        ShellViewModel shell,
+        OnboardingViewModel onboarding,
         IThemeService themeService,
         IWindowContext windowContext,
         ILocalizationService localizationService,
@@ -44,6 +48,8 @@ public sealed partial class MainWindow : Window
     {
         InitializeComponent();
         _navigationService = navigationService;
+        Shell = shell;
+        Onboarding = onboarding;
         _windowController = windowController;
         _placementAdapter = placementAdapter;
         _modeCoordinator = modeCoordinator;
@@ -131,7 +137,7 @@ public sealed partial class MainWindow : Window
         AppWindow.TitleBar.ButtonInactiveForegroundColor = isLight ? Colors.DimGray : Colors.LightGray;
     }
 
-    private void OnRootLayoutLoaded(object sender, RoutedEventArgs e)
+    private async void OnRootLayoutLoaded(object sender, RoutedEventArgs e)
     {
         RootLayout.Loaded -= OnRootLayoutLoaded;
         // The XamlRoot (and its rasterization scale) is available now; recompute the compact caption
@@ -145,7 +151,16 @@ public sealed partial class MainWindow : Window
 
         // Keep the standard dashboard navigated and its data loaded regardless of the starting mode,
         // so expanding from a cold compact start shows populated cards immediately.
-        _navigationService.GoToDashboard();
+#if DEBUG
+        if (Qa.QaShellStartup.Present(Environment.GetCommandLineArgs(), Qa.QaShellStartup.StartFlag))
+        {
+            Onboarding.SuppressForActivation();
+            await Qa.QaShellStartup.ApplyStartAsync(Environment.GetCommandLineArgs(), _navigationService, _dashboardViewModel);
+        }
+#endif
+        var normalStart = _navigationService.CurrentDestination is null && Program.LaunchMode == LaunchMode.Foreground;
+        _navigationService.EnsureInitialNavigation();
+        await Onboarding.OnMainWindowShownAsync(normalStart);
         if (_modeCoordinator.CurrentMode == WindowMode.Compact)
         {
             _ = _dashboardViewModel.LoadAsync();
