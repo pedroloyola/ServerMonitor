@@ -4,10 +4,10 @@ namespace ServerMonitor.App.Services;
 
 public interface INavigationService
 {
-    NavigationDestination? CurrentDestination => null;
-    event EventHandler? Navigated { add { } remove { } }
-    void EnsureInitialNavigation() => GoToDashboard();
-    void GoToHistory() { }
+    NavigationDestination? CurrentDestination { get; }
+    event EventHandler? Navigated;
+    void EnsureInitialNavigation();
+    void GoToHistory();
     void Initialize(Frame frame);
 
     /// <summary>

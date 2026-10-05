@@ -93,10 +93,10 @@ public partial class App : Application
         // Attach the router to the single activation hand-off now that it exists: this atomically flushes
         // the latest intent buffered before this App object was built (the cold launch, or a redirect that
         // raced construction). The router buffers it internally until the shell signals ready (§M-1).
-        var onboarding = ServicesHost.Services.GetRequiredService<OnboardingViewModel>();
+        var activation = ServicesHost.Services.GetRequiredService<ActivationLatch>();
         Program.AttachActivationConsumer(intent =>
         {
-            onboarding.RecordActivation();
+            activation.Record();
             _activationRouter.Route(intent);
         });
 
@@ -828,6 +828,7 @@ public partial class App : Application
         services.AddTransient<WorkloadsPage>();
         services.AddSingleton<ShellViewModel>();
         services.AddSingleton<OnboardingViewModel>();
+        services.AddSingleton<ActivationLatch>();
         services.AddTransient<MainWindow>();
 #if DEBUG
         // Debug-only QA: --qa-backup <scenario> swaps the backup engine and its file pickers for in-memory

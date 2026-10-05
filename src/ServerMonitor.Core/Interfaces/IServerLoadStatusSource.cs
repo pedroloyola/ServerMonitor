@@ -12,3 +12,11 @@ public interface IServerLoadStatusSource
 {
     Task<ServerLoadStatus> GetLoadStatusAsync(CancellationToken cancellationToken = default);
 }
+
+/// <summary>Read-only detail used to reconcile a diagnostic read with the process-cached list.</summary>
+public sealed record ServerLoadDiagnosis(ServerLoadStatus Status, int LoadableCount);
+
+public interface IServerLoadDiagnosisSource : IServerLoadStatusSource
+{
+    Task<ServerLoadDiagnosis> GetLoadDiagnosisAsync(CancellationToken cancellationToken = default);
+}

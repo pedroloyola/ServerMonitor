@@ -23,7 +23,6 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
 
     public void Navigate(ShellDestination destination)
     {
-        if (SelectedDestination == destination) return;
         switch (destination)
         {
             case ShellDestination.Overview: _navigation.GoToDashboard(); break;

@@ -22,10 +22,15 @@ public sealed class ServerService(
             try
             {
                 await EnsureLoadedAsync(cancellationToken);
-                var status = repository is IServerLoadStatusSource source
-                    ? await source.GetLoadStatusAsync(cancellationToken) : ServerLoadStatus.Loaded;
-                _loadStatus = _servers!.Count == 0 && _quarantined.Count > 0
-                    ? ServerLoadStatus.Unavailable : status;
+                // The list feeding the UI wins. A later disk read only explains an empty cache;
+                // it never reloads it or changes the legacy process-cache contract.
+                if (_servers!.Count > 0) return (_loadStatus = ServerLoadStatus.Loaded).Value;
+                var diagnosis = repository is IServerLoadDiagnosisSource detailed
+                    ? await detailed.GetLoadDiagnosisAsync(cancellationToken)
+                    : new ServerLoadDiagnosis(repository is IServerLoadStatusSource source
+                        ? await source.GetLoadStatusAsync(cancellationToken) : ServerLoadStatus.Loaded, 0);
+                _loadStatus = _quarantined.Count > 0 || diagnosis.LoadableCount > 0
+                    ? ServerLoadStatus.Unavailable : diagnosis.Status;
             }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
             {

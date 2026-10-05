@@ -14,6 +14,7 @@ public sealed class NavigationService : INavigationService
     private INavigationHost? _host;
     private readonly Dictionary<Guid, ServerDetailOrigin> _detailOrigins = [];
     private Guid? _lastDetailServer;
+    private bool _historyFromSidebar;
     public NavigationDestination? CurrentDestination { get; private set; }
     public event EventHandler? Navigated;
 
@@ -117,6 +118,7 @@ public sealed class NavigationService : INavigationService
         // A fresh page per navigation so each visit starts clean and disposes on Unloaded — the
         // target server is a runtime argument, so this cannot use the type-only NavigateTo cache.
         var page = (IHistoryView)_pageFactory(typeof(HistoryPage));
+        _historyFromSidebar = false;
         Show(page, NavigationDestination.History);
         page.Load(serverId, serverName, fromDetail: true);
         _logger.LogInformation("Navigated to History for a server.");
@@ -186,8 +188,9 @@ public sealed class NavigationService : INavigationService
 
     public void GoToHistory()
     {
-        if (CurrentDestination == NavigationDestination.History) return;
+        if (CurrentDestination == NavigationDestination.History && _historyFromSidebar) return;
         var page = (IHistoryView)_pageFactory(typeof(HistoryPage));
+        _historyFromSidebar = true;
         Show(page, NavigationDestination.History);
         page.LoadSidebar(_lastDetailServer);
     }
@@ -228,7 +231,6 @@ public sealed class NavigationService : INavigationService
         var previous = Host.Content;
         Host.Content = page;
         CurrentDestination = destination;
-        Navigated?.Invoke(this, EventArgs.Empty);
         if (!ReferenceEquals(previous, page) && previous is IDisposable disposable)
         {
             disposable.Dispose();
@@ -238,6 +240,7 @@ public sealed class NavigationService : INavigationService
         {
             NavigatedAwayFromOverview?.Invoke(this, EventArgs.Empty);
         }
+        Navigated?.Invoke(this, EventArgs.Empty);
     }
 
     private sealed class FrameHost(Frame frame) : INavigationHost

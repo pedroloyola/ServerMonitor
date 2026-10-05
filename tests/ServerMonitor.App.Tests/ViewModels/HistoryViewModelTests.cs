@@ -83,6 +83,24 @@ public sealed class HistoryViewModelTests
         Assert.True(vm.ShowDetailBack);
     }
 
+    [Fact]
+    public async Task Ui6_SidebarListFailure_ShowsUnavailable_NotNoServers()
+    {
+        var kit = Ui4TestKit.Create(new Ui4TestKit.Fleet());
+        using var dashboard = kit.Dashboard;
+        kit.Servers.GetAllOverride = _ => throw new InvalidOperationException("synthetic");
+        var query = new ControllableHistoryQueryService();
+        using var vm = new HistoryViewModel(query, kit.Metrics, kit.States, kit.Servers,
+            kit.Navigation, kit.Localization, NullLogger<HistoryViewModel>.Instance, new FakeTimeProvider());
+        await vm.LoadSidebarAsync(null);
+        Assert.True(vm.ShowUnavailable);
+        Assert.False(vm.ShowEmpty);
+        Assert.False(vm.IsLoading);
+        Assert.False(vm.HasServer);
+        Assert.False(vm.ShowDetailBack);
+        Assert.Empty(query.RequestedIds);
+    }
+
     private static ServerHistoryResult Result(HistoryTimeRange range, bool empty)
     {
         var end = new DateTimeOffset(2026, 8, 26, 12, 0, 0, TimeSpan.Zero);

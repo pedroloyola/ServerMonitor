@@ -471,9 +471,15 @@ public sealed class HistoryViewModel : ObservableObject, IDisposable
     public async Task LoadSidebarAsync(Guid? lastDetailServer)
     {
         IsLoading = true;
-        await LoadServersAsync();
+        var loaded = await TryLoadServersAsync();
         if (_disposed) return;
         _serversRequested = true;
+        if (!loaded)
+        {
+            Load(null, string.Empty, fromDetail: false);
+            IsUnavailable = true;
+            return;
+        }
         var server = Servers.FirstOrDefault(option => option.Id == lastDetailServer) ?? Servers.FirstOrDefault();
         Load(server?.Id, server?.Name ?? string.Empty, fromDetail: false);
     }
@@ -545,14 +551,17 @@ public sealed class HistoryViewModel : ObservableObject, IDisposable
     /// Reads the server list from the same service that feeds the Dashboard (visible servers only, same
     /// order). The server being viewed is always selectable even if the list could not be read.
     /// </summary>
-    public async Task LoadServersAsync()
+    public async Task LoadServersAsync() => await TryLoadServersAsync();
+
+    private async Task<bool> TryLoadServersAsync()
     {
         if (_disposed || _serverService is null)
         {
-            return;
+            return false;
         }
 
         var generation = Interlocked.Increment(ref _serversGeneration);
+        var loaded = true;
         IReadOnlyList<Server> servers;
         try
         {
@@ -562,11 +571,12 @@ public sealed class HistoryViewModel : ObservableObject, IDisposable
         {
             _logger.LogError("History server list failed. Type: {Type}.", exception.GetType().Name);
             servers = [];
+            loaded = false;
         }
 
         if (_disposed || generation != Volatile.Read(ref _serversGeneration))
         {
-            return;
+            return false;
         }
 
         Servers.Clear();
@@ -581,6 +591,7 @@ public sealed class HistoryViewModel : ObservableObject, IDisposable
         }
 
         SyncSelectedServer();
+        return loaded;
     }
 
     private HistoryServerOptionViewModel BuildServerOption(Guid serverId, string name)

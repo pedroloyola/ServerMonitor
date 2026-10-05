@@ -1,4 +1,6 @@
 using System.Text.Json;
+using System.Security.AccessControl;
+using System.Security.Principal;
 using Microsoft.Extensions.Logging.Abstractions;
 using ServerMonitor.Core.Backup;
 using ServerMonitor.Core.Domain;
@@ -105,6 +107,69 @@ public sealed class Ui6LoadStatusTests : IDisposable
         Assert.Empty(await service.GetAllAsync());
         Assert.Equal(ServerLoadStatus.Unavailable, await service.GetLoadStatusAsync());
         Assert.Empty(await service.GetAllAsync());
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task CachedList_WinsOverLaterDiskDiagnosis(bool lockedAtFirstRead)
+    {
+        var server = new Server { Id = Guid.NewGuid(), Name = "test", Host = "test.local", Username = "qa" };
+        await Write(Direct, JsonSerializer.Serialize(new[] { server }, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
+        using var repository = Repository();
+        using var service = new ServerService(repository, new ServerValidator(), new ConfigurationWriteGate());
+        if (lockedAtFirstRead)
+        {
+            using (var locked = new FileStream(Direct, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+                Assert.Empty(await service.GetAllAsync());
+            Assert.Equal(ServerLoadStatus.Unavailable, await service.GetLoadStatusAsync());
+            Assert.Empty(await service.GetAllAsync());
+        }
+        else
+        {
+            Assert.Single(await service.GetAllAsync());
+            using var locked = new FileStream(Direct, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+            Assert.Equal(ServerLoadStatus.Loaded, await service.GetLoadStatusAsync());
+            Assert.Single(await service.GetAllAsync());
+        }
+    }
+
+    [WindowsAclFact]
+    public async Task AccessDenied_IsUnavailable_ForRepositoryAndService_AndAclIsRestored()
+    {
+        await Write(Direct, "[]");
+        if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException();
+        var directory = new DirectoryInfo(_root);
+        var original = directory.GetAccessControl().GetSecurityDescriptorSddlForm(AccessControlSections.Access);
+        var denied = directory.GetAccessControl();
+        var rule = new FileSystemAccessRule(WindowsIdentity.GetCurrent().User!,
+            FileSystemRights.ReadData | FileSystemRights.ReadAttributes | FileSystemRights.ExecuteFile,
+            InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit,
+            PropagationFlags.None, AccessControlType.Deny);
+        denied.AddAccessRule(rule);
+        try
+        {
+            directory.SetAccessControl(denied);
+            Assert.Throws<UnauthorizedAccessException>(() => File.GetAttributes(Direct));
+            Assert.False(File.Exists(Direct));
+            using var repository = Repository();
+            Assert.Equal(ServerLoadStatus.Unavailable, await repository.GetLoadStatusAsync());
+            using var service = new ServerService(repository, new ServerValidator(), new ConfigurationWriteGate());
+            Assert.Equal(ServerLoadStatus.Unavailable, await service.GetLoadStatusAsync());
+        }
+        finally
+        {
+            var restore = new DirectorySecurity();
+            restore.SetSecurityDescriptorSddlForm(original, AccessControlSections.Access);
+            directory.SetAccessControl(restore);
+        }
+        Assert.Equal(original, directory.GetAccessControl().GetSecurityDescriptorSddlForm(AccessControlSections.Access));
+        Assert.Equal("[]", await File.ReadAllTextAsync(Direct));
+    }
+
+    public sealed class WindowsAclFactAttribute : FactAttribute
+    {
+        public WindowsAclFactAttribute() { if (!OperatingSystem.IsWindows()) Skip = "Windows ACL integration test."; }
     }
 
     public void Dispose() { if (Directory.Exists(_root)) Directory.Delete(_root, true); }

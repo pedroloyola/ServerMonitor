@@ -1,22 +1,31 @@
+using Microsoft.Extensions.Logging;
+using ServerMonitor.App.Windowing;
 using ServerMonitor.App.Services;
 using ServerMonitor.Core.Interfaces;
 
 namespace ServerMonitor.App.ViewModels;
 
 /// <summary>Derived first run; dismissal and activation suppression last for this process only.</summary>
-public sealed class OnboardingViewModel : ObservableObject
+public sealed class OnboardingViewModel : ObservableObject, IDisposable
 {
     private readonly IServerService _servers;
     private readonly INavigationService _navigation;
     private bool _dismissed;
-    private volatile bool _activation;
+    private readonly ActivationLatch _activation;
+    private readonly ILogger<OnboardingViewModel> _logger;
+    private bool _normalStart;
+    private bool _standard = true;
     private bool _visible;
     private int _step = 1;
 
-    public OnboardingViewModel(IServerService servers, INavigationService navigation, DashboardViewModel dashboard)
+    public OnboardingViewModel(IServerService servers, INavigationService navigation, DashboardViewModel dashboard,
+        ActivationLatch activation, ILogger<OnboardingViewModel> logger)
     {
         _servers = servers;
         _navigation = navigation;
+        _activation = activation;
+        _logger = logger;
+        _navigation.Navigated += OnNavigated;
         AddServerCommand = new AsyncRelayCommand(() => FinishAsync(dashboard.AddServerCommand));
         ImportFromSshCommand = new AsyncRelayCommand(() => FinishAsync(dashboard.ImportFromSshCommand));
     }
@@ -30,23 +39,44 @@ public sealed class OnboardingViewModel : ObservableObject
 
     public async Task OnMainWindowShownAsync(bool normalStart)
     {
+        _normalStart = normalStart;
         try
         {
             LoadStatus = _servers is IServerLoadStatusSource source
                 ? await source.GetLoadStatusAsync() : ServerLoadStatus.Loaded;
         }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        catch (Exception exception)
         {
             LoadStatus = ServerLoadStatus.Unavailable;
+            _logger.LogWarning("Onboarding configuration diagnosis failed. Type: {Type}.", exception.GetType().Name);
         }
         OnPropertyChanged(nameof(LoadStatus));
         OnPropertyChanged(nameof(IsConfigurationUnavailable));
-        IsVisible = normalStart && !_activation && !_dismissed && LoadStatus == ServerLoadStatus.NotFound;
+        UpdateVisibility();
     }
 
-    public void RecordActivation() => _activation = true;
+    private void UpdateVisibility() => IsVisible = _normalStart && _standard && !_activation.IsRecorded && !_dismissed
+        && LoadStatus == ServerLoadStatus.NotFound;
 
-    public void SuppressForActivation() { _activation = true; IsVisible = false; }
+    public void SetWindowMode(WindowMode mode)
+    {
+        _standard = mode == WindowMode.Standard;
+        UpdateVisibility();
+    }
+
+    private void OnNavigated(object? sender, EventArgs args)
+    {
+        if (IsVisible && _navigation.CurrentDestination != NavigationDestination.Overview) Dismiss();
+    }
+
+    public void Dispose()
+    {
+        _navigation.Navigated -= OnNavigated;
+        Dismiss();
+    }
+
+    public void RecordActivation() => _activation.Record();
+    public void SuppressForActivation() { _activation.Record(); IsVisible = false; }
     public void Next() { if (IsVisible && Step < 3) Step++; }
     public void Back() { if (IsVisible && Step > 1) Step--; }
     public void Dismiss() { _dismissed = true; IsVisible = false; }

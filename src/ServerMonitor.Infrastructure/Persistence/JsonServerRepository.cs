@@ -34,7 +34,7 @@ namespace ServerMonitor.Infrastructure.Persistence;
 public sealed class JsonServerRepository(
     ServerStorageOptions storageOptions,
     ILogger<JsonServerRepository> logger,
-    IConfigurationWriteGate writeGate) : IServerRepository, IServerLoadStatusSource, IDisposable
+    IConfigurationWriteGate writeGate) : IServerRepository, IServerLoadDiagnosisSource, IDisposable
 {
     internal const int SupportedRoutedSchemaVersion = 1;
 
@@ -63,7 +63,10 @@ public sealed class JsonServerRepository(
     // here and absent from the new list; any other entry is someone else's data and is kept.
     private readonly HashSet<Guid> _knownIds = [];
 
-    public async Task<ServerLoadStatus> GetLoadStatusAsync(CancellationToken cancellationToken = default)
+    public async Task<ServerLoadStatus> GetLoadStatusAsync(CancellationToken cancellationToken = default) =>
+        (await GetLoadDiagnosisAsync(cancellationToken)).Status;
+
+    public async Task<ServerLoadDiagnosis> GetLoadDiagnosisAsync(CancellationToken cancellationToken = default)
     {
         await _gate.WaitAsync(cancellationToken);
         try
@@ -75,7 +78,7 @@ public sealed class JsonServerRepository(
                 try
                 {
                     if ((File.GetAttributes(path) & FileAttributes.Directory) != 0)
-                        return ServerLoadStatus.Unavailable;
+                        return new(ServerLoadStatus.Unavailable, 0);
                 }
                 catch (FileNotFoundException) { }
                 catch (DirectoryNotFoundException) { }
@@ -84,18 +87,18 @@ public sealed class JsonServerRepository(
             var direct = await ReadDirectAsync(cancellationToken);
             var routed = await ReadRoutedAsync(cancellationToken);
             if (direct.IsCorrupt || routed.IsCorrupt || routed.IsReadOnly)
-                return ServerLoadStatus.Unavailable;
+                return new(ServerLoadStatus.Unavailable, 0);
             if (!direct.Exists && !routed.Exists)
-                return ServerLoadStatus.NotFound;
+                return new(ServerLoadStatus.NotFound, 0);
 
             var validCount = routed.Entries.Count + DirectEntriesToLoad(direct, routed).Count();
             var quarantinedCount = direct.Quarantined.Count + routed.Quarantined.Count;
-            return validCount == 0 && quarantinedCount > 0
-                ? ServerLoadStatus.Unavailable : ServerLoadStatus.Loaded;
+            return new(validCount == 0 && quarantinedCount > 0
+                ? ServerLoadStatus.Unavailable : ServerLoadStatus.Loaded, validCount);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
-            return ServerLoadStatus.Unavailable;
+            return new(ServerLoadStatus.Unavailable, 0);
         }
         finally { _gate.Release(); }
     }

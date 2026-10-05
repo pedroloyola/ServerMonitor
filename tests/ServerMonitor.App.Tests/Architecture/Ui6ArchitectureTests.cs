@@ -27,6 +27,39 @@ public sealed class Ui6ArchitectureTests
     }
 
     [Fact]
+    public void StartupOrder_PreservesCompactAndRecoveryBeforeOnboarding()
+    {
+        var window = AppSourceTree.CodeWithoutComments("MainWindow.xaml.cs");
+        var capture = window.IndexOf("var normalStart = OnboardingStartup.IsNormalStart(_navigationService.CurrentDestination, Program.LaunchMode)", StringComparison.Ordinal);
+        var ensure = window.IndexOf("_navigationService.EnsureInitialNavigation()", StringComparison.Ordinal);
+        var compact = window.IndexOf("_ = _dashboardViewModel.LoadAsync()", ensure, StringComparison.Ordinal);
+        var recovery = window.IndexOf("_ = _backupRestore.ShowStartupRecoveryOnceAsync()", compact, StringComparison.Ordinal);
+        var evaluate = window.IndexOf("_ = Onboarding.OnMainWindowShownAsync(normalStart)", recovery, StringComparison.Ordinal);
+        Assert.True(capture >= 0 && capture < ensure && ensure < compact && compact < recovery && recovery < evaluate);
+        Assert.Contains("Onboarding.SetWindowMode(_modeCoordinator.CurrentMode)", window);
+        Assert.Contains("Onboarding.SetWindowMode(mode)", window);
+    }
+
+    [Fact]
+    public void ActivationHandOff_UsesDependencyFreeLatchBeforeWindowConstruction()
+    {
+        var app = AppSourceTree.CodeWithoutComments("App.xaml.cs");
+        var constructor = app[app.IndexOf("public App()", StringComparison.Ordinal)..app.IndexOf("private void ExecuteActivationIntent", StringComparison.Ordinal)];
+        Assert.DoesNotContain("GetRequiredService<OnboardingViewModel>", constructor);
+        Assert.DoesNotContain("GetRequiredService<DashboardViewModel>", constructor);
+        Assert.Contains("GetRequiredService<ActivationLatch>", constructor);
+        Assert.Contains("activation.Record()", constructor);
+        Assert.Contains("AddSingleton<ActivationLatch>()", app);
+        Assert.Empty(typeof(ActivationLatch).GetConstructors().Single().GetParameters());
+    }
+
+    [Fact]
+    public void NavigationContract_HasNoDefaultImplementations()
+    {
+        foreach (var method in typeof(INavigationService).GetMethods()) Assert.True(method.IsAbstract, method.Name);
+    }
+
+    [Fact]
     public void ShellAndOnboarding_DoNotReferenceTrustCredentialsOrPersistence()
     {
         foreach (var type in new[] { typeof(ShellViewModel), typeof(OnboardingViewModel) })

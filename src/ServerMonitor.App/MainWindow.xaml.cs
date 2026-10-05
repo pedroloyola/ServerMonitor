@@ -158,9 +158,8 @@ public sealed partial class MainWindow : Window
             await Qa.QaShellStartup.ApplyStartAsync(Environment.GetCommandLineArgs(), _navigationService, _dashboardViewModel);
         }
 #endif
-        var normalStart = _navigationService.CurrentDestination is null && Program.LaunchMode == LaunchMode.Foreground;
+        var normalStart = OnboardingStartup.IsNormalStart(_navigationService.CurrentDestination, Program.LaunchMode);
         _navigationService.EnsureInitialNavigation();
-        await Onboarding.OnMainWindowShownAsync(normalStart);
         if (_modeCoordinator.CurrentMode == WindowMode.Compact)
         {
             _ = _dashboardViewModel.LoadAsync();
@@ -169,10 +168,14 @@ public sealed partial class MainWindow : Window
         // M14.6: what startup recovery did with an interrupted restore, once per process. It waits for
         // the first window because the notice needs a XamlRoot; a headless start shows it here later.
         _ = _backupRestore.ShowStartupRecoveryOnceAsync();
+        Onboarding.SetWindowMode(_modeCoordinator.CurrentMode);
+        // The task observes and logs diagnosis failures; it cannot delay the earlier startup work.
+        _ = Onboarding.OnMainWindowShownAsync(normalStart);
     }
 
     private void OnWindowModeChanged(object? sender, WindowMode mode)
     {
+        Onboarding.SetWindowMode(mode);
         if (mode == WindowMode.Compact)
         {
             StandardRoot.Visibility = Visibility.Collapsed;
