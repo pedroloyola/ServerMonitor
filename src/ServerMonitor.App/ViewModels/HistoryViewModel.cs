@@ -474,7 +474,8 @@ public sealed class HistoryViewModel : ObservableObject, IDisposable
         var loaded = await TryLoadServersAsync();
         if (_disposed) return;
         _serversRequested = true;
-        if (!loaded)
+        if (loaded is null) return; // Superseded: the newer read owns presentation.
+        if (loaded is false)
         {
             Load(null, string.Empty, fromDetail: false);
             IsUnavailable = true;
@@ -553,7 +554,7 @@ public sealed class HistoryViewModel : ObservableObject, IDisposable
     /// </summary>
     public async Task LoadServersAsync() => await TryLoadServersAsync();
 
-    private async Task<bool> TryLoadServersAsync()
+    private async Task<bool?> TryLoadServersAsync()
     {
         if (_disposed || _serverService is null)
         {
@@ -576,7 +577,7 @@ public sealed class HistoryViewModel : ObservableObject, IDisposable
 
         if (_disposed || generation != Volatile.Read(ref _serversGeneration))
         {
-            return false;
+            return null;
         }
 
         Servers.Clear();

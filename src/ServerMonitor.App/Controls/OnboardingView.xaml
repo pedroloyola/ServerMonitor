@@ -1,0 +1,53 @@
+<UserControl x:Class="ServerMonitor.App.Controls.OnboardingView"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:p="using:ServerMonitor.App.Controls.Primitives" IsTabStop="False">
+ <ScrollViewer x:Name="Scroller" HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Center" IsTabStop="False">
+ <!-- Figma 112:247/461/619: 1040x780, p36,48,36,48, g24. Same native window, no sidebar or window resize. -->
+ <Grid x:Name="Panel" MaxWidth="1040" MinHeight="780" Padding="{StaticResource SaOnboardingPadding}" RowSpacing="24" HorizontalAlignment="Stretch">
+ <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+ <Grid ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="148"/></Grid.ColumnDefinitions>
+ <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center"><p:SaBrandMark Size="26"/><TextBlock Text="ServerAlyzer" Style="{StaticResource SaBrandTextStyle}" VerticalAlignment="Center"/></StackPanel>
+ <Button Grid.Column="1" x:Uid="OnboardingDismiss" Click="OnDismiss" Style="{StaticResource SaOnboardingSecondaryButtonStyle}"/>
+ </Grid>
+ <StackPanel Grid.Row="1" Spacing="24" VerticalAlignment="Center">
+ <p:SaBrandMark x:Name="HeroBrand" Size="58" HorizontalAlignment="Center"/>
+ <p:SaIcon x:Name="HeroShield" Data="{StaticResource SaIconShield01Data}" Size="48" HorizontalAlignment="Center" Visibility="Collapsed"/>
+ <!-- 112:314 42/53; 112:500/656 36/45. Exactly one active H1 across all steps. -->
+ <TextBlock x:Name="Heading" Style="{StaticResource SaOnboardingHeroTextStyle}" TextAlignment="Center" AutomationProperties.HeadingLevel="Level1" IsTextSelectionEnabled="True" IsTabStop="False"/>
+ <TextBlock x:Name="Subtitle" Style="{StaticResource SaOnboardingBodyTextStyle}" MaxWidth="800" TextAlignment="Center" Foreground="{ThemeResource SaTextSecondaryBrush}"/>
+ <Grid x:Name="Benefits" ColumnSpacing="16" RowSpacing="16"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition/><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
+<!-- Figma 112:317: 304x128 r18 p18 g10; responsive stacking is DERIVED. -->
+ <Border x:Name="Benefit0" Grid.Column="0" MinHeight="128" Padding="{StaticResource SaOnboardingBenefitPadding}" CornerRadius="{StaticResource SaRadiusOnboardingBenefit}" Background="{ThemeResource SaOnboardingBenefitBrush}">
+ <StackPanel Spacing="10"><p:SaIcon Data="{StaticResource SaIconServerStack01Data}" Size="22" HorizontalAlignment="Left"/><TextBlock x:Uid="OnboardingStatusTitle" Style="{StaticResource SaOnboardingBenefitTextStyle}" TextWrapping="Wrap" /><TextBlock x:Uid="OnboardingStatusBody" Style="{StaticResource SaCaptionTextStyle}" TextWrapping="Wrap" Foreground="{ThemeResource SaTextSecondaryBrush}"/></StackPanel></Border><!-- Figma 112:327: 304x128 r18 p18 g10; responsive stacking is DERIVED. -->
+ <Border x:Name="Benefit1" Grid.Column="1" MinHeight="128" Padding="{StaticResource SaOnboardingBenefitPadding}" CornerRadius="{StaticResource SaRadiusOnboardingBenefit}" Background="{ThemeResource SaOnboardingBenefitBrush}">
+ <StackPanel Spacing="10"><p:SaIcon Data="{StaticResource SaIconClock01Data}" Size="22" HorizontalAlignment="Left"/><TextBlock x:Uid="OnboardingHistoryTitle" Style="{StaticResource SaOnboardingBenefitTextStyle}" TextWrapping="Wrap" /><TextBlock x:Uid="OnboardingHistoryBody" Style="{StaticResource SaCaptionTextStyle}" TextWrapping="Wrap" Foreground="{ThemeResource SaTextSecondaryBrush}"/></StackPanel></Border><!-- Figma 112:333: 304x128 r18 p18 g10; responsive stacking is DERIVED. -->
+ <Border x:Name="Benefit2" Grid.Column="2" MinHeight="128" Padding="{StaticResource SaOnboardingBenefitPadding}" CornerRadius="{StaticResource SaRadiusOnboardingBenefit}" Background="{ThemeResource SaOnboardingBenefitBrush}">
+ <StackPanel Spacing="10"><p:SaIcon Data="{StaticResource SaIconComputerData}" Size="22" HorizontalAlignment="Left"/><TextBlock x:Uid="OnboardingNearbyTitle" Style="{StaticResource SaOnboardingBenefitTextStyle}" TextWrapping="Wrap" /><TextBlock x:Uid="OnboardingNearbyBody" Style="{StaticResource SaCaptionTextStyle}" TextWrapping="Wrap" Foreground="{ThemeResource SaTextSecondaryBrush}"/></StackPanel></Border></Grid>
+ <!-- 112:502: w720, g20, icons24, gap20. Text wraps instead of fixed-height clipping. -->
+ <StackPanel x:Name="Principles" MaxWidth="720" Spacing="20" Visibility="Collapsed"><Grid ColumnSpacing="20" MinHeight="66"><Grid.ColumnDefinitions><ColumnDefinition Width="24"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+ <p:SaIcon Data="{StaticResource SaIconKey01Data}" Size="24" VerticalAlignment="Top" Foreground="{ThemeResource SaTextSecondaryBrush}"/>
+ <StackPanel Grid.Column="1" Spacing="6"><TextBlock x:Uid="OnboardingSshTitle" Style="{StaticResource SaOnboardingPrincipleTextStyle}" TextWrapping="Wrap" /><TextBlock x:Uid="OnboardingSshBody" Style="{StaticResource SaBodyTextStyle}" TextWrapping="Wrap" Foreground="{ThemeResource SaTextSecondaryBrush}"/></StackPanel></Grid><Grid ColumnSpacing="20" MinHeight="66"><Grid.ColumnDefinitions><ColumnDefinition Width="24"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+ <p:SaIcon Data="{StaticResource SaIconShield01Data}" Size="24" VerticalAlignment="Top" Foreground="{ThemeResource SaTextSecondaryBrush}"/>
+ <StackPanel Grid.Column="1" Spacing="6"><TextBlock x:Uid="OnboardingIdentityTitle" Style="{StaticResource SaOnboardingPrincipleTextStyle}" TextWrapping="Wrap" /><TextBlock x:Uid="OnboardingIdentityBody" Style="{StaticResource SaBodyTextStyle}" TextWrapping="Wrap" Foreground="{ThemeResource SaTextSecondaryBrush}"/></StackPanel></Grid><Grid ColumnSpacing="20" MinHeight="66"><Grid.ColumnDefinitions><ColumnDefinition Width="24"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+ <p:SaIcon Data="{StaticResource SaIconHardDriveData}" Size="24" VerticalAlignment="Top" Foreground="{ThemeResource SaTextSecondaryBrush}"/>
+ <StackPanel Grid.Column="1" Spacing="6"><TextBlock x:Uid="OnboardingDeviceTitle" Style="{StaticResource SaOnboardingPrincipleTextStyle}" TextWrapping="Wrap" /><TextBlock x:Uid="OnboardingDeviceBody" Style="{StaticResource SaBodyTextStyle}" TextWrapping="Wrap" Foreground="{ThemeResource SaTextSecondaryBrush}"/></StackPanel></Grid></StackPanel>
+ <Grid x:Name="Methods" ColumnSpacing="24" RowSpacing="24" Visibility="Collapsed"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition/><RowDefinition/></Grid.RowDefinitions><!-- 112:659 / 112:667: 460x252 r22 p24 g18; action412x46. -->
+ <Border x:Name="Method0" Grid.Column="0" MinHeight="252" Padding="{StaticResource SaOnboardingCardPadding}" CornerRadius="{StaticResource SaRadiusOnboardingCard}" Background="{ThemeResource SaOnboardingBenefitBrush}" BorderBrush="{ThemeResource SaGlassBorderBrush}" BorderThickness="{StaticResource SaBorderThickness}">
+ <StackPanel Spacing="18"><p:SaIcon Data="{StaticResource SaIconAdd01Data}" Size="28" HorizontalAlignment="Left"/><TextBlock x:Uid="OnboardingManualTitle" Style="{StaticResource SaOnboardingMethodTextStyle}" TextWrapping="Wrap" /><TextBlock x:Uid="OnboardingManualBody" Style="{StaticResource SaOnboardingMethodBodyTextStyle}" TextWrapping="Wrap" />
+ <Button x:Uid="OnboardingAdd" Command="{Binding AddServerCommand}" HorizontalAlignment="Stretch" Style="{StaticResource SaOnboardingPrimaryButtonStyle}"/></StackPanel></Border><!-- 112:659 / 112:667: 460x252 r22 p24 g18; action412x46. -->
+ <Border x:Name="Method1" Grid.Column="1" MinHeight="252" Padding="{StaticResource SaOnboardingCardPadding}" CornerRadius="{StaticResource SaRadiusOnboardingCard}" Background="{ThemeResource SaOnboardingBenefitBrush}" BorderBrush="{ThemeResource SaGlassBorderBrush}" BorderThickness="{StaticResource SaBorderThickness}">
+ <StackPanel Spacing="18"><p:SaIcon Data="{StaticResource SaIconFolder01Data}" Size="28" HorizontalAlignment="Left"/><TextBlock x:Uid="OnboardingImportTitle" Style="{StaticResource SaOnboardingMethodTextStyle}" TextWrapping="Wrap" /><TextBlock x:Uid="OnboardingImportBody" Style="{StaticResource SaOnboardingMethodBodyTextStyle}" TextWrapping="Wrap" />
+ <Button x:Uid="OnboardingImport" Command="{Binding ImportFromSshCommand}" HorizontalAlignment="Stretch" Style="{StaticResource SaOnboardingSecondaryButtonStyle}"/></StackPanel></Border></Grid>
+ <TextBlock x:Name="StepNote" Style="{StaticResource SaPageSubtitleTextStyle}" TextAlignment="Center" TextWrapping="Wrap" Visibility="Collapsed"/>
+ </StackPanel>
+ <!-- 112:339: reserved Back130 even on step1; progress stable; CTA208; h46/r15. -->
+ <Grid Grid.Row="2" ColumnSpacing="16"><Grid.ColumnDefinitions><ColumnDefinition Width="130"/><ColumnDefinition Width="*"/><ColumnDefinition Width="208"/></Grid.ColumnDefinitions>
+ <Button x:Name="BackButton" x:Uid="OnboardingBack" Click="OnBack" Style="{StaticResource SaOnboardingSecondaryButtonStyle}"/>
+ <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center" VerticalAlignment="Center">
+ <Border x:Name="Dot1" Height="6" Width="24" CornerRadius="{StaticResource SaRadiusMiniBar}" Background="{ThemeResource SaTextSecondaryBrush}"/>
+ <Border x:Name="Dot2" Height="6" Width="6" CornerRadius="{StaticResource SaRadiusMiniBar}" Background="{ThemeResource SaTextSecondaryBrush}"/>
+ <Border x:Name="Dot3" Height="6" Width="6" CornerRadius="{StaticResource SaRadiusMiniBar}" Background="{ThemeResource SaTextSecondaryBrush}"/>
+ <TextBlock x:Name="ProgressText" Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" AutomationProperties.LiveSetting="Polite"/>
+ </StackPanel>
+ <Button x:Name="NextButton" Grid.Column="2" Click="OnNext" Style="{StaticResource SaOnboardingPrimaryButtonStyle}"/>
+ </Grid></Grid></ScrollViewer>
+</UserControl>

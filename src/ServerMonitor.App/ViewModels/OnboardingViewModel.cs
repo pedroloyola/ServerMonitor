@@ -8,7 +8,7 @@ namespace ServerMonitor.App.ViewModels;
 /// <summary>Derived first run; dismissal and activation suppression last for this process only.</summary>
 public sealed class OnboardingViewModel : ObservableObject, IDisposable
 {
-    private readonly IServerService _servers;
+    private readonly IServerLoadStatusSource _servers;
     private readonly INavigationService _navigation;
     private bool _dismissed;
     private readonly ActivationLatch _activation;
@@ -18,7 +18,7 @@ public sealed class OnboardingViewModel : ObservableObject, IDisposable
     private bool _visible;
     private int _step = 1;
 
-    public OnboardingViewModel(IServerService servers, INavigationService navigation, DashboardViewModel dashboard,
+    public OnboardingViewModel(IServerLoadStatusSource servers, INavigationService navigation, OnboardingActions actions,
         ActivationLatch activation, ILogger<OnboardingViewModel> logger)
     {
         _servers = servers;
@@ -26,8 +26,8 @@ public sealed class OnboardingViewModel : ObservableObject, IDisposable
         _activation = activation;
         _logger = logger;
         _navigation.Navigated += OnNavigated;
-        AddServerCommand = new AsyncRelayCommand(() => FinishAsync(dashboard.AddServerCommand));
-        ImportFromSshCommand = new AsyncRelayCommand(() => FinishAsync(dashboard.ImportFromSshCommand));
+        AddServerCommand = new AsyncRelayCommand(() => FinishAsync(actions.AddServerCommand));
+        ImportFromSshCommand = new AsyncRelayCommand(() => FinishAsync(actions.ImportFromSshCommand));
     }
 
     public bool IsVisible { get => _visible; private set => SetProperty(ref _visible, value); }
@@ -42,8 +42,7 @@ public sealed class OnboardingViewModel : ObservableObject, IDisposable
         _normalStart = normalStart;
         try
         {
-            LoadStatus = _servers is IServerLoadStatusSource source
-                ? await source.GetLoadStatusAsync() : ServerLoadStatus.Loaded;
+            LoadStatus = await _servers.GetLoadStatusAsync();
         }
         catch (Exception exception)
         {
@@ -56,7 +55,7 @@ public sealed class OnboardingViewModel : ObservableObject, IDisposable
     }
 
     private void UpdateVisibility() => IsVisible = _normalStart && _standard && !_activation.IsRecorded && !_dismissed
-        && LoadStatus == ServerLoadStatus.NotFound;
+        && _navigation.CurrentDestination == NavigationDestination.Overview && LoadStatus == ServerLoadStatus.NotFound;
 
     public void SetWindowMode(WindowMode mode)
     {

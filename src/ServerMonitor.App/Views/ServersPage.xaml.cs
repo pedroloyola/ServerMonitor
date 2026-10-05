@@ -36,6 +36,7 @@ public sealed partial class ServersPage : Page, IDisposable
     // or, with no server at all, to "Adicionar servidor" (Prism r2 C-R2-1: nothing to search for).
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
+        if (ShellPageFocus.GetKeepSidebar(this)) return;
         var index = ViewModel.TakeReturnFocusIndex();
         DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
         {
@@ -44,14 +45,7 @@ public sealed partial class ServersPage : Page, IDisposable
                 return;
             }
 
-            if (ViewModel.ShowEmptyState)
-            {
-                EmptyAddButton.Focus(FocusState.Programmatic);
-            }
-            else
-            {
-                SearchBox.Focus(FocusState.Programmatic);
-            }
+            ShellPageFocus.FocusHeading(this);
         });
     }
 
@@ -99,7 +93,6 @@ public sealed partial class ServersPage : Page, IDisposable
     /// <summary>Idempotent: the view model unsubscribes once.</summary>
     public void Dispose() => ViewModel.Dispose();
 
-    private void OnBreadcrumbParentInvoked(object? sender, EventArgs e) => ViewModel.BackToOverviewCommand.Execute(null);
 
     // "Limpar pesquisa" disappears once it worked; focus returns to the search box (UI.3 pattern).
     private void OnClearSearchClick(object sender, RoutedEventArgs e) => FocusAfterAction.MoveTo((Control)sender, SearchBox);

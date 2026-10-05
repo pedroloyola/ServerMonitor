@@ -1,4 +1,4 @@
-<Page
+<Page x:Name="PageViewport"
     x:Class="ServerMonitor.App.Views.ServersPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -223,12 +223,12 @@
             <VisualStateGroup x:Name="WidthStates">
                 <VisualState x:Name="Wide">
                     <VisualState.StateTriggers>
-                        <AdaptiveTrigger MinWindowWidth="1040" />
+                        <primitives:SaContentWidthTrigger Width="{Binding ActualWidth, ElementName=PageViewport}" MinWidth="1040" />
                     </VisualState.StateTriggers>
                 </VisualState>
                 <VisualState x:Name="Mid">
                     <VisualState.StateTriggers>
-                        <AdaptiveTrigger MinWindowWidth="900" />
+                        <primitives:SaContentWidthTrigger Width="{Binding ActualWidth, ElementName=PageViewport}" MinWidth="900" MaxWidth="1040" />
                     </VisualState.StateTriggers>
                     <VisualState.Setters>
                         <Setter Target="ServersRepeater.ItemTemplate" Value="{StaticResource ServerRowMidTemplate}" />
@@ -239,7 +239,7 @@
                 </VisualState>
                 <VisualState x:Name="Stacked">
                     <VisualState.StateTriggers>
-                        <AdaptiveTrigger MinWindowWidth="640" />
+                        <primitives:SaContentWidthTrigger Width="{Binding ActualWidth, ElementName=PageViewport}" MinWidth="640" MaxWidth="900" />
                     </VisualState.StateTriggers>
                     <VisualState.Setters>
                         <Setter Target="ServersRepeater.ItemTemplate" Value="{StaticResource ServerRowStackedTemplate}" />
@@ -248,7 +248,7 @@
                 </VisualState>
                 <VisualState x:Name="StackedCompact">
                     <VisualState.StateTriggers>
-                        <AdaptiveTrigger MinWindowWidth="0" />
+                        <primitives:SaContentWidthTrigger Width="{Binding ActualWidth, ElementName=PageViewport}" MinWidth="0" MaxWidth="640" />
                     </VisualState.StateTriggers>
                     <VisualState.Setters>
                         <Setter Target="PageRoot.Padding" Value="{StaticResource SaPagePaddingCompact}" />
@@ -261,7 +261,6 @@
 
         <ScrollViewer x:Name="PageScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled">
             <StackPanel x:Name="PageRoot" Padding="{StaticResource SaPagePadding}" Spacing="{StaticResource SaSpace24}">
-                <primitives:SaBreadcrumb x:Name="Breadcrumb" x:Uid="ServersBreadcrumb" ParentInvoked="OnBreadcrumbParentInvoked" />
 
                 <!-- Header 112:1420: title 32 Semibold + summary 13 muted (or the §14 loading line), Adicionar 156×44. -->
                 <Grid x:Name="HeaderGrid" ColumnSpacing="{StaticResource SaSpace20}">
@@ -274,7 +273,7 @@
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
                     <StackPanel Spacing="6">
-                        <TextBlock x:Uid="ServersPageTitleText" AutomationProperties.HeadingLevel="Level1"
+                        <TextBlock x:Uid="ServersPageTitleText" AutomationProperties.HeadingLevel="Level1" IsTextSelectionEnabled="True" IsTabStop="False"
                                    Style="{StaticResource SaPageTitleTextStyle}" Foreground="{ThemeResource SaTextBrush}" />
                         <TextBlock Style="{StaticResource SaPageSubtitleTextStyle}" TextWrapping="Wrap"
                                    Text="{x:Bind ViewModel.HeaderContextDisplay, Mode=OneWay}" AutomationProperties.LiveSetting="Polite" />

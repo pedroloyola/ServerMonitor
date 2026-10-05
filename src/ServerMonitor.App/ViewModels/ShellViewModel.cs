@@ -21,8 +21,17 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         _ => null
     };
 
+    public bool IsOverviewSelected => SelectedDestination == ShellDestination.Overview;
+    public bool IsServersSelected => SelectedDestination == ShellDestination.Servers;
+    public bool IsHistorySelected => SelectedDestination == ShellDestination.History;
+    public bool IsSettingsSelected => SelectedDestination == ShellDestination.Settings;
+    public bool IsSidebarNavigation { get; private set; }
+
     public void Navigate(ShellDestination destination)
     {
+        IsSidebarNavigation = true;
+        try
+        {
         switch (destination)
         {
             case ShellDestination.Overview: _navigation.GoToDashboard(); break;
@@ -30,8 +39,15 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
             case ShellDestination.History: _navigation.GoToHistory(); break;
             case ShellDestination.Settings: _navigation.GoToSettings(); break;
         }
+        }
+        finally { IsSidebarNavigation = false; }
     }
 
-    private void OnNavigated(object? sender, EventArgs args) => OnPropertyChanged(nameof(SelectedDestination));
+    private void OnNavigated(object? sender, EventArgs args)
+    {
+        OnPropertyChanged(nameof(SelectedDestination));
+        OnPropertyChanged(nameof(IsOverviewSelected)); OnPropertyChanged(nameof(IsServersSelected));
+        OnPropertyChanged(nameof(IsHistorySelected)); OnPropertyChanged(nameof(IsSettingsSelected));
+    }
     public void Dispose() => _navigation.Navigated -= OnNavigated;
 }

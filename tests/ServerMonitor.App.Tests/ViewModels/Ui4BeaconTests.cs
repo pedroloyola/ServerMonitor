@@ -51,9 +51,9 @@ public sealed class Ui4BeaconTests
     {
         var kit = await LoadedAsync(Mixed());
 
-        kit.Dashboard.ViewAllServersCommand.Execute(null);
+        kit.Dashboard.OpenServerDirectoryCommand.Execute(null);
 
-        Assert.Equal(OverviewReturnTarget.ViewAll, kit.Dashboard.TakeReturnFocus().Target);
+        Assert.Equal(OverviewReturnTarget.DirectoryLink, kit.Dashboard.TakeReturnFocus().Target);
     }
 
     /// <summary>The Servidores page is per visit: the NEXT one refocuses the row that opened the interim page.</summary>

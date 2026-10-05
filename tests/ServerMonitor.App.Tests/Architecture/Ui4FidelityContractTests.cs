@@ -166,7 +166,7 @@ public sealed class Ui4FidelityContractTests
     {
         var states = Elements(Overview).Where(e => e.Name.LocalName == "VisualState").ToList();
         var narrowWide = Assert.Single(states, s => Name(s) == "NarrowWide");
-        Assert.Contains(narrowWide.Descendants(), e => e.Name.LocalName == "AdaptiveTrigger" && Attr(e, "MinWindowWidth") == "600");
+        Assert.Contains(narrowWide.Descendants(), e => e.Name.LocalName == "SaContentWidthTrigger" && Attr(e, "MinWidth") == "600");
         Assert.DoesNotContain(narrowWide.Descendants(), e => Attr(e, "Target")?.StartsWith("HeaderActions.", StringComparison.Ordinal) == true);
         Assert.Contains(Assert.Single(states, s => Name(s) == "Narrow").Descendants(), e => Attr(e, "Target") == "HeaderActions.(Grid.Row)");
     }

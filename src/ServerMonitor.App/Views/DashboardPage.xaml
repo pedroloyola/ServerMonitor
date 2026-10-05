@@ -1,4 +1,4 @@
-<Page
+<Page x:Name="PageViewport"
     x:Class="ServerMonitor.App.Views.DashboardPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -194,13 +194,13 @@
             <VisualStateGroup x:Name="WidthStates">
                 <VisualState x:Name="Wide">
                     <VisualState.StateTriggers>
-                        <AdaptiveTrigger MinWindowWidth="900" />
+                        <primitives:SaContentWidthTrigger Width="{Binding ActualWidth, ElementName=PageViewport}" MinWidth="900" />
                     </VisualState.StateTriggers>
                 </VisualState>
                 <!-- < 900 (Prism r1): Prioritário under Saúde, both full width. -->
                 <VisualState x:Name="Medium">
                     <VisualState.StateTriggers>
-                        <AdaptiveTrigger MinWindowWidth="640" />
+                        <primitives:SaContentWidthTrigger Width="{Binding ActualWidth, ElementName=PageViewport}" MinWidth="640" MaxWidth="900" />
                     </VisualState.StateTriggers>
                     <VisualState.Setters>
                         <Setter Target="PriorityHost.(Grid.Row)" Value="1" />
@@ -213,7 +213,7 @@
                 <!-- 600-639 (Prism C3): as Narrow, but the header actions still fit beside the title. -->
                 <VisualState x:Name="NarrowWide">
                     <VisualState.StateTriggers>
-                        <AdaptiveTrigger MinWindowWidth="600" />
+                        <primitives:SaContentWidthTrigger Width="{Binding ActualWidth, ElementName=PageViewport}" MinWidth="600" MaxWidth="640" />
                     </VisualState.StateTriggers>
                     <VisualState.Setters>
                         <Setter Target="PageRoot.Padding" Value="{StaticResource SaPagePaddingCompact}" />
@@ -238,7 +238,7 @@
                      actions on a second line, left-aligned. -->
                 <VisualState x:Name="Narrow">
                     <VisualState.StateTriggers>
-                        <AdaptiveTrigger MinWindowWidth="0" />
+                        <primitives:SaContentWidthTrigger Width="{Binding ActualWidth, ElementName=PageViewport}" MinWidth="0" MaxWidth="600" />
                     </VisualState.StateTriggers>
                     <VisualState.Setters>
                         <Setter Target="PageRoot.Padding" Value="{StaticResource SaPagePaddingCompact}" />
@@ -282,8 +282,9 @@
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
                     <StackPanel VerticalAlignment="Center" Spacing="{StaticResource SaSpace4}">
-                        <TextBlock x:Uid="OverviewTitle" AutomationProperties.HeadingLevel="Level1"
+                        <TextBlock x:Uid="OverviewTitle" AutomationProperties.HeadingLevel="Level1" IsTextSelectionEnabled="True" IsTabStop="False"
                                    Style="{StaticResource SaPageTitleTextStyle}" Foreground="{ThemeResource SaTextBrush}" />
+                        <TextBlock x:Uid="FirstServerSubtitle" Style="{StaticResource SaPageSubtitleTextStyle}" Visibility="{x:Bind ViewModel.ShowEmptyState, Mode=OneWay}"/>
                         <TextBlock Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}"
                                    Text="{x:Bind ViewModel.HeaderContextDisplay, Mode=OneWay}"
                                    Visibility="{x:Bind ViewModel.HasHeaderContext, Mode=OneWay}"
@@ -295,11 +296,7 @@
                                 Command="{x:Bind WindowMode.EnterCompactCommand}">
                             <FontIcon Glyph="&#xE73F;" />
                         </Button>
-                        <Button x:Uid="DashboardSettingsButton" Style="{StaticResource SaIconButtonStyle}"
-                                Command="{x:Bind ViewModel.OpenSettingsCommand}">
-                            <primitives:SaIcon Data="{StaticResource SaIconSettings01Data}" Size="19" />
-                        </Button>
-                        <Button x:Uid="OverviewRefreshButton" Style="{StaticResource SaIconButtonStyle}"
+                        <Button Visibility="{x:Bind ViewModel.HasVisibleServers, Mode=OneWay}" x:Uid="OverviewRefreshButton" Style="{StaticResource SaIconButtonStyle}"
                                 Command="{x:Bind ViewModel.RefreshAllCommand}">
                             <Grid>
                                 <primitives:SaIcon Data="{StaticResource SaIconRefreshData}" Size="19"
@@ -308,7 +305,7 @@
                                               Visibility="{x:Bind ViewModel.IsRefreshingAll, Mode=OneWay}" />
                             </Grid>
                         </Button>
-                        <Button x:Uid="OverviewAddButton" MinWidth="156" Style="{StaticResource SaPrimaryButtonStyle}"
+                        <Button Visibility="{x:Bind ViewModel.HasVisibleServers, Mode=OneWay}" x:Uid="OverviewAddButton" MinWidth="156" Style="{StaticResource SaPrimaryButtonStyle}"
                                 Command="{x:Bind ViewModel.AddServerCommand}">
                             <StackPanel Orientation="Horizontal" Spacing="{StaticResource SaSpace8}">
                                 <primitives:SaIcon Data="{StaticResource SaIconAdd01Data}" Size="18" VerticalAlignment="Center" />
@@ -504,8 +501,6 @@
                         <StackPanel Orientation="Horizontal" Spacing="{StaticResource SaSpace16}" VerticalAlignment="Center">
                             <TextBlock x:Uid="OverviewServersTitle" AutomationProperties.HeadingLevel="Level2" VerticalAlignment="Center"
                                        Style="{StaticResource SaSectionTitleTextStyle}" Foreground="{ThemeResource SaTextBrush}" />
-                            <Button x:Name="ViewAllButton" x:Uid="OverviewViewAllButton" VerticalAlignment="Center" Style="{StaticResource SaBreadcrumbParentButtonStyle}"
-                                    Command="{x:Bind ViewModel.ViewAllServersCommand}" />
                         </StackPanel>
                         <TextBox x:Name="OverviewSearchBox" x:Uid="OverviewSearch" Grid.Column="1" Width="214"
                                  Style="{StaticResource SaPillSearchFieldStyle}"
@@ -523,7 +518,7 @@
                             <Button Style="{StaticResource SaBreadcrumbParentButtonStyle}" HorizontalAlignment="Left" Margin="12,12,0,0"
                                     Content="{x:Bind ViewModel.OverviewMoreDisplay, Mode=OneWay}"
                                     AutomationProperties.Name="{x:Bind ViewModel.OverviewMoreDisplay, Mode=OneWay}"
-                                    Command="{x:Bind ViewModel.ViewAllServersCommand}"
+                                    x:Name="DirectoryLinkButton" Command="{x:Bind ViewModel.OpenServerDirectoryCommand}"
                                     Visibility="{x:Bind ViewModel.HasOverviewMore, Mode=OneWay}" />
                             <primitives:SaEmptyState x:Name="OverviewNoResultsState" TitleHeadingLevel="Level3" IconData="{StaticResource SaIconSearch01Data}"
                                                      Title="{x:Bind ViewModel.OverviewNoResultsTitle, Mode=OneWay}"
@@ -551,14 +546,15 @@
                     </Border>
                 </StackPanel>
 
-                <!-- Empty state (no visible server): Adicionar + Importar do SSH, and discovery INSIDE it (one instance). -->
-                <Border Style="{StaticResource SaSolidSurfaceStyle}" Visibility="{x:Bind ViewModel.ShowEmptyState, Mode=OneWay}">
-                    <primitives:SaEmptyState x:Uid="OverviewEmptyState" TitleHeadingLevel="Level2" IconData="{StaticResource SaIconServerStack01Data}">
-                        <StackPanel Spacing="{StaticResource SaSpace16}">
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="{StaticResource SaSpace12}">
-                                <Button x:Name="EmptyAddButton" x:Uid="OverviewEmptyAddButton" Style="{StaticResource SaSolidButtonStyle}" Command="{x:Bind ViewModel.AddServerCommand}" />
-                                <Button x:Uid="OverviewEmptyImportButton" Style="{StaticResource SaSecondaryButtonStyle}" Command="{x:Bind ViewModel.ImportFromSshCommand}" />
-                            </StackPanel>
+                <!-- UI.6 112:822/826: no card, centred block h620, icon48, title28, gap20; buttons202x46 r15. -->
+                <StackPanel MinHeight="620" VerticalAlignment="Center" Spacing="{StaticResource SaSpace20}" Visibility="{x:Bind ViewModel.ShowFirstServerState, Mode=OneWay}">
+                    <primitives:SaIcon Data="{StaticResource SaIconServerStack01Data}" Size="48" HorizontalAlignment="Center"/>
+                    <TextBlock x:Uid="FirstServerTitle" Style="{StaticResource SaFirstServerTitleTextStyle}" AutomationProperties.HeadingLevel="Level2" TextAlignment="Center"/>
+                    <TextBlock x:Uid="FirstServerBody" Style="{StaticResource SaOnboardingBodyTextStyle}" MaxWidth="640" Foreground="{ThemeResource SaTextSecondaryBrush}" TextAlignment="Center"/>
+                    <VariableSizedWrapGrid Orientation="Horizontal" HorizontalAlignment="Center" ItemWidth="218" ItemHeight="62" MaximumRowsOrColumns="2">
+                        <Button x:Name="EmptyAddButton" x:Uid="OverviewEmptyAddButton" Width="202" Style="{StaticResource SaOnboardingPrimaryButtonStyle}" Command="{x:Bind ViewModel.AddServerCommand}"/>
+                        <Button x:Uid="OverviewEmptyImportButton" Width="202" Style="{StaticResource SaOnboardingSecondaryButtonStyle}" Command="{x:Bind ViewModel.ImportFromSshCommand}"/>
+                    </VariableSizedWrapGrid>
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="{StaticResource SaSpace8}"
                                         Visibility="{x:Bind ViewModel.IsSearchingLocalNetwork, Mode=OneWay}">
                                 <ProgressRing Width="14" Height="14" IsActive="{x:Bind ViewModel.IsSearchingLocalNetwork, Mode=OneWay}" />
@@ -568,9 +564,16 @@
                             <ItemsRepeater MaxWidth="560" AutomationProperties.LiveSetting="Polite"
                                            ItemsSource="{x:Bind ViewModel.DiscoveredServers}" ItemTemplate="{StaticResource DiscoveredRowTemplate}"
                                            Visibility="{x:Bind ViewModel.ShowEmptyStateDiscoveries, Mode=OneWay}" />
-                        </StackPanel>
-                    </primitives:SaEmptyState>
-                </Border>
+
+                </StackPanel>
+                <!-- G-15 derived: live hidden list, never first-server copy. -->
+                <StackPanel Spacing="{StaticResource SaSpace20}" Visibility="{x:Bind ViewModel.ShowAllHiddenState, Mode=OneWay}">
+                    <TextBlock x:Uid="HiddenOverviewTitle" Style="{StaticResource SaFirstServerTitleTextStyle}" AutomationProperties.HeadingLevel="Level2" TextAlignment="Center"/>
+                    <TextBlock x:Uid="HiddenOverviewBody" Style="{StaticResource SaSecondaryBodyTextStyle}" TextAlignment="Center" TextWrapping="Wrap"/>
+                    <Button x:Uid="HiddenOverviewAction" HorizontalAlignment="Center" Style="{StaticResource SaOnboardingPrimaryButtonStyle}" Command="{x:Bind ViewModel.RestoreHiddenServersCommand}"/>
+                </StackPanel>
+                <!-- Derived D: startup diagnosis only; removed on next ServersChanged. -->
+                <primitives:SaInlineNotice x:Uid="ConfigurationUnavailableNotice" Severity="Error" AnnouncePolitely="True" AutomationProperties.LiveSetting="Polite" Visibility="{x:Bind ViewModel.ShowConfigurationUnavailable, Mode=OneWay}"/>
             </StackPanel>
         </ScrollViewer>
     </Grid>

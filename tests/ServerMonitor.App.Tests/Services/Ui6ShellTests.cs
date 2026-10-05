@@ -147,7 +147,7 @@ public sealed class Ui6ShellTests
         var navigation = new NavigationService(new ServiceCollection().BuildServiceProvider(), NullLogger<NavigationService>.Instance, _ => new Page());
         navigation.Initialize(new Host());
         var shell = new ShellViewModel(navigation);
-        var changes = 0; shell.PropertyChanged += (_, _) => changes++;
+        var changes = 0; shell.PropertyChanged += (_, args) => { if (args.PropertyName == nameof(ShellViewModel.SelectedDestination)) changes++; };
         navigation.GoToDashboard(); Assert.Equal(1, changes);
         shell.Dispose(); navigation.GoToServers(); Assert.Equal(1, changes);
     }

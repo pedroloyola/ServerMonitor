@@ -8,6 +8,11 @@
     <!-- QA-ONLY (UI.2 S4): SidebarNavItem selected / unselected and the DERIVED states. -->
     <ScrollViewer AutomationProperties.AutomationId="PageScroll" qa:QaWallpaper.IsEnabled="True" BringIntoViewOnFocusChange="False">
         <StackPanel Padding="24" Spacing="{StaticResource SaSpace16}">
+            <!-- UI.6 official brand 112:1361, not an icon substitution. -->
+            <StackPanel Orientation="Horizontal" Spacing="16"><primitives:SaBrandMark Size="30"/><primitives:SaBrandMark Size="58"/>
+            <Button Content="UI.6 primary h46 r15" Style="{StaticResource SaOnboardingPrimaryButtonStyle}"/>
+            <Button Content="UI.6 secondary h46 r15" Style="{StaticResource SaOnboardingSecondaryButtonStyle}"/></StackPanel>
+
             <TextBlock Style="{StaticResource SaSectionHeaderTextStyle}" Text="Navigation" />
             <TextBlock Style="{StaticResource SaSecondaryBodyTextStyle}" TextWrapping="Wrap" Text="Selected = Secondary fill + highlight, Medium; unselected = Regular muted (112:969 / 112:976). Icon 20, gap 10, h46." />
             <TextBlock Style="{StaticResource SaMonoTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" Text="Sidebar 112:936 / 112:1147 (material SaSidebarMaterialBrush; the host is a UI.6 decision). Keyboard (R1 F-3): ONE Tab stop, entry on the selected item, arrows move focus only, Space/Enter activate - SaGroupNavigation.Mode=FocusOnly." TextWrapping="Wrap" />

@@ -20,8 +20,9 @@ public sealed class Ui6OnboardingTests
     {
         var kit = Ui4TestKit.Create(new Ui4TestKit.Fleet());
         using var dashboard = kit.Dashboard;
+        kit.Navigation.CurrentDestination = NavigationDestination.Overview;
         kit.Servers.LoadStatus = status;
-        var vm = new OnboardingViewModel(kit.Servers, kit.Navigation, dashboard, new ActivationLatch(), NullLogger<OnboardingViewModel>.Instance);
+        var vm = new OnboardingViewModel(kit.Servers, kit.Navigation, new OnboardingActions(dashboard.AddServerCommand, dashboard.ImportFromSshCommand), new ActivationLatch(), NullLogger<OnboardingViewModel>.Instance);
         if (activation) vm.SuppressForActivation();
         await vm.OnMainWindowShownAsync(normal);
         Assert.Equal(expected, vm.IsVisible);
@@ -39,8 +40,9 @@ public sealed class Ui6OnboardingTests
         var dialog = new Dialog();
         var kit = Ui4TestKit.Create(new Ui4TestKit.Fleet(), dialogs: dialog);
         using var dashboard = kit.Dashboard;
+        kit.Navigation.CurrentDestination = NavigationDestination.Overview;
         kit.Servers.LoadStatus = ServerLoadStatus.NotFound;
-        var vm = new OnboardingViewModel(kit.Servers, kit.Navigation, dashboard, new ActivationLatch(), NullLogger<OnboardingViewModel>.Instance);
+        var vm = new OnboardingViewModel(kit.Servers, kit.Navigation, new OnboardingActions(dashboard.AddServerCommand, dashboard.ImportFromSshCommand), new ActivationLatch(), NullLogger<OnboardingViewModel>.Instance);
         dialog.BeforeOpen = () => { Assert.False(vm.IsVisible); Assert.Equal(1, kit.Navigation.DashboardCount); };
         await vm.OnMainWindowShownAsync(true);
         vm.Back(); Assert.Equal(1, vm.Step);
@@ -61,9 +63,10 @@ public sealed class Ui6OnboardingTests
     {
         var kit = Ui4TestKit.Create(new Ui4TestKit.Fleet());
         using var dashboard = kit.Dashboard;
+        kit.Navigation.CurrentDestination = NavigationDestination.Overview;
         var pending = new TaskCompletionSource<ServerLoadStatus>();
         kit.Servers.LoadStatusOverride = () => pending.Task;
-        var vm = new OnboardingViewModel(kit.Servers, kit.Navigation, dashboard, new ActivationLatch(), NullLogger<OnboardingViewModel>.Instance);
+        var vm = new OnboardingViewModel(kit.Servers, kit.Navigation, new OnboardingActions(dashboard.AddServerCommand, dashboard.ImportFromSshCommand), new ActivationLatch(), NullLogger<OnboardingViewModel>.Instance);
         var load = vm.OnMainWindowShownAsync(true);
         if (activation) vm.RecordActivation(); else vm.Dismiss();
         pending.SetResult(ServerLoadStatus.NotFound);
@@ -83,9 +86,10 @@ public sealed class Ui6OnboardingTests
     {
         var kit = Ui4TestKit.Create(new Ui4TestKit.Fleet());
         using var dashboard = kit.Dashboard;
+        kit.Navigation.CurrentDestination = NavigationDestination.Overview;
         kit.Servers.LoadStatusOverride = () => throw new InvalidOperationException("synthetic");
         var log = new RecordingLogger();
-        using var vm = new OnboardingViewModel(kit.Servers, kit.Navigation, dashboard, new ActivationLatch(), log);
+        using var vm = new OnboardingViewModel(kit.Servers, kit.Navigation, new OnboardingActions(dashboard.AddServerCommand, dashboard.ImportFromSshCommand), new ActivationLatch(), log);
         await vm.OnMainWindowShownAsync(true);
         Assert.False(vm.IsVisible);
         Assert.True(vm.IsConfigurationUnavailable);
@@ -98,9 +102,10 @@ public sealed class Ui6OnboardingTests
     {
         var kit = Ui4TestKit.Create(new Ui4TestKit.Fleet());
         using var dashboard = kit.Dashboard;
+        kit.Navigation.CurrentDestination = NavigationDestination.Overview;
         kit.Servers.LoadStatus = ServerLoadStatus.NotFound;
         var before = kit.Navigation.NavigatedSubscribers;
-        var vm = new OnboardingViewModel(kit.Servers, kit.Navigation, dashboard, new ActivationLatch(), NullLogger<OnboardingViewModel>.Instance);
+        var vm = new OnboardingViewModel(kit.Servers, kit.Navigation, new OnboardingActions(dashboard.AddServerCommand, dashboard.ImportFromSshCommand), new ActivationLatch(), NullLogger<OnboardingViewModel>.Instance);
         Assert.Equal(before + 1, kit.Navigation.NavigatedSubscribers);
         await vm.OnMainWindowShownAsync(true);
         kit.Navigation.GoToDashboard(); Assert.True(vm.IsVisible);
@@ -116,8 +121,9 @@ public sealed class Ui6OnboardingTests
         var activation = new ActivationLatch(); activation.Record();
         var kit = Ui4TestKit.Create(new Ui4TestKit.Fleet());
         using var dashboard = kit.Dashboard;
+        kit.Navigation.CurrentDestination = NavigationDestination.Overview;
         kit.Servers.LoadStatus = ServerLoadStatus.NotFound;
-        using var vm = new OnboardingViewModel(kit.Servers, kit.Navigation, dashboard, activation, NullLogger<OnboardingViewModel>.Instance);
+        using var vm = new OnboardingViewModel(kit.Servers, kit.Navigation, new OnboardingActions(dashboard.AddServerCommand, dashboard.ImportFromSshCommand), activation, NullLogger<OnboardingViewModel>.Instance);
         await vm.OnMainWindowShownAsync(true);
         Assert.False(vm.IsVisible);
     }
@@ -127,14 +133,33 @@ public sealed class Ui6OnboardingTests
     {
         var kit = Ui4TestKit.Create(new Ui4TestKit.Fleet());
         using var dashboard = kit.Dashboard;
+        kit.Navigation.CurrentDestination = NavigationDestination.Overview;
         kit.Servers.LoadStatus = ServerLoadStatus.NotFound;
-        using var vm = new OnboardingViewModel(kit.Servers, kit.Navigation, dashboard, new ActivationLatch(), NullLogger<OnboardingViewModel>.Instance);
+        using var vm = new OnboardingViewModel(kit.Servers, kit.Navigation, new OnboardingActions(dashboard.AddServerCommand, dashboard.ImportFromSshCommand), new ActivationLatch(), NullLogger<OnboardingViewModel>.Instance);
         vm.SetWindowMode(WindowMode.Compact);
         await vm.OnMainWindowShownAsync(true);
         Assert.False(vm.IsVisible);
         kit.Servers.LoadStatusOverride = () => throw new InvalidOperationException("must not read again");
         vm.SetWindowMode(WindowMode.Standard); Assert.True(vm.IsVisible);
         vm.Dismiss(); vm.SetWindowMode(WindowMode.Compact); vm.SetWindowMode(WindowMode.Standard);
+        Assert.False(vm.IsVisible);
+    }
+
+    [Fact]
+    public async Task LateDiagnosis_AfterNavigationToSettings_NeverShowsOnboarding()
+    {
+        var kit = Ui4TestKit.Create(new Ui4TestKit.Fleet());
+        using var dashboard = kit.Dashboard;
+        kit.Navigation.CurrentDestination = NavigationDestination.Overview;
+        var pending = new TaskCompletionSource<ServerLoadStatus>();
+        kit.Servers.LoadStatusOverride = () => pending.Task;
+        using var vm = new OnboardingViewModel(kit.Servers, kit.Navigation,
+            new OnboardingActions(dashboard.AddServerCommand, dashboard.ImportFromSshCommand),
+            new ActivationLatch(), NullLogger<OnboardingViewModel>.Instance);
+        var load = vm.OnMainWindowShownAsync(true);
+        kit.Navigation.GoToSettings();
+        pending.SetResult(ServerLoadStatus.NotFound);
+        await load;
         Assert.False(vm.IsVisible);
     }
 

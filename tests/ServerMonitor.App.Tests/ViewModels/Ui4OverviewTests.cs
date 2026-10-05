@@ -408,7 +408,7 @@ public sealed class Ui4OverviewTests
         var kit = Ui4TestKit.Create(fleet);
         await kit.Dashboard.LoadAsync();
 
-        kit.Dashboard.ViewAllServersCommand.Execute(null);
+        kit.Dashboard.OpenServerDirectoryCommand.Execute(null);
         Assert.Equal(1, kit.Navigation.ServersCount);
 
         kit.Dashboard.OverviewServers[0].OpenDetailCommand.Execute(null);

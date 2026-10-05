@@ -76,6 +76,10 @@ public sealed partial class SettingsDataPage : Page, ISettingsNavigationTarget
                 AboutSection.StartBringIntoView();
             });
         }
+        else
+        {
+            DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () => ShellPageFocus.FocusHeading(this));
+        }
     }
 
     /// <summary>The project page (the same URI the About section always opened).</summary>

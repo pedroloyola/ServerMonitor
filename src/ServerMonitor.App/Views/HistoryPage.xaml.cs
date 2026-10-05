@@ -11,6 +11,7 @@ public sealed partial class HistoryPage : Page, ServerMonitor.App.Services.IHist
         InitializeComponent();
         ViewModel = viewModel;
         DataContext = viewModel;
+        Loaded += (_, _) => DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () => ShellPageFocus.FocusHeading(this));
         Unloaded += (_, _) => ViewModel.Dispose();
     }
 

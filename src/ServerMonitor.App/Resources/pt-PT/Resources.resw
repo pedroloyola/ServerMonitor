@@ -8,11 +8,7 @@
   <data name="AppWindowTitle" xml:space="preserve"><value>ServerAlyzer</value></data>
   <data name="NavigationDashboardItem.Content" xml:space="preserve"><value>Servidores</value></data>
   <data name="NavigationSettingsItem.Content" xml:space="preserve"><value>Definições</value></data>
-  <data name="DashboardSettingsButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Abrir definições</value></data>
-  <data name="DashboardSettingsButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Definições</value></data>
   <data name="SettingsTitle.Text" xml:space="preserve"><value>Definições</value></data>
-  <data name="SettingsBackButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Voltar à visão geral</value></data>
-  <data name="SettingsBackButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Voltar</value></data>
   <data name="SettingsSubtitle.Text" xml:space="preserve"><value>À tua medida.</value></data>
   <data name="SettingsAppearanceTitle.Text" xml:space="preserve"><value>Aparência</value></data>
   <data name="SettingsAppearanceDescription.Text" xml:space="preserve"><value>Escolhe como preferes ver o ServerAlyzer.</value></data>
@@ -743,8 +739,6 @@
   <data name="ServersSummaryTotalOther" xml:space="preserve"><value>{0} servidores</value></data>
   <data name="ServersSummaryHealthyOne" xml:space="preserve"><value>{0} saudável</value></data>
   <data name="ServersSummaryHealthyOther" xml:space="preserve"><value>{0} saudáveis</value></data>
-  <data name="ServersBreadcrumb.ParentText" xml:space="preserve"><value>Visão geral</value></data>
-  <data name="ServersBreadcrumb.CurrentText" xml:space="preserve"><value>Servidores</value></data>
   <data name="ServersPageTitleText.Text" xml:space="preserve"><value>Servidores</value></data>
   <data name="ServersSearch.PlaceholderText" xml:space="preserve"><value>Procurar por nome ou endereço</value></data>
   <data name="ServersSearch.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Procurar servidores por nome ou endereço</value></data>
@@ -761,8 +755,6 @@
   <data name="OverviewAddText.Text" xml:space="preserve"><value>Adicionar</value></data>
   <data name="OverviewHealthLabel.Text" xml:space="preserve"><value>Saúde geral</value></data>
   <data name="OverviewServersTitle.Text" xml:space="preserve"><value>Servidores</value></data>
-  <data name="OverviewViewAllButton.Content" xml:space="preserve"><value>Ver todos</value></data>
-  <data name="OverviewViewAllButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Ver todos os servidores</value></data>
   <data name="OverviewSearch.PlaceholderText" xml:space="preserve"><value>Procurar</value></data>
   <data name="OverviewSearch.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Procurar servidores por nome ou endereço</value></data>
   <data name="OverviewServerList.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Servidores</value></data>
@@ -900,4 +892,62 @@
   <data name="HistoryClearConfirmNote" xml:space="preserve"><value>Servidores, credenciais e definições são mantidos. Esta ação não pode ser anulada.</value></data>
   <data name="HistoryResetConfirmAffected" xml:space="preserve"><value>Histórico local · base indisponível</value></data>
   <data name="HistoryResetConfirmNote" xml:space="preserve"><value>Servidores, credenciais e definições são mantidos. Esta ação não pode ser anulada.</value></data>
+  <data name="ShellOverview.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Visão geral</value></data>
+  <data name="ShellOverview.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Visão geral</value></data>
+  <data name="ShellOverviewLabel.Text" xml:space="preserve"><value>Visão geral</value></data>
+  <data name="ShellServers.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Servidores</value></data>
+  <data name="ShellServers.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Servidores</value></data>
+  <data name="ShellServersLabel.Text" xml:space="preserve"><value>Servidores</value></data>
+  <data name="ShellHistory.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Histórico</value></data>
+  <data name="ShellHistory.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Histórico</value></data>
+  <data name="ShellHistoryLabel.Text" xml:space="preserve"><value>Histórico</value></data>
+  <data name="ShellSettings.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Definições</value></data>
+  <data name="ShellSettings.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Definições</value></data>
+  <data name="ShellSettingsLabel.Text" xml:space="preserve"><value>Definições</value></data>
+  <data name="ShellNavigation.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Navegação principal</value></data>
+  <data name="ShellNavigationList.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Navegação principal</value></data>
+  <data name="OnboardingWelcomeTitle.Text" xml:space="preserve"><value>Os teus servidores.
+Num só lugar.</value></data>
+  <data name="OnboardingWelcomeBody.Text" xml:space="preserve"><value>Acompanha o estado dos teus servidores Linux e macOS,
+com métricas claras e acesso direto por SSH.</value></data>
+  <data name="OnboardingLocalTitle.Text" xml:space="preserve"><value>O controlo fica contigo.</value></data>
+  <data name="OnboardingLocalBody.Text" xml:space="preserve"><value>Uma ligação direta. Dados guardados no teu dispositivo.</value></data>
+  <data name="OnboardingSetupTitle.Text" xml:space="preserve"><value>Começa pelo primeiro servidor.</value></data>
+  <data name="OnboardingSetupBody.Text" xml:space="preserve"><value>Escolhe como queres configurar a ligação.</value></data>
+  <data name="OnboardingStatusTitle.Text" xml:space="preserve"><value>Estado num relance</value></data>
+  <data name="OnboardingStatusBody.Text" xml:space="preserve"><value>Vê o que precisa de atenção.</value></data>
+  <data name="OnboardingHistoryTitle.Text" xml:space="preserve"><value>Histórico local</value></data>
+  <data name="OnboardingHistoryBody.Text" xml:space="preserve"><value>Acompanha a evolução das métricas.</value></data>
+  <data name="OnboardingNearbyTitle.Text" xml:space="preserve"><value>Sempre por perto</value></data>
+  <data name="OnboardingNearbyBody.Text" xml:space="preserve"><value>Usa o modo compacto e os widgets.</value></data>
+  <data name="OnboardingSshTitle.Text" xml:space="preserve"><value>Liga por SSH</value></data>
+  <data name="OnboardingSshBody.Text" xml:space="preserve"><value>Usa a tua chave privada ou palavra-passe para aceder ao servidor.</value></data>
+  <data name="OnboardingIdentityTitle.Text" xml:space="preserve"><value>Confirma a identidade</value></data>
+  <data name="OnboardingIdentityBody.Text" xml:space="preserve"><value>Na primeira ligação, confirma a impressão digital da chave SSH.</value></data>
+  <data name="OnboardingDeviceTitle.Text" xml:space="preserve"><value>Mantém os dados contigo</value></data>
+  <data name="OnboardingDeviceBody.Text" xml:space="preserve"><value>Histórico local e credenciais protegidas pelo Windows. Sem conta obrigatória.</value></data>
+  <data name="OnboardingReadOnly.Text" xml:space="preserve"><value>A monitorização consulta o servidor em modo de leitura.</value></data>
+  <data name="OnboardingManualTitle.Text" xml:space="preserve"><value>Adicionar manualmente</value></data>
+  <data name="OnboardingManualBody.Text" xml:space="preserve"><value>Introduz o endereço, o utilizador e o método de autenticação SSH.</value></data>
+  <data name="OnboardingImportTitle.Text" xml:space="preserve"><value>Importar de SSH</value></data>
+  <data name="OnboardingImportBody.Text" xml:space="preserve"><value>Usa um perfil do ficheiro ~/.ssh/config que já tens neste dispositivo.</value></data>
+  <data name="OnboardingMore.Text" xml:space="preserve"><value>Podes adicionar mais servidores e ajustar as definições a qualquer momento.</value></data>
+  <data name="OnboardingDismiss.Content" xml:space="preserve"><value>Agora não</value></data>
+  <data name="OnboardingBack.Content" xml:space="preserve"><value>Voltar</value></data>
+  <data name="OnboardingStart.Content" xml:space="preserve"><value>Começar</value></data>
+  <data name="OnboardingContinue.Content" xml:space="preserve"><value>Continuar</value></data>
+  <data name="OnboardingExplore.Content" xml:space="preserve"><value>Explorar primeiro</value></data>
+  <data name="OnboardingAdd.Content" xml:space="preserve"><value>Adicionar servidor</value></data>
+  <data name="OnboardingImport.Content" xml:space="preserve"><value>Escolher perfil SSH</value></data>
+  <data name="OnboardingProgressFormat" xml:space="preserve"><value>{0} de 3</value></data>
+  <data name="OnboardingStepNameFormat" xml:space="preserve"><value>Passo {0} de 3</value></data>
+  <data name="FirstServerTitle.Text" xml:space="preserve"><value>Vamos ligar o teu primeiro servidor?</value></data>
+  <data name="FirstServerBody.Text" xml:space="preserve"><value>Adiciona uma ligação SSH para acompanhar o estado,
+as métricas e o histórico do servidor.</value></data>
+  <data name="FirstServerSubtitle.Text" xml:space="preserve"><value>O teu espaço de monitorização.</value></data>
+  <data name="HiddenOverviewTitle.Text" xml:space="preserve"><value>Os teus servidores estão ocultos.</value></data>
+  <data name="HiddenOverviewBody.Text" xml:space="preserve"><value>Podes restaurá-los em Definições › Dados e servidores.</value></data>
+  <data name="HiddenOverviewAction.Content" xml:space="preserve"><value>Gerir servidores ocultos</value></data>
+  <data name="ConfigurationUnavailableNotice.Message" xml:space="preserve"><value>Não foi possível ler a configuração dos servidores. A configuração não foi alterada.</value></data>
+  <data name="ConfigurationUnavailableNotice.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Não foi possível ler a configuração dos servidores. A configuração não foi alterada.</value></data>
 </root>

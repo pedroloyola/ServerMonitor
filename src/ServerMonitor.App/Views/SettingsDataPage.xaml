@@ -1,9 +1,9 @@
-<Page
+<Page x:Name="PageViewport"
     x:Class="ServerMonitor.App.Views.SettingsDataPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:primitives="using:ServerMonitor.App.Controls.Primitives"
-    primitives:SaThemeRefresh.IsEnabled="True">
+>
     <!-- UI.5 "Dados e servidores", Figma 112:8230 (D) / 112:8276 (L): back + title, glass cards (hidden servers, ignored
          devices, history, Backup/Restore - DERIVED, H-UI5-4, between History and About - and About), footer. Successes
          show the page-local toast (Figma §3.2); errors stay inline next to their card. -->
@@ -18,13 +18,13 @@
                 <VisualStateGroup x:Name="WidthStates">
                     <VisualState x:Name="Wide">
                         <VisualState.StateTriggers>
-                            <AdaptiveTrigger MinWindowWidth="700" />
+                            <primitives:SaContentWidthTrigger Width="{Binding ActualWidth, ElementName=PageViewport}" MinWidth="700" />
                         </VisualState.StateTriggers>
                     </VisualState>
                     <!-- < 700: compact padding; each card's action moves under its title. -->
                     <VisualState x:Name="Narrow">
                         <VisualState.StateTriggers>
-                            <AdaptiveTrigger MinWindowWidth="0" />
+                            <primitives:SaContentWidthTrigger Width="{Binding ActualWidth, ElementName=PageViewport}" MinWidth="0" MaxWidth="700" />
                         </VisualState.StateTriggers>
                         <VisualState.Setters>
                             <Setter Target="PageRoot.Padding" Value="{StaticResource SaPagePaddingCompact}" />
@@ -65,7 +65,7 @@
                         </primitives:SaIcon>
                     </Button>
                     <StackPanel Grid.Column="1" Spacing="{StaticResource SaSpace4}">
-                        <TextBlock x:Uid="SettingsDataTitle" AutomationProperties.HeadingLevel="Level1" Style="{StaticResource SaHeadingTextStyle}" TextWrapping="Wrap" />
+                        <TextBlock x:Uid="SettingsDataTitle" AutomationProperties.HeadingLevel="Level1" IsTextSelectionEnabled="True" IsTabStop="False" Style="{StaticResource SaHeadingTextStyle}" TextWrapping="Wrap" />
                         <TextBlock x:Uid="SettingsDataParent" Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" />
                     </StackPanel>
                 </Grid>

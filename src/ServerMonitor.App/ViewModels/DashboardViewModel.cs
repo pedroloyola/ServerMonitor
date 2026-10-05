@@ -123,10 +123,9 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
 
         AddServerCommand = new AsyncRelayCommand(AddServerAsync);
         ImportFromSshCommand = new AsyncRelayCommand(ImportFromSshAsync);
-        OpenSettingsCommand = new RelayCommand(navigationService.GoToSettings);
-        ViewAllServersCommand = new RelayCommand(() =>
+        OpenServerDirectoryCommand = new RelayCommand(() =>
         {
-            RememberReturnFocus(OverviewReturnTarget.ViewAll, Guid.Empty);
+            RememberReturnFocus(OverviewReturnTarget.DirectoryLink, Guid.Empty);
             navigationService.GoToServers();
         });
         // Cortex r1 SHOULD-1: the user moving to another page cancels a deep-link still waiting for its server.
@@ -236,7 +235,6 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
     /// <summary>Empty state "Import from SSH": the normal add editor with the ssh-config import panel open.</summary>
     public ICommand ImportFromSshCommand { get; }
 
-    public ICommand OpenSettingsCommand { get; }
 
     public bool HasVisibleServers
     {
@@ -248,6 +246,7 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
                 OnEmptyStateDiscoveryChanged();
                 OnPropertyChanged(nameof(ShowOverviewContent));
                 OnPropertyChanged(nameof(ShowEmptyState));
+                NotifyEmptyStates();
                 OnPropertyChanged(nameof(ShowNoProblems));
                 OnPropertyChanged(nameof(ShowNoReadings));
             }
@@ -362,7 +361,7 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
 
     // --- UI.4 overview -----------------------------------------------------------------------------------------
 
-    public ICommand ViewAllServersCommand { get; } = null!;
+    public ICommand OpenServerDirectoryCommand { get; } = null!;
 
     public ICommand ClearOverviewSearchCommand { get; } = null!;
 
@@ -385,6 +384,7 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
                 OnPropertyChanged(nameof(ShowNoReadings));
                 OnPropertyChanged(nameof(ShowOverviewContent));
                 OnPropertyChanged(nameof(ShowEmptyState));
+                NotifyEmptyStates();
                 OnPropertyChanged(nameof(HeaderContextDisplay));
                 OnPropertyChanged(nameof(HasHeaderContext));
             }
@@ -396,6 +396,19 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
 
     /// <summary>The empty state ("Adicionar" / "Importar do SSH" / discovery) — only once loaded, never during loading.</summary>
     public bool ShowEmptyState => !IsLoading && !HasVisibleServers;
+    private bool _configurationChanged;
+    private bool _configurationUnavailable;
+    private Task<ServerLoadStatus>? _startupDiagnosis;
+    public bool ShowConfigurationUnavailable => !_configurationChanged && _configurationUnavailable;
+    public bool ShowFirstServerState => ShowEmptyState && HiddenServerCount == 0 && !ShowConfigurationUnavailable;
+    public bool ShowAllHiddenState => ShowEmptyState && HiddenServerCount > 0 && !ShowConfigurationUnavailable;
+    public ICommand RestoreHiddenServersCommand => new RelayCommand(() => _navigationService.GoToSettings(SettingsSection.Data));
+    private void NotifyEmptyStates()
+    {
+        OnPropertyChanged(nameof(ShowConfigurationUnavailable));
+        OnPropertyChanged(nameof(ShowFirstServerState));
+        OnPropertyChanged(nameof(ShowAllHiddenState));
+    }
 
     public bool IsRefreshingAll
     {
@@ -413,7 +426,7 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
     public int HiddenServerCount
     {
         get => _hiddenServerCount;
-        private set => SetProperty(ref _hiddenServerCount, value);
+        private set { if (SetProperty(ref _hiddenServerCount, value)) NotifyEmptyStates(); }
     }
 
     public HealthSummary HealthSummary => _healthSummary ?? HealthSummary.Empty;
@@ -552,6 +565,12 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
             HiddenServerCount = all.Count(server => server.IsHidden);
             SetServers(all.Where(server => !server.IsHidden));
             RebuildDiscovered();
+            if (!_configurationChanged && _serverService is IServerLoadStatusSource source)
+            {
+                _startupDiagnosis ??= source.GetLoadStatusAsync();
+                _configurationUnavailable = await _startupDiagnosis == ServerLoadStatus.Unavailable;
+                NotifyEmptyStates();
+            }
         }
         catch (Exception exception)
         {
@@ -1124,7 +1143,12 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         return value.TrimEnd('.').ToLowerInvariant();
     }
 
-    private async void OnServersChanged(object? sender, EventArgs args) => await LoadAsync();
+    private async void OnServersChanged(object? sender, EventArgs args)
+    {
+        _configurationChanged = true;
+        NotifyEmptyStates();
+        await LoadAsync();
+    }
 
     private void OnConnectionStateChanged(object? sender, Guid serverId)
     {

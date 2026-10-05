@@ -827,6 +827,9 @@ public partial class App : Application
         services.AddTransient<WorkloadsViewModel>();
         services.AddTransient<WorkloadsPage>();
         services.AddSingleton<ShellViewModel>();
+        services.AddSingleton<IServerLoadStatusSource>(sp => sp.GetRequiredService<IServerService>() as IServerLoadStatusSource ?? new LoadedServerLoadStatusSource());
+        services.AddSingleton(sp => new OnboardingActions(sp.GetRequiredService<DashboardViewModel>().AddServerCommand,
+            sp.GetRequiredService<DashboardViewModel>().ImportFromSshCommand));
         services.AddSingleton<OnboardingViewModel>();
         services.AddSingleton<ActivationLatch>();
         services.AddTransient<MainWindow>();

@@ -20,4 +20,8 @@
     <CornerRadius x:Key="SaRadiusSelector">16</CornerRadius>
     <!-- UI.5: disk "segmented capacity" segment 16x18 r5, 112:1891 (the memory segments / CPU bars use SaRadiusMiniBar 3). -->
     <CornerRadius x:Key="SaRadiusDiskSegment">5</CornerRadius>
+    <!-- UI.6 112:665 / 112:317 / 112:659. -->
+    <CornerRadius x:Key="SaRadiusOnboardingButton">15</CornerRadius>
+    <CornerRadius x:Key="SaRadiusOnboardingBenefit">18</CornerRadius>
+    <CornerRadius x:Key="SaRadiusOnboardingCard">22</CornerRadius>
 </ResourceDictionary>

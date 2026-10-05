@@ -83,6 +83,22 @@ public static class SaThemeRefresh
         return true;
     }
 
+    public static bool Remount(FrameworkElement control, UIElement? content, Action<UIElement?> replaceContent)
+    {
+        if (content is null || control.XamlRoot is null) return false;
+        var focused = FocusManager.GetFocusedElement(control.XamlRoot) as Control;
+        var scroller = FirstScrollViewer(content);
+        var offset = scroller?.VerticalOffset ?? 0;
+        replaceContent(null);
+        replaceContent(content);
+        control.DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+        {
+            scroller?.ChangeView(null, offset, null, disableAnimation: true);
+            focused?.Focus(FocusState.Programmatic);
+        });
+        return true;
+    }
+
     private static ScrollViewer? FirstScrollViewer(DependencyObject root)
     {
         if (root is ScrollViewer viewer)

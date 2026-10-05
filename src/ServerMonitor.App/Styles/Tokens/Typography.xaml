@@ -230,4 +230,58 @@
         <Setter Property="LineHeight" Value="{StaticResource SaLineHeightCardTitle}" />
         <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
     </Style>
+    <!-- UI.6 Figma 112:1391 / 112:314 / 112:500 / 112:834: 16/22 SemiBold; Segoe fallback D1. -->
+    <x:Double x:Key="SaFontSizeBrand">16</x:Double><x:Double x:Key="SaLineHeightBrand">22</x:Double>
+    <Style x:Key="SaBrandTextStyle" TargetType="TextBlock"><Setter Property="FontFamily" Value="{StaticResource SaFontText}" />
+        <Setter Property="FontSize" Value="{StaticResource SaFontSizeBrand}" /><Setter Property="LineHeight" Value="{StaticResource SaLineHeightBrand}" />
+        <Setter Property="FontWeight" Value="SemiBold" /><Setter Property="TextWrapping" Value="Wrap" /></Style>
+    <!-- UI.6 Figma 112:1391 / 112:314 / 112:500 / 112:834: 42/53 SemiBold; Segoe fallback D1. -->
+    <x:Double x:Key="SaFontSizeOnboardingHero">42</x:Double><x:Double x:Key="SaLineHeightOnboardingHero">53</x:Double>
+    <Style x:Key="SaOnboardingHeroTextStyle" TargetType="TextBlock"><Setter Property="FontFamily" Value="{StaticResource SaFontText}" />
+        <Setter Property="FontSize" Value="{StaticResource SaFontSizeOnboardingHero}" /><Setter Property="LineHeight" Value="{StaticResource SaLineHeightOnboardingHero}" />
+        <Setter Property="FontWeight" Value="SemiBold" /><Setter Property="TextWrapping" Value="Wrap" /></Style>
+    <!-- UI.6 Figma 112:1391 / 112:314 / 112:500 / 112:834: 36/45 SemiBold; Segoe fallback D1. -->
+    <x:Double x:Key="SaFontSizeOnboardingTitle">36</x:Double><x:Double x:Key="SaLineHeightOnboardingTitle">45</x:Double>
+    <Style x:Key="SaOnboardingTitleTextStyle" TargetType="TextBlock"><Setter Property="FontFamily" Value="{StaticResource SaFontText}" />
+        <Setter Property="FontSize" Value="{StaticResource SaFontSizeOnboardingTitle}" /><Setter Property="LineHeight" Value="{StaticResource SaLineHeightOnboardingTitle}" />
+        <Setter Property="FontWeight" Value="SemiBold" /><Setter Property="TextWrapping" Value="Wrap" /></Style>
+    <!-- UI.6 Figma 112:1391 / 112:314 / 112:500 / 112:834: 28/35 SemiBold; Segoe fallback D1. -->
+    <x:Double x:Key="SaFontSizeFirstServerTitle">28</x:Double><x:Double x:Key="SaLineHeightFirstServerTitle">35</x:Double>
+    <Style x:Key="SaFirstServerTitleTextStyle" TargetType="TextBlock"><Setter Property="FontFamily" Value="{StaticResource SaFontText}" />
+        <Setter Property="FontSize" Value="{StaticResource SaFontSizeFirstServerTitle}" /><Setter Property="LineHeight" Value="{StaticResource SaLineHeightFirstServerTitle}" />
+        <Setter Property="FontWeight" Value="SemiBold" /><Setter Property="TextWrapping" Value="Wrap" /></Style>
+    <!-- UI.6 Figma 112:1391 / 112:314 / 112:500 / 112:834: 16/20 Normal; Segoe fallback D1. -->
+    <x:Double x:Key="SaFontSizeOnboardingBody">16</x:Double><x:Double x:Key="SaLineHeightOnboardingBody">20</x:Double>
+    <Style x:Key="SaOnboardingBodyTextStyle" TargetType="TextBlock"><Setter Property="FontFamily" Value="{StaticResource SaFontText}" />
+        <Setter Property="FontSize" Value="{StaticResource SaFontSizeOnboardingBody}" /><Setter Property="LineHeight" Value="{StaticResource SaLineHeightOnboardingBody}" />
+        <Setter Property="FontWeight" Value="Normal" /><Setter Property="TextWrapping" Value="Wrap" /></Style>
+    <!-- UI.6 Figma 112:1391 / 112:314 / 112:500 / 112:834: 15/19 SemiBold; Segoe fallback D1. -->
+    <x:Double x:Key="SaFontSizeOnboardingBenefit">15</x:Double><x:Double x:Key="SaLineHeightOnboardingBenefit">19</x:Double>
+    <Style x:Key="SaOnboardingBenefitTextStyle" TargetType="TextBlock"><Setter Property="FontFamily" Value="{StaticResource SaFontText}" />
+        <Setter Property="FontSize" Value="{StaticResource SaFontSizeOnboardingBenefit}" /><Setter Property="LineHeight" Value="{StaticResource SaLineHeightOnboardingBenefit}" />
+        <Setter Property="FontWeight" Value="SemiBold" /><Setter Property="TextWrapping" Value="Wrap" /></Style>
+    <!-- UI.6 Prism 3.4: 17px / 125 percent. -->
+    <x:Double x:Key="SaFontSizeOnboardingLead">17</x:Double><x:Double x:Key="SaLineHeightOnboardingLead">21</x:Double>
+    <Style x:Key="SaOnboardingLeadTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SaOnboardingBodyTextStyle}">
+        <Setter Property="FontSize" Value="{StaticResource SaFontSizeOnboardingLead}"/><Setter Property="LineHeight" Value="{StaticResource SaLineHeightOnboardingLead}"/>
+        <Setter Property="FontWeight" Value="Normal"/><Setter Property="LineStackingStrategy" Value="BlockLineHeight"/>
+    </Style>
+    <!-- UI.6 Prism 3.4: 17px / 125 percent. -->
+    <x:Double x:Key="SaFontSizeOnboardingPrinciple">17</x:Double><x:Double x:Key="SaLineHeightOnboardingPrinciple">21</x:Double>
+    <Style x:Key="SaOnboardingPrincipleTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SaOnboardingBodyTextStyle}">
+        <Setter Property="FontSize" Value="{StaticResource SaFontSizeOnboardingPrinciple}"/><Setter Property="LineHeight" Value="{StaticResource SaLineHeightOnboardingPrinciple}"/>
+        <Setter Property="FontWeight" Value="SemiBold"/><Setter Property="LineStackingStrategy" Value="BlockLineHeight"/>
+    </Style>
+    <!-- UI.6 Prism 3.4: 20px / 125 percent. -->
+    <x:Double x:Key="SaFontSizeOnboardingMethod">20</x:Double><x:Double x:Key="SaLineHeightOnboardingMethod">25</x:Double>
+    <Style x:Key="SaOnboardingMethodTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SaOnboardingBodyTextStyle}">
+        <Setter Property="FontSize" Value="{StaticResource SaFontSizeOnboardingMethod}"/><Setter Property="LineHeight" Value="{StaticResource SaLineHeightOnboardingMethod}"/>
+        <Setter Property="FontWeight" Value="SemiBold"/><Setter Property="LineStackingStrategy" Value="BlockLineHeight"/>
+    </Style>
+    <!-- UI.6 Prism 3.4: 15px / 125 percent. -->
+    <x:Double x:Key="SaFontSizeOnboardingMethodBody">15</x:Double><x:Double x:Key="SaLineHeightOnboardingMethodBody">19</x:Double>
+    <Style x:Key="SaOnboardingMethodBodyTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SaOnboardingBodyTextStyle}">
+        <Setter Property="FontSize" Value="{StaticResource SaFontSizeOnboardingMethodBody}"/><Setter Property="LineHeight" Value="{StaticResource SaLineHeightOnboardingMethodBody}"/>
+        <Setter Property="FontWeight" Value="Normal"/><Setter Property="LineStackingStrategy" Value="BlockLineHeight"/>
+    </Style>
 </ResourceDictionary>

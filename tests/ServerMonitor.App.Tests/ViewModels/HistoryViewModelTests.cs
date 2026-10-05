@@ -101,6 +101,31 @@ public sealed class HistoryViewModelTests
         Assert.Empty(query.RequestedIds);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Ui6_SupersededSidebarRead_DoesNotOverwriteNewerPresentation(bool oldFails)
+    {
+        var kit = Ui4TestKit.Create(new Ui4TestKit.Fleet().Add("current", ServerMonitor.Core.Enums.ServerHealth.Healthy));
+        using var dashboard = kit.Dashboard;
+        var pending = new TaskCompletionSource<IReadOnlyList<Server>>();
+        kit.Servers.GetAllOverride = _ => pending.Task;
+        var query = new ControllableHistoryQueryService { Immediate = range => Result(range, empty: true) };
+        using var vm = new HistoryViewModel(query, kit.Metrics, kit.States, kit.Servers,
+            kit.Navigation, kit.Localization, NullLogger<HistoryViewModel>.Instance, new FakeTimeProvider());
+        var old = vm.LoadSidebarAsync(null);
+        kit.Servers.GetAllOverride = null;
+        await vm.LoadSidebarAsync(null);
+        var selected = vm.SelectedServer;
+        var requests = query.RequestedIds.Count;
+        if (oldFails) pending.SetException(new IOException("superseded")); else pending.SetResult([]);
+        await old;
+        Assert.Same(selected, vm.SelectedServer);
+        Assert.True(vm.HasServer);
+        Assert.False(vm.IsUnavailable);
+        Assert.Equal(requests, query.RequestedIds.Count);
+    }
+
     private static ServerHistoryResult Result(HistoryTimeRange range, bool empty)
     {
         var end = new DateTimeOffset(2026, 8, 26, 12, 0, 0, TimeSpan.Zero);

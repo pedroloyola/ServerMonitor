@@ -38,12 +38,13 @@ public sealed partial class DashboardPage : Page
     /// </summary>
     private void RestoreFocus()
     {
+        if (ShellPageFocus.GetKeepSidebar(this)) return;
         var (target, serverId) = ViewModel.TakeReturnFocus();
         var focused = target switch
         {
             OverviewReturnTarget.ServerRow => FocusOverviewRow(serverId),
             OverviewReturnTarget.Priority => PriorityButton.Focus(FocusState.Programmatic),
-            OverviewReturnTarget.ViewAll => ViewAllButton.Focus(FocusState.Programmatic),
+            OverviewReturnTarget.DirectoryLink => DirectoryLinkButton.Visibility == Visibility.Visible && DirectoryLinkButton.Focus(FocusState.Programmatic),
             _ => false,
         };
 
@@ -67,17 +68,7 @@ public sealed partial class DashboardPage : Page
         return false;
     }
 
-    private void FocusContent()
-    {
-        if (ViewModel.ShowOverviewContent)
-        {
-            HealthCard.Focus(FocusState.Programmatic);
-        }
-        else if (ViewModel.ShowEmptyState)
-        {
-            EmptyAddButton.Focus(FocusState.Programmatic);
-        }
-    }
+    private void FocusContent() => ShellPageFocus.FocusHeading(this);
 
     // "Limpar pesquisa" disappears once it worked; focus returns to the search box (UI.3 pattern).
     private void OnClearSearchClick(object sender, RoutedEventArgs e) => FocusAfterAction.MoveTo((Control)sender, OverviewSearchBox);

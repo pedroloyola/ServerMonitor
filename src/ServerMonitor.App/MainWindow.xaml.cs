@@ -1,4 +1,7 @@
 using Microsoft.Extensions.Logging;
+using System.ComponentModel;
+using ServerMonitor.App.Controls.Primitives;
+using ServerMonitor.App.Views;
 using Microsoft.UI;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Windowing;
@@ -25,6 +28,7 @@ public sealed partial class MainWindow : Window
     private readonly ILogger<MainWindow> _logger;
     private readonly DispatcherQueueTimer _persistTimer;
     private bool _isEnforcingMinimumSize;
+    private bool _usesOpaqueFallback;
 
     private const int MinimumWindowWidth = 560;
     private const int MinimumWindowHeight = 640;
@@ -50,6 +54,13 @@ public sealed partial class MainWindow : Window
         _navigationService = navigationService;
         Shell = shell;
         Onboarding = onboarding;
+        Sidebar.DataContext = shell;
+        FirstRunView.Localization = localizationService;
+        FirstRunView.DataContext = onboarding;
+        Onboarding.PropertyChanged += OnOnboardingChanged;
+        _navigationService.Navigated += OnShellNavigated;
+        StandardRoot.SizeChanged += OnStandardSizeChanged;
+        RootLayout.KeyDown += OnShellKeyDown;
         _windowController = windowController;
         _placementAdapter = placementAdapter;
         _modeCoordinator = modeCoordinator;
@@ -87,7 +98,7 @@ public sealed partial class MainWindow : Window
     private void ConfigureWindow()
     {
         ExtendsContentIntoTitleBar = true;
-        SetTitleBar(AppTitleBar);
+        SetTitleBar(ShellDragRegion);
 
         ApplyWindowIcon();
 
@@ -106,7 +117,8 @@ public sealed partial class MainWindow : Window
         catch (Exception exception)
         {
             _logger.LogWarning(exception, "Desktop Acrylic is unavailable; the opaque fallback will be used.");
-            RootLayout.Background = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["AppBackgroundBrush"];
+            _usesOpaqueFallback = true;
+            ApplyShellBackground();
         }
     }
 
@@ -159,7 +171,9 @@ public sealed partial class MainWindow : Window
         }
 #endif
         var normalStart = OnboardingStartup.IsNormalStart(_navigationService.CurrentDestination, Program.LaunchMode);
+        _startingOverview = _navigationService.CurrentDestination is null;
         _navigationService.EnsureInitialNavigation();
+        _startingOverview = false;
         if (_modeCoordinator.CurrentMode == WindowMode.Compact)
         {
             _ = _dashboardViewModel.LoadAsync();
@@ -176,6 +190,7 @@ public sealed partial class MainWindow : Window
     private void OnWindowModeChanged(object? sender, WindowMode mode)
     {
         Onboarding.SetWindowMode(mode);
+        ApplyShellBackground();
         if (mode == WindowMode.Compact)
         {
             StandardRoot.Visibility = Visibility.Collapsed;
@@ -189,7 +204,7 @@ public sealed partial class MainWindow : Window
         {
             CompactRoot.Visibility = Visibility.Collapsed;
             StandardRoot.Visibility = Visibility.Visible;
-            SetTitleBar(AppTitleBar);
+            SetTitleBar(ShellDragRegion);
         }
 
         UpdateCaptionButtonColors();
@@ -219,9 +234,70 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private void ApplyShellBackground()
+    {
+        // The new material belongs to Standard only; Compact retains its original opaque background.
+        var key = _usesOpaqueFallback || _modeCoordinator.CurrentMode == WindowMode.Compact
+            ? "AppBackgroundBrush" : "SaWindowMaterialBrush";
+        RootLayout.Background = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[key];
+    }
+
     private void OnActualThemeChanged(FrameworkElement sender, object args)
     {
+        ApplyShellBackground();
         UpdateCaptionButtonColors();
+        // R-4: remount page CONTENT, never the Frame's Page (Unloaded would dispose per-visit VMs).
+        DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+        {
+            if (ContentFrame.Content is Microsoft.UI.Xaml.Controls.Page page) SaThemeRefresh.Remount(page);
+            SaThemeRefresh.Remount(Sidebar, Sidebar.Content, content => Sidebar.Content = content);
+            SaThemeRefresh.Remount(FirstRunView, FirstRunView.Content, content => FirstRunView.Content = content);
+        });
+    }
+
+    private bool _startingOverview;
+    private void OnStandardSizeChanged(object sender, SizeChangedEventArgs args)
+    {
+        var width = ShellLayout.SidebarWidth(args.NewSize.Width);
+        SidebarColumn.Width = new GridLength(width);
+        Sidebar.SetRail(width == ShellLayout.RailWidth);
+    }
+    private void OnShellNavigated(object? sender, EventArgs args)
+    {
+        if (ContentFrame.Content is not Microsoft.UI.Xaml.Controls.Page page) return;
+        var keepSidebar = _startingOverview || Shell.IsSidebarNavigation;
+        ShellPageFocus.SetKeepSidebar(page, keepSidebar);
+        DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+        {
+            if (!ReferenceEquals(ContentFrame.Content, page) || Onboarding.IsVisible) return;
+            if (keepSidebar) Sidebar.FocusSelected(); // Content pages own H1 / one-shot return focus after Loaded.
+        });
+    }
+    private void OnOnboardingChanged(object? sender, PropertyChangedEventArgs args)
+    {
+        if (args.PropertyName != nameof(OnboardingViewModel.IsVisible)) return;
+        ShellSurface.Visibility = Onboarding.IsVisible ? Visibility.Collapsed : Visibility.Visible;
+        FirstRunView.Visibility = Onboarding.IsVisible ? Visibility.Visible : Visibility.Collapsed;
+        if (Onboarding.IsVisible) FirstRunView.FocusHeading();
+        else if (ContentFrame.Content is Microsoft.UI.Xaml.Controls.Page page)
+        {
+            ShellPageFocus.SetKeepSidebar(page, false);
+            DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+            {
+                if (ReferenceEquals(ContentFrame.Content, page)) ShellPageFocus.FocusHeading(page, force: true);
+            });
+        }
+    }
+    private void OnShellKeyDown(object sender, Microsoft.UI.Xaml.Input.KeyRoutedEventArgs args)
+    {
+        if (args.Key != Windows.System.VirtualKey.F6 || Onboarding.IsVisible || _modeCoordinator.CurrentMode != WindowMode.Standard) return;
+        var focused = Microsoft.UI.Xaml.Input.FocusManager.GetFocusedElement(RootLayout.XamlRoot) as DependencyObject;
+        var inSidebar = false;
+        for (var node = focused; node is not null; node = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetParent(node))
+            if (ReferenceEquals(node, Sidebar)) { inSidebar = true; break; }
+        if (inSidebar && ContentFrame.Content is Microsoft.UI.Xaml.Controls.Page page) ShellPageFocus.FocusHeading(page, force: true);
+        else Sidebar.FocusSelected();
+        args.Handled = true;
     }
 
     private void OnAppWindowChanged(AppWindow sender, AppWindowChangedEventArgs args)
@@ -313,6 +389,10 @@ public sealed partial class MainWindow : Window
     /// </summary>
     private void OnWindowClosed(object sender, WindowEventArgs args)
     {
+        Onboarding.PropertyChanged -= OnOnboardingChanged;
+        _navigationService.Navigated -= OnShellNavigated;
+        StandardRoot.SizeChanged -= OnStandardSizeChanged;
+        RootLayout.KeyDown -= OnShellKeyDown;
         _persistTimer.Stop();
         _persistTimer.Tick -= OnPersistTimerTick;
         _modeCoordinator.PersistCurrentBounds();

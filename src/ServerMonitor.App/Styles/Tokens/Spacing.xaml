@@ -22,4 +22,11 @@
     <!-- UI.3 page padding: 40 (Figma 112:2258 / 112:2613, >= 640 wide) and 24 on narrow windows (< 640, DERIVED). -->
     <Thickness x:Key="SaPagePadding">40</Thickness>
     <Thickness x:Key="SaPagePaddingCompact">24</Thickness>
+    <!-- UI.6 112:1359 p24, Settings bottom 40. Rail and narrow onboarding are DERIVED. -->
+    <Thickness x:Key="SaSidebarPadding">24,24,24,40</Thickness>
+    <Thickness x:Key="SaRailPadding">16,24,16,40</Thickness>
+    <Thickness x:Key="SaOnboardingPadding">48,36,48,36</Thickness>
+    <Thickness x:Key="SaOnboardingBenefitPadding">18</Thickness>
+    <Thickness x:Key="SaOnboardingCardPadding">24</Thickness>
+    <x:Double x:Key="SaOnboardingButtonHeight">46</x:Double>
 </ResourceDictionary>

@@ -8,6 +8,11 @@
     </ResourceDictionary.MergedDictionaries>
     <ResourceDictionary.ThemeDictionaries>
         <ResourceDictionary x:Key="Dark">
+            <!-- UI.6 Figma 112:1358 window, 112:665/112:837 primary, 112:317 benefit. HC platform colours. -->
+            <SolidColorBrush x:Key="SaWindowMaterialBrush" Color="#9E0E0E0E" />
+            <SolidColorBrush x:Key="SaOnboardingPrimaryBrush" Color="#59808080" />
+            <SolidColorBrush x:Key="SaOnboardingPrimaryTextBrush" Color="#FFF2F2F2" />
+            <SolidColorBrush x:Key="SaOnboardingBenefitBrush" Color="#14808080" />
             <SolidColorBrush x:Key="SaNeutralSurfaceBrush" Color="{StaticResource SaColorSurfaceDark}" />
             <SolidColorBrush x:Key="SaElevatedSurfaceBrush" Color="{StaticResource SaColorElevatedSurfaceDark}" />
             <AcrylicBrush x:Key="SaGlassSurfaceBrush" TintColor="{StaticResource SaColorGlassTintDark}" TintOpacity=".43" TintLuminosityOpacity=".18" FallbackColor="{StaticResource SaColorSurfaceDark}" />
@@ -17,6 +22,11 @@
             <SolidColorBrush x:Key="SaOverlaySmokeBrush" Color="{StaticResource SaColorOverlaySmokeDark}" />
         </ResourceDictionary>
         <ResourceDictionary x:Key="Light">
+            <!-- UI.6 Figma 112:1358 window, 112:665/112:837 primary, 112:317 benefit. HC platform colours. -->
+            <SolidColorBrush x:Key="SaWindowMaterialBrush" Color="#59FFFFFF" />
+            <SolidColorBrush x:Key="SaOnboardingPrimaryBrush" Color="#FF2B2B2B" />
+            <SolidColorBrush x:Key="SaOnboardingPrimaryTextBrush" Color="#FFFAFAFA" />
+            <SolidColorBrush x:Key="SaOnboardingBenefitBrush" Color="#14FFFFFF" />
             <SolidColorBrush x:Key="SaNeutralSurfaceBrush" Color="{StaticResource SaColorSurfaceLight}" />
             <SolidColorBrush x:Key="SaElevatedSurfaceBrush" Color="{StaticResource SaColorElevatedSurfaceLight}" />
             <!-- R1 (Prism MF-1): Light calibrated on the Figma 112:1142 wallpaper to card +3 levels over the backdrop (112:1222:
@@ -29,6 +39,11 @@
             <SolidColorBrush x:Key="SaOverlaySmokeBrush" Color="{StaticResource SaColorOverlaySmokeLight}" />
         </ResourceDictionary>
         <ResourceDictionary x:Key="HighContrast">
+            <!-- UI.6 Figma 112:1358 window, 112:665/112:837 primary, 112:317 benefit. HC platform colours. -->
+            <SolidColorBrush x:Key="SaWindowMaterialBrush" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="SaOnboardingPrimaryBrush" Color="{ThemeResource SystemColorButtonFaceColor}" />
+            <SolidColorBrush x:Key="SaOnboardingPrimaryTextBrush" Color="{ThemeResource SystemColorButtonTextColor}" />
+            <SolidColorBrush x:Key="SaOnboardingBenefitBrush" Color="{ThemeResource SystemColorWindowColor}" />
             <SolidColorBrush x:Key="SaNeutralSurfaceBrush" Color="{ThemeResource SystemColorWindowColor}" />
             <SolidColorBrush x:Key="SaElevatedSurfaceBrush" Color="{ThemeResource SystemColorWindowColor}" />
             <SolidColorBrush x:Key="SaGlassSurfaceBrush" Color="{ThemeResource SystemColorWindowColor}" />

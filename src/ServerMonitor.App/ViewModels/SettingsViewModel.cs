@@ -70,7 +70,6 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
         _logger = logger;
         _serverService.ServersChanged += OnServersChanged;
         _notificationSettingsService.NotificationsEnabledChanged += OnNotificationsEnabledChanged;
-        BackCommand = new RelayCommand(navigationService.GoToDashboard);
         // UI.5 Cortex 2: the in-page links between the two sub-pages (no sidebar until UI.6).
         OpenDataCommand = new RelayCommand(() => navigationService.GoToSettings(SettingsSection.Data));
         OpenAboutCommand = new RelayCommand(() => navigationService.GoToSettings(SettingsSection.About));
@@ -146,7 +145,6 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
     /// <summary>Beacon C1 M2: the hidden-servers list's accessible name (its card title).</summary>
     public string HiddenServersListName => _localizationService.GetString("SettingsHiddenServersTitle.Text");
 
-    public ICommand BackCommand { get; }
 
     /// <summary>"Definições" → "Dados e servidores".</summary>
     public ICommand OpenDataCommand { get; }
