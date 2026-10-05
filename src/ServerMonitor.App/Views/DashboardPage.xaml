@@ -194,13 +194,13 @@
             <VisualStateGroup x:Name="WidthStates">
                 <VisualState x:Name="Wide">
                     <VisualState.StateTriggers>
-                        <primitives:SaContentWidthTrigger Width="{Binding ActualWidth, ElementName=PageViewport}" MinWidth="900" />
+                        <primitives:SaContentWidthTrigger Source="{Binding ElementName=PageViewport}" MinWidth="900" />
                     </VisualState.StateTriggers>
                 </VisualState>
                 <!-- < 900 (Prism r1): Prioritário under Saúde, both full width. -->
                 <VisualState x:Name="Medium">
                     <VisualState.StateTriggers>
-                        <primitives:SaContentWidthTrigger Width="{Binding ActualWidth, ElementName=PageViewport}" MinWidth="640" MaxWidth="900" />
+                        <primitives:SaContentWidthTrigger Source="{Binding ElementName=PageViewport}" MinWidth="640" MaxWidth="900" />
                     </VisualState.StateTriggers>
                     <VisualState.Setters>
                         <Setter Target="PriorityHost.(Grid.Row)" Value="1" />
@@ -213,7 +213,7 @@
                 <!-- 600-639 (Prism C3): as Narrow, but the header actions still fit beside the title. -->
                 <VisualState x:Name="NarrowWide">
                     <VisualState.StateTriggers>
-                        <primitives:SaContentWidthTrigger Width="{Binding ActualWidth, ElementName=PageViewport}" MinWidth="600" MaxWidth="640" />
+                        <primitives:SaContentWidthTrigger Source="{Binding ElementName=PageViewport}" MinWidth="600" MaxWidth="640" />
                     </VisualState.StateTriggers>
                     <VisualState.Setters>
                         <Setter Target="PageRoot.Padding" Value="{StaticResource SaPagePaddingCompact}" />
@@ -238,7 +238,7 @@
                      actions on a second line, left-aligned. -->
                 <VisualState x:Name="Narrow">
                     <VisualState.StateTriggers>
-                        <primitives:SaContentWidthTrigger Width="{Binding ActualWidth, ElementName=PageViewport}" MinWidth="0" MaxWidth="600" />
+                        <primitives:SaContentWidthTrigger Source="{Binding ElementName=PageViewport}" MinWidth="0" MaxWidth="600" />
                     </VisualState.StateTriggers>
                     <VisualState.Setters>
                         <Setter Target="PageRoot.Padding" Value="{StaticResource SaPagePaddingCompact}" />

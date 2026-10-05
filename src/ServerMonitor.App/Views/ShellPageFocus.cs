@@ -14,7 +14,17 @@ public static class ShellPageFocus
     public static void FocusHeading(Page page, bool force = false)
     {
         if (!force && GetKeepSidebar(page)) return;
-        if (FindHeading(page) is { } heading) _ = FocusManager.TryFocusAsync(heading,FocusState.Programmatic);
+        if (page.XamlRoot?.Content is FrameworkElement root && root.FindName("ModalOverlayHost") is Panel { IsHitTestVisible: true }) return;
+        if (FindHeading(page) is TextBlock heading) _ = FocusTextAsync(heading);
+    }
+    public static async Task<bool> FocusTextAsync(TextBlock heading)
+    {
+        // WinUI TextBlock requires IsTabStop while focus is acquired. Restore it immediately:
+        // the heading remains the programmatic target without adding a stop to normal Tab navigation.
+        var previous = heading.IsTabStop;
+        heading.IsTabStop = true;
+        try { return (await FocusManager.TryFocusAsync(heading, FocusState.Programmatic)).Succeeded; }
+        finally { heading.IsTabStop = previous; }
     }
     public static FrameworkElement? FindHeading(DependencyObject root)
     {

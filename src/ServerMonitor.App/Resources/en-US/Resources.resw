@@ -767,8 +767,6 @@
   <data name="OverviewNoReadingsTitleText.Text" xml:space="preserve"><value>No readings</value></data>
   <data name="OverviewNoReadingsMessageText.Text" xml:space="preserve"><value>When your servers respond, CPU, memory or disk problems will show here.</value></data>
   <data name="OverviewClearSearchButton.Content" xml:space="preserve"><value>Clear search</value></data>
-  <data name="OverviewEmptyState.Title" xml:space="preserve"><value>Ready to connect your first server?</value></data>
-  <data name="OverviewEmptyState.Message" xml:space="preserve"><value>Add an SSH connection to follow the server's status, metrics and history.</value></data>
   <data name="OverviewEmptyAddButton.Content" xml:space="preserve"><value>Add server</value></data>
   <data name="OverviewEmptyImportButton.Content" xml:space="preserve"><value>Import from SSH</value></data>
   <data name="OverviewMoreServersOne" xml:space="preserve"><value>{0} more server · View all</value></data>

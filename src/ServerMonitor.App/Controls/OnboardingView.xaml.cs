@@ -17,7 +17,8 @@ public sealed partial class OnboardingView : UserControl
         Loaded += (_, _) => Subscribe();
         Unloaded += (_, _) => Unsubscribe();
         DataContextChanged += (_, _) => { if (IsLoaded) Subscribe(); };
-        Panel.SizeChanged += (_, _) => Reflow();
+        SizeChanged += (_, _) => { Panel.Width = Math.Min(1040, ActualWidth); Reflow(); };
+        KeyDown += OnPanelKeyDown;
     }
     private void Subscribe()
     {
@@ -53,16 +54,25 @@ public sealed partial class OnboardingView : UserControl
     }
     private void Reflow()
     {
-        var wide = Panel.ActualWidth >= 900;
+        var panelWidth = Math.Min(1040, ActualWidth);
+        var wide = panelWidth >= 900;
         Benefits.RowSpacing = wide ? 0 : 16;
         Methods.RowSpacing = wide ? 0 : 24;
-        Panel.Padding = (Thickness)Application.Current.Resources[Panel.ActualWidth < 700 ? "SaPagePaddingCompact" : "SaOnboardingPadding"];
+        Panel.Padding = (Thickness)Application.Current.Resources[panelWidth < 700 ? "SaPagePaddingCompact" : "SaOnboardingPadding"];
         var benefits = new[] { Benefit0, Benefit1, Benefit2 };
         for (var i=0;i<benefits.Length;i++) { Grid.SetColumn(benefits[i],wide ? i : 0); Grid.SetRow(benefits[i],wide ? 0 : i); Grid.SetColumnSpan(benefits[i],wide ? 1 : 3); }
         Grid.SetColumn(Method1,wide ? 1 : 0); Grid.SetRow(Method1,wide ? 0 : 1);
         Grid.SetColumnSpan(Method0,wide ? 1 : 2); Grid.SetColumnSpan(Method1,wide ? 1 : 2);
     }
-    public void FocusHeading() => DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () => { _ = FocusManager.TryFocusAsync(Heading, FocusState.Programmatic); Scroller.ChangeView(null,0,null,true); });
+    public void FocusHeading() => DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () => { _ = ServerMonitor.App.Views.ShellPageFocus.FocusTextAsync(Heading); Scroller.ChangeView(null,0,null,true); });
+    private void OnPanelKeyDown(object sender, KeyRoutedEventArgs args)
+    {
+        if (args.Key == Windows.System.VirtualKey.Tab && ReferenceEquals(FocusManager.GetFocusedElement(XamlRoot), Heading))
+        {
+            DismissButton.Focus(FocusState.Keyboard);
+            args.Handled = true;
+        }
+    }
     private void OnDismiss(object sender,RoutedEventArgs args) => (DataContext as OnboardingViewModel)?.Dismiss();
     private void OnBack(object sender,RoutedEventArgs args) => (DataContext as OnboardingViewModel)?.Back();
     private void OnNext(object sender,RoutedEventArgs args) { if (DataContext is not OnboardingViewModel vm) return; if (vm.Step == 3) vm.Dismiss(); else vm.Next(); }

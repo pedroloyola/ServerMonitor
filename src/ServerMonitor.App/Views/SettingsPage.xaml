@@ -17,13 +17,13 @@
             <VisualStateGroup x:Name="WidthStates">
                 <VisualState x:Name="Wide">
                     <VisualState.StateTriggers>
-                        <primitives:SaContentWidthTrigger Width="{Binding ActualWidth, ElementName=PageViewport}" MinWidth="700" />
+                        <primitives:SaContentWidthTrigger Source="{Binding ElementName=PageViewport}" MinWidth="700" />
                     </VisualState.StateTriggers>
                 </VisualState>
                 <!-- < 700: compact padding; each control under its text; the disclosures stacked; autosave under the title. -->
                 <VisualState x:Name="Narrow">
                     <VisualState.StateTriggers>
-                        <primitives:SaContentWidthTrigger Width="{Binding ActualWidth, ElementName=PageViewport}" MinWidth="0" MaxWidth="700" />
+                        <primitives:SaContentWidthTrigger Source="{Binding ElementName=PageViewport}" MinWidth="0" MaxWidth="700" />
                     </VisualState.StateTriggers>
                     <VisualState.Setters>
                         <Setter Target="PageRoot.Padding" Value="{StaticResource SaPagePaddingCompact}" />

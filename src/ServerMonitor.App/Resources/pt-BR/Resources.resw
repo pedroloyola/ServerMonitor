@@ -772,8 +772,6 @@
   <data name="OverviewNoReadingsTitleText.Text" xml:space="preserve"><value>Sem leituras</value></data>
   <data name="OverviewNoReadingsMessageText.Text" xml:space="preserve"><value>Quando os servidores responderem, os problemas de CPU, memória ou disco aparecem aqui.</value></data>
   <data name="OverviewClearSearchButton.Content" xml:space="preserve"><value>Limpar pesquisa</value></data>
-  <data name="OverviewEmptyState.Title" xml:space="preserve"><value>Vamos conectar o seu primeiro servidor?</value></data>
-  <data name="OverviewEmptyState.Message" xml:space="preserve"><value>Adicione uma conexão SSH para acompanhar o estado, as métricas e o histórico do servidor.</value></data>
   <data name="OverviewEmptyAddButton.Content" xml:space="preserve"><value>Adicionar servidor</value></data>
   <data name="OverviewEmptyImportButton.Content" xml:space="preserve"><value>Importar do SSH</value></data>
   <data name="OverviewMoreServersOne" xml:space="preserve"><value>Mais {0} servidor · Ver todos</value></data>

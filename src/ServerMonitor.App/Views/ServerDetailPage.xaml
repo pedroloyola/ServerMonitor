@@ -18,13 +18,13 @@
             <VisualStateGroup x:Name="WidthStates">
                 <VisualState x:Name="Wide">
                     <VisualState.StateTriggers>
-                        <primitives:SaContentWidthTrigger Width="{Binding ActualWidth, ElementName=PageViewport}" MinWidth="1120" />
+                        <primitives:SaContentWidthTrigger Source="{Binding ElementName=PageViewport}" MinWidth="1120" />
                     </VisualState.StateTriggers>
                 </VisualState>
                 <!-- 700-1119: metric cards and Ligação / Explorar one per row; actions stay beside the name. -->
                 <VisualState x:Name="Medium">
                     <VisualState.StateTriggers>
-                        <primitives:SaContentWidthTrigger Width="{Binding ActualWidth, ElementName=PageViewport}" MinWidth="700" MaxWidth="1120" />
+                        <primitives:SaContentWidthTrigger Source="{Binding ElementName=PageViewport}" MinWidth="700" MaxWidth="1120" />
                     </VisualState.StateTriggers>
                     <VisualState.Setters>
                         <Setter Target="MetricsColumn2.Width" Value="0" />
@@ -46,7 +46,7 @@
                 <!-- < 700: compact padding; the actions move under the identity, left-aligned. -->
                 <VisualState x:Name="Narrow">
                     <VisualState.StateTriggers>
-                        <primitives:SaContentWidthTrigger Width="{Binding ActualWidth, ElementName=PageViewport}" MinWidth="0" MaxWidth="700" />
+                        <primitives:SaContentWidthTrigger Source="{Binding ElementName=PageViewport}" MinWidth="0" MaxWidth="700" />
                     </VisualState.StateTriggers>
                     <VisualState.Setters>
                         <Setter Target="PageRoot.Padding" Value="{StaticResource SaPagePaddingCompact}" />

@@ -223,12 +223,12 @@
             <VisualStateGroup x:Name="WidthStates">
                 <VisualState x:Name="Wide">
                     <VisualState.StateTriggers>
-                        <primitives:SaContentWidthTrigger Width="{Binding ActualWidth, ElementName=PageViewport}" MinWidth="1040" />
+                        <primitives:SaContentWidthTrigger Source="{Binding ElementName=PageViewport}" MinWidth="1040" />
                     </VisualState.StateTriggers>
                 </VisualState>
                 <VisualState x:Name="Mid">
                     <VisualState.StateTriggers>
-                        <primitives:SaContentWidthTrigger Width="{Binding ActualWidth, ElementName=PageViewport}" MinWidth="900" MaxWidth="1040" />
+                        <primitives:SaContentWidthTrigger Source="{Binding ElementName=PageViewport}" MinWidth="900" MaxWidth="1040" />
                     </VisualState.StateTriggers>
                     <VisualState.Setters>
                         <Setter Target="ServersRepeater.ItemTemplate" Value="{StaticResource ServerRowMidTemplate}" />
@@ -239,7 +239,7 @@
                 </VisualState>
                 <VisualState x:Name="Stacked">
                     <VisualState.StateTriggers>
-                        <primitives:SaContentWidthTrigger Width="{Binding ActualWidth, ElementName=PageViewport}" MinWidth="640" MaxWidth="900" />
+                        <primitives:SaContentWidthTrigger Source="{Binding ElementName=PageViewport}" MinWidth="640" MaxWidth="900" />
                     </VisualState.StateTriggers>
                     <VisualState.Setters>
                         <Setter Target="ServersRepeater.ItemTemplate" Value="{StaticResource ServerRowStackedTemplate}" />
@@ -248,7 +248,7 @@
                 </VisualState>
                 <VisualState x:Name="StackedCompact">
                     <VisualState.StateTriggers>
-                        <primitives:SaContentWidthTrigger Width="{Binding ActualWidth, ElementName=PageViewport}" MinWidth="0" MaxWidth="640" />
+                        <primitives:SaContentWidthTrigger Source="{Binding ElementName=PageViewport}" MinWidth="0" MaxWidth="640" />
                     </VisualState.StateTriggers>
                     <VisualState.Setters>
                         <Setter Target="PageRoot.Padding" Value="{StaticResource SaPagePaddingCompact}" />

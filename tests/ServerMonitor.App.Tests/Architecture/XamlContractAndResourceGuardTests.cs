@@ -28,7 +28,7 @@ public sealed partial class XamlContractAndResourceGuardTests
     {
         // Shell: standard/compact presentations, title bar, navigation frame, modal host, theme background.
         // CompactRoot is also the target of a runtime {Binding ElementName=CompactRoot} in MainWindow.xaml.
-        ["Controls/OnboardingView.xaml"] = ["Scroller", "Panel", "HeroBrand", "HeroShield", "Heading", "Subtitle", "Benefits", "Benefit0", "Benefit1", "Benefit2", "Principles", "Methods", "Method0", "Method1", "StepNote", "BackButton", "Dot1", "Dot2", "Dot3", "ProgressText", "NextButton"],
+        ["Controls/OnboardingView.xaml"] = ["DismissButton", "Scroller", "Panel", "HeroBrand", "HeroShield", "Heading", "Subtitle", "Benefits", "Benefit0", "Benefit1", "Benefit2", "Principles", "Methods", "Method0", "Method1", "StepNote", "BackButton", "Dot1", "Dot2", "Dot3", "ProgressText", "NextButton"],
         ["Controls/SaSidebar.xaml"] = ["Scroller", "NavGrid", "Brand", "BrandText", "OverviewItem", "OverviewLabel", "ServersItem", "ServersLabel", "HistoryItem", "HistoryLabel", "SettingsItem", "SettingsLabel"],
         ["MainWindow.xaml"] =
         [

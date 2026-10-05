@@ -88,13 +88,13 @@
             <VisualStateGroup x:Name="WidthStates">
                 <VisualState x:Name="Wide">
                     <VisualState.StateTriggers>
-                        <primitives:SaContentWidthTrigger Width="{Binding ActualWidth, ElementName=PageViewport}" MinWidth="900" />
+                        <primitives:SaContentWidthTrigger Source="{Binding ElementName=PageViewport}" MinWidth="900" />
                     </VisualState.StateTriggers>
                 </VisualState>
                 <!-- < 900: the cards stack (Containers above Services) and the filter goes under the search. -->
                 <VisualState x:Name="Medium">
                     <VisualState.StateTriggers>
-                        <primitives:SaContentWidthTrigger Width="{Binding ActualWidth, ElementName=PageViewport}" MinWidth="640" MaxWidth="900" />
+                        <primitives:SaContentWidthTrigger Source="{Binding ElementName=PageViewport}" MinWidth="640" MaxWidth="900" />
                     </VisualState.StateTriggers>
                     <VisualState.Setters>
                         <Setter Target="FilterTrack.(Grid.Row)" Value="1" />
@@ -130,7 +130,7 @@
                 </VisualState>
                 <VisualState x:Name="Narrow">
                     <VisualState.StateTriggers>
-                        <primitives:SaContentWidthTrigger Width="{Binding ActualWidth, ElementName=PageViewport}" MinWidth="0" MaxWidth="640" />
+                        <primitives:SaContentWidthTrigger Source="{Binding ElementName=PageViewport}" MinWidth="0" MaxWidth="640" />
                     </VisualState.StateTriggers>
                     <VisualState.Setters>
                         <Setter Target="PageRoot.Padding" Value="{StaticResource SaPagePaddingCompact}" />

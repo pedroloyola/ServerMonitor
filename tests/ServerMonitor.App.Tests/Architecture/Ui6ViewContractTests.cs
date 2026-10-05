@@ -65,12 +65,33 @@ public sealed class Ui6ViewContractTests
         Assert.DoesNotContain(doc.Descendants(),e=>e.Name.LocalName=="AdaptiveTrigger");
         var triggers=doc.Descendants().Where(e=>e.Name.LocalName=="SaContentWidthTrigger").ToArray();
         Assert.NotEmpty(triggers);
-        Assert.All(triggers,e=>Assert.Equal("{Binding ActualWidth, ElementName=PageViewport}",A(e,"Width")));
+        Assert.All(triggers,e=>Assert.Equal("{Binding ElementName=PageViewport}",A(e,"Source")));
         foreach(var width in new[]{480d,560d,600d,620d,640d,700d,832d,900d,912d,1040d,1120d,1232d})
             Assert.Single(triggers,e=>SaContentWidthTrigger.Matches(width,double.Parse(A(e,"MinWidth")!),A(e,"MaxWidth") is {} max?double.Parse(max):double.MaxValue));
         var heading=Assert.Single(doc.Descendants(),e=>A(e,"AutomationProperties.HeadingLevel")=="Level1");
         Assert.Equal("False",A(heading,"IsTabStop")); Assert.Equal("True",A(heading,"IsTextSelectionEnabled"));
         Assert.DoesNotContain(doc.Root!.Attributes(),a=>a.Name.LocalName=="SaThemeRefresh.IsEnabled");
+    }
+
+    [Fact]
+    public void RuntimeWidthAndHeadingWiring_AreNotPassiveBindings()
+    {
+        var trigger=AppSourceTree.CodeWithoutComments("Controls/Primitives/SaContentWidthTrigger.cs");
+        Assert.Contains("current.SizeChanged += trigger.OnSizeChanged",trigger);
+        Assert.Contains("previous.SizeChanged -= trigger.OnSizeChanged",trigger);
+        Assert.Contains("Width = args.NewSize.Width",trigger);
+        Assert.Contains("current.Loaded += trigger.OnLoaded",trigger);
+        var focus=AppSourceTree.CodeWithoutComments("Views/ShellPageFocus.cs");
+        Assert.Contains("heading.IsTabStop = true",focus);
+        Assert.Contains("finally { heading.IsTabStop = previous; }",focus);
+        Assert.Contains("await FocusManager.TryFocusAsync",focus);
+        var onboarding=AppSourceTree.LoadXaml("Controls/OnboardingView.xaml");
+        Assert.Equal("Center",A(Named(onboarding,"Scroller"),"HorizontalContentAlignment"));
+        foreach(var name in new[]{"DismissButton","BackButton","NextButton"})
+            Assert.Equal("Stretch",A(Named(onboarding,name),"HorizontalAlignment"));
+        var view=AppSourceTree.CodeWithoutComments("Controls/OnboardingView.xaml.cs");
+        Assert.Contains("Panel.Width = Math.Min(1040, ActualWidth)",view);
+        Assert.Contains("DismissButton.Focus(FocusState.Keyboard)",view);
     }
 
     [Fact]

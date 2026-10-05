@@ -1,12 +1,12 @@
 <UserControl x:Class="ServerMonitor.App.Controls.OnboardingView"
  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:p="using:ServerMonitor.App.Controls.Primitives" IsTabStop="False">
- <ScrollViewer x:Name="Scroller" HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Center" IsTabStop="False">
+ <ScrollViewer x:Name="Scroller" HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" IsTabStop="False">
  <!-- Figma 112:247/461/619: 1040x780, p36,48,36,48, g24. Same native window, no sidebar or window resize. -->
- <Grid x:Name="Panel" MaxWidth="1040" MinHeight="780" Padding="{StaticResource SaOnboardingPadding}" RowSpacing="24" HorizontalAlignment="Stretch">
+ <Grid x:Name="Panel" MaxWidth="1040" MinHeight="780" Padding="{StaticResource SaOnboardingPadding}" RowSpacing="24" HorizontalAlignment="Center" VerticalAlignment="Center">
  <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
  <Grid ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="148"/></Grid.ColumnDefinitions>
  <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center"><p:SaBrandMark Size="26"/><TextBlock Text="ServerAlyzer" Style="{StaticResource SaBrandTextStyle}" VerticalAlignment="Center"/></StackPanel>
- <Button Grid.Column="1" x:Uid="OnboardingDismiss" Click="OnDismiss" Style="{StaticResource SaOnboardingSecondaryButtonStyle}"/>
+ <Button x:Name="DismissButton" Grid.Column="1" HorizontalAlignment="Stretch" x:Uid="OnboardingDismiss" Click="OnDismiss" Style="{StaticResource SaOnboardingSecondaryButtonStyle}"/>
  </Grid>
  <StackPanel Grid.Row="1" Spacing="24" VerticalAlignment="Center">
  <p:SaBrandMark x:Name="HeroBrand" Size="58" HorizontalAlignment="Center"/>
@@ -41,13 +41,13 @@
  </StackPanel>
  <!-- 112:339: reserved Back130 even on step1; progress stable; CTA208; h46/r15. -->
  <Grid Grid.Row="2" ColumnSpacing="16"><Grid.ColumnDefinitions><ColumnDefinition Width="130"/><ColumnDefinition Width="*"/><ColumnDefinition Width="208"/></Grid.ColumnDefinitions>
- <Button x:Name="BackButton" x:Uid="OnboardingBack" Click="OnBack" Style="{StaticResource SaOnboardingSecondaryButtonStyle}"/>
+ <Button x:Name="BackButton" x:Uid="OnboardingBack" HorizontalAlignment="Stretch" Click="OnBack" Style="{StaticResource SaOnboardingSecondaryButtonStyle}"/>
  <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center" VerticalAlignment="Center">
  <Border x:Name="Dot1" Height="6" Width="24" CornerRadius="{StaticResource SaRadiusMiniBar}" Background="{ThemeResource SaTextSecondaryBrush}"/>
  <Border x:Name="Dot2" Height="6" Width="6" CornerRadius="{StaticResource SaRadiusMiniBar}" Background="{ThemeResource SaTextSecondaryBrush}"/>
  <Border x:Name="Dot3" Height="6" Width="6" CornerRadius="{StaticResource SaRadiusMiniBar}" Background="{ThemeResource SaTextSecondaryBrush}"/>
  <TextBlock x:Name="ProgressText" Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" AutomationProperties.LiveSetting="Polite"/>
  </StackPanel>
- <Button x:Name="NextButton" Grid.Column="2" Click="OnNext" Style="{StaticResource SaOnboardingPrimaryButtonStyle}"/>
+ <Button x:Name="NextButton" Grid.Column="2" HorizontalAlignment="Stretch" Click="OnNext" Style="{StaticResource SaOnboardingPrimaryButtonStyle}"/>
  </Grid></Grid></ScrollViewer>
 </UserControl>
