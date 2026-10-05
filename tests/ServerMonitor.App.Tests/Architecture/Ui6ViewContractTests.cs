@@ -83,7 +83,9 @@ public sealed class Ui6ViewContractTests
         Assert.Contains("current.Loaded += trigger.OnLoaded",trigger);
         var focus=AppSourceTree.CodeWithoutComments("Views/ShellPageFocus.cs");
         Assert.Contains("heading.IsTabStop = true",focus);
-        Assert.Contains("finally { heading.IsTabStop = previous; }",focus);
+        Assert.Contains("heading.LostFocus += restore;",focus);
+        Assert.Contains("heading.LostFocus -= restore;",focus);
+        Assert.Contains("heading.IsTabStop = previous;",focus);
         Assert.Contains("await FocusManager.TryFocusAsync",focus);
         var onboarding=AppSourceTree.LoadXaml("Controls/OnboardingView.xaml");
         Assert.Equal("Center",A(Named(onboarding,"Scroller"),"HorizontalContentAlignment"));
