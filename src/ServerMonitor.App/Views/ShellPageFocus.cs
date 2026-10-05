@@ -1,3 +1,4 @@
+using ServerMonitor.App.Controls.Primitives;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Automation.Peers;
@@ -15,30 +16,8 @@ public static class ShellPageFocus
     {
         if (!force && GetKeepSidebar(page)) return;
         if (page.XamlRoot?.Content is FrameworkElement root && root.FindName("ModalOverlayHost") is Panel { IsHitTestVisible: true }) return;
-        if (FindHeading(page) is TextBlock heading) _ = FocusTextAsync(heading);
+        if (FindHeading(page) is SaHeadingHost heading) heading.FocusHeading();
     }
-    public static async Task<bool> FocusTextAsync(TextBlock heading)
-    {
-        // WinUI clears focus when IsTabStop is reset on the focused TextBlock.
-        // Keep it focusable only for this visit; remove the stop as soon as focus leaves.
-        var previous = heading.IsTabStop;
-        RoutedEventHandler? restore = null;
-        restore = (_, _) =>
-        {
-            heading.LostFocus -= restore;
-            heading.IsTabStop = previous;
-        };
-        heading.LostFocus += restore;
-        heading.IsTabStop = true;
-        var result = await FocusManager.TryFocusAsync(heading, FocusState.Programmatic);
-        if (!result.Succeeded)
-        {
-            heading.LostFocus -= restore;
-            heading.IsTabStop = previous;
-        }
-        return result.Succeeded;
-    }
-
     public static FrameworkElement? FindHeading(DependencyObject root)
     {
         if (root is FrameworkElement element && AutomationProperties.GetHeadingLevel(element) == AutomationHeadingLevel.Level1) return element;

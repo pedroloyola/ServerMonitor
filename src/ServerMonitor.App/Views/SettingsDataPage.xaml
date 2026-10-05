@@ -65,7 +65,7 @@
                         </primitives:SaIcon>
                     </Button>
                     <StackPanel Grid.Column="1" Spacing="{StaticResource SaSpace4}">
-                        <TextBlock x:Uid="SettingsDataTitle" AutomationProperties.HeadingLevel="Level1" IsTextSelectionEnabled="True" IsTabStop="False" Style="{StaticResource SaHeadingTextStyle}" TextWrapping="Wrap" />
+                        <primitives:SaHeadingHost AutomationProperties.HeadingLevel="Level1" IsTabStop="False"><TextBlock x:Uid="SettingsDataTitle" AutomationProperties.AccessibilityView="Raw" IsTextSelectionEnabled="False" IsTabStop="False" Style="{StaticResource SaHeadingTextStyle}" TextWrapping="Wrap" /></primitives:SaHeadingHost>
                         <TextBlock x:Uid="SettingsDataParent" Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" />
                     </StackPanel>
                 </Grid>

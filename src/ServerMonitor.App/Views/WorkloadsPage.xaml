@@ -193,11 +193,11 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <StackPanel Spacing="6">
-                <TextBlock
+                <primitives:SaHeadingHost AutomationProperties.HeadingLevel="Level1" IsTabStop="False"><TextBlock
                     x:Uid="WorkloadsPageTitle"
-                    AutomationProperties.HeadingLevel="Level1" IsTextSelectionEnabled="True" IsTabStop="False"
+                    AutomationProperties.AccessibilityView="Raw" IsTextSelectionEnabled="False" IsTabStop="False"
                     Style="{StaticResource SaPageTitleTextStyle}"
-                    Foreground="{ThemeResource SaTextBrush}" />
+                    Foreground="{ThemeResource SaTextBrush}" /></primitives:SaHeadingHost>
                 <TextBlock
                     Style="{StaticResource SaPageSubtitleTextStyle}"
                     Text="{Binding ContextDisplay}"

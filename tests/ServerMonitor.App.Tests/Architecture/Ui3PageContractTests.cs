@@ -30,7 +30,7 @@ public sealed partial class Ui3PageContractTests
     public void History_TitleIsTheLevel1Heading_AndEachChartCardHasALevel2Heading()
     {
         var title = Assert.Single(Elements(History), e => Uid(e) == "HistoryPageTitle");
-        Assert.Equal("Level1", Attr(title, "AutomationProperties.HeadingLevel"));
+        Assert.Equal("Level1", Attr(title.Parent!, "AutomationProperties.HeadingLevel"));
         Assert.Equal(3, Elements(History).Count(e => Attr(e, "AutomationProperties.HeadingLevel") == "Level2"));
     }
 
@@ -331,7 +331,7 @@ public sealed partial class Ui3PageContractTests
     [Fact]
     public void Workloads_TitleIsLevel1_AndSectionTitlesAreLevel2()
     {
-        Assert.Equal("Level1", Attr(Assert.Single(Elements(Workloads), e => Uid(e) == "WorkloadsPageTitle"), "AutomationProperties.HeadingLevel"));
+        Assert.Equal("Level1", Attr(Assert.Single(Elements(Workloads), e => Uid(e) == "WorkloadsPageTitle").Parent!, "AutomationProperties.HeadingLevel"));
         Assert.Equal("Level2", Attr(Assert.Single(Elements(Workloads), e => Uid(e) == "WorkloadDockerSectionTitle"), "AutomationProperties.HeadingLevel"));
         Assert.Equal("Level2", Attr(Assert.Single(Elements(Workloads), e => Uid(e) == "WorkloadServicesSectionTitle"), "AutomationProperties.HeadingLevel"));
     }

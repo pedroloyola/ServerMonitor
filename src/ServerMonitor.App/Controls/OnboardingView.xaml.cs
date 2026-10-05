@@ -64,10 +64,10 @@ public sealed partial class OnboardingView : UserControl
         Grid.SetColumn(Method1,wide ? 1 : 0); Grid.SetRow(Method1,wide ? 0 : 1);
         Grid.SetColumnSpan(Method0,wide ? 1 : 2); Grid.SetColumnSpan(Method1,wide ? 1 : 2);
     }
-    public void FocusHeading() => DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () => { _ = ServerMonitor.App.Views.ShellPageFocus.FocusTextAsync(Heading); Scroller.ChangeView(null,0,null,true); });
+    public void FocusHeading() => DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () => { HeadingHost.FocusHeading(); Scroller.ChangeView(null,0,null,true); });
     private void OnPanelKeyDown(object sender, KeyRoutedEventArgs args)
     {
-        if (args.Key == Windows.System.VirtualKey.Tab && ReferenceEquals(FocusManager.GetFocusedElement(XamlRoot), Heading))
+        if (args.Key == Windows.System.VirtualKey.Tab && ReferenceEquals(FocusManager.GetFocusedElement(XamlRoot), HeadingHost))
         {
             DismissButton.Focus(FocusState.Keyboard);
             args.Handled = true;
