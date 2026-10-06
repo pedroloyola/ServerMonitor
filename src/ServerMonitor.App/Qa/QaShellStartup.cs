@@ -70,9 +70,14 @@ internal static class QaShellStartup
 
     // The editor opens over the Visão geral (its origin); an Edit opens from the seeded server's Detail page, the only Edit
     // surface. The commands are not awaited: their task lasts as long as the editor visit.
-    private static async Task StartEditorAsync(string value, INavigationService navigation, DashboardViewModel dashboard)
+    private static Task StartEditorAsync(string value, INavigationService navigation, DashboardViewModel dashboard) =>
+        StartEditorAsync(value, navigation, dashboard, App.ServicesHost.Services.GetService(typeof(QaEditorSeed)) as QaEditorSeed);
+
+    /// <summary>Test seam: the editor start over a given seed (the composition's one in production).</summary>
+    internal static async Task StartEditorAsync(string value, INavigationService navigation, DashboardViewModel dashboard, QaEditorSeed? seed)
     {
-        if (App.ServicesHost.Services.GetService(typeof(QaEditorSeed)) is QaEditorSeed seed)
+        // The seed is written HERE, on the UI thread, after the shell is up (never by a startup hosted service).
+        if (seed is not null)
         {
             await seed.EnsureWrittenAsync();
         }
