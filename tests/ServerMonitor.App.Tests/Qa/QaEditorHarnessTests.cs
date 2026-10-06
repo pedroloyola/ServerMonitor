@@ -121,7 +121,7 @@ public sealed class QaEditorHarnessTests
     [Fact]
     public void TheCatalogue_IsClosed_AndEveryOutcomeAnswersForTheMatchingForm()
     {
-        Assert.Equal(23, QaScriptedSshConnectionService.Outcomes.Count);
+        Assert.Equal(24, QaScriptedSshConnectionService.Outcomes.Count); // UI.7B: + hostkey-unknown-jump-then-target
         Assert.Equal(QaScriptedSshConnectionService.Outcomes.Count, QaScriptedSshConnectionService.Outcomes.Distinct().Count());
         foreach (var outcome in QaScriptedSshConnectionService.Outcomes.Where(o => o is not ("cancelled-at-auth" or "unexpected")))
         {
@@ -152,6 +152,57 @@ public sealed class QaEditorHarnessTests
         Assert.Equal(
             [SshConnectionStage.PortReachable, SshConnectionStage.HostKeyVerified, SshConnectionStage.Authenticated, SshConnectionStage.OperatingSystemIdentified],
             stages);
+    }
+
+    /// <summary>UI.7B: the two-step outcome asks for the jump's key, then the target's, consulting the stores each time.</summary>
+    [Fact]
+    public async Task JumpThenTarget_AsksTheJumpFirst_ThenTheTarget_ThenSucceeds()
+    {
+        var direct = new MemoryTrust();
+        var routed = new MemoryRoutedTrust();
+        var service = new QaScriptedSshConnectionService("hostkey-unknown-jump-then-target", held: false, direct, routed);
+
+        var first = await service.TestConnectionAsync(Request(routed: true));
+        Assert.Equal((ServerConnectionState.HostKeyUnknown, SshHostKeyHop.Jump), (first.State, first.HostKeyHop));
+
+        await direct.TrustAsync(first.HostKeyEndpoint!, first.PresentedHostKey!);
+        var second = await service.TestConnectionAsync(Request(routed: true));
+        Assert.Equal((ServerConnectionState.HostKeyUnknown, SshHostKeyHop.Target), (second.State, second.HostKeyHop));
+
+        await routed.TrustAsync(second.HostKeyRoute!, second.PresentedHostKey!);
+        Assert.True((await service.TestConnectionAsync(Request(routed: true))).IsSuccess);
+    }
+
+    private sealed class MemoryTrust : IHostKeyTrustStore
+    {
+        private readonly Dictionary<SshEndpoint, HostKeyIdentity> _keys = [];
+
+        public Task<TrustedHostKey?> GetAsync(SshEndpoint endpoint, CancellationToken cancellationToken = default) =>
+            Task.FromResult(_keys.TryGetValue(endpoint, out var key) ? new TrustedHostKey { Endpoint = endpoint, Identity = key } : null);
+
+        public Task TrustAsync(SshEndpoint endpoint, HostKeyIdentity identity, CancellationToken cancellationToken = default)
+        {
+            _keys[endpoint] = identity;
+            return Task.CompletedTask;
+        }
+
+        public Task<bool> RemoveAsync(SshEndpoint endpoint, CancellationToken cancellationToken = default) => Task.FromResult(_keys.Remove(endpoint));
+    }
+
+    private sealed class MemoryRoutedTrust : IRoutedHostKeyTrustStore
+    {
+        private readonly Dictionary<SshRoute, HostKeyIdentity> _keys = [];
+
+        public Task<TrustedRoutedHostKey?> GetAsync(SshRoute route, CancellationToken cancellationToken = default) =>
+            Task.FromResult(_keys.TryGetValue(route, out var key) ? new TrustedRoutedHostKey { Route = route, Identity = key } : null);
+
+        public Task TrustAsync(SshRoute route, HostKeyIdentity identity, CancellationToken cancellationToken = default)
+        {
+            _keys[route] = identity;
+            return Task.CompletedTask;
+        }
+
+        public Task<bool> RemoveAsync(SshRoute route, CancellationToken cancellationToken = default) => Task.FromResult(_keys.Remove(route));
     }
 
     [Fact]

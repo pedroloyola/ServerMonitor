@@ -25,6 +25,8 @@ internal sealed class QaScriptedSshConnectionService(
         "fail-dns", "fail-port", "fail-timeout", "fail-protocol", "fail-auth", "fail-key", "fail-credential",
         "jump-unreachable", "jump-auth", "jump-credential", "target-unreachable", "tunnel",
         "hostkey-unknown-direct", "hostkey-unknown-jump", "hostkey-unknown-target",
+        // UI.7B: the M14.4b-2 two-step trust in one run - the jump's key until trusted, then the target's, then OK.
+        "hostkey-unknown-jump-then-target",
         "hostkey-mismatch-direct", "hostkey-mismatch-jump", "hostkey-mismatch-target",
         "cancelled-at-auth", "unexpected"
     ];
@@ -93,6 +95,15 @@ internal sealed class QaScriptedSshConnectionService(
                     ? Unknown(SshHostKeyHop.Jump, SshConnectionErrorCode.JumpHostKeyUnknown, jump, null)
                     : Connected(ServerOperatingSystem.Linux);
             case "hostkey-unknown-target" when route is not null:
+                return await routedTrust.GetAsync(route, cancellationToken) is null
+                    ? Unknown(SshHostKeyHop.Target, SshConnectionErrorCode.RoutedHostKeyUnknown, null, route)
+                    : Connected(ServerOperatingSystem.Linux);
+            case "hostkey-unknown-jump-then-target" when jump is not null && route is not null:
+                if (await directTrust.GetAsync(jump, cancellationToken) is null)
+                {
+                    return Unknown(SshHostKeyHop.Jump, SshConnectionErrorCode.JumpHostKeyUnknown, jump, null);
+                }
+
                 return await routedTrust.GetAsync(route, cancellationToken) is null
                     ? Unknown(SshHostKeyHop.Target, SshConnectionErrorCode.RoutedHostKeyUnknown, null, route)
                     : Connected(ServerOperatingSystem.Linux);
