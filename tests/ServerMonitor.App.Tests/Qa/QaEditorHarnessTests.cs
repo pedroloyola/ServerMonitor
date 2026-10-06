@@ -45,6 +45,7 @@ public sealed class QaEditorHarnessTests
     [InlineData("--qa-editor", "--qa-backup", "ok", "--qa-start=editor-edit:1")] // nothing seeded
     [InlineData("--qa-editor", "--qa-backup", "ok", "--qa-editor-seed=direct", "--qa-start=editor-edit:2")]
     [InlineData("--qa-editor", "--qa-backup", "ok", "--qa-start=overview")]
+    [InlineData("--qa-editor", "--qa-backup", "ok", "--qa-editor-seed=direct")] // the seed is written by --qa-start
     [InlineData("--QA-EDITOR", "--qa-backup", "ok")]
     public void MalformedOrOrphanLaunches_AreRefused(params string[] args) =>
         Assert.NotNull(QaStartupIsolation.LaunchRefusal([Exe, .. args]));
@@ -73,11 +74,10 @@ public sealed class QaEditorHarnessTests
         Assert.IsType<JsonRoutedHostKeyTrustStore>(provider.GetRequiredService<IRoutedHostKeyTrustStore>());
         Assert.IsType<QaInMemoryCredentialStore>(provider.GetRequiredService<ServerMonitor.Infrastructure.Security.UngatedCredentialStore>().Store);
         Assert.IsType<QaMonitoringEngine>(provider.GetRequiredService<IMonitoringEngine>());
-        // The seed is the harness's hosted service (resolved through its own factory; the production hosted services
-        // registered by the root are not constructed here).
-        var seed = provider.GetRequiredService<QaEditorSeed>();
-        var hosted = app.Services.Last(descriptor => descriptor.ServiceType == typeof(IHostedService));
-        Assert.Same(seed, hosted.ImplementationFactory!(provider));
+        // The seed is NOT a hosted service (it is written by the --qa-start step on the UI thread).
+        Assert.NotNull(provider.GetRequiredService<QaEditorSeed>());
+        Assert.DoesNotContain(app.Services, descriptor => descriptor.ServiceType == typeof(IHostedService)
+            && descriptor.ImplementationFactory?.Method.ReturnType == typeof(QaEditorSeed));
         Assert.StartsWith(QaTestRoots.Root, provider.GetRequiredService<ServerStorageOptions>().FilePath, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -109,7 +109,9 @@ public sealed class QaEditorHarnessTests
     public async Task TheSeed_IsWrittenThroughTheRealProfilePath_OnTheQaRoot(string seed, bool routed)
     {
         using var world = new SeedWorld();
-        await new QaEditorSeed(seed, world.Profiles, world.Root).StartAsync(CancellationToken.None);
+        var qaSeed = new QaEditorSeed(seed, world.Profiles, world.Root);
+        await qaSeed.EnsureWrittenAsync();
+        await qaSeed.EnsureWrittenAsync(); // once
 
         var server = Assert.Single(await world.Servers.GetAllAsync());
         Assert.Equal(routed, server.Route is not null);

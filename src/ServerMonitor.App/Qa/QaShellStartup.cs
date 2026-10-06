@@ -74,7 +74,7 @@ internal static class QaShellStartup
     {
         if (App.ServicesHost.Services.GetService(typeof(QaEditorSeed)) is QaEditorSeed seed)
         {
-            await seed.Completed;
+            await seed.EnsureWrittenAsync();
         }
 
         await dashboard.LoadAsync();

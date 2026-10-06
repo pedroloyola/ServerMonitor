@@ -1,5 +1,4 @@
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using ServerMonitor.App.Services;
 using ServerMonitor.Core.Backup;
 using ServerMonitor.Core.Domain;
@@ -15,8 +14,9 @@ namespace ServerMonitor.App.Qa;
 /// trust stores run on that root, so a Save or a trust accept is observable on disk; monitoring and discovery are inert;
 /// the SSH service is <see cref="QaScriptedSshConnectionService"/> - a CLOSED catalogue of outcomes, never a network.
 /// <list type="bullet">
-/// <item><c>--qa-editor-seed=direct|routed|password</c>: one saved server (written through the real profile path at
-/// startup) for an Edit.</item>
+/// <item><c>--qa-editor-seed=direct|routed|password</c>: one saved server for an Edit, written through the real profile
+/// path by the <c>--qa-start</c> step on the UI thread (never from a hosted service during startup, where its
+/// ServersChanged would reach the live, UI-bound dashboard off the UI thread). Requires <c>--qa-start</c>.</item>
 /// <item><c>--qa-editor-ssh=&lt;outcome&gt;[:held]</c>: what "Testar ligação" answers (default <c>ok-linux</c>); <c>:held</c>
 /// keeps the test running until Cancel or the QA release signal (a named event per process; no wall clock).</item>
 /// <item><c>--qa-editor-save=fail|locked</c>: Save fails (a validation failure / a restore holding the configuration).</item>
@@ -61,6 +61,11 @@ internal static class QaEditorComposition
         if (QaShellStartup.Present(args, SeedFlag) && Seed(args) is null)
         {
             return $"{SeedFlag} needs exactly one of: {string.Join(", ", Seeds)} (as {SeedFlag}=<value>).";
+        }
+
+        if (QaShellStartup.Present(args, SeedFlag) && !QaShellStartup.Present(args, QaShellStartup.StartFlag))
+        {
+            return $"{SeedFlag} is written by the {QaShellStartup.StartFlag} step: add {QaShellStartup.StartFlag}=editor-*.";
         }
 
         if (QaShellStartup.Present(args, SshFlag) && SshScript(args) is null)
@@ -139,7 +144,6 @@ internal static class QaEditorComposition
                 sp.GetRequiredService<IServerCredentialStore>(),
                 sp.GetRequiredService<IConfigurationWriteGate>()),
             QaStartupIsolation.DefaultRoot()));
-        services.AddHostedService(sp => sp.GetRequiredService<QaEditorSeed>());
         if (SaveFailure(args) is { } failure)
         {
             services.AddSingleton<IServerProfileService>(sp => new QaFailingProfileService(
@@ -152,33 +156,17 @@ internal static class QaEditorComposition
     }
 }
 
-/// <summary>QA-ONLY: one saved server for an Edit, written at startup through the real profile service on the QA root.</summary>
-internal sealed class QaEditorSeed(string? seed, IServerProfileService profiles, string root) : IHostedService
+/// <summary>
+/// QA-ONLY: one saved server for an Edit, written ONCE through the real profile service on the QA root - by the
+/// <c>--qa-start</c> step, on the UI thread, after the shell is up.
+/// </summary>
+internal sealed class QaEditorSeed(string? seed, IServerProfileService profiles, string root)
 {
-    private readonly TaskCompletionSource _completed = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private Task? _written;
 
-    /// <summary>Completes once the seed is written (or immediately without one).</summary>
-    public Task Completed => _completed.Task;
-
-    public async Task StartAsync(CancellationToken cancellationToken)
-    {
-        try
-        {
-            if (seed is not null)
-            {
-                await QaEditorSeedData.WriteAsync(seed, profiles, root, cancellationToken);
-            }
-
-            _completed.TrySetResult();
-        }
-        catch (Exception exception)
-        {
-            _completed.TrySetException(exception);
-            throw;
-        }
-    }
-
-    public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+    /// <summary>Writes the seed the first time it is asked (nothing without one); later calls return the same task.</summary>
+    public Task EnsureWrittenAsync(CancellationToken cancellationToken = default) =>
+        _written ??= seed is null ? Task.CompletedTask : QaEditorSeedData.WriteAsync(seed, profiles, root, cancellationToken);
 }
 
 /// <summary>QA-ONLY: Save answers a validation failure ("fail") or a restore holding the configuration ("locked").</summary>
