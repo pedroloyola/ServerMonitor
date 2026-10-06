@@ -74,10 +74,10 @@ public sealed class QaEditorHarnessTests
         Assert.IsType<JsonRoutedHostKeyTrustStore>(provider.GetRequiredService<IRoutedHostKeyTrustStore>());
         Assert.IsType<QaInMemoryCredentialStore>(provider.GetRequiredService<ServerMonitor.Infrastructure.Security.UngatedCredentialStore>().Store);
         Assert.IsType<QaMonitoringEngine>(provider.GetRequiredService<IMonitoringEngine>());
-        // The seed is NOT a hosted service (it is written by the --qa-start step on the UI thread).
+        // The harness adds NO hosted service: the seed is written by the --qa-start step on the UI thread (runtime smoke:
+        // as a startup hosted service the Edit launch never reached the editor).
         Assert.NotNull(provider.GetRequiredService<QaEditorSeed>());
-        Assert.DoesNotContain(app.Services, descriptor => descriptor.ServiceType == typeof(IHostedService)
-            && descriptor.ImplementationFactory?.Method.ReturnType == typeof(QaEditorSeed));
+        Assert.Equal(app.HostedBeforeEditor, app.Services.Count(descriptor => descriptor.ServiceType == typeof(IHostedService)));
         Assert.StartsWith(QaTestRoots.Root, provider.GetRequiredService<ServerStorageOptions>().FilePath, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -177,12 +177,28 @@ public sealed class QaEditorHarnessTests
         Assert.True((await released).IsSuccess);
     }
 
-    private static IsolatedAppComposition Compose(IReadOnlyList<string> args)
+    private static ComposedHarness Compose(IReadOnlyList<string> args)
     {
         var app = new IsolatedAppComposition();
         QaStartupIsolation.Apply(app.Services, Path.Combine(QaTestRoots.Root, "isolated", "editor-" + Guid.NewGuid().ToString("N")), rerootSshProfile: true);
+        var hosted = app.Services.Count(descriptor => descriptor.ServiceType == typeof(IHostedService));
         QaEditorComposition.Apply(app.Services, args);
-        return app;
+        return new ComposedHarness(app, hosted);
+    }
+
+    private sealed class ComposedHarness(IsolatedAppComposition app, int hostedBeforeEditor) : IDisposable
+    {
+        public int HostedBeforeEditor { get; } = hostedBeforeEditor;
+
+        public Microsoft.Extensions.DependencyInjection.ServiceCollection Services => app.Services;
+
+        public string DataDirectory => app.DataDirectory;
+
+        public string UserProfile => app.UserProfile;
+
+        public ServiceProvider BuildProvider() => app.BuildProvider();
+
+        public void Dispose() => app.Dispose();
     }
 
     private static SshConnectionRequest Request(bool routed, IProgress<SshConnectionStage>? progress = null) => new()

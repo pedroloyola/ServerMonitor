@@ -44,7 +44,7 @@ public sealed class Ui7EditorSessionTests : IDisposable
         Assert.NotSame(page, _world.Host.Content);
         if (exit != "second-editor")
         {
-            await visit;
+            await Ended(visit);
         }
 
         Assert.Equal(1, _world.Prompt.Asked.Count); // dirty: "Descartar alterações?" once, answered "discard"
@@ -64,7 +64,7 @@ public sealed class Ui7EditorSessionTests : IDisposable
         await _world.Page.TestAsync();
 
         Exit(exit);
-        await visit;
+        await Ended(visit);
 
         Assert.Equal(before, _world.PersistedSnapshot());
         Assert.Equal(0, _world.Credentials.Writes);
@@ -85,7 +85,7 @@ public sealed class Ui7EditorSessionTests : IDisposable
         Assert.True(_world.ViewModel.HasUnknownHostKey);
 
         _world.Page.Controller.Cancel();
-        await visit;
+        await Ended(visit);
 
         Assert.Equal(0, _world.DirectTrust.Trusts);
         Assert.Equal(0, _world.RoutedTrust.Trusts);
@@ -109,7 +109,7 @@ public sealed class Ui7EditorSessionTests : IDisposable
 
         await _world.ViewModel.TrustAndConnectAsync();
         _world.Page.Controller.Cancel();
-        await visit;
+        await Ended(visit);
 
         Assert.Equal(1, _world.DirectTrust.Trusts);
         Assert.Equal(0, _world.RoutedTrust.Trusts);
@@ -135,7 +135,7 @@ public sealed class Ui7EditorSessionTests : IDisposable
         var page = _world.Page;
 
         var outcome = await page.SubmitAsync();
-        await visit;
+        await Ended(visit);
 
         Assert.Equal(ServerEditorSaveStatus.Saved, outcome!.Status);
         var saved = Assert.Single(await _world.ServerService.GetAllAsync());
@@ -158,7 +158,7 @@ public sealed class Ui7EditorSessionTests : IDisposable
         _world.ViewModel.Name = "web-renamed";
 
         var outcome = await _world.Page.SubmitAsync();
-        await visit;
+        await Ended(visit);
 
         Assert.Equal(ServerEditorSaveStatus.Saved, outcome!.Status);
         Assert.Equal("web-renamed", (await _world.ServerService.GetAllAsync()).Single().Name);
@@ -220,7 +220,7 @@ public sealed class Ui7EditorSessionTests : IDisposable
         _world.OpenerName = "AddButton";
         var visit = OpenAdd();
         _world.Page.Controller.Cancel();
-        await visit;
+        await Ended(visit);
 
         Assert.Equal(origin, _world.Navigation.CurrentDestination);
         Assert.Equal("AddButton", _world.ReturnFocus.Take(origin));
@@ -236,7 +236,7 @@ public sealed class Ui7EditorSessionTests : IDisposable
         var visit = _world.OpenEditAsync(server.Id);
 
         _world.Page.Controller.Cancel(); // "Voltar ao detalhe" and Cancelar are the same exit
-        await visit;
+        await Ended(visit);
 
         Assert.Equal(server.Id, Assert.IsType<Ui7EditorWorld.DetailPageDouble>(_world.Host.Content).ServerId);
         Assert.Equal("EditButton", _world.ReturnFocus.Take(NavigationDestination.Detail));
@@ -270,7 +270,7 @@ public sealed class Ui7EditorSessionTests : IDisposable
         var visit = OpenAdd();
 
         _world.Navigation.GoToServers();
-        await visit;
+        await Ended(visit);
 
         Assert.Empty(_world.Prompt.Asked);
         Assert.Equal(NavigationDestination.Servers, _world.Navigation.CurrentDestination);
@@ -291,7 +291,7 @@ public sealed class Ui7EditorSessionTests : IDisposable
         var firstViewModel = _world.ViewModel;
 
         var second = ((AsyncRelayCommand)_world.Dashboard.ImportFromSshCommand).ExecuteAsync();
-        await first;
+        await Ended(first);
 
         Assert.Equal([true, true], _world.PreviousEditorsDisposedAtLoad);
         Assert.Throws<ObjectDisposedException>(() => firstSecret.Reveal());
@@ -299,7 +299,7 @@ public sealed class Ui7EditorSessionTests : IDisposable
         Assert.Same(_world.ViewModel, _world.Session.LiveViewModel);
         Assert.Equal(2, _world.Session.CreatedViewModels);
         _world.Page.Controller.Cancel();
-        await second;
+        await Ended(second, page: 1);
     }
 
     [Fact]
@@ -319,13 +319,13 @@ public sealed class Ui7EditorSessionTests : IDisposable
         Assert.Same(firstViewModel, _world.Session.LiveViewModel);
 
         _world.Prompt.Answer(discard: true);
-        await first;
+        await Ended(first);
 
         Assert.Equal(2, _world.Session.CreatedViewModels);
         Assert.NotSame(firstViewModel, _world.Session.LiveViewModel);
         Assert.Equal([true, true], _world.PreviousEditorsDisposedAtLoad);
         _world.Page.Controller.Cancel();
-        await second;
+        await Ended(second, page: 1);
     }
 
     [Fact]
@@ -338,7 +338,7 @@ public sealed class Ui7EditorSessionTests : IDisposable
         var page = _world.Page;
 
         var second = ((AsyncRelayCommand)_world.Dashboard.ImportFromSshCommand).ExecuteAsync();
-        await second;
+        Assert.True(second.IsCompleted, "the refused open did not end at once");
 
         Assert.Same(page, _world.Host.Content);
         Assert.Equal(1, _world.Session.CreatedViewModels);
@@ -353,7 +353,7 @@ public sealed class Ui7EditorSessionTests : IDisposable
         var firstPage = _world.Page;
         var firstViewModel = _world.ViewModel;
         firstPage.Controller.Cancel();
-        await first;
+        await Ended(first);
 
         var second = OpenAdd();
 
@@ -362,7 +362,7 @@ public sealed class Ui7EditorSessionTests : IDisposable
         Assert.True(firstPage.Disposed);
         Assert.Same(_world.ViewModel, _world.Session.LiveViewModel);
         _world.Page.Controller.Cancel();
-        await second;
+        await Ended(second, page: 1);
     }
 
     // ---- CP-7: the staged secret dies with the page ---------------------------------------------------------------------
@@ -380,7 +380,7 @@ public sealed class Ui7EditorSessionTests : IDisposable
         Assert.Equal("s3cret", new string(staged.Reveal()));
 
         new ShellViewModel(_world.Navigation).Navigate(ShellDestination.History);
-        await visit;
+        await Ended(visit);
 
         Assert.Throws<ObjectDisposedException>(() => staged.Reveal());
     }
@@ -405,8 +405,9 @@ public sealed class Ui7EditorSessionTests : IDisposable
 
         markDisposed();
         Exit(exit);
+        Assert.True(test.IsCompleted, "leaving did not cancel the running test");
         await test;
-        await visit;
+        await Ended(visit);
 
         Assert.Empty(late);
         Assert.Equal(0, _world.ConnectionStates.SetCount);
@@ -427,8 +428,9 @@ public sealed class Ui7EditorSessionTests : IDisposable
         Assert.True(_world.ViewModel.IsTestingConnection);
 
         _world.Page.Controller.Escape();
+        Assert.True(test.IsCompleted, "leaving did not cancel the running test");
         await test;
-        await visit;
+        await Ended(visit);
 
         Assert.Equal(1, _world.Prompt.Asked.Count); // the form was dirty: Esc asked before leaving
         Assert.Equal(NavigationDestination.Overview, _world.Navigation.CurrentDestination);
@@ -454,7 +456,7 @@ public sealed class Ui7EditorSessionTests : IDisposable
         await test;
         AssertNothingPersisted();
         _world.Page.Controller.Cancel();
-        await visit;
+        await Ended(visit);
     }
 
     [Fact]
@@ -477,10 +479,17 @@ public sealed class Ui7EditorSessionTests : IDisposable
         await trust;
         Assert.Null((await _world.ServerService.GetAllAsync()).SingleOrDefault());
         _world.Page.Controller.Cancel();
-        await visit;
+        await Ended(visit);
     }
 
     // ---- helpers -------------------------------------------------------------------------------------------------------
+
+    // Fails (instead of hanging) when an exit did not release the visit's page: the visit could then never end.
+    private Task Ended(Task visit, int page = 0)
+    {
+        Assert.True(_world.EditorPages[page].Disposed, "the editor page of this visit was never released");
+        return visit;
+    }
 
     private Task OpenAdd() => ((AsyncRelayCommand)_world.Dashboard.AddServerCommand).ExecuteAsync();
 

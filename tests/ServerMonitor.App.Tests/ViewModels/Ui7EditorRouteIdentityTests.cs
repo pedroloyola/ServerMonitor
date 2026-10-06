@@ -25,6 +25,7 @@ public sealed class Ui7EditorRouteIdentityTests : IDisposable
         Assert.False(_world.ViewModel.IsDirty);
 
         var outcome = await _world.Page.SubmitAsync();
+        Assert.True(_world.EditorPages[0].Disposed, "the editor page was never released");
         await visit;
 
         Assert.Equal(ServerEditorSaveStatus.Saved, outcome!.Status);
@@ -48,6 +49,7 @@ public sealed class Ui7EditorRouteIdentityTests : IDisposable
 
         _world.ViewModel.UseJumpHost = false;
         var outcome = await _world.Page.SubmitAsync();
+        Assert.True(_world.EditorPages[0].Disposed, "the editor page was never released");
         await visit;
 
         Assert.Equal(ServerEditorSaveStatus.Saved, outcome!.Status);
