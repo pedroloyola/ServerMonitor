@@ -65,6 +65,9 @@ public sealed class ServerEditorSession : IServerEditorSession
     /// <summary>Test probe: the number of view models this session created (never two alive, CP-13 / R-13).</summary>
     internal int CreatedViewModels { get; private set; }
 
+    /// <summary>Visits not ended yet (tests: a visit never hangs after a failed navigation).</summary>
+    internal int OpenVisits => _visits.Count;
+
     /// <summary>Test probe: the view model of the live visit, if any.</summary>
     internal ServerEditorViewModel? LiveViewModel => _live?.ViewModel;
 

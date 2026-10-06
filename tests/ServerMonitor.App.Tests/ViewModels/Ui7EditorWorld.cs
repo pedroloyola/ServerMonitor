@@ -394,9 +394,13 @@ internal sealed class ScriptedDiscardPrompt : IServerEditorDiscardPrompt
     /// <summary>The answer given at once; null = held until <see cref="Answer"/> (synchronous continuations).</summary>
     public bool? AutoAnswer { get; set; } = true;
 
+    /// <summary>UI.7B: runs as the question is asked (to observe the editor's state at that moment).</summary>
+    public Action? OnAsked { get; set; }
+
     public Task<bool> ConfirmDiscardAsync(ServerEditorDiscardContext context)
     {
         Asked.Add(context);
+        OnAsked?.Invoke();
         if (AutoAnswer is { } answer)
         {
             return Task.FromResult(answer);

@@ -27,6 +27,7 @@ public sealed class Ui7DeferredNavigationTests : IDisposable
         _world.ThrowOnNextEditorPage = true;
         _world.Prompt.Answer(true); // "Descartar" → the deferred GoToServerEditor runs and its page factory throws
 
+        Assert.Equal(1, _world.Session.OpenVisits); // the second visit ended at once (only the first editor's remains)
         await second; // the visit of the second editor ended: its opener resumes
         Assert.True(import.CanExecute(null));
         Assert.Equal(1, _world.Session.CreatedViewModels); // the second editor never got a view model
