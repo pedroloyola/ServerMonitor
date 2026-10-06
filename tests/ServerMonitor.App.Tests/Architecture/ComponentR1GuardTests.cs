@@ -39,6 +39,7 @@ public sealed class ComponentR1GuardTests
     [Theory]
     [InlineData("Styles/Components/Sa.Buttons.xaml", "SaSecondaryButtonStyle")]
     [InlineData("Styles/Components/Sa.Buttons.xaml", "SaSecondaryRectButtonStyle")]
+    [InlineData("Styles/Components/Sa.Buttons.xaml", "SaPickerButtonStyle")] // UI.7B key picker
     [InlineData("Styles/Components/Sa.Buttons.xaml", "SaIconButtonStyle")]
     [InlineData("Styles/Components/Sa.Forms.xaml", "SaPillSearchFieldStyle")]
     [InlineData("Styles/Components/Sa.Forms.xaml", "SaSelectorPillStyle")]

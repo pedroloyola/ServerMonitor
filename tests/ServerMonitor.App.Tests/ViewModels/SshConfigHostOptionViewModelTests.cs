@@ -105,16 +105,15 @@ public sealed class SshConfigHostOptionViewModelTests
     public void ThePreviewLine_IsCollapsedByHasPreview_InTheHostList()
     {
         XNamespace presentation = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
+        // UI.7B: the host list lives in the "Importar de SSH" dialog (x:Bind to the same option view model).
         var xaml = XDocument.Load(Path.Combine(
-            FindRepositoryRoot(), "src", "ServerMonitor.App", "Controls", "ServerFormControl.xaml"));
+            FindRepositoryRoot(), "src", "ServerMonitor.App", "Views", "SshConfigImportDialog.xaml"));
 
         var preview = Assert.Single(
             xaml.Descendants(presentation + "TextBlock"),
-            block => (string?)block.Attribute("Text") == "{Binding Preview}");
+            block => (string?)block.Attribute("Text") == "{x:Bind Preview}");
 
-        Assert.Equal(
-            "{Binding HasPreview, Converter={StaticResource BooleanToVisibilityConverter}}",
-            (string?)preview.Attribute("Visibility"));
+        Assert.Equal("{x:Bind HasPreview}", (string?)preview.Attribute("Visibility"));
     }
 
     private static string FindRepositoryRoot()

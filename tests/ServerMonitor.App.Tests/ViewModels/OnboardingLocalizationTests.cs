@@ -41,10 +41,8 @@ public sealed class OnboardingLocalizationTests
     // Resolved by x:Uid in ServerFormControl.xaml / DashboardPage.xaml.
     private static readonly string[] XamlKeys =
     [
-        "ServerFormLocalKeySelector.Header",
-        "ServerFormLocalKeySelector.PlaceholderText",
-        "ServerFormJumpLocalKeySelector.Header",
-        "ServerFormJumpLocalKeySelector.PlaceholderText",
+        // UI.7B: the two "found keys" combo boxes became the key picker's menu (ServerEditorKeyPicker*), so their
+        // ServerForm*LocalKeySelector keys are no longer resolved by a view (dead keys: removal with B-22, 7C).
         "ServerFormPrepHelpLink.Content",
         "ServerPrepTitle.Text",
         "ServerPrepIntro.Text",

@@ -64,6 +64,7 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
     private string _sshConfigFileWarningMessage = string.Empty;
     private IReadOnlyList<SshConfigHostOptionViewModel> _sshConfigHosts = [];
     private CancellationTokenSource? _sshConfigLoadCancellation;
+    private SshConfigLoadOutcome _sshConfigLoadOutcome;
     private readonly ILocalSshKeyDiscovery? _localSshKeyDiscovery;
     // Cancelled (never disposed) when the editor goes away, so a discovery still running just stops.
     private readonly CancellationTokenSource _lifetimeCancellation = new();
@@ -483,6 +484,14 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
         private set => SetProperty(ref _hostKeySubjectDisplay, value);
     }
 
+    /// <summary>
+    /// UI.7B (presentation only): which hop presented the key of the trust prompt or mismatch on screen, read from the
+    /// result that raised it; null when neither is shown. The trust dialog derives "PASSO 1/2 DE 2" from it. Read-only:
+    /// it never feeds <see cref="TrustAndConnectAsync"/>, whose hop check stays on the pending key.
+    /// </summary>
+    public SshHostKeyHop? HostKeyPromptHop =>
+        (HasUnknownHostKey || HasHostKeyMismatch) && _lastConnectionResult is { } result ? result.HostKeyHop : null;
+
     public void CaptureJumpSecret(string? value)
     {
         if (string.IsNullOrEmpty(value) || !UseJumpHost)
@@ -718,6 +727,17 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
     public bool HasSshConfigFileWarning => SshConfigFileWarningMessage.Length > 0;
 
     /// <summary>
+    /// UI.7B (presentation only): what the last load of <c>~/.ssh/config</c> ended with, so the import dialog can pick
+    /// the Figma 07 state (no file, unreadable, no profiles, a list). The message itself stays
+    /// <see cref="SshConfigStatusMessage"/>; nothing about the classification of a host comes from here.
+    /// </summary>
+    public SshConfigLoadOutcome SshConfigLoadOutcome
+    {
+        get => _sshConfigLoadOutcome;
+        private set => SetProperty(ref _sshConfigLoadOutcome, value);
+    }
+
+    /// <summary>
     /// Reads <c>~/.ssh/config</c> (read-only) and lists its concrete aliases for preview. Nothing
     /// in the form changes until the user picks one with <see cref="ApplySshConfigHost(SshConfigHostEntry)"/>.
     /// </summary>
@@ -733,6 +753,7 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
         SshConfigHosts = [];
         SshConfigStatusMessage = string.Empty;
         SshConfigFileWarningMessage = string.Empty;
+        SshConfigLoadOutcome = SshConfigLoadOutcome.None;
         var cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         _sshConfigLoadCancellation = cancellation;
         try
@@ -761,12 +782,14 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
             {
                 case SshConfigImportStatus.NotFound:
                     SshConfigStatusMessage = _localizationService.GetString("SshConfigImportNotFound");
+                    SshConfigLoadOutcome = SshConfigLoadOutcome.NotFound;
                     break;
                 case SshConfigImportStatus.Error:
                     var error = _localizationService.GetString($"SshConfigImportError{result.ErrorCode}");
                     SshConfigStatusMessage = result.ErrorDetail is null
                         ? error
                         : error + " " + Format("SshConfigImportErrorFileFormat", result.ErrorDetail);
+                    SshConfigLoadOutcome = SshConfigLoadOutcome.Error;
                     break;
                 default:
                     SshConfigHosts = result.Hosts
@@ -780,6 +803,7 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
                         result.FileWarnings
                             .Select(warning => _localizationService.GetString($"SshConfigImportWarning{warning}"))
                             .Concat(result.Diagnostics.Select(DescribeDiagnostic)));
+                    SshConfigLoadOutcome = result.Hosts.Count == 0 ? SshConfigLoadOutcome.NoHosts : SshConfigLoadOutcome.Hosts;
                     break;
             }
         }
@@ -816,6 +840,7 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
         SshConfigHosts = [];
         SshConfigStatusMessage = string.Empty;
         SshConfigFileWarningMessage = string.Empty;
+        SshConfigLoadOutcome = SshConfigLoadOutcome.None;
     }
 
     public bool ApplySshConfigHost(SshConfigHostOptionViewModel option) => ApplySshConfigHost(option.Entry);

@@ -46,7 +46,7 @@ public sealed partial class GeometryLiteralRatchetTests
         new Dictionary<(string Ledger, string Property), int>
         {
             [("GeometryLiteralBaseline.tsv", "CornerRadius")] = 17,
-            [("GeometryLiteralBaseline.tsv", "Padding")] = 33, // UI.7A: ServerFormControl lost its modal Padding 2,2,10,2
+            [("GeometryLiteralBaseline.tsv", "Padding")] = 26, // UI.7B: the inline import/trust panels left ServerFormControl (7A: 33)
             [("GeometryLiteralAllowlist.tsv", "CornerRadius")] = 0,
             [("GeometryLiteralAllowlist.tsv", "Padding")] = 50
         };

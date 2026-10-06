@@ -1,0 +1,64 @@
+<ContentDialog
+    x:Class="ServerMonitor.App.Views.ServerEditorConnectionDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:primitives="using:ServerMonitor.App.Controls.Primitives">
+    <!-- UI.7B (B-10): the editor's ONE connection dialog host (Figma 09 chrome, 640: icon 25 + title, body, the identity
+         inset, the fingerprint(s), the scope line). Its content switches with the prompt (unknown → PASSO 2 → mismatch);
+         7C puts the connection test (Figma 08) in this same host, so two ContentDialogs are never stacked. It draws the
+         prompt only: the page accepts through the controller (the SAME TrustAndConnectAsync), and a mismatch has no
+         accept button at all. Enter / first focus = the safe button (a stray Enter never trusts). -->
+    <ContentDialog.Style>
+        <StaticResource ResourceKey="SaDialogStyle" />
+    </ContentDialog.Style>
+    <ContentDialog.Title>
+        <StackPanel Spacing="6">
+            <TextBlock x:Name="StepText" Style="{StaticResource SaLabelTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}"
+                       Visibility="Collapsed" />
+            <Grid ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <primitives:SaIcon x:Name="TitleIcon" Size="25" VerticalAlignment="Center" Foreground="{ThemeResource SaTextBrush}" />
+                <TextBlock x:Name="TitleText" Grid.Column="1" Style="{StaticResource SaTitleTextStyle}" VerticalAlignment="Center"
+                           TextWrapping="Wrap" AutomationProperties.HeadingLevel="Level1" />
+            </Grid>
+        </StackPanel>
+    </ContentDialog.Title>
+    <StackPanel MaxWidth="584" Spacing="{StaticResource SaSpace16}">
+        <TextBlock x:Name="BodyText" Style="{StaticResource SaSecondaryBodyTextStyle}" TextWrapping="Wrap" />
+        <!-- The subject: the server, "jump host X" or "target T via J" - never the tunnel's loopback (PJ-UI). -->
+        <Border Style="{StaticResource SaInsetTintedSurfaceStyle}" MinHeight="38">
+            <Grid ColumnSpacing="10" VerticalAlignment="Center">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <primitives:SaIcon Data="{StaticResource SaIconServerStack01Data}" Size="17" VerticalAlignment="Center"
+                                   Foreground="{ThemeResource SaTextSecondaryBrush}" />
+                <TextBlock x:Name="SubjectText" Grid.Column="1" Style="{StaticResource SaControlTextStyle}" VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis" />
+            </Grid>
+        </Border>
+        <!-- Mismatch only: the trusted key, then the received one. -->
+        <StackPanel x:Name="TrustedBlock" Spacing="4" Visibility="Collapsed">
+            <TextBlock x:Name="TrustedLabel" Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" />
+            <TextBlock x:Name="TrustedFingerprintText" Style="{StaticResource SaMonoTextStyle}" IsTextSelectionEnabled="True"
+                       TextWrapping="Wrap" />
+        </StackPanel>
+        <StackPanel Spacing="4">
+            <TextBlock x:Name="PresentedLabel" Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" />
+            <TextBlock x:Name="PresentedFingerprintText" Style="{StaticResource SaMonoTextStyle}" IsTextSelectionEnabled="True"
+                       TextWrapping="Wrap" />
+        </StackPanel>
+        <TextBlock x:Name="ScopeText" Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}"
+                   TextWrapping="Wrap" />
+        <!-- After "Confiar": the key is being written, then the SAME retest runs. -->
+        <StackPanel x:Name="WorkingRow" Orientation="Horizontal" Spacing="10" Visibility="Collapsed">
+            <ProgressRing x:Name="WorkingRing" Width="16" Height="16" IsActive="False" AutomationProperties.AccessibilityView="Raw" />
+            <TextBlock x:Name="WorkingText" Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}"
+                       VerticalAlignment="Center" AutomationProperties.LiveSetting="Polite" />
+        </StackPanel>
+    </StackPanel>
+</ContentDialog>

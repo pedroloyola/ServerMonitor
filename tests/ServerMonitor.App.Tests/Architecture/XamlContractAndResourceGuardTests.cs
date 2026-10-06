@@ -75,9 +75,12 @@ public sealed partial class XamlContractAndResourceGuardTests
         ["Controls/ServerFormControl.xaml"] =
         [
             "NameField", "PrepHelpLink", "PrepHelpContent", "PrepKeygenText", "PrepCopyKeygenButton",
-            "PrepCopyKeyText", "PrepCopyKeyButton", "PrepPlaceholderNote", "LocalKeySelector", "PassphraseField",
-            "PasswordField", "JumpLocalKeySelector", "JumpPassphraseField", "JumpPasswordField", "ChecklistPanel",
-            "UnknownHostHeading",
+            "PrepCopyKeyText", "PrepCopyKeyButton", "PrepPlaceholderNote", "PassphraseField",
+            "PasswordField", "JumpPassphraseField", "JumpPasswordField", "ChecklistPanel",
+            // UI.7B: the key pickers (B-12), the saved-secret labels (G-13), the route line (B-13) and the import status.
+            "KeyPickerButton", "KeyPickerText", "KeyPickerMenu", "PrivateKeyField", "PassphraseFormField", "PasswordFormField",
+            "JumpKeyPickerButton", "JumpKeyPickerText", "JumpKeyPickerMenu", "JumpPrivateKeyField", "JumpPassphraseFormField",
+            "JumpPasswordFormField", "RouteLine", "ImportStatusText",
             // UI.7A: the mode copy set from code-behind and the B-19 stacking setters.
             "IdentitySubtitle", "AuthTitle", "AuthSubtitle", "FormRoot", "CardsGrid", "CardsColumn2", "AuthCard",
             "JumpCardsGrid", "JumpCardsColumn2", "JumpAuthCard", "OptionsGrid", "OptionsColumn3", "RefreshIntervalField"
@@ -88,6 +91,16 @@ public sealed partial class XamlContractAndResourceGuardTests
             "PageViewport", "PageRoot", "HeaderTitle", "EditorHeading", "EditorSubtitle", "ServerForm", "SaveFailedNotice",
             "ActionBar", "TestButton", "CancelTestButton", "TestingRing", "ActionHint", "ActionEnd", "PrimaryButton",
             "CredentialNoteTitle", "HeaderButton"
+        ],
+        // UI.7B dialogs hosted by the editor page: the trust prompt (Figma 09; 7C adds the test) and "Importar de SSH".
+        ["Views/ServerEditorConnectionDialog.xaml"] =
+        [
+            "StepText", "TitleIcon", "TitleText", "BodyText", "SubjectText", "TrustedBlock", "TrustedLabel", "TrustedFingerprintText",
+            "PresentedLabel", "PresentedFingerprintText", "ScopeText", "WorkingRow", "WorkingRing", "WorkingText"
+        ],
+        ["Views/SshConfigImportDialog.xaml"] =
+        [
+            "LoadingRow", "LoadingRing", "StatePanel", "StateIcon", "StateTitle", "StateBody", "ListPanel", "CountText", "HostList", "WarningText"
         ],
         // HistoryChart parts: the chart draws into these by name.
         ["Controls/HistoryChart.xaml"] = ["RootGrid", "PlotHost", "GridCanvas", "PlotCanvas", "YAxisCanvas", "XAxisCanvas"],

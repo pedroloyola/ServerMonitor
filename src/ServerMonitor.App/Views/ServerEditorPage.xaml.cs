@@ -16,6 +16,9 @@ namespace ServerMonitor.App.Views;
 /// A fresh page per visit: navigation disposes it when another page replaces it, which ends the visit (the session
 /// disposes the view model). Unloading alone (window hidden to the tray) keeps the editor and only clears the password
 /// boxes (H-UI7-3, Vigil H5).
+/// UI.7B: the page is also the editor's dialog host - at most ONE ContentDialog at a time, chosen from the view model's
+/// state: the trust prompt (the connection dialog, which 7C reuses for the test) or "Importar de SSH". The dialogs draw;
+/// the controller decides (accept = the SAME TrustAndConnectAsync, only for the key on screen; dismiss writes nothing).
 /// </summary>
 public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigationExitGuard, IDisposable
 {
@@ -23,6 +26,10 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
     private readonly ILocalizationService _localization;
     private ServerEditorViewModel? _viewModel;
     private bool _disposed;
+    // UI.7B dialog host: the one dialog open now (null = none), completed when it has closed.
+    private ContentDialog? _openDialog;
+    private TaskCompletionSource? _dialogClosed;
+    private bool _acceptingTrust;
 
     public ServerEditorPage(
         IServerEditorSession session,
@@ -65,7 +72,15 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
         UpdateActionState();
     }
 
-    public Task<bool> ConfirmLeaveAsync() => _controller.ConfirmLeaveAsync();
+    /// <summary>
+    /// H-UI7-3 guard. A navigation that arrives while a dialog is open (external activation) first closes it - an open trust
+    /// prompt is dismissed, nothing is trusted - so the "Descartar alterações?" question is never stacked on it.
+    /// </summary>
+    public async Task<bool> ConfirmLeaveAsync()
+    {
+        await CloseDialogAsync();
+        return await _controller.ConfirmLeaveAsync();
+    }
 
     /// <summary>Idempotent: ends the visit (the session disposes the view model) and clears the password boxes.</summary>
     public void Dispose()
@@ -83,6 +98,8 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
 
         ServerForm.ClearSecrets();
         _controller.Dispose();
+        // The controller is gone first, so closing the dialog dismisses / applies nothing.
+        _openDialog?.Hide();
     }
 
     private void OnLoaded(object sender, RoutedEventArgs e)
@@ -94,6 +111,9 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
             {
                 ShellPageFocus.FocusHeading(this);
             }
+
+            // An editor opened for "Importar de SSH" started its load before the page had a window.
+            EvaluateDialogs();
         });
     }
 
@@ -106,6 +126,197 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
             or nameof(ServerEditorViewModel.Username))
         {
             UpdateActionState();
+        }
+
+        if (e.PropertyName is nameof(ServerEditorViewModel.HasUnknownHostKey)
+            or nameof(ServerEditorViewModel.HasHostKeyMismatch)
+            or nameof(ServerEditorViewModel.IsSshConfigImportOpen)
+            or nameof(ServerEditorViewModel.IsLoadingSshConfig)
+            or nameof(ServerEditorViewModel.SshConfigHosts)
+            or nameof(ServerEditorViewModel.SshConfigLoadOutcome)
+            or nameof(ServerEditorViewModel.SshConfigFileWarningMessage))
+        {
+            EvaluateDialogs();
+        }
+    }
+
+    // The dialog host: what the view model shows now decides which ONE dialog is open. Never accepts or applies anything.
+    private void EvaluateDialogs()
+    {
+        if (_disposed || _viewModel is not { } viewModel || XamlRoot is null)
+        {
+            return;
+        }
+
+        switch (_openDialog)
+        {
+            case SshConfigImportDialog import:
+                if (viewModel.IsSshConfigImportOpen)
+                {
+                    import.Update(viewModel);
+                }
+                else
+                {
+                    import.Hide();
+                }
+
+                return;
+            case ServerEditorConnectionDialog connection:
+                if (_acceptingTrust)
+                {
+                    return; // the accept path redraws when the retest is over
+                }
+
+                if (_controller.PromptToShow() is { } prompt)
+                {
+                    if (prompt != connection.Prompt)
+                    {
+                        connection.ShowPrompt(prompt);
+                    }
+                }
+                else
+                {
+                    connection.Hide();
+                }
+
+                return;
+        }
+
+        if (viewModel.IsSshConfigImportOpen)
+        {
+            var import = new SshConfigImportDialog(_localization);
+            import.Update(viewModel);
+            import.PrimaryButtonClick += OnImportPrimaryClick;
+            import.Closing += (_, _) => _controller.CloseImport();
+            _ = ShowDialogAsync(import);
+        }
+        else if (_controller.PromptToShow() is { } prompt)
+        {
+            var connection = new ServerEditorConnectionDialog(_localization);
+            connection.ShowPrompt(prompt);
+            connection.PrimaryButtonClick += OnTrustPrimaryClick;
+            connection.Closing += OnConnectionDialogClosing;
+            _ = ShowDialogAsync(connection);
+        }
+    }
+
+    private async Task ShowDialogAsync(ContentDialog dialog)
+    {
+        var closed = new TaskCompletionSource();
+        _openDialog = dialog;
+        _dialogClosed = closed;
+        dialog.XamlRoot = XamlRoot;
+        dialog.RequestedTheme = ActualTheme;
+        if (dialog is ServerEditorConnectionDialog connection)
+        {
+            connection.FillWindow();
+        }
+        else if (dialog is SshConfigImportDialog import)
+        {
+            import.FillWindow();
+        }
+
+        var shown = false;
+        dialog.Opened += (_, _) => shown = true;
+        try
+        {
+            await dialog.ShowAsync();
+        }
+        catch (Exception)
+        {
+            // Another ContentDialog holds the window: fail closed - drop the prompt / the import, nothing is applied.
+        }
+        finally
+        {
+            _openDialog = null;
+            _dialogClosed = null;
+            closed.TrySetResult();
+        }
+
+        if (!shown)
+        {
+            _controller.DismissTrustPrompt();
+            _controller.CloseImport();
+            return;
+        }
+
+        // A prompt that came up while this dialog was closing (e.g. "PASSO 2 DE 2") opens now.
+        EvaluateDialogs();
+    }
+
+    private async Task CloseDialogAsync()
+    {
+        if (_openDialog is { } dialog && _dialogClosed is { } closed)
+        {
+            dialog.Hide();
+            await closed.Task;
+        }
+    }
+
+    // "Confiar e testar / continuar": an explicit gesture in the dialog, distinct from Save. The dialog stays open while
+    // the key is written and the SAME retest runs, then shows the next prompt (PASSO 2) or closes.
+    private async void OnTrustPrimaryClick(ContentDialog sender, ContentDialogButtonClickEventArgs args)
+    {
+        args.Cancel = true;
+        if (_acceptingTrust || sender is not ServerEditorConnectionDialog { Prompt: { CanAccept: true } shown } dialog)
+        {
+            return;
+        }
+
+        _acceptingTrust = true;
+        dialog.SetWorking(true);
+        try
+        {
+            await _controller.AcceptTrustAsync(shown);
+        }
+        finally
+        {
+            _acceptingTrust = false;
+        }
+
+        if (_disposed)
+        {
+            return;
+        }
+
+        if (!ReferenceEquals(_openDialog, dialog))
+        {
+            EvaluateDialogs(); // closed meanwhile: the next prompt (if any) gets its own dialog
+            return;
+        }
+
+        if (_controller.PromptToShow() is { } next)
+        {
+            dialog.ShowPrompt(next);
+        }
+        else
+        {
+            dialog.Hide();
+        }
+    }
+
+    // Cancelar / Voltar ao formulário / Esc / closed by the host: an unknown key is dismissed (nothing written); during an
+    // accept, the retest is cancelled (a key already being written completes - it was accepted).
+    private void OnConnectionDialogClosing(ContentDialog sender, ContentDialogClosingEventArgs args)
+    {
+        if (_acceptingTrust)
+        {
+            if (_viewModel is { IsTestingConnection: true } viewModel)
+            {
+                viewModel.CancelTest();
+            }
+
+            return;
+        }
+
+        _controller.DismissTrustPrompt();
+    }
+
+    private void OnImportPrimaryClick(ContentDialog sender, ContentDialogButtonClickEventArgs args)
+    {
+        if (sender is not SshConfigImportDialog import || !_controller.ApplyImport(import.Selected))
+        {
+            args.Cancel = true; // nothing selected, or a blocked profile: never used
         }
     }
 
@@ -160,9 +371,9 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
         {
             _controller.Cancel();
         }
-        else if (_viewModel is { } viewModel)
+        else
         {
-            await viewModel.LoadSshConfigHostsAsync();
+            await _controller.OpenImportAsync();
         }
     }
 

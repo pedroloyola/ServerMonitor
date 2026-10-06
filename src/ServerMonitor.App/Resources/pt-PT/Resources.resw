@@ -1023,4 +1023,69 @@ as métricas e o histórico do servidor.</value></data>
   <data name="ServerEditorJumpPassphraseInput.PlaceholderText" xml:space="preserve"><value>Apenas se a chave estiver protegida</value></data>
   <data name="ServerEditorJumpPasswordField.Header" xml:space="preserve"><value>Palavra-passe</value></data>
   <data name="ServerEditorJumpPasswordInput.PlaceholderText" xml:space="preserve"><value>Introduz a palavra-passe do jump host</value></data>
+  <data name="ServerEditorAuthKeyOption.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Chave SSH</value></data>
+  <data name="ServerEditorAuthKeyOptionText.Text" xml:space="preserve"><value>Chave SSH</value></data>
+  <data name="ServerEditorAuthPasswordOption.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Palavra-passe</value></data>
+  <data name="ServerEditorAuthPasswordOptionText.Text" xml:space="preserve"><value>Palavra-passe</value></data>
+  <data name="ServerEditorJumpAuthKeyOption.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Chave SSH do jump host</value></data>
+  <data name="ServerEditorJumpAuthKeyOptionText.Text" xml:space="preserve"><value>Chave SSH</value></data>
+  <data name="ServerEditorJumpAuthPasswordOption.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Palavra-passe do jump host</value></data>
+  <data name="ServerEditorJumpAuthPasswordOptionText.Text" xml:space="preserve"><value>Palavra-passe</value></data>
+  <data name="ServerEditorKeyPickerChoose" xml:space="preserve"><value>Escolher ficheiro…</value></data>
+  <data name="ServerEditorKeyPickerChosenFormat" xml:space="preserve"><value>{0}  ·  Alterar ficheiro…</value></data>
+  <data name="ServerEditorKeyPickerBrowse" xml:space="preserve"><value>Procurar ficheiro…</value></data>
+  <data name="ServerEditorKeyPickerHelper" xml:space="preserve"><value>Seleciona id_ed25519, id_rsa ou outra chave compatível.</value></data>
+  <data name="ServerEditorJumpKeyPickerHelper" xml:space="preserve"><value>Seleciona a chave privada do jump host.</value></data>
+  <data name="ServerEditorKeyPickerAccessibleFormat" xml:space="preserve"><value>{0}: {1}</value></data>
+  <data name="ServerEditorPassphraseHeader" xml:space="preserve"><value>Frase-passe da chave · opcional</value></data>
+  <data name="ServerEditorPassphrasePlaceholder" xml:space="preserve"><value>Apenas se a tua chave estiver protegida</value></data>
+  <data name="ServerEditorJumpPassphrasePlaceholder" xml:space="preserve"><value>Apenas se a chave estiver protegida</value></data>
+  <data name="ServerEditorPasswordHeader" xml:space="preserve"><value>Palavra-passe</value></data>
+  <data name="ServerEditorPasswordPlaceholder" xml:space="preserve"><value>Introduz a palavra-passe</value></data>
+  <data name="ServerEditorJumpPasswordPlaceholder" xml:space="preserve"><value>Introduz a palavra-passe do jump host</value></data>
+  <data name="ServerEditorPassphraseSavedHeader" xml:space="preserve"><value>Frase-passe · guardada</value></data>
+  <data name="ServerEditorPasswordSavedHeader" xml:space="preserve"><value>Palavra-passe · guardada</value></data>
+  <data name="ServerEditorSecretKeepPlaceholder" xml:space="preserve"><value>Deixa em branco para manter a atual</value></data>
+  <data name="ServerEditorRouteJumpPending" xml:space="preserve"><value>Jump host por preencher</value></data>
+  <data name="ServerEditorRouteFormat" xml:space="preserve"><value>Este dispositivo   →   {0}   →   {1}</value></data>
+  <data name="ServerEditorRouteTargetPending" xml:space="preserve"><value>servidor por preencher</value></data>
+  <data name="ServerEditorTrustStepFormat" xml:space="preserve"><value>PASSO {0} DE {1}</value></data>
+  <data name="ServerEditorTrustUnknownTitle" xml:space="preserve"><value>Confirmar identidade do servidor</value></data>
+  <data name="ServerEditorTrustJumpTitle" xml:space="preserve"><value>Confirmar jump host</value></data>
+  <data name="ServerEditorTrustTargetTitle" xml:space="preserve"><value>Confirmar servidor</value></data>
+  <data name="ServerEditorTrustMismatchTitle" xml:space="preserve"><value>A identidade do servidor mudou</value></data>
+  <data name="ServerEditorTrustJumpChangedTitle" xml:space="preserve"><value>A chave do jump host mudou</value></data>
+  <data name="ServerEditorTrustTargetChangedTitle" xml:space="preserve"><value>A chave do servidor mudou</value></data>
+  <data name="ServerEditorTrustUnknownBody" xml:space="preserve"><value>É a primeira ligação a este endereço. Compara a impressão digital com a fornecida pelo administrador antes de confiar.</value></data>
+  <data name="ServerEditorTrustJumpBody" xml:space="preserve"><value>Esta é a identidade do servidor intermédio. Compara a impressão digital com a fornecida pelo administrador antes de confiar.</value></data>
+  <data name="ServerEditorTrustTargetBody" xml:space="preserve"><value>Esta é a identidade do servidor final. É independente da chave do jump host; confirma também esta impressão digital.</value></data>
+  <data name="ServerEditorTrustMismatchBody" xml:space="preserve"><value>A chave recebida é diferente da guardada. A ligação foi bloqueada. Confirma a alteração com o administrador do servidor.</value></data>
+  <data name="ServerEditorTrustJumpChangedBody" xml:space="preserve"><value>A ligação foi bloqueada: a identidade do servidor intermédio mudou. Confirma a nova chave com o administrador do jump host.</value></data>
+  <data name="ServerEditorTrustTargetChangedBody" xml:space="preserve"><value>A ligação foi bloqueada: a identidade do servidor final mudou. Confirma a nova chave com o administrador do servidor.</value></data>
+  <data name="ServerEditorTrustUnknownScope" xml:space="preserve"><value>Ao confiar, esta identidade fica guardada neste dispositivo.</value></data>
+  <data name="ServerEditorTrustJumpScope" xml:space="preserve"><value>A confiança fica guardada apenas para este jump host.</value></data>
+  <data name="ServerEditorTrustTargetScope" xml:space="preserve"><value>A confiança fica guardada apenas para este servidor, através deste jump host.</value></data>
+  <data name="ServerEditorTrustMismatchScope" xml:space="preserve"><value>Não é possível continuar enquanto existir esta diferença.</value></data>
+  <data name="ServerEditorTrustPresentedFormat" xml:space="preserve"><value>Impressão digital apresentada · {0}</value></data>
+  <data name="ServerEditorTrustReceivedFormat" xml:space="preserve"><value>Chave recebida · {0}</value></data>
+  <data name="ServerEditorTrustSavedLabel" xml:space="preserve"><value>Chave guardada</value></data>
+  <data name="ServerEditorTrustAcceptTest" xml:space="preserve"><value>Confiar e testar</value></data>
+  <data name="ServerEditorTrustAcceptContinue" xml:space="preserve"><value>Confiar e continuar</value></data>
+  <data name="ServerEditorTrustCancel" xml:space="preserve"><value>Cancelar</value></data>
+  <data name="ServerEditorTrustBack" xml:space="preserve"><value>Voltar ao formulário</value></data>
+  <data name="ServerEditorTrustWorking" xml:space="preserve"><value>A guardar esta identidade e a testar a ligação…</value></data>
+  <data name="ServerEditorImportTitle" xml:space="preserve"><value>Importar de SSH</value></data>
+  <data name="ServerEditorImportSubtitle.Text" xml:space="preserve"><value>Escolhe um perfil da configuração SSH deste dispositivo.</value></data>
+  <data name="ServerEditorImportSource.Text" xml:space="preserve"><value>~/.ssh/config</value></data>
+  <data name="ServerEditorImportLoading.Text" xml:space="preserve"><value>A ler ~/.ssh/config…</value></data>
+  <data name="ServerEditorImportList.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Perfis SSH</value></data>
+  <data name="ServerEditorImportAvailable.Text" xml:space="preserve"><value>Disponível</value></data>
+  <data name="ServerEditorImportBlocked.Text" xml:space="preserve"><value>Bloqueado</value></data>
+  <data name="ServerEditorImportNote.Text" xml:space="preserve"><value>Preenche apenas os campos vazios do servidor e do jump host. Os dados já introduzidos são mantidos. ProxyJump com um único jump host é suportado.</value></data>
+  <data name="ServerEditorImportUse" xml:space="preserve"><value>Usar perfil</value></data>
+  <data name="ServerEditorImportCancel" xml:space="preserve"><value>Cancelar</value></data>
+  <data name="ServerEditorImportCountFormat" xml:space="preserve"><value>{0} disponíveis · {1} bloqueados</value></data>
+  <data name="ServerEditorImportNotFoundTitle" xml:space="preserve"><value>Não encontrámos a configuração SSH</value></data>
+  <data name="ServerEditorImportErrorTitle" xml:space="preserve"><value>Não foi possível ler a configuração SSH</value></data>
+  <data name="ServerEditorImportNoHostsTitle" xml:space="preserve"><value>Não foram encontrados perfis</value></data>
 </root>

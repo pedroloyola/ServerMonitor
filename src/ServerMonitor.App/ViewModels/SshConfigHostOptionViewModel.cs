@@ -56,6 +56,9 @@ public sealed class SshConfigHostOptionViewModel
 
     public bool IsImportable => Entry.IsImportable;
 
+    /// <summary>UI.7B: the resolver blocked this profile; the import dialog shows why and never offers to use it.</summary>
+    public bool IsBlocked => !Entry.IsImportable;
+
     public string UseAutomationName { get; }
 
     /// <summary>The list item's UI Automation name (set on the ListViewItem container).</summary>

@@ -112,6 +112,65 @@ public sealed class ServerEditorPageController : IDisposable
     }
 
     /// <summary>
+    /// UI.7B (B-10): the trust prompt the page's dialog host should show now, or null. Showing never accepts: a key is
+    /// trusted only by <see cref="AcceptTrustAsync"/>, an explicit gesture distinct from Save (no TOFU, no trust on save).
+    /// </summary>
+    public HostKeyTrustPrompt? PromptToShow() =>
+        _disposed || ViewModel is not { } viewModel ? null : HostKeyTrustPrompt.From(viewModel);
+
+    /// <summary>
+    /// "Confiar e testar / continuar": the SAME <see cref="ServerEditorViewModel.TrustAndConnectAsync"/>, and only while
+    /// the key pending in the view model is still exactly the one the dialog showed (same hop, subject and fingerprint).
+    /// A mismatch is never accepted. False = nothing was trusted from here.
+    /// </summary>
+    public async Task<bool> AcceptTrustAsync(HostKeyTrustPrompt shown)
+    {
+        ArgumentNullException.ThrowIfNull(shown);
+        if (_disposed
+            || !shown.CanAccept
+            || ViewModel is not { } viewModel
+            || viewModel.IsConnectionWorkInProgress
+            || PromptToShow() != shown)
+        {
+            return false;
+        }
+
+        await viewModel.TrustAndConnectAsync();
+        return true;
+    }
+
+    /// <summary>Cancel / Esc / close on an unknown key: the prompt is dropped and nothing is written.</summary>
+    public void DismissTrustPrompt()
+    {
+        if (!_disposed && ViewModel is { HasUnknownHostKey: true } viewModel)
+        {
+            viewModel.DismissHostKeyPrompt();
+        }
+    }
+
+    /// <summary>"Importar de SSH" (Add only): the existing read-only load; the dialog follows the view model's state.</summary>
+    public Task OpenImportAsync() =>
+        _disposed || ViewModel is not { IsSshConfigImportAvailable: true } viewModel
+            ? Task.CompletedTask
+            : viewModel.LoadSshConfigHostsAsync();
+
+    /// <summary>"Usar perfil": the existing Add-only apply, which never sets auth, a secret or a trust. Blocked = refused.</summary>
+    public bool ApplyImport(SshConfigHostOptionViewModel? option) =>
+        !_disposed
+        && SshConfigImportPresentation.CanUse(option)
+        && ViewModel is { } viewModel
+        && viewModel.ApplySshConfigHost(option!);
+
+    /// <summary>Closing the import dialog cancels a load still running (and leaves an applied profile's message alone).</summary>
+    public void CloseImport()
+    {
+        if (!_disposed && ViewModel is { IsSshConfigImportOpen: true } viewModel)
+        {
+            viewModel.CloseSshConfigImport();
+        }
+    }
+
+    /// <summary>
     /// The action-bar hint (Figma 04/05, advice only - nothing is gated by a test, G-10): unsaved edits are named; an add
     /// without host or user asks for them; otherwise "test before saving".
     /// </summary>

@@ -280,6 +280,19 @@
         <Setter Property="BorderBrush" Value="{ThemeResource SaSecondaryBorderBrush}" />
         <Setter Property="BorderThickness" Value="{ThemeResource SaSecondaryBorderThickness}" />
     </Style>
+    <!-- UI.7B key picker 112:3356 selector (Prism G-17): h40, radius 12 (the input radius), pad-left 14, content LEFT-aligned
+         (Folder01 18 + gap 10 + 13 Regular file name), the same glass fill/highlight as the secondary families. -->
+    <Style x:Key="SaPickerButtonStyle" TargetType="Button" BasedOn="{StaticResource SaButtonBaseStyle}">
+        <Setter Property="Height" Value="40" />
+        <Setter Property="Padding" Value="14,0" />
+        <Setter Property="CornerRadius" Value="{StaticResource SaRadiusControl}" />
+        <Setter Property="FontWeight" Value="Normal" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="HorizontalContentAlignment" Value="Left" />
+        <Setter Property="Background" Value="{ThemeResource SaSecondaryFillBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource SaSecondaryBorderBrush}" />
+        <Setter Property="BorderThickness" Value="{ThemeResource SaSecondaryBorderThickness}" />
+    </Style>
     <!-- Dialog neutral 112:8573 / 112:8759: h42, radius 13, min width 168, fill .14/.12 + 1px border .14/.16, 13 Medium; no highlight. -->
     <Style x:Key="SaDialogButtonStyle" TargetType="Button" BasedOn="{StaticResource SaButtonBaseStyle}">
         <Setter Property="Template" Value="{StaticResource SaFlatButtonTemplate}" />

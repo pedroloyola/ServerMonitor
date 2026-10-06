@@ -11,10 +11,10 @@
          508 + 24 + 508 ("O teu servidor" | "Como te queres ligar?"), the options card (Porta 160 · SO · Atualizar), the
          jump-host disclosure and, when on, its two cards. Every field binds to the SAME ServerEditorViewModel properties
          as before (no intermediate draft, Vigil H4); secrets stay in PasswordBoxes read and cleared in code (never bound).
-         The page (ServerEditorPage) owns the header, the action bar and the credential note. TEMPORARY in 7A (7B/7C turn
-         them into the Figma dialogs / per-field errors): the inline SSH-config import list, the validation InfoBar, the
-         test checklist and the trust panels. Below 760 of useful width the cards stack (Identity → Auth) and the options
-         card wraps (B-19). -->
+         The page (ServerEditorPage) owns the header, the action bar, the credential note and (UI.7B) the dialogs: the
+         SSH-config import and the trust prompt are no longer inline here. TEMPORARY until 7C (per-field errors, the
+         Figma 08 test dialog): the validation InfoBar and the test checklist. Below 760 of useful width the cards stack
+         (Identity → Auth) and the options card wraps (B-19). -->
     <StackPanel x:Name="FormRoot" Spacing="16">
         <VisualStateManager.VisualStateGroups>
             <VisualStateGroup x:Name="WidthStates">
@@ -56,102 +56,16 @@
             IsOpen="{Binding HasValidationErrors}"
             Severity="Error" />
 
-        <!-- TEMPORARY (7B: Figma 04/07 dialog): the read-only ~/.ssh/config import list, opened by "Importar de SSH".
-             Choosing a host fills only empty fields; blocked hosts cannot be used. -->
+        <!-- UI.7B: what the last "Importar de SSH" did ("filled from X" / "nothing filled"), said politely in the form. The
+             import itself is the page's dialog (Figma 04 chrome, 07 states); no inline list any more. -->
         <TextBlock
+            x:Name="ImportStatusText"
             AutomationProperties.LiveSetting="Polite"
             Style="{StaticResource SaCaptionTextStyle}"
             Foreground="{ThemeResource SaTextSecondaryBrush}"
             Text="{Binding SshConfigStatusMessage}"
             TextWrapping="Wrap"
-            Visibility="{Binding HasSshConfigStatus, Converter={StaticResource BooleanToVisibilityConverter}}" />
-        <Border
-            Padding="12"
-            Background="{ThemeResource MutedSurfaceBrush}"
-            BorderBrush="{ThemeResource GlassBorderBrush}"
-            BorderThickness="1"
-            CornerRadius="{StaticResource RadiusMedium}"
-            Visibility="{Binding IsSshConfigImportOpen, Converter={StaticResource BooleanToVisibilityConverter}}">
-            <StackPanel Spacing="8">
-                <Grid ColumnSpacing="8">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock
-                        x:Uid="ServerFormSshConfigTitle"
-                        VerticalAlignment="Center"
-                        AutomationProperties.HeadingLevel="Level2"
-                        FontSize="13"
-                        FontWeight="SemiBold" />
-                    <Button
-                        x:Uid="ServerFormSshConfigCloseButton"
-                        Grid.Column="1"
-                        Click="OnCloseSshConfigImportClick"
-                        Style="{StaticResource QuietPillButtonStyle}" />
-                </Grid>
-                <ProgressRing
-                    Width="18"
-                    Height="18"
-                    HorizontalAlignment="Left"
-                    IsActive="{Binding IsLoadingSshConfig}"
-                    Visibility="{Binding IsLoadingSshConfig, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                <TextBlock
-                    FontSize="12"
-                    Foreground="{ThemeResource TextSecondaryBrush}"
-                    Text="{Binding SshConfigFileWarningMessage}"
-                    TextWrapping="Wrap"
-                    Visibility="{Binding HasSshConfigFileWarning, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                <!-- Virtualized and height-bounded: the list is capped at 500 hosts by the resolver. -->
-                <ListView
-                    x:Uid="ServerFormSshConfigHostList"
-                    MaxHeight="320"
-                    IsItemClickEnabled="False"
-                    ContainerContentChanging="OnSshConfigHostContainerContentChanging"
-                    ItemsSource="{Binding SshConfigHosts}"
-                    SelectionMode="None">
-                    <ListView.ItemTemplate>
-                        <DataTemplate>
-                            <Grid Padding="0,6" ColumnSpacing="8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Spacing="2">
-                                    <TextBlock FontSize="13" FontWeight="SemiBold" Text="{Binding Alias}" TextWrapping="Wrap" />
-                                    <TextBlock
-                                        FontSize="12"
-                                        Foreground="{ThemeResource TextSecondaryBrush}"
-                                        Text="{Binding Preview}"
-                                        TextWrapping="Wrap"
-                                        Visibility="{Binding HasPreview, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                                    <TextBlock
-                                        FontSize="12"
-                                        FontWeight="SemiBold"
-                                        Text="{Binding RequirementText}"
-                                        TextWrapping="Wrap"
-                                        Visibility="{Binding HasRequirement, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                                    <TextBlock
-                                        FontSize="11"
-                                        Foreground="{ThemeResource TextTertiaryBrush}"
-                                        Text="{Binding ClassificationText}"
-                                        TextWrapping="Wrap"
-                                        Visibility="{Binding HasClassification, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                                </StackPanel>
-                                <Button
-                                    x:Uid="ServerFormSshConfigUseButton"
-                                    Grid.Column="1"
-                                    VerticalAlignment="Top"
-                                    AutomationProperties.Name="{Binding UseAutomationName}"
-                                    Click="OnUseSshConfigHostClick"
-                                    IsEnabled="{Binding IsImportable}"
-                                    Style="{StaticResource QuietPillButtonStyle}" />
-                            </Grid>
-                        </DataTemplate>
-                    </ListView.ItemTemplate>
-                </ListView>
-            </StackPanel>
-        </Border>
+            Visibility="Collapsed" />
 
         <!-- Connection and authentication 112:3320: 508 + 24 + 508. -->
         <Grid x:Name="CardsGrid" ColumnSpacing="24">
@@ -326,49 +240,50 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
-                            <RadioButton x:Uid="AuthenticationSshKeyOption" GroupName="ServerEditorAuthentication" HorizontalAlignment="Stretch"
+                            <!-- 112:3356: Key01 / LockPassword 16 + Medium 12; the SAME SelectedAuthenticationIndex setter as
+                                 before, so changing the method still drops a staged secret (Vigil H4). -->
+                            <RadioButton x:Uid="ServerEditorAuthKeyOption" GroupName="ServerEditorAuthentication" HorizontalAlignment="Stretch"
                                          Style="{StaticResource SaSegmentedPillItemStyle}" IsEnabled="{Binding IsNotTestingConnection}"
-                                         IsChecked="{Binding SelectedAuthenticationIndex, Mode=TwoWay, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=0}" />
-                            <RadioButton x:Uid="AuthenticationPasswordOption" Grid.Column="1" GroupName="ServerEditorAuthentication" HorizontalAlignment="Stretch"
+                                         IsChecked="{Binding SelectedAuthenticationIndex, Mode=TwoWay, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=0}">
+                                <StackPanel Orientation="Horizontal" Spacing="7">
+                                    <primitives:SaIcon Data="{StaticResource SaIconKey01Data}" Size="16" VerticalAlignment="Center" />
+                                    <TextBlock x:Uid="ServerEditorAuthKeyOptionText" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+                            </RadioButton>
+                            <RadioButton x:Uid="ServerEditorAuthPasswordOption" Grid.Column="1" GroupName="ServerEditorAuthentication" HorizontalAlignment="Stretch"
                                          Style="{StaticResource SaSegmentedPillItemStyle}" IsEnabled="{Binding IsNotTestingConnection}"
-                                         IsChecked="{Binding SelectedAuthenticationIndex, Mode=TwoWay, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=1}" />
+                                         IsChecked="{Binding SelectedAuthenticationIndex, Mode=TwoWay, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=1}">
+                                <StackPanel Orientation="Horizontal" Spacing="7">
+                                    <primitives:SaIcon Data="{StaticResource SaIconLockPasswordData}" Size="16" VerticalAlignment="Center" />
+                                    <TextBlock x:Uid="ServerEditorAuthPasswordOptionText" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+                            </RadioButton>
                         </Grid>
                     </Border>
 
-                    <!-- SSH key: found keys (metadata only) or the file picker; the auto-selection is said (no silent choice).
-                         7B: the Figma 460x40 picker button with its flyout (G-3/G-4/G-17). -->
+                    <!-- SSH key (B-12): the 460x40 picker shows the file NAME; its menu lists the keys found in .ssh (metadata
+                         only) + "Procurar ficheiro…"; the full path is in the tooltip and the UIA HelpText; the helper says
+                         when the editor pre-selected a key (no silent choice). No editable path box. -->
                     <StackPanel Spacing="14" Visibility="{Binding IsPrivateKeyAuthentication, Converter={StaticResource BooleanToVisibilityConverter}}">
-                        <ComboBox
-                            x:Name="LocalKeySelector"
-                            x:Uid="ServerFormLocalKeySelector"
-                            HorizontalAlignment="Stretch"
-                            Style="{StaticResource SaSelectorFieldStyle}"
-                            DisplayMemberPath="Label"
-                            IsEnabled="{Binding IsNotTestingConnection}"
-                            ItemsSource="{Binding LocalKeyOptions}"
-                            SelectionChanged="OnLocalKeySelectionChanged"
-                            Visibility="{Binding HasLocalKeyOptions, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                        <primitives:SaFormField x:Uid="ServerEditorPrivateKeyField" HelperText="{Binding PrivateKeyHint}">
-                            <Grid ColumnSpacing="8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <TextBox
-                                    x:Uid="ServerEditorPrivateKeyInput"
-                                    Style="{StaticResource SaTextFieldStyle}"
-                                    IsReadOnly="True"
-                                    Text="{Binding PrivateKeyPath}"
-                                    ToolTipService.ToolTip="{Binding PrivateKeyPath}" />
-                                <Button
-                                    x:Uid="ServerFormChoosePrivateKeyButton"
-                                    Grid.Column="1"
-                                    Style="{StaticResource SaSecondaryRectButtonStyle}"
-                                    Click="OnChoosePrivateKeyClick"
-                                    IsEnabled="{Binding IsNotTestingConnection}" />
-                            </Grid>
+                        <primitives:SaFormField x:Name="PrivateKeyField" x:Uid="ServerEditorPrivateKeyField">
+                            <Button x:Name="KeyPickerButton" Style="{StaticResource SaPickerButtonStyle}"
+                                    IsEnabled="{Binding IsNotTestingConnection}">
+                                <Grid ColumnSpacing="10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <primitives:SaIcon Data="{StaticResource SaIconFolder01Data}" Size="18" VerticalAlignment="Center"
+                                                       Foreground="{ThemeResource SaTextSecondaryBrush}" />
+                                    <TextBlock x:Name="KeyPickerText" Grid.Column="1" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                </Grid>
+                                <Button.Flyout>
+                                    <MenuFlyout x:Name="KeyPickerMenu" Placement="BottomEdgeAlignedLeft" Opening="OnKeyPickerMenuOpening" />
+                                </Button.Flyout>
+                            </Button>
                         </primitives:SaFormField>
-                        <primitives:SaFormField x:Uid="ServerEditorPassphraseField">
+                        <!-- G-13: a saved passphrase is never drawn as dots: empty field + "guardada" + "Deixa em branco…". -->
+                        <primitives:SaFormField x:Name="PassphraseFormField" x:Uid="ServerEditorPassphraseField">
                             <PasswordBox
                                 x:Name="PassphraseField"
                                 x:Uid="ServerEditorPassphraseInput"
@@ -376,22 +291,17 @@
                                 IsEnabled="{Binding IsNotTestingConnection}"
                                 PasswordRevealMode="Peek" />
                         </primitives:SaFormField>
-                        <TextBlock
-                            x:Uid="ServerFormSavedPassphraseHint"
-                            Style="{StaticResource SaCaptionTextStyle}"
-                            Foreground="{ThemeResource SaTextSecondaryBrush}"
-                            TextWrapping="Wrap"
-                            Visibility="{Binding HasSavedPassphrase, Converter={StaticResource BooleanToVisibilityConverter}}" />
                         <CheckBox
                             x:Uid="ServerFormRemoveSavedPassphrase"
                             Style="{StaticResource SaCheckBoxStyle}"
                             IsChecked="{Binding RemoveSavedPassphrase, Mode=TwoWay}"
+                            IsEnabled="{Binding IsNotTestingConnection}"
                             Visibility="{Binding HasSavedPassphrase, Converter={StaticResource BooleanToVisibilityConverter}}" />
                     </StackPanel>
 
-                    <!-- Password 112:3693: never bound; read and cleared by the page on Test/Save. -->
+                    <!-- Password 112:3693: never bound; read and cleared by the page on Test/Save. A saved one: empty + "guardada". -->
                     <StackPanel Spacing="14" Visibility="{Binding IsPasswordAuthentication, Converter={StaticResource BooleanToVisibilityConverter}}">
-                        <primitives:SaFormField x:Uid="ServerEditorPasswordField">
+                        <primitives:SaFormField x:Name="PasswordFormField" x:Uid="ServerEditorPasswordField">
                             <PasswordBox
                                 x:Name="PasswordField"
                                 x:Uid="ServerEditorPasswordInput"
@@ -399,12 +309,6 @@
                                 IsEnabled="{Binding IsNotTestingConnection}"
                                 PasswordRevealMode="Peek" />
                         </primitives:SaFormField>
-                        <TextBlock
-                            x:Uid="ServerFormSavedPasswordHint"
-                            Style="{StaticResource SaCaptionTextStyle}"
-                            Foreground="{ThemeResource SaTextSecondaryBrush}"
-                            TextWrapping="Wrap"
-                            Visibility="{Binding HasSavedPassword, Converter={StaticResource BooleanToVisibilityConverter}}" />
                     </StackPanel>
                 </StackPanel>
             </Border>
@@ -533,47 +437,44 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
-                            <RadioButton x:Uid="JumpAuthenticationSshKeyOption" GroupName="ServerEditorJumpAuthentication" HorizontalAlignment="Stretch"
+                            <RadioButton x:Uid="ServerEditorJumpAuthKeyOption" GroupName="ServerEditorJumpAuthentication" HorizontalAlignment="Stretch"
                                          Style="{StaticResource SaSegmentedPillItemStyle}" IsEnabled="{Binding IsNotTestingConnection}"
-                                         IsChecked="{Binding SelectedJumpAuthenticationIndex, Mode=TwoWay, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=0}" />
-                            <RadioButton x:Uid="JumpAuthenticationPasswordOption" Grid.Column="1" GroupName="ServerEditorJumpAuthentication" HorizontalAlignment="Stretch"
+                                         IsChecked="{Binding SelectedJumpAuthenticationIndex, Mode=TwoWay, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=0}">
+                                <StackPanel Orientation="Horizontal" Spacing="7">
+                                    <primitives:SaIcon Data="{StaticResource SaIconKey01Data}" Size="16" VerticalAlignment="Center" />
+                                    <TextBlock x:Uid="ServerEditorJumpAuthKeyOptionText" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+                            </RadioButton>
+                            <RadioButton x:Uid="ServerEditorJumpAuthPasswordOption" Grid.Column="1" GroupName="ServerEditorJumpAuthentication" HorizontalAlignment="Stretch"
                                          Style="{StaticResource SaSegmentedPillItemStyle}" IsEnabled="{Binding IsNotTestingConnection}"
-                                         IsChecked="{Binding SelectedJumpAuthenticationIndex, Mode=TwoWay, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=1}" />
+                                         IsChecked="{Binding SelectedJumpAuthenticationIndex, Mode=TwoWay, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=1}">
+                                <StackPanel Orientation="Horizontal" Spacing="7">
+                                    <primitives:SaIcon Data="{StaticResource SaIconLockPasswordData}" Size="16" VerticalAlignment="Center" />
+                                    <TextBlock x:Uid="ServerEditorJumpAuthPasswordOptionText" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+                            </RadioButton>
                         </Grid>
                     </Border>
-                    <!-- Same found keys as the target; the jump host's key is never pre-selected. -->
+                    <!-- The same picker and the same found keys as the target; the jump host's key is NEVER pre-selected. -->
                     <StackPanel Spacing="14" Visibility="{Binding IsJumpPrivateKeyAuthentication, Converter={StaticResource BooleanToVisibilityConverter}}">
-                        <ComboBox
-                            x:Name="JumpLocalKeySelector"
-                            x:Uid="ServerFormJumpLocalKeySelector"
-                            HorizontalAlignment="Stretch"
-                            Style="{StaticResource SaSelectorFieldStyle}"
-                            DisplayMemberPath="Label"
-                            IsEnabled="{Binding IsNotTestingConnection}"
-                            ItemsSource="{Binding LocalKeyOptions}"
-                            SelectionChanged="OnJumpLocalKeySelectionChanged"
-                            Visibility="{Binding HasLocalKeyOptions, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                        <primitives:SaFormField x:Uid="ServerEditorJumpPrivateKeyField">
-                            <Grid ColumnSpacing="8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <TextBox
-                                    x:Uid="ServerEditorJumpPrivateKeyInput"
-                                    Style="{StaticResource SaTextFieldStyle}"
-                                    IsReadOnly="True"
-                                    Text="{Binding JumpPrivateKeyPath}"
-                                    ToolTipService.ToolTip="{Binding JumpPrivateKeyPath}" />
-                                <Button
-                                    x:Uid="ServerFormChooseJumpPrivateKeyButton"
-                                    Grid.Column="1"
-                                    Style="{StaticResource SaSecondaryRectButtonStyle}"
-                                    Click="OnChooseJumpPrivateKeyClick"
-                                    IsEnabled="{Binding IsNotTestingConnection}" />
-                            </Grid>
+                        <primitives:SaFormField x:Name="JumpPrivateKeyField" x:Uid="ServerEditorJumpPrivateKeyField">
+                            <Button x:Name="JumpKeyPickerButton" Style="{StaticResource SaPickerButtonStyle}"
+                                    IsEnabled="{Binding IsNotTestingConnection}">
+                                <Grid ColumnSpacing="10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <primitives:SaIcon Data="{StaticResource SaIconFolder01Data}" Size="18" VerticalAlignment="Center"
+                                                       Foreground="{ThemeResource SaTextSecondaryBrush}" />
+                                    <TextBlock x:Name="JumpKeyPickerText" Grid.Column="1" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                </Grid>
+                                <Button.Flyout>
+                                    <MenuFlyout x:Name="JumpKeyPickerMenu" Placement="BottomEdgeAlignedLeft" Opening="OnJumpKeyPickerMenuOpening" />
+                                </Button.Flyout>
+                            </Button>
                         </primitives:SaFormField>
-                        <primitives:SaFormField x:Uid="ServerEditorJumpPassphraseField">
+                        <primitives:SaFormField x:Name="JumpPassphraseFormField" x:Uid="ServerEditorJumpPassphraseField">
                             <PasswordBox
                                 x:Name="JumpPassphraseField"
                                 x:Uid="ServerEditorJumpPassphraseInput"
@@ -582,7 +483,8 @@
                                 PasswordRevealMode="Peek" />
                         </primitives:SaFormField>
                     </StackPanel>
-                    <primitives:SaFormField x:Uid="ServerEditorJumpPasswordField"
+                    <!-- G-13 (156:478 draws dots): a saved jump secret stays an EMPTY box + "guardada" + "Deixa em branco…". -->
+                    <primitives:SaFormField x:Name="JumpPasswordFormField" x:Uid="ServerEditorJumpPasswordField"
                                             Visibility="{Binding IsJumpPasswordAuthentication, Converter={StaticResource BooleanToVisibilityConverter}}">
                         <PasswordBox
                             x:Name="JumpPasswordField"
@@ -591,15 +493,19 @@
                             IsEnabled="{Binding IsNotTestingConnection}"
                             PasswordRevealMode="Peek" />
                     </primitives:SaFormField>
-                    <TextBlock
-                        x:Uid="ServerFormSavedJumpSecretHint"
-                        Style="{StaticResource SaCaptionTextStyle}"
-                        Foreground="{ThemeResource SaTextSecondaryBrush}"
-                        TextWrapping="Wrap"
-                        Visibility="{Binding HasSavedJumpSecret, Converter={StaticResource BooleanToVisibilityConverter}}" />
                 </StackPanel>
             </Border>
         </Grid>
+
+        <!-- Derived route line 155:1165 (B-13): "Este dispositivo → jump → alvo" / "Jump host por preencher". Shown only for a
+             routed server; computed from the form, stored nowhere. -->
+        <TextBlock
+            x:Name="RouteLine"
+            Style="{StaticResource SaCaptionTextStyle}"
+            Foreground="{ThemeResource SaTextSecondaryBrush}"
+            TextTrimming="CharacterEllipsis"
+            AutomationProperties.LiveSetting="Polite"
+            Visibility="{Binding UseJumpHost, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
         <!-- TEMPORARY (7C: the Figma 08 test dialog with the 4 real stages): the connection checklist. -->
     <!-- Connection checklist (M14.5): port → identity → authentication → operating system.
@@ -749,120 +655,5 @@
         </StackPanel>
     </Border>
 
-        <!-- TEMPORARY (7B: the Figma 09 trust dialog, the same TrustAndConnectAsync): unknown / changed host key. -->
-    <!-- Unknown Host Key Confirmation -->
-    <Border
-        Padding="16"
-        Background="{ThemeResource MutedSurfaceBrush}"
-        BorderBrush="{ThemeResource StatusWarningBrush}"
-        BorderThickness="1"
-        CornerRadius="{StaticResource RadiusMedium}"
-        Visibility="{Binding HasUnknownHostKey, Converter={StaticResource BooleanToVisibilityConverter}}">
-        <StackPanel Spacing="8">
-            <TextBlock
-                x:Name="UnknownHostHeading"
-                x:Uid="HostKeyUnknownTitle"
-                AutomationProperties.HeadingLevel="Level2"
-                FontSize="15"
-                FontWeight="SemiBold" />
-            <TextBlock x:Uid="HostKeyUnknownDescription" FontSize="12" Foreground="{ThemeResource TextSecondaryBrush}" TextWrapping="Wrap" />
-            <Grid ColumnSpacing="12">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
-                <StackPanel Spacing="2">
-                    <TextBlock x:Uid="HostKeyServerLabel" FontSize="11" Foreground="{ThemeResource TextTertiaryBrush}" FontWeight="Medium" />
-                    <TextBlock Text="{Binding HostKeySubjectDisplay}" FontWeight="SemiBold" FontSize="12" TextWrapping="Wrap" />
-                </StackPanel>
-                <StackPanel Grid.Column="1" Spacing="2">
-                    <TextBlock x:Uid="HostKeyAlgorithmLabel" FontSize="11" Foreground="{ThemeResource TextTertiaryBrush}" FontWeight="Medium" />
-                    <TextBlock Text="{Binding PresentedHostKeyAlgorithm}" FontSize="12" />
-                </StackPanel>
-            </Grid>
-            <StackPanel Spacing="3">
-                <TextBlock x:Uid="HostKeyFingerprintLabel" FontSize="11" Foreground="{ThemeResource TextTertiaryBrush}" FontWeight="Medium" />
-                <Border
-                    Padding="10,7"
-                    Background="{ThemeResource MutedSurfaceBrush}"
-                    BorderBrush="{ThemeResource GlassBorderBrush}"
-                    BorderThickness="1"
-                    CornerRadius="{StaticResource RadiusSmall}">
-                    <TextBlock
-                        FontFamily="Cascadia Code, Cascadia Mono, Consolas"
-                        FontSize="12"
-                        IsTextSelectionEnabled="True"
-                        Text="{Binding PresentedHostKeyFingerprint}"
-                        TextWrapping="WrapWholeWords" />
-                </Border>
-            </StackPanel>
-            <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,4,0,0">
-                <Button
-                    x:Uid="HostKeyTrustAndConnectButton"
-                    Click="OnTrustAndConnectClick"
-                    Style="{StaticResource AccentPillButtonStyle}" />
-                <Button
-                    x:Uid="HostKeyCancelButton"
-                    Click="OnDismissHostKeyClick"
-                    Style="{StaticResource QuietPillButtonStyle}" />
-            </StackPanel>
-        </StackPanel>
-    </Border>
-
-    <!-- Host Key Mismatch Alert -->
-    <Border
-        Padding="16"
-        Background="{ThemeResource MutedSurfaceBrush}"
-        BorderBrush="{ThemeResource StatusCriticalBrush}"
-        BorderThickness="1"
-        CornerRadius="{StaticResource RadiusMedium}"
-        Visibility="{Binding HasHostKeyMismatch, Converter={StaticResource BooleanToVisibilityConverter}}">
-        <StackPanel Spacing="8">
-            <TextBlock
-                x:Uid="HostKeyMismatchTitle"
-                AutomationProperties.HeadingLevel="Level2"
-                AutomationProperties.LiveSetting="Assertive"
-                FontSize="15"
-                FontWeight="SemiBold"
-                Foreground="{ThemeResource StatusCriticalBrush}" />
-            <TextBlock x:Uid="HostKeyMismatchDescription" FontSize="12" Foreground="{ThemeResource TextSecondaryBrush}" TextWrapping="Wrap" />
-            <StackPanel Spacing="2">
-                <TextBlock x:Uid="HostKeyMismatchServerLabel" FontSize="11" Foreground="{ThemeResource TextTertiaryBrush}" FontWeight="Medium" />
-                <TextBlock Text="{Binding HostKeySubjectDisplay}" FontWeight="SemiBold" FontSize="12" TextWrapping="Wrap" />
-            </StackPanel>
-            <StackPanel Spacing="3">
-                <TextBlock x:Uid="HostKeyKnownFingerprintLabel" FontSize="11" Foreground="{ThemeResource TextTertiaryBrush}" FontWeight="Medium" />
-                <Border
-                    Padding="10,7"
-                    Background="{ThemeResource MutedSurfaceBrush}"
-                    BorderBrush="{ThemeResource GlassBorderBrush}"
-                    BorderThickness="1"
-                    CornerRadius="{StaticResource RadiusSmall}">
-                    <TextBlock
-                        FontFamily="Cascadia Code, Cascadia Mono, Consolas"
-                        FontSize="12"
-                        IsTextSelectionEnabled="True"
-                        Text="{Binding TrustedHostKeyFingerprint}"
-                        TextWrapping="WrapWholeWords" />
-                </Border>
-            </StackPanel>
-            <StackPanel Spacing="3">
-                <TextBlock x:Uid="HostKeyReceivedFingerprintLabel" FontSize="11" Foreground="{ThemeResource TextTertiaryBrush}" FontWeight="Medium" />
-                <Border
-                    Padding="10,7"
-                    Background="{ThemeResource MutedSurfaceBrush}"
-                    BorderBrush="{ThemeResource GlassBorderBrush}"
-                    BorderThickness="1"
-                    CornerRadius="{StaticResource RadiusSmall}">
-                    <TextBlock
-                        FontFamily="Cascadia Code, Cascadia Mono, Consolas"
-                        FontSize="12"
-                        IsTextSelectionEnabled="True"
-                        Text="{Binding PresentedHostKeyFingerprint}"
-                        TextWrapping="WrapWholeWords" />
-                </Border>
-            </StackPanel>
-        </StackPanel>
-    </Border>
     </StackPanel>
 </UserControl>
