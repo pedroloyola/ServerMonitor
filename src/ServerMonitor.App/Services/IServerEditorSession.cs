@@ -57,6 +57,15 @@ public interface IServerEditorSession
     /// </summary>
     Task<ServerEditorSaveOutcome> SaveAsync(ServerEditorRequest request, ServerEditorResult result);
 
+    /// <summary>
+    /// UI.7C (H-UI7-2): every saved server, visible and hidden, for the in-memory duplicate notice (read only; empty when
+    /// the list cannot be read - the notice is advice, never a gate).
+    /// </summary>
+    Task<IReadOnlyList<Server>> GetKnownServersAsync();
+
+    /// <summary>"Abrir servidor" on the duplicate notice: that server's Detail page, through the exit guard (H-UI7-3).</summary>
+    void OpenExistingServer(ServerEditorRequest request, Guid serverId);
+
     /// <summary>True once the visit saved (its page may then leave without asking) or ended.</summary>
     bool IsSaved(ServerEditorRequest request);
 

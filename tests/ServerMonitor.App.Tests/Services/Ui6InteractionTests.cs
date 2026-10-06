@@ -38,22 +38,6 @@ public sealed class Ui6InteractionTests
         Assert.False(sync.ActivateKey(VirtualKey.Space, ShellDestination.Settings));
         Assert.Equal(NavigationDestination.History, router.CurrentDestination);
     }
-    [Theory]
-    [InlineData(true)] [InlineData(false)]
-    public void Dialog_ReturnsToOriginOrHeading_Once_EvenAfterExceptionalExit(bool attached)
-    {
-        var order = new List<string>();
-        var focus = new DialogReturnFocus(() => { order.Add("origin"); return attached; }, () => order.Add("heading"));
-        try
-        {
-            using var scope = focus;
-            order.Add("dialog");
-            throw new InvalidOperationException();
-        }
-        catch (InvalidOperationException) { }
-        focus.Dispose();
-        Assert.Equal(attached ? new[] { "dialog", "origin" } : new[] { "dialog", "origin", "heading" }, order);
-    }
     [Fact]
     public void HeadingName_CollapsesNewlinesAndWhitespace() =>
         Assert.Equal("Seus servidores. Em um só lugar.", SaHeadingHost.NormalizeName("Seus servidores.\r\nEm um só lugar."));

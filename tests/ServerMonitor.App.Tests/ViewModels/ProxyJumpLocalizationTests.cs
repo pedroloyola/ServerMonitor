@@ -3,35 +3,37 @@ using System.Xml.Linq;
 namespace ServerMonitor.App.Tests.ViewModels;
 
 /// <summary>
-/// M14.4b-2 jump-host editor strings: present and non-empty in every supported culture, and the jump port
-/// announces itself distinctly from the target port to assistive technology (visual QA finding: both fields
-/// were exposed to UI Automation as a bare "Port").
+/// M14.4b-2 jump-host editor strings, on the UI.7 editor page's keys (the M14 ServerForm* keys died with the modal, B-22):
+/// present and non-empty in every supported culture, and every jump input announces itself distinctly from the target's
+/// input with the same visible label (visual QA finding: both ports were exposed to UI Automation as a bare "Port"; UI.7C
+/// Beacon: the same for the SSH user, the password/passphrase and the key picker).
 /// </summary>
 public sealed class ProxyJumpLocalizationTests
 {
     private static readonly string[] Cultures = ["pt-BR", "pt-PT", "en-US"];
 
-    private const string JumpPortAutomationName =
-        "ServerFormJumpPortField.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name";
+    private const string AutomationName = ".[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name";
 
     private static readonly string[] RequiredKeys =
     [
-        "ServerFormRouteTitle.Text",
-        "ServerFormUseJumpHost.Content",
-        "ServerFormJumpHostHint.Text",
-        "ServerFormJumpHostField.Header",
-        "ServerFormJumpHostField.PlaceholderText",
-        "ServerFormJumpPortField.Header",
-        JumpPortAutomationName,
-        "ServerFormJumpUsernameField.Header",
-        "ServerFormJumpAuthenticationMethodField.Header",
-        "JumpAuthenticationSshKeyOption.Content",
-        "JumpAuthenticationPasswordOption.Content",
-        "ServerFormJumpPrivateKeyPathField.Header",
-        "ServerFormChooseJumpPrivateKeyButton.Content",
-        "ServerFormJumpPassphraseField.Header",
-        "ServerFormJumpPasswordField.Header",
-        "ServerFormSavedJumpSecretHint.Text",
+        "ServerEditorUseJumpHost.Content",
+        "ServerEditorJumpHostDescription.Text",
+        "ServerEditorJumpHostTitle.Text",
+        "ServerEditorJumpHostField.Header",
+        "ServerEditorJumpHostInput.PlaceholderText",
+        "ServerEditorJumpPortField.Header",
+        "ServerEditorJumpPortInput" + AutomationName,
+        "ServerEditorJumpUsernameField.Header",
+        "ServerEditorJumpUsernameInput" + AutomationName,
+        "ServerEditorJumpAuthTitle.Text",
+        "ServerEditorJumpAuthMethodGroup" + AutomationName,
+        "ServerEditorJumpPrivateKeyField.Header",
+        "ServerEditorJumpKeyPickerAccessibleHeader",
+        "ServerEditorJumpPassphraseField.Header",
+        "ServerEditorJumpPassphraseInput" + AutomationName,
+        "ServerEditorJumpPasswordField.Header",
+        "ServerEditorJumpPasswordInput" + AutomationName,
+        "ServerEditorRouteJumpPending",
         "HostKeySubjectJumpFormat",
         "HostKeySubjectTargetFormat",
     ];
@@ -50,18 +52,32 @@ public sealed class ProxyJumpLocalizationTests
         }
     }
 
-    [Fact]
-    public void JumpPort_IsAnnouncedDistinctlyFromTheTargetPort()
+    [Theory]
+    [InlineData("ServerEditorPortField.Header", "ServerEditorJumpPortInput" + AutomationName)]
+    [InlineData("ServerEditorUsernameField.Header", "ServerEditorJumpUsernameInput" + AutomationName)]
+    [InlineData("ServerEditorPasswordHeader", "ServerEditorJumpPasswordInput" + AutomationName)]
+    [InlineData("ServerEditorPassphraseHeader", "ServerEditorJumpPassphraseInput" + AutomationName)]
+    [InlineData("ServerEditorPrivateKeyField.Header", "ServerEditorJumpKeyPickerAccessibleHeader")]
+    public void EveryJumpInput_IsAnnouncedDistinctlyFromTheTargetInput(string targetLabel, string jumpName)
     {
         foreach (var culture in Cultures)
         {
             var resources = LoadResources(culture);
-
-            Assert.NotEqual(
-                resources["ServerFormPortField.Header"],
-                resources[JumpPortAutomationName],
-                StringComparer.OrdinalIgnoreCase);
+            Assert.NotEqual(resources[targetLabel], resources[jumpName], StringComparer.OrdinalIgnoreCase);
         }
+    }
+
+    [Fact]
+    public void TheJumpInputs_CarryTheirOwnName()
+    {
+        var form = File.ReadAllText(Path.Combine(FindRepositoryRoot(), "src", "ServerMonitor.App", "Controls", "ServerFormControl.xaml"));
+        foreach (var uid in new[] { "ServerEditorJumpPortInput", "ServerEditorJumpUsernameInput", "ServerEditorJumpPasswordInput", "ServerEditorJumpPassphraseInput" })
+        {
+            Assert.Contains($"x:Uid=\"{uid}\"", form);
+        }
+
+        Assert.Contains("ServerEditorJumpKeyPickerAccessibleHeader", File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(), "src", "ServerMonitor.App", "Controls", "ServerFormControl.xaml.cs")));
     }
 
     private static IReadOnlyDictionary<string, string> LoadResources(string culture)

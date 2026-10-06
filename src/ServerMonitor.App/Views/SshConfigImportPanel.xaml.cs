@@ -23,6 +23,9 @@ public sealed partial class SshConfigImportPanel : UserControl
 
     public event EventHandler? UseRequested;
 
+    /// <summary>UI.7C (H-UI7-2): whether a profile describes a saved server (the page's controller answers).</summary>
+    public Func<Core.SshConfig.SshConfigHostEntry, bool>? IsAlreadyAdded { get; set; }
+
     public event EventHandler? CloseRequested;
 
     /// <summary>The title, which also names the layer for UI Automation.</summary>
@@ -71,6 +74,18 @@ public sealed partial class SshConfigImportPanel : UserControl
         UseButton.IsEnabled = SshConfigImportPresentation.CanUse(Selected);
     }
 
+    /// <summary>UI.7C: the saved-server list arrived after the rows were drawn: redraw them so "Já adicionado" is current.</summary>
+    public void RefreshMarkers()
+    {
+        if (HostList.ItemsSource is { } hosts)
+        {
+            var selected = HostList.SelectedItem;
+            HostList.ItemsSource = null;
+            HostList.ItemsSource = hosts;
+            HostList.SelectedItem = selected;
+        }
+    }
+
     /// <summary>The first focus: the list when it has profiles, otherwise Cancelar.</summary>
     public void FocusInitial()
     {
@@ -93,7 +108,17 @@ public sealed partial class SshConfigImportPanel : UserControl
     {
         if (args.Item is SshConfigHostOptionViewModel option)
         {
-            AutomationProperties.SetName(args.ItemContainer, option.AccessibleName);
+            var added = IsAlreadyAdded?.Invoke(option.Entry) == true;
+            if (args.ItemContainer.ContentTemplateRoot is FrameworkElement root && root.FindName("AlreadyAddedText") is TextBlock marker)
+            {
+                marker.Visibility = added ? Visibility.Visible : Visibility.Collapsed;
+            }
+
+            AutomationProperties.SetName(
+                args.ItemContainer,
+                added && _localization is { } localization
+                    ? string.Format(CultureInfo.CurrentCulture, localization.GetString("ServerEditorImportAlreadyAddedAccessibleFormat"), option.AccessibleName)
+                    : option.AccessibleName);
         }
     }
 

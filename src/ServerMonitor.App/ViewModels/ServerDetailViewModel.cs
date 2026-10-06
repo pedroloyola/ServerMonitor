@@ -33,6 +33,10 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
     private readonly IServerHistoryQueryService? _history;
     private readonly ServerDetailReturnFocus? _returnFocus;
     private readonly ServersReturnNotice? _serversNotice;
+    // UI.7 B-5: the editor's one-shot "Servidor adicionado" / "Alterações guardadas" toast for THIS server (taken once).
+    private readonly ServerEditorSavedNotice? _savedNotice;
+    private TransientNoticeTimer? _savedToastTimer;
+    private ServerEditorSaved? _saved;
     private readonly PresentationClock _clock;
     private readonly Action _flushAction;
     private ServerCardViewModel? _card;
@@ -63,7 +67,8 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
         ServerDetailReturnFocus? returnFocus = null,
         MonitoringOptions? monitoringOptions = null,
         PresentationClock? clock = null,
-        ServersReturnNotice? serversNotice = null)
+        ServersReturnNotice? serversNotice = null,
+        ServerEditorSavedNotice? savedNotice = null)
     {
         _dashboard = dashboard ?? throw new ArgumentNullException(nameof(dashboard));
         _navigation = navigation ?? throw new ArgumentNullException(nameof(navigation));
@@ -71,6 +76,7 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
         _history = history;
         _returnFocus = returnFocus;
         _serversNotice = serversNotice;
+        _savedNotice = savedNotice;
         _clock = clock ?? PresentationClock.System;
         // Prism C1 N-4 decision: the Detail shows no severity colour (its metric colours are identity), so the engine's
         // thresholds are not read here; the parameter stays for the composition root's constructor shape.
@@ -458,6 +464,52 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
         }
 
         Resolve();
+        TakeSavedToast();
+    }
+
+    /// <summary>UI.7 B-5 (Figma 12): the editor saved this server just before navigating here; shown once, polite.</summary>
+    public bool IsSavedToastOpen => _saved is not null;
+
+    public string SavedToastTitle => _saved is null
+        ? string.Empty
+        : _localization.GetString(_saved.Mode == ServerEditorMode.Add ? "ServerEditorSavedAddedTitle" : "ServerEditorSavedEditedTitle");
+
+    public string SavedToastMessage => _saved is null
+        ? string.Empty
+        : string.Format(
+            System.Globalization.CultureInfo.CurrentCulture,
+            _localization.GetString(_saved.Mode == ServerEditorMode.Add ? "ServerEditorSavedAddedMessageFormat" : "ServerEditorSavedEditedMessageFormat"),
+            _saved.ServerName);
+
+    public string SavedToastCloseName => _localization.GetString("ServerEditorSavedCloseName");
+
+    /// <summary>Closes the saved toast (its close button, its countdown, or leaving the page).</summary>
+    public void DismissSavedToast()
+    {
+        _savedToastTimer?.Cancel();
+        if (_saved is null)
+        {
+            return;
+        }
+
+        _saved = null;
+        OnPropertyChanged(nameof(IsSavedToastOpen));
+    }
+
+    // Taken once for this server (another server's notice is dropped); it closes itself after TransientNoticeTimer.Duration.
+    private void TakeSavedToast()
+    {
+        if (_savedNotice?.TakeFor(_serverId) is not { } saved)
+        {
+            return;
+        }
+
+        _saved = saved;
+        _savedToastTimer ??= new TransientNoticeTimer(_clock.TimeProvider);
+        _savedToastTimer.Start(DismissSavedToast);
+        OnPropertyChanged(nameof(IsSavedToastOpen));
+        OnPropertyChanged(nameof(SavedToastTitle));
+        OnPropertyChanged(nameof(SavedToastMessage));
     }
 
     /// <summary>Where focus returns after Histórico / Serviços e containers (taken once, for this server only).</summary>
@@ -482,6 +534,7 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
         _pulseCancellation?.Cancel();
         _pulseCancellation?.Dispose();
         _pulseCancellation = null;
+        _savedToastTimer?.Dispose();
     }
 
     private void OnDashboardPropertyChanged(object? sender, PropertyChangedEventArgs e)

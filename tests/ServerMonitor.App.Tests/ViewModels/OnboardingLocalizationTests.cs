@@ -54,7 +54,6 @@ public sealed class OnboardingLocalizationTests
         "ServerPrepCopyKeygenButton" + AutomationName,
         "ServerPrepCopyKeyButton.Content",
         "ServerPrepCopyKeyButton" + AutomationName,
-        "ServerFormChecklistTitle.Text",
         "ConnectionStepCopyCommandButton.Content",
         "ConnectionStepCopyCommandButton" + AutomationName,
         // UI.4: the empty dashboard is the SaEmptyState of the Visão geral (Add + Import from SSH + discovery).
@@ -287,7 +286,11 @@ public sealed class OnboardingLocalizationTests
         var form = File.ReadAllText(Path.Combine(
             FindRepositoryRoot(), "src", "ServerMonitor.App", "Controls", "ServerFormControl.xaml"));
         Assert.DoesNotContain("ServerFormConnectionStatus", form);
-        Assert.Contains("x:Uid=\"ServerFormChecklistTitle\"", form);
+        // UI.7C (B-9): the checklist is the test dialog's stage list now; no inline checklist (or its title) in the form.
+        Assert.DoesNotContain("ServerFormChecklistTitle", form);
+        var testPanel = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(), "src", "ServerMonitor.App", "Views", "ServerEditorTestPanel.xaml"));
+        Assert.Contains("x:Name=\"StageList\"", testPanel);
     }
 
     [Fact]
@@ -295,7 +298,8 @@ public sealed class OnboardingLocalizationTests
     {
         var root = FindRepositoryRoot();
         var xaml = File.ReadAllText(Path.Combine(root, "src", "ServerMonitor.App", "Controls", "ServerFormControl.xaml"))
-            + File.ReadAllText(Path.Combine(root, "src", "ServerMonitor.App", "Views", "DashboardPage.xaml"));
+            + File.ReadAllText(Path.Combine(root, "src", "ServerMonitor.App", "Views", "DashboardPage.xaml"))
+            + File.ReadAllText(Path.Combine(root, "src", "ServerMonitor.App", "Views", "ServerEditorTestPanel.xaml"));
 
         foreach (var uid in XamlKeys.Select(key => key[..key.IndexOf('.')]).Distinct())
         {

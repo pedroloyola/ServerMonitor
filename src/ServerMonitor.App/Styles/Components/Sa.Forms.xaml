@@ -297,6 +297,11 @@
         <Setter Property="FontSize" Value="{StaticResource SaFontSizeControl}" />
         <Setter Property="PasswordRevealMode" Value="Hidden" />
     </Style>
+    <!-- UI.7C (B-16, Figma 06 112:16924, G-24): the password box in error - the SAME 1.5 danger border as a text field. -->
+    <Style x:Key="SaPasswordBoxErrorStyle" TargetType="PasswordBox" BasedOn="{StaticResource SaPasswordBoxStyle}">
+        <Setter Property="BorderBrush" Value="{ThemeResource SaErrorBrush}" />
+        <Setter Property="BorderThickness" Value="{StaticResource SaErrorBorderThickness}" />
+    </Style>
     <!-- Eye toggle of SaPasswordField: 28x28, no fill, muted icon; checked (revealed) = text colour. DERIVED states. -->
     <Style x:Key="SaRevealToggleStyle" TargetType="ToggleButton">
         <Setter Property="Width" Value="28" />

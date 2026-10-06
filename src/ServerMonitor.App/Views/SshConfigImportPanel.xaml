@@ -9,7 +9,9 @@
          unified on the Sa dialog buttons) with the state content of 07 (no file, unreadable, no profiles, profiles with blocked ones). Read-only:
          the list and every classification come from the existing resolver through the view model; a BLOCKED profile is
          listed with its reason and can never be used (no "fix" anywhere). "Usar perfil" fills only empty fields (Add only).
-         Closing cancels a load still running. HOOK (7C, H-UI7-2): "Já adicionado" needs the duplicate rule - not faked. -->
+         Closing cancels a load still running. UI.7C (H-UI7-2): a profile that would describe a saved server says
+         "Já adicionado" (still selectable - the duplicate is advice, never a block). G-15: "Disponível" neutral, a block
+         in the accessible attention colour, always written out. -->
     <StackPanel Spacing="{StaticResource SaSpace16}">
         <TextBlock x:Name="TitleText" x:Uid="ServerEditorImportTitleText" Style="{StaticResource SaTitleTextStyle}" TextWrapping="Wrap"
                    AutomationProperties.HeadingLevel="Level1" />
@@ -65,18 +67,20 @@
                                 <TextBlock Text="{x:Bind Alias}" Style="{StaticResource SaBodyTextStyle}" FontWeight="Medium" TextTrimming="CharacterEllipsis" />
                                 <TextBlock Text="{x:Bind Preview}" Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}"
                                            TextWrapping="Wrap" Visibility="{x:Bind HasPreview}" />
-                                <TextBlock Text="{x:Bind RequirementText}" Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaDangerTextBrush}"
+                                <TextBlock Text="{x:Bind RequirementText}" Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaAttentionTextBrush}"
                                            TextWrapping="Wrap" Visibility="{x:Bind HasRequirement}" />
                                 <TextBlock Text="{x:Bind ClassificationText}" Style="{StaticResource SaHelperTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}"
                                            TextWrapping="Wrap" Visibility="{x:Bind HasClassification}" />
                             </StackPanel>
-                            <!-- The state is written out (not colour only): Disponível / Bloqueado. -->
-                            <Grid Grid.Column="1" VerticalAlignment="Top" AutomationProperties.AccessibilityView="Raw">
-                                <TextBlock x:Uid="ServerEditorImportAvailable" Style="{StaticResource SaCaptionTextStyle}"
+                            <!-- The state is written out (not colour only): Disponível / Bloqueado, and Já adicionado. -->
+                            <StackPanel Grid.Column="1" VerticalAlignment="Top" Spacing="2" AutomationProperties.AccessibilityView="Raw">
+                                <TextBlock x:Uid="ServerEditorImportAvailable" Style="{StaticResource SaCaptionTextStyle}" HorizontalAlignment="Right"
                                            Foreground="{ThemeResource SaTextSecondaryBrush}" Visibility="{x:Bind IsImportable}" />
-                                <TextBlock x:Uid="ServerEditorImportBlocked" Style="{StaticResource SaCaptionTextStyle}"
-                                           Foreground="{ThemeResource SaDangerTextBrush}" Visibility="{x:Bind IsBlocked}" />
-                            </Grid>
+                                <TextBlock x:Uid="ServerEditorImportBlocked" Style="{StaticResource SaCaptionTextStyle}" HorizontalAlignment="Right"
+                                           Foreground="{ThemeResource SaAttentionTextBrush}" Visibility="{x:Bind IsBlocked}" />
+                                <TextBlock x:Name="AlreadyAddedText" x:Uid="ServerEditorImportAlreadyAdded" Style="{StaticResource SaCaptionTextStyle}"
+                                           HorizontalAlignment="Right" Foreground="{ThemeResource SaTextSecondaryBrush}" Visibility="Collapsed" />
+                            </StackPanel>
                         </Grid>
                     </DataTemplate>
                 </ListView.ItemTemplate>

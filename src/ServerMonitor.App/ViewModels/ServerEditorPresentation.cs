@@ -202,3 +202,136 @@ public static class SshConfigImportPresentation
         _ => string.Empty
     };
 }
+
+/// <summary>UI.7C (B-9, Figma 08): where the connection test is.</summary>
+public enum ConnectionTestPhase
+{
+    None,
+    Testing,
+    Verified,
+    Failed,
+    Cancelled
+}
+
+/// <summary>
+/// UI.7C (B-9, Figma 08 112:5594 / PJ 160:413): the test dialog's chrome, a read-only snapshot of the view model. The
+/// phase comes from <see cref="ServerEditorViewModel.IsTestingConnection"/> and the last result's state; the failure
+/// family (title, body, "Rever …" wording) only from its <see cref="SshConnectionErrorCode"/> - never from any message
+/// text. The rows themselves are the view model's four real stages (<see cref="ConnectionChecklistViewModel"/>), for a
+/// direct AND a routed server: the jump's name and cause live in stage 1 (G-7, no fake six-row list).
+/// </summary>
+public sealed record ConnectionTestView(
+    ConnectionTestPhase Phase,
+    ConnectionFailureFamily Family,
+    bool Routed)
+{
+    public string IconKey => Phase switch
+    {
+        ConnectionTestPhase.Testing => "SaIconRefreshData",
+        ConnectionTestPhase.Verified => "SaIconShield01Data",
+        ConnectionTestPhase.Cancelled => "SaIconInformationCircleData",
+        _ => "SaIconAlert02Data"
+    };
+
+    public string TitleKey => Phase switch
+    {
+        ConnectionTestPhase.Testing => "ServerEditorTestTestingTitle",
+        ConnectionTestPhase.Verified => "ServerEditorTestVerifiedTitle",
+        ConnectionTestPhase.Cancelled => "ServerEditorTestCancelledTitle",
+        _ => $"ServerEditorTestFailed{Family}Title"
+    };
+
+    /// <summary>The body; the testing one is a format with the endpoint ({0}).</summary>
+    public string BodyKey => Phase switch
+    {
+        ConnectionTestPhase.Testing => "ServerEditorTestTestingBodyFormat",
+        ConnectionTestPhase.Verified => "ServerEditorTestVerifiedBody",
+        ConnectionTestPhase.Cancelled => "ServerEditorTestCancelledBody",
+        _ => $"ServerEditorTestFailed{Family}Body"
+    };
+
+    /// <summary>"SSH autenticado · Identidade confirmada" - only after a complete, verified test.</summary>
+    public string? VerifiedDetailKey => Phase == ConnectionTestPhase.Verified ? "ServerEditorTestVerifiedDetail" : null;
+
+    /// <summary>The safe (left) action: Cancelar teste while testing, else back to the form ("Rever …" after a failure).</summary>
+    public string CloseKey => Phase switch
+    {
+        ConnectionTestPhase.Testing => "ServerFormCancelTestButton.Content",
+        ConnectionTestPhase.Failed when Routed && Family is ConnectionFailureFamily.Authentication or ConnectionFailureFamily.Jump
+            => "ServerEditorTestReviewCredentials",
+        ConnectionTestPhase.Failed when Routed => "ServerEditorTestReviewRoute",
+        ConnectionTestPhase.Failed => "ServerEditorTestReviewData",
+        _ => "ServerEditorTrustBack"
+    };
+
+    /// <summary>The emphasised (right) action, or null: Tentar novamente after a failure, Testar novamente after a cancel.</summary>
+    public string? RetryKey => Phase switch
+    {
+        ConnectionTestPhase.Failed => "ServerEditorTestRetry",
+        ConnectionTestPhase.Cancelled => "ServerEditorTestAgain",
+        _ => null
+    };
+
+    /// <summary>The dialog for the view model now; <see cref="ConnectionTestPhase.None"/> before any test.</summary>
+    public static ConnectionTestView From(ServerEditorViewModel viewModel)
+    {
+        ArgumentNullException.ThrowIfNull(viewModel);
+        var routed = viewModel.UseJumpHost;
+        if (viewModel.IsTestingConnection)
+        {
+            return new ConnectionTestView(ConnectionTestPhase.Testing, ConnectionFailureFamily.None, routed);
+        }
+
+        return viewModel.LastTestState switch
+        {
+            null => new ConnectionTestView(ConnectionTestPhase.None, ConnectionFailureFamily.None, routed),
+            ServerConnectionState.Connected => new ConnectionTestView(ConnectionTestPhase.Verified, ConnectionFailureFamily.None, routed),
+            ServerConnectionState.Cancelled => new ConnectionTestView(ConnectionTestPhase.Cancelled, ConnectionFailureFamily.None, routed),
+            _ when viewModel.LastTestErrorCode == SshConnectionErrorCode.Cancelled =>
+                new ConnectionTestView(ConnectionTestPhase.Cancelled, ConnectionFailureFamily.None, routed),
+            _ => new ConnectionTestView(ConnectionTestPhase.Failed, FamilyOf(viewModel.LastTestErrorCode), routed)
+        };
+    }
+
+    /// <summary>The failure family of an error code (the mapping table the tests pin, one row per code).</summary>
+    public static ConnectionFailureFamily FamilyOf(SshConnectionErrorCode code) => code switch
+    {
+        SshConnectionErrorCode.None => ConnectionFailureFamily.Protocol,
+        SshConnectionErrorCode.InvalidConfiguration
+            or SshConnectionErrorCode.DnsResolutionFailed
+            or SshConnectionErrorCode.ConnectionRefused
+            or SshConnectionErrorCode.HostUnreachable
+            or SshConnectionErrorCode.NetworkUnavailable
+            or SshConnectionErrorCode.ConnectionTimedOut => ConnectionFailureFamily.Network,
+        SshConnectionErrorCode.CredentialNotConfigured
+            or SshConnectionErrorCode.CredentialUnavailable
+            or SshConnectionErrorCode.PrivateKeyUnavailable
+            or SshConnectionErrorCode.PrivateKeyInvalid
+            or SshConnectionErrorCode.AuthenticationFailed => ConnectionFailureFamily.Authentication,
+        SshConnectionErrorCode.HostKeyUnknown
+            or SshConnectionErrorCode.HostKeyMismatch
+            or SshConnectionErrorCode.RoutedHostKeyUnknown
+            or SshConnectionErrorCode.RoutedHostKeyMismatch => ConnectionFailureFamily.Identity,
+        SshConnectionErrorCode.JumpConnectionFailed
+            or SshConnectionErrorCode.JumpAuthenticationFailed
+            or SshConnectionErrorCode.JumpHostKeyUnknown
+            or SshConnectionErrorCode.JumpHostKeyMismatch
+            or SshConnectionErrorCode.JumpCredentialUnavailable => ConnectionFailureFamily.Jump,
+        SshConnectionErrorCode.TargetUnreachableViaJump => ConnectionFailureFamily.TargetViaJump,
+        SshConnectionErrorCode.LocalTunnelFailed => ConnectionFailureFamily.Tunnel,
+        _ => ConnectionFailureFamily.Protocol
+    };
+}
+
+/// <summary>UI.7C: the families the test dialog words differently (from the error code only).</summary>
+public enum ConnectionFailureFamily
+{
+    None,
+    Network,
+    Protocol,
+    Authentication,
+    Identity,
+    Jump,
+    TargetViaJump,
+    Tunnel
+}

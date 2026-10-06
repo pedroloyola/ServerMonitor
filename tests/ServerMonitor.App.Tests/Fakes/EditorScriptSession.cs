@@ -50,6 +50,10 @@ internal sealed class EditorScriptSession(IEditorScript script) : IServerEditorS
 
     public bool IsSaved(ServerEditorRequest request) => throw new NotSupportedException();
 
+    public Task<IReadOnlyList<Server>> GetKnownServersAsync() => Task.FromResult<IReadOnlyList<Server>>([]);
+
+    public void OpenExistingServer(ServerEditorRequest request, Guid serverId) => throw new NotSupportedException();
+
     public void ResumeSavedDestination(ServerEditorRequest request)
     {
     }
@@ -78,6 +82,12 @@ internal sealed class InertEditorSession : IServerEditorSession
         Task.FromResult(new ServerEditorSaveOutcome(ServerEditorSaveStatus.NotCurrent));
 
     public bool IsSaved(ServerEditorRequest request) => true;
+
+    public Task<IReadOnlyList<Server>> GetKnownServersAsync() => Task.FromResult<IReadOnlyList<Server>>([]);
+
+    public void OpenExistingServer(ServerEditorRequest request, Guid serverId)
+    {
+    }
 
     public void ResumeSavedDestination(ServerEditorRequest request)
     {

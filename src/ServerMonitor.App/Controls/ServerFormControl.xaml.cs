@@ -1,7 +1,6 @@
 using System.ComponentModel;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
-using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using ServerMonitor.App.Services;
@@ -17,6 +16,7 @@ public sealed partial class ServerFormControl : UserControl
     private string _copyLabel = string.Empty;
     private ILocalizationService? _localization;
     private bool _isEditMode;
+    private IReadOnlyDictionary<ServerEditorField, string> _errors = new Dictionary<ServerEditorField, string>();
 
     public ServerFormControl()
     {
@@ -24,9 +24,97 @@ public sealed partial class ServerFormControl : UserControl
         DataContextChanged += OnDataContextChanged;
         Unloaded += (_, _) => Attach(null);
         Loaded += (_, _) => Attach(DataContext as ServerEditorViewModel);
+        PasswordField.PasswordChanged += OnPasswordChanged;
+        PassphraseField.PasswordChanged += OnPasswordChanged;
+        JumpPasswordField.PasswordChanged += OnPasswordChanged;
+        JumpPassphraseField.PasswordChanged += OnPasswordChanged;
     }
 
+    /// <summary>A password box gained or lost typed text (the page's hint and the password errors follow it).</summary>
+    public event EventHandler? TypedSecretChanged;
+
     public void FocusFirstField() => NameField.Focus(FocusState.Programmatic);
+
+    /// <summary>B-16: the first invalid field takes the focus after a failed attempt (its error is described by it).</summary>
+    public void FocusField(ServerEditorField field)
+    {
+        Control target = field switch
+        {
+            ServerEditorField.Name => NameField,
+            ServerEditorField.Host => HostField,
+            ServerEditorField.Username => UsernameField,
+            ServerEditorField.PrivateKey => KeyPickerButton,
+            ServerEditorField.Password => PasswordField,
+            ServerEditorField.Port => PortField,
+            ServerEditorField.JumpHost => JumpHostField,
+            ServerEditorField.JumpUsername => JumpUsernameField,
+            ServerEditorField.JumpPort => JumpPortField,
+            ServerEditorField.JumpPrivateKey => JumpKeyPickerButton,
+            _ => JumpPasswordField
+        };
+        target.StartBringIntoView();
+        target.Focus(FocusState.Programmatic);
+    }
+
+    /// <summary>
+    /// UI.7C (B-16, Figma 06): each field shows its own message under the input with the 1.5 danger border (SaFormField
+    /// describes the input with it). A password box with typed text hides its "missing" error - the view model only sees
+    /// the secret on the next Test/Save.
+    /// </summary>
+    public void ShowErrors(IReadOnlyDictionary<ServerEditorField, string> errors)
+    {
+        _errors = errors ?? throw new ArgumentNullException(nameof(errors));
+        ApplyErrors();
+    }
+
+    /// <summary>"Como preparo o meu servidor?" from a failed stage of the test dialog: the same helper, at that anchor.</summary>
+    public void ShowPrepHelp(FrameworkElement anchor)
+    {
+        ArgumentNullException.ThrowIfNull(anchor);
+        if (FlyoutBase.GetAttachedFlyout(PrepHelpLink) is { } flyout)
+        {
+            flyout.ShowAt(anchor);
+        }
+    }
+
+    private void ApplyErrors()
+    {
+        if (_localization is not { } localization)
+        {
+            return;
+        }
+
+        SetError(NameFormField, NameField, ServerEditorField.Name);
+        SetError(HostFormField, HostField, ServerEditorField.Host);
+        SetError(UsernameFormField, UsernameField, ServerEditorField.Username);
+        SetError(PortFormField, PortField, ServerEditorField.Port);
+        SetError(JumpHostFormField, JumpHostField, ServerEditorField.JumpHost);
+        SetError(JumpUsernameFormField, JumpUsernameField, ServerEditorField.JumpUsername);
+        SetError(JumpPortFormField, JumpPortField, ServerEditorField.JumpPort);
+        SetError(PrivateKeyField, KeyPickerButton, ServerEditorField.PrivateKey);
+        SetError(JumpPrivateKeyField, JumpKeyPickerButton, ServerEditorField.JumpPrivateKey);
+        SetError(PasswordFormField, PasswordField, ServerEditorField.Password, typed: PasswordField.Password.Length > 0);
+        SetError(JumpPasswordFormField, JumpPasswordField, ServerEditorField.JumpPassword, typed: JumpPasswordField.Password.Length > 0);
+
+        void SetError(Primitives.SaFormField field, Control input, ServerEditorField key, bool typed = false)
+        {
+            var message = !typed && _errors.TryGetValue(key, out var messageKey) ? localization.GetString(messageKey) : string.Empty;
+            field.ErrorText = message;
+            var invalid = message.Length > 0;
+            input.Style = (Style)Application.Current.Resources[input switch
+            {
+                TextBox => invalid ? "SaTextFieldErrorStyle" : "SaTextFieldStyle",
+                PasswordBox => invalid ? "SaPasswordBoxErrorStyle" : "SaPasswordBoxStyle",
+                _ => invalid ? "SaPickerButtonErrorStyle" : "SaPickerButtonStyle"
+            }];
+        }
+    }
+
+    private void OnPasswordChanged(object sender, RoutedEventArgs e)
+    {
+        ApplyErrors();
+        TypedSecretChanged?.Invoke(this, EventArgs.Empty);
+    }
 
     /// <summary>
     /// UI.7A: the mode-dependent card copy (Figma 04 Add / 05 Edit). Set once by the editor page before the form loads.
@@ -123,14 +211,12 @@ public sealed partial class ServerFormControl : UserControl
         if (_viewModel is not null)
         {
             _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
-            _viewModel.ConnectionChecklist.PropertyChanged -= OnChecklistPropertyChanged;
         }
 
         _viewModel = viewModel;
         if (viewModel is not null)
         {
             viewModel.PropertyChanged += OnViewModelPropertyChanged;
-            viewModel.ConnectionChecklist.PropertyChanged += OnChecklistPropertyChanged;
             UpdateAuthSubtitle();
             UpdatePresentation();
         }
@@ -176,13 +262,16 @@ public sealed partial class ServerFormControl : UserControl
             KeyPickerText,
             PrivateKeyField,
             viewModel.PrivateKeyPath,
-            viewModel.HasPrivateKeyHint ? viewModel.PrivateKeyHint : localization.GetString("ServerEditorKeyPickerHelper"));
+            viewModel.HasPrivateKeyHint ? viewModel.PrivateKeyHint : localization.GetString("ServerEditorKeyPickerHelper"),
+            PrivateKeyField.Header);
+        // B-20: the jump picker is named apart from the target's (same visible label, different UIA name).
         UpdateKeyPicker(
             JumpKeyPickerButton,
             JumpKeyPickerText,
             JumpPrivateKeyField,
             viewModel.JumpPrivateKeyPath,
-            localization.GetString("ServerEditorJumpKeyPickerHelper"));
+            localization.GetString("ServerEditorJumpKeyPickerHelper"),
+            localization.GetString("ServerEditorJumpKeyPickerAccessibleHeader"));
 
         SetSavedSecretLabels(PassphraseFormField, PassphraseField, viewModel.HasSavedPassphrase,
             "ServerEditorPassphraseHeader", "ServerEditorPassphrasePlaceholder", "ServerEditorPassphraseSavedHeader");
@@ -200,7 +289,7 @@ public sealed partial class ServerFormControl : UserControl
             : Visibility.Collapsed;
     }
 
-    private void UpdateKeyPicker(Button button, TextBlock text, Primitives.SaFormField field, string path, string helper)
+    private void UpdateKeyPicker(Button button, TextBlock text, Primitives.SaFormField field, string path, string helper, string accessibleHeader)
     {
         var localization = _localization!;
         var label = ServerEditorKeyPicker.ButtonText(path, localization);
@@ -211,7 +300,7 @@ public sealed partial class ServerFormControl : UserControl
         AutomationProperties.SetName(button, string.Format(
             System.Globalization.CultureInfo.CurrentCulture,
             localization.GetString("ServerEditorKeyPickerAccessibleFormat"),
-            field.Header,
+            accessibleHeader,
             label));
         AutomationProperties.SetHelpText(button, fullPath);
     }
@@ -293,25 +382,6 @@ public sealed partial class ServerFormControl : UserControl
         }
     }
 
-    // Each checklist change is spoken once, as a notification on the checklist itself.
-    private void OnChecklistPropertyChanged(object? sender, PropertyChangedEventArgs e)
-    {
-        if (e.PropertyName != nameof(ConnectionChecklistViewModel.Announcement)
-            || _viewModel is not { } viewModel
-            || viewModel.ConnectionChecklist.Announcement is not { Length: > 0 } announcement)
-        {
-            return;
-        }
-
-        var peer = FrameworkElementAutomationPeer.FromElement(ChecklistPanel)
-            ?? FrameworkElementAutomationPeer.CreatePeerForElement(ChecklistPanel);
-        peer?.RaiseNotificationEvent(
-            AutomationNotificationKind.ActionCompleted,
-            AutomationNotificationProcessing.ImportantMostRecent,
-            announcement,
-            "ServerFormConnectionChecklist");
-    }
-
     private void OnPrepHelpClick(object sender, RoutedEventArgs e)
     {
         if (sender is FrameworkElement anchor && FlyoutBase.GetAttachedFlyout(PrepHelpLink) is { } flyout)
@@ -327,7 +397,7 @@ public sealed partial class ServerFormControl : UserControl
             return;
         }
 
-        // A flyout is its own popup: give it the modal's theme, and rebuild the commands from the form as it is now.
+        // A flyout is its own popup: give it the page's theme, and rebuild the commands from the form as it is now.
         PrepHelpContent.RequestedTheme = ActualTheme;
         _prepCommands = viewModel.BuildServerPrepCommands();
         PrepKeygenText.Text = _prepCommands.GenerateKey;
@@ -347,9 +417,6 @@ public sealed partial class ServerFormControl : UserControl
 
     private void OnCopyPrepKeyClick(object sender, RoutedEventArgs e) =>
         CopyCommand(_prepCommands?.CopyPublicKey, sender);
-
-    private void OnCopyStepCommandClick(object sender, RoutedEventArgs e) =>
-        CopyCommand((sender as FrameworkElement)?.DataContext is ConnectionStepViewModel step ? step.Command : null, sender);
 
     // Copies the command text and nothing else. The button says so only when the clipboard took it.
     private void CopyCommand(string? command, object sender)

@@ -11,9 +11,10 @@
          508 + 24 + 508 ("O teu servidor" | "Como te queres ligar?"), the options card (Porta 160 · SO · Atualizar), the
          jump-host disclosure and, when on, its two cards. Every field binds to the SAME ServerEditorViewModel properties
          as before (no intermediate draft, Vigil H4); secrets stay in PasswordBoxes read and cleared in code (never bound).
-         The page (ServerEditorPage) owns the header, the action bar, the credential note and (UI.7B) the dialogs: the
-         SSH-config import and the trust prompt are no longer inline here. TEMPORARY until 7C (per-field errors, the
-         Figma 08 test dialog): the validation InfoBar and the test checklist. Below 760 of useful width the cards stack
+         The page (ServerEditorPage) owns the header, the action bar, the credential note and the in-page dialogs (the
+         connection test, the trust prompt, the SSH-config import): none of them is inline here any more. UI.7C (B-16,
+         Figma 06): every field can show its own error (SaFormField.ErrorText + the 1.5 danger border), set by the page
+         from the view model's FieldErrors after a failed Test/Save. Below 760 of useful width the cards stack
          (Identity → Auth) and the options card wraps (B-19). -->
     <StackPanel x:Name="FormRoot" Spacing="16">
         <VisualStateManager.VisualStateGroups>
@@ -48,14 +49,6 @@
             </VisualStateGroup>
         </VisualStateManager.VisualStateGroups>
 
-        <!-- TEMPORARY (7C: per-field errors, Figma 06): the existing assertive validation summary. -->
-        <InfoBar
-            x:Uid="ServerFormValidationError"
-            AutomationProperties.LiveSetting="Assertive"
-            IsClosable="False"
-            IsOpen="{Binding HasValidationErrors}"
-            Severity="Error" />
-
         <!-- UI.7B: what the last "Importar de SSH" did ("filled from X" / "nothing filled"), said politely in the form. The
              import itself is the page's dialog (Figma 04 chrome, 07 states); no inline list any more. -->
         <TextBlock
@@ -89,7 +82,7 @@
                     </StackPanel>
                     <TextBlock x:Name="IdentitySubtitle" Style="{StaticResource SaCaptionTextStyle}"
                                Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap" />
-                    <primitives:SaFormField x:Uid="ServerEditorNameField">
+                    <primitives:SaFormField x:Name="NameFormField" x:Uid="ServerEditorNameField">
                         <TextBox
                             x:Name="NameField"
                             x:Uid="ServerEditorNameInput"
@@ -97,15 +90,17 @@
                             IsEnabled="{Binding IsNotTestingConnection}"
                             Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                     </primitives:SaFormField>
-                    <primitives:SaFormField x:Uid="ServerEditorHostField">
+                    <primitives:SaFormField x:Name="HostFormField" x:Uid="ServerEditorHostField">
                         <TextBox
+                            x:Name="HostField"
                             x:Uid="ServerEditorHostInput"
                             Style="{StaticResource SaTextFieldStyle}"
                             IsEnabled="{Binding IsNotTestingConnection}"
                             Text="{Binding Host, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                     </primitives:SaFormField>
-                    <primitives:SaFormField x:Uid="ServerEditorUsernameField">
+                    <primitives:SaFormField x:Name="UsernameFormField" x:Uid="ServerEditorUsernameField">
                         <TextBox
+                            x:Name="UsernameField"
                             x:Uid="ServerEditorUsernameInput"
                             Style="{StaticResource SaTextFieldStyle}"
                             IsEnabled="{Binding IsNotTestingConnection}"
@@ -132,15 +127,16 @@
                             <HyperlinkButton
                                 x:Name="PrepHelpLink"
                                 x:Uid="ServerFormPrepHelpLink"
-                                Padding="6,2"
+                                Style="{StaticResource SaTextLinkButtonStyle}"
                                 VerticalAlignment="Center"
-                                Click="OnPrepHelpClick"
-                                FontSize="12">
+                                Click="OnPrepHelpClick">
                                 <FlyoutBase.AttachedFlyout>
                                     <Flyout
                                         x:Name="PrepHelpFlyout"
                                         Opening="OnPrepHelpOpening"
                                         Placement="Bottom">
+                                        <!-- G-5 (no Figma frame): the helper in the Sa language - card title, caption copy, the commands in
+                                             tinted insets (mono, selectable) with a "Copiar" each. Text only; it runs nothing. -->
                                         <StackPanel
                                             x:Name="PrepHelpContent"
                                             Width="400"
@@ -148,83 +144,73 @@
                                             <TextBlock
                                                 x:Uid="ServerPrepTitle"
                                                 AutomationProperties.HeadingLevel="Level2"
-                                                Style="{StaticResource SectionTitleTextStyle}"
+                                                Style="{StaticResource SaCardTitleTextStyle}"
                                                 TextWrapping="Wrap" />
                                             <TextBlock
                                                 x:Uid="ServerPrepIntro"
-                                                FontSize="12"
+                                                Style="{StaticResource SaCaptionTextStyle}"
                                                 TextWrapping="Wrap" />
                                             <TextBlock
                                                 x:Uid="ServerPrepKeygenStep"
-                                                FontSize="12"
-                                                Foreground="{ThemeResource TextSecondaryBrush}"
+                                                Style="{StaticResource SaCaptionTextStyle}"
+                                                Foreground="{ThemeResource SaTextSecondaryBrush}"
                                                 TextWrapping="Wrap" />
                                             <Grid ColumnSpacing="8">
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="*" />
                                                     <ColumnDefinition Width="Auto" />
                                                 </Grid.ColumnDefinitions>
-                                                <Border
-                                                    Padding="10,7"
-                                                    Background="{ThemeResource MutedSurfaceBrush}"
-                                                    BorderBrush="{ThemeResource GlassBorderBrush}"
-                                                    BorderThickness="1"
-                                                    CornerRadius="{StaticResource RadiusSmall}">
+                                                <Border Style="{StaticResource SaInsetTintedSurfaceStyle}" MinHeight="34">
                                                     <TextBlock
                                                         x:Name="PrepKeygenText"
-                                                        FontFamily="Cascadia Code, Cascadia Mono, Consolas"
-                                                        FontSize="12"
+                                                        Style="{StaticResource SaMonoTextStyle}"
+                                                        VerticalAlignment="Center"
                                                         IsTextSelectionEnabled="True"
                                                         TextWrapping="Wrap" />
                                                 </Border>
                                                 <Button
                                                     x:Name="PrepCopyKeygenButton"
                                                     x:Uid="ServerPrepCopyKeygenButton"
-                                                                        VerticalAlignment="Top"
+                                                    VerticalAlignment="Center"
                                                     Click="OnCopyPrepKeygenClick"
-                                                    Style="{StaticResource QuietPillButtonStyle}" />
+                                                    Style="{StaticResource SaSecondaryRectButtonStyle}" />
                                             </Grid>
                                             <TextBlock
                                                 x:Uid="ServerPrepCopyKeyStep"
-                                                FontSize="12"
-                                                Foreground="{ThemeResource TextSecondaryBrush}"
+                                                Style="{StaticResource SaCaptionTextStyle}"
+                                                Foreground="{ThemeResource SaTextSecondaryBrush}"
                                                 TextWrapping="Wrap" />
                                             <Grid ColumnSpacing="8">
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="*" />
                                                     <ColumnDefinition Width="Auto" />
                                                 </Grid.ColumnDefinitions>
-                                                <Border
-                                                    Padding="10,7"
-                                                    Background="{ThemeResource MutedSurfaceBrush}"
-                                                    BorderBrush="{ThemeResource GlassBorderBrush}"
-                                                    BorderThickness="1"
-                                                    CornerRadius="{StaticResource RadiusSmall}">
+                                                <Border Style="{StaticResource SaInsetTintedSurfaceStyle}" MinHeight="34">
                                                     <TextBlock
                                                         x:Name="PrepCopyKeyText"
-                                                        FontFamily="Cascadia Code, Cascadia Mono, Consolas"
-                                                        FontSize="12"
+                                                        Style="{StaticResource SaMonoTextStyle}"
+                                                        VerticalAlignment="Center"
                                                         IsTextSelectionEnabled="True"
                                                         TextWrapping="Wrap" />
                                                 </Border>
                                                 <Button
                                                     x:Name="PrepCopyKeyButton"
                                                     x:Uid="ServerPrepCopyKeyButton"
-                                                                        VerticalAlignment="Top"
+                                                    VerticalAlignment="Center"
                                                     Click="OnCopyPrepKeyClick"
-                                                    Style="{StaticResource QuietPillButtonStyle}" />
+                                                    Style="{StaticResource SaSecondaryRectButtonStyle}" />
                                             </Grid>
                                             <TextBlock
                                                 x:Name="PrepPlaceholderNote"
                                                 x:Uid="ServerPrepPlaceholderNote"
-                                                FontSize="12"
-                                                Foreground="{ThemeResource TextSecondaryBrush}"
+                                                Style="{StaticResource SaCaptionTextStyle}"
+                                                Foreground="{ThemeResource SaTextSecondaryBrush}"
                                                 TextWrapping="Wrap"
                                                 Visibility="Collapsed" />
                                             <TextBlock
                                                 x:Uid="ServerPrepServiceStep"
-                                                FontSize="12"
-                                                Foreground="{ThemeResource TextSecondaryBrush}"
+                                                Style="{StaticResource SaCaptionTextStyle}"
+                                                Foreground="{ThemeResource SaTextSecondaryBrush}"
                                                 TextWrapping="Wrap" />
                                         </StackPanel>
                                     </Flyout>
@@ -326,8 +312,9 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
-                <primitives:SaFormField x:Uid="ServerEditorPortField">
+                <primitives:SaFormField x:Name="PortFormField" x:Uid="ServerEditorPortField">
                     <TextBox
+                        x:Name="PortField"
                         x:Uid="ServerEditorPortInput"
                         Style="{StaticResource SaTextFieldStyle}"
                         InputScope="Number"
@@ -396,22 +383,25 @@
                     </StackPanel>
                     <TextBlock x:Uid="ServerEditorJumpHostSubtitle" Style="{StaticResource SaCaptionTextStyle}"
                                Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap" />
-                    <primitives:SaFormField x:Uid="ServerEditorJumpHostField">
+                    <primitives:SaFormField x:Name="JumpHostFormField" x:Uid="ServerEditorJumpHostField">
                         <TextBox
+                            x:Name="JumpHostField"
                             x:Uid="ServerEditorJumpHostInput"
                             Style="{StaticResource SaTextFieldStyle}"
                             IsEnabled="{Binding IsNotTestingConnection}"
                             Text="{Binding JumpHost, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                     </primitives:SaFormField>
-                    <primitives:SaFormField x:Uid="ServerEditorJumpUsernameField">
+                    <primitives:SaFormField x:Name="JumpUsernameFormField" x:Uid="ServerEditorJumpUsernameField">
                         <TextBox
+                            x:Name="JumpUsernameField"
                             x:Uid="ServerEditorJumpUsernameInput"
                             Style="{StaticResource SaTextFieldStyle}"
                             IsEnabled="{Binding IsNotTestingConnection}"
                             Text="{Binding JumpUsername, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                     </primitives:SaFormField>
-                    <primitives:SaFormField x:Uid="ServerEditorJumpPortField">
+                    <primitives:SaFormField x:Name="JumpPortFormField" x:Uid="ServerEditorJumpPortField">
                         <TextBox
+                            x:Name="JumpPortField"
                             x:Uid="ServerEditorJumpPortInput"
                             Style="{StaticResource SaTextFieldStyle}"
                             InputScope="Number"
@@ -506,154 +496,6 @@
             TextTrimming="CharacterEllipsis"
             AutomationProperties.LiveSetting="Polite"
             Visibility="{Binding UseJumpHost, Converter={StaticResource BooleanToVisibilityConverter}}" />
-
-        <!-- TEMPORARY (7C: the Figma 08 test dialog with the 4 real stages): the connection checklist. -->
-    <!-- Connection checklist (M14.5): port → identity → authentication → operating system.
-         State changes are announced from code-behind (one notification per change). -->
-    <Border
-        x:Name="ChecklistPanel"
-        Padding="14,12"
-        Background="{ThemeResource MutedSurfaceBrush}"
-        BorderBrush="{ThemeResource GlassBorderBrush}"
-        BorderThickness="1"
-        CornerRadius="{StaticResource RadiusMedium}"
-        Visibility="{Binding HasConnectionStatus, Converter={StaticResource BooleanToVisibilityConverter}}">
-        <StackPanel Spacing="8">
-            <Grid ColumnSpacing="10">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
-                <TextBlock
-                    x:Uid="ServerFormChecklistTitle"
-                    VerticalAlignment="Center"
-                    AutomationProperties.HeadingLevel="Level2"
-                    FontSize="13"
-                    FontWeight="SemiBold" />
-                <TextBlock
-                    Grid.Column="1"
-                    VerticalAlignment="Center"
-                    FontSize="12"
-                    Foreground="{ThemeResource TextSecondaryBrush}"
-                    HorizontalTextAlignment="Right"
-                    Text="{Binding ConnectionStatusMessage}"
-                    TextWrapping="Wrap" />
-            </Grid>
-            <ItemsControl IsTabStop="False" ItemsSource="{Binding ConnectionChecklist.Steps}">
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <StackPanel Padding="0,4" Spacing="6">
-                            <Grid ColumnSpacing="10">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="18" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <!-- One state mark at a time; the state is also always written out as text. -->
-                                <Grid
-                                    Width="18"
-                                    Height="18"
-                                    VerticalAlignment="Top"
-                                    AutomationProperties.AccessibilityView="Raw">
-                                    <FontIcon
-                                        FontSize="14"
-                                        Foreground="{ThemeResource TextTertiaryBrush}"
-                                        Glyph="&#xEA3A;"
-                                        Visibility="{Binding IsPending, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                                    <ProgressRing
-                                        Width="14"
-                                        Height="14"
-                                        IsActive="{Binding IsRunning}"
-                                        Visibility="{Binding IsRunning, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                                    <FontIcon
-                                        FontSize="14"
-                                        Foreground="{ThemeResource StatusHealthyBrush}"
-                                        Glyph="&#xE73E;"
-                                        Visibility="{Binding IsPassed, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                                    <FontIcon
-                                        FontSize="14"
-                                        Foreground="{ThemeResource StatusCriticalBrush}"
-                                        Glyph="&#xEA39;"
-                                        Visibility="{Binding IsFailed, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                                    <FontIcon
-                                        FontSize="14"
-                                        Foreground="{ThemeResource TextTertiaryBrush}"
-                                        Glyph="&#xE738;"
-                                        Visibility="{Binding IsNotReached, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                                    <FontIcon
-                                        FontSize="14"
-                                        Foreground="{ThemeResource StatusWarningBrush}"
-                                        Glyph="&#xE72E;"
-                                        Visibility="{Binding IsActionRequired, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                                    <FontIcon
-                                        FontSize="14"
-                                        Foreground="{ThemeResource StatusWarningBrush}"
-                                        Glyph="&#xE7BA;"
-                                        Visibility="{Binding IsWarning, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                                </Grid>
-                                <TextBlock
-                                    Grid.Column="1"
-                                    AutomationProperties.Name="{Binding AccessibleName}"
-                                    FontSize="13"
-                                    Text="{Binding Title}"
-                                    TextWrapping="Wrap" />
-                                <TextBlock
-                                    Grid.Column="2"
-                                    AutomationProperties.AccessibilityView="Raw"
-                                    FontSize="12"
-                                    Foreground="{ThemeResource TextSecondaryBrush}"
-                                    Text="{Binding StateText}" />
-                            </Grid>
-                            <StackPanel
-                                Margin="28,0,0,0"
-                                Spacing="6"
-                                Visibility="{Binding HasDetail, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                <TextBlock
-                                    FontSize="12"
-                                    Foreground="{ThemeResource TextSecondaryBrush}"
-                                    IsTextSelectionEnabled="True"
-                                    Text="{Binding Detail}"
-                                    TextWrapping="Wrap" />
-                                <Grid
-                                    ColumnSpacing="8"
-                                    Visibility="{Binding HasCommand, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <Border
-                                        Padding="10,7"
-                                        Background="{ThemeResource MutedSurfaceBrush}"
-                                        BorderBrush="{ThemeResource GlassBorderBrush}"
-                                        BorderThickness="1"
-                                        CornerRadius="{StaticResource RadiusSmall}">
-                                        <TextBlock
-                                            FontFamily="Cascadia Code, Cascadia Mono, Consolas"
-                                            FontSize="12"
-                                            IsTextSelectionEnabled="True"
-                                            Text="{Binding Command}"
-                                            TextWrapping="Wrap" />
-                                    </Border>
-                                    <Button
-                                        x:Uid="ConnectionStepCopyCommandButton"
-                                        Grid.Column="1"
-                                        VerticalAlignment="Top"
-                                        Click="OnCopyStepCommandClick"
-                                        Style="{StaticResource QuietPillButtonStyle}" />
-                                </Grid>
-                                <HyperlinkButton
-                                    x:Uid="ServerFormPrepHelpLink"
-                                    Padding="0"
-                                    Click="OnPrepHelpClick"
-                                    FontSize="12"
-                                    Visibility="{Binding OffersPrepHelp, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                            </StackPanel>
-                        </StackPanel>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-        </StackPanel>
-    </Border>
 
     </StackPanel>
 </UserControl>

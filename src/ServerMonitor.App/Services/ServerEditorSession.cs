@@ -30,6 +30,8 @@ public sealed class ServerEditorSession : IServerEditorSession
     private readonly ILogger<ServerEditorSession> _logger;
     private readonly Func<string?> _captureFocusedElementName;
     private readonly Dictionary<ServerEditorRequest, Visit> _visits = new(ReferenceEqualityComparer.Instance);
+    private readonly IServerService? _servers;
+    private readonly ServerEditorSavedNotice? _savedNotice;
     private Visit? _live;
 
     public ServerEditorSession(
@@ -45,8 +47,13 @@ public sealed class ServerEditorSession : IServerEditorSession
         INavigationService navigation,
         ServerEditorReturnFocus returnFocus,
         ILogger<ServerEditorSession> logger,
-        Func<string?>? captureFocusedElementName = null)
+        Func<string?>? captureFocusedElementName = null,
+        IServerService? servers = null,
+        ServerEditorSavedNotice? savedNotice = null)
     {
+        // UI.7C: the saved list (read only, for the in-memory duplicate notice) and the Detail's one-shot saved toast.
+        _servers = servers;
+        _savedNotice = savedNotice;
         _validator = validator;
         _sshConnectionService = sshConnectionService;
         _hostKeyTrustStore = hostKeyTrustStore;
@@ -196,6 +203,8 @@ public sealed class ServerEditorSession : IServerEditorSession
 
             visit.Saved = true;
             visit.SavedServerId = persisted.Server!.Id;
+            // B-5: the Detail this Save goes to shows "Servidor adicionado" / "Alterações guardadas" once.
+            _savedNotice?.Post(new ServerEditorSaved(request.Mode, persisted.Server.Id, persisted.Server.Name));
             GoToSavedDestination(visit);
             return new ServerEditorSaveOutcome(ServerEditorSaveStatus.Saved, secretsConsumed);
         }
@@ -229,6 +238,39 @@ public sealed class ServerEditorSession : IServerEditorSession
                 serverId,
                 request.Origin.Destination == NavigationDestination.Servers ? ServerDetailOrigin.Servers : ServerDetailOrigin.Overview);
         }
+    }
+
+    public async Task<IReadOnlyList<Server>> GetKnownServersAsync()
+    {
+        if (_servers is null)
+        {
+            return [];
+        }
+
+        try
+        {
+            return await _servers.GetAllAsync();
+        }
+        catch (Exception exception)
+        {
+            // The duplicate notice is advice only: no list, no notice.
+            _logger.LogDebug("No server list for the duplicate notice. Exception type: {ExceptionType}.", exception.GetType().Name);
+            return [];
+        }
+    }
+
+    public void OpenExistingServer(ServerEditorRequest request, Guid serverId)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (!_visits.TryGetValue(request, out var visit) || visit.Ended || serverId == Guid.Empty)
+        {
+            return;
+        }
+
+        // H-UI7-3: through the same exit guard as every other exit (dirty → "Descartar alterações?").
+        _navigation.GoToServerDetail(
+            serverId,
+            request.Origin.Destination == NavigationDestination.Servers ? ServerDetailOrigin.Servers : ServerDetailOrigin.Overview);
     }
 
     public bool IsSaved(ServerEditorRequest request) =>

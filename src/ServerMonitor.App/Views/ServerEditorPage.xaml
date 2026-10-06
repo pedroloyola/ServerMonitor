@@ -6,16 +6,17 @@
     xmlns:local="using:ServerMonitor.App.Views"
     xmlns:primitives="using:ServerMonitor.App.Controls.Primitives"
     NavigationCacheMode="Disabled">
-    <!-- UI.7A Add / Edit server page (Figma 04 112:3252 / 112:3412, 05 112:4613 / 112:4779): header (H1 30/42 + subtitle +
-         one header button), the form (ServerFormControl: 2 cards, options, jump), an optional save-failure notice
-         (Figma 06 112:19116), the action bar (Testar + hint | Cancelar + Adicionar/Guardar; not sticky, the page scrolls)
-         and the credential note. A fresh page per visit, never cached (B-1); disposed by navigation when replaced, which
-         ends the visit and disposes its view model (the session owns it). Tab order (B-20): H1 (programmatic entry) →
-         Nome → ... → actions → the header button LAST (declared after everything in the tree; drawn in the header row). -->
-    <!-- UI.7B (Cortex §8, binding): the page hosts its own modal LAYER (trust prompt now, the 7C test later, and "Importar de
-         SSH") in the tree, over the form only - NOT a ContentDialog, so the exit guard's "Descartar alterações?" (the one
-         ContentDialog per XamlRoot) can always open. Smoke over the form, SaModalSurface chrome, Tab cycles inside, Esc is
-         handled by the layer (a test running = cancel it). -->
+    <!-- UI.7 Add / Edit server page (Figma 04 112:3252 / 112:3412, 05 112:4613 / 112:4779): header (H1 30/42 + subtitle +
+         one header button), the form (ServerFormControl: 2 cards, options, jump), the notices of Figma 06 (duplicate
+         112:17491, save failure 112:19116), the action bar (Testar + hint | Cancelar + Adicionar/Guardar; not sticky, the
+         page scrolls) and the credential note. A fresh page per visit, never cached (B-1); disposed by navigation when
+         replaced, which ends the visit and disposes its view model (the session owns it). Tab order (B-20): H1
+         (programmatic entry) → Nome → ... → actions → the header button LAST (declared after everything in the tree; drawn
+         in the header row). B-16: after a failed Test/Save the H1 subtitle becomes the assertive summary. -->
+    <!-- UI.7B/7C (Cortex §8, binding): the page hosts its own modal LAYER (the connection test, the trust prompt that test
+         meets, and "Importar de SSH") in the tree, over the form only - NOT a ContentDialog, so the exit guard's
+         "Descartar alterações?" (the one ContentDialog per XamlRoot) can always open. Smoke over the form, SaModalSurface
+         chrome, Tab cycles inside, Esc is handled by the layer (a test running = cancel it). -->
     <Grid x:Name="EditorHost">
     <ScrollViewer x:Name="PageScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
         <VisualStateManager.VisualStateGroups>
@@ -62,6 +63,7 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
             <!-- Header 112:3319: title column (H1 + subtitle) | the header button (drawn here, declared last). -->
@@ -73,24 +75,42 @@
                         Style="{StaticResource SaHeadingTextStyle}"
                         TextTrimming="CharacterEllipsis" />
                 </primitives:SaHeadingHost>
+                <!-- B-16 / G-26: the summary of a failed attempt ("Verifica os campos assinalados para continuar.") is this
+                     subtitle, announced assertively when it switches (no InfoBar in Figma 06). -->
                 <TextBlock
                     x:Name="EditorSubtitle"
                     Style="{StaticResource SaPageSubtitleTextStyle}"
+                    AutomationProperties.LiveSetting="Assertive"
                     TextWrapping="Wrap" />
             </StackPanel>
 
             <controls:ServerFormControl x:Name="ServerForm" Grid.Row="1" />
 
+            <!-- H-UI7-2 duplicate (Figma 06 112:17491): non-blocking, "Abrir servidor" goes through the exit guard. -->
+            <primitives:SaInlineNotice
+                x:Name="DuplicateNotice"
+                Grid.Row="2"
+                Severity="Error"
+                AnnouncePolitely="True"
+                AutomationProperties.LiveSetting="Polite"
+                Visibility="Collapsed">
+                <Button x:Name="OpenDuplicateButton" x:Uid="ServerEditorDuplicateOpenButton" MinWidth="160" Height="36"
+                        Style="{StaticResource SaSolidButtonStyle}" Click="OnOpenDuplicateClick" />
+            </primitives:SaInlineNotice>
+
             <!-- Figma 06 "Falha ao guardar" (112:19265): the form stays as typed; a consumed secret must be typed again. -->
             <primitives:SaInlineNotice
                 x:Name="SaveFailedNotice"
-                Grid.Row="2"
+                Grid.Row="3"
                 Severity="Error"
                 AutomationProperties.LiveSetting="Assertive"
-                Visibility="Collapsed" />
+                Visibility="Collapsed">
+                <Button x:Name="RetrySaveButton" x:Uid="ServerEditorSaveRetryButton" MinWidth="160" Height="36"
+                        Style="{StaticResource SaSolidButtonStyle}" Click="OnPrimaryClick" />
+            </primitives:SaInlineNotice>
 
             <!-- Form actions 112:3404: not sticky (B-14); no primary button (G-2): the right-hand action is the default. -->
-            <Grid x:Name="ActionBar" Grid.Row="3" ColumnSpacing="{StaticResource SaSpace12}">
+            <Grid x:Name="ActionBar" Grid.Row="4" ColumnSpacing="{StaticResource SaSpace12}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
@@ -99,16 +119,17 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
-                <StackPanel Orientation="Horizontal" Spacing="{StaticResource SaSpace12}" VerticalAlignment="Center">
+                <Grid ColumnSpacing="{StaticResource SaSpace12}" VerticalAlignment="Center">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
                     <Button x:Name="TestButton" x:Uid="ServerFormTestConnectionButton" MinWidth="154"
                             Style="{StaticResource SaSecondaryButtonStyle}" Click="OnTestClick" />
-                    <Button x:Name="CancelTestButton" x:Uid="ServerFormCancelTestButton" MinWidth="114"
-                            Style="{StaticResource SaSecondaryButtonStyle}" Click="OnCancelTestClick" Visibility="Collapsed" />
-                    <ProgressRing x:Name="TestingRing" Width="18" Height="18" AutomationProperties.AccessibilityView="Raw" Visibility="Collapsed" />
-                    <TextBlock x:Name="ActionHint" Style="{StaticResource SaCaptionTextStyle}" VerticalAlignment="Center"
-                               Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap" MaxWidth="360"
+                    <TextBlock x:Name="ActionHint" Grid.Column="1" Style="{StaticResource SaCaptionTextStyle}" VerticalAlignment="Center"
+                               Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap"
                                AutomationProperties.LiveSetting="Polite" />
-                </StackPanel>
+                </Grid>
                 <StackPanel x:Name="ActionEnd" Grid.Column="1" Orientation="Horizontal" Spacing="{StaticResource SaSpace12}"
                             HorizontalAlignment="Right" VerticalAlignment="Center">
                     <Button x:Name="CancelButton" x:Uid="ServerEditorCancelButton" MinWidth="114"
@@ -119,7 +140,7 @@
             </Grid>
 
             <!-- Credential reassurance 112:3409: Shield01 17 + two lines. -->
-            <Grid Grid.Row="4" ColumnSpacing="9">
+            <Grid Grid.Row="5" ColumnSpacing="9">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
@@ -146,6 +167,7 @@
                         HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="720"
                         AutomationProperties.IsDialog="True" TabFocusNavigation="Cycle">
                     <Grid>
+                        <local:ServerEditorTestPanel x:Name="TestPanel" Visibility="Collapsed" />
                         <local:ServerEditorTrustPanel x:Name="TrustPanel" Visibility="Collapsed" />
                         <local:SshConfigImportPanel x:Name="ImportPanel" Visibility="Collapsed" />
                     </Grid>

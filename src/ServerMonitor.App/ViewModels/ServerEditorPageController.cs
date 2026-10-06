@@ -1,11 +1,14 @@
 using ServerMonitor.App.Services;
+using ServerMonitor.Core.Models;
+using ServerMonitor.Core.SshConfig;
 
 namespace ServerMonitor.App.ViewModels;
 
 /// <summary>
-/// UI.7: everything the editor page decides that is not drawing - its exit guard, Cancel/Esc, the single submit path and
-/// the action hint - kept out of the XAML code-behind so it is testable with the real session, navigation and view model.
-/// The page owns one controller per visit and disposes it when navigation replaces the page.
+/// UI.7: everything the editor page decides that is not drawing - its exit guard, Cancel/Esc, the single submit path,
+/// the in-page modal layer (trust, the 7C connection test, the import), the duplicate notice and the action hint - kept
+/// out of the XAML code-behind so it is testable with the real session, navigation and view model. The page owns one
+/// controller per visit and disposes it when navigation replaces the page.
 /// </summary>
 public sealed class ServerEditorPageController : IDisposable
 {
@@ -15,6 +18,17 @@ public sealed class ServerEditorPageController : IDisposable
     private bool _disposed;
     // UI.7B: "Voltar ao formulário" was pressed on the mismatch on screen; cleared when the view model's mismatch goes.
     private bool _mismatchAcknowledged;
+    // UI.7C (B-9): the test dialog is open (opened by "Testar ligação" once a test really starts; closed by its own
+    // "Voltar ao formulário" / "Rever …" or by closing the trust prompt it led to).
+    private bool _testOpen;
+    private bool _testRequested;
+    // UI.7C (Vigil 7B L-1): "Descartar alterações?" while its answer is pending. A test that starts meanwhile (the retest
+    // after a key accepted just before the question) is cancelled at once: nothing runs under the question.
+    private Task<bool>? _leaveQuestion;
+    // UI.7C (G-23): a profile was just applied from "Importar de SSH" (the hint says so until the next test).
+    private bool _importApplied;
+    // UI.7C (H-UI7-2): the saved servers (visible and hidden) for the in-memory duplicate notice.
+    private IReadOnlyList<Server> _known = [];
 
     public ServerEditorPageController(IServerEditorSession session, IServerEditorDiscardPrompt discardPrompt)
     {
@@ -43,8 +57,14 @@ public sealed class ServerEditorPageController : IDisposable
     /// </summary>
     public bool IsSaving => _saving;
 
+    /// <summary>UI.7C: the connection-test dialog is open in the layer.</summary>
+    public bool IsTestOpen => _testOpen;
+
     /// <summary>Raised when <see cref="IsSaving"/> changes (the page disables Cancelar, the header button and the actions).</summary>
     public event EventHandler? SavingChanged;
+
+    /// <summary>UI.7C: the saved-server list arrived (the duplicate notice and the import rows may change).</summary>
+    public event EventHandler? KnownServersChanged;
 
     public bool Load(ServerEditorRequest request)
     {
@@ -54,9 +74,22 @@ public sealed class ServerEditorPageController : IDisposable
         if (ViewModel is not null)
         {
             ViewModel.PropertyChanged += OnViewModelPropertyChanged;
+            _ = LoadKnownServersAsync();
         }
 
         return ViewModel is not null;
+    }
+
+    private async Task LoadKnownServersAsync()
+    {
+        var known = await _session.GetKnownServersAsync();
+        if (_disposed)
+        {
+            return;
+        }
+
+        _known = known;
+        KnownServersChanged?.Invoke(this, EventArgs.Empty);
     }
 
     /// <summary>
@@ -91,10 +124,15 @@ public sealed class ServerEditorPageController : IDisposable
             ViewModel.CancelTest();
         }
 
-        return _discardPrompt.ConfirmDiscardAsync(new ServerEditorDiscardContext(
+        // Vigil 7B L-1: a key write still in flight completes under the question, and the retest it would start is
+        // cancelled as it starts (OnViewModelPropertyChanged) - "Continuar a editar" then shows "Teste cancelado". The
+        // question's own task is returned (no extra async hop between the answer and the navigation that waits for it).
+        var answer = _discardPrompt.ConfirmDiscardAsync(new ServerEditorDiscardContext(
             Request.Mode,
             ViewModel.OpenedName,
             ViewModel.Name));
+        _leaveQuestion = answer;
+        return answer;
     }
 
     /// <summary>Cancelar / Voltar ao detalhe: back to the origin through the exit guard.</summary>
@@ -162,6 +200,37 @@ public sealed class ServerEditorPageController : IDisposable
     }
 
     /// <summary>
+    /// UI.7C (B-9): "Testar ligação" / "Tentar novamente" / "Testar novamente": stage the typed secrets, then the SAME
+    /// <see cref="ServerEditorViewModel.TestConnectionAsync"/>. The test dialog opens only when a test really starts; an
+    /// invalid form opens nothing (the per-field errors show instead). False = nothing was tested (invalid or busy).
+    /// </summary>
+    public async Task<bool> StartTestAsync(Action captureSecrets)
+    {
+        ArgumentNullException.ThrowIfNull(captureSecrets);
+        if (_disposed || _saving || ViewModel is not { } viewModel || viewModel.IsConnectionWorkInProgress)
+        {
+            return false;
+        }
+
+        _testRequested = true;
+        try
+        {
+            captureSecrets();
+            await viewModel.TestConnectionAsync();
+        }
+        finally
+        {
+            _testRequested = false;
+        }
+
+        return !_disposed && !viewModel.HasValidationErrors;
+    }
+
+    /// <summary>UI.7C (B-9): the test dialog's content now, or null when it is not open.</summary>
+    public ConnectionTestView? TestToShow() =>
+        _disposed || !_testOpen || ViewModel is not { } viewModel ? null : ConnectionTestView.From(viewModel);
+
+    /// <summary>
     /// UI.7B (B-10): the trust prompt the page's dialog host should show now, or null. Showing never accepts: a key is
     /// trusted only by <see cref="AcceptTrustAsync"/>, an explicit gesture distinct from Save (no TOFU, no trust on save).
     /// </summary>
@@ -190,9 +259,9 @@ public sealed class ServerEditorPageController : IDisposable
     }
 
     /// <summary>
-    /// UI.7B: the in-page modal layer the view model needs now (Cortex §8: an in-tree layer, never a ContentDialog). The
-    /// import while its dialog is open; the trust prompt while one is shown (and not acknowledged) or while an accepted
-    /// key is written and retested.
+    /// The in-page modal layer the view model needs now (Cortex §8: an in-tree layer, never a ContentDialog). The import
+    /// while its dialog is open; the trust prompt while one is shown (and not acknowledged) or while an accepted key is
+    /// written and retested - the trust prompt appears in the SAME layer mid-test; otherwise the open test dialog.
     /// </summary>
     public ServerEditorLayer LayerToShow(bool accepting)
     {
@@ -211,15 +280,19 @@ public sealed class ServerEditorPageController : IDisposable
             return ServerEditorLayer.Trust;
         }
 
-        return PromptToShow() is { } prompt && !(prompt.Kind == HostKeyPromptKind.Mismatch && _mismatchAcknowledged)
-            ? ServerEditorLayer.Trust
-            : ServerEditorLayer.None;
+        if (PromptToShow() is { } prompt && !(prompt.Kind == HostKeyPromptKind.Mismatch && _mismatchAcknowledged))
+        {
+            return ServerEditorLayer.Trust;
+        }
+
+        return _testOpen ? ServerEditorLayer.Test : ServerEditorLayer.None;
     }
 
     /// <summary>
     /// Cancelar / Voltar ao formulário / Esc on the layer: during an accept the retest is cancelled (the key already being
-    /// written completes - it was accepted); an unknown key is dismissed (nothing written); a mismatch is acknowledged
-    /// (never accepted); the import is closed (its load cancelled).
+    /// written completes - it was accepted); an unknown key is dismissed (nothing written) and a mismatch acknowledged
+    /// (never accepted) - both back to the form; on the test dialog a running test is cancelled (the dialog stays with
+    /// "Teste cancelado"), otherwise the dialog closes; the import is closed (its load cancelled).
     /// </summary>
     public void CloseLayer(ServerEditorLayer layer, bool accepting)
     {
@@ -244,6 +317,18 @@ public sealed class ServerEditorPageController : IDisposable
                 }
 
                 DismissTrustPrompt();
+                _testOpen = false;
+                break;
+            case ServerEditorLayer.Test:
+                if (viewModel.IsTestingConnection)
+                {
+                    viewModel.CancelTest();
+                }
+                else
+                {
+                    _testOpen = false;
+                }
+
                 break;
             case ServerEditorLayer.Import:
                 CloseImport();
@@ -256,6 +341,21 @@ public sealed class ServerEditorPageController : IDisposable
         if (e.PropertyName == nameof(ServerEditorViewModel.HasHostKeyMismatch) && ViewModel is { HasHostKeyMismatch: false })
         {
             _mismatchAcknowledged = false;
+        }
+
+        if (e.PropertyName == nameof(ServerEditorViewModel.IsTestingConnection) && ViewModel is { IsTestingConnection: true } viewModel)
+        {
+            if (_leaveQuestion is { IsCompleted: false })
+            {
+                // L-1: nothing starts under "Descartar alterações?".
+                viewModel.CancelTest();
+            }
+            else if (_testRequested)
+            {
+                _testOpen = true;
+            }
+
+            _importApplied = false;
         }
     }
 
@@ -275,11 +375,19 @@ public sealed class ServerEditorPageController : IDisposable
             : viewModel.LoadSshConfigHostsAsync();
 
     /// <summary>"Usar perfil": the existing Add-only apply, which never sets auth, a secret or a trust. Blocked = refused.</summary>
-    public bool ApplyImport(SshConfigHostOptionViewModel? option) =>
-        !_disposed
-        && SshConfigImportPresentation.CanUse(option)
-        && ViewModel is { } viewModel
-        && viewModel.ApplySshConfigHost(option!);
+    public bool ApplyImport(SshConfigHostOptionViewModel? option)
+    {
+        var applied = !_disposed
+            && SshConfigImportPresentation.CanUse(option)
+            && ViewModel is { } viewModel
+            && viewModel.ApplySshConfigHost(option!);
+        if (applied)
+        {
+            _importApplied = true;
+        }
+
+        return applied;
+    }
 
     /// <summary>Closing the import dialog cancels a load still running (and leaves an applied profile's message alone).</summary>
     public void CloseImport()
@@ -291,8 +399,34 @@ public sealed class ServerEditorPageController : IDisposable
     }
 
     /// <summary>
-    /// The action-bar hint (Figma 04/05, advice only - nothing is gated by a test, G-10): unsaved edits are named; an add
-    /// without host or user asks for them; otherwise "test before saving".
+    /// UI.7C (H-UI7-2): the saved server the form describes again (same normalized endpoint, user and via), or null. An
+    /// edit never matches itself. Advice only: Save stays allowed.
+    /// </summary>
+    public Server? Duplicate() =>
+        _disposed || ViewModel is not { } viewModel
+            ? null
+            : ServerEditorDuplicates.Find(
+                _known,
+                ServerEditorDuplicates.Of(viewModel.Host, viewModel.Port, viewModel.Username, viewModel.UseJumpHost, viewModel.JumpHost, viewModel.JumpPort),
+                Request?.Existing?.Id);
+
+    /// <summary>UI.7C (H-UI7-2): an import profile that would describe a saved server ("Já adicionado"; still selectable).</summary>
+    public bool IsAlreadyAdded(SshConfigHostEntry entry) =>
+        ServerEditorDuplicates.Find(_known, ServerEditorDuplicates.Of(entry), Request?.Existing?.Id) is not null;
+
+    /// <summary>"Abrir servidor" on the duplicate notice: that server's Detail, through the exit guard.</summary>
+    public void OpenDuplicate()
+    {
+        if (!_disposed && !_saving && Request is not null && Duplicate() is { } duplicate)
+        {
+            _session.OpenExistingServer(Request, duplicate.Id);
+        }
+    }
+
+    /// <summary>
+    /// The action-bar hint (Figma 04/05/06, advice only - nothing is gated by a test, G-10): fields to fix after a failed
+    /// attempt; unsaved edits; a profile just imported; an edit switched to a password it must receive; an add without
+    /// host or user; otherwise "test before saving".
     /// </summary>
     public string ActionHintKey()
     {
@@ -301,9 +435,26 @@ public sealed class ServerEditorPageController : IDisposable
             return string.Empty;
         }
 
+        if (viewModel.HasFieldErrors)
+        {
+            return viewModel.FieldErrors.Keys.All(ServerEditorValidation.IsJumpField)
+                ? "ServerEditorHintFixJumpFields"
+                : "ServerEditorHintFixFields";
+        }
+
         if (IsEdit)
         {
+            if (viewModel.IsPasswordAuthentication && !viewModel.HasSavedPassword && HasTypedSecret?.Invoke() != true)
+            {
+                return "ServerEditorHintPasswordToContinue";
+            }
+
             return IsDirty ? "ServerEditorHintUnsaved" : "ServerEditorHintTestBeforeSave";
+        }
+
+        if (_importApplied)
+        {
+            return "ServerEditorHintImported";
         }
 
         return string.IsNullOrWhiteSpace(viewModel.Host) || string.IsNullOrWhiteSpace(viewModel.Username)
@@ -329,6 +480,7 @@ public sealed class ServerEditorPageController : IDisposable
         }
 
         _disposed = true;
+        _testOpen = false;
         if (ViewModel is not null)
         {
             ViewModel.PropertyChanged -= OnViewModelPropertyChanged;
@@ -341,12 +493,13 @@ public sealed class ServerEditorPageController : IDisposable
     }
 }
 
-/// <summary>UI.7B: the editor page's one in-page modal layer (none, the trust prompt / 7C test, or "Importar de SSH").</summary>
+/// <summary>The editor page's one in-page modal layer (none, the trust prompt, the 7C connection test, or "Importar de SSH").</summary>
 public enum ServerEditorLayer
 {
     None,
     Trust,
-    Import
+    Import,
+    Test
 }
 
 /// <summary>What a submit attempt did. <see cref="Invalid"/>: the form did not validate (nothing persisted).</summary>

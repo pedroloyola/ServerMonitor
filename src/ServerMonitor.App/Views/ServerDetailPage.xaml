@@ -13,7 +13,13 @@
         <converters:ServerHealthToStatusKindConverter x:Key="ServerHealthToStatusKindConverter" />
     </Page.Resources>
 
-    <ScrollViewer x:Name="PageScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+    <Grid x:Name="DetailHost">
+        <!-- UI.7 B-5: the one-shot "Servidor adicionado" / "Alterações guardadas" toast (Figma 12 112:19456 / 112:19787) has
+             its own row under the scrolling content, like the Servidores notice (never covers an actionable control). -->
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
         <VisualStateManager.VisualStateGroups>
             <VisualStateGroup x:Name="WidthStates">
                 <VisualState x:Name="Wide">
@@ -73,6 +79,7 @@
                 </VisualState>
             </VisualStateGroup>
         </VisualStateManager.VisualStateGroups>
+    <ScrollViewer x:Name="PageScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
         <StackPanel x:Name="PageRoot" Padding="{StaticResource SaPagePadding}" Spacing="{StaticResource SaSpace24}">
 
             <!-- Breadcrumb 112:1786: the origin (A-2), then the server. -->
@@ -388,4 +395,19 @@
             </Grid>
         </StackPanel>
     </ScrollViewer>
+
+        <primitives:SaToast
+            x:Name="SavedToast"
+            Grid.Row="1"
+            Margin="40,12,40,36"
+            MaxWidth="600"
+            HorizontalAlignment="Right"
+            VerticalAlignment="Bottom"
+            Title="{Binding SavedToastTitle}"
+            Message="{Binding SavedToastMessage}"
+            CloseButtonAutomationName="{Binding SavedToastCloseName}"
+            CloseRequested="OnSavedToastCloseRequested"
+            AutomationProperties.LiveSetting="Polite"
+            Visibility="{Binding IsSavedToastOpen, Converter={StaticResource BooleanToVisibilityConverter}}" />
+    </Grid>
 </Page>

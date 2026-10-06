@@ -71,12 +71,14 @@ public sealed partial class XamlContractAndResourceGuardTests
         ["Views/RestoreOpenDialog.xaml"] = ["PassphraseBox"],
         ["Views/AddServerDialog.xaml"] = ["ServerForm"],
         ["Views/EditServerDialog.xaml"] = ["ServerForm"],
-        ["Controls/ServerEditorModal.xaml"] = ["ServerForm", "ModalTitleText", "PrimaryActionButton", "CancelActionButton"],
         ["Controls/ServerFormControl.xaml"] =
         [
             "NameField", "PrepHelpLink", "PrepHelpContent", "PrepKeygenText", "PrepCopyKeygenButton",
             "PrepCopyKeyText", "PrepCopyKeyButton", "PrepPlaceholderNote", "PassphraseField",
-            "PasswordField", "JumpPassphraseField", "JumpPasswordField", "ChecklistPanel",
+            "PasswordField", "JumpPassphraseField", "JumpPasswordField",
+            // UI.7C (B-16): every field that shows its own error, and its input (focus on the first invalid one).
+            "NameFormField", "HostFormField", "HostField", "UsernameFormField", "UsernameField", "PortFormField", "PortField",
+            "JumpHostFormField", "JumpHostField", "JumpUsernameFormField", "JumpUsernameField", "JumpPortFormField", "JumpPortField",
             // UI.7B: the key pickers (B-12), the saved-secret labels (G-13), the route line (B-13) and the import status.
             "KeyPickerButton", "KeyPickerText", "KeyPickerMenu", "PrivateKeyField", "PassphraseFormField", "PasswordFormField",
             "JumpKeyPickerButton", "JumpKeyPickerText", "JumpKeyPickerMenu", "JumpPrivateKeyField", "JumpPassphraseFormField",
@@ -89,10 +91,12 @@ public sealed partial class XamlContractAndResourceGuardTests
         ["Views/ServerEditorPage.xaml"] =
         [
             "PageViewport", "PageRoot", "HeaderTitle", "EditorHeading", "EditorSubtitle", "ServerForm", "SaveFailedNotice",
-            "ActionBar", "TestButton", "CancelTestButton", "TestingRing", "ActionHint", "ActionEnd", "PrimaryButton",
+            "ActionBar", "TestButton", "ActionHint", "ActionEnd", "PrimaryButton",
             "CredentialNoteTitle", "HeaderButton",
             // UI.7B: the in-page modal layer (Cortex §8) and its two panels.
             "PageScroll", "DialogLayer", "DialogSurface", "TrustPanel", "ImportPanel",
+            // UI.7C: the test panel in the same layer, the duplicate notice (H-UI7-2) and "Tentar guardar".
+            "TestPanel", "DuplicateNotice", "OpenDuplicateButton", "RetrySaveButton",
             // UI.7A fix c1 (M-1): Cancelar is disabled while a Save is persisted.
             "CancelButton"
         ],
@@ -102,10 +106,17 @@ public sealed partial class XamlContractAndResourceGuardTests
             "StepText", "TitleIcon", "TitleText", "BodyText", "SubjectText", "TrustedBlock", "TrustedLabel", "TrustedFingerprintText",
             "PresentedLabel", "PresentedFingerprintText", "ScopeText", "WorkingRow", "WorkingRing", "WorkingText", "CloseButton", "AcceptButton"
         ],
+        // UI.7C (B-9): the connection test in the same layer (Figma 08, the four real stages).
+        ["Views/ServerEditorTestPanel.xaml"] =
+        [
+            "TitleIcon", "TitleText", "BodyText", "SubjectText", "StageList", "VerifiedDetailText", "CloseButton", "RetryButton"
+        ],
         ["Views/SshConfigImportPanel.xaml"] =
         [
             "TitleText", "LoadingRow", "LoadingRing", "StatePanel", "StateIcon", "StateTitle", "StateBody", "ListPanel", "CountText", "HostList",
-            "WarningText", "CancelButton", "UseButton"
+            "WarningText", "CancelButton", "UseButton",
+            // UI.7C (H-UI7-2): the "Já adicionado" marker of a row (found by name in the recycled container).
+            "AlreadyAddedText"
         ],
         // HistoryChart parts: the chart draws into these by name.
         ["Controls/HistoryChart.xaml"] = ["RootGrid", "PlotHost", "GridCanvas", "PlotCanvas", "YAxisCanvas", "XAxisCanvas"],
@@ -368,35 +379,31 @@ public sealed partial class XamlContractAndResourceGuardTests
     }
 
     /// <summary>
-    /// resw pin: the server editor modal titles/buttons come from the six AddServerDialog.* / EditServerDialog.*
-    /// resw entries, not from the dialog views. The views may be deleted by the rebuild; these keys must survive
-    /// in every shipped culture and stay referenced by Controls/ServerEditorModal.xaml.cs.
+    /// UI.7C (B-22, Vigil 7B N-1, Cortex n-7): the server editor is a PAGE; the legacy modal (whose submit path had no
+    /// TrustAsync-window guard), the unused DialogReturnFocus and their resw keys are gone, so nobody can wire them back.
+    /// The editor's old M14 ServerForm* / AddServerDialog* / EditServerDialog* / inline HostKey* keys are gone from every
+    /// culture too (zero use proven by grep in the delivery).
     /// </summary>
     [Fact]
-    public void ServerEditorModalKeysExistInEveryCultureAndAreReferencedByTheModal()
+    public void TheLegacyServerEditorModal_AndItsKeys_AreGone()
     {
-        string[] cultures = ["pt-PT", "pt-BR", "en-US"];
-        var keys = new[] { "AddServerDialog", "EditServerDialog" }
-            .SelectMany(prefix => new[] { "Title", "PrimaryButtonText", "CloseButtonText" }.Select(property => (prefix, property)))
-            .ToList();
-        var modal = File.ReadAllText(AppSourceTree.Full("Controls/ServerEditorModal.xaml.cs"));
-
-        var failures = new List<string>();
-        foreach (var culture in cultures)
+        Assert.False(File.Exists(AppSourceTree.Full("Controls/ServerEditorModal.xaml")));
+        Assert.False(File.Exists(AppSourceTree.Full("Controls/ServerEditorModal.xaml.cs")));
+        Assert.False(File.Exists(AppSourceTree.Full("Services/DialogReturnFocus.cs")));
+        foreach (var culture in new[] { "pt-PT", "pt-BR", "en-US" })
         {
-            var entries = XDocument.Load(AppSourceTree.Full($"Resources/{culture}/Resources.resw"))
-                .Root!.Elements("data")
-                .ToDictionary(e => (string)e.Attribute("name")!, e => (string?)e.Element("value"), StringComparer.Ordinal);
-            failures.AddRange(keys
-                .Where(key => string.IsNullOrWhiteSpace(entries.GetValueOrDefault($"{key.prefix}.{key.property}")))
-                .Select(key => $"Resources/{culture}/Resources.resw is missing {key.prefix}.{key.property}"));
+            var names = XDocument.Load(AppSourceTree.Full($"Resources/{culture}/Resources.resw"))
+                .Root!.Elements("data").Select(e => (string)e.Attribute("name")!).ToList();
+            Assert.DoesNotContain(names, name => name.StartsWith("AddServerDialog.", StringComparison.Ordinal)
+                || name.StartsWith("EditServerDialog.", StringComparison.Ordinal)
+                || name.StartsWith("ServerFormValidationError.", StringComparison.Ordinal)
+                || name.StartsWith("ServerFormLocalKeySelector.", StringComparison.Ordinal)
+                || name.StartsWith("ServerFormJumpLocalKeySelector.", StringComparison.Ordinal)
+                || name.StartsWith("ServerFormSshConfigTitle.", StringComparison.Ordinal)
+                || name.StartsWith("ServerFormSshConfigUseButton.", StringComparison.Ordinal)
+                || name.StartsWith("ServerFormChecklistTitle.", StringComparison.Ordinal)
+                || name.StartsWith("HostKeyTrustAndConnectButton.", StringComparison.Ordinal));
         }
-
-        failures.AddRange(keys
-            .Where(key => !modal.Contains($"\"{key.prefix}/{key.property}\"", StringComparison.Ordinal))
-            .Select(key => $"Controls/ServerEditorModal.xaml.cs no longer reads \"{key.prefix}/{key.property}\""));
-
-        Assert.True(failures.Count == 0, string.Join(Environment.NewLine, failures));
     }
 
     /// <summary>App-wide scope: App.xaml plus every dictionary under Styles/** (generic, so new token files count).</summary>

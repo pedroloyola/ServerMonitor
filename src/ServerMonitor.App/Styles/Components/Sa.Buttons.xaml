@@ -293,6 +293,18 @@
         <Setter Property="BorderBrush" Value="{ThemeResource SaSecondaryBorderBrush}" />
         <Setter Property="BorderThickness" Value="{ThemeResource SaSecondaryBorderThickness}" />
     </Style>
+    <!-- UI.7C (B-16, G-24): the key picker in error - 1.5 danger border like every invalid field (Figma draws 1 px on the
+         picker; one rule for all fields, Prism G-24). -->
+    <Style x:Key="SaPickerButtonErrorStyle" TargetType="Button" BasedOn="{StaticResource SaPickerButtonStyle}">
+        <Setter Property="BorderBrush" Value="{ThemeResource SaErrorBrush}" />
+        <Setter Property="BorderThickness" Value="{StaticResource SaErrorBorderThickness}" />
+    </Style>
+    <!-- UI.7C: an inline text link ("Como preparo o meu servidor?" in the form and under a failed test stage, G-5): caption
+         size, no padding, so it sits on the text baseline of its row. -->
+    <Style x:Key="SaTextLinkButtonStyle" TargetType="HyperlinkButton">
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="FontSize" Value="{StaticResource SaFontSizeCaption}" />
+    </Style>
     <!-- Dialog neutral 112:8573 / 112:8759: h42, radius 13, min width 168, fill .14/.12 + 1px border .14/.16, 13 Medium; no highlight. -->
     <Style x:Key="SaDialogButtonStyle" TargetType="Button" BasedOn="{StaticResource SaButtonBaseStyle}">
         <Setter Property="Template" Value="{StaticResource SaFlatButtonTemplate}" />

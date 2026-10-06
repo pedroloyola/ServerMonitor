@@ -84,6 +84,10 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
     // UI.7 B-15: the form as it was opened (after ctor + prefill); IsDirty compares against it.
     private readonly DirtyState _openedState;
     private bool _isDirty;
+    // UI.7C (B-16): per-field errors, shown only after a Test/Save attempt failed validation, then kept live per field.
+    private static readonly IReadOnlyDictionary<ServerEditorField, string> NoFieldErrors = new Dictionary<ServerEditorField, string>();
+    private bool _fieldErrorsShown;
+    private IReadOnlyDictionary<ServerEditorField, string> _fieldErrors = NoFieldErrors;
 
     public ServerEditorViewModel(
         IServerValidator validator,
@@ -173,6 +177,116 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
         }
 
         IsDirty = CaptureDirtyState() != _openedState;
+        if (_fieldErrorsShown && IsValidatedProperty(e.PropertyName))
+        {
+            RefreshFieldErrors();
+        }
+    }
+
+    /// <summary>
+    /// UI.7C (B-16, Figma 06): the message key of each invalid field (Core's draft rules incl. H-UI7-1, plus a password
+    /// that was never typed). Empty until a Test/Save attempt fails validation; from then on recomputed only when a field
+    /// it depends on changes, and raised only when the set of errors really changes (no validation storm per keystroke).
+    /// </summary>
+    public IReadOnlyDictionary<ServerEditorField, string> FieldErrors => _fieldErrors;
+
+    public bool HasFieldErrors => _fieldErrors.Count > 0;
+
+    /// <summary>The first invalid field in visual order (focus goes there after a failed attempt).</summary>
+    public ServerEditorField? FirstInvalidField =>
+        _fieldErrors.Count == 0 ? null : _fieldErrors.Keys.Min();
+
+    private static bool IsValidatedProperty(string? propertyName) => propertyName is
+        nameof(Name) or nameof(Host) or nameof(Port) or nameof(Username) or nameof(PrivateKeyPath)
+        or nameof(SelectedAuthenticationIndex) or nameof(UseJumpHost) or nameof(JumpHost) or nameof(JumpPort)
+        or nameof(JumpUsername) or nameof(SelectedJumpAuthenticationIndex) or nameof(JumpPrivateKeyPath);
+
+    // An attempt (Test or Save) failed validation: the errors become visible and stay live per field.
+    private void RevealFieldErrors()
+    {
+        _fieldErrorsShown = true;
+        RefreshFieldErrors();
+    }
+
+    private void RefreshFieldErrors()
+    {
+        if (_disposed || !_fieldErrorsShown)
+        {
+            return;
+        }
+
+        var errors = ComputeFieldErrors();
+        if (errors.Count == _fieldErrors.Count
+            && errors.All(error => _fieldErrors.TryGetValue(error.Key, out var key) && key == error.Value))
+        {
+            return;
+        }
+
+        _fieldErrors = errors;
+        OnPropertyChanged(nameof(FieldErrors));
+        OnPropertyChanged(nameof(HasFieldErrors));
+        OnPropertyChanged(nameof(FirstInvalidField));
+    }
+
+    // Side-effect free: the same input TryCreateDraft builds (an unparsable port counts as out of range), Core's draft
+    // validation, and the editor's own "password typed nowhere" rules. Never stages or clears a secret.
+    private Dictionary<ServerEditorField, string> ComputeFieldErrors()
+    {
+        var errors = new Dictionary<ServerEditorField, string>();
+        var port = int.TryParse(Port, NumberStyles.None, CultureInfo.InvariantCulture, out var parsedPort) ? parsedPort : 0;
+        var authenticationMethod = IsPasswordAuthentication ? AuthenticationMethod.Password : AuthenticationMethod.SshKey;
+        ServerRoute? route = null;
+        if (UseJumpHost)
+        {
+            var jumpAuthentication = SelectedJumpAuthenticationIndex == 1 ? AuthenticationMethod.Password : AuthenticationMethod.SshKey;
+            route = new ServerRoute
+            {
+                Jump = new JumpHop
+                {
+                    Host = JumpHost.Trim(),
+                    Port = int.TryParse(JumpPort, NumberStyles.None, CultureInfo.InvariantCulture, out var parsedJumpPort) ? parsedJumpPort : 0,
+                    Username = JumpUsername.Trim(),
+                    AuthenticationMethod = jumpAuthentication,
+                    PrivateKeyPath = jumpAuthentication == AuthenticationMethod.SshKey && !string.IsNullOrWhiteSpace(JumpPrivateKeyPath)
+                        ? JumpPrivateKeyPath
+                        : null,
+                    CredentialReferenceId = GetExistingJumpCredentialReference()
+                }
+            };
+        }
+
+        var input = new ServerInput
+        {
+            Name = Name,
+            Host = Host,
+            Port = port,
+            Username = Username,
+            AuthenticationMethod = authenticationMethod,
+            PrivateKeyPath = IsPrivateKeyAuthentication ? PrivateKeyPath : null,
+            CredentialReferenceId = GetExistingCredentialReference(authenticationMethod),
+            Route = route
+        };
+        foreach (var error in _validator.ValidateDraft(input).Errors)
+        {
+            if (ServerEditorValidation.Place(error.Code) is { } placed)
+            {
+                errors.TryAdd(placed.Field, placed.MessageKey);
+            }
+        }
+
+        if (authenticationMethod == AuthenticationMethod.Password && _secret is null && input.CredentialReferenceId is null)
+        {
+            errors.TryAdd(ServerEditorField.Password, ServerEditorValidation.PasswordMissingKey);
+        }
+
+        if (route?.Jump is { AuthenticationMethod: AuthenticationMethod.Password } jumpHop
+            && _jumpSecret is null
+            && jumpHop.CredentialReferenceId is null)
+        {
+            errors.TryAdd(ServerEditorField.JumpPassword, ServerEditorValidation.JumpPasswordMissingKey);
+        }
+
+        return errors;
     }
 
     private void RefreshDirty()
@@ -491,6 +605,15 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
     /// </summary>
     public SshHostKeyHop? HostKeyPromptHop =>
         (HasUnknownHostKey || HasHostKeyMismatch) && _lastConnectionResult is { } result ? result.HostKeyHop : null;
+
+    /// <summary>
+    /// UI.7C (presentation only): the state of the last test's result, null before any (or after an edit invalidated it).
+    /// The test dialog reads its phase from it; nothing reads it to decide trust, credentials or a save.
+    /// </summary>
+    public ServerConnectionState? LastTestState => _lastConnectionResult?.State;
+
+    /// <summary>UI.7C (presentation only): the last result's error code (its family words the test dialog; never text).</summary>
+    public SshConnectionErrorCode LastTestErrorCode => _lastConnectionResult?.ErrorCode ?? SshConnectionErrorCode.None;
 
     public void CaptureJumpSecret(string? value)
     {
@@ -1333,6 +1456,7 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
         if (!int.TryParse(Port, NumberStyles.None, CultureInfo.InvariantCulture, out var parsedPort))
         {
             HasValidationErrors = true;
+            RevealFieldErrors();
             return false;
         }
 
@@ -1348,6 +1472,7 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
             if (!int.TryParse(JumpPort, NumberStyles.None, CultureInfo.InvariantCulture, out var parsedJumpPort))
             {
                 HasValidationErrors = true;
+                RevealFieldErrors();
                 return false;
             }
 
@@ -1394,8 +1519,12 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
         HasValidationErrors = !validation.IsValid || passwordMissing || jumpPasswordMissing;
         if (HasValidationErrors)
         {
+            RevealFieldErrors();
             return false;
         }
+
+        // UI.7C: a valid attempt clears whatever was still shown (e.g. a password typed since).
+        RefreshFieldErrors();
 
         draft = new Server
         {

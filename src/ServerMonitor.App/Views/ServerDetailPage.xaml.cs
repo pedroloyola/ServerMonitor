@@ -42,6 +42,8 @@ public sealed partial class ServerDetailPage : Page, IServerDetailView, IDisposa
         ViewModel.Dispose();
     }
 
+    private void OnSavedToastCloseRequested(object? sender, EventArgs e) => ViewModel.DismissSavedToast();
+
     // An Ocultar / Remover that did not leave the page (cancelled, failed): back to "…", after the dialog / menu closed.
     private void OnActionsFocusRequested(object? sender, EventArgs e) =>
         DispatcherQueue?.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () => MoreActionsButton.Focus(FocusState.Programmatic));

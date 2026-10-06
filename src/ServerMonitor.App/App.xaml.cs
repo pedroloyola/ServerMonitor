@@ -443,7 +443,10 @@ public partial class App : Application
             sp.GetRequiredService<INavigationService>(),
             sp.GetRequiredService<ServerEditorReturnFocus>(),
             sp.GetRequiredService<ILogger<ServerEditorSession>>(),
-            FocusOrigin.CaptureName(sp.GetRequiredService<IWindowContext>())));
+            FocusOrigin.CaptureName(sp.GetRequiredService<IWindowContext>()),
+            sp.GetRequiredService<IServerService>(),
+            sp.GetRequiredService<ServerEditorSavedNotice>()));
+        services.AddSingleton<ServerEditorSavedNotice>();
         services.AddSingleton(sp => new AppShutdownCoordinator(
             () => ServicesHost,
             sp.GetRequiredService<ILogger<AppShutdownCoordinator>>()));

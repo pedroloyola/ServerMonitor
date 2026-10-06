@@ -35,64 +35,22 @@
   <data name="OperatingSystemLinux" xml:space="preserve"><value>Linux</value></data>
   <data name="OperatingSystemMacOS" xml:space="preserve"><value>macOS</value></data>
   <data name="OperatingSystemUnknown" xml:space="preserve"><value>Unknown</value></data>
-  <data name="ServerFormScrollViewer.AutomationProperties.Name" xml:space="preserve"><value>Server configuration</value></data>
-  <data name="ServerFormValidationError.Title" xml:space="preserve"><value>Review the details</value></data>
-  <data name="ServerFormValidationError.Message" xml:space="preserve"><value>Review the required fields, port, and SSH authentication configuration.</value></data>
-  <data name="ServerFormNameField.Header" xml:space="preserve"><value>Name</value></data>
-  <data name="ServerFormNameField.PlaceholderText" xml:space="preserve"><value>e.g. Main server</value></data>
-  <data name="ServerFormHostField.Header" xml:space="preserve"><value>Host / IP</value></data>
-  <data name="ServerFormHostField.PlaceholderText" xml:space="preserve"><value>e.g. server.example.com</value></data>
-  <data name="ServerFormPortField.Header" xml:space="preserve"><value>Port</value></data>
-  <data name="ServerFormUsernameField.Header" xml:space="preserve"><value>Username</value></data>
-  <data name="ServerFormUsernameField.PlaceholderText" xml:space="preserve"><value>e.g. monitor</value></data>
-  <data name="ServerFormOperatingSystemField.Header" xml:space="preserve"><value>Operating system</value></data>
   <data name="OperatingSystemAutoOption.Content" xml:space="preserve"><value>Automatic</value></data>
   <data name="OperatingSystemLinuxOption.Content" xml:space="preserve"><value>Linux</value></data>
   <data name="OperatingSystemMacOSOption.Content" xml:space="preserve"><value>macOS</value></data>
   <data name="OperatingSystemUnknownOption.Content" xml:space="preserve"><value>Unknown</value></data>
-  <data name="ServerFormRefreshIntervalField.Header" xml:space="preserve"><value>Update interval</value></data>
   <data name="RefreshInterval10sOption.Content" xml:space="preserve"><value>10 seconds</value></data>
   <data name="RefreshInterval30sOption.Content" xml:space="preserve"><value>30 seconds</value></data>
   <data name="RefreshInterval1minOption.Content" xml:space="preserve"><value>1 minute</value></data>
   <data name="RefreshInterval5minOption.Content" xml:space="preserve"><value>5 minutes</value></data>
-  <data name="AddServerDialog.Title" xml:space="preserve"><value>Add server</value></data>
-  <data name="AddServerDialog.PrimaryButtonText" xml:space="preserve"><value>Save</value></data>
-  <data name="AddServerDialog.CloseButtonText" xml:space="preserve"><value>Cancel</value></data>
-  <data name="EditServerDialog.Title" xml:space="preserve"><value>Edit server</value></data>
-  <data name="EditServerDialog.PrimaryButtonText" xml:space="preserve"><value>Save changes</value></data>
-  <data name="EditServerDialog.CloseButtonText" xml:space="preserve"><value>Cancel</value></data>
   <data name="SettingsHiddenServersTitle.Text" xml:space="preserve"><value>Hidden servers</value></data>
   <data name="SettingsHiddenServersDescription.Text" xml:space="preserve"><value>They stay saved but don't appear on the dashboard.</value></data>
   <data name="SettingsHiddenServersEmpty.Text" xml:space="preserve"><value>No hidden servers.</value></data>
   <data name="HiddenServerRestoreButton.Content" xml:space="preserve"><value>Restore</value></data>
   <data name="HiddenServerRestoreFor" xml:space="preserve"><value>Restore {0}</value></data>
-  <data name="ServerFormAuthenticationTitle.Text" xml:space="preserve"><value>Authentication</value></data>
-  <data name="ServerFormAuthenticationMethodField.Header" xml:space="preserve"><value>Authentication method</value></data>
-  <data name="AuthenticationSshKeyOption.Content" xml:space="preserve"><value>SSH private key (recommended)</value></data>
-  <data name="AuthenticationPasswordOption.Content" xml:space="preserve"><value>Password</value></data>
-  <data name="ServerFormPrivateKeyPathField.Header" xml:space="preserve"><value>Private key file</value></data>
-  <data name="ServerFormPrivateKeyPathField.PlaceholderText" xml:space="preserve"><value>Select id_ed25519, id_rsa, or another compatible key</value></data>
-  <data name="ServerFormChoosePrivateKeyButton.Content" xml:space="preserve"><value>Choose file…</value></data>
-  <data name="ServerFormPassphraseField.Header" xml:space="preserve"><value>Key passphrase (optional)</value></data>
-  <data name="ServerFormPassphraseField.PlaceholderText" xml:space="preserve"><value>It will not be stored in the configuration file</value></data>
-  <data name="ServerFormSavedPassphraseHint.Text" xml:space="preserve"><value>A passphrase is protected in Credential Manager. Leave this blank to keep it.</value></data>
   <data name="ServerFormRemoveSavedPassphrase.Content" xml:space="preserve"><value>Remove saved passphrase</value></data>
-  <data name="ServerFormPasswordField.Header" xml:space="preserve"><value>SSH password</value></data>
-  <data name="ServerFormPasswordField.PlaceholderText" xml:space="preserve"><value>Stored securely by Windows</value></data>
-  <data name="ServerFormSavedPasswordHint.Text" xml:space="preserve"><value>A password is protected in Credential Manager. Enter one only to replace it.</value></data>
   <data name="ServerFormTestConnectionButton.Content" xml:space="preserve"><value>Test connection</value></data>
   <data name="ServerFormCancelTestButton.Content" xml:space="preserve"><value>Cancel test</value></data>
-  <data name="HostKeyUnknownTitle.Text" xml:space="preserve"><value>Confirm server identity</value></data>
-  <data name="HostKeyUnknownDescription.Text" xml:space="preserve"><value>This host key is not known yet. Compare the SHA-256 fingerprint through an independent channel before trusting it.</value></data>
-  <data name="HostKeyServerLabel.Text" xml:space="preserve"><value>Server</value></data>
-  <data name="HostKeyAlgorithmLabel.Text" xml:space="preserve"><value>Algorithm</value></data>
-  <data name="HostKeyFingerprintLabel.Text" xml:space="preserve"><value>SHA-256 fingerprint</value></data>
-  <data name="HostKeyTrustAndConnectButton.Content" xml:space="preserve"><value>Trust and connect</value></data>
-  <data name="HostKeyCancelButton.Content" xml:space="preserve"><value>Cancel</value></data>
-  <data name="HostKeyMismatchTitle.Text" xml:space="preserve"><value>This server's identity has changed</value></data>
-  <data name="HostKeyMismatchDescription.Text" xml:space="preserve"><value>The connection was blocked. Do not continue until you confirm the change with the server administrator.</value></data>
-  <data name="HostKeyKnownFingerprintLabel.Text" xml:space="preserve"><value>Known fingerprint</value></data>
-  <data name="HostKeyReceivedFingerprintLabel.Text" xml:space="preserve"><value>Received fingerprint</value></data>
   <data name="ConnectionStateNeverConnected" xml:space="preserve"><value>Not tested yet</value></data>
   <data name="ConnectionStateConnecting" xml:space="preserve"><value>Testing connection…</value></data>
   <data name="ConnectionStateConnected" xml:space="preserve"><value>Connection verified</value></data>
@@ -343,10 +301,7 @@
   <data name="BackgroundDegradedNotice.Title" xml:space="preserve"><value>Background unavailable in this session</value></data>
   <data name="BackgroundDegradedNotice.Message" xml:space="preserve"><value>ServerAlyzer opened this window because it could not place or keep its icon in the taskbar notification area. Without that icon there is no way to reopen or quit the app from the background, so closing this window now quits ServerAlyzer. Your preference was not changed: open ServerAlyzer again later to try again.</value></data>
   <data name="SettingsBackgroundDegradedCaption.Text" xml:space="preserve"><value>Unavailable in this session: the notification-area icon could not be created or kept. Closing the window quits ServerAlyzer. Your preference was kept and will be used the next time you open the app.</value></data>
-  <data name="ServerFormImportSshConfigButton.Content" xml:space="preserve"><value>Import from SSH config</value></data>
-  <data name="ServerFormSshConfigTitle.Text" xml:space="preserve"><value>Hosts in ~/.ssh/config</value></data>
   <data name="ServerFormSshConfigCloseButton.Content" xml:space="preserve"><value>Close</value></data>
-  <data name="ServerFormSshConfigUseButton.Content" xml:space="preserve"><value>Use</value></data>
   <data name="SshConfigHostUseForFormat" xml:space="preserve"><value>Use {0}</value></data>
   <data name="SshConfigImportNotFound" xml:space="preserve"><value>No ~/.ssh/config found.</value></data>
   <data name="SshConfigImportNoHosts" xml:space="preserve"><value>No hosts to import in ~/.ssh/config.</value></data>
@@ -378,7 +333,6 @@
   <data name="SshConfigHostBlockedProxyMaySetByInclude" xml:space="preserve"><value>An Include could not be verified — cannot check the proxy, not imported</value></data>
   <data name="SshConfigImportWarningHostsTruncated" xml:space="preserve"><value>Only the first 500 hosts are listed.</value></data>
   <data name="SshConfigImportErrorInvalidSyntax" xml:space="preserve"><value>~/.ssh/config or a file it includes has a malformed line that ssh would reject. Nothing was imported.</value></data>
-  <data name="ServerFormSshConfigHostList.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Hosts in ~/.ssh/config</value></data>
   <data name="SshConfigImportErrorTooManyFiles" xml:space="preserve"><value>Too many included files (limit 64 files, 256 matches per Include). Nothing was imported.</value></data>
   <data name="SshConfigImportErrorIncludeCycle" xml:space="preserve"><value>A file includes itself, directly or through other files, so ssh would fail. Nothing was imported.</value></data>
   <data name="SshConfigImportErrorIncludeTooDeep" xml:space="preserve"><value>Include files are nested more than 16 levels deep, so ssh would fail. Nothing was imported.</value></data>
@@ -398,36 +352,14 @@
   <data name="SshConfigHostAccessibleImportableFormat" xml:space="preserve"><value>{0} — importable</value></data>
   <data name="SshConfigHostAccessibleBlockedFormat" xml:space="preserve"><value>{0} — blocked: {1}</value></data>
   <data name="SshConfigHostAccessibleNotesFormat" xml:space="preserve"><value>Notes: {0}</value></data>
-  <data name="ServerFormRouteTitle.Text" xml:space="preserve"><value>Route</value></data>
-  <data name="ServerFormUseJumpHost.Content" xml:space="preserve"><value>Connect through a jump host</value></data>
-  <data name="ServerFormJumpHostHint.Text" xml:space="preserve"><value>The server is then reached only through this jump host (one hop). Its host key is confirmed separately.</value></data>
-  <data name="ServerFormJumpHostField.Header" xml:space="preserve"><value>Jump host</value></data>
-  <data name="ServerFormJumpHostField.PlaceholderText" xml:space="preserve"><value>e.g. bastion.example.com</value></data>
-  <data name="ServerFormJumpPortField.Header" xml:space="preserve"><value>Port</value></data>
-  <data name="ServerFormJumpPortField.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Jump host port</value></data>
-  <data name="ServerFormJumpUsernameField.Header" xml:space="preserve"><value>Jump host username</value></data>
-  <data name="ServerFormJumpAuthenticationMethodField.Header" xml:space="preserve"><value>Jump host authentication</value></data>
-  <data name="JumpAuthenticationSshKeyOption.Content" xml:space="preserve"><value>SSH private key</value></data>
-  <data name="JumpAuthenticationPasswordOption.Content" xml:space="preserve"><value>Password</value></data>
-  <data name="ServerFormJumpPrivateKeyPathField.Header" xml:space="preserve"><value>Jump host private key file</value></data>
-  <data name="ServerFormChooseJumpPrivateKeyButton.Content" xml:space="preserve"><value>Choose file…</value></data>
-  <data name="ServerFormJumpPassphraseField.Header" xml:space="preserve"><value>Jump host key passphrase (optional)</value></data>
-  <data name="ServerFormJumpPasswordField.Header" xml:space="preserve"><value>Jump host password</value></data>
-  <data name="ServerFormSavedJumpSecretHint.Text" xml:space="preserve"><value>The jump host secret is protected in Credential Manager. Enter one only to replace it.</value></data>
   <data name="HostKeySubjectJumpFormat" xml:space="preserve"><value>Jump host {0}</value></data>
   <data name="HostKeySubjectTargetFormat" xml:space="preserve"><value>Target {0} via {1}</value></data>
-  <data name="HostKeyMismatchServerLabel.Text" xml:space="preserve"><value>Server</value></data>
   <data name="DashboardEmptyDiscoverySearching.Text" xml:space="preserve"><value>Looking for SSH servers on your local network…</value></data>
   <data name="DashboardEmptyDiscoveryFoundFormat" xml:space="preserve"><value>Found on your local network: {0}</value></data>
-  <data name="ServerFormLocalKeySelector.Header" xml:space="preserve"><value>Keys found in .ssh</value></data>
-  <data name="ServerFormLocalKeySelector.PlaceholderText" xml:space="preserve"><value>Choose a key that was found…</value></data>
-  <data name="ServerFormJumpLocalKeySelector.Header" xml:space="preserve"><value>Keys found in .ssh (jump host)</value></data>
-  <data name="ServerFormJumpLocalKeySelector.PlaceholderText" xml:space="preserve"><value>Choose a key that was found…</value></data>
   <data name="LocalKeyOptionRecommendedFormat" xml:space="preserve"><value>{0} · Recommended</value></data>
   <data name="LocalKeyOptionBrowse" xml:space="preserve"><value>Browse for another file…</value></data>
   <data name="LocalKeyAutoSelectedHint" xml:space="preserve"><value>Key found in .ssh</value></data>
   <data name="LocalKeyNoneFoundHint" xml:space="preserve"><value>No key was found in .ssh. Select id_ed25519, id_rsa or another compatible key.</value></data>
-  <data name="ServerFormCredentialReassurance.Text" xml:space="preserve"><value>Your key stays on this device. Passwords and passphrases are protected by Windows Credential Manager.</value></data>
   <data name="ServerFormPrepHelpLink.Content" xml:space="preserve"><value>How do I prepare my server?</value></data>
   <data name="ServerPrepTitle.Text" xml:space="preserve"><value>Preparing your server</value></data>
   <data name="ServerPrepIntro.Text" xml:space="preserve"><value>ServerAlyzer needs no root access and installs nothing on the server. A regular user is enough to read the metrics.</value></data>
@@ -443,7 +375,6 @@
   <data name="ServerPrepUserPlaceholder" xml:space="preserve"><value>&lt;user&gt;</value></data>
   <data name="ServerPrepHostPlaceholder" xml:space="preserve"><value>&lt;server&gt;</value></data>
   <data name="ServerPrepJumpPlaceholder" xml:space="preserve"><value>&lt;jump-host&gt;</value></data>
-  <data name="ServerFormChecklistTitle.Text" xml:space="preserve"><value>Connection test</value></data>
   <data name="ConnectionStepPortTitle" xml:space="preserve"><value>SSH port</value></data>
   <data name="ConnectionStepPortViaJumpFormat" xml:space="preserve"><value>SSH port (via {0})</value></data>
   <data name="ConnectionStepHostKeyTitle" xml:space="preserve"><value>Server identity (SHA-256)</value></data>
@@ -993,7 +924,6 @@ status, metrics and history.</value></data>
   <data name="ServerEditorUsernameField.Header" xml:space="preserve"><value>SSH user</value></data>
   <data name="ServerEditorUsernameInput.PlaceholderText" xml:space="preserve"><value>e.g. monitor</value></data>
   <data name="ServerEditorPrivateKeyField.Header" xml:space="preserve"><value>Private key file</value></data>
-  <data name="ServerEditorPrivateKeyInput.PlaceholderText" xml:space="preserve"><value>Select id_ed25519, id_rsa or another compatible key.</value></data>
   <data name="ServerEditorPassphraseField.Header" xml:space="preserve"><value>Key passphrase · optional</value></data>
   <data name="ServerEditorPassphraseInput.PlaceholderText" xml:space="preserve"><value>Only if your key is protected</value></data>
   <data name="ServerEditorPasswordField.Header" xml:space="preserve"><value>Password</value></data>
@@ -1018,7 +948,6 @@ status, metrics and history.</value></data>
   <data name="ServerEditorJumpAuthSubtitle.Text" xml:space="preserve"><value>Used only to connect to the jump host.</value></data>
   <data name="ServerEditorJumpAuthMethodGroup.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Jump host authentication method</value></data>
   <data name="ServerEditorJumpPrivateKeyField.Header" xml:space="preserve"><value>Private key file</value></data>
-  <data name="ServerEditorJumpPrivateKeyInput.PlaceholderText" xml:space="preserve"><value>Select the jump host's private key.</value></data>
   <data name="ServerEditorJumpPassphraseField.Header" xml:space="preserve"><value>Key passphrase · optional</value></data>
   <data name="ServerEditorJumpPassphraseInput.PlaceholderText" xml:space="preserve"><value>Only if the key is protected</value></data>
   <data name="ServerEditorJumpPasswordField.Header" xml:space="preserve"><value>Password</value></data>
@@ -1088,4 +1017,70 @@ status, metrics and history.</value></data>
   <data name="ServerEditorImportTitleText.Text" xml:space="preserve"><value>Import from SSH</value></data>
   <data name="ServerEditorImportCancelButton.Content" xml:space="preserve"><value>Cancel</value></data>
   <data name="ServerEditorImportUseButton.Content" xml:space="preserve"><value>Use profile</value></data>
+  <data name="ServerEditorErrorNameRequired" xml:space="preserve"><value>Enter a name to identify the server.</value></data>
+  <data name="ServerEditorErrorHostRequired" xml:space="preserve"><value>Enter the server address.</value></data>
+  <data name="ServerEditorErrorHostFormat" xml:space="preserve"><value>Use a host name or IP address, without https:// or a path.</value></data>
+  <data name="ServerEditorErrorPortRange" xml:space="preserve"><value>Use a value from 1 to 65535.</value></data>
+  <data name="ServerEditorErrorUsernameRequired" xml:space="preserve"><value>Enter the SSH user.</value></data>
+  <data name="ServerEditorErrorPrivateKeyRequired" xml:space="preserve"><value>Choose the private key file.</value></data>
+  <data name="ServerEditorErrorPrivateKeyIsPublic" xml:space="preserve"><value>This is a public key. Choose the private key, without .pub.</value></data>
+  <data name="ServerEditorErrorPasswordRequired" xml:space="preserve"><value>Enter the SSH user's password.</value></data>
+  <data name="ServerEditorErrorJumpHostRequired" xml:space="preserve"><value>Enter the jump host address.</value></data>
+  <data name="ServerEditorErrorJumpIsTarget" xml:space="preserve"><value>The jump host can't be the target server itself.</value></data>
+  <data name="ServerEditorErrorJumpPortRange" xml:space="preserve"><value>Use a port between 1 and 65535.</value></data>
+  <data name="ServerEditorErrorJumpUsernameRequired" xml:space="preserve"><value>Enter the jump host's SSH user.</value></data>
+  <data name="ServerEditorErrorJumpPrivateKeyRequired" xml:space="preserve"><value>Select the jump host's private key.</value></data>
+  <data name="ServerEditorErrorJumpPrivateKeyIsPublic" xml:space="preserve"><value>Choose a valid private key, not the public key.</value></data>
+  <data name="ServerEditorErrorJumpPasswordRequired" xml:space="preserve"><value>Enter the jump host's password.</value></data>
+  <data name="ServerEditorValidationSummary" xml:space="preserve"><value>Check the highlighted fields to continue.</value></data>
+  <data name="ServerEditorHintFixFields" xml:space="preserve"><value>Fix the highlighted fields.</value></data>
+  <data name="ServerEditorHintFixJumpFields" xml:space="preserve"><value>Fix the jump host fields to continue.</value></data>
+  <data name="ServerEditorHintPasswordToContinue" xml:space="preserve"><value>Enter the password to continue.</value></data>
+  <data name="ServerEditorHintImported" xml:space="preserve"><value>Profile imported. Test the connection to continue.</value></data>
+  <data name="ServerEditorSaveFailedSubtitleAdd" xml:space="preserve"><value>The server couldn't be added.</value></data>
+  <data name="ServerEditorSaveFailedSubtitleEdit" xml:space="preserve"><value>The changes couldn't be saved.</value></data>
+  <data name="ServerEditorSaveRetryButton.Content" xml:space="preserve"><value>Try saving again</value></data>
+  <data name="ServerEditorDuplicateTitle" xml:space="preserve"><value>This server is already added</value></data>
+  <data name="ServerEditorDuplicateMessageFormat" xml:space="preserve"><value>{0} · {1} — already exists as {2}.</value></data>
+  <data name="ServerEditorDuplicateOpenButton.Content" xml:space="preserve"><value>Open server</value></data>
+  <data name="ServerEditorDuplicateOpenAccessibleFormat" xml:space="preserve"><value>Open the server {0}</value></data>
+  <data name="ServerEditorImportAlreadyAdded.Text" xml:space="preserve"><value>Already added</value></data>
+  <data name="ServerEditorImportAlreadyAddedAccessibleFormat" xml:space="preserve"><value>{0}. Already added</value></data>
+  <data name="ServerEditorTestTestingTitle" xml:space="preserve"><value>Testing connection</value></data>
+  <data name="ServerEditorTestTestingBodyFormat" xml:space="preserve"><value>Checking SSH access to {0}.</value></data>
+  <data name="ServerEditorTestVerifiedTitle" xml:space="preserve"><value>Connection verified</value></data>
+  <data name="ServerEditorTestVerifiedBody" xml:space="preserve"><value>The server responded and SSH authentication completed.</value></data>
+  <data name="ServerEditorTestVerifiedDetail" xml:space="preserve"><value>SSH authenticated · Identity confirmed</value></data>
+  <data name="ServerEditorTestCancelledTitle" xml:space="preserve"><value>Test cancelled</value></data>
+  <data name="ServerEditorTestCancelledBody" xml:space="preserve"><value>The check was stopped. You can adjust the details or try again.</value></data>
+  <data name="ServerEditorTestFailedNetworkTitle" xml:space="preserve"><value>Couldn't reach the server</value></data>
+  <data name="ServerEditorTestFailedNetworkBody" xml:space="preserve"><value>The server didn't answer on the SSH port. Check the address and the port, then test again.</value></data>
+  <data name="ServerEditorTestFailedProtocolTitle" xml:space="preserve"><value>The SSH session wasn't established</value></data>
+  <data name="ServerEditorTestFailedProtocolBody" xml:space="preserve"><value>The server answered, but the SSH connection didn't complete. See the details below.</value></data>
+  <data name="ServerEditorTestFailedAuthenticationTitle" xml:space="preserve"><value>Couldn't authenticate</value></data>
+  <data name="ServerEditorTestFailedAuthenticationBody" xml:space="preserve"><value>Check the user and the credential: the private key and passphrase, or the password. Then test again.</value></data>
+  <data name="ServerEditorTestFailedIdentityTitle" xml:space="preserve"><value>Couldn't confirm the identity</value></data>
+  <data name="ServerEditorTestFailedIdentityBody" xml:space="preserve"><value>The server's identity wasn't confirmed. Go back to the form and test again to review it.</value></data>
+  <data name="ServerEditorTestFailedJumpTitle" xml:space="preserve"><value>Couldn't use the jump host</value></data>
+  <data name="ServerEditorTestFailedJumpBody" xml:space="preserve"><value>The connection stopped at the jump host. Check its address, user and credentials, then test again.</value></data>
+  <data name="ServerEditorTestFailedTargetViaJumpTitle" xml:space="preserve"><value>The jump host can't reach the server</value></data>
+  <data name="ServerEditorTestFailedTargetViaJumpBody" xml:space="preserve"><value>The jump host answered but couldn't open a connection to the target server. Check the server's address and port.</value></data>
+  <data name="ServerEditorTestFailedTunnelTitle" xml:space="preserve"><value>Couldn't open the local tunnel</value></data>
+  <data name="ServerEditorTestFailedTunnelBody" xml:space="preserve"><value>This device couldn't open the local tunnel through the jump host. Try again in a moment.</value></data>
+  <data name="ServerEditorTestReviewData" xml:space="preserve"><value>Review details</value></data>
+  <data name="ServerEditorTestReviewRoute" xml:space="preserve"><value>Review connection</value></data>
+  <data name="ServerEditorTestReviewCredentials" xml:space="preserve"><value>Review credentials</value></data>
+  <data name="ServerEditorTestRetry" xml:space="preserve"><value>Try again</value></data>
+  <data name="ServerEditorTestAgain" xml:space="preserve"><value>Test again</value></data>
+  <data name="ServerEditorTestViaFormat" xml:space="preserve"><value>via {0}</value></data>
+  <data name="ServerEditorSavedAddedTitle" xml:space="preserve"><value>Server added</value></data>
+  <data name="ServerEditorSavedAddedMessageFormat" xml:space="preserve"><value>{0} · Collecting the first metrics.</value></data>
+  <data name="ServerEditorSavedEditedTitle" xml:space="preserve"><value>Changes saved</value></data>
+  <data name="ServerEditorSavedEditedMessageFormat" xml:space="preserve"><value>The details of {0} were updated.</value></data>
+  <data name="ServerEditorSavedCloseName" xml:space="preserve"><value>Close notification</value></data>
+  <data name="ServerEditorJumpUsernameInput.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Jump host SSH user</value></data>
+  <data name="ServerEditorJumpPortInput.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Jump host port</value></data>
+  <data name="ServerEditorJumpPasswordInput.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Jump host password</value></data>
+  <data name="ServerEditorJumpPassphraseInput.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Jump host key passphrase</value></data>
+  <data name="ServerEditorJumpKeyPickerAccessibleHeader" xml:space="preserve"><value>Jump host private key</value></data>
 </root>

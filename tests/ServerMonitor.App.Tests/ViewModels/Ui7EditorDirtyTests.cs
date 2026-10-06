@@ -209,6 +209,12 @@ public sealed class Ui7EditorDirtyTests : IDisposable
 
         public bool IsSaved(ServerEditorRequest request) => false;
 
+        public Task<IReadOnlyList<Server>> GetKnownServersAsync() => Task.FromResult<IReadOnlyList<Server>>([]);
+
+        public void OpenExistingServer(ServerEditorRequest request, Guid serverId)
+        {
+        }
+
         public void ResumeSavedDestination(ServerEditorRequest request)
         {
         }

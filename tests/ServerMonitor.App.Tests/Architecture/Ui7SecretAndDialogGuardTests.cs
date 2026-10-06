@@ -93,10 +93,12 @@ public sealed partial class Ui7SecretAndDialogGuardTests
     public void CP9_ThePasswordBoxesAreReadOnlyToStageAndCleared_InTheFormOnly()
     {
         var code = AppSourceTree.CodeWithoutComments("Controls/ServerFormControl.xaml.cs");
-        // Read: CaptureSecret (4) + HasTypedSecret (4); cleared: CaptureSecret (4) + ClearSecrets (4).
-        Assert.Equal(8, Regex.Matches(code, @"Field\.Password\.Length > 0|\? (Jump)?(Password|Passphrase)Field\.Password|: (Jump)?(Password|Passphrase)Field\.Password").Count);
+        // Read: CaptureSecret (4) + HasTypedSecret (4) + UI.7C ApplyErrors (2: only the LENGTH - a typed password hides its
+        // own "missing" error); cleared: CaptureSecret (4) + ClearSecrets (4).
+        Assert.Equal(10, Regex.Matches(code, @"Field\.Password\.Length > 0|\? (Jump)?(Password|Passphrase)Field\.Password|: (Jump)?(Password|Passphrase)Field\.Password").Count);
+        Assert.Equal(6, Regex.Matches(code, @"Field\.Password\.Length > 0").Count);
         Assert.Equal(8, Regex.Matches(code, @"Field\.Password = string\.Empty;").Count);
-        foreach (var other in new[] { "Views/ServerEditorPage.xaml.cs", "Views/ServerEditorTrustPanel.xaml.cs", "Views/SshConfigImportPanel.xaml.cs" })
+        foreach (var other in new[] { "Views/ServerEditorPage.xaml.cs", "Views/ServerEditorTrustPanel.xaml.cs", "Views/SshConfigImportPanel.xaml.cs", "Views/ServerEditorTestPanel.xaml.cs" })
         {
             Assert.DoesNotContain(".Password", AppSourceTree.CodeWithoutComments(other), StringComparison.Ordinal);
         }

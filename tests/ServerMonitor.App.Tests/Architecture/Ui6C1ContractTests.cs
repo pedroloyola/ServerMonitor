@@ -73,10 +73,8 @@ public sealed class Ui6C1ContractTests
         Assert.Contains("visit.ViewModel?.Dispose();",code);
         Assert.Contains("visit.Completion.TrySetResult();",code);
         Assert.True(code.IndexOf("_returnFocus.Remember(",StringComparison.Ordinal)>code.IndexOf("_navigation.LeaveCurrentPageThen(",StringComparison.Ordinal));
-        var focus=AppSourceTree.CodeWithoutComments("Services/DialogReturnFocus.cs");
-        Assert.Contains("IsLoaded: true",focus);
-        Assert.Contains("ReferenceEquals(origin.XamlRoot, root)",focus);
-        Assert.Contains("ShellPageFocus.FocusHeading(page, force: true)",focus);
+        // UI.7C (B-22, Cortex n-7): DialogReturnFocus had no caller left (the editor became a page with its own return slot).
+        Assert.False(File.Exists(AppSourceTree.Full("Services/DialogReturnFocus.cs")));
     }
     [Theory]
     [InlineData("Dashboard", "TakeReturnFocus()")]
