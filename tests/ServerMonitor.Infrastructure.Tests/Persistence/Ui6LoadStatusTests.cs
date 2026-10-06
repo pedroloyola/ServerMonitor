@@ -150,31 +150,33 @@ public sealed class Ui6LoadStatusTests : IDisposable
         denied.AddAccessRule(rule);
         try
         {
-            directory.SetAccessControl(denied);
-            Assert.Throws<UnauthorizedAccessException>(() => File.GetAttributes(Direct));
-            Assert.False(File.Exists(Direct));
-            using var repository = Repository();
-            Assert.Equal(ServerLoadStatus.Unavailable, await repository.GetLoadStatusAsync());
-            using var service = new ServerService(repository, new ServerValidator(), new ConfigurationWriteGate());
-            Assert.Equal(ServerLoadStatus.Unavailable, await service.GetLoadStatusAsync());
-        }
-        finally
-        {
-            var restore = new DirectorySecurity();
-            restore.SetSecurityDescriptorSddlForm(original, AccessControlSections.Access);
-            directory.SetAccessControl(restore);
-        }
-        try
-        {
-            var restored = directory.GetAccessControl();
-            Assert.DoesNotContain(restored.GetAccessRules(true, true, typeof(SecurityIdentifier)).Cast<FileSystemAccessRule>(),
-                candidate => candidate.AccessControlType == AccessControlType.Deny && candidate.IdentityReference.Equals(rule.IdentityReference));
-            Assert.Equal(AccessRules(originalSecurity), AccessRules(restored));
-            var originalDescriptor = new RawSecurityDescriptor(original);
-            var restoredDescriptor = new RawSecurityDescriptor(restored.GetSecurityDescriptorSddlForm(AccessControlSections.Access));
-            Assert.Equal(originalDescriptor.ControlFlags & ~ControlFlags.DiscretionaryAclAutoInherited,
-                restoredDescriptor.ControlFlags & ~ControlFlags.DiscretionaryAclAutoInherited);
-            Assert.Equal("[]", await File.ReadAllTextAsync(Direct));
+            try
+            {
+                directory.SetAccessControl(denied);
+                Assert.Throws<UnauthorizedAccessException>(() => File.GetAttributes(Direct));
+                Assert.False(File.Exists(Direct));
+                using var repository = Repository();
+                Assert.Equal(ServerLoadStatus.Unavailable, await repository.GetLoadStatusAsync());
+                using var service = new ServerService(repository, new ServerValidator(), new ConfigurationWriteGate());
+                Assert.Equal(ServerLoadStatus.Unavailable, await service.GetLoadStatusAsync());
+            }
+            finally
+            {
+                var restore = new DirectorySecurity();
+                restore.SetSecurityDescriptorSddlForm(original, AccessControlSections.Access);
+                directory.SetAccessControl(restore);
+            }
+            {
+                var restored = directory.GetAccessControl();
+                Assert.DoesNotContain(restored.GetAccessRules(true, true, typeof(SecurityIdentifier)).Cast<FileSystemAccessRule>(),
+                    candidate => candidate.AccessControlType == AccessControlType.Deny && candidate.IdentityReference.Equals(rule.IdentityReference));
+                Assert.Equal(AccessRules(originalSecurity), AccessRules(restored));
+                var originalDescriptor = new RawSecurityDescriptor(original);
+                var restoredDescriptor = new RawSecurityDescriptor(restored.GetSecurityDescriptorSddlForm(AccessControlSections.Access));
+                Assert.Equal(originalDescriptor.ControlFlags & ~ControlFlags.DiscretionaryAclAutoInherited,
+                    restoredDescriptor.ControlFlags & ~ControlFlags.DiscretionaryAclAutoInherited);
+                Assert.Equal("[]", await File.ReadAllTextAsync(Direct));
+            }
         }
         finally
         {

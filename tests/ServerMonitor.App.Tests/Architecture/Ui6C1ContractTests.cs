@@ -53,9 +53,10 @@ public sealed class Ui6C1ContractTests
         if(page=="Settings") Assert.Equal("0",A(heading.Parent!,"Grid.Column"));
         if(page=="History")
         {
-            Assert.Null(A(heading.Parent!.Parent!,"ColumnSpacing"));
-            var back=heading.Parent.Parent!.Elements().Single(e=>e.Name.LocalName=="Button");
-            Assert.Equal("0,6,12,0",A(back,"Margin"));
+            Assert.Equal("StackPanel", heading.Parent!.Parent!.Name.LocalName);
+            Assert.Null(A(heading.Parent!, "Grid.Column"));
+            var back = heading.Parent.Parent.Elements().Single(e => e.Name.LocalName == "Button");
+            Assert.Equal("22", A(back, "Height"));
         }
         // Detail's identity icon and Data/Workloads back affordances intentionally precede H1 within the same column.
     }

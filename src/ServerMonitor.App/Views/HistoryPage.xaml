@@ -41,6 +41,10 @@
                         <Setter Target="RangeTrack.(Grid.Row)" Value="1" />
                         <Setter Target="RangeTrack.(Grid.Column)" Value="0" />
                         <Setter Target="ServerSelector.Width" Value="NaN" />
+                        <Setter Target="ServerSelector.MinWidth" Value="0" />
+                        <Setter Target="ControlsFirstColumn.Width" Value="*" />
+                        <Setter Target="RangeTrack.(Grid.ColumnSpan)" Value="3" />
+                        <Setter Target="RangeItems.ItemWidth" Value="78" />
                         <Setter Target="ServerSelector.(Grid.ColumnSpan)" Value="3" />
                         <Setter Target="ServerSelector.HorizontalAlignment" Value="Stretch" />
                         <Setter Target="CpuChart.(Grid.Row)" Value="1" />
@@ -70,20 +74,16 @@
         </Grid.RowDefinitions>
 
         <!-- Header 112:2259: title 32 Semibold + subtitle 13 Regular muted, gap 5. -->
-        <Grid>
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
+        <StackPanel Spacing="{StaticResource SaSpace8}">
             <Button
-                x:Uid="HistoryBackButton" Visibility="{Binding ShowDetailBack, Converter={StaticResource BooleanToVisibilityConverter}}"
+                x:Uid="HistoryBackButton" AutomationProperties.Name="{Binding BackAutomationName}" Visibility="{Binding ShowDetailBack, Converter={StaticResource BooleanToVisibilityConverter}}"
                 VerticalAlignment="Top"
-                Margin="0,6,12,0"
+                Height="22" HorizontalAlignment="Left"
                 Command="{Binding BackCommand}"
                 Style="{StaticResource SaBreadcrumbParentButtonStyle}">
                 <StackPanel Orientation="Horizontal" Spacing="8"><primitives:SaIcon Data="{StaticResource SaIconArrowRight01Data}" Size="16" RenderTransformOrigin="0.5,0.5"><primitives:SaIcon.RenderTransform><RotateTransform Angle="180"/></primitives:SaIcon.RenderTransform></primitives:SaIcon><TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" MaxWidth="160"/></StackPanel>
             </Button>
-            <StackPanel Grid.Column="1" Spacing="5">
+            <StackPanel Spacing="5">
                 <primitives:SaHeadingHost AutomationProperties.HeadingLevel="Level1" IsTabStop="False">
                         <TextBlock
                     x:Uid="HistoryPageTitle"
@@ -96,13 +96,13 @@
                     Style="{StaticResource SaPageSubtitleTextStyle}"
                     TextWrapping="Wrap" />
             </StackPanel>
-        </Grid>
+        </StackPanel>
 
         <!-- Selector + range row 112:2264 / 112:2278: h56, flexible gap. -->
         <!-- RowSpacing only when the range wraps under the selector (Prism R1 F4: an empty 2nd row must add no gap). -->
         <Grid x:Name="ControlsRow" Grid.Row="1" ColumnSpacing="{StaticResource SaSpace20}">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition x:Name="ControlsFirstColumn" Width="Auto" />
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
@@ -123,22 +123,21 @@
                 Grid.Column="2"
                 VerticalAlignment="Center"
                 Style="{StaticResource SaSegmentedRectTrackStyle}">
-                <StackPanel
+                <VariableSizedWrapGrid x:Name="RangeItems"
                     x:Uid="HistoryRangeSelector"
-                    Orientation="Horizontal"
-                    Spacing="4"
+                    Orientation="Horizontal" ItemWidth="86" ItemHeight="36" MaximumRowsOrColumns="5"
                     primitives:SaGroupNavigation.Mode="SelectionFollowsFocus">
-                    <RadioButton x:Uid="HistoryRangeLastHour" GroupName="HistoryRange" MinWidth="82" Style="{StaticResource SaSegmentedRectItemStyle}"
+                    <RadioButton x:Uid="HistoryRangeLastHour" GroupName="HistoryRange" MinWidth="0" Margin="0,0,4,0" Style="{StaticResource SaSegmentedRectCompactItemStyle}"
                                  IsChecked="{Binding SelectedRangeIndex, Mode=TwoWay, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=0}" />
-                    <RadioButton x:Uid="HistoryRangeLast6Hours" GroupName="HistoryRange" MinWidth="82" Style="{StaticResource SaSegmentedRectItemStyle}"
+                    <RadioButton x:Uid="HistoryRangeLast6Hours" GroupName="HistoryRange" MinWidth="0" Margin="0,0,4,0" Style="{StaticResource SaSegmentedRectCompactItemStyle}"
                                  IsChecked="{Binding SelectedRangeIndex, Mode=TwoWay, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=1}" />
-                    <RadioButton x:Uid="HistoryRangeLast24Hours" GroupName="HistoryRange" MinWidth="82" Style="{StaticResource SaSegmentedRectItemStyle}"
+                    <RadioButton x:Uid="HistoryRangeLast24Hours" GroupName="HistoryRange" MinWidth="0" Margin="0,0,4,0" Style="{StaticResource SaSegmentedRectCompactItemStyle}"
                                  IsChecked="{Binding SelectedRangeIndex, Mode=TwoWay, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=2}" />
-                    <RadioButton x:Uid="HistoryRangeLast7Days" GroupName="HistoryRange" MinWidth="82" Style="{StaticResource SaSegmentedRectItemStyle}"
+                    <RadioButton x:Uid="HistoryRangeLast7Days" GroupName="HistoryRange" MinWidth="0" Margin="0,0,4,0" Style="{StaticResource SaSegmentedRectCompactItemStyle}"
                                  IsChecked="{Binding SelectedRangeIndex, Mode=TwoWay, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=3}" />
-                    <RadioButton x:Name="RangeLast30Days" x:Uid="HistoryRangeLast30Days" GroupName="HistoryRange" MinWidth="82" Style="{StaticResource SaSegmentedRectItemStyle}"
+                    <RadioButton x:Name="RangeLast30Days" x:Uid="HistoryRangeLast30Days" GroupName="HistoryRange" MinWidth="0" Margin="0,0,4,0" Style="{StaticResource SaSegmentedRectCompactItemStyle}"
                                  IsChecked="{Binding SelectedRangeIndex, Mode=TwoWay, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=4}" />
-                </StackPanel>
+                </VariableSizedWrapGrid>
             </Border>
         </Grid>
 

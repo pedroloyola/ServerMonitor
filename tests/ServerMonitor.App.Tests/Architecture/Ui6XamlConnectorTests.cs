@@ -17,26 +17,60 @@ public sealed class Ui6XamlConnectorTests
             Assert.All(host.Elements(), child => Assert.NotEqual(((IXmlLineInfo)host).LineNumber, ((IXmlLineInfo)child).LineNumber));
     }
 
-    [Theory]
-    [MemberData(nameof(Pages))]
-    public void GeneratedConnectionTargets_MatchTheirConnectorCasts(string page)
+    [Fact]
+    public void EveryGeneratedConnector_MatchesEveryTargetCast_IncludingBindings()
     {
 #if DEBUG
         const string configuration = "Debug";
 #else
         const string configuration = "Release";
 #endif
-        var generated = Path.Combine(AppSourceTree.AppRoot, "obj", "x64", configuration, "net10.0-windows10.0.19041.0", "win-x64", page);
-        var doc = XDocument.Load(generated + ".xaml");
-        var code = File.ReadAllText(generated + ".g.cs");
-        var casts = Regex.Matches(code, @"case (\d+):[^\{]*\{\s*(?:(?!break;).)*?CastExtensions.As<global::([\w.]+)>\(target\)", RegexOptions.Singleline)
-            .ToDictionary(m => m.Groups[1].Value, m => m.Groups[2].Value.Split('.').Last());
-        Assert.NotEmpty(casts);
-        foreach (var element in doc.Descendants())
+        // Canonical solution x64/RID/TFM. Review this parser when upgrading WindowsAppSDK:
+        // unknown cast syntax, missing XAML/id or disagreeing casts must fail closed.
+        var generated = Path.Combine(AppSourceTree.AppRoot, "obj", "x64", configuration, "net10.0-windows10.0.19041.0", "win-x64");
+        var files = Directory.GetFiles(generated, "*.g.cs", SearchOption.AllDirectories);
+        Assert.NotEmpty(files);
+        var checkedCasts = 0;
+        foreach (var file in files)
         {
-            var id = (string?)element.Attribute(AppSourceTree.Xaml + "ConnectionId");
-            if (id is not null && casts.TryGetValue(id, out var expected))
-                Assert.True(expected == element.Name.LocalName, $"{page}: connection {id} targets {element.Name.LocalName}, connector casts {expected}.");
+            var code = File.ReadAllText(file);
+            var all = TargetCasts(code).ToArray();
+            if (all.Length == 0) continue;
+            var xaml = file[..^5] + ".xaml";
+            Assert.True(File.Exists(xaml), $"Missing generated XAML for {file}");
+            var doc = XDocument.Load(xaml);
+            var elements = doc.Descendants().Where(e => e.Attribute(AppSourceTree.Xaml + "ConnectionId") is not null)
+                .ToDictionary(e => (string)e.Attribute(AppSourceTree.Xaml + "ConnectionId")!);
+            var checkedInFile = 0;
+            var typesById = new Dictionary<string, string>();
+            foreach (Match block in Regex.Matches(code, @"case (?<id>\d+):(?<body>.*?)(?=\bcase\s|\bdefault\s*:|\z)", RegexOptions.Singleline))
+            {
+                foreach (var type in TargetCasts(block.Groups["body"].Value))
+                {
+                    var id = block.Groups["id"].Value;
+                    Assert.True(elements.ContainsKey(id), $"{file}: cast connection {id} has no XAML target");
+                    if (typesById.ContainsKey(id)) Assert.Equal(typesById[id], type);
+                    typesById[id] = type;
+                    Assert.True(elements[id].Name.LocalName == type,
+                        $"{file}: connection {id} targets {elements[id].Name.LocalName}, connector casts {type}");
+                    checkedInFile++;
+                }
+            }
+            Assert.Equal(all.Length, checkedInFile);
+            checkedCasts += checkedInFile;
+        }
+        Assert.True(checkedCasts > 0);
+    }
+
+    private static IEnumerable<string> TargetCasts(string code)
+    {
+        // Match all target casts first, then reject unrecognised syntax rather than ignoring it.
+        Assert.DoesNotMatch(@"\btarget\s+as\b", code);
+        foreach (Match cast in Regex.Matches(code, @"(?:[\w.:]+(?:<[^;\n]+?>)?\s*\(\s*target\s*\)|\([^();\n]+\)\s*target)"))
+        {
+            var match = Regex.Match(cast.Value, @"^(?:global::)?WinRT\.CastExtensions\.As<global::(?<type>[\w.]+)>\(target\)$|^\(global::(?<type>[\w.]+)\)target$");
+            Assert.True(match.Success, $"Unrecognised generated target cast: {cast.Value}");
+            yield return match.Groups["type"].Value.Split('.').Last();
         }
     }
 

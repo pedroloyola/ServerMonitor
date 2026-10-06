@@ -215,7 +215,6 @@
   <data name="SettingsAlwaysOnTopToggle.OffContent" xml:space="preserve"><value>Desativado</value></data>
   <data name="SettingsAlwaysOnTopToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Manter o widget compacto sempre no topo</value></data>
   <!-- M10 Local History + Charts -->
-  <data name="HistoryBackButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Voltar ao servidor</value></data>
   <data name="HistoryBackButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Voltar</value></data>
   <data name="HistorySubtitle.Text" xml:space="preserve"><value>Histórico</value></data>
   <data name="HistoryRangeSelector.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Intervalo de tempo</value></data>
@@ -953,4 +952,5 @@ as métricas e o histórico do servidor.</value></data>
   <data name="HiddenOverviewAction.Content" xml:space="preserve"><value>Gerenciar servidores ocultos</value></data>
   <data name="ConfigurationUnavailableNotice.Message" xml:space="preserve"><value>Não foi possível ler a configuração dos servidores. A configuração não foi alterada.</value></data>
   <data name="ConfigurationUnavailableNotice.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Não foi possível ler a configuração dos servidores. A configuração não foi alterada.</value></data>
+  <data name="HistoryBackToServerFormat" xml:space="preserve"><value>Voltar para {0}</value></data>
 </root>

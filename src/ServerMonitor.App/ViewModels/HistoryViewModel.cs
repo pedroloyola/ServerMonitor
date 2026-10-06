@@ -315,10 +315,12 @@ public sealed class HistoryViewModel : ObservableObject, IDisposable
 
     public string DiskTitle { get; }
 
+    public string BackAutomationName => string.Format(CultureInfo.CurrentCulture, _localizationService.GetString("HistoryBackToServerFormat"), Title);
+
     public string Title
     {
         get => _title;
-        private set => SetProperty(ref _title, value);
+        private set { if (SetProperty(ref _title, value)) OnPropertyChanged(nameof(BackAutomationName)); }
     }
 
     /// <summary>0..4 → 1h/6h/24h/7d/30d. Two-way bound to the range selector; setting it reloads.</summary>

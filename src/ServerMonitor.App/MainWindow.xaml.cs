@@ -58,6 +58,7 @@ public sealed partial class MainWindow : Window
         FirstRunView.Localization = localizationService;
         FirstRunView.DataContext = onboarding;
         Onboarding.PropertyChanged += OnOnboardingChanged;
+        Onboarding.PreparingEditor += PrepareOnboardingEditorAsync;
         _navigationService.Navigated += OnShellNavigated;
         StandardRoot.SizeChanged += OnStandardSizeChanged;
         RootLayout.KeyDown += OnShellKeyDown;
@@ -273,6 +274,27 @@ public sealed partial class MainWindow : Window
             if (keepSidebar) Sidebar.FocusSelected(); // Content pages own H1 / one-shot return focus after Loaded.
         });
     }
+    private Task PrepareOnboardingEditorAsync()
+    {
+        // Run after the dismissal/navigation focus callbacks, before the dialog captures its origin.
+        var ready = new TaskCompletionSource();
+        if (!DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
+        {
+            try
+            {
+                if (ContentFrame.Content is Microsoft.UI.Xaml.Controls.Page page)
+                {
+                    page.UpdateLayout();
+                    ShellPageFocus.SetKeepSidebar(page, false);
+                    ShellPageFocus.FocusHeading(page, force: true);
+                }
+                ready.SetResult();
+            }
+            catch (Exception error) { ready.SetException(error); }
+        })) ready.SetCanceled();
+        return ready.Task;
+    }
+
     private void OnOnboardingChanged(object? sender, PropertyChangedEventArgs args)
     {
         if (args.PropertyName != nameof(OnboardingViewModel.IsVisible)) return;
@@ -390,6 +412,7 @@ public sealed partial class MainWindow : Window
     private void OnWindowClosed(object sender, WindowEventArgs args)
     {
         Onboarding.PropertyChanged -= OnOnboardingChanged;
+        Onboarding.PreparingEditor -= PrepareOnboardingEditorAsync;
         _navigationService.Navigated -= OnShellNavigated;
         StandardRoot.SizeChanged -= OnStandardSizeChanged;
         RootLayout.KeyDown -= OnShellKeyDown;

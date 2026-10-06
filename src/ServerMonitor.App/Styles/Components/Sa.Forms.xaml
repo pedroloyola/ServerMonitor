@@ -874,4 +874,7 @@
             </Setter.Value>
         </Setter>
     </Style>
+    <Style x:Key="SaSegmentedRectCompactItemStyle" TargetType="RadioButton" BasedOn="{StaticResource SaSegmentedRectItemStyle}">
+        <Setter Property="Padding" Value="8,0" />
+    </Style>
 </ResourceDictionary>

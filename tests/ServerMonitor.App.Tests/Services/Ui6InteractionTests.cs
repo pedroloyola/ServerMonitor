@@ -17,11 +17,14 @@ public sealed class Ui6InteractionTests
         router.GoToDashboard();
         values[ShellDestination.Servers] = true; // native RadioButton local change before Click
         shell.Navigate(ShellDestination.Servers);
+        Assert.Equal(NavigationDestination.Servers, router.CurrentDestination);
+        Assert.All(values, value => Assert.Equal(value.Key == ShellDestination.Servers, value.Value));
         router.GoToSettings(SettingsSection.Data);
         Assert.All(values, value => Assert.Equal(value.Key == ShellDestination.Settings, value.Value));
         sync.Bind(null);
+        values.Clear();
         router.GoToDashboard();
-        Assert.All(values.Values, Assert.False);
+        Assert.Empty(values);
     }
     [Fact]
     public void Enter_NavigatesThroughRouter_AndOtherKeysRemainNative()
@@ -40,13 +43,15 @@ public sealed class Ui6InteractionTests
     public void Dialog_ReturnsToOriginOrHeading_Once_EvenAfterExceptionalExit(bool attached)
     {
         var order = new List<string>();
+        var focus = new DialogReturnFocus(() => { order.Add("origin"); return attached; }, () => order.Add("heading"));
         try
         {
-            using var focus = new DialogReturnFocus(() => { order.Add("origin"); return attached; }, () => order.Add("heading"));
+            using var scope = focus;
             order.Add("dialog");
             throw new InvalidOperationException();
         }
         catch (InvalidOperationException) { }
+        focus.Dispose();
         Assert.Equal(attached ? new[] { "dialog", "origin" } : new[] { "dialog", "origin", "heading" }, order);
     }
     [Fact]

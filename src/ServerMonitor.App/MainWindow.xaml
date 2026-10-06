@@ -14,14 +14,15 @@
         <Grid x:Name="StandardRoot">
             <Grid x:Name="ShellSurface">
                 <Grid.ColumnDefinitions><ColumnDefinition x:Name="SidebarColumn" Width="208"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                <controls:SaSidebar x:Name="Sidebar" Background="{ThemeResource SaSidebarMaterialBrush}" />
+                <Border Background="{ThemeResource SaSidebarMaterialBrush}" IsHitTestVisible="False"/>
+                <controls:SaSidebar x:Name="Sidebar"/>
                 <Border Width="1" HorizontalAlignment="Right" Background="{ThemeResource SaSidebarEdgeBrush}" IsHitTestVisible="False" />
                 <Frame x:Name="ContentFrame" Grid.Column="1" Background="Transparent" />
             </Grid>
             <!-- Figma 112:247: same window, no sidebar; panel1040x780. Modal remains above both hosts. -->
             <controls:OnboardingView x:Name="FirstRunView" Visibility="Collapsed" />
-            <!-- G-1 platform exception: no 52px band. Drag only the top24, above page headers at y40. Native captions remain. -->
-            <Grid x:Name="ShellDragRegion" Height="24" VerticalAlignment="Top" Background="Transparent" />
+            <!-- G-1 platform exception: no 52px band. Drag only the top32, above page headers at y40. Native captions remain. -->
+            <Grid x:Name="ShellDragRegion" Height="32" VerticalAlignment="Top" Background="Transparent" />
         </Grid>
 
         <!-- ============================ COMPACT PRESENTATION ============================ -->

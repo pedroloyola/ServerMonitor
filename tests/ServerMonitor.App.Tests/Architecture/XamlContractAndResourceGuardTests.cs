@@ -37,7 +37,7 @@ public sealed partial class XamlContractAndResourceGuardTests
         ],
         // UI.4: adaptive VisualState setters reflow these; OverviewSearchBox also takes focus after "Limpar pesquisa";
         // Beacon r1: the code-behind focuses the content / the return target (HealthCard … EmptyAddButton).
-        ["Views/DashboardPage.xaml"] = ["PageViewport", "PageRoot", "HeaderGrid", "HeaderActions", "HealthRow", "HealthColumn2", "HealthCountRow", "HealthSegments",
+        ["Views/DashboardPage.xaml"] = ["FirstServerStateBlock", "HiddenStateBlock", "PageViewport", "PageRoot", "HeaderGrid", "HeaderActions", "HealthRow", "HealthColumn2", "HealthCountRow", "HealthSegments",
             "PriorityHost", "ServersToolbar", "OverviewSearchBox", "StateOverlay",
             "HealthCard", "PriorityButton", "DirectoryLinkButton", "OverviewRepeater", "EmptyAddButton"],
         // UI.5: BackgroundSection is brought into view from code-behind; the rest are reflowed by the WidthStates setters.
@@ -59,7 +59,7 @@ public sealed partial class XamlContractAndResourceGuardTests
             // UI.5 fix round 3 (Beacon C2 R2-M1): focus returns to the history button that opened its dialog.
             "ClearHistoryButton", "ResetHistoryButton"],
         // UI.3: adaptive VisualState setters reflow these (no code-behind dependency).
-        ["Views/HistoryPage.xaml"] = ["PageViewport", "RangeLast30Days", "UnavailableState", "EmptyState", "PageRoot", "ControlsRow", "ServerSelector", "RangeTrack", "CpuChart", "MemoryChart", "DiskChart", "RetentionText"],
+        ["Views/HistoryPage.xaml"] = ["PageViewport", "ControlsFirstColumn", "RangeItems", "RangeLast30Days", "UnavailableState", "EmptyState", "PageRoot", "ControlsRow", "ServerSelector", "RangeTrack", "CpuChart", "MemoryChart", "DiskChart", "RetentionText"],
         ["Views/WorkloadsPage.xaml"] = ["PageViewport", "PageHost", "PageScroll", "PageRoot", "QueryRow", "SearchBox", "FilterTrack", "ServicesCard", "CardsGrid", "CardsColumn2", "CardsRow1", "CardsRow2", "ContainersScroll", "ServicesScroll",
             "DockerNoResultsText", "DockerNotInstalledState", "DockerPermissionState", "DockerUnavailableState", "DockerErrorState", "DockerEmptyState",
             "ServicesNoResultsText", "ServicesUnsupportedState", "ServicesUnavailableState", "ServicesErrorState", "ServicesEmptyState",

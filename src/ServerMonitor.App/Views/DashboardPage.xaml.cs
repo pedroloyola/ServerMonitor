@@ -18,6 +18,8 @@ public sealed partial class DashboardPage : Page
         // Atlas review). A widget "open server" deep-link no longer scrolls a card here: UI.4 D-UI4-DETAIL opens the
         // interim server page through the view model.
         Loaded += OnLoaded;
+        SizeChanged += (_, _) => UpdateEmptyStateHeight();
+        HeaderGrid.SizeChanged += (_, _) => UpdateEmptyStateHeight();
     }
 
     public DashboardViewModel ViewModel { get; }
@@ -25,8 +27,17 @@ public sealed partial class DashboardPage : Page
     /// <summary>Backs the discreet "compact mode" entry in the header (D-UI4-NAV, until UI.6).</summary>
     public WindowModeViewModel WindowMode { get; }
 
+    internal static double EmptyStateMinimumHeight(double usableHeight) => usableHeight >= 700 ? 620 : 0;
+
+    private void UpdateEmptyStateHeight()
+    {
+        var usable = ActualHeight - PageRoot.Padding.Top - PageRoot.Padding.Bottom - HeaderGrid.ActualHeight - PageRoot.Spacing;
+        FirstServerStateBlock.MinHeight = HiddenStateBlock.MinHeight = EmptyStateMinimumHeight(usable);
+    }
+
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
+        UpdateEmptyStateHeight();
         await ViewModel.LoadAsync();
         DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, RestoreFocus);
     }

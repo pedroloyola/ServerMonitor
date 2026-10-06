@@ -210,7 +210,6 @@
   <data name="SettingsAlwaysOnTopToggle.OffContent" xml:space="preserve"><value>Off</value></data>
   <data name="SettingsAlwaysOnTopToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Keep the compact widget always on top</value></data>
   <!-- M10 Local History + Charts -->
-  <data name="HistoryBackButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Back to server</value></data>
   <data name="HistoryBackButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Back</value></data>
   <data name="HistorySubtitle.Text" xml:space="preserve"><value>History</value></data>
   <data name="HistoryRangeSelector.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Time range</value></data>
@@ -948,4 +947,5 @@ status, metrics and history.</value></data>
   <data name="HiddenOverviewAction.Content" xml:space="preserve"><value>Manage hidden servers</value></data>
   <data name="ConfigurationUnavailableNotice.Message" xml:space="preserve"><value>The server configuration could not be read. The configuration was not changed.</value></data>
   <data name="ConfigurationUnavailableNotice.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>The server configuration could not be read. The configuration was not changed.</value></data>
+  <data name="HistoryBackToServerFormat" xml:space="preserve"><value>Back to {0}</value></data>
 </root>

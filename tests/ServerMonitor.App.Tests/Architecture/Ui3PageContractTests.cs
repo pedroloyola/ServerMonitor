@@ -104,7 +104,7 @@ public sealed partial class Ui3PageContractTests
         Assert.Equal(5, segments.Count);
         for (var i = 0; i < segments.Count; i++)
         {
-            Assert.Equal("{StaticResource SaSegmentedRectItemStyle}", Attr(segments[i], "Style"));
+            Assert.Equal("{StaticResource SaSegmentedRectCompactItemStyle}", Attr(segments[i], "Style"));
             Assert.Contains($"ConverterParameter={i}", Attr(segments[i], "IsChecked"), StringComparison.Ordinal);
             Assert.Contains("SelectedRangeIndex, Mode=TwoWay", Attr(segments[i], "IsChecked"), StringComparison.Ordinal);
         }

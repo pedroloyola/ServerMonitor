@@ -97,12 +97,14 @@ internal sealed class FakeNavigationService : INavigationService
     public void GoToHistory(Guid serverId, string serverName)
     {
         LastHistoryServerId = serverId;
+        CurrentDestination = NavigationDestination.History;
         Raise();
     }
 
     public void GoToWorkloads(Guid serverId, string serverName)
     {
         LastWorkloadsServerId = serverId;
+        CurrentDestination = NavigationDestination.Workloads;
         Raise();
     }
 
@@ -111,6 +113,7 @@ internal sealed class FakeNavigationService : INavigationService
     public void GoToServers()
     {
         ServersCount++;
+        CurrentDestination = NavigationDestination.Servers;
         Raise();
     }
 
@@ -121,12 +124,14 @@ internal sealed class FakeNavigationService : INavigationService
     public void ReturnToServerDetail(Guid serverId)
     {
         ServerDetailReturns.Add(serverId);
+        CurrentDestination = NavigationDestination.Detail;
         Raise();
     }
 
     public void GoToServerDetail(Guid serverId, ServerDetailOrigin origin)
     {
         ServerDetailRequests.Add((serverId, origin));
+        CurrentDestination = NavigationDestination.Detail;
         Raise();
     }
 }

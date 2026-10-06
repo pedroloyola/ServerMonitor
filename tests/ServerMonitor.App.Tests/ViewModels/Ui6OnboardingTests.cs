@@ -181,6 +181,43 @@ public sealed class Ui6OnboardingTests
         Assert.False(vm.IsVisible);
     }
 
+    [Theory]
+    [InlineData(false)] [InlineData(true)]
+    public async Task StepThree_WaitsForOverviewHeading_BeforeDialogCapturesReturnOrigin(bool import)
+    {
+        var dialog = new Dialog();
+        var kit = Ui4TestKit.Create(new Ui4TestKit.Fleet(), dialogs: dialog);
+        using var dashboard = kit.Dashboard;
+        kit.Navigation.CurrentDestination = NavigationDestination.Overview;
+        kit.Servers.LoadStatus = ServerLoadStatus.NotFound;
+        using var vm = new OnboardingViewModel(kit.Servers, kit.Navigation,
+            new OnboardingActions(dashboard.AddServerCommand, dashboard.ImportFromSshCommand), new ActivationLatch(), NullLogger<OnboardingViewModel>.Instance);
+        var ready = new TaskCompletionSource();
+        var focus = "sidebar";
+        vm.PreparingEditor += async () =>
+        {
+            Assert.False(vm.IsVisible);
+            Assert.Equal(NavigationDestination.Overview, kit.Navigation.CurrentDestination);
+            await ready.Task;
+            focus = "Overview H1";
+        };
+        dialog.BeforeOpen = () =>
+        {
+            Assert.Equal("Overview H1", focus);
+            var captured = focus;
+            focus = "editor";
+            using var returnFocus = new DialogReturnFocus(() => { focus = captured; return true; }, () => focus = "fallback");
+        };
+        await vm.OnMainWindowShownAsync(true);
+        vm.Next(); vm.Next();
+        var opening = (import ? vm.ImportFromSshCommand : vm.AddServerCommand).ExecuteAsync();
+        Assert.Equal(0, dialog.Add + dialog.Import);
+        ready.SetResult();
+        await opening;
+        Assert.Equal(1, dialog.Add + dialog.Import);
+        Assert.Equal("Overview H1", focus);
+    }
+
     private sealed class RecordingLogger : ILogger<OnboardingViewModel>
     {
         public List<string> Messages { get; } = [];

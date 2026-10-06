@@ -62,7 +62,7 @@
             <SolidColorBrush x:Key="SaNeutralSurfaceBrush" Color="{ThemeResource SystemColorWindowColor}" />
             <SolidColorBrush x:Key="SaElevatedSurfaceBrush" Color="{ThemeResource SystemColorWindowColor}" />
             <SolidColorBrush x:Key="SaGlassSurfaceBrush" Color="{ThemeResource SystemColorWindowColor}" />
-            <SolidColorBrush x:Key="SaSidebarMaterialBrush" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="SaSidebarMaterialBrush" Color="Transparent" />
             <SolidColorBrush x:Key="SaModalSurfaceBrush" Color="{ThemeResource SystemColorWindowColor}" />
             <SolidColorBrush x:Key="SaOpaqueFallbackBrush" Color="{ThemeResource SystemColorWindowColor}" />
             <SolidColorBrush x:Key="SaOverlaySmokeBrush" Color="{ThemeResource SystemColorWindowColor}" />
