@@ -682,6 +682,7 @@ public partial class App : Application
         var qaScreenshot = Qa.QaStoreScreenshotComposition.IsRequested();
         var qaProxyJump = Qa.QaProxyJumpComposition.IsRequested();
         var qaOverview = Qa.QaOverviewComposition.IsRequested();
+        var qaEditor = Qa.QaEditorComposition.IsRequested();
         var qaMode = Qa.QaStartupIsolation.IsHarnessLaunch();
         if (qaMode)
         {
@@ -772,6 +773,11 @@ public partial class App : Application
         {
             // UI.4 Visão geral / Servidores; throws for an unknown --qa-overview-scenario (refused, never another one).
             Qa.QaOverviewComposition.Apply(services);
+        }
+        else if (qaEditor)
+        {
+            // UI.7 B-23: real server/profile/trust services on the QA root, scripted SSH; throws for a malformed launch.
+            Qa.QaEditorComposition.Apply(services);
         }
         else if (qaProxyJump)
         {

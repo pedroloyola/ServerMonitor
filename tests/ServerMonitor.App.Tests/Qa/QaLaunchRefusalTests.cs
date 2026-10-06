@@ -84,8 +84,8 @@ public sealed partial class QaLaunchRefusalTests
     {
         foreach (var harness in QaStartupIsolation.HarnessFlags)
         {
-            // UI.5 (Boss B2 answer 5): the overview harness always carries the backup doubles.
-            string[] extra = harness == QaOverviewComposition.LaunchFlag && !arguments.Any(a => a.StartsWith("--qa-backup", StringComparison.Ordinal))
+            // UI.5 (Boss B2 answer 5): the overview harness always carries the backup doubles; UI.7 B-23: the editor too.
+            string[] extra = (harness == QaOverviewComposition.LaunchFlag || harness == QaEditorComposition.LaunchFlag) && !arguments.Any(a => a.StartsWith("--qa-backup", StringComparison.Ordinal))
                 ? ["--qa-backup", "ok"]
                 : [];
             string[] before = [Exe, harness, .. arguments, .. extra];
@@ -162,11 +162,11 @@ public sealed partial class QaLaunchRefusalTests
     {
         Assert.Equal(
             ["--qa-health", "--qa-discovery", "--qa-notifications", "--qa-compact", "--qa-history", "--qa-workloads",
-                "--qa-store-screenshot", QaProxyJumpPolicy.LaunchFlag, "--qa-overview"],
+                "--qa-store-screenshot", QaProxyJumpPolicy.LaunchFlag, "--qa-overview", "--qa-editor"],
             QaStartupIsolation.HarnessFlags);
         Assert.Equal(
             [QaSshConfigProfilePolicy.LaunchFlag, QaUiLanguagePolicy.LaunchFlag, QaBackupPolicy.LaunchFlag, QaProxyJumpPolicy.DirectoryFlag,
-                "--qa-overview-scenario", "--qa-start", "--qa-activation"],
+                "--qa-overview-scenario", "--qa-start", "--qa-activation", "--qa-editor-seed", "--qa-editor-ssh", "--qa-editor-save"],
             QaStartupIsolation.ModifierFlags);
         Assert.True(QaProxyJumpPolicy.IsRequested([Exe, QaProxyJumpPolicy.LaunchFlag], isDebugBuild: true));
     }

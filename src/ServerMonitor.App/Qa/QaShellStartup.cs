@@ -33,6 +33,17 @@ internal static class QaShellStartup
         var start = Present(args, StartFlag);
         var activation = Present(args, ActivationFlag);
         if (!start && !activation) return null;
+        // UI.7 B-23: the editor harness starts on the editor (Add, SSH import, or an Edit of a seeded server).
+        if (args.Contains(QaEditorComposition.LaunchFlag, StringComparer.Ordinal))
+        {
+            var editorValue = Value(args, StartFlag);
+            return !activation && start && editorValue is not null
+                && (editorValue is "editor-add" or "editor-import"
+                    || Index(editorValue, "editor-edit:", QaEditorComposition.SeededCount(args)) is not null)
+                ? null
+                : "With --qa-editor, --qa-start must be editor-add, editor-import or editor-edit:<n> (n within the seed); --qa-activation is not supported.";
+        }
+
         if (!args.Contains(QaOverviewComposition.LaunchFlag, StringComparer.Ordinal) || (start && activation))
             return "Shell modifiers require --qa-overview and are mutually exclusive.";
         var scenario = QaOverviewScenarioPolicy.ResolveScenario(args, true)
@@ -57,11 +68,40 @@ internal static class QaShellStartup
         return ActivationIntent.Server(servers[Index(value, "server:", servers.Length)!.Value - 1].Server.Id);
     }
 
+    // The editor opens over the Visão geral (its origin); an Edit opens from the seeded server's Detail page, the only Edit
+    // surface. The commands are not awaited: their task lasts as long as the editor visit.
+    private static async Task StartEditorAsync(string value, INavigationService navigation, DashboardViewModel dashboard)
+    {
+        if (App.ServicesHost.Services.GetService(typeof(QaEditorSeed)) is QaEditorSeed seed)
+        {
+            await seed.Completed;
+        }
+
+        await dashboard.LoadAsync();
+        navigation.GoToDashboard();
+        switch (value)
+        {
+            case "editor-add": dashboard.AddServerCommand.Execute(null); break;
+            case "editor-import": dashboard.ImportFromSshCommand.Execute(null); break;
+            default:
+                var card = dashboard.VisibleServers[Index(value, "editor-edit:", dashboard.VisibleServers.Count)!.Value - 1];
+                navigation.GoToServerDetail(card.Server.Id, ServerDetailOrigin.Servers);
+                card.EditCommand.Execute(null);
+                break;
+        }
+    }
+
     internal static async Task ApplyStartAsync(IReadOnlyList<string> args, INavigationService navigation, DashboardViewModel dashboard)
     {
         if (!Present(args, StartFlag)) return;
         if (Refusal(args) is { } refusal) throw new ArgumentException(refusal);
         var value = Value(args, StartFlag)!;
+        if (value.StartsWith("editor-", StringComparison.Ordinal))
+        {
+            await StartEditorAsync(value, navigation, dashboard);
+            return;
+        }
+
         if (value is "history" || value.StartsWith("detail:", StringComparison.Ordinal)) await dashboard.LoadAsync();
         switch (value)
         {
