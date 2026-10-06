@@ -1307,6 +1307,8 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
             },
             ConnectionResult = _lastConnectionResult
         };
+        // UI.7A fix c1 (Cortex n-2): the staged secrets were just handed over, so the dirty state is recomputed (additive).
+        RefreshDirty();
         return true;
     }
 

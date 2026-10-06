@@ -209,6 +209,10 @@ public sealed class Ui7EditorDirtyTests : IDisposable
 
         public bool IsSaved(ServerEditorRequest request) => false;
 
+        public void ResumeSavedDestination(ServerEditorRequest request)
+        {
+        }
+
         public void Leave(ServerEditorRequest request)
         {
         }

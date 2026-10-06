@@ -27,6 +27,10 @@ public sealed class Ui7EditorContractTests
         // One submit path (button and Enter), and Enter is refused while a test or a trust write runs.
         Assert.Equal(1, Count(code, "_controller.SubmitAsync("));
         Assert.Contains("IsConnectionWorkInProgress: false", code, StringComparison.Ordinal);
+        // UI.7A fix c1 (M-1): while a Save is persisted, Cancelar / the header button / the actions are disabled.
+        Assert.Contains("_controller.SavingChanged += (_, _) => UpdateActionState();", code, StringComparison.Ordinal);
+        Assert.Contains("CancelButton.IsEnabled = !saving;", code, StringComparison.Ordinal);
+        Assert.Contains("HeaderButton.IsEnabled = !saving &&", code, StringComparison.Ordinal);
     }
 
     [Fact]

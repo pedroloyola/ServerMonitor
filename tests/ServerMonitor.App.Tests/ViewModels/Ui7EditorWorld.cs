@@ -471,12 +471,31 @@ internal sealed class RecordingCredentialStore : IServerCredentialStore
         Log.Clear();
     }
 
-    public Task WriteAsync(CredentialReference reference, SecretValue secret, CancellationToken cancellationToken = default)
+    /// <summary>UI.7A fix c1 (M-1): when set, a write waits here - the persist of a Save is held mid-way.</summary>
+    public TaskCompletionSource? WriteBarrier { get; set; }
+
+    /// <summary>Signalled when a held write has arrived at <see cref="WriteBarrier"/>.</summary>
+    public TaskCompletionSource WriteArrived { get; } = new();
+
+    /// <summary>When set, a write throws after the barrier (a persist that fails).</summary>
+    public bool FailWrites { get; set; }
+
+    public async Task WriteAsync(CredentialReference reference, SecretValue secret, CancellationToken cancellationToken = default)
     {
+        if (WriteBarrier is { } barrier)
+        {
+            WriteArrived.TrySetResult();
+            await barrier.Task;
+        }
+
+        if (FailWrites)
+        {
+            throw new IOException("QA: the credential store refused the write.");
+        }
+
         Writes++;
         Log.Add(("write", reference.Kind));
         _secrets[reference] = new string(secret.Reveal());
-        return Task.CompletedTask;
     }
 
     public Task<SecretValue?> ReadAsync(CredentialReference reference, CancellationToken cancellationToken = default)

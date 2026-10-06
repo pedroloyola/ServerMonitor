@@ -35,6 +35,15 @@ public sealed class ServerEditorPageController : IDisposable
 
     public bool IsDirty => ViewModel?.IsDirty == true || HasTypedSecret?.Invoke() == true;
 
+    /// <summary>
+    /// UI.7A fix c1 (Cortex M-1): a Save is being persisted. The page stays until the session decides (success → Detail,
+    /// failure → the notice): the exit guard refuses without asking, and Cancelar / Voltar / Esc do nothing meanwhile.
+    /// </summary>
+    public bool IsSaving => _saving;
+
+    /// <summary>Raised when <see cref="IsSaving"/> changes (the page disables Cancelar, the header button and the actions).</summary>
+    public event EventHandler? SavingChanged;
+
     public bool Load(ServerEditorRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -49,6 +58,13 @@ public sealed class ServerEditorPageController : IDisposable
     /// </summary>
     public Task<bool> ConfirmLeaveAsync()
     {
+        // M-1: a Save in flight decides where the page goes; leaving now would ask about (or discard) a committed edit.
+        // The Save's OWN navigation to Detail comes after the visit is marked saved, so it passes.
+        if (!_disposed && _saving && Request is not null && !_session.IsSaved(Request))
+        {
+            return Task.FromResult(false);
+        }
+
         if (_disposed || Request is null || ViewModel is null || _session.IsSaved(Request) || !IsDirty)
         {
             return Task.FromResult(true);
@@ -63,7 +79,7 @@ public sealed class ServerEditorPageController : IDisposable
     /// <summary>Cancelar / Voltar ao detalhe: back to the origin through the exit guard.</summary>
     public void Cancel()
     {
-        if (!_disposed && Request is not null)
+        if (!_disposed && !_saving && Request is not null)
         {
             _session.Leave(Request);
         }
@@ -72,6 +88,11 @@ public sealed class ServerEditorPageController : IDisposable
     /// <summary>B-20: Esc = Back through the guard; a running test is cancelled first.</summary>
     public void Escape()
     {
+        if (_saving)
+        {
+            return;
+        }
+
         if (ViewModel?.IsTestingConnection == true)
         {
             ViewModel.CancelTest();
@@ -99,16 +120,24 @@ public sealed class ServerEditorPageController : IDisposable
             return ServerEditorSubmitOutcome.Invalid;
         }
 
-        _saving = true;
+        SetSaving(true);
+        ServerEditorSaveOutcome saved;
         try
         {
-            var saved = await _session.SaveAsync(Request, result!);
-            return new ServerEditorSubmitOutcome(saved.Status, saved.SecretsConsumed);
+            saved = await _session.SaveAsync(Request, result!);
         }
         finally
         {
-            _saving = false;
+            SetSaving(false);
         }
+
+        if (saved.Status == ServerEditorSaveStatus.NotCurrent && !_disposed)
+        {
+            // M-1 (3): a visit that already saved but is still on screen is never left orphaned: go where its Save goes.
+            _session.ResumeSavedDestination(Request);
+        }
+
+        return new ServerEditorSubmitOutcome(saved.Status, saved.SecretsConsumed);
     }
 
     /// <summary>
@@ -189,6 +218,15 @@ public sealed class ServerEditorPageController : IDisposable
         return string.IsNullOrWhiteSpace(viewModel.Host) || string.IsNullOrWhiteSpace(viewModel.Username)
             ? "ServerEditorHintFillToTest"
             : "ServerEditorHintTestBeforeSave";
+    }
+
+    private void SetSaving(bool value)
+    {
+        if (_saving != value)
+        {
+            _saving = value;
+            SavingChanged?.Invoke(this, EventArgs.Empty);
+        }
     }
 
     /// <summary>The visit ends with its page (idempotent): the session disposes the view model.</summary>

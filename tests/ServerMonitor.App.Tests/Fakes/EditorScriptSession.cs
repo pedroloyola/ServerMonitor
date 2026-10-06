@@ -50,6 +50,10 @@ internal sealed class EditorScriptSession(IEditorScript script) : IServerEditorS
 
     public bool IsSaved(ServerEditorRequest request) => throw new NotSupportedException();
 
+    public void ResumeSavedDestination(ServerEditorRequest request)
+    {
+    }
+
     public void Leave(ServerEditorRequest request) => throw new NotSupportedException();
 
     public void Detach(ServerEditorRequest request) => throw new NotSupportedException();
@@ -74,6 +78,10 @@ internal sealed class InertEditorSession : IServerEditorSession
         Task.FromResult(new ServerEditorSaveOutcome(ServerEditorSaveStatus.NotCurrent));
 
     public bool IsSaved(ServerEditorRequest request) => true;
+
+    public void ResumeSavedDestination(ServerEditorRequest request)
+    {
+    }
 
     public void Leave(ServerEditorRequest request)
     {

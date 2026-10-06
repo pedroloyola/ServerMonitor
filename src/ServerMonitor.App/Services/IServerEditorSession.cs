@@ -60,6 +60,12 @@ public interface IServerEditorSession
     /// <summary>True once the visit saved (its page may then leave without asking) or ended.</summary>
     bool IsSaved(ServerEditorRequest request);
 
+    /// <summary>
+    /// UI.7A fix c1 (Cortex M-1 (3)): a visit that saved but whose page is still on screen (its navigation was not taken)
+    /// goes where its Save goes - the saved server's Detail. No effect for a visit that did not save or already ended.
+    /// </summary>
+    void ResumeSavedDestination(ServerEditorRequest request);
+
     /// <summary>Cancel / Back / Esc: back to the origin, through the exit guard; focus returns to the opening control.</summary>
     void Leave(ServerEditorRequest request);
 

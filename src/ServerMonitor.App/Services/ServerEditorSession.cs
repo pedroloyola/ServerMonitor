@@ -192,23 +192,39 @@ public sealed class ServerEditorSession : IServerEditorSession
             }
 
             visit.Saved = true;
-            if (!visit.Ended)
-            {
-                // B-5: the saved server's Detail page (its page lets go without asking: the visit saved).
-                var serverId = persisted.Server!.Id;
-                if (request.Mode == ServerEditorMode.Edit)
-                {
-                    _navigation.ReturnToServerDetail(serverId);
-                }
-                else
-                {
-                    _navigation.GoToServerDetail(
-                        serverId,
-                        request.Origin.Destination == NavigationDestination.Servers ? ServerDetailOrigin.Servers : ServerDetailOrigin.Overview);
-                }
-            }
-
+            visit.SavedServerId = persisted.Server!.Id;
+            GoToSavedDestination(visit);
             return new ServerEditorSaveOutcome(ServerEditorSaveStatus.Saved, secretsConsumed);
+        }
+    }
+
+    public void ResumeSavedDestination(ServerEditorRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (_visits.TryGetValue(request, out var visit))
+        {
+            GoToSavedDestination(visit);
+        }
+    }
+
+    // B-5: the saved server's Detail page (its page lets go without asking: the visit saved).
+    private void GoToSavedDestination(Visit visit)
+    {
+        if (visit.Ended || !visit.Saved || visit.SavedServerId is not { } serverId)
+        {
+            return;
+        }
+
+        var request = visit.Request;
+        if (request.Mode == ServerEditorMode.Edit)
+        {
+            _navigation.ReturnToServerDetail(serverId);
+        }
+        else
+        {
+            _navigation.GoToServerDetail(
+                serverId,
+                request.Origin.Destination == NavigationDestination.Servers ? ServerDetailOrigin.Servers : ServerDetailOrigin.Overview);
         }
     }
 
@@ -319,6 +335,8 @@ public sealed class ServerEditorSession : IServerEditorSession
         public ServerEditorViewModel? ViewModel { get; set; }
 
         public bool Saved { get; set; }
+
+        public Guid? SavedServerId { get; set; }
 
         public bool Ended { get; set; }
     }

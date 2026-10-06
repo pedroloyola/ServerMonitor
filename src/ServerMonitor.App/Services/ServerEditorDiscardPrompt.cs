@@ -13,6 +13,12 @@ public sealed class ServerEditorDiscardPrompt(IWindowContext windowContext, ILoc
     public async Task<bool> ConfirmDiscardAsync(ServerEditorDiscardContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
+        if (windowContext.XamlRoot is null)
+        {
+            // Cortex n-4: no window to ask in - keep editing; nothing is discarded without an answer.
+            return false;
+        }
+
         var dialog = new DestructiveConfirmDialog(DestructiveConfirmation.DiscardEditorChanges(
             context, localizationService, DestructiveConfirmation.IconData("SaIconServerStack01Data")))
         {

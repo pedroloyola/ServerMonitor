@@ -42,6 +42,8 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
         {
             HasTypedSecret = () => ServerForm.HasTypedSecret()
         };
+        // M-1: while a Save is persisted nothing on the page can leave or act (the session decides where it goes).
+        _controller.SavingChanged += (_, _) => UpdateActionState();
         Loaded += OnLoaded;
         Unloaded += (_, _) => ServerForm.ClearSecrets();
         KeyDown += OnPageKeyDown;
@@ -327,10 +329,12 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
             return;
         }
 
-        var busy = viewModel.IsConnectionWorkInProgress;
+        var saving = _controller.IsSaving;
+        var busy = viewModel.IsConnectionWorkInProgress || saving;
         TestButton.IsEnabled = !busy;
         PrimaryButton.IsEnabled = !busy;
-        HeaderButton.IsEnabled = !busy || _controller.IsEdit;
+        CancelButton.IsEnabled = !saving;
+        HeaderButton.IsEnabled = !saving && (!busy || _controller.IsEdit);
         CancelTestButton.Visibility = viewModel.IsTestingConnection ? Visibility.Visible : Visibility.Collapsed;
         TestingRing.IsActive = viewModel.IsTestingConnection;
         TestingRing.Visibility = CancelTestButton.Visibility;
