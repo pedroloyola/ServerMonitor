@@ -429,6 +429,12 @@ internal sealed class ScriptedSsh : ISshConnectionService
 
     public List<SshConnectionRequest> Requests { get; } = [];
 
+    /// <summary>
+    /// UI.7B gate fix (Vigil M-1): the token of the latest test. "Cancelled" is read from it - set synchronously by
+    /// CancelTest - never from IsTestingConnection, which flips only when the test's continuation has run.
+    /// </summary>
+    public CancellationToken LastToken { get; private set; }
+
     /// <summary>Signalled when a held test has arrived at the barrier.</summary>
     public TaskCompletionSource Arrived { get; private set; } = new();
 
@@ -445,6 +451,7 @@ internal sealed class ScriptedSsh : ISshConnectionService
     {
         TestConnectionCount++;
         Requests.Add(request);
+        LastToken = cancellationToken;
         if (!Hold)
         {
             return Task.FromResult(Queue.Count > 0 ? Queue.Dequeue() : Result);

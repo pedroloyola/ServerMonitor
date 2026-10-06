@@ -187,14 +187,15 @@ public sealed class Ui7TrustDialogTests : IDisposable
         Assert.Equal(ServerEditorLayer.Trust, _world.Page.Controller.LayerToShow(accepting: true));
         var page = _world.Page;
         var viewModel = _world.ViewModel;
-        bool? testingWhenAsked = null;
-        _world.Prompt.OnAsked = () => testingWhenAsked = viewModel.IsTestingConnection;
+        var retest = _world.Ssh.LastToken; // the held retest's own token
+        bool? cancelledWhenAsked = null;
+        _world.Prompt.OnAsked = () => cancelledWhenAsked = retest.IsCancellationRequested;
 
         new ShellViewModel(_world.Navigation).Navigate(ShellDestination.History);
         await accept;
 
         Assert.Single(_world.Prompt.Asked);
-        Assert.False(testingWhenAsked, "the running retest must be cancelled BEFORE the question is asked");
+        Assert.True(cancelledWhenAsked, "the running retest must be cancelled BEFORE the question is asked");
         Assert.True(page.Disposed);
         Assert.Equal(1, _world.DirectTrust.Trusts); // the accepted key stays (B-6); nothing else
         Assert.Equal(2, _world.Ssh.TestConnectionCount); // no further test after the leave
