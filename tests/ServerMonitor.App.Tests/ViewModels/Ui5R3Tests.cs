@@ -123,7 +123,6 @@ public sealed class Ui5R3Tests
 
     public static TheoryData<string, string> Producers => new()
     {
-        { "edit", "result" }, { "edit", "throws" },
         { "hide", "result" }, { "hide", "throws" },
         { "remove", "result" }, { "remove", "throws" }
     };
@@ -145,7 +144,6 @@ public sealed class Ui5R3Tests
     }
 
     [Theory]
-    [InlineData("edit")]
     [InlineData("hide")]
     [InlineData("remove")]
     public async Task ALockedConfiguration_IsGlobal_NeverAServerScopedError(string operation)
@@ -273,7 +271,7 @@ public sealed class Ui5R3Tests
     }
 
     /// <summary>The Editar / Remover producers fail as asked: a negative result, a synthetic exception, or a locked configuration.</summary>
-    private sealed class FailingProducers(string failure) : IServerDialogService, Core.Interfaces.IServerProfileService
+    private sealed class FailingProducers(string failure) : IEditorScript, Core.Interfaces.IServerProfileService
     {
         public Task<T> Fail<T>(T negative) => failure switch
         {

@@ -60,12 +60,19 @@ public sealed class Ui6C1ContractTests
         }
         // Detail's identity icon and Data/Workloads back affordances intentionally precede H1 within the same column.
     }
+    /// <summary>
+    /// UI.7 B-3/B-5 (rewritten from the UI.6 modal contract): the editor's opener is captured when the session opens a
+    /// visit, remembered only when the user leaves without saving, and the view model is disposed in a finally that also
+    /// ends the visit. The shared dialog return focus (still used by the remaining dialogs) keeps its UI.6 rules.
+    /// </summary>
     [Fact]
-    public void DialogFinally_RestoresCapturedFocus_WithoutChangingEditor()
+    public void EditorSession_CapturesOpenerFirst_AndAlwaysEndsTheVisit()
     {
-        var code=AppSourceTree.CodeWithoutComments("Services/ServerDialogService.cs");
-        Assert.True(code.IndexOf("DialogReturnFocus.Capture",StringComparison.Ordinal)<code.IndexOf("ServerEditorModal.ShowAsync",StringComparison.Ordinal));
-        Assert.Contains("finally { returnFocus(); }",code);
+        var code=AppSourceTree.CodeWithoutComments("Services/ServerEditorSession.cs");
+        Assert.True(code.IndexOf("CaptureTrigger()",StringComparison.Ordinal)<code.IndexOf("_navigation.GoToServerEditor(",StringComparison.Ordinal));
+        Assert.Contains("visit.ViewModel?.Dispose();",code);
+        Assert.Contains("visit.Completion.TrySetResult();",code);
+        Assert.True(code.IndexOf("_returnFocus.Remember(",StringComparison.Ordinal)>code.IndexOf("_navigation.LeaveCurrentPageThen(",StringComparison.Ordinal));
         var focus=AppSourceTree.CodeWithoutComments("Services/DialogReturnFocus.cs");
         Assert.Contains("IsLoaded: true",focus);
         Assert.Contains("ReferenceEquals(origin.XamlRoot, root)",focus);

@@ -6,6 +6,7 @@ using Microsoft.UI.Dispatching;
 using ServerMonitor.App.Services;
 using ServerMonitor.Core.Backup;
 using ServerMonitor.Core.Discovery;
+using ServerMonitor.Core.Domain;
 using ServerMonitor.Core.Enums;
 using ServerMonitor.Core.Interfaces;
 using ServerMonitor.Core.Models;
@@ -17,6 +18,8 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
     private readonly IServerService _serverService;
     private readonly IServerProfileService _serverProfileService;
     private readonly IServerDialogService _dialogService;
+    // UI.7 B-3: the editor page's lifetime owner; every Add / Edit / discovery / SSH-import entry point opens it.
+    private readonly IServerEditorSession _editorSession;
     private readonly IServerConnectionStateStore _connectionStateStore;
     private readonly IServerMetricsStore _metricsStore;
     private readonly IServerMonitoringStateStore _monitoringStateStore;
@@ -83,6 +86,7 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         IServerService serverService,
         IServerProfileService serverProfileService,
         IServerDialogService dialogService,
+        IServerEditorSession editorSession,
         IServerConnectionStateStore connectionStateStore,
         IServerMetricsStore metricsStore,
         IServerMonitoringStateStore monitoringStateStore,
@@ -103,6 +107,7 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         _serverService = serverService;
         _serverProfileService = serverProfileService;
         _dialogService = dialogService;
+        _editorSession = editorSession;
         _connectionStateStore = connectionStateStore;
         _metricsStore = metricsStore;
         _monitoringStateStore = monitoringStateStore;
@@ -882,8 +887,7 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
     {
         try
         {
-            using var editorResult = await _dialogService.ShowEditorAsync(null);
-            await PersistEditorResultAsync(editorResult);
+            await _editorSession.OpenAddAsync(PersistAddedServerAsync);
         }
         catch (Exception exception)
         {
@@ -896,8 +900,7 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         try
         {
             // A normal add: cancel persists nothing, a save goes through the same profile path.
-            using var editorResult = await _dialogService.ShowEditorForSshImportAsync();
-            await PersistEditorResultAsync(editorResult);
+            await _editorSession.OpenSshImportAsync(PersistAddedServerAsync);
         }
         catch (Exception exception)
         {
@@ -909,10 +912,9 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
     {
         try
         {
-            // Exactly the normal add flow, only pre-filled: cancel returns null and persists
-            // nothing; a successful save reaches monitoring solely through ServersChanged.
-            using var editorResult = await _dialogService.ShowEditorForDiscoveryAsync(discovered.ToPrefill());
-            await PersistEditorResultAsync(editorResult);
+            // Exactly the normal add flow, only pre-filled: cancel persists nothing; a successful save reaches
+            // monitoring solely through ServersChanged.
+            await _editorSession.OpenDiscoveryAsync(discovered.ToPrefill(), PersistAddedServerAsync);
         }
         catch (Exception exception)
         {
@@ -932,55 +934,65 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         }
     }
 
-    private async Task PersistEditorResultAsync(ServerEditorResult? editorResult)
+    /// <summary>
+    /// UI.7 B-4: the add write path, unchanged (IServerProfileService.AddAsync, then the transient connection state). The
+    /// editor page waits for this answer: a failure (or an exception, incl. ConfigurationLocked) keeps the page and its
+    /// form; the session disposes the result. A saved server is listed before the session opens its Detail page.
+    /// </summary>
+    internal async Task<ServerOperationResult> PersistAddedServerAsync(ServerEditorResult editorResult)
     {
-        if (editorResult is null)
+        var result = await _serverProfileService.AddAsync(editorResult.Profile);
+        if (result.Succeeded)
         {
-            return;
+            if (editorResult.ConnectionResult is not null)
+            {
+                _connectionStateStore.Set(result.Server!.Id, editorResult.ConnectionResult);
+            }
+
+            await EnsureListedAsync(result.Server!.Id);
         }
 
-        var result = await _serverProfileService.AddAsync(editorResult.Profile);
-        if (!result.Succeeded)
-        {
-            ReportOperationError(serverId: null);
-        }
-        else if (editorResult.ConnectionResult is not null)
-        {
-            _connectionStateStore.Set(result.Server!.Id, editorResult.ConnectionResult);
-        }
+        return result;
     }
 
     private async Task EditServerAsync(Server server)
     {
         try
         {
-            using var editorResult = await _dialogService.ShowEditorAsync(server);
-            if (editorResult is null)
-            {
-                return;
-            }
-
-            var result = await _serverProfileService.UpdateAsync(server, editorResult.Profile);
-            if (!result.Succeeded)
-            {
-                ReportOperationError(server.Id);
-            }
-            else
-            {
-                _metricsStore.Remove(server.Id);
-                if (editorResult.ConnectionResult is not null)
-                {
-                    _connectionStateStore.Set(server.Id, editorResult.ConnectionResult);
-                }
-                else
-                {
-                    _connectionStateStore.Remove(server.Id);
-                }
-            }
+            await _editorSession.OpenEditAsync(server, editorResult => PersistEditedServerAsync(server, editorResult));
         }
         catch (Exception exception)
         {
             HandleError(exception, "edit server", server.Id);
+        }
+    }
+
+    /// <summary>UI.7 B-4: the edit write path, unchanged (UpdateAsync, then metrics and connection-state bookkeeping).</summary>
+    internal async Task<ServerOperationResult> PersistEditedServerAsync(Server server, ServerEditorResult editorResult)
+    {
+        var result = await _serverProfileService.UpdateAsync(server, editorResult.Profile);
+        if (result.Succeeded)
+        {
+            _metricsStore.Remove(server.Id);
+            if (editorResult.ConnectionResult is not null)
+            {
+                _connectionStateStore.Set(server.Id, editorResult.ConnectionResult);
+            }
+            else
+            {
+                _connectionStateStore.Remove(server.Id);
+            }
+        }
+
+        return result;
+    }
+
+    // The list refreshes on ServersChanged (async); the Detail page of a just-added server needs it listed now.
+    private async Task EnsureListedAsync(Guid serverId)
+    {
+        if (!HasVisibleServer(serverId))
+        {
+            await LoadAsync();
         }
     }
 

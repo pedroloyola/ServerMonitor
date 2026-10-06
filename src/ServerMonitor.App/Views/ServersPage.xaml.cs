@@ -1,5 +1,6 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using ServerMonitor.App.Services;
 using ServerMonitor.App.ViewModels;
 
 namespace ServerMonitor.App.Views;
@@ -7,9 +8,12 @@ namespace ServerMonitor.App.Views;
 /// <summary>UI.4 §3: the Servidores directory. Fresh per navigation; the view model is disposed on Unloaded.</summary>
 public sealed partial class ServersPage : Page, IDisposable
 {
-    public ServersPage(ServersViewModel viewModel)
+    private readonly ServerEditorReturnFocus? _editorReturnFocus;
+
+    public ServersPage(ServersViewModel viewModel, ServerEditorReturnFocus? editorReturnFocus = null)
     {
         InitializeComponent();
+        _editorReturnFocus = editorReturnFocus;
         ViewModel = viewModel;
         DataContext = viewModel;
         // Released on Unloaded AND when navigation replaces the page (a page replaced before Loaded never unloads).
@@ -37,10 +41,12 @@ public sealed partial class ServersPage : Page, IDisposable
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
         var index = ViewModel.TakeReturnFocusIndex();
+        // UI.7 B-5: back from the editor without saving, focus returns to the control that opened it.
+        var editorOpener = _editorReturnFocus?.Take(NavigationDestination.Servers);
         if (ShellPageFocus.GetKeepSidebar(this)) return;
         DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
         {
-            if (RepeaterFocus.FocusIndex(ServersRepeater, index))
+            if (EditorReturnFocus.TryFocusNow(this, editorOpener) || RepeaterFocus.FocusIndex(ServersRepeater, index))
             {
                 return;
             }

@@ -948,4 +948,79 @@ as métricas e o histórico do servidor.</value></data>
   <data name="ConfigurationUnavailableNotice.Message" xml:space="preserve"><value>Não foi possível ler a configuração dos servidores. A configuração não foi alterada.</value></data>
   <data name="ConfigurationUnavailableNotice.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Não foi possível ler a configuração dos servidores. A configuração não foi alterada.</value></data>
   <data name="HistoryBackToServerFormat" xml:space="preserve"><value>Voltar a {0}</value></data>
+  <!-- UI.7A: the Add / Edit server page (Figma 04/05/06/11). -->
+  <data name="ServerEditorAddTitle" xml:space="preserve"><value>Adicionar servidor</value></data>
+  <data name="ServerEditorAddSubtitle" xml:space="preserve"><value>Liga um servidor Linux ou macOS por SSH.</value></data>
+  <data name="ServerEditorEditTitle" xml:space="preserve"><value>Editar servidor</value></data>
+  <data name="ServerEditorEditSubtitleFormat" xml:space="preserve"><value>Atualiza os dados de ligação de {0}.</value></data>
+  <data name="ServerEditorImportButton" xml:space="preserve"><value>Importar de SSH</value></data>
+  <data name="ServerEditorBackToDetailButton" xml:space="preserve"><value>Voltar ao detalhe</value></data>
+  <data name="ServerEditorAddButton" xml:space="preserve"><value>Adicionar servidor</value></data>
+  <data name="ServerEditorSaveButton" xml:space="preserve"><value>Guardar alterações</value></data>
+  <data name="ServerEditorCancelButton.Content" xml:space="preserve"><value>Cancelar</value></data>
+  <data name="ServerEditorHintFillToTest" xml:space="preserve"><value>Preenche os campos para testar.</value></data>
+  <data name="ServerEditorHintTestBeforeSave" xml:space="preserve"><value>Testa a ligação antes de guardar.</value></data>
+  <data name="ServerEditorHintUnsaved" xml:space="preserve"><value>Tens alterações por guardar.</value></data>
+  <data name="ServerEditorCredentialNoteAdd" xml:space="preserve"><value>A tua chave permanece neste dispositivo.</value></data>
+  <data name="ServerEditorCredentialNoteEdit" xml:space="preserve"><value>As tuas credenciais permanecem neste dispositivo.</value></data>
+  <data name="ServerEditorCredentialNoteBody.Text" xml:space="preserve"><value>Palavras-passe e frases-passe ficam protegidas pelo Gestor de Credenciais do Windows.</value></data>
+  <data name="ServerEditorSaveFailedTitleAdd" xml:space="preserve"><value>Não foi possível adicionar o servidor</value></data>
+  <data name="ServerEditorSaveFailedTitleEdit" xml:space="preserve"><value>As alterações não foram guardadas</value></data>
+  <data name="ServerEditorSaveFailedBody" xml:space="preserve"><value>Os dados introduzidos continuam aqui. Tenta guardar novamente.</value></data>
+  <data name="ServerEditorSaveFailedRetypeSecret" xml:space="preserve"><value>Introduz de novo a palavra-passe ou a frase-passe antes de guardar.</value></data>
+  <data name="ServerEditorDiscardTitle" xml:space="preserve"><value>Descartar alterações?</value></data>
+  <data name="ServerEditorDiscardBody" xml:space="preserve"><value>As alterações que fizeste a este servidor ainda não foram guardadas.</value></data>
+  <data name="ServerEditorDiscardNote" xml:space="preserve"><value>Podes continuar a editar ou sair sem guardar.</value></data>
+  <data name="ServerEditorDiscardPrimary" xml:space="preserve"><value>Descartar alterações</value></data>
+  <data name="ServerEditorDiscardClose" xml:space="preserve"><value>Continuar a editar</value></data>
+  <data name="ServerEditorDiscardRenamedFormat" xml:space="preserve"><value>{0} → {1}</value></data>
+  <data name="ServerEditorDiscardUnnamed" xml:space="preserve"><value>Novo servidor</value></data>
+  <data name="ServerEditorIdentityTitle.Text" xml:space="preserve"><value>O teu servidor</value></data>
+  <data name="ServerEditorIdentitySubtitleAdd" xml:space="preserve"><value>Começa pelos dados de ligação.</value></data>
+  <data name="ServerEditorIdentitySubtitleEdit" xml:space="preserve"><value>Identificação e acesso ao servidor.</value></data>
+  <data name="ServerEditorAuthTitleAdd" xml:space="preserve"><value>Como te queres ligar?</value></data>
+  <data name="ServerEditorAuthTitleEdit" xml:space="preserve"><value>Autenticação</value></data>
+  <data name="ServerEditorAuthSubtitleKeyAdd" xml:space="preserve"><value>Chave SSH recomendada para ligações frequentes.</value></data>
+  <data name="ServerEditorAuthSubtitlePasswordAdd" xml:space="preserve"><value>Usa a palavra-passe do utilizador SSH.</value></data>
+  <data name="ServerEditorAuthSubtitleKeyEdit" xml:space="preserve"><value>Mantém a chave atual ou escolhe outro ficheiro.</value></data>
+  <data name="ServerEditorAuthSubtitlePasswordEdit" xml:space="preserve"><value>Introduz uma credencial para mudar de método.</value></data>
+  <data name="ServerEditorAuthSubtitlePasswordKeepEdit" xml:space="preserve"><value>Deixa em branco para manter a palavra-passe atual.</value></data>
+  <data name="ServerEditorAuthMethodGroup.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Método de autenticação</value></data>
+  <data name="ServerEditorNameField.Header" xml:space="preserve"><value>Nome</value></data>
+  <data name="ServerEditorNameInput.PlaceholderText" xml:space="preserve"><value>Ex.: Servidor principal</value></data>
+  <data name="ServerEditorHostField.Header" xml:space="preserve"><value>Host ou endereço IP</value></data>
+  <data name="ServerEditorHostInput.PlaceholderText" xml:space="preserve"><value>Ex.: server.example.com</value></data>
+  <data name="ServerEditorUsernameField.Header" xml:space="preserve"><value>Utilizador SSH</value></data>
+  <data name="ServerEditorUsernameInput.PlaceholderText" xml:space="preserve"><value>Ex.: monitor</value></data>
+  <data name="ServerEditorPrivateKeyField.Header" xml:space="preserve"><value>Ficheiro da chave privada</value></data>
+  <data name="ServerEditorPrivateKeyInput.PlaceholderText" xml:space="preserve"><value>Seleciona id_ed25519, id_rsa ou outra chave compatível.</value></data>
+  <data name="ServerEditorPassphraseField.Header" xml:space="preserve"><value>Frase-passe da chave · opcional</value></data>
+  <data name="ServerEditorPassphraseInput.PlaceholderText" xml:space="preserve"><value>Apenas se a tua chave estiver protegida</value></data>
+  <data name="ServerEditorPasswordField.Header" xml:space="preserve"><value>Palavra-passe</value></data>
+  <data name="ServerEditorPasswordField.HelperText" xml:space="preserve"><value>Guardada no Gestor de Credenciais do Windows.</value></data>
+  <data name="ServerEditorPasswordInput.PlaceholderText" xml:space="preserve"><value>Introduz a palavra-passe</value></data>
+  <data name="ServerEditorPortField.Header" xml:space="preserve"><value>Porta</value></data>
+  <data name="ServerEditorPortInput.PlaceholderText" xml:space="preserve"><value>22</value></data>
+  <data name="ServerEditorOperatingSystemField.Header" xml:space="preserve"><value>Sistema operativo</value></data>
+  <data name="ServerEditorRefreshIntervalField.Header" xml:space="preserve"><value>Atualizar a cada</value></data>
+  <data name="ServerEditorUseJumpHost.Content" xml:space="preserve"><value>Ligar através de um jump host</value></data>
+  <data name="ServerEditorJumpHostDescription.Text" xml:space="preserve"><value>Usa um servidor intermédio para chegar a redes que não aceitam uma ligação SSH direta.</value></data>
+  <data name="ServerEditorJumpHostKind.Text" xml:space="preserve"><value>ProxyJump / bastion</value></data>
+  <data name="ServerEditorJumpHostTitle.Text" xml:space="preserve"><value>Jump host</value></data>
+  <data name="ServerEditorJumpHostSubtitle.Text" xml:space="preserve"><value>Credenciais próprias do servidor intermédio.</value></data>
+  <data name="ServerEditorJumpHostField.Header" xml:space="preserve"><value>Jump host</value></data>
+  <data name="ServerEditorJumpHostInput.PlaceholderText" xml:space="preserve"><value>Ex.: bastion.example.com</value></data>
+  <data name="ServerEditorJumpUsernameField.Header" xml:space="preserve"><value>Utilizador SSH</value></data>
+  <data name="ServerEditorJumpUsernameInput.PlaceholderText" xml:space="preserve"><value>Ex.: admin</value></data>
+  <data name="ServerEditorJumpPortField.Header" xml:space="preserve"><value>Porta</value></data>
+  <data name="ServerEditorJumpPortInput.PlaceholderText" xml:space="preserve"><value>22</value></data>
+  <data name="ServerEditorJumpAuthTitle.Text" xml:space="preserve"><value>Autenticação</value></data>
+  <data name="ServerEditorJumpAuthSubtitle.Text" xml:space="preserve"><value>Usadas apenas para ligar ao jump host.</value></data>
+  <data name="ServerEditorJumpAuthMethodGroup.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Método de autenticação do jump host</value></data>
+  <data name="ServerEditorJumpPrivateKeyField.Header" xml:space="preserve"><value>Ficheiro da chave privada</value></data>
+  <data name="ServerEditorJumpPrivateKeyInput.PlaceholderText" xml:space="preserve"><value>Seleciona a chave privada do jump host.</value></data>
+  <data name="ServerEditorJumpPassphraseField.Header" xml:space="preserve"><value>Frase-passe da chave · opcional</value></data>
+  <data name="ServerEditorJumpPassphraseInput.PlaceholderText" xml:space="preserve"><value>Apenas se a chave estiver protegida</value></data>
+  <data name="ServerEditorJumpPasswordField.Header" xml:space="preserve"><value>Palavra-passe</value></data>
+  <data name="ServerEditorJumpPasswordInput.PlaceholderText" xml:space="preserve"><value>Introduz a palavra-passe do jump host</value></data>
 </root>

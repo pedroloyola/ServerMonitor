@@ -112,17 +112,18 @@ public sealed class Ui6C2ContractTests
     public void EmptyBlocks_CentreOnlyWhenUsableHeightIsSufficient(double height, double expected) =>
         Assert.Equal(expected, DashboardPage.EmptyStateMinimumHeight(height));
 
+    /// <summary>
+    /// UI.7 B-5: the onboarding focus preparation existed only so a MODAL editor captured the Visão geral H1 as its return
+    /// origin. The editor is a page now (its origin is the Visão geral, focus returns through ServerEditorReturnFocus), so
+    /// the hook is retired with its contract - and must not come back half-wired.
+    /// </summary>
     [Fact]
-    public void OnboardingEditorPreparation_IsWiredToHeadingBeforeCapture()
+    public void OnboardingEditorPreparation_IsRetiredWithTheModal()
     {
         var code = AppSourceTree.CodeWithoutComments("MainWindow.xaml.cs");
-        Assert.Contains("Onboarding.PreparingEditor += PrepareOnboardingEditorAsync", code);
-        Assert.Contains("Onboarding.PreparingEditor -= PrepareOnboardingEditorAsync", code);
-        var start = code.IndexOf("private Task PrepareOnboardingEditorAsync", StringComparison.Ordinal);
-        var end = code.IndexOf("private void OnOnboardingChanged", start, StringComparison.Ordinal);
-        var body = code[start..end];
-        Assert.Contains("DispatcherQueuePriority.Low", body);
-        Assert.True(body.IndexOf("ShellPageFocus.FocusHeading(page, force: true)",StringComparison.Ordinal) < body.IndexOf("ready.SetResult()",StringComparison.Ordinal));
+        Assert.DoesNotContain("PreparingEditor", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("PrepareOnboardingEditorAsync", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("PreparingEditor", AppSourceTree.CodeWithoutComments("ViewModels/OnboardingViewModel.cs"), StringComparison.Ordinal);
         Assert.Contains("FirstServerStateBlock.MinHeight = HiddenStateBlock.MinHeight = EmptyStateMinimumHeight(usable)",AppSourceTree.CodeWithoutComments("Views/DashboardPage.xaml.cs"));
     }
 }

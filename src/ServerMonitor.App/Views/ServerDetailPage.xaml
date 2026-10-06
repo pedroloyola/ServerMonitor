@@ -148,6 +148,7 @@
                         </StackPanel>
                     </Button>
                     <Button
+                        x:Name="EditButton"
                         x:Uid="ServerDetailEditButton"
                         MinWidth="104"
                         Style="{StaticResource SaSecondaryRectButtonStyle}"

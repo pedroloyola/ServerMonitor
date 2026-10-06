@@ -19,7 +19,6 @@ Controls/ServerFormControl.xaml	Padding	10,7	6
 Controls/ServerFormControl.xaml	Padding	12	1
 Controls/ServerFormControl.xaml	Padding	14,12	1
 Controls/ServerFormControl.xaml	Padding	16	2
-Controls/ServerFormControl.xaml	Padding	2,2,10,2	1
 Controls/ServerFormControl.xaml	Padding	6,2	1
 MainWindow.xaml	CornerRadius	6	1
 MainWindow.xaml	Padding	0	2

@@ -33,6 +33,41 @@ public sealed record DestructiveConfirmation(
             localization.GetString("DestructiveConfirmClose"));
     }
 
+    /// <summary>
+    /// UI.7 H-UI7-3, Figma 112:9185: "Descartar alterações?" · the server's name - "before → after" only when the name was
+    /// changed (B-15) · "you can keep editing". Kind=Destructive keeps "Continuar a editar" the default and first focus.
+    /// </summary>
+    public static DestructiveConfirmation DiscardEditorChanges(
+        ServerEditorDiscardContext context,
+        ILocalizationService localization,
+        string serverIconData)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(localization);
+        return new DestructiveConfirmation(
+            localization.GetString("ServerEditorDiscardTitle"),
+            localization.GetString("ServerEditorDiscardBody"),
+            DiscardAffected(context, localization),
+            serverIconData,
+            localization.GetString("ServerEditorDiscardNote"),
+            localization.GetString("ServerEditorDiscardPrimary"),
+            localization.GetString("ServerEditorDiscardClose"));
+    }
+
+    /// <summary>Pure (unit-tested): the name line of the discard dialog.</summary>
+    internal static string DiscardAffected(ServerEditorDiscardContext context, ILocalizationService localization)
+    {
+        var before = context.OpenedName.Trim();
+        var after = context.CurrentName.Trim();
+        if (before.Length > 0 && after.Length > 0 && !string.Equals(before, after, StringComparison.Ordinal))
+        {
+            return Format(localization, "ServerEditorDiscardRenamedFormat", before, after);
+        }
+
+        var name = after.Length > 0 ? after : before;
+        return name.Length > 0 ? name : localization.GetString("ServerEditorDiscardUnnamed");
+    }
+
     /// <summary>Figma 112:8876: "Limpar todo o histórico?" · "Histórico local · Todos os servidores" · settings kept.</summary>
     public static DestructiveConfirmation ClearHistory(ILocalizationService localization, string historyIconData) =>
         History(localization, historyIconData, "HistoryClearConfirm");

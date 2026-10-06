@@ -122,6 +122,7 @@ public sealed class DashboardDiscoveryViewModelTests
         var vm = (DashboardViewModel)RuntimeHelpers.GetUninitializedObject(typeof(DashboardViewModel));
         SetField(vm, "_serverProfileService", profileService);
         SetField(vm, "_dialogService", dialog);
+        SetField(vm, "_editorSession", new EditorScriptSession((IEditorScript)dialog));
         SetField(vm, "_connectionStateStore", new FakeConnectionStateStore());
         SetField(vm, "_logger", NullLogger<DashboardViewModel>.Instance);
         return vm;
@@ -204,7 +205,7 @@ public sealed class DashboardDiscoveryViewModelTests
             throw new NotSupportedException();
     }
 
-    private sealed class FakeDialogService : IServerDialogService
+    private sealed class FakeDialogService : IEditorScript
     {
         public ServerEditorResult? DiscoveryResult { get; init; }
         public int DiscoveryShowCount { get; private set; }

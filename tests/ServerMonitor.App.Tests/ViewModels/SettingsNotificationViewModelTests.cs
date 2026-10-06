@@ -346,6 +346,8 @@ public sealed class SettingsNotificationViewModelTests
         {
         }
 
+        public void GoToServerEditor(ServerEditorRequest request, Action? refused = null) => throw new NotSupportedException();
+        public void LeaveCurrentPageThen(Action continuation) => continuation();
         public void ReturnToServerDetail(Guid serverId)
         {
         }

@@ -15,7 +15,9 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
     public ShellDestination? SelectedDestination => _navigation.CurrentDestination switch
     {
         NavigationDestination.Overview => ShellDestination.Overview,
-        NavigationDestination.Servers or NavigationDestination.Detail or NavigationDestination.Workloads => ShellDestination.Servers,
+        // UI.7 B-1 (UI.6 D-4): the server editor belongs to Servidores.
+        NavigationDestination.Servers or NavigationDestination.Detail or NavigationDestination.Workloads
+            or NavigationDestination.ServerEditor => ShellDestination.Servers,
         NavigationDestination.History => ShellDestination.History,
         NavigationDestination.Settings or NavigationDestination.SettingsData => ShellDestination.Settings,
         _ => null

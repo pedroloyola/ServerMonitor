@@ -24,7 +24,7 @@ public sealed partial class UiDebtRatchetTests
         ["Controls/EmptyStateControl.xaml"] = 3,
         ["Controls/ServerCompactCard.xaml"] = 15,
         ["Controls/ServerEditorModal.xaml"] = 1,
-        ["Controls/ServerFormControl.xaml"] = 50,
+        ["Controls/ServerFormControl.xaml"] = 43, // UI.7A: the cards/fields moved to Sa type-ramp styles; the temporary inline panels remain
         ["MainWindow.xaml"] = 7,
         ["Styles/Controls.xaml"] = 7,
         ["Views/BackupCreateDialog.xaml"] = 3,

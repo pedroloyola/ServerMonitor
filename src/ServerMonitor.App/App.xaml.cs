@@ -149,18 +149,26 @@ public partial class App : Application
                 }
 
                 ServicesHost.Services.GetRequiredService<IApplicationWindowController>().RestoreAndActivate();
-                ServicesHost.Services.GetRequiredService<INavigationService>().GoToDashboard();
+                var navigation = ServicesHost.Services.GetRequiredService<INavigationService>();
 
-                var dashboard = ServicesHost.Services.GetRequiredService<DashboardViewModel>();
-                if (intent.Kind == ActivationIntentKind.OpenServer && intent.ServerId is { } serverId)
+                // UI.7 H-UI7-3: an activation leaves the current page through the SAME exit guard as every other
+                // navigation. An editor with unsaved changes asks "Descartar alterações?" first; keeping them drops the
+                // activation (nothing is ever saved implicitly, and the editor never keeps running behind another page).
+                navigation.LeaveCurrentPageThen(() =>
                 {
-                    dashboard.FocusServer(serverId);
-                }
-                else
-                {
-                    // A dashboard intent supersedes an older, still-pending server-focus request (§M-3).
-                    dashboard.ClearServerFocus();
-                }
+                    navigation.GoToDashboard();
+
+                    var dashboard = ServicesHost.Services.GetRequiredService<DashboardViewModel>();
+                    if (intent.Kind == ActivationIntentKind.OpenServer && intent.ServerId is { } serverId)
+                    {
+                        dashboard.FocusServer(serverId);
+                    }
+                    else
+                    {
+                        // A dashboard intent supersedes an older, still-pending server-focus request (§M-3).
+                        dashboard.ClearServerFocus();
+                    }
+                });
             }
             catch (Exception exception)
             {
@@ -419,6 +427,23 @@ public partial class App : Application
         services.AddSingleton<IPrivateKeyFilePicker, PrivateKeyFilePicker>();
         services.AddSingleton<IServerConnectionStateStore, ServerConnectionStateStore>();
         services.AddSingleton<IServerDialogService, ServerDialogService>();
+        // UI.7 B-3: the editor page's single lifetime owner, its return-focus slot and its discard confirmation.
+        services.AddSingleton<ServerEditorReturnFocus>();
+        services.AddSingleton<IServerEditorDiscardPrompt, ServerEditorDiscardPrompt>();
+        services.AddSingleton<IServerEditorSession>(sp => new ServerEditorSession(
+            sp.GetRequiredService<IServerValidator>(),
+            sp.GetRequiredService<ISshConnectionService>(),
+            sp.GetRequiredService<IHostKeyTrustStore>(),
+            sp.GetRequiredService<IRoutedHostKeyTrustStore>(),
+            sp.GetRequiredService<IServerConnectionStateStore>(),
+            sp.GetRequiredService<IPrivateKeyFilePicker>(),
+            sp.GetRequiredService<ILocalizationService>(),
+            sp.GetRequiredService<ISshConfigImportSource>(),
+            sp.GetRequiredService<ILocalSshKeyDiscovery>(),
+            sp.GetRequiredService<INavigationService>(),
+            sp.GetRequiredService<ServerEditorReturnFocus>(),
+            sp.GetRequiredService<ILogger<ServerEditorSession>>(),
+            FocusOrigin.CaptureName(sp.GetRequiredService<IWindowContext>())));
         services.AddSingleton(sp => new AppShutdownCoordinator(
             () => ServicesHost,
             sp.GetRequiredService<ILogger<AppShutdownCoordinator>>()));
@@ -820,6 +845,8 @@ public partial class App : Application
         // UI.5 Boss B2 answer 1: the one-shot "Servidor ocultado / removido" notice the Detail hands to Servidores.
         services.AddSingleton<ServersReturnNotice>();
         services.AddTransient<ServerDetailPage>();
+        // UI.7 B-1: the server editor page is per visit (fresh, never cached, disposed by navigation when replaced).
+        services.AddTransient<ServerEditorPage>();
         // History is opened per-server, so a fresh page/VM each navigation (disposed on Unloaded).
         services.AddTransient<HistoryViewModel>();
         services.AddTransient<HistoryPage>();

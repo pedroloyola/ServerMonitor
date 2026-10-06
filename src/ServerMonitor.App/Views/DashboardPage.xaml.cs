@@ -1,14 +1,18 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using ServerMonitor.App.Services;
 using ServerMonitor.App.ViewModels;
 
 namespace ServerMonitor.App.Views;
 
 public sealed partial class DashboardPage : Page
 {
-    public DashboardPage(DashboardViewModel viewModel, WindowModeViewModel windowMode)
+    private readonly ServerEditorReturnFocus? _editorReturnFocus;
+
+    public DashboardPage(DashboardViewModel viewModel, WindowModeViewModel windowMode, ServerEditorReturnFocus? editorReturnFocus = null)
     {
         InitializeComponent();
+        _editorReturnFocus = editorReturnFocus;
         ViewModel = viewModel;
         WindowMode = windowMode;
         DataContext = ViewModel;
@@ -50,7 +54,10 @@ public sealed partial class DashboardPage : Page
     private void RestoreFocus()
     {
         var (target, serverId) = ViewModel.TakeReturnFocus();
+        // UI.7 B-5: back from the editor without saving, focus returns to the control that opened it.
+        var editorOpener = _editorReturnFocus?.Take(NavigationDestination.Overview);
         if (ShellPageFocus.GetKeepSidebar(this)) return;
+        if (EditorReturnFocus.TryFocus(this, editorOpener)) return;
         var focused = target switch
         {
             OverviewReturnTarget.ServerRow => FocusOverviewRow(serverId),

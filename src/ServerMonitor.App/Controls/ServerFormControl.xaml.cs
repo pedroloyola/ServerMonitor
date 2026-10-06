@@ -4,6 +4,7 @@ using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
+using ServerMonitor.App.Services;
 using ServerMonitor.App.ViewModels;
 using Windows.ApplicationModel.DataTransfer;
 
@@ -16,6 +17,8 @@ public sealed partial class ServerFormControl : UserControl
     private bool _syncingKeySelectors;
     private ServerPrepCommands? _prepCommands;
     private string _copyLabel = string.Empty;
+    private ILocalizationService? _localization;
+    private bool _isEditMode;
 
     public ServerFormControl()
     {
@@ -26,6 +29,65 @@ public sealed partial class ServerFormControl : UserControl
     }
 
     public void FocusFirstField() => NameField.Focus(FocusState.Programmatic);
+
+    /// <summary>
+    /// UI.7A: the mode-dependent card copy (Figma 04 Add / 05 Edit). Set once by the editor page before the form loads.
+    /// </summary>
+    public void Configure(ILocalizationService localization, bool isEditMode)
+    {
+        _localization = localization ?? throw new ArgumentNullException(nameof(localization));
+        _isEditMode = isEditMode;
+        IdentitySubtitle.Text = localization.GetString(isEditMode ? "ServerEditorIdentitySubtitleEdit" : "ServerEditorIdentitySubtitleAdd");
+        AuthTitle.Text = localization.GetString(isEditMode ? "ServerEditorAuthTitleEdit" : "ServerEditorAuthTitleAdd");
+        UpdateAuthSubtitle();
+    }
+
+    /// <summary>A password box holds text the view model has not received yet (it only reads them on Test/Save).</summary>
+    public bool HasTypedSecret() =>
+        PasswordField.Password.Length > 0
+        || PassphraseField.Password.Length > 0
+        || JumpPasswordField.Password.Length > 0
+        || JumpPassphraseField.Password.Length > 0;
+
+    /// <summary>R-2 / Vigil H5: the page clears every password box when it unloads or leaves.</summary>
+    public void ClearSecrets()
+    {
+        PasswordField.Password = string.Empty;
+        PassphraseField.Password = string.Empty;
+        JumpPasswordField.Password = string.Empty;
+        JumpPassphraseField.Password = string.Empty;
+    }
+
+    /// <summary>"Testar ligação" (now in the page's action bar): stage the typed secrets, test, then focus the trust prompt.</summary>
+    public async Task TestConnectionAsync()
+    {
+        if (DataContext is ServerEditorViewModel viewModel && !viewModel.IsConnectionWorkInProgress)
+        {
+            CaptureSecret();
+            await viewModel.TestConnectionAsync();
+            if (viewModel.HasUnknownHostKey)
+            {
+                UnknownHostHeading.Focus(FocusState.Programmatic);
+            }
+        }
+    }
+
+    private void UpdateAuthSubtitle()
+    {
+        if (_localization is null || _viewModel is not { } viewModel)
+        {
+            return;
+        }
+
+        var key = (_isEditMode, viewModel.IsPasswordAuthentication) switch
+        {
+            (false, false) => "ServerEditorAuthSubtitleKeyAdd",
+            (false, true) => "ServerEditorAuthSubtitlePasswordAdd",
+            (true, false) => "ServerEditorAuthSubtitleKeyEdit",
+            (true, true) => viewModel.HasSavedPassword ? "ServerEditorAuthSubtitlePasswordKeepEdit" : "ServerEditorAuthSubtitlePasswordEdit"
+        };
+        AuthSubtitle.Text = _localization.GetString(key);
+    }
 
     public void CaptureSecret()
     {
@@ -72,6 +134,7 @@ public sealed partial class ServerFormControl : UserControl
             viewModel.PropertyChanged += OnViewModelPropertyChanged;
             viewModel.ConnectionChecklist.PropertyChanged += OnChecklistPropertyChanged;
             SyncKeySelectors();
+            UpdateAuthSubtitle();
         }
     }
 
@@ -81,6 +144,10 @@ public sealed partial class ServerFormControl : UserControl
             or nameof(ServerEditorViewModel.SelectedJumpLocalKeyOption))
         {
             SyncKeySelectors();
+        }
+        else if (e.PropertyName is nameof(ServerEditorViewModel.SelectedAuthenticationIndex))
+        {
+            UpdateAuthSubtitle();
         }
     }
 
@@ -248,14 +315,6 @@ public sealed partial class ServerFormControl : UserControl
         }
     }
 
-    private async void OnImportSshConfigClick(object sender, RoutedEventArgs e)
-    {
-        if (DataContext is ServerEditorViewModel viewModel)
-        {
-            await viewModel.LoadSshConfigHostsAsync();
-        }
-    }
-
     private void OnCloseSshConfigImportClick(object sender, RoutedEventArgs e)
     {
         if (DataContext is ServerEditorViewModel viewModel)
@@ -280,27 +339,6 @@ public sealed partial class ServerFormControl : UserControl
             && sender is FrameworkElement { DataContext: SshConfigHostOptionViewModel option })
         {
             viewModel.ApplySshConfigHost(option);
-        }
-    }
-
-    private async void OnTestConnectionClick(object sender, RoutedEventArgs e)
-    {
-        if (DataContext is ServerEditorViewModel viewModel)
-        {
-            CaptureSecret();
-            await viewModel.TestConnectionAsync();
-            if (viewModel.HasUnknownHostKey)
-            {
-                UnknownHostHeading.Focus(FocusState.Programmatic);
-            }
-        }
-    }
-
-    private void OnCancelTestClick(object sender, RoutedEventArgs e)
-    {
-        if (DataContext is ServerEditorViewModel viewModel)
-        {
-            viewModel.CancelTest();
         }
     }
 

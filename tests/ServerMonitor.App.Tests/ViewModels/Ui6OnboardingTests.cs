@@ -3,6 +3,8 @@ using Microsoft.Extensions.Logging.Abstractions;
 using ServerMonitor.App.Windowing;
 using ServerMonitor.App.Services;
 using ServerMonitor.App.ViewModels;
+using ServerMonitor.App.Tests.Architecture;
+using ServerMonitor.App.Tests.Fakes;
 using ServerMonitor.Core.Interfaces;
 using ServerMonitor.Core.Models;
 
@@ -183,8 +185,11 @@ public sealed class Ui6OnboardingTests
 
     [Theory]
     [InlineData(false)] [InlineData(true)]
-    public async Task StepThree_WaitsForOverviewHeading_BeforeDialogCapturesReturnOrigin(bool import)
+    public async Task StepThree_OpensTheEditorPage_OverTheVisaoGeral(bool import)
     {
+        // UI.7 B-5: the editor is a page whose origin is the Visão geral. PreparingEditor (focus the overview H1 before a
+        // modal captured its return origin) is retired with its contract: the onboarding hides, the overview is shown,
+        // and only then the existing command opens the editor.
         var dialog = new Dialog();
         var kit = Ui4TestKit.Create(new Ui4TestKit.Fleet(), dialogs: dialog);
         using var dashboard = kit.Dashboard;
@@ -192,59 +197,20 @@ public sealed class Ui6OnboardingTests
         kit.Servers.LoadStatus = ServerLoadStatus.NotFound;
         using var vm = new OnboardingViewModel(kit.Servers, kit.Navigation,
             new OnboardingActions(dashboard.AddServerCommand, dashboard.ImportFromSshCommand), new ActivationLatch(), NullLogger<OnboardingViewModel>.Instance);
-        var ready = new TaskCompletionSource();
-        var focus = "sidebar";
-        vm.PreparingEditor += async () =>
+        dialog.BeforeOpen = () =>
         {
             Assert.False(vm.IsVisible);
             Assert.Equal(NavigationDestination.Overview, kit.Navigation.CurrentDestination);
-            await ready.Task;
-            focus = "Overview H1";
-        };
-        dialog.BeforeOpen = () =>
-        {
-            Assert.Equal("Overview H1", focus);
-            var captured = focus;
-            focus = "editor";
-            using var returnFocus = new DialogReturnFocus(() => { focus = captured; return true; }, () => focus = "fallback");
         };
         await vm.OnMainWindowShownAsync(true);
         vm.Next(); vm.Next();
-        var opening = (import ? vm.ImportFromSshCommand : vm.AddServerCommand).ExecuteAsync();
-        Assert.Equal(0, dialog.Add + dialog.Import);
-        ready.SetResult();
-        await opening;
-        Assert.Equal(1, dialog.Add + dialog.Import);
-        Assert.Equal("Overview H1", focus);
-    }
 
-    [Theory]
-    [InlineData(false, false)] [InlineData(false, true)]
-    [InlineData(true, false)] [InlineData(true, true)]
-    public async Task StepThree_FocusPreparationFailure_IsLoggedByType_AndEditorStillOpens(bool import, bool cancelled)
-    {
-        var dialog = new Dialog();
-        var kit = Ui4TestKit.Create(new Ui4TestKit.Fleet(), dialogs: dialog);
-        using var dashboard = kit.Dashboard;
-        kit.Navigation.CurrentDestination = NavigationDestination.Overview;
-        kit.Servers.LoadStatus = ServerLoadStatus.NotFound;
-        var logger = new RecordingLogger();
-        using var vm = new OnboardingViewModel(kit.Servers, kit.Navigation,
-            new OnboardingActions(dashboard.AddServerCommand, dashboard.ImportFromSshCommand), new ActivationLatch(), logger);
-        vm.PreparingEditor += () => cancelled
-            ? Task.FromCanceled(new CancellationToken(true))
-            : throw new InvalidOperationException("private focus detail must not be logged");
-        var subsequentHandlerRan = false;
-        vm.PreparingEditor += () => { subsequentHandlerRan = true; return Task.CompletedTask; };
-        await vm.OnMainWindowShownAsync(true);
-        vm.Next(); vm.Next();
         await (import ? vm.ImportFromSshCommand : vm.AddServerCommand).ExecuteAsync();
-        Assert.True(subsequentHandlerRan);
+
         Assert.Equal(import ? 0 : 1, dialog.Add);
         Assert.Equal(import ? 1 : 0, dialog.Import);
-        var log = Assert.Single(logger.Messages);
-        Assert.Contains(cancelled ? "TaskCanceledException" : "InvalidOperationException", log);
-        Assert.DoesNotContain("private focus detail", log);
+        Assert.DoesNotContain("PreparingEditor", AppSourceTree.CodeWithoutComments("ViewModels/OnboardingViewModel.cs"), StringComparison.Ordinal);
+        Assert.DoesNotContain("PrepareOnboardingEditorAsync", AppSourceTree.CodeWithoutComments("MainWindow.xaml.cs"), StringComparison.Ordinal);
     }
 
     private sealed class RecordingLogger : ILogger<OnboardingViewModel>
@@ -255,7 +221,7 @@ public sealed class Ui6OnboardingTests
         public void Log<TState>(LogLevel level, EventId id, TState state, Exception? exception, Func<TState, Exception?, string> formatter) => Messages.Add(formatter(state, exception));
     }
 
-    private sealed class Dialog : IServerDialogService
+    private sealed class Dialog : IEditorScript
     {
         public int Add, Import;
         public Action? BeforeOpen;

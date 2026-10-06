@@ -31,8 +31,6 @@ public sealed class OnboardingViewModel : ObservableObject, IDisposable
         ImportFromSshCommand = new AsyncRelayCommand(() => FinishAsync(actions.ImportFromSshCommand));
     }
 
-    public event Func<Task>? PreparingEditor;
-
     public bool IsVisible { get => _visible; private set => SetProperty(ref _visible, value); }
     public int Step { get => _step; private set => SetProperty(ref _step, value); }
     public ServerLoadStatus? LoadStatus { get; private set; }
@@ -89,15 +87,8 @@ public sealed class OnboardingViewModel : ObservableObject, IDisposable
         if (!IsVisible || Step != 3) return;
         Dismiss();
         _navigation.GoToDashboard();
-        if (PreparingEditor is { } prepare)
-            foreach (Func<Task> handler in prepare.GetInvocationList())
-            {
-                try { await handler(); }
-                catch (Exception exception)
-                {
-                    _logger.LogWarning("Onboarding focus preparation failed. Type: {Type}.", exception.GetType().Name);
-                }
-            }
+        // UI.7 B-5: the editor is a page now; it opens over the Visão geral as its origin (no modal whose return focus had
+        // to be prepared first - PreparingEditor is retired with its contract).
         if (command is AsyncRelayCommand asyncCommand) await asyncCommand.ExecuteAsync();
         else if (command.CanExecute(null)) command.Execute(null);
     }

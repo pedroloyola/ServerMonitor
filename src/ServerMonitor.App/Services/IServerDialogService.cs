@@ -1,24 +1,12 @@
 using ServerMonitor.Core.Models;
-using ServerMonitor.App.ViewModels;
 
 namespace ServerMonitor.App.Services;
 
+/// <summary>
+/// UI.7 B-3: only the non-editor server dialog. Add / Edit / discovery / SSH import open the editor PAGE through
+/// <see cref="IServerEditorSession"/>.
+/// </summary>
 public interface IServerDialogService
 {
-    Task<ServerEditorResult?> ShowEditorAsync(Server? server);
-
-    /// <summary>
-    /// Opens the editor as a normal add, pre-filled from a network-discovery suggestion. It is an
-    /// add (never an edit): the exact M3 test-connection / host-key-trust / save flow applies and
-    /// only the non-sensitive name/host/port are seeded.
-    /// </summary>
-    Task<ServerEditorResult?> ShowEditorForDiscoveryAsync(ServerDiscoveryPrefill prefill);
-
-    /// <summary>
-    /// Opens the editor as a normal add with the read-only <c>~/.ssh/config</c> import panel already open
-    /// (M14.5 empty state, "Import from SSH"). Nothing is filled until the user picks a host.
-    /// </summary>
-    Task<ServerEditorResult?> ShowEditorForSshImportAsync();
-
     Task<bool> ConfirmRemoveAsync(Server server);
 }

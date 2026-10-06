@@ -605,7 +605,7 @@ public sealed class Ui5B2Tests
         }
     }
 
-    private sealed class ConfirmingDialogs : IServerDialogService
+    private sealed class ConfirmingDialogs : IEditorScript
     {
         public bool Confirm { get; init; } = true;
 

@@ -77,7 +77,17 @@ public sealed partial class XamlContractAndResourceGuardTests
             "NameField", "PrepHelpLink", "PrepHelpContent", "PrepKeygenText", "PrepCopyKeygenButton",
             "PrepCopyKeyText", "PrepCopyKeyButton", "PrepPlaceholderNote", "LocalKeySelector", "PassphraseField",
             "PasswordField", "JumpLocalKeySelector", "JumpPassphraseField", "JumpPasswordField", "ChecklistPanel",
-            "UnknownHostHeading"
+            "UnknownHostHeading",
+            // UI.7A: the mode copy set from code-behind and the B-19 stacking setters.
+            "IdentitySubtitle", "AuthTitle", "AuthSubtitle", "FormRoot", "CardsGrid", "CardsColumn2", "AuthCard",
+            "JumpCardsGrid", "JumpCardsColumn2", "JumpAuthCard", "OptionsGrid", "OptionsColumn3", "RefreshIntervalField"
+        ],
+        // UI.7A Add / Edit server page: code-behind (header, actions, notice) and the WidthStates setters.
+        ["Views/ServerEditorPage.xaml"] =
+        [
+            "PageViewport", "PageRoot", "HeaderTitle", "EditorHeading", "EditorSubtitle", "ServerForm", "SaveFailedNotice",
+            "ActionBar", "TestButton", "CancelTestButton", "TestingRing", "ActionHint", "ActionEnd", "PrimaryButton",
+            "CredentialNoteTitle", "HeaderButton"
         ],
         // HistoryChart parts: the chart draws into these by name.
         ["Controls/HistoryChart.xaml"] = ["RootGrid", "PlotHost", "GridCanvas", "PlotCanvas", "YAxisCanvas", "XAxisCanvas"],

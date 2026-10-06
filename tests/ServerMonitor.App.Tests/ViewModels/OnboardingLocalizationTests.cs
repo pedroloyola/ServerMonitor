@@ -45,7 +45,6 @@ public sealed class OnboardingLocalizationTests
         "ServerFormLocalKeySelector.PlaceholderText",
         "ServerFormJumpLocalKeySelector.Header",
         "ServerFormJumpLocalKeySelector.PlaceholderText",
-        "ServerFormCredentialReassurance.Text",
         "ServerFormPrepHelpLink.Content",
         "ServerPrepTitle.Text",
         "ServerPrepIntro.Text",
