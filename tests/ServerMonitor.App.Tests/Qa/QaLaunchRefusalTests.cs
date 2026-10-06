@@ -166,7 +166,7 @@ public sealed partial class QaLaunchRefusalTests
             QaStartupIsolation.HarnessFlags);
         Assert.Equal(
             [QaSshConfigProfilePolicy.LaunchFlag, QaUiLanguagePolicy.LaunchFlag, QaBackupPolicy.LaunchFlag, QaProxyJumpPolicy.DirectoryFlag,
-                "--qa-overview-scenario"],
+                "--qa-overview-scenario", "--qa-start", "--qa-activation"],
             QaStartupIsolation.ModifierFlags);
         Assert.True(QaProxyJumpPolicy.IsRequested([Exe, QaProxyJumpPolicy.LaunchFlag], isDebugBuild: true));
     }

@@ -61,8 +61,8 @@ public sealed class OnboardingLocalizationTests
         "ConnectionStepCopyCommandButton.Content",
         "ConnectionStepCopyCommandButton" + AutomationName,
         // UI.4: the empty dashboard is the SaEmptyState of the Visão geral (Add + Import from SSH + discovery).
-        "OverviewEmptyState.Title",
-        "OverviewEmptyState.Message",
+        "FirstServerTitle.Text",
+        "FirstServerBody.Text",
         "OverviewEmptyAddButton.Content",
         "OverviewEmptyImportButton.Content",
         "DashboardEmptyDiscoverySearching.Text",

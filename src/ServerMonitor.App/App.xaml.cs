@@ -93,7 +93,12 @@ public partial class App : Application
         // Attach the router to the single activation hand-off now that it exists: this atomically flushes
         // the latest intent buffered before this App object was built (the cold launch, or a redirect that
         // raced construction). The router buffers it internally until the shell signals ready (§M-1).
-        Program.AttachActivationConsumer(_activationRouter.Route);
+        var activation = ServicesHost.Services.GetRequiredService<ActivationLatch>();
+        Program.AttachActivationConsumer(intent =>
+        {
+            activation.Record();
+            _activationRouter.Route(intent);
+        });
 
         // M13 S2 requirement 1. The process no longer ends because the last window closed, which is what
         // lets the Dashboard be hidden while monitoring continues (QA-8). It lands ONLY together with the
@@ -132,6 +137,7 @@ public partial class App : Application
         {
             try
             {
+                ServicesHost.Services.GetRequiredService<OnboardingViewModel>().SuppressForActivation();
                 // QA-2: a widget activation must SURFACE the Dashboard even if the app is in Compact mode.
                 // RestoreAndActivate preserves the current presentation, so a Compact window would stay
                 // Compact and never show the Dashboard/server. Force Standard first (Compact → Standard →
@@ -820,6 +826,12 @@ public partial class App : Application
         // Workloads (M11) mirror History: opened per-server, fresh page/VM each navigation.
         services.AddTransient<WorkloadsViewModel>();
         services.AddTransient<WorkloadsPage>();
+        services.AddSingleton<ShellViewModel>();
+        services.AddSingleton<IServerLoadStatusSource>(sp => (IServerLoadStatusSource)sp.GetRequiredService<IServerService>());
+        services.AddSingleton(sp => new OnboardingActions(sp.GetRequiredService<DashboardViewModel>().AddServerCommand,
+            sp.GetRequiredService<DashboardViewModel>().ImportFromSshCommand));
+        services.AddSingleton<OnboardingViewModel>();
+        services.AddSingleton<ActivationLatch>();
         services.AddTransient<MainWindow>();
 #if DEBUG
         // Debug-only QA: --qa-backup <scenario> swaps the backup engine and its file pickers for in-memory

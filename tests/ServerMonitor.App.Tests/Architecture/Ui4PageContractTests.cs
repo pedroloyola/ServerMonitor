@@ -95,7 +95,9 @@ public sealed partial class Ui4PageContractTests
     {
         var level1 = Elements(file).Where(e => Attr(e, "AutomationProperties.HeadingLevel") == "Level1").ToList();
 
-        Assert.Equal(titleUid, Uid(Assert.Single(level1)));
+        var host = Assert.Single(level1);
+        Assert.Equal("SaHeadingHost", host.Name.LocalName);
+        Assert.Equal(titleUid, Uid(Assert.Single(host.Elements())));
     }
 
     /// <summary>Every icon-only button carries an accessible name (x:Uid key or binding), never just a glyph (T-17).</summary>

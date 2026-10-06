@@ -9,6 +9,7 @@
         <ResourceDictionary Source="ms-appx:///Styles/Tokens/Typography.xaml" />
         <ResourceDictionary Source="ms-appx:///Styles/Tokens/Radius.xaml" />
         <ResourceDictionary Source="ms-appx:///Styles/Tokens/Borders.xaml" />
+        <ResourceDictionary Source="ms-appx:///Styles/Tokens/Spacing.xaml" />
         <ResourceDictionary Source="ms-appx:///Styles/Components/Sa.Surfaces.xaml" />
     </ResourceDictionary.MergedDictionaries>
 
@@ -372,5 +373,18 @@
         <Setter Property="Background" Value="{ThemeResource SaGlassSurfaceBrush}" />
         <Setter Property="BorderBrush" Value="{ThemeResource SaGlassBorderBrush}" />
         <Setter Property="BorderThickness" Value="{StaticResource SaBorderThickness}" />
+    </Style>
+    <!-- UI.6 112:665/112:672/112:837: h46 r15; native button behaviour, no new animations. -->
+    <Style x:Key="SaOnboardingSecondaryButtonStyle" TargetType="Button" BasedOn="{StaticResource SaSecondaryRectButtonStyle}">
+        <Setter Property="Background" Value="{ThemeResource SaOnboardingSecondaryFillBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource SaOnboardingButtonBorderBrush}" />
+        <Setter Property="BorderThickness" Value="{StaticResource SaBorderThickness}" />
+        <Setter Property="Height" Value="{StaticResource SaOnboardingButtonHeight}" />
+        <Setter Property="CornerRadius" Value="{StaticResource SaRadiusOnboardingButton}" />
+    </Style>
+    <Style x:Key="SaOnboardingPrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource SaOnboardingSecondaryButtonStyle}">
+        <Setter Property="Template" Value="{StaticResource SaKeepForegroundButtonTemplate}" />
+        <Setter Property="Background" Value="{ThemeResource SaOnboardingPrimaryBrush}" />
+        <Setter Property="Foreground" Value="{ThemeResource SaOnboardingPrimaryTextBrush}" />
     </Style>
 </ResourceDictionary>

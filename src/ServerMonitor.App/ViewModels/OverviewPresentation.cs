@@ -296,5 +296,5 @@ public enum OverviewReturnTarget
     None,
     ServerRow,
     Priority,
-    ViewAll
+    DirectoryLink
 }

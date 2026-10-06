@@ -28,23 +28,25 @@ public sealed partial class XamlContractAndResourceGuardTests
     {
         // Shell: standard/compact presentations, title bar, navigation frame, modal host, theme background.
         // CompactRoot is also the target of a runtime {Binding ElementName=CompactRoot} in MainWindow.xaml.
+        ["Controls/OnboardingView.xaml"] = ["DismissButton", "Scroller", "Panel", "HeroBrand", "HeroShield", "HeadingHost", "Heading", "Subtitle", "Benefits", "Benefit0", "Benefit1", "Benefit2", "Principles", "Methods", "Method0", "Method1", "StepNote", "BackButton", "Dot1", "Dot2", "Dot3", "ProgressText", "NextButton"],
+        ["Controls/SaSidebar.xaml"] = ["Scroller", "NavGrid", "Brand", "BrandText", "OverviewItem", "OverviewLabel", "ServersItem", "ServersLabel", "HistoryItem", "HistoryLabel", "SettingsItem", "SettingsLabel"],
         ["MainWindow.xaml"] =
         [
-            "RootLayout", "StandardRoot", "AppTitleBar", "ContentFrame", "ModalOverlayHost",
+            "RootLayout", "WindowBackground", "StandardRoot", "ShellDragRegion", "ShellSurface", "Sidebar", "FirstRunView", "SidebarColumn", "ContentFrame", "ModalOverlayHost",
             "CompactRoot", "CompactCaptionColumn", "CompactDragRegion", "CompactBody"
         ],
         // UI.4: adaptive VisualState setters reflow these; OverviewSearchBox also takes focus after "Limpar pesquisa";
         // Beacon r1: the code-behind focuses the content / the return target (HealthCard … EmptyAddButton).
-        ["Views/DashboardPage.xaml"] = ["PageRoot", "HeaderGrid", "HeaderActions", "HealthRow", "HealthColumn2", "HealthCountRow", "HealthSegments",
+        ["Views/DashboardPage.xaml"] = ["FirstServerStateBlock", "HiddenStateBlock", "PageViewport", "PageRoot", "HeaderGrid", "HeaderActions", "HealthRow", "HealthColumn2", "HealthCountRow", "HealthSegments",
             "PriorityHost", "ServersToolbar", "OverviewSearchBox", "StateOverlay",
-            "HealthCard", "PriorityButton", "ViewAllButton", "OverviewRepeater", "EmptyAddButton"],
+            "HealthCard", "PriorityButton", "DirectoryLinkButton", "OverviewRepeater", "EmptyAddButton"],
         // UI.5: BackgroundSection is brought into view from code-behind; the rest are reflowed by the WidthStates setters.
-        ["Views/SettingsPage.xaml"] = ["BackgroundSection", "PageRoot", "AutosaveText", "ThemeControl", "LanguageControl", "BackgroundControl",
+        ["Views/SettingsPage.xaml"] = ["PageViewport", "BackgroundSection", "PageRoot", "AutosaveText", "ThemeControl", "LanguageControl", "BackgroundControl",
             "NotificationsControl", "CompactControl", "TopmostControl", "DisclosureColumn2", "DisclosureGrid", "AboutDisclosure",
             // UI.5 fix round 2 (Prism C1 M-8): the Narrow state spaces these rows.
             "ThemeRow", "CompactRow"],
         // UI.5 Server Detail: WidthStates setters + code-behind focus (HistoryRow / WorkloadsRow / RefreshButton).
-        ["Views/ServerDetailPage.xaml"] = ["PageScroll", "PageRoot", "IdentityGrid", "IdentityActions", "ServerNameHeading", "RefreshButton",
+        ["Views/ServerDetailPage.xaml"] = ["PageViewport", "PageScroll", "PageRoot", "IdentityGrid", "IdentityActions", "ServerNameHeading", "RefreshButton",
             "CollectingColumns", "MetricsGrid", "MetricsColumn2", "MetricsColumn3", "MemoryCard", "DiskCard", "DeeperGrid", "DeeperColumn2",
             "ExploreCard", "HistoryRow", "WorkloadsRow",
             // UI.5 fix round 2 (Beacon C1 N2): the live "A atualizar…" text announced from code-behind.
@@ -52,18 +54,18 @@ public sealed partial class XamlContractAndResourceGuardTests
             // UI.5 fix round 2: focus returns to "…" after a cancelled / failed Ocultar or Remover.
             "MoreActionsButton"],
         // UI.5 §4: the Data sub-page brings the backup status and (H-UI5-4) the About card into view from code-behind.
-        ["Views/SettingsDataPage.xaml"] = ["BackupStatusBar", "AboutSection", "PageRoot", "ResetIgnoredButton", "HistoryActions", "BackupActions",
+        ["Views/SettingsDataPage.xaml"] = ["PageViewport", "BackupStatusBar", "AboutSection", "PageRoot", "ResetIgnoredButton", "HistoryActions", "BackupActions",
             "GitHubButton", "SuccessToast",
             // UI.5 fix round 3 (Beacon C2 R2-M1): focus returns to the history button that opened its dialog.
             "ClearHistoryButton", "ResetHistoryButton"],
         // UI.3: adaptive VisualState setters reflow these (no code-behind dependency).
-        ["Views/HistoryPage.xaml"] = ["RangeLast30Days", "UnavailableState", "EmptyState", "PageRoot", "ControlsRow", "ServerSelector", "RangeTrack", "CpuChart", "MemoryChart", "DiskChart", "RetentionText"],
-        ["Views/WorkloadsPage.xaml"] = ["PageHost", "PageScroll", "PageRoot", "QueryRow", "SearchBox", "FilterTrack", "ServicesCard", "CardsGrid", "CardsColumn2", "CardsRow1", "CardsRow2", "ContainersScroll", "ServicesScroll",
+        ["Views/HistoryPage.xaml"] = ["PageViewport", "ControlsFirstColumn", "RangeItems", "RangeLast30Days", "UnavailableState", "EmptyState", "PageRoot", "ControlsRow", "ServerSelector", "RangeTrack", "CpuChart", "MemoryChart", "DiskChart", "RetentionText"],
+        ["Views/WorkloadsPage.xaml"] = ["PageViewport", "PageHost", "PageScroll", "PageRoot", "QueryRow", "SearchBox", "FilterTrack", "ServicesCard", "CardsGrid", "CardsColumn2", "CardsRow1", "CardsRow2", "ContainersScroll", "ServicesScroll",
             "DockerNoResultsText", "DockerNotInstalledState", "DockerPermissionState", "DockerUnavailableState", "DockerErrorState", "DockerEmptyState",
             "ServicesNoResultsText", "ServicesUnsupportedState", "ServicesUnavailableState", "ServicesErrorState", "ServicesEmptyState",
             "UnavailableState", "NothingState", "NoResultsState"],
         // UI.4: "Limpar pesquisa" returns focus to the search box (code-behind FocusAfterAction).
-        ["Views/ServersPage.xaml"] = ["SearchBox", "PageRoot", "HeaderGrid", "AddButton", "TableHeader", "HeaderSystemColumn", "HeaderSystemText",
+        ["Views/ServersPage.xaml"] = ["PageViewport", "SearchBox", "PageRoot", "HeaderGrid", "AddButton", "TableHeader", "HeaderSystemColumn", "HeaderSystemText",
             "HeaderActionColumn", "ServersRepeater", "RootGrid", "EmptyAddButton", "ReturnNotice"],
         ["Views/BackupCreateDialog.xaml"] = ["PassphraseBox", "ConfirmationBox"],
         ["Views/RestoreOpenDialog.xaml"] = ["PassphraseBox"],
@@ -85,7 +87,7 @@ public sealed partial class XamlContractAndResourceGuardTests
             "PART_Dot", "PART_Label", "PART_Path", "PART_Header", "PART_Helper", "PART_Error", "PART_PasswordBox", "PART_RevealButton",
             // S6
             "RootGrid", "KeyColumn", "PART_Key", "PART_Value", "PART_Fill", "PART_Track", "PART_Text", "PART_Icon", "PART_Chevron",
-            "PART_Detail", "PART_Trailing", "PART_InfoLayout", "PART_ErrorLayout", "PART_CloseButton", "PART_Parent",
+            "PART_Detail", "PART_Trailing", "PART_InfoLayout", "PART_ErrorLayout", "PART_ErrorTitle", "PART_CloseButton", "PART_Parent",
             // UI.5 SaSegmentMeter / SaPulseBars: the host the code fills and the theme-aware brush sources it binds to.
             "PART_Host", "PART_LitBrush", "PART_EmptyBrush", "PART_BarBrush"
         ],

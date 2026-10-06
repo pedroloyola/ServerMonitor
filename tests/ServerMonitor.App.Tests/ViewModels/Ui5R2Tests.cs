@@ -439,7 +439,7 @@ public sealed class Ui5R2Tests
         });
         Assert.Equal("{Binding CpuPulseCeiling}", (string?)meters.Single(e => e.Name.LocalName == "SaPulseBars").Attribute("Ceiling"));
         var wide = page.Descendants().Single(e => e.Name.LocalName == "VisualState" && (string?)e.Attribute(AppSourceTree.Xaml + "Name") == "Wide");
-        Assert.Equal("1120", (string?)wide.Descendants().Single(e => e.Name.LocalName == "AdaptiveTrigger").Attribute("MinWindowWidth"));
+        Assert.Equal("1120", (string?)wide.Descendants().Single(e => e.Name.LocalName == "SaContentWidthTrigger").Attribute("MinWidth"));
     }
 
     [Fact]
@@ -500,7 +500,7 @@ public sealed class Ui5R2Tests
         }
 
         var icons = page.Descendants().Where(e => e.Name.LocalName == "SaIcon"
-            && e.Ancestors().Any(a => a.Name.LocalName == "Button" && (string?)a.Attribute(AppSourceTree.Xaml + "Uid") != "SettingsBackButton")).ToList();
+            && e.Ancestors().Any(a => a.Name.LocalName == "Button")).ToList();
         Assert.Equal(5, icons.Count); // Entrar chevron + 2 disclosures × (icon, chevron) - Prism C1 N-5
         Assert.All(icons, icon => Assert.Equal("{ThemeResource SaTextSecondaryBrush}", (string?)icon.Attribute("Foreground")));
     }
@@ -540,8 +540,13 @@ public sealed class Ui5R2Tests
     [InlineData("Views/ServerDetailPage.xaml")]
     [InlineData("Views/SettingsPage.xaml")]
     [InlineData("Views/SettingsDataPage.xaml")]
-    public void TheGlassOfTheOpenPage_FollowsALiveThemeSwitch(string file) =>
-        Assert.Equal("True", (string?)AppSourceTree.LoadXaml(file).Root!.Attribute(Primitives + "SaThemeRefresh.IsEnabled"));
+    public void TheGlassOfTheOpenPage_FollowsALiveThemeSwitch(string file)
+    {
+        Assert.Null(AppSourceTree.LoadXaml(file).Root!.Attribute(Primitives + "SaThemeRefresh.IsEnabled"));
+        var shell = AppSourceTree.CodeWithoutComments("MainWindow.xaml.cs");
+        Assert.Contains("SaThemeRefresh.Remount(page)", shell);
+        Assert.Contains("SaThemeRefresh.Remount(Sidebar, Sidebar.Content", shell);
+    }
 
     // ---- helpers ----------------------------------------------------------------------------------------------------------
 

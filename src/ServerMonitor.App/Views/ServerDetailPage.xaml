@@ -1,10 +1,10 @@
-<Page
+<Page x:Name="PageViewport"
     x:Class="ServerMonitor.App.Views.ServerDetailPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:converters="using:ServerMonitor.App.Converters"
     xmlns:primitives="using:ServerMonitor.App.Controls.Primitives"
-    primitives:SaThemeRefresh.IsEnabled="True">
+>
     <!-- UI.5 Server Detail, Figma 112:1785 (D) / 112:2022 (L), first reading 112:16007 / 112:16164. Three metric columns
          from a 1120 window (content ≥ 1040, each card ≥ 336: the Figma geometry, Prism C1 M-1); below that the metric
          cards and Ligação / Explorar stack (SPEC §5). The meters keep their fixed 288 track in every state. Derived states (no Figma
@@ -18,13 +18,13 @@
             <VisualStateGroup x:Name="WidthStates">
                 <VisualState x:Name="Wide">
                     <VisualState.StateTriggers>
-                        <AdaptiveTrigger MinWindowWidth="1120" />
+                        <primitives:SaContentWidthTrigger Source="{Binding ElementName=PageViewport}" MinWidth="1120" />
                     </VisualState.StateTriggers>
                 </VisualState>
                 <!-- 700-1119: metric cards and Ligação / Explorar one per row; actions stay beside the name. -->
                 <VisualState x:Name="Medium">
                     <VisualState.StateTriggers>
-                        <AdaptiveTrigger MinWindowWidth="700" />
+                        <primitives:SaContentWidthTrigger Source="{Binding ElementName=PageViewport}" MinWidth="700" MaxWidth="1120" />
                     </VisualState.StateTriggers>
                     <VisualState.Setters>
                         <Setter Target="MetricsColumn2.Width" Value="0" />
@@ -46,7 +46,7 @@
                 <!-- < 700: compact padding; the actions move under the identity, left-aligned. -->
                 <VisualState x:Name="Narrow">
                     <VisualState.StateTriggers>
-                        <AdaptiveTrigger MinWindowWidth="0" />
+                        <primitives:SaContentWidthTrigger Source="{Binding ElementName=PageViewport}" MinWidth="0" MaxWidth="700" />
                     </VisualState.StateTriggers>
                     <VisualState.Setters>
                         <Setter Target="PageRoot.Padding" Value="{StaticResource SaPagePaddingCompact}" />
@@ -96,12 +96,14 @@
                     <primitives:SaIcon Data="{StaticResource SaIconServerStack01Data}" Size="30" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Border>
                 <StackPanel Grid.Column="1" Spacing="6" VerticalAlignment="Center">
-                    <TextBlock
+                    <primitives:SaHeadingHost AutomationProperties.HeadingLevel="Level1" IsTabStop="False">
+                        <TextBlock
                         x:Name="ServerNameHeading"
                         Text="{Binding Title}"
-                        AutomationProperties.HeadingLevel="Level1"
+                        AutomationProperties.AccessibilityView="Raw" IsTextSelectionEnabled="False" IsTabStop="False"
                         Style="{StaticResource SaPageTitleTextStyle}"
                         TextTrimming="CharacterEllipsis" />
+                    </primitives:SaHeadingHost>
                     <TextBlock
                         Text="{Binding HeaderSubtitle}"
                         Style="{StaticResource SaControlTextStyle}"

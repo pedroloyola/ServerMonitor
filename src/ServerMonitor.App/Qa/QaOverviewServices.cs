@@ -16,7 +16,7 @@ namespace ServerMonitor.App.Qa;
 /// really change the IN-MEMORY list and announce it - or return false when the scenario asks them to fail. Nothing is
 /// ever persisted.
 /// </summary>
-internal sealed class QaOverviewServerService(QaOverviewScenario scenario, Action<TimeSpan, Action>? schedule = null) : IServerService
+internal sealed class QaOverviewServerService(QaOverviewScenario scenario, Action<TimeSpan, Action>? schedule = null) : IServerService, IServerLoadStatusSource
 {
     private readonly TaskCompletionSource<IReadOnlyList<Server>> _neverCompletes = new();
     private readonly Lock _gate = new();
@@ -26,6 +26,10 @@ internal sealed class QaOverviewServerService(QaOverviewScenario scenario, Actio
     private bool _vanished;
 
     public event EventHandler? ServersChanged;
+
+    public Task<ServerLoadStatus> GetLoadStatusAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(scenario.Name == "first-run" ? ServerLoadStatus.NotFound
+            : scenario.Name == "config-unavailable" ? ServerLoadStatus.Unavailable : ServerLoadStatus.Loaded);
 
     public Task<IReadOnlyList<Server>> GetAllAsync(CancellationToken cancellationToken = default)
     {

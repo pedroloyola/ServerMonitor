@@ -19,6 +19,7 @@ namespace ServerMonitor.App.ViewModels;
 public enum HistoryEmptyKind
 {
     None,
+    NoServer,
     NeverRecorded,
     Period
 }
@@ -145,6 +146,10 @@ public sealed class HistoryViewModel : ObservableObject, IDisposable
         YAxisLabels = HistoryPresentation.YAxisLabels(FormatCulture);
     }
 
+    public bool HasServer => _serverId != Guid.Empty;
+    public bool HasDetailOrigin { get; private set; }
+    public bool ShowDetailBack => HasServer && HasDetailOrigin;
+
     public ICommand BackCommand { get; }
 
     /// <summary>"Ver servidor" in the never-recorded state (D-UI3-5: Dashboard until UI.5).</summary>
@@ -265,14 +270,14 @@ public sealed class HistoryViewModel : ObservableObject, IDisposable
 
     public string EmptyTitle => EmptyKind switch
     {
-        HistoryEmptyKind.NeverRecorded => Text("HistoryEmptyNeverTitle"),
+        HistoryEmptyKind.NoServer or HistoryEmptyKind.NeverRecorded => Text("HistoryEmptyNeverTitle"),
         HistoryEmptyKind.Period => Text("HistoryEmptyPeriodTitle"),
         _ => string.Empty
     };
 
     public string EmptyMessage => EmptyKind switch
     {
-        HistoryEmptyKind.NeverRecorded => Text("HistoryEmptyNeverMessage"),
+        HistoryEmptyKind.NoServer or HistoryEmptyKind.NeverRecorded => Text("HistoryEmptyNeverMessage"),
         HistoryEmptyKind.Period => Text("HistoryEmptyPeriodMessage"),
         _ => string.Empty
     };
@@ -310,10 +315,12 @@ public sealed class HistoryViewModel : ObservableObject, IDisposable
 
     public string DiskTitle { get; }
 
+    public string BackAutomationName => string.Format(CultureInfo.CurrentCulture, _localizationService.GetString("HistoryBackToServerFormat"), Title);
+
     public string Title
     {
         get => _title;
-        private set => SetProperty(ref _title, value);
+        private set { if (SetProperty(ref _title, value)) OnPropertyChanged(nameof(BackAutomationName)); }
     }
 
     /// <summary>0..4 → 1h/6h/24h/7d/30d. Two-way bound to the range selector; setting it reloads.</summary>
@@ -463,8 +470,56 @@ public sealed class HistoryViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>Binds the VM to a server and starts loading its history. Called on the UI thread.</summary>
+    public async Task LoadSidebarAsync(Guid? lastDetailServer)
+    {
+        IsLoading = true;
+        var loaded = await TryLoadServersAsync();
+        if (_disposed) return;
+        _serversRequested = true;
+        if (loaded is null) return; // Superseded: the newer read owns presentation.
+        if (loaded is false)
+        {
+            Load(null, string.Empty, fromDetail: false);
+            IsUnavailable = true;
+            return;
+        }
+        var server = Servers.FirstOrDefault(option => option.Id == lastDetailServer) ?? Servers.FirstOrDefault();
+        Load(server?.Id, server?.Name ?? string.Empty, fromDetail: false);
+    }
+
+    public void Load(Guid? serverId, string serverName, bool fromDetail)
+    {
+        HasDetailOrigin = fromDetail;
+        if (serverId is { } id && id != Guid.Empty)
+        {
+            Load(id, serverName);
+        }
+        else
+        {
+            Interlocked.Increment(ref _generation);
+            _cts?.Cancel();
+            _serverId = Guid.Empty;
+            _selectedServer = null;
+            Title = string.Empty;
+            ClearPresentedRange();
+            IsLoading = false;
+            IsUnavailable = false;
+            IsEmpty = true;
+            EmptyKind = HistoryEmptyKind.NoServer;
+            if (!_serversRequested)
+            {
+                _serversRequested = true;
+                _ = LoadServersAsync();
+            }
+        }
+        OnPropertyChanged(nameof(HasServer));
+        OnPropertyChanged(nameof(HasDetailOrigin));
+        OnPropertyChanged(nameof(ShowDetailBack));
+    }
+
     public void Load(Guid serverId, string serverName)
     {
+        if (serverId == Guid.Empty) { Load(null, string.Empty, false); return; }
         // Cortex M-1: switching servers must never show server A's series, peaks, summaries or period while B loads.
         if (serverId != _serverId)
         {
@@ -499,14 +554,17 @@ public sealed class HistoryViewModel : ObservableObject, IDisposable
     /// Reads the server list from the same service that feeds the Dashboard (visible servers only, same
     /// order). The server being viewed is always selectable even if the list could not be read.
     /// </summary>
-    public async Task LoadServersAsync()
+    public async Task LoadServersAsync() => await TryLoadServersAsync();
+
+    private async Task<bool?> TryLoadServersAsync()
     {
         if (_disposed || _serverService is null)
         {
-            return;
+            return false;
         }
 
         var generation = Interlocked.Increment(ref _serversGeneration);
+        var loaded = true;
         IReadOnlyList<Server> servers;
         try
         {
@@ -516,11 +574,12 @@ public sealed class HistoryViewModel : ObservableObject, IDisposable
         {
             _logger.LogError("History server list failed. Type: {Type}.", exception.GetType().Name);
             servers = [];
+            loaded = false;
         }
 
         if (_disposed || generation != Volatile.Read(ref _serversGeneration))
         {
-            return;
+            return null;
         }
 
         Servers.Clear();
@@ -535,6 +594,7 @@ public sealed class HistoryViewModel : ObservableObject, IDisposable
         }
 
         SyncSelectedServer();
+        return loaded;
     }
 
     private HistoryServerOptionViewModel BuildServerOption(Guid serverId, string name)
@@ -590,7 +650,7 @@ public sealed class HistoryViewModel : ObservableObject, IDisposable
     /// </summary>
     public async Task LoadRangeAsync(HistoryTimeRange range)
     {
-        if (_disposed)
+        if (_disposed || _serverId == Guid.Empty)
         {
             return;
         }

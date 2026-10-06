@@ -26,6 +26,9 @@ public sealed class SaInlineNotice : ContentControl
     public static readonly DependencyProperty MessageProperty = DependencyProperty.Register(
         nameof(Message), typeof(string), typeof(SaInlineNotice), new PropertyMetadata(string.Empty, (d, _) => ((SaInlineNotice)d).Update()));
 
+    public static readonly DependencyProperty AnnouncePolitelyProperty = DependencyProperty.Register(nameof(AnnouncePolitely), typeof(bool), typeof(SaInlineNotice), new PropertyMetadata(false, (d,_) => ((SaInlineNotice)d).Update()));
+    public bool AnnouncePolitely { get => (bool)GetValue(AnnouncePolitelyProperty); set => SetValue(AnnouncePolitelyProperty,value); }
+
     public SaInlineNotice()
     {
         DefaultStyleKey = typeof(SaInlineNotice);
@@ -75,8 +78,9 @@ public sealed class SaInlineNotice : ContentControl
 
     private void Update()
     {
+        if (GetTemplateChild("PART_ErrorTitle") is TextBlock title) title.Visibility = string.IsNullOrWhiteSpace(Title) ? Visibility.Collapsed : Visibility.Visible;
         var error = Severity == SaNoticeSeverity.Error;
-        AutomationProperties.SetLiveSetting(this, error ? AutomationLiveSetting.Assertive : AutomationLiveSetting.Polite);
+        AutomationProperties.SetLiveSetting(this, error && !AnnouncePolitely ? AutomationLiveSetting.Assertive : AutomationLiveSetting.Polite);
         AutomationProperties.SetName(this, AccessibleName(Title, Message));
         VisualStateManager.GoToState(this, error ? "Error" : "Info", useTransitions: false);
         if (IsLoaded)

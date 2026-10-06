@@ -43,10 +43,10 @@ public sealed class Ui4BeaconContractTests
         Assert.True(load >= 0);
         Assert.True(code.IndexOf("RestoreFocus", load, StringComparison.Ordinal) > load, "focus is placed after the load");
         Assert.Contains("ViewModel.TakeReturnFocus()", code);
-        Assert.Contains("HealthCard.Focus(", code);
-        Assert.Contains("EmptyAddButton.Focus(", code);
+        Assert.Contains("ShellPageFocus.FocusHeading(this)", code);
+        Assert.Contains("ShellPageFocus.GetKeepSidebar(this)", code);
         Assert.Contains("PriorityButton.Focus(", code);
-        Assert.Contains("ViewAllButton.Focus(", code);
+        Assert.Contains("DirectoryLinkButton.Focus(", code);
     }
 
     /// <summary>SHOULD-1/5: Servidores refocuses the origin row on Loaded and the focused row across the width reflow.</summary>
@@ -56,8 +56,8 @@ public sealed class Ui4BeaconContractTests
         var code = AppSourceTree.CodeWithoutComments("Views/ServersPage.xaml.cs");
         Assert.Contains("ViewModel.TakeReturnFocusIndex()", code);
         // Prism r2 C-R2-1: with no server, "Adicionar servidor" rather than an empty search.
-        Assert.Contains("if (ViewModel.ShowEmptyState)", code);
-        Assert.Contains("EmptyAddButton.Focus(FocusState.Programmatic);", code);
+        Assert.Contains("ShellPageFocus.GetKeepSidebar(this)", code);
+        Assert.Contains("ShellPageFocus.FocusHeading(this)", code);
         // AdaptiveTrigger changes never raise CurrentStateChanging/Changed (QA r2): the template swap is observed instead.
         Assert.Contains("ServersRepeater.RegisterPropertyChangedCallback(ItemsRepeater.ItemTemplateProperty, OnRowTemplateChanged)", code);
         Assert.Contains("ServersRepeater.GotFocus += OnRowGotFocus", code);

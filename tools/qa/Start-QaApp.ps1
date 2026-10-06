@@ -38,7 +38,7 @@ $ErrorActionPreference = 'Stop'
 
 # Mirrors QaStartupIsolation (tested against it).
 $HarnessFlags = @('--qa-health', '--qa-discovery', '--qa-notifications', '--qa-compact', '--qa-history', '--qa-workloads', '--qa-store-screenshot', '--qa-proxyjump', '--qa-overview')
-$ModifierFlags = @('--qa-ssh-config', '--qa-ui-language', '--qa-backup', '--qa-proxyjump-dir', '--qa-overview-scenario')
+$ModifierFlags = @('--qa-ssh-config', '--qa-ui-language', '--qa-backup', '--qa-proxyjump-dir', '--qa-overview-scenario', '--qa-start', '--qa-activation')
 $GalleryFlags = @('--qa-components', '--qa-tokens')
 
 function Test-IsHarness([string]$a) { ($HarnessFlags -ccontains $a) -or ($a -cmatch '^--qa-compact:\d{1,4}$') }

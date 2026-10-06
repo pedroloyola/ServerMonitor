@@ -1,10 +1,10 @@
-<Page
+<Page x:Name="PageViewport"
     x:Class="ServerMonitor.App.Views.SettingsPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:converters="using:ServerMonitor.App.Converters"
     xmlns:primitives="using:ServerMonitor.App.Controls.Primitives"
-    primitives:SaThemeRefresh.IsEnabled="True">
+>
     <!-- UI.5 "Definições", Figma 112:7909 (D) / 112:8003 (L): header, three sections (title 17 + glass card of setting
          rows: label 14 Medium + description 12 | control at the right), two disclosures, local-preferences footer.
          Below 700 the control of each row moves under its text (SPEC §5). -->
@@ -17,18 +17,18 @@
             <VisualStateGroup x:Name="WidthStates">
                 <VisualState x:Name="Wide">
                     <VisualState.StateTriggers>
-                        <AdaptiveTrigger MinWindowWidth="700" />
+                        <primitives:SaContentWidthTrigger Source="{Binding ElementName=PageViewport}" MinWidth="700" />
                     </VisualState.StateTriggers>
                 </VisualState>
                 <!-- < 700: compact padding; each control under its text; the disclosures stacked; autosave under the title. -->
                 <VisualState x:Name="Narrow">
                     <VisualState.StateTriggers>
-                        <AdaptiveTrigger MinWindowWidth="0" />
+                        <primitives:SaContentWidthTrigger Source="{Binding ElementName=PageViewport}" MinWidth="0" MaxWidth="700" />
                     </VisualState.StateTriggers>
                     <VisualState.Setters>
                         <Setter Target="PageRoot.Padding" Value="{StaticResource SaPagePaddingCompact}" />
                         <Setter Target="AutosaveText.(Grid.Row)" Value="1" />
-                        <Setter Target="AutosaveText.(Grid.Column)" Value="1" />
+                        <Setter Target="AutosaveText.(Grid.Column)" Value="0" />
                         <Setter Target="AutosaveText.HorizontalAlignment" Value="Left" />
                         <Setter Target="ThemeControl.(Grid.Row)" Value="1" />
                         <Setter Target="ThemeControl.(Grid.Column)" Value="0" />
@@ -66,7 +66,6 @@
             <!-- Settings header 112:7910: [back, DERIVED until UI.6's sidebar] title 32 + "À tua medida." | autosave 11. -->
             <Grid ColumnSpacing="{StaticResource SaSpace16}" RowSpacing="{StaticResource SaSpace4}">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
@@ -74,24 +73,15 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
-                <Button
-                    x:Uid="SettingsBackButton"
-                    VerticalAlignment="Center"
-                    Command="{Binding BackCommand}"
-                    Style="{StaticResource SaIconButtonSmallStyle}">
-                    <primitives:SaIcon Data="{StaticResource SaIconArrowRight01Data}" Size="18" RenderTransformOrigin="0.5,0.5">
-                        <primitives:SaIcon.RenderTransform>
-                            <RotateTransform Angle="180" />
-                        </primitives:SaIcon.RenderTransform>
-                    </primitives:SaIcon>
-                </Button>
-                <StackPanel Grid.Column="1" Spacing="{StaticResource SaSpace4}" VerticalAlignment="Center">
-                    <TextBlock x:Uid="SettingsTitle" AutomationProperties.HeadingLevel="Level1" Style="{StaticResource SaPageTitleTextStyle}" />
+                <StackPanel Grid.Column="0" Spacing="{StaticResource SaSpace4}" VerticalAlignment="Center">
+                    <primitives:SaHeadingHost AutomationProperties.HeadingLevel="Level1" IsTabStop="False">
+                        <TextBlock x:Uid="SettingsTitle" AutomationProperties.AccessibilityView="Raw" IsTextSelectionEnabled="False" IsTabStop="False" Style="{StaticResource SaPageTitleTextStyle}" />
+                    </primitives:SaHeadingHost>
                     <TextBlock x:Uid="SettingsSubtitle" Style="{StaticResource SaControlTextStyle}" FontWeight="Normal"
                                Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap" />
                 </StackPanel>
                 <!-- A-9: a fixed label; a failed save shows its own notice next to the setting (the label never claims success). -->
-                <TextBlock x:Name="AutosaveText" x:Uid="SettingsAutosave" Grid.Column="2" VerticalAlignment="Center"
+                <TextBlock x:Name="AutosaveText" x:Uid="SettingsAutosave" Grid.Column="1" VerticalAlignment="Center"
                            Style="{StaticResource SaHelperTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" />
             </Grid>
 

@@ -34,7 +34,7 @@ namespace ServerMonitor.Infrastructure.Persistence;
 public sealed class JsonServerRepository(
     ServerStorageOptions storageOptions,
     ILogger<JsonServerRepository> logger,
-    IConfigurationWriteGate writeGate) : IServerRepository, IDisposable
+    IConfigurationWriteGate writeGate) : IServerRepository, IServerLoadDiagnosisSource, IDisposable
 {
     internal const int SupportedRoutedSchemaVersion = 1;
 
@@ -62,6 +62,46 @@ public sealed class JsonServerRepository(
     // Ids this instance has returned or been given. A save deletes an on-disk entry only when its id is in
     // here and absent from the new list; any other entry is someone else's data and is kept.
     private readonly HashSet<Guid> _knownIds = [];
+
+    public async Task<ServerLoadStatus> GetLoadStatusAsync(CancellationToken cancellationToken = default) =>
+        (await GetLoadDiagnosisAsync(cancellationToken)).Status;
+
+    public async Task<ServerLoadDiagnosis> GetLoadDiagnosisAsync(CancellationToken cancellationToken = default)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            // File.Exists suppresses access errors. Probe attributes first so denied access cannot
+            // masquerade as a first run. Missing parent directories are legitimate absence.
+            foreach (var path in new[] { storageOptions.FilePath, storageOptions.RoutedFilePath })
+            {
+                try
+                {
+                    if ((File.GetAttributes(path) & FileAttributes.Directory) != 0)
+                        return new(ServerLoadStatus.Unavailable, 0);
+                }
+                catch (FileNotFoundException) { }
+                catch (DirectoryNotFoundException) { }
+            }
+
+            var direct = await ReadDirectAsync(cancellationToken);
+            var routed = await ReadRoutedAsync(cancellationToken);
+            if (direct.IsCorrupt || routed.IsCorrupt || routed.IsReadOnly)
+                return new(ServerLoadStatus.Unavailable, 0);
+            if (!direct.Exists && !routed.Exists)
+                return new(ServerLoadStatus.NotFound, 0);
+
+            var validCount = routed.Entries.Count + DirectEntriesToLoad(direct, routed).Count();
+            var quarantinedCount = direct.Quarantined.Count + routed.Quarantined.Count;
+            return new(validCount == 0 && quarantinedCount > 0
+                ? ServerLoadStatus.Unavailable : ServerLoadStatus.Loaded, validCount);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return new(ServerLoadStatus.Unavailable, 0);
+        }
+        finally { _gate.Release(); }
+    }
 
     public async Task<IReadOnlyList<Server>> GetAllAsync(
         CancellationToken cancellationToken = default)

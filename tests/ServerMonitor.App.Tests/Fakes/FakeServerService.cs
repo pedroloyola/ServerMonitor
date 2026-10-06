@@ -10,8 +10,12 @@ namespace ServerMonitor.App.Tests.Fakes;
 /// implemented; the mutation methods are irrelevant here and throw. Tests mutate
 /// <see cref="Servers"/> then call <see cref="RaiseChanged"/> to drive a reconcile.
 /// </summary>
-internal sealed class FakeServerService : IServerService
+internal sealed class FakeServerService : IServerService, IServerLoadStatusSource
 {
+    public ServerLoadStatus LoadStatus { get; set; } = ServerLoadStatus.Loaded;
+    public Func<Task<ServerLoadStatus>>? LoadStatusOverride { get; set; }
+    public Task<ServerLoadStatus> GetLoadStatusAsync(CancellationToken cancellationToken = default) => LoadStatusOverride?.Invoke() ?? Task.FromResult(LoadStatus);
+
     public event EventHandler? ServersChanged;
 
     public List<Server> Servers { get; } = [];

@@ -45,7 +45,8 @@ public sealed class HighContrastSurfaceGuardTests
     [Fact]
     public void EveryHighContrastTokenIsASystemColour()
     {
-        string[] transparentAllowed = ["SaGlassHighlightBrush"];
+        // UI.6 c2 Boss/Prism: HC has no sidebar veil; the system-colour shell remains underneath.
+        string[] transparentAllowed = ["SaGlassHighlightBrush", "SaSidebarMaterialBrush"];
         var failures = new List<string>();
         var entries = 0;
         foreach (var file in AppSourceTree.Files(".xaml").Where(f => f.StartsWith("Styles/Tokens/", StringComparison.Ordinal)))

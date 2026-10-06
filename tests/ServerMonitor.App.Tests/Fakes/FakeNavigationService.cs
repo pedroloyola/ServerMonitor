@@ -6,6 +6,12 @@ namespace ServerMonitor.App.Tests.Fakes;
 /// <summary>Inert <see cref="INavigationService"/> for ViewModel tests. Records the last navigation.</summary>
 internal sealed class FakeNavigationService : INavigationService
 {
+    public NavigationDestination? CurrentDestination { get; set; }
+    public event EventHandler? Navigated;
+    public int NavigatedSubscribers => Navigated?.GetInvocationList().Length ?? 0;
+    public void EnsureInitialNavigation() { if (CurrentDestination is null) GoToDashboard(); }
+    public void GoToHistory() { CurrentDestination = NavigationDestination.History; Raise(); }
+
     public int DashboardCount { get; private set; }
 
     public Guid? LastHistoryServerId { get; private set; }
@@ -22,9 +28,18 @@ internal sealed class FakeNavigationService : INavigationService
 
     public event EventHandler? NavigatedAwayFromOverview;
 
-    private void Raise() => NavigatedAwayFromOverview?.Invoke(this, EventArgs.Empty);
+    private void Raise()
+    {
+        NavigatedAwayFromOverview?.Invoke(this, EventArgs.Empty);
+        Navigated?.Invoke(this, EventArgs.Empty);
+    }
 
-    public void GoToDashboard() => DashboardCount++;
+    public void GoToDashboard()
+    {
+        DashboardCount++;
+        CurrentDestination = NavigationDestination.Overview;
+        Navigated?.Invoke(this, EventArgs.Empty);
+    }
 
     public void RequestBackgroundSettingsFocus() => BackgroundSettingsFocusRequests++;
 
@@ -45,6 +60,7 @@ internal sealed class FakeNavigationService : INavigationService
 
     public void GoToSettings()
     {
+        CurrentDestination = NavigationDestination.Settings;
         SettingsCount++;
         SettingsSections.Add(SettingsSection.General);
         Raise();
@@ -54,6 +70,7 @@ internal sealed class FakeNavigationService : INavigationService
 
     public void GoToSettings(SettingsSection section)
     {
+        CurrentDestination = section == SettingsSection.General ? NavigationDestination.Settings : NavigationDestination.SettingsData;
         SettingsCount++;
         SettingsSections.Add(section);
         if (section == SettingsSection.About)
@@ -80,12 +97,14 @@ internal sealed class FakeNavigationService : INavigationService
     public void GoToHistory(Guid serverId, string serverName)
     {
         LastHistoryServerId = serverId;
+        CurrentDestination = NavigationDestination.History;
         Raise();
     }
 
     public void GoToWorkloads(Guid serverId, string serverName)
     {
         LastWorkloadsServerId = serverId;
+        CurrentDestination = NavigationDestination.Workloads;
         Raise();
     }
 
@@ -94,6 +113,7 @@ internal sealed class FakeNavigationService : INavigationService
     public void GoToServers()
     {
         ServersCount++;
+        CurrentDestination = NavigationDestination.Servers;
         Raise();
     }
 
@@ -104,12 +124,14 @@ internal sealed class FakeNavigationService : INavigationService
     public void ReturnToServerDetail(Guid serverId)
     {
         ServerDetailReturns.Add(serverId);
+        CurrentDestination = NavigationDestination.Detail;
         Raise();
     }
 
     public void GoToServerDetail(Guid serverId, ServerDetailOrigin origin)
     {
         ServerDetailRequests.Add((serverId, origin));
+        CurrentDestination = NavigationDestination.Detail;
         Raise();
     }
 }

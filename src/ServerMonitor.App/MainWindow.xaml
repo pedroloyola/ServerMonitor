@@ -5,54 +5,24 @@
     xmlns:controls="using:ServerMonitor.App.Controls">
     <Grid
         x:Name="RootLayout"
-        Background="{ThemeResource WindowBackdropTintBrush}">
+        Background="Transparent">
+
+        <Border x:Name="WindowBackground" Style="{StaticResource SaShellWindowBackgroundStyle}" IsHitTestVisible="False"/>
 
         <!-- ============================ STANDARD PRESENTATION ============================ -->
+        <!-- UI.6 112:1358: native window, sidebar208 + content; each page owns p40 exactly once. -->
         <Grid x:Name="StandardRoot">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="52" />
-                <RowDefinition Height="*" />
-            </Grid.RowDefinitions>
-
-            <Grid
-                x:Name="AppTitleBar"
-                Grid.Row="0"
-                Padding="20,0,144,0"
-                Background="{ThemeResource TitleBarSurfaceBrush}">
-                <StackPanel
-                    VerticalAlignment="Center"
-                    Orientation="Horizontal"
-                    Spacing="9">
-                    <Border
-                        Width="22"
-                        Height="22"
-                        Background="{ThemeResource AccentSoftBrush}"
-                        CornerRadius="7">
-                        <FontIcon
-                            FontSize="11"
-                            Foreground="{ThemeResource AccentTextBrush}"
-                            Glyph="&#xE9D9;" />
-                    </Border>
-                    <TextBlock
-                        x:Uid="AppNameText"
-                        VerticalAlignment="Center"
-                        FontFamily="Segoe UI Variable Text"
-                        FontSize="13"
-                        FontWeight="SemiBold" />
-                </StackPanel>
+            <Grid x:Name="ShellSurface">
+                <Grid.ColumnDefinitions><ColumnDefinition x:Name="SidebarColumn" Width="208"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <Border Background="{ThemeResource SaSidebarMaterialBrush}" IsHitTestVisible="False"/>
+                <controls:SaSidebar x:Name="Sidebar"/>
+                <Border Width="1" HorizontalAlignment="Right" Background="{ThemeResource SaSidebarEdgeBrush}" IsHitTestVisible="False" />
+                <Frame x:Name="ContentFrame" Grid.Column="1" Background="Transparent" />
             </Grid>
-
-            <Frame
-                x:Name="ContentFrame"
-                Grid.Row="1"
-                Background="Transparent" />
-
-            <!-- Full Window Overlay Modal Container -->
-            <Grid
-                x:Name="ModalOverlayHost"
-                Grid.Row="0"
-                Grid.RowSpan="2"
-                IsHitTestVisible="False" />
+            <!-- Figma 112:247: same window, no sidebar; panel1040x780. Modal remains above both hosts. -->
+            <controls:OnboardingView x:Name="FirstRunView" Visibility="Collapsed" />
+            <!-- G-1 platform exception: no 52px band. Drag only the top32, above page headers at y40. Native captions remain. -->
+            <Grid x:Name="ShellDragRegion" Height="32" VerticalAlignment="Top" Background="Transparent" />
         </Grid>
 
         <!-- ============================ COMPACT PRESENTATION ============================ -->
@@ -169,5 +139,7 @@
                 </StackPanel>
             </Grid>
         </Grid>
+        <!-- Full-window modal, above Standard/onboarding/Compact and the drag surface. -->
+        <Grid x:Name="ModalOverlayHost" IsHitTestVisible="False" />
     </Grid>
 </Window>

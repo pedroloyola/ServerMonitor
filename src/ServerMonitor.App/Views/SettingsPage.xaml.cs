@@ -57,5 +57,9 @@ public sealed partial class SettingsPage : Page, ISettingsNavigationTarget
                 BackgroundSection.StartBringIntoView();
             });
         }
+        else
+        {
+            DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () => ShellPageFocus.FocusHeading(this));
+        }
     }
 }

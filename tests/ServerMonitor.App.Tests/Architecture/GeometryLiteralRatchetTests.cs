@@ -45,8 +45,8 @@ public sealed partial class GeometryLiteralRatchetTests
     private static readonly IReadOnlyDictionary<(string Ledger, string Property), int> PinnedLedgerTotals =
         new Dictionary<(string Ledger, string Property), int>
         {
-            [("GeometryLiteralBaseline.tsv", "CornerRadius")] = 18,
-            [("GeometryLiteralBaseline.tsv", "Padding")] = 35,
+            [("GeometryLiteralBaseline.tsv", "CornerRadius")] = 17,
+            [("GeometryLiteralBaseline.tsv", "Padding")] = 34,
             [("GeometryLiteralAllowlist.tsv", "CornerRadius")] = 0,
             [("GeometryLiteralAllowlist.tsv", "Padding")] = 50
         };

@@ -37,6 +37,7 @@ public sealed partial class ServersPage : Page, IDisposable
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
         var index = ViewModel.TakeReturnFocusIndex();
+        if (ShellPageFocus.GetKeepSidebar(this)) return;
         DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
         {
             if (RepeaterFocus.FocusIndex(ServersRepeater, index))
@@ -44,14 +45,7 @@ public sealed partial class ServersPage : Page, IDisposable
                 return;
             }
 
-            if (ViewModel.ShowEmptyState)
-            {
-                EmptyAddButton.Focus(FocusState.Programmatic);
-            }
-            else
-            {
-                SearchBox.Focus(FocusState.Programmatic);
-            }
+            ShellPageFocus.FocusHeading(this);
         });
     }
 
@@ -99,7 +93,6 @@ public sealed partial class ServersPage : Page, IDisposable
     /// <summary>Idempotent: the view model unsubscribes once.</summary>
     public void Dispose() => ViewModel.Dispose();
 
-    private void OnBreadcrumbParentInvoked(object? sender, EventArgs e) => ViewModel.BackToOverviewCommand.Execute(null);
 
     // "Limpar pesquisa" disappears once it worked; focus returns to the search box (UI.3 pattern).
     private void OnClearSearchClick(object sender, RoutedEventArgs e) => FocusAfterAction.MoveTo((Control)sender, SearchBox);

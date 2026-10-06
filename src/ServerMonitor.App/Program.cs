@@ -92,6 +92,10 @@ public static class Program
         {
             // Bypass: allow multiple instances (Debug QA harnesses only). Still funnel THIS launch's own
             // cold activation intent so a serveralyzer:// Debug launch routes through the same hand-off.
+#if DEBUG
+            Qa.QaStartupIsolation.RefuseUnisolatedLaunch();
+            _pendingActivation.Deliver(Qa.QaShellStartup.Activation(Environment.GetCommandLineArgs()));
+#endif
             _pendingActivation.Deliver(ProtocolActivationReader.TryGetIntent(
                 AppInstance.GetCurrent().GetActivatedEventArgs()));
             return false;

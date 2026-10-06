@@ -59,22 +59,20 @@ public sealed partial class ServerDetailPage : Page, IServerDetailView, IDisposa
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
-        Control target = ViewModel.TakeReturnFocus() switch
+        var returnTarget = ViewModel.TakeReturnFocus();
+        if (ShellPageFocus.GetKeepSidebar(this)) return;
+        Control? target = returnTarget switch
         {
             ServerDetailReturnTarget.History => HistoryRow,
             ServerDetailReturnTarget.Workloads => WorkloadsRow,
-            _ => RefreshButton
+            _ => null
         };
 
         // Low priority: after the first layout pass, so the element is realized and can take focus.
         DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
         {
-            if (!target.Focus(FocusState.Programmatic) && target != RefreshButton)
-            {
-                RefreshButton.Focus(FocusState.Programmatic);
-            }
-
-            target.StartBringIntoView();
+            if (target is null || !target.Focus(FocusState.Programmatic)) ShellPageFocus.FocusHeading(this);
+            target?.StartBringIntoView();
         });
     }
 
