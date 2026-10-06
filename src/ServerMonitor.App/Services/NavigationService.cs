@@ -19,6 +19,8 @@ public sealed class NavigationService : INavigationService
     private bool _leaving;
     // UI.7: an exit decision (the discard dialog) is open; any other navigation meanwhile is refused, never queued.
     private bool _exitDecisionPending;
+    // m-2: the latest external activation that arrived while the discard question was open (latest-wins).
+    private Action? _pendingActivation;
     public NavigationDestination? CurrentDestination { get; private set; }
     public event EventHandler? Navigated;
 
@@ -253,6 +255,20 @@ public sealed class NavigationService : INavigationService
         continuation();
     }
 
+    /// <inheritdoc />
+    public void LeaveCurrentPageForActivation(Action continuation)
+    {
+        ArgumentNullException.ThrowIfNull(continuation);
+        if (_exitDecisionPending && !_leaving && _host?.Content is INavigationExitGuard)
+        {
+            _pendingActivation = continuation;
+            _logger.LogInformation("An activation arrived while the exit question is open; the latest one is kept.");
+            return;
+        }
+
+        LeaveCurrentPageThen(continuation);
+    }
+
     /// <summary>
     /// UI.7 H-UI7-3: the ONE exit path. When the page shown is an <see cref="INavigationExitGuard"/>, the navigation runs
     /// only once it says yes - at once for a clean page (a completed answer), after the discard dialog otherwise. True =
@@ -311,10 +327,20 @@ public sealed class NavigationService : INavigationService
             _exitDecisionPending = false;
         }
 
-        Conclude(decision, navigation, refused);
+        // m-2: an activation that arrived meanwhile replaces the navigation that asked - only if the user discards.
+        var activation = _pendingActivation;
+        _pendingActivation = null;
+        if (activation is not null && decision.Status == TaskStatus.RanToCompletion && decision.Result)
+        {
+            refused?.Invoke(); // the original navigation will not happen
+            Conclude(decision, activation, null, deferred: true);
+            return;
+        }
+
+        Conclude(decision, navigation, refused, deferred: true);
     }
 
-    private void Conclude(Task<bool> decision, Action navigation, Action? refused)
+    private void Conclude(Task<bool> decision, Action navigation, Action? refused, bool deferred = false)
     {
         if (decision.Status != TaskStatus.RanToCompletion || !decision.Result)
         {
@@ -332,6 +358,14 @@ public sealed class NavigationService : INavigationService
         try
         {
             navigation();
+        }
+        catch (Exception exception) when (deferred)
+        {
+            // m-1: nobody awaits a deferred navigation. A failure is logged (type only, B-21) and reported to the caller's
+            // refusal path, so an editor visit still ends and its opener's command is released. A synchronous navigation
+            // keeps throwing to its caller (OpenAsync already ends the visit and reports it).
+            _logger.LogError("A deferred navigation failed. Exception type: {ExceptionType}.", exception.GetType().Name);
+            refused?.Invoke();
         }
         finally
         {

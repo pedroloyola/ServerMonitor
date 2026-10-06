@@ -135,7 +135,8 @@ public sealed class Ui7NavigationGuardTests
         var start = code.IndexOf("private void ExecuteActivationIntent", StringComparison.Ordinal);
         var body = code[start..code.IndexOf("public static IHost ServicesHost", start, StringComparison.Ordinal)];
 
-        var leave = body.IndexOf("navigation.LeaveCurrentPageThen(", StringComparison.Ordinal);
+        // UI.7A fix c1 (m-2): the activation variant of the same guarded exit (latest-wins while the question is open).
+        var leave = body.IndexOf("navigation.LeaveCurrentPageForActivation(", StringComparison.Ordinal);
         Assert.True(leave > 0, "the activation does not leave through the exit guard");
         Assert.True(body.IndexOf("navigation.GoToDashboard()", StringComparison.Ordinal) > leave);
         Assert.True(body.IndexOf("dashboard.FocusServer(serverId)", StringComparison.Ordinal) > leave);

@@ -154,7 +154,7 @@ public partial class App : Application
                 // UI.7 H-UI7-3: an activation leaves the current page through the SAME exit guard as every other
                 // navigation. An editor with unsaved changes asks "Descartar alterações?" first; keeping them drops the
                 // activation (nothing is ever saved implicitly, and the editor never keeps running behind another page).
-                navigation.LeaveCurrentPageThen(() =>
+                navigation.LeaveCurrentPageForActivation(() =>
                 {
                     navigation.GoToDashboard();
 

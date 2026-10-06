@@ -151,4 +151,6 @@ internal sealed class FakeNavigationService : INavigationService
         LeaveRequests++;
         continuation();
     }
+
+    public void LeaveCurrentPageForActivation(Action continuation) => LeaveCurrentPageThen(continuation);
 }

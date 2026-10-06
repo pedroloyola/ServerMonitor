@@ -119,6 +119,9 @@ internal sealed class Ui7EditorWorld : IDisposable
 
     public List<EditorPageDouble> EditorPages { get; } = [];
 
+    /// <summary>UI.7A fix c1 (m-1): the next editor page creation throws (a navigation that fails).</summary>
+    public bool ThrowOnNextEditorPage { get; set; }
+
     /// <summary>Per editor page load: were all earlier editor pages (and so their view models) already disposed?</summary>
     public List<bool> PreviousEditorsDisposedAtLoad { get; } = [];
 
@@ -211,6 +214,12 @@ internal sealed class Ui7EditorWorld : IDisposable
     {
         if (type == typeof(ServerEditorPage))
         {
+            if (ThrowOnNextEditorPage)
+            {
+                ThrowOnNextEditorPage = false;
+                throw new InvalidOperationException("QA: the editor page could not be created.");
+            }
+
             var page = new EditorPageDouble(Session, Prompt);
             var earlier = EditorPages.ToList();
             page.BeforeLoad = () => PreviousEditorsDisposedAtLoad.Add(earlier.All(previous => previous.Disposed));

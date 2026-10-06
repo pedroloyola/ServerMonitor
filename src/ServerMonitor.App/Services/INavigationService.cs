@@ -80,4 +80,12 @@ public interface INavigationService
     /// editing. External activations (toast, widget, tray deep-link) and the editor's own Cancel/Back go through here.
     /// </summary>
     void LeaveCurrentPageThen(Action continuation);
+
+    /// <summary>
+    /// UI.7A fix c1 (Cortex m-2, Boss decision DERIVED): an EXTERNAL activation (toast, widget, tray deep-link) leaves like
+    /// <see cref="LeaveCurrentPageThen"/>, except while "Descartar alterações?" is already being asked: then only the
+    /// LATEST activation is kept (latest-wins, like the ActivationRouter). "Descartar" runs that activation instead of the
+    /// navigation that asked; "Continuar a editar" drops it. Clicks are never queued (the question is modal).
+    /// </summary>
+    void LeaveCurrentPageForActivation(Action continuation);
 }
