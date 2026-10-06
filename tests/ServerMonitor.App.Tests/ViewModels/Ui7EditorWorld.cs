@@ -27,7 +27,7 @@ internal sealed class Ui7EditorWorld : IDisposable
 {
     private readonly Dictionary<Type, object> _singletonPages = [];
 
-    public Ui7EditorWorld(ILocalSshKeyDiscovery? keyDiscovery = null)
+    public Ui7EditorWorld(ILocalSshKeyDiscovery? keyDiscovery = null, ISshConfigImportSource? importSource = null)
     {
         Directory = Path.Combine(Path.GetTempPath(), "servermonitor-ui7-tests", Guid.NewGuid().ToString("N"));
         System.IO.Directory.CreateDirectory(Directory);
@@ -54,7 +54,7 @@ internal sealed class Ui7EditorWorld : IDisposable
             ConnectionStates,
             new NullPicker(),
             new FakeLocalizationService(),
-            new EmptyImportSource(),
+            importSource ?? new EmptyImportSource(),
             keyDiscovery ?? new NoKeys(),
             Navigation,
             ReturnFocus,
@@ -173,6 +173,14 @@ internal sealed class Ui7EditorWorld : IDisposable
         Navigation.GoToServerDetail(serverId, ServerDetailOrigin.Servers);
         var card = Dashboard.VisibleServers.Single(candidate => candidate.Server.Id == serverId);
         return ((AsyncRelayCommand)card.EditCommand).ExecuteAsync();
+    }
+
+    /// <summary>UI.7B: forget the trust/credential counts of the setup (the next assertions count only what follows).</summary>
+    public void ResetTrustCounts()
+    {
+        DirectTrust.ResetCounts();
+        RoutedTrust.ResetCounts();
+        Credentials.ResetCounts();
     }
 
     /// <summary>The bytes of every persisted store the editor could touch (servers, routed servers, both trust files).</summary>
@@ -324,10 +332,34 @@ internal sealed class EditorPageDouble : IServerEditorView, INavigationExitGuard
 
     public Task<ServerEditorSubmitOutcome?> SubmitAsync() => Controller.SubmitAsync(CaptureSecrets);
 
+    /// <summary>UI.7B: every trust prompt the page's dialog host was asked to show (it shows; it never accepts).</summary>
+    public List<HostKeyTrustPrompt> ShownPrompts { get; } = [];
+
     public async Task TestAsync()
     {
         CaptureSecrets();
         await Controller.ViewModel!.TestConnectionAsync();
+        EvaluateDialogs();
+    }
+
+    /// <summary>What ServerEditorPage.EvaluateDialogs does when the view model raises a prompt: ask the controller.</summary>
+    public HostKeyTrustPrompt? EvaluateDialogs()
+    {
+        var prompt = Controller.PromptToShow();
+        if (prompt is not null)
+        {
+            ShownPrompts.Add(prompt);
+        }
+
+        return prompt;
+    }
+
+    /// <summary>"Confiar e …" pressed in the dialog showing <paramref name="shown"/> (the page's OnTrustPrimaryClick).</summary>
+    public async Task<bool> AcceptAsync(HostKeyTrustPrompt shown)
+    {
+        var accepted = await Controller.AcceptTrustAsync(shown);
+        EvaluateDialogs();
+        return accepted;
     }
 
     public void Dispose()
@@ -375,6 +407,9 @@ internal sealed class ScriptedSsh : ISshConnectionService
 
     public SshConnectionResult Result { get; set; } = TestData.Connected();
 
+    /// <summary>UI.7B: results returned in order before <see cref="Result"/> (e.g. jump unknown → target unknown → ok).</summary>
+    public Queue<SshConnectionResult> Queue { get; } = new();
+
     public bool Hold { get; set; }
 
     public int TestConnectionCount { get; private set; }
@@ -399,7 +434,7 @@ internal sealed class ScriptedSsh : ISshConnectionService
         Requests.Add(request);
         if (!Hold)
         {
-            return Task.FromResult(Result);
+            return Task.FromResult(Queue.Count > 0 ? Queue.Dequeue() : Result);
         }
 
         _barrier = new TaskCompletionSource<SshConnectionResult>();
@@ -422,11 +457,24 @@ internal sealed class RecordingCredentialStore : IServerCredentialStore
 
     public int Count => _secrets.Count;
 
-    public void ResetCounts() => Writes = Deletes = Reads = 0;
+    /// <summary>UI.7B (R-9): every write/delete in order, with the credential kind.</summary>
+    public List<(string Operation, ServerCredentialKind Kind)> Log { get; } = [];
+
+    public IReadOnlyCollection<CredentialReference> References => _secrets.Keys;
+
+    public string? SecretOf(ServerCredentialKind kind) =>
+        _secrets.Where(pair => pair.Key.Kind == kind).Select(pair => pair.Value).SingleOrDefault();
+
+    public void ResetCounts()
+    {
+        Writes = Deletes = Reads = 0;
+        Log.Clear();
+    }
 
     public Task WriteAsync(CredentialReference reference, SecretValue secret, CancellationToken cancellationToken = default)
     {
         Writes++;
+        Log.Add(("write", reference.Kind));
         _secrets[reference] = new string(secret.Reveal());
         return Task.CompletedTask;
     }
@@ -440,6 +488,7 @@ internal sealed class RecordingCredentialStore : IServerCredentialStore
     public Task<bool> DeleteAsync(CredentialReference reference, CancellationToken cancellationToken = default)
     {
         Deletes++;
+        Log.Add(("delete", reference.Kind));
         return Task.FromResult(_secrets.Remove(reference));
     }
 }
