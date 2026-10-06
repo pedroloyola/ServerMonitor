@@ -59,7 +59,9 @@ internal sealed class Ui7EditorWorld : IDisposable
             Navigation,
             ReturnFocus,
             NullLogger<ServerEditorSession>.Instance,
-            () => OpenerName);
+            () => OpenerName,
+            ServerService,
+            SavedNotice);
         Dashboard = new DashboardViewModel(
             ServerService,
             Profiles,
@@ -113,6 +115,9 @@ internal sealed class Ui7EditorWorld : IDisposable
     public DashboardViewModel Dashboard { get; }
 
     public ScriptedDiscardPrompt Prompt { get; } = new();
+
+    /// <summary>UI.7C (B-5): the one-shot "saved" toast slot the session posts to (the Detail takes it).</summary>
+    public ServerEditorSavedNotice SavedNotice { get; } = new();
 
     /// <summary>The x:Name the "focused opener" capture reports when an editor opens.</summary>
     public string? OpenerName { get; set; } = "OverviewAddButton";
@@ -350,6 +355,12 @@ internal sealed class EditorPageDouble : IServerEditorView, INavigationExitGuard
         await Controller.ViewModel!.TestConnectionAsync();
         EvaluateDialogs();
     }
+
+    /// <summary>UI.7C: "Testar ligação" / "Tentar novamente" as the page does it (the test dialog opens once a test starts).</summary>
+    public Task<bool> StartTestAsync() => Controller.StartTestAsync(CaptureSecrets);
+
+    /// <summary>UI.7C: the layer the page would show now.</summary>
+    public ServerEditorLayer Layer(bool accepting = false) => Controller.LayerToShow(accepting);
 
     /// <summary>What ServerEditorPage.EvaluateDialogs does when the view model raises a prompt: ask the controller.</summary>
     public HostKeyTrustPrompt? EvaluateDialogs()

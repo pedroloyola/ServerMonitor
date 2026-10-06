@@ -66,6 +66,9 @@ public sealed class ServerEditorPageController : IDisposable
     /// <summary>UI.7C: the saved-server list arrived (the duplicate notice and the import rows may change).</summary>
     public event EventHandler? KnownServersChanged;
 
+    /// <summary>Test signal: completes once the saved-server list of this visit was read (never faults).</summary>
+    internal Task KnownServersLoaded { get; private set; } = Task.CompletedTask;
+
     public bool Load(ServerEditorRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -74,7 +77,7 @@ public sealed class ServerEditorPageController : IDisposable
         if (ViewModel is not null)
         {
             ViewModel.PropertyChanged += OnViewModelPropertyChanged;
-            _ = LoadKnownServersAsync();
+            KnownServersLoaded = LoadKnownServersAsync();
         }
 
         return ViewModel is not null;
