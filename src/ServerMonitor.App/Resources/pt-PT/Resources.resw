@@ -1074,7 +1074,6 @@ as métricas e o histórico do servidor.</value></data>
   <data name="ServerEditorTrustCancel" xml:space="preserve"><value>Cancelar</value></data>
   <data name="ServerEditorTrustBack" xml:space="preserve"><value>Voltar ao formulário</value></data>
   <data name="ServerEditorTrustWorking" xml:space="preserve"><value>A guardar esta identidade e a testar a ligação…</value></data>
-  <data name="ServerEditorImportTitle" xml:space="preserve"><value>Importar de SSH</value></data>
   <data name="ServerEditorImportSubtitle.Text" xml:space="preserve"><value>Escolhe um perfil da configuração SSH deste dispositivo.</value></data>
   <data name="ServerEditorImportSource.Text" xml:space="preserve"><value>~/.ssh/config</value></data>
   <data name="ServerEditorImportLoading.Text" xml:space="preserve"><value>A ler ~/.ssh/config…</value></data>
@@ -1082,10 +1081,11 @@ as métricas e o histórico do servidor.</value></data>
   <data name="ServerEditorImportAvailable.Text" xml:space="preserve"><value>Disponível</value></data>
   <data name="ServerEditorImportBlocked.Text" xml:space="preserve"><value>Bloqueado</value></data>
   <data name="ServerEditorImportNote.Text" xml:space="preserve"><value>Preenche apenas os campos vazios do servidor e do jump host. Os dados já introduzidos são mantidos. ProxyJump com um único jump host é suportado.</value></data>
-  <data name="ServerEditorImportUse" xml:space="preserve"><value>Usar perfil</value></data>
-  <data name="ServerEditorImportCancel" xml:space="preserve"><value>Cancelar</value></data>
   <data name="ServerEditorImportCountFormat" xml:space="preserve"><value>{0} disponíveis · {1} bloqueados</value></data>
   <data name="ServerEditorImportNotFoundTitle" xml:space="preserve"><value>Não encontrámos a configuração SSH</value></data>
   <data name="ServerEditorImportErrorTitle" xml:space="preserve"><value>Não foi possível ler a configuração SSH</value></data>
   <data name="ServerEditorImportNoHostsTitle" xml:space="preserve"><value>Não foram encontrados perfis</value></data>
+  <data name="ServerEditorImportTitleText.Text" xml:space="preserve"><value>Importar de SSH</value></data>
+  <data name="ServerEditorImportCancelButton.Content" xml:space="preserve"><value>Cancelar</value></data>
+  <data name="ServerEditorImportUseButton.Content" xml:space="preserve"><value>Usar perfil</value></data>
 </root>

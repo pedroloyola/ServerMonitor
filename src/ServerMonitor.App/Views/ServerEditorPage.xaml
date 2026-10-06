@@ -3,6 +3,7 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:controls="using:ServerMonitor.App.Controls"
+    xmlns:local="using:ServerMonitor.App.Views"
     xmlns:primitives="using:ServerMonitor.App.Controls.Primitives"
     NavigationCacheMode="Disabled">
     <!-- UI.7A Add / Edit server page (Figma 04 112:3252 / 112:3412, 05 112:4613 / 112:4779): header (H1 30/42 + subtitle +
@@ -11,6 +12,11 @@
          and the credential note. A fresh page per visit, never cached (B-1); disposed by navigation when replaced, which
          ends the visit and disposes its view model (the session owns it). Tab order (B-20): H1 (programmatic entry) →
          Nome → ... → actions → the header button LAST (declared after everything in the tree; drawn in the header row). -->
+    <!-- UI.7B (Cortex §8, binding): the page hosts its own modal LAYER (trust prompt now, the 7C test later, and "Importar de
+         SSH") in the tree, over the form only - NOT a ContentDialog, so the exit guard's "Descartar alterações?" (the one
+         ContentDialog per XamlRoot) can always open. Smoke over the form, SaModalSurface chrome, Tab cycles inside, Esc is
+         handled by the layer (a test running = cancel it). -->
+    <Grid x:Name="EditorHost">
     <ScrollViewer x:Name="PageScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
         <VisualStateManager.VisualStateGroups>
             <VisualStateGroup x:Name="WidthStates">
@@ -133,4 +139,18 @@
                     Style="{StaticResource SaSecondaryButtonStyle}" Click="OnHeaderButtonClick" />
         </Grid>
     </ScrollViewer>
+
+        <Border x:Name="DialogLayer" Style="{StaticResource SaOverlayStyle}" Visibility="Collapsed">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <Border x:Name="DialogSurface" Style="{StaticResource SaModalSurfaceStyle}" Margin="{StaticResource SaPagePaddingCompact}"
+                        HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="720"
+                        AutomationProperties.IsDialog="True" TabFocusNavigation="Cycle">
+                    <Grid>
+                        <local:ServerEditorTrustPanel x:Name="TrustPanel" Visibility="Collapsed" />
+                        <local:SshConfigImportPanel x:Name="ImportPanel" Visibility="Collapsed" />
+                    </Grid>
+                </Border>
+            </ScrollViewer>
+        </Border>
+    </Grid>
 </Page>

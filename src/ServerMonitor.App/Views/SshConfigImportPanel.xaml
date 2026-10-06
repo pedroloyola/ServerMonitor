@@ -1,18 +1,18 @@
-<ContentDialog
-    x:Class="ServerMonitor.App.Views.SshConfigImportDialog"
+<UserControl
+    x:Class="ServerMonitor.App.Views.SshConfigImportPanel"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:primitives="using:ServerMonitor.App.Controls.Primitives"
     xmlns:viewModels="using:ServerMonitor.App.ViewModels">
-    <!-- UI.7B (B-11): "Importar de SSH" - Figma 04 dialog chrome (112:4049 / 112:4250, G-14 unified on SaDialogStyle and its
-         buttons) with the state content of 07 (no file, unreadable, no profiles, profiles with blocked ones). Read-only:
+    <!-- UI.7B (B-11): "Importar de SSH" - content of the editor page's in-page modal layer (Cortex section 8: an in-tree
+         layer, so the exit guard's discard question stays openable). Figma 04 dialog chrome (112:4049 / 112:4250, G-14
+         unified on the Sa dialog buttons) with the state content of 07 (no file, unreadable, no profiles, profiles with blocked ones). Read-only:
          the list and every classification come from the existing resolver through the view model; a BLOCKED profile is
          listed with its reason and can never be used (no "fix" anywhere). "Usar perfil" fills only empty fields (Add only).
          Closing cancels a load still running. HOOK (7C, H-UI7-2): "Já adicionado" needs the duplicate rule - not faked. -->
-    <ContentDialog.Style>
-        <StaticResource ResourceKey="SaDialogStyle" />
-    </ContentDialog.Style>
-    <StackPanel MaxWidth="664" Spacing="{StaticResource SaSpace16}">
+    <StackPanel Spacing="{StaticResource SaSpace16}">
+        <TextBlock x:Name="TitleText" x:Uid="ServerEditorImportTitleText" Style="{StaticResource SaTitleTextStyle}" TextWrapping="Wrap"
+                   AutomationProperties.HeadingLevel="Level1" />
         <TextBlock x:Uid="ServerEditorImportSubtitle" Style="{StaticResource SaSecondaryBodyTextStyle}" TextWrapping="Wrap" />
         <Border Style="{StaticResource SaInsetTintedSurfaceStyle}" MinHeight="38">
             <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
@@ -87,5 +87,11 @@
                    TextWrapping="Wrap" Visibility="Collapsed" />
         <TextBlock x:Uid="ServerEditorImportNote" Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}"
                    TextWrapping="Wrap" />
+        <StackPanel Orientation="Horizontal" Spacing="{StaticResource SaSpace12}" HorizontalAlignment="Right">
+            <Button x:Name="CancelButton" x:Uid="ServerEditorImportCancelButton" Style="{StaticResource SaDialogCommandButtonStyle}"
+                    Click="OnCancelClick" />
+            <Button x:Name="UseButton" x:Uid="ServerEditorImportUseButton" Style="{StaticResource SaDialogCommandButtonStyle}"
+                    IsEnabled="False" Click="OnUseClick" />
+        </StackPanel>
     </StackPanel>
-</ContentDialog>
+</UserControl>

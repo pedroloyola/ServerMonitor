@@ -135,6 +135,7 @@ public sealed class Ui7ImportDialogTests : IDisposable
         Assert.True(_world.ViewModel.IsLoadingSshConfig);
 
         _world.Page.Controller.CloseImport();
+        Assert.True(load.IsCompleted, "closing must end the load at once (it is cancelled, not left running)");
         await load;
 
         Assert.True(_source.LastToken.IsCancellationRequested);
@@ -142,6 +143,43 @@ public sealed class Ui7ImportDialogTests : IDisposable
         Assert.Empty(_world.ViewModel.SshConfigHosts);
         Assert.Equal(SshConfigLoadOutcome.None, _world.ViewModel.SshConfigLoadOutcome);
         Assert.False(_world.ViewModel.IsDirty);
+    }
+
+    /// <summary>
+    /// Cortex section 8: the import is an in-page LAYER, so an external activation can ask "Descartar alteracoes?" over
+    /// it; "Continuar a editar" finds the import exactly as it was, "Descartar" leaves (the load ends with the editor).
+    /// </summary>
+    [Fact]
+    public async Task AnActivationWithTheImportOpen_AsksOverIt_AndKeepEditingFindsItAsItWas()
+    {
+        await OpenAddAsync();
+        _world.ViewModel.Name = "typed"; // dirty
+        await _world.Page.Controller.OpenImportAsync();
+        Assert.Equal(ServerEditorLayer.Import, _world.Page.Controller.LayerToShow(accepting: false));
+        _world.Prompt.AutoAnswer = false;
+
+        _world.Navigation.LeaveCurrentPageForActivation(_world.Navigation.GoToDashboard);
+
+        Assert.Single(_world.Prompt.Asked);
+        Assert.Equal(ServerEditorLayer.Import, _world.Page.Controller.LayerToShow(accepting: false));
+        Assert.Equal(3, _world.ViewModel.SshConfigHosts.Count);
+
+        _world.Prompt.AutoAnswer = true;
+        var page = _world.Page;
+        _world.Navigation.LeaveCurrentPageForActivation(_world.Navigation.GoToDashboard);
+        Assert.True(page.Disposed);
+    }
+
+    [Fact]
+    public async Task ClosingTheImportLayer_ClosesTheImport()
+    {
+        await OpenAddAsync();
+        await _world.Page.Controller.OpenImportAsync();
+
+        _world.Page.Controller.CloseLayer(ServerEditorLayer.Import, accepting: false);
+
+        Assert.False(_world.ViewModel.IsSshConfigImportOpen);
+        Assert.Equal(ServerEditorLayer.None, _world.Page.Controller.LayerToShow(accepting: false));
     }
 
     [Fact]

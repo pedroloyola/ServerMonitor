@@ -16,9 +16,7 @@ public sealed class Ui7EditorContractTests
     {
         var code = AppSourceTree.CodeWithoutComments("Views/ServerEditorPage.xaml.cs");
 
-        // UI.7B: an open dialog is closed (a trust prompt dismissed) before the guard asks; the decision stays the controller's.
-        Assert.Contains("await CloseDialogAsync();", code, StringComparison.Ordinal);
-        Assert.Contains("return await _controller.ConfirmLeaveAsync();", code, StringComparison.Ordinal);
+        Assert.Contains("public Task<bool> ConfirmLeaveAsync() => _controller.ConfirmLeaveAsync();", code, StringComparison.Ordinal);
         Assert.Contains("_controller.Escape();", code, StringComparison.Ordinal);
         Assert.Contains("_controller.SubmitAsync(ServerForm.CaptureSecret)", code, StringComparison.Ordinal);
         Assert.Contains("_controller.Dispose();", code, StringComparison.Ordinal);

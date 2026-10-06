@@ -90,17 +90,22 @@ public sealed partial class XamlContractAndResourceGuardTests
         [
             "PageViewport", "PageRoot", "HeaderTitle", "EditorHeading", "EditorSubtitle", "ServerForm", "SaveFailedNotice",
             "ActionBar", "TestButton", "CancelTestButton", "TestingRing", "ActionHint", "ActionEnd", "PrimaryButton",
-            "CredentialNoteTitle", "HeaderButton"
+            "CredentialNoteTitle", "HeaderButton",
+            // UI.7B: the in-page modal layer (Cortex §8) and its two panels.
+            "PageScroll", "DialogLayer", "DialogSurface", "TrustPanel", "ImportPanel",
+            // UI.7A fix c1 (M-1): Cancelar is disabled while a Save is persisted.
+            "CancelButton"
         ],
-        // UI.7B dialogs hosted by the editor page: the trust prompt (Figma 09; 7C adds the test) and "Importar de SSH".
-        ["Views/ServerEditorConnectionDialog.xaml"] =
+        // UI.7B panels of the editor page's in-page modal layer: the trust prompt (Figma 09; 7C adds the test) and "Importar de SSH".
+        ["Views/ServerEditorTrustPanel.xaml"] =
         [
             "StepText", "TitleIcon", "TitleText", "BodyText", "SubjectText", "TrustedBlock", "TrustedLabel", "TrustedFingerprintText",
-            "PresentedLabel", "PresentedFingerprintText", "ScopeText", "WorkingRow", "WorkingRing", "WorkingText"
+            "PresentedLabel", "PresentedFingerprintText", "ScopeText", "WorkingRow", "WorkingRing", "WorkingText", "CloseButton", "AcceptButton"
         ],
-        ["Views/SshConfigImportDialog.xaml"] =
+        ["Views/SshConfigImportPanel.xaml"] =
         [
-            "LoadingRow", "LoadingRing", "StatePanel", "StateIcon", "StateTitle", "StateBody", "ListPanel", "CountText", "HostList", "WarningText"
+            "TitleText", "LoadingRow", "LoadingRing", "StatePanel", "StateIcon", "StateTitle", "StateBody", "ListPanel", "CountText", "HostList",
+            "WarningText", "CancelButton", "UseButton"
         ],
         // HistoryChart parts: the chart draws into these by name.
         ["Controls/HistoryChart.xaml"] = ["RootGrid", "PlotHost", "GridCanvas", "PlotCanvas", "YAxisCanvas", "XAxisCanvas"],

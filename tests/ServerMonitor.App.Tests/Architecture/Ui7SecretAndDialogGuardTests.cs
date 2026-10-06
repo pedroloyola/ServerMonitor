@@ -17,8 +17,8 @@ public sealed partial class Ui7SecretAndDialogGuardTests
     [
         "Controls/ServerFormControl.xaml",
         "Views/ServerEditorPage.xaml",
-        "Views/ServerEditorConnectionDialog.xaml",
-        "Views/SshConfigImportDialog.xaml"
+        "Views/ServerEditorTrustPanel.xaml",
+        "Views/SshConfigImportPanel.xaml"
     ];
 
     /// <summary>The only bindable names that merely mention a secret (flags about it, never its value).</summary>
@@ -79,7 +79,7 @@ public sealed partial class Ui7SecretAndDialogGuardTests
         }
 
         // Code-behind never hands a password box's text to UI Automation, a tooltip or a log.
-        foreach (var code in new[] { "Controls/ServerFormControl.xaml.cs", "Views/ServerEditorPage.xaml.cs", "Views/ServerEditorConnectionDialog.xaml.cs", "Views/SshConfigImportDialog.xaml.cs" })
+        foreach (var code in new[] { "Controls/ServerFormControl.xaml.cs", "Views/ServerEditorPage.xaml.cs", "Views/ServerEditorTrustPanel.xaml.cs", "Views/SshConfigImportPanel.xaml.cs" })
         {
             var text = AppSourceTree.CodeWithoutComments(code);
             foreach (var line in text.Split('\n').Where(l => l.Contains("AutomationProperties.Set", StringComparison.Ordinal) || l.Contains("ToolTipService.SetToolTip", StringComparison.Ordinal) || l.Contains("Log", StringComparison.Ordinal)))
@@ -96,7 +96,7 @@ public sealed partial class Ui7SecretAndDialogGuardTests
         // Read: CaptureSecret (4) + HasTypedSecret (4); cleared: CaptureSecret (4) + ClearSecrets (4).
         Assert.Equal(8, Regex.Matches(code, @"Field\.Password\.Length > 0|\? (Jump)?(Password|Passphrase)Field\.Password|: (Jump)?(Password|Passphrase)Field\.Password").Count);
         Assert.Equal(8, Regex.Matches(code, @"Field\.Password = string\.Empty;").Count);
-        foreach (var other in new[] { "Views/ServerEditorPage.xaml.cs", "Views/ServerEditorConnectionDialog.xaml.cs", "Views/SshConfigImportDialog.xaml.cs" })
+        foreach (var other in new[] { "Views/ServerEditorPage.xaml.cs", "Views/ServerEditorTrustPanel.xaml.cs", "Views/SshConfigImportPanel.xaml.cs" })
         {
             Assert.DoesNotContain(".Password", AppSourceTree.CodeWithoutComments(other), StringComparison.Ordinal);
         }
@@ -121,8 +121,8 @@ public sealed partial class Ui7SecretAndDialogGuardTests
     {
         var page = AppSourceTree.CodeWithoutComments("Views/ServerEditorPage.xaml.cs");
         Assert.Equal(1, Count(page, "_controller.AcceptTrustAsync("));
-        Assert.Contains("OnTrustPrimaryClick", page, StringComparison.Ordinal);
-        foreach (var code in new[] { "Views/ServerEditorPage.xaml.cs", "Controls/ServerFormControl.xaml.cs", "Views/ServerEditorConnectionDialog.xaml.cs" })
+        Assert.Contains("OnTrustAcceptRequested", page, StringComparison.Ordinal);
+        foreach (var code in new[] { "Views/ServerEditorPage.xaml.cs", "Controls/ServerFormControl.xaml.cs", "Views/ServerEditorTrustPanel.xaml.cs" })
         {
             Assert.DoesNotContain("TrustAndConnectAsync", AppSourceTree.CodeWithoutComments(code), StringComparison.Ordinal);
         }
@@ -133,9 +133,14 @@ public sealed partial class Ui7SecretAndDialogGuardTests
         submit = submit[..submit.IndexOf("public HostKeyTrustPrompt? PromptToShow", StringComparison.Ordinal)];
         Assert.DoesNotContain("Trust", submit, StringComparison.Ordinal); // Save never trusts
 
-        var dialog = AppSourceTree.CodeWithoutComments("Views/ServerEditorConnectionDialog.xaml.cs");
-        Assert.Contains("DefaultButton = ContentDialogButton.Close;", dialog, StringComparison.Ordinal);
-        Assert.Contains("PrimaryButtonText = prompt.AcceptKey is { } accept", dialog, StringComparison.Ordinal);
+        // The layer's first focus is the safe button; a mismatch has no accept button; Enter on the page never saves while
+        // the layer is open (the focused button in the layer owns it).
+        var panel = AppSourceTree.CodeWithoutComments("Views/ServerEditorTrustPanel.xaml.cs");
+        Assert.Contains("public void FocusSafeButton() => CloseButton.Focus(FocusState.Programmatic);", panel, StringComparison.Ordinal);
+        Assert.Contains("AcceptButton.Visibility = prompt.AcceptKey is null ? Visibility.Collapsed : Visibility.Visible;", panel, StringComparison.Ordinal);
+        Assert.Contains("TrustPanel.FocusSafeButton();", page, StringComparison.Ordinal);
+        var keys = page[page.IndexOf("private void OnPageKeyDown", StringComparison.Ordinal)..];
+        Assert.True(keys.IndexOf("if (_layer != ServerEditorLayer.None)", StringComparison.Ordinal) < keys.IndexOf("Submit();", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -153,6 +158,35 @@ public sealed partial class Ui7SecretAndDialogGuardTests
         }
 
         Assert.DoesNotContain("ApplySshConfigHost", AppSourceTree.CodeWithoutComments("Controls/ServerFormControl.xaml.cs"), StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Cortex §8 (binding): the Test/Trust host and the import are an IN-PAGE modal layer, never a ContentDialog (one per
+    /// XamlRoot - the exit guard's discard question must stay openable).
+    /// </summary>
+    [Fact]
+    public void TheEditorsDialogs_AreAnInPageLayer_NeverAContentDialog()
+    {
+        foreach (var file in new[] { "Views/ServerEditorPage.xaml", "Views/ServerEditorTrustPanel.xaml", "Views/SshConfigImportPanel.xaml", "Controls/ServerFormControl.xaml" })
+        {
+            Assert.DoesNotContain(AppSourceTree.LoadXaml(file).Descendants(), e => e.Name.LocalName == "ContentDialog");
+        }
+
+        foreach (var code in new[] { "Views/ServerEditorPage.xaml.cs", "Views/ServerEditorTrustPanel.xaml.cs", "Views/SshConfigImportPanel.xaml.cs", "Controls/ServerFormControl.xaml.cs" })
+        {
+            var text = AppSourceTree.CodeWithoutComments(code);
+            Assert.DoesNotContain("ContentDialog", text, StringComparison.Ordinal);
+            Assert.DoesNotContain("ShowAsync", text, StringComparison.Ordinal);
+        }
+
+        var page = AppSourceTree.LoadXaml("Views/ServerEditorPage.xaml");
+        var layer = page.Descendants().Single(e => (string?)e.Attribute(AppSourceTree.Xaml + "Name") == "DialogLayer");
+        var surface = layer.Descendants().Single(e => (string?)e.Attribute(AppSourceTree.Xaml + "Name") == "DialogSurface");
+        Assert.Equal("Cycle", (string?)surface.Attribute("TabFocusNavigation")); // focus trap
+        Assert.Equal("True", (string?)surface.Attribute("AutomationProperties.IsDialog"));
+        Assert.Equal("{StaticResource SaModalSurfaceStyle}", (string?)surface.Attribute("Style"));
+        Assert.Contains(surface.Descendants(), e => e.Name.LocalName == "ServerEditorTrustPanel");
+        Assert.Contains(surface.Descendants(), e => e.Name.LocalName == "SshConfigImportPanel");
     }
 
     // ---- B-12: a picker, not a path box --------------------------------------------------------------------------------
@@ -194,10 +228,10 @@ public sealed partial class Ui7SecretAndDialogGuardTests
     [Fact]
     public void EveryNewDialogKey_ExistsInEveryCulture_AndPtPtSaysTu()
     {
-        var uids = new[] { "Views/ServerEditorConnectionDialog.xaml", "Views/SshConfigImportDialog.xaml", "Controls/ServerFormControl.xaml" }
+        var uids = new[] { "Views/ServerEditorTrustPanel.xaml", "Views/SshConfigImportPanel.xaml", "Controls/ServerFormControl.xaml" }
             .SelectMany(file => AppSourceTree.LoadXaml(file).Descendants())
             .Select(e => (string?)e.Attribute(AppSourceTree.Xaml + "Uid")).OfType<string>().Distinct().ToList();
-        var code = string.Concat(new[] { "Views/ServerEditorConnectionDialog.xaml.cs", "Views/SshConfigImportDialog.xaml.cs", "Controls/ServerFormControl.xaml.cs", "ViewModels/ServerEditorPresentation.cs" }
+        var code = string.Concat(new[] { "Views/ServerEditorTrustPanel.xaml.cs", "Views/SshConfigImportPanel.xaml.cs", "Controls/ServerFormControl.xaml.cs", "ViewModels/ServerEditorPresentation.cs" }
             .Select(AppSourceTree.CodeWithoutComments));
         var keys = Regex.Matches(code, "\"(ServerEditor[A-Za-z]+)\"").Select(m => m.Groups[1].Value).Distinct().ToList();
         Assert.True(keys.Count >= 50, $"only {keys.Count} keys found in code");

@@ -129,6 +129,110 @@ public sealed class Ui7TrustDialogTests : IDisposable
         Assert.Null(await _world.DirectTrust.GetAsync(SshEndpoint.Create("10.0.0.99", 22)));
     }
 
+    /// <summary>Vigil CP-2 (routed twin): a target key presented for a route the form does not describe is never trusted.</summary>
+    [Fact]
+    public async Task CP2_ATargetKeyPresentedForAnotherRoute_IsRefusedEvenWhenAccepted()
+    {
+        await OpenAddRoutedAsync();
+        var otherRoute = SshRoute.Create(SshEndpoint.Create("other-bastion.example.test", 2222), TargetEndpoint);
+        _world.Ssh.Result = TargetUnknown() with { HostKeyRoute = otherRoute };
+        await _world.Page.TestAsync();
+        var shown = Assert.Single(_world.Page.ShownPrompts);
+
+        await _world.Page.AcceptAsync(shown);
+
+        AssertNoTrustWritten();
+        Assert.Null(await _world.RoutedTrust.GetAsync(Route));
+        Assert.Null(await _world.RoutedTrust.GetAsync(otherRoute));
+    }
+
+    // ---- Cortex section 8: the layer and the exit guard -----------------------------------------------------------------
+
+    [Fact]
+    public async Task Layer_LeavingWithThePromptOpen_AsksOverIt_AndKeepEditingFindsThePromptAsItWas()
+    {
+        await OpenAddDirectAsync();
+        _world.Ssh.Result = Ui7EditorSessionTests.Unknown(Direct);
+        await _world.Page.TestAsync();
+        var shown = Assert.Single(_world.Page.ShownPrompts);
+        Assert.Equal(ServerEditorLayer.Trust, _world.Page.Controller.LayerToShow(accepting: false));
+        _world.Prompt.AutoAnswer = false;
+
+        new ShellViewModel(_world.Navigation).Navigate(ShellDestination.History);
+
+        Assert.Single(_world.Prompt.Asked); // the guard's question opened over the layer
+        Assert.False(_world.Page.Disposed);
+        Assert.Equal(ServerEditorLayer.Trust, _world.Page.Controller.LayerToShow(accepting: false));
+        Assert.Equal(shown, _world.Page.Controller.PromptToShow()); // nothing lost silently
+        AssertNoTrustWritten();
+
+        _world.Prompt.AutoAnswer = true;
+        var page = _world.Page;
+        _world.Navigation.LeaveCurrentPageForActivation(_world.Navigation.GoToDashboard);
+        Assert.True(page.Disposed);
+        AssertNoTrustWritten();
+    }
+
+    [Fact]
+    public async Task Layer_LeavingDuringTheRetestAfterAnAccept_CancelsTheTestFirst_ThenAsks()
+    {
+        await OpenAddDirectAsync();
+        _world.Ssh.Result = Ui7EditorSessionTests.Unknown(Direct);
+        await _world.Page.TestAsync();
+        var shown = Assert.Single(_world.Page.ShownPrompts);
+        _world.Ssh.Hold = true;
+        var arrived = _world.Ssh.Arrived.Task;
+        var accept = _world.Page.Controller.AcceptTrustAsync(shown);
+        await arrived; // the key is written; the SAME retest is running (held)
+        Assert.Equal(ServerEditorLayer.Trust, _world.Page.Controller.LayerToShow(accepting: true));
+        var page = _world.Page;
+
+        new ShellViewModel(_world.Navigation).Navigate(ShellDestination.History);
+        await accept;
+
+        Assert.Single(_world.Prompt.Asked);
+        Assert.True(page.Disposed);
+        Assert.Equal(1, _world.DirectTrust.Trusts); // the accepted key stays (B-6); nothing else
+        Assert.Equal(2, _world.Ssh.TestConnectionCount); // no further test after the leave
+    }
+
+    [Fact]
+    public async Task Layer_EscDuringTheRetest_CancelsThatTest_AndTheLayerThenCloses()
+    {
+        await OpenAddDirectAsync();
+        _world.Ssh.Result = Ui7EditorSessionTests.Unknown(Direct);
+        await _world.Page.TestAsync();
+        var shown = Assert.Single(_world.Page.ShownPrompts);
+        _world.Ssh.Hold = true;
+        var arrived = _world.Ssh.Arrived.Task;
+        var accept = _world.Page.Controller.AcceptTrustAsync(shown);
+        await arrived;
+
+        _world.Page.Controller.CloseLayer(ServerEditorLayer.Trust, accepting: true);
+        await accept;
+
+        Assert.False(_world.ViewModel.IsTestingConnection);
+        Assert.Equal(ServerEditorLayer.None, _world.Page.Controller.LayerToShow(accepting: false));
+        Assert.False(_world.Page.Disposed); // Esc in the layer is not Back
+        Assert.Empty(_world.Prompt.Asked);
+    }
+
+    [Fact]
+    public async Task Layer_BackToTheFormOnAMismatch_ClosesIt_AndTheNextMismatchShowsAgain()
+    {
+        await OpenAddDirectAsync();
+        _world.Ssh.Result = Mismatch(SshHostKeyHop.Direct);
+        await _world.Page.TestAsync();
+        Assert.Equal(ServerEditorLayer.Trust, _world.Page.Controller.LayerToShow(accepting: false));
+
+        _world.Page.Controller.CloseLayer(ServerEditorLayer.Trust, accepting: false);
+        Assert.Equal(ServerEditorLayer.None, _world.Page.Controller.LayerToShow(accepting: false));
+
+        await _world.Page.TestAsync();
+        Assert.Equal(ServerEditorLayer.Trust, _world.Page.Controller.LayerToShow(accepting: false));
+        AssertNoTrustWritten();
+    }
+
     [Fact]
     public async Task AStaleDialog_CannotAcceptADifferentKey_ThanTheOneItShows()
     {

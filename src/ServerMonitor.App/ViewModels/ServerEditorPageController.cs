@@ -13,6 +13,8 @@ public sealed class ServerEditorPageController : IDisposable
     private readonly IServerEditorDiscardPrompt _discardPrompt;
     private bool _saving;
     private bool _disposed;
+    // UI.7B: "Voltar ao formulário" was pressed on the mismatch on screen; cleared when the view model's mismatch goes.
+    private bool _mismatchAcknowledged;
 
     public ServerEditorPageController(IServerEditorSession session, IServerEditorDiscardPrompt discardPrompt)
     {
@@ -49,6 +51,11 @@ public sealed class ServerEditorPageController : IDisposable
         ArgumentNullException.ThrowIfNull(request);
         Request = request;
         ViewModel = _session.Attach(request);
+        if (ViewModel is not null)
+        {
+            ViewModel.PropertyChanged += OnViewModelPropertyChanged;
+        }
+
         return ViewModel is not null;
     }
 
@@ -65,9 +72,23 @@ public sealed class ServerEditorPageController : IDisposable
             return Task.FromResult(false);
         }
 
-        if (_disposed || Request is null || ViewModel is null || _session.IsSaved(Request) || !IsDirty)
+        if (_disposed || Request is null || ViewModel is null || _session.IsSaved(Request))
         {
             return Task.FromResult(true);
+        }
+
+        // A clean form leaves at once: the view model's Dispose cancels a running test with nothing after it (B-7).
+        if (!IsDirty)
+        {
+            return Task.FromResult(true);
+        }
+
+        // Cortex §8: about to ask with a test running - also the retest after an accepted key in the layer - cancels that
+        // test first, so nothing runs unowned under the question. The layer itself stays: the question opens over it, and
+        // "Continuar a editar" finds it as it was (nothing lost silently).
+        if (ViewModel.IsTestingConnection)
+        {
+            ViewModel.CancelTest();
         }
 
         return _discardPrompt.ConfirmDiscardAsync(new ServerEditorDiscardContext(
@@ -168,6 +189,76 @@ public sealed class ServerEditorPageController : IDisposable
         return true;
     }
 
+    /// <summary>
+    /// UI.7B: the in-page modal layer the view model needs now (Cortex §8: an in-tree layer, never a ContentDialog). The
+    /// import while its dialog is open; the trust prompt while one is shown (and not acknowledged) or while an accepted
+    /// key is written and retested.
+    /// </summary>
+    public ServerEditorLayer LayerToShow(bool accepting)
+    {
+        if (_disposed || ViewModel is not { } viewModel)
+        {
+            return ServerEditorLayer.None;
+        }
+
+        if (viewModel.IsSshConfigImportOpen)
+        {
+            return ServerEditorLayer.Import;
+        }
+
+        if (accepting)
+        {
+            return ServerEditorLayer.Trust;
+        }
+
+        return PromptToShow() is { } prompt && !(prompt.Kind == HostKeyPromptKind.Mismatch && _mismatchAcknowledged)
+            ? ServerEditorLayer.Trust
+            : ServerEditorLayer.None;
+    }
+
+    /// <summary>
+    /// Cancelar / Voltar ao formulário / Esc on the layer: during an accept the retest is cancelled (the key already being
+    /// written completes - it was accepted); an unknown key is dismissed (nothing written); a mismatch is acknowledged
+    /// (never accepted); the import is closed (its load cancelled).
+    /// </summary>
+    public void CloseLayer(ServerEditorLayer layer, bool accepting)
+    {
+        if (_disposed || ViewModel is not { } viewModel)
+        {
+            return;
+        }
+
+        switch (layer)
+        {
+            case ServerEditorLayer.Trust when accepting:
+                if (viewModel.IsTestingConnection)
+                {
+                    viewModel.CancelTest();
+                }
+
+                break;
+            case ServerEditorLayer.Trust:
+                if (viewModel.HasHostKeyMismatch)
+                {
+                    _mismatchAcknowledged = true;
+                }
+
+                DismissTrustPrompt();
+                break;
+            case ServerEditorLayer.Import:
+                CloseImport();
+                break;
+        }
+    }
+
+    private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(ServerEditorViewModel.HasHostKeyMismatch) && ViewModel is { HasHostKeyMismatch: false })
+        {
+            _mismatchAcknowledged = false;
+        }
+    }
+
     /// <summary>Cancel / Esc / close on an unknown key: the prompt is dropped and nothing is written.</summary>
     public void DismissTrustPrompt()
     {
@@ -238,11 +329,24 @@ public sealed class ServerEditorPageController : IDisposable
         }
 
         _disposed = true;
+        if (ViewModel is not null)
+        {
+            ViewModel.PropertyChanged -= OnViewModelPropertyChanged;
+        }
+
         if (Request is not null)
         {
             _session.Detach(Request);
         }
     }
+}
+
+/// <summary>UI.7B: the editor page's one in-page modal layer (none, the trust prompt / 7C test, or "Importar de SSH").</summary>
+public enum ServerEditorLayer
+{
+    None,
+    Trust,
+    Import
 }
 
 /// <summary>What a submit attempt did. <see cref="Invalid"/>: the form did not validate (nothing persisted).</summary>

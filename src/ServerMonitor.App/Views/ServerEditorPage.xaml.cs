@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Globalization;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using ServerMonitor.App.Services;
@@ -16,9 +17,10 @@ namespace ServerMonitor.App.Views;
 /// A fresh page per visit: navigation disposes it when another page replaces it, which ends the visit (the session
 /// disposes the view model). Unloading alone (window hidden to the tray) keeps the editor and only clears the password
 /// boxes (H-UI7-3, Vigil H5).
-/// UI.7B: the page is also the editor's dialog host - at most ONE ContentDialog at a time, chosen from the view model's
-/// state: the trust prompt (the connection dialog, which 7C reuses for the test) or "Importar de SSH". The dialogs draw;
-/// the controller decides (accept = the SAME TrustAndConnectAsync, only for the key on screen; dismiss writes nothing).
+/// UI.7B (Cortex §8, binding): the page hosts the editor's ONE in-page modal layer - in the tree, NOT a ContentDialog, so
+/// the exit guard's "Descartar alterações?" can always open over it - showing what the view model needs now (the trust
+/// prompt, which 7C reuses for the test, or "Importar de SSH"). The panels draw; the controller decides (accept = the SAME
+/// TrustAndConnectAsync, only for the key on screen; dismiss writes nothing).
 /// </summary>
 public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigationExitGuard, IDisposable
 {
@@ -26,9 +28,8 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
     private readonly ILocalizationService _localization;
     private ServerEditorViewModel? _viewModel;
     private bool _disposed;
-    // UI.7B dialog host: the one dialog open now (null = none), completed when it has closed.
-    private ContentDialog? _openDialog;
-    private TaskCompletionSource? _dialogClosed;
+    // UI.7B in-page layer: which one is shown, and whether an accepted key is being written + retested.
+    private ServerEditorLayer _layer;
     private bool _acceptingTrust;
 
     public ServerEditorPage(
@@ -44,6 +45,12 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
         };
         // M-1: while a Save is persisted nothing on the page can leave or act (the session decides where it goes).
         _controller.SavingChanged += (_, _) => UpdateActionState();
+        TrustPanel.Configure(localization);
+        TrustPanel.AcceptRequested += OnTrustAcceptRequested;
+        TrustPanel.CloseRequested += OnTrustCloseRequested;
+        ImportPanel.Configure(localization);
+        ImportPanel.UseRequested += OnImportUseRequested;
+        ImportPanel.CloseRequested += OnImportCloseRequested;
         Loaded += OnLoaded;
         Unloaded += (_, _) => ServerForm.ClearSecrets();
         KeyDown += OnPageKeyDown;
@@ -74,15 +81,7 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
         UpdateActionState();
     }
 
-    /// <summary>
-    /// H-UI7-3 guard. A navigation that arrives while a dialog is open (external activation) first closes it - an open trust
-    /// prompt is dismissed, nothing is trusted - so the "Descartar alterações?" question is never stacked on it.
-    /// </summary>
-    public async Task<bool> ConfirmLeaveAsync()
-    {
-        await CloseDialogAsync();
-        return await _controller.ConfirmLeaveAsync();
-    }
+    public Task<bool> ConfirmLeaveAsync() => _controller.ConfirmLeaveAsync();
 
     /// <summary>Idempotent: ends the visit (the session disposes the view model) and clears the password boxes.</summary>
     public void Dispose()
@@ -100,8 +99,8 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
 
         ServerForm.ClearSecrets();
         _controller.Dispose();
-        // The controller is gone first, so closing the dialog dismisses / applies nothing.
-        _openDialog?.Hide();
+        // The controller is gone first, so hiding the layer dismisses / applies nothing.
+        HideLayer();
     }
 
     private void OnLoaded(object sender, RoutedEventArgs e)
@@ -114,8 +113,8 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
                 ShellPageFocus.FocusHeading(this);
             }
 
-            // An editor opened for "Importar de SSH" started its load before the page had a window.
-            EvaluateDialogs();
+            // An editor opened for "Importar de SSH" started its load before the page was shown.
+            EvaluateLayer();
         });
     }
 
@@ -132,141 +131,102 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
 
         if (e.PropertyName is nameof(ServerEditorViewModel.HasUnknownHostKey)
             or nameof(ServerEditorViewModel.HasHostKeyMismatch)
+            or nameof(ServerEditorViewModel.IsConnectionWorkInProgress)
             or nameof(ServerEditorViewModel.IsSshConfigImportOpen)
             or nameof(ServerEditorViewModel.IsLoadingSshConfig)
             or nameof(ServerEditorViewModel.SshConfigHosts)
             or nameof(ServerEditorViewModel.SshConfigLoadOutcome)
             or nameof(ServerEditorViewModel.SshConfigFileWarningMessage))
         {
-            EvaluateDialogs();
+            EvaluateLayer();
         }
     }
 
-    // The dialog host: what the view model shows now decides which ONE dialog is open. Never accepts or applies anything.
-    private void EvaluateDialogs()
+    // The layer host: the controller says which ONE layer the view model needs now. Drawing never accepts or applies.
+    private void EvaluateLayer()
     {
-        if (_disposed || _viewModel is not { } viewModel || XamlRoot is null)
+        if (_disposed || _viewModel is not { } viewModel)
         {
             return;
         }
 
-        switch (_openDialog)
+        var wanted = _controller.LayerToShow(_acceptingTrust);
+        switch (wanted)
         {
-            case SshConfigImportDialog import:
-                if (viewModel.IsSshConfigImportOpen)
+            case ServerEditorLayer.Import:
+                ImportPanel.Update(viewModel);
+                ShowLayer(wanted);
+                break;
+            case ServerEditorLayer.Trust:
+                if (!_acceptingTrust && _controller.PromptToShow() is { } prompt && prompt != TrustPanel.Prompt)
                 {
-                    import.Update(viewModel);
-                }
-                else
-                {
-                    import.Hide();
-                }
-
-                return;
-            case ServerEditorConnectionDialog connection:
-                if (_acceptingTrust)
-                {
-                    return; // the accept path redraws when the retest is over
+                    TrustPanel.ShowPrompt(prompt);
                 }
 
-                if (_controller.PromptToShow() is { } prompt)
-                {
-                    if (prompt != connection.Prompt)
-                    {
-                        connection.ShowPrompt(prompt);
-                    }
-                }
-                else
-                {
-                    connection.Hide();
-                }
-
-                return;
-        }
-
-        if (viewModel.IsSshConfigImportOpen)
-        {
-            var import = new SshConfigImportDialog(_localization);
-            import.Update(viewModel);
-            import.PrimaryButtonClick += OnImportPrimaryClick;
-            import.Closing += (_, _) => _controller.CloseImport();
-            _ = ShowDialogAsync(import);
-        }
-        else if (_controller.PromptToShow() is { } prompt)
-        {
-            var connection = new ServerEditorConnectionDialog(_localization);
-            connection.ShowPrompt(prompt);
-            connection.PrimaryButtonClick += OnTrustPrimaryClick;
-            connection.Closing += OnConnectionDialogClosing;
-            _ = ShowDialogAsync(connection);
+                TrustPanel.SetWorking(_acceptingTrust, acceptAllowed: !viewModel.IsConnectionWorkInProgress);
+                ShowLayer(wanted);
+                break;
+            default:
+                HideLayer();
+                break;
         }
     }
 
-    private async Task ShowDialogAsync(ContentDialog dialog)
+    private void ShowLayer(ServerEditorLayer layer)
     {
-        var closed = new TaskCompletionSource();
-        _openDialog = dialog;
-        _dialogClosed = closed;
-        dialog.XamlRoot = XamlRoot;
-        dialog.RequestedTheme = ActualTheme;
-        if (dialog is ServerEditorConnectionDialog connection)
+        var opening = _layer != layer;
+        _layer = layer;
+        TrustPanel.Visibility = layer == ServerEditorLayer.Trust ? Visibility.Visible : Visibility.Collapsed;
+        ImportPanel.Visibility = layer == ServerEditorLayer.Import ? Visibility.Visible : Visibility.Collapsed;
+        DialogSurface.MaxWidth = layer == ServerEditorLayer.Trust ? 640 : 720;
+        AutomationProperties.SetName(DialogSurface, layer == ServerEditorLayer.Trust ? TrustPanel.Title : ImportPanel.Title);
+        DialogLayer.Visibility = Visibility.Visible;
+        PageScroll.IsTabStop = false;
+        if (opening)
         {
-            connection.FillWindow();
+            // Focus moves into the layer (Tab then cycles inside it); the first stop is the safe one.
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                if (_layer == ServerEditorLayer.Trust)
+                {
+                    TrustPanel.FocusSafeButton();
+                }
+                else if (_layer == ServerEditorLayer.Import)
+                {
+                    ImportPanel.FocusInitial();
+                }
+            });
         }
-        else if (dialog is SshConfigImportDialog import)
-        {
-            import.FillWindow();
-        }
+    }
 
-        var shown = false;
-        dialog.Opened += (_, _) => shown = true;
-        try
+    private void HideLayer()
+    {
+        if (_layer == ServerEditorLayer.None)
         {
-            await dialog.ShowAsync();
-        }
-        catch (Exception)
-        {
-            // Another ContentDialog holds the window: fail closed - drop the prompt / the import, nothing is applied.
-        }
-        finally
-        {
-            _openDialog = null;
-            _dialogClosed = null;
-            closed.TrySetResult();
-        }
-
-        if (!shown)
-        {
-            _controller.DismissTrustPrompt();
-            _controller.CloseImport();
             return;
         }
 
-        // A prompt that came up while this dialog was closing (e.g. "PASSO 2 DE 2") opens now.
-        EvaluateDialogs();
-    }
-
-    private async Task CloseDialogAsync()
-    {
-        if (_openDialog is { } dialog && _dialogClosed is { } closed)
+        _layer = ServerEditorLayer.None;
+        DialogLayer.Visibility = Visibility.Collapsed;
+        TrustPanel.Visibility = Visibility.Collapsed;
+        ImportPanel.Visibility = Visibility.Collapsed;
+        if (!_disposed)
         {
-            dialog.Hide();
-            await closed.Task;
+            TestButton.Focus(FocusState.Programmatic);
         }
     }
 
-    // "Confiar e testar / continuar": an explicit gesture in the dialog, distinct from Save. The dialog stays open while
-    // the key is written and the SAME retest runs, then shows the next prompt (PASSO 2) or closes.
-    private async void OnTrustPrimaryClick(ContentDialog sender, ContentDialogButtonClickEventArgs args)
+    // "Confiar e testar / continuar": an explicit gesture in the layer, distinct from Save. The layer stays while the key is
+    // written and the SAME retest runs, then shows the next prompt (PASSO 2) or closes.
+    private async void OnTrustAcceptRequested(object? sender, EventArgs e)
     {
-        args.Cancel = true;
-        if (_acceptingTrust || sender is not ServerEditorConnectionDialog { Prompt: { CanAccept: true } shown } dialog)
+        if (_acceptingTrust || TrustPanel.Prompt is not { CanAccept: true } shown)
         {
             return;
         }
 
         _acceptingTrust = true;
-        dialog.SetWorking(true);
+        TrustPanel.SetWorking(true, acceptAllowed: false);
         try
         {
             await _controller.AcceptTrustAsync(shown);
@@ -276,50 +236,28 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
             _acceptingTrust = false;
         }
 
-        if (_disposed)
-        {
-            return;
-        }
+        EvaluateLayer();
+    }
 
-        if (!ReferenceEquals(_openDialog, dialog))
-        {
-            EvaluateDialogs(); // closed meanwhile: the next prompt (if any) gets its own dialog
-            return;
-        }
+    // Cancelar / Voltar ao formulário / Esc: an unknown key is dismissed (nothing written); during an accept the retest is
+    // cancelled (a key already being written completes - it was accepted).
+    private void OnTrustCloseRequested(object? sender, EventArgs e) => CloseLayer();
 
-        if (_controller.PromptToShow() is { } next)
+    private void OnImportUseRequested(object? sender, EventArgs e)
+    {
+        // Nothing selected, or a blocked profile: never used, the layer stays.
+        if (_controller.ApplyImport(ImportPanel.Selected))
         {
-            dialog.ShowPrompt(next);
-        }
-        else
-        {
-            dialog.Hide();
+            EvaluateLayer();
         }
     }
 
-    // Cancelar / Voltar ao formulário / Esc / closed by the host: an unknown key is dismissed (nothing written); during an
-    // accept, the retest is cancelled (a key already being written completes - it was accepted).
-    private void OnConnectionDialogClosing(ContentDialog sender, ContentDialogClosingEventArgs args)
+    private void OnImportCloseRequested(object? sender, EventArgs e) => CloseLayer();
+
+    private void CloseLayer()
     {
-        if (_acceptingTrust)
-        {
-            if (_viewModel is { IsTestingConnection: true } viewModel)
-            {
-                viewModel.CancelTest();
-            }
-
-            return;
-        }
-
-        _controller.DismissTrustPrompt();
-    }
-
-    private void OnImportPrimaryClick(ContentDialog sender, ContentDialogButtonClickEventArgs args)
-    {
-        if (sender is not SshConfigImportDialog import || !_controller.ApplyImport(import.Selected))
-        {
-            args.Cancel = true; // nothing selected, or a blocked profile: never used
-        }
+        _controller.CloseLayer(_layer, _acceptingTrust);
+        EvaluateLayer();
     }
 
     private void UpdateActionState()
@@ -346,6 +284,19 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
     // multi-line box and while a test or a trust write runs. A focused button, combo box or the trust panel keeps its keys.
     private void OnPageKeyDown(object sender, KeyRoutedEventArgs e)
     {
+        if (_layer != ServerEditorLayer.None)
+        {
+            // The layer owns the keys: Esc closes it (a running retest is cancelled first); Enter belongs to the focused
+            // button inside it - never the page's Save.
+            if (e.Key == VirtualKey.Escape)
+            {
+                e.Handled = true;
+                CloseLayer();
+            }
+
+            return;
+        }
+
         if (e.Key == VirtualKey.Escape)
         {
             e.Handled = true;

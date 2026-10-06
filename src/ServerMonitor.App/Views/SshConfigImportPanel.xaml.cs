@@ -8,31 +8,37 @@ using ServerMonitor.App.ViewModels;
 namespace ServerMonitor.App.Views;
 
 /// <summary>
-/// UI.7B (B-11): the "Importar de SSH" dialog. Drawing only, from the view model's existing load state; the page wires
-/// "Usar perfil" to the controller (the existing Add-only apply) and closing to the load's cancellation.
+/// UI.7B (B-11): the "Importar de SSH" content of the editor page's in-page modal layer. Drawing only, from the view
+/// model's existing load state; the page wires "Usar perfil" to the controller (the existing Add-only apply) and closing
+/// to the load's cancellation.
 /// </summary>
-public sealed partial class SshConfigImportDialog : ContentDialog
+public sealed partial class SshConfigImportPanel : UserControl
 {
-    private readonly ILocalizationService _localization;
+    private ILocalizationService? _localization;
 
-    public SshConfigImportDialog(ILocalizationService localization)
+    public SshConfigImportPanel()
     {
-        _localization = localization ?? throw new ArgumentNullException(nameof(localization));
         InitializeComponent();
-        Title = localization.GetString("ServerEditorImportTitle");
-        AutomationProperties.SetName(this, (string)Title);
-        PrimaryButtonText = localization.GetString("ServerEditorImportUse");
-        CloseButtonText = localization.GetString("ServerEditorImportCancel");
-        IsPrimaryButtonEnabled = false;
     }
+
+    public event EventHandler? UseRequested;
+
+    public event EventHandler? CloseRequested;
+
+    /// <summary>The title, which also names the layer for UI Automation.</summary>
+    public string Title => TitleText.Text;
 
     /// <summary>The selected profile (blocked ones can be selected to read why, never used).</summary>
     public SshConfigHostOptionViewModel? Selected => HostList.SelectedItem as SshConfigHostOptionViewModel;
+
+    public void Configure(ILocalizationService localization) =>
+        _localization = localization ?? throw new ArgumentNullException(nameof(localization));
 
     /// <summary>Redraws the state from the view model (loading, a 07 state, or the profile list).</summary>
     public void Update(ServerEditorViewModel viewModel)
     {
         ArgumentNullException.ThrowIfNull(viewModel);
+        var localization = _localization ?? throw new InvalidOperationException("Configure the panel first.");
         var loading = viewModel.IsLoadingSshConfig;
         LoadingRow.Visibility = loading ? Visibility.Visible : Visibility.Collapsed;
         LoadingRing.IsActive = loading;
@@ -42,15 +48,14 @@ public sealed partial class SshConfigImportDialog : ContentDialog
         StatePanel.Visibility = showState ? Visibility.Visible : Visibility.Collapsed;
         if (showState)
         {
-            StateTitle.Text = _localization.GetString(stateTitleKey);
+            StateTitle.Text = localization.GetString(stateTitleKey);
             StateBody.Text = viewModel.SshConfigStatusMessage;
             StateIcon.Data = Application.Current.Resources[
                 viewModel.SshConfigLoadOutcome == SshConfigLoadOutcome.NoHosts ? "SaIconInformationCircleData" : "SaIconAlert02Data"] as string;
         }
 
         var hosts = viewModel.SshConfigHosts;
-        var showList = !loading && hosts.Count > 0;
-        ListPanel.Visibility = showList ? Visibility.Visible : Visibility.Collapsed;
+        ListPanel.Visibility = !loading && hosts.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         if (!ReferenceEquals(HostList.ItemsSource, hosts))
         {
             HostList.ItemsSource = hosts;
@@ -58,36 +63,29 @@ public sealed partial class SshConfigImportDialog : ContentDialog
 
         CountText.Text = string.Format(
             CultureInfo.CurrentCulture,
-            _localization.GetString("ServerEditorImportCountFormat"),
+            localization.GetString("ServerEditorImportCountFormat"),
             SshConfigImportPresentation.Available(hosts),
             SshConfigImportPresentation.Blocked(hosts));
         WarningText.Text = viewModel.SshConfigFileWarningMessage;
         WarningText.Visibility = !loading && viewModel.HasSshConfigFileWarning ? Visibility.Visible : Visibility.Collapsed;
-        IsPrimaryButtonEnabled = SshConfigImportPresentation.CanUse(Selected);
+        UseButton.IsEnabled = SshConfigImportPresentation.CanUse(Selected);
     }
 
-    /// <summary>The smoke layer covers the whole window (like the other Sa dialogs). Call after XamlRoot.</summary>
-    public void FillWindow()
+    /// <summary>The first focus: the list when it has profiles, otherwise Cancelar.</summary>
+    public void FocusInitial()
     {
-        if (XamlRoot is not { } root)
+        if (ListPanel.Visibility == Visibility.Visible)
         {
-            return;
+            HostList.Focus(FocusState.Programmatic);
         }
-
-        void UpdateBounds()
+        else
         {
-            Width = root.Size.Width;
-            Height = root.Size.Height;
+            CancelButton.Focus(FocusState.Programmatic);
         }
-
-        void OnRootChanged(XamlRoot sender, XamlRootChangedEventArgs args) => UpdateBounds();
-        UpdateBounds();
-        root.Changed += OnRootChanged;
-        Closed += (_, _) => root.Changed -= OnRootChanged;
     }
 
     private void OnHostSelectionChanged(object sender, SelectionChangedEventArgs e) =>
-        IsPrimaryButtonEnabled = SshConfigImportPresentation.CanUse(Selected);
+        UseButton.IsEnabled = SshConfigImportPresentation.CanUse(Selected);
 
     // A ListViewItem's UIA name otherwise falls back to the item's type: give each container the localized
     // "alias — importable / blocked: why" text (containers are recycled, so set it every time).
@@ -98,4 +96,8 @@ public sealed partial class SshConfigImportDialog : ContentDialog
             AutomationProperties.SetName(args.ItemContainer, option.AccessibleName);
         }
     }
+
+    private void OnUseClick(object sender, RoutedEventArgs e) => UseRequested?.Invoke(this, EventArgs.Empty);
+
+    private void OnCancelClick(object sender, RoutedEventArgs e) => CloseRequested?.Invoke(this, EventArgs.Empty);
 }

@@ -1,17 +1,14 @@
-<ContentDialog
-    x:Class="ServerMonitor.App.Views.ServerEditorConnectionDialog"
+<UserControl
+    x:Class="ServerMonitor.App.Views.ServerEditorTrustPanel"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:primitives="using:ServerMonitor.App.Controls.Primitives">
-    <!-- UI.7B (B-10): the editor's ONE connection dialog host (Figma 09 chrome, 640: icon 25 + title, body, the identity
-         inset, the fingerprint(s), the scope line). Its content switches with the prompt (unknown → PASSO 2 → mismatch);
-         7C puts the connection test (Figma 08) in this same host, so two ContentDialogs are never stacked. It draws the
-         prompt only: the page accepts through the controller (the SAME TrustAndConnectAsync), and a mismatch has no
-         accept button at all. Enter / first focus = the safe button (a stray Enter never trusts). -->
-    <ContentDialog.Style>
-        <StaticResource ResourceKey="SaDialogStyle" />
-    </ContentDialog.Style>
-    <ContentDialog.Title>
+    <!-- UI.7B (B-10) content of the editor's ONE in-page modal layer for the connection (Cortex §8: an in-tree layer, NOT a
+         ContentDialog, so the exit guard's "Descartar alterações?" stays openable; 7C puts the Figma 08 test here too).
+         Figma 09 chrome inside the layer's SaModalSurface: pre-title PASSO, icon 25 + title, body, the identity inset, the
+         fingerprint(s), the scope line, then the actions (Cancelar / Voltar ao formulário first in the tab order = the
+         safe default; "Confiar e …" only for an unknown key). Drawing only: the page accepts through the controller. -->
+    <StackPanel Spacing="{StaticResource SaSpace16}">
         <StackPanel Spacing="6">
             <TextBlock x:Name="StepText" Style="{StaticResource SaLabelTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}"
                        Visibility="Collapsed" />
@@ -25,8 +22,6 @@
                            TextWrapping="Wrap" AutomationProperties.HeadingLevel="Level1" />
             </Grid>
         </StackPanel>
-    </ContentDialog.Title>
-    <StackPanel MaxWidth="584" Spacing="{StaticResource SaSpace16}">
         <TextBlock x:Name="BodyText" Style="{StaticResource SaSecondaryBodyTextStyle}" TextWrapping="Wrap" />
         <!-- The subject: the server, "jump host X" or "target T via J" - never the tunnel's loopback (PJ-UI). -->
         <Border Style="{StaticResource SaInsetTintedSurfaceStyle}" MinHeight="38">
@@ -54,11 +49,15 @@
         </StackPanel>
         <TextBlock x:Name="ScopeText" Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}"
                    TextWrapping="Wrap" />
-        <!-- After "Confiar": the key is being written, then the SAME retest runs. -->
+        <!-- After "Confiar": the key is being written, then the SAME retest runs (Cancelar = cancel that test). -->
         <StackPanel x:Name="WorkingRow" Orientation="Horizontal" Spacing="10" Visibility="Collapsed">
             <ProgressRing x:Name="WorkingRing" Width="16" Height="16" IsActive="False" AutomationProperties.AccessibilityView="Raw" />
             <TextBlock x:Name="WorkingText" Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}"
                        VerticalAlignment="Center" AutomationProperties.LiveSetting="Polite" />
         </StackPanel>
+        <StackPanel Orientation="Horizontal" Spacing="{StaticResource SaSpace12}" HorizontalAlignment="Right">
+            <Button x:Name="CloseButton" Style="{StaticResource SaDialogCommandButtonStyle}" Click="OnCloseClick" />
+            <Button x:Name="AcceptButton" Style="{StaticResource SaDialogCommandButtonStyle}" Click="OnAcceptClick" />
+        </StackPanel>
     </StackPanel>
-</ContentDialog>
+</UserControl>
