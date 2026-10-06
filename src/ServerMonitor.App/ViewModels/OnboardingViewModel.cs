@@ -90,7 +90,14 @@ public sealed class OnboardingViewModel : ObservableObject, IDisposable
         Dismiss();
         _navigation.GoToDashboard();
         if (PreparingEditor is { } prepare)
-            foreach (Func<Task> handler in prepare.GetInvocationList()) await handler();
+            foreach (Func<Task> handler in prepare.GetInvocationList())
+            {
+                try { await handler(); }
+                catch (Exception exception)
+                {
+                    _logger.LogWarning("Onboarding focus preparation failed. Type: {Type}.", exception.GetType().Name);
+                }
+            }
         if (command is AsyncRelayCommand asyncCommand) await asyncCommand.ExecuteAsync();
         else if (command.CanExecute(null)) command.Execute(null);
     }

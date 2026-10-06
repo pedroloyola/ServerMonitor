@@ -21,10 +21,45 @@ public sealed class Ui6C2ContractTests
         Assert.Equal("*", setters.GetValueOrDefault("ControlsFirstColumn.Width", "Auto"));
         Assert.Equal("3", setters.GetValueOrDefault("RangeTrack.(Grid.ColumnSpan)", "1"));
         var group = Named(d, "RangeItems");
-        Assert.Equal("VariableSizedWrapGrid", group.Name.LocalName);
-        var width = double.Parse(setters.GetValueOrDefault("RangeItems.ItemWidth", A(group,"ItemWidth")!), CultureInfo.InvariantCulture);
-        Assert.True(5 * width + 8 <= contentWidth - 48, "Five periods plus track padding must fit without inflating the selector column.");
-        Assert.All(group.Elements(), e => Assert.Equal("0", A(e,"MinWidth")));
+        Assert.Equal("Grid", group.Name.LocalName);
+        Assert.Equal("4", A(group,"ColumnSpacing"));
+        Assert.Equal("436", A(Named(d,"RangeTrack"),"Width"));
+        var usable = contentWidth - 48;
+        var track = HistoryPage.RangeTrackWidth(usable);
+        Assert.True(track <= usable);
+        Assert.True((track - 8 - 4 * 4) / 5 >= 74);
+        Assert.Contains("RangeTrack.Width = RangeTrackWidth(ActualWidth - PageRoot.Padding.Left - PageRoot.Padding.Right)",AppSourceTree.CodeWithoutComments("Views/HistoryPage.xaml.cs"));
+    }
+
+    [Theory]
+    [InlineData(436, 82.4)] [InlineData(416, 78.4)] [InlineData(496, 82.4)] [InlineData(394, 74)] [InlineData(1000, 82.4)]
+    public void History_ItemsFillEqualHitAreas_InWideAndNarrow(double usableWidth, double expected)
+    {
+        var d = AppSourceTree.LoadXaml("Views/HistoryPage.xaml");
+        var group = Named(d, "RangeItems");
+        Assert.Equal("Grid", group.Name.LocalName);
+        var columns = group.Element(group.Name.Namespace+"Grid.ColumnDefinitions")!.Elements().ToArray();
+        Assert.Equal(5, columns.Length);
+        Assert.All(columns, column => Assert.Equal("*",A(column,"Width")));
+        Assert.Equal("4",A(group,"ColumnSpacing"));
+        var forms = AppSourceTree.LoadXaml("Styles/Components/Sa.Forms.xaml");
+        var trackStyle = forms.Descendants().Single(e => (string?)e.Attribute(AppSourceTree.Xaml+"Key") == "SaSegmentedRectTrackStyle");
+        Assert.Contains(trackStyle.Elements(), e => A(e,"Property") == "Padding" && A(e,"Value") == "4");
+        var widths = new List<double>();
+        foreach (var item in group.Elements().Where(e => e.Name.LocalName == "RadioButton"))
+        {
+            var styleKey = A(item,"Style")!.Replace("{StaticResource ", "").TrimEnd('}');
+            var style = forms.Descendants().Single(e => (string?)e.Attribute(AppSourceTree.Xaml+"Key") == styleKey);
+            var setters = style.Elements().ToDictionary(e => A(e,"Property")!, e => A(e,"Value")!);
+            Assert.Equal("Stretch", A(item,"HorizontalAlignment") ?? setters.GetValueOrDefault("HorizontalAlignment"));
+            Assert.Equal("Center", A(item,"HorizontalContentAlignment") ?? setters.GetValueOrDefault("HorizontalContentAlignment"));
+            Assert.Null(A(item,"Width")); Assert.Null(A(item,"Margin"));
+            Assert.Equal("74", A(item,"MinWidth"));
+            Assert.Equal(widths.Count.ToString(CultureInfo.InvariantCulture), A(item,"Grid.Column"));
+            widths.Add((HistoryPage.RangeTrackWidth(usableWidth) - 8 - 4 * 4) / columns.Length);
+        }
+        Assert.Equal(5, widths.Count);
+        Assert.All(widths, width => { Assert.Equal(expected,width,5); Assert.True(width >= 74); });
     }
 
     [Fact]

@@ -11,9 +11,16 @@ public sealed partial class HistoryPage : Page, ServerMonitor.App.Services.IHist
         InitializeComponent();
         ViewModel = viewModel;
         DataContext = viewModel;
+        SizeChanged += (_, _) => UpdateRangeTrackWidth();
+        PageRoot.RegisterPropertyChangedCallback(Grid.PaddingProperty, (_, _) => UpdateRangeTrackWidth());
         Loaded += (_, _) => DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () => ShellPageFocus.FocusHeading(this));
         Unloaded += (_, _) => ViewModel.Dispose();
     }
+
+    internal static double RangeTrackWidth(double usableWidth) => Math.Min(436, Math.Max(0, usableWidth));
+
+    private void UpdateRangeTrackWidth() =>
+        RangeTrack.Width = RangeTrackWidth(ActualWidth - PageRoot.Padding.Left - PageRoot.Padding.Right);
 
     public HistoryViewModel ViewModel { get; }
 

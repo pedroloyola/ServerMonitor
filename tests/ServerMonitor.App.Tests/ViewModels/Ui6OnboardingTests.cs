@@ -218,6 +218,35 @@ public sealed class Ui6OnboardingTests
         Assert.Equal("Overview H1", focus);
     }
 
+    [Theory]
+    [InlineData(false, false)] [InlineData(false, true)]
+    [InlineData(true, false)] [InlineData(true, true)]
+    public async Task StepThree_FocusPreparationFailure_IsLoggedByType_AndEditorStillOpens(bool import, bool cancelled)
+    {
+        var dialog = new Dialog();
+        var kit = Ui4TestKit.Create(new Ui4TestKit.Fleet(), dialogs: dialog);
+        using var dashboard = kit.Dashboard;
+        kit.Navigation.CurrentDestination = NavigationDestination.Overview;
+        kit.Servers.LoadStatus = ServerLoadStatus.NotFound;
+        var logger = new RecordingLogger();
+        using var vm = new OnboardingViewModel(kit.Servers, kit.Navigation,
+            new OnboardingActions(dashboard.AddServerCommand, dashboard.ImportFromSshCommand), new ActivationLatch(), logger);
+        vm.PreparingEditor += () => cancelled
+            ? Task.FromCanceled(new CancellationToken(true))
+            : throw new InvalidOperationException("private focus detail must not be logged");
+        var subsequentHandlerRan = false;
+        vm.PreparingEditor += () => { subsequentHandlerRan = true; return Task.CompletedTask; };
+        await vm.OnMainWindowShownAsync(true);
+        vm.Next(); vm.Next();
+        await (import ? vm.ImportFromSshCommand : vm.AddServerCommand).ExecuteAsync();
+        Assert.True(subsequentHandlerRan);
+        Assert.Equal(import ? 0 : 1, dialog.Add);
+        Assert.Equal(import ? 1 : 0, dialog.Import);
+        var log = Assert.Single(logger.Messages);
+        Assert.Contains(cancelled ? "TaskCanceledException" : "InvalidOperationException", log);
+        Assert.DoesNotContain("private focus detail", log);
+    }
+
     private sealed class RecordingLogger : ILogger<OnboardingViewModel>
     {
         public List<string> Messages { get; } = [];

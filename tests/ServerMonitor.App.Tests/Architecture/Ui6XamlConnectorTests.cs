@@ -34,6 +34,7 @@ public sealed class Ui6XamlConnectorTests
         foreach (var file in files)
         {
             var code = File.ReadAllText(file);
+            AssertEveryCaseTargetIsRecognized(code);
             var all = TargetCasts(code).ToArray();
             if (all.Length == 0) continue;
             var xaml = file[..^5] + ".xaml";
@@ -43,7 +44,7 @@ public sealed class Ui6XamlConnectorTests
                 .ToDictionary(e => (string)e.Attribute(AppSourceTree.Xaml + "ConnectionId")!);
             var checkedInFile = 0;
             var typesById = new Dictionary<string, string>();
-            foreach (Match block in Regex.Matches(code, @"case (?<id>\d+):(?<body>.*?)(?=\bcase\s|\bdefault\s*:|\z)", RegexOptions.Singleline))
+            foreach (Match block in Regex.Matches(code, @"case (?<id>\d+):(?<body>.*?)(?=\bbreak\s*;|\bcase\s|\bdefault\s*:|\z)", RegexOptions.Singleline))
             {
                 foreach (var type in TargetCasts(block.Groups["body"].Value))
                 {
@@ -61,6 +62,34 @@ public sealed class Ui6XamlConnectorTests
         }
         Assert.True(checkedCasts > 0);
     }
+
+    private static void AssertEveryCaseTargetIsRecognized(string code)
+    {
+        foreach (Match block in Regex.Matches(code, @"case (?<id>\d+):(?<body>.*?)(?=\bbreak\s*;|\bcase\s|\bdefault\s*:|\z)", RegexOptions.Singleline))
+        {
+            var body = Regex.Replace(block.Groups["body"].Value, @"//[^\n]*|/\*.*?\*/", "", RegexOptions.Singleline);
+            var castCount = TargetCasts(body).Count();
+            var targetCount = Regex.Matches(body, @"\btarget\b").Count;
+            Assert.True(targetCount == castCount,
+                $"Connection {block.Groups["id"].Value}: {targetCount} target uses, {castCount} recognised casts; review WindowsAppSDK generator syntax.");
+        }
+    }
+
+    [Theory]
+    [InlineData("if (target is global::Microsoft.UI.Xaml.Controls.Button button) { }")]
+    [InlineData("var value = (global::Microsoft.UI.Xaml.Controls.Button)(target);")]
+    [InlineData("var value = Unsafe.As<global::Microsoft.UI.Xaml.Controls.Button>(target);")]
+    public void UnknownTargetForms_AreRejected_EvenWithoutAnyRecognisedCast(string body)
+    {
+        Assert.ThrowsAny<Xunit.Sdk.XunitException>(() => AssertEveryCaseTargetIsRecognized("case 7: " + body + " break;"));
+    }
+
+    [Theory]
+    [InlineData("var value = global::WinRT.CastExtensions.As<global::Microsoft.UI.Xaml.Controls.Button>(target);")]
+    [InlineData("var value = new global::System.WeakReference(global::WinRT.CastExtensions.As<global::Microsoft.UI.Xaml.Controls.Button>(target));")]
+    [InlineData("var value = (global::Microsoft.UI.Xaml.Controls.Button)target;")]
+    public void KnownTargetForms_AreCompletelyAccountedFor(string body) =>
+        AssertEveryCaseTargetIsRecognized("case 7: " + body + " break;");
 
     private static IEnumerable<string> TargetCasts(string code)
     {
