@@ -1,10 +1,12 @@
 # UI.6 — Shell, Sidebar e Onboarding
 
-**Estado: READY_TO_MERGE** (2026-10-06). O merge aguarda GO humano.
-- **Branch:** `ui/ui6-shell-sidebar-onboarding`, base `4f5bfaa`.
-- **PR:** #25.
-- **Candidato:** `006e4ec` (código validado; este commit de documentação vem por cima).
-- **CI:** verde no `006e4ec` (run 37396058509: Debug build + tests, Release build + vulnerability scan).
+**Estado: COMPLETE** (2026-10-06).
+- **Merge:** PR #25 integrado por merge commit (GO humano), fixado ao head `acf7ea9` → `main` = `ba7736d` (pais `4f5bfaa` + `acf7ea9`).
+- **CI pós-merge:** verde à primeira tentativa (run 37444152466).
+- **Branch:** `ui/ui6-shell-sidebar-onboarding` (mantida), base `4f5bfaa`. Código validado em `006e4ec`; `acf7ea9` é só documentação.
+- **CI do PR:** verde no `006e4ec` (run 37396058509) e no `acf7ea9` (run 37396699811).
+- **Floor UI.6:** removido depois do merge, sem apagar a branch. Confirmado nas três provas: `maestri floor list`, `git worktree list` e diretório inexistente.
+- **Limpeza pós-merge (GO humano):** as 4 regras de Firewall do `testhost` deste Floor foram removidas por Name exato (710 → 706, 0 a mais, 0 novas), e o diretório temporário residual foi apagado.
 
 **Autoridade visual:** Figma `Qvk5dUFgsWf4UOYzfAkiDV`, página 05 (principal), 04 (marca) e 06 (só extensibilidade). Precedência: invariantes/segurança > a11y/plataforma > Figma.
 
@@ -159,10 +161,10 @@ Os estados vazios B/C só centram num bloco de 620 quando a altura útil é ≥ 
 - **Dados reais:** metadados e SHA-256 de 22 ficheiros (`%LOCALAPPDATA%\ServerMonitor`, `~/.ssh`, `Settings`/`LocalState` do pacote), mais a contagem de alvos do Credential Manager, antes e depois de **todas** as vagas de QA: **0 diferenças**. Não se passou nenhum caminho real à app nem aos testes.
 - **Firewall:** 718 regras no total, sem alteração desde a linha de base.
   - Existem 4 regras "Query User" **Inbound Allow** do `testhost` deste Floor: Infrastructure.Tests, Debug e Release, TCP e UDP. Os nomes exatos estão em `.boss/evidence/ui6/firewall-after.csv`.
-  - **Não foram removidas** (precisam de GO humano). Nenhum prompt foi respondido por agentes.
+  - Foram removidas depois do merge, com GO humano, por Name exato e com elevação. Nenhum prompt foi respondido por agentes.
 - **Resíduo:** o diretório temporário `%TEMP%\ui6-load-23eb0e25-8ca0-4753-942b-0d7f9731e94d` (um `servers.json` sintético de 2 B, com a regra Deny já removida) ficou de uma contraprova ACL inicial.
   - A ferramenta do implementador recusou apagá-lo, e o pedido para o Boss o apagar foi recusado (não se contorna uma recusa por outro agente).
-  - Fica para decisão humana. O `finally` corrigido impede que se repita.
+  - Foi apagado depois do merge, com GO humano: caminho exato, sem reparse point e sem processos. O `finally` corrigido impede que se repita.
 
 ## 10. Backlog
 
