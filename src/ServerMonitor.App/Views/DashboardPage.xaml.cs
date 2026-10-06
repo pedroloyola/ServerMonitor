@@ -57,6 +57,8 @@ public sealed partial class DashboardPage : Page
         // UI.7 B-5: back from the editor without saving, focus returns to the control that opened it.
         var editorOpener = _editorReturnFocus?.Take(NavigationDestination.Overview);
         if (ShellPageFocus.GetKeepSidebar(this)) return;
+        // Cortex 7A m-3: "Adicionar" of a network suggestion has no page-level name; its row is found by the suggestion.
+        if (EditorOpenerToken.TryGetSuggestion(editorOpener, out var suggestion) && FocusSuggestion(suggestion)) return;
         if (EditorReturnFocus.TryFocus(this, editorOpener)) return;
         var focused = target switch
         {
@@ -80,6 +82,41 @@ public sealed partial class DashboardPage : Page
             if (rows[i].ServerId == serverId)
             {
                 return RepeaterFocus.FocusIndex(OverviewRepeater, i);
+            }
+        }
+
+        return false;
+    }
+
+    // The suggestion's row in whichever list shows it (the section, or the first-server state), then its "Adicionar".
+    // A suggestion that is gone (added, ignored, no longer seen) returns false: the page falls back to its own rule.
+    private bool FocusSuggestion(string endpoint)
+    {
+        var suggestions = ViewModel.DiscoveredServers;
+        var index = -1;
+        for (var i = 0; i < suggestions.Count; i++)
+        {
+            if (string.Equals(suggestions[i].Endpoint, endpoint, StringComparison.Ordinal))
+            {
+                index = i;
+                break;
+            }
+        }
+
+        if (index < 0)
+        {
+            return false;
+        }
+
+        foreach (var repeater in new[] { DiscoveredRepeater, EmptyDiscoveredRepeater })
+        {
+            if (repeater.GetOrCreateElement(index) is Panel row && row.Children.OfType<Button>().FirstOrDefault() is { } add)
+            {
+                add.StartBringIntoView();
+                if (add.Focus(FocusState.Programmatic))
+                {
+                    return true;
+                }
             }
         }
 

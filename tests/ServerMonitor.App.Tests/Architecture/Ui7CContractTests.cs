@@ -1,4 +1,5 @@
 using System.Xml.Linq;
+using ServerMonitor.App.Services;
 
 namespace ServerMonitor.App.Tests.Architecture;
 
@@ -22,6 +23,33 @@ public sealed class Ui7CContractTests
         Assert.True(dispose.IndexOf("_controller.Dispose();", StringComparison.Ordinal) < dispose.IndexOf("HideLayer();", StringComparison.Ordinal),
             "the controller goes first, so hiding the layer dismisses / applies nothing");
         Assert.Contains("public Task<bool> ConfirmLeaveAsync() => _controller.ConfirmLeaveAsync();", page, StringComparison.Ordinal);
+    }
+
+    /// <summary>Cortex 7A m-3: back from the editor opened by a suggestion's "Adicionar", focus returns to that row's button.</summary>
+    [Fact]
+    public void M3_ASuggestionsAdicionar_IsCapturedAsItsRow_AndTheOverviewFocusesItFirst()
+    {
+        var origin = AppSourceTree.CodeWithoutComments("Services/FocusOrigin.cs");
+        Assert.Contains("DataContext: DiscoveredServerViewModel suggestion", origin, StringComparison.Ordinal);
+        Assert.Contains("EditorOpenerToken.ForSuggestion(suggestion.Endpoint)", origin, StringComparison.Ordinal);
+
+        var overview = AppSourceTree.CodeWithoutComments("Views/DashboardPage.xaml.cs");
+        var token = overview.IndexOf("EditorOpenerToken.TryGetSuggestion(editorOpener, out var suggestion) && FocusSuggestion(suggestion)", StringComparison.Ordinal);
+        Assert.True(token > 0);
+        Assert.True(token < overview.IndexOf("EditorReturnFocus.TryFocus(this, editorOpener)", StringComparison.Ordinal));
+        Assert.True(token > overview.IndexOf("if (ShellPageFocus.GetKeepSidebar(this)) return;", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("10.0.0.5:22")]
+    [InlineData("[fe80::1]:2222")]
+    public void M3_TheSuggestionToken_RoundTrips_AndAPlainNameIsNotAToken(string endpoint)
+    {
+        Assert.True(EditorOpenerToken.TryGetSuggestion(EditorOpenerToken.ForSuggestion(endpoint), out var back));
+        Assert.Equal(endpoint, back);
+        Assert.False(EditorOpenerToken.TryGetSuggestion("OverviewAddButton", out _));
+        Assert.False(EditorOpenerToken.TryGetSuggestion("suggestion:", out _));
+        Assert.False(EditorOpenerToken.TryGetSuggestion(null, out _));
     }
 
     [Fact]

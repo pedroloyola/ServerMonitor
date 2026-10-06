@@ -39,7 +39,9 @@ public sealed partial class XamlContractAndResourceGuardTests
         // Beacon r1: the code-behind focuses the content / the return target (HealthCard … EmptyAddButton).
         ["Views/DashboardPage.xaml"] = ["FirstServerStateBlock", "HiddenStateBlock", "PageViewport", "PageRoot", "HeaderGrid", "HeaderActions", "HealthRow", "HealthColumn2", "HealthCountRow", "HealthSegments",
             "PriorityHost", "ServersToolbar", "OverviewSearchBox", "StateOverlay",
-            "HealthCard", "PriorityButton", "DirectoryLinkButton", "OverviewRepeater", "EmptyAddButton"],
+            "HealthCard", "PriorityButton", "DirectoryLinkButton", "OverviewRepeater", "EmptyAddButton",
+            // UI.7C (Cortex m-3): the editor's return focus finds a suggestion's "Adicionar" in these lists.
+            "DiscoveredRepeater", "EmptyDiscoveredRepeater"],
         // UI.5: BackgroundSection is brought into view from code-behind; the rest are reflowed by the WidthStates setters.
         ["Views/SettingsPage.xaml"] = ["PageViewport", "BackgroundSection", "PageRoot", "AutosaveText", "ThemeControl", "LanguageControl", "BackgroundControl",
             "NotificationsControl", "CompactControl", "TopmostControl", "DisclosureColumn2", "DisclosureGrid", "AboutDisclosure",

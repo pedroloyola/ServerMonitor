@@ -542,7 +542,7 @@
                                    Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap" />
                     </StackPanel>
                     <Border Style="{StaticResource SaGlassSurfaceStyle}">
-                        <ItemsRepeater AutomationProperties.LiveSetting="Polite"
+                        <ItemsRepeater x:Name="DiscoveredRepeater" AutomationProperties.LiveSetting="Polite"
                                        AutomationProperties.Name="{x:Bind ViewModel.DiscoveredCountAutomationName, Mode=OneWay}"
                                        ItemsSource="{x:Bind ViewModel.DiscoveredServers}" ItemTemplate="{StaticResource DiscoveredRowTemplate}" />
                     </Border>
@@ -564,7 +564,7 @@
                                 <TextBlock x:Uid="DashboardEmptyDiscoverySearching" Style="{StaticResource SaCaptionTextStyle}"
                                            Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap" />
                             </StackPanel>
-                            <ItemsRepeater MaxWidth="560" AutomationProperties.LiveSetting="Polite"
+                            <ItemsRepeater x:Name="EmptyDiscoveredRepeater" MaxWidth="560" AutomationProperties.LiveSetting="Polite"
                                            ItemsSource="{x:Bind ViewModel.DiscoveredServers}" ItemTemplate="{StaticResource DiscoveredRowTemplate}"
                                            Visibility="{x:Bind ViewModel.ShowEmptyStateDiscoveries, Mode=OneWay}" />
 
