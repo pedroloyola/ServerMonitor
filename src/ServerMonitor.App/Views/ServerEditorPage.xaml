@@ -18,7 +18,8 @@
          "Descartar alterações?" (the one ContentDialog per XamlRoot) can always open. Smoke over the form, SaModalSurface
          chrome, Tab cycles inside, Esc is handled by the layer (a test running = cancel it). -->
     <Grid x:Name="EditorHost">
-    <ScrollViewer x:Name="PageScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+    <!-- UI.7C QA fix: the width states live on the page's ROOT element - attached to a child, their triggers never fired
+         (at 560 the header button stayed beside a truncated H1). -->
         <VisualStateManager.VisualStateGroups>
             <VisualStateGroup x:Name="WidthStates">
                 <VisualState x:Name="Wide">
@@ -56,6 +57,7 @@
                 </VisualState>
             </VisualStateGroup>
         </VisualStateManager.VisualStateGroups>
+    <ScrollViewer x:Name="PageScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
         <Grid x:Name="PageRoot" Padding="{StaticResource SaPagePadding}" RowSpacing="{StaticResource SaSpace16}">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />

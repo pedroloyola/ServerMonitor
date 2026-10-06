@@ -68,6 +68,23 @@ public sealed class Ui7CContractTests
         Assert.Equal("Cycle", (string?)surface.Attribute("TabFocusNavigation"));
     }
 
+    /// <summary>
+    /// UI.7C QA finding (B-19): width states attached to a child of the page never fired (at 560 the editor kept its wide
+    /// header). They live on the page's root element - the editor and the Detail it restructured for the saved toast.
+    /// </summary>
+    [Theory]
+    [InlineData("Views/ServerEditorPage.xaml", "EditorHost")]
+    [InlineData("Views/ServerDetailPage.xaml", "DetailHost")]
+    public void TheWidthStates_LiveOnThePagesRootElement(string file, string root)
+    {
+        var page = AppSourceTree.LoadXaml(file).Root!;
+        var content = page.Elements().Single(e => !e.Name.LocalName.Contains('.', StringComparison.Ordinal));
+        Assert.Equal(root, (string?)content.Attribute(AppSourceTree.Xaml + "Name"));
+        Assert.Contains(content.Elements(), e => e.Name.LocalName == "VisualStateManager.VisualStateGroups");
+        Assert.Single(page.Descendants().Where(e => e.Name.LocalName == "VisualStateManager.VisualStateGroups"
+            && e.Descendants().Any(d => (string?)d.Attribute(AppSourceTree.Xaml + "Name") == "WidthStates")));
+    }
+
     [Fact]
     public void TheFormHasNoInlineChecklistOrValidationInfoBar_AnyMore()
     {
