@@ -91,6 +91,26 @@ public sealed class QaCompactHarnessTests
         Assert.Null(QaCompactComposition.Parse(args));
     }
 
+    /// <summary>
+    /// UI.8 RC-4 QA: an external activation on the compact harness (e.g. with --background, Compact persisted in memory)
+    /// - dashboard or server:&lt;n&gt; over the scenario's VISIBLE servers; never --qa-start, never out of range.
+    /// </summary>
+    [Fact]
+    public void AnActivation_OnTheCompactHarness_IsStrict_AndResolvesTheScenariosVisibleServer()
+    {
+        string[] server = [Exe, "--qa-compact", "--background", "--qa-activation=server:6"];
+        Assert.Null(QaStartupIsolation.LaunchRefusal(server));
+        Assert.Equal(ServerMonitor.ActivationContract.ActivationIntent.Server(QaCompactCatalog.Build("figma").Servers[5].Id), QaShellStartup.Activation(server));
+        Assert.Equal(ServerMonitor.ActivationContract.ActivationIntent.Dashboard,
+            QaShellStartup.Activation([Exe, "--qa-compact", "--qa-compact-scenario", "one", "--qa-activation=dashboard"]));
+
+        Assert.NotNull(QaStartupIsolation.LaunchRefusal([Exe, "--qa-compact", "--qa-activation=server:7"]));      // figma has 6
+        Assert.NotNull(QaStartupIsolation.LaunchRefusal([Exe, "--qa-compact", "--qa-compact-scenario=all-hidden", "--qa-activation=server:1"]));
+        Assert.NotNull(QaStartupIsolation.LaunchRefusal([Exe, "--qa-compact", "--qa-start=overview"]));
+        Assert.NotNull(QaStartupIsolation.LaunchRefusal([Exe, "--qa-compact", "--qa-activation=server:x"]));
+        Assert.NotNull(QaStartupIsolation.LaunchRefusal([Exe, "--qa-compact", "--qa-compact-scenario=nope", "--qa-activation=dashboard"]));
+    }
+
     [Fact]
     public void AnUnknownScenario_IsNeverBuilt()
     {
