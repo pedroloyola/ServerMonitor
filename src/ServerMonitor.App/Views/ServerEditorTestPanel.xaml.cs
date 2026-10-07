@@ -74,7 +74,10 @@ public sealed partial class ServerEditorTestPanel : UserControl
     }
 
     /// <summary>The safe action takes the focus (Cancelar teste while testing, else back to the form).</summary>
-    public void FocusSafeButton() => CloseButton.Focus(FocusState.Programmatic);
+    public bool FocusSafeButton() => CloseButton.Focus(FocusState.Programmatic);
+
+    /// <summary>Final c2 (Prism C2-1): the commands stack (default first, full width) when the dialog is too narrow.</summary>
+    public void SetStackedCommands(bool stacked) => DialogCommandRow.Apply(ActionRow, CloseButton, RetryButton, stacked);
 
     /// <summary>The panel is hidden: it stops listening to the checklist (the next Show attaches again).</summary>
     public void Detach()

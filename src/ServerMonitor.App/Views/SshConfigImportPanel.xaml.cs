@@ -86,23 +86,47 @@ public sealed partial class SshConfigImportPanel : UserControl
         }
     }
 
+    /// <summary>Final c2 (Prism C2-1): the commands stack (default first, full width) when the dialog is too narrow.</summary>
+    public void SetStackedCommands(bool stacked) => DialogCommandRow.Apply(ActionRow, CancelButton, UseButton, stacked);
+
     /// <summary>The first focus: the list when it has profiles, otherwise Cancelar.</summary>
-    public void FocusInitial()
-    {
-        if (ListPanel.Visibility == Visibility.Visible)
-        {
-            HostList.Focus(FocusState.Programmatic);
-        }
-        else
-        {
-            CancelButton.Focus(FocusState.Programmatic);
-        }
-    }
+    public bool FocusInitial() =>
+        ListPanel.Visibility == Visibility.Visible
+            ? HostList.Focus(FocusState.Programmatic)
+            : CancelButton.Focus(FocusState.Programmatic);
 
     private void OnHostSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         UseButton.IsEnabled = SshConfigImportPresentation.CanUse(Selected);
         UpdateDetails();
+        foreach (var item in e.RemovedItems.Concat(e.AddedItems))
+        {
+            if (HostList.ContainerFromItem(item) is ListViewItem container && item is SshConfigHostOptionViewModel option)
+            {
+                UpdateRowState(container, option);
+            }
+        }
+    }
+
+    // C2-4: the state column - "Selecionado" for the selected importable row, "Disponível" for the others; a blocked row
+    // keeps "Bloqueado" (its own x:Bind) whether selected or not.
+    private static void UpdateRowState(ListViewItem container, SshConfigHostOptionViewModel option)
+    {
+        if (container.ContentTemplateRoot is not FrameworkElement root)
+        {
+            return;
+        }
+
+        var state = SshConfigImportPresentation.RowState(option.IsImportable, container.IsSelected);
+        if (root.FindName("AvailableText") is TextBlock available)
+        {
+            available.Visibility = state == SshConfigImportRowState.Available ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        if (root.FindName("SelectedText") is TextBlock selected)
+        {
+            selected.Visibility = state == SshConfigImportRowState.Selected ? Visibility.Visible : Visibility.Collapsed;
+        }
     }
 
     // Final c1 (Prism F-2, Figma 04): the selected profile's Host / Utilizador / Chave privada. Only what the file gives;
@@ -148,6 +172,11 @@ public sealed partial class SshConfigImportPanel : UserControl
                     SetLine(root.FindName("DetailText") as TextBlock, SshConfigImportPresentation.Detail(option.Entry, rowLocalization));
                     SetLine(root.FindName("JumpText") as TextBlock, SshConfigImportPresentation.Jump(option.Entry, rowLocalization));
                 }
+            }
+
+            if (args.ItemContainer is ListViewItem row)
+            {
+                UpdateRowState(row, option);
             }
 
             // The key's full path is never drawn in the row: it is the item's UIA HelpText (and the details block's tooltip).

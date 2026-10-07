@@ -160,7 +160,10 @@ public sealed partial class StartQaAppScriptTests
         ["--QA-HEALTH"],
         ["--qa-health", "--qa-made-up"],
         ["--qa-proxyjump", "--qa-proxyjump-dir="],
-        [@"C:\Users\x\AppData\Local\Temp\ServerMonitor-QA\relay-pj"] // the incident's argument
+        [@"C:\Users\x\AppData\Local\Temp\ServerMonitor-QA\relay-pj"], // the incident's argument
+        // UI.7 final c2 (Beacon): the app refuses an activation on the editor harness - so does the launcher, first.
+        ["--qa-editor", "--qa-backup", "ok", "--qa-activation=dashboard"],
+        ["--qa-editor", "--qa-backup", "ok", "--qa-start=editor-add", "--qa-activation", "dashboard"]
     ];
 
     private static readonly string[][] AllowedLaunches =
@@ -231,6 +234,32 @@ public sealed partial class StartQaAppScriptTests
             var appAllows = QaStartupIsolation.LaunchRefusal(appArgs) is null && corpus[i].Any(QaStartupIsolation.IsQaLike);
             Assert.True(appAllows == (results[i] == "ALLOWED"), $"[{string.Join(' ', corpus[i])}] app={appAllows} script={results[i]}");
         }
+    }
+
+    /// <summary>
+    /// UI.7 final c2 (Beacon / Vigil): the editor harness with an external activation is refused by the app
+    /// (QaShellStartup.Refusal) AND by the launcher before Start-Process; the editor's own start stays allowed.
+    /// </summary>
+    [Fact]
+    public void AnActivationOnTheEditorHarness_IsRefusedByTheLauncher_AsByTheApp()
+    {
+        string[][] refused =
+        [
+            ["--qa-editor", "--qa-backup", "ok", "--qa-activation=dashboard"],
+            ["--qa-editor", "--qa-backup", "ok", "--qa-start=editor-add", "--qa-activation=server:1"]
+        ];
+        string[] allowed = ["--qa-editor", "--qa-backup", "ok", "--qa-start=editor-add"];
+
+        var results = RunScript([.. refused, allowed], SentinelExe, validateOnly: true);
+        for (var i = 0; i < refused.Length; i++)
+        {
+            Assert.NotNull(QaStartupIsolation.LaunchRefusal([SentinelExe, .. refused[i]]));
+            Assert.StartsWith("REFUSED", results[i]);
+            Assert.Contains("--qa-activation is not supported with --qa-editor", results[i]);
+        }
+
+        Assert.Null(QaStartupIsolation.LaunchRefusal([SentinelExe, .. allowed]));
+        Assert.Equal("ALLOWED", results[^1]);
     }
 
     /// <summary>One pwsh process for all cases; each case prints ALLOWED / REFUSED:&lt;msg&gt; / ERROR:&lt;msg&gt;.</summary>

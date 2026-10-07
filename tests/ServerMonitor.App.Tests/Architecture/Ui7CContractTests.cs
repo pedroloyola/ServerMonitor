@@ -22,7 +22,9 @@ public sealed class Ui7CContractTests
         Assert.Contains("ServerForm.ClearSecrets();", dispose, StringComparison.Ordinal);
         Assert.True(dispose.IndexOf("_controller.Dispose();", StringComparison.Ordinal) < dispose.IndexOf("HideLayer();", StringComparison.Ordinal),
             "the controller goes first, so hiding the layer dismisses / applies nothing");
-        Assert.Contains("public Task<bool> ConfirmLeaveAsync() => _controller.ConfirmLeaveAsync();", page, StringComparison.Ordinal);
+        // Final c2 (B-2): the page's guard IS the controller's task - returned as is, the focus restore rides beside it.
+        Assert.Contains("var answer = _controller.ConfirmLeaveAsync();", page, StringComparison.Ordinal);
+        Assert.Contains("return answer;", page, StringComparison.Ordinal);
     }
 
     /// <summary>Cortex 7A m-3: back from the editor opened by a suggestion's "Adicionar", focus returns to that row's button.</summary>

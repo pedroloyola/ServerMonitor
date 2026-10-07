@@ -32,7 +32,7 @@
                 </VisualState>
                 <VisualState x:Name="Stacked">
                     <VisualState.StateTriggers>
-                        <primitives:SaContentWidthTrigger Source="{Binding ElementName=FormRoot}" MinWidth="0" MaxWidth="760" />
+                        <primitives:SaContentWidthTrigger Source="{Binding ElementName=FormRoot}" MinWidth="420" MaxWidth="760" />
                     </VisualState.StateTriggers>
                     <VisualState.Setters>
                         <Setter Target="CardsColumn2.Width" Value="0" />
@@ -50,6 +50,38 @@
                         <Setter Target="RefreshIntervalField.(Grid.Row)" Value="1" />
                         <Setter Target="RefreshIntervalField.(Grid.Column)" Value="0" />
                         <Setter Target="RefreshIntervalField.(Grid.ColumnSpan)" Value="2" />
+                        <!-- Final c2 (Prism C2-2): the selectors fit their column (no 200 minimum), chevron always visible. -->
+                        <Setter Target="OperatingSystemSelector.MinWidth" Value="0" />
+                        <Setter Target="RefreshIntervalSelector.MinWidth" Value="0" />
+                    </VisualState.Setters>
+                </VisualState>
+                <VisualState x:Name="Compact">
+                    <!-- Final c2 (Prism C2-2): under 420 of card width Porta, SO and Atualizar each take a full row. -->
+                    <VisualState.StateTriggers>
+                        <primitives:SaContentWidthTrigger Source="{Binding ElementName=FormRoot}" MinWidth="0" MaxWidth="420" />
+                    </VisualState.StateTriggers>
+                    <VisualState.Setters>
+                        <Setter Target="CardsColumn2.Width" Value="0" />
+                        <Setter Target="CardsGrid.ColumnSpacing" Value="0" />
+                        <Setter Target="CardsGrid.RowSpacing" Value="{StaticResource SaSpace16}" />
+                        <Setter Target="AuthCard.(Grid.Column)" Value="0" />
+                        <Setter Target="AuthCard.(Grid.Row)" Value="1" />
+                        <Setter Target="JumpCardsColumn2.Width" Value="0" />
+                        <Setter Target="JumpCardsGrid.ColumnSpacing" Value="0" />
+                        <Setter Target="JumpCardsGrid.RowSpacing" Value="{StaticResource SaSpace16}" />
+                        <Setter Target="JumpAuthCard.(Grid.Column)" Value="0" />
+                        <Setter Target="JumpAuthCard.(Grid.Row)" Value="1" />
+                        <Setter Target="OptionsColumn3.Width" Value="0" />
+                        <Setter Target="OptionsGrid.RowSpacing" Value="{StaticResource SaSpace16}" />
+                        <Setter Target="OptionsColumn1.Width" Value="*" />
+                        <Setter Target="OptionsColumn2.Width" Value="0" />
+                        <Setter Target="OptionsGrid.ColumnSpacing" Value="0" />
+                        <Setter Target="OperatingSystemField.(Grid.Row)" Value="1" />
+                        <Setter Target="OperatingSystemField.(Grid.Column)" Value="0" />
+                        <Setter Target="RefreshIntervalField.(Grid.Row)" Value="2" />
+                        <Setter Target="RefreshIntervalField.(Grid.Column)" Value="0" />
+                        <Setter Target="OperatingSystemSelector.MinWidth" Value="0" />
+                        <Setter Target="RefreshIntervalSelector.MinWidth" Value="0" />
                     </VisualState.Setters>
                 </VisualState>
             </VisualStateGroup>
@@ -310,11 +342,12 @@
         <Border x:Name="OptionsCard" Style="{StaticResource SaGlassSurfaceStyle}">
             <Grid x:Name="OptionsGrid" ColumnSpacing="16">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="160" />
-                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition x:Name="OptionsColumn1" Width="160" />
+                    <ColumnDefinition x:Name="OptionsColumn2" Width="*" />
                     <ColumnDefinition x:Name="OptionsColumn3" Width="*" />
                 </Grid.ColumnDefinitions>
                 <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
@@ -328,8 +361,9 @@
                         MaxLength="5"
                         Text="{Binding Port, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                 </primitives:SaFormField>
-                <primitives:SaFormField x:Uid="ServerEditorOperatingSystemField" Grid.Column="1">
+                <primitives:SaFormField x:Name="OperatingSystemField" x:Uid="ServerEditorOperatingSystemField" Grid.Column="1">
                     <ComboBox
+                        x:Name="OperatingSystemSelector"
                         HorizontalAlignment="Stretch"
                         Style="{StaticResource SaSelectorFieldStyle}"
                         IsEnabled="{Binding IsNotTestingConnection}"
@@ -342,6 +376,7 @@
                 </primitives:SaFormField>
                 <primitives:SaFormField x:Name="RefreshIntervalField" x:Uid="ServerEditorRefreshIntervalField" Grid.Column="2">
                     <ComboBox
+                        x:Name="RefreshIntervalSelector"
                         HorizontalAlignment="Stretch"
                         Style="{StaticResource SaSelectorFieldStyle}"
                         IsEnabled="{Binding IsNotTestingConnection}"

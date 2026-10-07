@@ -89,6 +89,8 @@ public sealed partial class XamlContractAndResourceGuardTests
             "IdentitySubtitle", "AuthTitle", "AuthSubtitle", "FormRoot", "CardsGrid", "CardsColumn2", "AuthCard",
             // UI.7 final c1 (Prism F-10): the Wide state keeps both cards at 384.
             "IdentityCard",
+            // UI.7 final c2 (Prism C2-2): the narrow options card (selectors without the 200 minimum; Compact rows).
+            "OperatingSystemField", "OperatingSystemSelector", "RefreshIntervalSelector", "OptionsColumn1", "OptionsColumn2",
             "JumpCardsGrid", "JumpCardsColumn2", "JumpAuthCard", "OptionsGrid", "OptionsColumn3", "RefreshIntervalField"
         ],
         // UI.7A Add / Edit server page: code-behind (header, actions, notice) and the WidthStates setters.
@@ -110,12 +112,15 @@ public sealed partial class XamlContractAndResourceGuardTests
         ["Views/ServerEditorTrustPanel.xaml"] =
         [
             "StepText", "TitleIcon", "TitleText", "BodyText", "SubjectText", "TrustedBlock", "TrustedLabel", "TrustedFingerprintText",
-            "PresentedLabel", "PresentedFingerprintText", "ScopeText", "WorkingRow", "WorkingRing", "WorkingText", "CloseButton", "AcceptButton"
+            "PresentedLabel", "PresentedFingerprintText", "ScopeText", "WorkingRow", "WorkingRing", "WorkingText", "CloseButton", "AcceptButton",
+            "ActionRow"
         ],
         // UI.7C (B-9): the connection test in the same layer (Figma 08, the four real stages).
         ["Views/ServerEditorTestPanel.xaml"] =
         [
-            "TitleIcon", "TitleText", "BodyText", "SubjectText", "StageList", "VerifiedDetailText", "CloseButton", "RetryButton"
+            "TitleIcon", "TitleText", "BodyText", "SubjectText", "StageList", "VerifiedDetailText", "CloseButton", "RetryButton",
+            // UI.7 final c2 (Prism C2-1): the command row that stacks in a narrow dialog.
+            "ActionRow"
         ],
         ["Views/SshConfigImportPanel.xaml"] =
         [
@@ -125,7 +130,9 @@ public sealed partial class XamlContractAndResourceGuardTests
             "AlreadyAddedText",
             // UI.7 final c1 (Prism F-2): a row's compact detail and jump lines, and the selected profile's details.
             "DetailText", "JumpText", "DetailsPanel", "DetailsHostLabel", "DetailsHostValue", "DetailsUserLabel", "DetailsUserValue",
-            "DetailsKeyLabel", "DetailsKeyValue"
+            "DetailsKeyLabel", "DetailsKeyValue",
+            // UI.7 final c2 (Prism C2-1 / C2-4): the stacking command row and the per-row state words.
+            "ActionRow", "AvailableText", "SelectedText"
         ],
         // HistoryChart parts: the chart draws into these by name.
         ["Controls/HistoryChart.xaml"] = ["RootGrid", "PlotHost", "GridCanvas", "PlotCanvas", "YAxisCanvas", "XAxisCanvas"],
@@ -140,6 +147,8 @@ public sealed partial class XamlContractAndResourceGuardTests
             "PART_Host", "PART_LitBrush", "PART_EmptyBrush", "PART_BarBrush"
         ],
         // UI.2 S4 control templates: names targeted by VisualState setters / storyboards (G-3).
+        // UI.7 final c2 (Prism C2-4): the inset list row template (selected / hover overlays over the tint).
+        ["Styles/Components/Sa.Surfaces.xaml"] = ["RowRoot", "SelectedOverlay", "HoverOverlay", "ContentPresenter"],
         ["Styles/Components/Sa.Buttons.xaml"] = ["RootGrid", "StateOverlay", "ContentPresenter", "Underline", "FocusUnderline"],
         ["Styles/Components/Sa.Forms.xaml"] =
         [

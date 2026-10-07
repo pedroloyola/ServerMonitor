@@ -32,9 +32,15 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
     private bool _disposed;
     // The in-page layer: which one is shown, and whether an accepted key is being written + retested.
     private ServerEditorLayer _layer;
+    // B-4: what opened the layer (Import = "Importar de SSH"; Test = "Testar ligação", also for the trust prompt it met).
+    private ServerEditorLayer _layerOpener;
     private bool _acceptingTrust;
     private string _subtitle = string.Empty;
     private bool _saveFailed;
+    // UI.7 final c2 (Beacon B-1..B-4): the one pending focus move (into the layer, back to its trigger, after a failed save
+    // or a kept edit), retried on the next layout passes only - never a timer.
+    private LayoutFocusAttempt? _pendingFocus;
+    private const int MaxFocusAttempts = 8;
 
     public ServerEditorPage(
         IServerEditorSession session,
@@ -70,6 +76,7 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
         Unloaded += (_, _) => ServerForm.ClearSecrets();
         KeyDown += OnPageKeyDown;
         EditorHost.SizeChanged += (_, _) => UpdateDialogMaxWidth();
+        DialogSurface.SizeChanged += (_, args) => UpdateDialogCommands(args.NewSize.Width);
     }
 
     /// <summary>
@@ -81,6 +88,16 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
     /// <summary>A narrow window still fits the dialog: at most the page width minus the surface's compact margins.</summary>
     internal static double DialogMaxWidth(double hostWidth, Thickness margin) =>
         Math.Max(0, hostWidth - margin.Left - margin.Right);
+
+    /// <summary>The width two dialog commands need side by side: 2 x SaDialogCommandButtonStyle MinWidth + the 12 between.</summary>
+    internal const double DialogCommandsSideBySideWidth = (2 * 196) + 12;
+
+    /// <summary>
+    /// Final c2 (Prism C2-1): below that content width (the 560 minimum window: dialog 416, content 360) the commands stack,
+    /// default action first, full width - never a command cut off at the content edge.
+    /// </summary>
+    internal static bool StackDialogCommands(double surfaceWidth, Thickness padding, Thickness border) =>
+        surfaceWidth - padding.Left - padding.Right - border.Left - border.Right < DialogCommandsSideBySideWidth;
 
     public void Load(ServerEditorRequest request)
     {
@@ -108,7 +125,49 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
         UpdateActionState();
     }
 
-    public Task<bool> ConfirmLeaveAsync() => _controller.ConfirmLeaveAsync();
+    /// <summary>
+    /// The exit guard is the controller's. Final c2 (Beacon B-2): the question is asked over whatever had the focus;
+    /// "Continuar a editar" puts the focus back there (else on Nome), every time - never on the sidebar. The controller's
+    /// own task is returned as is (no extra hop between the answer and the navigation that waits for it).
+    /// </summary>
+    public Task<bool> ConfirmLeaveAsync()
+    {
+        var focused = XamlRoot is { } root ? FocusManager.GetFocusedElement(root) as Control : null;
+        var answer = _controller.ConfirmLeaveAsync();
+        if (!answer.IsCompleted)
+        {
+            _ = RunIfKeptAsync(answer, () => !_disposed, () => FocusWhenLaidOut(() => KeptFocusTarget(focused)));
+        }
+
+        return answer;
+    }
+
+    /// <summary>
+    /// B-2: <paramref name="restore"/> runs once per question answered "Continuar a editar" (false) while the page is still
+    /// here - every cycle, not only the first; never after "Descartar" or a failed question (the navigation that waits for
+    /// the answer handles those).
+    /// </summary>
+    internal static async Task RunIfKeptAsync(Task<bool> answer, Func<bool> stillHere, Action restore)
+    {
+        bool leave;
+        try
+        {
+            leave = await answer;
+        }
+        catch (Exception)
+        {
+            return;
+        }
+
+        if (!leave && stillHere())
+        {
+            restore();
+        }
+    }
+
+    /// <summary>Where "Continuar a editar" returns: the element the question was asked over, else the first field.</summary>
+    private bool KeptFocusTarget(Control? focused) =>
+        (focused is { IsLoaded: true, IsEnabled: true } && focused.Focus(FocusState.Programmatic)) || ServerForm.FocusFirstField();
 
     /// <summary>Idempotent: ends the visit (the session disposes the view model) and clears the password boxes.</summary>
     public void Dispose()
@@ -128,6 +187,7 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
         _controller.Dispose();
         // The controller is gone first, so hiding the layer dismisses / applies nothing.
         HideLayer();
+        CancelPendingFocus();
     }
 
     private void OnLoaded(object sender, RoutedEventArgs e)
@@ -252,20 +312,20 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
         PageScroll.IsTabStop = false;
         if (opening)
         {
-            // Focus moves into the layer (Tab then cycles inside it); the first stop is the safe one.
-            DispatcherQueue.TryEnqueue(() =>
+            if (layer == ServerEditorLayer.Import || _layerOpener == ServerEditorLayer.None)
             {
-                switch (_layer)
+                _layerOpener = layer == ServerEditorLayer.Import ? ServerEditorLayer.Import : ServerEditorLayer.Test;
+            }
+
+            // B-1: no pointer reaches the page from now on. Focus moves INTO the layer first (Tab then cycles inside it;
+            // the first stop is the safe one), once the panel is laid out; only then is the page disabled (c) - disabling
+            // the control that has the focus would throw it to the next tab stop behind the layer.
+            PageRoot.IsHitTestVisible = false;
+            FocusWhenLaidOut(FocusLayer, _ =>
+            {
+                if (_layer != ServerEditorLayer.None && !_disposed)
                 {
-                    case ServerEditorLayer.Test:
-                        TestPanel.FocusSafeButton();
-                        break;
-                    case ServerEditorLayer.Trust:
-                        TrustPanel.FocusSafeButton();
-                        break;
-                    case ServerEditorLayer.Import:
-                        ImportPanel.FocusInitial();
-                        break;
+                    SetPageInteractive(false);
                 }
             });
         }
@@ -273,6 +333,63 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
 
     private void UpdateDialogMaxWidth() =>
         DialogSurface.MaxWidth = DialogMaxWidth(EditorHost.ActualWidth, DialogSurface.Margin);
+
+    private void UpdateDialogCommands(double surfaceWidth)
+    {
+        var stacked = StackDialogCommands(surfaceWidth, DialogSurface.Padding, DialogSurface.BorderThickness);
+        TestPanel.SetStackedCommands(stacked);
+        TrustPanel.SetStackedCommands(stacked);
+        ImportPanel.SetStackedCommands(stacked);
+    }
+
+    // B-1 (b): while a layer is open the page behind it takes no pointer, no Tab and no Enter; the sidebar is reached
+    // only through the exit guard (D-B2).
+    private void SetPageInteractive(bool interactive)
+    {
+        PageRoot.IsHitTestVisible = interactive;
+        PageScroll.IsEnabled = interactive;
+    }
+
+    private void FocusWhenLaidOut(Func<bool> tryFocus, Action<bool>? completed = null)
+    {
+        CancelPendingFocus();
+        var attempt = new LayoutFocusAttempt(tryFocus, MaxFocusAttempts, completed);
+        if (attempt.Step())
+        {
+            return;
+        }
+
+        _pendingFocus = attempt;
+        LayoutUpdated += OnLayoutUpdatedFocus;
+        // A layout pass that already happened raises nothing more: one low-priority try after it as well.
+        DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, StepPendingFocus);
+    }
+
+    private void OnLayoutUpdatedFocus(object? sender, object e) => StepPendingFocus();
+
+    private void StepPendingFocus()
+    {
+        if (_pendingFocus is null || _pendingFocus.Step())
+        {
+            CancelPendingFocus();
+        }
+    }
+
+    private void CancelPendingFocus()
+    {
+        _pendingFocus?.Cancel();
+        _pendingFocus = null;
+        LayoutUpdated -= OnLayoutUpdatedFocus;
+    }
+
+    /// <summary>B-1 (a): the layer's first stop - the safe button (test / trust) or the list / Cancelar (import).</summary>
+    private bool FocusLayer() => _layer switch
+    {
+        ServerEditorLayer.Test => TestPanel.FocusSafeButton(),
+        ServerEditorLayer.Trust => TrustPanel.FocusSafeButton(),
+        ServerEditorLayer.Import => ImportPanel.FocusInitial(),
+        _ => true
+    };
 
     private void HideLayer()
     {
@@ -282,16 +399,27 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
         }
 
         _layer = ServerEditorLayer.None;
+        var opener = _layerOpener;
+        _layerOpener = ServerEditorLayer.None;
         DialogLayer.Visibility = Visibility.Collapsed;
         TestPanel.Visibility = Visibility.Collapsed;
         TestPanel.Detach();
         TrustPanel.Visibility = Visibility.Collapsed;
         ImportPanel.Visibility = Visibility.Collapsed;
+        SetPageInteractive(true);
         if (!_disposed)
         {
-            TestButton.Focus(FocusState.Programmatic);
+            UpdateActionState();
+            // B-4: back to the control that opened the layer - "Importar de SSH" for the import, "Testar ligação" for the
+            // test and the trust prompt it met.
+            Control trigger = LayerReturnsToHeaderButton(opener, HeaderButton.Visibility == Visibility.Visible) ? HeaderButton : TestButton;
+            FocusWhenLaidOut(() => trigger.Focus(FocusState.Programmatic));
         }
     }
+
+    /// <summary>B-4: the import goes back to "Importar de SSH"; the test and its trust prompt to "Testar ligação".</summary>
+    internal static bool LayerReturnsToHeaderButton(ServerEditorLayer opener, bool headerButtonShown) =>
+        opener == ServerEditorLayer.Import && headerButtonShown;
 
     // "Testar ligação" / "Tentar novamente" / "Testar novamente": the test dialog opens once a test really starts; an
     // invalid form shows its field errors instead and focuses the first one.
@@ -363,14 +491,25 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
 
         var saving = _controller.IsSaving;
         var busy = viewModel.IsConnectionWorkInProgress || saving;
-        TestButton.IsEnabled = !busy;
-        PrimaryButton.IsEnabled = !busy;
-        RetrySaveButton.IsEnabled = !busy;
-        CancelButton.IsEnabled = !saving;
-        HeaderButton.IsEnabled = !saving && (!busy || _controller.IsEdit);
+        SetEnabled(TestButton, !busy);
+        SetEnabled(PrimaryButton, !busy);
+        SetEnabled(RetrySaveButton, !busy);
+        SetEnabled(CancelButton, !saving);
+        SetEnabled(HeaderButton, !saving && (!busy || _controller.IsEdit));
         var hint = _controller.ActionHintKey();
         ActionHint.Text = hint.Length == 0 ? string.Empty : _localization.GetString(hint);
     }
+
+    /// <summary>
+    /// Final c2 (Beacon B-1 c / B-3): the control that has the focus is never disabled under it - WinUI would throw the
+    /// focus to the next tab stop (the page's Cancelar behind a layer, or the sidebar). It stays enabled and every action
+    /// behind it refuses re-entry itself (the controller's IsSaving / busy guards); the next UpdateActionState after the
+    /// focus has moved (layer opened, save ended) applies the state.
+    /// </summary>
+    internal static bool KeepsEnabledForFocus(bool wanted, bool hasFocus) => wanted || hasFocus;
+
+    private static void SetEnabled(Control control, bool enabled) =>
+        control.IsEnabled = KeepsEnabledForFocus(enabled, control.FocusState != FocusState.Unfocused);
 
     // B-16 / G-26: per-field errors (after a failed attempt, then live), the H1 subtitle as the assertive summary.
     private void UpdateValidation()
@@ -476,6 +615,12 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
 
     private async void OnHeaderButtonClick(object sender, RoutedEventArgs e)
     {
+        // B-3: kept enabled while it has the focus during a Save - and then does nothing.
+        if (_controller.IsSaving)
+        {
+            return;
+        }
+
         if (_controller.IsEdit)
         {
             _controller.Cancel();
@@ -534,8 +679,12 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
 
         SaveFailedNotice.Message = message;
         SaveFailedNotice.Visibility = Visibility.Visible;
-        RetrySaveButton.Visibility = outcome.Status == ServerEditorSaveStatus.ConfigurationLocked ? Visibility.Collapsed : Visibility.Visible;
+        var locked = outcome.Status == ServerEditorSaveStatus.ConfigurationLocked;
+        RetrySaveButton.Visibility = locked ? Visibility.Collapsed : Visibility.Visible;
         UpdateValidation();
         SaveFailedNotice.StartBringIntoView();
+        // B-3: the focus goes to the way forward - "Tentar guardar" (fail) or the first field (locked: no retry exists) -
+        // never to the sidebar.
+        FocusWhenLaidOut(() => locked ? ServerForm.FocusFirstField() : RetrySaveButton.Focus(FocusState.Programmatic));
     }
 }

@@ -266,6 +266,10 @@ public static class SshConfigImportPresentation
             : string.Empty;
     }
 
+    /// <summary>Final c2 (Prism C2-4): what a row's state column says.</summary>
+    public static SshConfigImportRowState RowState(bool importable, bool selected) =>
+        !importable ? SshConfigImportRowState.Blocked : selected ? SshConfigImportRowState.Selected : SshConfigImportRowState.Available;
+
     /// <summary>"Usar perfil" is possible only for a selected, importable profile.</summary>
     public static bool CanUse(SshConfigHostOptionViewModel? selected) => selected is { IsImportable: true };
 
@@ -276,6 +280,14 @@ public static class SshConfigImportPresentation
         SshConfigLoadOutcome.NoHosts => "ServerEditorImportNoHostsTitle",
         _ => string.Empty
     };
+}
+
+/// <summary>UI.7 final c2 (Prism C2-4): the import row's state column ("Disponível" / "Selecionado" / "Bloqueado").</summary>
+public enum SshConfigImportRowState
+{
+    Available,
+    Selected,
+    Blocked
 }
 
 /// <summary>UI.7C (B-9, Figma 08): where the connection test is.</summary>

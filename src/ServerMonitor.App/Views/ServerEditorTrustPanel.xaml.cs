@@ -77,7 +77,10 @@ public sealed partial class ServerEditorTrustPanel : UserControl
     }
 
     /// <summary>The first focus is the safe button: a stray Enter never trusts a key.</summary>
-    public void FocusSafeButton() => CloseButton.Focus(FocusState.Programmatic);
+    public bool FocusSafeButton() => CloseButton.Focus(FocusState.Programmatic);
+
+    /// <summary>Final c2 (Prism C2-1): the commands stack (default first, full width) when the dialog is too narrow.</summary>
+    public void SetStackedCommands(bool stacked) => DialogCommandRow.Apply(ActionRow, CloseButton, AcceptButton, stacked);
 
     private void OnAcceptClick(object sender, RoutedEventArgs e) => AcceptRequested?.Invoke(this, EventArgs.Empty);
 

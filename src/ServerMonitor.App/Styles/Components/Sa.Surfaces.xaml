@@ -68,8 +68,9 @@
         <Setter Property="MinHeight" Value="38" />
     </Style>
     <!-- UI.7 final c1 (Prism F-2, Figma 04 112:4049): a selectable row of a short list (the SSH-config import) - inset tint,
-         r13, 8 between rows; the selected/hover fills are the ListView's (neutral under Sa.AccentNeutralScope). No BasedOn:
-         the WinUI default ListViewItem style stays the base layer. -->
+         r13, 8 between rows. Final c2 (Prism C2-4, Figma 112:4067 @.20 vs @.05): its own template - the selected fill
+         (SaSelectedBrush; HC Highlight) is drawn OVER the tint in every focus state, hover is the SaHoverBrush veil; no
+         accent selection pill. Keyboard focus = the system focus ring (the Sa 2 px ring). -->
     <Style x:Key="SaInsetListItemStyle" TargetType="ListViewItem">
         <Setter Property="Background" Value="{ThemeResource SaInsetTintedBrush}" />
         <Setter Property="CornerRadius" Value="{StaticResource SaRadiusListRow}" />
@@ -77,6 +78,70 @@
         <Setter Property="Padding" Value="14,10" />
         <Setter Property="MinHeight" Value="66" />
         <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="UseSystemFocusVisuals" Value="True" />
+        <Setter Property="FocusVisualPrimaryBrush" Value="{ThemeResource SaFocusRingBrush}" />
+        <Setter Property="FocusVisualPrimaryThickness" Value="{StaticResource SaFocusRingThickness}" />
+        <Setter Property="FocusVisualSecondaryThickness" Value="0" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ListViewItem">
+                    <Grid x:Name="RowRoot" Background="{TemplateBinding Background}" CornerRadius="{TemplateBinding CornerRadius}">
+                        <VisualStateManager.VisualStateGroups>
+                            <VisualStateGroup x:Name="CommonStates">
+                                <VisualState x:Name="Normal" />
+                                <VisualState x:Name="PointerOver">
+                                    <VisualState.Setters>
+                                        <Setter Target="HoverOverlay.Opacity" Value="1" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Pressed">
+                                    <VisualState.Setters>
+                                        <Setter Target="HoverOverlay.Opacity" Value="1" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Selected">
+                                    <VisualState.Setters>
+                                        <Setter Target="SelectedOverlay.Opacity" Value="1" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="PointerOverSelected">
+                                    <VisualState.Setters>
+                                        <Setter Target="SelectedOverlay.Opacity" Value="1" />
+                                        <Setter Target="HoverOverlay.Opacity" Value="1" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="PressedSelected">
+                                    <VisualState.Setters>
+                                        <Setter Target="SelectedOverlay.Opacity" Value="1" />
+                                        <Setter Target="HoverOverlay.Opacity" Value="1" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                            </VisualStateGroup>
+                            <VisualStateGroup x:Name="DisabledStates">
+                                <VisualState x:Name="Enabled" />
+                                <VisualState x:Name="Disabled">
+                                    <VisualState.Setters>
+                                        <Setter Target="RowRoot.Opacity" Value="0.58" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                            </VisualStateGroup>
+                        </VisualStateManager.VisualStateGroups>
+                        <Border x:Name="SelectedOverlay" Background="{ThemeResource SaSelectedBrush}" CornerRadius="{TemplateBinding CornerRadius}"
+                                Opacity="0" IsHitTestVisible="False" />
+                        <Border x:Name="HoverOverlay" Background="{ThemeResource SaHoverBrush}" CornerRadius="{TemplateBinding CornerRadius}"
+                                Opacity="0" IsHitTestVisible="False" />
+                        <ContentPresenter x:Name="ContentPresenter"
+                                          Padding="{TemplateBinding Padding}"
+                                          HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                                          Content="{TemplateBinding Content}"
+                                          ContentTemplate="{TemplateBinding ContentTemplate}"
+                                          ContentTransitions="{TemplateBinding ContentTransitions}" />
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
     <!-- A block of read-only details on the same inset tint (the import's selected profile). -->
     <Style x:Key="SaInsetPanelSurfaceStyle" TargetType="Border" BasedOn="{StaticResource SaInsetTintedSurfaceStyle}">

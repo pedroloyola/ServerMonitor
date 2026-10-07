@@ -51,11 +51,12 @@
                    TextWrapping="Wrap" />
         <!-- After "Confiar": the key is being written, then the SAME retest runs (Cancelar = cancel that test). -->
         <StackPanel x:Name="WorkingRow" Orientation="Horizontal" Spacing="10" Visibility="Collapsed">
-            <ProgressRing x:Name="WorkingRing" Width="16" Height="16" IsActive="False" AutomationProperties.AccessibilityView="Raw" />
+            <ProgressRing x:Name="WorkingRing" Width="16" Height="16" IsActive="False" Foreground="{ThemeResource SaTextBrush}"
+                          AutomationProperties.AccessibilityView="Raw" />
             <TextBlock x:Name="WorkingText" Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}"
                        VerticalAlignment="Center" AutomationProperties.LiveSetting="Polite" />
         </StackPanel>
-        <StackPanel Orientation="Horizontal" Spacing="{StaticResource SaSpace12}" HorizontalAlignment="Right">
+        <StackPanel x:Name="ActionRow" Orientation="Horizontal" Spacing="{StaticResource SaSpace12}" HorizontalAlignment="Right">
             <Button x:Name="CloseButton" Style="{StaticResource SaDialogCommandButtonStyle}" Click="OnCloseClick" />
             <Button x:Name="AcceptButton" Style="{StaticResource SaDialogCommandButtonStyle}" Click="OnAcceptClick" />
         </StackPanel>

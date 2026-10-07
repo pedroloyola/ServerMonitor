@@ -56,7 +56,7 @@
                                          Visibility="{Binding IsPending, Converter={StaticResource BooleanToVisibilityConverter}}" />
                                 <Ellipse Width="13" Height="13" StrokeThickness="1.5" Stroke="{ThemeResource SaTextSecondaryBrush}"
                                          Visibility="{Binding IsNotReached, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                                <ProgressRing Width="14" Height="14" IsActive="{Binding IsRunning}"
+                                <ProgressRing Width="14" Height="14" IsActive="{Binding IsRunning}" Foreground="{ThemeResource SaTextBrush}"
                                               Visibility="{Binding IsRunning, Converter={StaticResource BooleanToVisibilityConverter}}" />
                                 <primitives:SaIcon Data="{StaticResource SaIconTick02Data}" Size="16" Foreground="{ThemeResource SaTextBrush}"
                                                    Visibility="{Binding IsPassed, Converter={StaticResource BooleanToVisibilityConverter}}" />

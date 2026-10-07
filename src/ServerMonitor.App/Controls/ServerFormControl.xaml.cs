@@ -34,7 +34,7 @@ public sealed partial class ServerFormControl : UserControl
     /// <summary>A password box gained or lost typed text (the page's hint and the password errors follow it).</summary>
     public event EventHandler? TypedSecretChanged;
 
-    public void FocusFirstField() => NameField.Focus(FocusState.Programmatic);
+    public bool FocusFirstField() => NameField.Focus(FocusState.Programmatic);
 
     /// <summary>B-16: the first invalid field takes the focus after a failed attempt (its error is described by it).</summary>
     public void FocusField(ServerEditorField field)

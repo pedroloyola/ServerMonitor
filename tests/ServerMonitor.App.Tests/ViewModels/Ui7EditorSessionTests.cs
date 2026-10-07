@@ -428,7 +428,9 @@ public sealed class Ui7EditorSessionTests : IDisposable
         Assert.True(_world.ViewModel.IsTestingConnection);
 
         _world.Page.Controller.Escape();
-        Assert.True(test.IsCompleted, "leaving did not cancel the running test");
+        // Atlas c2 N-3: the normative signal is the running test's own token (the M-1 idiom), not whether the
+        // cancellation continuation happened to run inline on this thread.
+        Assert.True(_world.Ssh.LastToken.IsCancellationRequested, "leaving did not cancel the running test");
         await test;
         await Ended(visit);
 
@@ -511,8 +513,9 @@ public sealed class Ui7EditorSessionTests : IDisposable
                 _world.Navigation.GoToDashboard();
                 break;
             case "activation":
-                // App.ExecuteActivationIntent: through the same exit guard, then the dashboard.
-                _world.Navigation.LeaveCurrentPageThen(_world.Navigation.GoToDashboard);
+                // App.ExecuteActivationIntent: the production entry point (Atlas c2 N-2) - the same exit guard, then the
+                // dashboard.
+                _world.Navigation.LeaveCurrentPageForActivation(_world.Navigation.GoToDashboard);
                 break;
             case "second-editor":
                 _ = ((AsyncRelayCommand)_world.Dashboard.ImportFromSshCommand).ExecuteAsync();

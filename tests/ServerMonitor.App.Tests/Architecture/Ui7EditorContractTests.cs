@@ -16,7 +16,9 @@ public sealed class Ui7EditorContractTests
     {
         var code = AppSourceTree.CodeWithoutComments("Views/ServerEditorPage.xaml.cs");
 
-        Assert.Contains("public Task<bool> ConfirmLeaveAsync() => _controller.ConfirmLeaveAsync();", code, StringComparison.Ordinal);
+        // Final c2 (B-2): the page's guard IS the controller's task - returned as is, the focus restore rides beside it.
+        Assert.Contains("var answer = _controller.ConfirmLeaveAsync();", code, StringComparison.Ordinal);
+        Assert.Contains("return answer;", code, StringComparison.Ordinal);
         Assert.Contains("_controller.Escape();", code, StringComparison.Ordinal);
         Assert.Contains("_controller.SubmitAsync(ServerForm.CaptureSecret)", code, StringComparison.Ordinal);
         Assert.Contains("_controller.Dispose();", code, StringComparison.Ordinal);
@@ -27,8 +29,10 @@ public sealed class Ui7EditorContractTests
         Assert.Contains("IsConnectionWorkInProgress: false", code, StringComparison.Ordinal);
         // UI.7A fix c1 (M-1): while a Save is persisted, Cancelar / the header button / the actions are disabled.
         Assert.Contains("_controller.SavingChanged += (_, _) => UpdateActionState();", code, StringComparison.Ordinal);
-        Assert.Contains("CancelButton.IsEnabled = !saving;", code, StringComparison.Ordinal);
-        Assert.Contains("HeaderButton.IsEnabled = !saving &&", code, StringComparison.Ordinal);
+        Assert.Contains("SetEnabled(CancelButton, !saving);", code, StringComparison.Ordinal);
+        Assert.Contains("SetEnabled(HeaderButton, !saving &&", code, StringComparison.Ordinal);
+        // Final c2 (B-3): a focused button is kept enabled (focus never thrown to the sidebar) - its action refuses itself.
+        Assert.Contains("if (_controller.IsSaving)", code, StringComparison.Ordinal);
     }
 
     [Fact]

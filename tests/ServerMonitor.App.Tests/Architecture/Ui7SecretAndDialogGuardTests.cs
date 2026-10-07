@@ -138,9 +138,9 @@ public sealed partial class Ui7SecretAndDialogGuardTests
         // The layer's first focus is the safe button; a mismatch has no accept button; Enter on the page never saves while
         // the layer is open (the focused button in the layer owns it).
         var panel = AppSourceTree.CodeWithoutComments("Views/ServerEditorTrustPanel.xaml.cs");
-        Assert.Contains("public void FocusSafeButton() => CloseButton.Focus(FocusState.Programmatic);", panel, StringComparison.Ordinal);
+        Assert.Contains("public bool FocusSafeButton() => CloseButton.Focus(FocusState.Programmatic);", panel, StringComparison.Ordinal);
         Assert.Contains("AcceptButton.Visibility = prompt.AcceptKey is null ? Visibility.Collapsed : Visibility.Visible;", panel, StringComparison.Ordinal);
-        Assert.Contains("TrustPanel.FocusSafeButton();", page, StringComparison.Ordinal);
+        Assert.Contains("ServerEditorLayer.Trust => TrustPanel.FocusSafeButton(),", page, StringComparison.Ordinal);
         var keys = page[page.IndexOf("private void OnPageKeyDown", StringComparison.Ordinal)..];
         Assert.True(keys.IndexOf("if (_layer != ServerEditorLayer.None)", StringComparison.Ordinal) < keys.IndexOf("Submit();", StringComparison.Ordinal));
     }

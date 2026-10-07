@@ -1010,6 +1010,7 @@ status, metrics and history.</value></data>
   <data name="ServerEditorImportLoading.Text" xml:space="preserve"><value>Reading ~/.ssh/config…</value></data>
   <data name="ServerEditorImportList.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>SSH profiles</value></data>
   <data name="ServerEditorImportAvailable.Text" xml:space="preserve"><value>Available</value></data>
+  <data name="ServerEditorImportSelected.Text" xml:space="preserve"><value>Selected</value></data>
   <data name="ServerEditorImportBlocked.Text" xml:space="preserve"><value>Blocked</value></data>
   <data name="ServerEditorImportNote.Text" xml:space="preserve"><value>Fills only the empty server and jump host fields. What you already entered is kept. ProxyJump with a single jump host is supported.</value></data>
   <data name="ServerEditorImportAvailableCountOne" xml:space="preserve"><value>{0} available</value></data>
