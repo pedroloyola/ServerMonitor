@@ -59,17 +59,21 @@ internal static partial class QaStartupIsolation
         QaShellStartup.ActivationFlag,
         QaEditorComposition.SeedFlag,
         QaEditorComposition.SshFlag,
-        QaEditorComposition.SaveFlag
+        QaEditorComposition.SaveFlag,
+        QaCompactComposition.ScenarioFlag,
+        QaCompactComposition.StartFlag,
+        QaCompactComposition.TickerFlag
     ];
 
     /// <summary>
     /// THE harness parser (Vigil M-1A-1): the composition root's qaMode, the launch refusal, the launch-time guard and the
     /// startup markers all use it, so no argument can be "a harness" for one and "production" for another. Exact and
     /// ordinal: <c>--qa-health=1</c>, <c>--qa-health:x</c>, <c>--QA-HEALTH</c> are not harness flags (and are refused).
-    /// The one documented value form is <c>--qa-compact:&lt;digits&gt;</c>.
+    /// UI.8 retired the one value form, <c>--qa-compact:&lt;digits&gt;</c> (a silent 0-40 clamp): the compact harness takes
+    /// a named scenario through <c>--qa-compact-scenario</c> instead, so <c>--qa-compact:12</c> is refused like any other.
     /// </summary>
     internal static bool IsHarnessArgument(string argument) =>
-        HarnessFlags.Contains(argument, StringComparer.Ordinal) || CompactCountForm().IsMatch(argument);
+        HarnessFlags.Contains(argument, StringComparer.Ordinal);
 
     /// <summary>True for the launches that select a Debug harness composition (the composition root's qaMode).</summary>
     public static bool IsHarnessLaunch() => IsHarnessLaunch(Environment.GetCommandLineArgs());
@@ -129,6 +133,10 @@ internal static partial class QaStartupIsolation
         // UI.7 B-23: the editor harness's own modifiers - exact values, only next to --qa-editor, which needs --qa-backup.
         if (QaEditorComposition.Refusal(commandLineArgs) is { } editorRefusal) return editorRefusal;
 
+        // UI.8 §3: the compact harness's modifiers - a closed scenario list and exact values, only next to --qa-compact,
+        // each at most once. Refused here (exit 3), before anything is composed; never a default instead.
+        if (QaCompactComposition.Refusal(commandLineArgs) is { } compactRefusal) return compactRefusal;
+
         // UI.4 (Cortex r1 NIT-4): the scenario modifier belongs to --qa-overview only; next to another harness it would be
         // silently ignored, so it is refused.
         if (QaOverviewScenarioPolicy.IsPresent(commandLineArgs) && !commandLineArgs.Contains(QaOverviewComposition.LaunchFlag, StringComparer.Ordinal))
@@ -158,9 +166,6 @@ internal static partial class QaStartupIsolation
 
     private static bool IsModifierArgument(string argument) =>
         ModifierFlags.Any(flag => argument == flag || (argument.StartsWith(flag + "=", StringComparison.Ordinal) && argument.Length > flag.Length + 1));
-
-    [System.Text.RegularExpressions.GeneratedRegex(@"^--qa-compact:\d{1,4}$")]
-    private static partial System.Text.RegularExpressions.Regex CompactCountForm();
 
     /// <summary>The per-process folder every re-rooted path lives in.</summary>
     public static string DefaultRoot() => Path.Combine(

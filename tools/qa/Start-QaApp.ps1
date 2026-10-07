@@ -4,7 +4,7 @@
 
 .DESCRIPTION
     Refuses BEFORE Start-Process unless the arguments select an isolated mode:
-      - at least one EXACT data-harness flag (or the documented --qa-compact:<digits>), or an EXACT gallery flag
+      - at least one EXACT data-harness flag (UI.8 retired the --qa-compact:<digits> form), or an EXACT gallery flag
         (--qa-components / --qa-tokens; the gallery's own policy then owns its options), and
       - every other argument starting with --qa is an exact harness flag or a well-formed modifier
         ('flag value' or 'flag=value'), when not in gallery mode.
@@ -40,10 +40,10 @@ $ErrorActionPreference = 'Stop'
 
 # Mirrors QaStartupIsolation (tested against it).
 $HarnessFlags = @('--qa-health', '--qa-discovery', '--qa-notifications', '--qa-compact', '--qa-history', '--qa-workloads', '--qa-store-screenshot', '--qa-proxyjump', '--qa-overview', '--qa-editor')
-$ModifierFlags = @('--qa-ssh-config', '--qa-ui-language', '--qa-backup', '--qa-proxyjump-dir', '--qa-overview-scenario', '--qa-start', '--qa-activation', '--qa-editor-seed', '--qa-editor-ssh', '--qa-editor-save')
+$ModifierFlags = @('--qa-ssh-config', '--qa-ui-language', '--qa-backup', '--qa-proxyjump-dir', '--qa-overview-scenario', '--qa-start', '--qa-activation', '--qa-editor-seed', '--qa-editor-ssh', '--qa-editor-save', '--qa-compact-scenario', '--qa-compact-start', '--qa-compact-ticker')
 $GalleryFlags = @('--qa-components', '--qa-tokens')
 
-function Test-IsHarness([string]$a) { ($HarnessFlags -ccontains $a) -or ($a -cmatch '^--qa-compact:\d{1,4}$') }
+function Test-IsHarness([string]$a) { $HarnessFlags -ccontains $a }
 function Test-IsModifier([string]$a) {
     foreach ($flag in $ModifierFlags) {
         if ($a -ceq $flag -or ($a.StartsWith("$flag=", [StringComparison]::Ordinal) -and $a.Length -gt $flag.Length + 1)) { return $true }

@@ -827,6 +827,11 @@ public partial class App : Application
             services.AddHostedService(sp =>
                 sp.GetRequiredService<Qa.QaNotificationSequenceService>());
         }
+        else if (qaCompact && Qa.QaCompactComposition.TickerRequested())
+        {
+            // UI.8 §3: the deterministic compact ticker publishes through the real state store, last, like a cycle would.
+            services.AddHostedService(sp => sp.GetRequiredService<Qa.QaCompactTicker>());
+        }
 #endif
 
         // M14.6 backup and restore UI. IConfigurationBackupService itself is registered with the engine.

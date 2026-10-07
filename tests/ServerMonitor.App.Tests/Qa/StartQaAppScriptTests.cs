@@ -160,6 +160,7 @@ public sealed partial class StartQaAppScriptTests
         ["--QA-HEALTH"],
         ["--qa-health", "--qa-made-up"],
         ["--qa-proxyjump", "--qa-proxyjump-dir="],
+        ["--qa-compact:12"],                                         // UI.8: the retired count form
         [@"C:\Users\x\AppData\Local\Temp\ServerMonitor-QA\relay-pj"], // the incident's argument
         // UI.7 final c2 (Beacon): the app refuses an activation on the editor harness - so does the launcher, first.
         ["--qa-editor", "--qa-backup", "ok", "--qa-activation=dashboard"],
@@ -170,7 +171,7 @@ public sealed partial class StartQaAppScriptTests
     [
         ["--qa-health"],
         ["--qa-health", "--qa-ui-language", "pt-PT"],
-        ["--qa-compact:12"],
+        ["--qa-compact", "--qa-compact-scenario", "n20", "--qa-compact-start=standard"],
         ["--qa-proxyjump", @"--qa-proxyjump-dir=C:\Temp\ServerMonitor-QA\pj", "--qa-ssh-config", @"C:\fixture dir"],
         ["--qa-components", "--qa-gallery-page", "forms", "--qa-gallery-theme", "dark"]
     ];
