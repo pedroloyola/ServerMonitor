@@ -130,6 +130,56 @@ public sealed class Ui7SaveGuardTests : IDisposable
         Assert.False(await prompt.ConfirmDiscardAsync(new ServerEditorDiscardContext(ServerEditorMode.Add, string.Empty, "db")));
     }
 
+    /// <summary>
+    /// Final c3 (Atlas c3-L1): "Importar de SSH" during the Save's persist opens nothing - no load of ~/.ssh/config, no
+    /// import state, no layer - and the same gesture after the Save works as before.
+    /// </summary>
+    [Fact]
+    public async Task C3_ImportDuringTheSavesPersist_OpensNothing_NoLoad_NoLayer()
+    {
+        var source = new CountingImportSource();
+        using var world = new Ui7EditorWorld(importSource: source);
+        await world.StartAsync();
+        _ = ((AsyncRelayCommand)world.Dashboard.AddServerCommand).ExecuteAsync();
+        Ui7EditorSessionTests.FillDirect(world.ViewModel, password: true);
+        world.Page.TypedPassword = "s3cret";
+        world.Credentials.FailWrites = true; // the page stays after the Save, so the import can be tried again
+        var barrier = new TaskCompletionSource();
+        world.Credentials.WriteBarrier = barrier;
+
+        var submit = world.Page.SubmitAsync();
+        await world.Credentials.WriteArrived.Task;
+        Assert.True(world.Page.Controller.IsSaving);
+
+        await world.Page.Controller.OpenImportAsync();
+
+        Assert.Equal(0, source.Loads);
+        Assert.False(world.ViewModel.IsSshConfigImportOpen);
+        Assert.False(world.ViewModel.IsLoadingSshConfig);
+        Assert.Equal(ServerEditorLayer.None, world.Page.Controller.LayerToShow(accepting: false));
+
+        barrier.SetResult();
+        Assert.Equal(ServerEditorSaveStatus.Failed, (await submit)!.Status);
+        Assert.False(world.Page.Controller.IsSaving);
+
+        // Control: not saving any more, the same gesture loads and opens the import layer.
+        world.Credentials.WriteBarrier = null;
+        await world.Page.Controller.OpenImportAsync();
+        Assert.Equal(1, source.Loads);
+        Assert.Equal(ServerEditorLayer.Import, world.Page.Controller.LayerToShow(accepting: false));
+    }
+
+    private sealed class CountingImportSource : ServerMonitor.Core.Interfaces.ISshConfigImportSource
+    {
+        public int Loads { get; private set; }
+
+        public Task<ServerMonitor.Core.SshConfig.SshConfigImportResult> LoadAsync(CancellationToken cancellationToken = default)
+        {
+            Loads++;
+            return Task.FromResult(ServerMonitor.Core.SshConfig.SshConfigImportResult.NotFound);
+        }
+    }
+
     private async Task<EditorPageDouble> OpenDirtyAddAsync(bool keyAuth = false)
     {
         await _world.StartAsync();

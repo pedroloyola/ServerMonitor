@@ -371,9 +371,12 @@ public sealed class ServerEditorPageController : IDisposable
         }
     }
 
-    /// <summary>"Importar de SSH" (Add only): the existing read-only load; the dialog follows the view model's state.</summary>
+    /// <summary>
+    /// "Importar de SSH" (Add only): the existing read-only load; the dialog follows the view model's state. Final c3
+    /// (Atlas c3-L1): refused while a Save is persisted, like Submit / Test - the page's own check is not the only guard.
+    /// </summary>
     public Task OpenImportAsync() =>
-        _disposed || ViewModel is not { IsSshConfigImportAvailable: true } viewModel
+        _disposed || _saving || ViewModel is not { IsSshConfigImportAvailable: true } viewModel
             ? Task.CompletedTask
             : viewModel.LoadSshConfigHostsAsync();
 

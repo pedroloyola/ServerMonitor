@@ -131,6 +131,7 @@ public sealed class Ui7FinalC2Tests
         Assert.Contains("if (_disposed || _saving || ViewModel is not { } viewModel || viewModel.IsConnectionWorkInProgress)", controller, StringComparison.Ordinal);
         Assert.Contains("if (!_disposed && !_saving && Request is not null)", controller, StringComparison.Ordinal);
         var header = Method(page, "private async void OnHeaderButtonClick", "private async void Submit()");
+        Assert.Matches(new Regex(@"if \(_controller\.IsSaving\)\s*\{\s*return;\s*\}"), header); // final c3: the check AND its return
         var guard = header.IndexOf("if (_controller.IsSaving)", StringComparison.Ordinal);
         Assert.True(guard >= 0 && guard < header.IndexOf("_controller.Cancel();", StringComparison.Ordinal)
             && guard < header.IndexOf("_controller.OpenImportAsync();", StringComparison.Ordinal), "the header button refuses while saving, first");
