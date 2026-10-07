@@ -17,8 +17,9 @@ namespace ServerMonitor.App.Qa;
 /// <item><c>--qa-editor-seed=direct|routed|password</c>: one saved server for an Edit, written through the real profile
 /// path by the <c>--qa-start</c> step on the UI thread (never from a hosted service during startup, where its
 /// ServersChanged would reach the live, UI-bound dashboard off the UI thread). Requires <c>--qa-start</c>.</item>
-/// <item><c>--qa-editor-ssh=&lt;outcome&gt;[:held]</c>: what "Testar ligação" answers (default <c>ok-linux</c>); <c>:held</c>
-/// keeps the test running until Cancel or the QA release signal (a named event per process; no wall clock).</item>
+/// <item><c>--qa-editor-ssh=&lt;outcome&gt;[:held|:held-at-auth]</c>: what "Testar ligação" answers (default <c>ok-linux</c>);
+/// <c>:held</c> keeps the test running until Cancel or the QA release signal (a named event per process; no wall clock),
+/// after its last stage; <c>:held-at-auth</c> holds the same way with authentication still running.</item>
 /// <item><c>--qa-editor-save=fail|locked</c>: Save fails (a validation failure / a restore holding the configuration).</item>
 /// <item><c>--qa-start=editor-add|editor-import|editor-edit:&lt;n&gt;</c> (see <see cref="QaShellStartup"/>).</item>
 /// </list>
@@ -32,6 +33,7 @@ internal static class QaEditorComposition
     public const string SshFlag = "--qa-editor-ssh";
     public const string SaveFlag = "--qa-editor-save";
     public const string HeldSuffix = ":held";
+    public const string HeldAtAuthSuffix = ":held-at-auth";
 
     public static IReadOnlyList<string> Seeds { get; } = ["direct", "routed", "password"];
 
@@ -71,7 +73,7 @@ internal static class QaEditorComposition
         if (QaShellStartup.Present(args, SshFlag) && SshScript(args) is null)
         {
             return $"{SshFlag} needs exactly one of: {string.Join(", ", QaScriptedSshConnectionService.Outcomes)} " +
-                $"(optionally {HeldSuffix}), as {SshFlag}=<value>.";
+                $"(optionally {HeldSuffix} or {HeldAtAuthSuffix}), as {SshFlag}=<value>.";
         }
 
         if (QaShellStartup.Present(args, SaveFlag) && SaveFailure(args) is null)
@@ -88,12 +90,15 @@ internal static class QaEditorComposition
     internal static string? SaveFailure(IReadOnlyList<string> args) =>
         QaShellStartup.Value(args, SaveFlag) is { } value && SaveFailures.Contains(value, StringComparer.Ordinal) ? value : null;
 
-    /// <summary>The scripted outcome and whether it is held; null for an unknown value. Absent = ok-linux, not held.</summary>
-    internal static (string Outcome, bool Held)? SshScript(IReadOnlyList<string> args)
+    /// <summary>
+    /// The scripted outcome and how it is held (after its last stage, or with authentication running); null for an unknown
+    /// value. Absent = ok-linux, not held.
+    /// </summary>
+    internal static (string Outcome, bool Held, bool HeldAtAuth)? SshScript(IReadOnlyList<string> args)
     {
         if (!QaShellStartup.Present(args, SshFlag))
         {
-            return ("ok-linux", false);
+            return ("ok-linux", false, false);
         }
 
         if (QaShellStartup.Value(args, SshFlag) is not { } value)
@@ -101,9 +106,10 @@ internal static class QaEditorComposition
             return null;
         }
 
-        var held = value.EndsWith(HeldSuffix, StringComparison.Ordinal);
-        var outcome = held ? value[..^HeldSuffix.Length] : value;
-        return QaScriptedSshConnectionService.Outcomes.Contains(outcome, StringComparer.Ordinal) ? (outcome, held) : null;
+        var heldAtAuth = value.EndsWith(HeldAtAuthSuffix, StringComparison.Ordinal);
+        var held = !heldAtAuth && value.EndsWith(HeldSuffix, StringComparison.Ordinal);
+        var outcome = heldAtAuth ? value[..^HeldAtAuthSuffix.Length] : held ? value[..^HeldSuffix.Length] : value;
+        return QaScriptedSshConnectionService.Outcomes.Contains(outcome, StringComparer.Ordinal) ? (outcome, held, heldAtAuth) : null;
     }
 
     /// <summary>How many saved servers the launch seeds (the range of <c>editor-edit:&lt;n&gt;</c>).</summary>
@@ -128,12 +134,13 @@ internal static class QaEditorComposition
         services.AddSingleton<IServerMonitoringStateStore>(new ServerMonitoringStateStore());
 
         // The scripted SSH service consults the REAL trust stores (on the QA root), so the two-step trust flow is visible.
-        var (outcome, held) = SshScript(args)!.Value;
+        var (outcome, held, heldAtAuth) = SshScript(args)!.Value;
         services.AddSingleton(sp => new QaScriptedSshConnectionService(
             outcome,
             held,
             sp.GetRequiredService<IHostKeyTrustStore>(),
-            sp.GetRequiredService<IRoutedHostKeyTrustStore>()));
+            sp.GetRequiredService<IRoutedHostKeyTrustStore>(),
+            heldAtAuth));
         services.AddSingleton<ISshConnectionService>(sp => sp.GetRequiredService<QaScriptedSshConnectionService>());
 
         // The seed is written through the REAL profile path; a scripted save failure only wraps what the editor uses.

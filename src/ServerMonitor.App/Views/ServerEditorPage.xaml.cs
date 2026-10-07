@@ -69,7 +69,18 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
         Loaded += OnLoaded;
         Unloaded += (_, _) => ServerForm.ClearSecrets();
         KeyDown += OnPageKeyDown;
+        EditorHost.SizeChanged += (_, _) => UpdateDialogMaxWidth();
     }
+
+    /// <summary>
+    /// Final c1 (Prism F-1): the layer's width is fixed per content (Figma 08 / 09 = 640, 04 import = 720), never sized by
+    /// what the current state happens to say, so one test keeps one width from "A testar" to its result.
+    /// </summary>
+    internal static double DialogWidth(ServerEditorLayer layer) => layer == ServerEditorLayer.Import ? 720 : 640;
+
+    /// <summary>A narrow window still fits the dialog: at most the page width minus the surface's compact margins.</summary>
+    internal static double DialogMaxWidth(double hostWidth, Thickness margin) =>
+        Math.Max(0, hostWidth - margin.Left - margin.Right);
 
     public void Load(ServerEditorRequest request)
     {
@@ -80,7 +91,7 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
         }
 
         _viewModel = viewModel;
-        ServerForm.Configure(_localization, _controller.IsEdit);
+        ServerForm.Configure(_localization, _controller.IsEdit, request.Existing?.PrivateKeyPath);
         ServerForm.DataContext = viewModel;
         viewModel.PropertyChanged += OnViewModelPropertyChanged;
 
@@ -229,7 +240,8 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
         TestPanel.Visibility = layer == ServerEditorLayer.Test ? Visibility.Visible : Visibility.Collapsed;
         TrustPanel.Visibility = layer == ServerEditorLayer.Trust ? Visibility.Visible : Visibility.Collapsed;
         ImportPanel.Visibility = layer == ServerEditorLayer.Import ? Visibility.Visible : Visibility.Collapsed;
-        DialogSurface.MaxWidth = layer == ServerEditorLayer.Import ? 720 : 640;
+        DialogSurface.Width = DialogWidth(layer);
+        UpdateDialogMaxWidth();
         AutomationProperties.SetName(DialogSurface, layer switch
         {
             ServerEditorLayer.Test => TestPanel.Title,
@@ -258,6 +270,9 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
             });
         }
     }
+
+    private void UpdateDialogMaxWidth() =>
+        DialogSurface.MaxWidth = DialogMaxWidth(EditorHost.ActualWidth, DialogSurface.Margin);
 
     private void HideLayer()
     {

@@ -16,6 +16,7 @@ public sealed partial class ServerFormControl : UserControl
     private string _copyLabel = string.Empty;
     private ILocalizationService? _localization;
     private bool _isEditMode;
+    private string? _savedKeyPath;
     private IReadOnlyDictionary<ServerEditorField, string> _errors = new Dictionary<ServerEditorField, string>();
 
     public ServerFormControl()
@@ -118,11 +119,13 @@ public sealed partial class ServerFormControl : UserControl
 
     /// <summary>
     /// UI.7A: the mode-dependent card copy (Figma 04 Add / 05 Edit). Set once by the editor page before the form loads.
+    /// Final c1 (F-8): Edit also passes the saved key path, so the picker can say "Chave privada atual" while it is chosen.
     /// </summary>
-    public void Configure(ILocalizationService localization, bool isEditMode)
+    public void Configure(ILocalizationService localization, bool isEditMode, string? savedKeyPath = null)
     {
         _localization = localization ?? throw new ArgumentNullException(nameof(localization));
         _isEditMode = isEditMode;
+        _savedKeyPath = isEditMode ? savedKeyPath : null;
         IdentitySubtitle.Text = localization.GetString(isEditMode ? "ServerEditorIdentitySubtitleEdit" : "ServerEditorIdentitySubtitleAdd");
         AuthTitle.Text = localization.GetString(isEditMode ? "ServerEditorAuthTitleEdit" : "ServerEditorAuthTitleAdd");
         UpdateAuthSubtitle();
@@ -232,6 +235,7 @@ public sealed partial class ServerFormControl : UserControl
         if (e.PropertyName is nameof(ServerEditorViewModel.PrivateKeyPath)
             or nameof(ServerEditorViewModel.JumpPrivateKeyPath)
             or nameof(ServerEditorViewModel.PrivateKeyHint)
+            or nameof(ServerEditorViewModel.SelectedLocalKeyOption)
             or nameof(ServerEditorViewModel.HasSavedPassphrase)
             or nameof(ServerEditorViewModel.HasSavedPassword)
             or nameof(ServerEditorViewModel.HasSavedJumpSecret)
@@ -262,7 +266,13 @@ public sealed partial class ServerFormControl : UserControl
             KeyPickerText,
             PrivateKeyField,
             viewModel.PrivateKeyPath,
-            viewModel.HasPrivateKeyHint ? viewModel.PrivateKeyHint : localization.GetString("ServerEditorKeyPickerHelper"),
+            ServerEditorKeyPicker.Helper(
+                _isEditMode,
+                viewModel.PrivateKeyPath,
+                _savedKeyPath,
+                viewModel.SelectedLocalKeyOption is not null,
+                viewModel.PrivateKeyHint,
+                localization),
             PrivateKeyField.Header);
         // B-20: the jump picker is named apart from the target's (same visible label, different UIA name).
         UpdateKeyPicker(

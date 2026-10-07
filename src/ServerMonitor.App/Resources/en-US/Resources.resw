@@ -964,6 +964,8 @@ status, metrics and history.</value></data>
   <data name="ServerEditorKeyPickerChosenFormat" xml:space="preserve"><value>{0}  ·  Change file…</value></data>
   <data name="ServerEditorKeyPickerBrowse" xml:space="preserve"><value>Browse for a file…</value></data>
   <data name="ServerEditorKeyPickerHelper" xml:space="preserve"><value>Select id_ed25519, id_rsa or another compatible key.</value></data>
+  <data name="ServerEditorKeyPickerCurrentHelper" xml:space="preserve"><value>Current private key</value></data>
+  <data name="ServerEditorKeyPickerCurrentSshHelper" xml:space="preserve"><value>Current private key · .ssh folder on this device</value></data>
   <data name="ServerEditorJumpKeyPickerHelper" xml:space="preserve"><value>Select the jump host's private key.</value></data>
   <data name="ServerEditorKeyPickerAccessibleFormat" xml:space="preserve"><value>{0}: {1}</value></data>
   <data name="ServerEditorPassphraseHeader" xml:space="preserve"><value>Key passphrase · optional</value></data>
@@ -1010,7 +1012,16 @@ status, metrics and history.</value></data>
   <data name="ServerEditorImportAvailable.Text" xml:space="preserve"><value>Available</value></data>
   <data name="ServerEditorImportBlocked.Text" xml:space="preserve"><value>Blocked</value></data>
   <data name="ServerEditorImportNote.Text" xml:space="preserve"><value>Fills only the empty server and jump host fields. What you already entered is kept. ProxyJump with a single jump host is supported.</value></data>
-  <data name="ServerEditorImportCountFormat" xml:space="preserve"><value>{0} available · {1} blocked</value></data>
+  <data name="ServerEditorImportAvailableCountOne" xml:space="preserve"><value>{0} available</value></data>
+  <data name="ServerEditorImportAvailableCountOther" xml:space="preserve"><value>{0} available</value></data>
+  <data name="ServerEditorImportBlockedCountOne" xml:space="preserve"><value>{0} blocked</value></data>
+  <data name="ServerEditorImportBlockedCountOther" xml:space="preserve"><value>{0} blocked</value></data>
+  <data name="ServerEditorImportRowPortFormat" xml:space="preserve"><value>port {0}</value></data>
+  <data name="ServerEditorImportRowJumpFormat" xml:space="preserve"><value>Via jump host {0}</value></data>
+  <data name="ServerEditorImportDetailsHost.Text" xml:space="preserve"><value>Host</value></data>
+  <data name="ServerEditorImportDetailsUser.Text" xml:space="preserve"><value>User</value></data>
+  <data name="ServerEditorImportDetailsKey.Text" xml:space="preserve"><value>Private key</value></data>
+  <data name="ServerEditorImportDetailsNotSet" xml:space="preserve"><value>Not set in the file</value></data>
   <data name="ServerEditorImportNotFoundTitle" xml:space="preserve"><value>No SSH configuration found</value></data>
   <data name="ServerEditorImportErrorTitle" xml:space="preserve"><value>The SSH configuration could not be read</value></data>
   <data name="ServerEditorImportNoHostsTitle" xml:space="preserve"><value>No profiles found</value></data>

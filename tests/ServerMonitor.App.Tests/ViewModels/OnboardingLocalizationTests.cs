@@ -261,7 +261,8 @@ public sealed class OnboardingLocalizationTests
             .ToArray();
         Assert.Equal(5, jumpCodes.Length);
 
-        foreach (var (culture, term) in new[] { ("pt-PT", "anfitrião de salto"), ("pt-BR", "host de salto"), ("en-US", "jump host") })
+        // UI.7 final c1 (Prism F-7): the editor family says "jump host" in every culture (Figma's term).
+        foreach (var (culture, term) in new[] { ("pt-PT", "jump host"), ("pt-BR", "jump host"), ("en-US", "jump host") })
         {
             var resources = LoadResources(culture);
             foreach (var code in jumpCodes)

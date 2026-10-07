@@ -64,14 +64,14 @@ public sealed partial class SshConfigImportPanel : UserControl
             HostList.ItemsSource = hosts;
         }
 
-        CountText.Text = string.Format(
-            CultureInfo.CurrentCulture,
-            localization.GetString("ServerEditorImportCountFormat"),
+        CountText.Text = SshConfigImportPresentation.CountText(
             SshConfigImportPresentation.Available(hosts),
-            SshConfigImportPresentation.Blocked(hosts));
+            SshConfigImportPresentation.Blocked(hosts),
+            localization);
         WarningText.Text = viewModel.SshConfigFileWarningMessage;
         WarningText.Visibility = !loading && viewModel.HasSshConfigFileWarning ? Visibility.Visible : Visibility.Collapsed;
         UseButton.IsEnabled = SshConfigImportPresentation.CanUse(Selected);
+        UpdateDetails();
     }
 
     /// <summary>UI.7C: the saved-server list arrived after the rows were drawn: redraw them so "Já adicionado" is current.</summary>
@@ -99,8 +99,35 @@ public sealed partial class SshConfigImportPanel : UserControl
         }
     }
 
-    private void OnHostSelectionChanged(object sender, SelectionChangedEventArgs e) =>
+    private void OnHostSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
         UseButton.IsEnabled = SshConfigImportPresentation.CanUse(Selected);
+        UpdateDetails();
+    }
+
+    // Final c1 (Prism F-2, Figma 04): the selected profile's Host / Utilizador / Chave privada. Only what the file gives;
+    // the key as its file name, the full path in the tooltip and the UIA HelpText.
+    private void UpdateDetails()
+    {
+        if (_localization is not { } localization || Selected is not { } selected || ListPanel.Visibility != Visibility.Visible)
+        {
+            DetailsPanel.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        var entry = selected.Entry;
+        var notSet = localization.GetString("ServerEditorImportDetailsNotSet");
+        DetailsHostValue.Text = string.IsNullOrWhiteSpace(entry.HostName) ? notSet : entry.HostName;
+        DetailsUserValue.Text = string.IsNullOrWhiteSpace(entry.User) ? notSet : entry.User;
+        var keyPath = entry.IdentityFile?.Trim() ?? string.Empty;
+        DetailsKeyValue.Text = ServerEditorKeyPicker.FileName(keyPath) ?? notSet;
+        ToolTipService.SetToolTip(DetailsKeyValue, keyPath.Length == 0 ? null : keyPath);
+        AutomationProperties.SetName(DetailsHostValue, DetailsHostLabel.Text + " " + DetailsHostValue.Text);
+        AutomationProperties.SetName(DetailsUserValue, DetailsUserLabel.Text + " " + DetailsUserValue.Text);
+        AutomationProperties.SetName(DetailsKeyValue, DetailsKeyLabel.Text + " " + DetailsKeyValue.Text);
+        AutomationProperties.SetHelpText(DetailsKeyValue, keyPath);
+        DetailsPanel.Visibility = Visibility.Visible;
+    }
 
     // A ListViewItem's UIA name otherwise falls back to the item's type: give each container the localized
     // "alias — importable / blocked: why" text (containers are recycled, so set it every time).
@@ -109,16 +136,37 @@ public sealed partial class SshConfigImportPanel : UserControl
         if (args.Item is SshConfigHostOptionViewModel option)
         {
             var added = IsAlreadyAdded?.Invoke(option.Entry) == true;
-            if (args.ItemContainer.ContentTemplateRoot is FrameworkElement root && root.FindName("AlreadyAddedText") is TextBlock marker)
+            if (args.ItemContainer.ContentTemplateRoot is FrameworkElement root)
             {
-                marker.Visibility = added ? Visibility.Visible : Visibility.Collapsed;
+                if (root.FindName("AlreadyAddedText") is TextBlock marker)
+                {
+                    marker.Visibility = added ? Visibility.Visible : Visibility.Collapsed;
+                }
+
+                if (_localization is { } rowLocalization)
+                {
+                    SetLine(root.FindName("DetailText") as TextBlock, SshConfigImportPresentation.Detail(option.Entry, rowLocalization));
+                    SetLine(root.FindName("JumpText") as TextBlock, SshConfigImportPresentation.Jump(option.Entry, rowLocalization));
+                }
             }
+
+            // The key's full path is never drawn in the row: it is the item's UIA HelpText (and the details block's tooltip).
+            AutomationProperties.SetHelpText(args.ItemContainer, option.Entry.IdentityFile?.Trim() ?? string.Empty);
 
             AutomationProperties.SetName(
                 args.ItemContainer,
                 added && _localization is { } localization
                     ? string.Format(CultureInfo.CurrentCulture, localization.GetString("ServerEditorImportAlreadyAddedAccessibleFormat"), option.AccessibleName)
                     : option.AccessibleName);
+        }
+    }
+
+    private static void SetLine(TextBlock? line, string text)
+    {
+        if (line is not null)
+        {
+            line.Text = text;
+            line.Visibility = text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
         }
     }
 

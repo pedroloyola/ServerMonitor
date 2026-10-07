@@ -13,6 +13,8 @@
             <SolidColorBrush x:Key="SaSurfaceBrush" Color="{StaticResource SaColorSurfaceDark}" />
             <SolidColorBrush x:Key="SaInteriorBrush" Color="{StaticResource SaColorInteriorDark}" />
             <SolidColorBrush x:Key="SaTextBrush" Color="{StaticResource SaColorTextDark}" />
+            <!-- UI.7 final c1 (Prism F-4): inline text links are neutral text (D8: no accent on the editor); HC = Hotlight. -->
+            <SolidColorBrush x:Key="SaLinkTextBrush" Color="{StaticResource SaColorTextDark}" />
             <SolidColorBrush x:Key="SaTextSecondaryBrush" Color="{StaticResource SaColorTextSecondaryDark}" />
             <SolidColorBrush x:Key="SaCpuBrush" Color="{StaticResource SaColorCpuDark}" />
             <SolidColorBrush x:Key="SaMemoryBrush" Color="{StaticResource SaColorMemoryDark}" />
@@ -69,6 +71,7 @@
             <SolidColorBrush x:Key="SaSurfaceBrush" Color="{StaticResource SaColorSurfaceLight}" />
             <SolidColorBrush x:Key="SaInteriorBrush" Color="{StaticResource SaColorInteriorLight}" />
             <SolidColorBrush x:Key="SaTextBrush" Color="{StaticResource SaColorTextLight}" />
+            <SolidColorBrush x:Key="SaLinkTextBrush" Color="{StaticResource SaColorTextLight}" />
             <SolidColorBrush x:Key="SaTextSecondaryBrush" Color="{StaticResource SaColorTextSecondaryLight}" />
             <SolidColorBrush x:Key="SaCpuBrush" Color="{StaticResource SaColorCpuLight}" />
             <SolidColorBrush x:Key="SaMemoryBrush" Color="{StaticResource SaColorMemoryLight}" />
@@ -124,6 +127,7 @@
             <SolidColorBrush x:Key="SaSurfaceBrush" Color="{ThemeResource SystemColorWindowColor}" />
             <SolidColorBrush x:Key="SaInteriorBrush" Color="{ThemeResource SystemColorWindowColor}" />
             <SolidColorBrush x:Key="SaTextBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="SaLinkTextBrush" Color="{ThemeResource SystemColorHotlightColor}" />
             <SolidColorBrush x:Key="SaTextSecondaryBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
             <SolidColorBrush x:Key="SaCpuBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
             <SolidColorBrush x:Key="SaMemoryBrush" Color="{ThemeResource SystemColorWindowTextColor}" />

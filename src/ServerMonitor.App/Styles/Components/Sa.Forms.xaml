@@ -66,9 +66,10 @@
                                 IsHitTestVisible="False"
                                 IsTabStop="False" />
             </Grid>
+            <!-- Final c1 (Prism F-3): the ring's brush comes from the style (SaFieldChrome) - an error style keeps the danger edge. -->
             <Border x:Name="FocusRing"
                     CornerRadius="{TemplateBinding CornerRadius}"
-                    BorderBrush="{ThemeResource SaFocusRingBrush}"
+                    BorderBrush="{Binding Path=(primitives:SaFieldChrome.FocusRingBrush), RelativeSource={RelativeSource TemplatedParent}}"
                     BorderThickness="{StaticResource SaFocusRingThickness}"
                     Opacity="0"
                     IsHitTestVisible="False" />
@@ -233,9 +234,10 @@
                                 IsHitTestVisible="False"
                                 IsTabStop="False" />
             </Grid>
+            <!-- Final c1 (Prism F-3): the ring's brush comes from the style (SaFieldChrome) - an error style keeps the danger edge. -->
             <Border x:Name="FocusRing"
                     CornerRadius="{TemplateBinding CornerRadius}"
-                    BorderBrush="{ThemeResource SaFocusRingBrush}"
+                    BorderBrush="{Binding Path=(primitives:SaFieldChrome.FocusRingBrush), RelativeSource={RelativeSource TemplatedParent}}"
                     BorderThickness="{StaticResource SaFocusRingThickness}"
                     Opacity="0"
                     IsHitTestVisible="False" />
@@ -246,6 +248,7 @@
          Placeholder uses SaTextSecondaryBrush (a11y deviation from Figma #808080/#7A7A7A, Boss B-2). -->
     <Style x:Key="SaTextFieldStyle" TargetType="TextBox">
         <Setter Property="Template" Value="{StaticResource SaTextFieldTemplate}" />
+        <Setter Property="primitives:SaFieldChrome.FocusRingBrush" Value="{ThemeResource SaFocusRingBrush}" />
         <Setter Property="Height" Value="40" />
         <Setter Property="Padding" Value="14,0" />
         <Setter Property="CornerRadius" Value="{StaticResource SaRadiusControl}" />
@@ -262,6 +265,7 @@
     <Style x:Key="SaTextFieldErrorStyle" TargetType="TextBox" BasedOn="{StaticResource SaTextFieldStyle}">
         <Setter Property="BorderBrush" Value="{ThemeResource SaErrorBrush}" />
         <Setter Property="BorderThickness" Value="{StaticResource SaErrorBorderThickness}" />
+        <Setter Property="primitives:SaFieldChrome.FocusRingBrush" Value="{ThemeResource SaErrorBrush}" />
     </Style>
     <!-- SearchField Page 112:1429 / 112:1611: h44, radius 14, pad-L 16, gap 10, search fill, no border, icon 18. -->
     <Style x:Key="SaPageSearchFieldStyle" TargetType="TextBox" BasedOn="{StaticResource SaTextFieldStyle}">
@@ -286,6 +290,7 @@
     <!-- PasswordBox inside SaPasswordField 112:3693: TextField metrics + room on the right for the eye (17, 15 from the edge). -->
     <Style x:Key="SaPasswordBoxStyle" TargetType="PasswordBox">
         <Setter Property="Template" Value="{StaticResource SaPasswordBoxTemplate}" />
+        <Setter Property="primitives:SaFieldChrome.FocusRingBrush" Value="{ThemeResource SaFocusRingBrush}" />
         <Setter Property="Height" Value="40" />
         <Setter Property="Padding" Value="14,0,44,0" />
         <Setter Property="CornerRadius" Value="{StaticResource SaRadiusControl}" />
@@ -301,6 +306,7 @@
     <Style x:Key="SaPasswordBoxErrorStyle" TargetType="PasswordBox" BasedOn="{StaticResource SaPasswordBoxStyle}">
         <Setter Property="BorderBrush" Value="{ThemeResource SaErrorBrush}" />
         <Setter Property="BorderThickness" Value="{StaticResource SaErrorBorderThickness}" />
+        <Setter Property="primitives:SaFieldChrome.FocusRingBrush" Value="{ThemeResource SaErrorBrush}" />
     </Style>
     <!-- Eye toggle of SaPasswordField: 28x28, no fill, muted icon; checked (revealed) = text colour. DERIVED states. -->
     <Style x:Key="SaRevealToggleStyle" TargetType="ToggleButton">

@@ -28,7 +28,7 @@ public sealed class ServerEditorPageController : IDisposable
     // UI.7C (G-23): a profile was just applied from "Importar de SSH" (the hint says so until the next test).
     private bool _importApplied;
     // UI.7C (H-UI7-2): the saved servers (visible and hidden) for the in-memory duplicate notice.
-    private IReadOnlyList<Server> _known = [];
+    private IReadOnlyList<ServerEditorDuplicates.KnownServer> _known = [];
 
     public ServerEditorPageController(IServerEditorSession session, IServerEditorDiscardPrompt discardPrompt)
     {
@@ -91,7 +91,7 @@ public sealed class ServerEditorPageController : IDisposable
             return;
         }
 
-        _known = known;
+        _known = ServerEditorDuplicates.Index(known);
         KnownServersChanged?.Invoke(this, EventArgs.Empty);
     }
 

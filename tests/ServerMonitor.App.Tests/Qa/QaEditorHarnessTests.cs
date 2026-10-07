@@ -29,6 +29,7 @@ public sealed class QaEditorHarnessTests
     [InlineData("--qa-editor", "--qa-backup", "ok")]
     [InlineData("--qa-editor", "--qa-backup", "ok", "--qa-editor-seed=routed", "--qa-start=editor-edit:1")]
     [InlineData("--qa-editor", "--qa-backup", "ok", "--qa-editor-ssh=hostkey-unknown-target:held", "--qa-start=editor-add")]
+    [InlineData("--qa-editor", "--qa-backup", "ok", "--qa-editor-ssh=ok-linux:held-at-auth", "--qa-start=editor-add")]
     [InlineData("--qa-editor", "--qa-backup", "ok", "--qa-editor-save=locked", "--qa-start=editor-import")]
     public void WellFormedLaunches_AreAllowed(params string[] args) =>
         Assert.Null(QaStartupIsolation.LaunchRefusal([Exe, .. args]));
@@ -40,6 +41,10 @@ public sealed class QaEditorHarnessTests
     [InlineData("--qa-editor", "--qa-backup", "ok", "--qa-editor-seed=other")]
     [InlineData("--qa-editor", "--qa-backup", "ok", "--qa-editor-ssh=ok")]
     [InlineData("--qa-editor", "--qa-backup", "ok", "--qa-editor-ssh=ok-linux:HELD")]
+    [InlineData("--qa-editor", "--qa-backup", "ok", "--qa-editor-ssh=ok-linux:held-at-AUTH")]
+    [InlineData("--qa-editor", "--qa-backup", "ok", "--qa-editor-ssh=ok-linux:held:held-at-auth")]
+    [InlineData("--qa-editor", "--qa-backup", "ok", "--qa-editor-ssh=ok-linux:held-at-auth:held")]
+    [InlineData("--qa-editor", "--qa-backup", "ok", "--qa-editor-ssh=:held-at-auth")]
     [InlineData("--qa-editor", "--qa-backup", "ok", "--qa-editor-save=maybe")]
     [InlineData("--qa-editor", "--qa-backup", "ok", "--qa-editor-seed=direct", "--qa-editor-seed=routed")]
     [InlineData("--qa-editor", "--qa-backup", "ok", "--qa-start=editor-edit:1")] // nothing seeded
@@ -226,6 +231,36 @@ public sealed class QaEditorHarnessTests
         }
 
         Assert.True((await released).IsSuccess);
+    }
+
+    [Theory]
+    [InlineData("ok-linux:held-at-auth", "ok-linux", false, true)]
+    [InlineData("ok-linux:held", "ok-linux", true, false)]
+    [InlineData("fail-auth", "fail-auth", false, false)]
+    public void TheSshScript_IsParsedStrictly(string value, string outcome, bool held, bool heldAtAuth) =>
+        Assert.Equal((outcome, held, heldAtAuth), QaEditorComposition.SshScript([Exe, "--qa-editor", "--qa-editor-ssh=" + value]));
+
+    // UI.7 final c1 (Prism R4): held-at-auth shows the test MID-way - port and host key done, authentication running, the
+    // rest pending - and reports the remaining stages only when released (no clock).
+    [Fact]
+    public async Task ATestHeldAtAuth_ReportsTheFirstTwoStages_ThenTheRestOnRelease()
+    {
+        var service = new QaScriptedSshConnectionService("ok-linux", held: false, new NoTrust(), new NoRoutedTrust(), heldAtAuth: true);
+        var stages = new List<SshConnectionStage>();
+
+        var test = service.TestConnectionAsync(Request(routed: false, new Progress(stages)));
+        Assert.False(test.IsCompleted);
+        Assert.Equal([SshConnectionStage.PortReachable, SshConnectionStage.HostKeyVerified], stages);
+
+        using (var signal = EventWaitHandle.OpenExisting(QaScriptedSshConnectionService.ReleaseEventName))
+        {
+            signal.Set();
+        }
+
+        Assert.True((await test).IsSuccess);
+        Assert.Equal(
+            [SshConnectionStage.PortReachable, SshConnectionStage.HostKeyVerified, SshConnectionStage.Authenticated, SshConnectionStage.OperatingSystemIdentified],
+            stages);
     }
 
     private static ComposedHarness Compose(IReadOnlyList<string> args)

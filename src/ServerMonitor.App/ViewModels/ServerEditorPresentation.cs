@@ -1,6 +1,7 @@
 using System.Globalization;
 using ServerMonitor.App.Services;
 using ServerMonitor.Core.Enums;
+using ServerMonitor.Core.SshConfig;
 
 namespace ServerMonitor.App.ViewModels;
 
@@ -134,6 +135,34 @@ public static class ServerEditorKeyPicker
         return name.Length == 0 ? trimmed : name;
     }
 
+    /// <summary>
+    /// The helper under the target's key picker. The view model's own hint ("Chave encontrada em .ssh", "no key found")
+    /// wins; Edit with the saved key still chosen says it is the current one (Figma 05 112:4737) - "· pasta .ssh deste
+    /// dispositivo" only when that key really is one discovered in .ssh; anything else gets the Add pointer.
+    /// </summary>
+    public static string Helper(
+        bool isEdit,
+        string? path,
+        string? savedPath,
+        bool discoveredInSshFolder,
+        string hint,
+        ILocalizationService localization)
+    {
+        ArgumentNullException.ThrowIfNull(localization);
+        if (!string.IsNullOrEmpty(hint))
+        {
+            return hint;
+        }
+
+        var current = isEdit
+            && !string.IsNullOrWhiteSpace(path)
+            && !string.IsNullOrWhiteSpace(savedPath)
+            && string.Equals(path.Trim(), savedPath.Trim(), StringComparison.OrdinalIgnoreCase);
+        return localization.GetString(current
+            ? discoveredInSshFolder ? "ServerEditorKeyPickerCurrentSshHelper" : "ServerEditorKeyPickerCurrentHelper"
+            : "ServerEditorKeyPickerHelper");
+    }
+
     /// <summary>"id_ed25519 · Alterar ficheiro…" once a key is chosen, "Escolher ficheiro…" before.</summary>
     public static string ButtonText(string? path, ILocalizationService localization)
     {
@@ -190,6 +219,52 @@ public static class SshConfigImportPresentation
     public static int Available(IReadOnlyList<SshConfigHostOptionViewModel> hosts) => hosts.Count(host => host.IsImportable);
 
     public static int Blocked(IReadOnlyList<SshConfigHostOptionViewModel> hosts) => hosts.Count(host => !host.IsImportable);
+
+    /// <summary>Final c1 (Prism F-2): "1 disponível · 2 bloqueados" - each count with its own singular / plural key.</summary>
+    public static string CountText(int available, int blocked, ILocalizationService localization)
+    {
+        ArgumentNullException.ThrowIfNull(localization);
+        return string.Format(CultureInfo.CurrentCulture, localization.GetString(available == 1 ? "ServerEditorImportAvailableCountOne" : "ServerEditorImportAvailableCountOther"), available)
+            + " · "
+            + string.Format(CultureInfo.CurrentCulture, localization.GetString(blocked == 1 ? "ServerEditorImportBlockedCountOne" : "ServerEditorImportBlockedCountOther"), blocked);
+    }
+
+    /// <summary>
+    /// Final c1 (Prism F-2, Figma 04): a row's compact line "{host} · {user} · porta {n}" - only the values the file gives
+    /// (nothing is assumed: no default port is written), never the key path.
+    /// </summary>
+    public static string Detail(SshConfigHostEntry entry, ILocalizationService localization)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        ArgumentNullException.ThrowIfNull(localization);
+        var parts = new List<string>(3);
+        if (!string.IsNullOrWhiteSpace(entry.HostName))
+        {
+            parts.Add(entry.HostName);
+        }
+
+        if (!string.IsNullOrWhiteSpace(entry.User))
+        {
+            parts.Add(entry.User);
+        }
+
+        if (entry.Port is { } port)
+        {
+            parts.Add(string.Format(CultureInfo.CurrentCulture, localization.GetString("ServerEditorImportRowPortFormat"), port.ToString(CultureInfo.InvariantCulture)));
+        }
+
+        return string.Join(" · ", parts);
+    }
+
+    /// <summary>"Via jump host bastion" for a routed profile, empty for a direct one.</summary>
+    public static string Jump(SshConfigHostEntry entry, ILocalizationService localization)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        ArgumentNullException.ThrowIfNull(localization);
+        return entry.Jump is { } jump
+            ? string.Format(CultureInfo.CurrentCulture, localization.GetString("ServerEditorImportRowJumpFormat"), jump.Name)
+            : string.Empty;
+    }
 
     /// <summary>"Usar perfil" is possible only for a selected, importable profile.</summary>
     public static bool CanUse(SshConfigHostOptionViewModel? selected) => selected is { IsImportable: true };

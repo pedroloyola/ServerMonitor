@@ -63,7 +63,7 @@
   <data name="ConnectionStateError" xml:space="preserve"><value>Erro de ligação</value></data>
   <data name="ConnectionErrorInvalidConfiguration" xml:space="preserve"><value>Reveja a configuração SSH.</value></data>
   <data name="ConnectionErrorCredentialNotConfigured" xml:space="preserve"><value>Configure uma palavra-passe ou frase-passe válida.</value></data>
-  <data name="ConnectionErrorCredentialUnavailable" xml:space="preserve"><value>A credencial guardada não está disponível. Introduza-a novamente.</value></data>
+  <data name="ConnectionErrorCredentialUnavailable" xml:space="preserve"><value>A credencial guardada não está disponível. Volta a introduzi-la.</value></data>
   <data name="ConnectionErrorPrivateKeyUnavailable" xml:space="preserve"><value>O ficheiro da chave privada não foi encontrado.</value></data>
   <data name="ConnectionErrorPrivateKeyInvalid" xml:space="preserve"><value>A chave privada ou a frase-passe não é válida.</value></data>
   <data name="ConnectionErrorAuthenticationFailed" xml:space="preserve"><value>O servidor recusou a autenticação.</value></data>
@@ -77,15 +77,15 @@
   <data name="ConnectionErrorProtocolError" xml:space="preserve"><value>Não foi possível concluir o handshake SSH em segurança.</value></data>
   <data name="ConnectionErrorCancelled" xml:space="preserve"><value>O teste foi cancelado.</value></data>
   <data name="ConnectionErrorUnexpected" xml:space="preserve"><value>O teste de ligação falhou inesperadamente.</value></data>
-  <data name="ConnectionErrorJumpConnectionFailed" xml:space="preserve"><value>Não foi possível alcançar o anfitrião de salto.</value></data>
-  <data name="ConnectionErrorJumpAuthenticationFailed" xml:space="preserve"><value>O anfitrião de salto recusou a autenticação.</value></data>
-  <data name="ConnectionErrorJumpHostKeyUnknown" xml:space="preserve"><value>A chave do anfitrião de salto ainda não é fidedigna. Ligue-se diretamente ao anfitrião de salto e confirme a chave.</value></data>
-  <data name="ConnectionErrorJumpHostKeyMismatch" xml:space="preserve"><value>A chave do anfitrião de salto mudou. A ligação foi bloqueada.</value></data>
-  <data name="ConnectionErrorJumpCredentialUnavailable" xml:space="preserve"><value>A credencial guardada do anfitrião de salto não está disponível. Introduza-a novamente.</value></data>
-  <data name="ConnectionErrorTargetUnreachableViaJump" xml:space="preserve"><value>O anfitrião de salto não conseguiu alcançar o servidor.</value></data>
-  <data name="ConnectionErrorRoutedHostKeyUnknown" xml:space="preserve"><value>A chave do servidor, vista através do anfitrião de salto, ainda não é fidedigna.</value></data>
-  <data name="ConnectionErrorRoutedHostKeyMismatch" xml:space="preserve"><value>A chave do servidor, vista através do anfitrião de salto, mudou. A ligação foi bloqueada.</value></data>
-  <data name="ConnectionErrorLocalTunnelFailed" xml:space="preserve"><value>Não foi possível abrir com segurança o túnel local para o anfitrião de salto. Tente novamente.</value></data>
+  <data name="ConnectionErrorJumpConnectionFailed" xml:space="preserve"><value>Não foi possível alcançar o jump host.</value></data>
+  <data name="ConnectionErrorJumpAuthenticationFailed" xml:space="preserve"><value>O jump host recusou a autenticação.</value></data>
+  <data name="ConnectionErrorJumpHostKeyUnknown" xml:space="preserve"><value>A chave do jump host ainda não é fidedigna. Liga-te diretamente ao jump host e confirma a chave.</value></data>
+  <data name="ConnectionErrorJumpHostKeyMismatch" xml:space="preserve"><value>A chave do jump host mudou. A ligação foi bloqueada.</value></data>
+  <data name="ConnectionErrorJumpCredentialUnavailable" xml:space="preserve"><value>A credencial guardada do jump host não está disponível. Volta a introduzi-la.</value></data>
+  <data name="ConnectionErrorTargetUnreachableViaJump" xml:space="preserve"><value>O jump host não conseguiu alcançar o servidor.</value></data>
+  <data name="ConnectionErrorRoutedHostKeyUnknown" xml:space="preserve"><value>A chave do servidor, vista através do jump host, ainda não é fidedigna.</value></data>
+  <data name="ConnectionErrorRoutedHostKeyMismatch" xml:space="preserve"><value>A chave do servidor, vista através do jump host, mudou. A ligação foi bloqueada.</value></data>
+  <data name="ConnectionErrorLocalTunnelFailed" xml:space="preserve"><value>Não foi possível abrir com segurança o túnel local para o jump host. Tenta novamente.</value></data>
   <data name="ServerMetricsWaitingForData.Text" xml:space="preserve"><value>A aguardar dados</value></data>
   <data name="ServerMetricsRefreshingLabel.Text" xml:space="preserve"><value>A atualizar…</value></data>
   <data name="ServerMetricsRefreshFor" xml:space="preserve"><value>Atualizar métricas de {0}</value></data>
@@ -304,41 +304,41 @@
   <data name="ServerFormSshConfigCloseButton.Content" xml:space="preserve"><value>Fechar</value></data>
   <data name="SshConfigHostUseForFormat" xml:space="preserve"><value>Usar {0}</value></data>
   <data name="SshConfigImportNotFound" xml:space="preserve"><value>Não foi encontrado ~/.ssh/config.</value></data>
-  <data name="SshConfigImportNoHosts" xml:space="preserve"><value>Não há anfitriões para importar em ~/.ssh/config.</value></data>
+  <data name="SshConfigImportNoHosts" xml:space="preserve"><value>Não há hosts para importar em ~/.ssh/config.</value></data>
   <data name="SshConfigImportErrorTooLarge" xml:space="preserve"><value>O ~/.ssh/config ou um ficheiro que ele inclui é demasiado grande para importar (256 KB por ficheiro, 1 MB no total). Nada foi importado.</value></data>
   <data name="SshConfigImportErrorUnreadable" xml:space="preserve"><value>Não foi possível ler o ~/.ssh/config ou um ficheiro que ele inclui. Nada foi importado.</value></data>
   <data name="SshConfigImportErrorInvalidEncoding" xml:space="preserve"><value>O ~/.ssh/config ou um ficheiro que ele inclui não é texto UTF-8 válido. Nada foi importado.</value></data>
-  <data name="SshConfigImportWarningIncludeNotFollowed" xml:space="preserve"><value>Algumas linhas Include não puderam ser verificadas e não foram seguidas. Os anfitriões que podem afetar não são importados.</value></data>
+  <data name="SshConfigImportWarningIncludeNotFollowed" xml:space="preserve"><value>Algumas linhas Include não puderam ser verificadas e não foram seguidas. Os hosts que podem afetar não são importados.</value></data>
   <data name="SshConfigImportWarningMatchNotEvaluated" xml:space="preserve"><value>Este ficheiro usa blocos Match, que não são avaliados. Os valores importados podem ser inexatos.</value></data>
   <data name="SshConfigHostUnsupportedFormat" xml:space="preserve"><value>Não suportado: {0}</value></data>
-  <data name="SshConfigHostAmbiguousFormat" xml:space="preserve"><value>Ambíguo: {0} (escolha manualmente)</value></data>
+  <data name="SshConfigHostAmbiguousFormat" xml:space="preserve"><value>Ambíguo: {0} (escolhe manualmente)</value></data>
   <data name="SshConfigHostInvalidFormat" xml:space="preserve"><value>Inválido: {0}</value></data>
   <data name="SshConfigHostIgnoredFormat" xml:space="preserve"><value>Ignorado (não relevante): {0}</value></data>
-  <data name="SshConfigPreviewHostNameFormat" xml:space="preserve"><value>Anfitrião: {0}</value></data>
+  <data name="SshConfigPreviewHostNameFormat" xml:space="preserve"><value>Host: {0}</value></data>
   <data name="SshConfigPreviewUserFormat" xml:space="preserve"><value>Utilizador: {0}</value></data>
   <data name="SshConfigPreviewPortFormat" xml:space="preserve"><value>Porta: {0}</value></data>
   <data name="SshConfigPreviewIdentityFileFormat" xml:space="preserve"><value>Chave: {0}</value></data>
   <data name="SshConfigPreviewJumpFormat" xml:space="preserve"><value>Através de: {0}</value></data>
-  <data name="SshConfigHostJumpClassificationFormat" xml:space="preserve"><value>Anfitrião de salto {0}: {1}</value></data>
-  <data name="SshConfigImportAppliedFormat" xml:space="preserve"><value>Os campos vazios foram preenchidos a partir de {0}. Os valores que já tinha introduzido foram mantidos.</value></data>
-  <data name="SshConfigImportNothingFilledHostDiffersFormat" xml:space="preserve"><value>Nada foi preenchido a partir de {0}: o anfitrião que introduziu é diferente. Os seus valores foram mantidos.</value></data>
+  <data name="SshConfigHostJumpClassificationFormat" xml:space="preserve"><value>Jump host {0}: {1}</value></data>
+  <data name="SshConfigImportAppliedFormat" xml:space="preserve"><value>Os campos vazios foram preenchidos a partir de {0}. Os valores que já tinhas introduzido foram mantidos.</value></data>
+  <data name="SshConfigImportNothingFilledHostDiffersFormat" xml:space="preserve"><value>Nada foi preenchido a partir de {0}: o host que introduziste é diferente. Os teus valores foram mantidos.</value></data>
   <data name="SshConfigImportNothingFilledFormat" xml:space="preserve"><value>Nada foi preenchido a partir de {0}: os campos que oferece já têm valores.</value></data>
-  <data name="SshConfigHostBlockedProxyCommand" xml:space="preserve"><value>Requer ProxyCommand (no anfitrião ou no anfitrião de salto) — não suportado</value></data>
-  <data name="SshConfigHostBlockedJumpMultiHop" xml:space="preserve"><value>Requer mais do que um anfitrião de salto (ProxyJump multi-salto ou encadeado) — não suportado</value></data>
+  <data name="SshConfigHostBlockedProxyCommand" xml:space="preserve"><value>Requer ProxyCommand (no host ou no jump host) — não suportado</value></data>
+  <data name="SshConfigHostBlockedJumpMultiHop" xml:space="preserve"><value>Requer mais do que um jump host (ProxyJump multi-salto ou encadeado) — não suportado</value></data>
   <data name="SshConfigHostBlockedJumpUnparsable" xml:space="preserve"><value>O valor de ProxyJump não pode ser lido com exatidão — não importado</value></data>
-  <data name="SshConfigHostBlockedJumpCycle" xml:space="preserve"><value>O ProxyJump volta a este anfitrião — não importado</value></data>
-  <data name="SshConfigHostBlockedJumpHostNameUnresolved" xml:space="preserve"><value>O HostName do anfitrião de salto não pode ser resolvido com exatidão — não importado</value></data>
+  <data name="SshConfigHostBlockedJumpCycle" xml:space="preserve"><value>O ProxyJump volta a este host — não importado</value></data>
+  <data name="SshConfigHostBlockedJumpHostNameUnresolved" xml:space="preserve"><value>O HostName do jump host não pode ser resolvido com exatidão — não importado</value></data>
   <data name="SshConfigHostBlockedCanonicalizationMayChangeRoute" xml:space="preserve"><value>CanonicalizeHostname pode mudar o destino a que o ssh se liga — não importado</value></data>
   <data name="SshConfigHostBlockedProxyMaySetByMatch" xml:space="preserve"><value>Um bloco Match pode definir um proxy — não é possível verificar, não importado</value></data>
   <data name="SshConfigHostBlockedProxyMaySetByInclude" xml:space="preserve"><value>Um Include não pôde ser verificado — não é possível confirmar o proxy, não importado</value></data>
-  <data name="SshConfigImportWarningHostsTruncated" xml:space="preserve"><value>Só são listados os primeiros 500 anfitriões.</value></data>
+  <data name="SshConfigImportWarningHostsTruncated" xml:space="preserve"><value>Só são listados os primeiros 500 hosts.</value></data>
   <data name="SshConfigImportErrorInvalidSyntax" xml:space="preserve"><value>O ~/.ssh/config ou um ficheiro que ele inclui tem uma linha mal formada, que o ssh rejeitaria. Nada foi importado.</value></data>
   <data name="SshConfigImportErrorTooManyFiles" xml:space="preserve"><value>Demasiados ficheiros incluídos (limite de 64 ficheiros, 256 correspondências por Include). Nada foi importado.</value></data>
   <data name="SshConfigImportErrorIncludeCycle" xml:space="preserve"><value>Um ficheiro inclui-se a si próprio, diretamente ou através de outros ficheiros, e o ssh falharia. Nada foi importado.</value></data>
   <data name="SshConfigImportErrorIncludeTooDeep" xml:space="preserve"><value>Os ficheiros Include estão aninhados em mais de 16 níveis, e o ssh falharia. Nada foi importado.</value></data>
   <data name="SshConfigImportErrorFileFormat" xml:space="preserve"><value>Ficheiro: {0}</value></data>
   <data name="SshConfigImportDiagnosticIncludeMatchedNoFiles" xml:space="preserve"><value>O Include '{0}' não corresponde a nenhum ficheiro.</value></data>
-  <data name="SshConfigImportDiagnosticIncludeNotVerified" xml:space="preserve"><value>O Include '{0}' não foi seguido ({1}). Os anfitriões que pode afetar não são importados.</value></data>
+  <data name="SshConfigImportDiagnosticIncludeNotVerified" xml:space="preserve"><value>O Include '{0}' não foi seguido ({1}). Os hosts que pode afetar não são importados.</value></data>
   <data name="SshConfigIncludeIssueNotFollowed" xml:space="preserve"><value>não seguido</value></data>
   <data name="SshConfigIncludeIssueOutsideSshDirectory" xml:space="preserve"><value>fora de ~/.ssh</value></data>
   <data name="SshConfigIncludeIssueReparsePoint" xml:space="preserve"><value>ligação simbólica ou junção</value></data>
@@ -352,7 +352,7 @@
   <data name="SshConfigHostAccessibleImportableFormat" xml:space="preserve"><value>{0} — importável</value></data>
   <data name="SshConfigHostAccessibleBlockedFormat" xml:space="preserve"><value>{0} — bloqueado: {1}</value></data>
   <data name="SshConfigHostAccessibleNotesFormat" xml:space="preserve"><value>Notas: {0}</value></data>
-  <data name="HostKeySubjectJumpFormat" xml:space="preserve"><value>Anfitrião de salto {0}</value></data>
+  <data name="HostKeySubjectJumpFormat" xml:space="preserve"><value>Jump host {0}</value></data>
   <data name="HostKeySubjectTargetFormat" xml:space="preserve"><value>Destino {0} via {1}</value></data>
   <data name="DashboardEmptyDiscoverySearching.Text" xml:space="preserve"><value>A procurar servidores SSH na tua rede local…</value></data>
   <data name="DashboardEmptyDiscoveryFoundFormat" xml:space="preserve"><value>Encontrado na rede local: {0}</value></data>
@@ -374,7 +374,7 @@
   <data name="ServerPrepCopied" xml:space="preserve"><value>Copiado</value></data>
   <data name="ServerPrepUserPlaceholder" xml:space="preserve"><value>&lt;utilizador&gt;</value></data>
   <data name="ServerPrepHostPlaceholder" xml:space="preserve"><value>&lt;servidor&gt;</value></data>
-  <data name="ServerPrepJumpPlaceholder" xml:space="preserve"><value>&lt;anfitrião-de-salto&gt;</value></data>
+  <data name="ServerPrepJumpPlaceholder" xml:space="preserve"><value>&lt;jump-host&gt;</value></data>
   <data name="ConnectionStepPortTitle" xml:space="preserve"><value>Porta SSH</value></data>
   <data name="ConnectionStepPortViaJumpFormat" xml:space="preserve"><value>Porta SSH (via {0})</value></data>
   <data name="ConnectionStepHostKeyTitle" xml:space="preserve"><value>Identidade do servidor (SHA-256)</value></data>
@@ -410,15 +410,15 @@
   <data name="ConnectionHintProtocolError" xml:space="preserve"><value>A porta respondeu, mas não como um servidor SSH. Confirma que esta é a porta do SSH e não a de outro serviço. Se for, o serviço SSH pode estar a recusar novas ligações (demasiadas tentativas ou uma regra de acesso).</value></data>
   <data name="ConnectionHintCancelled" xml:space="preserve"><value>Cancelaste o teste. Podes voltar a testar quando quiseres.</value></data>
   <data name="ConnectionHintUnexpected" xml:space="preserve"><value>Algo inesperado interrompeu o teste. Testa de novo; se continuar, reinicia a aplicação.</value></data>
-  <data name="ConnectionHintJumpConnectionFailed" xml:space="preserve"><value>O problema está no anfitrião de salto, não no servidor: não foi possível chegar a ele. Confirma o endereço e a porta do anfitrião de salto.</value></data>
-  <data name="ConnectionHintJumpAuthenticationFailed" xml:space="preserve"><value>O problema está no anfitrião de salto, não no servidor: ele não aceitou o início de sessão. Confirma o utilizador e a chave ou palavra-passe do anfitrião de salto. No anfitrião de salto, com esse utilizador:</value></data>
-  <data name="ConnectionHintJumpHostKeyUnknown" xml:space="preserve"><value>A identidade do anfitrião de salto ainda não é conhecida. Compara a impressão digital SHA-256 com a do anfitrião de salto antes de confiar.</value></data>
-  <data name="ConnectionHintJumpHostKeyMismatch" xml:space="preserve"><value>A identidade do anfitrião de salto é diferente da que estava guardada. A ligação foi bloqueada. Não continues até confirmares com quem o administra que a chave mudou de facto.</value></data>
-  <data name="ConnectionHintJumpCredentialUnavailable" xml:space="preserve"><value>Não foi possível ler a credencial guardada do anfitrião de salto. Volta a introduzi-la na secção do anfitrião de salto e testa de novo.</value></data>
-  <data name="ConnectionHintTargetUnreachableViaJump" xml:space="preserve"><value>O anfitrião de salto funcionou, mas não conseguiu chegar ao servidor. Confirma o endereço e a porta do servidor tal como são vistos a partir do anfitrião de salto.</value></data>
-  <data name="ConnectionHintRoutedHostKeyUnknown" xml:space="preserve"><value>É a primeira vez que este servidor é visto através do anfitrião de salto. Compara a impressão digital SHA-256 abaixo com a do servidor antes de confiar.</value></data>
-  <data name="ConnectionHintRoutedHostKeyMismatch" xml:space="preserve"><value>A identidade do servidor, vista através do anfitrião de salto, é diferente da que estava guardada. A ligação foi bloqueada. Não continues até confirmares com quem administra o servidor que a chave mudou de facto.</value></data>
-  <data name="ConnectionHintLocalTunnelFailed" xml:space="preserve"><value>Não foi possível abrir neste computador o túnel local para o anfitrião de salto. Não é um problema do servidor: testa de novo.</value></data>
+  <data name="ConnectionHintJumpConnectionFailed" xml:space="preserve"><value>O problema está no jump host, não no servidor: não foi possível chegar a ele. Confirma o endereço e a porta do jump host.</value></data>
+  <data name="ConnectionHintJumpAuthenticationFailed" xml:space="preserve"><value>O problema está no jump host, não no servidor: ele não aceitou o início de sessão. Confirma o utilizador e a chave ou palavra-passe do jump host. No jump host, com esse utilizador:</value></data>
+  <data name="ConnectionHintJumpHostKeyUnknown" xml:space="preserve"><value>A identidade do jump host ainda não é conhecida. Compara a impressão digital SHA-256 com a do jump host antes de confiar.</value></data>
+  <data name="ConnectionHintJumpHostKeyMismatch" xml:space="preserve"><value>A identidade do jump host é diferente da que estava guardada. A ligação foi bloqueada. Não continues até confirmares com quem o administra que a chave mudou de facto.</value></data>
+  <data name="ConnectionHintJumpCredentialUnavailable" xml:space="preserve"><value>Não foi possível ler a credencial guardada do jump host. Volta a introduzi-la na secção do jump host e testa de novo.</value></data>
+  <data name="ConnectionHintTargetUnreachableViaJump" xml:space="preserve"><value>O jump host funcionou, mas não conseguiu chegar ao servidor. Confirma o endereço e a porta do servidor tal como são vistos a partir do jump host.</value></data>
+  <data name="ConnectionHintRoutedHostKeyUnknown" xml:space="preserve"><value>É a primeira vez que este servidor é visto através do jump host. Compara a impressão digital SHA-256 abaixo com a do servidor antes de confiar.</value></data>
+  <data name="ConnectionHintRoutedHostKeyMismatch" xml:space="preserve"><value>A identidade do servidor, vista através do jump host, é diferente da que estava guardada. A ligação foi bloqueada. Não continues até confirmares com quem administra o servidor que a chave mudou de facto.</value></data>
+  <data name="ConnectionHintLocalTunnelFailed" xml:space="preserve"><value>Não foi possível abrir neste computador o túnel local para o jump host. Não é um problema do servidor: testa de novo.</value></data>
   <!-- M14.6 Cópia de segurança e restauro encriptados -->
   <data name="BackupSectionTitle.Text" xml:space="preserve"><value>Cópia de segurança e restauro</value></data>
   <data name="BackupSectionDescription.Text" xml:space="preserve"><value>Guarda os teus servidores, rotas, chaves de anfitrião confiáveis e palavras-passe guardadas num ficheiro encriptado que podes restaurar neste ou noutro computador. O ficheiro é protegido por uma frase-passe à tua escolha. Os ficheiros de chave privada nunca são incluídos, apenas os caminhos.</value></data>
@@ -964,6 +964,8 @@ as métricas e o histórico do servidor.</value></data>
   <data name="ServerEditorKeyPickerChosenFormat" xml:space="preserve"><value>{0}  ·  Alterar ficheiro…</value></data>
   <data name="ServerEditorKeyPickerBrowse" xml:space="preserve"><value>Procurar ficheiro…</value></data>
   <data name="ServerEditorKeyPickerHelper" xml:space="preserve"><value>Seleciona id_ed25519, id_rsa ou outra chave compatível.</value></data>
+  <data name="ServerEditorKeyPickerCurrentHelper" xml:space="preserve"><value>Chave privada atual</value></data>
+  <data name="ServerEditorKeyPickerCurrentSshHelper" xml:space="preserve"><value>Chave privada atual · pasta .ssh deste dispositivo</value></data>
   <data name="ServerEditorJumpKeyPickerHelper" xml:space="preserve"><value>Seleciona a chave privada do jump host.</value></data>
   <data name="ServerEditorKeyPickerAccessibleFormat" xml:space="preserve"><value>{0}: {1}</value></data>
   <data name="ServerEditorPassphraseHeader" xml:space="preserve"><value>Frase-passe da chave · opcional</value></data>
@@ -1010,7 +1012,16 @@ as métricas e o histórico do servidor.</value></data>
   <data name="ServerEditorImportAvailable.Text" xml:space="preserve"><value>Disponível</value></data>
   <data name="ServerEditorImportBlocked.Text" xml:space="preserve"><value>Bloqueado</value></data>
   <data name="ServerEditorImportNote.Text" xml:space="preserve"><value>Preenche apenas os campos vazios do servidor e do jump host. Os dados já introduzidos são mantidos. ProxyJump com um único jump host é suportado.</value></data>
-  <data name="ServerEditorImportCountFormat" xml:space="preserve"><value>{0} disponíveis · {1} bloqueados</value></data>
+  <data name="ServerEditorImportAvailableCountOne" xml:space="preserve"><value>{0} disponível</value></data>
+  <data name="ServerEditorImportAvailableCountOther" xml:space="preserve"><value>{0} disponíveis</value></data>
+  <data name="ServerEditorImportBlockedCountOne" xml:space="preserve"><value>{0} bloqueado</value></data>
+  <data name="ServerEditorImportBlockedCountOther" xml:space="preserve"><value>{0} bloqueados</value></data>
+  <data name="ServerEditorImportRowPortFormat" xml:space="preserve"><value>porta {0}</value></data>
+  <data name="ServerEditorImportRowJumpFormat" xml:space="preserve"><value>Via jump host {0}</value></data>
+  <data name="ServerEditorImportDetailsHost.Text" xml:space="preserve"><value>Host</value></data>
+  <data name="ServerEditorImportDetailsUser.Text" xml:space="preserve"><value>Utilizador</value></data>
+  <data name="ServerEditorImportDetailsKey.Text" xml:space="preserve"><value>Chave privada</value></data>
+  <data name="ServerEditorImportDetailsNotSet" xml:space="preserve"><value>Não definido no ficheiro</value></data>
   <data name="ServerEditorImportNotFoundTitle" xml:space="preserve"><value>Não encontrámos a configuração SSH</value></data>
   <data name="ServerEditorImportErrorTitle" xml:space="preserve"><value>Não foi possível ler a configuração SSH</value></data>
   <data name="ServerEditorImportNoHostsTitle" xml:space="preserve"><value>Não foram encontrados perfis</value></data>

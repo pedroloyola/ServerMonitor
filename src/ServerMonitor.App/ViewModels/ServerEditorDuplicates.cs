@@ -65,8 +65,17 @@ public static class ServerEditorDuplicates
             (entry.Jump?.Port ?? 22).ToString(CultureInfo.InvariantCulture));
     }
 
+    /// <summary>A saved server with its identity, computed once per visit (Cortex n-1) - not again on every keystroke.</summary>
+    public sealed record KnownServer(Server Server, Identity? Identity);
+
+    public static IReadOnlyList<KnownServer> Index(IReadOnlyList<Server> servers)
+    {
+        ArgumentNullException.ThrowIfNull(servers);
+        return servers.Select(server => new KnownServer(server, Of(server))).ToList();
+    }
+
     /// <summary>The first saved server with the same identity, never <paramref name="self"/> (the server being edited).</summary>
-    public static Server? Find(IReadOnlyList<Server> known, Identity? identity, Guid? self)
+    public static Server? Find(IReadOnlyList<KnownServer> known, Identity? identity, Guid? self)
     {
         ArgumentNullException.ThrowIfNull(known);
         if (identity is null)
@@ -74,7 +83,7 @@ public static class ServerEditorDuplicates
             return null;
         }
 
-        return known.FirstOrDefault(server => server.Id != self && Of(server) == identity);
+        return known.FirstOrDefault(entry => entry.Server.Id != self && entry.Identity == identity)?.Server;
     }
 
     private static bool TryEndpoint(string host, string port, out SshEndpoint? endpoint)

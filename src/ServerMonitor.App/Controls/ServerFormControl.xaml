@@ -23,6 +23,12 @@
                     <VisualState.StateTriggers>
                         <primitives:SaContentWidthTrigger Source="{Binding ElementName=FormRoot}" MinWidth="760" />
                     </VisualState.StateTriggers>
+                    <!-- Final c1 (Prism F-10): side by side the two cards keep Figma's 384 (sized for Edit), so switching
+                         key / password or Add / Edit does not make the form jump. Stacked, they hug their content. -->
+                    <VisualState.Setters>
+                        <Setter Target="IdentityCard.MinHeight" Value="384" />
+                        <Setter Target="AuthCard.MinHeight" Value="384" />
+                    </VisualState.Setters>
                 </VisualState>
                 <VisualState x:Name="Stacked">
                     <VisualState.StateTriggers>
@@ -116,110 +122,110 @@
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <primitives:SaIcon Data="{StaticResource SaIconKey01Data}" Size="20" VerticalAlignment="Center"
                                            Foreground="{ThemeResource SaTextSecondaryBrush}" />
                         <TextBlock x:Name="AuthTitle" Grid.Column="1" Style="{StaticResource SaTitleCompactTextStyle}"
                                    AutomationProperties.HeadingLevel="Level2" VerticalAlignment="Center" TextWrapping="Wrap" />
-                        <!-- "Como preparo o meu servidor?" (M14.5, survives - G-5): text and copyable commands only; runs nothing. -->
-                        <StackPanel Grid.Column="2" VerticalAlignment="Center">
-                            <HyperlinkButton
-                                x:Name="PrepHelpLink"
-                                x:Uid="ServerFormPrepHelpLink"
-                                Style="{StaticResource SaTextLinkButtonStyle}"
-                                VerticalAlignment="Center"
-                                Click="OnPrepHelpClick">
-                                <FlyoutBase.AttachedFlyout>
-                                    <Flyout
-                                        x:Name="PrepHelpFlyout"
-                                        Opening="OnPrepHelpOpening"
-                                        Placement="Bottom">
-                                        <!-- G-5 (no Figma frame): the helper in the Sa language - card title, caption copy, the commands in
-                                             tinted insets (mono, selectable) with a "Copiar" each. Text only; it runs nothing. -->
-                                        <StackPanel
-                                            x:Name="PrepHelpContent"
-                                            Width="400"
-                                            Spacing="10">
-                                            <TextBlock
-                                                x:Uid="ServerPrepTitle"
-                                                AutomationProperties.HeadingLevel="Level2"
-                                                Style="{StaticResource SaCardTitleTextStyle}"
-                                                TextWrapping="Wrap" />
-                                            <TextBlock
-                                                x:Uid="ServerPrepIntro"
-                                                Style="{StaticResource SaCaptionTextStyle}"
-                                                TextWrapping="Wrap" />
-                                            <TextBlock
-                                                x:Uid="ServerPrepKeygenStep"
-                                                Style="{StaticResource SaCaptionTextStyle}"
-                                                Foreground="{ThemeResource SaTextSecondaryBrush}"
-                                                TextWrapping="Wrap" />
-                                            <Grid ColumnSpacing="8">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="*" />
-                                                    <ColumnDefinition Width="Auto" />
-                                                </Grid.ColumnDefinitions>
-                                                <Border Style="{StaticResource SaInsetTintedSurfaceStyle}" MinHeight="34">
-                                                    <TextBlock
-                                                        x:Name="PrepKeygenText"
-                                                        Style="{StaticResource SaMonoTextStyle}"
-                                                        VerticalAlignment="Center"
-                                                        IsTextSelectionEnabled="True"
-                                                        TextWrapping="Wrap" />
-                                                </Border>
-                                                <Button
-                                                    x:Name="PrepCopyKeygenButton"
-                                                    x:Uid="ServerPrepCopyKeygenButton"
-                                                    VerticalAlignment="Center"
-                                                    Click="OnCopyPrepKeygenClick"
-                                                    Style="{StaticResource SaSecondaryRectButtonStyle}" />
-                                            </Grid>
-                                            <TextBlock
-                                                x:Uid="ServerPrepCopyKeyStep"
-                                                Style="{StaticResource SaCaptionTextStyle}"
-                                                Foreground="{ThemeResource SaTextSecondaryBrush}"
-                                                TextWrapping="Wrap" />
-                                            <Grid ColumnSpacing="8">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="*" />
-                                                    <ColumnDefinition Width="Auto" />
-                                                </Grid.ColumnDefinitions>
-                                                <Border Style="{StaticResource SaInsetTintedSurfaceStyle}" MinHeight="34">
-                                                    <TextBlock
-                                                        x:Name="PrepCopyKeyText"
-                                                        Style="{StaticResource SaMonoTextStyle}"
-                                                        VerticalAlignment="Center"
-                                                        IsTextSelectionEnabled="True"
-                                                        TextWrapping="Wrap" />
-                                                </Border>
-                                                <Button
-                                                    x:Name="PrepCopyKeyButton"
-                                                    x:Uid="ServerPrepCopyKeyButton"
-                                                    VerticalAlignment="Center"
-                                                    Click="OnCopyPrepKeyClick"
-                                                    Style="{StaticResource SaSecondaryRectButtonStyle}" />
-                                            </Grid>
-                                            <TextBlock
-                                                x:Name="PrepPlaceholderNote"
-                                                x:Uid="ServerPrepPlaceholderNote"
-                                                Style="{StaticResource SaCaptionTextStyle}"
-                                                Foreground="{ThemeResource SaTextSecondaryBrush}"
-                                                TextWrapping="Wrap"
-                                                Visibility="Collapsed" />
-                                            <TextBlock
-                                                x:Uid="ServerPrepServiceStep"
-                                                Style="{StaticResource SaCaptionTextStyle}"
-                                                Foreground="{ThemeResource SaTextSecondaryBrush}"
-                                                TextWrapping="Wrap" />
-                                        </StackPanel>
-                                    </Flyout>
-                                </FlyoutBase.AttachedFlyout>
-                            </HyperlinkButton>
-                        </StackPanel>
                     </Grid>
                     <TextBlock x:Name="AuthSubtitle" Style="{StaticResource SaCaptionTextStyle}"
                                Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap" />
+                    <!-- "Como preparo o meu servidor?" (M14.5, survives - G-5): text and copyable commands only; runs nothing. Final c1
+                         (Prism F-5): its own row under the subtitle, so the card title keeps one line at 1040 / 560. -->
+                    <StackPanel HorizontalAlignment="Left">
+                        <HyperlinkButton
+                            x:Name="PrepHelpLink"
+                            x:Uid="ServerFormPrepHelpLink"
+                            Style="{StaticResource SaTextLinkButtonStyle}"
+                            VerticalAlignment="Center"
+                            Click="OnPrepHelpClick">
+                            <FlyoutBase.AttachedFlyout>
+                                <Flyout
+                                    x:Name="PrepHelpFlyout"
+                                    Opening="OnPrepHelpOpening"
+                                    Placement="Bottom">
+                                    <!-- G-5 (no Figma frame): the helper in the Sa language - card title, caption copy, the commands in
+                                         tinted insets (mono, selectable) with a "Copiar" each. Text only; it runs nothing. -->
+                                    <StackPanel
+                                        x:Name="PrepHelpContent"
+                                        Width="400"
+                                        Spacing="10">
+                                        <TextBlock
+                                            x:Uid="ServerPrepTitle"
+                                            AutomationProperties.HeadingLevel="Level2"
+                                            Style="{StaticResource SaCardTitleTextStyle}"
+                                            TextWrapping="Wrap" />
+                                        <TextBlock
+                                            x:Uid="ServerPrepIntro"
+                                            Style="{StaticResource SaCaptionTextStyle}"
+                                            TextWrapping="Wrap" />
+                                        <TextBlock
+                                            x:Uid="ServerPrepKeygenStep"
+                                            Style="{StaticResource SaCaptionTextStyle}"
+                                            Foreground="{ThemeResource SaTextSecondaryBrush}"
+                                            TextWrapping="Wrap" />
+                                        <Grid ColumnSpacing="8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <Border Style="{StaticResource SaInsetTintedSurfaceStyle}" MinHeight="34">
+                                                <TextBlock
+                                                    x:Name="PrepKeygenText"
+                                                    Style="{StaticResource SaMonoTextStyle}"
+                                                    VerticalAlignment="Center"
+                                                    IsTextSelectionEnabled="True"
+                                                    TextWrapping="Wrap" />
+                                            </Border>
+                                            <Button
+                                                x:Name="PrepCopyKeygenButton"
+                                                x:Uid="ServerPrepCopyKeygenButton"
+                                                VerticalAlignment="Center"
+                                                Click="OnCopyPrepKeygenClick"
+                                                Style="{StaticResource SaSecondaryRectButtonStyle}" />
+                                        </Grid>
+                                        <TextBlock
+                                            x:Uid="ServerPrepCopyKeyStep"
+                                            Style="{StaticResource SaCaptionTextStyle}"
+                                            Foreground="{ThemeResource SaTextSecondaryBrush}"
+                                            TextWrapping="Wrap" />
+                                        <Grid ColumnSpacing="8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <Border Style="{StaticResource SaInsetTintedSurfaceStyle}" MinHeight="34">
+                                                <TextBlock
+                                                    x:Name="PrepCopyKeyText"
+                                                    Style="{StaticResource SaMonoTextStyle}"
+                                                    VerticalAlignment="Center"
+                                                    IsTextSelectionEnabled="True"
+                                                    TextWrapping="Wrap" />
+                                            </Border>
+                                            <Button
+                                                x:Name="PrepCopyKeyButton"
+                                                x:Uid="ServerPrepCopyKeyButton"
+                                                VerticalAlignment="Center"
+                                                Click="OnCopyPrepKeyClick"
+                                                Style="{StaticResource SaSecondaryRectButtonStyle}" />
+                                        </Grid>
+                                        <TextBlock
+                                            x:Name="PrepPlaceholderNote"
+                                            x:Uid="ServerPrepPlaceholderNote"
+                                            Style="{StaticResource SaCaptionTextStyle}"
+                                            Foreground="{ThemeResource SaTextSecondaryBrush}"
+                                            TextWrapping="Wrap"
+                                            Visibility="Collapsed" />
+                                        <TextBlock
+                                            x:Uid="ServerPrepServiceStep"
+                                            Style="{StaticResource SaCaptionTextStyle}"
+                                            Foreground="{ThemeResource SaTextSecondaryBrush}"
+                                            TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </Flyout>
+                            </FlyoutBase.AttachedFlyout>
+                        </HyperlinkButton>
+                    </StackPanel>
                     <Border Style="{StaticResource SaSegmentedPillTrackStyle}" HorizontalAlignment="Stretch">
                         <Grid x:Uid="ServerEditorAuthMethodGroup" ColumnSpacing="4" primitives:SaGroupNavigation.Mode="SelectionFollowsFocus">
                             <Grid.ColumnDefinitions>

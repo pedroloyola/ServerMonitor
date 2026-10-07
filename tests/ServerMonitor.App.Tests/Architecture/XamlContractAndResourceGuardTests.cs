@@ -87,6 +87,8 @@ public sealed partial class XamlContractAndResourceGuardTests
             "JumpPasswordFormField", "RouteLine", "ImportStatusText",
             // UI.7A: the mode copy set from code-behind and the B-19 stacking setters.
             "IdentitySubtitle", "AuthTitle", "AuthSubtitle", "FormRoot", "CardsGrid", "CardsColumn2", "AuthCard",
+            // UI.7 final c1 (Prism F-10): the Wide state keeps both cards at 384.
+            "IdentityCard",
             "JumpCardsGrid", "JumpCardsColumn2", "JumpAuthCard", "OptionsGrid", "OptionsColumn3", "RefreshIntervalField"
         ],
         // UI.7A Add / Edit server page: code-behind (header, actions, notice) and the WidthStates setters.
@@ -100,7 +102,9 @@ public sealed partial class XamlContractAndResourceGuardTests
             // UI.7C: the test panel in the same layer, the duplicate notice (H-UI7-2) and "Tentar guardar".
             "TestPanel", "DuplicateNotice", "OpenDuplicateButton", "RetrySaveButton",
             // UI.7A fix c1 (M-1): Cancelar is disabled while a Save is persisted.
-            "CancelButton"
+            "CancelButton",
+            // UI.7 final c1 (Prism F-1): the layer's maximum width follows the page.
+            "EditorHost"
         ],
         // UI.7B panels of the editor page's in-page modal layer: the trust prompt (Figma 09; 7C adds the test) and "Importar de SSH".
         ["Views/ServerEditorTrustPanel.xaml"] =
@@ -118,7 +122,10 @@ public sealed partial class XamlContractAndResourceGuardTests
             "TitleText", "LoadingRow", "LoadingRing", "StatePanel", "StateIcon", "StateTitle", "StateBody", "ListPanel", "CountText", "HostList",
             "WarningText", "CancelButton", "UseButton",
             // UI.7C (H-UI7-2): the "Já adicionado" marker of a row (found by name in the recycled container).
-            "AlreadyAddedText"
+            "AlreadyAddedText",
+            // UI.7 final c1 (Prism F-2): a row's compact detail and jump lines, and the selected profile's details.
+            "DetailText", "JumpText", "DetailsPanel", "DetailsHostLabel", "DetailsHostValue", "DetailsUserLabel", "DetailsUserValue",
+            "DetailsKeyLabel", "DetailsKeyValue"
         ],
         // HistoryChart parts: the chart draws into these by name.
         ["Controls/HistoryChart.xaml"] = ["RootGrid", "PlotHost", "GridCanvas", "PlotCanvas", "YAxisCanvas", "XAxisCanvas"],
@@ -133,7 +140,7 @@ public sealed partial class XamlContractAndResourceGuardTests
             "PART_Host", "PART_LitBrush", "PART_EmptyBrush", "PART_BarBrush"
         ],
         // UI.2 S4 control templates: names targeted by VisualState setters / storyboards (G-3).
-        ["Styles/Components/Sa.Buttons.xaml"] = ["RootGrid", "StateOverlay", "ContentPresenter"],
+        ["Styles/Components/Sa.Buttons.xaml"] = ["RootGrid", "StateOverlay", "ContentPresenter", "Underline", "FocusUnderline"],
         ["Styles/Components/Sa.Forms.xaml"] =
         [
             "RootGrid", "HoverOverlay", "FocusRing", "Shell", "Highlight", "StateOverlay", "ContentPresenter", "Box",
@@ -194,7 +201,9 @@ public sealed partial class XamlContractAndResourceGuardTests
         "SystemColorWindowTextColor",
         // UI.2 R1 (Prism MF-4): HC rest fill/border of secondary controls - the framework's ButtonFace/ButtonText.
         "SystemColorButtonFaceColor",
-        "SystemColorButtonTextColor"
+        "SystemColorButtonTextColor",
+        // UI.7 final c1 (Prism F-4): HC inline text links (SaLinkTextBrush) use the framework hyperlink colour.
+        "SystemColorHotlightColor"
     };
 
     /// <summary>True for a documented WinUI platform key (shared with the UI.2 component-layer guards).</summary>

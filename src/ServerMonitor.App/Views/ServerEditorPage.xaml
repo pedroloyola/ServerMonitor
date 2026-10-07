@@ -64,8 +64,6 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
             <!-- Header 112:3319: title column (H1 + subtitle) | the header button (drawn here, declared last). -->
@@ -88,61 +86,63 @@
 
             <controls:ServerFormControl x:Name="ServerForm" Grid.Row="1" />
 
-            <!-- H-UI7-2 duplicate (Figma 06 112:17491): non-blocking, "Abrir servidor" goes through the exit guard. -->
-            <primitives:SaInlineNotice
-                x:Name="DuplicateNotice"
-                Grid.Row="2"
-                Severity="Error"
-                AnnouncePolitely="True"
-                AutomationProperties.LiveSetting="Polite"
-                Visibility="Collapsed">
-                <Button x:Name="OpenDuplicateButton" x:Uid="ServerEditorDuplicateOpenButton" MinWidth="160" Height="36"
-                        Style="{StaticResource SaSolidButtonStyle}" Click="OnOpenDuplicateClick" />
-            </primitives:SaInlineNotice>
+            <!-- Final c1 (Prism F-6): the two notices and the action bar share one StackPanel - a Collapsed notice takes no
+                 spacing (grid rows did: +32 px above the actions), so the actions sit 16 under the form as in Figma. -->
+            <StackPanel x:Name="ActionArea" Grid.Row="2" Spacing="{StaticResource SaSpace16}">
+                <!-- H-UI7-2 duplicate (Figma 06 112:17491): non-blocking, "Abrir servidor" goes through the exit guard. -->
+                <primitives:SaInlineNotice
+                    x:Name="DuplicateNotice"
+                    Severity="Error"
+                    AnnouncePolitely="True"
+                    AutomationProperties.LiveSetting="Polite"
+                    Visibility="Collapsed">
+                    <Button x:Name="OpenDuplicateButton" x:Uid="ServerEditorDuplicateOpenButton" MinWidth="220" Height="36"
+                            Style="{StaticResource SaSolidButtonStyle}" Click="OnOpenDuplicateClick" />
+                </primitives:SaInlineNotice>
 
-            <!-- Figma 06 "Falha ao guardar" (112:19265): the form stays as typed; a consumed secret must be typed again. -->
-            <primitives:SaInlineNotice
-                x:Name="SaveFailedNotice"
-                Grid.Row="3"
-                Severity="Error"
-                AutomationProperties.LiveSetting="Assertive"
-                Visibility="Collapsed">
-                <Button x:Name="RetrySaveButton" x:Uid="ServerEditorSaveRetryButton" MinWidth="160" Height="36"
-                        Style="{StaticResource SaSolidButtonStyle}" Click="OnPrimaryClick" />
-            </primitives:SaInlineNotice>
+                <!-- Figma 06 "Falha ao guardar" (112:19265): the form stays as typed; a consumed secret must be typed again. -->
+                <primitives:SaInlineNotice
+                    x:Name="SaveFailedNotice"
+                    Severity="Error"
+                    AutomationProperties.LiveSetting="Assertive"
+                    Visibility="Collapsed">
+                    <Button x:Name="RetrySaveButton" x:Uid="ServerEditorSaveRetryButton" MinWidth="160" Height="36"
+                            Style="{StaticResource SaSolidButtonStyle}" Click="OnPrimaryClick" />
+                </primitives:SaInlineNotice>
 
-            <!-- Form actions 112:3404: not sticky (B-14); no primary button (G-2): the right-hand action is the default. -->
-            <Grid x:Name="ActionBar" Grid.Row="4" ColumnSpacing="{StaticResource SaSpace12}">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
-                <Grid ColumnSpacing="{StaticResource SaSpace12}" VerticalAlignment="Center">
+                <!-- Form actions 112:3404: not sticky (B-14); no primary button (G-2): the right-hand action is the default. -->
+                <Grid x:Name="ActionBar" ColumnSpacing="{StaticResource SaSpace12}">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <Button x:Name="TestButton" x:Uid="ServerFormTestConnectionButton" MinWidth="154"
-                            Style="{StaticResource SaSecondaryButtonStyle}" Click="OnTestClick" />
-                    <TextBlock x:Name="ActionHint" Grid.Column="1" Style="{StaticResource SaCaptionTextStyle}" VerticalAlignment="Center"
-                               Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap"
-                               AutomationProperties.LiveSetting="Polite" />
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Grid ColumnSpacing="{StaticResource SaSpace12}" VerticalAlignment="Center">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Button x:Name="TestButton" x:Uid="ServerFormTestConnectionButton" MinWidth="154"
+                                Style="{StaticResource SaSecondaryButtonStyle}" Click="OnTestClick" />
+                        <TextBlock x:Name="ActionHint" Grid.Column="1" Style="{StaticResource SaCaptionTextStyle}" VerticalAlignment="Center"
+                                   Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap"
+                                   AutomationProperties.LiveSetting="Polite" />
+                    </Grid>
+                    <StackPanel x:Name="ActionEnd" Grid.Column="1" Orientation="Horizontal" Spacing="{StaticResource SaSpace12}"
+                                HorizontalAlignment="Right" VerticalAlignment="Center">
+                        <Button x:Name="CancelButton" x:Uid="ServerEditorCancelButton" MinWidth="114"
+                                Style="{StaticResource SaSecondaryButtonStyle}" Click="OnCancelClick" />
+                        <Button x:Name="PrimaryButton" MinWidth="176"
+                                Style="{StaticResource SaSecondaryButtonStyle}" Click="OnPrimaryClick" />
+                    </StackPanel>
                 </Grid>
-                <StackPanel x:Name="ActionEnd" Grid.Column="1" Orientation="Horizontal" Spacing="{StaticResource SaSpace12}"
-                            HorizontalAlignment="Right" VerticalAlignment="Center">
-                    <Button x:Name="CancelButton" x:Uid="ServerEditorCancelButton" MinWidth="114"
-                            Style="{StaticResource SaSecondaryButtonStyle}" Click="OnCancelClick" />
-                    <Button x:Name="PrimaryButton" MinWidth="176"
-                            Style="{StaticResource SaSecondaryButtonStyle}" Click="OnPrimaryClick" />
-                </StackPanel>
-            </Grid>
+            </StackPanel>
 
             <!-- Credential reassurance 112:3409: Shield01 17 + two lines. -->
-            <Grid Grid.Row="5" ColumnSpacing="9">
+            <Grid Grid.Row="3" ColumnSpacing="9">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
@@ -166,7 +166,7 @@
         <Border x:Name="DialogLayer" Style="{StaticResource SaOverlayStyle}" Visibility="Collapsed">
             <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                 <Border x:Name="DialogSurface" Style="{StaticResource SaModalSurfaceStyle}" Margin="{StaticResource SaPagePaddingCompact}"
-                        HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="720"
+                        HorizontalAlignment="Center" VerticalAlignment="Center"
                         AutomationProperties.IsDialog="True" TabFocusNavigation="Cycle">
                     <Grid>
                         <local:ServerEditorTestPanel x:Name="TestPanel" Visibility="Collapsed" />

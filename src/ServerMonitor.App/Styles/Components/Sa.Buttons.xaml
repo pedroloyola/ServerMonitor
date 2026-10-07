@@ -300,10 +300,71 @@
         <Setter Property="BorderThickness" Value="{StaticResource SaErrorBorderThickness}" />
     </Style>
     <!-- UI.7C: an inline text link ("Como preparo o meu servidor?" in the form and under a failed test stage, G-5): caption
-         size, no padding, so it sits on the text baseline of its row. -->
+         size, no padding, so it sits on the text baseline of its row. Final c1 (Prism F-4): neutral text (SaLinkTextBrush,
+         HC = Hotlight), never the system accent; underlined on hover, press and keyboard focus (the system focus ring stays). -->
+    <ControlTemplate x:Key="SaTextLinkButtonTemplate" TargetType="HyperlinkButton">
+        <Grid x:Name="RootGrid" Background="Transparent">
+            <VisualStateManager.VisualStateGroups>
+                <VisualStateGroup x:Name="CommonStates">
+                    <VisualState x:Name="Normal" />
+                    <VisualState x:Name="PointerOver">
+                        <VisualState.Setters>
+                            <Setter Target="Underline.Opacity" Value="1" />
+                        </VisualState.Setters>
+                    </VisualState>
+                    <VisualState x:Name="Pressed">
+                        <VisualState.Setters>
+                            <Setter Target="Underline.Opacity" Value="1" />
+                            <Setter Target="RootGrid.Opacity" Value="0.8" />
+                        </VisualState.Setters>
+                    </VisualState>
+                    <VisualState x:Name="Disabled">
+                        <VisualState.Setters>
+                            <Setter Target="ContentPresenter.Foreground" Value="{ThemeResource SaDisabledTextBrush}" />
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+                <VisualStateGroup x:Name="FocusStates">
+                    <VisualState x:Name="Focused">
+                        <VisualState.Setters>
+                            <Setter Target="FocusUnderline.Opacity" Value="1" />
+                        </VisualState.Setters>
+                    </VisualState>
+                    <VisualState x:Name="Unfocused" />
+                    <VisualState x:Name="PointerFocused" />
+                </VisualStateGroup>
+            </VisualStateManager.VisualStateGroups>
+            <ContentPresenter x:Name="ContentPresenter"
+                              Padding="{TemplateBinding Padding}"
+                              HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                              VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                              Content="{TemplateBinding Content}"
+                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                              FontFamily="{TemplateBinding FontFamily}"
+                              FontSize="{TemplateBinding FontSize}"
+                              FontWeight="{TemplateBinding FontWeight}"
+                              Foreground="{TemplateBinding Foreground}"
+                              AutomationProperties.AccessibilityView="Raw" />
+            <Border x:Name="Underline" Height="1" VerticalAlignment="Bottom" Background="{TemplateBinding Foreground}"
+                    Opacity="0" IsHitTestVisible="False" />
+            <Border x:Name="FocusUnderline" Height="1" VerticalAlignment="Bottom" Background="{TemplateBinding Foreground}"
+                    Opacity="0" IsHitTestVisible="False" />
+        </Grid>
+    </ControlTemplate>
     <Style x:Key="SaTextLinkButtonStyle" TargetType="HyperlinkButton">
+        <Setter Property="Template" Value="{StaticResource SaTextLinkButtonTemplate}" />
         <Setter Property="Padding" Value="0" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="FontFamily" Value="{StaticResource SaFontText}" />
         <Setter Property="FontSize" Value="{StaticResource SaFontSizeCaption}" />
+        <Setter Property="FontWeight" Value="Normal" />
+        <Setter Property="Foreground" Value="{ThemeResource SaLinkTextBrush}" />
+        <Setter Property="UseSystemFocusVisuals" Value="True" />
+        <Setter Property="FocusVisualPrimaryBrush" Value="{ThemeResource SaFocusRingBrush}" />
+        <Setter Property="FocusVisualPrimaryThickness" Value="{StaticResource SaFocusRingThickness}" />
+        <Setter Property="FocusVisualSecondaryThickness" Value="0" />
+        <Setter Property="FocusVisualMargin" Value="-3" />
     </Style>
     <!-- Dialog neutral 112:8573 / 112:8759: h42, radius 13, min width 168, fill .14/.12 + 1px border .14/.16, 13 Medium; no highlight. -->
     <Style x:Key="SaDialogButtonStyle" TargetType="Button" BasedOn="{StaticResource SaButtonBaseStyle}">

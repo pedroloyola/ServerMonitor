@@ -11,13 +11,16 @@ namespace ServerMonitor.App.Qa;
 /// host-key-unknown outcomes consult the REAL trust stores of the QA root: once the editor's "Confiar e ligar" wrote the
 /// key, the retest succeeds - so the two-step trust flow is exercised end to end without SSH. A <c>held</c> outcome keeps
 /// the test running (the "a testar" state) until Cancel or the per-process release signal <see cref="ReleaseEventName"/>
-/// is set; there is no wall clock. Nothing here writes anything.
+/// is set; there is no wall clock. UI.7 final c1 (Prism R4): <c>held-at-auth</c> holds the SAME way but mid-test - the
+/// port and host-key stages are reported, authentication is the running stage, and the rest is reported on release - so
+/// QA can see "A testar" as done / done / running / pending. Nothing here writes anything.
 /// </summary>
 internal sealed class QaScriptedSshConnectionService(
     string outcome,
     bool held,
     IHostKeyTrustStore directTrust,
-    IRoutedHostKeyTrustStore routedTrust) : ISshConnectionService
+    IRoutedHostKeyTrustStore routedTrust,
+    bool heldAtAuth = false) : ISshConnectionService
 {
     public static IReadOnlyList<string> Outcomes { get; } =
     [
@@ -42,6 +45,8 @@ internal sealed class QaScriptedSshConnectionService(
 
     public bool Held { get; } = held;
 
+    public bool HeldAtAuth { get; } = heldAtAuth;
+
     public Task<SshConnectionResult> ConnectAsync(SshConnectionRequest request, CancellationToken cancellationToken = default) =>
         Task.FromResult(new SshConnectionResult { State = ServerConnectionState.Error, ErrorCode = SshConnectionErrorCode.Unexpected });
 
@@ -52,7 +57,16 @@ internal sealed class QaScriptedSshConnectionService(
     {
         ArgumentNullException.ThrowIfNull(request);
         var result = await ResultForAsync(request.Server, cancellationToken);
-        Report(request, result.ReachedStage);
+        if (HeldAtAuth)
+        {
+            var beforeAuth = result.ReachedStage < SshConnectionStage.HostKeyVerified ? result.ReachedStage : SshConnectionStage.HostKeyVerified;
+            Report(request, SshConnectionStage.PortReachable, beforeAuth);
+            await WaitForReleaseAsync(cancellationToken);
+            Report(request, beforeAuth + 1, result.ReachedStage);
+            return Outcome == "unexpected" ? throw new InvalidOperationException("QA scripted unexpected failure.") : result;
+        }
+
+        Report(request, SshConnectionStage.PortReachable, result.ReachedStage);
         if (Held || Outcome == "cancelled-at-auth")
         {
             await WaitForReleaseAsync(cancellationToken);
@@ -131,9 +145,9 @@ internal sealed class QaScriptedSshConnectionService(
         }
     }
 
-    private static void Report(SshConnectionRequest request, SshConnectionStage reached)
+    private static void Report(SshConnectionRequest request, SshConnectionStage from, SshConnectionStage reached)
     {
-        for (var stage = SshConnectionStage.PortReachable; stage <= reached; stage++)
+        for (var stage = from < SshConnectionStage.PortReachable ? SshConnectionStage.PortReachable : from; stage <= reached; stage++)
         {
             request.StageProgress?.Report(stage);
         }

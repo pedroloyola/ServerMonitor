@@ -51,11 +51,21 @@
             <ListView
                 x:Name="HostList"
                 x:Uid="ServerEditorImportList"
+                ItemContainerStyle="{StaticResource SaInsetListItemStyle}"
                 MaxHeight="320"
                 SelectionMode="Single"
                 IsItemClickEnabled="False"
                 ContainerContentChanging="OnHostContainerContentChanging"
                 SelectionChanged="OnHostSelectionChanged">
+                <!-- Final c1 (Prism F-2, Figma 04 112:4049): each profile is a row surface (r13, inset tint, selected =
+                     SaSelectedBrush, 8 between rows); the selection marker is neutral (the local accent-neutral scope). -->
+                <ListView.Resources>
+                    <ResourceDictionary>
+                        <ResourceDictionary.MergedDictionaries>
+                            <ResourceDictionary Source="ms-appx:///Styles/Components/Sa.AccentNeutralScope.xaml" />
+                        </ResourceDictionary.MergedDictionaries>
+                    </ResourceDictionary>
+                </ListView.Resources>
                 <ListView.ItemTemplate>
                     <DataTemplate x:DataType="viewModels:SshConfigHostOptionViewModel">
                         <Grid ColumnSpacing="12">
@@ -65,8 +75,11 @@
                             </Grid.ColumnDefinitions>
                             <StackPanel Spacing="2">
                                 <TextBlock Text="{x:Bind Alias}" Style="{StaticResource SaBodyTextStyle}" FontWeight="Medium" TextTrimming="CharacterEllipsis" />
-                                <TextBlock Text="{x:Bind Preview}" Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}"
-                                           TextWrapping="Wrap" Visibility="{x:Bind HasPreview}" />
+                                <!-- "{host} · {user} · porta {n}" and "Via jump host {jump}" (set per container; never the key path). -->
+                                <TextBlock x:Name="DetailText" Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}"
+                                           TextTrimming="CharacterEllipsis" Visibility="Collapsed" />
+                                <TextBlock x:Name="JumpText" Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}"
+                                           TextTrimming="CharacterEllipsis" Visibility="Collapsed" />
                                 <TextBlock Text="{x:Bind RequirementText}" Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaAttentionTextBrush}"
                                            TextWrapping="Wrap" Visibility="{x:Bind HasRequirement}" />
                                 <TextBlock Text="{x:Bind ClassificationText}" Style="{StaticResource SaHelperTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}"
@@ -85,6 +98,34 @@
                     </DataTemplate>
                 </ListView.ItemTemplate>
             </ListView>
+
+            <!-- Final c1 (Prism F-2, Figma 04): the selected profile's details - Host / Utilizador / Chave privada (the key's
+                 file name; the full path only in the tooltip and the UIA HelpText). Read-only, from the resolver's entry. -->
+            <Border x:Name="DetailsPanel" Style="{StaticResource SaInsetPanelSurfaceStyle}" Visibility="Collapsed">
+                <Grid ColumnSpacing="16" RowSpacing="6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <TextBlock x:Name="DetailsHostLabel" x:Uid="ServerEditorImportDetailsHost" Style="{StaticResource SaCaptionTextStyle}"
+                               Foreground="{ThemeResource SaTextSecondaryBrush}" />
+                    <TextBlock x:Name="DetailsHostValue" Grid.Column="1" Style="{StaticResource SaCaptionTextStyle}" TextTrimming="CharacterEllipsis"
+                               IsTextSelectionEnabled="True" />
+                    <TextBlock x:Name="DetailsUserLabel" Grid.Row="1" x:Uid="ServerEditorImportDetailsUser" Style="{StaticResource SaCaptionTextStyle}"
+                               Foreground="{ThemeResource SaTextSecondaryBrush}" />
+                    <TextBlock x:Name="DetailsUserValue" Grid.Row="1" Grid.Column="1" Style="{StaticResource SaCaptionTextStyle}"
+                               TextTrimming="CharacterEllipsis" IsTextSelectionEnabled="True" />
+                    <TextBlock x:Name="DetailsKeyLabel" Grid.Row="2" x:Uid="ServerEditorImportDetailsKey" Style="{StaticResource SaCaptionTextStyle}"
+                               Foreground="{ThemeResource SaTextSecondaryBrush}" />
+                    <TextBlock x:Name="DetailsKeyValue" Grid.Row="2" Grid.Column="1" Style="{StaticResource SaCaptionTextStyle}"
+                               TextTrimming="CharacterEllipsis" />
+                </Grid>
+            </Border>
         </StackPanel>
 
         <TextBlock x:Name="WarningText" Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}"

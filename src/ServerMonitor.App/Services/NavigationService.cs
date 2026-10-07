@@ -283,7 +283,8 @@ public sealed class NavigationService : INavigationService
 
         if (_exitDecisionPending)
         {
-            // One question at a time: a navigation that arrives while the user decides is dropped, not queued.
+            // One question at a time: a navigation that arrives while the user decides is dropped, not queued
+            // (activations: see _pendingActivation - the latest one runs only if the user discards).
             refused?.Invoke();
             return true;
         }
