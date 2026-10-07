@@ -166,6 +166,9 @@
   <data name="CompactEmptyTitle.Text" xml:space="preserve"><value>Nenhum servidor configurado</value></data>
   <data name="CompactEmptyAction.Content" xml:space="preserve"><value>Abrir o ServerAlyzer</value></data>
   <data name="CompactMetricsUnavailable.Text" xml:space="preserve"><value>Offline</value></data>
+  <data name="CompactRowAccessibleFormat" xml:space="preserve"><value>{0}, {1}. CPU {2}, RAM {3}, disco {4}. Abrir detalhes</value></data>
+  <data name="CompactMetricAttentionAccessible" xml:space="preserve"><value>em atenção</value></data>
+  <data name="CompactMetricCriticalAccessible" xml:space="preserve"><value>crítico</value></data>
   <data name="SettingsCompactTitle.Text" xml:space="preserve"><value>Modo compacto</value></data>
   <data name="SettingsCompactDescription.Text" xml:space="preserve"><value>Uma visão reduzida dos seus servidores.</value></data>
   <data name="SettingsAlwaysOnTopToggle.Header" xml:space="preserve"><value>Sempre no topo</value></data>

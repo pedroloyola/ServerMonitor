@@ -844,6 +844,8 @@ public partial class App : Application
         // (QaOverviewComposition runs earlier in this method) and must keep winning (runtime smoke: "Há 8 segundos").
         services.TryAddSingleton(PresentationClock.System);
         services.AddSingleton<DashboardViewModel>();
+        // UI.8: the Compact window's presentation - a view over the singleton dashboard's cards (no engine, no store).
+        services.AddSingleton<CompactPresentationViewModel>();
         services.AddSingleton<SettingsViewModel>();
         services.AddSingleton<DashboardPage>();
         services.AddSingleton<SettingsPage>();
