@@ -235,6 +235,10 @@
     <Style x:Key="SaBrandTextStyle" TargetType="TextBlock"><Setter Property="FontFamily" Value="{StaticResource SaFontText}" />
         <Setter Property="FontSize" Value="{StaticResource SaFontSizeBrand}" /><Setter Property="LineHeight" Value="{StaticResource SaLineHeightBrand}" />
         <Setter Property="FontWeight" Value="SemiBold" /><Setter Property="TextWrapping" Value="Wrap" /><Setter Property="LineStackingStrategy" Value="BlockLineHeight" /></Style>
+    <!-- UI.8 Compact Mode (Prism R-6). Metric label 112:9447 Regular 9 / 125 % (box 13), UPPER CASE by its own resw key;
+         metric value Medium 15 (box 22); state label Regular 10 (SaMicroTextStyle is SemiBold, so not reused). -->
+    <x:Double x:Key="SaFontSizeCompactMetricLabel">9</x:Double>
+    <x:Double x:Key="SaLineHeightCompactMetricLabel">13</x:Double>
     <!-- UI.6 Figma 112:314: 42/53 SemiBold; Segoe fallback D1. -->
     <x:Double x:Key="SaFontSizeOnboardingHero">42</x:Double><x:Double x:Key="SaLineHeightOnboardingHero">53</x:Double>
     <Style x:Key="SaOnboardingHeroTextStyle" TargetType="TextBlock"><Setter Property="FontFamily" Value="{StaticResource SaFontText}" />

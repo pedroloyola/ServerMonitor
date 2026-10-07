@@ -45,6 +45,13 @@ public sealed class CompactPresentationViewModel : ObservableObject, IDisposable
         nameof(DashboardViewModel.UpdatedAgoDisplay)
     };
 
+    private static readonly string[] StateProperties =
+    [
+        nameof(BodyState), nameof(ShowsSummary), nameof(ShowsList), nameof(ShowsStateBlock), nameof(ShowsLoading),
+        nameof(ShowsServerIcon), nameof(ShowsAlertIcon), nameof(ShowsAddAction), nameof(ShowsHiddenAction),
+        nameof(StateTitle), nameof(StateBody), nameof(HasStateBody)
+    ];
+
     private readonly DashboardViewModel _dashboard;
     private readonly ILocalizationService _localization;
     private readonly MonitoringThresholds _thresholds;
@@ -83,6 +90,46 @@ public sealed class CompactPresentationViewModel : ObservableObject, IDisposable
     public bool HasUpdatedAgo => _updatedAgoDisplay is not null;
 
     public bool ShowsSummary => _bodyState == CompactBodyState.List;
+
+    /// <summary>The rows (only with at least one visible server).</summary>
+    public bool ShowsList => _bodyState == CompactBodyState.List;
+
+    /// <summary>R-8: one centred block (icon + title + body + optional real action) for every non-list state.</summary>
+    public bool ShowsStateBlock => _bodyState != CompactBodyState.List;
+
+    /// <summary>The native ProgressRing replaces the icon while loading (no motion of our own).</summary>
+    public bool ShowsLoading => _bodyState == CompactBodyState.Loading;
+
+    public bool ShowsServerIcon => _bodyState is CompactBodyState.Empty or CompactBodyState.AllHidden;
+
+    public bool ShowsAlertIcon => _bodyState == CompactBodyState.ConfigurationUnavailable;
+
+    /// <summary>D-UI8-8: "Adicionar servidor" only when there are no servers at all - never a fake action elsewhere.</summary>
+    public bool ShowsAddAction => _bodyState == CompactBodyState.Empty;
+
+    /// <summary>R-8: the real existing action of the all-hidden state, "Gerir servidores ocultos".</summary>
+    public bool ShowsHiddenAction => _bodyState == CompactBodyState.AllHidden;
+
+    /// <summary>The state block's title (R-8 copy: existing keys reused, new ones only where none existed).</summary>
+    public string StateTitle => _bodyState switch
+    {
+        CompactBodyState.Loading => _localization.GetString("ServersLoadingSubtitle"),
+        CompactBodyState.Empty => _localization.GetString("CompactEmptyTitle.Text"),
+        CompactBodyState.AllHidden => _localization.GetString("HiddenOverviewTitle.Text"),
+        CompactBodyState.ConfigurationUnavailable => _localization.GetString("CompactConfigUnavailableTitle.Text"),
+        _ => string.Empty
+    };
+
+    /// <summary>The state block's body; null (hidden) while loading and with the list.</summary>
+    public string? StateBody => _bodyState switch
+    {
+        CompactBodyState.Empty => _localization.GetString("CompactEmptyBody.Text"),
+        CompactBodyState.AllHidden => _localization.GetString("HiddenOverviewBody.Text"),
+        CompactBodyState.ConfigurationUnavailable => _localization.GetString("ConfigurationUnavailableNotice.Message"),
+        _ => null
+    };
+
+    public bool HasStateBody => StateBody is not null;
 
     public void Dispose()
     {
@@ -162,8 +209,10 @@ public sealed class CompactPresentationViewModel : ObservableObject, IDisposable
 
         if (stateChanged)
         {
-            OnPropertyChanged(nameof(BodyState));
-            OnPropertyChanged(nameof(ShowsSummary));
+            foreach (var name in StateProperties)
+            {
+                OnPropertyChanged(name);
+            }
         }
 
         if (countChanged)

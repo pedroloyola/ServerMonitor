@@ -18,6 +18,8 @@ public sealed partial class MainWindow : Window
     private readonly INavigationService _navigationService;
     public ShellViewModel Shell { get; }
     public OnboardingViewModel Onboarding { get; }
+    /// <summary>The compact chrome's view model ("Expandir", always-on-top, the Compact exits).</summary>
+    public WindowModeViewModel ModeView { get; }
     private readonly WindowCloseCoordinator _closeCoordinator;
     private readonly IApplicationWindowController _windowController;
     private readonly AppWindowPlacementAdapter _placementAdapter;
@@ -42,11 +44,13 @@ public sealed partial class MainWindow : Window
         IWindowModeCoordinator modeCoordinator,
         WindowModeViewModel windowModeViewModel,
         DashboardViewModel dashboardViewModel,
+        CompactPresentationViewModel compactPresentation,
         TrayService trayService,
         WindowCloseCoordinator closeCoordinator,
         BackupRestoreViewModel backupRestore,
         ILogger<MainWindow> logger)
     {
+        ModeView = windowModeViewModel;
         InitializeComponent();
         _navigationService = navigationService;
         Shell = shell;
@@ -74,10 +78,10 @@ public sealed partial class MainWindow : Window
         _placementAdapter.Attach(this);
         navigationService.Initialize(ContentFrame);
 
-        // The compact chrome/empty-state bind to the window-mode VM; the compact server list reuses
-        // the one shared DashboardViewModel, so both presentations show the same live state.
-        CompactRoot.DataContext = windowModeViewModel;
-        CompactBody.DataContext = dashboardViewModel;
+        // UI.8: the Compact body is a view over the one dashboard's cards (CompactPresentationViewModel) and hands every
+        // exit to the window-mode VM; both presentations show the same live state.
+        CompactShellView.Initialize(compactPresentation, windowModeViewModel);
+        CompactRoot.SizeChanged += OnCompactSizeChanged;
 
         _persistTimer = DispatcherQueue.CreateTimer();
         _persistTimer.Interval = TimeSpan.FromMilliseconds(700);
@@ -157,6 +161,7 @@ public sealed partial class MainWindow : Window
         }
 
         UpdateCompactCaptionReserve();
+        UpdateCompactTitleLayout();
 
         // Keep the standard dashboard navigated and its data loaded regardless of the starting mode,
         // so expanding from a cold compact start shows populated cards immediately.
@@ -196,6 +201,7 @@ public sealed partial class MainWindow : Window
             // The presenter's caption set is now the compact one (maximize disabled); size the
             // reserve to whatever the system actually reserves at the current DPI.
             UpdateCompactCaptionReserve();
+            UpdateCompactTitleLayout();
         }
         else
         {
@@ -205,6 +211,70 @@ public sealed partial class MainWindow : Window
         }
 
         UpdateCaptionButtonColors();
+        FocusAfterModeChange(mode);
+    }
+
+    /// <summary>
+    /// UI.8 RC-8 (deterministic, documented): entering Compact focuses the first server row, else the state block's real
+    /// action, else "Expandir"; leaving it focuses the current page's heading (never the window root, UI.6 section 184).
+    /// Keyboard focus only moves when the window already had it - a background mode change never steals focus.
+    /// </summary>
+    private void FocusAfterModeChange(WindowMode mode)
+    {
+        if (RootLayout.XamlRoot is not { } xamlRoot || Microsoft.UI.Xaml.Input.FocusManager.GetFocusedElement(xamlRoot) is null)
+        {
+            return;
+        }
+
+        DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+        {
+            if (mode == WindowMode.Compact)
+            {
+                if (CompactShellView.Repeater.ItemsSourceView is { Count: > 0 } && RepeaterFocus.FocusIndex(CompactShellView.Repeater, 0, FocusState.Keyboard))
+                {
+                    return;
+                }
+
+                if (CompactShellView.StateAction is { } action && action.Focus(FocusState.Keyboard))
+                {
+                    return;
+                }
+
+                CompactExpandButton.Focus(FocusState.Keyboard);
+            }
+            else if (ContentFrame.Content is Microsoft.UI.Xaml.Controls.Page page && !Onboarding.IsVisible)
+            {
+                ShellPageFocus.FocusHeading(page, force: true);
+            }
+        });
+    }
+
+    private void OnCompactSizeChanged(object sender, SizeChangedEventArgs args) => UpdateCompactTitleLayout();
+
+    /// <summary>
+    /// Prism R-3: decides, from MEASURED widths, whether "Expandir" shows its text, and whether the mark / wordmark fit
+    /// (CompactTitleLayout). Runs on every size change of the compact root and after the caption reserve is recomputed.
+    /// </summary>
+    private void UpdateCompactTitleLayout()
+    {
+        if (CompactRoot.Visibility != Visibility.Visible || CompactRoot.ActualWidth <= 0)
+        {
+            return;
+        }
+
+        var infinite = new Windows.Foundation.Size(double.PositiveInfinity, double.PositiveInfinity);
+        CompactWordmark.Measure(infinite);
+        CompactExpandText.Measure(infinite);
+        var padding = CompactExpandButton.Padding;
+        var buttonWithText = padding.Left + CompactExpandText.DesiredSize.Width + 6 + 16 + padding.Right;
+        var available = CompactRoot.ActualWidth - CompactDragRegion.Padding.Left - CompactCaptionColumn.ActualWidth;
+        var decision = CompactTitleLayout.Decide(available, CompactBrandMark.Size, CompactWordmark.DesiredSize.Width, buttonWithText);
+
+        CompactExpandText.Visibility = decision.ShowExpandText ? Visibility.Visible : Visibility.Collapsed;
+        CompactExpandButton.Padding = decision.ShowExpandText ? new Thickness(14, 0, 14, 0) : new Thickness(0);
+        CompactExpandButton.Width = decision.ShowExpandText ? double.NaN : CompactTitleLayout.IconButtonWidth;
+        CompactBrandMark.Visibility = decision.ShowMark ? Visibility.Visible : Visibility.Collapsed;
+        CompactWordmark.Visibility = decision.ShowWordmark ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void OnXamlRootChanged(Microsoft.UI.Xaml.XamlRoot sender, Microsoft.UI.Xaml.XamlRootChangedEventArgs args) =>
@@ -228,14 +298,15 @@ public sealed partial class MainWindow : Window
         if (reserved > 0)
         {
             CompactCaptionColumn.Width = new GridLength(reserved);
+            UpdateCompactTitleLayout();
         }
     }
 
     private void ApplyShellBackground()
     {
-        // Styles keep ThemeResource live on this root; Compact uses its exact pre-UI.6 backdrop.
-        var key = _usesOpaqueFallback ? "SaOpaqueWindowBackgroundStyle"
-            : _modeCoordinator.CurrentMode == WindowMode.Compact ? "SaLegacyWindowBackgroundStyle" : "SaShellWindowBackgroundStyle";
+        // Styles keep ThemeResource live on this root. UI.8 D-UI8-12: Compact uses the SAME material as the shell (Figma
+        // #0E0E0E@.62 / #FFF@.35 = SaWindowMaterialBrush), with the same opaque / High Contrast fallback.
+        var key = _usesOpaqueFallback ? "SaOpaqueWindowBackgroundStyle" : "SaShellWindowBackgroundStyle";
         WindowBackground.Style = (Style)Application.Current.Resources[key];
     }
 
@@ -249,6 +320,7 @@ public sealed partial class MainWindow : Window
             if (ContentFrame.Content is Microsoft.UI.Xaml.Controls.Page page) SaThemeRefresh.Remount(page);
             SaThemeRefresh.Remount(Sidebar, Sidebar.Content, content => Sidebar.Content = content);
             SaThemeRefresh.Remount(FirstRunView, FirstRunView.Content, content => FirstRunView.Content = content);
+            SaThemeRefresh.Remount(CompactShellView, CompactShellView.Content, content => CompactShellView.Content = content);
         });
     }
 
@@ -390,6 +462,7 @@ public sealed partial class MainWindow : Window
         Onboarding.PropertyChanged -= OnOnboardingChanged;
         _navigationService.Navigated -= OnShellNavigated;
         StandardRoot.SizeChanged -= OnStandardSizeChanged;
+        CompactRoot.SizeChanged -= OnCompactSizeChanged;
         RootLayout.KeyDown -= OnShellKeyDown;
         _persistTimer.Stop();
         _persistTimer.Tick -= OnPersistTimerTick;

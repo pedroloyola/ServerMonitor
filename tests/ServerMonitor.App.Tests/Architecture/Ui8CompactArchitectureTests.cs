@@ -23,14 +23,21 @@ public sealed partial class Ui8CompactArchitectureTests
         typeof(CompactBodyState),
         typeof(ServerMetricPresentation),
         typeof(ServerMetricReading),
-        typeof(ServerMetricKind)
+        typeof(ServerMetricKind),
+        // 8C: the Compact view, its x:Bind functions and its bar primitive.
+        typeof(ServerMonitor.App.Controls.CompactShell),
+        typeof(ServerMonitor.App.Converters.CompactRowStyles),
+        typeof(ServerMonitor.App.Controls.Primitives.SaCompactMetricBar)
     ];
 
     private static readonly string[] CompactSources =
     [
         "ViewModels/CompactServerRowViewModel.cs",
         "ViewModels/CompactPresentationViewModel.cs",
-        "ViewModels/ServerMetricPresentation.cs"
+        "ViewModels/ServerMetricPresentation.cs",
+        "Controls/CompactShell.xaml.cs",
+        "Converters/CompactRowStyles.cs",
+        "Controls/Primitives/SaCompactMetricBar.cs"
     ];
 
     private static readonly Type[] Forbidden =

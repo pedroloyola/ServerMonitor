@@ -26,7 +26,8 @@ public sealed class Ui6ViewContractTests
         Assert.Null(A(Named(doc,"Sidebar"),"Background"));
         Assert.Contains(doc.Descendants(), e => e.Name.LocalName == "Border" && A(e,"Background") == "{ThemeResource SaSidebarMaterialBrush}");
         Assert.Equal("{StaticResource SaShellWindowBackgroundStyle}", A(Named(doc,"WindowBackground"),"Style"));
-        Assert.Contains(AppSourceTree.LoadXaml("Styles/Components/Sa.Primitives.xaml").Descendants(), e => A(e,"Value")=="{ThemeResource WindowBackdropTintBrush}");
+        // UI.8 D-UI8-12: the Compact window uses the shell's material too; the pre-UI.6 compact backdrop style is gone.
+        Assert.DoesNotContain(AppSourceTree.LoadXaml("Styles/Components/Sa.Primitives.xaml").Descendants(), e => A(e,"Value")=="{ThemeResource WindowBackdropTintBrush}");
         Assert.Same(Named(doc,"RootLayout"), Named(doc,"ModalOverlayHost").Parent);
         Assert.Same(Named(doc,"StandardRoot"), Named(doc,"FirstRunView").Parent);
         Assert.Equal("32", A(Named(doc,"ShellDragRegion"),"Height"));

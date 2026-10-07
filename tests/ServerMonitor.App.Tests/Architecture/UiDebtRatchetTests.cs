@@ -17,15 +17,14 @@ public sealed partial class UiDebtRatchetTests
 {
     /// <summary>Literal <c>FontSize="n"</c> (attribute or <c>Setter Property="FontSize" Value="n"</c>) per file,
     /// for every XAML except App.xaml and Styles/Tokens/** (Views/, Controls/, MainWindow.xaml, legacy Styles/*.xaml,
-    /// any new folder). Files not listed have a baseline of zero. Total today: 96 (UI.3 removed HistoryPage 7 + WorkloadsPage 38; UI.4 DashboardPage 8; UI.5 ServerFullCard 21 + ServerActionsButton 1 + SettingsPage 20).</summary>
+    /// any new folder). Files not listed have a baseline of zero. Total today: 74 (UI.3 removed HistoryPage 7 + WorkloadsPage 38; UI.4 DashboardPage 8; UI.5 ServerFullCard 21 + ServerActionsButton 1 + SettingsPage 20; UI.8 ServerCompactCard 15 + MainWindow 7).</summary>
     private static readonly IReadOnlyDictionary<string, int> FontSizeLiteralBaseline = new Dictionary<string, int>(StringComparer.Ordinal)
     {
         ["Controls/DiscoveredServerCard.xaml"] = 5,
         ["Controls/EmptyStateControl.xaml"] = 3,
-        ["Controls/ServerCompactCard.xaml"] = 15,
         // UI.7C (B-22): ServerEditorModal deleted; ServerFormControl's last inline panels (checklist, prep helper) moved to
         // the type ramp / the test dialog - 43 + 1 literals gone (win locked).
-        ["MainWindow.xaml"] = 7,
+        // UI.8 (D-UI8-15): the legacy compact card (15) and the old compact chrome (MainWindow 7) are gone (win locked).
         ["Styles/Controls.xaml"] = 7,
         ["Views/BackupCreateDialog.xaml"] = 3,
         ["Views/RestoreConfirmDialog.xaml"] = 3,
@@ -47,9 +46,8 @@ public sealed partial class UiDebtRatchetTests
     private static readonly IReadOnlyDictionary<string, int> LegacyAccentBaseline = new Dictionary<string, int>(StringComparer.Ordinal)
     {
         ["Controls/EmptyStateControl.xaml"] = 3,
-        ["Controls/ServerCompactCard.xaml"] = 3,
         // UI.7C (B-22): ServerFormControl's last legacy accent dependency is gone (win locked).
-        ["MainWindow.xaml"] = 4,
+        // UI.8 (D-UI8-15): the legacy compact card (3) and the old compact chrome's accent tile (MainWindow 4) are gone.
         ["Styles/Controls.xaml"] = 4,
         ["Styles/DesignTokens.xaml"] = 92
     };

@@ -653,8 +653,153 @@
         </ControlTemplate></Setter.Value></Setter>
     </Style>
 
+    <!-- ============================ UI.8 COMPACT MODE (Prism R-5 / R-6) ============================ -->
+    <Style x:Key="SaCompactMetricLabelTextStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource SaFontText}" />
+        <Setter Property="FontSize" Value="{StaticResource SaFontSizeCompactMetricLabel}" />
+        <Setter Property="FontWeight" Value="Normal" />
+        <Setter Property="LineHeight" Value="{StaticResource SaLineHeightCompactMetricLabel}" />
+        <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
+        <Setter Property="CharacterSpacing" Value="0" />
+        <Setter Property="Foreground" Value="{ThemeResource SaTextSecondaryBrush}" />
+    </Style>
+    <Style x:Key="SaCompactMetricValueTextStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource SaFontText}" />
+        <Setter Property="FontSize" Value="{StaticResource SaFontSizeListRowTitle}" />
+        <Setter Property="FontWeight" Value="Medium" />
+        <Setter Property="LineHeight" Value="{StaticResource SaLineHeightListRowTitle}" />
+        <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
+        <Setter Property="Foreground" Value="{ThemeResource SaTextBrush}" />
+    </Style>
+    <!-- Unknown / Offline "—" and a stale (retained) value: secondary. Attention / critical: the UI.4 metric vocabulary. -->
+    <Style x:Key="SaCompactMetricValueMutedTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SaCompactMetricValueTextStyle}">
+        <Setter Property="Foreground" Value="{ThemeResource SaTextSecondaryBrush}" />
+    </Style>
+    <Style x:Key="SaCompactMetricValueAttentionTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SaCompactMetricValueTextStyle}">
+        <Setter Property="Foreground" Value="{ThemeResource SaAttentionTextBrush}" />
+    </Style>
+    <Style x:Key="SaCompactMetricValueCriticalTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SaCompactMetricValueTextStyle}">
+        <Setter Property="Foreground" Value="{ThemeResource SaDangerTextBrush}" />
+    </Style>
+    <Style x:Key="SaCompactStatusTextStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource SaFontText}" />
+        <Setter Property="FontSize" Value="{StaticResource SaFontSizeMicro}" />
+        <Setter Property="FontWeight" Value="Normal" />
+        <Setter Property="LineHeight" Value="{StaticResource SaLineHeightMicro}" />
+        <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
+        <Setter Property="Foreground" Value="{ThemeResource SaTextSecondaryBrush}" />
+    </Style>
+    <!-- Healthy / no data stay secondary (Figma); attention, critical and no connection take the state colour. -->
+    <Style x:Key="SaCompactStatusAttentionTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SaCompactStatusTextStyle}">
+        <Setter Property="Foreground" Value="{ThemeResource SaAttentionTextBrush}" />
+    </Style>
+    <Style x:Key="SaCompactStatusCriticalTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SaCompactStatusTextStyle}">
+        <Setter Property="Foreground" Value="{ThemeResource SaDangerTextBrush}" />
+    </Style>
+    <Style x:Key="SaCompactStatusOfflineTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SaCompactStatusTextStyle}">
+        <Setter Property="Foreground" Value="{ThemeResource SaOfflineBrush}" />
+    </Style>
+
+    <!-- Compact "Expandir" 112:9430 / "Adicionar servidor" 112:9828: h36, SaRadiusControl, padding 14,0, 12 Medium, flat glass
+         fill (SaCompactButtonBrush @.18 / emphasis @.25), HC ButtonFace + ButtonText edge. Hover/pressed = the shared veil
+         over the fill (DERIVED), disabled .58, keyboard focus = the Sa ring. -->
+    <Style x:Key="SaCompactButtonStyle" TargetType="Button" BasedOn="{StaticResource SaButtonBaseStyle}">
+        <Setter Property="Template" Value="{StaticResource SaFlatButtonTemplate}" />
+        <Setter Property="Height" Value="36" />
+        <Setter Property="MinWidth" Value="36" />
+        <Setter Property="Padding" Value="14,0" />
+        <Setter Property="CornerRadius" Value="{StaticResource SaRadiusControl}" />
+        <Setter Property="FontSize" Value="{StaticResource SaFontSizeLabel}" />
+        <Setter Property="FontWeight" Value="Medium" />
+        <Setter Property="Background" Value="{ThemeResource SaCompactButtonBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource SaCompactButtonBorderBrush}" />
+        <Setter Property="BorderThickness" Value="{ThemeResource SaSecondaryBorderThickness}" />
+    </Style>
+    <Style x:Key="SaCompactButtonEmphasisStyle" TargetType="Button" BasedOn="{StaticResource SaCompactButtonStyle}">
+        <Setter Property="Background" Value="{ThemeResource SaCompactButtonEmphasisBrush}" />
+    </Style>
+
+    <!-- Compact server row 112:9439: the WHOLE row is one button (D-UI8-7: Enter / Space / click -> Detail), fill
+         SaCompactRowBrush, r15, padding 12,10, HC 1 px edge. Hover / pressed = the shared veil (DERIVED: the Figma draws no
+         interactive state); the focus ring sits ON the row edge (FocusVisualMargin 0) so it never spills into the 8 gap. -->
+    <Style x:Key="SaCompactRowButtonStyle" TargetType="Button" BasedOn="{StaticResource SaButtonBaseStyle}">
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="VerticalContentAlignment" Value="Stretch" />
+        <Setter Property="Padding" Value="12,10" />
+        <Setter Property="CornerRadius" Value="{StaticResource SaRadiusCompactRow}" />
+        <Setter Property="Background" Value="{ThemeResource SaCompactRowBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource SaCompactRowBorderBrush}" />
+        <Setter Property="BorderThickness" Value="{ThemeResource SaSecondaryBorderThickness}" />
+        <Setter Property="FocusVisualMargin" Value="0" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Grid x:Name="RootGrid" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                          BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="{TemplateBinding CornerRadius}">
+                        <VisualStateManager.VisualStateGroups>
+                            <VisualStateGroup x:Name="CommonStates">
+                                <VisualState x:Name="Normal" />
+                                <VisualState x:Name="PointerOver">
+                                    <VisualState.Setters>
+                                        <Setter Target="StateOverlay.Background" Value="{ThemeResource SaHoverBrush}" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Pressed">
+                                    <VisualState.Setters>
+                                        <Setter Target="StateOverlay.Background" Value="{ThemeResource SaSelectedBrush}" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Disabled" />
+                            </VisualStateGroup>
+                        </VisualStateManager.VisualStateGroups>
+                        <Border x:Name="StateOverlay" CornerRadius="{TemplateBinding CornerRadius}" IsHitTestVisible="False" />
+                        <ContentPresenter
+                            Padding="{TemplateBinding Padding}"
+                            HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                            VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                            Content="{TemplateBinding Content}"
+                            AutomationProperties.AccessibilityView="Raw" />
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Compact metric track 112:9450: h3, SaRadiusMiniBar (Figma r2), empty = SaBarEmptyBrush, fill = SaCompactBarBrush or
+         the severity text colour (the Figma uses the SAME colour for value and bar). -->
+    <Style TargetType="primitives:SaCompactMetricBar">
+        <Setter Property="IsTabStop" Value="False" />
+        <Setter Property="Height" Value="3" />
+        <Setter Property="AutomationProperties.AccessibilityView" Value="Raw" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="primitives:SaCompactMetricBar">
+                    <Border x:Name="PART_Track" CornerRadius="{StaticResource SaRadiusMiniBar}" Background="{ThemeResource SaBarEmptyBrush}">
+                        <VisualStateManager.VisualStateGroups>
+                            <VisualStateGroup x:Name="ToneStates">
+                                <VisualState x:Name="Neutral" />
+                                <VisualState x:Name="Attention">
+                                    <VisualState.Setters>
+                                        <Setter Target="PART_Fill.Background" Value="{ThemeResource SaAttentionTextBrush}" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Critical">
+                                    <VisualState.Setters>
+                                        <Setter Target="PART_Fill.Background" Value="{ThemeResource SaDangerTextBrush}" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                            </VisualStateGroup>
+                        </VisualStateManager.VisualStateGroups>
+                        <Border x:Name="PART_Fill" HorizontalAlignment="Left" Width="0" Visibility="Collapsed"
+                                CornerRadius="{StaticResource SaRadiusMiniBar}" Background="{ThemeResource SaCompactBarBrush}" />
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
             <Style x:Key="SaShellWindowBackgroundStyle" TargetType="Border"><Setter Property="Background" Value="{ThemeResource SaWindowMaterialBrush}"/></Style>
-            <Style x:Key="SaLegacyWindowBackgroundStyle" TargetType="Border"><Setter Property="Background" Value="{ThemeResource WindowBackdropTintBrush}"/></Style>
             <Style x:Key="SaOpaqueWindowBackgroundStyle" TargetType="Border"><Setter Property="Background" Value="{ThemeResource AppBackgroundBrush}"/></Style>
 
 </ResourceDictionary>

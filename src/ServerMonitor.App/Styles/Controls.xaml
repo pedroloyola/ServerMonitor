@@ -4,7 +4,6 @@
     xmlns:controls="using:ServerMonitor.App.Controls"
     xmlns:converters="using:ServerMonitor.App.Converters">
     <converters:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
-    <converters:HealthToBrushConverter x:Key="HealthToBrushConverter" />
 
     <Style x:Key="PageTitleTextStyle" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="Segoe UI Variable Display" />
@@ -58,16 +57,6 @@
         <Setter Property="Background" Value="{ThemeResource MutedSurfaceBrush}" />
         <Setter Property="BorderBrush" Value="{ThemeResource GlassBorderBrush}" />
         <Setter Property="BorderThickness" Value="1" />
-    </Style>
-
-    <!-- Compact widget chrome toggle (always-on-top). Transparent when off; the default ToggleButton
-         checked visual paints it with the brand accent, which is the sanctioned "selected" use of
-         #1846E1 (never a health colour). -->
-    <Style x:Key="CompactChromeToggleStyle" TargetType="ToggleButton">
-        <Setter Property="CornerRadius" Value="15" />
-        <Setter Property="Background" Value="Transparent" />
-        <Setter Property="BorderThickness" Value="0" />
-        <Setter Property="MinWidth" Value="0" />
     </Style>
 
     <Style x:Key="ContentDialogPrimaryButtonStyle" TargetType="Button">

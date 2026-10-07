@@ -65,6 +65,13 @@
             <SolidColorBrush x:Key="SaSecondaryFillBrush" Color="{StaticResource SaColorSelectedDark}" />
             <SolidColorBrush x:Key="SaSecondaryBorderBrush" Color="Transparent" />
             <SolidColorBrush x:Key="SaToggleOnTrackBrush" Color="{StaticResource SaColorHealthyDark}" />
+            <!-- UI.8 Compact (Prism R-6). -->
+            <SolidColorBrush x:Key="SaCompactRowBrush" Color="{StaticResource SaColorCompactRowDark}" />
+            <SolidColorBrush x:Key="SaCompactRowBorderBrush" Color="Transparent" />
+            <SolidColorBrush x:Key="SaCompactButtonBrush" Color="{StaticResource SaColorCompactButtonDark}" />
+            <SolidColorBrush x:Key="SaCompactButtonEmphasisBrush" Color="{StaticResource SaColorCompactButtonEmphasisDark}" />
+            <SolidColorBrush x:Key="SaCompactButtonBorderBrush" Color="Transparent" />
+            <SolidColorBrush x:Key="SaCompactBarBrush" Color="{StaticResource SaColorCompactBarDark}" />
         </ResourceDictionary>
         <ResourceDictionary x:Key="Light">
             <SolidColorBrush x:Key="SaCanvasBrush" Color="{StaticResource SaColorCanvasLight}" />
@@ -121,6 +128,13 @@
             <SolidColorBrush x:Key="SaSecondaryFillBrush" Color="{StaticResource SaColorSelectedLight}" />
             <SolidColorBrush x:Key="SaSecondaryBorderBrush" Color="Transparent" />
             <SolidColorBrush x:Key="SaToggleOnTrackBrush" Color="{StaticResource SaColorHealthyLight}" />
+            <!-- UI.8 Compact (Prism R-6). -->
+            <SolidColorBrush x:Key="SaCompactRowBrush" Color="{StaticResource SaColorCompactRowLight}" />
+            <SolidColorBrush x:Key="SaCompactRowBorderBrush" Color="Transparent" />
+            <SolidColorBrush x:Key="SaCompactButtonBrush" Color="{StaticResource SaColorCompactButtonLight}" />
+            <SolidColorBrush x:Key="SaCompactButtonEmphasisBrush" Color="{StaticResource SaColorCompactButtonEmphasisLight}" />
+            <SolidColorBrush x:Key="SaCompactButtonBorderBrush" Color="Transparent" />
+            <SolidColorBrush x:Key="SaCompactBarBrush" Color="{StaticResource SaColorCompactBarLight}" />
         </ResourceDictionary>
         <ResourceDictionary x:Key="HighContrast">
             <SolidColorBrush x:Key="SaCanvasBrush" Color="{ThemeResource SystemColorWindowColor}" />
@@ -177,6 +191,13 @@
             <SolidColorBrush x:Key="SaSecondaryFillBrush" Color="{ThemeResource SystemColorButtonFaceColor}" />
             <SolidColorBrush x:Key="SaSecondaryBorderBrush" Color="{ThemeResource SystemColorButtonTextColor}" />
             <SolidColorBrush x:Key="SaToggleOnTrackBrush" Color="{ThemeResource SystemColorHighlightColor}" />
+            <!-- UI.8 Compact (Prism R-6): HC rows/buttons keep a 1 px WindowText/ButtonText edge (no fill to tell them apart). -->
+            <SolidColorBrush x:Key="SaCompactRowBrush" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="SaCompactRowBorderBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="SaCompactButtonBrush" Color="{ThemeResource SystemColorButtonFaceColor}" />
+            <SolidColorBrush x:Key="SaCompactButtonEmphasisBrush" Color="{ThemeResource SystemColorButtonFaceColor}" />
+            <SolidColorBrush x:Key="SaCompactButtonBorderBrush" Color="{ThemeResource SystemColorButtonTextColor}" />
+            <SolidColorBrush x:Key="SaCompactBarBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
         </ResourceDictionary>
     </ResourceDictionary.ThemeDictionaries>
 </ResourceDictionary>

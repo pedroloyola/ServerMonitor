@@ -128,7 +128,7 @@ public sealed class Ui8CompactPresentationTests
             Assert.Equal(ServerStatusPresentation.StatusKey(row.Card.Health), row.StatusText);
             Assert.DoesNotContain("ServerHealth", row.StatusText, StringComparison.Ordinal);
         });
-        Assert.DoesNotContain(typeof(CompactServerRowViewModel).GetProperties(), property => property.Name == nameof(ServerCardViewModel.HealthDisplayName));
+        Assert.DoesNotContain(typeof(CompactServerRowViewModel).GetProperties(), property => property.Name == "HealthDisplayName");
     }
 
     [Fact]

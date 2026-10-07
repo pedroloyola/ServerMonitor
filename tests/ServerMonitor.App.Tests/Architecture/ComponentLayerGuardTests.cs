@@ -334,7 +334,8 @@ public sealed partial class ComponentLayerGuardTests
 
         var mapped = AliasRow().Matches(section.Value).Select(m => m.Groups[1].Value)
             .Where(k => k != "Chave antiga").ToList();
-        Assert.Equal(70, mapped.Count);
+        // UI.8 (D-UI8-15): TitleBarSurfaceBrush removed with its only consumer, the pre-UI.8 compact title bar.
+        Assert.Equal(69, mapped.Count);
         Assert.Equal(mapped.Count, mapped.Distinct(StringComparer.Ordinal).Count());
 
         string[] themeKeys = ["Dark", "Light", "Default", "HighContrast"];

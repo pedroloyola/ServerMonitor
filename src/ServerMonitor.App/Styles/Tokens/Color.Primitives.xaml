@@ -144,4 +144,14 @@
     <!-- UI.5: server symbol tile rgba(153,153,153,.15) / rgba(255,255,255,.15), 112:1792 / 112:2028. -->
     <Color x:Key="SaColorIconTileDark">#26999999</Color>
     <Color x:Key="SaColorIconTileLight">#26FFFFFF</Color>
+    <!-- UI.8 Compact Mode (Prism R-6), Figma 05 sec. 15: row fill 112:9439 #808080@.09 / 112:9631 #FFF@.23; "Expandir"
+         112:9430 @.18 and "Adicionar servidor" 112:9828 @.25; neutral metric bar 112:9450 #BDBDBD / 112:9642 #666666. -->
+    <Color x:Key="SaColorCompactRowDark">#17808080</Color>
+    <Color x:Key="SaColorCompactRowLight">#3BFFFFFF</Color>
+    <Color x:Key="SaColorCompactButtonDark">#2E808080</Color>
+    <Color x:Key="SaColorCompactButtonLight">#2EFFFFFF</Color>
+    <Color x:Key="SaColorCompactButtonEmphasisDark">#40808080</Color>
+    <Color x:Key="SaColorCompactButtonEmphasisLight">#40FFFFFF</Color>
+    <Color x:Key="SaColorCompactBarDark">#BDBDBD</Color>
+    <Color x:Key="SaColorCompactBarLight">#666666</Color>
 </ResourceDictionary>

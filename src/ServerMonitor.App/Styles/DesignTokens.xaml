@@ -6,7 +6,6 @@
             <!-- Backgrounds & Glass Layers -->
             <SolidColorBrush x:Key="AppBackgroundBrush" Color="#111318" />
             <SolidColorBrush x:Key="WindowBackdropTintBrush" Color="#28111318" />
-            <SolidColorBrush x:Key="TitleBarSurfaceBrush" Color="#20111318" />
             <AcrylicBrush
                 x:Key="GlassSurfaceBrush"
                 FallbackColor="#E8161A22"
@@ -83,7 +82,6 @@
             <!-- Backgrounds & Glass Layers -->
             <SolidColorBrush x:Key="AppBackgroundBrush" Color="#FFFFFF" />
             <SolidColorBrush x:Key="WindowBackdropTintBrush" Color="#20FFFFFF" />
-            <SolidColorBrush x:Key="TitleBarSurfaceBrush" Color="#18FFFFFF" />
             <AcrylicBrush
                 x:Key="GlassSurfaceBrush"
                 FallbackColor="#F4FFFFFF"
@@ -159,7 +157,6 @@
         <ResourceDictionary x:Key="Default">
             <SolidColorBrush x:Key="AppBackgroundBrush" Color="#111318" />
             <SolidColorBrush x:Key="WindowBackdropTintBrush" Color="#28111318" />
-            <SolidColorBrush x:Key="TitleBarSurfaceBrush" Color="#20111318" />
             <AcrylicBrush
                 x:Key="GlassSurfaceBrush"
                 FallbackColor="#E8161A22"
@@ -226,7 +223,6 @@
         <ResourceDictionary x:Key="HighContrast">
             <StaticResource x:Key="AppBackgroundBrush" ResourceKey="SystemColorWindowBrush" />
             <StaticResource x:Key="WindowBackdropTintBrush" ResourceKey="SystemColorWindowBrush" />
-            <StaticResource x:Key="TitleBarSurfaceBrush" ResourceKey="SystemColorWindowBrush" />
             <StaticResource x:Key="GlassSurfaceBrush" ResourceKey="SystemColorWindowBrush" />
             <StaticResource x:Key="GlassBorderBrush" ResourceKey="SystemColorWindowTextBrush" />
             <StaticResource x:Key="GlassHighlightBrush" ResourceKey="SystemColorWindowTextBrush" />

@@ -45,8 +45,9 @@ public sealed partial class GeometryLiteralRatchetTests
     private static readonly IReadOnlyDictionary<(string Ledger, string Property), int> PinnedLedgerTotals =
         new Dictionary<(string Ledger, string Property), int>
         {
-            [("GeometryLiteralBaseline.tsv", "CornerRadius")] = 17,
-            [("GeometryLiteralBaseline.tsv", "Padding")] = 18, // UI.7C (B-22): modal deleted + the form's checklist/prep paddings gone (7B: 26, 7A: 33)
+            // UI.8 (D-UI8-15): the legacy compact card, the old compact chrome and its toggle style are gone (17 -> 8, 18 -> 12).
+            [("GeometryLiteralBaseline.tsv", "CornerRadius")] = 8,
+            [("GeometryLiteralBaseline.tsv", "Padding")] = 12, // UI.7C (B-22): modal deleted + the form's checklist/prep paddings gone (7B: 26, 7A: 33)
             [("GeometryLiteralAllowlist.tsv", "CornerRadius")] = 0,
             [("GeometryLiteralAllowlist.tsv", "Padding")] = 50
         };
