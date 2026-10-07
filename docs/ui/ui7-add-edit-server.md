@@ -1,8 +1,13 @@
 # UI.7 — Adicionar / Editar servidor
 
-**Estado: READY_TO_MERGE** (2026-10-07).
-- **PR:** #27, branch `ui/ui7-add-edit-server`, base `4ffbb1b`. Código validado em `c25ffb9`; o commit que acrescenta este documento é só de documentação.
-- **CI do PR:** verde em `a5915a5` (run 37554757487), `ace95a5` (run 37593466055) `7ca4d86` (run 37606201930) e `c25ffb9` (ver PR).
+**Estado: COMPLETE** (2026-10-07).
+- **Merge:** PR #27 integrado por merge commit (GO humano 2026-10-07), fixado ao head `82ca791` → `main` = `ce34bd8` (pais `4ffbb1b` + `82ca791`; árvore == `82ca791`).
+- **CI pós-merge:** verde à primeira tentativa (run 37610805348).
+- **Branch:** `ui/ui7-add-edit-server` (mantida, local e remota), base `4ffbb1b`. Código validado em `c25ffb9`; `82ca791` acrescenta só este documento.
+- **CI do PR:** verde em `a5915a5` (run 37554757487), `ace95a5` (run 37593466055), `7ca4d86` (run 37606201930) e `82ca791` (run 37610180105).
+- **Floor UI.7:** removido depois do merge, sem apagar a branch (`floor delete --keep-branch`). Triple-check: ausente de `maestri floor list`, ausente de `git worktree list` (`prune --dry-run` limpo) e diretório inexistente.
+- **Limpeza:** 100 raízes QA por lançamento + `editor\` em `%TEMP%\ServerMonitor-QA` removidas por caminho exato (conteúdo sintético verificado, sem reparse points; as 2 raízes anteriores e as de outros milestones ficaram). 0 processos residuais. Dados reais 0 diffs antes do merge.
+- **Exceção registada (Firewall):** as 4 regras "Query User" Inbound Allow do `testhost.exe` de `Infrastructure.Tests` deste Floor (Debug/Release, TCP/UDP) **não** foram removidas: a sessão não estava elevada e a remoção exige consentimento UAC humano. Os Names exatos estão na evidência da run; remover por Name exato com elevação.
 - **Âmbito:** o modal Add/Edit foi substituído pela página inteira do Figma dentro do shell do UI.6, preservando todas as invariantes M14: SSH config import, credenciais, ProxyJump, trust, key discovery e o teste de ligação em 4 etapas. É um redesenho de apresentação; não há migração de armazenamento.
 - **Execução:** um PR em três blocos internos. UI.7A (IA, página, sessão, guard, ciclo de vida, harness), UI.7B (SSH, credenciais, ProxyJump, trust, import, key discovery; gate Vigil obrigatório antes do 7C) e UI.7C (validação, teste de ligação, feedback, fidelidade, limpeza do legado).
 
@@ -150,7 +155,7 @@ Nota de comportamento (Cortex n-2/n-3): a lista de servidores conhecidos para o 
 
 - Antes e depois de cada janela de QA (7A ×3, 7B, 7C ×2, Beacon c1 e c3), o snapshot de metadata + SHA-256 de `%LOCALAPPDATA%\ServerMonitor`, `~\.ssh`, as pastas do pacote e a contagem de alvos do Credential Manager mostrou **0 diferenças**. O `known-hosts.json` real ficou inalterado e o `known-hosts.routes.json` real não existe.
 - Todos os lançamentos foram feitos via `tools/qa/Start-QaApp.ps1`, com paragem por PID exato e 0 processos residuais. Não houve prompt de Firewall durante a QA.
-- O Firewall ganhou 4 regras "Query User" Inbound Allow para o `testhost.exe` de `Infrastructure.Tests` (Debug/Release, TCP/UDP) do Floor UI.7. A remoção por Name exato está autorizada e fica registada no fecho.
+- O Firewall ganhou 4 regras "Query User" Inbound Allow para o `testhost.exe` de `Infrastructure.Tests` (Debug/Release, TCP/UDP) do Floor UI.7. A remoção por Name exato estava autorizada, mas ficou como **exceção registada**: a sessão não estava elevada e o consentimento UAC exige um humano (ver o topo).
 
 ## 9. Motion (UI.11)
 
