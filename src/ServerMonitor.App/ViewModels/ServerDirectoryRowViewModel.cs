@@ -52,42 +52,40 @@ public sealed class ServerDirectoryRowViewModel : ObservableObject, IDisposable
     /// <summary>UI.5: the shared status copy (<see cref="ServerStatusPresentation"/>), the same function the Detail page reads.</summary>
     public string StatusDisplay => ServerStatusPresentation.StatusText(Health, _localization);
 
-    public string CpuDisplay => Percent(HasCpuPercent, Card.CpuUsageValue);
+    public string CpuDisplay => ServerMetricPresentation.Text(Cpu, _localization);
 
-    public string MemoryDisplay => Percent(HasMemoryPercent, Card.MemoryUsageValue);
+    public string MemoryDisplay => ServerMetricPresentation.Text(Memory, _localization);
 
-    public string DiskDisplay => Percent(HasDiskPercent, Card.DiskUsageValue);
+    public string DiskDisplay => ServerMetricPresentation.Text(Disk, _localization);
 
     // An Offline server shows "—", not its retained (stale) snapshot — the table has no staleness cue, so an old value
     // would read as current. The Detail page shows that reading marked stale instead (H-UI5-2); both rules live in
-    // ServerStatusPresentation.
-    public bool HasCpuPercent => Card.HasCpuPercent && !IsOffline;
+    // ServerStatusPresentation, the metric rules in ServerMetricPresentation (UI.8 RC-6, shared with the Compact row).
+    public bool HasCpuPercent => Cpu.IsKnown;
 
-    public bool HasMemoryPercent => Card.HasMemoryPercent && !IsOffline;
+    public bool HasMemoryPercent => Memory.IsKnown;
 
-    public bool HasDiskPercent => Card.HasDiskPercent && !IsOffline;
+    public bool HasDiskPercent => Disk.IsKnown;
 
-    public double CpuValue => HasCpuPercent ? Card.CpuUsageValue : 0;
+    public double CpuValue => Cpu.Value;
 
-    public double MemoryValue => HasMemoryPercent ? Card.MemoryUsageValue : 0;
+    public double MemoryValue => Memory.Value;
 
-    public double DiskValue => HasDiskPercent ? Card.DiskUsageValue : 0;
-
-    private bool IsOffline => ServerStatusPresentation.RowHidesRetainedMetrics(Card.Health);
+    public double DiskValue => Disk.Value;
 
     // Figma 112:1468: a value above the engine's attention limit is drawn in the attention (or critical) text colour,
     // always next to its number (colour is never the only signal). Same inclusive limits as the engine.
-    public ServerHealth CpuSeverity => HasCpuPercent
-        ? OverviewPresentation.MetricSeverity(Card.CpuUsageValue, _thresholds.CpuWarning, _thresholds.CpuCritical)
-        : ServerHealth.Healthy;
+    public ServerHealth CpuSeverity => Cpu.Severity;
 
-    public ServerHealth MemorySeverity => HasMemoryPercent
-        ? OverviewPresentation.MetricSeverity(Card.MemoryUsageValue, _thresholds.MemoryWarning, _thresholds.MemoryCritical)
-        : ServerHealth.Healthy;
+    public ServerHealth MemorySeverity => Memory.Severity;
 
-    public ServerHealth DiskSeverity => HasDiskPercent
-        ? OverviewPresentation.MetricSeverity(Card.DiskUsageValue, _thresholds.DiskWarning, _thresholds.DiskCritical)
-        : ServerHealth.Healthy;
+    public ServerHealth DiskSeverity => Disk.Severity;
+
+    private ServerMetricReading Cpu => ServerMetricPresentation.Read(Card, ServerMetricKind.Cpu, _thresholds);
+
+    private ServerMetricReading Memory => ServerMetricPresentation.Read(Card, ServerMetricKind.Memory, _thresholds);
+
+    private ServerMetricReading Disk => ServerMetricPresentation.Read(Card, ServerMetricKind.Disk, _thresholds);
 
     /// <summary>The summary-list row (112:1057) read as "prod-web-01, Saudável".</summary>
     public string ListAutomationName => string.Join(", ", Name, StatusDisplay);
@@ -100,9 +98,9 @@ public sealed class ServerDirectoryRowViewModel : ObservableObject, IDisposable
         "ServerRowAutomationFormat",
         Name,
         StatusDisplay,
-        AccessiblePercent(HasCpuPercent, Card.CpuUsageValue),
-        AccessiblePercent(HasMemoryPercent, Card.MemoryUsageValue),
-        AccessiblePercent(HasDiskPercent, Card.DiskUsageValue),
+        ServerMetricPresentation.Accessible(Cpu, _localization),
+        ServerMetricPresentation.Accessible(Memory, _localization),
+        ServerMetricPresentation.Accessible(Disk, _localization),
         Address,
         OperatingSystemDisplay);
 
@@ -153,12 +151,6 @@ public sealed class ServerDirectoryRowViewModel : ObservableObject, IDisposable
                 break;
         }
     }
-
-    private string Percent(bool known, double value) => known
-        ? string.Format(CultureInfo.CurrentUICulture, "{0:0}%", value)
-        : _localization.GetString("ServerMetricUnavailable");
-
-    private string AccessiblePercent(bool known, double value) => ServerStatusPresentation.AccessiblePercent(known, value, _localization);
 
     private string Format(string key, params object[] args) =>
         string.Format(CultureInfo.CurrentUICulture, _localization.GetString(key), args);
