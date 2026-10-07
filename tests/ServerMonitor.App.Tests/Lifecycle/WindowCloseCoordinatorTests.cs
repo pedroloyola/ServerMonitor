@@ -39,6 +39,8 @@ public sealed class WindowCloseCoordinatorTests
 
         public void RestoreAndActivate() => RestoreCount++;
 
+        public void RestoreAndActivateStandard() { }
+
         public void OpenSettings() { }
 
         public void OpenBackgroundSettings() { }
@@ -248,6 +250,8 @@ public sealed class WindowCloseCoordinatorTests
         public void HideToBackground() => order.Add("hide");
 
         public void RestoreAndActivate() { }
+
+        public void RestoreAndActivateStandard() { }
 
         public void OpenSettings() { }
 

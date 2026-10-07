@@ -156,6 +156,8 @@ public sealed class TrayAffordanceLifecycleTests
 
         public void RestoreAndActivate() => Calls.Add(nameof(RestoreAndActivate));
 
+        public void RestoreAndActivateStandard() => Calls.Add(nameof(RestoreAndActivateStandard));
+
         public void OpenSettings() => Calls.Add(nameof(OpenSettings));
 
         public void OpenBackgroundSettings() => Calls.Add("OpenBackgroundSettings");

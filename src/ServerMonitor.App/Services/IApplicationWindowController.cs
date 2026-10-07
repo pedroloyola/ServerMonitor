@@ -23,8 +23,17 @@ public interface IApplicationWindowController
     /// <summary>True once a window exists (materialized or created at launch).</summary>
     bool IsMaterialized { get; }
 
+    /// <summary>Shows and activates the window in its CURRENT mode (tray "Abrir", OpenDashboard, second instance).</summary>
     void RestoreAndActivate();
 
+    /// <summary>
+    /// UI.8 D-UI8-10: materializes the window if needed, then switches it to Standard and shows it - for destinations that
+    /// exist only in Standard (a server's Detail, the editor, Settings). A headless launch with Compact persisted ends in
+    /// Standard too, because the switch runs after the window (and so the mode coordinator) exists.
+    /// </summary>
+    void RestoreAndActivateStandard();
+
+    /// <summary>Surfaces the window in Standard (<see cref="RestoreAndActivateStandard"/>), then navigates to Settings.</summary>
     void OpenSettings();
 
     /// <summary>

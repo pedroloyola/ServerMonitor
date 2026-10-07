@@ -143,6 +143,10 @@ public sealed class ApplicationWindowController(
         logger.LogDebug("Main window hidden to background.");
     });
 
+    /// <summary>
+    /// Tray "Abrir", the OpenDashboard notification and the second-instance redirect: shows the window in the mode it is
+    /// in (a Compact window stays Compact). Never switches the mode.
+    /// </summary>
     public void RestoreAndActivate() => RunOnUiThread(() =>
     {
         if (!TryMaterialize())
@@ -150,26 +154,30 @@ public sealed class ApplicationWindowController(
             return;
         }
 
-        _appWindow!.IsShownInSwitchers = true;
-        _appWindow.Show();
-        WindowManager.Get(_window!).WindowState = WindowState.Normal;
-        _window!.Activate();
-        _window.SetForegroundWindow();
+        ShowAndActivate();
         logger.LogDebug("Main window restored from the system tray.");
     });
 
+    /// <summary>
+    /// UI.8 D-UI8-10 (Cortex RC-4): surfaces the window in Standard - materialized first, so a headless process with
+    /// Compact persisted switches AFTER the coordinator applied that mode (see <see cref="StandardSurfacing"/>).
+    /// </summary>
+    public void RestoreAndActivateStandard() => RunOnUiThread(() =>
+    {
+        if (StandardSurfacing.Run(TryMaterialize, modeCoordinator, IsMinimized, ShowAndActivate))
+        {
+            logger.LogDebug("Main window surfaced in Standard.");
+        }
+    });
+
+    /// <summary>Settings exists only in Standard: surfaced there first, then navigated (the order it always had).</summary>
     public void OpenSettings() => RunOnUiThread(() =>
     {
-        if (!TryMaterialize())
+        if (!StandardSurfacing.Run(TryMaterialize, modeCoordinator, IsMinimized, ShowAndActivate))
         {
             return;
         }
 
-        _appWindow!.IsShownInSwitchers = true;
-        _appWindow.Show();
-        WindowManager.Get(_window!).WindowState = WindowState.Normal;
-        _window!.Activate();
-        _window.SetForegroundWindow();
         navigationService.GoToSettings();
     });
 
@@ -182,21 +190,36 @@ public sealed class ApplicationWindowController(
     /// </summary>
     public void OpenBackgroundSettings() => RunOnUiThread(() =>
     {
-        if (!TryMaterialize())
+        // UI.8 RC-4: still "navigate while hidden, then show" - and the Standard switch sits between the two, after the
+        // window exists, so a Compact window (or a headless one with Compact persisted) ends on Settings › Background.
+        if (!StandardSurfacing.Run(
+            TryMaterialize,
+            modeCoordinator,
+            IsMinimized,
+            ShowAndActivate,
+            navigateWhileHidden: () =>
+            {
+                navigationService.GoToSettings();
+                navigationService.RequestBackgroundSettingsFocus();
+            }))
         {
             return;
         }
 
-        navigationService.GoToSettings();
-        navigationService.RequestBackgroundSettingsFocus();
+        logger.LogDebug("Opened Settings on the background section from a notification.");
+    });
 
+    // The one "bring it back" block every surfacing path shares. Must run on the UI thread with a materialized window.
+    private void ShowAndActivate()
+    {
         _appWindow!.IsShownInSwitchers = true;
         _appWindow.Show();
         WindowManager.Get(_window!).WindowState = WindowState.Normal;
         _window!.Activate();
         _window.SetForegroundWindow();
-        logger.LogDebug("Opened Settings on the background section from a notification.");
-    });
+    }
+
+    private bool IsMinimized() => _appWindow?.Presenter is OverlappedPresenter { State: OverlappedPresenterState.Minimized };
 
     /// <summary>
     /// Ensures a window exists, creating it from the registered factory on first use. Returns false only
@@ -244,11 +267,7 @@ public sealed class ApplicationWindowController(
 
         // Toggling from the tray must also bring the window back from the tray first, then switch,
         // so the mode change lands on a visible, activated window in a consistent state.
-        _appWindow!.IsShownInSwitchers = true;
-        _appWindow.Show();
-        WindowManager.Get(_window!).WindowState = WindowState.Normal;
-        _window!.Activate();
-        _window.SetForegroundWindow();
+        ShowAndActivate();
         modeCoordinator.Toggle();
         logger.LogDebug("Toggled compact mode from the system tray.");
     });

@@ -138,17 +138,12 @@ public partial class App : Application
             try
             {
                 ServicesHost.Services.GetRequiredService<OnboardingViewModel>().SuppressForActivation();
-                // QA-2: a widget activation must SURFACE the Dashboard even if the app is in Compact mode.
-                // RestoreAndActivate preserves the current presentation, so a Compact window would stay
-                // Compact and never show the Dashboard/server. Force Standard first (Compact → Standard →
-                // Dashboard → focus). No-op when already Standard; single-instance invariants are unchanged.
-                var windowMode = ServicesHost.Services.GetRequiredService<IWindowModeCoordinator>();
-                if (windowMode.CurrentMode == WindowMode.Compact)
-                {
-                    windowMode.SwitchTo(WindowMode.Standard);
-                }
-
-                ServicesHost.Services.GetRequiredService<IApplicationWindowController>().RestoreAndActivate();
+                // QA-2 / UI.8 D-UI8-10: a widget activation must SURFACE the Dashboard even in Compact mode, so the window
+                // is brought back in Standard. The switch happens INSIDE RestoreAndActivateStandard, after the window is
+                // materialized: switching here first was a no-op in a headless process (the mode coordinator is
+                // initialized by the window), which then opened in its persisted Compact mode with the server behind it.
+                // The exit guard below therefore runs in Standard, where its dialog fits. Single-instance unchanged.
+                ServicesHost.Services.GetRequiredService<IApplicationWindowController>().RestoreAndActivateStandard();
                 var navigation = ServicesHost.Services.GetRequiredService<INavigationService>();
 
                 // UI.7 H-UI7-3: an activation leaves the current page through the SAME exit guard as every other
