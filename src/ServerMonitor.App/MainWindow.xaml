@@ -46,12 +46,17 @@
                 <!-- The drag handle (SetTitleBar): the whole strip left of the button. Mark 23 · g12 · wordmark (trims, then
                      collapses below its minimum); priority captions > Expandir > mark > wordmark (CompactTitleLayout). -->
                 <Grid x:Name="CompactDragRegion" Padding="{StaticResource SaCompactTitlePadding}" Background="Transparent">
-                    <StackPanel x:Name="CompactBrand" Height="40" Orientation="Horizontal" Spacing="{StaticResource SaSpace12}" VerticalAlignment="Top">
+                    <!-- A Grid, not a StackPanel: the wordmark gets the remaining width, so it trims with an ellipsis (never clipped). -->
+                    <Grid x:Name="CompactBrand" Height="40" ColumnSpacing="{StaticResource SaSpace12}" VerticalAlignment="Top">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
                         <primitives:SaBrandMark x:Name="CompactBrandMark" Size="23" VerticalAlignment="Center" />
-                        <TextBlock x:Name="CompactWordmark" x:Uid="AppNameText" VerticalAlignment="Center" Style="{StaticResource SaBrandTextStyle}"
+                        <TextBlock x:Name="CompactWordmark" x:Uid="AppNameText" Grid.Column="1" VerticalAlignment="Center" Style="{StaticResource SaBrandTextStyle}"
                                    Foreground="{ThemeResource SaTextBrush}" TextWrapping="NoWrap" MaxLines="1" TextTrimming="CharacterEllipsis"
                                    AutomationProperties.AccessibilityView="Raw" />
-                    </StackPanel>
+                    </Grid>
                 </Grid>
 
                 <!-- "Expandir ›" 112:9430: hugs its content (not 126 fixed, R-3); icon-only 36x36 below the MEASURED threshold,
