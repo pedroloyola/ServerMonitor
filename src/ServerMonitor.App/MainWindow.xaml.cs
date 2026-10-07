@@ -27,11 +27,8 @@ public sealed partial class MainWindow : Window
     private readonly BackupRestoreViewModel _backupRestore;
     private readonly ILogger<MainWindow> _logger;
     private readonly DispatcherQueueTimer _persistTimer;
-    private bool _isEnforcingMinimumSize;
+    private bool _isEnforcingSize;
     private bool _usesOpaqueFallback;
-
-    private const int MinimumWindowWidth = 560;
-    private const int MinimumWindowHeight = 640;
 
     public MainWindow(
         INavigationService navigationService,
@@ -313,7 +310,7 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        if (_isEnforcingMinimumSize || _modeCoordinator.IsApplyingBounds)
+        if (_isEnforcingSize || _modeCoordinator.IsApplyingBounds)
         {
             return;
         }
@@ -327,27 +324,27 @@ public sealed partial class MainWindow : Window
         _modeCoordinator.CaptureCurrentBounds();
         SchedulePersist();
 
-        // The manual minimum-size floor applies to the resizable Standard window only; Compact is
-        // non-resizable and drives its own bounds, so enforcing 560×640 there would corrupt it.
-        if (args.DidSizeChange && _modeCoordinator.CurrentMode == WindowMode.Standard)
+        // UI.8 RC-2: both modes are resizable, so every user resize is held inside the ACTIVE mode's envelope (Standard:
+        // its 560×640 floor; Compact: its DIP envelope at the current DPI, frame included). The limits come from the
+        // coordinator, never from constants here, so leaving Compact can never leave its maximum on Standard.
+        if (args.DidSizeChange)
         {
-            EnforceMinimumSize(sender);
+            EnforceSizeLimits(sender);
         }
     }
 
-    private void EnforceMinimumSize(AppWindow sender)
+    private void EnforceSizeLimits(AppWindow sender)
     {
         var size = sender.Size;
-        var width = Math.Max(size.Width, MinimumWindowWidth);
-        var height = Math.Max(size.Height, MinimumWindowHeight);
+        var (width, height) = _modeCoordinator.CurrentSizeLimits().Clamp(size.Width, size.Height);
         if (width == size.Width && height == size.Height)
         {
             return;
         }
 
-        _isEnforcingMinimumSize = true;
+        _isEnforcingSize = true;
         sender.Resize(new SizeInt32(width, height));
-        _isEnforcingMinimumSize = false;
+        _isEnforcingSize = false;
     }
 
     private void SchedulePersist()

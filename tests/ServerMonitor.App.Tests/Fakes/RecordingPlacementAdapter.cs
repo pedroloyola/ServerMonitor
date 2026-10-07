@@ -19,6 +19,8 @@ internal sealed class RecordingPlacementAdapter : IWindowPlacementAdapter
 
     public WindowMode LastPresenterMode { get; private set; }
 
+    public WindowFrame Frame { get; set; } = WindowFrame.None;
+
     public int ApplyBoundsCount { get; private set; }
 
     public bool IsAttached => true;
@@ -35,6 +37,8 @@ internal sealed class RecordingPlacementAdapter : IWindowPlacementAdapter
 
     public void ConfigurePresenter(WindowMode mode, WindowSizeConstraints constraints) =>
         LastPresenterMode = mode;
+
+    public WindowFrame GetFrame() => Frame;
 
     public void SetAlwaysOnTop(bool enabled) => TopmostMutations.Add(enabled);
 }

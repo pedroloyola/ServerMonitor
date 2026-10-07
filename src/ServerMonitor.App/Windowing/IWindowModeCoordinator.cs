@@ -38,4 +38,11 @@ public interface IWindowModeCoordinator
     /// <summary>Captures (best-effort) then writes the current mode's bounds to disk
     /// (on the debounced move, on minimize and on close).</summary>
     void PersistCurrentBounds();
+
+    /// <summary>
+    /// UI.8 RC-2: the ACTIVE mode's size envelope in physical pixels of the outer window, at the window's current DPI
+    /// and measured frame - what the window enforces on every user resize. Standard is its pixel envelope (no maximum
+    /// in practice); leaving Compact therefore never leaves the Compact limits behind.
+    /// </summary>
+    WindowSizeConstraints CurrentSizeLimits();
 }

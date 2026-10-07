@@ -119,12 +119,19 @@ public sealed class WindowModeCoordinator : IWindowModeCoordinator
         _store.Save(_settings);
     }
 
+    public WindowSizeConstraints CurrentSizeLimits()
+    {
+        var dpi = _adapter.GetPlacement()?.DpiScalePercent ?? WindowPlacementSettings.DefaultDpiScalePercent;
+        return WindowSizeConstraints.For(_mode).ScaledTo(dpi, _adapter.GetFrame());
+    }
+
     private void ApplyMode(WindowMode mode)
     {
         var constraints = WindowSizeConstraints.For(mode);
         _applyingBounds = true;
         try
         {
+            // Capabilities first: resizability changes the non-client frame the envelope is measured against.
             _adapter.ConfigurePresenter(mode, constraints);
 
             var displays = _adapter.GetDisplays();
@@ -132,7 +139,8 @@ public sealed class WindowModeCoordinator : IWindowModeCoordinator
                 ? (_settings.CompactBounds, _settings.CompactDpiScalePercent)
                 : (_settings.StandardBounds, _settings.StandardDpiScalePercent);
 
-            var resolved = WindowPlacementResolver.Resolve(savedBounds, savedDpi, displays, constraints);
+            // UI.8 RC-1: a DIP (client) envelope is converted for the TARGET monitor, outer frame included.
+            var resolved = WindowPlacementResolver.Resolve(savedBounds, savedDpi, displays, constraints, _adapter.GetFrame());
             _adapter.ApplyBounds(resolved);
             _adapter.SetAlwaysOnTop(mode == WindowMode.Compact && _settings.CompactAlwaysOnTop);
 

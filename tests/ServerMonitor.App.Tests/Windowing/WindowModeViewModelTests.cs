@@ -92,6 +92,8 @@ public sealed class WindowModeViewModelTests
 
         public void PersistCurrentBounds() { }
 
+        public WindowSizeConstraints CurrentSizeLimits() => WindowSizeConstraints.For(CurrentMode);
+
         public void RaiseModeChanged(WindowMode mode)
         {
             CurrentMode = mode;

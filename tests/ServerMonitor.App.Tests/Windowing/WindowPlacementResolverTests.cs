@@ -127,9 +127,10 @@ public sealed class WindowPlacementResolverTests
 
         var result = WindowPlacementResolver.Resolve(saved, 100, [hiDpi], Compact);
 
-        // 400×380 logical at 100% → 800×760 physical at 200%, then clamped to the compact envelope.
-        Assert.Equal(Math.Min(800, Compact.MaxWidth), result.Width);
-        Assert.Equal(Math.Min(760, Compact.MaxHeight), result.Height);
+        // 400×380 logical at 100% → 800×760 physical at 200%, then clamped to the compact envelope, which UI.8 RC-1
+        // defines in DIP: at 200% its maximum is 432×704 DIP = 864×1408 physical (it was 400×560 RAW pixels before).
+        Assert.Equal(Math.Min(800, Compact.MaxWidth * 2), result.Width);
+        Assert.Equal(Math.Min(760, Compact.MaxHeight * 2), result.Height);
     }
 
     [Fact]
