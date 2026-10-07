@@ -23,6 +23,18 @@ public sealed class ServerEditorSavedNotice
         }
     }
 
+    /// <summary>Test probe: a notice is waiting (for any server).</summary>
+    internal bool IsPending
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _pending is not null;
+            }
+        }
+    }
+
     /// <summary>The pending notice for <paramref name="serverId"/> at most once; a notice for another server is dropped.</summary>
     public ServerEditorSaved? TakeFor(Guid serverId)
     {

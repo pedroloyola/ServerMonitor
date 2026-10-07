@@ -175,6 +175,7 @@ public sealed class Ui7DuplicateAndToastTests : IDisposable
         var failed = await _world.Page.SubmitAsync();
 
         Assert.Equal(ServerEditorSaveStatus.Failed, failed!.Status);
+        Assert.False(_world.SavedNotice.IsPending); // nothing posted at all, for this server or any other
         Assert.Null(_world.SavedNotice.TakeFor(server.Id));
     }
 
