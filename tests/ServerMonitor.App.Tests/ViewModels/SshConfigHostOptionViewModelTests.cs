@@ -102,19 +102,22 @@ public sealed class SshConfigHostOptionViewModelTests
     }
 
     [Fact]
-    public void ThePreviewLine_IsCollapsedByHasPreview_InTheHostList()
+    public void TheRowDetailLines_StartCollapsed_AndTheFullPreviewIsNotDrawnInTheHostList()
     {
         XNamespace presentation = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
+        XNamespace x = "http://schemas.microsoft.com/winfx/2006/xaml";
+        // UI.7B: the host list lives in the "Importar de SSH" layer panel. UI.7 final c1 (Prism F-2): the row shows the compact
+        // "{host} · {user} · porta {n}" and jump lines (set per container, collapsed when empty) - never the preview with the
+        // key's full path.
         var xaml = XDocument.Load(Path.Combine(
-            FindRepositoryRoot(), "src", "ServerMonitor.App", "Controls", "ServerFormControl.xaml"));
+            FindRepositoryRoot(), "src", "ServerMonitor.App", "Views", "SshConfigImportPanel.xaml"));
 
-        var preview = Assert.Single(
-            xaml.Descendants(presentation + "TextBlock"),
-            block => (string?)block.Attribute("Text") == "{Binding Preview}");
-
-        Assert.Equal(
-            "{Binding HasPreview, Converter={StaticResource BooleanToVisibilityConverter}}",
-            (string?)preview.Attribute("Visibility"));
+        Assert.DoesNotContain(xaml.Descendants(presentation + "TextBlock"), block => (string?)block.Attribute("Text") == "{x:Bind Preview}");
+        foreach (var name in new[] { "DetailText", "JumpText" })
+        {
+            var line = Assert.Single(xaml.Descendants(presentation + "TextBlock"), block => (string?)block.Attribute(x + "Name") == name);
+            Assert.Equal("Collapsed", (string?)line.Attribute("Visibility"));
+        }
     }
 
     private static string FindRepositoryRoot()

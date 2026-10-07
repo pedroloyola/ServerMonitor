@@ -1,9 +1,9 @@
 using System.ComponentModel;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
-using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
+using ServerMonitor.App.Services;
 using ServerMonitor.App.ViewModels;
 using Windows.ApplicationModel.DataTransfer;
 
@@ -12,10 +12,12 @@ namespace ServerMonitor.App.Controls;
 public sealed partial class ServerFormControl : UserControl
 {
     private ServerEditorViewModel? _viewModel;
-    // True while code (not the user) moves a key selector's selection.
-    private bool _syncingKeySelectors;
     private ServerPrepCommands? _prepCommands;
     private string _copyLabel = string.Empty;
+    private ILocalizationService? _localization;
+    private bool _isEditMode;
+    private string? _savedKeyPath;
+    private IReadOnlyDictionary<ServerEditorField, string> _errors = new Dictionary<ServerEditorField, string>();
 
     public ServerFormControl()
     {
@@ -23,9 +25,158 @@ public sealed partial class ServerFormControl : UserControl
         DataContextChanged += OnDataContextChanged;
         Unloaded += (_, _) => Attach(null);
         Loaded += (_, _) => Attach(DataContext as ServerEditorViewModel);
+        PasswordField.PasswordChanged += OnPasswordChanged;
+        PassphraseField.PasswordChanged += OnPasswordChanged;
+        JumpPasswordField.PasswordChanged += OnPasswordChanged;
+        JumpPassphraseField.PasswordChanged += OnPasswordChanged;
     }
 
-    public void FocusFirstField() => NameField.Focus(FocusState.Programmatic);
+    /// <summary>A password box gained or lost typed text (the page's hint and the password errors follow it).</summary>
+    public event EventHandler? TypedSecretChanged;
+
+    public bool FocusFirstField() => NameField.Focus(FocusState.Programmatic);
+
+    /// <summary>B-16: the first invalid field takes the focus after a failed attempt (its error is described by it).</summary>
+    public void FocusField(ServerEditorField field)
+    {
+        Control target = field switch
+        {
+            ServerEditorField.Name => NameField,
+            ServerEditorField.Host => HostField,
+            ServerEditorField.Username => UsernameField,
+            ServerEditorField.PrivateKey => KeyPickerButton,
+            ServerEditorField.Password => PasswordField,
+            ServerEditorField.Port => PortField,
+            ServerEditorField.JumpHost => JumpHostField,
+            ServerEditorField.JumpUsername => JumpUsernameField,
+            ServerEditorField.JumpPort => JumpPortField,
+            ServerEditorField.JumpPrivateKey => JumpKeyPickerButton,
+            _ => JumpPasswordField
+        };
+        target.StartBringIntoView();
+        target.Focus(FocusState.Programmatic);
+    }
+
+    /// <summary>
+    /// UI.7C (B-16, Figma 06): each field shows its own message under the input with the 1.5 danger border (SaFormField
+    /// describes the input with it). A password box with typed text hides its "missing" error - the view model only sees
+    /// the secret on the next Test/Save.
+    /// </summary>
+    public void ShowErrors(IReadOnlyDictionary<ServerEditorField, string> errors)
+    {
+        _errors = errors ?? throw new ArgumentNullException(nameof(errors));
+        ApplyErrors();
+    }
+
+    /// <summary>"Como preparo o meu servidor?" from a failed stage of the test dialog: the same helper, at that anchor.</summary>
+    public void ShowPrepHelp(FrameworkElement anchor)
+    {
+        ArgumentNullException.ThrowIfNull(anchor);
+        if (FlyoutBase.GetAttachedFlyout(PrepHelpLink) is { } flyout)
+        {
+            flyout.ShowAt(anchor);
+        }
+    }
+
+    private void ApplyErrors()
+    {
+        if (_localization is not { } localization)
+        {
+            return;
+        }
+
+        SetError(NameFormField, NameField, ServerEditorField.Name);
+        SetError(HostFormField, HostField, ServerEditorField.Host);
+        SetError(UsernameFormField, UsernameField, ServerEditorField.Username);
+        SetError(PortFormField, PortField, ServerEditorField.Port);
+        SetError(JumpHostFormField, JumpHostField, ServerEditorField.JumpHost);
+        SetError(JumpUsernameFormField, JumpUsernameField, ServerEditorField.JumpUsername);
+        SetError(JumpPortFormField, JumpPortField, ServerEditorField.JumpPort);
+        SetError(PrivateKeyField, KeyPickerButton, ServerEditorField.PrivateKey);
+        SetError(JumpPrivateKeyField, JumpKeyPickerButton, ServerEditorField.JumpPrivateKey);
+        SetError(PasswordFormField, PasswordField, ServerEditorField.Password, typed: PasswordField.Password.Length > 0);
+        SetError(JumpPasswordFormField, JumpPasswordField, ServerEditorField.JumpPassword, typed: JumpPasswordField.Password.Length > 0);
+
+        void SetError(Primitives.SaFormField field, Control input, ServerEditorField key, bool typed = false)
+        {
+            var message = !typed && _errors.TryGetValue(key, out var messageKey) ? localization.GetString(messageKey) : string.Empty;
+            field.ErrorText = message;
+            var invalid = message.Length > 0;
+            input.Style = (Style)Application.Current.Resources[input switch
+            {
+                TextBox => invalid ? "SaTextFieldErrorStyle" : "SaTextFieldStyle",
+                PasswordBox => invalid ? "SaPasswordBoxErrorStyle" : "SaPasswordBoxStyle",
+                _ => invalid ? "SaPickerButtonErrorStyle" : "SaPickerButtonStyle"
+            }];
+        }
+    }
+
+    private void OnPasswordChanged(object sender, RoutedEventArgs e)
+    {
+        ApplyErrors();
+        TypedSecretChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// UI.7A: the mode-dependent card copy (Figma 04 Add / 05 Edit). Set once by the editor page before the form loads.
+    /// Final c1 (F-8): Edit also passes the saved key path, so the picker can say "Chave privada atual" while it is chosen.
+    /// </summary>
+    public void Configure(ILocalizationService localization, bool isEditMode, string? savedKeyPath = null)
+    {
+        _localization = localization ?? throw new ArgumentNullException(nameof(localization));
+        _isEditMode = isEditMode;
+        _savedKeyPath = isEditMode ? savedKeyPath : null;
+        IdentitySubtitle.Text = localization.GetString(isEditMode ? "ServerEditorIdentitySubtitleEdit" : "ServerEditorIdentitySubtitleAdd");
+        AuthTitle.Text = localization.GetString(isEditMode ? "ServerEditorAuthTitleEdit" : "ServerEditorAuthTitleAdd");
+        UpdateAuthSubtitle();
+        UpdatePresentation();
+    }
+
+    /// <summary>A password box holds text the view model has not received yet (it only reads them on Test/Save).</summary>
+    public bool HasTypedSecret() =>
+        PasswordField.Password.Length > 0
+        || PassphraseField.Password.Length > 0
+        || JumpPasswordField.Password.Length > 0
+        || JumpPassphraseField.Password.Length > 0;
+
+    /// <summary>R-2 / Vigil H5: the page clears every password box when it unloads or leaves.</summary>
+    public void ClearSecrets()
+    {
+        PasswordField.Password = string.Empty;
+        PassphraseField.Password = string.Empty;
+        JumpPasswordField.Password = string.Empty;
+        JumpPassphraseField.Password = string.Empty;
+    }
+
+    /// <summary>
+    /// "Testar ligação" (in the page's action bar): stage the typed secrets (read, then cleared), then test. A key the
+    /// test meets is shown by the page's trust dialog; nothing here accepts it.
+    /// </summary>
+    public async Task TestConnectionAsync()
+    {
+        if (DataContext is ServerEditorViewModel viewModel && !viewModel.IsConnectionWorkInProgress)
+        {
+            CaptureSecret();
+            await viewModel.TestConnectionAsync();
+        }
+    }
+
+    private void UpdateAuthSubtitle()
+    {
+        if (_localization is null || _viewModel is not { } viewModel)
+        {
+            return;
+        }
+
+        var key = (_isEditMode, viewModel.IsPasswordAuthentication) switch
+        {
+            (false, false) => "ServerEditorAuthSubtitleKeyAdd",
+            (false, true) => "ServerEditorAuthSubtitlePasswordAdd",
+            (true, false) => "ServerEditorAuthSubtitleKeyEdit",
+            (true, true) => viewModel.HasSavedPassword ? "ServerEditorAuthSubtitlePasswordKeepEdit" : "ServerEditorAuthSubtitlePasswordEdit"
+        };
+        AuthSubtitle.Text = _localization.GetString(key);
+    }
 
     public void CaptureSecret()
     {
@@ -63,108 +214,182 @@ public sealed partial class ServerFormControl : UserControl
         if (_viewModel is not null)
         {
             _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
-            _viewModel.ConnectionChecklist.PropertyChanged -= OnChecklistPropertyChanged;
         }
 
         _viewModel = viewModel;
         if (viewModel is not null)
         {
             viewModel.PropertyChanged += OnViewModelPropertyChanged;
-            viewModel.ConnectionChecklist.PropertyChanged += OnChecklistPropertyChanged;
-            SyncKeySelectors();
+            UpdateAuthSubtitle();
+            UpdatePresentation();
         }
     }
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName is nameof(ServerEditorViewModel.SelectedLocalKeyOption)
-            or nameof(ServerEditorViewModel.SelectedJumpLocalKeyOption))
+        if (e.PropertyName is nameof(ServerEditorViewModel.SelectedAuthenticationIndex))
         {
-            SyncKeySelectors();
+            UpdateAuthSubtitle();
+        }
+
+        if (e.PropertyName is nameof(ServerEditorViewModel.PrivateKeyPath)
+            or nameof(ServerEditorViewModel.JumpPrivateKeyPath)
+            or nameof(ServerEditorViewModel.PrivateKeyHint)
+            or nameof(ServerEditorViewModel.SelectedLocalKeyOption)
+            or nameof(ServerEditorViewModel.HasSavedPassphrase)
+            or nameof(ServerEditorViewModel.HasSavedPassword)
+            or nameof(ServerEditorViewModel.HasSavedJumpSecret)
+            or nameof(ServerEditorViewModel.SelectedAuthenticationIndex)
+            or nameof(ServerEditorViewModel.SelectedJumpAuthenticationIndex)
+            or nameof(ServerEditorViewModel.UseJumpHost)
+            or nameof(ServerEditorViewModel.JumpHost)
+            or nameof(ServerEditorViewModel.Host)
+            or nameof(ServerEditorViewModel.SshConfigStatusMessage)
+            or nameof(ServerEditorViewModel.IsSshConfigImportOpen))
+        {
+            UpdatePresentation();
         }
     }
 
-    // The selectors mirror the key paths: a found key shows as selected, any other file (or none) shows the
-    // placeholder. Done here rather than by a binding so a programmatic change is never mistaken for a choice.
-    private void SyncKeySelectors()
+    // UI.7B: everything derived from the view model that a binding cannot say on its own - the key pickers (file name,
+    // full path only in tooltip/HelpText, the auto-selection hint), the saved-secret labels (G-13: never dots), the
+    // route line and the import status. Text only; never a secret (the password boxes are never read here).
+    private void UpdatePresentation()
     {
-        if (_viewModel is null)
+        if (_localization is not { } localization || _viewModel is not { } viewModel)
         {
             return;
         }
 
-        _syncingKeySelectors = true;
-        try
-        {
-            LocalKeySelector.SelectedItem = _viewModel.SelectedLocalKeyOption;
-            JumpLocalKeySelector.SelectedItem = _viewModel.SelectedJumpLocalKeyOption;
-        }
-        finally
-        {
-            _syncingKeySelectors = false;
-        }
+        UpdateKeyPicker(
+            KeyPickerButton,
+            KeyPickerText,
+            PrivateKeyField,
+            viewModel.PrivateKeyPath,
+            ServerEditorKeyPicker.Helper(
+                _isEditMode,
+                viewModel.PrivateKeyPath,
+                _savedKeyPath,
+                viewModel.SelectedLocalKeyOption is not null,
+                viewModel.PrivateKeyHint,
+                localization),
+            PrivateKeyField.Header);
+        // B-20: the jump picker is named apart from the target's (same visible label, different UIA name).
+        UpdateKeyPicker(
+            JumpKeyPickerButton,
+            JumpKeyPickerText,
+            JumpPrivateKeyField,
+            viewModel.JumpPrivateKeyPath,
+            localization.GetString("ServerEditorJumpKeyPickerHelper"),
+            localization.GetString("ServerEditorJumpKeyPickerAccessibleHeader"));
+
+        SetSavedSecretLabels(PassphraseFormField, PassphraseField, viewModel.HasSavedPassphrase,
+            "ServerEditorPassphraseHeader", "ServerEditorPassphrasePlaceholder", "ServerEditorPassphraseSavedHeader");
+        SetSavedSecretLabels(PasswordFormField, PasswordField, viewModel.HasSavedPassword,
+            "ServerEditorPasswordHeader", "ServerEditorPasswordPlaceholder", "ServerEditorPasswordSavedHeader");
+        SetSavedSecretLabels(JumpPassphraseFormField, JumpPassphraseField, viewModel.HasSavedJumpSecret,
+            "ServerEditorPassphraseHeader", "ServerEditorJumpPassphrasePlaceholder", "ServerEditorPassphraseSavedHeader");
+        SetSavedSecretLabels(JumpPasswordFormField, JumpPasswordField, viewModel.HasSavedJumpSecret,
+            "ServerEditorPasswordHeader", "ServerEditorJumpPasswordPlaceholder", "ServerEditorPasswordSavedHeader");
+
+        RouteLine.Text = ServerEditorRouteLine.Describe(viewModel.JumpHost, viewModel.Host, localization);
+        ToolTipService.SetToolTip(RouteLine, RouteLine.Text);
+        ImportStatusText.Visibility = viewModel.HasSshConfigStatus && !viewModel.IsSshConfigImportOpen
+            ? Visibility.Visible
+            : Visibility.Collapsed;
     }
 
-    private async void OnLocalKeySelectionChanged(object sender, SelectionChangedEventArgs e)
+    private void UpdateKeyPicker(Button button, TextBlock text, Primitives.SaFormField field, string path, string helper, string accessibleHeader)
     {
-        if (_syncingKeySelectors
-            || DataContext is not ServerEditorViewModel viewModel
-            || LocalKeySelector.SelectedItem is not LocalKeyOptionViewModel option
-            // SelectionChanged can be raised after SyncKeySelectors has returned: a selection that only
-            // mirrors the view model is never a choice, or the pre-selected key would stop being "found".
-            || ReferenceEquals(option, viewModel.SelectedLocalKeyOption))
+        var localization = _localization!;
+        var label = ServerEditorKeyPicker.ButtonText(path, localization);
+        text.Text = label;
+        field.HelperText = helper;
+        var fullPath = string.IsNullOrWhiteSpace(path) ? string.Empty : path.Trim();
+        ToolTipService.SetToolTip(button, fullPath.Length == 0 ? null : fullPath);
+        AutomationProperties.SetName(button, string.Format(
+            System.Globalization.CultureInfo.CurrentCulture,
+            localization.GetString("ServerEditorKeyPickerAccessibleFormat"),
+            accessibleHeader,
+            label));
+        AutomationProperties.SetHelpText(button, fullPath);
+    }
+
+    // A saved secret is never shown: the box stays empty, the label says "guardada" and the placeholder says how to keep it.
+    private void SetSavedSecretLabels(
+        Primitives.SaFormField field,
+        PasswordBox box,
+        bool saved,
+        string headerKey,
+        string placeholderKey,
+        string savedHeaderKey)
+    {
+        var localization = _localization!;
+        field.Header = localization.GetString(saved ? savedHeaderKey : headerKey);
+        box.PlaceholderText = localization.GetString(saved ? "ServerEditorSecretKeepPlaceholder" : placeholderKey);
+    }
+
+    private void OnKeyPickerMenuOpening(object? sender, object e) =>
+        FillKeyMenu(KeyPickerMenu, jump: false);
+
+    private void OnJumpKeyPickerMenuOpening(object? sender, object e) =>
+        FillKeyMenu(JumpKeyPickerMenu, jump: true);
+
+    // The menu is rebuilt each time it opens: the keys discovery found (metadata only) with the current one checked, then
+    // the browse entry. Choosing goes through the SAME view model calls as before (SelectLocalKey / the file picker).
+    private void FillKeyMenu(MenuFlyout menu, bool jump)
+    {
+        menu.Items.Clear();
+        if (_viewModel is not { } viewModel || _localization is null)
         {
             return;
         }
 
-        if (option.IsBrowse)
+        var current = jump ? viewModel.SelectedJumpLocalKeyOption : viewModel.SelectedLocalKeyOption;
+        foreach (var option in ServerEditorKeyPicker.MenuItems(viewModel.LocalKeyOptions, _localization))
         {
-            // The existing picker; on cancel the view model asks the selector to snap back.
-            await viewModel.SelectPrivateKeyAsync();
-        }
-        else
-        {
-            viewModel.SelectLocalKey(option);
-        }
-    }
+            if (option.IsBrowse)
+            {
+                if (menu.Items.Count > 0)
+                {
+                    menu.Items.Add(new MenuFlyoutSeparator());
+                }
 
-    private async void OnJumpLocalKeySelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (_syncingKeySelectors
-            || DataContext is not ServerEditorViewModel viewModel
-            || JumpLocalKeySelector.SelectedItem is not LocalKeyOptionViewModel option
-            || ReferenceEquals(option, viewModel.SelectedJumpLocalKeyOption))
-        {
-            return;
-        }
+                var browse = new MenuFlyoutItem { Text = option.Label };
+                browse.Click += async (_, _) =>
+                {
+                    if (jump)
+                    {
+                        await viewModel.SelectJumpPrivateKeyAsync();
+                    }
+                    else
+                    {
+                        await viewModel.SelectPrivateKeyAsync();
+                    }
+                };
+                menu.Items.Add(browse);
+                continue;
+            }
 
-        if (option.IsBrowse)
-        {
-            await viewModel.SelectJumpPrivateKeyAsync();
+            var key = new RadioMenuFlyoutItem
+            {
+                Text = option.Label,
+                GroupName = jump ? "JumpKeyChoices" : "KeyChoices",
+                IsChecked = ReferenceEquals(option, current)
+            };
+            key.Click += (_, _) =>
+            {
+                if (jump)
+                {
+                    viewModel.SelectJumpLocalKey(option);
+                }
+                else
+                {
+                    viewModel.SelectLocalKey(option);
+                }
+            };
+            menu.Items.Add(key);
         }
-        else
-        {
-            viewModel.SelectJumpLocalKey(option);
-        }
-    }
-
-    // Each checklist change is spoken once, as a notification on the checklist itself.
-    private void OnChecklistPropertyChanged(object? sender, PropertyChangedEventArgs e)
-    {
-        if (e.PropertyName != nameof(ConnectionChecklistViewModel.Announcement)
-            || _viewModel is not { } viewModel
-            || viewModel.ConnectionChecklist.Announcement is not { Length: > 0 } announcement)
-        {
-            return;
-        }
-
-        var peer = FrameworkElementAutomationPeer.FromElement(ChecklistPanel)
-            ?? FrameworkElementAutomationPeer.CreatePeerForElement(ChecklistPanel);
-        peer?.RaiseNotificationEvent(
-            AutomationNotificationKind.ActionCompleted,
-            AutomationNotificationProcessing.ImportantMostRecent,
-            announcement,
-            "ServerFormConnectionChecklist");
     }
 
     private void OnPrepHelpClick(object sender, RoutedEventArgs e)
@@ -182,7 +407,7 @@ public sealed partial class ServerFormControl : UserControl
             return;
         }
 
-        // A flyout is its own popup: give it the modal's theme, and rebuild the commands from the form as it is now.
+        // A flyout is its own popup: give it the page's theme, and rebuild the commands from the form as it is now.
         PrepHelpContent.RequestedTheme = ActualTheme;
         _prepCommands = viewModel.BuildServerPrepCommands();
         PrepKeygenText.Text = _prepCommands.GenerateKey;
@@ -202,9 +427,6 @@ public sealed partial class ServerFormControl : UserControl
 
     private void OnCopyPrepKeyClick(object sender, RoutedEventArgs e) =>
         CopyCommand(_prepCommands?.CopyPublicKey, sender);
-
-    private void OnCopyStepCommandClick(object sender, RoutedEventArgs e) =>
-        CopyCommand((sender as FrameworkElement)?.DataContext is ConnectionStepViewModel step ? step.Command : null, sender);
 
     // Copies the command text and nothing else. The button says so only when the clipboard took it.
     private void CopyCommand(string? command, object sender)
@@ -229,94 +451,6 @@ public sealed partial class ServerFormControl : UserControl
         if (sender is Button button && DataContext is ServerEditorViewModel viewModel)
         {
             button.Content = viewModel.CopiedLabel;
-        }
-    }
-
-    private async void OnChoosePrivateKeyClick(object sender, RoutedEventArgs e)
-    {
-        if (DataContext is ServerEditorViewModel viewModel)
-        {
-            await viewModel.SelectPrivateKeyAsync();
-        }
-    }
-
-    private async void OnChooseJumpPrivateKeyClick(object sender, RoutedEventArgs e)
-    {
-        if (DataContext is ServerEditorViewModel viewModel)
-        {
-            await viewModel.SelectJumpPrivateKeyAsync();
-        }
-    }
-
-    private async void OnImportSshConfigClick(object sender, RoutedEventArgs e)
-    {
-        if (DataContext is ServerEditorViewModel viewModel)
-        {
-            await viewModel.LoadSshConfigHostsAsync();
-        }
-    }
-
-    private void OnCloseSshConfigImportClick(object sender, RoutedEventArgs e)
-    {
-        if (DataContext is ServerEditorViewModel viewModel)
-        {
-            viewModel.CloseSshConfigImport();
-        }
-    }
-
-    // A ListViewItem's UIA name otherwise falls back to the item's type name; give each container the
-    // localized "alias — importable / blocked: why" text (containers are recycled, so set it every time).
-    private void OnSshConfigHostContainerContentChanging(ListViewBase sender, ContainerContentChangingEventArgs args)
-    {
-        if (args.Item is SshConfigHostOptionViewModel option)
-        {
-            AutomationProperties.SetName(args.ItemContainer, option.AccessibleName);
-        }
-    }
-
-    private void OnUseSshConfigHostClick(object sender, RoutedEventArgs e)
-    {
-        if (DataContext is ServerEditorViewModel viewModel
-            && sender is FrameworkElement { DataContext: SshConfigHostOptionViewModel option })
-        {
-            viewModel.ApplySshConfigHost(option);
-        }
-    }
-
-    private async void OnTestConnectionClick(object sender, RoutedEventArgs e)
-    {
-        if (DataContext is ServerEditorViewModel viewModel)
-        {
-            CaptureSecret();
-            await viewModel.TestConnectionAsync();
-            if (viewModel.HasUnknownHostKey)
-            {
-                UnknownHostHeading.Focus(FocusState.Programmatic);
-            }
-        }
-    }
-
-    private void OnCancelTestClick(object sender, RoutedEventArgs e)
-    {
-        if (DataContext is ServerEditorViewModel viewModel)
-        {
-            viewModel.CancelTest();
-        }
-    }
-
-    private async void OnTrustAndConnectClick(object sender, RoutedEventArgs e)
-    {
-        if (DataContext is ServerEditorViewModel viewModel)
-        {
-            await viewModel.TrustAndConnectAsync();
-        }
-    }
-
-    private void OnDismissHostKeyClick(object sender, RoutedEventArgs e)
-    {
-        if (DataContext is ServerEditorViewModel viewModel)
-        {
-            viewModel.DismissHostKeyPrompt();
         }
     }
 }

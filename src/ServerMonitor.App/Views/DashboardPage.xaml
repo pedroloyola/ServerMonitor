@@ -307,7 +307,7 @@
                                               Visibility="{x:Bind ViewModel.IsRefreshingAll, Mode=OneWay}" />
                             </Grid>
                         </Button>
-                        <Button Visibility="{x:Bind ViewModel.HasVisibleServers, Mode=OneWay}" x:Uid="OverviewAddButton" MinWidth="156" Style="{StaticResource SaPrimaryButtonStyle}"
+                        <Button x:Name="OverviewAddButton" Visibility="{x:Bind ViewModel.HasVisibleServers, Mode=OneWay}" x:Uid="OverviewAddButton" MinWidth="156" Style="{StaticResource SaPrimaryButtonStyle}"
                                 Command="{x:Bind ViewModel.AddServerCommand}">
                             <StackPanel Orientation="Horizontal" Spacing="{StaticResource SaSpace8}">
                                 <primitives:SaIcon Data="{StaticResource SaIconAdd01Data}" Size="18" VerticalAlignment="Center" />
@@ -542,7 +542,7 @@
                                    Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap" />
                     </StackPanel>
                     <Border Style="{StaticResource SaGlassSurfaceStyle}">
-                        <ItemsRepeater AutomationProperties.LiveSetting="Polite"
+                        <ItemsRepeater x:Name="DiscoveredRepeater" AutomationProperties.LiveSetting="Polite"
                                        AutomationProperties.Name="{x:Bind ViewModel.DiscoveredCountAutomationName, Mode=OneWay}"
                                        ItemsSource="{x:Bind ViewModel.DiscoveredServers}" ItemTemplate="{StaticResource DiscoveredRowTemplate}" />
                     </Border>
@@ -556,7 +556,7 @@
                     <TextBlock x:Uid="FirstServerBody" Style="{StaticResource SaOnboardingBodyTextStyle}" MaxWidth="640" Foreground="{ThemeResource SaTextSecondaryBrush}" TextAlignment="Center"/>
                     <VariableSizedWrapGrid Orientation="Horizontal" HorizontalAlignment="Center" ItemWidth="218" ItemHeight="62" MaximumRowsOrColumns="2">
                         <Button x:Name="EmptyAddButton" x:Uid="OverviewEmptyAddButton" Width="202" Style="{StaticResource SaOnboardingPrimaryButtonStyle}" Command="{x:Bind ViewModel.AddServerCommand}"/>
-                        <Button x:Uid="OverviewEmptyImportButton" Width="202" Style="{StaticResource SaOnboardingSecondaryButtonStyle}" Command="{x:Bind ViewModel.ImportFromSshCommand}"/>
+                        <Button x:Name="OverviewEmptyImportButton" x:Uid="OverviewEmptyImportButton" Width="202" Style="{StaticResource SaOnboardingSecondaryButtonStyle}" Command="{x:Bind ViewModel.ImportFromSshCommand}"/>
                     </VariableSizedWrapGrid>
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="{StaticResource SaSpace8}"
                                         Visibility="{x:Bind ViewModel.IsSearchingLocalNetwork, Mode=OneWay}">
@@ -564,7 +564,7 @@
                                 <TextBlock x:Uid="DashboardEmptyDiscoverySearching" Style="{StaticResource SaCaptionTextStyle}"
                                            Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap" />
                             </StackPanel>
-                            <ItemsRepeater MaxWidth="560" AutomationProperties.LiveSetting="Polite"
+                            <ItemsRepeater x:Name="EmptyDiscoveredRepeater" MaxWidth="560" AutomationProperties.LiveSetting="Polite"
                                            ItemsSource="{x:Bind ViewModel.DiscoveredServers}" ItemTemplate="{StaticResource DiscoveredRowTemplate}"
                                            Visibility="{x:Bind ViewModel.ShowEmptyStateDiscoveries, Mode=OneWay}" />
 

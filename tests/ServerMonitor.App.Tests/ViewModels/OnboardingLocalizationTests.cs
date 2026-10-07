@@ -41,11 +41,8 @@ public sealed class OnboardingLocalizationTests
     // Resolved by x:Uid in ServerFormControl.xaml / DashboardPage.xaml.
     private static readonly string[] XamlKeys =
     [
-        "ServerFormLocalKeySelector.Header",
-        "ServerFormLocalKeySelector.PlaceholderText",
-        "ServerFormJumpLocalKeySelector.Header",
-        "ServerFormJumpLocalKeySelector.PlaceholderText",
-        "ServerFormCredentialReassurance.Text",
+        // UI.7B: the two "found keys" combo boxes became the key picker's menu (ServerEditorKeyPicker*), so their
+        // ServerForm*LocalKeySelector keys are no longer resolved by a view (dead keys: removal with B-22, 7C).
         "ServerFormPrepHelpLink.Content",
         "ServerPrepTitle.Text",
         "ServerPrepIntro.Text",
@@ -57,7 +54,6 @@ public sealed class OnboardingLocalizationTests
         "ServerPrepCopyKeygenButton" + AutomationName,
         "ServerPrepCopyKeyButton.Content",
         "ServerPrepCopyKeyButton" + AutomationName,
-        "ServerFormChecklistTitle.Text",
         "ConnectionStepCopyCommandButton.Content",
         "ConnectionStepCopyCommandButton" + AutomationName,
         // UI.4: the empty dashboard is the SaEmptyState of the Visão geral (Add + Import from SSH + discovery).
@@ -265,7 +261,8 @@ public sealed class OnboardingLocalizationTests
             .ToArray();
         Assert.Equal(5, jumpCodes.Length);
 
-        foreach (var (culture, term) in new[] { ("pt-PT", "anfitrião de salto"), ("pt-BR", "host de salto"), ("en-US", "jump host") })
+        // UI.7 final c1 (Prism F-7): the editor family says "jump host" in every culture (Figma's term).
+        foreach (var (culture, term) in new[] { ("pt-PT", "jump host"), ("pt-BR", "jump host"), ("en-US", "jump host") })
         {
             var resources = LoadResources(culture);
             foreach (var code in jumpCodes)
@@ -290,7 +287,11 @@ public sealed class OnboardingLocalizationTests
         var form = File.ReadAllText(Path.Combine(
             FindRepositoryRoot(), "src", "ServerMonitor.App", "Controls", "ServerFormControl.xaml"));
         Assert.DoesNotContain("ServerFormConnectionStatus", form);
-        Assert.Contains("x:Uid=\"ServerFormChecklistTitle\"", form);
+        // UI.7C (B-9): the checklist is the test dialog's stage list now; no inline checklist (or its title) in the form.
+        Assert.DoesNotContain("ServerFormChecklistTitle", form);
+        var testPanel = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(), "src", "ServerMonitor.App", "Views", "ServerEditorTestPanel.xaml"));
+        Assert.Contains("x:Name=\"StageList\"", testPanel);
     }
 
     [Fact]
@@ -298,7 +299,8 @@ public sealed class OnboardingLocalizationTests
     {
         var root = FindRepositoryRoot();
         var xaml = File.ReadAllText(Path.Combine(root, "src", "ServerMonitor.App", "Controls", "ServerFormControl.xaml"))
-            + File.ReadAllText(Path.Combine(root, "src", "ServerMonitor.App", "Views", "DashboardPage.xaml"));
+            + File.ReadAllText(Path.Combine(root, "src", "ServerMonitor.App", "Views", "DashboardPage.xaml"))
+            + File.ReadAllText(Path.Combine(root, "src", "ServerMonitor.App", "Views", "ServerEditorTestPanel.xaml"));
 
         foreach (var uid in XamlKeys.Select(key => key[..key.IndexOf('.')]).Distinct())
         {

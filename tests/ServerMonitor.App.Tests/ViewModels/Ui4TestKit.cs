@@ -95,7 +95,8 @@ internal static class Ui4TestKit
         MonitoringOptions? options = null,
         INavigationService? navigationOverride = null,
         IServerDialogService? dialogs = null,
-        IServerProfileService? profiles = null)
+        IServerProfileService? profiles = null,
+        IServerEditorSession? editorSession = null)
     {
         var servers = new FakeServerService();
         servers.Servers.AddRange(fleet.Entries.Select(entry => entry.Server));
@@ -119,6 +120,7 @@ internal static class Ui4TestKit
             servers,
             profiles ?? new InertProfileService(),
             dialogs ?? new InertDialogService(),
+            editorSession ?? (dialogs is IEditorScript script ? new EditorScriptSession(script) : new InertEditorSession()),
             connections,
             metrics,
             states,
@@ -166,7 +168,7 @@ internal static class Ui4TestKit
         public Task<bool> RemoveAsync(Server server, CancellationToken cancellationToken = default) => Task.FromResult(false);
     }
 
-    private sealed class InertDialogService : IServerDialogService
+    private sealed class InertDialogService : IEditorScript
     {
         public Task<ServerEditorResult?> ShowEditorAsync(Server? server) => Task.FromResult<ServerEditorResult?>(null);
 

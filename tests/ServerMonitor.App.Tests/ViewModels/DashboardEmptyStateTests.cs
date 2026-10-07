@@ -197,6 +197,7 @@ public sealed class DashboardEmptyStateTests
             servers ?? new FakeServerService(),
             profiles ?? new RecordingProfileService(),
             dialog ?? new RecordingDialogService(),
+            new EditorScriptSession((IEditorScript)(dialog ?? new RecordingDialogService())),
             new FakeConnectionStateStore(),
             new FakeServerMetricsStore(),
             new ServerMonitoringStateStore(),
@@ -286,7 +287,7 @@ public sealed class DashboardEmptyStateTests
             throw new NotSupportedException();
     }
 
-    private sealed class RecordingDialogService : IServerDialogService
+    private sealed class RecordingDialogService : IEditorScript
     {
         public ServerEditorResult? SshImportResult { get; init; }
 

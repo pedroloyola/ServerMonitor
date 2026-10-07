@@ -15,9 +15,12 @@ namespace ServerMonitor.App.Views;
 /// </summary>
 public sealed partial class ServerDetailPage : Page, IServerDetailView, IDisposable
 {
-    public ServerDetailPage(ServerDetailViewModel viewModel)
+    private readonly ServerEditorReturnFocus? _editorReturnFocus;
+
+    public ServerDetailPage(ServerDetailViewModel viewModel, ServerEditorReturnFocus? editorReturnFocus = null)
     {
         InitializeComponent();
+        _editorReturnFocus = editorReturnFocus;
         ViewModel = viewModel;
         DataContext = viewModel;
         Loaded += OnLoaded;
@@ -38,6 +41,8 @@ public sealed partial class ServerDetailPage : Page, IServerDetailView, IDisposa
         ViewModel.ActionsFocusRequested -= OnActionsFocusRequested;
         ViewModel.Dispose();
     }
+
+    private void OnSavedToastCloseRequested(object? sender, EventArgs e) => ViewModel.DismissSavedToast();
 
     // An Ocultar / Remover that did not leave the page (cancelled, failed): back to "…", after the dialog / menu closed.
     private void OnActionsFocusRequested(object? sender, EventArgs e) =>
@@ -60,12 +65,14 @@ public sealed partial class ServerDetailPage : Page, IServerDetailView, IDisposa
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
         var returnTarget = ViewModel.TakeReturnFocus();
+        // UI.7 B-5: back from the editor without saving ("Voltar ao detalhe", Cancelar, Esc), focus returns to Editar.
+        var editorOpener = _editorReturnFocus?.Take(NavigationDestination.Detail);
         if (ShellPageFocus.GetKeepSidebar(this)) return;
         Control? target = returnTarget switch
         {
             ServerDetailReturnTarget.History => HistoryRow,
             ServerDetailReturnTarget.Workloads => WorkloadsRow,
-            _ => null
+            _ => editorOpener is null ? null : FindName(editorOpener) as Control
         };
 
         // Low priority: after the first layout pass, so the element is realized and can take focus.

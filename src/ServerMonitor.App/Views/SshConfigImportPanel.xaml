@@ -1,0 +1,146 @@
+<UserControl
+    x:Class="ServerMonitor.App.Views.SshConfigImportPanel"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:primitives="using:ServerMonitor.App.Controls.Primitives"
+    xmlns:viewModels="using:ServerMonitor.App.ViewModels">
+    <!-- UI.7B (B-11): "Importar de SSH" - content of the editor page's in-page modal layer (Cortex section 8: an in-tree
+         layer, so the exit guard's discard question stays openable). Figma 04 dialog chrome (112:4049 / 112:4250, G-14
+         unified on the Sa dialog buttons) with the state content of 07 (no file, unreadable, no profiles, profiles with blocked ones). Read-only:
+         the list and every classification come from the existing resolver through the view model; a BLOCKED profile is
+         listed with its reason and can never be used (no "fix" anywhere). "Usar perfil" fills only empty fields (Add only).
+         Closing cancels a load still running. UI.7C (H-UI7-2): a profile that would describe a saved server says
+         "Já adicionado" (still selectable - the duplicate is advice, never a block). G-15: "Disponível" neutral, a block
+         in the accessible attention colour, always written out. -->
+    <StackPanel Spacing="{StaticResource SaSpace16}">
+        <TextBlock x:Name="TitleText" x:Uid="ServerEditorImportTitleText" Style="{StaticResource SaTitleTextStyle}" TextWrapping="Wrap"
+                   AutomationProperties.HeadingLevel="Level1" />
+        <TextBlock x:Uid="ServerEditorImportSubtitle" Style="{StaticResource SaSecondaryBodyTextStyle}" TextWrapping="Wrap" />
+        <Border Style="{StaticResource SaInsetTintedSurfaceStyle}" MinHeight="38">
+            <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                <primitives:SaIcon Data="{StaticResource SaIconFolder01Data}" Size="18" VerticalAlignment="Center"
+                                   Foreground="{ThemeResource SaTextSecondaryBrush}" />
+                <TextBlock x:Uid="ServerEditorImportSource" Style="{StaticResource SaControlTextStyle}" VerticalAlignment="Center" />
+            </StackPanel>
+        </Border>
+
+        <!-- Loading (G-28): the read is running; Cancelar stops it. -->
+        <StackPanel x:Name="LoadingRow" Orientation="Horizontal" Spacing="10" Visibility="Collapsed">
+            <ProgressRing x:Name="LoadingRing" Width="18" Height="18" IsActive="False" Foreground="{ThemeResource SaTextBrush}"
+                          AutomationProperties.AccessibilityView="Raw" />
+            <TextBlock x:Uid="ServerEditorImportLoading" Style="{StaticResource SaCaptionTextStyle}" VerticalAlignment="Center"
+                       Foreground="{ThemeResource SaTextSecondaryBrush}" AutomationProperties.LiveSetting="Polite" />
+        </StackPanel>
+
+        <!-- 07 states: no file / unreadable / no profiles. The body is the view model's own message. -->
+        <StackPanel x:Name="StatePanel" Spacing="10" HorizontalAlignment="Center" Visibility="Collapsed">
+            <Border Width="44" Height="44" CornerRadius="{StaticResource SaRadiusPill}" HorizontalAlignment="Center" Style="{StaticResource SaInsetTintedSurfaceStyle}">
+                <primitives:SaIcon x:Name="StateIcon" Size="22" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   Foreground="{ThemeResource SaTextSecondaryBrush}" />
+            </Border>
+            <TextBlock x:Name="StateTitle" Style="{StaticResource SaTitleCompactTextStyle}" HorizontalAlignment="Center"
+                       HorizontalTextAlignment="Center" TextWrapping="Wrap" AutomationProperties.HeadingLevel="Level2" />
+            <TextBlock x:Name="StateBody" Style="{StaticResource SaSecondaryBodyTextStyle}" HorizontalAlignment="Center"
+                       HorizontalTextAlignment="Center" TextWrapping="Wrap" IsTextSelectionEnabled="True"
+                       AutomationProperties.LiveSetting="Polite" />
+        </StackPanel>
+
+        <!-- Profiles: "N disponíveis · M bloqueados", then the list (the resolver caps it at 500; virtualized). -->
+        <StackPanel x:Name="ListPanel" Spacing="8" Visibility="Collapsed">
+            <TextBlock x:Name="CountText" Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}"
+                       AutomationProperties.LiveSetting="Polite" />
+            <ListView
+                x:Name="HostList"
+                x:Uid="ServerEditorImportList"
+                ItemContainerStyle="{StaticResource SaInsetListItemStyle}"
+                MaxHeight="320"
+                SelectionMode="Single"
+                IsItemClickEnabled="False"
+                ContainerContentChanging="OnHostContainerContentChanging"
+                SelectionChanged="OnHostSelectionChanged">
+                <!-- Final c1 (Prism F-2, Figma 04 112:4049): each profile is a row surface (r13, inset tint, selected =
+                     SaSelectedBrush, 8 between rows); the selection marker is neutral (the local accent-neutral scope). -->
+                <ListView.Resources>
+                    <ResourceDictionary>
+                        <ResourceDictionary.MergedDictionaries>
+                            <ResourceDictionary Source="ms-appx:///Styles/Components/Sa.AccentNeutralScope.xaml" />
+                        </ResourceDictionary.MergedDictionaries>
+                    </ResourceDictionary>
+                </ListView.Resources>
+                <ListView.ItemTemplate>
+                    <DataTemplate x:DataType="viewModels:SshConfigHostOptionViewModel">
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="{x:Bind Alias}" Style="{StaticResource SaBodyTextStyle}" FontWeight="Medium" TextTrimming="CharacterEllipsis" />
+                                <!-- "{host} · {user} · porta {n}" and "Via jump host {jump}" (set per container; never the key path). -->
+                                <TextBlock x:Name="DetailText" Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}"
+                                           TextTrimming="CharacterEllipsis" Visibility="Collapsed" />
+                                <TextBlock x:Name="JumpText" Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}"
+                                           TextTrimming="CharacterEllipsis" Visibility="Collapsed" />
+                                <TextBlock Text="{x:Bind RequirementText}" Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaAttentionTextBrush}"
+                                           TextWrapping="Wrap" Visibility="{x:Bind HasRequirement}" />
+                                <TextBlock Text="{x:Bind ClassificationText}" Style="{StaticResource SaHelperTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}"
+                                           TextWrapping="Wrap" Visibility="{x:Bind HasClassification}" />
+                            </StackPanel>
+                            <!-- The state is written out (not colour only): Disponível / Bloqueado, and Já adicionado. -->
+                            <StackPanel Grid.Column="1" VerticalAlignment="Top" Spacing="2" AutomationProperties.AccessibilityView="Raw">
+                                <TextBlock x:Name="AvailableText" x:Uid="ServerEditorImportAvailable" Style="{StaticResource SaCaptionTextStyle}" HorizontalAlignment="Right"
+                                           Foreground="{ThemeResource SaTextSecondaryBrush}" Visibility="Collapsed" />
+                                <!-- Final c2 (Prism C2-4, Figma 112:4067): the selected importable row says so in words. -->
+                                <TextBlock x:Name="SelectedText" x:Uid="ServerEditorImportSelected" Style="{StaticResource SaCaptionTextStyle}"
+                                           HorizontalAlignment="Right" Foreground="{ThemeResource SaTextBrush}" Visibility="Collapsed" />
+                                <TextBlock x:Uid="ServerEditorImportBlocked" Style="{StaticResource SaCaptionTextStyle}" HorizontalAlignment="Right"
+                                           Foreground="{ThemeResource SaAttentionTextBrush}" Visibility="{x:Bind IsBlocked}" />
+                                <TextBlock x:Name="AlreadyAddedText" x:Uid="ServerEditorImportAlreadyAdded" Style="{StaticResource SaCaptionTextStyle}"
+                                           HorizontalAlignment="Right" Foreground="{ThemeResource SaTextSecondaryBrush}" Visibility="Collapsed" />
+                            </StackPanel>
+                        </Grid>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+
+            <!-- Final c1 (Prism F-2, Figma 04): the selected profile's details - Host / Utilizador / Chave privada (the key's
+                 file name; the full path only in the tooltip and the UIA HelpText). Read-only, from the resolver's entry. -->
+            <Border x:Name="DetailsPanel" Style="{StaticResource SaInsetPanelSurfaceStyle}" Visibility="Collapsed">
+                <Grid ColumnSpacing="16" RowSpacing="6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <TextBlock x:Name="DetailsHostLabel" x:Uid="ServerEditorImportDetailsHost" Style="{StaticResource SaCaptionTextStyle}"
+                               Foreground="{ThemeResource SaTextSecondaryBrush}" />
+                    <TextBlock x:Name="DetailsHostValue" Grid.Column="1" Style="{StaticResource SaCaptionTextStyle}" TextTrimming="CharacterEllipsis"
+                               IsTextSelectionEnabled="True" />
+                    <TextBlock x:Name="DetailsUserLabel" Grid.Row="1" x:Uid="ServerEditorImportDetailsUser" Style="{StaticResource SaCaptionTextStyle}"
+                               Foreground="{ThemeResource SaTextSecondaryBrush}" />
+                    <TextBlock x:Name="DetailsUserValue" Grid.Row="1" Grid.Column="1" Style="{StaticResource SaCaptionTextStyle}"
+                               TextTrimming="CharacterEllipsis" IsTextSelectionEnabled="True" />
+                    <TextBlock x:Name="DetailsKeyLabel" Grid.Row="2" x:Uid="ServerEditorImportDetailsKey" Style="{StaticResource SaCaptionTextStyle}"
+                               Foreground="{ThemeResource SaTextSecondaryBrush}" />
+                    <TextBlock x:Name="DetailsKeyValue" Grid.Row="2" Grid.Column="1" Style="{StaticResource SaCaptionTextStyle}"
+                               TextTrimming="CharacterEllipsis" />
+                </Grid>
+            </Border>
+        </StackPanel>
+
+        <TextBlock x:Name="WarningText" Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}"
+                   TextWrapping="Wrap" Visibility="Collapsed" />
+        <TextBlock x:Uid="ServerEditorImportNote" Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}"
+                   TextWrapping="Wrap" />
+        <StackPanel x:Name="ActionRow" Orientation="Horizontal" Spacing="{StaticResource SaSpace12}" HorizontalAlignment="Right">
+            <Button x:Name="CancelButton" x:Uid="ServerEditorImportCancelButton" Style="{StaticResource SaDialogCommandButtonStyle}"
+                    Click="OnCancelClick" />
+            <Button x:Name="UseButton" x:Uid="ServerEditorImportUseButton" Style="{StaticResource SaDialogCommandButtonStyle}"
+                    IsEnabled="False" Click="OnUseClick" />
+        </StackPanel>
+    </StackPanel>
+</UserControl>

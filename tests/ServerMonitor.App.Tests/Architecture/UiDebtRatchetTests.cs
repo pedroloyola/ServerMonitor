@@ -23,8 +23,8 @@ public sealed partial class UiDebtRatchetTests
         ["Controls/DiscoveredServerCard.xaml"] = 5,
         ["Controls/EmptyStateControl.xaml"] = 3,
         ["Controls/ServerCompactCard.xaml"] = 15,
-        ["Controls/ServerEditorModal.xaml"] = 1,
-        ["Controls/ServerFormControl.xaml"] = 50,
+        // UI.7C (B-22): ServerEditorModal deleted; ServerFormControl's last inline panels (checklist, prep helper) moved to
+        // the type ramp / the test dialog - 43 + 1 literals gone (win locked).
         ["MainWindow.xaml"] = 7,
         ["Styles/Controls.xaml"] = 7,
         ["Views/BackupCreateDialog.xaml"] = 3,
@@ -48,7 +48,7 @@ public sealed partial class UiDebtRatchetTests
     {
         ["Controls/EmptyStateControl.xaml"] = 3,
         ["Controls/ServerCompactCard.xaml"] = 3,
-        ["Controls/ServerFormControl.xaml"] = 1,
+        // UI.7C (B-22): ServerFormControl's last legacy accent dependency is gone (win locked).
         ["MainWindow.xaml"] = 4,
         ["Styles/Controls.xaml"] = 4,
         ["Styles/DesignTokens.xaml"] = 92

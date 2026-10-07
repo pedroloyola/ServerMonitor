@@ -43,7 +43,8 @@ internal static partial class QaStartupIsolation
         QaWorkloadsComposition.LaunchFlag,
         QaStoreScreenshotComposition.LaunchFlag,
         QaProxyJumpPolicy.LaunchFlag,
-        QaOverviewComposition.LaunchFlag
+        QaOverviewComposition.LaunchFlag,
+        QaEditorComposition.LaunchFlag
     ];
 
     /// <summary>The modifiers a harness may carry, each as <c>flag value</c> or <c>flag=value</c>.</summary>
@@ -55,7 +56,10 @@ internal static partial class QaStartupIsolation
         QaProxyJumpPolicy.DirectoryFlag,
         QaOverviewScenarioPolicy.LaunchFlag,
         QaShellStartup.StartFlag,
-        QaShellStartup.ActivationFlag
+        QaShellStartup.ActivationFlag,
+        QaEditorComposition.SeedFlag,
+        QaEditorComposition.SshFlag,
+        QaEditorComposition.SaveFlag
     ];
 
     /// <summary>
@@ -121,6 +125,9 @@ internal static partial class QaStartupIsolation
         }
 
         if (QaShellStartup.Refusal(commandLineArgs) is { } shellRefusal) return shellRefusal;
+
+        // UI.7 B-23: the editor harness's own modifiers - exact values, only next to --qa-editor, which needs --qa-backup.
+        if (QaEditorComposition.Refusal(commandLineArgs) is { } editorRefusal) return editorRefusal;
 
         // UI.4 (Cortex r1 NIT-4): the scenario modifier belongs to --qa-overview only; next to another harness it would be
         // silently ignored, so it is refused.

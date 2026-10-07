@@ -1,0 +1,180 @@
+<Page x:Name="PageViewport"
+    x:Class="ServerMonitor.App.Views.ServerEditorPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:ServerMonitor.App.Controls"
+    xmlns:local="using:ServerMonitor.App.Views"
+    xmlns:primitives="using:ServerMonitor.App.Controls.Primitives"
+    NavigationCacheMode="Disabled">
+    <!-- UI.7 Add / Edit server page (Figma 04 112:3252 / 112:3412, 05 112:4613 / 112:4779): header (H1 30/42 + subtitle +
+         one header button), the form (ServerFormControl: 2 cards, options, jump), the notices of Figma 06 (duplicate
+         112:17491, save failure 112:19116), the action bar (Testar + hint | Cancelar + Adicionar/Guardar; not sticky, the
+         page scrolls) and the credential note. A fresh page per visit, never cached (B-1); disposed by navigation when
+         replaced, which ends the visit and disposes its view model (the session owns it). Tab order (B-20): H1
+         (programmatic entry) → Nome → ... → actions → the header button LAST (declared after everything in the tree; drawn
+         in the header row). B-16: after a failed Test/Save the H1 subtitle becomes the assertive summary. -->
+    <!-- UI.7B/7C (Cortex §8, binding): the page hosts its own modal LAYER (the connection test, the trust prompt that test
+         meets, and "Importar de SSH") in the tree, over the form only - NOT a ContentDialog, so the exit guard's
+         "Descartar alterações?" (the one ContentDialog per XamlRoot) can always open. Smoke over the form, SaModalSurface
+         chrome, Tab cycles inside, Esc is handled by the layer (a test running = cancel it). -->
+    <Grid x:Name="EditorHost">
+    <!-- UI.7C QA fix: the width states live on the page's ROOT element - attached to a child, their triggers never fired
+         (at 560 the header button stayed beside a truncated H1). -->
+        <VisualStateManager.VisualStateGroups>
+            <VisualStateGroup x:Name="WidthStates">
+                <VisualState x:Name="Wide">
+                    <VisualState.StateTriggers>
+                        <primitives:SaContentWidthTrigger Source="{Binding ElementName=PageViewport}" MinWidth="840" />
+                    </VisualState.StateTriggers>
+                </VisualState>
+                <!-- B-19: the action bar wraps (Testar + hint above, Cancelar + Adicionar below, right-aligned). -->
+                <VisualState x:Name="Medium">
+                    <VisualState.StateTriggers>
+                        <primitives:SaContentWidthTrigger Source="{Binding ElementName=PageViewport}" MinWidth="700" MaxWidth="840" />
+                    </VisualState.StateTriggers>
+                    <VisualState.Setters>
+                        <Setter Target="ActionEnd.(Grid.Row)" Value="1" />
+                        <Setter Target="ActionEnd.(Grid.Column)" Value="0" />
+                        <Setter Target="ActionEnd.(Grid.ColumnSpan)" Value="2" />
+                        <Setter Target="ActionBar.RowSpacing" Value="{StaticResource SaSpace12}" />
+                    </VisualState.Setters>
+                </VisualState>
+                <!-- < 700: compact padding too; the header button moves under the title. -->
+                <VisualState x:Name="Narrow">
+                    <VisualState.StateTriggers>
+                        <primitives:SaContentWidthTrigger Source="{Binding ElementName=PageViewport}" MinWidth="0" MaxWidth="700" />
+                    </VisualState.StateTriggers>
+                    <VisualState.Setters>
+                        <Setter Target="PageRoot.Padding" Value="{StaticResource SaPagePaddingCompact}" />
+                        <Setter Target="ActionEnd.(Grid.Row)" Value="1" />
+                        <Setter Target="ActionEnd.(Grid.Column)" Value="0" />
+                        <Setter Target="ActionEnd.(Grid.ColumnSpan)" Value="2" />
+                        <Setter Target="ActionBar.RowSpacing" Value="{StaticResource SaSpace12}" />
+                        <Setter Target="HeaderButton.VerticalAlignment" Value="Bottom" />
+                        <Setter Target="HeaderButton.HorizontalAlignment" Value="Left" />
+                        <Setter Target="HeaderTitle.Margin" Value="0,0,0,58" />
+                    </VisualState.Setters>
+                </VisualState>
+            </VisualStateGroup>
+        </VisualStateManager.VisualStateGroups>
+    <ScrollViewer x:Name="PageScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <Grid x:Name="PageRoot" Padding="{StaticResource SaPagePadding}" RowSpacing="{StaticResource SaSpace16}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <!-- Header 112:3319: title column (H1 + subtitle) | the header button (drawn here, declared last). -->
+            <StackPanel x:Name="HeaderTitle" Spacing="4" Margin="0,0,236,0" VerticalAlignment="Center">
+                <primitives:SaHeadingHost AutomationProperties.HeadingLevel="Level1" IsTabStop="False">
+                    <TextBlock
+                        x:Name="EditorHeading"
+                        AutomationProperties.AccessibilityView="Raw" IsTextSelectionEnabled="False" IsTabStop="False"
+                        Style="{StaticResource SaHeadingTextStyle}"
+                        TextTrimming="CharacterEllipsis" />
+                </primitives:SaHeadingHost>
+                <!-- B-16 / G-26: the summary of a failed attempt ("Verifica os campos assinalados para continuar.") is this
+                     subtitle, announced assertively when it switches (no InfoBar in Figma 06). -->
+                <TextBlock
+                    x:Name="EditorSubtitle"
+                    Style="{StaticResource SaPageSubtitleTextStyle}"
+                    AutomationProperties.LiveSetting="Assertive"
+                    TextWrapping="Wrap" />
+            </StackPanel>
+
+            <controls:ServerFormControl x:Name="ServerForm" Grid.Row="1" />
+
+            <!-- Final c1 (Prism F-6): the two notices and the action bar share one StackPanel - a Collapsed notice takes no
+                 spacing (grid rows did: +32 px above the actions), so the actions sit 16 under the form as in Figma. -->
+            <StackPanel x:Name="ActionArea" Grid.Row="2" Spacing="{StaticResource SaSpace16}">
+                <!-- H-UI7-2 duplicate (Figma 06 112:17491): non-blocking, "Abrir servidor" goes through the exit guard. -->
+                <primitives:SaInlineNotice
+                    x:Name="DuplicateNotice"
+                    Severity="Error"
+                    AnnouncePolitely="True"
+                    AutomationProperties.LiveSetting="Polite"
+                    Visibility="Collapsed">
+                    <Button x:Name="OpenDuplicateButton" x:Uid="ServerEditorDuplicateOpenButton" MinWidth="220" Height="36"
+                            Style="{StaticResource SaSolidButtonStyle}" Click="OnOpenDuplicateClick" />
+                </primitives:SaInlineNotice>
+
+                <!-- Figma 06 "Falha ao guardar" (112:19265): the form stays as typed; a consumed secret must be typed again. -->
+                <primitives:SaInlineNotice
+                    x:Name="SaveFailedNotice"
+                    Severity="Error"
+                    AutomationProperties.LiveSetting="Assertive"
+                    Visibility="Collapsed">
+                    <Button x:Name="RetrySaveButton" x:Uid="ServerEditorSaveRetryButton" MinWidth="160" Height="36"
+                            Style="{StaticResource SaSolidButtonStyle}" Click="OnPrimaryClick" />
+                </primitives:SaInlineNotice>
+
+                <!-- Form actions 112:3404: not sticky (B-14); no primary button (G-2): the right-hand action is the default. -->
+                <Grid x:Name="ActionBar" ColumnSpacing="{StaticResource SaSpace12}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Grid ColumnSpacing="{StaticResource SaSpace12}" VerticalAlignment="Center">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Button x:Name="TestButton" x:Uid="ServerFormTestConnectionButton" MinWidth="154"
+                                Style="{StaticResource SaSecondaryButtonStyle}" Click="OnTestClick" />
+                        <TextBlock x:Name="ActionHint" Grid.Column="1" Style="{StaticResource SaCaptionTextStyle}" VerticalAlignment="Center"
+                                   Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap"
+                                   AutomationProperties.LiveSetting="Polite" />
+                    </Grid>
+                    <StackPanel x:Name="ActionEnd" Grid.Column="1" Orientation="Horizontal" Spacing="{StaticResource SaSpace12}"
+                                HorizontalAlignment="Right" VerticalAlignment="Center">
+                        <Button x:Name="CancelButton" x:Uid="ServerEditorCancelButton" MinWidth="114"
+                                Style="{StaticResource SaSecondaryButtonStyle}" Click="OnCancelClick" />
+                        <Button x:Name="PrimaryButton" MinWidth="176"
+                                Style="{StaticResource SaSecondaryButtonStyle}" Click="OnPrimaryClick" />
+                    </StackPanel>
+                </Grid>
+            </StackPanel>
+
+            <!-- Credential reassurance 112:3409: Shield01 17 + two lines. -->
+            <Grid Grid.Row="3" ColumnSpacing="9">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <primitives:SaIcon Data="{StaticResource SaIconShield01Data}" Size="16" VerticalAlignment="Top" Margin="0,1,0,0"
+                                   Foreground="{ThemeResource SaTextSecondaryBrush}" />
+                <StackPanel Grid.Column="1" Spacing="1">
+                    <TextBlock x:Name="CredentialNoteTitle" Style="{StaticResource SaHelperTextStyle}"
+                               Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap" />
+                    <TextBlock x:Uid="ServerEditorCredentialNoteBody" Style="{StaticResource SaHelperTextStyle}"
+                               Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap" />
+                </StackPanel>
+            </Grid>
+
+            <!-- Header button 112:3324 (Add: "Importar de SSH"; Edit: "Voltar ao detalhe"). Last in the tree = last Tab stop. -->
+            <Button x:Name="HeaderButton" MinWidth="204" HorizontalAlignment="Right" VerticalAlignment="Center"
+                    Style="{StaticResource SaSecondaryButtonStyle}" Click="OnHeaderButtonClick" />
+        </Grid>
+    </ScrollViewer>
+
+        <Border x:Name="DialogLayer" Style="{StaticResource SaOverlayStyle}" Visibility="Collapsed">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <Border x:Name="DialogSurface" Style="{StaticResource SaModalSurfaceStyle}" Margin="{StaticResource SaPagePaddingCompact}"
+                        HorizontalAlignment="Center" VerticalAlignment="Center"
+                        AutomationProperties.IsDialog="True" TabFocusNavigation="Cycle">
+                    <Grid>
+                        <local:ServerEditorTestPanel x:Name="TestPanel" Visibility="Collapsed" />
+                        <local:ServerEditorTrustPanel x:Name="TrustPanel" Visibility="Collapsed" />
+                        <local:SshConfigImportPanel x:Name="ImportPanel" Visibility="Collapsed" />
+                    </Grid>
+                </Border>
+            </ScrollViewer>
+        </Border>
+    </Grid>
+</Page>

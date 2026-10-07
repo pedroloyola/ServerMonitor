@@ -5,9 +5,14 @@ namespace ServerMonitor.Core.Domain;
 
 public sealed class ServerValidator : IServerValidator
 {
-    public ServerValidationResult Validate(ServerInput input) => ValidateInput(input, true);
+    /// <summary>
+    /// A new write (the Add/Update path of <see cref="ServerService"/>): the stored rules plus the write-only format rules
+    /// (UI.7 H-UI7-1). Never used to load, quarantine or restore - that is <see cref="Validate(Server)"/>.
+    /// </summary>
+    public ServerValidationResult Validate(ServerInput input) => WithWriteRules(ValidateInput(input, true), input);
 
-    public ServerValidationResult ValidateDraft(ServerInput input) => ValidateInput(input, false);
+    /// <summary>The editor's draft: the same write-only format rules as <see cref="Validate(ServerInput)"/>, so UI and Core agree.</summary>
+    public ServerValidationResult ValidateDraft(ServerInput input) => WithWriteRules(ValidateInput(input, false), input);
 
     public ServerValidationResult Validate(Server server)
     {
@@ -127,6 +132,77 @@ public sealed class ServerValidator : IServerValidator
         if (jump.CredentialReferenceId == Guid.Empty)
         {
             yield return new(nameof(JumpHop.CredentialReferenceId), ServerValidationErrorCode.JumpCredentialReferenceInvalid);
+        }
+    }
+
+    private static ServerValidationResult WithWriteRules(ServerValidationResult stored, ServerInput input)
+    {
+        var errors = stored.Errors.Concat(ValidateWriteRules(input)).ToList();
+        return errors.Count == 0
+            ? ServerValidationResult.Success
+            : new ServerValidationResult(errors);
+    }
+
+    // UI.7 H-UI7-1, write-only: a host with a scheme, a path or whitespace; a PUBLIC key (.pub) chosen as the private key of
+    // the target or the jump host; a jump host that is the target itself (normalized endpoints). Load/quarantine and backup
+    // restore (Validate(Server)) never run these, so nothing already saved is quarantined or refused by them.
+    private static IEnumerable<ServerValidationError> ValidateWriteRules(ServerInput input)
+    {
+        if (!string.IsNullOrWhiteSpace(input.Host) && !IsPlainHost(input.Host))
+        {
+            yield return new(nameof(input.Host), ServerValidationErrorCode.HostFormatInvalid);
+        }
+
+        if (input.AuthenticationMethod == Enums.AuthenticationMethod.SshKey && IsPublicKeyPath(input.PrivateKeyPath))
+        {
+            yield return new(nameof(input.PrivateKeyPath), ServerValidationErrorCode.PrivateKeyIsPublicKey);
+        }
+
+        if (input.Route?.Jump is not { } jump)
+        {
+            yield break;
+        }
+
+        if (jump.AuthenticationMethod == Enums.AuthenticationMethod.SshKey && IsPublicKeyPath(jump.PrivateKeyPath))
+        {
+            yield return new(nameof(JumpHop.PrivateKeyPath), ServerValidationErrorCode.JumpPrivateKeyIsPublicKey);
+        }
+
+        if (TryEndpoint(input.Host, input.Port, out var target)
+            && TryEndpoint(jump.Host, jump.Port, out var via)
+            && target == via)
+        {
+            yield return new(nameof(JumpHop.Host), ServerValidationErrorCode.JumpEndpointIsTarget);
+        }
+    }
+
+    private static bool IsPlainHost(string host)
+    {
+        var trimmed = host.Trim();
+        return !trimmed.Contains("://", StringComparison.Ordinal)
+            && trimmed.IndexOfAny(['/', '\\']) < 0
+            && !trimmed.Any(char.IsWhiteSpace);
+    }
+
+    private static bool IsPublicKeyPath(string? path) =>
+        !string.IsNullOrWhiteSpace(path) && path.Trim().EndsWith(".pub", StringComparison.OrdinalIgnoreCase);
+
+    private static bool TryEndpoint(string? host, int port, out SshEndpoint? endpoint)
+    {
+        endpoint = null;
+        if (string.IsNullOrWhiteSpace(host) || port is < 1 or > 65535)
+        {
+            return false;
+        }
+
+        try
+        {
+            endpoint = SshEndpoint.Create(host, port);
+            return true;
+        }
+        catch (ArgumentException)
+        {
+            return false;
         }
     }
 

@@ -16,6 +16,8 @@
     and contain ServerMonitor.App.Qa.QaStartupIsolation.
 
     The lists below mirror QaStartupIsolation.HarnessFlags / ModifierFlags; QaLaunchRefusalTests fails if they drift.
+    UI.7 final c2: it also mirrors one combination rule of QaShellStartup.Refusal - --qa-activation with --qa-editor is
+    refused here, before Start-Process, as the app refuses it (exit 3, no window).
 
     After the start it re-reads the PID's image path and command line; a mismatch stops exactly that PID (image path +
     start time re-checked) and throws. Returns PID, StartTime, the Process object and the verified command line.
@@ -37,8 +39,8 @@ param(
 $ErrorActionPreference = 'Stop'
 
 # Mirrors QaStartupIsolation (tested against it).
-$HarnessFlags = @('--qa-health', '--qa-discovery', '--qa-notifications', '--qa-compact', '--qa-history', '--qa-workloads', '--qa-store-screenshot', '--qa-proxyjump', '--qa-overview')
-$ModifierFlags = @('--qa-ssh-config', '--qa-ui-language', '--qa-backup', '--qa-proxyjump-dir', '--qa-overview-scenario', '--qa-start', '--qa-activation')
+$HarnessFlags = @('--qa-health', '--qa-discovery', '--qa-notifications', '--qa-compact', '--qa-history', '--qa-workloads', '--qa-store-screenshot', '--qa-proxyjump', '--qa-overview', '--qa-editor')
+$ModifierFlags = @('--qa-ssh-config', '--qa-ui-language', '--qa-backup', '--qa-proxyjump-dir', '--qa-overview-scenario', '--qa-start', '--qa-activation', '--qa-editor-seed', '--qa-editor-ssh', '--qa-editor-save')
 $GalleryFlags = @('--qa-components', '--qa-tokens')
 
 function Test-IsHarness([string]$a) { ($HarnessFlags -ccontains $a) -or ($a -cmatch '^--qa-compact:\d{1,4}$') }
@@ -56,6 +58,9 @@ function Get-QaLaunchRefusal([string[]]$arguments) {
     $unknown = $qa | Where-Object { -not (Test-IsHarness $_) -and -not (Test-IsModifier $_) } | Select-Object -First 1
     if ($unknown) { return "'$unknown' is not a recognised QA switch (exact, lower-case: $($HarnessFlags -join ', '); modifiers $($ModifierFlags -join ', '))" }
     if (@($qa | Where-Object { Test-IsHarness $_ }).Count -eq 0) { return "$($qa[0]) is not an isolated harness; combine it with one of: $($HarnessFlags -join ', ')" }
+    if (($qa -ccontains '--qa-editor') -and @($qa | Where-Object { $_ -ceq '--qa-activation' -or $_.StartsWith('--qa-activation=', [StringComparison]::Ordinal) }).Count -gt 0) {
+        return '--qa-activation is not supported with --qa-editor (the app refuses it too: exit 3, no window)'
+    }
     $null
 }
 

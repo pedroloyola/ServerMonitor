@@ -134,4 +134,23 @@ internal sealed class FakeNavigationService : INavigationService
         CurrentDestination = NavigationDestination.Detail;
         Raise();
     }
+
+    public List<ServerEditorRequest> EditorRequests { get; } = [];
+
+    public void GoToServerEditor(ServerEditorRequest request, Action? refused = null)
+    {
+        EditorRequests.Add(request);
+        CurrentDestination = NavigationDestination.ServerEditor;
+        Raise();
+    }
+
+    public int LeaveRequests { get; private set; }
+
+    public void LeaveCurrentPageThen(Action continuation)
+    {
+        LeaveRequests++;
+        continuation();
+    }
+
+    public void LeaveCurrentPageForActivation(Action continuation) => LeaveCurrentPageThen(continuation);
 }

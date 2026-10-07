@@ -65,6 +65,72 @@ public sealed class SshConnectionServiceTests
         Assert.Equal(new[] { "probe", "password" }, fixture.Factory.Calls);
     }
 
+    /// <summary>
+    /// UI.7B (Cortex R-15): the editor's Test of a saved server sends no override, so the service READS the saved
+    /// credential - once, after the probe - and never writes or deletes one. (The only write a read can cause is the
+    /// legacy-target migration inside <c>WindowsCredentialStore.ReadAsync</c> itself, never an
+    /// <see cref="IServerCredentialStore.WriteAsync"/>; it has its own tests.)
+    /// </summary>
+    [Theory]
+    [InlineData(AuthenticationMethod.Password)]
+    [InlineData(AuthenticationMethod.SshKey)]
+    public async Task R15_a_test_with_the_saved_secret_and_no_override_only_reads_it(AuthenticationMethod authentication)
+    {
+        var keyPath = Path.GetTempFileName();
+        try
+        {
+            var fixture = new Fixture
+            {
+                TrustedHostKey = Trusted(Identity(1))
+            };
+            fixture.Credentials.Secret = "saved secret";
+            fixture.Factory.Enqueue(new FakeSession(Identity(1), SshConnectionErrorCode.AuthenticationFailed));
+            fixture.Factory.Enqueue(new FakeSession(Identity(1), SshConnectionErrorCode.None));
+
+            var result = await fixture.Service.TestConnectionAsync(Request(server => server with
+            {
+                AuthenticationMethod = authentication,
+                PrivateKeyPath = authentication == AuthenticationMethod.SshKey ? keyPath : null
+            }));
+
+            Assert.True(result.IsSuccess);
+            Assert.Equal(1, fixture.Credentials.ReadCount);
+            Assert.Equal(0, fixture.Credentials.WriteCount);
+            Assert.Equal(0, fixture.Credentials.DeleteCount);
+        }
+        finally
+        {
+            File.Delete(keyPath);
+        }
+    }
+
+    [Fact]
+    public async Task R15_a_test_with_a_typed_override_never_touches_the_store()
+    {
+        var fixture = new Fixture
+        {
+            TrustedHostKey = Trusted(Identity(1))
+        };
+        fixture.Credentials.Secret = "saved secret";
+        fixture.Factory.Enqueue(new FakeSession(Identity(1), SshConnectionErrorCode.AuthenticationFailed));
+        fixture.Factory.Enqueue(new FakeSession(Identity(1), SshConnectionErrorCode.None));
+        using var typed = new SecretValue("typed secret");
+
+        var request = Request();
+        var result = await fixture.Service.TestConnectionAsync(new SshConnectionRequest
+        {
+            Server = request.Server,
+            Timeout = request.Timeout,
+            CredentialOverride = typed
+        });
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("typed secret", fixture.Factory.Password);
+        Assert.Equal(0, fixture.Credentials.ReadCount);
+        Assert.Equal(0, fixture.Credentials.WriteCount);
+        Assert.Equal(0, fixture.Credentials.DeleteCount);
+    }
+
     [Fact]
     public async Task Key_change_between_probe_and_authentication_is_blocked()
     {
@@ -645,9 +711,14 @@ public sealed class SshConnectionServiceTests
             Task.FromResult(false);
     }
 
+    // UI.7B (Cortex R-15): RECORDING, not a silent no-op - a write or delete during a test would be counted.
     private sealed class FakeCredentialStore : IServerCredentialStore
     {
         public int ReadCount { get; private set; }
+
+        public int WriteCount { get; private set; }
+
+        public int DeleteCount { get; private set; }
 
         public string? Secret { get; set; }
 
@@ -656,7 +727,11 @@ public sealed class SshConnectionServiceTests
         public Task WriteAsync(
             CredentialReference reference,
             SecretValue secret,
-            CancellationToken cancellationToken = default) => Task.CompletedTask;
+            CancellationToken cancellationToken = default)
+        {
+            WriteCount++;
+            return Task.CompletedTask;
+        }
 
         public Task<SecretValue?> ReadAsync(
             CredentialReference reference,
@@ -669,7 +744,11 @@ public sealed class SshConnectionServiceTests
 
         public Task<bool> DeleteAsync(
             CredentialReference reference,
-            CancellationToken cancellationToken = default) => Task.FromResult(false);
+            CancellationToken cancellationToken = default)
+        {
+            DeleteCount++;
+            return Task.FromResult(false);
+        }
     }
 
     private sealed class FakeSessionFactory : ISshSessionFactory

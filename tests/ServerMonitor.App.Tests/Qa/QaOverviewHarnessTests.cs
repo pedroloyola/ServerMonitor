@@ -256,6 +256,7 @@ public sealed class QaOverviewHarnessTests
             provider.GetRequiredService<IServerService>(),
             null!,
             null!,
+            new InertEditorSession(),
             new FakeConnectionStateStore(),
             provider.GetRequiredService<IServerMetricsStore>(),
             provider.GetRequiredService<IServerMonitoringStateStore>(),

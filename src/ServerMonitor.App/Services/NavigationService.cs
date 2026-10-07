@@ -15,6 +15,12 @@ public sealed class NavigationService : INavigationService
     private readonly Dictionary<Guid, ServerDetailOrigin> _detailOrigins = [];
     private Guid? _lastDetailServer;
     private bool _historyFromSidebar;
+    // UI.7 H-UI7-3: true while a navigation the exit guard accepted runs (its own nested navigations are not re-asked).
+    private bool _leaving;
+    // UI.7: an exit decision (the discard dialog) is open; any other navigation meanwhile is refused, never queued.
+    private bool _exitDecisionPending;
+    // m-2: the latest external activation that arrived while the discard question was open (latest-wins).
+    private Action? _pendingActivation;
     public NavigationDestination? CurrentDestination { get; private set; }
     public event EventHandler? Navigated;
 
@@ -54,6 +60,11 @@ public sealed class NavigationService : INavigationService
             return;
         }
 
+        if (DeferToExitGuard(NavigateTo<TPage>))
+        {
+            return;
+        }
+
         Show(_pageFactory(typeof(TPage)), DestinationFor(typeof(TPage)));
         _logger.LogInformation("Navigated to {Page}.", typeof(TPage).Name);
     }
@@ -74,6 +85,11 @@ public sealed class NavigationService : INavigationService
 
         // Both sub-pages are singletons: the factory hands back the very instance already shown, if it is.
         var page = _pageFactory(pageType);
+        if (!ReferenceEquals(Host.Content, page) && DeferToExitGuard(() => GoToSettings(section)))
+        {
+            return;
+        }
+
         if (ReferenceEquals(Host.Content, page))
         {
             // Cortex #6: no content swap means no Loaded — notify the page so a pending section request is honoured now.
@@ -114,6 +130,10 @@ public sealed class NavigationService : INavigationService
     public void GoToHistory(Guid serverId, string serverName)
     {
         _ = Host;
+        if (DeferToExitGuard(() => GoToHistory(serverId, serverName)))
+        {
+            return;
+        }
 
         // A fresh page per navigation so each visit starts clean and disposes on Unloaded — the
         // target server is a runtime argument, so this cannot use the type-only NavigateTo cache.
@@ -127,6 +147,10 @@ public sealed class NavigationService : INavigationService
     public void GoToWorkloads(Guid serverId, string serverName)
     {
         _ = Host;
+        if (DeferToExitGuard(() => GoToWorkloads(serverId, serverName)))
+        {
+            return;
+        }
 
         // A fresh page per navigation so each visit starts clean and disposes on Unloaded — the
         // target server is a runtime argument, so this cannot use the type-only NavigateTo cache.
@@ -143,6 +167,7 @@ public sealed class NavigationService : INavigationService
         // Fresh page/VM per visit: the directory holds per-row subscriptions to the shared server cards that must not
         // outlive the visit (released by Show when the page is replaced, and on Unloaded).
         if (CurrentDestination == NavigationDestination.Servers) return;
+        if (DeferToExitGuard(GoToServers)) return;
         Show(_pageFactory(typeof(ServersPage)), NavigationDestination.Servers);
         _logger.LogInformation("Navigated to Servers.");
     }
@@ -150,6 +175,10 @@ public sealed class NavigationService : INavigationService
     public void GoToServerDetail(Guid serverId, ServerDetailOrigin origin)
     {
         _ = Host;
+        if (DeferToExitGuard(() => GoToServerDetail(serverId, origin)))
+        {
+            return;
+        }
 
         // Cortex r1 MUST-1: a server that is no longer in the list (removed/hidden between a click or a deep-link and
         // this call) never gets the Detail page — the user lands on the origin instead of a dead page with no way out.
@@ -189,10 +218,160 @@ public sealed class NavigationService : INavigationService
     public void GoToHistory()
     {
         if (CurrentDestination == NavigationDestination.History && _historyFromSidebar) return;
+        if (DeferToExitGuard(GoToHistory)) return;
         var page = (IHistoryView)_pageFactory(typeof(HistoryPage));
         _historyFromSidebar = true;
         Show(page, NavigationDestination.History);
         page.LoadSidebar(_lastDetailServer);
+    }
+
+    /// <inheritdoc />
+    public void GoToServerEditor(ServerEditorRequest request, Action? refused = null)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        _ = Host;
+        if (DeferToExitGuard(() => GoToServerEditor(request, refused), refused))
+        {
+            return;
+        }
+
+        // Content BEFORE Load: replacing the previous page disposes it first (a previous editor's view model is gone before
+        // this visit's one is created, CP-13); a fresh page per visit, never cached (B-1).
+        var page = (IServerEditorView)_pageFactory(typeof(ServerEditorPage));
+        Show(page, NavigationDestination.ServerEditor);
+        page.Load(request);
+        _logger.LogInformation("Navigated to the server editor ({Mode}).", request.Mode);
+    }
+
+    /// <inheritdoc />
+    public void LeaveCurrentPageThen(Action continuation)
+    {
+        ArgumentNullException.ThrowIfNull(continuation);
+        if (DeferToExitGuard(continuation))
+        {
+            return;
+        }
+
+        continuation();
+    }
+
+    /// <inheritdoc />
+    public void LeaveCurrentPageForActivation(Action continuation)
+    {
+        ArgumentNullException.ThrowIfNull(continuation);
+        if (_exitDecisionPending && !_leaving && _host?.Content is INavigationExitGuard)
+        {
+            _pendingActivation = continuation;
+            _logger.LogInformation("An activation arrived while the exit question is open; the latest one is kept.");
+            return;
+        }
+
+        LeaveCurrentPageThen(continuation);
+    }
+
+    /// <summary>
+    /// UI.7 H-UI7-3: the ONE exit path. When the page shown is an <see cref="INavigationExitGuard"/>, the navigation runs
+    /// only once it says yes - at once for a clean page (a completed answer), after the discard dialog otherwise. True =
+    /// this call was taken over (run, deferred or refused); the caller must not navigate itself.
+    /// </summary>
+    private bool DeferToExitGuard(Action navigation, Action? refused = null)
+    {
+        if (_leaving || _host?.Content is not INavigationExitGuard guard)
+        {
+            return false;
+        }
+
+        if (_exitDecisionPending)
+        {
+            // One question at a time: a navigation that arrives while the user decides is dropped, not queued
+            // (activations: see _pendingActivation - the latest one runs only if the user discards).
+            refused?.Invoke();
+            return true;
+        }
+
+        Task<bool> decision;
+        try
+        {
+            decision = guard.ConfirmLeaveAsync();
+        }
+        catch (Exception exception)
+        {
+            // Fail safe: an exit guard that cannot answer keeps the page (nothing is discarded without an answer).
+            _logger.LogError("The exit guard failed. Exception type: {ExceptionType}.", exception.GetType().Name);
+            refused?.Invoke();
+            return true;
+        }
+
+        if (decision.IsCompleted)
+        {
+            Conclude(decision, navigation, refused);
+            return true;
+        }
+
+        _exitDecisionPending = true;
+        _ = AwaitExitDecisionAsync(decision, navigation, refused);
+        return true;
+    }
+
+    private async Task AwaitExitDecisionAsync(Task<bool> decision, Action navigation, Action? refused)
+    {
+        try
+        {
+            await decision.ConfigureAwait(true);
+        }
+        catch
+        {
+            // Observed in Conclude.
+        }
+        finally
+        {
+            _exitDecisionPending = false;
+        }
+
+        // m-2: an activation that arrived meanwhile replaces the navigation that asked - only if the user discards.
+        var activation = _pendingActivation;
+        _pendingActivation = null;
+        if (activation is not null && decision.Status == TaskStatus.RanToCompletion && decision.Result)
+        {
+            refused?.Invoke(); // the original navigation will not happen
+            Conclude(decision, activation, null, deferred: true);
+            return;
+        }
+
+        Conclude(decision, navigation, refused, deferred: true);
+    }
+
+    private void Conclude(Task<bool> decision, Action navigation, Action? refused, bool deferred = false)
+    {
+        if (decision.Status != TaskStatus.RanToCompletion || !decision.Result)
+        {
+            if (decision.IsFaulted)
+            {
+                _logger.LogError("The exit guard failed. Exception type: {ExceptionType}.",
+                    decision.Exception?.InnerException?.GetType().Name ?? nameof(Exception));
+            }
+
+            refused?.Invoke();
+            return;
+        }
+
+        _leaving = true;
+        try
+        {
+            navigation();
+        }
+        catch (Exception exception) when (deferred)
+        {
+            // m-1: nobody awaits a deferred navigation. A failure is logged (type only, B-21) and reported to the caller's
+            // refusal path, so an editor visit still ends and its opener's command is released. A synchronous navigation
+            // keeps throwing to its caller (OpenAsync already ends the visit and reports it).
+            _logger.LogError("A deferred navigation failed. Exception type: {ExceptionType}.", exception.GetType().Name);
+            refused?.Invoke();
+        }
+        finally
+        {
+            _leaving = false;
+        }
     }
 
     private static NavigationDestination DestinationFor(Type type) => type == typeof(DashboardPage)
@@ -202,6 +381,7 @@ public sealed class NavigationService : INavigationService
         : type == typeof(WorkloadsPage) ? NavigationDestination.Workloads
         : type == typeof(SettingsPage) ? NavigationDestination.Settings
         : type == typeof(SettingsDataPage) ? NavigationDestination.SettingsData
+        : type == typeof(ServerEditorPage) ? NavigationDestination.ServerEditor
         : throw new ArgumentException("Unknown navigation page.", nameof(type));
 
     private bool IsListed(Guid serverId) =>
@@ -263,6 +443,12 @@ internal interface INavigationHost
 public interface IServerDetailView
 {
     void Load(Guid serverId, ServerDetailOrigin origin);
+}
+
+/// <summary>UI.7 B-1: the server editor page as navigation sees it (one fresh page per visit).</summary>
+public interface IServerEditorView
+{
+    void Load(ServerEditorRequest request);
 }
 
 public interface IHistoryView

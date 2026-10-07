@@ -35,64 +35,22 @@
   <data name="OperatingSystemLinux" xml:space="preserve"><value>Linux</value></data>
   <data name="OperatingSystemMacOS" xml:space="preserve"><value>macOS</value></data>
   <data name="OperatingSystemUnknown" xml:space="preserve"><value>Desconhecido</value></data>
-  <data name="ServerFormScrollViewer.AutomationProperties.Name" xml:space="preserve"><value>Configuração do servidor</value></data>
-  <data name="ServerFormValidationError.Title" xml:space="preserve"><value>Reveja os dados</value></data>
-  <data name="ServerFormValidationError.Message" xml:space="preserve"><value>Reveja os campos obrigatórios, a porta e a configuração de autenticação SSH.</value></data>
-  <data name="ServerFormNameField.Header" xml:space="preserve"><value>Nome</value></data>
-  <data name="ServerFormNameField.PlaceholderText" xml:space="preserve"><value>Ex.: Servidor principal</value></data>
-  <data name="ServerFormHostField.Header" xml:space="preserve"><value>Host / IP</value></data>
-  <data name="ServerFormHostField.PlaceholderText" xml:space="preserve"><value>Ex.: server.example.com</value></data>
-  <data name="ServerFormPortField.Header" xml:space="preserve"><value>Porta</value></data>
-  <data name="ServerFormUsernameField.Header" xml:space="preserve"><value>Utilizador</value></data>
-  <data name="ServerFormUsernameField.PlaceholderText" xml:space="preserve"><value>Ex.: monitor</value></data>
-  <data name="ServerFormOperatingSystemField.Header" xml:space="preserve"><value>Sistema operativo</value></data>
   <data name="OperatingSystemAutoOption.Content" xml:space="preserve"><value>Automático</value></data>
   <data name="OperatingSystemLinuxOption.Content" xml:space="preserve"><value>Linux</value></data>
   <data name="OperatingSystemMacOSOption.Content" xml:space="preserve"><value>macOS</value></data>
   <data name="OperatingSystemUnknownOption.Content" xml:space="preserve"><value>Desconhecido</value></data>
-  <data name="ServerFormRefreshIntervalField.Header" xml:space="preserve"><value>Intervalo de atualização</value></data>
   <data name="RefreshInterval10sOption.Content" xml:space="preserve"><value>10 segundos</value></data>
   <data name="RefreshInterval30sOption.Content" xml:space="preserve"><value>30 segundos</value></data>
   <data name="RefreshInterval1minOption.Content" xml:space="preserve"><value>1 minuto</value></data>
   <data name="RefreshInterval5minOption.Content" xml:space="preserve"><value>5 minutos</value></data>
-  <data name="AddServerDialog.Title" xml:space="preserve"><value>Adicionar servidor</value></data>
-  <data name="AddServerDialog.PrimaryButtonText" xml:space="preserve"><value>Guardar</value></data>
-  <data name="AddServerDialog.CloseButtonText" xml:space="preserve"><value>Cancelar</value></data>
-  <data name="EditServerDialog.Title" xml:space="preserve"><value>Editar servidor</value></data>
-  <data name="EditServerDialog.PrimaryButtonText" xml:space="preserve"><value>Guardar alterações</value></data>
-  <data name="EditServerDialog.CloseButtonText" xml:space="preserve"><value>Cancelar</value></data>
   <data name="SettingsHiddenServersTitle.Text" xml:space="preserve"><value>Servidores ocultos</value></data>
   <data name="SettingsHiddenServersDescription.Text" xml:space="preserve"><value>Continuam guardados, mas não aparecem no painel.</value></data>
   <data name="SettingsHiddenServersEmpty.Text" xml:space="preserve"><value>Não há servidores ocultos.</value></data>
   <data name="HiddenServerRestoreButton.Content" xml:space="preserve"><value>Restaurar</value></data>
   <data name="HiddenServerRestoreFor" xml:space="preserve"><value>Restaurar {0}</value></data>
-  <data name="ServerFormAuthenticationTitle.Text" xml:space="preserve"><value>Autenticação</value></data>
-  <data name="ServerFormAuthenticationMethodField.Header" xml:space="preserve"><value>Método de autenticação</value></data>
-  <data name="AuthenticationSshKeyOption.Content" xml:space="preserve"><value>Chave privada SSH (recomendado)</value></data>
-  <data name="AuthenticationPasswordOption.Content" xml:space="preserve"><value>Palavra-passe</value></data>
-  <data name="ServerFormPrivateKeyPathField.Header" xml:space="preserve"><value>Ficheiro da chave privada</value></data>
-  <data name="ServerFormPrivateKeyPathField.PlaceholderText" xml:space="preserve"><value>Selecione id_ed25519, id_rsa ou outra chave compatível</value></data>
-  <data name="ServerFormChoosePrivateKeyButton.Content" xml:space="preserve"><value>Escolher ficheiro…</value></data>
-  <data name="ServerFormPassphraseField.Header" xml:space="preserve"><value>Frase-passe da chave (opcional)</value></data>
-  <data name="ServerFormPassphraseField.PlaceholderText" xml:space="preserve"><value>Não será guardada no ficheiro de configuração</value></data>
-  <data name="ServerFormSavedPassphraseHint.Text" xml:space="preserve"><value>Existe uma frase-passe protegida no Gestor de Credenciais. Deixe vazio para a manter.</value></data>
   <data name="ServerFormRemoveSavedPassphrase.Content" xml:space="preserve"><value>Remover a frase-passe guardada</value></data>
-  <data name="ServerFormPasswordField.Header" xml:space="preserve"><value>Palavra-passe SSH</value></data>
-  <data name="ServerFormPasswordField.PlaceholderText" xml:space="preserve"><value>Guardada com segurança no Windows</value></data>
-  <data name="ServerFormSavedPasswordHint.Text" xml:space="preserve"><value>Existe uma palavra-passe protegida no Gestor de Credenciais. Digite apenas para a substituir.</value></data>
   <data name="ServerFormTestConnectionButton.Content" xml:space="preserve"><value>Testar ligação</value></data>
   <data name="ServerFormCancelTestButton.Content" xml:space="preserve"><value>Cancelar teste</value></data>
-  <data name="HostKeyUnknownTitle.Text" xml:space="preserve"><value>Confirmar identidade do servidor</value></data>
-  <data name="HostKeyUnknownDescription.Text" xml:space="preserve"><value>Esta host key ainda não é conhecida. Compare a fingerprint SHA-256 através de um canal independente antes de confiar.</value></data>
-  <data name="HostKeyServerLabel.Text" xml:space="preserve"><value>Servidor</value></data>
-  <data name="HostKeyAlgorithmLabel.Text" xml:space="preserve"><value>Algoritmo</value></data>
-  <data name="HostKeyFingerprintLabel.Text" xml:space="preserve"><value>Fingerprint SHA-256</value></data>
-  <data name="HostKeyTrustAndConnectButton.Content" xml:space="preserve"><value>Confiar e ligar</value></data>
-  <data name="HostKeyCancelButton.Content" xml:space="preserve"><value>Cancelar</value></data>
-  <data name="HostKeyMismatchTitle.Text" xml:space="preserve"><value>A identidade deste servidor mudou</value></data>
-  <data name="HostKeyMismatchDescription.Text" xml:space="preserve"><value>A ligação foi bloqueada. Não continue até confirmar a alteração com o administrador do servidor.</value></data>
-  <data name="HostKeyKnownFingerprintLabel.Text" xml:space="preserve"><value>Fingerprint conhecida</value></data>
-  <data name="HostKeyReceivedFingerprintLabel.Text" xml:space="preserve"><value>Fingerprint recebida</value></data>
   <data name="ConnectionStateNeverConnected" xml:space="preserve"><value>Ainda não testado</value></data>
   <data name="ConnectionStateConnecting" xml:space="preserve"><value>A testar ligação…</value></data>
   <data name="ConnectionStateConnected" xml:space="preserve"><value>Ligação verificada</value></data>
@@ -105,7 +63,7 @@
   <data name="ConnectionStateError" xml:space="preserve"><value>Erro de ligação</value></data>
   <data name="ConnectionErrorInvalidConfiguration" xml:space="preserve"><value>Reveja a configuração SSH.</value></data>
   <data name="ConnectionErrorCredentialNotConfigured" xml:space="preserve"><value>Configure uma palavra-passe ou frase-passe válida.</value></data>
-  <data name="ConnectionErrorCredentialUnavailable" xml:space="preserve"><value>A credencial guardada não está disponível. Introduza-a novamente.</value></data>
+  <data name="ConnectionErrorCredentialUnavailable" xml:space="preserve"><value>A credencial guardada não está disponível. Volta a introduzi-la.</value></data>
   <data name="ConnectionErrorPrivateKeyUnavailable" xml:space="preserve"><value>O ficheiro da chave privada não foi encontrado.</value></data>
   <data name="ConnectionErrorPrivateKeyInvalid" xml:space="preserve"><value>A chave privada ou a frase-passe não é válida.</value></data>
   <data name="ConnectionErrorAuthenticationFailed" xml:space="preserve"><value>O servidor recusou a autenticação.</value></data>
@@ -119,15 +77,15 @@
   <data name="ConnectionErrorProtocolError" xml:space="preserve"><value>Não foi possível concluir o handshake SSH em segurança.</value></data>
   <data name="ConnectionErrorCancelled" xml:space="preserve"><value>O teste foi cancelado.</value></data>
   <data name="ConnectionErrorUnexpected" xml:space="preserve"><value>O teste de ligação falhou inesperadamente.</value></data>
-  <data name="ConnectionErrorJumpConnectionFailed" xml:space="preserve"><value>Não foi possível alcançar o anfitrião de salto.</value></data>
-  <data name="ConnectionErrorJumpAuthenticationFailed" xml:space="preserve"><value>O anfitrião de salto recusou a autenticação.</value></data>
-  <data name="ConnectionErrorJumpHostKeyUnknown" xml:space="preserve"><value>A chave do anfitrião de salto ainda não é fidedigna. Ligue-se diretamente ao anfitrião de salto e confirme a chave.</value></data>
-  <data name="ConnectionErrorJumpHostKeyMismatch" xml:space="preserve"><value>A chave do anfitrião de salto mudou. A ligação foi bloqueada.</value></data>
-  <data name="ConnectionErrorJumpCredentialUnavailable" xml:space="preserve"><value>A credencial guardada do anfitrião de salto não está disponível. Introduza-a novamente.</value></data>
-  <data name="ConnectionErrorTargetUnreachableViaJump" xml:space="preserve"><value>O anfitrião de salto não conseguiu alcançar o servidor.</value></data>
-  <data name="ConnectionErrorRoutedHostKeyUnknown" xml:space="preserve"><value>A chave do servidor, vista através do anfitrião de salto, ainda não é fidedigna.</value></data>
-  <data name="ConnectionErrorRoutedHostKeyMismatch" xml:space="preserve"><value>A chave do servidor, vista através do anfitrião de salto, mudou. A ligação foi bloqueada.</value></data>
-  <data name="ConnectionErrorLocalTunnelFailed" xml:space="preserve"><value>Não foi possível abrir com segurança o túnel local para o anfitrião de salto. Tente novamente.</value></data>
+  <data name="ConnectionErrorJumpConnectionFailed" xml:space="preserve"><value>Não foi possível alcançar o jump host.</value></data>
+  <data name="ConnectionErrorJumpAuthenticationFailed" xml:space="preserve"><value>O jump host recusou a autenticação.</value></data>
+  <data name="ConnectionErrorJumpHostKeyUnknown" xml:space="preserve"><value>A chave do jump host ainda não é fidedigna. Liga-te diretamente ao jump host e confirma a chave.</value></data>
+  <data name="ConnectionErrorJumpHostKeyMismatch" xml:space="preserve"><value>A chave do jump host mudou. A ligação foi bloqueada.</value></data>
+  <data name="ConnectionErrorJumpCredentialUnavailable" xml:space="preserve"><value>A credencial guardada do jump host não está disponível. Volta a introduzi-la.</value></data>
+  <data name="ConnectionErrorTargetUnreachableViaJump" xml:space="preserve"><value>O jump host não conseguiu alcançar o servidor.</value></data>
+  <data name="ConnectionErrorRoutedHostKeyUnknown" xml:space="preserve"><value>A chave do servidor, vista através do jump host, ainda não é fidedigna.</value></data>
+  <data name="ConnectionErrorRoutedHostKeyMismatch" xml:space="preserve"><value>A chave do servidor, vista através do jump host, mudou. A ligação foi bloqueada.</value></data>
+  <data name="ConnectionErrorLocalTunnelFailed" xml:space="preserve"><value>Não foi possível abrir com segurança o túnel local para o jump host. Tenta novamente.</value></data>
   <data name="ServerMetricsWaitingForData.Text" xml:space="preserve"><value>A aguardar dados</value></data>
   <data name="ServerMetricsRefreshingLabel.Text" xml:space="preserve"><value>A atualizar…</value></data>
   <data name="ServerMetricsRefreshFor" xml:space="preserve"><value>Atualizar métricas de {0}</value></data>
@@ -343,48 +301,44 @@
   <data name="BackgroundDegradedNotice.Title" xml:space="preserve"><value>Segundo plano indisponível nesta sessão</value></data>
   <data name="BackgroundDegradedNotice.Message" xml:space="preserve"><value>O ServerAlyzer abriu esta janela porque não conseguiu colocar ou manter o seu ícone na área de notificação da barra de tarefas. Sem esse ícone não há forma de reabrir ou encerrar a app em segundo plano, por isso fechar esta janela agora encerra o ServerAlyzer. A tua preferência não foi alterada: abre o ServerAlyzer de novo mais tarde para tentares outra vez.</value></data>
   <data name="SettingsBackgroundDegradedCaption.Text" xml:space="preserve"><value>Indisponível nesta sessão: o ícone da área de notificação não pôde ser criado ou mantido. Fechar a janela encerra o ServerAlyzer. A tua preferência foi mantida e será usada na próxima abertura.</value></data>
-  <data name="ServerFormImportSshConfigButton.Content" xml:space="preserve"><value>Importar da configuração SSH</value></data>
-  <data name="ServerFormSshConfigTitle.Text" xml:space="preserve"><value>Anfitriões em ~/.ssh/config</value></data>
   <data name="ServerFormSshConfigCloseButton.Content" xml:space="preserve"><value>Fechar</value></data>
-  <data name="ServerFormSshConfigUseButton.Content" xml:space="preserve"><value>Usar</value></data>
   <data name="SshConfigHostUseForFormat" xml:space="preserve"><value>Usar {0}</value></data>
   <data name="SshConfigImportNotFound" xml:space="preserve"><value>Não foi encontrado ~/.ssh/config.</value></data>
-  <data name="SshConfigImportNoHosts" xml:space="preserve"><value>Não há anfitriões para importar em ~/.ssh/config.</value></data>
+  <data name="SshConfigImportNoHosts" xml:space="preserve"><value>Não há hosts para importar em ~/.ssh/config.</value></data>
   <data name="SshConfigImportErrorTooLarge" xml:space="preserve"><value>O ~/.ssh/config ou um ficheiro que ele inclui é demasiado grande para importar (256 KB por ficheiro, 1 MB no total). Nada foi importado.</value></data>
   <data name="SshConfigImportErrorUnreadable" xml:space="preserve"><value>Não foi possível ler o ~/.ssh/config ou um ficheiro que ele inclui. Nada foi importado.</value></data>
   <data name="SshConfigImportErrorInvalidEncoding" xml:space="preserve"><value>O ~/.ssh/config ou um ficheiro que ele inclui não é texto UTF-8 válido. Nada foi importado.</value></data>
-  <data name="SshConfigImportWarningIncludeNotFollowed" xml:space="preserve"><value>Algumas linhas Include não puderam ser verificadas e não foram seguidas. Os anfitriões que podem afetar não são importados.</value></data>
+  <data name="SshConfigImportWarningIncludeNotFollowed" xml:space="preserve"><value>Algumas linhas Include não puderam ser verificadas e não foram seguidas. Os hosts que podem afetar não são importados.</value></data>
   <data name="SshConfigImportWarningMatchNotEvaluated" xml:space="preserve"><value>Este ficheiro usa blocos Match, que não são avaliados. Os valores importados podem ser inexatos.</value></data>
   <data name="SshConfigHostUnsupportedFormat" xml:space="preserve"><value>Não suportado: {0}</value></data>
-  <data name="SshConfigHostAmbiguousFormat" xml:space="preserve"><value>Ambíguo: {0} (escolha manualmente)</value></data>
+  <data name="SshConfigHostAmbiguousFormat" xml:space="preserve"><value>Ambíguo: {0} (escolhe manualmente)</value></data>
   <data name="SshConfigHostInvalidFormat" xml:space="preserve"><value>Inválido: {0}</value></data>
   <data name="SshConfigHostIgnoredFormat" xml:space="preserve"><value>Ignorado (não relevante): {0}</value></data>
-  <data name="SshConfigPreviewHostNameFormat" xml:space="preserve"><value>Anfitrião: {0}</value></data>
+  <data name="SshConfigPreviewHostNameFormat" xml:space="preserve"><value>Host: {0}</value></data>
   <data name="SshConfigPreviewUserFormat" xml:space="preserve"><value>Utilizador: {0}</value></data>
   <data name="SshConfigPreviewPortFormat" xml:space="preserve"><value>Porta: {0}</value></data>
   <data name="SshConfigPreviewIdentityFileFormat" xml:space="preserve"><value>Chave: {0}</value></data>
   <data name="SshConfigPreviewJumpFormat" xml:space="preserve"><value>Através de: {0}</value></data>
-  <data name="SshConfigHostJumpClassificationFormat" xml:space="preserve"><value>Anfitrião de salto {0}: {1}</value></data>
-  <data name="SshConfigImportAppliedFormat" xml:space="preserve"><value>Os campos vazios foram preenchidos a partir de {0}. Os valores que já tinha introduzido foram mantidos.</value></data>
-  <data name="SshConfigImportNothingFilledHostDiffersFormat" xml:space="preserve"><value>Nada foi preenchido a partir de {0}: o anfitrião que introduziu é diferente. Os seus valores foram mantidos.</value></data>
+  <data name="SshConfigHostJumpClassificationFormat" xml:space="preserve"><value>Jump host {0}: {1}</value></data>
+  <data name="SshConfigImportAppliedFormat" xml:space="preserve"><value>Os campos vazios foram preenchidos a partir de {0}. Os valores que já tinhas introduzido foram mantidos.</value></data>
+  <data name="SshConfigImportNothingFilledHostDiffersFormat" xml:space="preserve"><value>Nada foi preenchido a partir de {0}: o host que introduziste é diferente. Os teus valores foram mantidos.</value></data>
   <data name="SshConfigImportNothingFilledFormat" xml:space="preserve"><value>Nada foi preenchido a partir de {0}: os campos que oferece já têm valores.</value></data>
-  <data name="SshConfigHostBlockedProxyCommand" xml:space="preserve"><value>Requer ProxyCommand (no anfitrião ou no anfitrião de salto) — não suportado</value></data>
-  <data name="SshConfigHostBlockedJumpMultiHop" xml:space="preserve"><value>Requer mais do que um anfitrião de salto (ProxyJump multi-salto ou encadeado) — não suportado</value></data>
+  <data name="SshConfigHostBlockedProxyCommand" xml:space="preserve"><value>Requer ProxyCommand (no host ou no jump host) — não suportado</value></data>
+  <data name="SshConfigHostBlockedJumpMultiHop" xml:space="preserve"><value>Requer mais do que um jump host (ProxyJump multi-salto ou encadeado) — não suportado</value></data>
   <data name="SshConfigHostBlockedJumpUnparsable" xml:space="preserve"><value>O valor de ProxyJump não pode ser lido com exatidão — não importado</value></data>
-  <data name="SshConfigHostBlockedJumpCycle" xml:space="preserve"><value>O ProxyJump volta a este anfitrião — não importado</value></data>
-  <data name="SshConfigHostBlockedJumpHostNameUnresolved" xml:space="preserve"><value>O HostName do anfitrião de salto não pode ser resolvido com exatidão — não importado</value></data>
+  <data name="SshConfigHostBlockedJumpCycle" xml:space="preserve"><value>O ProxyJump volta a este host — não importado</value></data>
+  <data name="SshConfigHostBlockedJumpHostNameUnresolved" xml:space="preserve"><value>O HostName do jump host não pode ser resolvido com exatidão — não importado</value></data>
   <data name="SshConfigHostBlockedCanonicalizationMayChangeRoute" xml:space="preserve"><value>CanonicalizeHostname pode mudar o destino a que o ssh se liga — não importado</value></data>
   <data name="SshConfigHostBlockedProxyMaySetByMatch" xml:space="preserve"><value>Um bloco Match pode definir um proxy — não é possível verificar, não importado</value></data>
   <data name="SshConfigHostBlockedProxyMaySetByInclude" xml:space="preserve"><value>Um Include não pôde ser verificado — não é possível confirmar o proxy, não importado</value></data>
-  <data name="SshConfigImportWarningHostsTruncated" xml:space="preserve"><value>Só são listados os primeiros 500 anfitriões.</value></data>
+  <data name="SshConfigImportWarningHostsTruncated" xml:space="preserve"><value>Só são listados os primeiros 500 hosts.</value></data>
   <data name="SshConfigImportErrorInvalidSyntax" xml:space="preserve"><value>O ~/.ssh/config ou um ficheiro que ele inclui tem uma linha mal formada, que o ssh rejeitaria. Nada foi importado.</value></data>
-  <data name="ServerFormSshConfigHostList.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Anfitriões em ~/.ssh/config</value></data>
   <data name="SshConfigImportErrorTooManyFiles" xml:space="preserve"><value>Demasiados ficheiros incluídos (limite de 64 ficheiros, 256 correspondências por Include). Nada foi importado.</value></data>
   <data name="SshConfigImportErrorIncludeCycle" xml:space="preserve"><value>Um ficheiro inclui-se a si próprio, diretamente ou através de outros ficheiros, e o ssh falharia. Nada foi importado.</value></data>
   <data name="SshConfigImportErrorIncludeTooDeep" xml:space="preserve"><value>Os ficheiros Include estão aninhados em mais de 16 níveis, e o ssh falharia. Nada foi importado.</value></data>
   <data name="SshConfigImportErrorFileFormat" xml:space="preserve"><value>Ficheiro: {0}</value></data>
   <data name="SshConfigImportDiagnosticIncludeMatchedNoFiles" xml:space="preserve"><value>O Include '{0}' não corresponde a nenhum ficheiro.</value></data>
-  <data name="SshConfigImportDiagnosticIncludeNotVerified" xml:space="preserve"><value>O Include '{0}' não foi seguido ({1}). Os anfitriões que pode afetar não são importados.</value></data>
+  <data name="SshConfigImportDiagnosticIncludeNotVerified" xml:space="preserve"><value>O Include '{0}' não foi seguido ({1}). Os hosts que pode afetar não são importados.</value></data>
   <data name="SshConfigIncludeIssueNotFollowed" xml:space="preserve"><value>não seguido</value></data>
   <data name="SshConfigIncludeIssueOutsideSshDirectory" xml:space="preserve"><value>fora de ~/.ssh</value></data>
   <data name="SshConfigIncludeIssueReparsePoint" xml:space="preserve"><value>ligação simbólica ou junção</value></data>
@@ -398,36 +352,14 @@
   <data name="SshConfigHostAccessibleImportableFormat" xml:space="preserve"><value>{0} — importável</value></data>
   <data name="SshConfigHostAccessibleBlockedFormat" xml:space="preserve"><value>{0} — bloqueado: {1}</value></data>
   <data name="SshConfigHostAccessibleNotesFormat" xml:space="preserve"><value>Notas: {0}</value></data>
-  <data name="ServerFormRouteTitle.Text" xml:space="preserve"><value>Rota</value></data>
-  <data name="ServerFormUseJumpHost.Content" xml:space="preserve"><value>Ligar através de um anfitrião de salto</value></data>
-  <data name="ServerFormJumpHostHint.Text" xml:space="preserve"><value>O servidor passa a ser alcançado apenas através deste anfitrião de salto (um salto). A host key dele é confirmada separadamente.</value></data>
-  <data name="ServerFormJumpHostField.Header" xml:space="preserve"><value>Anfitrião de salto</value></data>
-  <data name="ServerFormJumpHostField.PlaceholderText" xml:space="preserve"><value>Ex.: bastion.example.com</value></data>
-  <data name="ServerFormJumpPortField.Header" xml:space="preserve"><value>Porta</value></data>
-  <data name="ServerFormJumpPortField.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Porta do anfitrião de salto</value></data>
-  <data name="ServerFormJumpUsernameField.Header" xml:space="preserve"><value>Utilizador do anfitrião de salto</value></data>
-  <data name="ServerFormJumpAuthenticationMethodField.Header" xml:space="preserve"><value>Autenticação do anfitrião de salto</value></data>
-  <data name="JumpAuthenticationSshKeyOption.Content" xml:space="preserve"><value>Chave privada SSH</value></data>
-  <data name="JumpAuthenticationPasswordOption.Content" xml:space="preserve"><value>Palavra-passe</value></data>
-  <data name="ServerFormJumpPrivateKeyPathField.Header" xml:space="preserve"><value>Ficheiro da chave privada do anfitrião de salto</value></data>
-  <data name="ServerFormChooseJumpPrivateKeyButton.Content" xml:space="preserve"><value>Escolher ficheiro…</value></data>
-  <data name="ServerFormJumpPassphraseField.Header" xml:space="preserve"><value>Frase-passe da chave do anfitrião de salto (opcional)</value></data>
-  <data name="ServerFormJumpPasswordField.Header" xml:space="preserve"><value>Palavra-passe do anfitrião de salto</value></data>
-  <data name="ServerFormSavedJumpSecretHint.Text" xml:space="preserve"><value>O segredo do anfitrião de salto está protegido no Gestor de Credenciais. Digite apenas para o substituir.</value></data>
-  <data name="HostKeySubjectJumpFormat" xml:space="preserve"><value>Anfitrião de salto {0}</value></data>
+  <data name="HostKeySubjectJumpFormat" xml:space="preserve"><value>Jump host {0}</value></data>
   <data name="HostKeySubjectTargetFormat" xml:space="preserve"><value>Destino {0} via {1}</value></data>
-  <data name="HostKeyMismatchServerLabel.Text" xml:space="preserve"><value>Servidor</value></data>
   <data name="DashboardEmptyDiscoverySearching.Text" xml:space="preserve"><value>A procurar servidores SSH na tua rede local…</value></data>
   <data name="DashboardEmptyDiscoveryFoundFormat" xml:space="preserve"><value>Encontrado na rede local: {0}</value></data>
-  <data name="ServerFormLocalKeySelector.Header" xml:space="preserve"><value>Chaves encontradas em .ssh</value></data>
-  <data name="ServerFormLocalKeySelector.PlaceholderText" xml:space="preserve"><value>Escolher uma chave encontrada…</value></data>
-  <data name="ServerFormJumpLocalKeySelector.Header" xml:space="preserve"><value>Chaves encontradas em .ssh (anfitrião de salto)</value></data>
-  <data name="ServerFormJumpLocalKeySelector.PlaceholderText" xml:space="preserve"><value>Escolher uma chave encontrada…</value></data>
   <data name="LocalKeyOptionRecommendedFormat" xml:space="preserve"><value>{0} · Recomendada</value></data>
   <data name="LocalKeyOptionBrowse" xml:space="preserve"><value>Procurar outro ficheiro…</value></data>
   <data name="LocalKeyAutoSelectedHint" xml:space="preserve"><value>Chave encontrada em .ssh</value></data>
   <data name="LocalKeyNoneFoundHint" xml:space="preserve"><value>Não foi encontrada nenhuma chave em .ssh. Seleciona id_ed25519, id_rsa ou outra chave compatível.</value></data>
-  <data name="ServerFormCredentialReassurance.Text" xml:space="preserve"><value>A tua chave permanece neste dispositivo. Palavras-passe e frases-passe ficam protegidas pelo Gestor de Credenciais do Windows.</value></data>
   <data name="ServerFormPrepHelpLink.Content" xml:space="preserve"><value>Como preparar o meu servidor?</value></data>
   <data name="ServerPrepTitle.Text" xml:space="preserve"><value>Como preparar o meu servidor</value></data>
   <data name="ServerPrepIntro.Text" xml:space="preserve"><value>O ServerAlyzer não requer root nem instala nada no servidor. Um utilizador normal chega para ler as métricas.</value></data>
@@ -442,8 +374,7 @@
   <data name="ServerPrepCopied" xml:space="preserve"><value>Copiado</value></data>
   <data name="ServerPrepUserPlaceholder" xml:space="preserve"><value>&lt;utilizador&gt;</value></data>
   <data name="ServerPrepHostPlaceholder" xml:space="preserve"><value>&lt;servidor&gt;</value></data>
-  <data name="ServerPrepJumpPlaceholder" xml:space="preserve"><value>&lt;anfitrião-de-salto&gt;</value></data>
-  <data name="ServerFormChecklistTitle.Text" xml:space="preserve"><value>Teste de ligação</value></data>
+  <data name="ServerPrepJumpPlaceholder" xml:space="preserve"><value>&lt;jump-host&gt;</value></data>
   <data name="ConnectionStepPortTitle" xml:space="preserve"><value>Porta SSH</value></data>
   <data name="ConnectionStepPortViaJumpFormat" xml:space="preserve"><value>Porta SSH (via {0})</value></data>
   <data name="ConnectionStepHostKeyTitle" xml:space="preserve"><value>Identidade do servidor (SHA-256)</value></data>
@@ -479,15 +410,15 @@
   <data name="ConnectionHintProtocolError" xml:space="preserve"><value>A porta respondeu, mas não como um servidor SSH. Confirma que esta é a porta do SSH e não a de outro serviço. Se for, o serviço SSH pode estar a recusar novas ligações (demasiadas tentativas ou uma regra de acesso).</value></data>
   <data name="ConnectionHintCancelled" xml:space="preserve"><value>Cancelaste o teste. Podes voltar a testar quando quiseres.</value></data>
   <data name="ConnectionHintUnexpected" xml:space="preserve"><value>Algo inesperado interrompeu o teste. Testa de novo; se continuar, reinicia a aplicação.</value></data>
-  <data name="ConnectionHintJumpConnectionFailed" xml:space="preserve"><value>O problema está no anfitrião de salto, não no servidor: não foi possível chegar a ele. Confirma o endereço e a porta do anfitrião de salto.</value></data>
-  <data name="ConnectionHintJumpAuthenticationFailed" xml:space="preserve"><value>O problema está no anfitrião de salto, não no servidor: ele não aceitou o início de sessão. Confirma o utilizador e a chave ou palavra-passe do anfitrião de salto. No anfitrião de salto, com esse utilizador:</value></data>
-  <data name="ConnectionHintJumpHostKeyUnknown" xml:space="preserve"><value>A identidade do anfitrião de salto ainda não é conhecida. Compara a impressão digital SHA-256 com a do anfitrião de salto antes de confiar.</value></data>
-  <data name="ConnectionHintJumpHostKeyMismatch" xml:space="preserve"><value>A identidade do anfitrião de salto é diferente da que estava guardada. A ligação foi bloqueada. Não continues até confirmares com quem o administra que a chave mudou de facto.</value></data>
-  <data name="ConnectionHintJumpCredentialUnavailable" xml:space="preserve"><value>Não foi possível ler a credencial guardada do anfitrião de salto. Volta a introduzi-la na secção do anfitrião de salto e testa de novo.</value></data>
-  <data name="ConnectionHintTargetUnreachableViaJump" xml:space="preserve"><value>O anfitrião de salto funcionou, mas não conseguiu chegar ao servidor. Confirma o endereço e a porta do servidor tal como são vistos a partir do anfitrião de salto.</value></data>
-  <data name="ConnectionHintRoutedHostKeyUnknown" xml:space="preserve"><value>É a primeira vez que este servidor é visto através do anfitrião de salto. Compara a impressão digital SHA-256 abaixo com a do servidor antes de confiar.</value></data>
-  <data name="ConnectionHintRoutedHostKeyMismatch" xml:space="preserve"><value>A identidade do servidor, vista através do anfitrião de salto, é diferente da que estava guardada. A ligação foi bloqueada. Não continues até confirmares com quem administra o servidor que a chave mudou de facto.</value></data>
-  <data name="ConnectionHintLocalTunnelFailed" xml:space="preserve"><value>Não foi possível abrir neste computador o túnel local para o anfitrião de salto. Não é um problema do servidor: testa de novo.</value></data>
+  <data name="ConnectionHintJumpConnectionFailed" xml:space="preserve"><value>O problema está no jump host, não no servidor: não foi possível chegar a ele. Confirma o endereço e a porta do jump host.</value></data>
+  <data name="ConnectionHintJumpAuthenticationFailed" xml:space="preserve"><value>O problema está no jump host, não no servidor: ele não aceitou o início de sessão. Confirma o utilizador e a chave ou palavra-passe do jump host. No jump host, com esse utilizador:</value></data>
+  <data name="ConnectionHintJumpHostKeyUnknown" xml:space="preserve"><value>A identidade do jump host ainda não é conhecida. Compara a impressão digital SHA-256 com a do jump host antes de confiar.</value></data>
+  <data name="ConnectionHintJumpHostKeyMismatch" xml:space="preserve"><value>A identidade do jump host é diferente da que estava guardada. A ligação foi bloqueada. Não continues até confirmares com quem o administra que a chave mudou de facto.</value></data>
+  <data name="ConnectionHintJumpCredentialUnavailable" xml:space="preserve"><value>Não foi possível ler a credencial guardada do jump host. Volta a introduzi-la na secção do jump host e testa de novo.</value></data>
+  <data name="ConnectionHintTargetUnreachableViaJump" xml:space="preserve"><value>O jump host funcionou, mas não conseguiu chegar ao servidor. Confirma o endereço e a porta do servidor tal como são vistos a partir do jump host.</value></data>
+  <data name="ConnectionHintRoutedHostKeyUnknown" xml:space="preserve"><value>É a primeira vez que este servidor é visto através do jump host. Compara a impressão digital SHA-256 abaixo com a do servidor antes de confiar.</value></data>
+  <data name="ConnectionHintRoutedHostKeyMismatch" xml:space="preserve"><value>A identidade do servidor, vista através do jump host, é diferente da que estava guardada. A ligação foi bloqueada. Não continues até confirmares com quem administra o servidor que a chave mudou de facto.</value></data>
+  <data name="ConnectionHintLocalTunnelFailed" xml:space="preserve"><value>Não foi possível abrir neste computador o túnel local para o jump host. Não é um problema do servidor: testa de novo.</value></data>
   <!-- M14.6 Cópia de segurança e restauro encriptados -->
   <data name="BackupSectionTitle.Text" xml:space="preserve"><value>Cópia de segurança e restauro</value></data>
   <data name="BackupSectionDescription.Text" xml:space="preserve"><value>Guarda os teus servidores, rotas, chaves de anfitrião confiáveis e palavras-passe guardadas num ficheiro encriptado que podes restaurar neste ou noutro computador. O ficheiro é protegido por uma frase-passe à tua escolha. Os ficheiros de chave privada nunca são incluídos, apenas os caminhos.</value></data>
@@ -948,4 +879,220 @@ as métricas e o histórico do servidor.</value></data>
   <data name="ConfigurationUnavailableNotice.Message" xml:space="preserve"><value>Não foi possível ler a configuração dos servidores. A configuração não foi alterada.</value></data>
   <data name="ConfigurationUnavailableNotice.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Não foi possível ler a configuração dos servidores. A configuração não foi alterada.</value></data>
   <data name="HistoryBackToServerFormat" xml:space="preserve"><value>Voltar a {0}</value></data>
+  <!-- UI.7A: the Add / Edit server page (Figma 04/05/06/11). -->
+  <data name="ServerEditorAddTitle" xml:space="preserve"><value>Adicionar servidor</value></data>
+  <data name="ServerEditorAddSubtitle" xml:space="preserve"><value>Liga um servidor Linux ou macOS por SSH.</value></data>
+  <data name="ServerEditorEditTitle" xml:space="preserve"><value>Editar servidor</value></data>
+  <data name="ServerEditorEditSubtitleFormat" xml:space="preserve"><value>Atualiza os dados de ligação de {0}.</value></data>
+  <data name="ServerEditorImportButton" xml:space="preserve"><value>Importar de SSH</value></data>
+  <data name="ServerEditorBackToDetailButton" xml:space="preserve"><value>Voltar ao detalhe</value></data>
+  <data name="ServerEditorAddButton" xml:space="preserve"><value>Adicionar servidor</value></data>
+  <data name="ServerEditorSaveButton" xml:space="preserve"><value>Guardar alterações</value></data>
+  <data name="ServerEditorCancelButton.Content" xml:space="preserve"><value>Cancelar</value></data>
+  <data name="ServerEditorHintFillToTest" xml:space="preserve"><value>Preenche os campos para testar.</value></data>
+  <data name="ServerEditorHintTestBeforeSave" xml:space="preserve"><value>Testa a ligação antes de guardar.</value></data>
+  <data name="ServerEditorHintUnsaved" xml:space="preserve"><value>Tens alterações por guardar.</value></data>
+  <data name="ServerEditorCredentialNoteAdd" xml:space="preserve"><value>A tua chave permanece neste dispositivo.</value></data>
+  <data name="ServerEditorCredentialNoteEdit" xml:space="preserve"><value>As tuas credenciais permanecem neste dispositivo.</value></data>
+  <data name="ServerEditorCredentialNoteBody.Text" xml:space="preserve"><value>Palavras-passe e frases-passe ficam protegidas pelo Gestor de Credenciais do Windows.</value></data>
+  <data name="ServerEditorSaveFailedTitleAdd" xml:space="preserve"><value>Não foi possível adicionar o servidor</value></data>
+  <data name="ServerEditorSaveFailedTitleEdit" xml:space="preserve"><value>As alterações não foram guardadas</value></data>
+  <data name="ServerEditorSaveFailedBody" xml:space="preserve"><value>Os dados introduzidos continuam aqui. Tenta guardar novamente.</value></data>
+  <data name="ServerEditorSaveFailedRetypeSecret" xml:space="preserve"><value>Introduz de novo a palavra-passe ou a frase-passe antes de guardar.</value></data>
+  <data name="ServerEditorDiscardTitle" xml:space="preserve"><value>Descartar alterações?</value></data>
+  <data name="ServerEditorDiscardBody" xml:space="preserve"><value>As alterações que fizeste a este servidor ainda não foram guardadas.</value></data>
+  <data name="ServerEditorDiscardNote" xml:space="preserve"><value>Podes continuar a editar ou sair sem guardar.</value></data>
+  <data name="ServerEditorDiscardPrimary" xml:space="preserve"><value>Descartar alterações</value></data>
+  <data name="ServerEditorDiscardClose" xml:space="preserve"><value>Continuar a editar</value></data>
+  <data name="ServerEditorDiscardRenamedFormat" xml:space="preserve"><value>{0} → {1}</value></data>
+  <data name="ServerEditorDiscardUnnamed" xml:space="preserve"><value>Novo servidor</value></data>
+  <data name="ServerEditorIdentityTitle.Text" xml:space="preserve"><value>O teu servidor</value></data>
+  <data name="ServerEditorIdentitySubtitleAdd" xml:space="preserve"><value>Começa pelos dados de ligação.</value></data>
+  <data name="ServerEditorIdentitySubtitleEdit" xml:space="preserve"><value>Identificação e acesso ao servidor.</value></data>
+  <data name="ServerEditorAuthTitleAdd" xml:space="preserve"><value>Como te queres ligar?</value></data>
+  <data name="ServerEditorAuthTitleEdit" xml:space="preserve"><value>Autenticação</value></data>
+  <data name="ServerEditorAuthSubtitleKeyAdd" xml:space="preserve"><value>Chave SSH recomendada para ligações frequentes.</value></data>
+  <data name="ServerEditorAuthSubtitlePasswordAdd" xml:space="preserve"><value>Usa a palavra-passe do utilizador SSH.</value></data>
+  <data name="ServerEditorAuthSubtitleKeyEdit" xml:space="preserve"><value>Mantém a chave atual ou escolhe outro ficheiro.</value></data>
+  <data name="ServerEditorAuthSubtitlePasswordEdit" xml:space="preserve"><value>Introduz uma credencial para mudar de método.</value></data>
+  <data name="ServerEditorAuthSubtitlePasswordKeepEdit" xml:space="preserve"><value>Deixa em branco para manter a palavra-passe atual.</value></data>
+  <data name="ServerEditorAuthMethodGroup.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Método de autenticação</value></data>
+  <data name="ServerEditorNameField.Header" xml:space="preserve"><value>Nome</value></data>
+  <data name="ServerEditorNameInput.PlaceholderText" xml:space="preserve"><value>Ex.: Servidor principal</value></data>
+  <data name="ServerEditorHostField.Header" xml:space="preserve"><value>Host ou endereço IP</value></data>
+  <data name="ServerEditorHostInput.PlaceholderText" xml:space="preserve"><value>Ex.: server.example.com</value></data>
+  <data name="ServerEditorUsernameField.Header" xml:space="preserve"><value>Utilizador SSH</value></data>
+  <data name="ServerEditorUsernameInput.PlaceholderText" xml:space="preserve"><value>Ex.: monitor</value></data>
+  <data name="ServerEditorPrivateKeyField.Header" xml:space="preserve"><value>Ficheiro da chave privada</value></data>
+  <data name="ServerEditorPassphraseField.Header" xml:space="preserve"><value>Frase-passe da chave · opcional</value></data>
+  <data name="ServerEditorPassphraseInput.PlaceholderText" xml:space="preserve"><value>Apenas se a tua chave estiver protegida</value></data>
+  <data name="ServerEditorPasswordField.Header" xml:space="preserve"><value>Palavra-passe</value></data>
+  <data name="ServerEditorPasswordField.HelperText" xml:space="preserve"><value>Guardada no Gestor de Credenciais do Windows.</value></data>
+  <data name="ServerEditorPasswordInput.PlaceholderText" xml:space="preserve"><value>Introduz a palavra-passe</value></data>
+  <data name="ServerEditorPortField.Header" xml:space="preserve"><value>Porta</value></data>
+  <data name="ServerEditorPortInput.PlaceholderText" xml:space="preserve"><value>22</value></data>
+  <data name="ServerEditorOperatingSystemField.Header" xml:space="preserve"><value>Sistema operativo</value></data>
+  <data name="ServerEditorRefreshIntervalField.Header" xml:space="preserve"><value>Atualizar a cada</value></data>
+  <data name="ServerEditorUseJumpHost.Content" xml:space="preserve"><value>Ligar através de um jump host</value></data>
+  <data name="ServerEditorJumpHostDescription.Text" xml:space="preserve"><value>Usa um servidor intermédio para chegar a redes que não aceitam uma ligação SSH direta.</value></data>
+  <data name="ServerEditorJumpHostKind.Text" xml:space="preserve"><value>ProxyJump / bastion</value></data>
+  <data name="ServerEditorJumpHostTitle.Text" xml:space="preserve"><value>Jump host</value></data>
+  <data name="ServerEditorJumpHostSubtitle.Text" xml:space="preserve"><value>Credenciais próprias do servidor intermédio.</value></data>
+  <data name="ServerEditorJumpHostField.Header" xml:space="preserve"><value>Jump host</value></data>
+  <data name="ServerEditorJumpHostInput.PlaceholderText" xml:space="preserve"><value>Ex.: bastion.example.com</value></data>
+  <data name="ServerEditorJumpUsernameField.Header" xml:space="preserve"><value>Utilizador SSH</value></data>
+  <data name="ServerEditorJumpUsernameInput.PlaceholderText" xml:space="preserve"><value>Ex.: admin</value></data>
+  <data name="ServerEditorJumpPortField.Header" xml:space="preserve"><value>Porta</value></data>
+  <data name="ServerEditorJumpPortInput.PlaceholderText" xml:space="preserve"><value>22</value></data>
+  <data name="ServerEditorJumpAuthTitle.Text" xml:space="preserve"><value>Autenticação</value></data>
+  <data name="ServerEditorJumpAuthSubtitle.Text" xml:space="preserve"><value>Usadas apenas para ligar ao jump host.</value></data>
+  <data name="ServerEditorJumpAuthMethodGroup.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Método de autenticação do jump host</value></data>
+  <data name="ServerEditorJumpPrivateKeyField.Header" xml:space="preserve"><value>Ficheiro da chave privada</value></data>
+  <data name="ServerEditorJumpPassphraseField.Header" xml:space="preserve"><value>Frase-passe da chave · opcional</value></data>
+  <data name="ServerEditorJumpPassphraseInput.PlaceholderText" xml:space="preserve"><value>Apenas se a chave estiver protegida</value></data>
+  <data name="ServerEditorJumpPasswordField.Header" xml:space="preserve"><value>Palavra-passe</value></data>
+  <data name="ServerEditorJumpPasswordInput.PlaceholderText" xml:space="preserve"><value>Introduz a palavra-passe do jump host</value></data>
+  <data name="ServerEditorAuthKeyOption.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Chave SSH</value></data>
+  <data name="ServerEditorAuthKeyOptionText.Text" xml:space="preserve"><value>Chave SSH</value></data>
+  <data name="ServerEditorAuthPasswordOption.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Palavra-passe</value></data>
+  <data name="ServerEditorAuthPasswordOptionText.Text" xml:space="preserve"><value>Palavra-passe</value></data>
+  <data name="ServerEditorJumpAuthKeyOption.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Chave SSH do jump host</value></data>
+  <data name="ServerEditorJumpAuthKeyOptionText.Text" xml:space="preserve"><value>Chave SSH</value></data>
+  <data name="ServerEditorJumpAuthPasswordOption.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Palavra-passe do jump host</value></data>
+  <data name="ServerEditorJumpAuthPasswordOptionText.Text" xml:space="preserve"><value>Palavra-passe</value></data>
+  <data name="ServerEditorKeyPickerChoose" xml:space="preserve"><value>Escolher ficheiro…</value></data>
+  <data name="ServerEditorKeyPickerChosenFormat" xml:space="preserve"><value>{0}  ·  Alterar ficheiro…</value></data>
+  <data name="ServerEditorKeyPickerBrowse" xml:space="preserve"><value>Procurar ficheiro…</value></data>
+  <data name="ServerEditorKeyPickerHelper" xml:space="preserve"><value>Seleciona id_ed25519, id_rsa ou outra chave compatível.</value></data>
+  <data name="ServerEditorKeyPickerCurrentHelper" xml:space="preserve"><value>Chave privada atual</value></data>
+  <data name="ServerEditorKeyPickerCurrentSshHelper" xml:space="preserve"><value>Chave privada atual · pasta .ssh deste dispositivo</value></data>
+  <data name="ServerEditorJumpKeyPickerHelper" xml:space="preserve"><value>Seleciona a chave privada do jump host.</value></data>
+  <data name="ServerEditorKeyPickerAccessibleFormat" xml:space="preserve"><value>{0}: {1}</value></data>
+  <data name="ServerEditorPassphraseHeader" xml:space="preserve"><value>Frase-passe da chave · opcional</value></data>
+  <data name="ServerEditorPassphrasePlaceholder" xml:space="preserve"><value>Apenas se a tua chave estiver protegida</value></data>
+  <data name="ServerEditorJumpPassphrasePlaceholder" xml:space="preserve"><value>Apenas se a chave estiver protegida</value></data>
+  <data name="ServerEditorPasswordHeader" xml:space="preserve"><value>Palavra-passe</value></data>
+  <data name="ServerEditorPasswordPlaceholder" xml:space="preserve"><value>Introduz a palavra-passe</value></data>
+  <data name="ServerEditorJumpPasswordPlaceholder" xml:space="preserve"><value>Introduz a palavra-passe do jump host</value></data>
+  <data name="ServerEditorPassphraseSavedHeader" xml:space="preserve"><value>Frase-passe · guardada</value></data>
+  <data name="ServerEditorPasswordSavedHeader" xml:space="preserve"><value>Palavra-passe · guardada</value></data>
+  <data name="ServerEditorSecretKeepPlaceholder" xml:space="preserve"><value>Deixa em branco para manter a atual</value></data>
+  <data name="ServerEditorRouteJumpPending" xml:space="preserve"><value>Jump host por preencher</value></data>
+  <data name="ServerEditorRouteFormat" xml:space="preserve"><value>Este dispositivo   →   {0}   →   {1}</value></data>
+  <data name="ServerEditorRouteTargetPending" xml:space="preserve"><value>servidor por preencher</value></data>
+  <data name="ServerEditorTrustStepFormat" xml:space="preserve"><value>PASSO {0} DE {1}</value></data>
+  <data name="ServerEditorTrustUnknownTitle" xml:space="preserve"><value>Confirmar identidade do servidor</value></data>
+  <data name="ServerEditorTrustJumpTitle" xml:space="preserve"><value>Confirmar jump host</value></data>
+  <data name="ServerEditorTrustTargetTitle" xml:space="preserve"><value>Confirmar servidor</value></data>
+  <data name="ServerEditorTrustMismatchTitle" xml:space="preserve"><value>A identidade do servidor mudou</value></data>
+  <data name="ServerEditorTrustJumpChangedTitle" xml:space="preserve"><value>A chave do jump host mudou</value></data>
+  <data name="ServerEditorTrustTargetChangedTitle" xml:space="preserve"><value>A chave do servidor mudou</value></data>
+  <data name="ServerEditorTrustUnknownBody" xml:space="preserve"><value>É a primeira ligação a este endereço. Compara a impressão digital com a fornecida pelo administrador antes de confiar.</value></data>
+  <data name="ServerEditorTrustJumpBody" xml:space="preserve"><value>Esta é a identidade do servidor intermédio. Compara a impressão digital com a fornecida pelo administrador antes de confiar.</value></data>
+  <data name="ServerEditorTrustTargetBody" xml:space="preserve"><value>Esta é a identidade do servidor final. É independente da chave do jump host; confirma também esta impressão digital.</value></data>
+  <data name="ServerEditorTrustMismatchBody" xml:space="preserve"><value>A chave recebida é diferente da guardada. A ligação foi bloqueada. Confirma a alteração com o administrador do servidor.</value></data>
+  <data name="ServerEditorTrustJumpChangedBody" xml:space="preserve"><value>A ligação foi bloqueada: a identidade do servidor intermédio mudou. Confirma a nova chave com o administrador do jump host.</value></data>
+  <data name="ServerEditorTrustTargetChangedBody" xml:space="preserve"><value>A ligação foi bloqueada: a identidade do servidor final mudou. Confirma a nova chave com o administrador do servidor.</value></data>
+  <data name="ServerEditorTrustUnknownScope" xml:space="preserve"><value>Ao confiar, esta identidade fica guardada neste dispositivo.</value></data>
+  <data name="ServerEditorTrustJumpScope" xml:space="preserve"><value>A confiança fica guardada apenas para este jump host.</value></data>
+  <data name="ServerEditorTrustTargetScope" xml:space="preserve"><value>A confiança fica guardada apenas para este servidor, através deste jump host.</value></data>
+  <data name="ServerEditorTrustMismatchScope" xml:space="preserve"><value>Não é possível continuar enquanto existir esta diferença.</value></data>
+  <data name="ServerEditorTrustPresentedFormat" xml:space="preserve"><value>Impressão digital apresentada · {0}</value></data>
+  <data name="ServerEditorTrustReceivedFormat" xml:space="preserve"><value>Chave recebida · {0}</value></data>
+  <data name="ServerEditorTrustSavedLabel" xml:space="preserve"><value>Chave guardada</value></data>
+  <data name="ServerEditorTrustAcceptTest" xml:space="preserve"><value>Confiar e testar</value></data>
+  <data name="ServerEditorTrustAcceptContinue" xml:space="preserve"><value>Confiar e continuar</value></data>
+  <data name="ServerEditorTrustCancel" xml:space="preserve"><value>Cancelar</value></data>
+  <data name="ServerEditorTrustBack" xml:space="preserve"><value>Voltar ao formulário</value></data>
+  <data name="ServerEditorTrustWorking" xml:space="preserve"><value>A guardar esta identidade e a testar a ligação…</value></data>
+  <data name="ServerEditorImportSubtitle.Text" xml:space="preserve"><value>Escolhe um perfil da configuração SSH deste dispositivo.</value></data>
+  <data name="ServerEditorImportSource.Text" xml:space="preserve"><value>~/.ssh/config</value></data>
+  <data name="ServerEditorImportLoading.Text" xml:space="preserve"><value>A ler ~/.ssh/config…</value></data>
+  <data name="ServerEditorImportList.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Perfis SSH</value></data>
+  <data name="ServerEditorImportAvailable.Text" xml:space="preserve"><value>Disponível</value></data>
+  <data name="ServerEditorImportSelected.Text" xml:space="preserve"><value>Selecionado</value></data>
+  <data name="ServerEditorImportBlocked.Text" xml:space="preserve"><value>Bloqueado</value></data>
+  <data name="ServerEditorImportNote.Text" xml:space="preserve"><value>Preenche apenas os campos vazios do servidor e do jump host. Os dados já introduzidos são mantidos. ProxyJump com um único jump host é suportado.</value></data>
+  <data name="ServerEditorImportAvailableCountOne" xml:space="preserve"><value>{0} disponível</value></data>
+  <data name="ServerEditorImportAvailableCountOther" xml:space="preserve"><value>{0} disponíveis</value></data>
+  <data name="ServerEditorImportBlockedCountOne" xml:space="preserve"><value>{0} bloqueado</value></data>
+  <data name="ServerEditorImportBlockedCountOther" xml:space="preserve"><value>{0} bloqueados</value></data>
+  <data name="ServerEditorImportRowPortFormat" xml:space="preserve"><value>porta {0}</value></data>
+  <data name="ServerEditorImportRowJumpFormat" xml:space="preserve"><value>Via jump host {0}</value></data>
+  <data name="ServerEditorImportDetailsHost.Text" xml:space="preserve"><value>Host</value></data>
+  <data name="ServerEditorImportDetailsUser.Text" xml:space="preserve"><value>Utilizador</value></data>
+  <data name="ServerEditorImportDetailsKey.Text" xml:space="preserve"><value>Chave privada</value></data>
+  <data name="ServerEditorImportDetailsNotSet" xml:space="preserve"><value>Não definido no ficheiro</value></data>
+  <data name="ServerEditorImportNotFoundTitle" xml:space="preserve"><value>Não encontrámos a configuração SSH</value></data>
+  <data name="ServerEditorImportErrorTitle" xml:space="preserve"><value>Não foi possível ler a configuração SSH</value></data>
+  <data name="ServerEditorImportNoHostsTitle" xml:space="preserve"><value>Não foram encontrados perfis</value></data>
+  <data name="ServerEditorImportTitleText.Text" xml:space="preserve"><value>Importar de SSH</value></data>
+  <data name="ServerEditorImportCancelButton.Content" xml:space="preserve"><value>Cancelar</value></data>
+  <data name="ServerEditorImportUseButton.Content" xml:space="preserve"><value>Usar perfil</value></data>
+  <data name="ServerEditorErrorNameRequired" xml:space="preserve"><value>Introduz um nome para identificar o servidor.</value></data>
+  <data name="ServerEditorErrorHostRequired" xml:space="preserve"><value>Introduz o endereço do servidor.</value></data>
+  <data name="ServerEditorErrorHostFormat" xml:space="preserve"><value>Usa um nome de host ou IP, sem https:// nem caminhos.</value></data>
+  <data name="ServerEditorErrorPortRange" xml:space="preserve"><value>Usa um valor de 1 a 65535.</value></data>
+  <data name="ServerEditorErrorUsernameRequired" xml:space="preserve"><value>Introduz o utilizador SSH.</value></data>
+  <data name="ServerEditorErrorPrivateKeyRequired" xml:space="preserve"><value>Escolhe o ficheiro da chave privada.</value></data>
+  <data name="ServerEditorErrorPrivateKeyIsPublic" xml:space="preserve"><value>Esta é uma chave pública. Escolhe a chave privada, sem .pub.</value></data>
+  <data name="ServerEditorErrorPasswordRequired" xml:space="preserve"><value>Introduz a palavra-passe do utilizador SSH.</value></data>
+  <data name="ServerEditorErrorJumpHostRequired" xml:space="preserve"><value>Introduz o endereço do jump host.</value></data>
+  <data name="ServerEditorErrorJumpIsTarget" xml:space="preserve"><value>O jump host não pode ser o próprio servidor final.</value></data>
+  <data name="ServerEditorErrorJumpPortRange" xml:space="preserve"><value>Usa uma porta entre 1 e 65535.</value></data>
+  <data name="ServerEditorErrorJumpUsernameRequired" xml:space="preserve"><value>Introduz o utilizador SSH do jump host.</value></data>
+  <data name="ServerEditorErrorJumpPrivateKeyRequired" xml:space="preserve"><value>Seleciona a chave privada do jump host.</value></data>
+  <data name="ServerEditorErrorJumpPrivateKeyIsPublic" xml:space="preserve"><value>Escolhe uma chave privada válida, não a chave pública.</value></data>
+  <data name="ServerEditorErrorJumpPasswordRequired" xml:space="preserve"><value>Introduz a palavra-passe do jump host.</value></data>
+  <data name="ServerEditorValidationSummary" xml:space="preserve"><value>Verifica os campos assinalados para continuar.</value></data>
+  <data name="ServerEditorHintFixFields" xml:space="preserve"><value>Corrige os campos assinalados.</value></data>
+  <data name="ServerEditorHintFixJumpFields" xml:space="preserve"><value>Corrige os campos do jump host para continuar.</value></data>
+  <data name="ServerEditorHintPasswordToContinue" xml:space="preserve"><value>Introduz a palavra-passe para continuar.</value></data>
+  <data name="ServerEditorHintImported" xml:space="preserve"><value>Perfil importado. Testa a ligação para continuar.</value></data>
+  <data name="ServerEditorSaveFailedSubtitleAdd" xml:space="preserve"><value>Não foi possível adicionar o servidor.</value></data>
+  <data name="ServerEditorSaveFailedSubtitleEdit" xml:space="preserve"><value>Não foi possível guardar as alterações.</value></data>
+  <data name="ServerEditorSaveRetryButton.Content" xml:space="preserve"><value>Tentar guardar</value></data>
+  <data name="ServerEditorDuplicateTitle" xml:space="preserve"><value>Este servidor já foi adicionado</value></data>
+  <data name="ServerEditorDuplicateMessageFormat" xml:space="preserve"><value>{0} · {1} — já existe como {2}.</value></data>
+  <data name="ServerEditorDuplicateOpenButton.Content" xml:space="preserve"><value>Abrir servidor</value></data>
+  <data name="ServerEditorDuplicateOpenAccessibleFormat" xml:space="preserve"><value>Abrir o servidor {0}</value></data>
+  <data name="ServerEditorImportAlreadyAdded.Text" xml:space="preserve"><value>Já adicionado</value></data>
+  <data name="ServerEditorImportAlreadyAddedAccessibleFormat" xml:space="preserve"><value>{0}. Já adicionado</value></data>
+  <data name="ServerEditorTestTestingTitle" xml:space="preserve"><value>A testar ligação</value></data>
+  <data name="ServerEditorTestTestingBodyFormat" xml:space="preserve"><value>A verificar o acesso SSH a {0}.</value></data>
+  <data name="ServerEditorTestVerifiedTitle" xml:space="preserve"><value>Ligação verificada</value></data>
+  <data name="ServerEditorTestVerifiedBody" xml:space="preserve"><value>O servidor respondeu e a autenticação SSH foi concluída.</value></data>
+  <data name="ServerEditorTestVerifiedDetail" xml:space="preserve"><value>SSH autenticado · Identidade confirmada</value></data>
+  <data name="ServerEditorTestCancelledTitle" xml:space="preserve"><value>Teste cancelado</value></data>
+  <data name="ServerEditorTestCancelledBody" xml:space="preserve"><value>A verificação foi interrompida. Podes ajustar os dados ou tentar novamente.</value></data>
+  <data name="ServerEditorTestFailedNetworkTitle" xml:space="preserve"><value>Não foi possível ligar ao servidor</value></data>
+  <data name="ServerEditorTestFailedNetworkBody" xml:space="preserve"><value>O servidor não respondeu na porta SSH. Confirma o endereço e a porta. Depois volta a testar.</value></data>
+  <data name="ServerEditorTestFailedProtocolTitle" xml:space="preserve"><value>A sessão SSH não foi estabelecida</value></data>
+  <data name="ServerEditorTestFailedProtocolBody" xml:space="preserve"><value>O servidor respondeu, mas a ligação SSH não chegou ao fim. Vê o detalhe abaixo.</value></data>
+  <data name="ServerEditorTestFailedAuthenticationTitle" xml:space="preserve"><value>Não foi possível autenticar</value></data>
+  <data name="ServerEditorTestFailedAuthenticationBody" xml:space="preserve"><value>Confirma o utilizador e a credencial: a chave privada e a frase-passe, ou a palavra-passe. Depois volta a testar.</value></data>
+  <data name="ServerEditorTestFailedIdentityTitle" xml:space="preserve"><value>Não foi possível confirmar a identidade</value></data>
+  <data name="ServerEditorTestFailedIdentityBody" xml:space="preserve"><value>A identidade do servidor não foi confirmada. Volta ao formulário e testa de novo para a rever.</value></data>
+  <data name="ServerEditorTestFailedJumpTitle" xml:space="preserve"><value>Não foi possível usar o jump host</value></data>
+  <data name="ServerEditorTestFailedJumpBody" xml:space="preserve"><value>A ligação parou no jump host. Confirma o endereço, o utilizador e as credenciais do jump host. Depois volta a testar.</value></data>
+  <data name="ServerEditorTestFailedTargetViaJumpTitle" xml:space="preserve"><value>O jump host não chega ao servidor</value></data>
+  <data name="ServerEditorTestFailedTargetViaJumpBody" xml:space="preserve"><value>O jump host respondeu, mas não conseguiu abrir a ligação ao servidor final. Confirma o endereço e a porta do servidor.</value></data>
+  <data name="ServerEditorTestFailedTunnelTitle" xml:space="preserve"><value>Não foi possível abrir o túnel local</value></data>
+  <data name="ServerEditorTestFailedTunnelBody" xml:space="preserve"><value>Este dispositivo não conseguiu abrir o túnel local para o jump host. Tenta novamente daqui a pouco.</value></data>
+  <data name="ServerEditorTestReviewData" xml:space="preserve"><value>Rever dados</value></data>
+  <data name="ServerEditorTestReviewRoute" xml:space="preserve"><value>Rever ligação</value></data>
+  <data name="ServerEditorTestReviewCredentials" xml:space="preserve"><value>Rever credenciais</value></data>
+  <data name="ServerEditorTestRetry" xml:space="preserve"><value>Tentar novamente</value></data>
+  <data name="ServerEditorTestAgain" xml:space="preserve"><value>Testar novamente</value></data>
+  <data name="ServerEditorTestViaFormat" xml:space="preserve"><value>via {0}</value></data>
+  <data name="ServerEditorSavedAddedTitle" xml:space="preserve"><value>Servidor adicionado</value></data>
+  <data name="ServerEditorSavedAddedMessageFormat" xml:space="preserve"><value>{0} · A recolher as primeiras métricas.</value></data>
+  <data name="ServerEditorSavedEditedTitle" xml:space="preserve"><value>Alterações guardadas</value></data>
+  <data name="ServerEditorSavedEditedMessageFormat" xml:space="preserve"><value>Os dados de {0} foram atualizados.</value></data>
+  <data name="ServerEditorSavedCloseName" xml:space="preserve"><value>Fechar notificação</value></data>
+  <data name="ServerEditorJumpUsernameInput.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Utilizador SSH do jump host</value></data>
+  <data name="ServerEditorJumpPortInput.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Porta do jump host</value></data>
+  <data name="ServerEditorJumpPasswordInput.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Palavra-passe do jump host</value></data>
+  <data name="ServerEditorJumpPassphraseInput.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Frase-passe da chave do jump host</value></data>
+  <data name="ServerEditorJumpKeyPickerAccessibleHeader" xml:space="preserve"><value>Chave privada do jump host</value></data>
 </root>

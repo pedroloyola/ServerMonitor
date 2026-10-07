@@ -797,7 +797,7 @@ public sealed class Ui5ServerDetailTests
         }
     }
 
-    private sealed class RecordingDialogs : IServerDialogService
+    private sealed class RecordingDialogs : IEditorScript
     {
         public List<Server> Edited { get; } = [];
 

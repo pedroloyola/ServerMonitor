@@ -14,6 +14,8 @@
     <CornerRadius x:Key="SaRadiusToast">20</CornerRadius>
     <CornerRadius x:Key="SaRadiusRect">14</CornerRadius>
     <CornerRadius x:Key="SaRadiusDialogButton">13</CornerRadius>
+    <!-- UI.7 final c1 (Prism F-2): a selectable list row on an inset tint (Figma 04 import rows 112:4049). -->
+    <CornerRadius x:Key="SaRadiusListRow">13</CornerRadius>
     <CornerRadius x:Key="SaRadiusSegment">11</CornerRadius>
     <CornerRadius x:Key="SaRadiusSkeleton">6</CornerRadius>
     <!-- UI.3 additive (D-UI3-8): rich server selector 330x52 r16, 112:2264 / 112:2442. -->

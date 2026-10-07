@@ -16,7 +16,6 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
     private readonly ISshConnectionService _sshConnectionService;
     private readonly IHostKeyTrustStore _hostKeyTrustStore;
     private readonly IRoutedHostKeyTrustStore? _routedHostKeyTrustStore;
-    private readonly IServerConnectionStateStore _connectionStateStore;
     private readonly IPrivateKeyFilePicker _privateKeyFilePicker;
     private readonly ILocalizationService _localizationService;
     private readonly Server? _existingServer;
@@ -65,6 +64,7 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
     private string _sshConfigFileWarningMessage = string.Empty;
     private IReadOnlyList<SshConfigHostOptionViewModel> _sshConfigHosts = [];
     private CancellationTokenSource? _sshConfigLoadCancellation;
+    private SshConfigLoadOutcome _sshConfigLoadOutcome;
     private readonly ILocalSshKeyDiscovery? _localSshKeyDiscovery;
     // Cancelled (never disposed) when the editor goes away, so a discovery still running just stops.
     private readonly CancellationTokenSource _lifetimeCancellation = new();
@@ -76,6 +76,18 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
     private bool _localKeyDiscoveryCompleted;
     private bool _isPrivateKeyAutoSelected;
     private StageProgressRelay? _activeStageProgress;
+    // UI.7 B-7 (F-2): set once by Dispose. Nothing that resumes after an await may start work, write a store or change a
+    // bound property once it is set. Volatile: a test/connection continuation may resume on another thread.
+    private volatile bool _disposed;
+    // UI.7 B-7 (Vigil H7): true while an accepted key is being written, so no submit path runs in that window.
+    private bool _isTrustingHostKey;
+    // UI.7 B-15: the form as it was opened (after ctor + prefill); IsDirty compares against it.
+    private readonly DirtyState _openedState;
+    private bool _isDirty;
+    // UI.7C (B-16): per-field errors, shown only after a Test/Save attempt failed validation, then kept live per field.
+    private static readonly IReadOnlyDictionary<ServerEditorField, string> NoFieldErrors = new Dictionary<ServerEditorField, string>();
+    private bool _fieldErrorsShown;
+    private IReadOnlyDictionary<ServerEditorField, string> _fieldErrors = NoFieldErrors;
 
     public ServerEditorViewModel(
         IServerValidator validator,
@@ -95,7 +107,9 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
         _hostKeyTrustStore = hostKeyTrustStore;
         // Absent, a target key seen through a jump can never be trusted from this editor (fail closed).
         _routedHostKeyTrustStore = routedHostKeyTrustStore;
-        _connectionStateStore = connectionStateStore;
+        // UI.7 B-8 (F-3): the editor no longer writes the saved server's connection state while testing a draft; that
+        // state changes only through the post-Save path in DashboardViewModel. The parameter stays (same ctor/factory, B-2).
+        _ = connectionStateStore;
         _privateKeyFilePicker = privateKeyFilePicker;
         _localizationService = localizationService;
         _existingServer = server;
@@ -127,9 +141,200 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
 
         ConnectionChecklist = new ConnectionChecklistViewModel(localizationService);
         _localSshKeyDiscovery = localSshKeyDiscovery;
+        // UI.7 B-15: the opened form (prefill included) is the clean state. Taken before discovery starts; a key the
+        // editor pre-selects later is not an edit (see CaptureDirtyState).
+        _openedState = CaptureDirtyState();
+        PropertyChanged += OnOwnPropertyChanged;
         // Starts as the editor opens; metadata-only, off the UI thread inside the service.
         LocalKeyDiscovery = DiscoverLocalKeysAsync();
     }
+
+    /// <summary>
+    /// UI.7 B-15: the form differs from how it was opened (ctor + discovery prefill). A key the editor pre-selected is
+    /// not an edit; an import, a typed or picked value, a staged secret and an OS detected by a test are. Reverting a
+    /// field by hand makes the form clean again. In memory only.
+    /// </summary>
+    public bool IsDirty
+    {
+        get => _isDirty;
+        private set => SetProperty(ref _isDirty, value);
+    }
+
+    /// <summary>
+    /// UI.7 B-7 (Vigil H7): a test is running or an accepted key is being written. No submit path may produce a result
+    /// meanwhile.
+    /// </summary>
+    public bool IsConnectionWorkInProgress => IsTestingConnection || _isTrustingHostKey;
+
+    /// <summary>The name the editor was opened with (the "before" of the discard dialog's name diff).</summary>
+    public string OpenedName => _openedState.Name;
+
+    private void OnOwnPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(IsDirty) || _disposed)
+        {
+            return;
+        }
+
+        IsDirty = CaptureDirtyState() != _openedState;
+        if (_fieldErrorsShown && IsValidatedProperty(e.PropertyName))
+        {
+            RefreshFieldErrors();
+        }
+    }
+
+    /// <summary>
+    /// UI.7C (B-16, Figma 06): the message key of each invalid field (Core's draft rules incl. H-UI7-1, plus a password
+    /// that was never typed). Empty until a Test/Save attempt fails validation; from then on recomputed only when a field
+    /// it depends on changes, and raised only when the set of errors really changes (no validation storm per keystroke).
+    /// </summary>
+    public IReadOnlyDictionary<ServerEditorField, string> FieldErrors => _fieldErrors;
+
+    public bool HasFieldErrors => _fieldErrors.Count > 0;
+
+    /// <summary>The first invalid field in visual order (focus goes there after a failed attempt).</summary>
+    public ServerEditorField? FirstInvalidField =>
+        _fieldErrors.Count == 0 ? null : _fieldErrors.Keys.Min();
+
+    private static bool IsValidatedProperty(string? propertyName) => propertyName is
+        nameof(Name) or nameof(Host) or nameof(Port) or nameof(Username) or nameof(PrivateKeyPath)
+        or nameof(SelectedAuthenticationIndex) or nameof(UseJumpHost) or nameof(JumpHost) or nameof(JumpPort)
+        or nameof(JumpUsername) or nameof(SelectedJumpAuthenticationIndex) or nameof(JumpPrivateKeyPath);
+
+    // An attempt (Test or Save) failed validation: the errors become visible and stay live per field.
+    private void RevealFieldErrors()
+    {
+        _fieldErrorsShown = true;
+        RefreshFieldErrors();
+    }
+
+    private void RefreshFieldErrors()
+    {
+        if (_disposed || !_fieldErrorsShown)
+        {
+            return;
+        }
+
+        var errors = ComputeFieldErrors();
+        if (errors.Count == _fieldErrors.Count
+            && errors.All(error => _fieldErrors.TryGetValue(error.Key, out var key) && key == error.Value))
+        {
+            return;
+        }
+
+        _fieldErrors = errors;
+        OnPropertyChanged(nameof(FieldErrors));
+        OnPropertyChanged(nameof(HasFieldErrors));
+        OnPropertyChanged(nameof(FirstInvalidField));
+    }
+
+    // Side-effect free: the same input TryCreateDraft builds (an unparsable port counts as out of range), Core's draft
+    // validation, and the editor's own "password typed nowhere" rules. Never stages or clears a secret.
+    private Dictionary<ServerEditorField, string> ComputeFieldErrors()
+    {
+        var errors = new Dictionary<ServerEditorField, string>();
+        var port = int.TryParse(Port, NumberStyles.None, CultureInfo.InvariantCulture, out var parsedPort) ? parsedPort : 0;
+        var authenticationMethod = IsPasswordAuthentication ? AuthenticationMethod.Password : AuthenticationMethod.SshKey;
+        ServerRoute? route = null;
+        if (UseJumpHost)
+        {
+            var jumpAuthentication = SelectedJumpAuthenticationIndex == 1 ? AuthenticationMethod.Password : AuthenticationMethod.SshKey;
+            route = new ServerRoute
+            {
+                Jump = new JumpHop
+                {
+                    Host = JumpHost.Trim(),
+                    Port = int.TryParse(JumpPort, NumberStyles.None, CultureInfo.InvariantCulture, out var parsedJumpPort) ? parsedJumpPort : 0,
+                    Username = JumpUsername.Trim(),
+                    AuthenticationMethod = jumpAuthentication,
+                    PrivateKeyPath = jumpAuthentication == AuthenticationMethod.SshKey && !string.IsNullOrWhiteSpace(JumpPrivateKeyPath)
+                        ? JumpPrivateKeyPath
+                        : null,
+                    CredentialReferenceId = GetExistingJumpCredentialReference()
+                }
+            };
+        }
+
+        var input = new ServerInput
+        {
+            Name = Name,
+            Host = Host,
+            Port = port,
+            Username = Username,
+            AuthenticationMethod = authenticationMethod,
+            PrivateKeyPath = IsPrivateKeyAuthentication ? PrivateKeyPath : null,
+            CredentialReferenceId = GetExistingCredentialReference(authenticationMethod),
+            Route = route
+        };
+        foreach (var error in _validator.ValidateDraft(input).Errors)
+        {
+            if (ServerEditorValidation.Place(error.Code) is { } placed)
+            {
+                errors.TryAdd(placed.Field, placed.MessageKey);
+            }
+        }
+
+        if (authenticationMethod == AuthenticationMethod.Password && _secret is null && input.CredentialReferenceId is null)
+        {
+            errors.TryAdd(ServerEditorField.Password, ServerEditorValidation.PasswordMissingKey);
+        }
+
+        if (route?.Jump is { AuthenticationMethod: AuthenticationMethod.Password } jumpHop
+            && _jumpSecret is null
+            && jumpHop.CredentialReferenceId is null)
+        {
+            errors.TryAdd(ServerEditorField.JumpPassword, ServerEditorValidation.JumpPasswordMissingKey);
+        }
+
+        return errors;
+    }
+
+    private void RefreshDirty()
+    {
+        if (!_disposed)
+        {
+            IsDirty = CaptureDirtyState() != _openedState;
+        }
+    }
+
+    // A pre-selected key path counts as the opened value: only a user/import/picker choice is an edit.
+    private DirtyState CaptureDirtyState() => new(
+        Name,
+        Host,
+        Port,
+        Username,
+        IsPrivateKeyAutoSelected ? _openedState.PrivateKeyPath : PrivateKeyPath,
+        SelectedOperatingSystemIndex,
+        SelectedAuthenticationIndex,
+        SelectedRefreshIntervalIndex,
+        RemoveSavedPassphrase,
+        UseJumpHost,
+        JumpHost,
+        JumpPort,
+        JumpUsername,
+        SelectedJumpAuthenticationIndex,
+        JumpPrivateKeyPath,
+        _secret is not null,
+        _jumpSecret is not null);
+
+    private readonly record struct DirtyState(
+        string Name,
+        string Host,
+        string Port,
+        string Username,
+        string PrivateKeyPath,
+        int OperatingSystem,
+        int Authentication,
+        int RefreshInterval,
+        bool RemoveSavedPassphrase,
+        bool UseJumpHost,
+        string JumpHost,
+        string JumpPort,
+        string JumpUsername,
+        int JumpAuthentication,
+        string JumpPrivateKeyPath,
+        bool HasStagedSecret,
+        bool HasStagedJumpSecret);
 
     /// <summary>The four-step "Test connection" checklist (M14.5), shown while <see cref="HasConnectionStatus"/>.</summary>
     public ConnectionChecklistViewModel ConnectionChecklist { get; }
@@ -393,6 +598,23 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
         private set => SetProperty(ref _hostKeySubjectDisplay, value);
     }
 
+    /// <summary>
+    /// UI.7B (presentation only): which hop presented the key of the trust prompt or mismatch on screen, read from the
+    /// result that raised it; null when neither is shown. The trust dialog derives "PASSO 1/2 DE 2" from it. Read-only:
+    /// it never feeds <see cref="TrustAndConnectAsync"/>, whose hop check stays on the pending key.
+    /// </summary>
+    public SshHostKeyHop? HostKeyPromptHop =>
+        (HasUnknownHostKey || HasHostKeyMismatch) && _lastConnectionResult is { } result ? result.HostKeyHop : null;
+
+    /// <summary>
+    /// UI.7C (presentation only): the state of the last test's result, null before any (or after an edit invalidated it).
+    /// The test dialog reads its phase from it; nothing reads it to decide trust, credentials or a save.
+    /// </summary>
+    public ServerConnectionState? LastTestState => _lastConnectionResult?.State;
+
+    /// <summary>UI.7C (presentation only): the last result's error code (its family words the test dialog; never text).</summary>
+    public SshConnectionErrorCode LastTestErrorCode => _lastConnectionResult?.ErrorCode ?? SshConnectionErrorCode.None;
+
     public void CaptureJumpSecret(string? value)
     {
         if (string.IsNullOrEmpty(value) || !UseJumpHost)
@@ -404,6 +626,7 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
         _jumpSecret = new SecretValue(value.AsSpan());
         _jumpSecretContext = TryCreateJumpCredentialContext(out var context) ? context : null;
         InvalidateConnectionResult();
+        RefreshDirty();
     }
 
     public async Task SelectJumpPrivateKeyAsync()
@@ -516,6 +739,7 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
             if (SetProperty(ref _isTestingConnection, value))
             {
                 OnPropertyChanged(nameof(IsNotTestingConnection));
+                OnPropertyChanged(nameof(IsConnectionWorkInProgress));
             }
         }
     }
@@ -626,6 +850,17 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
     public bool HasSshConfigFileWarning => SshConfigFileWarningMessage.Length > 0;
 
     /// <summary>
+    /// UI.7B (presentation only): what the last load of <c>~/.ssh/config</c> ended with, so the import dialog can pick
+    /// the Figma 07 state (no file, unreadable, no profiles, a list). The message itself stays
+    /// <see cref="SshConfigStatusMessage"/>; nothing about the classification of a host comes from here.
+    /// </summary>
+    public SshConfigLoadOutcome SshConfigLoadOutcome
+    {
+        get => _sshConfigLoadOutcome;
+        private set => SetProperty(ref _sshConfigLoadOutcome, value);
+    }
+
+    /// <summary>
     /// Reads <c>~/.ssh/config</c> (read-only) and lists its concrete aliases for preview. Nothing
     /// in the form changes until the user picks one with <see cref="ApplySshConfigHost(SshConfigHostEntry)"/>.
     /// </summary>
@@ -641,6 +876,7 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
         SshConfigHosts = [];
         SshConfigStatusMessage = string.Empty;
         SshConfigFileWarningMessage = string.Empty;
+        SshConfigLoadOutcome = SshConfigLoadOutcome.None;
         var cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         _sshConfigLoadCancellation = cancellation;
         try
@@ -669,12 +905,14 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
             {
                 case SshConfigImportStatus.NotFound:
                     SshConfigStatusMessage = _localizationService.GetString("SshConfigImportNotFound");
+                    SshConfigLoadOutcome = SshConfigLoadOutcome.NotFound;
                     break;
                 case SshConfigImportStatus.Error:
                     var error = _localizationService.GetString($"SshConfigImportError{result.ErrorCode}");
                     SshConfigStatusMessage = result.ErrorDetail is null
                         ? error
                         : error + " " + Format("SshConfigImportErrorFileFormat", result.ErrorDetail);
+                    SshConfigLoadOutcome = SshConfigLoadOutcome.Error;
                     break;
                 default:
                     SshConfigHosts = result.Hosts
@@ -688,6 +926,7 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
                         result.FileWarnings
                             .Select(warning => _localizationService.GetString($"SshConfigImportWarning{warning}"))
                             .Concat(result.Diagnostics.Select(DescribeDiagnostic)));
+                    SshConfigLoadOutcome = result.Hosts.Count == 0 ? SshConfigLoadOutcome.NoHosts : SshConfigLoadOutcome.Hosts;
                     break;
             }
         }
@@ -724,6 +963,7 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
         SshConfigHosts = [];
         SshConfigStatusMessage = string.Empty;
         SshConfigFileWarningMessage = string.Empty;
+        SshConfigLoadOutcome = SshConfigLoadOutcome.None;
     }
 
     public bool ApplySshConfigHost(SshConfigHostOptionViewModel option) => ApplySshConfigHost(option.Entry);
@@ -850,6 +1090,7 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
         _secretContext = TryCreateCredentialContext(out var context) ? context : null;
         RemoveSavedPassphrase = false;
         InvalidateConnectionResult();
+        RefreshDirty();
     }
 
     public async Task SelectPrivateKeyAsync()
@@ -866,6 +1107,12 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
 
     public async Task TestConnectionAsync()
     {
+        // UI.7 B-7 (F-2): a disposed editor never starts a connection (no new CancellationTokenSource after Dispose).
+        if (_disposed)
+        {
+            return;
+        }
+
         EnsureStagedSecretMatchesCurrentContext();
         if (!TryCreateDraft(out var draft))
         {
@@ -928,7 +1175,11 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
                 _activeStageProgress = null;
             }
 
-            IsTestingConnection = false;
+            // UI.7 B-7: no bound property changes once the editor is gone.
+            if (!_disposed)
+            {
+                IsTestingConnection = false;
+            }
         }
     }
 
@@ -937,7 +1188,7 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
     // that arrives after the result was applied can no longer change the checklist.
     private void OnStageProgress(StageProgressRelay source, SshConnectionStage stage)
     {
-        if (ReferenceEquals(_activeStageProgress, source))
+        if (!_disposed && ReferenceEquals(_activeStageProgress, source))
         {
             ConnectionChecklist.Report(stage);
         }
@@ -970,7 +1221,8 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
     /// </summary>
     public async Task TrustAndConnectAsync()
     {
-        if (_pendingHostKey is null)
+        // UI.7 B-7: a disposed editor trusts nothing.
+        if (_pendingHostKey is null || _disposed)
         {
             return;
         }
@@ -1003,13 +1255,29 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
 
         try
         {
-            if (route is not null)
+            // UI.7 B-7 (Vigil H7): no submit path runs while the accepted key is being written.
+            SetTrustingHostKey(true);
+            try
             {
-                await _routedHostKeyTrustStore!.TrustAsync(route, presentedHostKey);
+                if (route is not null)
+                {
+                    await _routedHostKeyTrustStore!.TrustAsync(route, presentedHostKey);
+                }
+                else
+                {
+                    await _hostKeyTrustStore.TrustAsync(directEndpoint!, presentedHostKey);
+                }
             }
-            else
+            finally
             {
-                await _hostKeyTrustStore.TrustAsync(directEndpoint!, presentedHostKey);
+                SetTrustingHostKey(false);
+            }
+
+            // UI.7 B-7 (F-2): an accepted key already being written may complete, but nothing after it runs once the
+            // editor is gone - no retest (no new connection), no state or property change.
+            if (_disposed)
+            {
+                return;
             }
 
             HasUnknownHostKey = false;
@@ -1055,7 +1323,10 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
                 ErrorCode = SshConnectionErrorCode.Unexpected,
                 ReachedStage = ConnectionChecklist.ReportedStage
             });
-            ConnectionStatusMessage = _localizationService.GetString(BackupMessageKeys.ConfigurationLocked);
+            if (!_disposed)
+            {
+                ConnectionStatusMessage = _localizationService.GetString(BackupMessageKeys.ConfigurationLocked);
+            }
         }
         catch
         {
@@ -1070,6 +1341,18 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
     }
 
     public void CancelTest() => _testCancellation?.Cancel();
+
+    private void SetTrustingHostKey(bool value)
+    {
+        if (_isTrustingHostKey == value || _disposed)
+        {
+            _isTrustingHostKey = value;
+            return;
+        }
+
+        _isTrustingHostKey = value;
+        OnPropertyChanged(nameof(IsConnectionWorkInProgress));
+    }
 
     public void DismissHostKeyPrompt()
     {
@@ -1147,11 +1430,14 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
             },
             ConnectionResult = _lastConnectionResult
         };
+        // UI.7A fix c1 (Cortex n-2): the staged secrets were just handed over, so the dirty state is recomputed (additive).
+        RefreshDirty();
         return true;
     }
 
     public void Dispose()
     {
+        _disposed = true;
         _lifetimeCancellation.Cancel();
         _sshConfigLoadCancellation?.Cancel();
         _testCancellation?.Cancel();
@@ -1170,6 +1456,7 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
         if (!int.TryParse(Port, NumberStyles.None, CultureInfo.InvariantCulture, out var parsedPort))
         {
             HasValidationErrors = true;
+            RevealFieldErrors();
             return false;
         }
 
@@ -1185,6 +1472,7 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
             if (!int.TryParse(JumpPort, NumberStyles.None, CultureInfo.InvariantCulture, out var parsedJumpPort))
             {
                 HasValidationErrors = true;
+                RevealFieldErrors();
                 return false;
             }
 
@@ -1231,8 +1519,12 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
         HasValidationErrors = !validation.IsValid || passwordMissing || jumpPasswordMissing;
         if (HasValidationErrors)
         {
+            RevealFieldErrors();
             return false;
         }
+
+        // UI.7C: a valid attempt clears whatever was still shown (e.g. a password typed since).
+        RefreshFieldErrors();
 
         draft = new Server
         {
@@ -1430,6 +1722,12 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
 
     private void ApplyConnectionResult(SshConnectionResult result)
     {
+        // UI.7 B-7 (F-2): a result that resumes after Dispose (cancelled test, late trust conflict) changes nothing.
+        if (_disposed)
+        {
+            return;
+        }
+
         _lastConnectionResult = result;
         if (result.State is ServerConnectionState.HostKeyUnknown or ServerConnectionState.HostKeyMismatch)
         {
@@ -1487,11 +1785,6 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
             && result.State is not ServerConnectionState.HostKeyMismatch)
         {
             ConnectionStatusMessage = _localizationService.GetString($"ConnectionError{result.ErrorCode}");
-        }
-
-        if (_existingServer is not null)
-        {
-            _connectionStateStore.Set(_existingServer.Id, result);
         }
     }
 

@@ -1,0 +1,108 @@
+<UserControl
+    x:Class="ServerMonitor.App.Views.ServerEditorTestPanel"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:primitives="using:ServerMonitor.App.Controls.Primitives">
+    <!-- UI.7C (B-9) content of the editor's ONE in-page modal layer for the connection test (Figma 08: direct 112:5761 D /
+         112:5944 L, ProxyJump list style 160:413). Same chrome as the trust content (icon 25 + title, body, the endpoint
+         inset, actions right-aligned, the safe one first); between them the FOUR real stages of the view model's checklist
+         for a direct AND a routed server (G-6/G-7: the jump's name and cause live in stage 1, never six fake rows). Each
+         row: state icon (SaIcon Tick02 / Cancel01 / Alert02, a ProgressRing while running, a 1.5 ring while pending; G-18)
+         + title + state written out; under a failed / action-required / warning row its hint, the copyable command and
+         "Como preparo o meu servidor?". Drawing only: the page decides through its controller. -->
+    <StackPanel Spacing="{StaticResource SaSpace16}">
+        <Grid ColumnSpacing="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <primitives:SaIcon x:Name="TitleIcon" Size="25" VerticalAlignment="Center" Foreground="{ThemeResource SaTextBrush}" />
+            <TextBlock x:Name="TitleText" Grid.Column="1" Style="{StaticResource SaTitleTextStyle}" VerticalAlignment="Center"
+                       TextWrapping="Wrap" AutomationProperties.HeadingLevel="Level1" />
+        </Grid>
+        <TextBlock x:Name="BodyText" Style="{StaticResource SaSecondaryBodyTextStyle}" TextWrapping="Wrap" />
+        <!-- The endpoint under test (Figma "SSH endpoint" 584x38): name · host:port · user (+ via jump). -->
+        <Border Style="{StaticResource SaInsetTintedSurfaceStyle}">
+            <Grid ColumnSpacing="10" VerticalAlignment="Center">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <primitives:SaIcon Data="{StaticResource SaIconServerStack01Data}" Size="17" VerticalAlignment="Center"
+                                   Foreground="{ThemeResource SaTextSecondaryBrush}" />
+                <TextBlock x:Name="SubjectText" Grid.Column="1" Style="{StaticResource SaControlTextStyle}" VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis" />
+            </Grid>
+        </Border>
+
+        <!-- The four real stages. A list for UI Automation (name = the dialog title); each row's name carries its state. -->
+        <ItemsControl x:Name="StageList" IsTabStop="False" AutomationProperties.AccessibilityView="Content">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <StackPanel Spacing="10" />
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <StackPanel Spacing="6">
+                        <Grid ColumnSpacing="10" AutomationProperties.Name="{Binding AccessibleName}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="16" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Grid Width="16" Height="16" VerticalAlignment="Center" AutomationProperties.AccessibilityView="Raw">
+                                <Ellipse Width="13" Height="13" StrokeThickness="1.5" Stroke="{ThemeResource SaTextSecondaryBrush}"
+                                         Visibility="{Binding IsPending, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                <Ellipse Width="13" Height="13" StrokeThickness="1.5" Stroke="{ThemeResource SaTextSecondaryBrush}"
+                                         Visibility="{Binding IsNotReached, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                <ProgressRing Width="14" Height="14" IsActive="{Binding IsRunning}" Foreground="{ThemeResource SaTextBrush}"
+                                              Visibility="{Binding IsRunning, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                <primitives:SaIcon Data="{StaticResource SaIconTick02Data}" Size="16" Foreground="{ThemeResource SaTextBrush}"
+                                                   Visibility="{Binding IsPassed, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                <primitives:SaIcon Data="{StaticResource SaIconCancel01Data}" Size="16" Foreground="{ThemeResource SaDangerTextBrush}"
+                                                   Visibility="{Binding IsFailed, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                <primitives:SaIcon Data="{StaticResource SaIconAlert02Data}" Size="16" Foreground="{ThemeResource SaAttentionTextBrush}"
+                                                   Visibility="{Binding IsActionRequired, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                <primitives:SaIcon Data="{StaticResource SaIconAlert02Data}" Size="16" Foreground="{ThemeResource SaAttentionTextBrush}"
+                                                   Visibility="{Binding IsWarning, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                            </Grid>
+                            <TextBlock Grid.Column="1" Style="{StaticResource SaLabelTextStyle}" Foreground="{ThemeResource SaTextBrush}"
+                                       Text="{Binding Title}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="2" Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}"
+                                       Text="{Binding StateText}" VerticalAlignment="Center" AutomationProperties.AccessibilityView="Raw" />
+                        </Grid>
+                        <StackPanel Margin="26,0,0,0" Spacing="6"
+                                    Visibility="{Binding HasDetail, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <TextBlock Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}"
+                                       IsTextSelectionEnabled="True" Text="{Binding Detail}" TextWrapping="Wrap" />
+                            <Grid ColumnSpacing="8" Visibility="{Binding HasCommand, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Border Style="{StaticResource SaInsetTintedSurfaceStyle}" MinHeight="34">
+                                    <TextBlock Style="{StaticResource SaMonoTextStyle}" VerticalAlignment="Center" IsTextSelectionEnabled="True"
+                                               Text="{Binding Command}" TextWrapping="Wrap" />
+                                </Border>
+                                <Button x:Uid="ConnectionStepCopyCommandButton" Grid.Column="1" VerticalAlignment="Center"
+                                        Style="{StaticResource SaSecondaryRectButtonStyle}" Click="OnCopyCommandClick" />
+                            </Grid>
+                            <HyperlinkButton x:Uid="ServerFormPrepHelpLink" Style="{StaticResource SaTextLinkButtonStyle}" Click="OnPrepHelpClick"
+                                             Visibility="{Binding OffersPrepHelp, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                        </StackPanel>
+                    </StackPanel>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <!-- Verified only: "SSH autenticado · Identidade confirmada" (Figma 112:5962), never before a complete test. -->
+        <TextBlock x:Name="VerifiedDetailText" Style="{StaticResource SaControlTextStyle}" Foreground="{ThemeResource SaTextBrush}"
+                   TextWrapping="Wrap" Visibility="Collapsed" />
+
+        <StackPanel x:Name="ActionRow" Orientation="Horizontal" Spacing="{StaticResource SaSpace12}" HorizontalAlignment="Right">
+            <Button x:Name="CloseButton" Style="{StaticResource SaDialogCommandButtonStyle}" Click="OnCloseClick" />
+            <Button x:Name="RetryButton" Style="{StaticResource SaDialogCommandButtonStyle}" Click="OnRetryClick" Visibility="Collapsed" />
+        </StackPanel>
+    </StackPanel>
+</UserControl>

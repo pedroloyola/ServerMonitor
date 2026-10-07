@@ -39,7 +39,9 @@ public sealed partial class XamlContractAndResourceGuardTests
         // Beacon r1: the code-behind focuses the content / the return target (HealthCard … EmptyAddButton).
         ["Views/DashboardPage.xaml"] = ["FirstServerStateBlock", "HiddenStateBlock", "PageViewport", "PageRoot", "HeaderGrid", "HeaderActions", "HealthRow", "HealthColumn2", "HealthCountRow", "HealthSegments",
             "PriorityHost", "ServersToolbar", "OverviewSearchBox", "StateOverlay",
-            "HealthCard", "PriorityButton", "DirectoryLinkButton", "OverviewRepeater", "EmptyAddButton"],
+            "HealthCard", "PriorityButton", "DirectoryLinkButton", "OverviewRepeater", "EmptyAddButton",
+            // UI.7C (Cortex m-3): the editor's return focus finds a suggestion's "Adicionar" in these lists.
+            "DiscoveredRepeater", "EmptyDiscoveredRepeater"],
         // UI.5: BackgroundSection is brought into view from code-behind; the rest are reflowed by the WidthStates setters.
         ["Views/SettingsPage.xaml"] = ["PageViewport", "BackgroundSection", "PageRoot", "AutosaveText", "ThemeControl", "LanguageControl", "BackgroundControl",
             "NotificationsControl", "CompactControl", "TopmostControl", "DisclosureColumn2", "DisclosureGrid", "AboutDisclosure",
@@ -71,13 +73,66 @@ public sealed partial class XamlContractAndResourceGuardTests
         ["Views/RestoreOpenDialog.xaml"] = ["PassphraseBox"],
         ["Views/AddServerDialog.xaml"] = ["ServerForm"],
         ["Views/EditServerDialog.xaml"] = ["ServerForm"],
-        ["Controls/ServerEditorModal.xaml"] = ["ServerForm", "ModalTitleText", "PrimaryActionButton", "CancelActionButton"],
         ["Controls/ServerFormControl.xaml"] =
         [
             "NameField", "PrepHelpLink", "PrepHelpContent", "PrepKeygenText", "PrepCopyKeygenButton",
-            "PrepCopyKeyText", "PrepCopyKeyButton", "PrepPlaceholderNote", "LocalKeySelector", "PassphraseField",
-            "PasswordField", "JumpLocalKeySelector", "JumpPassphraseField", "JumpPasswordField", "ChecklistPanel",
-            "UnknownHostHeading"
+            "PrepCopyKeyText", "PrepCopyKeyButton", "PrepPlaceholderNote", "PassphraseField",
+            "PasswordField", "JumpPassphraseField", "JumpPasswordField",
+            // UI.7C (B-16): every field that shows its own error, and its input (focus on the first invalid one).
+            "NameFormField", "HostFormField", "HostField", "UsernameFormField", "UsernameField", "PortFormField", "PortField",
+            "JumpHostFormField", "JumpHostField", "JumpUsernameFormField", "JumpUsernameField", "JumpPortFormField", "JumpPortField",
+            // UI.7B: the key pickers (B-12), the saved-secret labels (G-13), the route line (B-13) and the import status.
+            "KeyPickerButton", "KeyPickerText", "KeyPickerMenu", "PrivateKeyField", "PassphraseFormField", "PasswordFormField",
+            "JumpKeyPickerButton", "JumpKeyPickerText", "JumpKeyPickerMenu", "JumpPrivateKeyField", "JumpPassphraseFormField",
+            "JumpPasswordFormField", "RouteLine", "ImportStatusText",
+            // UI.7A: the mode copy set from code-behind and the B-19 stacking setters.
+            "IdentitySubtitle", "AuthTitle", "AuthSubtitle", "FormRoot", "CardsGrid", "CardsColumn2", "AuthCard",
+            // UI.7 final c1 (Prism F-10): the Wide state keeps both cards at 384.
+            "IdentityCard",
+            // UI.7 final c2 (Prism C2-2): the narrow options card (selectors without the 200 minimum; Compact rows).
+            "OperatingSystemField", "OperatingSystemSelector", "RefreshIntervalSelector", "OptionsColumn1", "OptionsColumn2",
+            "JumpCardsGrid", "JumpCardsColumn2", "JumpAuthCard", "OptionsGrid", "OptionsColumn3", "RefreshIntervalField"
+        ],
+        // UI.7A Add / Edit server page: code-behind (header, actions, notice) and the WidthStates setters.
+        ["Views/ServerEditorPage.xaml"] =
+        [
+            "PageViewport", "PageRoot", "HeaderTitle", "EditorHeading", "EditorSubtitle", "ServerForm", "SaveFailedNotice",
+            "ActionBar", "TestButton", "ActionHint", "ActionEnd", "PrimaryButton",
+            "CredentialNoteTitle", "HeaderButton",
+            // UI.7B: the in-page modal layer (Cortex §8) and its two panels.
+            "PageScroll", "DialogLayer", "DialogSurface", "TrustPanel", "ImportPanel",
+            // UI.7C: the test panel in the same layer, the duplicate notice (H-UI7-2) and "Tentar guardar".
+            "TestPanel", "DuplicateNotice", "OpenDuplicateButton", "RetrySaveButton",
+            // UI.7A fix c1 (M-1): Cancelar is disabled while a Save is persisted.
+            "CancelButton",
+            // UI.7 final c1 (Prism F-1): the layer's maximum width follows the page.
+            "EditorHost"
+        ],
+        // UI.7B panels of the editor page's in-page modal layer: the trust prompt (Figma 09; 7C adds the test) and "Importar de SSH".
+        ["Views/ServerEditorTrustPanel.xaml"] =
+        [
+            "StepText", "TitleIcon", "TitleText", "BodyText", "SubjectText", "TrustedBlock", "TrustedLabel", "TrustedFingerprintText",
+            "PresentedLabel", "PresentedFingerprintText", "ScopeText", "WorkingRow", "WorkingRing", "WorkingText", "CloseButton", "AcceptButton",
+            "ActionRow"
+        ],
+        // UI.7C (B-9): the connection test in the same layer (Figma 08, the four real stages).
+        ["Views/ServerEditorTestPanel.xaml"] =
+        [
+            "TitleIcon", "TitleText", "BodyText", "SubjectText", "StageList", "VerifiedDetailText", "CloseButton", "RetryButton",
+            // UI.7 final c2 (Prism C2-1): the command row that stacks in a narrow dialog.
+            "ActionRow"
+        ],
+        ["Views/SshConfigImportPanel.xaml"] =
+        [
+            "TitleText", "LoadingRow", "LoadingRing", "StatePanel", "StateIcon", "StateTitle", "StateBody", "ListPanel", "CountText", "HostList",
+            "WarningText", "CancelButton", "UseButton",
+            // UI.7C (H-UI7-2): the "Já adicionado" marker of a row (found by name in the recycled container).
+            "AlreadyAddedText",
+            // UI.7 final c1 (Prism F-2): a row's compact detail and jump lines, and the selected profile's details.
+            "DetailText", "JumpText", "DetailsPanel", "DetailsHostLabel", "DetailsHostValue", "DetailsUserLabel", "DetailsUserValue",
+            "DetailsKeyLabel", "DetailsKeyValue",
+            // UI.7 final c2 (Prism C2-1 / C2-4): the stacking command row and the per-row state words.
+            "ActionRow", "AvailableText", "SelectedText"
         ],
         // HistoryChart parts: the chart draws into these by name.
         ["Controls/HistoryChart.xaml"] = ["RootGrid", "PlotHost", "GridCanvas", "PlotCanvas", "YAxisCanvas", "XAxisCanvas"],
@@ -92,7 +147,9 @@ public sealed partial class XamlContractAndResourceGuardTests
             "PART_Host", "PART_LitBrush", "PART_EmptyBrush", "PART_BarBrush"
         ],
         // UI.2 S4 control templates: names targeted by VisualState setters / storyboards (G-3).
-        ["Styles/Components/Sa.Buttons.xaml"] = ["RootGrid", "StateOverlay", "ContentPresenter"],
+        // UI.7 final c2 (Prism C2-4): the inset list row template (selected / hover overlays over the tint).
+        ["Styles/Components/Sa.Surfaces.xaml"] = ["RowRoot", "SelectedOverlay", "HoverOverlay", "ContentPresenter"],
+        ["Styles/Components/Sa.Buttons.xaml"] = ["RootGrid", "StateOverlay", "ContentPresenter", "Underline", "FocusUnderline"],
         ["Styles/Components/Sa.Forms.xaml"] =
         [
             "RootGrid", "HoverOverlay", "FocusRing", "Shell", "Highlight", "StateOverlay", "ContentPresenter", "Box",
@@ -153,7 +210,9 @@ public sealed partial class XamlContractAndResourceGuardTests
         "SystemColorWindowTextColor",
         // UI.2 R1 (Prism MF-4): HC rest fill/border of secondary controls - the framework's ButtonFace/ButtonText.
         "SystemColorButtonFaceColor",
-        "SystemColorButtonTextColor"
+        "SystemColorButtonTextColor",
+        // UI.7 final c1 (Prism F-4): HC inline text links (SaLinkTextBrush) use the framework hyperlink colour.
+        "SystemColorHotlightColor"
     };
 
     /// <summary>True for a documented WinUI platform key (shared with the UI.2 component-layer guards).</summary>
@@ -340,35 +399,31 @@ public sealed partial class XamlContractAndResourceGuardTests
     }
 
     /// <summary>
-    /// resw pin: the server editor modal titles/buttons come from the six AddServerDialog.* / EditServerDialog.*
-    /// resw entries, not from the dialog views. The views may be deleted by the rebuild; these keys must survive
-    /// in every shipped culture and stay referenced by Controls/ServerEditorModal.xaml.cs.
+    /// UI.7C (B-22, Vigil 7B N-1, Cortex n-7): the server editor is a PAGE; the legacy modal (whose submit path had no
+    /// TrustAsync-window guard), the unused DialogReturnFocus and their resw keys are gone, so nobody can wire them back.
+    /// The editor's old M14 ServerForm* / AddServerDialog* / EditServerDialog* / inline HostKey* keys are gone from every
+    /// culture too (zero use proven by grep in the delivery).
     /// </summary>
     [Fact]
-    public void ServerEditorModalKeysExistInEveryCultureAndAreReferencedByTheModal()
+    public void TheLegacyServerEditorModal_AndItsKeys_AreGone()
     {
-        string[] cultures = ["pt-PT", "pt-BR", "en-US"];
-        var keys = new[] { "AddServerDialog", "EditServerDialog" }
-            .SelectMany(prefix => new[] { "Title", "PrimaryButtonText", "CloseButtonText" }.Select(property => (prefix, property)))
-            .ToList();
-        var modal = File.ReadAllText(AppSourceTree.Full("Controls/ServerEditorModal.xaml.cs"));
-
-        var failures = new List<string>();
-        foreach (var culture in cultures)
+        Assert.False(File.Exists(AppSourceTree.Full("Controls/ServerEditorModal.xaml")));
+        Assert.False(File.Exists(AppSourceTree.Full("Controls/ServerEditorModal.xaml.cs")));
+        Assert.False(File.Exists(AppSourceTree.Full("Services/DialogReturnFocus.cs")));
+        foreach (var culture in new[] { "pt-PT", "pt-BR", "en-US" })
         {
-            var entries = XDocument.Load(AppSourceTree.Full($"Resources/{culture}/Resources.resw"))
-                .Root!.Elements("data")
-                .ToDictionary(e => (string)e.Attribute("name")!, e => (string?)e.Element("value"), StringComparer.Ordinal);
-            failures.AddRange(keys
-                .Where(key => string.IsNullOrWhiteSpace(entries.GetValueOrDefault($"{key.prefix}.{key.property}")))
-                .Select(key => $"Resources/{culture}/Resources.resw is missing {key.prefix}.{key.property}"));
+            var names = XDocument.Load(AppSourceTree.Full($"Resources/{culture}/Resources.resw"))
+                .Root!.Elements("data").Select(e => (string)e.Attribute("name")!).ToList();
+            Assert.DoesNotContain(names, name => name.StartsWith("AddServerDialog.", StringComparison.Ordinal)
+                || name.StartsWith("EditServerDialog.", StringComparison.Ordinal)
+                || name.StartsWith("ServerFormValidationError.", StringComparison.Ordinal)
+                || name.StartsWith("ServerFormLocalKeySelector.", StringComparison.Ordinal)
+                || name.StartsWith("ServerFormJumpLocalKeySelector.", StringComparison.Ordinal)
+                || name.StartsWith("ServerFormSshConfigTitle.", StringComparison.Ordinal)
+                || name.StartsWith("ServerFormSshConfigUseButton.", StringComparison.Ordinal)
+                || name.StartsWith("ServerFormChecklistTitle.", StringComparison.Ordinal)
+                || name.StartsWith("HostKeyTrustAndConnectButton.", StringComparison.Ordinal));
         }
-
-        failures.AddRange(keys
-            .Where(key => !modal.Contains($"\"{key.prefix}/{key.property}\"", StringComparison.Ordinal))
-            .Select(key => $"Controls/ServerEditorModal.xaml.cs no longer reads \"{key.prefix}/{key.property}\""));
-
-        Assert.True(failures.Count == 0, string.Join(Environment.NewLine, failures));
     }
 
     /// <summary>App-wide scope: App.xaml plus every dictionary under Styles/** (generic, so new token files count).</summary>

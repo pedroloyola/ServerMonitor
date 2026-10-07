@@ -609,7 +609,7 @@ public sealed class Ui5R2Tests
         return raised;
     }
 
-    private sealed class DecidingDialogs : IServerDialogService
+    private sealed class DecidingDialogs : IEditorScript
     {
         public Task<ServerEditorResult?> ShowEditorAsync(Server? server) => Task.FromResult<ServerEditorResult?>(null);
 

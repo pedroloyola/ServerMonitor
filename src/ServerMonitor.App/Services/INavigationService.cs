@@ -67,4 +67,25 @@ public interface INavigationService
     /// (UI.4, unchanged); <see cref="Guid.Empty"/> lands on the Visão geral.
     /// </summary>
     void ReturnToServerDetail(Guid serverId);
+
+    /// <summary>
+    /// UI.7 B-1: the server editor page for one visit (Servidores stays selected in the sidebar). Like every navigation it
+    /// leaves the current page through its exit guard (H-UI7-3); <paramref name="refused"/> runs when that page stays.
+    /// </summary>
+    void GoToServerEditor(ServerEditorRequest request, Action? refused = null);
+
+    /// <summary>
+    /// UI.7 H-UI7-3: runs <paramref name="continuation"/> (which navigates) once the current page agreed to be left - at
+    /// once when it has nothing to lose, after the "Descartar alterações?" answer otherwise, never when the user keeps
+    /// editing. External activations (toast, widget, tray deep-link) and the editor's own Cancel/Back go through here.
+    /// </summary>
+    void LeaveCurrentPageThen(Action continuation);
+
+    /// <summary>
+    /// UI.7A fix c1 (Cortex m-2, Boss decision DERIVED): an EXTERNAL activation (toast, widget, tray deep-link) leaves like
+    /// <see cref="LeaveCurrentPageThen"/>, except while "Descartar alterações?" is already being asked: then only the
+    /// LATEST activation is kept (latest-wins, like the ActivationRouter). "Descartar" runs that activation instead of the
+    /// navigation that asked; "Continuar a editar" drops it. Clicks are never queued (the question is modal).
+    /// </summary>
+    void LeaveCurrentPageForActivation(Action continuation);
 }
