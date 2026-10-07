@@ -179,6 +179,22 @@ public sealed class Ui7DuplicateAndToastTests : IDisposable
         Assert.Null(_world.SavedNotice.TakeFor(server.Id));
     }
 
+    /// <summary>A persist that answers "not saved" (ServerNotFound: the server vanished) posts no toast either.</summary>
+    [Fact]
+    public async Task ARejectedPersist_PostsNoSavedToast()
+    {
+        await _world.StartAsync();
+        var server = await _world.SeedAsync();
+        _ = _world.OpenEditAsync(server.Id);
+        _world.ViewModel.Name = "renamed";
+        Assert.True(await _world.ServerService.RemoveAsync(server.Id));
+
+        var outcome = await _world.Page.SubmitAsync();
+
+        Assert.Equal(ServerEditorSaveStatus.Failed, outcome!.Status);
+        Assert.False(_world.SavedNotice.IsPending);
+    }
+
     [Fact]
     public async Task TheDetail_ShowsItsSavedToastOnce_AndItClosesOnItsCountdownOrItsButton()
     {
