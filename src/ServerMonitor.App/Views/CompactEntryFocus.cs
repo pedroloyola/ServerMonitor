@@ -9,8 +9,10 @@ namespace ServerMonitor.App.Views;
 /// <item>Rows → the first row; a state with a real action → that action; otherwise "Expandir".</item>
 /// <item>A target that exists but is not laid out yet is WAITED for (the next layout pass), never replaced by the fallback
 /// - up to <see cref="MaxLayoutPasses"/> passes (a pass count, not a timer), then "Expandir".</item>
-/// <item>The focus state is Keyboard only when the user reached Compact with the keyboard; otherwise Programmatic, so no
-/// focus ring is painted after a click, a tray command or a launch (WinUI convention).</item>
+/// <item>The focus state is Keyboard only when the user reached Compact with the keyboard; otherwise Pointer, so no focus
+/// ring is painted after a click, a tray command or a launch. MEASURED (c1, 6673ec9+f0ce41b): Programmatic still drew the
+/// keyboard ring at launch (WinUI keeps the last input mode, keyboard by default), so Pointer is the state that matches
+/// "focused, no ring" - the element still owns focus and Tab continues from it.</item>
 /// </list>
 /// </summary>
 internal static class CompactEntryFocus
@@ -45,6 +47,6 @@ internal static class CompactEntryFocus
         return Target.Expand;
     }
 
-    /// <summary>Keyboard only for a keyboard entry; every other entry is Programmatic (no ring).</summary>
-    public static FocusState StateFor(bool enteredByKeyboard) => enteredByKeyboard ? FocusState.Keyboard : FocusState.Programmatic;
+    /// <summary>Keyboard only for a keyboard entry; every other entry is Pointer (focused, no ring).</summary>
+    public static FocusState StateFor(bool enteredByKeyboard) => enteredByKeyboard ? FocusState.Keyboard : FocusState.Pointer;
 }

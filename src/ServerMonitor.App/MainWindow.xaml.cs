@@ -198,11 +198,11 @@ public sealed partial class MainWindow : Window
         Onboarding.SetWindowMode(_modeCoordinator.CurrentMode);
         // The task observes and logs diagnosis failures; it cannot delay the earlier startup work.
         _ = Onboarding.OnMainWindowShownAsync(normalStart);
-        // Prism c1 P-2: a launch straight into Compact puts focus where a mode change would - programmatically (no ring),
-        // instead of leaving WinUI's first-tab-stop default ("Expandir", drawn with a keyboard ring).
+        // Prism c1 P-2: a launch straight into Compact puts focus where a mode change would - without a ring - instead of
+        // leaving WinUI's first-tab-stop default ("Expandir", drawn with a keyboard ring).
         if (_modeCoordinator.CurrentMode == WindowMode.Compact)
         {
-            BeginCompactEntryFocus(FocusState.Programmatic);
+            BeginCompactEntryFocus(CompactEntryFocus.StateFor(enteredByKeyboard: false));
         }
     }
 

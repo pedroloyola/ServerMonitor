@@ -59,7 +59,8 @@ public sealed class Ui8CompactC1Tests
     public void TheFocusRing_OnlyFollowsAKeyboardEntry()
     {
         Assert.Equal(FocusState.Keyboard, CompactEntryFocus.StateFor(enteredByKeyboard: true));
-        Assert.Equal(FocusState.Programmatic, CompactEntryFocus.StateFor(enteredByKeyboard: false));
+        // Measured: Programmatic still paints the ring at launch; Pointer is "focused, no ring".
+        Assert.Equal(FocusState.Pointer, CompactEntryFocus.StateFor(enteredByKeyboard: false));
     }
 
     [Fact]
@@ -74,7 +75,7 @@ public sealed class Ui8CompactC1Tests
         Assert.Contains("RootLayout.AddHandler(UIElement.KeyDownEvent, _keyInputObserver, handledEventsToo: true);", code, StringComparison.Ordinal);
         Assert.Contains("RootLayout.AddHandler(UIElement.PointerPressedEvent, _pointerInputObserver, handledEventsToo: true);", code, StringComparison.Ordinal);
         var loaded = code[code.IndexOf("private async void OnRootLayoutLoaded", StringComparison.Ordinal)..code.IndexOf("private void OnWindowModeChanged", StringComparison.Ordinal)];
-        Assert.Contains("BeginCompactEntryFocus(FocusState.Programmatic);", loaded, StringComparison.Ordinal);
+        Assert.Contains("BeginCompactEntryFocus(CompactEntryFocus.StateFor(enteredByKeyboard: false));", loaded, StringComparison.Ordinal);
         var entry = code[code.IndexOf("private bool TryCompactEntryFocus", StringComparison.Ordinal)..];
         Assert.DoesNotContain("FocusState.Keyboard", entry[..entry.IndexOf("\n    }", StringComparison.Ordinal)], StringComparison.Ordinal);
         // "Never steal focus": a background mode change still requires the window to hold focus already.
