@@ -1,6 +1,6 @@
 # UI.9 — Windows Widget V3
 
-**Status: implementation and packaged real QA COMPLETE (2026-10-08); merge pending.**
+**Status: UI.9 COMPLETE (2026-10-08).** PR #32 merged by merge commit pinned to `df15963` → `main` = `c266b38` (parents `9a81dc1` + `df15963`; tree == `df15963`). Post-merge CI run 37850235873: attempt 1 failed only in the pre-existing, non-deterministic `Ui7SaveGuardTests.M1` (Debug; independent of UI.9); a single rerun as a measurement passed both jobs (attempt 2). See §15.
 - **Branch:** `ui/ui9-windows-widget-v3`, base `9a81dc1`.
   - Code validated at `dec83f3`: the installed V3 build `1.1.2.2` was built from it, with clean provenance (`.boss/tmp/ui9/beacon-v3build.md`).
   - This document's commit adds docs only.
@@ -357,3 +357,33 @@ Correctness/robustness IDs UI9-COR-1..2 and UI9-ROB-1..3 are covered by the V-RC
 | `REL0-STORE-TRANSITION` / `REL0-TESTCERT-REMOVAL` / `REL0-DEFAULT-LANGUAGE` | REL.0 obligations from H4, UI9-SIGN-1 and C2 N2-4 |
 | `UI9-FW-PROMPT` | packaged app listens on start → Windows Firewall prompt on each new install path; listen only on demand / Private UDP 5353 / manifest rule; Vigil before any Store release |
 | `APP-COPY-QUASECHEIO` | the App Overview's "almost full" at 80 % exaggerates; align with the widget's "high/critical" |
+
+## 15. Post-merge state and closeout
+
+- **Integration:** PR #32 merged (merge commit, no squash/rebase) at the authorised head `df15963` → `main` `c266b38`.
+- **Post-merge CI** (run 37850235873):
+  - Attempt 1: Release PASS. Debug FAIL in exactly one test, `Ui7SaveGuardTests.M1_ASavedVisitStillOnScreen_GoesToItsDetail_OnTheNextSubmit`.
+    - That test is pre-existing and scheduling-dependent (`UI7-SAVEGUARD-M1-RELEASE`).
+    - The UI.9 diff does not touch the editor, navigation or the UI.7 tests.
+  - Attempt 2 (one rerun, as a measurement): both jobs PASS (App.Tests 3438/3438). The recurrence is recorded in the backlog, and a test-only fix needs a separate decision.
+- **Cleanup:**
+  - The UI.9 Floor was removed with its branch kept (triple-check: Maestri floor list, `git worktree list`, directory).
+  - The evidence-only spike worktree `ServerMonitor-ui9-c0probe` was removed without `--force` (local branch `spike/ui9-c0probe` kept).
+  - Branch `ui/ui9-windows-widget-v3` is kept (local + remote).
+- **Preserved on the QA machine (not in Git):** the packaged-QA backups, inventories, checksums, sign-offs and work folders under `%LOCALAPPDATA%\ServerAlyzer-QA-Backup\ui9`. They are kept until REL.0 and a validated Store-managed upgrade.
+- **Installed state:**
+  - The real installation remains `PedroLoy.ServerAlyzer 1.1.2.2`, Developer-signed (human decision H4), with the original single Medium widget pin.
+  - The 2 Firewall rules of the installed `1.1.2.2` app are kept. The start-up Firewall prompt (`UI9-FW-PROMPT`) is tracked separately.
+- **REL.0 obligations (not started):**
+  - validate a Store-managed upgrade that preserves data and widget pins;
+  - replace the Developer build with the Store package;
+  - remove the test certificate by 2026-11-30;
+  - fix the embedded local paths (`PRIV-PDBPATH`) before any distribution.
+- **NOT_RUN (unchanged, not reclassified):**
+  - Narrator;
+  - Medium with ≥ 3 real servers;
+  - header icon after a live theme switch;
+  - host vertical centring (D-18);
+  - start-up Firewall prompt;
+  - the UI.7 test above.
+- UI.10 not started.
