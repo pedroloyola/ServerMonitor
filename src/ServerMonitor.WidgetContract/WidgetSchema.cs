@@ -34,4 +34,22 @@ public static class WidgetSchema
     /// The producer and reader may be different processes reading slightly different clocks.
     /// </summary>
     public static readonly TimeSpan MaxClockSkew = TimeSpan.FromMinutes(5);
+
+    /// <summary>
+    /// Allowed lead of a server's <c>lastUpdatedUtc</c> over the snapshot's <c>generatedAtUtc</c> (UI.9
+    /// V-RC-5). The producer reads both from one clock with the reading strictly before the write, so a
+    /// server can never be fresher than the snapshot that carries it; the second only absorbs rounding.
+    /// </summary>
+    public static readonly TimeSpan MaxLastUpdatedLead = TimeSpan.FromSeconds(1);
+
+    /// <summary>
+    /// Bounds of the optional per-server <c>staleAfterSeconds</c> (UI.9 D-UI9-3, V-RC-4) — exactly the
+    /// domain of the app's stale policy over its supported refresh intervals (20 s floor .. 2 × 300 s).
+    /// Anything outside is rejected as out of range, so one bad value cannot stretch the derived snapshot
+    /// threshold (D-UI9-4). The app proves its policy stays inside these bounds by test.
+    /// </summary>
+    public const int MinStaleAfterSeconds = 20;
+
+    /// <inheritdoc cref="MinStaleAfterSeconds"/>
+    public const int MaxStaleAfterSeconds = 600;
 }
