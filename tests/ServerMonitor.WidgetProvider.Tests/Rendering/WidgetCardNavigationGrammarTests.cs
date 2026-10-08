@@ -197,7 +197,9 @@ public sealed class WidgetCardNavigationGrammarTests
         {
             var actions = ActionsOf(state, size);
 
-            Assert.Empty(actions.Urls);
+            // UI.9 C3 (Vigil C0 §2): the only url values are the compile-time image constants (bars, empty
+            // icon) — never an action target. No action carries a url (the per-action key sets are exact).
+            Assert.All(actions.Urls, u => Assert.Contains(u, WidgetImages.All));
             Assert.DoesNotContain(actions.All, a => a.GetProperty("type").GetString() == "Action.OpenUrl");
         }
     }

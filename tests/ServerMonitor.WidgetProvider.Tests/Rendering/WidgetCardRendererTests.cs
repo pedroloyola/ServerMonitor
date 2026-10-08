@@ -90,11 +90,11 @@ public sealed class WidgetCardRendererTests
     }
 
     internal static (WidgetViewModel Vm, WidgetCard Card, JsonObject Expanded) Render(
-        WidgetReadResult read, WidgetSizeHint size, WidgetStrings? strings = null)
+        WidgetReadResult read, WidgetSizeHint size, WidgetStrings? strings = null, string hostTheme = "dark")
     {
         var vm = WidgetViewModelBuilder.Build(read, size, Now, strings ?? En);
         var card = WidgetCardRenderer.Render(vm);
-        return (vm, card, CardTemplateHarness.Expand(card.TemplateJson, card.DataJson));
+        return (vm, card, CardTemplateHarness.Expand(card.TemplateJson, card.DataJson, hostTheme));
     }
 
     // =====================================================================================================
@@ -137,19 +137,22 @@ public sealed class WidgetCardRendererTests
     }
 
     [Fact]
-    public void Template_has_no_schema_header_url_image_or_open_url()
+    public void Template_has_no_schema_header_or_open_url_and_every_url_is_a_literal_image_constant()
     {
+        // UI.9 C3 (Vigil C0 §2): images exist now, but only as WidgetImages constants written literally.
+        // The full scan (data JSON, expanded cards, PNG chunks) is WidgetImageScanTests.
         foreach (var size in Sizes)
         {
             var template = WidgetCardRenderer.TemplateFor(size);
             var keys = CardTemplateHarness.Objects(JsonNode.Parse(template)).SelectMany(o => o.Node.Select(p => p.Key)).ToHashSet();
 
-            foreach (var forbidden in new[] { "$schema", "header", "url", "backgroundImage", "iconUrl" })
+            foreach (var forbidden in new[] { "$schema", "header", "iconUrl" })
             {
                 Assert.DoesNotContain(forbidden, keys);
             }
 
-            Assert.DoesNotContain("\"Image\"", template);
+            Assert.All(CardTemplateHarness.Strings(JsonNode.Parse(template)).Where(s => s.Key == "url"),
+                s => Assert.Contains(s.Value, WidgetImages.All));
             Assert.DoesNotContain("Action.OpenUrl", template);
             Assert.DoesNotContain("Action.Submit", template);
         }
@@ -281,13 +284,16 @@ public sealed class WidgetCardRendererTests
     // =====================================================================================================
 
     [Fact]
-    public void No_card_carries_a_url_and_the_verb_set_is_exactly_the_two_contract_verbs()
+    public void No_card_carries_a_url_beyond_the_image_constants_and_the_verb_set_is_exactly_the_two_contract_verbs()
     {
         var url = new Regex(@"(?i)(https?:|file:|data:|ms-appx:|ms-appdata:|\\\\|//)");
         var verbs = new HashSet<string>(StringComparer.Ordinal);
         foreach (var size in Sizes)
         {
-            Assert.DoesNotMatch(url, WidgetCardRenderer.TemplateFor(size));
+            // C3: the only URLs are the WidgetImages constants; every other string value is URL-free. Compared on
+            // the parsed values (what the host reads): the serializer writes '+' as + in the raw JSON.
+            var values = CardTemplateHarness.Strings(JsonNode.Parse(WidgetCardRenderer.TemplateFor(size))).ToList();
+            Assert.All(values.Where(s => !WidgetImages.All.Contains(s.Value)), s => Assert.DoesNotMatch(url, s.Value));
             foreach (var culture in Cultures)
             {
                 foreach (var (_, read) in States())
@@ -440,10 +446,12 @@ public sealed class WidgetCardRendererTests
     }
 
     // =====================================================================================================
-    // Meters (R-2): shape-distinguished glyphs, neutral fill, % always text; Offline/Unknown → "—", none
+    // Meters. UI.9 C3 (Prism C0 §1): continuous bars, metric colour per theme, % always text;
+    // Offline/Unknown → "—", no bar. The ▰/▱ glyph meter stays behind WidgetLayout.Meter as the fallback.
     // =====================================================================================================
 
-    // Prism P-C1-5 (replaces DV-10): 0 only at 0 %, full only at 100 %, otherwise clamp(round(p/20), 1, 4).
+    // Glyph fallback, Prism P-C1-5 (replaces DV-10): 0 only at 0 %, full only at 100 %, otherwise
+    // clamp(round(p/20), 1, 4).
     [Theory]
     [InlineData(0, 0)]
     [InlineData(1, 1)]
@@ -458,44 +466,124 @@ public sealed class WidgetCardRendererTests
     public void Filled_segments_never_read_empty_or_full_unless_exactly_0_or_100(int percent, int filled) =>
         Assert.Equal(filled, WidgetLayout.FilledSegments(percent));
 
-    private static List<JsonObject> Meters(JsonNode row) =>
-        CardTemplateHarness.Objects(row).Select(o => o.Node)
-            .Where(o => (string?)o["type"] == "RichTextBlock"
-                && o["inlines"]!.AsArray().All(r => ((string?)r!["text"])!.All(c => c is '▰' or '▱')))
+    // Prism C0 §1 weight rule: 0 and 100 exact; 1–2 → 3 and 98–99 → 97, so a tiny fill or a tiny track
+    // stays visible and a near-full bar never reads full.
+    [Theory]
+    [InlineData(0, 0)]
+    [InlineData(1, 3)]
+    [InlineData(2, 3)]
+    [InlineData(3, 3)]
+    [InlineData(50, 50)]
+    [InlineData(97, 97)]
+    [InlineData(98, 97)]
+    [InlineData(99, 97)]
+    [InlineData(100, 100)]
+    public void Bar_fill_weight_follows_the_w_rule(int percent, int weight) =>
+        Assert.Equal(weight, WidgetLayout.BarFillWeight(percent));
+
+    /// <summary>One segment of an expanded bar: its constant url, column weight and height.</summary>
+    internal sealed record BarSegment(string Url, int Weight, string MinHeight);
+
+    /// <summary>An expanded bar: the fill and track segments, null when $when removed one.</summary>
+    internal sealed record BarView(BarSegment? Fill, BarSegment? Track);
+
+    internal static List<BarView> Bars(JsonNode node) =>
+        CardTemplateHarness.Objects(node).Select(o => o.Node)
+            .Where(o => (string?)o["type"] == "ColumnSet" && o["columns"]!.AsArray().Count > 0
+                && o["columns"]!.AsArray().All(c => BarSegmentOf(c!.AsObject()) is not null))
+            .Select(o =>
+            {
+                var segments = o["columns"]!.AsArray().Select(c => BarSegmentOf(c!.AsObject())!).ToList();
+                var track = segments.SingleOrDefault(s => s.Url == WidgetImages.BarTrackDark || s.Url == WidgetImages.BarTrackLight);
+                var fill = segments.SingleOrDefault(s => s != track);
+                Assert.Equal(segments.Count, (fill is null ? 0 : 1) + (track is null ? 0 : 1));
+                return new BarView(fill, track);
+            })
             .ToList();
 
-    [Fact]
-    public void A_fresh_meter_is_neutral_accent_fill_plus_subtle_track_and_never_a_health_colour()
+    private static BarSegment? BarSegmentOf(JsonObject column)
     {
-        var (_, _, expanded) = Render(Read(Now, Server(1, WidgetHealth.Critical, metric: "disk", cpu: 41)), WidgetSizeHint.Medium);
-        var row = CardTemplateHarness.Rows(expanded).Single();
-        var meters = Meters(row);
-
-        Assert.Equal(3, meters.Count); // CPU, RAM, Disk
-        foreach (var meter in meters)
+        if ((string?)column["type"] != "Column" || column["items"] is not JsonArray { Count: 1 } items
+            || items[0] is not JsonObject inner || inner["backgroundImage"] is not JsonObject bg)
         {
-            var runs = meter["inlines"]!.AsArray().Select(r => r!.AsObject()).ToList();
-            Assert.Equal(WidgetLayout.MeterSegments, runs.Sum(r => ((string)r["text"]!).Length));
-            Assert.All(runs.Where(r => ((string)r["text"]!).Contains('▰')), r => Assert.Equal("accent", (string?)r["color"]));
-            Assert.All(runs.Where(r => ((string)r["text"]!).Contains('▱')), r => Assert.True((bool)r["isSubtle"]!));
-            Assert.DoesNotContain(CardTemplateHarness.Strings(meter), s => s is { Key: "color", Value: "good" or "warning" or "attention" });
+            return null;
         }
 
-        Assert.Contains("41%", CardTemplateHarness.VisibleTexts(row)); // the % is text
+        Assert.Empty(inner["items"]!.AsArray()); // an empty container: the bar is pure background
+        Assert.Equal("repeat", (string?)bg["fillMode"]);
+        return new BarSegment((string)bg["url"]!, (int)column["width"]!, (string)inner["minHeight"]!);
+    }
+
+    public static TheoryData<string, string, string, string, string> ThemeBarColours() => new()
+    {
+        { "dark", WidgetImages.BarCpuDark, WidgetImages.BarRamDark, WidgetImages.BarDiskDark, WidgetImages.BarTrackDark },
+        { "light", WidgetImages.BarCpuLight, WidgetImages.BarRamLight, WidgetImages.BarDiskLight, WidgetImages.BarTrackLight },
+    };
+
+    [Theory]
+    [MemberData(nameof(ThemeBarColours))]
+    public void A_fresh_bar_uses_the_metric_colour_of_the_host_theme_and_never_a_state_colour(
+        string theme, string cpu, string ram, string disk, string track)
+    {
+        foreach (var (size, height) in new[] { (WidgetSizeHint.Medium, "4px"), (WidgetSizeHint.Large, "6px") })
+        {
+            // A Critical row with a Disk attention metric: the bar colours still say CPU/RAM/Disk, not Critical.
+            var (_, _, expanded) = Render(Read(Now, Server(1, WidgetHealth.Critical, metric: "disk", cpu: 41)), size, hostTheme: theme);
+            var row = CardTemplateHarness.Rows(expanded).Single();
+            var bars = Bars(row);
+
+            Assert.Equal(3, bars.Count); // only the host theme's set survives $when
+            Assert.Equal(new[] { cpu, ram, disk }, bars.Select(b => b.Fill!.Url).ToArray());
+            Assert.Equal(new[] { 41, 73, 92 }, bars.Select(b => b.Fill!.Weight).ToArray());
+            Assert.All(bars, b =>
+            {
+                Assert.Equal(track, b.Track!.Url);
+                Assert.Equal(100, b.Fill!.Weight + b.Track.Weight);
+                Assert.Equal(height, b.Fill.MinHeight);
+                Assert.Equal(height, b.Track.MinHeight);
+            });
+            Assert.Contains("41%", CardTemplateHarness.VisibleTexts(row)); // the % is text
+        }
+    }
+
+    [Theory]
+    [InlineData(0, null, 100)]
+    [InlineData(1, 3, 97)]
+    [InlineData(99, 97, 3)]
+    [InlineData(100, 100, null)]
+    public void A_bar_never_draws_a_zero_weight_segment(int percent, int? fill, int? track)
+    {
+        var (_, _, expanded) = Render(Read(Now, Server(1, cpu: percent)), WidgetSizeHint.Medium);
+        var bar = Bars(CardTemplateHarness.Rows(expanded).Single())[0];
+
+        Assert.Equal(fill, bar.Fill?.Weight);
+        Assert.Equal(track, bar.Track?.Weight);
+        Assert.Contains($"{percent}%", CardTemplateHarness.VisibleTexts(expanded));
+    }
+
+    [Theory]
+    [InlineData("dark")]
+    [InlineData("light")]
+    public void A_stale_row_bar_is_muted(string theme)
+    {
+        var (_, _, expanded) = Render(Read(Now, Server(1, updated: Now.AddSeconds(-500))), WidgetSizeHint.Medium, hostTheme: theme);
+        var bars = Bars(CardTemplateHarness.Rows(expanded).Single());
+
+        Assert.Equal(3, bars.Count);
+        var stale = theme == "dark" ? WidgetImages.BarStaleDark : WidgetImages.BarStaleLight;
+        Assert.All(bars, b => Assert.Equal(stale, b.Fill!.Url));
     }
 
     [Fact]
-    public void A_stale_row_meter_is_muted()
+    public void Bars_are_the_active_meter_and_the_glyph_meter_stays_only_as_the_fallback_seam()
     {
-        var (_, _, expanded) = Render(Read(Now, Server(1, updated: Now.AddSeconds(-500))), WidgetSizeHint.Medium);
-        var meters = Meters(CardTemplateHarness.Rows(expanded).Single());
-
-        Assert.Equal(3, meters.Count);
-        Assert.All(meters, m => Assert.All(m["inlines"]!.AsArray(), r =>
+        Assert.Equal(WidgetLayout.MeterStyle.Bars, WidgetLayout.Meter);
+        foreach (var size in new[] { WidgetSizeHint.Medium, WidgetSizeHint.Large })
         {
-            Assert.Null(r!["color"]);
-            Assert.True((bool)r["isSubtle"]!);
-        }));
+            var (_, _, expanded) = Render(States().Single(s => s.State == "healthy").Read, size);
+            Assert.DoesNotContain(CardTemplateHarness.VisibleTexts(expanded), t => t.Contains('▰') || t.Contains('▱'));
+            Assert.Equal(9, Bars(expanded).Count); // 3 rows x 3 metrics
+        }
     }
 
     [Fact]
@@ -510,14 +598,14 @@ public sealed class WidgetCardRendererTests
         {
             var texts = CardTemplateHarness.VisibleTexts(row);
             Assert.DoesNotContain(texts, t => t.EndsWith('%'));
-            Assert.Empty(Meters(row));
+            Assert.Empty(Bars(row));
             Assert.Equal(6, texts.Count(t => t == En.MetricUnknown)); // 3 values + 3 details
         }
 
         var partial = CardTemplateHarness.VisibleTexts(rows[2]);
         Assert.Contains(En.MetricUnknown, partial);
         Assert.DoesNotContain("0%", partial);
-        Assert.Equal(2, Meters(rows[2]).Count); // RAM + Disk only
+        Assert.Equal(2, Bars(rows[2]).Count); // RAM + Disk only
     }
 
     // =====================================================================================================
@@ -538,10 +626,13 @@ public sealed class WidgetCardRendererTests
                 var runs = block["inlines"]!.AsArray().Select(r => (string)r!["text"]!).ToArray();
                 Assert.Equal(["${" + key + "Label}", "${gap}", "${" + key + "Value}"], runs);
 
-                // The metric cell (its column) contains no ColumnSet at all.
+                // The metric cell (its column) has no ColumnSet holding text: the only ColumnSets in it are
+                // the C3 bars, which hold empty background containers.
                 var cell = CardTemplateHarness.Objects(template).Select(o => o.Node)
                     .Single(o => (string?)o["type"] == "Column" && CardTemplateHarness.Objects(o).Any(i => i.Node == block));
-                Assert.DoesNotContain(CardTemplateHarness.Objects(cell["items"]), o => (string?)o.Node["type"] == "ColumnSet");
+                Assert.All(CardTemplateHarness.Objects(cell["items"]).Where(o => (string?)o.Node["type"] == "ColumnSet"),
+                    set => Assert.DoesNotContain(CardTemplateHarness.Objects(set.Node),
+                        o => (string?)o.Node["type"] is "TextBlock" or "RichTextBlock" or "TextRun"));
             }
         }
     }
@@ -694,11 +785,11 @@ public sealed class WidgetCardRendererTests
     }
 
     // =====================================================================================================
-    // a11y (RC-8/R-4): titles are headings; state is always text
+    // a11y (RC-8/R-4): titles are headings on M/L (C3 / Prism C0 §4: not on Small); state is always text
     // =====================================================================================================
 
     [Fact]
-    public void Titles_use_the_heading_style_and_every_coloured_text_carries_words()
+    public void Titles_use_the_heading_style_on_medium_and_large_only_and_every_coloured_text_carries_words()
     {
         foreach (var size in Sizes)
         {
@@ -706,7 +797,17 @@ public sealed class WidgetCardRendererTests
             {
                 var (vm, _, expanded) = Render(read, size);
                 var headings = CardTemplateHarness.Objects(expanded).Select(o => o.Node).Where(o => (string?)o["style"] == "heading").ToList();
-                if (size == WidgetSizeHint.Small || vm.CardState is WidgetCardState.Empty or WidgetCardState.Unavailable)
+                if (size == WidgetSizeHint.Small)
+                {
+                    // The Small title is Medium Bolder without the heading style: the host maps heading to
+                    // Large, which the ~85 px Small body cannot afford.
+                    Assert.Empty(headings);
+                    var title = CardTemplateHarness.Objects(expanded).Select(o => o.Node)
+                        .Single(o => (string?)o["type"] == "TextBlock" && (string?)o["text"] == vm.Title);
+                    Assert.Equal("Medium", (string?)title["size"]);
+                    Assert.Equal("Bolder", (string?)title["weight"]);
+                }
+                else if (vm.CardState is WidgetCardState.Empty or WidgetCardState.Unavailable)
                 {
                     Assert.Contains(headings, h => (string?)h["text"] == vm.Title);
                 }

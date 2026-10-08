@@ -156,8 +156,9 @@ public sealed class WidgetViewModelBuilderTests
     [Theory]
     [InlineData(WidgetSizeHint.Medium, 1, 1)]
     [InlineData(WidgetSizeHint.Medium, 2, 2)]
-    [InlineData(WidgetSizeHint.Medium, 3, 2)]
-    [InlineData(WidgetSizeHint.Medium, 100, 2)]
+    [InlineData(WidgetSizeHint.Medium, 3, 3)]
+    [InlineData(WidgetSizeHint.Medium, 4, 3)]
+    [InlineData(WidgetSizeHint.Medium, 100, 3)]
     [InlineData(WidgetSizeHint.Large, 3, 3)]
     [InlineData(WidgetSizeHint.Large, 4, 3)]
     [InlineData(WidgetSizeHint.Large, 100, 3)]
@@ -172,9 +173,9 @@ public sealed class WidgetViewModelBuilderTests
     }
 
     // ---- The shared invariant. MEASURED capacities, written as literals rather than read from MaxRowsFor:
-    // asserting against the production constant would be circular (Atlas M1). V3 targets 3 on Medium; the
-    // number changes only when C0 measures V3 rows on the real board.
-    public const int MeasuredMediumCapacity = 2;
+    // asserting against the production constant would be circular (Atlas M1). UI.9 C3: 3 on Medium, from
+    // the real-board C0 session (V3 rows measured on the board).
+    public const int MeasuredMediumCapacity = 3;
     public const int MeasuredLargeCapacity = 3;
 
     public static TheoryData<WidgetSizeHint, int> RowRenderingSizes() => new()
@@ -229,7 +230,7 @@ public sealed class WidgetViewModelBuilderTests
     public void Rows_of_total_is_localized()
     {
         var read = Read(Now, Enumerable.Range(0, 5).Select(i => Server($"s{i}")).ToArray());
-        foreach (var (culture, expected) in new[] { ("en-US", "2 of 5 servers"), ("pt-BR", "2 de 5 servidores"), ("pt-PT", "2 de 5 servidores") })
+        foreach (var (culture, expected) in new[] { ("en-US", "3 of 5 servers"), ("pt-BR", "3 de 5 servidores"), ("pt-PT", "3 de 5 servidores") })
         {
             var vm = WidgetViewModelBuilder.Build(read, WidgetSizeHint.Medium, Now, WidgetStrings.ForCulture(CultureInfo.GetCultureInfo(culture)));
             Assert.Equal(expected, vm.RowsOfTotalText);
@@ -247,7 +248,7 @@ public sealed class WidgetViewModelBuilderTests
 
         Assert.Equal(new[] { "offline", "critical", "warning" },
             Build(Read(Now, servers), WidgetSizeHint.Large).Rows.Select(r => r.DisplayName.Value).ToArray());
-        Assert.Equal(new[] { "offline", "critical" },
+        Assert.Equal(new[] { "offline", "critical", "warning" },
             Build(Read(Now, servers), WidgetSizeHint.Medium).Rows.Select(r => r.DisplayName.Value).ToArray());
     }
 

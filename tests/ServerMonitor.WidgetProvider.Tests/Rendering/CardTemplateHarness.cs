@@ -9,6 +9,9 @@ namespace ServerMonitor.WidgetProvider.Tests.Rendering;
 /// <item><c>"$data": "${key}"</c> repeats an array element per item;</item>
 /// <item><c>"$when": "${key}"</c> keeps an element only when a boolean key is true;</item>
 /// <item><c>"${key}"</c> bindings in string values, also <c>${$root.key}</c>.</item>
+/// <item>UI.9 C3: exactly two host expressions in <c>$when</c>: <c>${$host.hostTheme == 'dark'}</c> and
+/// <c>${$host.hostTheme != 'dark'}</c>. Their behaviour on the native host was proven on the board
+/// (P-theme / P-D).</item>
 /// </list>
 /// It is STRICT: an unknown key, a non-boolean <c>$when</c>, or any expression beyond a plain key throws.
 /// The templates therefore cannot quietly rely on a feature the tests do not model.
@@ -26,17 +29,38 @@ internal static partial class CardTemplateHarness
     [GeneratedRegex(@"^(\$root\.)?[A-Za-z][A-Za-z0-9]*$")]
     private static partial Regex PlainKey();
 
-    public static JsonObject Expand(string templateJson, string dataJson)
+    public const string DarkTheme = "${$host.hostTheme == 'dark'}";
+    public const string LightTheme = "${$host.hostTheme != 'dark'}";
+
+    [ThreadStatic] private static string? _hostTheme;
+
+    public static JsonObject Expand(string templateJson, string dataJson, string hostTheme = "dark")
     {
         var data = JsonNode.Parse(dataJson)!.AsObject();
         var template = JsonNode.Parse(templateJson)!.AsObject();
-        var expanded = ExpandObject(template, data, data);
-        return expanded ?? throw new InvalidOperationException("the card root was removed by $when");
+        _hostTheme = hostTheme;
+        try
+        {
+            var expanded = ExpandObject(template, data, data);
+            return expanded ?? throw new InvalidOperationException("the card root was removed by $when");
+        }
+        finally
+        {
+            _hostTheme = null;
+        }
     }
 
     private static JsonObject? ExpandObject(JsonObject source, JsonObject scope, JsonObject root)
     {
-        if (source["$when"] is JsonValue when)
+        if (source["$when"] is JsonValue hostWhen && hostWhen.GetValue<string>() is DarkTheme or LightTheme)
+        {
+            var isDark = _hostTheme == "dark";
+            if ((hostWhen.GetValue<string>() == DarkTheme) != isDark)
+            {
+                return null;
+            }
+        }
+        else if (source["$when"] is JsonValue when)
         {
             var value = Resolve(BindingKey(when.GetValue<string>()), scope, root);
             if (value is not JsonValue v || !v.TryGetValue<bool>(out var keep))
@@ -157,7 +181,7 @@ internal static partial class CardTemplateHarness
 
     private static readonly HashSet<string> ElementTypes = new(StringComparer.Ordinal)
     {
-        "TextBlock", "RichTextBlock", "ColumnSet", "Container", "ActionSet"
+        "TextBlock", "RichTextBlock", "ColumnSet", "Container", "ActionSet", "Image"
     };
 
     private static readonly Dictionary<string, string[]> Enums = new(StringComparer.Ordinal)
@@ -168,8 +192,7 @@ internal static partial class CardTemplateHarness
         ["spacing"] = ["None", "Small", "Default", "Medium", "Large", "ExtraLarge", "Padding"],
         ["horizontalAlignment"] = ["Left", "Center", "Right"],
         ["verticalContentAlignment"] = ["Top", "Center", "Bottom"],
-        ["style"] = ["default", "heading"],
-        ["width"] = ["auto", "stretch"]
+        ["style"] = ["default", "heading"]
     };
 
     /// <summary>Returns every violation of the AC 1.6 subset the widget may use; empty = valid.</summary>
@@ -209,6 +232,7 @@ internal static partial class CardTemplateHarness
                     }
                     break;
                 case "Container":
+                    CheckBackground(e, p, errors);
                     if (e["items"] is not JsonArray items) errors.Add($"{p}: items");
                     else CheckElements(items, p + ".items", errors);
                     break;
@@ -223,8 +247,13 @@ internal static partial class CardTemplateHarness
                         }
 
                         CheckEnums(col, $"{p}.columns[{c}]", errors);
+                        CheckWidth(col["width"], $"{p}.columns[{c}]", errors);
                         CheckElements(colItems, $"{p}.columns[{c}].items", errors);
                     }
+                    break;
+                case "Image":
+                    if (e["url"] is not JsonValue url || !url.TryGetValue<string>(out _)) errors.Add($"{p}: Image.url");
+                    if (e["altText"] is not JsonValue alt || string.IsNullOrEmpty(alt.GetValue<string>())) errors.Add($"{p}: Image.altText");
                     break;
                 case "ActionSet":
                     if (e["actions"] is not JsonArray actions || actions.Count == 0) errors.Add($"{p}: actions");
@@ -232,6 +261,31 @@ internal static partial class CardTemplateHarness
                     break;
             }
         }
+    }
+
+    // Column width: "auto" | "stretch" | a positive weight (number). A weight of 0 is never emitted: the
+    // zero-weight column is removed by $when instead.
+    private static void CheckWidth(JsonNode? width, string path, List<string> errors)
+    {
+        switch (width)
+        {
+            case JsonValue v when v.TryGetValue<string>(out var s) && s is "auto" or "stretch":
+                return;
+            case JsonValue v when v.TryGetValue<int>(out var w) && w > 0:
+                return;
+            default:
+                errors.Add($"{path}: width={width?.ToJsonString()}");
+                return;
+        }
+    }
+
+    private static void CheckBackground(JsonObject e, string path, List<string> errors)
+    {
+        if (e["backgroundImage"] is null) return;
+        if (e["backgroundImage"] is not JsonObject bg || bg["url"] is not JsonValue || (string?)bg["fillMode"] is not ("repeat" or "cover"))
+            errors.Add($"{path}: backgroundImage");
+        if (e["minHeight"] is not JsonValue mh || !((string?)mh)!.EndsWith("px", StringComparison.Ordinal))
+            errors.Add($"{path}: a background bar needs minHeight in px");
     }
 
     private static void CheckAction(JsonNode? action, string path, List<string> errors)

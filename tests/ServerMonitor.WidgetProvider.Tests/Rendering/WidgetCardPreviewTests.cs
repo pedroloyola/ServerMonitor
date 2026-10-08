@@ -16,10 +16,11 @@ namespace ServerMonitor.WidgetProvider.Tests.Rendering;
 /// <list type="bullet">
 /// <item><c>.template.json</c> + <c>.data.json</c>, the exact pair the host receives (paste both into the
 /// Adaptive Cards Designer);</item>
-/// <item><c>.expanded.json</c>, the card as the test harness expands it.</item>
+/// <item><c>.expanded-dark.json</c> / <c>.expanded-light.json</c>, the card as the test harness expands it
+/// for each host theme.</item>
 /// </list>
-/// The templates carry no theme-dependent content (no images until C0), so one file per case serves both
-/// themes (DV-12). The real board stays NOT_RUN.
+/// UI.9 C3: the bars and the empty icon pick their constant image by <c>$host.hostTheme</c>, so each theme
+/// has its own expansion (this supersedes DV-12, one file for both themes). The real board stays NOT_RUN.
 /// </summary>
 public sealed class WidgetCardPreviewTests
 {
@@ -55,16 +56,17 @@ public sealed class WidgetCardPreviewTests
         var read = WidgetCardRendererTests.States().Single(s => s.State == state).Read;
         var strings = WidgetStrings.ForCulture(CultureInfo.GetCultureInfo(culture));
         var card = WidgetCardRenderer.Render(WidgetViewModelBuilder.Build(read, size, Now, strings));
-        var expanded = CardTemplateHarness.Expand(card.TemplateJson, card.DataJson);
-
-        Assert.Empty(CardTemplateHarness.ShapeErrors(expanded));
-
         var dir = Path.Combine(Path.GetTempPath(), "sm-widget-preview", "v3");
         Directory.CreateDirectory(dir);
         var stem = Path.Combine(dir, $"{size.ToString().ToLowerInvariant()}-{state}-{culture}");
         File.WriteAllText(stem + ".template.json", Indent(card.TemplateJson));
         File.WriteAllText(stem + ".data.json", Indent(card.DataJson));
-        File.WriteAllText(stem + ".expanded.json", expanded.ToJsonString(Pretty));
+        foreach (var theme in new[] { "dark", "light" })
+        {
+            var expanded = CardTemplateHarness.Expand(card.TemplateJson, card.DataJson, theme);
+            Assert.Empty(CardTemplateHarness.ShapeErrors(expanded));
+            File.WriteAllText($"{stem}.expanded-{theme}.json", expanded.ToJsonString(Pretty));
+        }
     }
 
     /// <summary>
@@ -100,15 +102,20 @@ public sealed class WidgetCardPreviewTests
             OverallHealth = Health.Healthy,
             Servers = servers
         });
-        var card = WidgetCardRenderer.Render(WidgetViewModelBuilder.Build(read, WidgetSizeHint.Medium, Now, strings));
-        var expanded = CardTemplateHarness.Expand(card.TemplateJson, card.DataJson);
+        var vm = WidgetViewModelBuilder.Build(read, WidgetSizeHint.Medium, Now, strings);
+        var card = WidgetCardRenderer.Render(vm);
 
-        Assert.Empty(CardTemplateHarness.ShapeErrors(expanded));
+        Assert.Equal(3, vm.Rows.Count); // C3: Medium shows the whole synthetic fleet (M = 3)
         Assert.Equal(strings.FleetAllHealthy, WidgetViewModelBuilder.Build(read, WidgetSizeHint.Small, Now, strings).Title);
 
         var dir = Path.Combine(Path.GetTempPath(), "sm-widget-preview", "picker");
         Directory.CreateDirectory(dir);
-        File.WriteAllText(Path.Combine(dir, $"medium-picker-{culture}.expanded.json"), expanded.ToJsonString(Pretty));
+        foreach (var theme in new[] { "dark", "light" })
+        {
+            var expanded = CardTemplateHarness.Expand(card.TemplateJson, card.DataJson, theme);
+            Assert.Empty(CardTemplateHarness.ShapeErrors(expanded));
+            File.WriteAllText(Path.Combine(dir, $"medium-picker-{culture}-{theme}.expanded.json"), expanded.ToJsonString(Pretty));
+        }
     }
 
     private static string Indent(string json)

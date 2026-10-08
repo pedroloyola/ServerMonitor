@@ -14,17 +14,55 @@ public static class WidgetLayout
     /// <para>
     /// These are HOST-CAPACITY limits that must be MEASURED on the real board, not chosen: the host gives
     /// each size a fixed card height and silently clips whatever does not fit (M13-QA-4/QA-5, P-017).
-    /// V3 targets 3 rows on Medium, but the legacy Medium measured 2 and the V3 proxy render leaves room
-    /// for only 2 (Prism P-C1-9). So Medium stays 2 until C0 measures it. Changing it here changes no
-    /// template byte; "N of M" and the truthful-degradation tests follow.
+    /// C0-online (Prism C0 debrief §2) measured 4 complete V3-geometry rows on Medium without heading/footer.
+    /// So Medium = 3 (Figma) with heading + footer, and Large = 3.
+    /// </para>
+    /// <para>
+    /// The V3 board check (V-2) uses the footer "N of M servers" as the control signal: if it is not fully
+    /// visible, Medium goes back to 2 HERE. That changes no template byte; "N of M" and the
+    /// truthful-degradation tests follow.
     /// </para>
     /// </summary>
     public static int MaxRowsFor(WidgetSizeHint size) => size switch
     {
         WidgetSizeHint.Large => 3,
-        WidgetSizeHint.Medium => 2,
+        WidgetSizeHint.Medium => 3,
         _ => 0
     };
+
+    /// <summary>How a metric is drawn under its "CPU 41%" text.</summary>
+    public enum MeterStyle
+    {
+        /// <summary>Continuous data-URI colour bars (Prism C0 debrief §1, FINAL).</summary>
+        Bars,
+
+        /// <summary>The ▰/▱ foreground glyph meter: the FALLBACK if the board shows the bars invisible or cut.</summary>
+        Glyphs
+    }
+
+    /// <summary>The seam: switching to <see cref="MeterStyle.Glyphs"/> here is the whole fallback.</summary>
+    public const MeterStyle Meter = MeterStyle.Bars;
+
+    /// <summary>Bar height per size (Figma 112:10278 Medium 4 px / 112:10387 Large 6 px).</summary>
+    public static string BarHeight(bool large) => large ? "6px" : "4px";
+
+    /// <summary>
+    /// The fill column WEIGHT of a bar for a DISPLAYED (rounded) percentage (Prism C0 debrief §1 `w` rule):
+    /// 0 → no fill (track only), 100 → fill only, 1–2 → 3 (a visible sliver), 98–99 → 97 (a visible
+    /// track), else the percentage itself. Full only at 100 %, never empty above 0 %. The track weight is
+    /// <c>100 − w</c>.
+    /// </summary>
+    public static int BarFillWeight(int percent)
+    {
+        var p = Math.Clamp(percent, 0, 100);
+        return p switch
+        {
+            0 or 100 => p,
+            <= 2 => 3,
+            >= 98 => 97,
+            _ => p
+        };
+    }
 
     /// <summary>Glyph meter segments. Pitch MEASURED on the board for the legacy ▮ (~13 px at Default);
     /// a V3 metric column is ~76–80 px, so 5 fit. C0 re-measures ▰/▱.</summary>

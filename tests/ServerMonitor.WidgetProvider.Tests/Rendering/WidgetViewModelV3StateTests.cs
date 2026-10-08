@@ -328,7 +328,7 @@ public sealed class WidgetViewModelV3StateTests
     }
 
     [Theory]
-    [InlineData(WidgetSizeHint.Medium, 5, "2 of 5 servers")]
+    [InlineData(WidgetSizeHint.Medium, 5, "3 of 5 servers")]
     [InlineData(WidgetSizeHint.Medium, 2, "2 of 2 servers")]
     [InlineData(WidgetSizeHint.Large, 1, "1 of 1 servers")]
     [InlineData(WidgetSizeHint.Large, 7, "3 of 7 servers")]

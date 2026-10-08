@@ -25,9 +25,12 @@ public sealed class TemplatingOracleTests
 {
     private static readonly DateTimeOffset Now = new(2026, 8, 30, 12, 0, 0, TimeSpan.Zero);
 
-    private static JsonNode OracleExpand(string templateJson, string dataJson)
+    // C3: the template reads $host.hostTheme (bar and icon variants), so the oracle gets the host context the
+    // board passes.
+    private static JsonNode OracleExpand(string templateJson, string dataJson, string hostTheme = "dark")
     {
-        var expanded = new AdaptiveCardTemplate(templateJson).Expand(new EvaluationContext { Root = dataJson });
+        var expanded = new AdaptiveCardTemplate(templateJson)
+            .Expand(new EvaluationContext(dataJson, "{\"hostTheme\":\"" + hostTheme + "\"}"));
         return JsonNode.Parse(expanded)!;
     }
 
@@ -53,16 +56,19 @@ public sealed class TemplatingOracleTests
                     var strings = WidgetStrings.ForCulture(CultureInfo.GetCultureInfo(culture));
                     var card = WidgetCardRenderer.Render(WidgetViewModelBuilder.Build(read, size, Now, strings));
 
-                    var oracle = Canonical(OracleExpand(card.TemplateJson, card.DataJson));
-                    var harness = Canonical(CardTemplateHarness.Expand(card.TemplateJson, card.DataJson));
+                    foreach (var theme in new[] { "dark", "light" })
+                    {
+                        var oracle = Canonical(OracleExpand(card.TemplateJson, card.DataJson, theme));
+                        var harness = Canonical(CardTemplateHarness.Expand(card.TemplateJson, card.DataJson, theme));
 
-                    Assert.True(oracle == harness, $"{size}/{state}/{culture}: oracle and harness differ\noracle:  {oracle}\nharness: {harness}");
-                    compared++;
+                        Assert.True(oracle == harness, $"{size}/{state}/{culture}/{theme}: oracle and harness differ\noracle:  {oracle}\nharness: {harness}");
+                        compared++;
+                    }
                 }
             }
         }
 
-        Assert.Equal(72, compared);
+        Assert.Equal(144, compared);
     }
 
     [Theory]

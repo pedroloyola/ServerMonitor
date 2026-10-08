@@ -152,6 +152,12 @@ public static class WidgetCardRenderer
         data[key + "HasTrack"] = filled < WidgetLayout.MeterSegments;
         data[key + "MeterFresh"] = hasMeter && !stale;
         data[key + "MeterStale"] = hasMeter && stale;
+
+        // Prism C0 §1 bars: two weighted columns. HasFill/HasTrack above hold for both meter styles (fill iff
+        // > 0 %, track iff < 100 %), so the bar never draws a zero-weight column.
+        var weight = metric.Percent is { } p ? WidgetLayout.BarFillWeight(p) : 0;
+        data[key + "FillW"] = weight;
+        data[key + "TrackW"] = 100 - weight;
     }
 
     private static string Glyphs(string glyph, int count) =>
@@ -206,14 +212,17 @@ public static class WidgetCardRenderer
                     {
                         Text("fraction", size: "ExtraLarge", weight: "Bolder", color: "${stateColor}")
                     }, verticalAlignment: "Center"),
+                    // Prism C0 §3/§4: the Small title is Medium Bolder WITHOUT style:heading, and nothing in the
+                    // Small card wraps. The board leaves ~85 px under the header and clips SILENTLY, and this
+                    // layout needs 64 px only if no line wraps; an elided title still leads with the count.
                     Column("stretch", new JsonArray
                     {
-                        Heading("title"),
-                        When("hasSubtitle", Text("subtitle", size: "Small", subtle: true, wrap: true, spacingNone: true))
+                        Text("title", size: "Medium", weight: "Bolder"),
+                        When("hasSubtitle", Text("subtitle", size: "Small", subtle: true, spacingNone: true))
                     }, verticalAlignment: "Center")
                 }
             },
-            Text("footer", size: "Small", subtle: true)
+            Text("footer", size: "Small", subtle: true, spacing: "Small")
         }
     });
 
@@ -317,11 +326,21 @@ public static class WidgetCardRenderer
                     Run(key + "Value", size: "Small", weight: "Bolder")
                 }
             },
-            // Fresh: neutral accent fill + subtle track. Stale: both subtle (muted, Prism RC-7). Unknown /
-            // hidden (Offline, Unknown): neither — no meter at all, never a 0 % track.
-            When(key + "MeterFresh", Meter(key, fillColor: WidgetLayout.MeterFillColor, fillSubtle: false)),
-            When(key + "MeterStale", Meter(key, fillColor: null, fillSubtle: true))
         };
+
+        // Unknown / hidden (Offline, Unknown): no meter at all, never a 0 % track (D-17).
+        if (WidgetLayout.Meter == WidgetLayout.MeterStyle.Bars)
+        {
+            // Fresh: the METRIC colour (never a state colour, RC-7). Stale: muted fill. Theme by $host.
+            items.Add(When(key + "MeterFresh", Bar(key, large, stale: false)));
+            items.Add(When(key + "MeterStale", Bar(key, large, stale: true)));
+        }
+        else
+        {
+            // Fallback (c): neutral accent fill + subtle track; stale = both subtle.
+            items.Add(When(key + "MeterFresh", Meter(key, fillColor: WidgetLayout.MeterFillColor, fillSubtle: false)));
+            items.Add(When(key + "MeterStale", Meter(key, fillColor: null, fillSubtle: true)));
+        }
 
         if (large)
         {
@@ -332,6 +351,70 @@ public static class WidgetCardRenderer
         }
 
         return Column("stretch", items);
+    }
+
+    // ---- Continuous bar (Prism C0 §1): ColumnSet of a weighted fill column + a weighted track column, each
+    // a Container of minHeight with a 1x1 constant data-URI backgroundImage repeated. The URL is a LITERAL
+    // WidgetImages constant chosen by $when on $host.hostTheme — never bound from data (Vigil C0 §2).
+    private static JsonObject Bar(string key, bool large, bool stale)
+    {
+        var (fillDark, fillLight) = stale
+            ? (WidgetImages.BarStaleDark, WidgetImages.BarStaleLight)
+            : key switch
+            {
+                "cpu" => (WidgetImages.BarCpuDark, WidgetImages.BarCpuLight),
+                "mem" => (WidgetImages.BarRamDark, WidgetImages.BarRamLight),
+                _ => (WidgetImages.BarDiskDark, WidgetImages.BarDiskLight)
+            };
+
+        return new JsonObject
+        {
+            ["type"] = "Container",
+            ["spacing"] = "Small",
+            ["items"] = new JsonArray
+            {
+                WhenTheme(dark: true, BarColumns(key, large, fillDark, WidgetImages.BarTrackDark)),
+                WhenTheme(dark: false, BarColumns(key, large, fillLight, WidgetImages.BarTrackLight))
+            }
+        };
+    }
+
+    private static JsonObject BarColumns(string key, bool large, string fill, string track) => new()
+    {
+        ["type"] = "ColumnSet",
+        ["spacing"] = "None",
+        ["columns"] = new JsonArray
+        {
+            When(key + "HasFill", BarColumn(key + "FillW", large, fill)),
+            When(key + "HasTrack", BarColumn(key + "TrackW", large, track))
+        }
+    };
+
+    private static JsonObject BarColumn(string weightKey, bool large, string url) => new()
+    {
+        ["type"] = "Column",
+        ["width"] = Bind(weightKey),
+        ["spacing"] = "None",
+        ["items"] = new JsonArray
+        {
+            new JsonObject
+            {
+                ["type"] = "Container",
+                ["minHeight"] = WidgetLayout.BarHeight(large),
+                ["backgroundImage"] = new JsonObject { ["url"] = url, ["fillMode"] = "repeat" },
+                ["items"] = new JsonArray()
+            }
+        }
+    };
+
+    /// <summary>
+    /// Host-theme selection (proven on the board, P-theme / P-D): dark when the host says "dark", the light
+    /// set for anything else, so a future host theme still gets a legible bar.
+    /// </summary>
+    private static JsonObject WhenTheme(bool dark, JsonObject element)
+    {
+        element["$when"] = dark ? "${$host.hostTheme == 'dark'}" : "${$host.hostTheme != 'dark'}";
+        return element;
     }
 
     private static JsonObject Meter(string key, string? fillColor, bool fillSubtle) => new()
@@ -348,10 +431,19 @@ public static class WidgetCardRenderer
     // ---- Empty: title (+ body on M/L) + the dashboard CTA (D2 = openDashboard, label "Open ServerAlyzer").
     private static JsonObject EmptyState(WidgetSizeHint size)
     {
-        var items = new JsonArray { Heading("title", center: true) };
+        var items = new JsonArray();
         if (size != WidgetSizeHint.Small)
         {
+            // Prism C0 §5: ServerStack01 40x40 above the title, M/L only. Decorative; its altText is the
+            // empty-state title (from WidgetStrings), so a screen reader hears no new or invented text.
+            items.Add(WhenTheme(dark: true, EmptyIcon(WidgetImages.EmptyIconDark)));
+            items.Add(WhenTheme(dark: false, EmptyIcon(WidgetImages.EmptyIconLight)));
+            items.Add(Heading("title", center: true));
             items.Add(Text("body", size: "Small", subtle: true, wrap: true, horizontalAlignment: "Center"));
+        }
+        else
+        {
+            items.Add(Text("title", size: "Medium", weight: "Bolder", horizontalAlignment: "Center")); // C0 §4: no heading on S
         }
 
         items.Add(new JsonObject
@@ -372,6 +464,16 @@ public static class WidgetCardRenderer
         return When("isEmpty", new JsonObject { ["type"] = "Container", ["items"] = items });
     }
 
+    private static JsonObject EmptyIcon(string url) => new()
+    {
+        ["type"] = "Image",
+        ["url"] = url,
+        ["width"] = "40px",
+        ["height"] = "40px",
+        ["horizontalAlignment"] = "Center",
+        ["altText"] = Bind("title")
+    };
+
     // ---- Unavailable: neutral title + body, no CTA (SPEC §3); the card still opens the Dashboard. ----
     private static JsonObject UnavailableState(WidgetSizeHint size)
     {
@@ -380,7 +482,8 @@ public static class WidgetCardRenderer
             ["type"] = "Container",
             ["items"] = new JsonArray
             {
-                Heading("title"),
+                // C0 §4: style:heading on M/L only; the Small title is Medium Bolder and does not wrap.
+                size == WidgetSizeHint.Small ? Text("title", size: "Medium", weight: "Bolder") : Heading("title"),
                 Text("body", size: "Small", subtle: true, wrap: true)
             }
         };
@@ -460,7 +563,8 @@ public static class WidgetCardRenderer
         bool wrap = false,
         bool spacingNone = false,
         string? horizontalAlignment = null,
-        string? style = null)
+        string? style = null,
+        string? spacing = null)
     {
         var node = new JsonObject
         {
@@ -498,6 +602,10 @@ public static class WidgetCardRenderer
         if (spacingNone)
         {
             node["spacing"] = "None";
+        }
+        else if (spacing is not null)
+        {
+            node["spacing"] = spacing;
         }
 
         if (horizontalAlignment is not null)
