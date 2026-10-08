@@ -910,6 +910,10 @@ public sealed class TrayOwnershipCompletenessTests
         {
         }
 
+        public void RestoreAndActivateStandard()
+        {
+        }
+
         public void OpenSettings()
         {
         }

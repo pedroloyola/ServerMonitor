@@ -217,6 +217,10 @@ public sealed class WindowModeCoordinatorTests
 
         public WindowMode LastPresenterMode { get; private set; }
 
+        public List<(WindowMode Mode, WindowSizeConstraints Constraints)> PresenterCalls { get; } = [];
+
+        public WindowFrame Frame { get; set; } = WindowFrame.None;
+
         public bool AlwaysOnTop { get; private set; }
 
         public bool IsAttached => true;
@@ -233,10 +237,25 @@ public sealed class WindowModeCoordinatorTests
             CurrentBounds = bounds; // the window moves to where it was told
         }
 
-        public void ConfigurePresenter(WindowMode mode, WindowSizeConstraints constraints) =>
+        public void ConfigurePresenter(WindowMode mode, WindowSizeConstraints constraints)
+        {
             LastPresenterMode = mode;
+            PresenterCalls.Add((mode, constraints));
+        }
+
+        public WindowFrame GetFrame() => Frame;
 
         public void SetAlwaysOnTop(bool enabled) => AlwaysOnTop = enabled;
+
+        public bool IsMaximized => false;
+
+        public void Restore()
+        {
+        }
+
+        public void Maximize()
+        {
+        }
     }
 
     private sealed class FakeStore(WindowPlacementSettings? initial = null) : IWindowPlacementStore

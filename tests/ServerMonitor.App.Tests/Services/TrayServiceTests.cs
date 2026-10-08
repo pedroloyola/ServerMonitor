@@ -293,6 +293,8 @@ public sealed class TrayServiceTests
         public void HideForMinimize() => HideCount++;
         public void RestoreAndActivate() => RestoreCount++;
 
+        public void RestoreAndActivateStandard() { }
+
         public event Action? BackgroundSettingsOpened;
         public void OpenSettings() => SettingsCount++;
         public void ToggleCompactMode() => ToggleCompactCount++;

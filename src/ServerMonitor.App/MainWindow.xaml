@@ -2,7 +2,8 @@
     x:Class="ServerMonitor.App.MainWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:controls="using:ServerMonitor.App.Controls">
+    xmlns:controls="using:ServerMonitor.App.Controls"
+    xmlns:primitives="using:ServerMonitor.App.Controls.Primitives">
     <Grid
         x:Name="RootLayout"
         Background="Transparent">
@@ -26,117 +27,51 @@
         </Grid>
 
         <!-- ============================ COMPACT PRESENTATION ============================ -->
-        <!-- The same window; DataContext for the chrome/empty-state is the WindowModeViewModel and
-             for the server list the shared DashboardViewModel — both wired in code-behind. -->
+        <!-- UI.8 (Figma 05 sec. 15, 112:9397 / 112:9589): the same window, client 432x704 DIP by default. Title strip = band
+             0-60 (p20 + 40; brand and "Expandir" centred on y40, Prism R-3) left of the measured native caption reserve
+             (CompactCaptionColumn, Min/Close stay native: G-3). The body is CompactShell (p20, 16 below the strip). -->
         <Grid x:Name="CompactRoot" Visibility="Collapsed">
             <Grid.RowDefinitions>
-                <RowDefinition Height="44" />
+                <RowDefinition Height="60" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
-            <!-- Compact title bar: col0 is the drag handle (SetTitleBar); col1 holds the custom
-                 controls (kept clickable, outside the drag region); col2 reserves exactly the native
-                 caption-button width, sized at runtime from AppWindow.TitleBar.RightInset (DPI-aware),
-                 so the custom controls never sit under Minimize/Maximize/Close. -->
-            <Grid
-                Grid.Row="0"
-                Background="{ThemeResource TitleBarSurfaceBrush}">
+            <Grid Grid.Row="0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition x:Name="CompactCaptionColumn" Width="96" />
                 </Grid.ColumnDefinitions>
 
-                <Grid
-                    x:Name="CompactDragRegion"
-                    Padding="14,0,0,0"
-                    Background="Transparent">
-                    <StackPanel
-                        VerticalAlignment="Center"
-                        Orientation="Horizontal"
-                        Spacing="9">
-                        <Border
-                            Width="20"
-                            Height="20"
-                            Background="{ThemeResource AccentSoftBrush}"
-                            CornerRadius="6">
-                            <FontIcon
-                                FontSize="10"
-                                Foreground="{ThemeResource AccentTextBrush}"
-                                Glyph="&#xE9D9;" />
-                        </Border>
-                        <TextBlock
-                            x:Uid="AppNameText"
-                            VerticalAlignment="Center"
-                            FontFamily="Segoe UI Variable Text"
-                            FontSize="12"
-                            FontWeight="SemiBold"
-                            TextTrimming="CharacterEllipsis" />
-                    </StackPanel>
+                <!-- The drag handle (SetTitleBar): the whole strip left of the button. Mark 23 · g12 · wordmark (trims, then
+                     collapses below its minimum); priority captions > Expandir > mark > wordmark (CompactTitleLayout). -->
+                <Grid x:Name="CompactDragRegion" Padding="{StaticResource SaCompactTitlePadding}" Background="Transparent">
+                    <!-- A Grid, not a StackPanel: the wordmark gets the remaining width, so it trims with an ellipsis (never clipped). -->
+                    <Grid x:Name="CompactBrand" Height="40" ColumnSpacing="{StaticResource SaSpace12}" VerticalAlignment="Top">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <primitives:SaBrandMark x:Name="CompactBrandMark" Size="23" VerticalAlignment="Center" />
+                        <TextBlock x:Name="CompactWordmark" x:Uid="AppNameText" Grid.Column="1" VerticalAlignment="Center" Style="{StaticResource SaBrandTextStyle}"
+                                   Foreground="{ThemeResource SaTextBrush}" TextWrapping="NoWrap" MaxLines="1" TextTrimming="CharacterEllipsis"
+                                   AutomationProperties.AccessibilityView="Raw" />
+                    </Grid>
                 </Grid>
 
-                <StackPanel
-                    Grid.Column="1"
-                    Margin="2,0,4,0"
-                    VerticalAlignment="Center"
-                    Orientation="Horizontal"
-                    Spacing="2">
-                    <ToggleButton
-                        x:Name="AlwaysOnTopToggle"
-                        x:Uid="CompactAlwaysOnTopToggle"
-                        Width="30"
-                        Height="30"
-                        Padding="0"
-                        IsChecked="{Binding CompactAlwaysOnTop, Mode=TwoWay}"
-                        Style="{StaticResource CompactChromeToggleStyle}">
-                        <FontIcon FontSize="12" Glyph="&#xE718;" />
-                    </ToggleButton>
-                    <Button
-                        x:Uid="CompactExpandButton"
-                        Width="30"
-                        Height="30"
-                        Padding="0"
-                        Command="{Binding ExitCompactCommand}"
-                        Style="{StaticResource SubtleIconButtonStyle}">
-                        <FontIcon FontSize="12" Glyph="&#xE740;" />
-                    </Button>
-                </StackPanel>
+                <!-- "Expandir ›" 112:9430: hugs its content (not 126 fixed, R-3); icon-only 36x36 below the MEASURED threshold,
+                     same accessible name + tooltip. -->
+                <Button x:Name="CompactExpandButton" x:Uid="CompactExpandButton" Grid.Column="1" Margin="0,20,0,0" VerticalAlignment="Center"
+                        Style="{StaticResource SaCompactButtonStyle}" Command="{x:Bind ModeView.ExitCompactCommand}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <TextBlock x:Name="CompactExpandText" x:Uid="CompactExpandButtonText" VerticalAlignment="Center" TextWrapping="NoWrap" />
+                        <primitives:SaIcon Data="{StaticResource SaIconArrowRight01Data}" Size="16" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
             </Grid>
 
-            <!-- Compact body: server list (bound to the shared DashboardViewModel) + empty state. -->
-            <Grid x:Name="CompactBody" Grid.Row="1" Padding="12,4,12,12">
-                <ScrollViewer
-                    Padding="0,0,2,0"
-                    VerticalScrollBarVisibility="Auto"
-                    Visibility="{Binding HasVisibleServers, Converter={StaticResource BooleanToVisibilityConverter}}">
-                    <ItemsControl AutomationProperties.LiveSetting="Polite" ItemsSource="{Binding VisibleServers}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <controls:ServerCompactCard />
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </ScrollViewer>
-
-                <StackPanel
-                    HorizontalAlignment="Center"
-                    VerticalAlignment="Center"
-                    MaxWidth="280"
-                    Spacing="12"
-                    Visibility="{Binding HasVisibleServers, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Invert}">
-                    <TextBlock
-                        x:Uid="CompactEmptyTitle"
-                        HorizontalAlignment="Center"
-                        FontSize="14"
-                        FontWeight="SemiBold"
-                        TextAlignment="Center"
-                        TextWrapping="Wrap" />
-                    <Button
-                        x:Uid="CompactEmptyAction"
-                        HorizontalAlignment="Center"
-                        Command="{Binding ElementName=CompactRoot, Path=DataContext.ExitCompactCommand}"
-                        Style="{StaticResource QuietPillButtonStyle}" />
-                </StackPanel>
+            <Grid x:Name="CompactBody" Grid.Row="1" Padding="{StaticResource SaCompactBodyPadding}">
+                <controls:CompactShell x:Name="CompactShellView" />
             </Grid>
         </Grid>
         <!-- Full-window modal, above Standard/onboarding/Compact and the drag surface. -->

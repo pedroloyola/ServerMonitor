@@ -118,8 +118,6 @@ public sealed class ServerCardViewModel : ObservableObject
 
     public ServerHealth Health => _monitoringState.Health;
 
-    public string HealthDisplayName => _localizationService.GetString($"ServerHealth{Health}");
-
     public bool IsRefreshingMetrics => _monitoringState.IsRefreshing;
 
     public bool IsStale => _monitoringState.IsStale;
@@ -290,7 +288,6 @@ public sealed class ServerCardViewModel : ObservableObject
     private void NotifyPresentationChanged()
     {
         OnPropertyChanged(nameof(Health));
-        OnPropertyChanged(nameof(HealthDisplayName));
         OnPropertyChanged(nameof(IsRefreshingMetrics));
         OnPropertyChanged(nameof(IsStale));
         OnPropertyChanged(nameof(ConsecutiveFailures));

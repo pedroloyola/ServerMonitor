@@ -44,6 +44,19 @@ internal static class QaShellStartup
                 : "With --qa-editor, --qa-start must be editor-add, editor-import or editor-edit:<n> (n within the seed); --qa-activation is not supported.";
         }
 
+        // UI.8 RC-4 QA: the compact harness takes an external activation (never --qa-start; it has --qa-compact-start),
+        // resolved against its own scenario's visible servers - e.g. --background + Compact + a server deep-link.
+        if (args.Contains(QaCompactComposition.LaunchFlag, StringComparer.Ordinal))
+        {
+            if (start) return "With --qa-compact, --qa-start is not supported (use --qa-compact-start); only --qa-activation is.";
+            if (QaCompactComposition.Parse(args) is not { } launch) return "Malformed --qa-compact launch.";
+            var compactValue = Value(args, ActivationFlag);
+            var visible = QaCompactCatalog.Build(launch.Scenario).Servers.Count(s => !s.IsHidden);
+            return compactValue == "dashboard" || (compactValue is not null && Index(compactValue, "server:", visible) is not null)
+                ? null
+                : "With --qa-compact, --qa-activation must be dashboard or server:<n> (n within the scenario's visible servers).";
+        }
+
         if (!args.Contains(QaOverviewComposition.LaunchFlag, StringComparer.Ordinal) || (start && activation))
             return "Shell modifiers require --qa-overview and are mutually exclusive.";
         var scenario = QaOverviewScenarioPolicy.ResolveScenario(args, true)
@@ -64,8 +77,10 @@ internal static class QaShellStartup
         if (Refusal(args) is { } refusal) throw new ArgumentException(refusal);
         var value = Value(args, ActivationFlag)!;
         if (value == "dashboard") return ActivationIntent.Dashboard;
-        var servers = QaOverviewCatalog.Build(QaOverviewComposition.RequestedScenario(args)).Servers.Where(s => !s.Server.IsHidden).ToArray();
-        return ActivationIntent.Server(servers[Index(value, "server:", servers.Length)!.Value - 1].Server.Id);
+        var servers = args.Contains(QaCompactComposition.LaunchFlag, StringComparer.Ordinal)
+            ? QaCompactCatalog.Build(QaCompactComposition.Parse(args)!.Scenario).Servers.Where(s => !s.IsHidden).Select(s => s.Id).ToArray()
+            : QaOverviewCatalog.Build(QaOverviewComposition.RequestedScenario(args)).Servers.Where(s => !s.Server.IsHidden).Select(s => s.Server.Id).ToArray();
+        return ActivationIntent.Server(servers[Index(value, "server:", servers.Length)!.Value - 1]);
     }
 
     // The editor opens over the Visão geral (its origin); an Edit opens from the seeded server's Detail page, the only Edit

@@ -704,7 +704,7 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
 
     private static Change Map(string? cardProperty) => cardProperty switch
     {
-        nameof(ServerCardViewModel.Health) or nameof(ServerCardViewModel.HealthDisplayName)
+        nameof(ServerCardViewModel.Health)
             => Change.Status | Change.Reading | Change.State,
         nameof(ServerCardViewModel.CpuUsageDisplay) or nameof(ServerCardViewModel.HasCpuPercent)
             or nameof(ServerCardViewModel.CpuUsageValue) or nameof(ServerCardViewModel.HasCpuUsage) => Change.Cpu,

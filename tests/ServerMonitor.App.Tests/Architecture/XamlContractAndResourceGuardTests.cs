@@ -33,8 +33,13 @@ public sealed partial class XamlContractAndResourceGuardTests
         ["MainWindow.xaml"] =
         [
             "RootLayout", "WindowBackground", "StandardRoot", "ShellDragRegion", "ShellSurface", "Sidebar", "FirstRunView", "SidebarColumn", "ContentFrame", "ModalOverlayHost",
-            "CompactRoot", "CompactCaptionColumn", "CompactDragRegion", "CompactBody"
+            "CompactRoot", "CompactCaptionColumn", "CompactDragRegion", "CompactBody",
+            // UI.8: the title strip's measured layout (CompactTitleLayout) and the Compact body host.
+            "CompactBrandMark", "CompactWordmark", "CompactExpandButton", "CompactExpandText", "CompactShellView"
         ],
+        // UI.8: the window focuses the first visible row (measured against ListScroller, c3 B-6) / the state's real action
+        // when Compact opens (RC-8).
+        ["Controls/CompactShell.xaml"] = ["CompactRepeater", "ListScroller", "AddServerButton", "ManageHiddenButton"],
         // UI.4: adaptive VisualState setters reflow these; OverviewSearchBox also takes focus after "Limpar pesquisa";
         // Beacon r1: the code-behind focuses the content / the return target (HealthCard … EmptyAddButton).
         ["Views/DashboardPage.xaml"] = ["FirstServerStateBlock", "HiddenStateBlock", "PageViewport", "PageRoot", "HeaderGrid", "HeaderActions", "HealthRow", "HealthColumn2", "HealthCountRow", "HealthSegments",
@@ -144,7 +149,9 @@ public sealed partial class XamlContractAndResourceGuardTests
             "RootGrid", "KeyColumn", "PART_Key", "PART_Value", "PART_Fill", "PART_Track", "PART_Text", "PART_Icon", "PART_Chevron",
             "PART_Detail", "PART_Trailing", "PART_InfoLayout", "PART_ErrorLayout", "PART_ErrorTitle", "PART_CloseButton", "PART_Parent",
             // UI.5 SaSegmentMeter / SaPulseBars: the host the code fills and the theme-aware brush sources it binds to.
-            "PART_Host", "PART_LitBrush", "PART_EmptyBrush", "PART_BarBrush"
+            "PART_Host", "PART_LitBrush", "PART_EmptyBrush", "PART_BarBrush",
+            // UI.8 SaCompactRowButtonStyle: the hover / pressed veil targeted by its VisualState setters.
+            "StateOverlay"
         ],
         // UI.2 S4 control templates: names targeted by VisualState setters / storyboards (G-3).
         // UI.7 final c2 (Prism C2-4): the inset list row template (selected / hover overlays over the tint).

@@ -22,9 +22,28 @@ public interface IWindowPlacementAdapter
     /// <summary>Moves and resizes the window to the given physical rectangle in one operation.</summary>
     void ApplyBounds(WindowBounds bounds);
 
-    /// <summary>Applies the presenter capabilities for a mode (resizable/maximizable + min size).</summary>
+    /// <summary>
+    /// Applies the presenter capabilities for a mode: resizable in both modes, maximizable only in Standard. The size
+    /// envelope itself is enforced by the window from <see cref="IWindowModeCoordinator.CurrentSizeLimits"/> (UI.8 RC-2
+    /// fallback: the presenter's own min/max units could not be established, so they are never set).
+    /// </summary>
     void ConfigurePresenter(WindowMode mode, WindowSizeConstraints constraints);
+
+    /// <summary>
+    /// The non-client size (outer minus client) at the window's current DPI, or <see cref="WindowFrame.None"/> when it
+    /// cannot be measured. Read after <see cref="ConfigurePresenter"/>, whose resizability changes the frame.
+    /// </summary>
+    WindowFrame GetFrame();
 
     /// <summary>Pins or unpins the window above others using the presenter's supported flag (no polling).</summary>
     void SetAlwaysOnTop(bool enabled);
+
+    /// <summary>True when the presenter is in the Maximized state.</summary>
+    bool IsMaximized { get; }
+
+    /// <summary>Returns a maximized window to the Restored state (its last restored bounds).</summary>
+    void Restore();
+
+    /// <summary>Maximizes the window (Standard only; its restored rect is kept by the presenter).</summary>
+    void Maximize();
 }

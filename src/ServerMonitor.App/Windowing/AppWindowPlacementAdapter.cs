@@ -129,10 +129,31 @@ public sealed class AppWindowPlacementAdapter(ILogger<AppWindowPlacementAdapter>
         var isStandard = mode == WindowMode.Standard;
         presenter.SetBorderAndTitleBar(hasBorder: true, hasTitleBar: true);
         presenter.IsMinimizable = true;
-        // Compact is a fixed-footprint utility widget: non-resizable and non-maximizable keeps its
-        // layout predictable and removes the maximize caption button for a widget-like chrome.
-        presenter.IsResizable = isStandard;
+        // UI.8 D-UI8-1: Compact is resizable INSIDE its envelope (the window enforces min/max on every size change) and
+        // never maximizable, which also removes the maximize caption button for a widget-like chrome. The presenter's
+        // PreferredMinimum*/PreferredMaximum* are deliberately left unset (RC-2 spike: their unit could not be proven).
+        presenter.IsResizable = true;
         presenter.IsMaximizable = isStandard;
+    }
+
+    public WindowFrame GetFrame()
+    {
+        if (_appWindow is null)
+        {
+            return WindowFrame.None;
+        }
+
+        var outer = _appWindow.Size;
+        var client = _appWindow.ClientSize;
+        if (outer.Width <= 0 || outer.Height <= 0 || client.Width <= 0 || client.Height <= 0)
+        {
+            return WindowFrame.None;
+        }
+
+        return new WindowFrame(
+            Math.Max(0, outer.Width - client.Width),
+            Math.Max(0, outer.Height - client.Height),
+            GetWindowDpiScalePercent());
     }
 
     public void SetAlwaysOnTop(bool enabled)
@@ -140,6 +161,24 @@ public sealed class AppWindowPlacementAdapter(ILogger<AppWindowPlacementAdapter>
         if (_appWindow?.Presenter is OverlappedPresenter presenter)
         {
             presenter.IsAlwaysOnTop = enabled;
+        }
+    }
+
+    public bool IsMaximized => _appWindow?.Presenter is OverlappedPresenter { State: OverlappedPresenterState.Maximized };
+
+    public void Restore()
+    {
+        if (_appWindow?.Presenter is OverlappedPresenter { State: OverlappedPresenterState.Maximized } presenter)
+        {
+            presenter.Restore();
+        }
+    }
+
+    public void Maximize()
+    {
+        if (_appWindow?.Presenter is OverlappedPresenter { IsMaximizable: true, State: not OverlappedPresenterState.Maximized } presenter)
+        {
+            presenter.Maximize();
         }
     }
 

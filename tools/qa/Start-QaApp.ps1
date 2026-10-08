@@ -4,7 +4,7 @@
 
 .DESCRIPTION
     Refuses BEFORE Start-Process unless the arguments select an isolated mode:
-      - at least one EXACT data-harness flag (or the documented --qa-compact:<digits>), or an EXACT gallery flag
+      - at least one EXACT data-harness flag (UI.8 retired the --qa-compact:<digits> form), or an EXACT gallery flag
         (--qa-components / --qa-tokens; the gallery's own policy then owns its options), and
       - every other argument starting with --qa is an exact harness flag or a well-formed modifier
         ('flag value' or 'flag=value'), when not in gallery mode.
@@ -40,10 +40,14 @@ $ErrorActionPreference = 'Stop'
 
 # Mirrors QaStartupIsolation (tested against it).
 $HarnessFlags = @('--qa-health', '--qa-discovery', '--qa-notifications', '--qa-compact', '--qa-history', '--qa-workloads', '--qa-store-screenshot', '--qa-proxyjump', '--qa-overview', '--qa-editor')
-$ModifierFlags = @('--qa-ssh-config', '--qa-ui-language', '--qa-backup', '--qa-proxyjump-dir', '--qa-overview-scenario', '--qa-start', '--qa-activation', '--qa-editor-seed', '--qa-editor-ssh', '--qa-editor-save')
+$ModifierFlags = @('--qa-ssh-config', '--qa-ui-language', '--qa-backup', '--qa-proxyjump-dir', '--qa-overview-scenario', '--qa-start', '--qa-activation', '--qa-editor-seed', '--qa-editor-ssh', '--qa-editor-save', '--qa-compact-scenario', '--qa-compact-start', '--qa-compact-ticker')
 $GalleryFlags = @('--qa-components', '--qa-tokens')
+# UI.8 (Atlas c1 A-4): the compact harness's value rules, mirrored from QaCompactComposition / QaShellStartup so the launcher
+# refuses what the app refuses (exit 3) instead of starting it. 'scenario=visible servers', as QaCompactCatalog (tested).
+$CompactScenarios = @('empty=0', 'one=1', 'many=12', 'mixed=8', 'figma=6', 'offline=3', 'stale=3', 'loading=0', 'all-hidden=0', 'config-unavailable=0', 'long-names=4', 'n20=20', 'n100=100', 'n200=200')
+$CompactModifiers = @('--qa-compact-scenario', '--qa-compact-start', '--qa-compact-ticker')
 
-function Test-IsHarness([string]$a) { ($HarnessFlags -ccontains $a) -or ($a -cmatch '^--qa-compact:\d{1,4}$') }
+function Test-IsHarness([string]$a) { $HarnessFlags -ccontains $a }
 function Test-IsModifier([string]$a) {
     foreach ($flag in $ModifierFlags) {
         if ($a -ceq $flag -or ($a.StartsWith("$flag=", [StringComparison]::Ordinal) -and $a.Length -gt $flag.Length + 1)) { return $true }
@@ -61,7 +65,66 @@ function Get-QaLaunchRefusal([string[]]$arguments) {
     if (($qa -ccontains '--qa-editor') -and @($qa | Where-Object { $_ -ceq '--qa-activation' -or $_.StartsWith('--qa-activation=', [StringComparison]::Ordinal) }).Count -gt 0) {
         return '--qa-activation is not supported with --qa-editor (the app refuses it too: exit 3, no window)'
     }
+    $compactRefusal = Get-QaCompactRefusal $arguments
+    if ($compactRefusal) { return $compactRefusal }
     $null
+}
+
+function Test-IsFlagOccurrence([string]$a, [string]$flag) { $a -ceq $flag -or $a.StartsWith("$flag=", [StringComparison]::Ordinal) }
+
+# QaCompactComposition.TryValue: at most once; 'flag value' (the next argument, not itself a switch) or 'flag=value'.
+function Get-QaCompactValue([string[]]$arguments, [string]$flag) {
+    $hits = @($arguments | Where-Object { Test-IsFlagOccurrence $_ $flag })
+    if ($hits.Count -eq 0) { return @{ Present = $false } }
+    if ($hits.Count -gt 1) { return @{ Present = $true; Refusal = "$flag may appear only once" } }
+    for ($i = 0; $i -lt $arguments.Count; $i++) {
+        if ($arguments[$i] -ceq $flag) {
+            $next = if ($i + 1 -lt $arguments.Count -and -not $arguments[$i + 1].StartsWith('--', [StringComparison]::Ordinal)) { $arguments[$i + 1] } else { $null }
+            if ([string]::IsNullOrEmpty($next)) { return @{ Present = $true; Refusal = "$flag needs a value" } }
+            return @{ Present = $true; Value = $next }
+        }
+        if ($arguments[$i].StartsWith("$flag=", [StringComparison]::Ordinal)) {
+            $value = $arguments[$i].Substring($flag.Length + 1)
+            if ([string]::IsNullOrEmpty($value)) { return @{ Present = $true; Refusal = "$flag needs a value" } }
+            return @{ Present = $true; Value = $value }
+        }
+    }
+    @{ Present = $false }
+}
+
+function Get-QaCompactRefusal([string[]]$arguments) {
+    $isCompact = $arguments -ccontains '--qa-compact'
+    $present = @($CompactModifiers | Where-Object { $flag = $_; @($arguments | Where-Object { Test-IsFlagOccurrence $_ $flag }).Count -gt 0 })
+    if (-not $isCompact) {
+        if ($present.Count -gt 0) { return "$($present -join ', ') only applies to --qa-compact" }
+        return $null
+    }
+    $scenario = 'figma'
+    foreach ($flag in $CompactModifiers) {
+        $v = Get-QaCompactValue $arguments $flag
+        if ($v.Refusal) { return $v.Refusal }
+        if (-not $v.Present) { continue }
+        switch ($flag) {
+            '--qa-compact-scenario' {
+                if (-not ($CompactScenarios | Where-Object { $_.Split('=')[0] -ceq $v.Value })) { return "--qa-compact-scenario needs one of: $(($CompactScenarios | ForEach-Object { $_.Split('=')[0] }) -join ', ')" }
+                $scenario = $v.Value
+            }
+            '--qa-compact-start' { if (@('compact', 'standard') -cnotcontains $v.Value) { return '--qa-compact-start needs one of: compact, standard' } }
+            '--qa-compact-ticker' { if (@('identical', 'varying') -cnotcontains $v.Value) { return '--qa-compact-ticker needs one of: identical, varying' } }
+        }
+    }
+    # QaShellStartup.Refusal, compact branch: never --qa-start; --qa-activation=dashboard|server:<n> over the visible servers.
+    if (@($arguments | Where-Object { Test-IsFlagOccurrence $_ '--qa-start' }).Count -gt 0) { return 'With --qa-compact, --qa-start is not supported (use --qa-compact-start)' }
+    $activations = @($arguments | Where-Object { Test-IsFlagOccurrence $_ '--qa-activation' })
+    if ($activations.Count -eq 0) { return $null }
+    $visible = [int](($CompactScenarios | Where-Object { $_.Split('=')[0] -ceq $scenario }).Split('=')[1])
+    $value = if ($activations.Count -eq 1 -and $activations[0].StartsWith('--qa-activation=', [StringComparison]::Ordinal)) { $activations[0].Substring('--qa-activation='.Length) } else { $null }
+    if ($value -ceq 'dashboard') { return $null }
+    if ($null -ne $value -and $value -cmatch '^server:([0-9]+)$') {
+        $n = 0
+        if ([int]::TryParse($Matches[1], [ref]$n) -and $n -ge 1 -and $n -le $visible) { return $null }
+    }
+    'With --qa-compact, --qa-activation must be dashboard or server:<n> (n within the scenario''s visible servers)'
 }
 
 # Windows command-line quoting (CommandLineToArgvW rules), so every element reaches the app as exactly one argument.

@@ -587,6 +587,8 @@ public sealed class WindowsAppNotificationServiceTests
         public int OpenBackgroundSettingsCount { get; private set; }
         public void HideForMinimize() { }
         public void RestoreAndActivate() => RestoreCount++;
+
+        public void RestoreAndActivateStandard() { }
         public void OpenSettings() { }
         public void ToggleCompactMode() { }
         public void RequestClose() { }

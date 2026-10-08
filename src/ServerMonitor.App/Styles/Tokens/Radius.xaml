@@ -26,4 +26,6 @@
     <CornerRadius x:Key="SaRadiusOnboardingButton">15</CornerRadius>
     <CornerRadius x:Key="SaRadiusOnboardingBenefit">18</CornerRadius>
     <CornerRadius x:Key="SaRadiusOnboardingCard">22</CornerRadius>
+    <!-- UI.8 Compact server row 392x80 r15, 112:9439 (Prism R-6). -->
+    <CornerRadius x:Key="SaRadiusCompactRow">15</CornerRadius>
 </ResourceDictionary>

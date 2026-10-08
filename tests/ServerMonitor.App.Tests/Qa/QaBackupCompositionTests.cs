@@ -60,7 +60,7 @@ public sealed class QaBackupCompositionTests : IDisposable
         {
             case "health": QaHealthComposition.Apply(services); break;
             case "notifications": QaNotificationComposition.Apply(services); break;
-            case "compact": QaCompactComposition.Apply(services); break;
+            case "compact": QaCompactComposition.Apply(services, new QaCompactLaunch(QaCompactCatalog.DefaultScenario, ServerMonitor.App.Windowing.WindowMode.Compact, null)); break;
             case "history": QaHistoryComposition.Apply(services); break;
             case "workloads": QaWorkloadsComposition.Apply(services); break;
             case "screenshot": QaStoreScreenshotComposition.Apply(services); break;

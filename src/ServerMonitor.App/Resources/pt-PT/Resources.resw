@@ -98,11 +98,6 @@
   <data name="ServerMetricsUptimeHoursMinutesFormat" xml:space="preserve"><value>{0}h {1}m</value></data>
   <data name="ServerMetricsUptimeMinutesFormat" xml:space="preserve"><value>{0}m</value></data>
   <data name="ServerMetricsUpdateFailed" xml:space="preserve"><value>Não foi possível atualizar as métricas.</value></data>
-  <data name="ServerHealthHealthy" xml:space="preserve"><value>Saudável</value></data>
-  <data name="ServerHealthWarning" xml:space="preserve"><value>Atenção</value></data>
-  <data name="ServerHealthCritical" xml:space="preserve"><value>Crítico</value></data>
-  <data name="ServerHealthOffline" xml:space="preserve"><value>Offline</value></data>
-  <data name="ServerHealthUnknown" xml:space="preserve"><value>Sem dados</value></data>
   <data name="ServerMetricsStaleMinutesFormat" xml:space="preserve"><value>Última atualização há {0} min</value></data>
   <data name="ServerMetricsStaleHoursFormat" xml:space="preserve"><value>Última atualização há {0} h</value></data>
   <data name="ServerMetricsStaleDaysFormat" xml:space="preserve"><value>Última atualização há {0} d</value></data>
@@ -155,12 +150,20 @@
   <data name="DashboardCompactModeButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Modo compacto</value></data>
   <data name="DashboardCompactModeButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Modo compacto</value></data>
   <data name="CompactAlwaysOnTopToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Sempre no topo</value></data>
-  <data name="CompactAlwaysOnTopToggle.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Sempre no topo</value></data>
   <data name="CompactExpandButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Expandir para a vista padrão</value></data>
   <data name="CompactExpandButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Expandir</value></data>
-  <data name="CompactEmptyTitle.Text" xml:space="preserve"><value>Nenhum servidor configurado</value></data>
-  <data name="CompactEmptyAction.Content" xml:space="preserve"><value>Abrir o ServerAlyzer</value></data>
-  <data name="CompactMetricsUnavailable.Text" xml:space="preserve"><value>Offline</value></data>
+  <data name="CompactEmptyTitle.Text" xml:space="preserve"><value>Ainda não tens servidores</value></data>
+  <data name="CompactEmptyAction.Content" xml:space="preserve"><value>Adicionar servidor</value></data>
+  <data name="CompactEmptyBody.Text" xml:space="preserve"><value>Adiciona o primeiro para começar a monitorizar.</value></data>
+  <data name="CompactConfigUnavailableTitle.Text" xml:space="preserve"><value>Configuração indisponível</value></data>
+  <data name="CompactExpandButtonText.Text" xml:space="preserve"><value>Expandir</value></data>
+  <data name="CompactMetricCpuLabel.Text" xml:space="preserve"><value>CPU</value></data>
+  <data name="CompactMetricMemoryLabel.Text" xml:space="preserve"><value>RAM</value></data>
+  <data name="CompactMetricDiskLabel.Text" xml:space="preserve"><value>DISCO</value></data>
+  <data name="CompactAlwaysOnTopLabel.Text" xml:space="preserve"><value>Sempre no topo</value></data>
+  <data name="CompactRowAccessibleFormat" xml:space="preserve"><value>{0}, {1}. CPU {2}, RAM {3}, disco {4}. Abrir detalhe</value></data>
+  <data name="CompactMetricAttentionAccessible" xml:space="preserve"><value>em atenção</value></data>
+  <data name="CompactMetricCriticalAccessible" xml:space="preserve"><value>crítico</value></data>
   <data name="SettingsCompactTitle.Text" xml:space="preserve"><value>Modo compacto</value></data>
   <data name="SettingsCompactDescription.Text" xml:space="preserve"><value>Uma vista reduzida dos teus servidores.</value></data>
   <data name="SettingsAlwaysOnTopToggle.Header" xml:space="preserve"><value>Sempre no topo</value></data>

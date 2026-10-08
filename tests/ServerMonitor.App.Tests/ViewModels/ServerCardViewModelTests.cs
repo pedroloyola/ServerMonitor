@@ -118,7 +118,7 @@ public sealed class ServerCardViewModelTests
     // --- Monitoring state application (auto refresh path) --------------------
 
     [Fact]
-    public void ApplyMonitoringState_UpdatesHealthAndDisplayName()
+    public void ApplyMonitoringState_UpdatesHealth()
     {
         var server = TestData.LinuxServer();
         var vm = CreateViewModel(new FakeServerMetricsStore(), server);
@@ -126,7 +126,8 @@ public sealed class ServerCardViewModelTests
         vm.ApplyMonitoringState(State(server.Id, ServerHealth.Critical));
 
         Assert.Equal(ServerHealth.Critical, vm.Health);
-        Assert.Equal("ServerHealthCritical", vm.HealthDisplayName);
+        // UI.8 (D-UI8-15): HealthDisplayName / ServerHealth* are gone; the status copy is ServerStatusPresentation's.
+        Assert.Null(typeof(ServerCardViewModel).GetProperty("HealthDisplayName"));
     }
 
     [Fact]

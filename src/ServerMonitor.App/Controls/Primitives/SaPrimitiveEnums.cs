@@ -69,3 +69,14 @@ public enum SaGroupNavigationMode
     /// <summary>Navigation: arrows move focus only; Space/Enter activate.</summary>
     FocusOnly
 }
+
+/// <summary>
+/// UI.8: the tone of a <see cref="SaCompactMetricBar"/> fill - neutral by default, the attention / critical text colour only
+/// when the page says the reading crosses the engine's limit (Prism R-5). A tone selector, not a domain rule.
+/// </summary>
+public enum SaMetricTone
+{
+    Neutral,
+    Attention,
+    Critical
+}

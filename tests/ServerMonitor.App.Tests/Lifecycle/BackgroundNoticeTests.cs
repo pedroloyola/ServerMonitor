@@ -238,6 +238,8 @@ public sealed class BackgroundNoticeTests
 
         public void RestoreAndActivate() { }
 
+        public void RestoreAndActivateStandard() { }
+
         public void OpenSettings() { }
 
         public void OpenBackgroundSettings() { }

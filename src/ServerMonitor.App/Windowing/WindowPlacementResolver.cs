@@ -22,12 +22,15 @@ public static class WindowPlacementResolver
     /// malformed, or lands entirely off every current display, the window is centered on the
     /// primary display at its default size. Otherwise the saved rectangle is rescaled for the
     /// target monitor's DPI, clamped to the mode's size envelope, and nudged fully on-screen.
+    /// UI.8 RC-1: a DIP-based envelope (Compact) is first converted to the TARGET monitor's physical pixels, including
+    /// the measured non-client <paramref name="frame"/>; a pixel envelope (Standard) is used as it is.
     /// </summary>
     public static WindowBounds Resolve(
         WindowBounds? saved,
         int savedDpiScalePercent,
         IReadOnlyList<DisplayWorkArea> displays,
-        WindowSizeConstraints constraints)
+        WindowSizeConstraints constraints,
+        WindowFrame frame = default)
     {
         ArgumentNullException.ThrowIfNull(displays);
         ArgumentNullException.ThrowIfNull(constraints);
@@ -36,7 +39,7 @@ public static class WindowPlacementResolver
 
         if (saved is not { } bounds || !IsSane(bounds))
         {
-            return CenterDefault(primary, constraints);
+            return CenterDefault(primary, constraints, frame);
         }
 
         // Pick the display the saved rectangle overlaps most. No overlap means the window would be
@@ -44,8 +47,10 @@ public static class WindowPlacementResolver
         var target = SelectTargetDisplay(bounds, displays);
         if (target is not { } display)
         {
-            return CenterDefault(primary, constraints);
+            return CenterDefault(primary, constraints, frame);
         }
+
+        constraints = constraints.ScaledTo(display.DpiScalePercent, frame);
 
         var width = bounds.Width;
         var height = bounds.Height;
@@ -69,9 +74,10 @@ public static class WindowPlacementResolver
     }
 
     /// <summary>Default rectangle centered on the primary display, used when nothing valid is saved.</summary>
-    public static WindowBounds CenterDefault(DisplayWorkArea display, WindowSizeConstraints constraints)
+    public static WindowBounds CenterDefault(DisplayWorkArea display, WindowSizeConstraints constraints, WindowFrame frame = default)
     {
         ArgumentNullException.ThrowIfNull(constraints);
+        constraints = constraints.ScaledTo(display.DpiScalePercent, frame);
 
         var width = ClampSize(constraints.DefaultWidth, constraints.MinWidth, constraints.MaxWidth, display.Width);
         var height = ClampSize(constraints.DefaultHeight, constraints.MinHeight, constraints.MaxHeight, display.Height);

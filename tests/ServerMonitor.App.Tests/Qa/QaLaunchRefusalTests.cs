@@ -46,6 +46,8 @@ public sealed partial class QaLaunchRefusalTests
         "--qa-compact=8",
         "--qa-compact:",
         "--qa-compact:abc",
+        "--qa-compact:12",
+        "--qa-compact-scenario:figma",
         "--QA-HEALTH",
         "--Qa-Health",
         "--qa-health1",
@@ -142,12 +144,18 @@ public sealed partial class QaLaunchRefusalTests
         }
     }
 
+    /// <summary>
+    /// UI.8 §3 retired the one harness value form, <c>--qa-compact:&lt;digits&gt;</c> (it silently clamped to 0-40): every
+    /// harness flag is now exact, and the compact harness takes a named scenario through its own modifier.
+    /// </summary>
     [Fact]
-    public void TheCompactCountForm_IsTheOnlyHarnessValueForm()
+    public void NoHarnessFlagCarriesAValue_TheCompactCountFormIsRetired()
     {
-        Assert.Null(QaStartupIsolation.LaunchRefusal([Exe, "--qa-compact:12", "--qa-ui-language", "en-US"]));
-        Assert.True(QaStartupIsolation.IsHarnessArgument("--qa-compact:12"));
+        Assert.NotNull(QaStartupIsolation.LaunchRefusal([Exe, "--qa-compact:12", "--qa-ui-language", "en-US"]));
+        Assert.False(QaStartupIsolation.IsHarnessArgument("--qa-compact:12"));
         Assert.False(QaStartupIsolation.IsHarnessArgument("--qa-compact=12"));
+        Assert.True(QaStartupIsolation.IsHarnessArgument("--qa-compact"));
+        Assert.Null(QaStartupIsolation.LaunchRefusal([Exe, "--qa-compact", "--qa-compact-scenario", "n20", "--qa-ui-language", "en-US"]));
     }
 
     [Theory]
@@ -166,7 +174,8 @@ public sealed partial class QaLaunchRefusalTests
             QaStartupIsolation.HarnessFlags);
         Assert.Equal(
             [QaSshConfigProfilePolicy.LaunchFlag, QaUiLanguagePolicy.LaunchFlag, QaBackupPolicy.LaunchFlag, QaProxyJumpPolicy.DirectoryFlag,
-                "--qa-overview-scenario", "--qa-start", "--qa-activation", "--qa-editor-seed", "--qa-editor-ssh", "--qa-editor-save"],
+                "--qa-overview-scenario", "--qa-start", "--qa-activation", "--qa-editor-seed", "--qa-editor-ssh", "--qa-editor-save",
+                "--qa-compact-scenario", "--qa-compact-start", "--qa-compact-ticker"],
             QaStartupIsolation.ModifierFlags);
         Assert.True(QaProxyJumpPolicy.IsRequested([Exe, QaProxyJumpPolicy.LaunchFlag], isDebugBuild: true));
     }

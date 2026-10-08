@@ -18,6 +18,8 @@ public sealed partial class MainWindow : Window
     private readonly INavigationService _navigationService;
     public ShellViewModel Shell { get; }
     public OnboardingViewModel Onboarding { get; }
+    /// <summary>The compact chrome's view model ("Expandir", always-on-top, the Compact exits).</summary>
+    public WindowModeViewModel ModeView { get; }
     private readonly WindowCloseCoordinator _closeCoordinator;
     private readonly IApplicationWindowController _windowController;
     private readonly AppWindowPlacementAdapter _placementAdapter;
@@ -27,11 +29,15 @@ public sealed partial class MainWindow : Window
     private readonly BackupRestoreViewModel _backupRestore;
     private readonly ILogger<MainWindow> _logger;
     private readonly DispatcherQueueTimer _persistTimer;
-    private bool _isEnforcingMinimumSize;
+    private bool _isEnforcingSize;
     private bool _usesOpaqueFallback;
-
-    private const int MinimumWindowWidth = 560;
-    private const int MinimumWindowHeight = 640;
+    // Prism c1 P-2: how the user last drove the window (a keyboard entry shows the focus ring, anything else does not).
+    private bool _lastInputWasKeyboard;
+    private readonly Microsoft.UI.Xaml.Input.KeyEventHandler _keyInputObserver;
+    private readonly Microsoft.UI.Xaml.Input.PointerEventHandler _pointerInputObserver;
+    private FocusState _compactEntryFocusState;
+    private readonly CompactEntryFocusWait _compactEntryWait;
+    private bool _isWindowActive;
 
     public MainWindow(
         INavigationService navigationService,
@@ -45,11 +51,13 @@ public sealed partial class MainWindow : Window
         IWindowModeCoordinator modeCoordinator,
         WindowModeViewModel windowModeViewModel,
         DashboardViewModel dashboardViewModel,
+        CompactPresentationViewModel compactPresentation,
         TrayService trayService,
         WindowCloseCoordinator closeCoordinator,
         BackupRestoreViewModel backupRestore,
         ILogger<MainWindow> logger)
     {
+        ModeView = windowModeViewModel;
         InitializeComponent();
         _navigationService = navigationService;
         Shell = shell;
@@ -61,6 +69,10 @@ public sealed partial class MainWindow : Window
         _navigationService.Navigated += OnShellNavigated;
         StandardRoot.SizeChanged += OnStandardSizeChanged;
         RootLayout.KeyDown += OnShellKeyDown;
+        _keyInputObserver = (_, _) => _lastInputWasKeyboard = true;
+        _pointerInputObserver = (_, _) => _lastInputWasKeyboard = false;
+        RootLayout.AddHandler(UIElement.KeyDownEvent, _keyInputObserver, handledEventsToo: true);
+        RootLayout.AddHandler(UIElement.PointerPressedEvent, _pointerInputObserver, handledEventsToo: true);
         _windowController = windowController;
         _placementAdapter = placementAdapter;
         _modeCoordinator = modeCoordinator;
@@ -77,10 +89,17 @@ public sealed partial class MainWindow : Window
         _placementAdapter.Attach(this);
         navigationService.Initialize(ContentFrame);
 
-        // The compact chrome/empty-state bind to the window-mode VM; the compact server list reuses
-        // the one shared DashboardViewModel, so both presentations show the same live state.
-        CompactRoot.DataContext = windowModeViewModel;
-        CompactBody.DataContext = dashboardViewModel;
+        // UI.8: the Compact body is a view over the one dashboard's cards (CompactPresentationViewModel) and hands every
+        // exit to the window-mode VM; both presentations show the same live state.
+        CompactShellView.Initialize(compactPresentation, windowModeViewModel);
+        _compactEntryWait = new CompactEntryFocusWait(
+            handler => CompactShellView.LayoutUpdated += handler,
+            handler => CompactShellView.LayoutUpdated -= handler,
+            TryCompactEntryFocus,
+            // Beacon c2 B-6: the next pass is requested at Low priority, AFTER the pending work (rows' Loaded included) -
+            // an immediate InvalidateMeasure burned the eight passes before the first row had loaded (measured at launch).
+            () => DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, CompactShellView.InvalidateMeasure));
+        CompactRoot.SizeChanged += OnCompactSizeChanged;
 
         _persistTimer = DispatcherQueue.CreateTimer();
         _persistTimer.Interval = TimeSpan.FromMilliseconds(700);
@@ -108,6 +127,7 @@ public sealed partial class MainWindow : Window
         RootLayout.ActualThemeChanged += OnActualThemeChanged;
         AppWindow.Closing += OnAppWindowClosing;
         Closed += OnWindowClosed;
+        Activated += OnWindowActivated;
         UpdateCaptionButtonColors();
 
         try
@@ -160,6 +180,7 @@ public sealed partial class MainWindow : Window
         }
 
         UpdateCompactCaptionReserve();
+        UpdateCompactTitleLayout();
 
         // Keep the standard dashboard navigated and its data loaded regardless of the starting mode,
         // so expanding from a cold compact start shows populated cards immediately.
@@ -185,6 +206,12 @@ public sealed partial class MainWindow : Window
         Onboarding.SetWindowMode(_modeCoordinator.CurrentMode);
         // The task observes and logs diagnosis failures; it cannot delay the earlier startup work.
         _ = Onboarding.OnMainWindowShownAsync(normalStart);
+        // Prism c1 P-2: a launch straight into Compact puts focus where a mode change would - without a ring - instead of
+        // leaving WinUI's first-tab-stop default ("Expandir", drawn with a keyboard ring).
+        if (_modeCoordinator.CurrentMode == WindowMode.Compact)
+        {
+            BeginCompactEntryFocus(CompactEntryFocus.StateFor(enteredByKeyboard: false));
+        }
     }
 
     private void OnWindowModeChanged(object? sender, WindowMode mode)
@@ -199,6 +226,7 @@ public sealed partial class MainWindow : Window
             // The presenter's caption set is now the compact one (maximize disabled); size the
             // reserve to whatever the system actually reserves at the current DPI.
             UpdateCompactCaptionReserve();
+            UpdateCompactTitleLayout();
         }
         else
         {
@@ -208,6 +236,117 @@ public sealed partial class MainWindow : Window
         }
 
         UpdateCaptionButtonColors();
+        FocusAfterModeChange(mode);
+    }
+
+    /// <summary>
+    /// UI.8 RC-8 (deterministic, documented): entering Compact focuses the first server row, else the state block's real
+    /// action, else "Expandir"; leaving it focuses the current page's heading (never the window root, UI.6 section 184).
+    /// Keyboard focus only moves when the window already had it - a background mode change never steals focus.
+    /// </summary>
+    private void FocusAfterModeChange(WindowMode mode)
+    {
+        // Atlas c1 A-3: leaving Compact always disarms a pending entry wait - also when the window is not the active one.
+        if (mode != WindowMode.Compact)
+        {
+            EndCompactEntryFocus();
+        }
+
+        // Never steal focus: only while this window is the active one. (c1: GetFocusedElement is already null here when the
+        // element that triggered the switch - the header button, "Entrar" - has just been collapsed with the Standard root.)
+        if (!_isWindowActive)
+        {
+            return;
+        }
+
+        if (mode == WindowMode.Compact)
+        {
+            BeginCompactEntryFocus(CompactEntryFocus.StateFor(_lastInputWasKeyboard));
+            return;
+        }
+
+        DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+        {
+            if (ContentFrame.Content is Microsoft.UI.Xaml.Controls.Page page && !Onboarding.IsVisible)
+            {
+                ShellPageFocus.FocusHeading(page, force: true);
+            }
+        });
+    }
+
+    /// <summary>
+    /// Prism c1 P-2: focuses the Compact entry target (CompactEntryFocus) once it is laid out. If the first row or the
+    /// state action exists but is not realized yet, waits for the next layout pass of the compact body (one-shot
+    /// LayoutUpdated, a bounded pass count - never a timer) instead of falling back to "Expandir" too early.
+    /// </summary>
+    private void BeginCompactEntryFocus(FocusState state)
+    {
+        _compactEntryFocusState = state;
+        _compactEntryWait.Begin();
+    }
+
+    private void EndCompactEntryFocus() => _compactEntryWait.End();
+
+    /// <summary>True when focus was placed (or there is nothing left to wait for).</summary>
+    private bool TryCompactEntryFocus(int layoutPasses)
+    {
+        var presentation = CompactShellView.Presentation;
+        var repeater = CompactShellView.Repeater;
+        var hasRows = presentation?.ShowsList == true && repeater.ItemsSourceView is { Count: > 0 };
+        // Beacon c2 B-6: the first VISIBLE row (the user's scroll position is kept), never row 1 by index.
+        var visibleRow = hasRows ? CompactShellView.FirstVisibleRow() : null;
+        var action = presentation is null ? null : CompactShellView.StateActionFor(presentation);
+        var target = CompactEntryFocus.Decide(
+            hasRows,
+            visibleRow is not null,
+            action is not null,
+            action is { IsLoaded: true, Visibility: Visibility.Visible } && action.ActualWidth > 0,
+            layoutPasses);
+        switch (target)
+        {
+            case CompactEntryFocus.Target.Wait:
+                return false;
+            case CompactEntryFocus.Target.FirstVisibleRow:
+                visibleRow!.Focus(_compactEntryFocusState);
+                return true;
+            case CompactEntryFocus.Target.StateAction:
+                action!.Focus(_compactEntryFocusState);
+                return true;
+            default:
+                CompactExpandButton.Focus(_compactEntryFocusState);
+                return true;
+        }
+    }
+
+    private void OnCompactSizeChanged(object sender, SizeChangedEventArgs args) => UpdateCompactTitleLayout();
+
+    private void OnWindowActivated(object sender, WindowActivatedEventArgs args) =>
+        _isWindowActive = args.WindowActivationState != WindowActivationState.Deactivated;
+
+    /// <summary>
+    /// Prism R-3: decides, from MEASURED widths, whether "Expandir" shows its text, and whether the mark / wordmark fit
+    /// (CompactTitleLayout). Runs on every size change of the compact root and after the caption reserve is recomputed.
+    /// </summary>
+    private void UpdateCompactTitleLayout()
+    {
+        if (CompactRoot.Visibility != Visibility.Visible || CompactRoot.ActualWidth <= 0)
+        {
+            return;
+        }
+
+        var infinite = new Windows.Foundation.Size(double.PositiveInfinity, double.PositiveInfinity);
+        CompactWordmark.Measure(infinite);
+        CompactExpandText.Measure(infinite);
+        var padding = CompactExpandButton.Padding;
+        var buttonWithText = padding.Left + CompactExpandText.DesiredSize.Width + 6 + 16 + padding.Right;
+        var available = CompactRoot.ActualWidth - CompactDragRegion.Padding.Left - CompactCaptionColumn.ActualWidth;
+        var decision = CompactTitleLayout.Decide(available, CompactBrandMark.Size, CompactWordmark.DesiredSize.Width, buttonWithText);
+
+        CompactExpandText.Visibility = decision.ShowExpandText ? Visibility.Visible : Visibility.Collapsed;
+        CompactExpandButton.Padding = decision.ShowExpandText ? new Thickness(14, 0, 14, 0) : new Thickness(0);
+        CompactExpandButton.Width = decision.ShowExpandText ? double.NaN : CompactTitleLayout.IconButtonWidth;
+        CompactBrandMark.Visibility = decision.ShowMark ? Visibility.Visible : Visibility.Collapsed;
+        CompactWordmark.Visibility = decision.ShowWordmark ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void OnXamlRootChanged(Microsoft.UI.Xaml.XamlRoot sender, Microsoft.UI.Xaml.XamlRootChangedEventArgs args) =>
@@ -231,14 +370,15 @@ public sealed partial class MainWindow : Window
         if (reserved > 0)
         {
             CompactCaptionColumn.Width = new GridLength(reserved);
+            UpdateCompactTitleLayout();
         }
     }
 
     private void ApplyShellBackground()
     {
-        // Styles keep ThemeResource live on this root; Compact uses its exact pre-UI.6 backdrop.
-        var key = _usesOpaqueFallback ? "SaOpaqueWindowBackgroundStyle"
-            : _modeCoordinator.CurrentMode == WindowMode.Compact ? "SaLegacyWindowBackgroundStyle" : "SaShellWindowBackgroundStyle";
+        // Styles keep ThemeResource live on this root. UI.8 D-UI8-12: Compact uses the SAME material as the shell (Figma
+        // #0E0E0E@.62 / #FFF@.35 = SaWindowMaterialBrush), with the same opaque / High Contrast fallback.
+        var key = _usesOpaqueFallback ? "SaOpaqueWindowBackgroundStyle" : "SaShellWindowBackgroundStyle";
         WindowBackground.Style = (Style)Application.Current.Resources[key];
     }
 
@@ -252,6 +392,7 @@ public sealed partial class MainWindow : Window
             if (ContentFrame.Content is Microsoft.UI.Xaml.Controls.Page page) SaThemeRefresh.Remount(page);
             SaThemeRefresh.Remount(Sidebar, Sidebar.Content, content => Sidebar.Content = content);
             SaThemeRefresh.Remount(FirstRunView, FirstRunView.Content, content => FirstRunView.Content = content);
+            SaThemeRefresh.Remount(CompactShellView, CompactShellView.Content, content => CompactShellView.Content = content);
         });
     }
 
@@ -313,7 +454,14 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        if (_isEnforcingMinimumSize || _modeCoordinator.IsApplyingBounds)
+        // UI.8 c2 B-2: Compact never stays maximized (caption button, title double-click, Win+Up). Checked before anything
+        // is captured, so a maximized Compact is never recorded; the restore raises its own change with the envelope bounds.
+        if ((args.DidPresenterChange || args.DidSizeChange || args.DidPositionChange) && _modeCoordinator.HoldCompactRestored())
+        {
+            return;
+        }
+
+        if (_isEnforcingSize || _modeCoordinator.IsApplyingBounds)
         {
             return;
         }
@@ -327,27 +475,33 @@ public sealed partial class MainWindow : Window
         _modeCoordinator.CaptureCurrentBounds();
         SchedulePersist();
 
-        // The manual minimum-size floor applies to the resizable Standard window only; Compact is
-        // non-resizable and drives its own bounds, so enforcing 560×640 there would corrupt it.
-        if (args.DidSizeChange && _modeCoordinator.CurrentMode == WindowMode.Standard)
+        // UI.8 RC-2: both modes are resizable, so every user resize is held inside the ACTIVE mode's envelope (Standard:
+        // its 560×640 floor; Compact: its DIP envelope at the current DPI, frame included). The limits come from the
+        // coordinator, never from constants here, so leaving Compact can never leave its maximum on Standard.
+        if (args.DidSizeChange)
         {
-            EnforceMinimumSize(sender);
+            EnforceSizeLimits(sender);
         }
     }
 
-    private void EnforceMinimumSize(AppWindow sender)
+    private void EnforceSizeLimits(AppWindow sender)
     {
+        // Cortex 8B gate N-4: a minimized window reports its iconized size (and no trustworthy DPI) - never clamp that.
+        if (sender.Presenter is OverlappedPresenter { State: OverlappedPresenterState.Minimized })
+        {
+            return;
+        }
+
         var size = sender.Size;
-        var width = Math.Max(size.Width, MinimumWindowWidth);
-        var height = Math.Max(size.Height, MinimumWindowHeight);
+        var (width, height) = _modeCoordinator.CurrentSizeLimits().Clamp(size.Width, size.Height);
         if (width == size.Width && height == size.Height)
         {
             return;
         }
 
-        _isEnforcingMinimumSize = true;
+        _isEnforcingSize = true;
         sender.Resize(new SizeInt32(width, height));
-        _isEnforcingMinimumSize = false;
+        _isEnforcingSize = false;
     }
 
     private void SchedulePersist()
@@ -393,7 +547,11 @@ public sealed partial class MainWindow : Window
         Onboarding.PropertyChanged -= OnOnboardingChanged;
         _navigationService.Navigated -= OnShellNavigated;
         StandardRoot.SizeChanged -= OnStandardSizeChanged;
+        CompactRoot.SizeChanged -= OnCompactSizeChanged;
         RootLayout.KeyDown -= OnShellKeyDown;
+        RootLayout.RemoveHandler(UIElement.KeyDownEvent, _keyInputObserver);
+        RootLayout.RemoveHandler(UIElement.PointerPressedEvent, _pointerInputObserver);
+        EndCompactEntryFocus();
         _persistTimer.Stop();
         _persistTimer.Tick -= OnPersistTimerTick;
         _modeCoordinator.PersistCurrentBounds();
@@ -406,6 +564,7 @@ public sealed partial class MainWindow : Window
         AppWindow.Changed -= OnAppWindowChanged;
         AppWindow.Closing -= OnAppWindowClosing;
         RootLayout.ActualThemeChanged -= OnActualThemeChanged;
+        Activated -= OnWindowActivated;
         Closed -= OnWindowClosed;
     }
 }
