@@ -125,7 +125,7 @@ public static class WidgetCardRenderer
             ["id"] = row.ServerId.ToString("D", CultureInfo.InvariantCulture),
             // The ONLY untrusted string on the card. The template binds ${name} in a TextRun and nowhere
             // else (R-1); see NameRun.
-            ["name"] = row.DisplayName.Value,
+            ["name"] = row.DisplayName.ForCard(),
             ["status"] = row.StatusText,
             ["statusColor"] = row.StatusColor,
             ["gap"] = LabelValueGap

@@ -60,6 +60,40 @@ public readonly record struct UntrustedText(string Value)
     /// key, via <see cref="Value"/>, which a grep can audit.
     /// </summary>
     public override string ToString() => "[untrusted]";
+
+    /// <summary>
+    /// The ONLY form in which an untrusted string may be emitted onto a card (Vigil C0 debrief §1, M-3).
+    /// The board proved that the TextRun keeps markdown literal, but its date/time pre-processor still
+    /// rewrites <c>{{DATE(…)}}</c> / <c>{{TIME(…)}}</c>. So a ZERO WIDTH SPACE (U+200B) is inserted between
+    /// every two consecutive <c>{</c>, and the emitted text never contains <c>{{</c>.
+    /// <list type="bullet">
+    /// <item>It applies LAST, after sanitisation and truncation. The value here is already truncated, so a
+    /// surrogate pair is never split by it.</item>
+    /// <item>It is invisible on the card. A name without <c>{{</c> comes back byte-identical, with no
+    /// gratuitous U+200B.</item>
+    /// <item>It lives in the type, so any future emitter inherits it.</item>
+    /// </list>
+    /// </summary>
+    public string ForCard()
+    {
+        if (!Value.Contains("{{", StringComparison.Ordinal))
+        {
+            return Value;
+        }
+
+        var builder = new System.Text.StringBuilder(Value.Length + 8);
+        for (var i = 0; i < Value.Length; i++)
+        {
+            if (i > 0 && Value[i] == '{' && Value[i - 1] == '{')
+            {
+                builder.Append('\u200B');
+            }
+
+            builder.Append(Value[i]);
+        }
+
+        return builder.ToString();
+    }
 }
 
 /// <summary>

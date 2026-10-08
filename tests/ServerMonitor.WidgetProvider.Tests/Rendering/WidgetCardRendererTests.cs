@@ -216,7 +216,7 @@ public sealed class WidgetCardRendererTests
         foreach (var size in new[] { WidgetSizeHint.Medium, WidgetSizeHint.Large })
         {
             var (vm, card, expanded) = Render(Read(Now, Server(1, WidgetHealth.Warning, hostile, metric: "disk")), size);
-            var shown = vm.Rows[0].DisplayName.Value;
+            var shown = vm.Rows[0].DisplayName.ForCard(); // M-3: the emitted (neutralised) form
 
             // Data: the name is a VALUE of exactly one key, "name" — never a key, never in another value.
             var data = JsonNode.Parse(card.DataJson)!;
@@ -326,7 +326,7 @@ public sealed class WidgetCardRendererTests
             var action = rows[i]["selectAction"]!.AsObject();
             Assert.Equal(vm.Rows[i].ServerId.ToString("D"), (string?)action["data"]!["serverId"]);
             Assert.Equal(["data", "type", "verb"], action.Select(p => p.Key).Order(StringComparer.Ordinal));
-            Assert.Contains(vm.Rows[i].DisplayName.Value, CardTemplateHarness.VisibleTexts(rows[i]));
+            Assert.Contains(vm.Rows[i].DisplayName.ForCard(), CardTemplateHarness.VisibleTexts(rows[i]));
         }
     }
 

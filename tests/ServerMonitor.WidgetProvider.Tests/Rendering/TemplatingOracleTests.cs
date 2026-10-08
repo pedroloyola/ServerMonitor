@@ -72,7 +72,7 @@ public sealed class TemplatingOracleTests
         var read = WidgetCardRendererTests.Read(Now, WidgetCardRendererTests.Server(1, name: hostile), WidgetCardRendererTests.Server(2, name: hostile));
         var vm = WidgetViewModelBuilder.Build(read, WidgetSizeHint.Large, Now, WidgetStrings.ForCulture(CultureInfo.GetCultureInfo("en-US")));
         var card = WidgetCardRenderer.Render(vm);
-        var shown = vm.Rows[0].DisplayName.Value;
+        var shown = vm.Rows[0].DisplayName.ForCard(); // M-3: the emitted (neutralised) form
 
         var expanded = OracleExpand(card.TemplateJson, card.DataJson);
 
