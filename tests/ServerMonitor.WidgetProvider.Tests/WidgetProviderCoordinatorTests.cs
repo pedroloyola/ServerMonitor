@@ -258,7 +258,7 @@ public sealed class WidgetProviderCoordinatorTests
         // The guarantee is functional — Shutdown leaves through its timeout path once ITS clock has passed the
         // drain bound — and is proven on the fake clock; nothing here asserts a wall-clock latency. The drain-entered
         // seam fires after the drain's timeout source exists, so the advance always reaches that timer.
-        var clock = new FakeTimeProvider(new DateTimeOffset(2026, 8, 30, 12, 0, 0, TimeSpan.Zero));
+        var clock = new TimerRecordingTimeProvider(new DateTimeOffset(2026, 8, 30, 12, 0, 0, TimeSpan.Zero));
         var host = new FakeWidgetHost();
         var block = new ManualResetEventSlim(false);
         host.BlockUpdate = block; // never released until the end → the update stays stuck
@@ -271,6 +271,10 @@ public sealed class WidgetProviderCoordinatorTests
 
         var shutdown = RunOnDedicatedThread(coordinator.Shutdown);
         Assert.True(await drainEntered.WaitAsync(DeadlockGuard)); // Shutdown has created its timeout and is waiting
+        // CI-WP-BOUNDED-CLOCK: the 2 s drain bound must be a timer on the INJECTED clock. A drain on the real
+        // clock would also let Shutdown return (after 2 real seconds, inside the deadlock guard), so only this
+        // assertion distinguishes the two.
+        Assert.Contains(TimeSpan.FromSeconds(2), clock.CreatedTimerDueTimes);
         clock.Advance(TimeSpan.FromSeconds(2));                    // fire the bounded-drain timeout
         await shutdown.WaitAsync(DeadlockGuard);                   // returns despite the update still being stuck
 

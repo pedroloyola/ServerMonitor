@@ -57,6 +57,51 @@ public sealed class SystemClockGuardTests
         Assert.Empty(offenders);
     }
 
+    /// <summary>
+    /// UI.9 SPEC test 9: the widget provider derives every age (snapshot and per-server freshness, debounce,
+    /// backstop, drain) from its injected <see cref="TimeProvider"/>. A direct wall-clock or stopwatch read in
+    /// its source tree would make freshness untestable and could drift from the injected clock.
+    /// </summary>
+    [Fact]
+    public void WidgetProvider_NeverReadsTheWallClockOrAStopwatchDirectly()
+    {
+        var root = Path.Combine(AppSourceTree.RepositoryRoot, "src", "ServerMonitor.WidgetProvider");
+        var scanned = 0;
+        var offenders = new List<string>();
+        foreach (var file in Directory.EnumerateFiles(root, "*.cs", SearchOption.AllDirectories))
+        {
+            var relative = Path.GetRelativePath(root, file).Replace(Path.DirectorySeparatorChar, '/');
+            if (relative.StartsWith("obj/", StringComparison.Ordinal) || relative.StartsWith("bin/", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            scanned++;
+            var code = CodeOnly(File.ReadAllText(file));
+            foreach (Match hit in ProviderWallClock.Matches(code))
+            {
+                offenders.Add($"{relative}: line {code[..hit.Index].Count(c => c == '\n') + 1} '{hit.Value}'");
+            }
+        }
+
+        Assert.True(scanned > 20, $"scanned only {scanned} provider files"); // the walk must be real
+        Assert.Empty(offenders);
+    }
+
+    private static readonly Regex ProviderWallClock = new(
+        @"\b(DateTime|DateTimeOffset)\s*\.\s*(Utc)?Now\b|\bStopwatch\b|\bEnvironment\s*\.\s*TickCount(64)?\b",
+        RegexOptions.CultureInvariant);
+
+    [Theory]
+    [InlineData("var now = DateTime.UtcNow;", 1)]
+    [InlineData("var now = DateTimeOffset . Now;", 1)]
+    [InlineData("var sw = System.Diagnostics.Stopwatch.StartNew();", 1)]
+    [InlineData("var t = Environment.TickCount64;", 1)]
+    [InlineData("var now = _timeProvider.GetUtcNow(); // not DateTime.UtcNow", 0)]
+    [InlineData("var s = \"DateTime.Now\";", 0)]
+    public void TheProviderGuard_CountsCodeUses_IgnoringCommentsAndStrings(string source, int expected) =>
+        Assert.Equal(expected, ProviderWallClock.Matches(CodeOnly(source)).Count);
+
     // The guard's own counterproofs: it decides on code, never on a mention.
     [Theory]
     [InlineData("var vm = new SettingsViewModel(a, b, clock: PresentationClock.System);", 1)]

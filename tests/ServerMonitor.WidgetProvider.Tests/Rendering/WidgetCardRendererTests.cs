@@ -320,7 +320,9 @@ public sealed class WidgetCardRendererTests
     {
         var server = new WidgetServerState
         {
-            Id = Guid.NewGuid(),
+            // FLAKE-WP-GUID (BACKLOG): a random Guid could contain "43d" (e.g. "...-43d9-...") and fail the
+            // Medium negative assertion below. A fixed id with no such substring makes the test deterministic.
+            Id = Guid.Parse("00000000-0000-0000-0000-000000000001"),
             DisplayName = "srv",
             Health = WidgetHealth.Healthy,
             CpuUsagePercent = 3,
