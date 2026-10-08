@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Globalization;
 using System.Reflection;
 using Microsoft.Extensions.Logging.Abstractions;
 using ServerMonitor.App.Services;
@@ -348,20 +349,29 @@ public sealed class Ui8CompactPresentationTests
         Assert.Equal("27%", row.CpuText);
     }
 
+    /// <summary>
+    /// Atlas c1 A-2: two bursts of samples, each coalesced by the dashboard into ONE recompute, each visibly updating the
+    /// Compact summary. Real en-US strings keep the seconds in the text (8 s → 1 s → 2 s, all distinct); the recorded
+    /// notifications are cleared per phase: none before a flush, exactly one summary change after it; the rows are the
+    /// same instances and nothing else is left queued.
+    /// </summary>
     [Fact]
     public async Task TwoBursts_EachRecomputeTheSummaryOnce_AndTheCompactViewAddsNoScheduler()
     {
         var fleet = Mixed();
-        var harness = Ui4TestKit.Create(fleet);
+        var harness = Ui4TestKit.Create(fleet, localization: new ResWLocalizationService("en-US"));
         var queued = new List<Action>();
         harness.Dashboard.OverviewScheduler = action => { queued.Add(action); return true; };
         await harness.Dashboard.LoadAsync();
         using var compact = Compact(harness);
+        var rows = compact.Rows;
         var raised = Changes(compact);
         queued.Clear();
+        var shown = new List<string?> { compact.UpdatedAgoDisplay };
 
         for (var burst = 1; burst <= 2; burst++)
         {
+            raised.Clear();
             foreach (var entry in fleet.Entries.Where(e => !e.Server.IsHidden))
             {
                 harness.States.Set(harness.States.Get(entry.Server.Id) with { LastSuccessAt = Ui4TestKit.Now.AddSeconds(-burst) });
@@ -369,15 +379,19 @@ public sealed class Ui8CompactPresentationTests
 
             var pending = Assert.Single(queued); // the WHOLE burst queued one recompute
             queued.Clear();
-            Assert.DoesNotContain(nameof(CompactPresentationViewModel.UpdatedAgoDisplay), raised); // nothing before the flush
+            Assert.Empty(raised); // nothing before the flush
             pending();
-        }
 
-        // Each burst moved the freshest success by one second: at most one forwarded change per burst, and only the
-        // summary's own properties - the rows stay the same instances.
-        Assert.InRange(raised.Count(name => name == nameof(CompactPresentationViewModel.UpdatedAgoDisplay)), 0, 2);
-        Assert.DoesNotContain(nameof(CompactPresentationViewModel.Rows), raised);
-        Assert.DoesNotContain(raised, name => name is not (nameof(CompactPresentationViewModel.UpdatedAgoDisplay) or nameof(CompactPresentationViewModel.HasUpdatedAgo)));
+            Assert.Equal(
+                [nameof(CompactPresentationViewModel.HasUpdatedAgo), nameof(CompactPresentationViewModel.UpdatedAgoDisplay)],
+                raised.Order(StringComparer.Ordinal));
+            Assert.Equal(harness.Dashboard.UpdatedAgoDisplay, compact.UpdatedAgoDisplay);
+            Assert.Contains(burst.ToString(CultureInfo.InvariantCulture), compact.UpdatedAgoDisplay, StringComparison.Ordinal);
+            Assert.DoesNotContain(compact.UpdatedAgoDisplay, shown); // a new text each burst
+            shown.Add(compact.UpdatedAgoDisplay);
+            Assert.Same(rows, compact.Rows);
+            Assert.Empty(queued); // the flush left nothing else pending
+        }
     }
 
     // ---- helpers -----------------------------------------------------------------------------------------------

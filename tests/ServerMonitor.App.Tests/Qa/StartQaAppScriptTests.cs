@@ -238,6 +238,56 @@ public sealed partial class StartQaAppScriptTests
     }
 
     /// <summary>
+    /// UI.8 (Atlas c1 A-4): the launcher's compact value rules use the catalogue's closed scenario list and each scenario's
+    /// VISIBLE server count (the --qa-activation=server:&lt;n&gt; range), exactly as the app builds them.
+    /// </summary>
+    [Fact]
+    public void TheScriptsCompactScenarioTable_IsTheCatalogue()
+    {
+        var expected = QaCompactCatalog.Scenarios
+            .Select(name => $"{name}={QaCompactCatalog.Build(name).Servers.Count(server => !server.IsHidden)}")
+            .ToArray();
+
+        Assert.Equal(expected, ListIn(File.ReadAllText(Script), "CompactScenarios"));
+    }
+
+    /// <summary>
+    /// UI.8 (Atlas c1 A-4): the scenario / start / ticker / activation matrix - valid, duplicated, malformed (missing value,
+    /// a switch as the value, unknown value, out of range), orphan (no --qa-compact) - decided by the launcher exactly as by
+    /// the app, in both argument forms ('flag value' and 'flag=value'). Every pair of tokens, alone and after --qa-compact.
+    /// </summary>
+    [Fact]
+    public void TheScriptsDecision_MatchesTheAppsRefusal_ForTheCompactModifiers()
+    {
+        string[] tokens = ["--qa-compact-scenario", "figma", "nope", "--qa-compact-scenario=one", "--qa-compact-scenario=all-hidden",
+            "--qa-compact-start=standard", "--qa-compact-start", "maximized", "standard", "--qa-compact-ticker=varying", "--qa-compact-ticker=fast",
+            "--qa-activation=server:6", "--qa-activation=server:7", "--qa-activation=server:1", "--qa-activation=server:x",
+            "--qa-activation=dashboard", "--qa-activation", "--qa-start=overview", "--qa-compact"];
+        var corpus = new List<string[]>();
+        foreach (var first in tokens)
+        {
+            foreach (var second in tokens)
+            {
+                corpus.Add([first, second]);
+                corpus.Add(["--qa-compact", first, second]);
+            }
+        }
+
+        var results = RunScript(corpus, SentinelExe, validateOnly: true);
+        var allowed = 0;
+        for (var i = 0; i < corpus.Count; i++)
+        {
+            string[] appArgs = [SentinelExe, .. corpus[i]];
+            var appAllows = QaStartupIsolation.LaunchRefusal(appArgs) is null && corpus[i].Any(QaStartupIsolation.IsQaLike);
+            Assert.True(appAllows == (results[i] == "ALLOWED"), $"[{string.Join(' ', corpus[i])}] app={appAllows} script={results[i]}");
+            allowed += appAllows ? 1 : 0;
+        }
+
+        // Both outcomes are exercised (not a corpus that is all-refused or all-allowed).
+        Assert.InRange(allowed, 20, corpus.Count - 20);
+    }
+
+    /// <summary>
     /// UI.7 final c2 (Beacon / Vigil): the editor harness with an external activation is refused by the app
     /// (QaShellStartup.Refusal) AND by the launcher before Start-Process; the editor's own start stays allowed.
     /// </summary>
