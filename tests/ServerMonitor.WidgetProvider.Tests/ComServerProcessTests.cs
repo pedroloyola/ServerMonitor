@@ -20,8 +20,7 @@ public sealed class ComServerProcessTests
     public void Starts_unreferenced_and_not_exiting()
     {
         var process = NewProcess(out _, out var suspended);
-        Assert.False(process.EverReferenced);
-        Assert.False(process.IsExiting);
+        Assert.False(process.WaitForExit(TimeSpan.Zero));
         Assert.False(suspended());
     }
 
@@ -30,9 +29,8 @@ public sealed class ComServerProcessTests
     {
         var process = NewProcess(out var count, out _);
         Assert.Equal(1u, process.AddRef());
-        Assert.True(process.EverReferenced);
-        Assert.False(process.IsExiting);
-        Assert.Equal(1, count());
+        Assert.Equal(1, count()); // the reference reached the (fake) COM count
+        Assert.False(process.WaitForExit(TimeSpan.Zero));
     }
 
     [Fact]
@@ -44,7 +42,6 @@ public sealed class ComServerProcessTests
         Assert.Equal(0u, process.Release());
 
         Assert.True(suspended());          // CoSuspendClassObjects was called
-        Assert.True(process.IsExiting);
         Assert.True(process.WaitForExit(TimeSpan.Zero));
     }
 
@@ -58,7 +55,6 @@ public sealed class ComServerProcessTests
         Assert.Equal(1u, process.Release()); // one object remains
 
         Assert.False(suspended());
-        Assert.False(process.IsExiting);
         Assert.False(process.WaitForExit(TimeSpan.Zero));
     }
 
@@ -72,8 +68,8 @@ public sealed class ComServerProcessTests
         Assert.Equal(2, count());
 
         Assert.Equal(1u, process.Release());
-        Assert.False(process.IsExiting);
+        Assert.False(process.WaitForExit(TimeSpan.Zero));
         Assert.Equal(0u, process.Release());
-        Assert.True(process.IsExiting);
+        Assert.True(process.WaitForExit(TimeSpan.Zero));
     }
 }

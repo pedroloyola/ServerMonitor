@@ -19,7 +19,6 @@ public sealed class ComServerProcess
     private readonly Func<uint> _release;
     private readonly Action _suspend;
     private readonly ManualResetEventSlim _exiting = new(false);
-    private int _everReferenced;
 
     public ComServerProcess(Func<uint>? addRef = null, Func<uint>? release = null, Action? suspend = null)
     {
@@ -28,18 +27,8 @@ public sealed class ComServerProcess
         _suspend = suspend ?? (() => Native.CoSuspendClassObjects());
     }
 
-    /// <summary>True once at least one COM object has ever been created (used to bound a never-activated launch).</summary>
-    public bool EverReferenced => Volatile.Read(ref _everReferenced) != 0;
-
-    /// <summary>True once the last object was released and new activations have been suspended.</summary>
-    public bool IsExiting => _exiting.IsSet;
-
     /// <summary>Call when a COM object is created. Returns the new per-process reference count.</summary>
-    public uint AddRef()
-    {
-        Volatile.Write(ref _everReferenced, 1);
-        return _addRef();
-    }
+    public uint AddRef() => _addRef();
 
     /// <summary>
     /// Call when a COM object is torn down. When the count reaches zero, suspends new activations and

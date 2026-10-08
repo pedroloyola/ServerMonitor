@@ -53,4 +53,22 @@ public sealed record WidgetServerState
     /// derives per-server freshness (fresh/stale) from this against its own clock (§22).
     /// </summary>
     public DateTimeOffset? LastUpdatedUtc { get; init; }
+
+    /// <summary>
+    /// UI.9 D-UI9-2 (additive, optional, schema stays 1): which metric drives a Warning/Critical health —
+    /// one of the <see cref="WidgetAttentionMetrics"/> wire values, or <c>null</c>. A plain string, NOT an
+    /// enum, so an unknown value can never fail the whole snapshot: readers go through
+    /// <see cref="WidgetAttentionMetrics.TryParse"/> and treat anything else as <c>null</c>. A presentation
+    /// hint only — it never changes or hides <see cref="Health"/>.
+    /// </summary>
+    public string? AttentionMetric { get; init; }
+
+    /// <summary>
+    /// UI.9 D-UI9-3 (additive, optional): how old <see cref="LastUpdatedUtc"/> may get before this server is
+    /// stale, in seconds, as the app's own stale policy computed it for this server's refresh interval.
+    /// <c>null</c> (older producers) or within
+    /// [<see cref="WidgetSchema.MinStaleAfterSeconds"/>, <see cref="WidgetSchema.MaxStaleAfterSeconds"/>].
+    /// The reader compares it against its OWN clock, so staleness stays true while the app is stopped.
+    /// </summary>
+    public int? StaleAfterSeconds { get; init; }
 }

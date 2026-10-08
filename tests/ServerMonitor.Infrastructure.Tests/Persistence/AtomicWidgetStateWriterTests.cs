@@ -148,6 +148,27 @@ public sealed class AtomicWidgetStateWriterTests : IDisposable
         Assert.False(File.Exists(_path + ".bak"));
     }
 
+    [Fact]
+    public async Task Post_delete_write_leaves_no_backup_that_could_resurrect_the_deleted_name()
+    {
+        // UI.9 V-RC-8 (UI9-SEC-1): after the fleet-change write that drops a deleted server, no .bak may
+        // remain — RecoverLastKnownGood would otherwise be able to promote the old file (and its name).
+        var writer = NewWriter();
+        await writer.WriteAsync(Snapshot(WidgetHealth.Healthy, "Deleted Box"), CancellationToken.None);
+        await writer.WriteAsync(new WidgetStateSnapshot
+        {
+            SchemaVersion = WidgetSchema.CurrentVersion,
+            GeneratedAtUtc = Now,
+            OverallHealth = WidgetHealth.Unknown,
+            Servers = Array.Empty<WidgetServerState>()
+        }, CancellationToken.None);
+
+        Assert.False(File.Exists(_path + ".bak"));
+        Assert.DoesNotContain("Deleted Box", await File.ReadAllTextAsync(_path));
+        Assert.All(Directory.GetFiles(_directory), file =>
+            Assert.DoesNotContain("Deleted Box", File.ReadAllText(file)));
+    }
+
     // ---- RecoverLastKnownGood (Atlas/Vigil S2 M-2): after a partial ReplaceFile failure, a complete
     //      snapshot must always remain at the destination. ----
 

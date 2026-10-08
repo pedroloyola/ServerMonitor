@@ -35,7 +35,11 @@ public sealed class WidgetContractSecurityTests
             nameof(WidgetServerState.DiskUsedGb),
             nameof(WidgetServerState.DiskTotalGb),
             nameof(WidgetServerState.UptimeSeconds),
-            nameof(WidgetServerState.LastUpdatedUtc)
+            nameof(WidgetServerState.LastUpdatedUtc),
+            // UI.9 D-UI9-2/3: a metric NAME from a fixed allowlist and a stale-policy number - presentation
+            // and policy, not host/network/credential/OS data (Vigil SPEC review, §9 still holds).
+            nameof(WidgetServerState.AttentionMetric),
+            nameof(WidgetServerState.StaleAfterSeconds)
         };
 
         var actual = typeof(WidgetServerState)
@@ -106,7 +110,7 @@ public sealed class WidgetContractSecurityTests
             "schemaVersion", "generatedAtUtc", "overallHealth", "servers",
             "id", "displayName", "health", "cpuUsagePercent", "memoryUsagePercent",
             "diskUsagePercent", "memoryUsedGb", "memoryTotalGb", "diskUsedGb", "diskTotalGb",
-            "uptimeSeconds", "lastUpdatedUtc"
+            "uptimeSeconds", "lastUpdatedUtc", "attentionMetric", "staleAfterSeconds"
         };
 
         Assert.Equal(expected.OrderBy(k => k, StringComparer.OrdinalIgnoreCase),

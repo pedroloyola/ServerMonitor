@@ -73,7 +73,7 @@ public static class WidgetStateValidator
 
         foreach (var server in snapshot.Servers)
         {
-            var result = ValidateServer(server, nowUtc);
+            var result = ValidateServer(server, snapshot.GeneratedAtUtc, nowUtc);
             if (!result.IsValid)
             {
                 return result;
@@ -83,7 +83,8 @@ public static class WidgetStateValidator
         return WidgetValidationResult.Valid;
     }
 
-    private static WidgetValidationResult ValidateServer(WidgetServerState? server, DateTimeOffset nowUtc)
+    private static WidgetValidationResult ValidateServer(
+        WidgetServerState? server, DateTimeOffset generatedAtUtc, DateTimeOffset nowUtc)
     {
         if (server is null)
         {
@@ -112,11 +113,23 @@ public static class WidgetStateValidator
             return WidgetValidationResult.Invalid(WidgetValidationFailure.MetricOutOfRange);
         }
 
-        if (server.LastUpdatedUtc is { } lastUpdated && !IsTimestampInRange(lastUpdated, nowUtc))
+        // UI.9 D-UI9-3/V-RC-4: absent (older producer) or inside the stale policy's own domain.
+        if (server.StaleAfterSeconds is { } staleAfter &&
+            (staleAfter < WidgetSchema.MinStaleAfterSeconds || staleAfter > WidgetSchema.MaxStaleAfterSeconds))
+        {
+            return WidgetValidationResult.Invalid(WidgetValidationFailure.MetricOutOfRange);
+        }
+
+        // UI.9 V-RC-5: a server is never fresher than the snapshot carrying it. A reading "after" the write
+        // would make its age negative, i.e. fresh for longer than the policy allows.
+        if (server.LastUpdatedUtc is { } lastUpdated &&
+            (!IsTimestampInRange(lastUpdated, nowUtc) || lastUpdated > generatedAtUtc + WidgetSchema.MaxLastUpdatedLead))
         {
             return WidgetValidationResult.Invalid(WidgetValidationFailure.LastUpdatedOutOfRange);
         }
 
+        // AttentionMetric is deliberately NOT validated: an unknown value is a missing hint, not a corrupt
+        // snapshot (D-UI9-2). Readers parse it through WidgetAttentionMetrics.TryParse.
         return WidgetValidationResult.Valid;
     }
 

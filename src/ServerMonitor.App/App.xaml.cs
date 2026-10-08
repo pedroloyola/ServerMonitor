@@ -305,6 +305,11 @@ public partial class App : Application
 
             await ServicesHost.StartAsync();
 
+            // UI.9 D-UI9-6: the widget snapshot must follow fleet changes (delete/hide/add) and reflect the
+            // startup fleet, not only cycle completions. Optional by design: the Debug QA compositions do not
+            // register the recorder, and Start() never throws.
+            ServicesHost.Services.GetService<WidgetSnapshotRecorder>()?.Start();
+
             // BLOCKING FIX (Prism, M13 S2-T). Resolving this is what SUBSCRIBES it to the affordance
             // source, and Evaluate() is what makes the process act on the state it already has. Until
             // now it was constructed lazily by WindowCloseCoordinator's lambda, so nothing evaluated it

@@ -32,8 +32,11 @@ public sealed class WidgetSnapshotFeatureModule : IFeatureModule
             sp.GetRequiredService<ILogger<AtomicWidgetStateWriter>>()));
         services.AddSingleton(sp => new WidgetSnapshotRecorder(
             sp.GetRequiredService<IServerService>(),
+            sp.GetRequiredService<IServerLoadStatusSource>(),
             sp.GetRequiredService<IServerMonitoringStateStore>(),
             sp.GetRequiredService<IServerMetricsStore>(),
+            // UI.9 D-UI9-2: the engine's own thresholds (the one MonitoringOptions instance), never a default.
+            sp.GetRequiredService<MonitoringOptions>().Thresholds,
             sp.GetRequiredService<IWidgetStateWriter>(),
             sp.GetRequiredService<ILogger<WidgetSnapshotRecorder>>()));
     }

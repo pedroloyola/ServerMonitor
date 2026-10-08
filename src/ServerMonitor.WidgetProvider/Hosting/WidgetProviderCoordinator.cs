@@ -28,7 +28,8 @@ public sealed class WidgetProviderCoordinator
     private readonly IWidgetHost _host;
     private readonly WidgetSnapshotReader _reader;
     private readonly TimeProvider _timeProvider;
-    private readonly TimeSpan _staleThreshold;
+    // null = derive per snapshot (UI.9 D-UI9-4); a value is an explicit override (tests/composition only).
+    private readonly TimeSpan? _staleThreshold;
     private readonly IWidgetProviderLog _log;
 
     private readonly object _gate = new();
@@ -78,7 +79,7 @@ public sealed class WidgetProviderCoordinator
         _host = host ?? throw new ArgumentNullException(nameof(host));
         _reader = reader ?? new WidgetSnapshotReader();
         _timeProvider = timeProvider ?? TimeProvider.System;
-        _staleThreshold = staleThreshold ?? WidgetFreshness.DefaultStaleThreshold;
+        _staleThreshold = staleThreshold;
         _log = log ?? NullWidgetProviderLog.Instance;
 
         // Only a delegate is handed over here; the pump calls nothing back until it is armed.
@@ -381,13 +382,18 @@ public sealed class WidgetProviderCoordinator
         }
     }
 
-    /// <summary>Repaint every registered widget. Best-effort per widget.</summary>
+    /// <summary>
+    /// Repaint every widget that is ON SCREEN. Best-effort per widget. A deactivated widget is still
+    /// registered but nobody is looking at it; it is repainted by the host's next <c>Activate</c> anyway
+    /// (<see cref="OnWidgetActivated"/>), so painting it here would only be wasted reads and host calls
+    /// (UI.9 SPEC §7).
+    /// </summary>
     public void RefreshAll()
     {
         WidgetActivation[] snapshot;
         lock (_gate)
         {
-            snapshot = _widgets.Values.ToArray();
+            snapshot = _widgets.Values.Where(widget => _onScreen.Contains(widget.WidgetId)).ToArray();
         }
 
         foreach (var widget in snapshot)

@@ -3,6 +3,7 @@ using Microsoft.Extensions.Time.Testing;
 using ServerMonitor.App.Services;
 using ServerMonitor.App.Tests.Fakes;
 using ServerMonitor.Core.Enums;
+using ServerMonitor.Core.Interfaces;
 using ServerMonitor.Core.Models;
 using ServerMonitor.Core.Monitoring;
 using ServerMonitor.WidgetContract;
@@ -45,8 +46,10 @@ public sealed class WidgetSnapshotRecorderTests
         {
             Recorder = new WidgetSnapshotRecorder(
                 Servers,
+                Servers,
                 States,
                 Metrics,
+                MonitoringThresholds.Default,
                 Writer,
                 NullLogger<WidgetSnapshotRecorder>.Instance,
                 Clock,
@@ -265,7 +268,7 @@ public sealed class WidgetSnapshotRecorderTests
         h.Clock.Advance(Interval);
         h.Recorder.OnCycleCompleted(Completion(MonitoringOutcome.Success)); // no-op after shutdown
 
-        // TriggerWrite returns synchronously without starting a Task, so the count is stable now.
+        // The cycle trigger returns synchronously without starting a Task, so the count is stable now.
         Assert.Equal(startedBefore, h.Writer.StartedCount);
     }
 
@@ -289,6 +292,338 @@ public sealed class WidgetSnapshotRecorderTests
 
         gate.SetResult(); // release the abandoned write so its task can finish cleanly
     }
+
+    // ---- UI.9 D-UI9-6: fleet-change and startup writes (SPEC test 11, V-RC-1/2/7, V-B1, L-1) -----------
+
+    /// <summary>Signals every entry into GetAllAsync, so a test knows a drain decision has been reached.</summary>
+    private static SemaphoreSlim SignalGetAll(Harness h)
+    {
+        var entered = new SemaphoreSlim(0);
+        h.Servers.GetAllOverride = _ =>
+        {
+            entered.Release();
+            return Task.FromResult<IReadOnlyList<Server>>(h.Servers.Servers.ToList());
+        };
+        return entered;
+    }
+
+    [Fact]
+    public async Task Start_with_servers_writes_nothing_and_the_first_cycle_writes()
+    {
+        // Cortex L-1: with servers present, a startup write would only replace the last session's real
+        // readings with "no data"; the first cycle completion writes instead.
+        await using var h = new Harness();
+        h.AddServer("Home", ServerHealth.Healthy);
+        var entered = SignalGetAll(h);
+
+        h.Recorder.Start();
+        Assert.True(await entered.WaitAsync(SafetyNet)); // the startup request was evaluated...
+
+        h.Recorder.OnCycleCompleted(Completion(MonitoringOutcome.Success)); // ...and the first cycle writes
+        Assert.True(await h.Writer.WaitCompletedAsync());
+        await h.Recorder.DisposeAsync();
+
+        Assert.Equal(1, h.Writer.StartedCount);
+        Assert.Equal("Home", Assert.Single(Assert.Single(h.Writer.Snapshots).Servers).DisplayName);
+    }
+
+    [Fact]
+    public async Task Start_with_servers_and_no_cycle_writes_nothing()
+    {
+        await using var h = new Harness();
+        h.AddServer("Home", ServerHealth.Healthy);
+        var entered = SignalGetAll(h);
+
+        h.Recorder.Start();
+        Assert.True(await entered.WaitAsync(SafetyNet));
+        await h.Recorder.DisposeAsync(); // quiesce: the startup decision has been taken
+
+        Assert.Equal(0, h.Writer.StartedCount);
+    }
+
+    [Fact]
+    public async Task Start_on_a_loaded_empty_fleet_writes_an_empty_snapshot()
+    {
+        // A fresh fleet with no servers must reach the widget as Empty, not stay Missing/Unavailable.
+        await using var h = new Harness();
+
+        h.Recorder.Start();
+
+        Assert.True(await h.Writer.WaitCompletedAsync());
+        Assert.Empty(Assert.Single(h.Writer.Snapshots).Servers);
+    }
+
+    [Fact]
+    public async Task Start_on_a_missing_configuration_writes_an_empty_snapshot()
+    {
+        // DV-1: NotFound (no servers file yet: a fresh install) is an honest empty fleet.
+        await using var h = new Harness();
+        h.Servers.LoadStatus = ServerLoadStatus.NotFound;
+
+        h.Recorder.Start();
+
+        Assert.True(await h.Writer.WaitCompletedAsync());
+        Assert.Empty(Assert.Single(h.Writer.Snapshots).Servers);
+    }
+
+    [Fact]
+    public async Task Unavailable_configuration_with_an_empty_list_and_no_fleet_change_never_writes_an_empty_snapshot()
+    {
+        // V-RC-1 (UI9-COR-1): a corrupt/locked servers file reads as an empty list. Writing it would claim
+        // "no servers" and destroy the last-known-good snapshot. The gate must be CONSULTED (the signal),
+        // and nothing may be written — at startup, nor on a later cycle.
+        await using var h = new Harness();
+        var consulted = new SemaphoreSlim(0);
+        h.Servers.LoadStatusOverride = () =>
+        {
+            consulted.Release();
+            return Task.FromResult(ServerLoadStatus.Unavailable);
+        };
+
+        h.Recorder.Start();
+        Assert.True(await consulted.WaitAsync(SafetyNet));
+        h.Recorder.OnCycleCompleted(Completion(MonitoringOutcome.Success));
+        Assert.True(await consulted.WaitAsync(SafetyNet));
+
+        await h.Recorder.DisposeAsync(); // awaits the drain to quiescence: every decision has been taken
+
+        Assert.Equal(0, h.Writer.StartedCount);
+    }
+
+    [Fact]
+    public async Task Quarantined_session_add_then_delete_writes_the_empty_fleet_and_drops_the_name()
+    {
+        // Vigil V-B1 (UI9-SEC-1): the load status is cached Unavailable for the whole process (a quarantined
+        // entry). After a fleet change the in-memory list was just persisted and is authoritative, so the
+        // empty fleet must be written — otherwise the deleted server's name stays in the snapshot forever.
+        await using var h = new Harness();
+        var consulted = new SemaphoreSlim(0);
+        h.Servers.LoadStatusOverride = () =>
+        {
+            consulted.Release();
+            return Task.FromResult(ServerLoadStatus.Unavailable);
+        };
+        h.Recorder.Start();
+        Assert.True(await consulted.WaitAsync(SafetyNet)); // startup: empty + Unavailable -> nothing written
+
+        var added = h.AddServer("Added Then Deleted", ServerHealth.Healthy);
+        h.Servers.RaiseChanged();
+        Assert.True(await h.Writer.WaitCompletedAsync());
+        Assert.Single(h.Writer.Snapshots[^1].Servers);
+
+        h.Servers.Servers.Remove(added);
+        h.Servers.RaiseChanged(); // no clock advance; status is still Unavailable
+        Assert.True(await h.Writer.WaitCompletedAsync());
+        await h.Recorder.DisposeAsync();
+
+        var last = h.Writer.Snapshots[^1];
+        Assert.Empty(last.Servers);
+        Assert.DoesNotContain("Added Then Deleted", WidgetStateSerializer.Serialize(last));
+    }
+
+    [Fact]
+    public async Task Unavailable_status_does_not_block_a_non_empty_fleet()
+    {
+        // The gate is about the EMPTY claim only; a non-empty list is real data whatever the cached status.
+        await using var h = new Harness();
+        h.Servers.LoadStatus = ServerLoadStatus.Unavailable;
+        h.AddServer("Home", ServerHealth.Healthy);
+
+        h.Recorder.Start();
+        h.Recorder.OnCycleCompleted(Completion(MonitoringOutcome.Success));
+
+        Assert.True(await h.Writer.WaitCompletedAsync());
+        Assert.Single(Assert.Single(h.Writer.Snapshots).Servers);
+    }
+
+    [Fact]
+    public async Task Deleting_the_last_server_during_a_blocked_cycle_write_writes_the_empty_fleet_without_any_clock_advance()
+    {
+        // V-RC-2 (a) / UI9-SEC-1: the cycle write is in flight; the user deletes the last server. With no
+        // further cycle and the clock frozen inside the throttle window, the drain must still write the
+        // empty fleet — otherwise the deleted server's name persists in the snapshot indefinitely.
+        await using var h = new Harness();
+        var server = h.AddServer("Deleted Box", ServerHealth.Healthy);
+        h.Recorder.Start();
+
+        var gate = h.Writer.InstallGate();
+        h.Recorder.OnCycleCompleted(Completion(MonitoringOutcome.Success)); // cycle write, held open
+        Assert.True(await h.Writer.WaitStartedAsync());
+
+        h.Servers.Servers.Remove(server);
+        h.Servers.RaiseChanged();
+        gate.SetResult(); // NO h.Clock.Advance: we are still inside the throttle window
+
+        Assert.True(await h.Writer.WaitCompletedAsync()); // the cycle write
+        Assert.True(await h.Writer.WaitCompletedAsync()); // the forced fleet-change write
+        await h.Recorder.DisposeAsync();
+
+        Assert.Equal(2, h.Writer.StartedCount);
+        Assert.Equal(1, h.Writer.MaxConcurrent);
+        var last = h.Writer.Snapshots[^1];
+        Assert.Empty(last.Servers);
+        Assert.DoesNotContain("Deleted Box", WidgetStateSerializer.Serialize(last));
+    }
+
+    [Fact]
+    public async Task A_burst_of_fifty_fleet_changes_coalesces_to_at_most_two_writes_that_never_overlap()
+    {
+        // V-RC-2 (b): ≤1 in flight + ≤1 pending, whatever the burst size.
+        await using var h = new Harness();
+        h.AddServer("Home", ServerHealth.Healthy);
+
+        var gate = h.Writer.InstallGate();
+        h.Recorder.Start();
+        h.Servers.RaiseChanged(); // write #1, held open
+        Assert.True(await h.Writer.WaitStartedAsync());
+
+        for (var i = 0; i < 50; i++)
+        {
+            h.Servers.RaiseChanged();
+        }
+
+        gate.SetResult();
+        Assert.True(await h.Writer.WaitCompletedAsync());
+        Assert.True(await h.Writer.WaitCompletedAsync());
+        await h.Recorder.DisposeAsync(); // quiesce: no third write can still be pending
+
+        Assert.Equal(2, h.Writer.StartedCount);
+        Assert.Equal(1, h.Writer.MaxConcurrent);
+    }
+
+    [Fact]
+    public async Task Hiding_a_server_removes_its_name_through_the_same_path()
+    {
+        // V-RC-2 (c): hide is a fleet change too; the hidden server's name must leave the snapshot.
+        await using var h = new Harness();
+        var visible = h.AddServer("Visible", ServerHealth.Healthy);
+        var secret = h.AddServer("Hidden Later", ServerHealth.Healthy);
+        h.Recorder.Start();
+        h.Recorder.OnCycleCompleted(Completion(MonitoringOutcome.Success));
+        Assert.True(await h.Writer.WaitCompletedAsync());
+
+        h.Servers.Servers[h.Servers.Servers.IndexOf(secret)] = secret with { IsHidden = true };
+        h.Servers.RaiseChanged(); // no clock advance
+
+        Assert.True(await h.Writer.WaitCompletedAsync());
+        var last = h.Writer.Snapshots[^1];
+        Assert.Equal(visible.Id, Assert.Single(last.Servers).Id);
+        Assert.DoesNotContain("Hidden Later", WidgetStateSerializer.Serialize(last));
+    }
+
+    [Fact]
+    public async Task Forced_writes_do_not_hold_back_or_speed_up_the_cycle_cadence()
+    {
+        // The throttle bypass is scoped to fleet changes: a forced write does not anchor the throttle (so
+        // the next cycle still writes at once), and cycles stay throttled among themselves.
+        await using var h = new Harness();
+        h.AddServer("Home", ServerHealth.Healthy);
+        h.Recorder.Start();
+        h.Servers.RaiseChanged();
+        Assert.True(await h.Writer.WaitCompletedAsync()); // forced, T0
+
+        h.Recorder.OnCycleCompleted(Completion(MonitoringOutcome.Success)); // cycle, T0: not held back
+        Assert.True(await h.Writer.WaitCompletedAsync());
+
+        h.Recorder.OnCycleCompleted(Completion(MonitoringOutcome.Success)); // cycle, T0: throttled
+        await h.Recorder.DisposeAsync();
+
+        Assert.Equal(2, h.Writer.StartedCount);
+    }
+
+    [Fact]
+    public async Task Cycle_triggers_stay_throttled_even_after_a_fleet_change()
+    {
+        await using var h = new Harness();
+        h.AddServer("Home", ServerHealth.Healthy);
+        h.Recorder.Start();
+
+        h.Recorder.OnCycleCompleted(Completion(MonitoringOutcome.Success)); // cycle, anchors at T0
+        Assert.True(await h.Writer.WaitCompletedAsync());
+        h.Servers.RaiseChanged();                                           // forced, bypasses the window
+        Assert.True(await h.Writer.WaitCompletedAsync());
+
+        h.Recorder.OnCycleCompleted(Completion(MonitoringOutcome.Success)); // cycle inside window: no write
+        await h.Recorder.DisposeAsync();
+
+        Assert.Equal(2, h.Writer.StartedCount);
+    }
+
+    [Fact]
+    public async Task Dispose_unsubscribes_from_fleet_changes_and_later_changes_write_nothing()
+    {
+        // SPEC test 6 / V-RC-7.
+        var h = new Harness();
+        h.AddServer("Home", ServerHealth.Healthy);
+
+        Assert.Equal(0, h.Servers.ServersChangedHandlerCount);
+        h.Recorder.Start();
+        h.Recorder.Start(); // idempotent: still exactly one subscription
+        Assert.Equal(1, h.Servers.ServersChangedHandlerCount);
+        h.Servers.RaiseChanged();
+        Assert.True(await h.Writer.WaitCompletedAsync());
+
+        await h.DisposeAsync();
+
+        Assert.Equal(0, h.Servers.ServersChangedHandlerCount);
+        var before = h.Writer.StartedCount;
+        h.Servers.RaiseChanged();
+        h.Recorder.Start(); // no resurrection after dispose
+        Assert.Equal(0, h.Servers.ServersChangedHandlerCount);
+        Assert.Equal(before, h.Writer.StartedCount);
+    }
+
+    [Fact]
+    public async Task Fleet_change_handler_never_does_io_on_the_raising_thread()
+    {
+        // V-RC-7: ServerService raises ServersChanged inside the user's save path. Even with the store read
+        // blocked, raising must return at once; the write happens on the drain.
+        await using var h = new Harness();
+        h.AddServer("Home", ServerHealth.Healthy);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var entered = new SemaphoreSlim(0);
+        h.Servers.GetAllOverride = async _ =>
+        {
+            entered.Release();
+            await release.Task;
+            return h.Servers.Servers.ToList();
+        };
+        h.Recorder.Start();
+        Assert.True(await entered.WaitAsync(SafetyNet)); // startup drain is blocked inside GetAllAsync
+
+        h.Servers.RaiseChanged(); // returns synchronously; would deadlock the test if it awaited the store
+
+        release.SetResult();
+        Assert.True(await h.Writer.WaitCompletedAsync()); // the fleet-change write (startup alone writes nothing)
+        await h.Recorder.DisposeAsync();
+        Assert.Equal(1, h.Writer.StartedCount);
+        Assert.Equal(1, h.Writer.MaxConcurrent);
+    }
+
+    [Fact]
+    public async Task Mapped_snapshot_carries_the_engine_thresholds_reason_and_stale_policy()
+    {
+        // The recorder hands its injected thresholds to the mapper (D-UI9-2) and the per-server interval
+        // reaches staleAfterSeconds (D-UI9-3).
+        await using var h = new Harness();
+        var server = new Server { Id = Guid.NewGuid(), Name = "Busy", RefreshIntervalSeconds = 60 };
+        h.Servers.Servers.Add(server);
+        h.SetHealth(server.Id, ServerHealth.Warning);
+        h.Metrics.Set(server.Id, new ServerMetricsSnapshot
+        {
+            ServerId = server.Id, CollectedAt = Start, CpuUsagePercent = 10, MemoryUsagePercent = 20, DiskUsagePercent = 85
+        });
+
+        h.Recorder.Start();
+        h.Recorder.OnCycleCompleted(Completion(MonitoringOutcome.Success));
+
+        Assert.True(await h.Writer.WaitCompletedAsync());
+        var mapped = Assert.Single(Assert.Single(h.Writer.Snapshots).Servers);
+        Assert.Equal(WidgetAttentionMetrics.Disk, mapped.AttentionMetric);
+        Assert.Equal(120, mapped.StaleAfterSeconds);
+    }
+
+    private static readonly TimeSpan SafetyNet = TimeSpan.FromSeconds(30);
 
     // ---- test doubles -------------------------------------------------------
 
