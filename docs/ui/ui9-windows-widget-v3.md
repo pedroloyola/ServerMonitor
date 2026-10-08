@@ -1,6 +1,6 @@
 # UI.9 — Windows Widget V3
 
-**Status: implementation and packaged real QA COMPLETE (2026-10-08); merge pending.**
+**Status: UI.9 COMPLETE (2026-10-08).** PR #32 merged by merge commit pinned to `df15963` → `main` = `c266b38` (parents `9a81dc1` + `df15963`; tree == `df15963`). Post-merge CI run 37850235873: attempt 1 failed only in the pre-existing, non-deterministic `Ui7SaveGuardTests.M1` (Debug; independent of UI.9); a single rerun as a measurement passed both jobs (attempt 2). See §15.
 - **Branch:** `ui/ui9-windows-widget-v3`, base `9a81dc1`.
   - Code validated at `dec83f3`: the installed V3 build `1.1.2.2` was built from it, with clean provenance (`.boss/tmp/ui9/beacon-v3build.md`).
   - This document's commit adds docs only.
