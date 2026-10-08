@@ -3,6 +3,9 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using ServerMonitor.WidgetProvider.Hosting;
 using ServerMonitor.WidgetProvider.Rendering;
+using Contract = ServerMonitor.WidgetContract.WidgetServerState;
+using Health = ServerMonitor.WidgetContract.WidgetHealth;
+using ServerMonitor.WidgetProvider.Reading;
 
 namespace ServerMonitor.WidgetProvider.Tests.Rendering;
 
@@ -62,6 +65,50 @@ public sealed class WidgetCardPreviewTests
         File.WriteAllText(stem + ".template.json", Indent(card.TemplateJson));
         File.WriteAllText(stem + ".data.json", Indent(card.DataJson));
         File.WriteAllText(stem + ".expanded.json", expanded.ToJsonString(Pretty));
+    }
+
+    /// <summary>
+    /// UI.9 C2: the SYNTHETIC fleet behind the widget-picker screenshots (Medium, per culture, all healthy and
+    /// fresh). Invented names, no host/IP/user — never real data. Written to
+    /// <c>%TEMP%\sm-widget-preview\picker\</c> for the offline proxy render that produces
+    /// <c>Public\ServerAlyzerWidgetScreenshot*.png</c> (command in the C2 report).
+    /// </summary>
+    [Theory]
+    [InlineData("en-US", "Web server", "Database", "Backup")]
+    [InlineData("pt-PT", "Servidor web", "Base de dados", "Cópias")]
+    [InlineData("pt-BR", "Servidor web", "Banco de dados", "Backup")]
+    public void Picker_fleet_is_synthetic_and_written_for_the_store_screenshot(string culture, string web, string db, string backup)
+    {
+        static Contract Server(int n, string name, double cpu, double mem, double disk) => new()
+        {
+            Id = new Guid($"00000000-0000-0000-0000-{n:D12}"),
+            DisplayName = name,
+            Health = Health.Healthy,
+            CpuUsagePercent = cpu,
+            MemoryUsagePercent = mem,
+            DiskUsagePercent = disk,
+            LastUpdatedUtc = Now.AddSeconds(-5),
+            StaleAfterSeconds = 60
+        };
+
+        var servers = new[] { Server(1, web, 24, 61, 43), Server(2, db, 39, 72, 55), Server(3, backup, 8, 22, 55) };
+        var strings = WidgetStrings.ForCulture(CultureInfo.GetCultureInfo(culture));
+        var read = WidgetReadResult.Available(new ServerMonitor.WidgetContract.WidgetStateSnapshot
+        {
+            SchemaVersion = ServerMonitor.WidgetContract.WidgetSchema.CurrentVersion,
+            GeneratedAtUtc = Now,
+            OverallHealth = Health.Healthy,
+            Servers = servers
+        });
+        var card = WidgetCardRenderer.Render(WidgetViewModelBuilder.Build(read, WidgetSizeHint.Medium, Now, strings));
+        var expanded = CardTemplateHarness.Expand(card.TemplateJson, card.DataJson);
+
+        Assert.Empty(CardTemplateHarness.ShapeErrors(expanded));
+        Assert.Equal(strings.FleetAllHealthy, WidgetViewModelBuilder.Build(read, WidgetSizeHint.Small, Now, strings).Title);
+
+        var dir = Path.Combine(Path.GetTempPath(), "sm-widget-preview", "picker");
+        Directory.CreateDirectory(dir);
+        File.WriteAllText(Path.Combine(dir, $"medium-picker-{culture}.expanded.json"), expanded.ToJsonString(Pretty));
     }
 
     private static string Indent(string json)
