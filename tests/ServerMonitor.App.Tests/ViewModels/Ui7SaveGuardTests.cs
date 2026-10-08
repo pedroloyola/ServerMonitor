@@ -82,26 +82,38 @@ public sealed class Ui7SaveGuardTests : IDisposable
         Assert.IsNotType<EditorPageDouble>(_world.Host.Content);
     }
 
-    /// <summary>M-1 (3): a visit that saved but stayed on screen (its navigation not taken) is never orphaned.</summary>
+    /// <summary>
+    /// M-1 (3): a visit that saved but stayed on screen (its navigation not taken) is never orphaned. The scenario runs
+    /// on one owner thread, as in the app (every gesture and every continuation on the UI dispatcher): the guard's
+    /// decision continuation is processed before the next gesture - drained explicitly, never waited for by time - so
+    /// the second submit meets a navigation that is free again and must take the visit to the saved server's Detail.
+    /// </summary>
     [Fact]
     public async Task M1_ASavedVisitStillOnScreen_GoesToItsDetail_OnTheNextSubmit()
     {
-        var page = await OpenDirtyAddAsync(keyAuth: true); // no secret: the second submit is valid too
-        _world.Prompt.AutoAnswer = null;
-        page.Controller.Cancel(); // "Descartar alterações?" is now pending: the save's own navigation will be dropped
+        using var owner = new OwnerThread();
+        await owner.RunAsync(async () =>
+        {
+            var page = await OpenDirtyAddAsync(keyAuth: true); // no secret: the second submit is valid too
+            _world.Prompt.AutoAnswer = null;
+            page.Controller.Cancel(); // "Descartar alterações?" is now pending: the save's own navigation will be dropped
 
-        var outcome = await page.SubmitAsync(); // (a test can submit under the question; the UI cannot - it is modal)
-        Assert.Equal(ServerEditorSaveStatus.Saved, outcome!.Status);
-        Assert.Same(page, _world.Host.Content);
-        _world.Prompt.Answer(false); // "Continuar a editar"
-        Assert.Same(page, _world.Host.Content);
+            var outcome = await page.SubmitAsync(); // (a test can submit under the question; the UI cannot - it is modal)
+            Assert.True(owner.IsCurrent); // the precondition this test rests on: the scenario is on the owner thread
+            Assert.Equal(ServerEditorSaveStatus.Saved, outcome!.Status);
+            Assert.Same(page, _world.Host.Content);
+            _world.Prompt.Answer(false); // "Continuar a editar"
+            await owner.DrainAsync(); // the dispatcher has processed the answer before the user's next click
+            Assert.Same(page, _world.Host.Content);
+            Assert.False(page.Disposed);
 
-        var again = await page.SubmitAsync();
+            var again = await page.SubmitAsync();
 
-        Assert.Equal(ServerEditorSaveStatus.NotCurrent, again!.Status);
-        var detail = Assert.IsType<Ui7EditorWorld.DetailPageDouble>(_world.Host.Content);
-        Assert.Equal(Assert.Single(await _world.ServerService.GetAllAsync()).Id, detail.ServerId);
-        Assert.True(page.Disposed);
+            Assert.Equal(ServerEditorSaveStatus.NotCurrent, again!.Status);
+            var detail = Assert.IsType<Ui7EditorWorld.DetailPageDouble>(_world.Host.Content);
+            Assert.Equal(Assert.Single(await _world.ServerService.GetAllAsync()).Id, detail.ServerId);
+            Assert.True(page.Disposed);
+        });
     }
 
     /// <summary>Cortex n-2: after a failed persist the consumed secrets no longer count as an unsaved edit of their own.</summary>
