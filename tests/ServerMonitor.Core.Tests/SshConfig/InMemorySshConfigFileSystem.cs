@@ -23,6 +23,9 @@ internal sealed class InMemorySshConfigFileSystem : ISshConfigFileSystem
 
     public List<string> Enumerations { get; } = [];
 
+    /// <summary>Every <see cref="GetInfo"/> path, in call order: the import's per-path probes.</summary>
+    public List<string> InfoQueries { get; } = [];
+
     /// <summary>Adds a file; a relative path is relative to <see cref="SshDirectory"/>.</summary>
     public InMemorySshConfigFileSystem File(string path, string text) => File(path, Encoding.UTF8.GetBytes(text));
 
@@ -57,10 +60,13 @@ internal sealed class InMemorySshConfigFileSystem : ISshConfigFileSystem
         return this;
     }
 
-    public SshConfigPathInfo GetInfo(string fullPath) =>
-        _entries.TryGetValue(fullPath, out var entry)
+    public SshConfigPathInfo GetInfo(string fullPath)
+    {
+        InfoQueries.Add(fullPath);
+        return _entries.TryGetValue(fullPath, out var entry)
             ? new SshConfigPathInfo(entry.Kind, entry.IsReparsePoint)
             : new SshConfigPathInfo(SshConfigPathKind.Missing, false);
+    }
 
     public IReadOnlyList<string>? EnumerateNames(string fullDirectoryPath)
     {

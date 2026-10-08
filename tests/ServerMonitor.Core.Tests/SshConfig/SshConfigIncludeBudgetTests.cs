@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Text;
 using ServerMonitor.Core.SshConfig;
 using Fs = ServerMonitor.Core.Tests.SshConfig.InMemorySshConfigFileSystem;
@@ -39,15 +38,19 @@ public sealed class SshConfigIncludeBudgetTests
         root.Append("Host a\n");
         var fs = WithEntries(new Fs().File("config", root.ToString()), "d", 4000);
 
-        var stopwatch = Stopwatch.StartNew();
         var result = Import(fs);
-        stopwatch.Stop();
 
         Assert.Equal(SshConfigImportErrorCode.TooManyFiles, result.ErrorCode);
         Assert.Equal(Fs.SshDirectory + @"\config", result.ErrorDetail);
         Assert.Empty(result.Hosts);
         Assert.Equal([Fs.SshDirectory + @"\d"], fs.Enumerations);
-        Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(5), $"took {stopwatch.Elapsed}");
+
+        // Fail fast, counted rather than timed: each Include argument admitted by the budget probes
+        // its directory chain before globbing, so the directory is probed exactly once per admitted
+        // argument and the ~17,000 arguments past the budget are never looked at.
+        Assert.Equal(
+            SshConfigIncludeExpander.MaxIncludeArguments,
+            fs.InfoQueries.Count(path => path == Fs.SshDirectory + @"\d"));
     }
 
     [Fact]

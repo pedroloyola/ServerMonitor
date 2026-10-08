@@ -522,7 +522,7 @@ public sealed class SshConfigResolverTests
     // ---- Vigil M14.4a M2: bounded output.
 
     [Fact]
-    public void ManyAliases_AreCappedWithATruncationWarning_AndResolveQuickly()
+    public void ManyAliases_AreCappedWithATruncationWarning()
     {
         var text = new System.Text.StringBuilder("Host *\n  ServerAliveInterval 30\n");
         for (var i = 0; i < 33_000; i++)
@@ -530,17 +530,16 @@ public sealed class SshConfigResolverTests
             text.Append("Host h").Append(i).Append("\n  HostName 10.0.0.1\n");
         }
 
-        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         var result = Import(text.ToString());
-        stopwatch.Stop();
 
         Assert.Equal(SshConfigResolver.MaxHosts, result.Hosts.Count);
         Assert.Contains(SshConfigFileWarning.HostsTruncated, result.FileWarnings);
         Assert.Equal("h0", result.Hosts[0].Alias);
         Assert.Equal("h499", result.Hosts[^1].Alias);
         Assert.All(result.Hosts, host => Assert.Equal("10.0.0.1", host.HostName));
-        // Generous bound: the indexed plan is linear; the old per-alias rescan was quadratic.
-        Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(5), $"took {stopwatch.Elapsed}");
+        // Speed is no longer timed here. SshConfigResolutionPlanTests checks, without a clock, the
+        // per-alias candidates of the index that replaced the quadratic rescan and the segment
+        // reads it costs; it does not measure end-to-end Resolve() cost.
     }
 
     [Fact]
