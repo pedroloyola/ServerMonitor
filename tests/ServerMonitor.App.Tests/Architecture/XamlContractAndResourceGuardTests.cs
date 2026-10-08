@@ -37,8 +37,9 @@ public sealed partial class XamlContractAndResourceGuardTests
             // UI.8: the title strip's measured layout (CompactTitleLayout) and the Compact body host.
             "CompactBrandMark", "CompactWordmark", "CompactExpandButton", "CompactExpandText", "CompactShellView"
         ],
-        // UI.8: the window focuses the first row / the state's real action when Compact opens (RC-8).
-        ["Controls/CompactShell.xaml"] = ["CompactRepeater", "AddServerButton", "ManageHiddenButton"],
+        // UI.8: the window focuses the first visible row (measured against ListScroller, c3 B-6) / the state's real action
+        // when Compact opens (RC-8).
+        ["Controls/CompactShell.xaml"] = ["CompactRepeater", "ListScroller", "AddServerButton", "ManageHiddenButton"],
         // UI.4: adaptive VisualState setters reflow these; OverviewSearchBox also takes focus after "Limpar pesquisa";
         // Beacon r1: the code-behind focuses the content / the return target (HealthCard … EmptyAddButton).
         ["Views/DashboardPage.xaml"] = ["FirstServerStateBlock", "HiddenStateBlock", "PageViewport", "PageRoot", "HeaderGrid", "HeaderActions", "HealthRow", "HealthColumn2", "HealthCountRow", "HealthSegments",
