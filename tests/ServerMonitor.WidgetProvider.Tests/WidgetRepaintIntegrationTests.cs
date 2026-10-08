@@ -52,25 +52,32 @@ public sealed class WidgetRepaintIntegrationTests : IDisposable
     private static WidgetActivation Widget(string id) =>
         new(id, "ServerAlyzer_Widget", WidgetSizeHint.Medium, CustomState: null);
 
-    private static WidgetStateSnapshot Snapshot(double cpu) => new()
+    private static WidgetStateSnapshot Snapshot(double cpu, bool withUi9Fields = false)
     {
-        SchemaVersion = WidgetSchema.CurrentVersion,
-        GeneratedAtUtc = DateTimeOffset.UtcNow,
-        OverallHealth = WidgetHealth.Healthy,
-        Servers = new[]
+        // One timestamp for both fields: the validator rejects a reading newer than the snapshot (V-RC-5).
+        var now = DateTimeOffset.UtcNow;
+        return new()
         {
-            new WidgetServerState
+            SchemaVersion = WidgetSchema.CurrentVersion,
+            GeneratedAtUtc = now,
+            OverallHealth = withUi9Fields ? WidgetHealth.Warning : WidgetHealth.Healthy,
+            Servers = new[]
             {
-                Id = Guid.Parse("11111111-1111-1111-1111-111111111111"),
-                DisplayName = "Home",
-                Health = WidgetHealth.Healthy,
-                CpuUsagePercent = cpu,
-                MemoryUsagePercent = 20,
-                DiskUsagePercent = 30,
-                LastUpdatedUtc = DateTimeOffset.UtcNow
+                new WidgetServerState
+                {
+                    Id = Guid.Parse("11111111-1111-1111-1111-111111111111"),
+                    DisplayName = "Home",
+                    Health = withUi9Fields ? WidgetHealth.Warning : WidgetHealth.Healthy,
+                    CpuUsagePercent = cpu,
+                    MemoryUsagePercent = 20,
+                    DiskUsagePercent = 30,
+                    LastUpdatedUtc = now,
+                    AttentionMetric = withUi9Fields ? WidgetAttentionMetrics.Disk : null,
+                    StaleAfterSeconds = withUi9Fields ? 600 : null
+                }
             }
-        }
-    };
+        };
+    }
 
     /// <summary>The writer's first-write primitive: unique temp in the same folder, then a plain rename.</summary>
     private void FirstWrite(double cpu)
@@ -81,10 +88,10 @@ public sealed class WidgetRepaintIntegrationTests : IDisposable
     }
 
     /// <summary>The writer's steady-state commit: unique temp in the same folder, then ReplaceFile.</summary>
-    private void AtomicReplace(double cpu)
+    private void AtomicReplace(double cpu, bool withUi9Fields = false)
     {
         var temp = WidgetStateLocation.NewTempPath(_dir);
-        File.WriteAllBytes(temp, WidgetStateSerializer.SerializeToUtf8Bytes(Snapshot(cpu)));
+        File.WriteAllBytes(temp, WidgetStateSerializer.SerializeToUtf8Bytes(Snapshot(cpu, withUi9Fields)));
         var backup = _path + ".bak";
         File.Replace(temp, _path, backup);
         try { File.Delete(backup); } catch { }
@@ -130,6 +137,37 @@ public sealed class WidgetRepaintIntegrationTests : IDisposable
                 repainted.Wait(UpdateTimeout),
                 "a real atomic snapshot replace never reached the widget - the repaint pump is dead");
             Assert.True(host.UpdateCountFor("a") >= 2);
+        }
+        finally
+        {
+            coordinator.Shutdown();
+        }
+    }
+
+    [Fact]
+    public void A_snapshot_carrying_the_ui9_fields_is_read_and_repainted_not_rejected()
+    {
+        // SPEC test 5: the real watcher/reader/validator path accepts a file with attentionMetric and
+        // staleAfterSeconds. Were the new fields rejected, the card would turn Unavailable and the CPU marker
+        // would never appear.
+        FirstWrite(cpu: 12);
+        var host = new FakeWidgetHost();
+        using var repainted = new ManualResetEventSlim(false);
+        var coordinator = NewCoordinator(host);
+        try
+        {
+            coordinator.OnWidgetActivated(Widget("a"));
+            host.Updated = (_, card, _) =>
+            {
+                if (card.Contains(CpuMarker(88), StringComparison.Ordinal))
+                {
+                    repainted.Set();
+                }
+            };
+
+            AtomicReplace(cpu: 88, withUi9Fields: true);
+
+            Assert.True(repainted.Wait(UpdateTimeout), "a snapshot with the UI.9 fields never reached the widget");
         }
         finally
         {

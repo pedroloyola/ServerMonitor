@@ -59,7 +59,10 @@ public sealed class WidgetLocalizationTests
                 new WidgetServerState
                 {
                     Id = Guid.NewGuid(), DisplayName = "Home", Health = WidgetHealth.Warning,
-                    CpuUsagePercent = 50, MemoryUsagePercent = 60, DiskUsagePercent = 70, LastUpdatedUtc = Now
+                    CpuUsagePercent = 50, MemoryUsagePercent = 60, DiskUsagePercent = 70,
+                    // UI.9 D-UI9-4: a 300 s server (staleAfter 600 s) keeps a 3-minute-old snapshot fresh; under
+                    // the old fixed 90 s it would now (correctly) render as "No recent data".
+                    LastUpdatedUtc = Now.AddMinutes(-3), StaleAfterSeconds = 600
                 }
             }
         });

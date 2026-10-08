@@ -5,6 +5,7 @@ using System.Text.Json.Nodes;
 using System.Text.Unicode;
 using ServerMonitor.ActivationContract;
 using ServerMonitor.WidgetProvider.Hosting;
+using ServerMonitor.WidgetProvider.Reading;
 
 namespace ServerMonitor.WidgetProvider.Rendering;
 
@@ -237,7 +238,8 @@ public static class WidgetCardRenderer
                 ["spacing"] = "None",
                 ["columns"] = new JsonArray
                 {
-                    StatTile(vm.HealthyCount, vm.HealthyLabel, vm.HealthyCount > 0 ? "good" : null),
+                    // UI.9 D-UI9-5 (minimal, until C1): a stale card never paints "healthy" green.
+                    StatTile(vm.HealthyCount, vm.HealthyLabel, vm.HealthyCount > 0 && !IsStale(vm) ? "good" : null),
                     StatTile(vm.WarningCount, vm.WarningLabel, vm.WarningCount > 0 ? "warning" : null),
                     StatTile(vm.CriticalCount, vm.CriticalLabel, vm.CriticalCount > 0 ? "attention" : null),
                     StatTile(vm.OfflineCount, vm.OfflineLabel, vm.OfflineCount > 0 ? "attention" : null)
@@ -386,9 +388,12 @@ public static class WidgetCardRenderer
             (Repeat(TickFilled, vm.CriticalCount + vm.OfflineCount), "attention", false),
             (Repeat(TickFilled, vm.WarningCount), "warning", false),
             (Repeat(TickFilled, vm.UnknownCount), (string?)null, true),
-            (Repeat(TickFilled, vm.HealthyCount), "good", false)
+            // UI.9 D-UI9-5 (minimal, until C1): stale → the healthy run is subtle, never "good" green.
+            (Repeat(TickFilled, vm.HealthyCount), IsStale(vm) ? null : "good", IsStale(vm))
         });
     }
+
+    private static bool IsStale(WidgetViewModel vm) => vm.Freshness == WidgetFreshnessState.Stale;
 
     // The fleet bar genuinely needs one colour per health, so it keeps coloured runs in adjacent auto
     // columns. It can afford to: it is bounded to MaxFleetTicks and sits in the wide hero region, where the

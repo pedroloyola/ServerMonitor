@@ -11,6 +11,16 @@ namespace ServerMonitor.WidgetProvider.Rendering;
 /// neutral placeholder for unknown (§19/§20 — never 0-for-unknown), relative freshness text (§23), and
 /// localized copy (§16). Uses the snapshot's already-computed OverallHealth (never recomputes, §11) and
 /// keeps privacy: only sanitized display names + normalized metrics reach the model (§15).
+/// <para>
+/// UI.9 B2 adds the V3 states (SPEC §3) at view-model level: per-server freshness against the provider's
+/// own clock and the snapshot's derived threshold (D-UI9-4/5), the card state, and Prism's binding copy.
+/// Precedence: Offline/Critical/Warning keep their label when stale (staleness never hides attention);
+/// only Healthy — and Unknown with an old reading — become "Not updated". Nothing says "All healthy" or
+/// counts a server as healthy unless it is Healthy AND fresh. The raw <c>attentionMetric</c> string never
+/// reaches the model: it is parsed to the allowlisted enum and only <see cref="WidgetStrings"/> text is
+/// emitted, with severity from the engine's health (V-RC-6). Until C1 rewrites the renderer, a stale
+/// snapshot also overrides the legacy hero/row labels so the current card never claims current health.
+/// </para>
 /// </summary>
 public static class WidgetViewModelBuilder
 {
@@ -57,18 +67,26 @@ public static class WidgetViewModelBuilder
             return Unavailable(size, strings);
         }
 
-        var freshnessState = WidgetFreshness.Evaluate(read, nowUtc, staleThreshold);
+        // D-UI9-4: one effective threshold for the snapshot AND the per-server fallback.
+        var threshold = staleThreshold ?? WidgetFreshness.DeriveSnapshotThreshold(snapshot);
+        var freshnessState = WidgetFreshness.Evaluate(read, nowUtc, threshold);
         var freshnessText = FreshnessText(snapshot.GeneratedAtUtc, nowUtc, strings);
+        var footerText = FooterText(snapshot.GeneratedAtUtc, nowUtc, freshnessState, strings);
 
         if (snapshot.Servers.Count == 0)
         {
-            return Empty(size, strings, freshnessState, freshnessText);
+            return Empty(size, strings, freshnessState, freshnessText, footerText);
         }
 
+        bool IsFresh(WidgetServerState server) =>
+            WidgetFreshness.IsServerFresh(server, freshnessState, threshold, nowUtc);
+
         var counts = CountByHealth(snapshot.Servers);
+        var v3 = CountV3(snapshot.Servers, IsFresh);
+        var stale = freshnessState == WidgetFreshnessState.Stale;
         var ordered = WidgetOrdering.ForDisplay(snapshot.Servers);
         var maxRows = MaxRowsFor(size);
-        var shown = ordered.Take(maxRows).Select(s => ToRow(s, strings)).ToArray();
+        var shown = ordered.Take(maxRows).Select(s => ToRow(s, strings, IsFresh(s), stale)).ToArray();
         // TRUTHFUL DEGRADATION INVARIANT (M13-QA-4 / QA-5): for a size that renders rows, visible + overflow
         // == total, and every server not rendered is announced. A server can never vanish from the card
         // without the user being told.
@@ -78,6 +96,12 @@ public static class WidgetViewModelBuilder
         // per server. Its overflow is therefore zero, not "everything" - carrying a phantom "+N" that
         // SmallBody never draws would be a trap for the next person to touch it (Prism L3).
         var overflow = maxRows == 0 ? 0 : Math.Max(0, snapshot.Servers.Count - maxRows);
+        var cardState = stale ? WidgetCardState.Stale
+            : v3.Problems > 0 ? WidgetCardState.Attention
+            : v3.NoCurrentData > 0 ? WidgetCardState.NoCurrentData
+            : WidgetCardState.Healthy;
+        var total = snapshot.Servers.Count;
+        var lastState = Format(strings.StaleLastStateFormat, counts.Healthy, total);
 
         return new WidgetViewModel
         {
@@ -85,10 +109,12 @@ public static class WidgetViewModelBuilder
             Size = size,
             BrandName = strings.BrandName,
             OverallHealth = snapshot.OverallHealth,
-            OverallHealthLabel = strings.HealthLabel(snapshot.OverallHealth),
-            OverallHealthColor = HealthColor(snapshot.OverallHealth),
+            // Legacy renderer fields: a stale snapshot never reads as current health (D-UI9-5, until C1).
+            OverallHealthLabel = stale ? strings.StaleTitle : strings.HealthLabel(snapshot.OverallHealth),
+            OverallHealthColor = stale ? HealthColor(WidgetHealth.Unknown) : HealthColor(snapshot.OverallHealth),
             HeroValue = $"{counts.Healthy}/{counts.Total}",
-            HeroLabel = counts.Healthy == counts.Total
+            HeroLabel = stale ? strings.StaleTitle
+                : counts.Healthy == counts.Total
                 ? strings.HealthyPlural
                 : strings.HealthLabel(snapshot.OverallHealth),
             CpuLabel = strings.Cpu,
@@ -99,7 +125,7 @@ public static class WidgetViewModelBuilder
             WarningLabel = strings.Warning,
             CriticalLabel = strings.Critical,
             OfflineLabel = strings.Offline,
-            PrimarySummary = PrimarySummary(snapshot.OverallHealth, counts, strings),
+            PrimarySummary = stale ? strings.StaleTitle : PrimarySummary(snapshot.OverallHealth, counts, strings),
             CountsSummary = CountsSummary(counts, strings),
             Freshness = freshnessState,
             FreshnessText = freshnessText,
@@ -113,8 +139,155 @@ public static class WidgetViewModelBuilder
             OverflowCount = overflow,
             OverflowText = overflow > 0
                 ? string.Format(CultureInfo.InvariantCulture, strings.MoreCount, overflow)
-                : string.Empty
+                : string.Empty,
+            CardState = cardState,
+            Title = cardState switch
+            {
+                WidgetCardState.Stale => strings.StaleTitle,
+                WidgetCardState.Attention => WidgetStrings.Plural(v3.Problems, strings.FleetProblemsOne, strings.FleetProblemsOther),
+                WidgetCardState.NoCurrentData => Format(strings.FleetUnknownOnly, v3.NoCurrentData),
+                _ => strings.FleetAllHealthy
+            },
+            Subtitle = stale
+                ? lastState
+                : WidgetStrings.Plural(counts.Healthy + counts.Warning + counts.Critical,
+                    strings.FleetConnectedOne, strings.FleetConnectedOther),
+            Summary = stale ? strings.StaleTitle : CountsSummaryV3(v3, strings),
+            FooterText = footerText,
+            RowsOfTotalText = maxRows == 0 ? string.Empty : Format(strings.OverflowFormat, shown.Length, total),
+            HealthyFreshCount = v3.HealthyFresh,
+            RingAltText = stale ? lastState : Format(strings.RingAltFormat, v3.HealthyFresh, total)
         };
+    }
+
+    /// <summary>
+    /// V3 row state (D-UI9-5): Offline/Critical/Warning keep their label whatever the freshness; Healthy
+    /// that is not fresh becomes NotUpdated; Unknown becomes NotUpdated only if it HAD a reading (a server
+    /// never read is "No data", which is the truer sentence).
+    /// </summary>
+    public static WidgetRowState RowState(WidgetServerState server, bool fresh) => server.Health switch
+    {
+        WidgetHealth.Offline => WidgetRowState.Offline,
+        WidgetHealth.Critical => WidgetRowState.Critical,
+        WidgetHealth.Warning => WidgetRowState.Warning,
+        WidgetHealth.Healthy => fresh ? WidgetRowState.Healthy : WidgetRowState.NotUpdated,
+        _ => fresh || server.LastUpdatedUtc is null ? WidgetRowState.Unknown : WidgetRowState.NotUpdated
+    };
+
+    private static string RowStatusText(WidgetRowState state, WidgetServerState server, WidgetStrings strings)
+    {
+        // V-RC-6: severity from the engine's health only; the metric only picks the noun.
+        var metric = state is WidgetRowState.Warning or WidgetRowState.Critical
+            ? WidgetAttentionMetrics.TryParse(server.AttentionMetric)
+            : null;
+        var critical = state == WidgetRowState.Critical;
+
+        return (state, metric) switch
+        {
+            (WidgetRowState.Healthy, _) => strings.StatusHealthy,
+            (WidgetRowState.Offline, _) => strings.StatusOffline,
+            (WidgetRowState.NotUpdated, _) => strings.StatusRowStale,
+            (_, WidgetAttentionMetric.Cpu) => critical ? strings.ReasonCpuCritical : strings.ReasonCpuWarning,
+            (_, WidgetAttentionMetric.Memory) => critical ? strings.ReasonMemoryCritical : strings.ReasonMemoryWarning,
+            (_, WidgetAttentionMetric.Disk) => critical ? strings.ReasonDiskCritical : strings.ReasonDiskWarning,
+            (WidgetRowState.Critical, _) => strings.StatusCritical,
+            (WidgetRowState.Warning, _) => strings.StatusWarning,
+            _ => strings.StatusUnknown
+        };
+    }
+
+    private static string RowStatusColor(WidgetRowState state) => state switch
+    {
+        WidgetRowState.Healthy => "good",
+        WidgetRowState.Warning => "warning",
+        WidgetRowState.Critical or WidgetRowState.Offline => "attention",
+        _ => "default"
+    };
+
+    private static string Format(string format, params object[] args) =>
+        string.Format(CultureInfo.InvariantCulture, format, args);
+
+    // Minute granularity (Prism RC-5): the card only repaints on a commit, a debounce or the backstop,
+    // so a seconds counter would freeze and lie. Stale switches to "Last reading …".
+    private static string FooterText(
+        DateTimeOffset generatedAt, DateTimeOffset nowUtc, WidgetFreshnessState freshness, WidgetStrings strings)
+    {
+        var age = nowUtc - generatedAt;
+        var stale = freshness == WidgetFreshnessState.Stale;
+        if (age < TimeSpan.FromMinutes(1) && !stale)
+        {
+            return strings.UpdatedJustNow;
+        }
+
+        if (age < TimeSpan.FromHours(1))
+        {
+            // A stale snapshot is at least 90 s old, so "0 min" cannot occur; clamp anyway.
+            var minutes = Math.Max(1, (int)age.TotalMinutes);
+            return Format(stale ? strings.LastReadingMinutesAgo : strings.UpdatedMinutesAgo, minutes);
+        }
+
+        return Format(stale ? strings.LastReadingHoursAgo : strings.UpdatedHoursAgo, (int)age.TotalHours);
+    }
+
+    // Unknown and not-fresh readings are their own bucket — never folded into healthy (§21, D-UI9-5).
+    private static string CountsSummaryV3(V3Counts counts, WidgetStrings strings)
+    {
+        var parts = new List<string>(5);
+        if (counts.HealthyFresh > 0)
+        {
+            parts.Add(WidgetStrings.Plural(counts.HealthyFresh, strings.CountHealthyOne, strings.CountHealthyOther));
+        }
+
+        if (counts.Warning > 0)
+        {
+            parts.Add(Format(strings.CountWarning, counts.Warning));
+        }
+
+        if (counts.Critical > 0)
+        {
+            parts.Add(WidgetStrings.Plural(counts.Critical, strings.CountCriticalOne, strings.CountCriticalOther));
+        }
+
+        if (counts.Offline > 0)
+        {
+            parts.Add(Format(strings.CountOffline, counts.Offline));
+        }
+
+        if (counts.NoCurrentData > 0)
+        {
+            parts.Add(Format(strings.CountUnknown, counts.NoCurrentData));
+        }
+
+        return string.Join(strings.CountSeparator, parts);
+    }
+
+    private static V3Counts CountV3(IReadOnlyList<WidgetServerState> servers, Func<WidgetServerState, bool> isFresh)
+    {
+        var counts = new V3Counts();
+        foreach (var server in servers)
+        {
+            switch (RowState(server, isFresh(server)))
+            {
+                case WidgetRowState.Healthy: counts.HealthyFresh++; break;
+                case WidgetRowState.Warning: counts.Warning++; break;
+                case WidgetRowState.Critical: counts.Critical++; break;
+                case WidgetRowState.Offline: counts.Offline++; break;
+                default: counts.NoCurrentData++; break;
+            }
+        }
+
+        return counts;
+    }
+
+    private sealed class V3Counts
+    {
+        public int HealthyFresh;
+        public int Warning;
+        public int Critical;
+        public int Offline;
+        public int NoCurrentData;
+
+        public int Problems => Warning + Critical + Offline;
     }
 
     /// <summary>Adaptive Card colour for a health — text always carries the label too (§18).</summary>
@@ -127,8 +300,12 @@ public static class WidgetViewModelBuilder
         _ => "default"
     };
 
-    private static WidgetServerRow ToRow(WidgetServerState server, WidgetStrings strings)
+    private static WidgetServerRow ToRow(WidgetServerState server, WidgetStrings strings, bool fresh, bool snapshotStale)
     {
+        var state = RowState(server, fresh);
+        var statusText = RowStatusText(state, server, strings);
+        var statusColor = RowStatusColor(state);
+
         var cpu = FormatPercent(server.CpuUsagePercent, strings);
         var mem = FormatPercent(server.MemoryUsagePercent, strings);
         var disk = FormatPercent(server.DiskUsagePercent, strings);
@@ -140,8 +317,9 @@ public static class WidgetViewModelBuilder
             ServerId: server.Id,
             DisplayName: TruncateName(server.DisplayName, strings),
             Health: server.Health,
-            HealthLabel: strings.HealthLabel(server.Health),
-            HealthColor: HealthColor(server.Health),
+            // Legacy renderer label: switches to the V3 status only when the whole snapshot is stale (until C1).
+            HealthLabel: snapshotStale ? statusText : strings.HealthLabel(server.Health),
+            HealthColor: snapshotStale ? statusColor : HealthColor(server.Health),
             CpuText: cpu,
             MemoryText: mem,
             DiskText: disk,
@@ -152,7 +330,12 @@ public static class WidgetViewModelBuilder
             DiskFraction = Fraction(server.DiskUsagePercent),
             CpuDetail = FormatUptime(server.UptimeSeconds),
             MemoryDetail = FormatGb(server.MemoryUsedGb, server.MemoryTotalGb),
-            DiskDetail = FormatGb(server.DiskUsedGb, server.DiskTotalGb)
+            DiskDetail = FormatGb(server.DiskUsedGb, server.DiskTotalGb),
+            State = state,
+            StatusText = statusText,
+            StatusColor = statusColor,
+            IsStale = !fresh,
+            ShowsMetrics = server.Health is not (WidgetHealth.Offline or WidgetHealth.Unknown)
         };
     }
 
@@ -288,7 +471,11 @@ public static class WidgetViewModelBuilder
     }
 
     private static WidgetViewModel Empty(
-        WidgetSizeHint size, WidgetStrings strings, WidgetFreshnessState freshness, string freshnessText) => new()
+        WidgetSizeHint size,
+        WidgetStrings strings,
+        WidgetFreshnessState freshness,
+        string freshnessText,
+        string footerText) => new()
     {
         DisplayState = WidgetDisplayState.Empty,
         Size = size,
@@ -301,7 +488,12 @@ public static class WidgetViewModelBuilder
         Freshness = freshness,
         FreshnessText = freshnessText,
         Rows = Array.Empty<WidgetServerRow>(),
-        NoServersText = strings.NoServers
+        NoServersText = strings.NoServers,
+        CardState = WidgetCardState.Empty,
+        Title = size == WidgetSizeHint.Small ? strings.EmptyTitleSmall : strings.EmptyTitle,
+        Body = strings.EmptyBody,
+        CtaText = strings.EmptyCta,
+        FooterText = footerText
     };
 
     private static WidgetViewModel Unavailable(WidgetSizeHint size, WidgetStrings strings) => new()
@@ -318,7 +510,11 @@ public static class WidgetViewModelBuilder
         FreshnessText = string.Empty,
         Rows = Array.Empty<WidgetServerRow>(),
         NoDataTitle = strings.NoDataTitle,
-        NoDataBody = strings.NoDataBody
+        NoDataBody = strings.NoDataBody,
+        // Neutral, never "healthy", and NO add-server CTA (SPEC §3); the card itself opens the dashboard.
+        CardState = WidgetCardState.Unavailable,
+        Title = strings.UnavailableTitle,
+        Body = strings.UnavailableBody
     };
 
     private sealed class HealthCounts
