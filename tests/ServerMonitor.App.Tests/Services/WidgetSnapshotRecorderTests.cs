@@ -293,18 +293,52 @@ public sealed class WidgetSnapshotRecorderTests
         gate.SetResult(); // release the abandoned write so its task can finish cleanly
     }
 
-    // ---- UI.9 D-UI9-6: fleet-change and startup writes (SPEC test 11, V-RC-1/2/7) ----------------------
+    // ---- UI.9 D-UI9-6: fleet-change and startup writes (SPEC test 11, V-RC-1/2/7, V-B1, L-1) -----------
+
+    /// <summary>Signals every entry into GetAllAsync, so a test knows a drain decision has been reached.</summary>
+    private static SemaphoreSlim SignalGetAll(Harness h)
+    {
+        var entered = new SemaphoreSlim(0);
+        h.Servers.GetAllOverride = _ =>
+        {
+            entered.Release();
+            return Task.FromResult<IReadOnlyList<Server>>(h.Servers.Servers.ToList());
+        };
+        return entered;
+    }
 
     [Fact]
-    public async Task Start_writes_once_without_any_cycle()
+    public async Task Start_with_servers_writes_nothing_and_the_first_cycle_writes()
+    {
+        // Cortex L-1: with servers present, a startup write would only replace the last session's real
+        // readings with "no data"; the first cycle completion writes instead.
+        await using var h = new Harness();
+        h.AddServer("Home", ServerHealth.Healthy);
+        var entered = SignalGetAll(h);
+
+        h.Recorder.Start();
+        Assert.True(await entered.WaitAsync(SafetyNet)); // the startup request was evaluated...
+
+        h.Recorder.OnCycleCompleted(Completion(MonitoringOutcome.Success)); // ...and the first cycle writes
+        Assert.True(await h.Writer.WaitCompletedAsync());
+        await h.Recorder.DisposeAsync();
+
+        Assert.Equal(1, h.Writer.StartedCount);
+        Assert.Equal("Home", Assert.Single(Assert.Single(h.Writer.Snapshots).Servers).DisplayName);
+    }
+
+    [Fact]
+    public async Task Start_with_servers_and_no_cycle_writes_nothing()
     {
         await using var h = new Harness();
         h.AddServer("Home", ServerHealth.Healthy);
+        var entered = SignalGetAll(h);
 
         h.Recorder.Start();
+        Assert.True(await entered.WaitAsync(SafetyNet));
+        await h.Recorder.DisposeAsync(); // quiesce: the startup decision has been taken
 
-        Assert.True(await h.Writer.WaitCompletedAsync());
-        Assert.Equal("Home", Assert.Single(Assert.Single(h.Writer.Snapshots).Servers).DisplayName);
+        Assert.Equal(0, h.Writer.StartedCount);
     }
 
     [Fact]
@@ -333,11 +367,11 @@ public sealed class WidgetSnapshotRecorderTests
     }
 
     [Fact]
-    public async Task Unavailable_configuration_with_an_empty_list_never_writes_an_empty_snapshot()
+    public async Task Unavailable_configuration_with_an_empty_list_and_no_fleet_change_never_writes_an_empty_snapshot()
     {
         // V-RC-1 (UI9-COR-1): a corrupt/locked servers file reads as an empty list. Writing it would claim
         // "no servers" and destroy the last-known-good snapshot. The gate must be CONSULTED (the signal),
-        // and nothing may be written, at startup or on a later fleet change.
+        // and nothing may be written — at startup, nor on a later cycle.
         await using var h = new Harness();
         var consulted = new SemaphoreSlim(0);
         h.Servers.LoadStatusOverride = () =>
@@ -348,12 +382,43 @@ public sealed class WidgetSnapshotRecorderTests
 
         h.Recorder.Start();
         Assert.True(await consulted.WaitAsync(SafetyNet));
-        h.Servers.RaiseChanged();
+        h.Recorder.OnCycleCompleted(Completion(MonitoringOutcome.Success));
         Assert.True(await consulted.WaitAsync(SafetyNet));
 
         await h.Recorder.DisposeAsync(); // awaits the drain to quiescence: every decision has been taken
 
         Assert.Equal(0, h.Writer.StartedCount);
+    }
+
+    [Fact]
+    public async Task Quarantined_session_add_then_delete_writes_the_empty_fleet_and_drops_the_name()
+    {
+        // Vigil V-B1 (UI9-SEC-1): the load status is cached Unavailable for the whole process (a quarantined
+        // entry). After a fleet change the in-memory list was just persisted and is authoritative, so the
+        // empty fleet must be written — otherwise the deleted server's name stays in the snapshot forever.
+        await using var h = new Harness();
+        var consulted = new SemaphoreSlim(0);
+        h.Servers.LoadStatusOverride = () =>
+        {
+            consulted.Release();
+            return Task.FromResult(ServerLoadStatus.Unavailable);
+        };
+        h.Recorder.Start();
+        Assert.True(await consulted.WaitAsync(SafetyNet)); // startup: empty + Unavailable -> nothing written
+
+        var added = h.AddServer("Added Then Deleted", ServerHealth.Healthy);
+        h.Servers.RaiseChanged();
+        Assert.True(await h.Writer.WaitCompletedAsync());
+        Assert.Single(h.Writer.Snapshots[^1].Servers);
+
+        h.Servers.Servers.Remove(added);
+        h.Servers.RaiseChanged(); // no clock advance; status is still Unavailable
+        Assert.True(await h.Writer.WaitCompletedAsync());
+        await h.Recorder.DisposeAsync();
+
+        var last = h.Writer.Snapshots[^1];
+        Assert.Empty(last.Servers);
+        Assert.DoesNotContain("Added Then Deleted", WidgetStateSerializer.Serialize(last));
     }
 
     [Fact]
@@ -365,6 +430,7 @@ public sealed class WidgetSnapshotRecorderTests
         h.AddServer("Home", ServerHealth.Healthy);
 
         h.Recorder.Start();
+        h.Recorder.OnCycleCompleted(Completion(MonitoringOutcome.Success));
 
         Assert.True(await h.Writer.WaitCompletedAsync());
         Assert.Single(Assert.Single(h.Writer.Snapshots).Servers);
@@ -379,11 +445,9 @@ public sealed class WidgetSnapshotRecorderTests
         await using var h = new Harness();
         var server = h.AddServer("Deleted Box", ServerHealth.Healthy);
         h.Recorder.Start();
-        Assert.True(await h.Writer.WaitCompletedAsync()); // startup write
 
         var gate = h.Writer.InstallGate();
         h.Recorder.OnCycleCompleted(Completion(MonitoringOutcome.Success)); // cycle write, held open
-        Assert.True(await h.Writer.WaitStartedAsync());
         Assert.True(await h.Writer.WaitStartedAsync());
 
         h.Servers.Servers.Remove(server);
@@ -392,8 +456,9 @@ public sealed class WidgetSnapshotRecorderTests
 
         Assert.True(await h.Writer.WaitCompletedAsync()); // the cycle write
         Assert.True(await h.Writer.WaitCompletedAsync()); // the forced fleet-change write
+        await h.Recorder.DisposeAsync();
 
-        Assert.Equal(3, h.Writer.StartedCount);
+        Assert.Equal(2, h.Writer.StartedCount);
         Assert.Equal(1, h.Writer.MaxConcurrent);
         var last = h.Writer.Snapshots[^1];
         Assert.Empty(last.Servers);
@@ -408,7 +473,8 @@ public sealed class WidgetSnapshotRecorderTests
         h.AddServer("Home", ServerHealth.Healthy);
 
         var gate = h.Writer.InstallGate();
-        h.Recorder.Start(); // write #1, held open
+        h.Recorder.Start();
+        h.Servers.RaiseChanged(); // write #1, held open
         Assert.True(await h.Writer.WaitStartedAsync());
 
         for (var i = 0; i < 50; i++)
@@ -433,6 +499,7 @@ public sealed class WidgetSnapshotRecorderTests
         var visible = h.AddServer("Visible", ServerHealth.Healthy);
         var secret = h.AddServer("Hidden Later", ServerHealth.Healthy);
         h.Recorder.Start();
+        h.Recorder.OnCycleCompleted(Completion(MonitoringOutcome.Success));
         Assert.True(await h.Writer.WaitCompletedAsync());
 
         h.Servers.Servers[h.Servers.Servers.IndexOf(secret)] = secret with { IsHidden = true };
@@ -447,11 +514,12 @@ public sealed class WidgetSnapshotRecorderTests
     [Fact]
     public async Task Forced_writes_do_not_hold_back_or_speed_up_the_cycle_cadence()
     {
-        // The throttle bypass is scoped to fleet changes: the startup write does not anchor the throttle
-        // (so the first cycle still writes at once), and cycles stay throttled among themselves.
+        // The throttle bypass is scoped to fleet changes: a forced write does not anchor the throttle (so
+        // the next cycle still writes at once), and cycles stay throttled among themselves.
         await using var h = new Harness();
         h.AddServer("Home", ServerHealth.Healthy);
         h.Recorder.Start();
+        h.Servers.RaiseChanged();
         Assert.True(await h.Writer.WaitCompletedAsync()); // forced, T0
 
         h.Recorder.OnCycleCompleted(Completion(MonitoringOutcome.Success)); // cycle, T0: not held back
@@ -469,7 +537,6 @@ public sealed class WidgetSnapshotRecorderTests
         await using var h = new Harness();
         h.AddServer("Home", ServerHealth.Healthy);
         h.Recorder.Start();
-        Assert.True(await h.Writer.WaitCompletedAsync());                   // forced (startup)
 
         h.Recorder.OnCycleCompleted(Completion(MonitoringOutcome.Success)); // cycle, anchors at T0
         Assert.True(await h.Writer.WaitCompletedAsync());
@@ -479,7 +546,7 @@ public sealed class WidgetSnapshotRecorderTests
         h.Recorder.OnCycleCompleted(Completion(MonitoringOutcome.Success)); // cycle inside window: no write
         await h.Recorder.DisposeAsync();
 
-        Assert.Equal(3, h.Writer.StartedCount);
+        Assert.Equal(2, h.Writer.StartedCount);
     }
 
     [Fact]
@@ -493,6 +560,7 @@ public sealed class WidgetSnapshotRecorderTests
         h.Recorder.Start();
         h.Recorder.Start(); // idempotent: still exactly one subscription
         Assert.Equal(1, h.Servers.ServersChangedHandlerCount);
+        h.Servers.RaiseChanged();
         Assert.True(await h.Writer.WaitCompletedAsync());
 
         await h.DisposeAsync();
@@ -526,8 +594,9 @@ public sealed class WidgetSnapshotRecorderTests
         h.Servers.RaiseChanged(); // returns synchronously; would deadlock the test if it awaited the store
 
         release.SetResult();
-        Assert.True(await h.Writer.WaitCompletedAsync());
-        Assert.True(await h.Writer.WaitCompletedAsync());
+        Assert.True(await h.Writer.WaitCompletedAsync()); // the fleet-change write (startup alone writes nothing)
+        await h.Recorder.DisposeAsync();
+        Assert.Equal(1, h.Writer.StartedCount);
         Assert.Equal(1, h.Writer.MaxConcurrent);
     }
 
@@ -546,6 +615,7 @@ public sealed class WidgetSnapshotRecorderTests
         });
 
         h.Recorder.Start();
+        h.Recorder.OnCycleCompleted(Completion(MonitoringOutcome.Success));
 
         Assert.True(await h.Writer.WaitCompletedAsync());
         var mapped = Assert.Single(Assert.Single(h.Writer.Snapshots).Servers);

@@ -35,10 +35,17 @@ namespace ServerMonitor.App.Services;
 /// <c>_forcePending</c> (under <c>_gate</c>) and BYPASS the throttle — they are rare and user-initiated —
 /// but go through the very same single-writer drain, so they coalesce (at most one write in flight plus
 /// one pending) and never overlap a cycle write. A forced write does not move the cycle throttle anchor,
-/// so cycle writes keep their exact cadence and the first cycle after startup is never held back. An
-/// EMPTY fleet is written only when the fleet actually loaded (V-RC-1): a corrupt/locked configuration
-/// reads as an empty list, and publishing that as "no servers" would be false and would destroy the
-/// last-known-good snapshot.
+/// so cycle writes keep their exact cadence and the first cycle after startup is never held back.
+/// </para>
+/// <para>
+/// <b>What a forced write may publish.</b> The STARTUP request only writes when the fleet is empty (Cortex
+/// L-1): with servers present the first cycle completion writes within seconds, and an earlier write would
+/// only replace the last session's real readings with "no data". An EMPTY fleet is written only when it is
+/// true (V-RC-1): the configuration loaded (or does not exist yet), OR the user changed the fleet in this
+/// session (Vigil V-B1) — after a <see cref="IServerService.ServersChanged"/> the in-memory list was just
+/// persisted and is authoritative, exactly as the dashboard treats it (<c>_configurationChanged</c>). A
+/// corrupt/locked configuration with no change in this session reads as an empty list that is NOT the
+/// truth, so nothing is written and the last-known-good snapshot ages into Stale instead.
 /// </para>
 /// Every failure is isolated and swallowed (§16): building or writing the snapshot can never throw into
 /// the cycle. Shutdown is bounded (§30): the drain is cancelled and awaited with a timeout so closing
@@ -67,8 +74,12 @@ public sealed class WidgetSnapshotRecorder : IMonitoringCycleObserver, IAsyncDis
     private readonly object _gate = new();
 
     private bool _dirty;
-    // Set only by ServersChanged / the startup request; consumed by the drain as a throttle bypass.
+    // Set only by ServersChanged; consumed by the drain as a throttle bypass.
     private bool _forcePending;
+    // Set only by Start(); a throttle bypass that writes ONLY an empty fleet (Cortex L-1).
+    private bool _startupPending;
+    // Latched by the first ServersChanged after Start(): the in-memory list is authoritative (Vigil V-B1).
+    private bool _fleetChangedSinceStart;
     private bool _writing;
     private bool _disposed;
     private bool _started;
@@ -135,7 +146,14 @@ public sealed class WidgetSnapshotRecorder : IMonitoringCycleObserver, IAsyncDis
             _servers.ServersChanged += OnServersChanged;
         }
 
-        TriggerWrite(force: true);
+        Trigger(WriteTrigger.Startup);
+    }
+
+    private enum WriteTrigger
+    {
+        Cycle,
+        Startup,
+        FleetChange
     }
 
     // V-RC-7: synchronous, exception-proof, no I/O on the invoker's thread (ServerService raises this inside
@@ -145,7 +163,7 @@ public sealed class WidgetSnapshotRecorder : IMonitoringCycleObserver, IAsyncDis
     {
         try
         {
-            TriggerWrite(force: true);
+            Trigger(WriteTrigger.FleetChange);
         }
         catch (Exception exception)
         {
@@ -159,8 +177,11 @@ public sealed class WidgetSnapshotRecorder : IMonitoringCycleObserver, IAsyncDis
     /// tests can drive it directly; production calls it from <see cref="OnCycleCompleted"/>,
     /// <see cref="Start"/>, and the <see cref="IServerService.ServersChanged"/> handler.
     /// </summary>
-    internal void TriggerWrite(bool force = false)
+    internal void TriggerWrite(bool force = false) => Trigger(force ? WriteTrigger.FleetChange : WriteTrigger.Cycle);
+
+    private void Trigger(WriteTrigger trigger)
     {
+        var force = trigger != WriteTrigger.Cycle;
         lock (_gate)
         {
             if (_disposed)
@@ -168,13 +189,18 @@ public sealed class WidgetSnapshotRecorder : IMonitoringCycleObserver, IAsyncDis
                 return;
             }
 
-            if (force)
+            switch (trigger)
             {
-                _forcePending = true;
-            }
-            else
-            {
-                _dirty = true;
+                case WriteTrigger.Startup:
+                    _startupPending = true;
+                    break;
+                case WriteTrigger.FleetChange:
+                    _forcePending = true;
+                    _fleetChangedSinceStart = true;
+                    break;
+                default:
+                    _dirty = true;
+                    break;
             }
 
             // A running drain will observe _dirty/_forcePending; establishing this under the same lock the
@@ -204,20 +230,28 @@ public sealed class WidgetSnapshotRecorder : IMonitoringCycleObserver, IAsyncDis
         {
             while (true)
             {
+                bool startupOnly;
+                bool fleetChanged;
                 lock (_gate)
                 {
                     // Stop when asked to, or when nothing may be written now: no forced write pending AND
                     // (nothing dirty OR the cycle throttle window has not yet elapsed). In the last case
                     // _dirty stays set and a later completion re-arms us.
-                    var forced = _forcePending;
+                    var forced = _forcePending || _startupPending;
                     if (cancellationToken.IsCancellationRequested || (!forced && (!_dirty || !MayWriteNowLocked())))
                     {
                         _writing = false;
                         return;
                     }
 
-                    // One write reflects the live stores, so it satisfies both kinds of pending request.
+                    // A startup request on its own may only publish an empty fleet (L-1); anything else
+                    // pending alongside it (a fleet change, a dirty cycle) makes this an ordinary write.
+                    startupOnly = _startupPending && !_forcePending && !_dirty;
+                    fleetChanged = _fleetChangedSinceStart;
+
+                    // One write reflects the live stores, so it satisfies every kind of pending request.
                     _forcePending = false;
+                    _startupPending = false;
                     _dirty = false;
                     if (!forced)
                     {
@@ -228,7 +262,7 @@ public sealed class WidgetSnapshotRecorder : IMonitoringCycleObserver, IAsyncDis
 
                 try
                 {
-                    await WriteOnceAsync(cancellationToken).ConfigureAwait(false);
+                    await WriteOnceAsync(startupOnly, fleetChanged, cancellationToken).ConfigureAwait(false);
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
@@ -260,14 +294,23 @@ public sealed class WidgetSnapshotRecorder : IMonitoringCycleObserver, IAsyncDis
         }
     }
 
-    private async Task WriteOnceAsync(CancellationToken cancellationToken)
+    private async Task WriteOnceAsync(bool startupOnly, bool fleetChanged, CancellationToken cancellationToken)
     {
         var servers = await _servers.GetAllAsync(cancellationToken).ConfigureAwait(false);
-        if (servers.Count == 0)
+        if (startupOnly && servers.Count > 0)
+        {
+            // Cortex L-1: the first cycle completion writes real readings within seconds; writing now would
+            // only replace the last session's readings with "no data".
+            _logger.LogDebug("Widget startup write skipped: the first cycle completion will write.");
+            return;
+        }
+
+        if (servers.Count == 0 && !fleetChanged)
         {
             // V-RC-1 (UI9-COR-1): an empty list is only "no servers" when the fleet really loaded. Missing
             // configuration (fresh install) is honestly empty too; Unavailable (corrupt/locked/quarantined)
-            // is not, so nothing is written and the last-known-good snapshot ages into Stale instead.
+            // is not, so nothing is written and the last-known-good snapshot ages into Stale instead. A fleet
+            // change in this session makes the persisted in-memory list authoritative (Vigil V-B1).
             var status = await _loadStatus.GetLoadStatusAsync(cancellationToken).ConfigureAwait(false);
             if (status is not (ServerLoadStatus.Loaded or ServerLoadStatus.NotFound))
             {
