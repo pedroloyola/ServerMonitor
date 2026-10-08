@@ -27,6 +27,19 @@ namespace ServerMonitor.App.Services;
 /// never overlap. Because the drain re-reads the live stores at write time (the same sources the
 /// dashboard uses, §20), coalesced/dropped triggers cost no freshness beyond the throttle interval.
 /// </para>
+/// <para>
+/// <b>Fleet-change and startup writes (UI.9 D-UI9-6).</b> Cycles alone cannot reflect a fleet that stops
+/// cycling: deleting the last server ends all completions, so the deleted server (and its name) would stay
+/// in the snapshot forever. <see cref="Start"/> therefore subscribes to
+/// <see cref="IServerService.ServersChanged"/> and requests one write at startup. Those two triggers set
+/// <c>_forcePending</c> (under <c>_gate</c>) and BYPASS the throttle — they are rare and user-initiated —
+/// but go through the very same single-writer drain, so they coalesce (at most one write in flight plus
+/// one pending) and never overlap a cycle write. A forced write does not move the cycle throttle anchor,
+/// so cycle writes keep their exact cadence and the first cycle after startup is never held back. An
+/// EMPTY fleet is written only when the fleet actually loaded (V-RC-1): a corrupt/locked configuration
+/// reads as an empty list, and publishing that as "no servers" would be false and would destroy the
+/// last-known-good snapshot.
+/// </para>
 /// Every failure is isolated and swallowed (§16): building or writing the snapshot can never throw into
 /// the cycle. Shutdown is bounded (§30): the drain is cancelled and awaited with a timeout so closing
 /// the app never hangs on a stuck write.
@@ -40,8 +53,10 @@ public sealed class WidgetSnapshotRecorder : IMonitoringCycleObserver, IAsyncDis
     public static readonly TimeSpan DefaultShutdownDrainTimeout = TimeSpan.FromSeconds(2);
 
     private readonly IServerService _servers;
+    private readonly IServerLoadStatusSource _loadStatus;
     private readonly IServerMonitoringStateStore _stateStore;
     private readonly IServerMetricsStore _metricsStore;
+    private readonly MonitoringThresholds _thresholds;
     private readonly IWidgetStateWriter _writer;
     private readonly TimeProvider _timeProvider;
     private readonly TimeSpan _minWriteInterval;
@@ -52,8 +67,11 @@ public sealed class WidgetSnapshotRecorder : IMonitoringCycleObserver, IAsyncDis
     private readonly object _gate = new();
 
     private bool _dirty;
+    // Set only by ServersChanged / the startup request; consumed by the drain as a throttle bypass.
+    private bool _forcePending;
     private bool _writing;
     private bool _disposed;
+    private bool _started;
     // Cadence is measured on the MONOTONIC timestamp, never wall-clock: a backward NTP/manual clock step
     // must not strand a dirty snapshot, and a forward step must not permit a write sooner than the
     // interval. Wall-clock time is used only for the snapshot's GeneratedAtUtc.
@@ -63,8 +81,10 @@ public sealed class WidgetSnapshotRecorder : IMonitoringCycleObserver, IAsyncDis
 
     public WidgetSnapshotRecorder(
         IServerService servers,
+        IServerLoadStatusSource loadStatus,
         IServerMonitoringStateStore stateStore,
         IServerMetricsStore metricsStore,
+        MonitoringThresholds thresholds,
         IWidgetStateWriter writer,
         ILogger<WidgetSnapshotRecorder> logger,
         TimeProvider? timeProvider = null,
@@ -72,8 +92,10 @@ public sealed class WidgetSnapshotRecorder : IMonitoringCycleObserver, IAsyncDis
         TimeSpan? shutdownDrainTimeout = null)
     {
         _servers = servers ?? throw new ArgumentNullException(nameof(servers));
+        _loadStatus = loadStatus ?? throw new ArgumentNullException(nameof(loadStatus));
         _stateStore = stateStore ?? throw new ArgumentNullException(nameof(stateStore));
         _metricsStore = metricsStore ?? throw new ArgumentNullException(nameof(metricsStore));
+        _thresholds = thresholds ?? throw new ArgumentNullException(nameof(thresholds));
         _writer = writer ?? throw new ArgumentNullException(nameof(writer));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _timeProvider = timeProvider ?? TimeProvider.System;
@@ -95,11 +117,49 @@ public sealed class WidgetSnapshotRecorder : IMonitoringCycleObserver, IAsyncDis
     }
 
     /// <summary>
-    /// Marks the snapshot dirty and, if the throttle allows and no drain is running, starts the single
-    /// writer. Internal so tests can drive it directly; production only calls it from
-    /// <see cref="OnCycleCompleted"/>.
+    /// D-UI9-6: subscribes to fleet changes and requests the startup write. Called once by the app after the
+    /// host starts; idempotent, and a no-op after <see cref="DisposeAsync"/>. Never throws into startup.
     /// </summary>
-    internal void TriggerWrite()
+    public void Start()
+    {
+        lock (_gate)
+        {
+            if (_disposed || _started)
+            {
+                return;
+            }
+
+            // Under _gate so it cannot interleave with DisposeAsync's unsubscribe. A field-like event's
+            // add/remove is lock-free, so no lock-order hazard is introduced.
+            _started = true;
+            _servers.ServersChanged += OnServersChanged;
+        }
+
+        TriggerWrite(force: true);
+    }
+
+    // V-RC-7: synchronous, exception-proof, no I/O on the invoker's thread (ServerService raises this inside
+    // the user's save path, before the engine's own reconcile handler). TriggerWrite only flips flags under
+    // _gate and, at most, queues the drain on the thread pool.
+    private void OnServersChanged(object? sender, EventArgs e)
+    {
+        try
+        {
+            TriggerWrite(force: true);
+        }
+        catch (Exception exception)
+        {
+            LogFailure(exception);
+        }
+    }
+
+    /// <summary>
+    /// Marks the snapshot dirty and, if the throttle allows and no drain is running, starts the single
+    /// writer. <paramref name="force"/> (fleet change / startup only) bypasses the throttle. Internal so
+    /// tests can drive it directly; production calls it from <see cref="OnCycleCompleted"/>,
+    /// <see cref="Start"/>, and the <see cref="IServerService.ServersChanged"/> handler.
+    /// </summary>
+    internal void TriggerWrite(bool force = false)
     {
         lock (_gate)
         {
@@ -108,13 +168,20 @@ public sealed class WidgetSnapshotRecorder : IMonitoringCycleObserver, IAsyncDis
                 return;
             }
 
-            _dirty = true;
+            if (force)
+            {
+                _forcePending = true;
+            }
+            else
+            {
+                _dirty = true;
+            }
 
-            // A running drain will observe _dirty; establishing this under the same lock the drain uses
-            // to stop makes start-vs-stop linearizable (L-010). Throttle: if the interval has not
-            // elapsed, leave the snapshot dirty — the next completion past the interval flushes it, so
-            // no timer is needed.
-            if (_writing || !MayWriteNowLocked())
+            // A running drain will observe _dirty/_forcePending; establishing this under the same lock the
+            // drain uses to stop makes start-vs-stop linearizable (L-010). Throttle (cycles only): if the
+            // interval has not elapsed, leave the snapshot dirty — the next completion past the interval
+            // flushes it, so no timer is needed.
+            if (_writing || (!force && !MayWriteNowLocked()))
             {
                 return;
             }
@@ -139,16 +206,24 @@ public sealed class WidgetSnapshotRecorder : IMonitoringCycleObserver, IAsyncDis
             {
                 lock (_gate)
                 {
-                    // Stop when asked to, when nothing is pending, or when the throttle window has not
-                    // yet elapsed. In the last case _dirty stays set and a later completion re-arms us.
-                    if (cancellationToken.IsCancellationRequested || !_dirty || !MayWriteNowLocked())
+                    // Stop when asked to, or when nothing may be written now: no forced write pending AND
+                    // (nothing dirty OR the cycle throttle window has not yet elapsed). In the last case
+                    // _dirty stays set and a later completion re-arms us.
+                    var forced = _forcePending;
+                    if (cancellationToken.IsCancellationRequested || (!forced && (!_dirty || !MayWriteNowLocked())))
                     {
                         _writing = false;
                         return;
                     }
 
+                    // One write reflects the live stores, so it satisfies both kinds of pending request.
+                    _forcePending = false;
                     _dirty = false;
-                    _lastWriteTimestamp = _timeProvider.GetTimestamp();
+                    if (!forced)
+                    {
+                        // Only cycle writes anchor the cycle throttle (see class remarks).
+                        _lastWriteTimestamp = _timeProvider.GetTimestamp();
+                    }
                 }
 
                 try
@@ -188,10 +263,24 @@ public sealed class WidgetSnapshotRecorder : IMonitoringCycleObserver, IAsyncDis
     private async Task WriteOnceAsync(CancellationToken cancellationToken)
     {
         var servers = await _servers.GetAllAsync(cancellationToken).ConfigureAwait(false);
+        if (servers.Count == 0)
+        {
+            // V-RC-1 (UI9-COR-1): an empty list is only "no servers" when the fleet really loaded. Missing
+            // configuration (fresh install) is honestly empty too; Unavailable (corrupt/locked/quarantined)
+            // is not, so nothing is written and the last-known-good snapshot ages into Stale instead.
+            var status = await _loadStatus.GetLoadStatusAsync(cancellationToken).ConfigureAwait(false);
+            if (status is not (ServerLoadStatus.Loaded or ServerLoadStatus.NotFound))
+            {
+                _logger.LogDebug("Widget snapshot not written: server configuration is {Status}.", status);
+                return;
+            }
+        }
+
         var snapshot = WidgetSnapshotMapper.Map(
             servers,
             id => _stateStore.Get(id),
             id => _metricsStore.GetLastSnapshot(id),
+            _thresholds,
             _timeProvider.GetUtcNow());
 
         await _writer.WriteAsync(snapshot, cancellationToken).ConfigureAwait(false);
@@ -213,9 +302,9 @@ public sealed class WidgetSnapshotRecorder : IMonitoringCycleObserver, IAsyncDis
     }
 
     /// <summary>
-    /// Cancels the drain and waits — with a hard timeout (§30) — for any in-flight write to unwind, so
-    /// closing the app never blocks on a stuck write. The normal cycle is the source of truth, so there
-    /// is no final forced write.
+    /// Unsubscribes from fleet changes, then cancels the drain and waits — with a hard timeout (§30) — for
+    /// any in-flight write to unwind, so closing the app never blocks on a stuck write. The normal cycle is
+    /// the source of truth, so there is no final forced write.
     /// </summary>
     public async ValueTask DisposeAsync()
     {
@@ -227,6 +316,12 @@ public sealed class WidgetSnapshotRecorder : IMonitoringCycleObserver, IAsyncDis
             }
 
             _disposed = true;
+
+            // V-RC-7: unsubscribe BEFORE cancelling, so no fleet change can queue work against a dying drain.
+            if (_started)
+            {
+                _servers.ServersChanged -= OnServersChanged;
+            }
         }
 
         _shutdown.Cancel();

@@ -28,6 +28,9 @@ internal sealed class FakeServerService : IServerService, IServerLoadStatusSourc
 
     public void RaiseChanged() => ServersChanged?.Invoke(this, EventArgs.Empty);
 
+    /// <summary>UI.9: how many handlers are subscribed, so a test can prove an unsubscribe.</summary>
+    public int ServersChangedHandlerCount => ServersChanged?.GetInvocationList().Length ?? 0;
+
     public Task<ServerOperationResult> AddAsync(ServerInput input, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException();
 
