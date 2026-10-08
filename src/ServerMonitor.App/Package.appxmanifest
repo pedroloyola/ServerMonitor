@@ -140,7 +140,7 @@
                 <Definitions>
                   <Definition Id="ServerAlyzer_Widget"
                               DisplayName="ServerAlyzer"
-                              Description="A saúde e as métricas dos seus servidores, num relance."
+                              Description="ms-resource:WidgetDescription"
                               AllowMultiple="true">
                     <Capabilities>
                       <Capability><Size Name="small" /></Capability>
@@ -152,9 +152,12 @@
                         <Icon Path="Public\ServerAlyzerWidgetIcon.png" />
                       </Icons>
                       <!-- Required fallback, used when a theme-specific screenshot is absent. -->
+                      <!-- UI.9 C2: Description/DisplayAltText resolve from Resources/<lang>/Resources.resw (ms-resource:);
+                           the Public\pt-pt and Public\pt-br folders hold locale screenshots (picker locale-folder convention);
+                           Public\ root is the language-neutral (en) fallback. Rendered from SYNTHETIC data only. -->
                       <Screenshots>
                         <Screenshot Path="Public\ServerAlyzerWidgetScreenshot.png"
-                                    DisplayAltText="Widget do ServerAlyzer a mostrar a saúde e as métricas de dois servidores." />
+                                    DisplayAltText="ms-resource:WidgetScreenshotAltText" />
                       </Screenshots>
                       <!-- The picker follows the system theme. Without these, a light-theme user sees a dark
                            rectangle among light previews at the exact moment they decide whether to add the
@@ -162,13 +165,13 @@
                       <DarkMode>
                         <Screenshots>
                           <Screenshot Path="Public\ServerAlyzerWidgetScreenshot.png"
-                                      DisplayAltText="Widget do ServerAlyzer a mostrar a saúde e as métricas de dois servidores." />
+                                      DisplayAltText="ms-resource:WidgetScreenshotAltText" />
                         </Screenshots>
                       </DarkMode>
                       <LightMode>
                         <Screenshots>
                           <Screenshot Path="Public\ServerAlyzerWidgetScreenshotLight.png"
-                                      DisplayAltText="Widget do ServerAlyzer a mostrar a saúde e as métricas de dois servidores." />
+                                      DisplayAltText="ms-resource:WidgetScreenshotAltText" />
                         </Screenshots>
                       </LightMode>
                     </ThemeResources>
