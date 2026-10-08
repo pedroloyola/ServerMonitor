@@ -180,6 +180,10 @@ public sealed class Ui8CompactEnvelopeTests
         Assert.Contains("EnforceSizeLimits(sender);", handler, StringComparison.Ordinal);
         Assert.Contains("_modeCoordinator.CurrentSizeLimits().Clamp(size.Width, size.Height)", handler, StringComparison.Ordinal);
         Assert.DoesNotContain("CurrentMode == WindowMode.Standard", handler, StringComparison.Ordinal);
+        // Cortex 8B gate N-4: the iconized size of a minimized window is never clamped.
+        var enforce = handler[handler.IndexOf("private void EnforceSizeLimits", StringComparison.Ordinal)..];
+        Assert.True(enforce.IndexOf("OverlappedPresenterState.Minimized", StringComparison.Ordinal) is var guard and >= 0
+            && guard < enforce.IndexOf(".Clamp(", StringComparison.Ordinal), "EnforceSizeLimits must return on Minimized before clamping");
         Assert.DoesNotContain("MinimumWindowWidth", window, StringComparison.Ordinal);
         Assert.DoesNotContain("560", window, StringComparison.Ordinal);
     }

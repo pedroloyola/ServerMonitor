@@ -220,7 +220,7 @@ Figma: os valores derivados (bordas, hover, selected, disabled, materiais) e os 
 
 ## 9. Mapa completo de aliases legados
 
-Mapa de todas as 69 chaves de DesignTokens.xaml (UI.8 removeu `TitleBarSurfaceBrush`, sem consumidores). Valores antigos continuam no ficheiro original intacto. Correspondência semântica não significa igualdade de cor/tamanho.
+Mapa de todas as 68 chaves de DesignTokens.xaml (UI.8 removeu `TitleBarSurfaceBrush` e `WindowBackdropTintBrush`, sem consumidores). Valores antigos continuam no ficheiro original intacto. Correspondência semântica não significa igualdade de cor/tamanho.
 
 | Chave antiga | Destino futuro (não aplicado) | UI.1 |
 |---|---|---|
@@ -286,7 +286,6 @@ Mapa de todas as 69 chaves de DesignTokens.xaml (UI.8 removeu `TitleBarSurfaceBr
 | TextPrimaryBrush | SaTextBrush | Mantido, valor antigo |
 | TextSecondaryBrush | SaTextSecondaryBrush | Mantido, valor antigo |
 | TextTertiaryBrush | SaTextSecondaryBrush (rever contraste) | Mantido, valor antigo |
-| WindowBackdropTintBrush | SaSidebarMaterialBrush | Mantido, valor antigo |
 | WorkloadDotCriticalBrush | SaErrorBrush | Mantido, valor antigo |
 | WorkloadDotHealthyBrush | SaHealthyBrush | Mantido, valor antigo |
 | WorkloadDotNeutralBrush | SaTextSecondaryBrush | Mantido, valor antigo |

@@ -14,7 +14,9 @@ internal static class StandardSurfacing
     /// Contract: materialize → (navigateWhileHidden) → switch → show; except a minimized window, which is shown (restored)
     /// first and switched after - the order ToggleCompactMode already proves, because applying bounds to a minimized
     /// window is unreliable. A hidden or never-shown window switches before it is shown, so no Compact frame is painted.
-    /// Returns false (and does nothing else) when no window exists and none can be created.
+    /// Returns false (and does nothing else) when no window exists and none can be created, and false when the coordinator
+    /// did not end in Standard after the switch (Cortex 8B gate N-1: the original defect's class - an ignored switch - must
+    /// never read as success; the window is still shown, so the user is not left with nothing).
     /// </summary>
     public static bool Run(
         Func<bool> tryMaterialize,
@@ -38,11 +40,11 @@ internal static class StandardSurfacing
         {
             show();
             mode.SwitchTo(WindowMode.Standard);
-            return true;
+            return mode.CurrentMode == WindowMode.Standard;
         }
 
         mode.SwitchTo(WindowMode.Standard);
         show();
-        return true;
+        return mode.CurrentMode == WindowMode.Standard;
     }
 }

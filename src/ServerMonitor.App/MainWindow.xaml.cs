@@ -407,6 +407,12 @@ public sealed partial class MainWindow : Window
 
     private void EnforceSizeLimits(AppWindow sender)
     {
+        // Cortex 8B gate N-4: a minimized window reports its iconized size (and no trustworthy DPI) - never clamp that.
+        if (sender.Presenter is OverlappedPresenter { State: OverlappedPresenterState.Minimized })
+        {
+            return;
+        }
+
         var size = sender.Size;
         var (width, height) = _modeCoordinator.CurrentSizeLimits().Clamp(size.Width, size.Height);
         if (width == size.Width && height == size.Height)

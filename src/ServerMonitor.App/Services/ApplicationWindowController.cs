@@ -168,6 +168,10 @@ public sealed class ApplicationWindowController(
         {
             logger.LogDebug("Main window surfaced in Standard.");
         }
+        else if (IsAttached)
+        {
+            logger.LogWarning("The main window could not be switched to Standard; it stays in {Mode}.", modeCoordinator.CurrentMode);
+        }
     });
 
     /// <summary>Settings exists only in Standard: surfaced there first, then navigated (the order it always had).</summary>

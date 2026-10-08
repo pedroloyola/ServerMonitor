@@ -334,8 +334,9 @@ public sealed partial class ComponentLayerGuardTests
 
         var mapped = AliasRow().Matches(section.Value).Select(m => m.Groups[1].Value)
             .Where(k => k != "Chave antiga").ToList();
-        // UI.8 (D-UI8-15): TitleBarSurfaceBrush removed with its only consumer, the pre-UI.8 compact title bar.
-        Assert.Equal(69, mapped.Count);
+        // UI.8 (D-UI8-15): TitleBarSurfaceBrush removed with its only consumer, the pre-UI.8 compact title bar; c0 (Boss Q1):
+        // WindowBackdropTintBrush too, left without consumers when SaLegacyWindowBackgroundStyle went.
+        Assert.Equal(68, mapped.Count);
         Assert.Equal(mapped.Count, mapped.Distinct(StringComparer.Ordinal).Count());
 
         string[] themeKeys = ["Dark", "Light", "Default", "HighContrast"];

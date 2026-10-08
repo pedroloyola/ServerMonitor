@@ -60,6 +60,26 @@ public sealed partial class StandardSurfacingTests
         Assert.Empty(nothing);
     }
 
+    /// <summary>
+    /// Cortex 8B gate N-1 (BOSS §15): a coordinator that ignores the switch (the original defect's mechanism) makes the run
+    /// FAIL - it is never reported as surfaced in Standard - while the window is still shown, in both branches.
+    /// </summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void AnIgnoredSwitch_IsAFailure_NeverAnApparentSuccess(bool minimized)
+    {
+        var deaf = new DeafCoordinator();
+        var shown = 0;
+
+        var ran = StandardSurfacing.Run(() => true, deaf, () => minimized, () => shown++);
+
+        Assert.False(ran);
+        Assert.Equal(1, deaf.SwitchRequests);
+        Assert.Equal(1, shown);
+        Assert.Equal(WindowMode.Compact, deaf.CurrentMode);
+    }
+
     [Fact]
     public void TheOldOrder_SwitchThenMaterialize_IsWhatLeftItInCompact()
     {
@@ -119,6 +139,34 @@ public sealed partial class StandardSurfacingTests
         Assert.Matches(OpenDashboardRestores(), notifications);
         var tray = AppSourceTree.CodeWithoutComments("Services/TrayService.cs");
         Assert.Contains("OnOpenRequested(object? sender, EventArgs args) => windowController.RestoreAndActivate();", tray, StringComparison.Ordinal);
+    }
+
+    /// <summary>A coordinator stuck in Compact that silently ignores every switch (as an uninitialized one does).</summary>
+    private sealed class DeafCoordinator : IWindowModeCoordinator
+    {
+        public int SwitchRequests { get; private set; }
+
+        public WindowMode CurrentMode => WindowMode.Compact;
+
+        public bool CompactAlwaysOnTop => false;
+
+        public bool IsApplyingBounds => false;
+
+        public event EventHandler<WindowMode>? ModeChanged { add { } remove { } }
+
+        public void Initialize() { }
+
+        public void SwitchTo(WindowMode mode) => SwitchRequests++;
+
+        public void Toggle() { }
+
+        public void SetCompactAlwaysOnTop(bool enabled) { }
+
+        public void CaptureCurrentBounds() { }
+
+        public void PersistCurrentBounds() { }
+
+        public WindowSizeConstraints CurrentSizeLimits() => WindowSizeConstraints.Compact;
     }
 
     private static (WindowModeCoordinator Coordinator, List<string> Order) Headless(WindowMode persisted)
