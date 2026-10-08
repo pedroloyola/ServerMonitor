@@ -370,7 +370,7 @@ public static class WidgetCardRenderer
         return new JsonObject
         {
             ["type"] = "Container",
-            ["spacing"] = "Small",
+            ["spacing"] = WidgetLayout.BarSpacing(large),
             ["items"] = new JsonArray
             {
                 WhenTheme(dark: true, BarColumns(key, large, fillDark, WidgetImages.BarTrackDark)),

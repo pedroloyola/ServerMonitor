@@ -47,6 +47,13 @@ public static class WidgetLayout
     public static string BarHeight(bool large) => large ? "6px" : "4px";
 
     /// <summary>
+    /// Gap above a bar (Prism RC-C3-1): None on Medium, where the text line box already gives the Figma 4 px
+    /// gap (112:9991) and 3 rows need the 24 px; Small (8 px) on Large, where the Figma centres the 6 px bar
+    /// in a 24 px box (112:10105).
+    /// </summary>
+    public static string BarSpacing(bool large) => large ? "Small" : "None";
+
+    /// <summary>
     /// The fill column WEIGHT of a bar for a DISPLAYED (rounded) percentage (Prism C0 debrief §1 `w` rule):
     /// 0 → no fill (track only), 100 → fill only, 1–2 → 3 (a visible sliver), 98–99 → 97 (a visible
     /// track), else the percentage itself. Full only at 100 %, never empty above 0 %. The track weight is

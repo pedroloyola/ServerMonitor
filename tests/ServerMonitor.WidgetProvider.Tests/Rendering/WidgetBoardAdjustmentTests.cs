@@ -114,6 +114,24 @@ public sealed class WidgetBoardAdjustmentTests
         Assert.True(Contrast("#B87B2F", "#E8E8E8") < 3.0);
     }
 
+    [Theory]
+    [InlineData(WidgetSizeHint.Medium, "None")]
+    [InlineData(WidgetSizeHint.Large, "Small")]
+    public void The_bar_sits_close_under_its_value_on_medium_and_spaced_on_large(WidgetSizeHint size, string spacing)
+    {
+        // Prism RC-C3-1: the 8 px gap above each Medium bar costs 24 px over 3 rows; the line box of the
+        // label/value text already gives the Figma 4 px gap. Large keeps Small (6 px bar centred in 24 px).
+        var template = JsonNode.Parse(WidgetCardRenderer.TemplateFor(size))!;
+        var barContainers = CardTemplateHarness.Objects(template).Select(o => o.Node)
+            .Where(o => (string?)o["type"] == "Container" && o["items"] is JsonArray items && items.Count == 2
+                && items.All(i => (string?)i!["$when"] is CardTemplateHarness.DarkTheme or CardTemplateHarness.LightTheme
+                    && (string?)i["type"] == "ColumnSet"))
+            .ToList();
+
+        Assert.Equal(6, barContainers.Count); // 3 metrics x (fresh + stale)
+        Assert.All(barContainers, c => Assert.Equal(spacing, (string?)c["spacing"]));
+    }
+
     // =====================================================================================================
     // Small (Prism §3/§4): fraction auto | [title Medium Bolder, no heading + subtitle] stretch; footer;
     // nothing wraps.
