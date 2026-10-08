@@ -268,7 +268,7 @@ public sealed class WidgetSnapshotRecorderTests
         h.Clock.Advance(Interval);
         h.Recorder.OnCycleCompleted(Completion(MonitoringOutcome.Success)); // no-op after shutdown
 
-        // TriggerWrite returns synchronously without starting a Task, so the count is stable now.
+        // The cycle trigger returns synchronously without starting a Task, so the count is stable now.
         Assert.Equal(startedBefore, h.Writer.StartedCount);
     }
 

@@ -124,7 +124,7 @@ public sealed class WidgetSnapshotRecorder : IMonitoringCycleObserver, IAsyncDis
             return;
         }
 
-        TriggerWrite();
+        Trigger(WriteTrigger.Cycle);
     }
 
     /// <summary>
@@ -157,7 +157,7 @@ public sealed class WidgetSnapshotRecorder : IMonitoringCycleObserver, IAsyncDis
     }
 
     // V-RC-7: synchronous, exception-proof, no I/O on the invoker's thread (ServerService raises this inside
-    // the user's save path, before the engine's own reconcile handler). TriggerWrite only flips flags under
+    // the user's save path, before the engine's own reconcile handler). Trigger only flips flags under
     // _gate and, at most, queues the drain on the thread pool.
     private void OnServersChanged(object? sender, EventArgs e)
     {
@@ -173,12 +173,10 @@ public sealed class WidgetSnapshotRecorder : IMonitoringCycleObserver, IAsyncDis
 
     /// <summary>
     /// Marks the snapshot dirty and, if the throttle allows and no drain is running, starts the single
-    /// writer. <paramref name="force"/> (fleet change / startup only) bypasses the throttle. Internal so
-    /// tests can drive it directly; production calls it from <see cref="OnCycleCompleted"/>,
-    /// <see cref="Start"/>, and the <see cref="IServerService.ServersChanged"/> handler.
+    /// writer. Every trigger kind is named (Cortex N-5): a cycle is throttled; startup and fleet change
+    /// bypass the throttle, and only a fleet change grants the empty-write authority (V-B1). There is no
+    /// boolean shortcut that could grant that authority by accident.
     /// </summary>
-    internal void TriggerWrite(bool force = false) => Trigger(force ? WriteTrigger.FleetChange : WriteTrigger.Cycle);
-
     private void Trigger(WriteTrigger trigger)
     {
         var force = trigger != WriteTrigger.Cycle;
