@@ -119,6 +119,18 @@ public sealed class WindowModeCoordinator : IWindowModeCoordinator
         _store.Save(_settings);
     }
 
+    public bool HoldCompactRestored()
+    {
+        if (_mode != WindowMode.Compact || !_adapter.IsAttached || !_adapter.IsMaximized)
+        {
+            return false;
+        }
+
+        _adapter.Restore();
+        _logger.LogInformation("A maximize of the Compact window was put back to its restored bounds.");
+        return true;
+    }
+
     public WindowSizeConstraints CurrentSizeLimits()
     {
         var dpi = _adapter.GetPlacement()?.DpiScalePercent ?? WindowPlacementSettings.DefaultDpiScalePercent;
@@ -166,6 +178,12 @@ public sealed class WindowModeCoordinator : IWindowModeCoordinator
         // Null placement means the window is minimized/not ready; its geometry is meaningless, so
         // keep the last good bounds rather than persisting a bogus rectangle.
         if (_adapter.GetPlacement() is not { } placement || !WindowPlacementResolver.IsSane(placement.Bounds))
+        {
+            return false;
+        }
+
+        // c2 B-2: a maximized Compact is never recorded (the window puts it back to Restored; those bounds are kept).
+        if (mode == WindowMode.Compact && _adapter.IsMaximized)
         {
             return false;
         }

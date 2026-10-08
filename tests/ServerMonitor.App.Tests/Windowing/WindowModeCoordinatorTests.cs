@@ -246,6 +246,12 @@ public sealed class WindowModeCoordinatorTests
         public WindowFrame GetFrame() => Frame;
 
         public void SetAlwaysOnTop(bool enabled) => AlwaysOnTop = enabled;
+
+        public bool IsMaximized => false;
+
+        public void Restore()
+        {
+        }
     }
 
     private sealed class FakeStore(WindowPlacementSettings? initial = null) : IWindowPlacementStore

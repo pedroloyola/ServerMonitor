@@ -1,10 +1,12 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.UI.Xaml;
+using ServerMonitor.App.Controls;
 using ServerMonitor.App.Services;
 using ServerMonitor.App.Tests.Fakes;
 using ServerMonitor.App.ViewModels;
 using ServerMonitor.App.Views;
 using ServerMonitor.App.Windowing;
+using ServerMonitor.Core.Monitoring;
 
 namespace ServerMonitor.App.Tests.ViewModels;
 
@@ -90,6 +92,48 @@ public sealed class Ui8CompactExitGuardTests : IDisposable
         Assert.Equal(server.Id, Assert.IsType<Ui7EditorWorld.DetailPageDouble>(_world.Host.Content).ServerId);
         Assert.Equal(WindowMode.Standard, _coordinator.CurrentMode);
         Assert.False(_windowMode.OpenServerDetailCommand.CanExecute("not-a-guid"));
+    }
+
+    /// <summary>
+    /// c2 B-1 / Atlas A-1: through the row's REAL handler path. <c>CompactShell.OnRowClick</c> is exactly
+    /// <c>CompactRowActivation.Open(row.CommandParameter, WindowMode.OpenServerDetailCommand)</c>, and the row's
+    /// CommandParameter is what the compiled binding writes for each item it is given (<c>Update_ServerId</c> from
+    /// <c>ProcessBindings</c> - a recycled element just receives the next row's id; guarded in Ui8CompactC2Tests). So the
+    /// value passed here is each MATERIALIZED Compact row's own id over the same dashboard, and each row opens its Detail in
+    /// Standard. Without an id (the c1 shape: the handler read DataContext, which the repeater leaves null) nothing moves.
+    /// </summary>
+    [Fact]
+    public async Task ARowActivation_ThroughTheRowHandler_OpensThatRowsDetail_InStandard()
+    {
+        await _world.SeedAsync("web-01");
+        await _world.SeedAsync("db-01");
+        await _world.StartAsync();
+        using var compact = new CompactPresentationViewModel(_world.Dashboard, new FakeLocalizationService(), MonitoringOptions.Default);
+        Assert.Equal(2, compact.Rows.Count);
+
+        foreach (var row in compact.Rows)
+        {
+            _coordinator.SwitchTo(WindowMode.Compact);
+            object? commandParameter = row.ServerId;
+
+            Assert.True(CompactRowActivation.Open(commandParameter, _windowMode.OpenServerDetailCommand));
+
+            Assert.Equal(row.ServerId, Assert.IsType<Ui7EditorWorld.DetailPageDouble>(_world.Host.Content).ServerId);
+            Assert.Equal(WindowMode.Standard, _coordinator.CurrentMode);
+        }
+
+        Assert.Empty(_world.Prompt.Asked);
+        Assert.Equal(2, _controller.Surfaced);
+
+        _world.Navigation.GoToDashboard();
+        _coordinator.SwitchTo(WindowMode.Compact);
+        var before = _world.Host.Content;
+        Assert.False(CompactRowActivation.Open(null, _windowMode.OpenServerDetailCommand));
+        Assert.False(CompactRowActivation.Open(compact.Rows[0].Name, _windowMode.OpenServerDetailCommand));
+        Assert.False(CompactRowActivation.Open(Guid.Empty, _windowMode.OpenServerDetailCommand));
+        Assert.False(CompactRowActivation.Open(compact.Rows[0].ServerId, null));
+        Assert.Same(before, _world.Host.Content);
+        Assert.Equal(WindowMode.Compact, _coordinator.CurrentMode);
     }
 
     private async Task<EditorPageDouble> DirtyEditorBehindCompactAsync()

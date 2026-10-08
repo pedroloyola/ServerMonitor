@@ -36,8 +36,7 @@ public sealed partial class MainWindow : Window
     private readonly Microsoft.UI.Xaml.Input.KeyEventHandler _keyInputObserver;
     private readonly Microsoft.UI.Xaml.Input.PointerEventHandler _pointerInputObserver;
     private FocusState _compactEntryFocusState;
-    private int _compactEntryLayoutPasses;
-    private bool _awaitingCompactEntryLayout;
+    private readonly CompactEntryFocusWait _compactEntryWait;
     private bool _isWindowActive;
 
     public MainWindow(
@@ -93,6 +92,10 @@ public sealed partial class MainWindow : Window
         // UI.8: the Compact body is a view over the one dashboard's cards (CompactPresentationViewModel) and hands every
         // exit to the window-mode VM; both presentations show the same live state.
         CompactShellView.Initialize(compactPresentation, windowModeViewModel);
+        _compactEntryWait = new CompactEntryFocusWait(
+            handler => CompactShellView.LayoutUpdated += handler,
+            handler => CompactShellView.LayoutUpdated -= handler,
+            TryCompactEntryFocus);
         CompactRoot.SizeChanged += OnCompactSizeChanged;
 
         _persistTimer = DispatcherQueue.CreateTimer();
@@ -240,6 +243,12 @@ public sealed partial class MainWindow : Window
     /// </summary>
     private void FocusAfterModeChange(WindowMode mode)
     {
+        // Atlas c1 A-3: leaving Compact always disarms a pending entry wait - also when the window is not the active one.
+        if (mode != WindowMode.Compact)
+        {
+            EndCompactEntryFocus();
+        }
+
         // Never steal focus: only while this window is the active one. (c1: GetFocusedElement is already null here when the
         // element that triggered the switch - the header button, "Entrar" - has just been collapsed with the Standard root.)
         if (!_isWindowActive)
@@ -253,7 +262,6 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        EndCompactEntryFocus();
         DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
         {
             if (ContentFrame.Content is Microsoft.UI.Xaml.Controls.Page page && !Onboarding.IsVisible)
@@ -270,36 +278,14 @@ public sealed partial class MainWindow : Window
     /// </summary>
     private void BeginCompactEntryFocus(FocusState state)
     {
-        EndCompactEntryFocus();
         _compactEntryFocusState = state;
-        _compactEntryLayoutPasses = 0;
-        if (!TryCompactEntryFocus())
-        {
-            _awaitingCompactEntryLayout = true;
-            CompactShellView.LayoutUpdated += OnCompactEntryLayoutUpdated;
-        }
+        _compactEntryWait.Begin();
     }
 
-    private void EndCompactEntryFocus()
-    {
-        if (_awaitingCompactEntryLayout)
-        {
-            _awaitingCompactEntryLayout = false;
-            CompactShellView.LayoutUpdated -= OnCompactEntryLayoutUpdated;
-        }
-    }
-
-    private void OnCompactEntryLayoutUpdated(object? sender, object e)
-    {
-        _compactEntryLayoutPasses++;
-        if (TryCompactEntryFocus())
-        {
-            EndCompactEntryFocus();
-        }
-    }
+    private void EndCompactEntryFocus() => _compactEntryWait.End();
 
     /// <summary>True when focus was placed (or there is nothing left to wait for).</summary>
-    private bool TryCompactEntryFocus()
+    private bool TryCompactEntryFocus(int layoutPasses)
     {
         var presentation = CompactShellView.Presentation;
         var repeater = CompactShellView.Repeater;
@@ -311,7 +297,7 @@ public sealed partial class MainWindow : Window
             firstRow is { IsLoaded: true },
             action is not null,
             action is { IsLoaded: true, Visibility: Visibility.Visible } && action.ActualWidth > 0,
-            _compactEntryLayoutPasses);
+            layoutPasses);
         switch (target)
         {
             case CompactEntryFocus.Target.Wait:
@@ -461,6 +447,13 @@ public sealed partial class MainWindow : Window
             // Persist the last good bounds before the window leaves the screen for the tray.
             _modeCoordinator.PersistCurrentBounds();
             _trayService.HandleWindowMinimized();
+            return;
+        }
+
+        // UI.8 c2 B-2: Compact never stays maximized (caption button, title double-click, Win+Up). Checked before anything
+        // is captured, so a maximized Compact is never recorded; the restore raises its own change with the envelope bounds.
+        if ((args.DidPresenterChange || args.DidSizeChange || args.DidPositionChange) && _modeCoordinator.HoldCompactRestored())
+        {
             return;
         }
 

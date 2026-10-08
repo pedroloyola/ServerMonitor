@@ -69,8 +69,9 @@ public sealed class Ui8CompactC1Tests
         var code = AppSourceTree.CodeWithoutComments("MainWindow.xaml.cs");
 
         Assert.Contains("BeginCompactEntryFocus(CompactEntryFocus.StateFor(_lastInputWasKeyboard));", code, StringComparison.Ordinal);
-        Assert.Contains("CompactShellView.LayoutUpdated += OnCompactEntryLayoutUpdated;", code, StringComparison.Ordinal);
-        Assert.Contains("CompactShellView.LayoutUpdated -= OnCompactEntryLayoutUpdated;", code, StringComparison.Ordinal);
+        // c2 (Atlas A-3): the one-shot LayoutUpdated wait lives in CompactEntryFocusWait (its lifecycle tested in Ui8CompactC2Tests).
+        Assert.Contains("handler => CompactShellView.LayoutUpdated += handler,", code, StringComparison.Ordinal);
+        Assert.Contains("handler => CompactShellView.LayoutUpdated -= handler,", code, StringComparison.Ordinal);
         Assert.Contains("CompactEntryFocus.Decide(", code, StringComparison.Ordinal);
         Assert.Contains("RootLayout.AddHandler(UIElement.KeyDownEvent, _keyInputObserver, handledEventsToo: true);", code, StringComparison.Ordinal);
         Assert.Contains("RootLayout.AddHandler(UIElement.PointerPressedEvent, _pointerInputObserver, handledEventsToo: true);", code, StringComparison.Ordinal);

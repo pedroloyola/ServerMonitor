@@ -45,4 +45,11 @@ public interface IWindowModeCoordinator
     /// in practice); leaving Compact therefore never leaves the Compact limits behind.
     /// </summary>
     WindowSizeConstraints CurrentSizeLimits();
+
+    /// <summary>
+    /// UI.8 c2 B-2: Compact is never maximized. Called when the presenter state changes; a maximized Compact (caption
+    /// button, title double-click, Win+Up - the shell can bypass <c>IsMaximizable=false</c>) is put back to Restored and
+    /// true is returned, so the caller records nothing for that change. False otherwise (Standard may maximize).
+    /// </summary>
+    bool HoldCompactRestored();
 }

@@ -167,6 +167,8 @@ public sealed partial class StandardSurfacingTests
         public void PersistCurrentBounds() { }
 
         public WindowSizeConstraints CurrentSizeLimits() => WindowSizeConstraints.Compact;
+
+        public bool HoldCompactRestored() => false;
     }
 
     private static (WindowModeCoordinator Coordinator, List<string> Order) Headless(WindowMode persisted)

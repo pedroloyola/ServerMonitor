@@ -41,6 +41,24 @@ internal sealed class RecordingPlacementAdapter : IWindowPlacementAdapter
     public WindowFrame GetFrame() => Frame;
 
     public void SetAlwaysOnTop(bool enabled) => TopmostMutations.Add(enabled);
+
+    /// <summary>UI.8 c2 B-2: what the presenter reports; set by a test to simulate a native maximize.</summary>
+    public bool IsMaximized { get; set; }
+
+    /// <summary>The bounds the presenter returns to on <see cref="Restore"/> (Windows keeps the restored rectangle).</summary>
+    public WindowBounds? RestoredBounds { get; set; }
+
+    public int RestoreCount { get; private set; }
+
+    public void Restore()
+    {
+        RestoreCount++;
+        IsMaximized = false;
+        if (RestoredBounds is { } restored)
+        {
+            CurrentBounds = restored;
+        }
+    }
 }
 
 /// <summary>Placement store over a fixed settings value.</summary>

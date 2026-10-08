@@ -22,6 +22,7 @@
              · optional stale cue (R-7). Rows are recycled: no element state, everything bound. -->
         <DataTemplate x:Key="CompactServerRowTemplate" x:DataType="vm:CompactServerRowViewModel">
             <controls:ServerTableRowButton Style="{StaticResource SaCompactRowButtonStyle}" Click="OnRowClick"
+                                           CommandParameter="{x:Bind ServerId}"
                                            AutomationProperties.Name="{x:Bind AccessibleName, Mode=OneWay}">
                 <StackPanel Spacing="{StaticResource SaSpace8}">
                     <Grid Height="18" ColumnSpacing="7">

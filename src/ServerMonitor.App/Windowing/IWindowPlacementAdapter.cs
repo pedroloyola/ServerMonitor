@@ -37,4 +37,10 @@ public interface IWindowPlacementAdapter
 
     /// <summary>Pins or unpins the window above others using the presenter's supported flag (no polling).</summary>
     void SetAlwaysOnTop(bool enabled);
+
+    /// <summary>True when the presenter is in the Maximized state.</summary>
+    bool IsMaximized { get; }
+
+    /// <summary>Returns a maximized window to the Restored state (its last restored bounds).</summary>
+    void Restore();
 }

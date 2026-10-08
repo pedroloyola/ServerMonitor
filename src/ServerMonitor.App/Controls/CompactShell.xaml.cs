@@ -1,5 +1,6 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
 using ServerMonitor.App.ViewModels;
 
 namespace ServerMonitor.App.Controls;
@@ -50,12 +51,8 @@ public sealed partial class CompactShell : UserControl
         }
     }
 
-    // D-UI8-7: a row opens its server's Detail through the window-mode exit (Standard first, then the guarded command).
-    private void OnRowClick(object sender, RoutedEventArgs e)
-    {
-        if (sender is FrameworkElement { DataContext: CompactServerRowViewModel row })
-        {
-            WindowMode?.OpenServerDetailCommand.Execute(row.ServerId);
-        }
-    }
+    // D-UI8-7: a row opens its server's Detail through the window-mode exit (Standard first, then the guarded command). The
+    // id is the row's compiled CommandParameter binding - never its DataContext, which the repeater leaves unset (c2 B-1).
+    private void OnRowClick(object sender, RoutedEventArgs e) =>
+        CompactRowActivation.Open((sender as ButtonBase)?.CommandParameter, WindowMode?.OpenServerDetailCommand);
 }

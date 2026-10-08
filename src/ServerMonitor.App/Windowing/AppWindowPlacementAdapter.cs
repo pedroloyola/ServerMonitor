@@ -164,6 +164,16 @@ public sealed class AppWindowPlacementAdapter(ILogger<AppWindowPlacementAdapter>
         }
     }
 
+    public bool IsMaximized => _appWindow?.Presenter is OverlappedPresenter { State: OverlappedPresenterState.Maximized };
+
+    public void Restore()
+    {
+        if (_appWindow?.Presenter is OverlappedPresenter { State: OverlappedPresenterState.Maximized } presenter)
+        {
+            presenter.Restore();
+        }
+    }
+
     /// <summary>
     /// Width, in physical pixels, that the system reserves on the right of the title bar for the
     /// native caption buttons. Meaningful only while the content is extended into the title bar;
