@@ -105,6 +105,17 @@ public sealed class Ui8CompactC1Tests
         Assert.Contains("ToolTipService.SetToolTip(row, sender.IsTextTrimmed ? sender.Text : null);", code, StringComparison.Ordinal);
     }
 
+    // ---- P-6 ----
+
+    [Fact]
+    public void TheLoadingRing_IsDrawnInThePrimaryTextColour()
+    {
+        // Measured (c1): the default accent arc was sub-legible on the Light Compact surface.
+        var ring = AppSourceTree.LoadXaml("Controls/CompactShell.xaml").Descendants().Single(e => e.Name.LocalName == "ProgressRing");
+
+        Assert.Equal("{ThemeResource SaTextBrush}", (string?)ring.Attribute("Foreground"));
+    }
+
     // ---- helpers ----
 
     private static XElement Style(string key) =>
