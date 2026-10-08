@@ -31,11 +31,24 @@ public sealed partial class CompactShell : UserControl
     /// <summary>The list host (the window focuses its first row when Compact opens with servers).</summary>
     internal ItemsRepeater Repeater => CompactRepeater;
 
-    /// <summary>The first focusable thing of the state block, if it has a real action.</summary>
-    internal Control? StateAction =>
-        AddServerButton.Visibility == Visibility.Visible ? AddServerButton
-        : ManageHiddenButton.Visibility == Visibility.Visible ? ManageHiddenButton
+    /// <summary>The state block's real action for this presentation state (whether or not it is laid out yet).</summary>
+    internal Control? StateActionFor(CompactPresentationViewModel presentation) =>
+        presentation.ShowsAddAction ? AddServerButton
+        : presentation.ShowsHiddenAction ? ManageHiddenButton
         : null;
+
+    // Prism c1 P-4: the name's tooltip only when the name is actually cut (the row's accessible name always carries it).
+    private void OnNameTrimmedChanged(TextBlock sender, IsTextTrimmedChangedEventArgs args)
+    {
+        for (DependencyObject? node = sender; node is not null; node = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetParent(node))
+        {
+            if (node is ServerTableRowButton row)
+            {
+                ToolTipService.SetToolTip(row, sender.IsTextTrimmed ? sender.Text : null);
+                return;
+            }
+        }
+    }
 
     // D-UI8-7: a row opens its server's Detail through the window-mode exit (Standard first, then the guarded command).
     private void OnRowClick(object sender, RoutedEventArgs e)

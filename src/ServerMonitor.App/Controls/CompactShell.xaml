@@ -22,8 +22,7 @@
              · optional stale cue (R-7). Rows are recycled: no element state, everything bound. -->
         <DataTemplate x:Key="CompactServerRowTemplate" x:DataType="vm:CompactServerRowViewModel">
             <controls:ServerTableRowButton Style="{StaticResource SaCompactRowButtonStyle}" Click="OnRowClick"
-                                           AutomationProperties.Name="{x:Bind AccessibleName, Mode=OneWay}"
-                                           ToolTipService.ToolTip="{x:Bind Name}">
+                                           AutomationProperties.Name="{x:Bind AccessibleName, Mode=OneWay}">
                 <StackPanel Spacing="{StaticResource SaSpace8}">
                     <Grid Height="18" ColumnSpacing="7">
                         <Grid.ColumnDefinitions>
@@ -36,7 +35,8 @@
                                                       Label="{x:Bind StatusText, Mode=OneWay}" />
                         <TextBlock Grid.Column="1" VerticalAlignment="Center" Style="{StaticResource SaControlTextStyle}"
                                    Foreground="{ThemeResource SaTextBrush}" Text="{x:Bind Name}" TextTrimming="CharacterEllipsis"
-                                   TextWrapping="NoWrap" MaxLines="1" AutomationProperties.AccessibilityView="Raw" />
+                                   TextWrapping="NoWrap" MaxLines="1" AutomationProperties.AccessibilityView="Raw"
+                                   IsTextTrimmedChanged="OnNameTrimmedChanged" />
                         <TextBlock Grid.Column="2" VerticalAlignment="Center" Text="{x:Bind StatusText, Mode=OneWay}"
                                    Style="{x:Bind converters:CompactRowStyles.Status(Health), Mode=OneWay}"
                                    TextWrapping="NoWrap" AutomationProperties.AccessibilityView="Raw" />
@@ -49,7 +49,8 @@
                         </Grid.ColumnDefinitions>
                         <!-- R-4: label column 50 while it fits (value at x54, aligned across the three), then it yields to the
                              value, which never truncates ("100%" always fits). -->
-                        <StackPanel Spacing="6">
+                        <!-- Prism c1 P-1: the column is FIXED 34 (112:9445; track at y28, 3 below) - row 80, step 88. -->
+                        <StackPanel Height="34" Spacing="6">
                             <Grid Height="22" ColumnSpacing="4">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*" MaxWidth="50" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                                 <TextBlock x:Uid="CompactMetricCpuLabel" VerticalAlignment="Center" Style="{StaticResource SaCompactMetricLabelTextStyle}"
@@ -61,7 +62,7 @@
                             <primitives:SaCompactMetricBar Value="{x:Bind converters:CompactRowStyles.BarValue(IsCpuKnown, CpuBarValue), Mode=OneWay}"
                                                            Tone="{x:Bind converters:CompactRowStyles.Tone(IsCpuKnown, CpuSeverity), Mode=OneWay}" />
                         </StackPanel>
-                        <StackPanel Grid.Column="1" Spacing="6">
+                        <StackPanel Grid.Column="1" Height="34" Spacing="6">
                             <Grid Height="22" ColumnSpacing="4">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*" MaxWidth="50" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                                 <TextBlock x:Uid="CompactMetricMemoryLabel" VerticalAlignment="Center" Style="{StaticResource SaCompactMetricLabelTextStyle}"
@@ -73,7 +74,7 @@
                             <primitives:SaCompactMetricBar Value="{x:Bind converters:CompactRowStyles.BarValue(IsMemoryKnown, MemoryBarValue), Mode=OneWay}"
                                                            Tone="{x:Bind converters:CompactRowStyles.Tone(IsMemoryKnown, MemorySeverity), Mode=OneWay}" />
                         </StackPanel>
-                        <StackPanel Grid.Column="2" Spacing="6">
+                        <StackPanel Grid.Column="2" Height="34" Spacing="6">
                             <Grid Height="22" ColumnSpacing="4">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*" MaxWidth="50" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                                 <TextBlock x:Uid="CompactMetricDiskLabel" VerticalAlignment="Center" Style="{StaticResource SaCompactMetricLabelTextStyle}"

@@ -715,7 +715,10 @@
         <Setter Property="BorderBrush" Value="{ThemeResource SaCompactButtonBorderBrush}" />
         <Setter Property="BorderThickness" Value="{ThemeResource SaSecondaryBorderThickness}" />
     </Style>
+    <!-- Prism c1 P-3: the state block's actions are at least 188 wide (112:9828); longer copy still grows. "Expandir" keeps
+         hugging its content (DV-2). -->
     <Style x:Key="SaCompactButtonEmphasisStyle" TargetType="Button" BasedOn="{StaticResource SaCompactButtonStyle}">
+        <Setter Property="MinWidth" Value="188" />
         <Setter Property="Background" Value="{ThemeResource SaCompactButtonEmphasisBrush}" />
     </Style>
 

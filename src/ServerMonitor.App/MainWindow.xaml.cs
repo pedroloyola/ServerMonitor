@@ -31,6 +31,13 @@ public sealed partial class MainWindow : Window
     private readonly DispatcherQueueTimer _persistTimer;
     private bool _isEnforcingSize;
     private bool _usesOpaqueFallback;
+    // Prism c1 P-2: how the user last drove the window (a keyboard entry shows the focus ring, anything else does not).
+    private bool _lastInputWasKeyboard;
+    private readonly Microsoft.UI.Xaml.Input.KeyEventHandler _keyInputObserver;
+    private readonly Microsoft.UI.Xaml.Input.PointerEventHandler _pointerInputObserver;
+    private FocusState _compactEntryFocusState;
+    private int _compactEntryLayoutPasses;
+    private bool _awaitingCompactEntryLayout;
 
     public MainWindow(
         INavigationService navigationService,
@@ -62,6 +69,10 @@ public sealed partial class MainWindow : Window
         _navigationService.Navigated += OnShellNavigated;
         StandardRoot.SizeChanged += OnStandardSizeChanged;
         RootLayout.KeyDown += OnShellKeyDown;
+        _keyInputObserver = (_, _) => _lastInputWasKeyboard = true;
+        _pointerInputObserver = (_, _) => _lastInputWasKeyboard = false;
+        RootLayout.AddHandler(UIElement.KeyDownEvent, _keyInputObserver, handledEventsToo: true);
+        RootLayout.AddHandler(UIElement.PointerPressedEvent, _pointerInputObserver, handledEventsToo: true);
         _windowController = windowController;
         _placementAdapter = placementAdapter;
         _modeCoordinator = modeCoordinator;
@@ -187,6 +198,12 @@ public sealed partial class MainWindow : Window
         Onboarding.SetWindowMode(_modeCoordinator.CurrentMode);
         // The task observes and logs diagnosis failures; it cannot delay the earlier startup work.
         _ = Onboarding.OnMainWindowShownAsync(normalStart);
+        // Prism c1 P-2: a launch straight into Compact puts focus where a mode change would - programmatically (no ring),
+        // instead of leaving WinUI's first-tab-stop default ("Expandir", drawn with a keyboard ring).
+        if (_modeCoordinator.CurrentMode == WindowMode.Compact)
+        {
+            BeginCompactEntryFocus(FocusState.Programmatic);
+        }
     }
 
     private void OnWindowModeChanged(object? sender, WindowMode mode)
@@ -226,27 +243,85 @@ public sealed partial class MainWindow : Window
             return;
         }
 
+        if (mode == WindowMode.Compact)
+        {
+            BeginCompactEntryFocus(CompactEntryFocus.StateFor(_lastInputWasKeyboard));
+            return;
+        }
+
+        EndCompactEntryFocus();
         DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
         {
-            if (mode == WindowMode.Compact)
-            {
-                if (CompactShellView.Repeater.ItemsSourceView is { Count: > 0 } && RepeaterFocus.FocusIndex(CompactShellView.Repeater, 0, FocusState.Keyboard))
-                {
-                    return;
-                }
-
-                if (CompactShellView.StateAction is { } action && action.Focus(FocusState.Keyboard))
-                {
-                    return;
-                }
-
-                CompactExpandButton.Focus(FocusState.Keyboard);
-            }
-            else if (ContentFrame.Content is Microsoft.UI.Xaml.Controls.Page page && !Onboarding.IsVisible)
+            if (ContentFrame.Content is Microsoft.UI.Xaml.Controls.Page page && !Onboarding.IsVisible)
             {
                 ShellPageFocus.FocusHeading(page, force: true);
             }
         });
+    }
+
+    /// <summary>
+    /// Prism c1 P-2: focuses the Compact entry target (CompactEntryFocus) once it is laid out. If the first row or the
+    /// state action exists but is not realized yet, waits for the next layout pass of the compact body (one-shot
+    /// LayoutUpdated, a bounded pass count - never a timer) instead of falling back to "Expandir" too early.
+    /// </summary>
+    private void BeginCompactEntryFocus(FocusState state)
+    {
+        EndCompactEntryFocus();
+        _compactEntryFocusState = state;
+        _compactEntryLayoutPasses = 0;
+        if (!TryCompactEntryFocus())
+        {
+            _awaitingCompactEntryLayout = true;
+            CompactShellView.LayoutUpdated += OnCompactEntryLayoutUpdated;
+        }
+    }
+
+    private void EndCompactEntryFocus()
+    {
+        if (_awaitingCompactEntryLayout)
+        {
+            _awaitingCompactEntryLayout = false;
+            CompactShellView.LayoutUpdated -= OnCompactEntryLayoutUpdated;
+        }
+    }
+
+    private void OnCompactEntryLayoutUpdated(object? sender, object e)
+    {
+        _compactEntryLayoutPasses++;
+        if (TryCompactEntryFocus())
+        {
+            EndCompactEntryFocus();
+        }
+    }
+
+    /// <summary>True when focus was placed (or there is nothing left to wait for).</summary>
+    private bool TryCompactEntryFocus()
+    {
+        var presentation = CompactShellView.Presentation;
+        var repeater = CompactShellView.Repeater;
+        var hasRows = presentation?.ShowsList == true && repeater.ItemsSourceView is { Count: > 0 };
+        var firstRow = hasRows ? repeater.TryGetElement(0) as Microsoft.UI.Xaml.Controls.Control : null;
+        var action = presentation is null ? null : CompactShellView.StateActionFor(presentation);
+        var target = CompactEntryFocus.Decide(
+            hasRows,
+            firstRow is { IsLoaded: true },
+            action is not null,
+            action is { IsLoaded: true, Visibility: Visibility.Visible } && action.ActualWidth > 0,
+            _compactEntryLayoutPasses);
+        switch (target)
+        {
+            case CompactEntryFocus.Target.Wait:
+                return false;
+            case CompactEntryFocus.Target.FirstRow:
+                firstRow!.Focus(_compactEntryFocusState);
+                return true;
+            case CompactEntryFocus.Target.StateAction:
+                action!.Focus(_compactEntryFocusState);
+                return true;
+            default:
+                CompactExpandButton.Focus(_compactEntryFocusState);
+                return true;
+        }
     }
 
     private void OnCompactSizeChanged(object sender, SizeChangedEventArgs args) => UpdateCompactTitleLayout();
@@ -470,6 +545,9 @@ public sealed partial class MainWindow : Window
         StandardRoot.SizeChanged -= OnStandardSizeChanged;
         CompactRoot.SizeChanged -= OnCompactSizeChanged;
         RootLayout.KeyDown -= OnShellKeyDown;
+        RootLayout.RemoveHandler(UIElement.KeyDownEvent, _keyInputObserver);
+        RootLayout.RemoveHandler(UIElement.PointerPressedEvent, _pointerInputObserver);
+        EndCompactEntryFocus();
         _persistTimer.Stop();
         _persistTimer.Tick -= OnPersistTimerTick;
         _modeCoordinator.PersistCurrentBounds();
