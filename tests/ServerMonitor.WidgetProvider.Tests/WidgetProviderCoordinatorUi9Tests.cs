@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Text;
+using System.Text.Json.Nodes;
 using Microsoft.Extensions.Time.Testing;
 using ServerMonitor.WidgetContract;
 using ServerMonitor.WidgetProvider.Hosting;
@@ -66,48 +67,58 @@ public sealed class WidgetProviderCoordinatorUi9Tests : IDisposable
 
     private static string WithServerFields(string extra) => Head + Server.Replace("{0}", extra) + "]}";
 
-    public static TheoryData<string, string, bool?> Inputs => new()
+    // Expected outcome per row: "Healthy" for the valid CONTROLS (they prove the healthy detection below is
+    // not vacuous), otherwise the exact reader reason. Every malformed/hostile row must paint the neutral
+    // Unavailable card — never a healthy state, healthy copy, healthy count or the good colour (Atlas final).
+    private const string HealthyControl = "Healthy";
+    // A UTF-8 BOM is not JSON to the source-generated deserializer: the file reads Corrupt and paints the
+    // neutral card (fail-closed). The app's writer never emits a BOM (serializer bytes, no preamble).
+    private const string BomOutcome = nameof(WidgetReadUnavailableReason.Corrupt);
+
+    public static TheoryData<string, string, string> Inputs => new()
     {
-        { "valid baseline", WithServerFields(string.Empty), true },
-        { "valid with both new fields", WithServerFields(""","attentionMetric":"disk","staleAfterSeconds":120"""), true },
-        { "unknown attentionMetric is a missing hint", WithServerFields(",\"attentionMetric\":\"nope\""), true },
-        { "truncated", WithServerFields(string.Empty)[..80], false },
-        { "staleAfterSeconds -1", WithServerFields(""","staleAfterSeconds":-1"""), false },
-        { "staleAfterSeconds 0", WithServerFields(""","staleAfterSeconds":0"""), false },
-        { "staleAfterSeconds 3601", WithServerFields(""","staleAfterSeconds":3601"""), false },
-        { "staleAfterSeconds wrong type", WithServerFields(""","staleAfterSeconds":"60" """), false },
-        { "attentionMetric wrong type", WithServerFields(""","attentionMetric":[1]"""), false },
-        { "health wrong type", WithServerFields(string.Empty).Replace("\"health\":\"Healthy\"", "\"health\":true"), false },
-        { "lastUpdated after generated", WithServerFields(string.Empty).Replace("11:59:50", "12:00:02"), false },
-        { "schema 2", WithServerFields(string.Empty).Replace("\"schemaVersion\":1", "\"schemaVersion\":2"), false },
-        { "UTF-8 BOM (outcome recorded, never a crash)", "﻿" + WithServerFields(string.Empty), null },
+        { "valid baseline", WithServerFields(string.Empty), HealthyControl },
+        { "valid with both new fields", WithServerFields(""","attentionMetric":"disk","staleAfterSeconds":120"""), HealthyControl },
+        { "unknown attentionMetric is a missing hint", WithServerFields(",\"attentionMetric\":\"nope\""), HealthyControl },
+        { "truncated", WithServerFields(string.Empty)[..80], nameof(WidgetReadUnavailableReason.Corrupt) },
+        { "staleAfterSeconds -1", WithServerFields(""","staleAfterSeconds":-1"""), nameof(WidgetReadUnavailableReason.Invalid) },
+        { "staleAfterSeconds 0", WithServerFields(""","staleAfterSeconds":0"""), nameof(WidgetReadUnavailableReason.Invalid) },
+        { "staleAfterSeconds 3601", WithServerFields(""","staleAfterSeconds":3601"""), nameof(WidgetReadUnavailableReason.Invalid) },
+        { "staleAfterSeconds wrong type", WithServerFields(""","staleAfterSeconds":"60" """), nameof(WidgetReadUnavailableReason.Corrupt) },
+        { "attentionMetric wrong type", WithServerFields(""","attentionMetric":[1]"""), nameof(WidgetReadUnavailableReason.Corrupt) },
+        { "health wrong type", WithServerFields(string.Empty).Replace("\"health\":\"Healthy\"", "\"health\":true"), nameof(WidgetReadUnavailableReason.Corrupt) },
+        { "lastUpdated after generated", WithServerFields(string.Empty).Replace("11:59:50", "12:00:02"), nameof(WidgetReadUnavailableReason.Invalid) },
+        { "schema 2", WithServerFields(string.Empty).Replace("\"schemaVersion\":1", "\"schemaVersion\":2"), nameof(WidgetReadUnavailableReason.Invalid) },
+        { "UTF-8 BOM", "﻿" + WithServerFields(string.Empty), BomOutcome },
     };
 
     [Theory]
     [MemberData(nameof(Inputs))]
-    public void Malformed_or_hostile_input_never_escapes_and_still_paints_a_card(string label, string json, bool? available)
+    public void Malformed_or_hostile_input_never_escapes_and_never_renders_healthy(string label, string json, string expected)
     {
         File.WriteAllBytes(_path, Encoding.UTF8.GetBytes(json));
-        AssertPaintsWithoutEscaping(label, available);
+        AssertOutcomeAndCard(label, expected);
     }
 
     [Fact]
-    public void Oversized_file_is_unavailable_and_still_paints()
+    public void Oversized_file_is_unavailable_and_never_renders_healthy()
     {
         var json = WithServerFields(string.Empty);
         var padded = json[..^2] + new string(' ', (int)WidgetStateLocation.MaxFileBytes) + "]}";
         File.WriteAllBytes(_path, Encoding.UTF8.GetBytes(padded));
-        AssertPaintsWithoutEscaping("oversized", available: false);
+        AssertOutcomeAndCard("oversized", nameof(WidgetReadUnavailableReason.Oversized));
     }
 
-    private void AssertPaintsWithoutEscaping(string label, bool? available)
+    // Healthy copy in every shipped culture (en-US / pt-PT / pt-BR), matched case-insensitively, so the
+    // check does not depend on the test machine's UI culture.
+    private static readonly string[] HealthyWords = ["healthy", "saudáv"];
+
+    private void AssertOutcomeAndCard(string label, string expected)
     {
         var clock = new FakeTimeProvider(Now);
         var read = new WidgetSnapshotReader(_path, timeProvider: clock).Read();
-        if (available is { } expected)
-        {
-            Assert.True(expected == read.IsAvailable, $"{label}: expected available={expected}, got {read.Status}/{read.Reason}");
-        }
+        var outcome = read.IsAvailable ? HealthyControl : read.Reason.ToString();
+        Assert.True(expected == outcome, $"{label}: expected {expected}, got {read.Status}/{read.Reason}");
 
         var host = new FakeWidgetHost();
         var coordinator = NewCoordinator(host, clock);
@@ -115,6 +126,39 @@ public sealed class WidgetProviderCoordinatorUi9Tests : IDisposable
 
         var update = Assert.Single(host.Updates);
         Assert.False(string.IsNullOrWhiteSpace(update.Template), label);
+        var data = JsonNode.Parse(update.Data)!.AsObject();
+        var card = Rendering.CardTemplateHarness.Expand(update.Template, update.Data);
+        Assert.Empty(Rendering.CardTemplateHarness.ShapeErrors(card));
+        var visible = Rendering.CardTemplateHarness.VisibleTexts(card);
+        var colours = Rendering.CardTemplateHarness.Strings(card).Where(s => s.Key == "color").Select(s => s.Value).ToList();
+
+        if (expected == HealthyControl)
+        {
+            // Control: a valid healthy snapshot really reads healthy, so the negative checks can fire.
+            Assert.True((bool)data["isHealthy"]!, label);
+            Assert.Contains(visible, t => HealthyWords.Any(w => t.Contains(w, StringComparison.OrdinalIgnoreCase)));
+            Assert.Contains("good", colours);
+            return;
+        }
+
+        // The neutral Unavailable card, and nothing else.
+        Assert.True((bool)data["isUnavailable"]!, label);
+        foreach (var flag in new[] { "isFleet", "isHealthy", "isAttention", "isNoCurrentData", "isStale", "isEmpty" })
+        {
+            Assert.False((bool)data[flag]!, $"{label}: {flag}");
+        }
+
+        Assert.Empty(data["rows"]!.AsArray());
+        Assert.Equal(string.Empty, (string?)data["fraction"]);
+        Assert.Equal(string.Empty, (string?)data["rowsOfTotal"]);
+        Assert.NotEqual("good", (string?)data["stateColor"]);
+
+        // No healthy word or good colour anywhere in the data or on the expanded card.
+        Assert.DoesNotContain(Rendering.CardTemplateHarness.Strings(data),
+            s => HealthyWords.Any(w => s.Value.Contains(w, StringComparison.OrdinalIgnoreCase)));
+        Assert.DoesNotContain(visible, t => HealthyWords.Any(w => t.Contains(w, StringComparison.OrdinalIgnoreCase)));
+        Assert.DoesNotContain("good", colours);
+        Assert.NotEmpty(visible); // the neutral title/body is really painted
     }
 }
 
