@@ -59,7 +59,6 @@ public sealed class WidgetStrings
     public required string CountCriticalOne { get; init; }
     public required string CountCriticalOther { get; init; }
     public required string CountOffline { get; init; }
-    public required string CountUnknown { get; init; }
     public required string CountSeparator { get; init; }
     public required string StaleTitle { get; init; }
     public required string StaleLastStateFormat { get; init; }
@@ -132,7 +131,6 @@ public sealed class WidgetStrings
         CountCriticalOne = "{0} critical",
         CountCriticalOther = "{0} critical",
         CountOffline = "{0} no connection",
-        CountUnknown = "{0} no data",
         CountSeparator = " · ",
         StaleTitle = "No recent data",
         StaleLastStateFormat = "Last state: {0} of {1} healthy",
@@ -185,7 +183,6 @@ public sealed class WidgetStrings
         CountCriticalOne = "{0} crítico",
         CountCriticalOther = "{0} críticos",
         CountOffline = "{0} sem conexão",
-        CountUnknown = "{0} sem dados",
         CountSeparator = " · ",
         StaleTitle = "Sem dados recentes",
         StaleLastStateFormat = "Último estado: {0} de {1} saudáveis",
@@ -238,7 +235,6 @@ public sealed class WidgetStrings
         CountCriticalOne = "{0} crítico",
         CountCriticalOther = "{0} críticos",
         CountOffline = "{0} sem ligação",
-        CountUnknown = "{0} sem dados",
         CountSeparator = " · ",
         StaleTitle = "Sem dados recentes",
         StaleLastStateFormat = "Último estado: {0} de {1} saudáveis",

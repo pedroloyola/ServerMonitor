@@ -22,27 +22,6 @@ namespace ServerMonitor.WidgetProvider.Rendering;
 /// </summary>
 public static class WidgetViewModelBuilder
 {
-    /// <summary>
-    /// Max servers rendered per size. Small shows a summary only.
-    /// <para>
-    /// These are HOST-CAPACITY limits that must be MEASURED on the real Windows Widgets board, not
-    /// chosen. The host gives each size a FIXED card height and silently clips whatever does not fit
-    /// (M13-QA-4/QA-5, P-017).
-    /// </para>
-    /// <list type="bullet">
-    /// <item>The V3 design targets 3 rows on Medium.</item>
-    /// <item>The legacy Medium measured only 2, and V3 rows have not been measured yet.</item>
-    /// <item>So Medium stays 2 until the C0 board measurement sets it. That is the ONLY place to change it:
-    /// the copy ("N of M") and the truthful-degradation tests follow.</item>
-    /// </list>
-    /// </summary>
-    public static int MaxRowsFor(WidgetSizeHint size) => size switch
-    {
-        WidgetSizeHint.Large => 3,
-        WidgetSizeHint.Medium => 2,
-        _ => 0
-    };
-
     private const int MaxNameLength = 22;
 
     public static WidgetViewModel Build(
@@ -75,7 +54,7 @@ public static class WidgetViewModelBuilder
 
         var counts = Count(snapshot.Servers, IsFresh);
         var ordered = WidgetOrdering.ForDisplay(snapshot.Servers);
-        var maxRows = MaxRowsFor(size);
+        var maxRows = WidgetLayout.MaxRowsFor(size);
         var shown = ordered.Take(maxRows).Select(s => ToRow(s, strings, IsFresh(s))).ToArray();
         var total = snapshot.Servers.Count;
 
@@ -121,13 +100,12 @@ public static class WidgetViewModelBuilder
             FooterText = footer,
             ServersHeading = strings.ServersHeading,
             RowsOfTotalText = maxRows == 0 ? string.Empty : Format(strings.OverflowFormat, shown.Length, total),
-            FractionText = string.Create(CultureInfo.InvariantCulture, $"{counts.HealthyFresh}/{total}"),
+            // Prism P-C1-4: a stale card quotes the LAST state (engine healthy/total) in the default colour —
+            // "0/3" would read as "none healthy". A fresh card counts healthy AND fresh only (P-RC-2).
+            FractionText = string.Create(CultureInfo.InvariantCulture, $"{(stale ? counts.EngineHealthy : counts.HealthyFresh)}/{total}"),
             RingAltText = stale ? lastState : Format(strings.RingAltFormat, counts.HealthyFresh, total),
             TotalServers = total,
             HealthyFreshCount = counts.HealthyFresh,
-            WarningCount = counts.Warning,
-            CriticalOrOfflineCount = counts.CriticalOrOffline,
-            NoCurrentDataCount = counts.NoCurrentData,
             Rows = shown,
             OverflowCount = overflow
         };
@@ -288,14 +266,18 @@ public static class WidgetViewModelBuilder
         return Format(stale ? strings.LastReadingHoursAgo : strings.UpdatedHoursAgo, (int)age.TotalHours);
     }
 
-    // Unknown and not-fresh readings are their own bucket — never folded into healthy (§21, D-UI9-5).
+    // Prism P-C1-2: "N healthy" only when EVERY server is healthy and fresh; otherwise only the counts that
+    // need the user — attention, critical, no connection, no recent data — so the colour of the line and its
+    // words agree and no problem count is pushed out by healthy ones. Unknown and not-fresh readings are
+    // their own bucket, never folded into healthy (§21, D-UI9-5), worded like the title (P-C1-7).
     private static string CountsSummary(Counts counts, WidgetStrings strings)
     {
-        var parts = new List<string>(5);
-        if (counts.HealthyFresh > 0)
+        if (counts.Problems == 0 && counts.NoCurrentData == 0)
         {
-            parts.Add(WidgetStrings.Plural(counts.HealthyFresh, strings.CountHealthyOne, strings.CountHealthyOther));
+            return WidgetStrings.Plural(counts.HealthyFresh, strings.CountHealthyOne, strings.CountHealthyOther);
         }
+
+        var parts = new List<string>(4);
 
         if (counts.Warning > 0)
         {
@@ -314,7 +296,7 @@ public static class WidgetViewModelBuilder
 
         if (counts.NoCurrentData > 0)
         {
-            parts.Add(Format(strings.CountUnknown, counts.NoCurrentData));
+            parts.Add(Format(strings.FleetUnknownOnly, counts.NoCurrentData));
         }
 
         return string.Join(strings.CountSeparator, parts);

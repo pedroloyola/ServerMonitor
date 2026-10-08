@@ -344,9 +344,15 @@ public sealed class WidgetCardRendererTests
         Assert.Equal(En.EmptyCta, (string?)button["title"]);
         Assert.Null(button["data"]);
 
+        // Cortex L-1: on Small the CTA is the ONLY touch target; Medium/Large also keep the card action.
+        var emptyActions = CardTemplateHarness.Actions(empty);
+        Assert.Equal(size == WidgetSizeHint.Small ? 1 : 2, emptyActions.Count);
+        Assert.Equal(size == WidgetSizeHint.Small, empty["selectAction"] is null);
+
         var (_, _, unavailable) = Render(Missing, size);
         Assert.DoesNotContain(CardTemplateHarness.Objects(unavailable), o => (string?)o.Node["type"] == "ActionSet");
-        Assert.Equal("openDashboard", (string?)unavailable["selectAction"]!["verb"]); // SPEC §3: card opens Dashboard
+        var only = Assert.Single(CardTemplateHarness.Actions(unavailable)); // SPEC §3: the card opens the Dashboard
+        Assert.Equal("openDashboard", (string?)only["verb"]);
         Assert.Contains(En.UnavailableTitle, CardTemplateHarness.VisibleTexts(unavailable));
         Assert.DoesNotContain(En.FleetAllHealthy, CardTemplateHarness.VisibleTexts(unavailable));
     }
@@ -421,7 +427,7 @@ public sealed class WidgetCardRendererTests
         var (vm, _, expanded) = Render(Read(Now, Enumerable.Range(1, total).Select(i => Server(i)).ToArray()), size);
         var rows = CardTemplateHarness.Rows(expanded);
 
-        Assert.Equal(Math.Min(total, WidgetViewModelBuilder.MaxRowsFor(size)), rows.Count);
+        Assert.Equal(Math.Min(total, WidgetLayout.MaxRowsFor(size)), rows.Count);
         if (size == WidgetSizeHint.Small)
         {
             Assert.Contains($"{total}/{total}", CardTemplateHarness.VisibleTexts(expanded)); // the fraction states the fleet
@@ -437,17 +443,20 @@ public sealed class WidgetCardRendererTests
     // Meters (R-2): shape-distinguished glyphs, neutral fill, % always text; Offline/Unknown → "—", none
     // =====================================================================================================
 
+    // Prism P-C1-5 (replaces DV-10): 0 only at 0 %, full only at 100 %, otherwise clamp(round(p/20), 1, 4).
     [Theory]
     [InlineData(0, 0)]
-    [InlineData(9, 0)]
+    [InlineData(1, 1)]
+    [InlineData(9, 1)]
     [InlineData(10, 1)]
     [InlineData(41, 2)]
     [InlineData(50, 3)]
     [InlineData(89, 4)]
-    [InlineData(90, 5)]
+    [InlineData(90, 4)]
+    [InlineData(99, 4)]
     [InlineData(100, 5)]
-    public void Filled_segments_round_to_the_nearest_fifth(int percent, int filled) =>
-        Assert.Equal(filled, WidgetCardRenderer.FilledSegments(percent));
+    public void Filled_segments_never_read_empty_or_full_unless_exactly_0_or_100(int percent, int filled) =>
+        Assert.Equal(filled, WidgetLayout.FilledSegments(percent));
 
     private static List<JsonObject> Meters(JsonNode row) =>
         CardTemplateHarness.Objects(row).Select(o => o.Node)
@@ -466,7 +475,7 @@ public sealed class WidgetCardRendererTests
         foreach (var meter in meters)
         {
             var runs = meter["inlines"]!.AsArray().Select(r => r!.AsObject()).ToList();
-            Assert.Equal(WidgetCardRenderer.MeterSegments, runs.Sum(r => ((string)r["text"]!).Length));
+            Assert.Equal(WidgetLayout.MeterSegments, runs.Sum(r => ((string)r["text"]!).Length));
             Assert.All(runs.Where(r => ((string)r["text"]!).Contains('▰')), r => Assert.Equal("accent", (string?)r["color"]));
             Assert.All(runs.Where(r => ((string)r["text"]!).Contains('▱')), r => Assert.True((bool)r["isSubtle"]!));
             Assert.DoesNotContain(CardTemplateHarness.Strings(meter), s => s is { Key: "color", Value: "good" or "warning" or "attention" });
@@ -512,7 +521,110 @@ public sealed class WidgetCardRendererTests
     }
 
     // =====================================================================================================
-    // L detail (RC-10) and the Small fleet bar (P-RC-2)
+    // Prism C1 review: label+value in one block (P-C1-1), problem-only wrapping summary (P-C1-2)
+    // =====================================================================================================
+
+    [Fact]
+    public void A_metric_cell_holds_label_and_value_in_one_text_block_never_a_label_value_column_set()
+    {
+        foreach (var size in new[] { WidgetSizeHint.Medium, WidgetSizeHint.Large })
+        {
+            var template = JsonNode.Parse(WidgetCardRenderer.TemplateFor(size))!;
+            foreach (var key in new[] { "cpu", "mem", "disk" })
+            {
+                var block = CardTemplateHarness.Objects(template).Select(o => o.Node)
+                    .Single(o => (string?)o["type"] == "RichTextBlock"
+                        && o["inlines"]!.AsArray().Any(r => (string?)r!["text"] == "${" + key + "Value}"));
+                var runs = block["inlines"]!.AsArray().Select(r => (string)r!["text"]!).ToArray();
+                Assert.Equal(["${" + key + "Label}", "${gap}", "${" + key + "Value}"], runs);
+
+                // The metric cell (its column) contains no ColumnSet at all.
+                var cell = CardTemplateHarness.Objects(template).Select(o => o.Node)
+                    .Single(o => (string?)o["type"] == "Column" && CardTemplateHarness.Objects(o).Any(i => i.Node == block));
+                Assert.DoesNotContain(CardTemplateHarness.Objects(cell["items"]), o => (string?)o.Node["type"] == "ColumnSet");
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(100.0, "100%")]
+    [InlineData(null, "—")]
+    public void Value_fixtures_stay_whole_inside_the_label_block(double? cpu, string expected)
+    {
+        var (_, _, expanded) = Render(Read(Now, Server(1, cpu: cpu)), WidgetSizeHint.Medium);
+        var row = CardTemplateHarness.Rows(expanded).Single();
+        var block = CardTemplateHarness.Objects(row).Select(o => o.Node)
+            .First(o => (string?)o["type"] == "RichTextBlock" && (string?)o["inlines"]![0]!["text"] == "CPU");
+        Assert.Equal(["CPU", " ", expected], block["inlines"]!.AsArray().Select(r => (string)r!["text"]!).ToArray());
+    }
+
+    [Fact]
+    public void The_worst_case_summary_lists_every_problem_and_the_template_wraps_it()
+    {
+        var (vm, card, _) = Render(Read(Now,
+            Server(1, WidgetHealth.Warning), Server(2, WidgetHealth.Critical), Server(3, WidgetHealth.Offline),
+            Server(4, updated: Now.AddSeconds(-500)), Server(5)), WidgetSizeHint.Medium);
+
+        Assert.Equal("1 attention · 1 critical · 1 no connection · 1 without recent data", vm.Summary);
+        Assert.Equal(vm.Summary, (string?)JsonNode.Parse(card.DataJson)!["summary"]);
+        Assert.DoesNotContain("healthy", vm.Summary);
+
+        foreach (var size in new[] { WidgetSizeHint.Medium, WidgetSizeHint.Large })
+        {
+            var template = JsonNode.Parse(WidgetCardRenderer.TemplateFor(size))!;
+            var summary = CardTemplateHarness.Objects(template).Select(o => o.Node).Single(o => (string?)o["text"] == "${summary}");
+            Assert.True((bool)summary["wrap"]!);
+            var columns = CardTemplateHarness.Objects(template).Select(o => o.Node)
+                .Where(o => (string?)o["type"] == "Column" && (CardTemplateHarness.Objects(o).Any(i => (string?)i.Node["text"] is "${summary}" or "${serversHeading}")))
+                .ToList();
+            Assert.Equal("auto", (string?)columns.Single(c => CardTemplateHarness.Objects(c).Any(i => (string?)i.Node["text"] == "${serversHeading}"))["width"]);
+            Assert.Equal("stretch", (string?)columns.Single(c => CardTemplateHarness.Objects(c).Any(i => (string?)i.Node["text"] == "${summary}"))["width"]);
+        }
+    }
+
+    [Fact]
+    public void An_all_healthy_summary_states_the_healthy_count()
+    {
+        var (vm, _, _) = Render(Read(Now, Server(1), Server(2), Server(3)), WidgetSizeHint.Medium);
+        Assert.Equal("3 healthy", vm.Summary);
+    }
+
+    // =====================================================================================================
+    // Vigil C1 L-1/L-2: untrusted text never stringifies; colours only from a closed allowlist
+    // =====================================================================================================
+
+    [Fact]
+    public void UntrustedText_never_turns_back_into_the_name_by_accident()
+    {
+        var name = new UntrustedText("[x](https://example.invalid)");
+        Assert.Equal("[untrusted]", name.ToString());
+        Assert.Equal("[untrusted]", $"{name}");
+        Assert.Equal("[x](https://example.invalid)", name.Value);
+    }
+
+    [Fact]
+    public void Every_colour_on_every_card_is_from_the_closed_allowlist()
+    {
+        string[] allowed = ["default", "good", "warning", "attention", "accent"];
+        var seen = 0;
+        foreach (var size in Sizes)
+        {
+            foreach (var (_, read) in States(HostileNames).Concat(States()))
+            {
+                var (_, _, expanded) = Render(read, size);
+                foreach (var (_, value) in CardTemplateHarness.Strings(expanded).Where(s => s.Key == "color"))
+                {
+                    Assert.Contains(value, allowed);
+                    seen++;
+                }
+            }
+        }
+
+        Assert.True(seen > 0); // the walk is real
+    }
+
+    // =====================================================================================================
+    // L detail (RC-10) and the Small fallback (P-RC-2 as amended by P-C1-3/4/6)
     // =====================================================================================================
 
     [Theory]
@@ -533,16 +645,42 @@ public sealed class WidgetCardRendererTests
     }
 
     [Theory]
-    [InlineData(1, true)]
-    [InlineData(8, true)]
-    [InlineData(9, false)]
-    public void Small_fleet_bar_is_drawn_up_to_the_budget_and_omitted_above(int servers, bool drawn)
+    [InlineData(1)]
+    [InlineData(8)]
+    [InlineData(9)]
+    public void Small_has_no_fleet_bar_and_always_shows_the_freshness_line(int servers)
     {
-        var (_, _, expanded) = Render(Read(Now, Enumerable.Range(1, servers).Select(i => Server(i)).ToArray()), WidgetSizeHint.Small);
-        var glyphs = string.Concat(CardTemplateHarness.VisibleTexts(expanded).Where(t => t.Length > 0 && t.All(c => c is '▰' or '▱')));
+        // Prism P-C1-3: fraction + title + subtitle + footer; no glyph bar pushing the footer out of 146 px.
+        var (vm, _, expanded) = Render(Read(Now, Enumerable.Range(1, servers).Select(i => Server(i)).ToArray()), WidgetSizeHint.Small);
+        var texts = CardTemplateHarness.VisibleTexts(expanded);
 
-        Assert.Equal(drawn ? servers : 0, glyphs.Length);
-        Assert.Contains($"{servers}/{servers}", CardTemplateHarness.VisibleTexts(expanded));
+        Assert.DoesNotContain(texts, t => t.Contains('▰') || t.Contains('▱'));
+        Assert.Contains($"{servers}/{servers}", texts);
+        Assert.Contains(vm.FooterText, texts);
+        Assert.DoesNotContain("fleetBar", WidgetCardRenderer.TemplateFor(WidgetSizeHint.Small), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void A_stale_small_card_quotes_the_last_state_in_the_default_colour()
+    {
+        // Prism P-C1-4: "0/3" would read as "none healthy"; the stale card shows the last state, neutrally.
+        var (vm, _, expanded) = Render(States().Single(s => s.State == "stale").Read, WidgetSizeHint.Small);
+        Assert.Equal("3/3", vm.FractionText);
+        var fraction = CardTemplateHarness.Objects(expanded).Select(o => o.Node).Single(o => (string?)o["text"] == "3/3");
+        Assert.Equal("default", (string?)fraction["color"]);
+        Assert.Contains(En.StaleTitle, CardTemplateHarness.VisibleTexts(expanded));
+    }
+
+    [Fact]
+    public void The_small_empty_card_has_no_freshness_line()
+    {
+        // Prism P-C1-6 (Figma 112:11594): title + CTA only.
+        foreach (var state in new[] { "empty", "empty-stale" })
+        {
+            var (vm, _, expanded) = Render(States().Single(s => s.State == state).Read, WidgetSizeHint.Small);
+            Assert.NotEmpty(vm.FooterText);
+            Assert.DoesNotContain(vm.FooterText, CardTemplateHarness.VisibleTexts(expanded));
+        }
     }
 
     [Fact]

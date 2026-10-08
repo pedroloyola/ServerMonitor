@@ -164,7 +164,7 @@ public sealed class WidgetViewModelV3StateTests
         Assert.Equal(WidgetCardState.NoCurrentData, vm.CardState);
         Assert.Equal("1 without recent data", vm.Title);
         Assert.Equal(1, vm.HealthyFreshCount);
-        Assert.Equal("1 healthy · 1 no data", vm.Summary);
+        Assert.Equal("1 without recent data", vm.Summary); // P-C1-2/P-C1-7: only non-healthy, title wording
     }
 
     [Fact]
@@ -275,7 +275,7 @@ public sealed class WidgetViewModelV3StateTests
         var vm = Build(Read(Now, Server(1), Server(2), Server(3, WidgetHealth.Unknown, neverRead: true)));
 
         Assert.Equal(2, vm.HealthyFreshCount);
-        Assert.Equal("2 healthy · 1 no data", vm.Summary);
+        Assert.Equal("1 without recent data", vm.Summary);
         Assert.Equal("2 of 3 healthy", vm.RingAltText);
         Assert.NotEqual("All healthy", vm.Title);
     }

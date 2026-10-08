@@ -47,16 +47,11 @@ public sealed record WidgetCard(string TemplateJson, string DataJson);
 /// </summary>
 public static class WidgetCardRenderer
 {
-    /// <summary>Glyph meter segments. MEASURED pitch: a Default-size block glyph is ~13 px; a V3 metric
-    /// column is ~76–80 px, so 5 fit with margin (legacy M13-QA-6 measurement). C0 re-measures ▰/▱.</summary>
-    public const int MeterSegments = 5;
-
-    /// <summary>Filled and empty meter glyphs — told apart by shape, not colour (R-2 / P-RC-1).</summary>
-    public const string MeterFill = "▰";
-    public const string MeterTrack = "▱";
-
-    /// <summary>Above this many servers the Small fleet bar is omitted rather than truncated (P-RC-2).</summary>
-    public const int MaxFleetTicks = 8;
+    /// <summary>
+    /// Separator between a metric label and its value inside ONE text block ("CPU 41%"). A no-break space,
+    /// so label and value never wrap apart. It is data, not template text (no literal copy in templates).
+    /// </summary>
+    private const string LabelValueGap = "\u00A0";
 
     // Human-readable Unicode, while still escaping JSON/HTML structural characters (< > & ' ").
     private static readonly JsonSerializerOptions SerializerOptions = new()
@@ -92,9 +87,6 @@ public static class WidgetCardRenderer
     {
         var fleet = vm.CardState is WidgetCardState.Healthy or WidgetCardState.Attention
             or WidgetCardState.NoCurrentData or WidgetCardState.Stale;
-        var stale = vm.Freshness == WidgetFreshnessState.Stale;
-        var showFleetBar = fleet && vm.TotalServers > 0 && vm.TotalServers <= MaxFleetTicks;
-
         var rows = new JsonArray();
         foreach (var row in vm.Rows)
         {
@@ -122,17 +114,6 @@ public static class WidgetCardRenderer
             ["serversHeading"] = vm.ServersHeading,
             ["rowsOfTotal"] = vm.RowsOfTotalText,
             ["fraction"] = vm.FractionText,
-            ["fleetBarFresh"] = showFleetBar && !stale,
-            ["fleetBarStale"] = showFleetBar && stale,
-            ["fleetCritical"] = Glyphs(MeterFill, vm.CriticalOrOfflineCount),
-            ["hasFleetCritical"] = vm.CriticalOrOfflineCount > 0,
-            ["fleetWarning"] = Glyphs(MeterFill, vm.WarningCount),
-            ["hasFleetWarning"] = vm.WarningCount > 0,
-            ["fleetNoData"] = Glyphs(MeterTrack, vm.NoCurrentDataCount),
-            ["hasFleetNoData"] = vm.NoCurrentDataCount > 0,
-            ["fleetHealthy"] = Glyphs(MeterFill, vm.HealthyFreshCount),
-            ["hasFleetHealthy"] = vm.HealthyFreshCount > 0,
-            ["fleetAll"] = Glyphs(MeterFill, vm.TotalServers),
             ["rows"] = rows
         };
     }
@@ -146,7 +127,8 @@ public static class WidgetCardRenderer
             // else (R-1); see NameRun.
             ["name"] = row.DisplayName.Value,
             ["status"] = row.StatusText,
-            ["statusColor"] = row.StatusColor
+            ["statusColor"] = row.StatusColor,
+            ["gap"] = LabelValueGap
         };
 
         AddMetric(data, "cpu", row.Cpu, row.IsStale);
@@ -157,27 +139,20 @@ public static class WidgetCardRenderer
 
     private static void AddMetric(JsonObject data, string key, WidgetMetric metric, bool stale)
     {
-        var filled = metric.Percent is { } percent ? FilledSegments(percent) : 0;
+        var filled = metric.Percent is { } percent ? WidgetLayout.FilledSegments(percent) : 0;
         var hasMeter = metric.Percent is not null;
 
         data[key + "Label"] = metric.Label;
         data[key + "Value"] = metric.ValueText;
         data[key + "Detail"] = metric.Detail;
-        data[key + "Fill"] = Glyphs(MeterFill, filled);
-        data[key + "Track"] = Glyphs(MeterTrack, MeterSegments - filled);
+        data[key + "Fill"] = Glyphs(WidgetLayout.MeterFill, filled);
+        data[key + "Track"] = Glyphs(WidgetLayout.MeterTrack, WidgetLayout.MeterSegments - filled);
         // 0 % has no fill run and 100 % no track run: never an empty TextRun on the card.
         data[key + "HasFill"] = filled > 0;
-        data[key + "HasTrack"] = filled < MeterSegments;
+        data[key + "HasTrack"] = filled < WidgetLayout.MeterSegments;
         data[key + "MeterFresh"] = hasMeter && !stale;
         data[key + "MeterStale"] = hasMeter && stale;
     }
-
-    /// <summary>
-    /// Filled segments for a percentage, rounded to the nearest segment (DV-10): 0–9 % → 0, 10–29 % → 1,
-    /// …, 90–100 % → 5. The meter is a glance aid; the exact % is always printed beside it.
-    /// </summary>
-    public static int FilledSegments(int percent) =>
-        (int)Math.Round(Math.Clamp(percent, 0, 100) * MeterSegments / 100d, MidpointRounding.AwayFromZero);
 
     private static string Glyphs(string glyph, int count) =>
         count <= 0 ? string.Empty : string.Concat(Enumerable.Repeat(glyph, count));
@@ -192,25 +167,34 @@ public static class WidgetCardRenderer
         {
             size == WidgetSizeHint.Small ? SmallFleet() : ListFleet(size == WidgetSizeHint.Large),
             EmptyState(size),
-            UnavailableState()
+            UnavailableState(size)
         };
 
-        return new JsonObject
+        var card = new JsonObject
         {
             ["type"] = "AdaptiveCard",
             ["version"] = "1.6",
-            ["verticalContentAlignment"] = "Top",
-            // The whole card opens the Dashboard in every state (SPEC §3); rows override with openServer.
-            ["selectAction"] = Execute(ActivationVerbs.OpenDashboard),
-            ["body"] = body
+            ["verticalContentAlignment"] = "Top"
         };
+
+        // Medium/Large: the whole card opens the Dashboard in every state (SPEC §3); rows override with
+        // openServer. Small allows ONE touch target (Cortex L-1): its single action lives on each state
+        // container instead, so the Empty state's only target is its CTA button.
+        if (size != WidgetSizeHint.Small)
+        {
+            card["selectAction"] = Execute(ActivationVerbs.OpenDashboard);
+        }
+
+        card["body"] = body;
+        return card;
     }
 
-    // ---- Small: the fleet verdict. P-RC-2 fallback: "3/3" ExtraLarge Bolder + title + subtitle, a fleet
-    // glyph bar only up to MaxFleetTicks servers, then the freshness line. -----------------------------
+    // ---- Small: the fleet verdict. P-RC-2 fallback (amended by Prism P-C1-3): "3/3" ExtraLarge Bolder +
+    // title + subtitle + the freshness line — no fleet bar, which pushed the freshness out of 146 px. ----
     private static JsonObject SmallFleet() => When("isFleet", new JsonObject
     {
         ["type"] = "Container",
+        ["selectAction"] = Execute(ActivationVerbs.OpenDashboard),
         ["items"] = new JsonArray
         {
             new JsonObject
@@ -229,34 +213,9 @@ public static class WidgetCardRenderer
                     }, verticalAlignment: "Center")
                 }
             },
-            FleetBarFresh(),
-            FleetBarStale(),
             Text("footer", size: "Small", subtle: true)
         }
     });
-
-    // One glyph per server, worst-first, in health FOREGROUND colours (the bar IS health by design, and
-    // the title states the same in text). Unknown/not-fresh use the hollow track glyph. Stale: one neutral
-    // subtle run — a stale fleet is never painted green.
-    private static JsonObject FleetBarFresh() =>
-        When("fleetBarFresh", new JsonObject
-        {
-            ["type"] = "RichTextBlock",
-            ["inlines"] = new JsonArray
-            {
-                When("hasFleetCritical", Run("fleetCritical", color: "attention")),
-                When("hasFleetWarning", Run("fleetWarning", color: "warning")),
-                When("hasFleetNoData", Run("fleetNoData", subtle: true)),
-                When("hasFleetHealthy", Run("fleetHealthy", color: "good"))
-            }
-        });
-
-    private static JsonObject FleetBarStale() =>
-        When("fleetBarStale", new JsonObject
-        {
-            ["type"] = "RichTextBlock",
-            ["inlines"] = new JsonArray { Run("fleetAll", subtle: true) }
-        });
 
     // ---- Medium/Large: "Servers" + summary, rows, footer with "N of M". ---------------------------------
     private static JsonObject ListFleet(bool large) => When("isFleet", new JsonObject
@@ -269,10 +228,12 @@ public static class WidgetCardRenderer
                 ["type"] = "ColumnSet",
                 ["columns"] = new JsonArray
                 {
-                    Column("stretch", new JsonArray { Text("serversHeading", weight: "Bolder") }, verticalAlignment: "Center"),
-                    Column("auto", new JsonArray
+                    // Prism P-C1-2: the heading never truncates (auto); the summary takes the rest and WRAPS
+                    // to a second line rather than eliding a problem count.
+                    Column("auto", new JsonArray { Text("serversHeading", weight: "Bolder") }, verticalAlignment: "Center"),
+                    Column("stretch", new JsonArray
                     {
-                        Text("summary", size: "Small", color: "${stateColor}", horizontalAlignment: "Right")
+                        Text("summary", size: "Small", color: "${stateColor}", wrap: true, horizontalAlignment: "Right")
                     }, verticalAlignment: "Center")
                 }
             },
@@ -343,25 +304,31 @@ public static class WidgetCardRenderer
     {
         var items = new JsonArray
         {
+            // Prism P-C1-1: label and value are ONE text block ("CPU 41%"), never a label/value ColumnSet —
+            // the host squeezes an `auto` column and elides the value ("4…"), which hides the % that must
+            // always be text. A text block wraps instead of being cut by column layout.
             new JsonObject
             {
-                ["type"] = "ColumnSet",
-                ["columns"] = new JsonArray
+                ["type"] = "RichTextBlock",
+                ["inlines"] = new JsonArray
                 {
-                    Column("stretch", new JsonArray { Text(key + "Label", size: "Small", subtle: true) }),
-                    Column("auto", new JsonArray { Text(key + "Value", size: "Small", weight: "Bolder") })
+                    Run(key + "Label", size: "Small", subtle: true),
+                    Run("gap", size: "Small"),
+                    Run(key + "Value", size: "Small", weight: "Bolder")
                 }
             },
             // Fresh: neutral accent fill + subtle track. Stale: both subtle (muted, Prism RC-7). Unknown /
             // hidden (Offline, Unknown): neither — no meter at all, never a 0 % track.
-            When(key + "MeterFresh", Meter(key, fillColor: "accent", fillSubtle: false)),
+            When(key + "MeterFresh", Meter(key, fillColor: WidgetLayout.MeterFillColor, fillSubtle: false)),
             When(key + "MeterStale", Meter(key, fillColor: null, fillSubtle: true))
         };
 
         if (large)
         {
-            // RC-10 detail: "Ativo 43d 18h" under CPU, "0,6/11,6 GB" under RAM/Disk, "—" when unknown.
-            items.Add(Text(key + "Detail", size: "Small", subtle: true, spacingNone: true));
+            // RC-10 detail: "Ativo 43d 18h" under CPU, "0,6/11,6 GB" under RAM/Disk, "—" when unknown. It
+            // WRAPS rather than eliding: the proxy render showed "Ativo 43d 1…" in an ~80 px column (C1-fix
+            // DV-14; RC-10's fallback "43d 18h" stays Prism's call after C0 measures).
+            items.Add(Text(key + "Detail", size: "Small", subtle: true, wrap: true, spacingNone: true));
         }
 
         return Column("stretch", items);
@@ -396,21 +363,35 @@ public static class WidgetCardRenderer
                 Execute(ActivationVerbs.OpenDashboard, title: "${cta}")
             }
         });
-        items.Add(When("hasFooter", Text("footer", size: "Small", subtle: true, horizontalAlignment: "Center")));
+        if (size != WidgetSizeHint.Small)
+        {
+            // Prism P-C1-6: the Small empty card has no freshness line (Figma 112:11594); it would be cut.
+            items.Add(When("hasFooter", Text("footer", size: "Small", subtle: true, horizontalAlignment: "Center")));
+        }
 
         return When("isEmpty", new JsonObject { ["type"] = "Container", ["items"] = items });
     }
 
-    // ---- Unavailable: neutral title + body, no CTA (SPEC §3). -----------------------------------------
-    private static JsonObject UnavailableState() => When("isUnavailable", new JsonObject
+    // ---- Unavailable: neutral title + body, no CTA (SPEC §3); the card still opens the Dashboard. ----
+    private static JsonObject UnavailableState(WidgetSizeHint size)
     {
-        ["type"] = "Container",
-        ["items"] = new JsonArray
+        var container = new JsonObject
         {
-            Heading("title"),
-            Text("body", size: "Small", subtle: true, wrap: true)
+            ["type"] = "Container",
+            ["items"] = new JsonArray
+            {
+                Heading("title"),
+                Text("body", size: "Small", subtle: true, wrap: true)
+            }
+        };
+
+        if (size == WidgetSizeHint.Small)
+        {
+            container["selectAction"] = Execute(ActivationVerbs.OpenDashboard); // Small: no card-level action
         }
-    });
+
+        return When("isUnavailable", container);
+    }
 
     // =====================================================================================================
     // Element helpers. Every text-bearing helper takes a DATA KEY, never text, so no literal copy can

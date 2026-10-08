@@ -54,7 +54,12 @@ public sealed record WidgetMetric(string Label, string ValueText, int? Percent, 
 /// </summary>
 public readonly record struct UntrustedText(string Value)
 {
-    public override string ToString() => Value;
+    /// <summary>
+    /// Deliberately NOT the value (Vigil C1 L-1 / Cortex N-1): interpolation or concatenation must never
+    /// turn the name back into a plain string unnoticed. The one reader is the renderer's <c>name</c> data
+    /// key, via <see cref="Value"/>, which a grep can audit.
+    /// </summary>
+    public override string ToString() => "[untrusted]";
 }
 
 /// <summary>
@@ -126,7 +131,8 @@ public sealed record WidgetViewModel
     /// <summary>"N of M servers" for Medium/Large whenever rows are shown — also "3 of 3" (SPEC §3).</summary>
     public string RowsOfTotalText { get; init; } = string.Empty;
 
-    /// <summary>Small ring fallback (P-RC-2): "healthy-and-fresh/total", e.g. "3/3".</summary>
+    /// <summary>Small ring fallback (P-RC-2): "healthy-and-fresh/total", e.g. "3/3"; when the snapshot is
+    /// stale, the LAST state "engine-healthy/total" shown in the default colour (P-C1-4).</summary>
     public string FractionText { get; init; } = string.Empty;
 
     /// <summary>Ring/fraction alt sentence ("2 of 3 healthy"), for the C0 ring image.</summary>
@@ -136,13 +142,6 @@ public sealed record WidgetViewModel
 
     /// <summary>Servers that are Healthy AND fresh — the only ones that count as healthy now.</summary>
     public int HealthyFreshCount { get; init; }
-    public int WarningCount { get; init; }
-
-    /// <summary>Critical + Offline (both "attention").</summary>
-    public int CriticalOrOfflineCount { get; init; }
-
-    /// <summary>Unknown + not-fresh readings — never folded into healthy.</summary>
-    public int NoCurrentDataCount { get; init; }
 
     /// <summary>Servers to render for this size (already ordered + capped). Empty for Small.</summary>
     public IReadOnlyList<WidgetServerRow> Rows { get; init; } = Array.Empty<WidgetServerRow>();

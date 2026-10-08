@@ -173,7 +173,7 @@ public sealed class WidgetCardNavigationGrammarTests
             var data = new TheoryData<WidgetSizeHint, int>();
             foreach (var size in Enum.GetValues<WidgetSizeHint>())
             {
-                data.Add(size, Math.Min(WidgetViewModelBuilder.MaxRowsFor(size), 3));
+                data.Add(size, Math.Min(WidgetLayout.MaxRowsFor(size), 3));
             }
 
             return data;
@@ -251,11 +251,16 @@ public sealed class WidgetCardNavigationGrammarTests
     {
         var actions = ActionsOf(Available(), size);
 
-        Assert.Equal(2, actions.All.Count);
-        Assert.Equal(2, actions.Dashboard.Count);
+        // Cortex L-1: Small allows ONE touch target — the CTA button only; Medium/Large add the card action.
+        var expected = size == WidgetSizeHint.Small ? 1 : 2;
+        Assert.Equal(expected, actions.All.Count);
+        Assert.Equal(expected, actions.Dashboard.Count);
         Assert.All(actions.Dashboard, a => Assert.Equal("Action.Execute", a.GetProperty("type").GetString()));
-        Assert.Contains(actions.Dashboard, a => Keys(a).SequenceEqual(["type", "verb"]));
         Assert.Contains(actions.Dashboard, a => Keys(a).SequenceEqual(["title", "type", "verb"]));
+        if (size != WidgetSizeHint.Small)
+        {
+            Assert.Contains(actions.Dashboard, a => Keys(a).SequenceEqual(["type", "verb"]));
+        }
     }
 
     /// <summary>

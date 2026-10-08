@@ -84,7 +84,7 @@ public sealed class WidgetViewModelBuilderTests
     {
         var vm = Build(Read(Now, Server(health: WidgetHealth.Healthy), Server(health: WidgetHealth.Unknown)));
         Assert.NotEqual(En.FleetAllHealthy, vm.Title);                // not "all healthy"
-        Assert.Contains(string.Format(CultureInfo.InvariantCulture, En.CountUnknown, 1), vm.Summary); // never hidden (§21)
+        Assert.Equal(string.Format(CultureInfo.InvariantCulture, En.FleetUnknownOnly, 1), vm.Summary); // never hidden (§21)
         Assert.Equal(1, vm.HealthyFreshCount);                        // never folded into healthy
         Assert.Equal(WidgetCardState.NoCurrentData, vm.CardState);
     }
@@ -99,7 +99,8 @@ public sealed class WidgetViewModelBuilderTests
             Server(health: WidgetHealth.Healthy)));
         Assert.Equal(WidgetCardState.Attention, vm.CardState);
         Assert.Equal("3 issues", vm.Title);
-        Assert.Equal("1 healthy · 1 attention · 1 critical · 1 no connection", vm.Summary);
+        // Prism P-C1-2: with problems the summary lists ONLY what needs the user.
+        Assert.Equal("1 attention · 1 critical · 1 no connection", vm.Summary);
         Assert.Equal("attention", vm.StateColor); // critical/offline outrank warning
     }
 
@@ -186,7 +187,7 @@ public sealed class WidgetViewModelBuilderTests
     [MemberData(nameof(RowRenderingSizes))]
     public void Sizes_that_render_rows_never_hide_a_server_silently(WidgetSizeHint size, int measuredCapacity)
     {
-        Assert.Equal(measuredCapacity, WidgetViewModelBuilder.MaxRowsFor(size));
+        Assert.Equal(measuredCapacity, WidgetLayout.MaxRowsFor(size));
 
         foreach (var total in new[] { 0, 1, 2, 3, 4, 5, 6, 7, 12, 100 })
         {
