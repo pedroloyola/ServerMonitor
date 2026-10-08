@@ -22,7 +22,11 @@ public sealed class ProviderBoundaryTests
         "ServerMonitor.Collectors",
         "ServerMonitor.App",
         "ServerMonitor.Features",
-        "Renci.SshNet" // SSH.NET
+        "Renci.SshNet", // SSH.NET
+        // UI.9 C1-fix S-1: the templating oracle is a TEST-ONLY dependency; production must never load it.
+        "AdaptiveCards.Templating",
+        "Microsoft.Bot.AdaptiveExpressions.Core",
+        "AdaptiveExpressions"
     };
 
     private static readonly Assembly Provider = typeof(WidgetProviderCoordinator).Assembly;

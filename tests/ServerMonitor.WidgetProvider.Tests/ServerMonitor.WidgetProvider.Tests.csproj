@@ -26,6 +26,15 @@
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
   </ItemGroup>
 
+  <!-- UI.9 C1-fix S-1: TEST-ONLY oracle. The .NET templating engine of the live widget host family
+       (AdaptiveCards.Templating on Microsoft.Bot.AdaptiveExpressions.Core 4.22.9, Relay C0-offline), used to
+       expand the constant templates and diff against CardTemplateHarness. Exact versions pinned; the provider
+       never references it (ProviderBoundaryTests). Vigil sign-off required before merge. -->
+  <ItemGroup>
+    <PackageReference Include="AdaptiveCards.Templating" Version="[2.0.5]" />
+    <PackageReference Include="Microsoft.Bot.AdaptiveExpressions.Core" Version="[4.22.9]" />
+  </ItemGroup>
+
   <ItemGroup>
     <Using Include="Xunit" />
   </ItemGroup>
