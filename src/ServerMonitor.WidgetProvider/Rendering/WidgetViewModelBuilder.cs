@@ -148,10 +148,12 @@ public static class WidgetViewModelBuilder
                 WidgetCardState.NoCurrentData => Format(strings.FleetUnknownOnly, v3.NoCurrentData),
                 _ => strings.FleetAllHealthy
             },
+            // Cortex N-2: "N servers connected" only vouches for servers with a FRESH reading; omitted at 0.
             Subtitle = stale
                 ? lastState
-                : WidgetStrings.Plural(counts.Healthy + counts.Warning + counts.Critical,
-                    strings.FleetConnectedOne, strings.FleetConnectedOther),
+                : v3.ConnectedFresh == 0
+                    ? string.Empty
+                    : WidgetStrings.Plural(v3.ConnectedFresh, strings.FleetConnectedOne, strings.FleetConnectedOther),
             Summary = stale ? strings.StaleTitle : CountsSummaryV3(v3, strings),
             FooterText = footerText,
             RowsOfTotalText = maxRows == 0 ? string.Empty : Format(strings.OverflowFormat, shown.Length, total),
@@ -266,7 +268,13 @@ public static class WidgetViewModelBuilder
         var counts = new V3Counts();
         foreach (var server in servers)
         {
-            switch (RowState(server, isFresh(server)))
+            var fresh = isFresh(server);
+            if (fresh && server.Health is WidgetHealth.Healthy or WidgetHealth.Warning or WidgetHealth.Critical)
+            {
+                counts.ConnectedFresh++;
+            }
+
+            switch (RowState(server, fresh))
             {
                 case WidgetRowState.Healthy: counts.HealthyFresh++; break;
                 case WidgetRowState.Warning: counts.Warning++; break;
@@ -286,6 +294,7 @@ public static class WidgetViewModelBuilder
         public int Critical;
         public int Offline;
         public int NoCurrentData;
+        public int ConnectedFresh;
 
         public int Problems => Warning + Critical + Offline;
     }
@@ -335,6 +344,10 @@ public static class WidgetViewModelBuilder
             StatusText = statusText,
             StatusColor = statusColor,
             IsStale = !fresh,
+            // Cortex N-3 (deliberate divergence, DV-8): the App hides retained metrics only for Offline
+            // (ServerStatusPresentation.RowHidesRetainedMetrics). The widget also hides them for Unknown,
+            // because engine Unknown covers non-transient errors (e.g. auth) where old values would read as
+            // current; SPEC §3 Unknown row = "Sem dados", "—".
             ShowsMetrics = server.Health is not (WidgetHealth.Offline or WidgetHealth.Unknown)
         };
     }

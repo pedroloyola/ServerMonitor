@@ -160,9 +160,21 @@ public sealed class WidgetViewModelV3StateTests
         Assert.True(stale.IsStale);
         Assert.True(stale.ShowsMetrics); // last values kept (muted), parity with the app
         Assert.Equal(WidgetCardState.NoCurrentData, vm.CardState);
-        Assert.Equal("1 no data", vm.Title);
+        Assert.Equal("1 without recent data", vm.Title);
         Assert.Equal(1, vm.HealthyFreshCount);
         Assert.Equal("1 healthy · 1 no data", vm.Summary);
+    }
+
+    [Fact]
+    public void Connected_subtitle_counts_only_servers_with_a_fresh_reading()
+    {
+        // Cortex N-2: "N servers connected" must not vouch for a server whose reading is stale.
+        var vm = Build(Read(Now, Server(1), Server(2, updated: Now.AddSeconds(-61), staleAfter: 60),
+            Server(3, WidgetHealth.Warning, updated: Now.AddSeconds(-500))));
+        Assert.Equal("1 server connected", vm.Subtitle);
+
+        vm = Build(Read(Now, Server(1, updated: Now.AddSeconds(-61), staleAfter: 60)));
+        Assert.Equal(string.Empty, vm.Subtitle); // omitted at 0 rather than "0 servers connected"
     }
 
     [Fact]
@@ -252,7 +264,7 @@ public sealed class WidgetViewModelV3StateTests
         Assert.Equal(WidgetRowState.NotUpdated, Assert.Single(vm.Rows, r => r.ServerId == Id(1)).State);
         Assert.Equal(WidgetRowState.Unknown, Assert.Single(vm.Rows, r => r.ServerId == Id(2)).State);
         Assert.Equal(WidgetCardState.NoCurrentData, vm.CardState);
-        Assert.Equal("2 no data", vm.Title);
+        Assert.Equal("2 without recent data", vm.Title);
     }
 
     [Fact]
