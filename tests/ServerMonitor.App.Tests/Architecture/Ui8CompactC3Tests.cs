@@ -113,7 +113,7 @@ public sealed class Ui8CompactC3Tests
     public void TheWindow_FocusesTheShellsFirstVisibleRow_AndLetsTheWaitRequestLayoutPasses()
     {
         var window = AppSourceTree.CodeWithoutComments("MainWindow.xaml.cs");
-        Assert.Contains("CompactShellView.InvalidateMeasure);", window, StringComparison.Ordinal);
+        Assert.Contains("() => DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, CompactShellView.InvalidateMeasure));", window, StringComparison.Ordinal);
         Assert.Contains("var visibleRow = hasRows ? CompactShellView.FirstVisibleRow() : null;", window, StringComparison.Ordinal);
         Assert.Contains("visibleRow!.Focus(_compactEntryFocusState);", window, StringComparison.Ordinal);
         Assert.DoesNotContain("TryGetElement(0)", window, StringComparison.Ordinal);

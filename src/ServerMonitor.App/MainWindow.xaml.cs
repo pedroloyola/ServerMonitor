@@ -96,7 +96,9 @@ public sealed partial class MainWindow : Window
             handler => CompactShellView.LayoutUpdated += handler,
             handler => CompactShellView.LayoutUpdated -= handler,
             TryCompactEntryFocus,
-            CompactShellView.InvalidateMeasure);
+            // Beacon c2 B-6: the next pass is requested at Low priority, AFTER the pending work (rows' Loaded included) -
+            // an immediate InvalidateMeasure burned the eight passes before the first row had loaded (measured at launch).
+            () => DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, CompactShellView.InvalidateMeasure));
         CompactRoot.SizeChanged += OnCompactSizeChanged;
 
         _persistTimer = DispatcherQueue.CreateTimer();
