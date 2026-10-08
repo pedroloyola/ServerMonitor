@@ -113,7 +113,7 @@ public sealed partial class Ui8CompactC2Tests
     {
         var source = new LayoutSource();
         var attempts = 0;
-        var wait = new CompactEntryFocusWait(source.Add, source.Remove, _ => { attempts++; return false; });
+        var wait = new CompactEntryFocusWait(source.Add, source.Remove, _ => { attempts++; return false; }, source.Request);
 
         wait.Begin();
         wait.Begin(); // a second entry re-arms, never stacks
@@ -141,7 +141,7 @@ public sealed partial class Ui8CompactC2Tests
     {
         var source = new LayoutSource();
         var passesSeen = new List<int>();
-        var wait = new CompactEntryFocusWait(source.Add, source.Remove, passes => { passesSeen.Add(passes); return passes == 2; });
+        var wait = new CompactEntryFocusWait(source.Add, source.Remove, passes => { passesSeen.Add(passes); return passes == 2; }, source.Request);
 
         wait.Begin();
         source.Raise();
@@ -161,10 +161,10 @@ public sealed partial class Ui8CompactC2Tests
         var targets = new List<CompactEntryFocus.Target>();
         var wait = new CompactEntryFocusWait(source.Add, source.Remove, passes =>
         {
-            var target = CompactEntryFocus.Decide(hasRows: true, firstRowReady: false, hasAction: false, actionReady: false, passes);
+            var target = CompactEntryFocus.Decide(hasRows: true, visibleRowReady: false, hasAction: false, actionReady: false, passes);
             targets.Add(target);
             return target != CompactEntryFocus.Target.Wait;
-        });
+        }, source.Request);
 
         wait.Begin();
         for (var pass = 0; pass < CompactEntryFocus.MaxLayoutPasses + 3; pass++)
@@ -183,7 +183,7 @@ public sealed partial class Ui8CompactC2Tests
     public void ATargetAlreadyLaidOut_IsFocusedAtOnce_WithNoSubscription()
     {
         var source = new LayoutSource();
-        var wait = new CompactEntryFocusWait(source.Add, source.Remove, _ => true);
+        var wait = new CompactEntryFocusWait(source.Add, source.Remove, _ => true, source.Request);
 
         wait.Begin();
 
@@ -274,6 +274,11 @@ public sealed partial class Ui8CompactC2Tests
         public void Remove(EventHandler<object> handler) => _handlers.Remove(handler);
 
         public IReadOnlyList<EventHandler<object>> Snapshot() => [.. _handlers];
+
+        /// <summary>The wait's request for one more layout pass (counted; Ui8CompactC3Tests drives the passes it requests).</summary>
+        public void Request() => Requests++;
+
+        public int Requests { get; private set; }
 
         public void Raise()
         {

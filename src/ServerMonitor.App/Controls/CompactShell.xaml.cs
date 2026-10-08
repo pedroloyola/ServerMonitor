@@ -29,8 +29,31 @@ public sealed partial class CompactShell : UserControl
         Bindings.Update();
     }
 
-    /// <summary>The list host (the window focuses its first row when Compact opens with servers).</summary>
+    /// <summary>The list host (the window focuses its first visible row when Compact opens with servers).</summary>
     internal ItemsRepeater Repeater => CompactRepeater;
+
+    /// <summary>
+    /// Beacon c2 B-6: the first row VISIBLE in the list's viewport among the realized rows (the scroll position is kept, so
+    /// row 1 may not be realized at all), chosen by <see cref="Views.CompactEntryFocus.FirstVisibleRow"/>; null until one
+    /// is laid out in view.
+    /// </summary>
+    internal Control? FirstVisibleRow()
+    {
+        var count = CompactRepeater.ItemsSourceView?.Count ?? 0;
+        var realized = new List<(int Index, double Top, double Height)>();
+        for (var index = 0; index < count; index++)
+        {
+            if (CompactRepeater.TryGetElement(index) is Control { IsLoaded: true, Visibility: Visibility.Visible } row && row.ActualHeight > 0)
+            {
+                var top = row.TransformToVisual(ListScroller).TransformPoint(new Windows.Foundation.Point(0, 0)).Y;
+                realized.Add((index, top, row.ActualHeight));
+            }
+        }
+
+        return Views.CompactEntryFocus.FirstVisibleRow(realized, ListScroller.ViewportHeight) is { } visible
+            ? CompactRepeater.TryGetElement(visible) as Control
+            : null;
+    }
 
     /// <summary>The state block's real action for this presentation state (whether or not it is laid out yet).</summary>
     internal Control? StateActionFor(CompactPresentationViewModel presentation) =>

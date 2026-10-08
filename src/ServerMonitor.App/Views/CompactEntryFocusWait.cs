@@ -7,22 +7,32 @@ namespace ServerMonitor.App.Views;
 /// <see cref="CompactEntryFocus.MaxLayoutPasses"/>). It unsubscribes after success, after the fallback, and on
 /// <see cref="End"/> (leaving Compact, closing the window). A pass that arrives after <see cref="End"/> - a callback the
 /// layout system had already captured - never moves focus.
+/// Beacon c2 B-6 (measured): a settled layout raises no further LayoutUpdated (5 passes, then silence, with row 1 never
+/// realized), so the fallback was never reached. Every waiting outcome therefore REQUESTS the next layout pass: the wait
+/// always ends - on a target or on the bounded fallback - without a timer.
 /// </summary>
 internal sealed class CompactEntryFocusWait
 {
     private readonly Action<EventHandler<object>> _subscribe;
     private readonly Action<EventHandler<object>> _unsubscribe;
     private readonly Func<int, bool> _tryFocus;
+    private readonly Action _requestLayoutPass;
     private readonly EventHandler<object> _onLayoutUpdated;
 
     /// <param name="subscribe">Adds the handler to the compact body's LayoutUpdated.</param>
     /// <param name="unsubscribe">Removes it.</param>
     /// <param name="tryFocus">Given the layout passes waited, places focus and returns true, or returns false to wait.</param>
-    public CompactEntryFocusWait(Action<EventHandler<object>> subscribe, Action<EventHandler<object>> unsubscribe, Func<int, bool> tryFocus)
+    /// <param name="requestLayoutPass">Schedules one more layout pass of the compact body (e.g. InvalidateMeasure).</param>
+    public CompactEntryFocusWait(
+        Action<EventHandler<object>> subscribe,
+        Action<EventHandler<object>> unsubscribe,
+        Func<int, bool> tryFocus,
+        Action requestLayoutPass)
     {
         _subscribe = subscribe ?? throw new ArgumentNullException(nameof(subscribe));
         _unsubscribe = unsubscribe ?? throw new ArgumentNullException(nameof(unsubscribe));
         _tryFocus = tryFocus ?? throw new ArgumentNullException(nameof(tryFocus));
+        _requestLayoutPass = requestLayoutPass ?? throw new ArgumentNullException(nameof(requestLayoutPass));
         _onLayoutUpdated = OnLayoutUpdated;
     }
 
@@ -42,6 +52,7 @@ internal sealed class CompactEntryFocusWait
 
         IsWaiting = true;
         _subscribe(_onLayoutUpdated);
+        _requestLayoutPass();
     }
 
     public void End()
@@ -66,6 +77,9 @@ internal sealed class CompactEntryFocusWait
         if (_tryFocus(LayoutPasses))
         {
             End();
+            return;
         }
+
+        _requestLayoutPass();
     }
 }

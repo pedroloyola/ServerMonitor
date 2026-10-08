@@ -44,7 +44,7 @@ public sealed class Ui8CompactC1Tests
     // ---- P-2 ----
 
     [Theory]
-    [InlineData(true, true, false, false, 0, "FirstRow")]
+    [InlineData(true, true, false, false, 0, "FirstVisibleRow")]
     [InlineData(true, false, false, false, 0, "Wait")]       // rows not realized yet: wait, no fallback
     [InlineData(true, false, false, false, 7, "Wait")]
     [InlineData(true, false, false, false, 8, "Expand")]     // bounded by layout passes, not by time

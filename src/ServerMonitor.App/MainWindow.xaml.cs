@@ -95,7 +95,8 @@ public sealed partial class MainWindow : Window
         _compactEntryWait = new CompactEntryFocusWait(
             handler => CompactShellView.LayoutUpdated += handler,
             handler => CompactShellView.LayoutUpdated -= handler,
-            TryCompactEntryFocus);
+            TryCompactEntryFocus,
+            CompactShellView.InvalidateMeasure);
         CompactRoot.SizeChanged += OnCompactSizeChanged;
 
         _persistTimer = DispatcherQueue.CreateTimer();
@@ -290,11 +291,12 @@ public sealed partial class MainWindow : Window
         var presentation = CompactShellView.Presentation;
         var repeater = CompactShellView.Repeater;
         var hasRows = presentation?.ShowsList == true && repeater.ItemsSourceView is { Count: > 0 };
-        var firstRow = hasRows ? repeater.TryGetElement(0) as Microsoft.UI.Xaml.Controls.Control : null;
+        // Beacon c2 B-6: the first VISIBLE row (the user's scroll position is kept), never row 1 by index.
+        var visibleRow = hasRows ? CompactShellView.FirstVisibleRow() : null;
         var action = presentation is null ? null : CompactShellView.StateActionFor(presentation);
         var target = CompactEntryFocus.Decide(
             hasRows,
-            firstRow is { IsLoaded: true },
+            visibleRow is not null,
             action is not null,
             action is { IsLoaded: true, Visibility: Visibility.Visible } && action.ActualWidth > 0,
             layoutPasses);
@@ -302,8 +304,8 @@ public sealed partial class MainWindow : Window
         {
             case CompactEntryFocus.Target.Wait:
                 return false;
-            case CompactEntryFocus.Target.FirstRow:
-                firstRow!.Focus(_compactEntryFocusState);
+            case CompactEntryFocus.Target.FirstVisibleRow:
+                visibleRow!.Focus(_compactEntryFocusState);
                 return true;
             case CompactEntryFocus.Target.StateAction:
                 action!.Focus(_compactEntryFocusState);
