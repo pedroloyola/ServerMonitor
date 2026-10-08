@@ -43,4 +43,7 @@ public interface IWindowPlacementAdapter
 
     /// <summary>Returns a maximized window to the Restored state (its last restored bounds).</summary>
     void Restore();
+
+    /// <summary>Maximizes the window (Standard only; its restored rect is kept by the presenter).</summary>
+    void Maximize();
 }

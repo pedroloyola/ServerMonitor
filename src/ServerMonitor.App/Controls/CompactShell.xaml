@@ -37,7 +37,7 @@
                         <TextBlock Grid.Column="1" VerticalAlignment="Center" Style="{StaticResource SaControlTextStyle}"
                                    Foreground="{ThemeResource SaTextBrush}" Text="{x:Bind Name}" TextTrimming="CharacterEllipsis"
                                    TextWrapping="NoWrap" MaxLines="1" AutomationProperties.AccessibilityView="Raw"
-                                   IsTextTrimmedChanged="OnNameTrimmedChanged" />
+                                   IsTextTrimmedChanged="OnNameTrimmedChanged" Loaded="OnNameLoaded" />
                         <TextBlock Grid.Column="2" VerticalAlignment="Center" Text="{x:Bind StatusText, Mode=OneWay}"
                                    Style="{x:Bind converters:CompactRowStyles.Status(Health), Mode=OneWay}"
                                    TextWrapping="NoWrap" AutomationProperties.AccessibilityView="Raw" />

@@ -12,6 +12,8 @@ namespace ServerMonitor.App.Controls;
 /// </summary>
 public sealed partial class CompactShell : UserControl
 {
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<TextBlock, object> NameTextWatched = new();
+
     public CompactShell()
     {
         InitializeComponent();
@@ -62,13 +64,26 @@ public sealed partial class CompactShell : UserControl
         : null;
 
     // Prism c1 P-4: the name's tooltip only when the name is actually cut (the row's accessible name always carries it).
-    private void OnNameTrimmedChanged(TextBlock sender, IsTextTrimmedChangedEventArgs args)
+    private void OnNameTrimmedChanged(TextBlock sender, IsTextTrimmedChangedEventArgs args) => UpdateNameTooltip(sender);
+
+    // Cortex c2 C2-2: a recycled row whose name goes from one cut text to another raises no IsTextTrimmedChanged, so the
+    // text change refreshes the tooltip too (one callback per name element, registered when it first loads).
+    private void OnNameLoaded(object sender, RoutedEventArgs e)
     {
-        for (DependencyObject? node = sender; node is not null; node = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetParent(node))
+        if (sender is TextBlock name && !NameTextWatched.TryGetValue(name, out _))
+        {
+            NameTextWatched.Add(name, new object());
+            name.RegisterPropertyChangedCallback(TextBlock.TextProperty, (element, _) => UpdateNameTooltip((TextBlock)element));
+        }
+    }
+
+    private static void UpdateNameTooltip(TextBlock name)
+    {
+        for (DependencyObject? node = name; node is not null; node = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetParent(node))
         {
             if (node is ServerTableRowButton row)
             {
-                ToolTipService.SetToolTip(row, sender.IsTextTrimmed ? sender.Text : null);
+                ToolTipService.SetToolTip(row, CompactNameTooltip.For(name.IsTextTrimmed, name.Text));
                 return;
             }
         }

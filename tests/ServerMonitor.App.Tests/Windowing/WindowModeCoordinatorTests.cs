@@ -252,6 +252,10 @@ public sealed class WindowModeCoordinatorTests
         public void Restore()
         {
         }
+
+        public void Maximize()
+        {
+        }
     }
 
     private sealed class FakeStore(WindowPlacementSettings? initial = null) : IWindowPlacementStore

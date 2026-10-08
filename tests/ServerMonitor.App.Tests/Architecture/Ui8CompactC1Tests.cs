@@ -103,7 +103,8 @@ public sealed class Ui8CompactC1Tests
         Assert.DoesNotContain(template.Descendants(), e => e.Attributes().Any(a => a.Name.LocalName == "ToolTipService.ToolTip"));
         Assert.Single(template.Descendants(), e => (string?)e.Attribute("IsTextTrimmedChanged") == "OnNameTrimmedChanged");
         var code = AppSourceTree.CodeWithoutComments("Controls/CompactShell.xaml.cs");
-        Assert.Contains("ToolTipService.SetToolTip(row, sender.IsTextTrimmed ? sender.Text : null);", code, StringComparison.Ordinal);
+        // c4 (Cortex C2-2): the same rule through CompactNameTooltip, on a trim change AND a text change (Ui8CompactC4Tests).
+        Assert.Contains("ToolTipService.SetToolTip(row, CompactNameTooltip.For(name.IsTextTrimmed, name.Text));", code, StringComparison.Ordinal);
     }
 
     // ---- P-6 ----

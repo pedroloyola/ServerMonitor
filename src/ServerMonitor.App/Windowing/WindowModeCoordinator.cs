@@ -21,6 +21,10 @@ public sealed class WindowModeCoordinator : IWindowModeCoordinator
     private bool _initialized;
     private bool _applyingBounds;
 
+    // c4 B-7: Standard was maximized when the window last left it. Session-only (never persisted): returning to Standard
+    // maximizes again over the Standard restored rect, which the maximized state never overwrites.
+    private bool _standardWasMaximized;
+
     public WindowModeCoordinator(
         IWindowPlacementAdapter adapter,
         IWindowPlacementStore store,
@@ -66,7 +70,13 @@ public sealed class WindowModeCoordinator : IWindowModeCoordinator
             return;
         }
 
-        // Remember where the mode we are leaving currently sits, so returning to it restores it.
+        // Remember where the mode we are leaving currently sits, so returning to it restores it. A maximized Standard is
+        // remembered as "maximized" (this session) and keeps its restored rect: its maximized bounds are never captured.
+        if (_mode == WindowMode.Standard)
+        {
+            _standardWasMaximized = _adapter.IsAttached && _adapter.IsMaximized;
+        }
+
         CaptureBoundsInto(_mode);
         _mode = mode;
         _settings = _settings with { Mode = mode };
@@ -121,13 +131,27 @@ public sealed class WindowModeCoordinator : IWindowModeCoordinator
 
     public bool HoldCompactRestored()
     {
-        if (_mode != WindowMode.Compact || !_adapter.IsAttached || !_adapter.IsMaximized)
+        // c4 B-7: never inside a transition the coordinator is applying (it restores the presenter itself, first).
+        if (_applyingBounds || _mode != WindowMode.Compact || !_adapter.IsAttached || !_adapter.IsMaximized)
         {
             return false;
         }
 
-        _adapter.Restore();
-        _logger.LogInformation("A maximize of the Compact window was put back to its restored bounds.");
+        // Restored, then back on the saved Compact bounds: Restore() alone returns to the presenter's restored rect, which
+        // can be the Standard one (c4 B-7) - never pull the Compact window there.
+        _applyingBounds = true;
+        try
+        {
+            _adapter.Restore();
+            _adapter.ApplyBounds(ResolveSavedBounds(WindowMode.Compact));
+            CaptureBoundsInto(WindowMode.Compact);
+        }
+        finally
+        {
+            _applyingBounds = false;
+        }
+
+        _logger.LogInformation("A maximize of the Compact window was put back to its saved bounds.");
         return true;
     }
 
@@ -143,18 +167,25 @@ public sealed class WindowModeCoordinator : IWindowModeCoordinator
         _applyingBounds = true;
         try
         {
+            // c4 B-7 (measured): a MoveAndResize on a still-maximized window keeps it Maximized, and the later Restore()
+            // returns it to the PREVIOUS mode's restored rect. So the presenter is restored first, then the mode applied.
+            if (_adapter.IsMaximized)
+            {
+                _adapter.Restore();
+            }
+
             // Capabilities first: resizability changes the non-client frame the envelope is measured against.
             _adapter.ConfigurePresenter(mode, constraints);
 
-            var displays = _adapter.GetDisplays();
-            var (savedBounds, savedDpi) = mode == WindowMode.Compact
-                ? (_settings.CompactBounds, _settings.CompactDpiScalePercent)
-                : (_settings.StandardBounds, _settings.StandardDpiScalePercent);
-
             // UI.8 RC-1: a DIP (client) envelope is converted for the TARGET monitor, outer frame included.
-            var resolved = WindowPlacementResolver.Resolve(savedBounds, savedDpi, displays, constraints, _adapter.GetFrame());
-            _adapter.ApplyBounds(resolved);
+            _adapter.ApplyBounds(ResolveSavedBounds(mode));
             _adapter.SetAlwaysOnTop(mode == WindowMode.Compact && _settings.CompactAlwaysOnTop);
+
+            // c4 B-7: back to a Standard that was maximized (this session) - maximized again over its restored rect.
+            if (mode == WindowMode.Standard && _standardWasMaximized)
+            {
+                _adapter.Maximize();
+            }
 
             // Record what was actually applied so the in-memory preference always reflects reality,
             // even before the user moves the window (important for the minimize-then-close path).
@@ -166,6 +197,14 @@ public sealed class WindowModeCoordinator : IWindowModeCoordinator
         }
 
         ModeChanged?.Invoke(this, mode);
+    }
+
+    private WindowBounds ResolveSavedBounds(WindowMode mode)
+    {
+        var (savedBounds, savedDpi) = mode == WindowMode.Compact
+            ? (_settings.CompactBounds, _settings.CompactDpiScalePercent)
+            : (_settings.StandardBounds, _settings.StandardDpiScalePercent);
+        return WindowPlacementResolver.Resolve(savedBounds, savedDpi, _adapter.GetDisplays(), WindowSizeConstraints.For(mode), _adapter.GetFrame());
     }
 
     private bool CaptureBoundsInto(WindowMode mode)
@@ -182,8 +221,9 @@ public sealed class WindowModeCoordinator : IWindowModeCoordinator
             return false;
         }
 
-        // c2 B-2: a maximized Compact is never recorded (the window puts it back to Restored; those bounds are kept).
-        if (mode == WindowMode.Compact && _adapter.IsMaximized)
+        // c2 B-2 / c4 B-7: a maximized window is never recorded as a mode's bounds - a maximized Compact is put back to
+        // Restored, a maximized Standard keeps its restored rect (and "maximized" for the session).
+        if (_adapter.IsMaximized)
         {
             return false;
         }
