@@ -549,6 +549,120 @@ public sealed class WidgetSnapshotRecorderTests
         Assert.Equal(2, h.Writer.StartedCount);
     }
 
+    // ---- UI9-RECORDER-RACE: a forced pass that carries a DUE cycle anchors; a not-yet-due one does not -----
+
+    /// <summary>
+    /// Awaits the recorder's current single-writer drain: an exact quiescence barrier (the drain has taken its
+    /// final decision and returned), never a timing guess. <see cref="WidgetSnapshotRecorder.DisposeAsync"/> is
+    /// not usable for this because it cancels first, which could hide a write the drain was about to make.
+    /// Reads the private field (test-only); a rename fails loudly here, never silently.
+    /// </summary>
+    private static async Task WaitForIdleAsync(WidgetSnapshotRecorder recorder)
+    {
+        var field = typeof(WidgetSnapshotRecorder).GetField("_drain",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        Assert.NotNull(field);
+        var drain = Assert.IsAssignableFrom<Task>(field.GetValue(recorder));
+        await drain.WaitAsync(SafetyNet);
+    }
+
+    [Fact]
+    public async Task A_due_cycle_coalesced_into_a_forced_write_anchors_the_throttle()
+    {
+        // The order that made Cycle_triggers_stay_throttled_even_after_a_fleet_change flaky (3/25 Release),
+        // forced instead of left to the thread pool: the startup drain is HELD inside GetAllAsync, and the
+        // first cycle plus a fleet change arrive while it is held, so the next pass consumes a forced flag
+        // together with a cycle that was due (no write yet). FakeTimeProvider is frozen at T0 throughout.
+        await using var h = new Harness();
+        h.AddServer("Home", ServerHealth.Healthy);
+        var entered = new SemaphoreSlim(0);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var calls = 0;
+        h.Servers.GetAllOverride = async ct =>
+        {
+            entered.Release();
+            if (Interlocked.Increment(ref calls) == 1)
+            {
+                await release.Task.WaitAsync(ct);
+            }
+
+            return h.Servers.Servers.ToList();
+        };
+
+        h.Recorder.Start();
+        Assert.True(await entered.WaitAsync(SafetyNet));                    // startup-only pass is held
+        h.Recorder.OnCycleCompleted(Completion(MonitoringOutcome.Success)); // first cycle: due
+        h.Servers.RaiseChanged();                                           // forced, same pending pass
+        release.SetResult();
+        await WaitForIdleAsync(h.Recorder);
+        Assert.Equal(1, h.Writer.StartedCount); // one write satisfied both, and it is the cycle's write
+
+        h.Servers.RaiseChanged();                                           // forced, bypasses the window
+        await WaitForIdleAsync(h.Recorder);
+        Assert.Equal(2, h.Writer.StartedCount);
+
+        h.Recorder.OnCycleCompleted(Completion(MonitoringOutcome.Success)); // cycle inside window: no write
+        await WaitForIdleAsync(h.Recorder);
+
+        Assert.Equal(2, h.Writer.StartedCount);
+        Assert.Equal(1, h.Writer.MaxConcurrent);
+    }
+
+    [Fact]
+    public async Task Startup_decided_before_the_first_cycle_also_keeps_the_next_cycle_throttled()
+    {
+        // The other ordering of the same scenario, also forced: the startup pass is decided (no write, servers
+        // present) BEFORE the first cycle arrives. Together with the test above, the fixed behaviour holds
+        // in both orderings rather than depending on scheduling.
+        await using var h = new Harness();
+        h.AddServer("Home", ServerHealth.Healthy);
+        var entered = SignalGetAll(h);
+
+        h.Recorder.Start();
+        Assert.True(await entered.WaitAsync(SafetyNet));
+        await WaitForIdleAsync(h.Recorder);                                 // startup decided, no write
+        Assert.Equal(0, h.Writer.StartedCount);
+
+        h.Recorder.OnCycleCompleted(Completion(MonitoringOutcome.Success)); // cycle, anchors at T0
+        await WaitForIdleAsync(h.Recorder);
+        h.Servers.RaiseChanged();                                           // forced
+        await WaitForIdleAsync(h.Recorder);
+        h.Recorder.OnCycleCompleted(Completion(MonitoringOutcome.Success)); // cycle inside window: no write
+        await WaitForIdleAsync(h.Recorder);
+
+        Assert.Equal(2, h.Writer.StartedCount);
+    }
+
+    [Fact]
+    public async Task A_forced_write_carrying_a_not_yet_due_cycle_does_not_push_the_cadence_later()
+    {
+        // DV-5 complement: only a DUE cycle anchors. A throttled cycle that piggybacks on a forced write must
+        // leave the anchor where the last cycle write put it, so the cadence is neither delayed nor advanced.
+        await using var h = new Harness();
+        h.AddServer("Home", ServerHealth.Healthy);
+        h.Recorder.Start();
+        await WaitForIdleAsync(h.Recorder);                                 // startup: no write
+
+        h.Recorder.OnCycleCompleted(Completion(MonitoringOutcome.Success)); // T0: cycle write, anchors T0
+        await WaitForIdleAsync(h.Recorder);
+        Assert.Equal(1, h.Writer.StartedCount);
+
+        h.Clock.Advance(TimeSpan.FromSeconds(10));
+        h.Recorder.OnCycleCompleted(Completion(MonitoringOutcome.Success)); // T0+10: throttled, stays dirty
+        await WaitForIdleAsync(h.Recorder);
+        Assert.Equal(1, h.Writer.StartedCount);
+
+        h.Servers.RaiseChanged();                                           // T0+10: forced, carries the cycle
+        await WaitForIdleAsync(h.Recorder);
+        Assert.Equal(2, h.Writer.StartedCount);
+
+        h.Clock.Advance(TimeSpan.FromSeconds(5));                           // T0+15: one interval after T0
+        h.Recorder.OnCycleCompleted(Completion(MonitoringOutcome.Success)); // due from T0, not from T0+10
+        await WaitForIdleAsync(h.Recorder);
+
+        Assert.Equal(3, h.Writer.StartedCount);
+    }
+
     [Fact]
     public async Task Dispose_unsubscribes_from_fleet_changes_and_later_changes_write_nothing()
     {
