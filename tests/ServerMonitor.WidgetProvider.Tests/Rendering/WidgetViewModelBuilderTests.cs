@@ -100,7 +100,7 @@ public sealed class WidgetViewModelBuilderTests
         Assert.Equal(WidgetCardState.Attention, vm.CardState);
         Assert.Equal("3 issues", vm.Title);
         // Prism P-C1-2: with problems the summary lists ONLY what needs the user.
-        Assert.Equal("1 attention · 1 critical · 1 no connection", vm.Summary);
+        Assert.Equal("1\u00A0attention · 1\u00A0critical · 1\u00A0no\u00A0connection", vm.Summary);
         Assert.Equal("attention", vm.StateColor); // critical/offline outrank warning
     }
 

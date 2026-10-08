@@ -565,7 +565,7 @@ public sealed class WidgetCardRendererTests
             Server(1, WidgetHealth.Warning), Server(2, WidgetHealth.Critical), Server(3, WidgetHealth.Offline),
             Server(4, updated: Now.AddSeconds(-500)), Server(5)), WidgetSizeHint.Medium);
 
-        Assert.Equal("1 attention · 1 critical · 1 no connection · 1 without recent data", vm.Summary);
+        Assert.Equal("1\u00A0attention · 1\u00A0critical · 1\u00A0no\u00A0connection · 1\u00A0without\u00A0recent\u00A0data", vm.Summary);
         Assert.Equal(vm.Summary, (string?)JsonNode.Parse(card.DataJson)!["summary"]);
         Assert.DoesNotContain("healthy", vm.Summary);
 
@@ -586,7 +586,7 @@ public sealed class WidgetCardRendererTests
     public void An_all_healthy_summary_states_the_healthy_count()
     {
         var (vm, _, _) = Render(Read(Now, Server(1), Server(2), Server(3)), WidgetSizeHint.Medium);
-        Assert.Equal("3 healthy", vm.Summary);
+        Assert.Equal("3\u00A0healthy", vm.Summary);
     }
 
     // =====================================================================================================

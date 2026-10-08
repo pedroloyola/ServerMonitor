@@ -73,4 +73,29 @@ public sealed partial class WidgetStringsParityTests
         Assert.Equal("O teu primeiro servidor", pt.EmptyTitle);
         Assert.Equal("Seu primeiro servidor", br.EmptyTitle);
     }
+
+    /// <summary>
+    /// Prism C1 N-1: a wrapping summary may only break at the " · " separator, never inside a category
+    /// ("1 sem / conexão"). So no count string used in the summary contains an ordinary space.
+    /// </summary>
+    [Theory]
+    [InlineData("en-US")]
+    [InlineData("pt-PT")]
+    [InlineData("pt-BR")]
+    public void Summary_counts_never_break_inside_a_category(string culture)
+    {
+        var strings = WidgetStrings.ForCulture(CultureInfo.GetCultureInfo(culture));
+        var counts = new[]
+        {
+            strings.CountHealthyOne, strings.CountHealthyOther, strings.CountWarning, strings.CountCriticalOne,
+            strings.CountCriticalOther, strings.CountOffline, strings.FleetUnknownOnly
+        };
+
+        Assert.All(counts, c =>
+        {
+            Assert.DoesNotContain(' ', c);
+            Assert.StartsWith("{0} ", c, StringComparison.Ordinal);
+        });
+        Assert.Equal(" · ", strings.CountSeparator); // the only breakable spaces in the summary
+    }
 }

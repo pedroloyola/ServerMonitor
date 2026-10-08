@@ -72,7 +72,7 @@ public sealed class WidgetViewModelV3StateTests
         Assert.Equal(WidgetCardState.Healthy, vm.CardState);
         Assert.Equal("All healthy", vm.Title);
         Assert.Equal("2 servers connected", vm.Subtitle);
-        Assert.Equal("2 healthy", vm.Summary);
+        Assert.Equal("2\u00A0healthy", vm.Summary);
         Assert.Equal(2, vm.HealthyFreshCount);
         Assert.Equal("2 of 2 healthy", vm.RingAltText);
         Assert.All(vm.Rows, r => Assert.Equal(WidgetRowState.Healthy, r.State));
@@ -162,9 +162,9 @@ public sealed class WidgetViewModelV3StateTests
         Assert.True(stale.IsStale);
         Assert.True(stale.ShowsMetrics); // last values kept (muted), parity with the app
         Assert.Equal(WidgetCardState.NoCurrentData, vm.CardState);
-        Assert.Equal("1 without recent data", vm.Title);
+        Assert.Equal("1\u00A0without\u00A0recent\u00A0data", vm.Title);
         Assert.Equal(1, vm.HealthyFreshCount);
-        Assert.Equal("1 without recent data", vm.Summary); // P-C1-2/P-C1-7: only non-healthy, title wording
+        Assert.Equal("1\u00A0without\u00A0recent\u00A0data", vm.Summary); // P-C1-2/P-C1-7: only non-healthy, title wording
     }
 
     [Fact]
@@ -266,7 +266,7 @@ public sealed class WidgetViewModelV3StateTests
         Assert.Equal(WidgetRowState.NotUpdated, Assert.Single(vm.Rows, r => r.ServerId == Id(1)).State);
         Assert.Equal(WidgetRowState.Unknown, Assert.Single(vm.Rows, r => r.ServerId == Id(2)).State);
         Assert.Equal(WidgetCardState.NoCurrentData, vm.CardState);
-        Assert.Equal("2 without recent data", vm.Title);
+        Assert.Equal("2\u00A0without\u00A0recent\u00A0data", vm.Title);
     }
 
     [Fact]
@@ -275,7 +275,7 @@ public sealed class WidgetViewModelV3StateTests
         var vm = Build(Read(Now, Server(1), Server(2), Server(3, WidgetHealth.Unknown, neverRead: true)));
 
         Assert.Equal(2, vm.HealthyFreshCount);
-        Assert.Equal("1 without recent data", vm.Summary);
+        Assert.Equal("1\u00A0without\u00A0recent\u00A0data", vm.Summary);
         Assert.Equal("2 of 3 healthy", vm.RingAltText);
         Assert.NotEqual("All healthy", vm.Title);
     }
