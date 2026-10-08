@@ -1,5 +1,6 @@
 using System.Globalization;
-using System.Text.Json;
+using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 using ServerMonitor.WidgetContract;
 using ServerMonitor.WidgetProvider.Hosting;
 using ServerMonitor.WidgetProvider.Reading;
@@ -7,73 +8,325 @@ using ServerMonitor.WidgetProvider.Rendering;
 
 namespace ServerMonitor.WidgetProvider.Tests.Rendering;
 
+/// <summary>
+/// UI.9 C1 — the V3 template/data renderer (SPEC §6/§8, V-RC-3, V-RC-9, R-1, R-2, P-RC-2, RC-8/10).
+/// Template-level properties are asserted on the raw constant templates; everything visible is asserted
+/// on the card EXPANDED with <see cref="CardTemplateHarness"/>. Ids are fixed (FLAKE-WP-GUID) and every
+/// age comes from explicit timestamps.
+/// </summary>
 public sealed class WidgetCardRendererTests
 {
     private static readonly DateTimeOffset Now = new(2026, 8, 30, 12, 0, 0, TimeSpan.Zero);
     private static readonly WidgetStrings En = WidgetStrings.ForCulture(CultureInfo.GetCultureInfo("en-US"));
+    private static readonly WidgetSizeHint[] Sizes = [WidgetSizeHint.Small, WidgetSizeHint.Medium, WidgetSizeHint.Large];
+    private static readonly string[] Cultures = ["en-US", "pt-PT", "pt-BR"];
 
-    private static readonly HashSet<string> AllowedElements = new(StringComparer.Ordinal)
-    {
-        "AdaptiveCard", "TextBlock", "ColumnSet", "Column", "Container", "Action.Execute"
-    };
+    /// <summary>Vigil's hostile fixture (V-RC-3 d) plus the TextBlock markdown/date vectors (R-1).</summary>
+    public static readonly string[] HostileNames =
+    [
+        "${$host.hostTheme}", "${name}", "{\"$when\":\"true\"}", "\"}],\"x\":\"", "\\",
+        "[x](https://example.invalid)", "**b**", "- a", "# h", new string('$', 60),
+        "{{DATE(2017-02-14T06:08:00Z)}}", "${if(true,'EVAL','no')}", "@{name}", "_i_"
+    ];
 
-    private static WidgetServerState Server(string name, WidgetHealth health, Guid? id = null,
-        double? cpu = 12, double? mem = 34, double? disk = 56) => new()
+    private static Guid Id(int n) => new($"00000000-0000-0000-0000-{n:D12}");
+
+    internal static WidgetServerState Server(
+        int n,
+        WidgetHealth health = WidgetHealth.Healthy,
+        string? name = null,
+        DateTimeOffset? updated = null,
+        double? cpu = 41,
+        double? mem = 73,
+        double? disk = 92,
+        string? metric = null) => new()
     {
-        Id = id ?? Guid.NewGuid(),
-        DisplayName = name,
+        Id = Id(n),
+        DisplayName = name ?? $"srv{n}",
         Health = health,
         CpuUsagePercent = cpu,
         MemoryUsagePercent = mem,
         DiskUsagePercent = disk,
-        LastUpdatedUtc = Now
+        MemoryUsedGb = 3.2,
+        MemoryTotalGb = 8,
+        DiskUsedGb = 460,
+        DiskTotalGb = 500,
+        UptimeSeconds = 43L * 86400 + 18 * 3600,
+        LastUpdatedUtc = updated ?? Now.AddSeconds(-5),
+        StaleAfterSeconds = 60,
+        AttentionMetric = metric
     };
 
-    private static WidgetReadResult Read(params WidgetServerState[] servers) =>
+    internal static WidgetReadResult Read(DateTimeOffset generatedAt, params WidgetServerState[] servers) =>
         WidgetReadResult.Available(new WidgetStateSnapshot
         {
             SchemaVersion = WidgetSchema.CurrentVersion,
-            GeneratedAtUtc = Now,
+            GeneratedAtUtc = generatedAt,
             OverallHealth = WidgetHealthPrecedence.Worst(servers.Select(s => s.Health)),
             Servers = servers
         });
 
-    private static WidgetCard Render(WidgetReadResult read, WidgetSizeHint size) =>
-        WidgetCardRenderer.Render(WidgetViewModelBuilder.Build(read, size, Now, En));
+    private static readonly WidgetReadResult Missing = WidgetReadResult.Unavailable(WidgetReadUnavailableReason.Missing);
 
-    private static JsonElement AssertValidCard(string templateJson)
+    /// <summary>Every card state, named, for a given set of names.</summary>
+    internal static IEnumerable<(string State, WidgetReadResult Read)> States(string[]? names = null)
     {
-        using var doc = JsonDocument.Parse(templateJson); // throws on invalid JSON
-        var root = doc.RootElement.Clone();
-        Assert.Equal("AdaptiveCard", root.GetProperty("type").GetString());
-        Assert.Equal("1.6", root.GetProperty("version").GetString());
-        // header:null — our composition owns the top region (no duplicated host brand strip).
-        Assert.True(root.TryGetProperty("header", out var header) && header.ValueKind == JsonValueKind.Null);
-        AssertElementsSupported(root);
-        return root;
+        string N(int i) => names is null ? $"srv{i}" : names[i % names.Length];
+        var old = Now.AddSeconds(-(WidgetSchema.MaxStaleAfterSeconds + 120));
+        yield return ("healthy", Read(Now, Server(1, name: N(1)), Server(2, name: N(2)), Server(3, name: N(3))));
+        yield return ("attention", Read(Now,
+            Server(1, WidgetHealth.Critical, N(1), metric: "disk"),
+            Server(2, WidgetHealth.Offline, N(2)),
+            Server(3, WidgetHealth.Warning, N(3), metric: "cpu"),
+            Server(4, name: N(4)), Server(5, name: N(5)), Server(6, name: N(6))));
+        yield return ("nocurrentdata", Read(Now, Server(1, name: N(1)),
+            Server(2, name: N(2), updated: Now.AddSeconds(-500)), Server(3, WidgetHealth.Unknown, N(3))));
+        yield return ("stale", Read(old, Server(1, name: N(1), updated: old), Server(2, name: N(2), updated: old),
+            Server(3, name: N(3), updated: old)));
+        yield return ("empty", Read(Now));
+        yield return ("empty-stale", Read(old));
+        yield return ("unavailable", Missing);
+        yield return ("overflow", Read(Now, Enumerable.Range(1, 12).Select(i => Server(i, name: N(i))).ToArray()));
     }
 
-    private static void AssertElementsSupported(JsonElement element)
+    internal static (WidgetViewModel Vm, WidgetCard Card, JsonObject Expanded) Render(
+        WidgetReadResult read, WidgetSizeHint size, WidgetStrings? strings = null)
     {
-        if (element.ValueKind == JsonValueKind.Object)
+        var vm = WidgetViewModelBuilder.Build(read, size, Now, strings ?? En);
+        var card = WidgetCardRenderer.Render(vm);
+        return (vm, card, CardTemplateHarness.Expand(card.TemplateJson, card.DataJson));
+    }
+
+    // =====================================================================================================
+    // V-RC-3: constant templates, fixed data keys, untrusted names only in TextRuns
+    // =====================================================================================================
+
+    [Fact]
+    public void Template_bytes_are_identical_across_every_state_and_hostile_snapshot()
+    {
+        foreach (var size in Sizes)
         {
-            if (element.TryGetProperty("type", out var type) && type.ValueKind == JsonValueKind.String)
+            var templates = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var names in new[] { null, HostileNames })
             {
-                Assert.True(AllowedElements.Contains(type.GetString() ?? string.Empty),
-                    $"unsupported element type: {type.GetString()}");
+                foreach (var culture in Cultures)
+                {
+                    foreach (var (_, read) in States(names))
+                    {
+                        templates.Add(Render(read, size, WidgetStrings.ForCulture(CultureInfo.GetCultureInfo(culture))).Card.TemplateJson);
+                    }
+                }
             }
 
-            foreach (var property in element.EnumerateObject())
+            Assert.Equal(WidgetCardRenderer.TemplateFor(size), Assert.Single(templates));
+        }
+    }
+
+    [Fact]
+    public void Template_carries_no_literal_visible_text_only_bindings()
+    {
+        var binding = new Regex(@"^\$\{[A-Za-z]+\}$");
+        foreach (var size in Sizes)
+        {
+            var template = JsonNode.Parse(WidgetCardRenderer.TemplateFor(size))!;
+            var texts = CardTemplateHarness.Strings(template).Where(s => s.Key is "text" or "title" or "altText").ToList();
+
+            Assert.NotEmpty(texts); // the walk is real
+            Assert.All(texts, t => Assert.Matches(binding, t.Value));
+        }
+    }
+
+    [Fact]
+    public void Template_has_no_schema_header_url_image_or_open_url()
+    {
+        foreach (var size in Sizes)
+        {
+            var template = WidgetCardRenderer.TemplateFor(size);
+            var keys = CardTemplateHarness.Objects(JsonNode.Parse(template)).SelectMany(o => o.Node.Select(p => p.Key)).ToHashSet();
+
+            foreach (var forbidden in new[] { "$schema", "header", "url", "backgroundImage", "iconUrl" })
             {
-                AssertElementsSupported(property.Value);
+                Assert.DoesNotContain(forbidden, keys);
+            }
+
+            Assert.DoesNotContain("\"Image\"", template);
+            Assert.DoesNotContain("Action.OpenUrl", template);
+            Assert.DoesNotContain("Action.Submit", template);
+        }
+    }
+
+    [Fact]
+    public void The_display_name_is_bound_exactly_once_and_only_as_a_TextRun()
+    {
+        foreach (var size in Sizes)
+        {
+            var template = JsonNode.Parse(WidgetCardRenderer.TemplateFor(size))!;
+            var bindings = CardTemplateHarness.Objects(template)
+                .Where(o => o.Node.Any(p => p.Value is JsonValue v && v.TryGetValue<string>(out var s) && s.Contains("${name}")))
+                .ToList();
+
+            if (size == WidgetSizeHint.Small)
+            {
+                Assert.Empty(bindings); // Small has no rows
+                continue;
+            }
+
+            var (node, owner) = Assert.Single(bindings);
+            Assert.Equal("TextRun", (string?)node["type"]);
+            Assert.Equal("inlines", owner);                 // inside a RichTextBlock, never a TextBlock
+            Assert.Equal("${name}", (string?)node["text"]);  // never concatenated with other text
+        }
+    }
+
+    [Fact]
+    public void Data_keys_are_fixed_whatever_the_state()
+    {
+        foreach (var size in Sizes)
+        {
+            var rootKeys = new HashSet<string>(StringComparer.Ordinal);
+            var rowKeys = new HashSet<string>(StringComparer.Ordinal);
+            var rowsSeen = 0;
+            foreach (var names in new[] { null, HostileNames })
+            {
+                foreach (var (_, read) in States(names))
+                {
+                    var data = JsonNode.Parse(Render(read, size).Card.DataJson)!.AsObject();
+                    rootKeys.Add(string.Join(",", data.Select(p => p.Key)));
+                    foreach (var row in data["rows"]!.AsArray())
+                    {
+                        rowsSeen++;
+                        rowKeys.Add(string.Join(",", row!.AsObject().Select(p => p.Key)));
+                    }
+                }
+            }
+
+            Assert.Single(rootKeys);
+            if (size != WidgetSizeHint.Small)
+            {
+                Assert.True(rowsSeen > 0);
+                Assert.Single(rowKeys);
             }
         }
-        else if (element.ValueKind == JsonValueKind.Array)
+    }
+
+    [Theory]
+    [MemberData(nameof(HostileNameData))]
+    public void A_hostile_name_reaches_the_card_only_as_a_literal_TextRun(string hostile)
+    {
+        foreach (var size in new[] { WidgetSizeHint.Medium, WidgetSizeHint.Large })
         {
-            foreach (var item in element.EnumerateArray())
+            var (vm, card, expanded) = Render(Read(Now, Server(1, WidgetHealth.Warning, hostile, metric: "disk")), size);
+            var shown = vm.Rows[0].DisplayName.Value;
+
+            // Data: the name is a VALUE of exactly one key, "name" — never a key, never in another value.
+            var data = JsonNode.Parse(card.DataJson)!;
+            Assert.All(CardTemplateHarness.Strings(data).Where(s => s.Value.Contains(shown, StringComparison.Ordinal)),
+                s => Assert.Equal("name", s.Key));
+
+            // Expanded: literal, unevaluated, in a TextRun; no TextBlock carries it.
+            var carriers = CardTemplateHarness.Objects(expanded)
+                .Where(o => (string?)o.Node["text"] == shown).ToList();
+            var (run, owner) = Assert.Single(carriers);
+            Assert.Equal("TextRun", (string?)run["type"]);
+            Assert.Equal("inlines", owner);
+            Assert.DoesNotContain(CardTemplateHarness.Objects(expanded),
+                o => (string?)o.Node["type"] == "TextBlock" && ((string?)o.Node["text"])?.Contains(shown, StringComparison.Ordinal) == true);
+
+            // The card structure is unchanged by the name.
+            Assert.Empty(CardTemplateHarness.ShapeErrors(expanded));
+        }
+    }
+
+    public static TheoryData<string> HostileNameData()
+    {
+        var data = new TheoryData<string>();
+        foreach (var name in HostileNames)
+        {
+            data.Add(name);
+        }
+
+        return data;
+    }
+
+    // =====================================================================================================
+    // SPEC test 10: valid AC 1.6 per size × state × culture
+    // =====================================================================================================
+
+    [Fact]
+    public void Every_size_state_and_culture_expands_to_a_valid_card()
+    {
+        var checkedCards = 0;
+        foreach (var size in Sizes)
+        {
+            foreach (var culture in Cultures)
             {
-                AssertElementsSupported(item);
+                foreach (var (state, read) in States())
+                {
+                    var (_, _, expanded) = Render(read, size, WidgetStrings.ForCulture(CultureInfo.GetCultureInfo(culture)));
+                    var errors = CardTemplateHarness.ShapeErrors(expanded);
+                    Assert.True(errors.Count == 0, $"{size}/{state}/{culture}: {string.Join("; ", errors)}");
+                    Assert.DoesNotContain(CardTemplateHarness.Strings(expanded), s => s.Value.Contains("${", StringComparison.Ordinal));
+                    Assert.All(CardTemplateHarness.VisibleTexts(expanded), t => Assert.DoesNotContain("{0}", t));
+                    Assert.DoesNotContain(CardTemplateHarness.Objects(expanded), o => (string?)o.Node["type"] == "TextRun" && (string?)o.Node["text"] == string.Empty);
+                    checkedCards++;
+                }
             }
+        }
+
+        Assert.Equal(3 * 3 * 8, checkedCards);
+    }
+
+    // =====================================================================================================
+    // V-RC-9: no URL of any kind; only Action.Execute; verb set == {openDashboard, openServer}
+    // =====================================================================================================
+
+    [Fact]
+    public void No_card_carries_a_url_and_the_verb_set_is_exactly_the_two_contract_verbs()
+    {
+        var url = new Regex(@"(?i)(https?:|file:|data:|ms-appx:|ms-appdata:|\\\\|//)");
+        var verbs = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var size in Sizes)
+        {
+            Assert.DoesNotMatch(url, WidgetCardRenderer.TemplateFor(size));
+            foreach (var culture in Cultures)
+            {
+                foreach (var (_, read) in States())
+                {
+                    var (_, card, expanded) = Render(read, size, WidgetStrings.ForCulture(CultureInfo.GetCultureInfo(culture)));
+                    Assert.DoesNotMatch(url, card.DataJson);
+                    foreach (var action in CardTemplateHarness.Actions(expanded))
+                    {
+                        Assert.Equal("Action.Execute", (string?)action["type"]);
+                        verbs.Add((string)action["verb"]!);
+                    }
+                }
+            }
+        }
+
+        Assert.Equal(new[] { "openDashboard", "openServer" }, verbs.Order(StringComparer.Ordinal));
+    }
+
+    // =====================================================================================================
+    // SPEC test 4: activation keeps its target
+    // =====================================================================================================
+
+    [Theory]
+    [InlineData(WidgetSizeHint.Medium)]
+    [InlineData(WidgetSizeHint.Large)]
+    public void Each_visible_row_opens_its_own_server_and_the_card_opens_the_dashboard(WidgetSizeHint size)
+    {
+        var (vm, _, expanded) = Render(Read(Now, Server(1), Server(2, WidgetHealth.Warning), Server(3, WidgetHealth.Critical)), size);
+
+        Assert.Equal("openDashboard", (string?)expanded["selectAction"]!["verb"]);
+        var rows = CardTemplateHarness.Rows(expanded);
+        Assert.Equal(vm.Rows.Count, rows.Count);
+        Assert.True(rows.Count >= 2);
+        for (var i = 0; i < rows.Count; i++)
+        {
+            var action = rows[i]["selectAction"]!.AsObject();
+            Assert.Equal(vm.Rows[i].ServerId.ToString("D"), (string?)action["data"]!["serverId"]);
+            Assert.Equal(["data", "type", "verb"], action.Select(p => p.Key).Order(StringComparer.Ordinal));
+            Assert.Contains(vm.Rows[i].DisplayName.Value, CardTemplateHarness.VisibleTexts(rows[i]));
         }
     }
 
@@ -81,744 +334,249 @@ public sealed class WidgetCardRendererTests
     [InlineData(WidgetSizeHint.Small)]
     [InlineData(WidgetSizeHint.Medium)]
     [InlineData(WidgetSizeHint.Large)]
-    public void All_sizes_render_valid_supported_cards(WidgetSizeHint size)
+    public void Empty_offers_the_dashboard_cta_and_unavailable_offers_none(WidgetSizeHint size)
     {
-        var card = Render(Read(Server("Home", WidgetHealth.Warning), Server("Db", WidgetHealth.Critical)), size);
-        AssertValidCard(card.TemplateJson);
-        Assert.Equal("{}", card.DataJson);
-        Assert.Contains(En.FleetKicker, card.TemplateJson); // FROTA/FLEET kicker owns the top now
+        var (_, _, empty) = Render(Read(Now), size);
+        var cta = CardTemplateHarness.Objects(empty).Select(o => o.Node).Single(o => (string?)o["type"] == "ActionSet");
+        var button = cta["actions"]!.AsArray().Single()!.AsObject();
+        Assert.Equal("Action.Execute", (string?)button["type"]);
+        Assert.Equal("openDashboard", (string?)button["verb"]);
+        Assert.Equal(En.EmptyCta, (string?)button["title"]);
+        Assert.Null(button["data"]);
+
+        var (_, _, unavailable) = Render(Missing, size);
+        Assert.DoesNotContain(CardTemplateHarness.Objects(unavailable), o => (string?)o.Node["type"] == "ActionSet");
+        Assert.Equal("openDashboard", (string?)unavailable["selectAction"]!["verb"]); // SPEC §3: card opens Dashboard
+        Assert.Contains(En.UnavailableTitle, CardTemplateHarness.VisibleTexts(unavailable));
+        Assert.DoesNotContain(En.FleetAllHealthy, CardTemplateHarness.VisibleTexts(unavailable));
     }
+
+    // =====================================================================================================
+    // SPEC test 3 + D-UI9-5 + DV-4 exit criterion: never healthy text when stale / not updated
+    // =====================================================================================================
 
     [Fact]
-    public void Small_shows_no_server_rows_but_summary()
+    public void A_stale_card_never_paints_healthy_text_or_healthy_green()
     {
-        var json = Render(Read(Server("Home", WidgetHealth.Healthy)), WidgetSizeHint.Small).TemplateJson;
-        AssertValidCard(json);
-        Assert.DoesNotContain("Home", json);   // Small = summary only, no per-server rows
-        Assert.Contains(En.FleetKicker, json);
-    }
-
-    [Fact]
-    public void Medium_and_large_show_server_names_and_metrics()
-    {
-        var medium = Render(Read(Server("WebServer", WidgetHealth.Warning)), WidgetSizeHint.Medium).TemplateJson;
-        AssertValidCard(medium);
-        Assert.Contains("WebServer", medium);
-        Assert.Contains("12", medium); // CPU number (value/unit are split: "12" + "%")
-        Assert.Contains("Warning", medium); // health label as text (§18)
-    }
-
-    // ---- M13-QA-4 / P-017: Medium capacity + truthful overflow + no dangling separator ----------
-
-    // Counts the server telemetry blocks in a card body: a Container that carries an openServer action.
-    private static List<JsonElement> ServerBlocks(JsonElement root) =>
-        root.GetProperty("body").EnumerateArray()
-            .Where(e => e.ValueKind == JsonValueKind.Object
-                        && e.TryGetProperty("type", out var t) && t.GetString() == "Container"
-                        && e.TryGetProperty("selectAction", out _))
-            .ToList();
-
-    private static IEnumerable<JsonElement> BodyItems(JsonElement root) =>
-        root.GetProperty("body").EnumerateArray();
-
-    // Every TextBlock "text" value in the card, JSON-decoded.
-    private static IEnumerable<string> AllTexts(JsonElement element)
-    {
-        if (element.ValueKind == JsonValueKind.Object)
+        foreach (var size in Sizes)
         {
-            if (element.TryGetProperty("type", out var t) && t.GetString() == "TextBlock"
-                && element.TryGetProperty("text", out var text) && text.GetString() is { } value)
+            foreach (var culture in Cultures)
             {
-                yield return value;
-            }
+                var strings = WidgetStrings.ForCulture(CultureInfo.GetCultureInfo(culture));
+                var (_, _, expanded) = Render(States().Single(s => s.State == "stale").Read, size, strings);
+                var texts = CardTemplateHarness.VisibleTexts(expanded);
 
-            foreach (var prop in element.EnumerateObject())
-            {
-                foreach (var found in AllTexts(prop.Value)) { yield return found; }
-            }
-        }
-        else if (element.ValueKind == JsonValueKind.Array)
-        {
-            foreach (var item in element.EnumerateArray())
-            {
-                foreach (var found in AllTexts(item)) { yield return found; }
+                Assert.Contains(strings.StaleTitle, texts);
+                Assert.DoesNotContain(strings.FleetAllHealthy, texts);
+                Assert.DoesNotContain(strings.StatusHealthy, texts);
+                Assert.DoesNotContain(CardTemplateHarness.Strings(expanded), s => s is { Key: "color", Value: "good" });
             }
         }
     }
+
+    [Fact]
+    public void A_not_updated_row_in_a_fresh_snapshot_never_reads_healthy()
+    {
+        // Cortex DV-4 exit criterion: the per-row V3 status is RENDERED, not only modelled.
+        foreach (var size in new[] { WidgetSizeHint.Medium, WidgetSizeHint.Large })
+        {
+            var (_, _, expanded) = Render(Read(Now, Server(1), Server(2, updated: Now.AddSeconds(-500))), size);
+            var stale = CardTemplateHarness.Rows(expanded).Single(r => (string?)r["selectAction"]!["data"]!["serverId"] == Id(2).ToString("D"));
+            var texts = CardTemplateHarness.VisibleTexts(stale);
+
+            Assert.Contains(En.StatusRowStale, texts);
+            Assert.DoesNotContain(En.StatusHealthy, texts);
+            Assert.DoesNotContain(CardTemplateHarness.Strings(stale), s => s is { Key: "color", Value: "good" or "accent" });
+        }
+    }
+
+    [Fact]
+    public void An_empty_snapshot_that_is_stale_does_not_claim_no_servers_yet()
+    {
+        // Vigil V-B2.
+        foreach (var size in Sizes)
+        {
+            var (_, _, expanded) = Render(States().Single(s => s.State == "empty-stale").Read, size);
+            var texts = CardTemplateHarness.VisibleTexts(expanded);
+            Assert.Contains(En.StaleTitle, texts);
+            Assert.DoesNotContain(En.EmptyTitleSmall, texts);
+            Assert.DoesNotContain(En.EmptyTitle, texts);
+            Assert.DoesNotContain(En.EmptyBody, texts);
+        }
+    }
+
+    // =====================================================================================================
+    // Overflow invariant: visible + overflow == total, "N of M" always on list sizes
+    // =====================================================================================================
 
     [Theory]
-    [InlineData(1, 1, 0)]
-    [InlineData(2, 2, 0)]
-    [InlineData(3, 2, 1)]
-    [InlineData(4, 2, 2)]
-    [InlineData(100, 2, 98)]
-    public void Medium_renders_two_blocks_and_announces_the_rest(int total, int expectedBlocks, int expectedOverflow)
-    {
-        var servers = Enumerable.Range(0, total)
-            .Select(i => Server($"srv{i:D3}", WidgetHealth.Healthy)).ToArray();
-        var json = Render(Read(servers), WidgetSizeHint.Medium).TemplateJson;
-        var root = AssertValidCard(json);
-
-        Assert.Equal(expectedBlocks, ServerBlocks(root).Count);
-
-        var texts = AllTexts(root).ToList();
-        var overflowText = $"{expectedOverflow} more";
-        if (expectedOverflow == 0)
-        {
-            Assert.DoesNotContain(texts, t => t.EndsWith(" more", StringComparison.Ordinal));
-        }
-        else
-        {
-            Assert.Contains(overflowText, texts);
-            // The overflow affordance is the LAST thing in the body, so it can never be pushed off the
-            // card by another block - that is precisely how servers used to vanish silently (P-017).
-            var last = BodyItems(root).Last();
-            Assert.Equal("TextBlock", last.GetProperty("type").GetString());
-            Assert.Equal(overflowText, last.GetProperty("text").GetString());
-        }
-    }
-
-    [Fact]
-    public void Medium_never_serializes_a_server_beyond_the_cap()
-    {
-        // Fixed ids so the assertion can actually check that the capped server's opaque id is absent too,
-        // not just its name (Vigil L-1: the comment used to promise more than the assertion delivered).
-        var hidden = Guid.Parse("11111111-2222-3333-4444-555555555555");
-        var json = Render(Read(
-            Server("alpha", WidgetHealth.Healthy),
-            Server("bravo", WidgetHealth.Healthy),
-            Server("charlie", WidgetHealth.Healthy, hidden)), WidgetSizeHint.Medium).TemplateJson;
-
-        AssertValidCard(json);
-        Assert.Contains("alpha", json, StringComparison.Ordinal);
-        Assert.Contains("bravo", json, StringComparison.Ordinal);
-        // The third server is not rendered at all - not its name, and not its opaque id.
-        Assert.DoesNotContain("charlie", json, StringComparison.Ordinal);
-        Assert.DoesNotContain(hidden.ToString("D"), json, StringComparison.OrdinalIgnoreCase);
-    }
-
-    [Theory]
+    [InlineData(WidgetSizeHint.Small, 12)]
     [InlineData(WidgetSizeHint.Medium, 1)]
     [InlineData(WidgetSizeHint.Medium, 2)]
-    [InlineData(WidgetSizeHint.Medium, 3)]
-    [InlineData(WidgetSizeHint.Medium, 10)]
+    [InlineData(WidgetSizeHint.Medium, 12)]
     [InlineData(WidgetSizeHint.Large, 3)]
-    [InlineData(WidgetSizeHint.Large, 6)]
-    [InlineData(WidgetSizeHint.Large, 20)]
-    public void No_dangling_separator_at_the_end_of_the_body(WidgetSizeHint size, int total)
+    [InlineData(WidgetSizeHint.Large, 12)]
+    public void Rows_on_the_card_plus_overflow_account_for_every_server(WidgetSizeHint size, int total)
     {
-        var servers = Enumerable.Range(0, total)
-            .Select(i => Server($"srv{i:D3}", WidgetHealth.Healthy)).ToArray();
-        var root = AssertValidCard(Render(Read(servers), size).TemplateJson);
+        var (vm, _, expanded) = Render(Read(Now, Enumerable.Range(1, total).Select(i => Server(i)).ToArray()), size);
+        var rows = CardTemplateHarness.Rows(expanded);
 
-        foreach (var item in BodyItems(root))
+        Assert.Equal(Math.Min(total, WidgetViewModelBuilder.MaxRowsFor(size)), rows.Count);
+        if (size == WidgetSizeHint.Small)
         {
-            if (!item.TryGetProperty("separator", out var sep) || !sep.GetBoolean())
-            {
-                continue;
-            }
-
-            // A separator is a rule drawn ABOVE its own element, so the element that carries it must
-            // actually have content. A separator introducing nothing is the dangling line QA-4 showed.
-            Assert.True(item.TryGetProperty("items", out var items), "separator element has no items");
-            Assert.NotEqual(0, items.GetArrayLength());
+            Assert.Contains($"{total}/{total}", CardTemplateHarness.VisibleTexts(expanded)); // the fraction states the fleet
+            return;
         }
 
-        // And the body itself never ends on an empty container.
-        var last = BodyItems(root).Last();
-        if (last.TryGetProperty("items", out var lastItems))
-        {
-            Assert.NotEqual(0, lastItems.GetArrayLength());
-        }
+        Assert.Equal(total, rows.Count + vm.OverflowCount);
+        Assert.Contains(string.Format(CultureInfo.InvariantCulture, En.OverflowFormat, rows.Count, total),
+            CardTemplateHarness.VisibleTexts(expanded));
     }
 
-    [Theory]
-    [InlineData(WidgetSizeHint.Medium)]
-    [InlineData(WidgetSizeHint.Large)]
-    public void Overflow_line_is_not_clickable_and_carries_no_server_action(WidgetSizeHint size)
-    {
-        var servers = Enumerable.Range(0, 12).Select(i => Server($"srv{i:D2}", WidgetHealth.Healthy)).ToArray();
-        var root = AssertValidCard(Render(Read(servers), size).TemplateJson);
-
-        var overflow = BodyItems(root).Single(e =>
-            e.TryGetProperty("type", out var t) && t.GetString() == "TextBlock"
-            && e.TryGetProperty("text", out var x) && (x.GetString() ?? string.Empty).EndsWith(" more", StringComparison.Ordinal));
-
-        // No per-element action: the overflow line falls through to the card's openDashboard, and can
-        // never carry an openServer verb for a server it does not identify.
-        Assert.False(overflow.TryGetProperty("selectAction", out _));
-        // And it must be legible, not de-emphasised - it is the only signal that servers are hidden.
-        Assert.False(overflow.TryGetProperty("isSubtle", out var subtle) && subtle.GetBoolean());
-    }
-
-    // M13-QA-5: Large holds three blocks plus the fleet-summary footer. The footer is NOT sacrificed to
-    // make room for the overflow line - both must survive, because both carry information the user needs.
-    [Theory]
-    [InlineData(1, 1, 0)]
-    [InlineData(2, 2, 0)]
-    [InlineData(3, 3, 0)]
-    [InlineData(4, 3, 1)]
-    [InlineData(6, 3, 3)]
-    [InlineData(7, 3, 4)]
-    [InlineData(100, 3, 97)]
-    public void Large_renders_three_blocks_announces_the_rest_and_keeps_the_footer(
-        int total, int expectedBlocks, int expectedOverflow)
-    {
-        var servers = Enumerable.Range(0, total)
-            .Select(i => Server($"srv{i:D3}", WidgetHealth.Healthy)).ToArray();
-        var root = AssertValidCard(Render(Read(servers), WidgetSizeHint.Large).TemplateJson);
-
-        Assert.Equal(expectedBlocks, ServerBlocks(root).Count);
-
-        var texts = AllTexts(root).ToList();
-        if (expectedOverflow == 0)
-        {
-            Assert.DoesNotContain(texts, t => t.EndsWith(" more", StringComparison.Ordinal));
-        }
-        else
-        {
-            Assert.Contains($"{expectedOverflow} more", texts);
-        }
-
-        // The fleet-summary footer survives in every case: its four labels are always present.
-        foreach (var label in new[] { En.HealthyPlural, En.Warning, En.Critical, En.Offline })
-        {
-            Assert.Contains(label.ToUpperInvariant(), texts.Select(t => t.ToUpperInvariant()));
-        }
-    }
-
-    [Fact]
-    public void Large_never_serializes_a_server_beyond_the_cap()
-    {
-        var json = Render(Read(
-            Server("alpha", WidgetHealth.Healthy),
-            Server("bravo", WidgetHealth.Healthy),
-            Server("charlie", WidgetHealth.Healthy),
-            Server("delta", WidgetHealth.Healthy)), WidgetSizeHint.Large).TemplateJson;
-
-        AssertValidCard(json);
-        Assert.Contains("alpha", json, StringComparison.Ordinal);
-        Assert.Contains("bravo", json, StringComparison.Ordinal);
-        Assert.Contains("charlie", json, StringComparison.Ordinal);
-        Assert.DoesNotContain("delta", json, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void Large_overflow_line_carries_no_server_action()
-    {
-        var servers = Enumerable.Range(0, 9).Select(i => Server($"srv{i}", WidgetHealth.Healthy)).ToArray();
-        var root = AssertValidCard(Render(Read(servers), WidgetSizeHint.Large).TemplateJson);
-
-        var overflow = BodyItems(root).Single(e =>
-            e.TryGetProperty("type", out var t) && t.GetString() == "TextBlock"
-            && e.TryGetProperty("text", out var x) && x.GetString() == "6 more");
-        Assert.False(overflow.TryGetProperty("selectAction", out _));
-    }
-
-    [Fact]
-    public void Large_shows_gb_and_uptime_detail_but_medium_does_not()
-    {
-        var server = new WidgetServerState
-        {
-            // FLAKE-WP-GUID (BACKLOG): a random Guid could contain "43d" (e.g. "...-43d9-...") and fail the
-            // Medium negative assertion below. A fixed id with no such substring makes the test deterministic.
-            Id = Guid.Parse("00000000-0000-0000-0000-000000000001"),
-            DisplayName = "srv",
-            Health = WidgetHealth.Healthy,
-            CpuUsagePercent = 3,
-            MemoryUsagePercent = 39,
-            DiskUsagePercent = 3,
-            MemoryUsedGb = 3.2,
-            MemoryTotalGb = 8,
-            DiskUsedGb = 12,
-            DiskTotalGb = 460,
-            UptimeSeconds = 3600 * 24 * 43, // 43 days
-            LastUpdatedUtc = Now
-        };
-
-        var large = Render(Read(server), WidgetSizeHint.Large).TemplateJson;
-        AssertValidCard(large);
-        Assert.Contains("/ 8 GB", large);       // memory detail (culture-agnostic — total is integer 8)
-        Assert.Contains("43d", large);          // cpu column uptime detail
-
-        var medium = Render(Read(server), WidgetSizeHint.Medium).TemplateJson;
-        AssertValidCard(medium);
-        Assert.DoesNotContain("GB", medium);    // Medium stays compact — no GB/uptime detail
-        Assert.DoesNotContain("43d", medium);
-    }
-
-    [Fact]
-    public void Large_footer_summarizes_fleet_health_counts()
-    {
-        var json = Render(Read(
-            Server("a", WidgetHealth.Healthy), Server("b", WidgetHealth.Healthy),
-            Server("c", WidgetHealth.Critical)), WidgetSizeHint.Large).TemplateJson;
-        var root = AssertValidCard(json);
-        // Footer tiles carry the localized category labels; only the healthy count is present twice
-        // (hero + footer) — the footer proves the severity breakdown renders.
-        Assert.Contains(En.Critical.ToUpperInvariant(), json);
-        Assert.Contains(En.Offline.ToUpperInvariant(), json);
-    }
-
-    // ---- M13-QA-6: the meter is ONE TextBlock of glyphs in a FOREGROUND colour role, not styled
-    // container backgrounds and not per-run columns ----
-
-    private const string TickFilled = "\u25AE";
-    private const string TickEmpty = "\u25AF";
-
-    // Any TextBlock made only of tick glyphs, filled and empty mixed.
-    private static bool IsTrack(string text) =>
-        text.Length > 0 && text.All(c => c.ToString() == TickFilled || c.ToString() == TickEmpty);
-
-    private static int CountFilled(string track) => track.Count(c => c.ToString() == TickFilled);
-    private static int CountEmpty(string track) => track.Count(c => c.ToString() == TickEmpty);
-
-    // The per-metric meter tracks: one TextBlock each, mixed glyphs, in the accent role.
-    private static List<string> MeterTracks(JsonElement root) =>
-        TickRuns(root).Where(r => r.Color == "accent" && IsTrack(r.Text)).Select(r => r.Text).ToList();
-
-    // Every TextBlock made purely of tick glyphs, with its colour role and subtlety.
-    private static List<(string Text, string? Color, bool Subtle)> TickRuns(JsonElement el)
-    {
-        var runs = new List<(string, string?, bool)>();
-        Walk(el);
-        return runs;
-
-        void Walk(JsonElement e)
-        {
-            if (e.ValueKind == JsonValueKind.Object)
-            {
-                if (e.TryGetProperty("type", out var t) && t.GetString() == "TextBlock"
-                    && e.TryGetProperty("text", out var tx) && tx.GetString() is { Length: > 0 } text
-                    && IsTrack(text))
-                {
-                    var color = e.TryGetProperty("color", out var c) ? c.GetString() : null;
-                    var subtle = e.TryGetProperty("isSubtle", out var sub) && sub.GetBoolean();
-                    runs.Add((text, color, subtle));
-                }
-
-                foreach (var prop in e.EnumerateObject()) { Walk(prop.Value); }
-            }
-            else if (e.ValueKind == JsonValueKind.Array)
-            {
-                foreach (var item in e.EnumerateArray()) { Walk(item); }
-            }
-        }
-    }
-
-    [Theory]
-    [InlineData(WidgetSizeHint.Medium)]
-    [InlineData(WidgetSizeHint.Large)]
-    public void Meter_uses_foreground_glyphs_not_container_background_styles(WidgetSizeHint size)
-    {
-        // The whole point of QA-6: container styles do not resolve usefully per theme in the host's light
-        // config, foreground colours do. If the meter ever returns to styled containers, this fails.
-        var root = AssertValidCard(Render(Read(Server("db", WidgetHealth.Healthy)), size).TemplateJson);
-
-        Assert.NotEmpty(TickRuns(root));
-
-        var styles = new List<string>();
-        CollectContainerStyles(root, styles);
-        Assert.DoesNotContain("accent", styles);
-        Assert.DoesNotContain("emphasis", styles);
-    }
-
-    [Fact]
-    public void Meter_fill_is_magnitude_neutral_not_health_coloured()
-    {
-        // A critical server must NOT tint its metric meters red: health lives only on the chip and on the
-        // fleet bar, which is health-coloured by design.
-        var root = AssertValidCard(Render(Read(Server("db", WidgetHealth.Critical)), WidgetSizeHint.Medium).TemplateJson);
-
-        Assert.Equal(3, MeterTracks(root).Count);   // three metrics, all in the neutral accent role
-
-        // The only health-coloured tick run on the card is the fleet bar.
-        var healthColoured = TickRuns(root).Where(r => r.Color is "attention" or "warning" or "good").ToList();
-        Assert.Single(healthColoured);
-        Assert.Equal("attention", healthColoured[0].Color);
-    }
-
-    [Fact]
-    public void Filled_and_empty_are_told_apart_by_shape_not_by_colour()
-    {
-        // The track is ONE block in ONE colour role, so the states cannot rely on colour: a filled tick is
-        // a solid glyph and an empty one is outlined. That difference survives High Contrast and colour
-        // vision deficiency, and it is what makes a single-colour track legible.
-        var root = AssertValidCard(Render(Read(Server("db", WidgetHealth.Healthy, cpu: 60, mem: 60, disk: 60)),
-            WidgetSizeHint.Medium).TemplateJson);
-
-        var tracks = MeterTracks(root);
-        Assert.Equal(3, tracks.Count);
-        foreach (var track in tracks)
-        {
-            Assert.Equal(3, CountFilled(track));
-            Assert.Equal(MeasuredMeterSegments - 3, CountEmpty(track));
-            Assert.NotEqual(TickFilled[0], TickEmpty[0]);   // the two states are different glyphs
-        }
-    }
+    // =====================================================================================================
+    // Meters (R-2): shape-distinguished glyphs, neutral fill, % always text; Offline/Unknown → "—", none
+    // =====================================================================================================
 
     [Theory]
     [InlineData(0, 0)]
-    [InlineData(1, 1)]     // any non-zero magnitude lights at least one tick
-    [InlineData(20, 1)]
-    [InlineData(30, 2)]    // ceil
-    [InlineData(60, 3)]
+    [InlineData(9, 0)]
+    [InlineData(10, 1)]
+    [InlineData(41, 2)]
+    [InlineData(50, 3)]
+    [InlineData(89, 4)]
+    [InlineData(90, 5)]
     [InlineData(100, 5)]
-    public void Filled_tick_count_tracks_magnitude(int percent, int expectedFilled)
-    {
-        var root = AssertValidCard(Render(Read(
-            Server("db", WidgetHealth.Healthy, cpu: percent, mem: percent, disk: percent)),
-            WidgetSizeHint.Medium).TemplateJson);
+    public void Filled_segments_round_to_the_nearest_fifth(int percent, int filled) =>
+        Assert.Equal(filled, WidgetCardRenderer.FilledSegments(percent));
 
-        var tracks = MeterTracks(root);
-        Assert.Equal(3, tracks.Count);
-        foreach (var track in tracks)
+    private static List<JsonObject> Meters(JsonNode row) =>
+        CardTemplateHarness.Objects(row).Select(o => o.Node)
+            .Where(o => (string?)o["type"] == "RichTextBlock"
+                && o["inlines"]!.AsArray().All(r => ((string?)r!["text"])!.All(c => c is '▰' or '▱')))
+            .ToList();
+
+    [Fact]
+    public void A_fresh_meter_is_neutral_accent_fill_plus_subtle_track_and_never_a_health_colour()
+    {
+        var (_, _, expanded) = Render(Read(Now, Server(1, WidgetHealth.Critical, metric: "disk", cpu: 41)), WidgetSizeHint.Medium);
+        var row = CardTemplateHarness.Rows(expanded).Single();
+        var meters = Meters(row);
+
+        Assert.Equal(3, meters.Count); // CPU, RAM, Disk
+        foreach (var meter in meters)
         {
-            Assert.Equal(expectedFilled, CountFilled(track));
-            Assert.Equal(MeasuredMeterSegments - expectedFilled, CountEmpty(track));
-            // The declared track is always drawn whole - never shortened, never truncated.
-            Assert.Equal(MeasuredMeterSegments, track.Length);
+            var runs = meter["inlines"]!.AsArray().Select(r => r!.AsObject()).ToList();
+            Assert.Equal(WidgetCardRenderer.MeterSegments, runs.Sum(r => ((string)r["text"]!).Length));
+            Assert.All(runs.Where(r => ((string)r["text"]!).Contains('▰')), r => Assert.Equal("accent", (string?)r["color"]));
+            Assert.All(runs.Where(r => ((string)r["text"]!).Contains('▱')), r => Assert.True((bool)r["isSubtle"]!));
+            Assert.DoesNotContain(CardTemplateHarness.Strings(meter), s => s is { Key: "color", Value: "good" or "warning" or "attention" });
         }
+
+        Assert.Contains("41%", CardTemplateHarness.VisibleTexts(row)); // the % is text
     }
 
     [Fact]
-    public void Unknown_metric_renders_an_all_empty_track_and_never_invents_zero()
+    public void A_stale_row_meter_is_muted()
     {
-        var root = AssertValidCard(Render(Read(
-            Server("db", WidgetHealth.Healthy, cpu: null, mem: null, disk: null)),
-            WidgetSizeHint.Medium).TemplateJson);
+        var (_, _, expanded) = Render(Read(Now, Server(1, updated: Now.AddSeconds(-500))), WidgetSizeHint.Medium);
+        var meters = Meters(CardTemplateHarness.Rows(expanded).Single());
 
-        var tracks = MeterTracks(root);
-        Assert.Equal(3, tracks.Count);
-        // An unknown metric draws the full track with nothing lit - it never invents a zero-length bar.
-        Assert.All(tracks, t => Assert.Equal(MeasuredMeterSegments, t.Length));
-        Assert.All(tracks, t => Assert.Equal(0, CountFilled(t)));
-        // And the number itself is the unknown placeholder, not "0".
-        Assert.Contains(En.MetricUnknown, AllTexts(root));
-    }
-
-    // ---- M13-QA-6: INTEGRITY. A legible but truncated instrument is worse than an illegible one - it
-    // answers confidently and wrongly. These capacities were MEASURED on the real board and are written as
-    // literals on purpose. It took three attempts to get here: 10 glyph segments were clipped to about 6;
-    // 5 segments split across auto columns were cut with an ellipsis; only one TextBlock holding the whole
-    // track survives, because there is then nothing for the host to squeeze. Every earlier attempt passed
-    // its tests, because the tests checked string lengths rather than what the host draws. ----
-
-    public const int MeasuredMeterSegments = 5;   // fits a ~90px metric column at the measured ~13px pitch
-    public const int MeasuredMaxFleetTicks = 8;   // fits the hero row beside the fraction and its label
-
-    [Theory]
-    [InlineData(0)]
-    [InlineData(1)]
-    [InlineData(37)]
-    [InlineData(99)]
-    [InlineData(100)]
-    public void Meter_always_draws_every_segment_it_declares(int percent)
-    {
-        foreach (var size in new[] { WidgetSizeHint.Medium, WidgetSizeHint.Large })
+        Assert.Equal(3, meters.Count);
+        Assert.All(meters, m => Assert.All(m["inlines"]!.AsArray(), r =>
         {
-            var root = AssertValidCard(Render(Read(
-                Server("db", WidgetHealth.Healthy, cpu: percent, mem: percent, disk: percent)), size).TemplateJson);
-
-            // Per metric cell: filled + empty must total the declared track, exactly. Three metrics per row.
-            var tracks = MeterTracks(root);
-            var rows = ServerBlocks(root).Count;
-            Assert.Equal(3 * rows, tracks.Count);
-            Assert.All(tracks, t => Assert.Equal(MeasuredMeterSegments, t.Length));
-        }
+            Assert.Null(r!["color"]);
+            Assert.True((bool)r["isSubtle"]!);
+        }));
     }
 
     [Fact]
-    public void Meter_segment_count_matches_the_capacity_measured_on_the_board()
+    public void Offline_and_unknown_rows_show_dashes_and_no_meter_and_unknown_metrics_never_read_zero()
     {
-        // The production constant must equal what was measured, not the other way round.
-        var root = AssertValidCard(Render(Read(Server("db", WidgetHealth.Healthy, cpu: 0, mem: 0, disk: 0)),
-            WidgetSizeHint.Medium).TemplateJson);
-        var tracks = MeterTracks(root);
-        Assert.Equal(3, tracks.Count);
-        Assert.All(tracks, t => Assert.Equal(MeasuredMeterSegments, t.Length));
-        Assert.All(tracks, t => Assert.Equal(0, CountFilled(t)));
+        var (_, _, expanded) = Render(Read(Now, Server(1, WidgetHealth.Offline), Server(2, WidgetHealth.Unknown),
+            Server(3, cpu: null)), WidgetSizeHint.Large);
+        var rows = CardTemplateHarness.Rows(expanded);
+        Assert.Equal(3, rows.Count);
+
+        foreach (var row in rows.Take(2))
+        {
+            var texts = CardTemplateHarness.VisibleTexts(row);
+            Assert.DoesNotContain(texts, t => t.EndsWith('%'));
+            Assert.Empty(Meters(row));
+            Assert.Equal(6, texts.Count(t => t == En.MetricUnknown)); // 3 values + 3 details
+        }
+
+        var partial = CardTemplateHarness.VisibleTexts(rows[2]);
+        Assert.Contains(En.MetricUnknown, partial);
+        Assert.DoesNotContain("0%", partial);
+        Assert.Equal(2, Meters(rows[2]).Count); // RAM + Disk only
     }
 
-    [Theory]
-    [InlineData(1)]
-    [InlineData(4)]
-    [InlineData(8)]
-    public void Fleet_bar_is_drawn_within_the_tick_budget(int servers)
-    {
-        var fleet = Enumerable.Range(0, servers).Select(i => Server($"s{i:D2}", WidgetHealth.Healthy)).ToArray();
-        var root = AssertValidCard(Render(Read(fleet), WidgetSizeHint.Small).TemplateJson);
+    // =====================================================================================================
+    // L detail (RC-10) and the Small fleet bar (P-RC-2)
+    // =====================================================================================================
 
-        // Small renders no rows, so every tick run belongs to the fleet bar.
-        Assert.Equal(servers, TickRuns(root).Sum(r => r.Text.Length));
+    [Theory]
+    [InlineData("en-US", "Up 43d 18h", "3.2/8 GB", "460/500 GB")]
+    [InlineData("pt-PT", "Ativo 43d 18h", "3,2/8 GB", "460/500 GB")]
+    [InlineData("pt-BR", "Ativo 43d 18h", "3,2/8 GB", "460/500 GB")]
+    public void Large_rows_carry_culture_aware_detail_and_medium_rows_do_not(string culture, string up, string ram, string disk)
+    {
+        var strings = WidgetStrings.ForCulture(CultureInfo.GetCultureInfo(culture));
+        var large = CardTemplateHarness.VisibleTexts(CardTemplateHarness.Rows(Render(Read(Now, Server(1)), WidgetSizeHint.Large, strings).Expanded).Single());
+        Assert.Contains(up, large);
+        Assert.Contains(ram, large);
+        Assert.Contains(disk, large);
+
+        var medium = CardTemplateHarness.VisibleTexts(CardTemplateHarness.Rows(Render(Read(Now, Server(1)), WidgetSizeHint.Medium, strings).Expanded).Single());
+        Assert.DoesNotContain(up, medium);
+        Assert.DoesNotContain(medium, t => t.EndsWith(" GB", StringComparison.Ordinal));
     }
 
     [Theory]
-    [InlineData(9)]
-    [InlineData(40)]
-    public void Fleet_bar_is_omitted_rather_than_truncated_above_the_budget(int servers)
+    [InlineData(1, true)]
+    [InlineData(8, true)]
+    [InlineData(9, false)]
+    public void Small_fleet_bar_is_drawn_up_to_the_budget_and_omitted_above(int servers, bool drawn)
     {
-        var fleet = Enumerable.Range(0, servers).Select(i => Server($"s{i:D2}", WidgetHealth.Healthy)).ToArray();
-        var json = Render(Read(fleet), WidgetSizeHint.Small).TemplateJson;
-        var root = AssertValidCard(json);
+        var (_, _, expanded) = Render(Read(Now, Enumerable.Range(1, servers).Select(i => Server(i)).ToArray()), WidgetSizeHint.Small);
+        var glyphs = string.Concat(CardTemplateHarness.VisibleTexts(expanded).Where(t => t.Length > 0 && t.All(c => c is '▰' or '▱')));
 
-        Assert.True(servers > MeasuredMaxFleetTicks);
-        // No partial bar - a bar showing 8 of 40 would be a confident lie about the fleet.
-        Assert.Empty(TickRuns(root));
-        // ...and no JSON null left where it used to be.
-        Assert.DoesNotContain("null", json.Replace("\"header\":null", string.Empty), StringComparison.Ordinal);
-        // The hero still states the whole truth.
-        Assert.Contains($"{servers}", AllTexts(root));
+        Assert.Equal(drawn ? servers : 0, glyphs.Length);
+        Assert.Contains($"{servers}/{servers}", CardTemplateHarness.VisibleTexts(expanded));
     }
 
     [Fact]
-    public void Fleet_bar_uses_health_foreground_colours_one_tick_per_server()
+    public void Small_fraction_counts_only_healthy_and_fresh_servers()
     {
-        var root = AssertValidCard(Render(Read(
-            Server("a", WidgetHealth.Healthy),
-            Server("b", WidgetHealth.Healthy),
-            Server("c", WidgetHealth.Warning),
-            Server("d", WidgetHealth.Critical),
-            Server("e", WidgetHealth.Offline)), WidgetSizeHint.Small).TemplateJson);
-
-        // Small renders no server rows, so every tick run on this card belongs to the fleet bar.
-        var runs = TickRuns(root);
-        Assert.Equal(2, runs.Single(r => r.Color == "good").Text.Length);       // 2 healthy
-        Assert.Equal(1, runs.Single(r => r.Color == "warning").Text.Length);    // 1 warning
-        Assert.Equal(2, runs.Single(r => r.Color == "attention").Text.Length);  // critical + offline
-        Assert.Equal(5, runs.Sum(r => r.Text.Length));                          // one tick per server
-
-        var styles = new List<string>();
-        CollectContainerStyles(root, styles);
-        Assert.DoesNotContain("good", styles);
-        Assert.DoesNotContain("warning", styles);
-        Assert.DoesNotContain("attention", styles);
+        // P-RC-2 / Cortex N-4: a Healthy server with a stale reading never fills the fraction.
+        var (vm, _, expanded) = Render(Read(Now, Server(1), Server(2, updated: Now.AddSeconds(-500)), Server(3)), WidgetSizeHint.Small);
+        Assert.Equal("2/3", vm.FractionText);
+        Assert.Contains("2/3", CardTemplateHarness.VisibleTexts(expanded));
+        Assert.Equal(string.Format(CultureInfo.InvariantCulture, En.RingAltFormat, 2, 3), vm.RingAltText);
     }
 
-    private static void CollectContainerStyles(JsonElement el, List<string> styles)
-    {
-        if (el.ValueKind == JsonValueKind.Object)
-        {
-            if (el.TryGetProperty("type", out var t) && t.GetString() == "Container" &&
-                el.TryGetProperty("style", out var s) && s.ValueKind == JsonValueKind.String)
-            {
-                styles.Add(s.GetString() ?? string.Empty);
-            }
-
-            foreach (var p in el.EnumerateObject())
-            {
-                CollectContainerStyles(p.Value, styles);
-            }
-        }
-        else if (el.ValueKind == JsonValueKind.Array)
-        {
-            foreach (var i in el.EnumerateArray())
-            {
-                CollectContainerStyles(i, styles);
-            }
-        }
-    }
+    // =====================================================================================================
+    // a11y (RC-8/R-4): titles are headings; state is always text
+    // =====================================================================================================
 
     [Fact]
-    public void Unavailable_card_is_valid_and_neutral()
+    public void Titles_use_the_heading_style_and_every_coloured_text_carries_words()
     {
-        var json = WidgetCardRenderer.Render(
-            WidgetViewModelBuilder.Build(WidgetReadResult.Unavailable(WidgetReadUnavailableReason.Corrupt),
-                WidgetSizeHint.Medium, Now, En)).TemplateJson;
-        AssertValidCard(json);
-        Assert.Contains(En.NoDataTitle, json);
-    }
-
-    [Fact]
-    public void Empty_card_is_valid_and_says_no_servers()
-    {
-        var read = WidgetReadResult.Available(new WidgetStateSnapshot
+        foreach (var size in Sizes)
         {
-            SchemaVersion = WidgetSchema.CurrentVersion,
-            GeneratedAtUtc = Now,
-            OverallHealth = WidgetHealth.Unknown,
-            Servers = Array.Empty<WidgetServerState>()
-        });
-        var json = WidgetCardRenderer.Render(WidgetViewModelBuilder.Build(read, WidgetSizeHint.Medium, Now, En)).TemplateJson;
-        AssertValidCard(json);
-        Assert.Contains(En.NoServers, json);
-    }
-
-    [Fact]
-    public void Hostile_display_name_never_breaks_the_json()
-    {
-        // Even though the contract sanitizes names on read, the renderer must be robust: quotes,
-        // backslashes and braces must be JSON-escaped, not concatenated raw (§44).
-        var hostile = "a\"b\\c{}<x>";
-        var json = Render(Read(Server(hostile, WidgetHealth.Warning)), WidgetSizeHint.Medium).TemplateJson;
-        var root = AssertValidCard(json); // parses => escaping is correct
-        Assert.True(ContainsTextValue(root, hostile)); // the name round-trips as a decoded VALUE
-    }
-
-    private static bool ContainsTextValue(JsonElement el, string value)
-    {
-        if (el.ValueKind == JsonValueKind.Object)
-        {
-            if (el.TryGetProperty("text", out var text) && text.ValueKind == JsonValueKind.String &&
-                text.GetString() == value)
+            foreach (var (_, read) in States())
             {
-                return true;
-            }
-
-            foreach (var p in el.EnumerateObject())
-            {
-                if (ContainsTextValue(p.Value, value))
+                var (vm, _, expanded) = Render(read, size);
+                var headings = CardTemplateHarness.Objects(expanded).Select(o => o.Node).Where(o => (string?)o["style"] == "heading").ToList();
+                if (size == WidgetSizeHint.Small || vm.CardState is WidgetCardState.Empty or WidgetCardState.Unavailable)
                 {
-                    return true;
+                    Assert.Contains(headings, h => (string?)h["text"] == vm.Title);
                 }
-            }
-        }
-        else if (el.ValueKind == JsonValueKind.Array)
-        {
-            foreach (var item in el.EnumerateArray())
-            {
-                if (ContainsTextValue(item, value))
-                {
-                    return true;
-                }
-            }
-        }
 
-        return false;
-    }
-
-    [Fact]
-    public void Opaque_id_appears_only_in_action_data_never_as_visible_text()
-    {
-        // The opaque id is the deep-link target in the row's Action.Execute data (§13) — allowed — but it
-        // must NEVER appear as a visible TextBlock (no id shown to the user).
-        var id = Guid.NewGuid();
-        var json = Render(Read(Server("Home", WidgetHealth.Healthy, id)), WidgetSizeHint.Large).TemplateJson;
-        using var doc = JsonDocument.Parse(json);
-
-        var texts = new List<string>();
-        CollectTexts(doc.RootElement, texts);
-        Assert.DoesNotContain(id.ToString("D"), texts);   // never rendered as visible text
-        Assert.True(ContainsActionServerId(doc.RootElement, id.ToString("D"))); // present in action data
-    }
-
-    private static void CollectTexts(JsonElement el, List<string> texts)
-    {
-        if (el.ValueKind == JsonValueKind.Object)
-        {
-            if (el.TryGetProperty("type", out var t) && t.GetString() == "TextBlock" &&
-                el.TryGetProperty("text", out var text) && text.ValueKind == JsonValueKind.String)
-            {
-                texts.Add(text.GetString() ?? string.Empty);
-            }
-
-            foreach (var p in el.EnumerateObject())
-            {
-                CollectTexts(p.Value, texts);
-            }
-        }
-        else if (el.ValueKind == JsonValueKind.Array)
-        {
-            foreach (var i in el.EnumerateArray())
-            {
-                CollectTexts(i, texts);
-            }
-        }
-    }
-
-    private static bool ContainsActionServerId(JsonElement el, string id)
-    {
-        if (el.ValueKind == JsonValueKind.Object)
-        {
-            if (el.TryGetProperty("type", out var t) && t.GetString() == "Action.Execute" &&
-                el.TryGetProperty("data", out var data) && data.ValueKind == JsonValueKind.Object &&
-                data.TryGetProperty("serverId", out var sid) && sid.GetString() == id)
-            {
-                return true;
-            }
-
-            foreach (var p in el.EnumerateObject())
-            {
-                if (ContainsActionServerId(p.Value, id))
-                {
-                    return true;
-                }
-            }
-        }
-        else if (el.ValueKind == JsonValueKind.Array)
-        {
-            foreach (var i in el.EnumerateArray())
-            {
-                if (ContainsActionServerId(i, id))
-                {
-                    return true;
-                }
-            }
-        }
-
-        return false;
-    }
-
-    [Fact]
-    public void Card_and_rows_carry_allowlisted_actions()
-    {
-        var id = Guid.NewGuid();
-        var json = Render(Read(Server("Home", WidgetHealth.Warning, id)), WidgetSizeHint.Medium).TemplateJson;
-        using var doc = JsonDocument.Parse(json);
-        var root = doc.RootElement;
-
-        // Card-level selectAction opens the dashboard.
-        Assert.True(root.TryGetProperty("selectAction", out var cardAction));
-        Assert.Equal("Action.Execute", cardAction.GetProperty("type").GetString());
-        Assert.Equal("openDashboard", cardAction.GetProperty("verb").GetString());
-
-        // A server row carries openServer with the opaque id.
-        Assert.True(ContainsActionServerId(root, id.ToString("D")));
-    }
-
-    [Fact]
-    public void Brand_uses_accent_and_health_never_does()
-    {
-        // #1846E1 brand is accent-only; health uses good/warning/attention, never accent (§4).
-        var json = Render(Read(Server("Home", WidgetHealth.Critical)), WidgetSizeHint.Medium).TemplateJson;
-        using var doc = JsonDocument.Parse(json);
-        var accentTexts = new List<string>();
-        var healthColors = new List<string>();
-        Collect(doc.RootElement, accentTexts, healthColors);
-
-        Assert.Contains(En.FleetKicker, accentTexts); // the FLEET kicker is the accent-coloured text
-        Assert.DoesNotContain("accent", healthColors); // health labels never accent
-    }
-
-    private static void Collect(JsonElement el, List<string> accentTexts, List<string> nonAccentColors)
-    {
-        if (el.ValueKind == JsonValueKind.Object)
-        {
-            if (el.TryGetProperty("type", out var t) && t.GetString() == "TextBlock" &&
-                el.TryGetProperty("color", out var c))
-            {
-                var color = c.GetString();
-                var text = el.TryGetProperty("text", out var tx) ? tx.GetString() ?? string.Empty : string.Empty;
-                if (color == "accent")
-                {
-                    accentTexts.Add(text);
-                }
-                else if (color is "good" or "warning" or "attention")
-                {
-                    nonAccentColors.Add(color!); // record health colours to prove they're not accent
-                }
-            }
-
-            foreach (var p in el.EnumerateObject())
-            {
-                Collect(p.Value, accentTexts, nonAccentColors);
-            }
-        }
-        else if (el.ValueKind == JsonValueKind.Array)
-        {
-            foreach (var item in el.EnumerateArray())
-            {
-                Collect(item, accentTexts, nonAccentColors);
+                // Colour never stands alone: every coloured TextBlock has letters or digits.
+                Assert.All(CardTemplateHarness.Objects(expanded).Select(o => o.Node)
+                        .Where(o => (string?)o["type"] == "TextBlock" && o["color"] is not null),
+                    o => Assert.Matches(@"[\p{L}\p{N}]", (string?)o["text"] ?? string.Empty));
             }
         }
     }

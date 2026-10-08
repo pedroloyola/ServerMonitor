@@ -51,10 +51,15 @@ public sealed class WidgetViewModelV3StateTests
         WidgetStrings? strings = null) =>
         WidgetViewModelBuilder.Build(read, size, Now, strings ?? En);
 
+    // The card as the host would show it: the constant template expanded with this data. Serialized with
+    // un-escaped Unicode so text assertions ("Saudável") are not vacuous.
     private static string Rendered(WidgetViewModel vm)
     {
         var card = WidgetCardRenderer.Render(vm);
-        return card.TemplateJson + card.DataJson;
+        return CardTemplateHarness.Expand(card.TemplateJson, card.DataJson).ToJsonString(new System.Text.Json.JsonSerializerOptions
+        {
+            Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+        });
     }
 
     // ---- Healthy -----------------------------------------------------------------------------------
@@ -117,15 +122,12 @@ public sealed class WidgetViewModelV3StateTests
             Assert.True(r.IsStale);                              // V-RC-5c: never fresher than the snapshot
             Assert.Equal(WidgetRowState.NotUpdated, r.State);
             Assert.NotEqual(strings.StatusHealthy, r.StatusText);
-            Assert.NotEqual(strings.Healthy, r.HealthLabel);     // legacy renderer label too
         });
 
-        // The stale mark is on the card (the legacy hero upper-cases it), nothing claims "all healthy", and
-        // nothing is painted "healthy" green (the legacy Large tiles keep the LAST-state counts, neutral).
-        Assert.Equal(strings.StaleTitle, vm.HeroLabel);
-        Assert.Contains(strings.StaleTitle.ToUpperInvariant(), rendered.ToUpperInvariant());
+        // The stale mark is on the expanded card, nothing claims "all healthy", nothing is painted green.
+        Assert.Contains(strings.StaleTitle, rendered);
         Assert.DoesNotContain(strings.FleetAllHealthy, rendered);
-        Assert.DoesNotContain(strings.AllHealthy, rendered);
+        Assert.DoesNotContain("\"" + strings.StatusHealthy + "\"", rendered);
         Assert.DoesNotContain("\"color\":\"good\"", rendered);
     }
 

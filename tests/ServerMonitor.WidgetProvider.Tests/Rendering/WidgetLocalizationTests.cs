@@ -18,7 +18,7 @@ public sealed class WidgetLocalizationTests
     public void Culture_resolves_to_supported_or_default(string culture, string expectedHealthy)
     {
         var strings = WidgetStrings.ForCulture(CultureInfo.GetCultureInfo(culture));
-        Assert.Equal(expectedHealthy, strings.Healthy);
+        Assert.Equal(expectedHealthy, strings.StatusHealthy);
     }
 
     [Fact]
@@ -26,21 +26,20 @@ public sealed class WidgetLocalizationTests
     {
         var br = WidgetStrings.ForCulture(CultureInfo.GetCultureInfo("pt-BR"));
         var pt = WidgetStrings.ForCulture(CultureInfo.GetCultureInfo("pt-PT"));
-        // "monitoramento" (pt-BR) vs "monitorização" (pt-PT).
-        Assert.Contains("monitoramento", br.NoDataBody);
-        Assert.Contains("monitorização", pt.NoDataBody);
+        // "monitoramento"/"conexão" (pt-BR) vs "monitorização"/"ligação" (pt-PT).
+        Assert.Contains("monitoramento", br.UnavailableTitle);
+        Assert.Contains("monitorização", pt.UnavailableTitle);
+        Assert.Equal("Sem conexão", br.StatusOffline);
+        Assert.Equal("Sem ligação", pt.StatusOffline);
     }
 
     [Fact]
-    public void Health_label_maps_all_values()
+    public void Each_culture_carries_its_own_number_culture()
     {
-        var en = WidgetStrings.ForCulture(CultureInfo.GetCultureInfo("en-US"));
-        Assert.Equal("Healthy", en.HealthLabel(WidgetHealth.Healthy));
-        Assert.Equal("Warning", en.HealthLabel(WidgetHealth.Warning));
-        Assert.Equal("Critical", en.HealthLabel(WidgetHealth.Critical));
-        Assert.Equal("Offline", en.HealthLabel(WidgetHealth.Offline));
-        Assert.Equal("Unknown", en.HealthLabel(WidgetHealth.Unknown));
-        Assert.Equal("Unknown", en.HealthLabel((WidgetHealth)99));
+        Assert.Equal("en-US", WidgetStrings.ForCulture(CultureInfo.GetCultureInfo("en-GB")).Culture.Name);
+        Assert.Equal("pt-PT", WidgetStrings.ForCulture(CultureInfo.GetCultureInfo("pt-PT")).Culture.Name);
+        Assert.Equal("pt-PT", WidgetStrings.ForCulture(CultureInfo.GetCultureInfo("pt-AO")).Culture.Name);
+        Assert.Equal("pt-BR", WidgetStrings.ForCulture(CultureInfo.GetCultureInfo("pt-BR")).Culture.Name);
     }
 
     [Theory]
@@ -58,20 +57,22 @@ public sealed class WidgetLocalizationTests
             {
                 new WidgetServerState
                 {
-                    Id = Guid.NewGuid(), DisplayName = "Home", Health = WidgetHealth.Warning,
+                    Id = new Guid("00000000-0000-0000-0000-000000000001"), DisplayName = "Home", Health = WidgetHealth.Warning,
                     CpuUsagePercent = 50, MemoryUsagePercent = 60, DiskUsagePercent = 70,
-                    // UI.9 D-UI9-4: a 300 s server (staleAfter 600 s) keeps a 3-minute-old snapshot fresh; under
-                    // the old fixed 90 s it would now (correctly) render as "No recent data".
+                    // A 300 s server (staleAfter 600 s) keeps a 3-minute-old snapshot fresh (D-UI9-4).
                     LastUpdatedUtc = Now.AddMinutes(-3), StaleAfterSeconds = 600
                 }
             }
         });
 
         var vm = WidgetViewModelBuilder.Build(read, WidgetSizeHint.Medium, Now, strings);
-        var json = WidgetCardRenderer.Render(vm).TemplateJson;
+        var card = WidgetCardRenderer.Render(vm);
+        var texts = CardTemplateHarness.VisibleTexts(CardTemplateHarness.Expand(card.TemplateJson, card.DataJson));
 
-        Assert.Contains("Alerta", json);            // localized "Warning"
-        Assert.Contains("Atualizado há 3 min", json); // localized freshness
+        Assert.Contains("Atenção", texts);              // localized "Warning" status
+        Assert.Contains("Atualizado há 3 min", texts);  // localized freshness
+        Assert.Contains("RAM", texts);
+        Assert.Contains("Disco", texts);
     }
 
     [Fact]
@@ -83,7 +84,7 @@ public sealed class WidgetLocalizationTests
         try
         {
             var en = WidgetStrings.ForCulture(CultureInfo.GetCultureInfo("en-US"));
-            Assert.Equal("Healthy", en.Healthy);
+            Assert.Equal("Healthy", en.StatusHealthy);
         }
         finally
         {

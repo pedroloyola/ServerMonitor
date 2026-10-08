@@ -98,11 +98,11 @@ public sealed class WidgetRepaintIntegrationTests : IDisposable
     }
 
     /// <summary>
-    /// How a CPU percentage appears in the rendered Adaptive Card: the renderer emits the number and its
-    /// unit as separate text blocks, so the marker is the number's own text node. Matching this — rather
-    /// than merely counting updates — is what proves the values actually CHANGED on the card (QA-8 H).
+    /// How a CPU percentage appears in the card's DATA (UI.9 C1: the template is constant, every value is
+    /// bound from data — the first row's CPU value). Matching this — rather than merely counting updates —
+    /// is what proves the values actually CHANGED on the card (QA-8 H).
     /// </summary>
-    private static string CpuMarker(int cpu) => $"\"text\":\"{cpu}\"";
+    private static string CpuMarker(int cpu) => $"\"cpuValue\":\"{cpu}%\"";
 
     private WidgetProviderCoordinator NewCoordinator(FakeWidgetHost host) =>
         WidgetProviderCoordinator.CreateWithFileSystemPump(
@@ -123,7 +123,7 @@ public sealed class WidgetRepaintIntegrationTests : IDisposable
             coordinator.OnWidgetActivated(Widget("a"));
             Assert.Equal(1, host.UpdateCountFor("a")); // the host callback's own paint
 
-            host.Updated = (_, card, _) =>
+            host.Updated = (_, _, card) =>
             {
                 if (card.Contains(CpuMarker(77), StringComparison.Ordinal))
                 {
@@ -157,7 +157,7 @@ public sealed class WidgetRepaintIntegrationTests : IDisposable
         try
         {
             coordinator.OnWidgetActivated(Widget("a"));
-            host.Updated = (_, card, _) =>
+            host.Updated = (_, _, card) =>
             {
                 if (card.Contains(CpuMarker(88), StringComparison.Ordinal))
                 {
@@ -187,7 +187,7 @@ public sealed class WidgetRepaintIntegrationTests : IDisposable
 
             using var seen = new ManualResetEventSlim(false);
             var wanted = string.Empty;
-            host.Updated = (_, card, _) =>
+            host.Updated = (_, _, card) =>
             {
                 var target = Volatile.Read(ref wanted);
                 if (target.Length > 0 && card.Contains(target, StringComparison.Ordinal))
@@ -228,7 +228,7 @@ public sealed class WidgetRepaintIntegrationTests : IDisposable
             coordinator.OnWidgetDeactivated("a");
             coordinator.OnWidgetActivated(Widget("a"));
 
-            host.Updated = (_, card, _) =>
+            host.Updated = (_, _, card) =>
             {
                 if (card.Contains(CpuMarker(77), StringComparison.Ordinal))
                 {
@@ -264,7 +264,7 @@ public sealed class WidgetRepaintIntegrationTests : IDisposable
             coordinator.RehydrateFromHost();
             Assert.Equal(1, host.UpdateCountFor("a"));
 
-            host.Updated = (_, card, _) =>
+            host.Updated = (_, _, card) =>
             {
                 if (card.Contains(CpuMarker(77), StringComparison.Ordinal))
                 {

@@ -25,7 +25,7 @@ public sealed partial class WidgetStringsParityTests
     [Fact]
     public void Every_key_is_non_empty_and_has_the_same_placeholders_in_every_culture()
     {
-        Assert.True(Keys.Length > 60, $"only {Keys.Length} keys found"); // the reflection walk is real
+        Assert.True(Keys.Length > 40, $"only {Keys.Length} keys found"); // the reflection walk is real
 
         var reference = WidgetStrings.ForCulture(CultureInfo.GetCultureInfo("en-US"));
         foreach (var culture in Cultures)

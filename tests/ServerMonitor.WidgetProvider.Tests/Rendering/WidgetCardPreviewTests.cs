@@ -1,97 +1,72 @@
 using System.Globalization;
+using System.Text.Encodings.Web;
 using System.Text.Json;
-using ServerMonitor.WidgetContract;
 using ServerMonitor.WidgetProvider.Hosting;
-using ServerMonitor.WidgetProvider.Reading;
 using ServerMonitor.WidgetProvider.Rendering;
 
 namespace ServerMonitor.WidgetProvider.Tests.Rendering;
 
 /// <summary>
-/// Renders representative real-world scenarios across sizes and cultures, ASSERTS each is a valid
-/// Adaptive Card, and writes the JSON to a scratch folder as a side effect for the visual review
-/// (ADR-018 §47). This is a genuine test (it always runs and always asserts) — not a no-op — so it never
-/// reports PASS for work that did not happen. The written JSON is a PREVIEW (pasteable into the official
-/// Adaptive Cards designer); the real Widgets-board runtime remains honestly NOT_RUN.
+/// Writes every size × state × culture as a preview for Prism (ADR-018 §47, SPEC §8). It ASSERTS that each
+/// expands to a valid card, so it never reports PASS for work that did not happen. For each case it writes
+/// three files under <c>%TEMP%\sm-widget-preview\v3\</c>:
+/// <list type="bullet">
+/// <item><c>.template.json</c> + <c>.data.json</c>, the exact pair the host receives (paste both into the
+/// Adaptive Cards Designer);</item>
+/// <item><c>.expanded.json</c>, the card as the test harness expands it.</item>
+/// </list>
+/// The templates carry no theme-dependent content (no images until C0), so one file per case serves both
+/// themes (DV-12). The real board stays NOT_RUN.
 /// </summary>
 public sealed class WidgetCardPreviewTests
 {
-    private static readonly DateTimeOffset Now = new(2026, 8, 30, 12, 0, 30, TimeSpan.Zero);
+    private static readonly DateTimeOffset Now = new(2026, 8, 30, 12, 0, 0, TimeSpan.Zero);
 
-    public static IEnumerable<object[]> Scenarios()
+    private static readonly JsonSerializerOptions Pretty = new()
     {
-        yield return new object[] { "small-en-mixed", Mixed(), WidgetSizeHint.Small, "en-US" };
-        yield return new object[] { "medium-en-mixed", Mixed(), WidgetSizeHint.Medium, "en-US" };
-        yield return new object[] { "large-en-mixed", Mixed(), WidgetSizeHint.Large, "en-US" };
-        yield return new object[] { "small-en-healthy", Healthy(), WidgetSizeHint.Small, "en-US" };
-        yield return new object[] { "medium-ptbr-mixed", Mixed(), WidgetSizeHint.Medium, "pt-BR" };
-        yield return new object[] { "medium-ptpt-mixed", Mixed(), WidgetSizeHint.Medium, "pt-PT" };
-        yield return new object[] { "medium-en-empty", Empty(), WidgetSizeHint.Medium, "en-US" };
-        yield return new object[] { "medium-en-unavailable", Unavailable(), WidgetSizeHint.Medium, "en-US" };
-        yield return new object[] { "medium-en-oneattention", OneAttention(), WidgetSizeHint.Medium, "en-US" };
-        yield return new object[] { "medium-en-longname", LongName(), WidgetSizeHint.Medium, "en-US" };
+        WriteIndented = true,
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+    };
+
+    public static TheoryData<string, WidgetSizeHint, string> Cases()
+    {
+        var data = new TheoryData<string, WidgetSizeHint, string>();
+        foreach (var size in new[] { WidgetSizeHint.Small, WidgetSizeHint.Medium, WidgetSizeHint.Large })
+        {
+            foreach (var (state, _) in WidgetCardRendererTests.States())
+            {
+                foreach (var culture in new[] { "en-US", "pt-PT", "pt-BR" })
+                {
+                    data.Add(state, size, culture);
+                }
+            }
+        }
+
+        return data;
     }
 
     [Theory]
-    [MemberData(nameof(Scenarios))]
-    public void Scenario_renders_a_valid_card_and_is_written_for_preview(
-        string name, WidgetReadResult read, WidgetSizeHint size, string culture)
+    [MemberData(nameof(Cases))]
+    public void Case_expands_to_a_valid_card_and_is_written_for_preview(string state, WidgetSizeHint size, string culture)
     {
+        var read = WidgetCardRendererTests.States().Single(s => s.State == state).Read;
         var strings = WidgetStrings.ForCulture(CultureInfo.GetCultureInfo(culture));
-        var vm = WidgetViewModelBuilder.Build(read, size, Now, strings);
-        var card = WidgetCardRenderer.Render(vm);
+        var card = WidgetCardRenderer.Render(WidgetViewModelBuilder.Build(read, size, Now, strings));
+        var expanded = CardTemplateHarness.Expand(card.TemplateJson, card.DataJson);
 
-        using var doc = JsonDocument.Parse(card.TemplateJson); // asserts valid JSON
-        Assert.Equal("AdaptiveCard", doc.RootElement.GetProperty("type").GetString());
-        Assert.Equal("1.6", doc.RootElement.GetProperty("version").GetString());
+        Assert.Empty(CardTemplateHarness.ShapeErrors(expanded));
 
-        var dir = Path.Combine(Path.GetTempPath(), "sm-widget-preview");
+        var dir = Path.Combine(Path.GetTempPath(), "sm-widget-preview", "v3");
         Directory.CreateDirectory(dir);
-        File.WriteAllText(Path.Combine(dir, name + ".json"), card.TemplateJson);
+        var stem = Path.Combine(dir, $"{size.ToString().ToLowerInvariant()}-{state}-{culture}");
+        File.WriteAllText(stem + ".template.json", Indent(card.TemplateJson));
+        File.WriteAllText(stem + ".data.json", Indent(card.DataJson));
+        File.WriteAllText(stem + ".expanded.json", expanded.ToJsonString(Pretty));
     }
 
-    private static WidgetServerState Server(string n, WidgetHealth h, double? c, double? m, double? d) => new()
+    private static string Indent(string json)
     {
-        Id = Guid.NewGuid(),
-        DisplayName = n,
-        Health = h,
-        CpuUsagePercent = c,
-        MemoryUsagePercent = m,
-        DiskUsagePercent = d,
-        LastUpdatedUtc = Now.AddMinutes(-4)
-    };
-
-    private static WidgetReadResult Read(DateTimeOffset at, params WidgetServerState[] servers) =>
-        WidgetReadResult.Available(new WidgetStateSnapshot
-        {
-            SchemaVersion = WidgetSchema.CurrentVersion,
-            GeneratedAtUtc = at,
-            OverallHealth = WidgetHealthPrecedence.Worst(servers.Select(s => s.Health)),
-            Servers = servers
-        });
-
-    private static WidgetReadResult Mixed() => Read(Now.AddMinutes(-4),
-        Server("Prod DB", WidgetHealth.Critical, 96, 88, 74),
-        Server("mac-mini", WidgetHealth.Offline, null, null, null),
-        Server("web-01", WidgetHealth.Warning, 71, 63, 40),
-        Server("cache", WidgetHealth.Unknown, null, null, null),
-        Server("hermes-debian", WidgetHealth.Healthy, 3, 39, 12),
-        Server("backup", WidgetHealth.Healthy, 8, 22, 55),
-        Server("edge", WidgetHealth.Healthy, 12, 30, 41),
-        Server("relay", WidgetHealth.Healthy, 5, 18, 27));
-
-    private static WidgetReadResult Healthy() => Read(Now.AddSeconds(-20),
-        Server("hermes-debian", WidgetHealth.Healthy, 3, 39, 12),
-        Server("mac-mini", WidgetHealth.Healthy, 9, 44, 33));
-
-    private static WidgetReadResult OneAttention() => Read(Now.AddSeconds(-40),
-        Server("Prod DB", WidgetHealth.Critical, 96, 88, 74),
-        Server("web-01", WidgetHealth.Healthy, 20, 30, 40));
-
-    private static WidgetReadResult LongName() => Read(Now.AddMinutes(-2),
-        Server("a-really-long-server-display-name-that-overflows", WidgetHealth.Warning, 55, 66, 77));
-
-    private static WidgetReadResult Empty() => Read(Now);
-
-    private static WidgetReadResult Unavailable() => WidgetReadResult.Unavailable(WidgetReadUnavailableReason.Missing);
+        using var document = JsonDocument.Parse(json);
+        return JsonSerializer.Serialize(document.RootElement, Pretty);
+    }
 }

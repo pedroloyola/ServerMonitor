@@ -84,8 +84,11 @@ public sealed class WidgetCardNavigationGrammarTests
     /// </summary>
     private static CardActions ActionsOf(WidgetReadResult read, WidgetSizeHint size)
     {
+        // UI.9 C1: the template is constant and binds data; the grammar is asserted on the card as the host
+        // expands it, so the bound serverId values are real (the raw template only holds "${id}").
         var viewModel = WidgetViewModelBuilder.Build(read, size, Now, Strings);
-        using var document = JsonDocument.Parse(WidgetCardRenderer.Render(viewModel).TemplateJson);
+        var card = WidgetCardRenderer.Render(viewModel);
+        using var document = JsonDocument.Parse(CardTemplateHarness.Expand(card.TemplateJson, card.DataJson).ToJsonString());
 
         var all = new List<JsonElement>();
         var urls = new List<string>();
@@ -238,30 +241,37 @@ public sealed class WidgetCardNavigationGrammarTests
         }
     }
 
-    [Theory]
-    [MemberData(nameof(AllSizes))]
-    public void An_empty_card_emits_only_the_dashboard_action(WidgetSizeHint size)
-    {
-        var actions = ActionsOf(Available(), size);
-
-        Assert.Single(actions.All);
-        Assert.Single(actions.Dashboard);
-        Assert.Equal("Action.Execute", actions.Dashboard[0].GetProperty("type").GetString());
-        Assert.Equal(["type", "verb"], Keys(actions.Dashboard[0]));
-    }
-
     /// <summary>
-    /// The neutral state deliberately carries NO navigation at all (§13/§14): there is nothing to open.
-    /// Asserting it here means "zero actions" is a checked property of that state, not an accident that
-    /// would make the other assertions vacuous.
+    /// Empty (D2 = openDashboard): the card itself plus the "Open ServerAlyzer" button, both openDashboard
+    /// with no data; the button additionally carries only its title.
     /// </summary>
     [Theory]
     [MemberData(nameof(AllSizes))]
-    public void An_unavailable_card_emits_no_navigation_at_all(WidgetSizeHint size)
+    public void An_empty_card_emits_only_dashboard_actions(WidgetSizeHint size)
+    {
+        var actions = ActionsOf(Available(), size);
+
+        Assert.Equal(2, actions.All.Count);
+        Assert.Equal(2, actions.Dashboard.Count);
+        Assert.All(actions.Dashboard, a => Assert.Equal("Action.Execute", a.GetProperty("type").GetString()));
+        Assert.Contains(actions.Dashboard, a => Keys(a).SequenceEqual(["type", "verb"]));
+        Assert.Contains(actions.Dashboard, a => Keys(a).SequenceEqual(["title", "type", "verb"]));
+    }
+
+    /// <summary>
+    /// UI.9 SPEC §3 (DV-11): the neutral state offers NO button, but the card itself opens the dashboard —
+    /// the only place the user can fix a missing/invalid snapshot. Exactly one action, asserted, so the
+    /// other assertions can never pass over an empty set.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(AllSizes))]
+    public void An_unavailable_card_only_opens_the_dashboard(WidgetSizeHint size)
     {
         var actions = ActionsOf(WidgetReadResult.Unavailable(WidgetReadUnavailableReason.Missing), size);
 
-        Assert.Empty(actions.All);
+        var only = Assert.Single(actions.All);
+        Assert.Equal(DashboardVerb, Verb(only));
+        Assert.Equal(["type", "verb"], Keys(only));
         Assert.Empty(actions.Urls);
     }
 
