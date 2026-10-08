@@ -335,6 +335,11 @@ Correctness/robustness IDs UI9-COR-1..2 and UI9-ROB-1..3 are covered by the V-RC
   - the real install stays Developer-signed `1.1.2.2` until the next Store release (`REL0-STORE-TRANSITION`; the Store version must be > the last QA version);
   - the test certificate `529C81F5…` must be removed from TrustedPeople/My by 2026-11-30 at the latest (`REL0-TESTCERT-REMOVAL`, UI9-SIGN-1);
   - the default package language must be decided (`REL0-DEFAULT-LANGUAGE`).
+- **Windows Firewall prompt during packaged QA (`UI9-FW-PROMPT`, protocol deviation):**
+  - What happened: about 2 s after each packaged app start, the app opened a listening socket (probably mDNS discovery, M7). Windows showed its Firewall prompt and created "Query User" Inbound Allow TCP+UDP rules for the app path. The human saw the prompt.
+  - Why it is a deviation: the checklist treated any Firewall prompt as a STOP (B-PROMPT), and this one was not reported during the session.
+  - Impact: none on data; both channels verified no data change beyond the expected matrix. This is pre-existing product behaviour, not a UI.9 change.
+  - Cleanup (human GO + UAC, exact Names): removed the 4 testhost rules from the UI.9 Floor test runs and the 2 rules for the removed `1.1.2.1` path; kept the 2 rules of the installed `1.1.2.2` app. Result 713 → 707, 0 collateral.
 - **C3-N3** (bars inside weighted columns): confirmed on the board. Coloured bars rendered at 4 px (M) and 6 px (L) in dark (V-1), and muted stale bars in light (V-2). Fresh coloured bars in light were not captured.
 
 ## 14. Backlog items created
@@ -350,4 +355,5 @@ Correctness/robustness IDs UI9-COR-1..2 and UI9-ROB-1..3 are covered by the V-RC
 | `UI7-SAVEGUARD-M1-RELEASE` | pre-existing Release-isolated test failure; consider App.Tests in Release CI |
 | `PRIV-PDBPATH` (+ distribution block) | deterministic source paths + gate before any distribution |
 | `REL0-STORE-TRANSITION` / `REL0-TESTCERT-REMOVAL` / `REL0-DEFAULT-LANGUAGE` | REL.0 obligations from H4, UI9-SIGN-1 and C2 N2-4 |
+| `UI9-FW-PROMPT` | packaged app listens on start → Windows Firewall prompt on each new install path; listen only on demand / Private UDP 5353 / manifest rule; Vigil before any Store release |
 | `APP-COPY-QUASECHEIO` | the App Overview's "almost full" at 80 % exaggerates; align with the widget's "high/critical" |
