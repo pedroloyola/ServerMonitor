@@ -1100,5 +1100,5 @@ as métricas e o histórico do servidor.</value></data>
   <data name="ServerEditorJumpKeyPickerAccessibleHeader" xml:space="preserve"><value>Chave privada do jump host</value></data>
   <!-- UI.9 C2: widget picker strings, referenced from Package*.appxmanifest via ms-resource: (Prism to approve wording). -->
   <data name="WidgetDescription" xml:space="preserve"><value>A saúde e as métricas dos teus servidores, num relance.</value></data>
-  <data name="WidgetScreenshotAltText" xml:space="preserve"><value>Widget do ServerAlyzer a mostrar a saúde e o uso de CPU, RAM e disco de dois servidores.</value></data>
+  <data name="WidgetScreenshotAltText" xml:space="preserve"><value>Widget do ServerAlyzer com a saúde dos servidores e o uso de CPU, RAM e disco.</value></data>
 </root>

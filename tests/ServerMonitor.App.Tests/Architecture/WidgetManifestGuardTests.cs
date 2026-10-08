@@ -95,6 +95,27 @@ public sealed class WidgetManifestGuardTests
             .Single(d => (string?)d.Attribute("name") == "WidgetDescription").Element("value")).Distinct().Count());
     }
 
+    /// <summary>
+    /// Prism C2 review §1 (BINDING): the exact picker copy per language. The alt text describes what is
+    /// constant (health + CPU/RAM/disk), never a server count, so the screenshot can change rows freely.
+    /// The en-US values are also the literal fallback if the board does not resolve ms-resource.
+    /// </summary>
+    [Theory]
+    [InlineData("en-US", "Your servers' health and metrics at a glance.",
+        "ServerAlyzer widget showing server health and CPU, RAM and disk use.")]
+    [InlineData("pt-PT", "A saúde e as métricas dos teus servidores, num relance.",
+        "Widget do ServerAlyzer com a saúde dos servidores e o uso de CPU, RAM e disco.")]
+    [InlineData("pt-BR", "A saúde e as métricas dos seus servidores, de relance.",
+        "Widget do ServerAlyzer com a saúde dos servidores e o uso de CPU, RAM e disco.")]
+    public void Picker_copy_matches_the_approved_table(string language, string description, string altText)
+    {
+        var resw = XDocument.Load(Path.Combine(AppDirectory, "Resources", language, "Resources.resw"));
+        string Value(string key) => (string)resw.Descendants("data").Single(d => (string?)d.Attribute("name") == key).Element("value")!;
+
+        Assert.Equal(description, Value("WidgetDescription"));
+        Assert.Equal(altText, Value("WidgetScreenshotAltText"));
+    }
+
     [Theory]
     [MemberData(nameof(ManifestNames))]
     public void No_hard_coded_portuguese_is_left_in_the_widget_registration(string manifestName)

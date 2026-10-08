@@ -75,7 +75,7 @@ public sealed class WidgetCardPreviewTests
     /// </summary>
     [Theory]
     [InlineData("en-US", "Web server", "Database", "Backup")]
-    [InlineData("pt-PT", "Servidor web", "Base de dados", "Cópias")]
+    [InlineData("pt-PT", "Servidor web", "Base de dados", "Backup")]
     [InlineData("pt-BR", "Servidor web", "Banco de dados", "Backup")]
     public void Picker_fleet_is_synthetic_and_written_for_the_store_screenshot(string culture, string web, string db, string backup)
     {
