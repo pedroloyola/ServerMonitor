@@ -137,8 +137,9 @@
         <!-- R-8 / D-UI8-2: one block centred in the body (empty 112:9818: icon 28 · g12 · title 19 · body 12 ≤ 280 · action). -->
         <StackPanel x:Name="StateBlock" Grid.Row="1" MaxWidth="280" HorizontalAlignment="Center" VerticalAlignment="Center"
                     Spacing="{StaticResource SaSpace12}" Visibility="{x:Bind Presentation.ShowsStateBlock, Mode=OneWay, FallbackValue=Collapsed}">
-            <!-- Native ring (no motion of our own); neutral, never the system accent blue (D-UI8-5). -->
-            <ProgressRing Width="20" Height="20" HorizontalAlignment="Center" Foreground="{ThemeResource SaTextSecondaryBrush}"
+            <!-- Native ring (no motion of our own); neutral, never the system accent blue (D-UI8-5). Prism c1 P-6: measured
+                 sub-legible in Light with the secondary text colour, so it takes the primary text colour. -->
+            <ProgressRing Width="20" Height="20" HorizontalAlignment="Center" Foreground="{ThemeResource SaTextBrush}"
                           IsActive="{x:Bind Presentation.ShowsLoading, Mode=OneWay}"
                           Visibility="{x:Bind Presentation.ShowsLoading, Mode=OneWay, FallbackValue=Collapsed}" />
             <primitives:SaIcon Data="{StaticResource SaIconServerStack01Data}" Size="28" HorizontalAlignment="Center"
