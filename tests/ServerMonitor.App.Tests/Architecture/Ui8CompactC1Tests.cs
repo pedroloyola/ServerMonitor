@@ -80,7 +80,7 @@ public sealed class Ui8CompactC1Tests
         Assert.DoesNotContain("FocusState.Keyboard", entry[..entry.IndexOf("\n    }", StringComparison.Ordinal)], StringComparison.Ordinal);
         // "Never steal focus": a background mode change still requires the window to hold focus already.
         var change = code[code.IndexOf("private void FocusAfterModeChange", StringComparison.Ordinal)..];
-        Assert.True(change.IndexOf("GetFocusedElement(xamlRoot) is null", StringComparison.Ordinal) is var guard and >= 0
+        Assert.True(change.IndexOf("if (!_isWindowActive)", StringComparison.Ordinal) is var guard and >= 0
             && guard < change.IndexOf("BeginCompactEntryFocus", StringComparison.Ordinal));
     }
 

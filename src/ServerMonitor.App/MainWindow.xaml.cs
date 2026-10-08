@@ -38,6 +38,7 @@ public sealed partial class MainWindow : Window
     private FocusState _compactEntryFocusState;
     private int _compactEntryLayoutPasses;
     private bool _awaitingCompactEntryLayout;
+    private bool _isWindowActive;
 
     public MainWindow(
         INavigationService navigationService,
@@ -120,6 +121,7 @@ public sealed partial class MainWindow : Window
         RootLayout.ActualThemeChanged += OnActualThemeChanged;
         AppWindow.Closing += OnAppWindowClosing;
         Closed += OnWindowClosed;
+        Activated += OnWindowActivated;
         UpdateCaptionButtonColors();
 
         try
@@ -238,7 +240,9 @@ public sealed partial class MainWindow : Window
     /// </summary>
     private void FocusAfterModeChange(WindowMode mode)
     {
-        if (RootLayout.XamlRoot is not { } xamlRoot || Microsoft.UI.Xaml.Input.FocusManager.GetFocusedElement(xamlRoot) is null)
+        // Never steal focus: only while this window is the active one. (c1: GetFocusedElement is already null here when the
+        // element that triggered the switch - the header button, "Entrar" - has just been collapsed with the Standard root.)
+        if (!_isWindowActive)
         {
             return;
         }
@@ -325,6 +329,9 @@ public sealed partial class MainWindow : Window
     }
 
     private void OnCompactSizeChanged(object sender, SizeChangedEventArgs args) => UpdateCompactTitleLayout();
+
+    private void OnWindowActivated(object sender, WindowActivatedEventArgs args) =>
+        _isWindowActive = args.WindowActivationState != WindowActivationState.Deactivated;
 
     /// <summary>
     /// Prism R-3: decides, from MEASURED widths, whether "Expandir" shows its text, and whether the mark / wordmark fit
@@ -560,6 +567,7 @@ public sealed partial class MainWindow : Window
         AppWindow.Changed -= OnAppWindowChanged;
         AppWindow.Closing -= OnAppWindowClosing;
         RootLayout.ActualThemeChanged -= OnActualThemeChanged;
+        Activated -= OnWindowActivated;
         Closed -= OnWindowClosed;
     }
 }
