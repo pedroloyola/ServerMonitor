@@ -537,8 +537,9 @@ public sealed class SshConfigResolverTests
         Assert.Equal("h0", result.Hosts[0].Alias);
         Assert.Equal("h499", result.Hosts[^1].Alias);
         Assert.All(result.Hosts, host => Assert.Equal("10.0.0.1", host.HostName));
-        // The per-alias index that keeps this linear (the old rescan was quadratic) is proven
-        // structurally, without a clock, in SshConfigResolutionPlanTests.
+        // Speed is no longer timed here. SshConfigResolutionPlanTests checks, without a clock, the
+        // per-alias candidates of the index that replaced the quadratic rescan and the segment
+        // reads it costs; it does not measure end-to-end Resolve() cost.
     }
 
     [Fact]

@@ -6,10 +6,11 @@ using ServerMonitor.Core.SshConfig;
 namespace ServerMonitor.Core.Tests.SshConfig;
 
 /// <summary>
-/// Vigil M14.4a M2 follow-up, without a clock: the resolver's private <c>ResolutionPlan</c> index is
-/// probed by reflection (no production seam). This proves the plan's STRUCTURE (which segments one
-/// alias visits, independent of how many aliases the file has) plus a structural IL guard that the
-/// resolver reads segments only through the plan. It does not measure end-to-end Resolve() cost.
+/// Vigil M14.4a M2 follow-up, without a clock: the resolver's private <c>ResolutionPlan</c> is probed
+/// by reflection (no production seam). Proven: the candidate sequence the plan returns per alias
+/// (selection, order, identity; constant whatever the number of aliases) and how many segment reads
+/// producing it costs after construction. Plus an architecture guard on selected IL wiring (easy to
+/// bypass; not a data-flow proof). NOT proven: the end-to-end cost of Resolve() or of parsing.
 /// </summary>
 public sealed class SshConfigResolutionPlanTests
 {
@@ -28,11 +29,13 @@ public sealed class SshConfigResolutionPlanTests
         SshConfigIncludeExpander.FromText(text).Document
         ?? throw new InvalidOperationException("fixture did not parse");
 
-    private static IReadOnlyList<SshConfigSegment> SegmentsFor(SshConfigSplicedDocument document, string alias)
-    {
-        var plan = Activator.CreateInstance(PlanType, [document])!;
-        return ((IEnumerable<SshConfigSegment>)SegmentsForMethod.Invoke(plan, [alias])!).ToList();
-    }
+    private static object Plan(SshConfigSplicedDocument document) => Activator.CreateInstance(PlanType, [document])!;
+
+    private static List<SshConfigSegment> SegmentsFor(object plan, string alias) =>
+        ((IEnumerable<SshConfigSegment>)SegmentsForMethod.Invoke(plan, [alias])!).ToList();
+
+    private static List<SshConfigSegment> SegmentsFor(SshConfigSplicedDocument document, string alias) =>
+        SegmentsFor(Plan(document), alias);
 
     /// <summary>What a full rescan would keep for <paramref name="alias"/> in a fixture without Match.</summary>
     private static List<SshConfigSegment> RescanFor(SshConfigSplicedDocument document, string alias) =>
@@ -65,7 +68,7 @@ public sealed class SshConfigResolutionPlanTests
             var visited = SegmentsFor(document, alias);
 
             // Exactly the Host * block, then the alias's own block, by reference: two segments per
-            // alias for 1 or 33,000 hosts. A per-alias rescan would hand back all hostCount + 1.
+            // alias for 1 or 33,000 hosts (an unfiltered rescan would hand back all hostCount + 1).
             Assert.Equal(2, visited.Count);
             Assert.Same(wildcard, visited[0]);
             Assert.Same(Assert.Single(document.Segments, segment => segment.Scope.Patterns.SequenceEqual([alias])), visited[1]);
@@ -106,7 +109,71 @@ public sealed class SshConfigResolutionPlanTests
             SegmentsFor(document, "unlisted"));
     }
 
-    // ---- structural guard: Resolve stays wired to the plan
+    [Theory]
+    [InlineData(100)]
+    [InlineData(33_000)]
+    public void Plan_ReadsOnlyTheSegmentsItReturns_AfterConstruction(int hostCount)
+    {
+        var parsed = Document(ManyHosts(hostCount));
+        var segments = new CountingSegmentList(parsed.Segments);
+        var plan = Plan(parsed with { Segments = segments });
+
+        // Building the index may read every segment once; that is linear in the file, not per alias.
+        Assert.True(segments.ElementReads <= hostCount + 1, $"construction read {segments.ElementReads}");
+
+        foreach (var alias in new[] { "h0", $"h{hostCount / 2}", $"h{hostCount - 1}" })
+        {
+            segments.Reset();
+            var visited = SegmentsFor(plan, alias);
+
+            // A per-alias scan that filters segments before returning them yields the same two
+            // objects but has to read (or count) all hostCount + 1 of them to decide.
+            Assert.Equal(2, visited.Count);
+            Assert.Equal(visited.Count, segments.ElementReads);
+            Assert.True(segments.CountReads <= 1, $"Count read {segments.CountReads} times");
+        }
+    }
+
+    /// <summary>A segment list that counts element and Count reads (indexer and enumerator alike).</summary>
+    private sealed class CountingSegmentList(IReadOnlyList<SshConfigSegment> inner) : IReadOnlyList<SshConfigSegment>
+    {
+        public int ElementReads { get; private set; }
+
+        public int CountReads { get; private set; }
+
+        public void Reset() => (ElementReads, CountReads) = (0, 0);
+
+        public int Count
+        {
+            get
+            {
+                CountReads++;
+                return inner.Count;
+            }
+        }
+
+        public SshConfigSegment this[int index]
+        {
+            get
+            {
+                ElementReads++;
+                return inner[index];
+            }
+        }
+
+        public IEnumerator<SshConfigSegment> GetEnumerator()
+        {
+            foreach (var segment in inner)
+            {
+                ElementReads++;
+                yield return segment;
+            }
+        }
+
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
+    }
+
+    // ---- architecture guard: Resolve stays wired to the plan (selected IL references only)
 
     [Fact]
     public void Resolver_ReadsDocumentSegmentsOnlyInThePlan_AndResolvesDestinationsThroughSegmentsFor()
@@ -116,7 +183,8 @@ public sealed class SshConfigResolutionPlanTests
             .Select(Name)
             .ToList();
 
-        // Only the plan's constructor may read the full segment list; any other reader is a rescan.
+        // Only the plan's constructor reads the full segment list. A second reader is not necessarily a
+        // per-alias rescan, but it bypasses the index, so it needs this guard (and the plan) reviewed.
         Assert.Equal(["ResolutionPlan..ctor"], readers);
 
         var resolveDestination = typeof(SshConfigResolver).GetMethod("ResolveDestination", BindingFlags.NonPublic | BindingFlags.Static)
