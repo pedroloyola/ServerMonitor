@@ -44,7 +44,7 @@
                                           ContentTemplate="{TemplateBinding ContentTemplate}" />
                         <TextBlock x:Name="PART_Helper" Style="{StaticResource SaHelperTextStyle}"
                                    Foreground="{ThemeResource SaTextSecondaryBrush}" Text="{TemplateBinding HelperText}" TextWrapping="Wrap" />
-                        <TextBlock x:Name="PART_Error" Style="{StaticResource SaCaptionTextStyle}" Visibility="Collapsed"
+                        <TextBlock x:Name="PART_Error" Style="{StaticResource SaCaptionTextStyle}" Visibility="Collapsed" primitives:SaMotion.Enter="Rise"
                                    Foreground="{ThemeResource SaDangerTextBrush}" Text="{TemplateBinding ErrorText}" TextWrapping="Wrap"
                                    AutomationProperties.LiveSetting="Assertive" />
                     </StackPanel>
@@ -756,7 +756,7 @@
                                 <VisualState x:Name="Disabled" />
                             </VisualStateGroup>
                         </VisualStateManager.VisualStateGroups>
-                        <Border x:Name="StateOverlay" CornerRadius="{TemplateBinding CornerRadius}" IsHitTestVisible="False" />
+                        <Border x:Name="StateOverlay" CornerRadius="{TemplateBinding CornerRadius}" IsHitTestVisible="False" Background="Transparent" primitives:SaMotion.HoverFade="True" />
                         <ContentPresenter
                             Padding="{TemplateBinding Padding}"
                             HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"

@@ -50,7 +50,7 @@
                     BorderBrush="{TemplateBinding BorderBrush}"
                     BorderThickness="{TemplateBinding BorderThickness}"
                     CornerRadius="{TemplateBinding CornerRadius}" />
-            <Border x:Name="HoverOverlay" CornerRadius="{TemplateBinding CornerRadius}" IsHitTestVisible="False" />
+            <Border x:Name="HoverOverlay" CornerRadius="{TemplateBinding CornerRadius}" IsHitTestVisible="False" Background="Transparent" primitives:SaMotion.HoverFade="True" />
             <Grid Padding="{TemplateBinding Padding}">
                 <ScrollViewer x:Name="ContentElement"
                               VerticalAlignment="Center"
@@ -106,7 +106,7 @@
                     BorderBrush="{TemplateBinding BorderBrush}"
                     BorderThickness="{TemplateBinding BorderThickness}"
                     CornerRadius="{TemplateBinding CornerRadius}" />
-            <Border x:Name="HoverOverlay" CornerRadius="{TemplateBinding CornerRadius}" IsHitTestVisible="False" />
+            <Border x:Name="HoverOverlay" CornerRadius="{TemplateBinding CornerRadius}" IsHitTestVisible="False" Background="Transparent" primitives:SaMotion.HoverFade="True" />
             <Grid Padding="{TemplateBinding Padding}"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                     <primitives:SaIcon Data="{StaticResource SaIconSearch01Data}" Size="18" Margin="0,0,10,0" VerticalAlignment="Center" Foreground="{ThemeResource SaTextSecondaryBrush}" />
                 <ScrollViewer x:Name="ContentElement" Grid.Column="1"
@@ -162,7 +162,7 @@
                     BorderBrush="{TemplateBinding BorderBrush}"
                     BorderThickness="{TemplateBinding BorderThickness}"
                     CornerRadius="{TemplateBinding CornerRadius}" />
-            <Border x:Name="HoverOverlay" CornerRadius="{TemplateBinding CornerRadius}" IsHitTestVisible="False" />
+            <Border x:Name="HoverOverlay" CornerRadius="{TemplateBinding CornerRadius}" IsHitTestVisible="False" Background="Transparent" primitives:SaMotion.HoverFade="True" />
             <Grid Padding="{TemplateBinding Padding}"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                     <primitives:SaIcon Data="{StaticResource SaIconSearch01Data}" Size="17" Margin="0,0,8,0" VerticalAlignment="Center" Foreground="{ThemeResource SaTextSecondaryBrush}" />
                 <ScrollViewer x:Name="ContentElement" Grid.Column="1"
@@ -218,7 +218,7 @@
                     BorderBrush="{TemplateBinding BorderBrush}"
                     BorderThickness="{TemplateBinding BorderThickness}"
                     CornerRadius="{TemplateBinding CornerRadius}" />
-            <Border x:Name="HoverOverlay" CornerRadius="{TemplateBinding CornerRadius}" IsHitTestVisible="False" />
+            <Border x:Name="HoverOverlay" CornerRadius="{TemplateBinding CornerRadius}" IsHitTestVisible="False" Background="Transparent" primitives:SaMotion.HoverFade="True" />
             <Grid Padding="{TemplateBinding Padding}">
                 <ScrollViewer x:Name="ContentElement"
                               VerticalAlignment="Center"
@@ -681,7 +681,7 @@
                             </VisualStateGroup>
                         </VisualStateManager.VisualStateGroups>
                         <Grid x:Name="SwitchAreaGrid" Width="52" Height="34" CornerRadius="17"
-                              Background="Transparent" Control.IsTemplateFocusTarget="True" HorizontalAlignment="Left">
+                              Background="Transparent" primitives:SaMotion.HoverFade="True" Control.IsTemplateFocusTarget="True" HorizontalAlignment="Left">
                             <Rectangle x:Name="OuterBorder" Width="44" Height="26" RadiusX="13" RadiusY="13"
                                        Fill="{ThemeResource SaToggleOffTrackBrush}" />
                             <Rectangle x:Name="SwitchKnobBounds" Width="44" Height="26" RadiusX="13" RadiusY="13" Opacity="0"
@@ -781,7 +781,7 @@
                             </VisualStateGroup>
                         </VisualStateManager.VisualStateGroups>
                         <Border x:Name="Shell" Background="{TemplateBinding Background}" CornerRadius="{TemplateBinding CornerRadius}" />
-                        <Border x:Name="StateOverlay" CornerRadius="{TemplateBinding CornerRadius}" IsHitTestVisible="False" />
+                        <Border x:Name="StateOverlay" CornerRadius="{TemplateBinding CornerRadius}" IsHitTestVisible="False" Background="Transparent" primitives:SaMotion.HoverFade="True" />
                         <ContentPresenter x:Name="ContentPresenter"
                                           Padding="{TemplateBinding Padding}"
                                           HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
@@ -862,7 +862,7 @@
                             </VisualStateGroup>
                         </VisualStateManager.VisualStateGroups>
                         <Border x:Name="Shell" Background="{TemplateBinding Background}" CornerRadius="{TemplateBinding CornerRadius}" />
-                        <Border x:Name="StateOverlay" CornerRadius="{TemplateBinding CornerRadius}" IsHitTestVisible="False" />
+                        <Border x:Name="StateOverlay" CornerRadius="{TemplateBinding CornerRadius}" IsHitTestVisible="False" Background="Transparent" primitives:SaMotion.HoverFade="True" />
                         <ContentPresenter x:Name="ContentPresenter"
                                           Padding="{TemplateBinding Padding}"
                                           HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
@@ -936,7 +936,7 @@
                             </VisualStateGroup>
                         </VisualStateManager.VisualStateGroups>
                         <Border x:Name="Shell" Background="{TemplateBinding Background}" CornerRadius="{TemplateBinding CornerRadius}" />
-                        <Border x:Name="StateOverlay" CornerRadius="{TemplateBinding CornerRadius}" IsHitTestVisible="False" />
+                        <Border x:Name="StateOverlay" CornerRadius="{TemplateBinding CornerRadius}" IsHitTestVisible="False" Background="Transparent" primitives:SaMotion.HoverFade="True" />
                         <ContentPresenter x:Name="ContentPresenter"
                                           Padding="{TemplateBinding Padding}"
                                           HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"

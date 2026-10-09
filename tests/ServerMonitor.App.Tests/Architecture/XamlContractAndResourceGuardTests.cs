@@ -167,7 +167,8 @@ public sealed partial class XamlContractAndResourceGuardTests
             "SwitchKnobOff", // UI.10 F26: the On state re-colours the thumb (SaToggleOnThumbBrush)
             "SwitchKnobOn" // UI.11 H02: the On thumb colour cross-fades as a second ellipse
         ],
-        ["Styles/Components/Sa.Navigation.xaml"] = ["RootGrid", "Shell", "Highlight", "StateOverlay", "ContentPresenter"],
+        // UI.11 F07: "Highlight" left with the selection fill (the sidebar's sliding indicator draws it).
+        ["Styles/Components/Sa.Navigation.xaml"] = ["RootGrid", "Shell", "StateOverlay", "ContentPresenter"],
         // UI.2 R1 (Prism MF-3): the Sa ContentDialog template keeps the Fluent PART names - ContentDialog's own code resolves
         // them (GetTemplateChild) and the VisualState setters target them; SaDialog focuses PrimaryButton/CloseButton by name.
         ["Styles/Components/Sa.Dialogs.xaml"] =

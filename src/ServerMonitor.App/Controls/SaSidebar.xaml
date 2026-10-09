@@ -6,6 +6,9 @@
  <p:SaListHost x:Uid="ShellNavigationList" VerticalContentAlignment="Stretch">
  <Grid x:Name="NavGrid" Padding="{StaticResource SaSidebarPadding}" RowSpacing="12" p:SaGroupNavigation.Mode="FocusOnly">
  <Grid.RowDefinitions><RowDefinition Height="44"/><RowDefinition Height="46"/><RowDefinition Height="46"/><RowDefinition Height="46"/><RowDefinition Height="*"/><RowDefinition Height="46"/></Grid.RowDefinitions>
+ <!-- UI.11 F07: the ONE sliding selection indicator (vertical), behind the items; snaps on the rail width change. -->
+ <Border Grid.RowSpan="6" IsHitTestVisible="False" AutomationProperties.AccessibilityView="Raw"
+   p:SaSlidingSelection.IndicatorBrush="{ThemeResource SaSelectedBrush}" p:SaSlidingSelection.HighlightBrush="{ThemeResource SaGlassHighlightBrush}"/>
  <!-- 112:1360: 160x44, official symbol30 + gap6 + 16/22 brand. -->
  <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" x:Name="Brand"><p:SaBrandMark/><TextBlock x:Name="BrandText" Text="ServerAlyzer" Style="{StaticResource SaBrandTextStyle}" VerticalAlignment="Center"/></StackPanel>
  <!-- Figma 112:1392: 160x46 r23, icon20 + gap10; label area106. -->
