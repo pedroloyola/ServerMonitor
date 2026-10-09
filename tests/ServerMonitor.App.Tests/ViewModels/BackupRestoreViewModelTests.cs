@@ -160,6 +160,7 @@ public sealed class BackupRestoreViewModelTests
         await viewModel.CreateBackupAsync();
 
         Assert.Equal(InfoBarSeverity.Warning, viewModel.StatusSeverity);
+        Assert.Equal("BackupCreatedWithWarningsTitle", viewModel.StatusTitle); // UI.10 F29: the title says "with warnings" too
         Assert.Equal(
             string.Join(
                 Environment.NewLine,

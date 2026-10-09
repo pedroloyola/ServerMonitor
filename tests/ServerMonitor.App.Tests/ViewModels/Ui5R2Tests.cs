@@ -85,8 +85,8 @@ public sealed class Ui5R2Tests
 
         settings.ViewModel.HiddenServers[0].RestoreCommand.Execute(null); // "Servidor restaurado" at t0
         clock.Advance(TimeSpan.FromSeconds(5));
-        settings.ViewModel.ResetIgnoredCommand.Execute(null);            // "Dispositivos repostos" at t0 + 5 s
-        Assert.Equal("Dispositivos repostos", settings.ViewModel.ToastTitle);
+        settings.ViewModel.ResetIgnoredCommand.Execute(null);            // "Dispositivos ignorados visíveis de novo" at t0 + 5 s
+        Assert.Equal("Dispositivos ignorados visíveis de novo", settings.ViewModel.ToastTitle);
 
         clock.Advance(TimeSpan.FromSeconds(5)); // the first toast's countdown (t0 + 8 s) must not close the newer one
         Assert.True(settings.ViewModel.IsToastOpen);

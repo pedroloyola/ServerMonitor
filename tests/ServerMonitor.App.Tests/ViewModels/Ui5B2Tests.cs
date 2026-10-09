@@ -188,7 +188,7 @@ public sealed class Ui5B2Tests
         Assert.Equal(1, clock.CreatedCount(TransientNoticeTimer.Duration));
         Assert.True(servers.IsNoticeOpen);
         Assert.Equal("Servidor ocultado", servers.NoticeTitle);
-        Assert.Equal("Podes restaurar web nas Definições.", servers.NoticeMessage); // A-12 "tu"
+        Assert.Equal("Podes mostrar web de novo nas Definições.", servers.NoticeMessage); // A-12 "tu"; UI.10 F27 "mostrar"
         servers.DismissNoticeCommand.Execute(null);
         Assert.False(servers.IsNoticeOpen);
 
@@ -266,11 +266,11 @@ public sealed class Ui5B2Tests
 
         settings.ViewModel.HiddenServers[0].RestoreCommand.Execute(null);
         Assert.True(settings.ViewModel.IsToastOpen);
-        Assert.Equal("Servidor restaurado", settings.ViewModel.ToastTitle);
+        Assert.Equal("Servidor visível de novo", settings.ViewModel.ToastTitle); // UI.10 F27
         Assert.Equal("O servidor está novamente visível na lista.", settings.ViewModel.ToastMessage);
 
         settings.ViewModel.ResetIgnoredCommand.Execute(null);
-        Assert.Equal("Dispositivos repostos", settings.ViewModel.ToastTitle);
+        Assert.Equal("Dispositivos ignorados visíveis de novo", settings.ViewModel.ToastTitle);
         Assert.Equal(timersBefore + 2, settings.Clock.CreatedCount(TransientNoticeTimer.Duration)); // both on the fake
 
         settings.ViewModel.DismissToastCommand.Execute(null);

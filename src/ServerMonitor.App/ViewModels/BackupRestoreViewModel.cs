@@ -549,9 +549,10 @@ public sealed class BackupRestoreViewModel : ObservableObject, IDisposable
             lines.Add(Format("BackupExcludedTrustNote", summary.ExcludedUnreferencedTrustedHostKeys));
         }
 
+        // UI.10 F29: the title says what the severity says - with entries left out it is "criada com avisos", not "criada".
         ShowStatus(
             incomplete ? InfoBarSeverity.Warning : InfoBarSeverity.Success,
-            GetString("BackupCreatedTitle"),
+            GetString(incomplete ? "BackupCreatedWithWarningsTitle" : "BackupCreatedTitle"),
             string.Join(Environment.NewLine, lines));
     }
 

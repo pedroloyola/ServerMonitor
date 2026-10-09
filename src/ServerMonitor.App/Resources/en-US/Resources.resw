@@ -46,8 +46,8 @@
   <data name="SettingsHiddenServersTitle.Text" xml:space="preserve"><value>Hidden servers</value></data>
   <data name="SettingsHiddenServersDescription.Text" xml:space="preserve"><value>They stay saved but don't appear on the dashboard.</value></data>
   <data name="SettingsHiddenServersEmpty.Text" xml:space="preserve"><value>No hidden servers.</value></data>
-  <data name="HiddenServerRestoreButton.Content" xml:space="preserve"><value>Restore</value></data>
-  <data name="HiddenServerRestoreFor" xml:space="preserve"><value>Restore {0}</value></data>
+  <data name="HiddenServerRestoreButton.Content" xml:space="preserve"><value>Show</value></data>
+  <data name="HiddenServerRestoreFor" xml:space="preserve"><value>Show {0}</value></data>
   <data name="ServerFormRemoveSavedPassphrase.Content" xml:space="preserve"><value>Remove saved passphrase</value></data>
   <data name="ServerFormTestConnectionButton.Content" xml:space="preserve"><value>Test connection</value></data>
   <data name="ServerFormCancelTestButton.Content" xml:space="preserve"><value>Cancel test</value></data>
@@ -112,8 +112,8 @@
   <data name="DiscoveredServerAutomationSummary" xml:space="preserve"><value>{0}, SSH, {1}, found on the network</value></data>
   <data name="SettingsIgnoredDiscoveriesTitle.Text" xml:space="preserve"><value>Ignored devices</value></data>
   <data name="SettingsIgnoredDiscoveriesDescription.Text" xml:space="preserve"><value>Shows devices still on the network again.</value></data>
-  <data name="SettingsResetIgnoredButton.Content" xml:space="preserve"><value>Reset devices</value></data>
-  <data name="SettingsResetIgnoredSuccess.Title" xml:space="preserve"><value>Devices reset</value></data>
+  <data name="SettingsResetIgnoredButton.Content" xml:space="preserve"><value>Show ignored devices again</value></data>
+  <data name="SettingsResetIgnoredSuccess.Title" xml:space="preserve"><value>Ignored devices shown again</value></data>
   <data name="SettingsResetIgnoredSuccess.Message" xml:space="preserve"><value>Devices on the network can appear again.</value></data>
   <data name="SettingsResetIgnoredError.Title" xml:space="preserve"><value>Could not reset ignored devices</value></data>
   <data name="SettingsResetIgnoredError.Message" xml:space="preserve"><value>Try again in a moment.</value></data>
@@ -188,7 +188,7 @@
   <data name="HistoryMetricMemory" xml:space="preserve"><value>Memory</value></data>
   <data name="HistoryMetricDisk" xml:space="preserve"><value>Disk</value></data>
   <data name="HistoryValueUnknown" xml:space="preserve"><value>—</value></data>
-  <data name="HistoryValueUnknownAccessible" xml:space="preserve"><value>Unknown</value></data>
+  <data name="HistoryValueUnknownAccessible" xml:space="preserve"><value>No data</value></data>
   <data name="HistoryOfflineNoticeTitle.Text" xml:space="preserve"><value>Offline period</value></data>
   <data name="HistoryOfflineNoticeDescription.Text" xml:space="preserve"><value>This range contains samples from a period when the server was offline. The charts show it as a gap.</value></data>
   <data name="HistoryRangeNameLastHour" xml:space="preserve"><value>Last hour</value></data>
@@ -442,6 +442,7 @@
   <data name="PassphraseMismatch" xml:space="preserve"><value>The passphrases don't match.</value></data>
   <data name="PassphraseEmpty" xml:space="preserve"><value>Enter the passphrase.</value></data>
   <data name="BackupCreatedTitle" xml:space="preserve"><value>Backup created</value></data>
+  <data name="BackupCreatedWithWarningsTitle" xml:space="preserve"><value>Backup created with warnings</value></data>
   <data name="BackupCreatedMessage" xml:space="preserve"><value>Backup saved to {3}. Servers: {0} · Trusted host keys: {1} · Saved passwords: {2}</value></data>
   <data name="BackupMissingCredentialsWarning" xml:space="preserve"><value>No saved password was found for: {0}. After restoring, you'll be asked for it.</value></data>
   <data name="BackupExcludedEntriesWarning" xml:space="preserve"><value>Unreadable server entries, not included: {0}</value></data>
@@ -484,7 +485,7 @@
   <data name="RestoreApplying" xml:space="preserve"><value>Restoring… Don't close ServerAlyzer.</value></data>
   <data name="RestoreCompletedTitle" xml:space="preserve"><value>Restore complete</value></data>
   <data name="RestoreCompletedMessage" xml:space="preserve"><value>ServerAlyzer will close now. Open it again to use the restored configuration.</value></data>
-  <data name="RestoreCompletedPrimary" xml:space="preserve"><value>Close ServerAlyzer</value></data>
+  <data name="RestoreCompletedPrimary" xml:space="preserve"><value>Exit ServerAlyzer</value></data>
   <data name="RestoreRolledBackTitle" xml:space="preserve"><value>Restore failed</value></data>
   <data name="RestoreRolledBackMessage" xml:space="preserve"><value>Something went wrong while restoring, and every change was undone. Your configuration is exactly as it was.</value></data>
   <data name="RestorePartialPendingMessage" xml:space="preserve"><value>The restore failed and couldn't be fully undone yet. Close and reopen ServerAlyzer to finish undoing it.</value></data>
@@ -507,7 +508,7 @@
   <data name="HistoryRetentionNotice" xml:space="preserve"><value>Stored on this device for 30 days.</value></data>
   <data name="HistorySelectorLoading" xml:space="preserve"><value>Loading history…</value></data>
   <data name="HistoryServerStatusConnected" xml:space="preserve"><value>Connected</value></data>
-  <data name="HistoryServerStatusOffline" xml:space="preserve"><value>Offline</value></data>
+  <data name="HistoryServerStatusOffline" xml:space="preserve"><value>No connection</value></data>
   <data name="HistoryEmptyNeverTitle" xml:space="preserve"><value>History starts here</value></data>
   <data name="HistoryEmptyNeverMessage" xml:space="preserve"><value>There are no saved readings for this server yet.&#10;Charts appear as metrics are collected.</value></data>
   <data name="HistoryEmptyNeverAction" xml:space="preserve"><value>View server</value></data>
@@ -655,8 +656,8 @@
   <data name="OverviewHealthAutomationWarningOther" xml:space="preserve"><value>{0} need attention</value></data>
   <data name="OverviewHealthAutomationCriticalOne" xml:space="preserve"><value>{0} critical</value></data>
   <data name="OverviewHealthAutomationCriticalOther" xml:space="preserve"><value>{0} critical</value></data>
-  <data name="OverviewHealthAutomationOfflineOne" xml:space="preserve"><value>{0} without connection</value></data>
-  <data name="OverviewHealthAutomationOfflineOther" xml:space="preserve"><value>{0} without connection</value></data>
+  <data name="OverviewHealthAutomationOfflineOne" xml:space="preserve"><value>{0} no connection</value></data>
+  <data name="OverviewHealthAutomationOfflineOther" xml:space="preserve"><value>{0} no connection</value></data>
   <data name="OverviewHealthAutomationUnknownOne" xml:space="preserve"><value>{0} without data</value></data>
   <data name="OverviewHealthAutomationUnknownOther" xml:space="preserve"><value>{0} without data</value></data>
   <data name="OverviewPriorityTitleCpu" xml:space="preserve"><value>High CPU</value></data>
@@ -682,7 +683,7 @@
   <data name="ServersEmptyState.Title" xml:space="preserve"><value>No servers yet</value></data>
   <data name="ServersEmptyState.Message" xml:space="preserve"><value>Add your first server to follow the health and resource usage of your machines.</value></data>
   <data name="ServersEmptyAddButton.Content" xml:space="preserve"><value>Add server</value></data>
-  <data name="ServersHiddenNote.Text" xml:space="preserve"><value>Hidden servers can be restored in Settings.</value></data>
+  <data name="ServersHiddenNote.Text" xml:space="preserve"><value>Hidden servers can be shown again in Settings.</value></data>
   <!-- UI.4 phase 2 (views, Prism r1 copy). -->
   <data name="OverviewTitle.Text" xml:space="preserve"><value>Overview</value></data>
   <data name="OverviewRefreshButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Refresh all</value></data>
@@ -713,8 +714,8 @@
   <data name="OverviewHealthSegmentWarningOther" xml:space="preserve"><value>{0} need attention</value></data>
   <data name="OverviewHealthSegmentCriticalOne" xml:space="preserve"><value>{0} critical</value></data>
   <data name="OverviewHealthSegmentCriticalOther" xml:space="preserve"><value>{0} critical</value></data>
-  <data name="OverviewHealthSegmentOfflineOne" xml:space="preserve"><value>{0} without connection</value></data>
-  <data name="OverviewHealthSegmentOfflineOther" xml:space="preserve"><value>{0} without connection</value></data>
+  <data name="OverviewHealthSegmentOfflineOne" xml:space="preserve"><value>{0} no connection</value></data>
+  <data name="OverviewHealthSegmentOfflineOther" xml:space="preserve"><value>{0} no connection</value></data>
   <data name="OverviewHealthSegmentUnknownOne" xml:space="preserve"><value>{0} without data</value></data>
   <data name="OverviewHealthSegmentUnknownOther" xml:space="preserve"><value>{0} without data</value></data>
   <data name="ServersAddButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Add server</value></data>
@@ -783,7 +784,7 @@
   <data name="ServerDetailMetricsUnsupportedNotice.Title" xml:space="preserve"><value>No metrics for this system</value></data>
   <data name="ServerDetailMetricsUnsupportedNotice.Message" xml:space="preserve"><value>Metrics are available for Linux and macOS servers.</value></data>
   <data name="ServersNoticeHiddenTitle" xml:space="preserve"><value>Server hidden</value></data>
-  <data name="ServersNoticeHiddenMessageFormat" xml:space="preserve"><value>You can restore {0} in Settings.</value></data>
+  <data name="ServersNoticeHiddenMessageFormat" xml:space="preserve"><value>You can show {0} again in Settings.</value></data>
   <data name="ServersNoticeRemovedTitle" xml:space="preserve"><value>Server removed</value></data>
   <data name="ServersNoticeRemovedMessageFormat" xml:space="preserve"><value>{0} was removed from ServerAlyzer.</value></data>
   <data name="ServersNoticeCloseName" xml:space="preserve"><value>Close notice</value></data>
@@ -807,7 +808,7 @@
   <data name="SettingsOpenAboutText.Text" xml:space="preserve"><value>About ServerAlyzer</value></data>
   <data name="SettingsLocalPreferences.Text" xml:space="preserve"><value>These preferences are stored on this device.</value></data>
   <data name="SettingsDataParent.Text" xml:space="preserve"><value>Settings</value></data>
-  <data name="SettingsServerRestoredTitle" xml:space="preserve"><value>Server restored</value></data>
+  <data name="SettingsServerRestoredTitle" xml:space="preserve"><value>Server visible again</value></data>
   <data name="SettingsServerRestoredMessage" xml:space="preserve"><value>The server is visible in the list again.</value></data>
   <data name="SettingsAboutVersionFormat" xml:space="preserve"><value>Version {0}</value></data>
   <data name="SettingsCredentialsCaption.Text" xml:space="preserve"><value>Passwords and passphrases are protected by Windows Credential Manager.</value></data>
@@ -880,7 +881,7 @@ with clear metrics and direct SSH access.</value></data>
 status, metrics and history.</value></data>
   <data name="FirstServerSubtitle.Text" xml:space="preserve"><value>Your monitoring space.</value></data>
   <data name="HiddenOverviewTitle.Text" xml:space="preserve"><value>Your servers are hidden.</value></data>
-  <data name="HiddenOverviewBody.Text" xml:space="preserve"><value>You can restore them in Settings › Data and servers.</value></data>
+  <data name="HiddenOverviewBody.Text" xml:space="preserve"><value>You can show them again in Settings › Data and servers.</value></data>
   <data name="HiddenOverviewAction.Content" xml:space="preserve"><value>Manage hidden servers</value></data>
   <data name="ConfigurationUnavailableNotice.Message" xml:space="preserve"><value>The server configuration could not be read. The configuration was not changed.</value></data>
   <data name="ConfigurationUnavailableNotice.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>The server configuration could not be read. The configuration was not changed.</value></data>
