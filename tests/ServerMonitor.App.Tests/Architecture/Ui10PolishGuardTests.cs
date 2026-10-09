@@ -101,7 +101,8 @@ public sealed partial class Ui10PolishGuardTests
     }
 
     /// <summary>
-    /// F01/F02/F46 (H01): the nav keyboard ring is concentric (-3 on every side, like the buttons), every selectable
+    /// F01/F02/F46 (H01, Prism UI.10C RC-1): the nav keyboard ring sits on the pill edge (margin 0 - never a frame larger
+    /// than the selection; action buttons keep -3), every selectable
     /// sidebar item has the same 46 geometry (Definições included), and the rail item is a 46 circle.
     /// </summary>
     [Fact]
@@ -109,7 +110,7 @@ public sealed partial class Ui10PolishGuardTests
     {
         var nav = AppSourceTree.LoadXaml("Styles/Components/Sa.Navigation.xaml").Root!.Elements(Ns + "Style")
             .Single(style => (string?)style.Attribute(X + "Key") == "SaNavItemStyle");
-        Assert.Equal("-3", (string?)Setter(nav, "FocusVisualMargin"));
+        Assert.Equal("0", (string?)Setter(nav, "FocusVisualMargin"));
         Assert.Equal("46", (string?)Setter(nav, "Height"));
         Assert.Equal("23", (string?)Setter(nav, "CornerRadius"));
 

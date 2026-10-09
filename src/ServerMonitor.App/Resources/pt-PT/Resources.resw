@@ -115,7 +115,7 @@
   <data name="SettingsResetIgnoredButton.Content" xml:space="preserve"><value>Voltar a mostrar dispositivos ignorados</value></data>
   <data name="SettingsResetIgnoredSuccess.Title" xml:space="preserve"><value>Dispositivos ignorados visíveis de novo</value></data>
   <data name="SettingsResetIgnoredSuccess.Message" xml:space="preserve"><value>Os dispositivos presentes na rede podem voltar a aparecer.</value></data>
-  <data name="SettingsResetIgnoredError.Title" xml:space="preserve"><value>Não foi possível repor os dispositivos ignorados</value></data>
+  <data name="SettingsResetIgnoredError.Title" xml:space="preserve"><value>Não foi possível voltar a mostrar os dispositivos ignorados</value></data>
   <data name="SettingsResetIgnoredError.Message" xml:space="preserve"><value>Tenta novamente dentro de momentos.</value></data>
   <data name="SettingsNotificationsTitle.Text" xml:space="preserve"><value>Alertas de estado</value></data>
   <data name="SettingsNotificationsDescription.Text" xml:space="preserve"><value>Recebe notificações quando a saúde de um servidor muda.</value></data>

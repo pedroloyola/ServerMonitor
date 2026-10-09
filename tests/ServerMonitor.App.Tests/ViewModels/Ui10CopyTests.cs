@@ -56,7 +56,7 @@ public sealed partial class Ui10CopyTests
     /// <summary>F28/F30/F33: the CTA names its real effect; one word for "no data".</summary>
     [Theory]
     [InlineData("pt-PT", "Voltar a mostrar dispositivos ignorados", "Sair do ServerAlyzer", "Sem dados")]
-    [InlineData("pt-BR", "Mostrar novamente dispositivos ignorados", "Sair do ServerAlyzer", "Sem dados")]
+    [InlineData("pt-BR", "Mostrar novamente os dispositivos ignorados", "Sair do ServerAlyzer", "Sem dados")]
     [InlineData("en-US", "Show ignored devices again", "Exit ServerAlyzer", "No data")]
     public void F28_F30_F33_SayWhatHappens(string culture, string devices, string exit, string noData)
     {
@@ -66,6 +66,21 @@ public sealed partial class Ui10CopyTests
         Assert.Equal(resources["TrayExitMenuItem"], resources["RestoreCompletedPrimary"]);
         Assert.Equal(noData, resources["HistoryValueUnknownAccessible"]);
         Assert.Equal(resources["ServerStatusUnknown"], resources["HistoryValueUnknownAccessible"]);
+    }
+
+    /// <summary>F28 + Prism UI.10C RC-2: the failure of that action uses the same verb - nothing is "reset".</summary>
+    [Theory]
+    [InlineData("pt-PT", "Não foi possível voltar a mostrar os dispositivos ignorados")]
+    [InlineData("pt-BR", "Não foi possível mostrar novamente os dispositivos ignorados")]
+    [InlineData("en-US", "Couldn't show ignored devices again")]
+    public void F28_TheErrorSaysTheSameAction(string culture, string error)
+    {
+        var resources = ResWLocalizationService.Load(culture);
+        Assert.Equal(error, resources["SettingsResetIgnoredError.Title"]);
+        foreach (var key in new[] { "SettingsResetIgnoredButton.Content", "SettingsResetIgnoredSuccess.Title", "SettingsResetIgnoredError.Title" })
+        {
+            Assert.DoesNotMatch(ResetWord(), resources[key]);
+        }
     }
 
     /// <summary>F32: en-US says "no connection" for states and counts; "offline" only for the History period.</summary>
@@ -89,6 +104,9 @@ public sealed partial class Ui10CopyTests
 
     [GeneratedRegex(@"\b(Restaur\w*|restaur\w*|Restore\w*|restore\w*)\b")]
     private static partial Regex RestoreWord();
+
+    [GeneratedRegex(@"\b([Rr]epor|[Rr]epost\w*|[Rr]edefini\w*|[Rr]eset\w*)\b")]
+    private static partial Regex ResetWord();
 
     // The formal imperatives / possessives the UI.10A audit found (F34), as whole words.
     [GeneratedRegex(@"\b(Introduza|Escolha|Tente|tente|Feche|feche|Abra|Abra-o|Volte|Verifique|Adicione-o|Reveja|Reinicie|Atualize|Restaure|Guarde-o|Confirme a|Use pelo|Use no|use ""Sair|Pode alterar)\b|\bpor si\b|\b[Aa] sua\b|\b[Aa]s suas\b|ser-lhe-(á|ão)")]

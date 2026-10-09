@@ -50,7 +50,7 @@ public sealed class DiscoveryLocalizationTests
 
         // UI.5 (Figma 112:8257 / 112:21538): Data-page copy about DEVICES (never "servidores"). UI.10 F28: the action only
         // stops ignoring discovered devices, so it says that - "repor/redefinir/reset" read as destructive.
-        Assert.Equal("Mostrar novamente dispositivos ignorados", brazilianPortuguese["SettingsResetIgnoredButton.Content"]);
+        Assert.Equal("Mostrar novamente os dispositivos ignorados", brazilianPortuguese["SettingsResetIgnoredButton.Content"]);
         Assert.Equal("Dispositivos ignorados visíveis novamente", brazilianPortuguese["SettingsResetIgnoredSuccess.Title"]);
         Assert.Equal("Voltar a mostrar dispositivos ignorados", europeanPortuguese["SettingsResetIgnoredButton.Content"]);
         Assert.Equal("Dispositivos ignorados visíveis de novo", europeanPortuguese["SettingsResetIgnoredSuccess.Title"]);
