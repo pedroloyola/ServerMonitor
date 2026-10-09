@@ -102,7 +102,7 @@ internal sealed class SlidingSelectionController
     private readonly FrameworkElement _host;
     private readonly SelectionIndicatorPlanner _planner = new();
     private readonly List<RadioButton> _items = [];
-    private bool _loaded;
+    private bool _externalSubscribed;
     private bool _flushQueued;
     private XamlRoot? _xamlRoot;
     private double _rasterizationScale;
@@ -125,6 +125,8 @@ internal sealed class SlidingSelectionController
         _host = host;
         _host.Loaded += OnLoaded;
         _host.Unloaded += OnUnloaded;
+        _host.SizeChanged += OnLayoutChanged;
+        _host.ActualThemeChanged += OnThemeChanged;
         if (_host.IsLoaded)
         {
             OnLoaded(_host, null);
@@ -149,25 +151,16 @@ internal sealed class SlidingSelectionController
         UpdateHighlightStops();
     }
 
+    /// <summary>
+    /// Idempotent: a remount (SaThemeRefresh: out of the tree and straight back in) can raise the new Loaded BEFORE the
+    /// stale Unloaded (measured, UI.11C runtime: the sidebar indicator stopped following after a theme change). So Loaded
+    /// always (re)collects and (re)subscribes, the item/host events live with the subtree (never dropped on Unloaded), and
+    /// Unloaded re-checks IsLoaded before giving up the process-wide subscriptions.
+    /// </summary>
     private void OnLoaded(object sender, RoutedEventArgs? e)
     {
-        if (_loaded)
-        {
-            return;
-        }
-
-        _loaded = true;
         CollectItems();
-        _host.SizeChanged += OnLayoutChanged;
-        _xamlRoot = _host.XamlRoot;
-        if (_xamlRoot is not null)
-        {
-            _rasterizationScale = _xamlRoot.RasterizationScale;
-            _xamlRoot.Changed += OnXamlRootChanged;
-        }
-
-        MotionPolicy.Source.Changed += OnReducedMotionChanged;
-        _host.ActualThemeChanged += OnThemeChanged;
+        SubscribeExternal();
         EnsureVisual();
         UpdateBrushes();
         _planner.Request(_planner.PresentedTarget is null ? IndicatorCause.FirstLayout : IndicatorCause.Remount);
@@ -176,10 +169,40 @@ internal sealed class SlidingSelectionController
 
     private void OnUnloaded(object sender, RoutedEventArgs e)
     {
-        // Unsubscribe only. The Composition objects stay attached to the host, so a theme remount (out of the tree and
-        // straight back in) keeps a running slide; they go with the host when it is collected.
-        _loaded = false;
-        _host.SizeChanged -= OnLayoutChanged;
+        // Only the process-wide subscriptions (the static Reduced Motion source, the XamlRoot) are given up; the Composition
+        // objects and the subtree's own events stay with the host, so a theme remount keeps a running slide. A stale
+        // Unloaded that arrives after the remount's Loaded is undone right after (the host is loaded again).
+        UnsubscribeExternal();
+        _host.DispatcherQueue?.TryEnqueue(DispatcherQueuePriority.Low, () =>
+        {
+            if (_host.IsLoaded)
+            {
+                SubscribeExternal();
+            }
+        });
+    }
+
+    private void SubscribeExternal()
+    {
+        UnsubscribeExternal();
+        _xamlRoot = _host.XamlRoot;
+        if (_xamlRoot is not null)
+        {
+            _rasterizationScale = _xamlRoot.RasterizationScale;
+            _xamlRoot.Changed += OnXamlRootChanged;
+        }
+
+        MotionPolicy.Source.Changed += OnReducedMotionChanged;
+        _externalSubscribed = true;
+    }
+
+    private void UnsubscribeExternal()
+    {
+        if (!_externalSubscribed)
+        {
+            return;
+        }
+
         if (_xamlRoot is not null)
         {
             _xamlRoot.Changed -= OnXamlRootChanged;
@@ -187,8 +210,7 @@ internal sealed class SlidingSelectionController
         }
 
         MotionPolicy.Source.Changed -= OnReducedMotionChanged;
-        _host.ActualThemeChanged -= OnThemeChanged;
-        ReleaseItems();
+        _externalSubscribed = false;
     }
 
     private void CollectItems()
@@ -276,7 +298,7 @@ internal sealed class SlidingSelectionController
     /// </summary>
     private void QueueFlush()
     {
-        if (_flushQueued || !_loaded)
+        if (_flushQueued || !_host.IsLoaded)
         {
             return;
         }
@@ -287,7 +309,7 @@ internal sealed class SlidingSelectionController
     private void Flush()
     {
         _flushQueued = false;
-        if (!_loaded || _visual is null)
+        if (!_host.IsLoaded || _visual is null)
         {
             return; // stays pending; the next Loaded re-plans
         }

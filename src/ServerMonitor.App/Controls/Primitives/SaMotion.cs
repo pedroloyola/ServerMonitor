@@ -175,6 +175,15 @@ public static class SaMotion
                 MotionPolicy.Source.Changed -= OnReducedMotionChanged;
                 _subscribed = false;
             }
+
+            // A remount may raise the new Loaded before this stale Unloaded: resubscribe if the element is loaded again.
+            _element.DispatcherQueue?.TryEnqueue(DispatcherQueuePriority.Low, () =>
+            {
+                if (_element.IsLoaded)
+                {
+                    Subscribe();
+                }
+            });
         }
 
         private void Subscribe()
