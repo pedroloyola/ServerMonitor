@@ -262,8 +262,9 @@
         <ScrollViewer x:Name="PageScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled">
             <StackPanel x:Name="PageRoot" Padding="{StaticResource SaPagePadding}" Spacing="{StaticResource SaSpace24}">
 
-                <!-- Header 112:1420: title 32 Semibold + summary 13 muted (or the §14 loading line), Adicionar 156×44. -->
-                <Grid x:Name="HeaderGrid" ColumnSpacing="{StaticResource SaSpace20}">
+                <!-- Header = the shared page header (UI.10 F09/F10, Figma Page header 240:588): title 32/40 + summary 13/18 muted (or
+                     the §14 loading line), Adicionar 156×44 centred on the title line - the same y as on Visão geral. -->
+                <Grid x:Name="HeaderGrid" Style="{StaticResource SaPageHeaderGridStyle}">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
@@ -272,21 +273,25 @@
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
-                    <StackPanel Spacing="6">
+                    <StackPanel Style="{StaticResource SaPageHeaderTitleBlockStyle}">
                         <primitives:SaHeadingHost AutomationProperties.HeadingLevel="Level1" IsTabStop="False">
                         <TextBlock x:Uid="ServersPageTitleText" AutomationProperties.AccessibilityView="Raw" IsTextSelectionEnabled="False" IsTabStop="False"
                                    Style="{StaticResource SaPageTitleTextStyle}" Foreground="{ThemeResource SaTextBrush}" />
                     </primitives:SaHeadingHost>
-                        <TextBlock Style="{StaticResource SaPageSubtitleTextStyle}" TextWrapping="Wrap"
-                                   Text="{x:Bind ViewModel.HeaderContextDisplay, Mode=OneWay}" AutomationProperties.LiveSetting="Polite" />
-                    </StackPanel>
-                    <Button x:Name="AddButton" x:Uid="ServersAddButton" Grid.Column="1" MinWidth="156" VerticalAlignment="Top"
-                            Style="{StaticResource SaPrimaryButtonStyle}" Command="{x:Bind ViewModel.AddServerCommand}">
-                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource SaSpace8}">
-                            <primitives:SaIcon Data="{StaticResource SaIconAdd01Data}" Size="18" VerticalAlignment="Center" />
-                            <TextBlock x:Uid="ServersAddText" VerticalAlignment="Center" />
+                        <StackPanel Style="{StaticResource SaPageHeaderLineTwoStyle}">
+                            <TextBlock Style="{StaticResource SaPageSubtitleTextStyle}" TextWrapping="Wrap"
+                                       Text="{x:Bind ViewModel.HeaderContextDisplay, Mode=OneWay}" AutomationProperties.LiveSetting="Polite" />
                         </StackPanel>
-                    </Button>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Style="{StaticResource SaPageHeaderActionsStyle}">
+                        <Button x:Name="AddButton" x:Uid="ServersAddButton" MinWidth="156"
+                                Style="{StaticResource SaPrimaryButtonStyle}" Command="{x:Bind ViewModel.AddServerCommand}">
+                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource SaSpace8}">
+                                <primitives:SaIcon Data="{StaticResource SaIconAdd01Data}" Size="18" VerticalAlignment="Center" />
+                                <TextBlock x:Uid="ServersAddText" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
                 </Grid>
 
                 <!-- Search 112:1429: 44 high, radius 14, full width; visible while loading too (§14). -->

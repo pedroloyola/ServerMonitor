@@ -254,6 +254,7 @@
                         <Setter Target="HeaderActions.(Grid.Row)" Value="1" />
                         <Setter Target="HeaderActions.(Grid.Column)" Value="0" />
                         <Setter Target="HeaderActions.HorizontalAlignment" Value="Left" />
+                        <Setter Target="HeaderActions.Margin" Value="0" />
                         <Setter Target="HeaderGrid.RowSpacing" Value="{StaticResource SaSpace16}" />
                         <Setter Target="OverviewSearchBox.(Grid.Row)" Value="1" />
                         <Setter Target="OverviewSearchBox.(Grid.Column)" Value="0" />
@@ -268,11 +269,13 @@
 
         <!-- One page ScrollViewer (Cortex M-3 pattern), vertical only: no horizontal scroll at any width. -->
         <ScrollViewer x:Name="PageScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled">
-            <StackPanel x:Name="PageRoot" Padding="{StaticResource SaPagePadding}" Spacing="{StaticResource SaSpace28}">
+            <!-- UI.10 F09: 24 between the sections, as on Servidores (Figma 112:996 28 -> 24). -->
+            <StackPanel x:Name="PageRoot" Padding="{StaticResource SaPagePadding}" Spacing="{StaticResource SaSpace24}">
 
-                <!-- Header 112:997: title 32 Semibold + context 12 muted; Modo compacto + Definições (D-UI4-NAV, until UI.6),
-                     Atualizar 44 round (112:1001), Adicionar 156×44 (112:1004). -->
-                <Grid x:Name="HeaderGrid" ColumnSpacing="{StaticResource SaSpace16}">
+                <!-- Header = the shared page header (UI.10 F09/F10, Figma Page header 240:614): title 32/40 + line 2 13/18 muted
+                     (the first-server line or "Atualizado há…", 18 reserved even when empty); Modo compacto, Atualizar 44 round
+                     (112:1001), Adicionar 156×44 (112:1004) centred on the title line - the same y as on Servidores. -->
+                <Grid x:Name="HeaderGrid" Style="{StaticResource SaPageHeaderGridStyle}">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
@@ -281,19 +284,20 @@
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
-                    <StackPanel VerticalAlignment="Center" Spacing="{StaticResource SaSpace4}">
+                    <StackPanel Style="{StaticResource SaPageHeaderTitleBlockStyle}">
                         <primitives:SaHeadingHost AutomationProperties.HeadingLevel="Level1" IsTabStop="False">
                         <TextBlock x:Uid="OverviewTitle" AutomationProperties.AccessibilityView="Raw" IsTextSelectionEnabled="False" IsTabStop="False"
                                    Style="{StaticResource SaPageTitleTextStyle}" Foreground="{ThemeResource SaTextBrush}" />
                     </primitives:SaHeadingHost>
-                        <TextBlock x:Uid="FirstServerSubtitle" Style="{StaticResource SaPageSubtitleTextStyle}" Visibility="{x:Bind ViewModel.ShowEmptyState, Mode=OneWay}"/>
-                        <TextBlock Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}"
-                                   Text="{x:Bind ViewModel.HeaderContextDisplay, Mode=OneWay}"
-                                   Visibility="{x:Bind ViewModel.HasHeaderContext, Mode=OneWay}"
-                                   AutomationProperties.LiveSetting="Polite" />
+                        <StackPanel Style="{StaticResource SaPageHeaderLineTwoStyle}">
+                            <TextBlock x:Uid="FirstServerSubtitle" Style="{StaticResource SaPageSubtitleTextStyle}" Visibility="{x:Bind ViewModel.ShowEmptyState, Mode=OneWay}"/>
+                            <TextBlock Style="{StaticResource SaPageSubtitleTextStyle}"
+                                       Text="{x:Bind ViewModel.HeaderContextDisplay, Mode=OneWay}"
+                                       Visibility="{x:Bind ViewModel.HasHeaderContext, Mode=OneWay}"
+                                       AutomationProperties.LiveSetting="Polite" />
+                        </StackPanel>
                     </StackPanel>
-                    <StackPanel x:Name="HeaderActions" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center"
-                                Spacing="{StaticResource SaSpace16}">
+                    <StackPanel x:Name="HeaderActions" Grid.Column="1" Style="{StaticResource SaPageHeaderActionsStyle}">
                         <Button x:Uid="DashboardCompactModeButton" Style="{StaticResource SaIconButtonStyle}"
                                 Command="{x:Bind WindowMode.EnterCompactCommand}">
                             <FontIcon Glyph="&#xE73F;" />

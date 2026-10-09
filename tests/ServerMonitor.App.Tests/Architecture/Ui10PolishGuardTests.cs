@@ -100,6 +100,81 @@ public sealed partial class Ui10PolishGuardTests
         Assert.True(failures.Count == 0, "Local re-shape of a tiered button:\n  " + string.Join("\n  ", failures));
     }
 
+    /// <summary>
+    /// F01/F02/F46 (H01): the nav keyboard ring is concentric (-3 on every side, like the buttons), every selectable
+    /// sidebar item has the same 46 geometry (Definições included), and the rail item is a 46 circle.
+    /// </summary>
+    [Fact]
+    public void NavItems_HaveAConcentricFocusRingAndOneGeometry()
+    {
+        var nav = AppSourceTree.LoadXaml("Styles/Components/Sa.Navigation.xaml").Root!.Elements(Ns + "Style")
+            .Single(style => (string?)style.Attribute(X + "Key") == "SaNavItemStyle");
+        Assert.Equal("-3", (string?)Setter(nav, "FocusVisualMargin"));
+        Assert.Equal("46", (string?)Setter(nav, "Height"));
+        Assert.Equal("23", (string?)Setter(nav, "CornerRadius"));
+
+        var sidebar = AppSourceTree.LoadXaml("Controls/SaSidebar.xaml");
+        var items = sidebar.Descendants(Ns + "RadioButton").ToList();
+        Assert.Equal(4, items.Count);
+        Assert.All(items, item => Assert.Equal("46", (string?)item.Attribute("Height")));
+        var rows = sidebar.Descendants(Ns + "RowDefinition").Select(row => (string?)row.Attribute("Height")).ToList();
+        foreach (var item in items)
+            Assert.Equal("46", rows[int.Parse((string)item.Attribute("Grid.Row")!, CultureInfo.InvariantCulture)]);
+
+        var code = AppSourceTree.CodeWithoutComments("Controls/SaSidebar.xaml.cs");
+        Assert.Contains("item.Width = rail ? 46 : 160;", code, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// F09/F10 (H04): Visão geral, Servidores and Definições share ONE header (Figma Page header 235:270): the same grid,
+    /// title block, reserved line 2 and an actions slot centred on the title line (buttons) or the status text (Definições),
+    /// so the "+ Adicionar" sits at the same y on both pages and line 2 never makes it jump; 24 to the content on both.
+    /// </summary>
+    [Theory]
+    [InlineData("Views/DashboardPage.xaml", "SaPageHeaderActionsStyle")]
+    [InlineData("Views/ServersPage.xaml", "SaPageHeaderActionsStyle")]
+    [InlineData("Views/SettingsPage.xaml", "SaPageHeaderStatusTextStyle")]
+    public void PageHeaders_AreTheSharedComponent(string page, string actionSlotStyle)
+    {
+        var document = AppSourceTree.LoadXaml(page);
+        string? StyleOf(XElement element) => StyleKey((string?)element.Attribute("Style"));
+        var header = Assert.Single(document.Descendants(Ns + "Grid"), grid => StyleOf(grid) == "SaPageHeaderGridStyle");
+        Assert.Null(header.Attribute("ColumnSpacing"));
+        var title = Assert.Single(header.Elements(Ns + "StackPanel"), panel => StyleOf(panel) == "SaPageHeaderTitleBlockStyle");
+        Assert.Null(title.Attribute("Spacing"));
+        Assert.Null(title.Attribute("VerticalAlignment"));
+        var lineTwo = Assert.Single(title.Elements(Ns + "StackPanel"), panel => StyleOf(panel) == "SaPageHeaderLineTwoStyle");
+        Assert.All(lineTwo.Elements(Ns + "TextBlock"), text => Assert.Equal("SaPageSubtitleTextStyle", StyleOf(text)));
+        var slot = Assert.Single(header.Elements(), element => StyleOf(element) == actionSlotStyle);
+        Assert.Equal("1", (string?)slot.Attribute("Grid.Column"));
+        Assert.Null(slot.Attribute("VerticalAlignment"));
+        Assert.Null(slot.Attribute("Margin"));
+        if (page != "Views/SettingsPage.xaml")
+        {
+            var root = document.Descendants(Ns + "StackPanel").Single(panel => (string?)panel.Attribute(X + "Name") == "PageRoot");
+            Assert.Equal("{StaticResource SaSpace24}", (string?)root.Attribute("Spacing"));
+        }
+    }
+
+    /// <summary>F09/F10: the shared header's geometry (component layer).</summary>
+    [Fact]
+    public void PageHeaderStyles_CentreTheActionsOnTheTitleLine()
+    {
+        var styles = AppSourceTree.LoadXaml("Styles/Components/Sa.Text.xaml").Root!.Elements(Ns + "Style")
+            .ToDictionary(style => (string)style.Attribute(X + "Key")!, StringComparer.Ordinal);
+        Assert.Equal("16", Setter(styles["SaPageHeaderGridStyle"], "ColumnSpacing"));
+        Assert.Equal("6", Setter(styles["SaPageHeaderTitleBlockStyle"], "Spacing"));
+        Assert.Equal("Top", Setter(styles["SaPageHeaderTitleBlockStyle"], "VerticalAlignment"));
+        Assert.Equal("{StaticResource SaLineHeightControl}", Setter(styles["SaPageHeaderLineTwoStyle"], "MinHeight"));
+        Assert.Equal("Top", Setter(styles["SaPageHeaderActionsStyle"], "VerticalAlignment"));
+        Assert.Equal("0,-2,0,0", Setter(styles["SaPageHeaderActionsStyle"], "Margin")); // 44 button on the 40 title line
+        Assert.Equal("16", Setter(styles["SaPageHeaderActionsStyle"], "Spacing"));
+        Assert.Equal("0,12,0,0", Setter(styles["SaPageHeaderStatusTextStyle"], "Margin")); // 16 line on the 40 title line
+    }
+
+    private static string? Setter(XElement style, string property) =>
+        (string?)style.Elements(Ns + "Setter").FirstOrDefault(setter => (string?)setter.Attribute("Property") == property)?.Attribute("Value");
+
     private static Dictionary<string, double> RadiusTiers() =>
         AppSourceTree.LoadXaml("Styles/Tokens/Radius.xaml").Root!.Elements(Ns + "CornerRadius")
             .Where(element => ((string?)element.Attribute(X + "Key"))?.StartsWith("SaRadiusButton", StringComparison.Ordinal) == true)

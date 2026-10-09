@@ -30,6 +30,7 @@
                         <Setter Target="AutosaveText.(Grid.Row)" Value="1" />
                         <Setter Target="AutosaveText.(Grid.Column)" Value="0" />
                         <Setter Target="AutosaveText.HorizontalAlignment" Value="Left" />
+                        <Setter Target="AutosaveText.Margin" Value="0" />
                         <Setter Target="ThemeControl.(Grid.Row)" Value="1" />
                         <Setter Target="ThemeControl.(Grid.Column)" Value="0" />
                         <Setter Target="ThemeControl.HorizontalAlignment" Value="Left" />
@@ -63,8 +64,9 @@
         </VisualStateManager.VisualStateGroups>
         <StackPanel x:Name="PageRoot" Padding="{StaticResource SaPagePadding}" Spacing="{StaticResource SaSpace20}">
 
-            <!-- Settings header 112:7910: [back, DERIVED until UI.6's sidebar] title 32 + "À tua medida." | autosave 11. -->
-            <Grid ColumnSpacing="{StaticResource SaSpace16}" RowSpacing="{StaticResource SaSpace4}">
+            <!-- Header = the shared page header, status-text variant (UI.10 F09/F10, Figma Page header Ação=Texto 247:418):
+                 title 32/40 + "À tua medida." 13/18 muted | autosave 11, centred on the title line. -->
+            <Grid Style="{StaticResource SaPageHeaderGridStyle}" RowSpacing="{StaticResource SaSpace4}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
@@ -73,16 +75,17 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
-                <StackPanel Grid.Column="0" Spacing="{StaticResource SaSpace4}" VerticalAlignment="Center">
+                <StackPanel Grid.Column="0" Style="{StaticResource SaPageHeaderTitleBlockStyle}">
                     <primitives:SaHeadingHost AutomationProperties.HeadingLevel="Level1" IsTabStop="False">
                         <TextBlock x:Uid="SettingsTitle" AutomationProperties.AccessibilityView="Raw" IsTextSelectionEnabled="False" IsTabStop="False" Style="{StaticResource SaPageTitleTextStyle}" />
                     </primitives:SaHeadingHost>
-                    <TextBlock x:Uid="SettingsSubtitle" Style="{StaticResource SaControlTextStyle}" FontWeight="Normal"
-                               Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap" />
+                    <StackPanel Style="{StaticResource SaPageHeaderLineTwoStyle}">
+                        <TextBlock x:Uid="SettingsSubtitle" Style="{StaticResource SaPageSubtitleTextStyle}" TextWrapping="Wrap" />
+                    </StackPanel>
                 </StackPanel>
                 <!-- A-9: a fixed label; a failed save shows its own notice next to the setting (the label never claims success). -->
-                <TextBlock x:Name="AutosaveText" x:Uid="SettingsAutosave" Grid.Column="1" VerticalAlignment="Center"
-                           Style="{StaticResource SaHelperTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" />
+                <TextBlock x:Name="AutosaveText" x:Uid="SettingsAutosave" Grid.Column="1"
+                           Style="{StaticResource SaPageHeaderStatusTextStyle}" />
             </Grid>
 
             <!-- A configuration write was refused because a restore holds the configuration (M14.6). -->

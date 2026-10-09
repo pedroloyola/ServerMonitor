@@ -173,14 +173,16 @@ public sealed class Ui4FidelityContractTests
 
     // ---- servidores ------------------------------------------------------------------------------------------
 
-    /// <summary>B8: "Adicionar" stays beside the title at every width (112:1420): no state moves it.</summary>
+    /// <summary>B8: "Adicionar" stays beside the title at every width (112:1420): no state moves it. UI.10 F09: it lives in
+    /// the shared header's actions slot (column 1).</summary>
     [Fact]
     public void Servers_AddStaysBesideTheTitle_AtEveryWidth()
     {
         var elements = Elements(Servers);
         Assert.DoesNotContain(elements, e => e.Name.LocalName == "Setter" && Attr(e, "Target")?.StartsWith("AddButton.", StringComparison.Ordinal) == true);
         var add = Assert.Single(elements, e => Name(e) == "AddButton");
-        Assert.Equal("1", Attr(add, "Grid.Column"));
+        Assert.Equal("1", Attr(add.Parent!, "Grid.Column"));
+        Assert.Equal("{StaticResource SaPageHeaderActionsStyle}", Attr(add.Parent!, "Style"));
     }
 
     // ---- Cortex r3 NIT-1: parity with the Core ------------------------------------------------------------------
