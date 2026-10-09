@@ -1,7 +1,7 @@
 <ResourceDictionary
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <!-- Definition only. Consumers must honour UISettings.AnimationsEnabled.
+    <!-- Consumers must honour Reduced Motion (UISettings.AnimationsEnabled) through Services/Motion/MotionPolicy.
          Stored as x:String exactly like WinUI's own ControlFastAnimationDuration / ControlFastOutSlowInKeySpline
          resources, so they convert wherever a KeyTime, Duration or KeySpline attribute consumes them.
          Focus timings preserve the former ServerFullCard keyframe times (not three phase lengths); kept after UI.5.
@@ -16,4 +16,17 @@
     <x:String x:Key="SaMotionLinearKeySpline">0,0,1,1</x:String>
     <x:String x:Key="SaMotionDirectKeySpline">0,0,0,1</x:String>
     <x:String x:Key="SaMotionPointToPointKeySpline">0.55,0.55,0,1</x:String>
+    <!-- UI.11 Motion System (Prism UI11A §4.1/§4.2): semantic aliases over the same Fluent 83/167/250 scale. Consumers use
+         the role; a tuning decision changes the alias, never the scale. Hierarchy: hover 83 < toggle 167 < select 250;
+         an exit is always shorter than its entrance; no UI.11 pattern exceeds 250 ms (SaMotionSlowDuration stays unused). -->
+    <x:String x:Key="SaMotionHoverDuration">0:0:0.083</x:String>
+    <x:String x:Key="SaMotionToggleDuration">0:0:0.167</x:String>
+    <x:String x:Key="SaMotionSelectDuration">0:0:0.250</x:String>
+    <x:String x:Key="SaMotionEnterDuration">0:0:0.167</x:String>
+    <x:String x:Key="SaMotionEnterOffsetDuration">0:0:0.250</x:String>
+    <x:String x:Key="SaMotionExitDuration">0:0:0.083</x:String>
+    <x:String x:Key="SaMotionExpandDuration">0:0:0.250</x:String>
+    <x:String x:Key="SaMotionCollapseDuration">0:0:0.167</x:String>
+    <!-- Fluent accelerate/exit: translation that leaves (exit, collapse). -->
+    <x:String x:Key="SaMotionExitKeySpline">1,0,1,1</x:String>
 </ResourceDictionary>
