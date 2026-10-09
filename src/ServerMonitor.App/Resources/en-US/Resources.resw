@@ -562,7 +562,12 @@
   <data name="WorkloadServiceDisplayAccessibleFormat" xml:space="preserve"><value>{0}, {1}, startup {2}</value></data>
   <data name="WorkloadNoResultsTitleFormat" xml:space="preserve"><value>No results for “{0}”</value></data>
   <data name="WorkloadNoProblemsTitle" xml:space="preserve"><value>No issues found</value></data>
-  <data name="WorkloadNoResultsMessage" xml:space="preserve"><value>Try another name or clear the filters&#10;to see all services and containers again.</value></data>
+  <data name="WorkloadNoResultsInFilterTitleFormat" xml:space="preserve"><value>No results for “{0}” in {1}</value></data>
+  <data name="WorkloadNoResultsSearchMessage" xml:space="preserve"><value>Try another name.</value></data>
+  <data name="WorkloadNoResultsFilterMessage" xml:space="preserve"><value>All services and containers are running.</value></data>
+  <data name="WorkloadNoResultsSearchAndFilterMessage" xml:space="preserve"><value>Try another name or show all.</value></data>
+  <data name="WorkloadShowAll" xml:space="preserve"><value>Show all</value></data>
+  <data name="WorkloadClearSearchAndFilter" xml:space="preserve"><value>Clear search and filter</value></data>
   <data name="WorkloadClearSearch" xml:space="preserve"><value>Clear search</value></data>
   <data name="WorkloadSectionNoResults" xml:space="preserve"><value>No results in this section</value></data>
   <data name="WorkloadNothingTitle" xml:space="preserve"><value>Nothing to show</value></data>
@@ -589,7 +594,6 @@
   <data name="WorkloadLoadingPanel.Text" xml:space="preserve"><value>Loading…</value></data>
   <data name="WorkloadRetryButton.Content" xml:space="preserve"><value>Try again</value></data>
   <data name="WorkloadNothingRefreshButton.Content" xml:space="preserve"><value>Refresh</value></data>
-  <data name="WorkloadClearSearchButton.Content" xml:space="preserve"><value>Clear search</value></data>
   <data name="HistoryUnavailableState.Title" xml:space="preserve"><value>History unavailable</value></data>
   <data name="HistoryUnavailableState.Message" xml:space="preserve"><value>Local history can't be read right now. Monitoring continues as usual.</value></data>
   <data name="HistoryOfflineNotice.Title" xml:space="preserve"><value>Offline period</value></data>
@@ -603,7 +607,6 @@
   <data name="WorkloadNothingState.Message" xml:space="preserve"><value>The check finished, but no services or containers&#10;are available to monitor.</value></data>
   <data name="WorkloadUnavailableState.Title" xml:space="preserve"><value>Couldn’t get services</value></data>
   <data name="WorkloadUnavailableState.Message" xml:space="preserve"><value>Check the connection and the SSH user’s permissions.&#10;Service and container data isn’t available.</value></data>
-  <data name="WorkloadNoResultsState.Message" xml:space="preserve"><value>Try another name or clear the filters&#10;to see all services and containers again.</value></data>
   <data name="WorkloadDockerNotInstalledState.Title" xml:space="preserve"><value>Docker not installed</value></data>
   <data name="WorkloadDockerNotInstalledState.Message" xml:space="preserve"><value>Docker isn't available on this server. Only services are shown.</value></data>
   <data name="WorkloadDockerPermissionState.Title" xml:space="preserve"><value>No permission to access Docker</value></data>

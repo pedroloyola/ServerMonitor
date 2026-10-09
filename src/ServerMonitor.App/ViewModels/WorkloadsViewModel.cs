@@ -43,6 +43,22 @@ public enum WorkloadGlobalFilter
 }
 
 /// <summary>
+/// UI.10 F12 (H06): which query emptied the page - the "no results" panel says exactly that and offers the action that
+/// undoes it (Prism UI.10A §H06; Figma 112:15289 A, 243:422 B, 243:641 C).
+/// </summary>
+public enum WorkloadNoResultsCase
+{
+    /// <summary>A: only a search - "Nenhum resultado para «x»", clear the search.</summary>
+    Search,
+
+    /// <summary>B: only the "Com problemas" filter - a positive "Nenhum problema encontrado", show all.</summary>
+    Filter,
+
+    /// <summary>C: search + filter - "... em Com problemas", clear both (said, not silent).</summary>
+    SearchAndFilter
+}
+
+/// <summary>
 /// Presents one server's read-only workloads (M11): Docker containers and managed services. Like the
 /// dashboard, it observes the transient <see cref="IServerWorkloadStore"/> and never runs a timer of its
 /// own — the collector/coordinator refresh the snapshot, this VM re-renders on <c>WorkloadChanged</c>.
@@ -79,7 +95,7 @@ public sealed class WorkloadsViewModel : ObservableObject, IDisposable
     private string? _updatedAgoDisplay;
     // UI.3 additions. Null-safe so a runtime-free host that skips field initializers can still read them.
     private readonly IServerMetricsStore? _metricsStore;
-    private readonly RelayCommand? _clearSearchCommand;
+    private readonly RelayCommand? _noResultsActionCommand;
     private string? _searchText;
     private WorkloadGlobalFilter _globalFilter;
     private ServiceManager _servicesManager;
@@ -123,7 +139,7 @@ public sealed class WorkloadsViewModel : ObservableObject, IDisposable
         // UI.4 (Boss, Beacon r1 SHOULD-4): the server crumb leads to that server's interim page (Visão geral if gone).
         BackCommand = new RelayCommand(() => navigationService.ReturnToServerDetail(_serverId));
         _refreshCommand = new AsyncRelayCommand(RefreshAsync, () => !IsRefreshing);
-        _clearSearchCommand = new RelayCommand(ClearSearch);
+        _noResultsActionCommand = new RelayCommand(UndoQuery);
 
         RefreshAutomationName = _localization.GetString("WorkloadRefreshButton");
     }
@@ -205,9 +221,14 @@ public sealed class WorkloadsViewModel : ObservableObject, IDisposable
     /// Page-level "Nenhum resultado": a query is active, at least one section has a list, and every
     /// visible list came back empty. Section-only misses use <see cref="ShowDockerSectionNoResults"/> /
     /// <see cref="ShowServicesSectionNoResults"/>.
+    /// UI.10 F14: only when BOTH sections have a known list (a list or a known-empty one) - while either section is
+    /// loading, in error, not installed, denied or unsupported, its own card stays visible, so an error is never hidden
+    /// behind a page-wide "no results" (the other card then shows "Sem resultados nesta secção").
     /// </summary>
     public bool ShowGlobalNoResults =>
         HasActiveQuery
+        && DockerState is DockerViewState.Containers or DockerViewState.Empty
+        && ServicesState is ServicesViewState.List or ServicesViewState.Empty
         && (ShowDockerContainers || ShowServicesList)
         && (!ShowDockerContainers || Containers.Count == 0)
         && (!ShowServicesList || Services.Count == 0);
@@ -218,20 +239,56 @@ public sealed class WorkloadsViewModel : ObservableObject, IDisposable
     /// <summary>"Sem resultados nesta secção" inside the Services card (the other card still has rows).</summary>
     public bool ShowServicesSectionNoResults => ShowServicesNoResults && !ShowGlobalNoResults;
 
-    /// <summary>"Nenhum resultado para “redis”", or "Nenhum problema encontrado" for the filter alone.</summary>
+    /// <summary>UI.10 F12: which query emptied the page (only meaningful while <see cref="ShowGlobalNoResults"/>).</summary>
+    public WorkloadNoResultsCase NoResultsCase
+    {
+        get
+        {
+            var search = SearchText.Trim().Length > 0;
+            var filter = _globalFilter != WorkloadGlobalFilter.All;
+            return search && filter ? WorkloadNoResultsCase.SearchAndFilter
+                : search ? WorkloadNoResultsCase.Search
+                : WorkloadNoResultsCase.Filter;
+        }
+    }
+
+    /// <summary>Case B is a positive state (nothing is wrong): the panel shows the tick, not the search glass.</summary>
+    public bool IsNoResultsAllClear => NoResultsCase == WorkloadNoResultsCase.Filter;
+
+    /// <summary>A "Nenhum resultado para “redis”", B "Nenhum problema encontrado", C "Nenhum resultado para “redis” em Com problemas".</summary>
     public string NoResultsTitle
     {
         get
         {
             var search = SearchText.Trim();
-            return search.Length > 0
-                ? string.Format(CultureInfo.CurrentUICulture, _localization?.GetString("WorkloadNoResultsTitleFormat") ?? "{0}", search)
-                : _localization?.GetString("WorkloadNoProblemsTitle") ?? string.Empty;
+            return NoResultsCase switch
+            {
+                WorkloadNoResultsCase.Search => string.Format(CultureInfo.CurrentUICulture, Text("WorkloadNoResultsTitleFormat", "{0}"), search),
+                WorkloadNoResultsCase.SearchAndFilter => string.Format(CultureInfo.CurrentUICulture,
+                    Text("WorkloadNoResultsInFilterTitleFormat", "{0} {1}"), search, Text("WorkloadFilterProblems", string.Empty)),
+                _ => Text("WorkloadNoProblemsTitle", string.Empty)
+            };
         }
     }
 
-    /// <summary>"Limpar pesquisa": clears the search AND resets the filter(s) to Todos.</summary>
-    public ICommand ClearSearchCommand => _clearSearchCommand ?? new RelayCommand(ClearSearch);
+    /// <summary>A "Experimenta outro nome.", B "Todos os serviços e containers estão a funcionar.", C "... ou mostra todos."</summary>
+    public string NoResultsMessage => Text(NoResultsCase switch
+    {
+        WorkloadNoResultsCase.Search => "WorkloadNoResultsSearchMessage",
+        WorkloadNoResultsCase.SearchAndFilter => "WorkloadNoResultsSearchAndFilterMessage",
+        _ => "WorkloadNoResultsFilterMessage"
+    }, string.Empty);
+
+    /// <summary>The CTA names its real effect: A "Limpar pesquisa", B "Mostrar todos", C "Limpar pesquisa e filtro".</summary>
+    public string NoResultsActionLabel => Text(NoResultsCase switch
+    {
+        WorkloadNoResultsCase.Search => "WorkloadClearSearch",
+        WorkloadNoResultsCase.SearchAndFilter => "WorkloadClearSearchAndFilter",
+        _ => "WorkloadShowAll"
+    }, string.Empty);
+
+    /// <summary>UI.10 F12: undoes exactly what the label says - A the search, B the filter, C both.</summary>
+    public ICommand NoResultsActionCommand => _noResultsActionCommand ?? new RelayCommand(UndoQuery);
 
     // --- UI.3 header context + section summaries --------------------------------------------------------
 
@@ -570,11 +627,21 @@ public sealed class WorkloadsViewModel : ObservableObject, IDisposable
     private string? ProblemBadge(int problems) =>
         problems > 0 ? Format(WorkloadPresentation.PluralKey("WorkloadProblemBadge", problems), problems) : null;
 
-    private void ClearSearch()
+    private void UndoQuery()
     {
-        SearchText = string.Empty;
-        GlobalFilter = WorkloadGlobalFilter.All;
+        var undo = NoResultsCase;
+        if (undo != WorkloadNoResultsCase.Filter)
+        {
+            SearchText = string.Empty;
+        }
+
+        if (undo != WorkloadNoResultsCase.Search)
+        {
+            GlobalFilter = WorkloadGlobalFilter.All;
+        }
     }
+
+    private string Text(string key, string fallback) => _localization?.GetString(key) ?? fallback;
 
     private void RaiseNoResults()
     {
@@ -585,6 +652,10 @@ public sealed class WorkloadsViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(ShowDockerSectionNoResults));
         OnPropertyChanged(nameof(ShowServicesSectionNoResults));
         OnPropertyChanged(nameof(NoResultsTitle));
+        OnPropertyChanged(nameof(NoResultsCase));
+        OnPropertyChanged(nameof(IsNoResultsAllClear));
+        OnPropertyChanged(nameof(NoResultsMessage));
+        OnPropertyChanged(nameof(NoResultsActionLabel));
     }
 
     private void ApplyFreshness(ServerWorkloadSnapshot? snapshot)
@@ -786,6 +857,7 @@ public sealed class WorkloadsViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(ShowDockerError));
         OnPropertyChanged(nameof(ShowDockerNoResults));
         OnPropertyChanged(nameof(ShowDockerTruncatedNotice));
+        RaiseNoResults(); // UI.10 F14: the page-level panel depends on both sections' states
     }
 
     private void RaiseServicesVisibility()
@@ -798,6 +870,7 @@ public sealed class WorkloadsViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(ShowServicesError));
         OnPropertyChanged(nameof(ShowServicesNoResults));
         OnPropertyChanged(nameof(ShowServicesTruncatedNotice));
+        RaiseNoResults(); // UI.10 F14
     }
 
     private string Format(string key, int value) =>

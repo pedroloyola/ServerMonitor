@@ -131,7 +131,7 @@ public sealed partial class Ui3PageContractTests
             .Order(StringComparer.Ordinal)
             .ToArray();
 
-        Assert.Equal(new[] { "{Binding ClearSearchCommand}", "{Binding RefreshCommand}" }, commands);
+        Assert.Equal(new[] { "{Binding NoResultsActionCommand}", "{Binding RefreshCommand}" }, commands); // UI.10 F12: the per-case CTA
         Assert.DoesNotContain(Elements(Workloads), e => e.Name.LocalName is "MenuFlyout" or "MenuFlyoutItem" or "AppBarButton");
     }
 
@@ -208,7 +208,8 @@ public sealed partial class Ui3PageContractTests
         var range = Assert.Single(Elements(History), e => (string?)e.Attribute(AppSourceTree.Xaml + "Name") == "RangeLast30Days");
         Assert.Equal("4", Attr(range, "IsChecked")!.Split("ConverterParameter=")[1].TrimEnd('}'));
 
-        var clear = Assert.Single(Elements(Workloads), e => Uid(e) == "WorkloadClearSearchButton");
+        // UI.10 F12: the per-case CTA (its label is bound) still returns focus to the search box.
+        var clear = Assert.Single(Elements(Workloads), e => (string?)e.Attribute(AppSourceTree.Xaml + "Name") == "NoResultsActionButton");
         Assert.Equal("OnClearSearchClick", Attr(clear, "Click"));
         Assert.Contains("FocusAfterAction.MoveTo((Control)sender, SearchBox)", AppSourceTree.CodeWithoutComments("Views/WorkloadsPage.xaml.cs"), StringComparison.Ordinal);
 
@@ -227,7 +228,7 @@ public sealed partial class Ui3PageContractTests
 
         var workloads = Elements(Workloads).ToList();   // one document: Except compares element instances
         var sectionStates = workloads.Where(e => e.Name.LocalName == "SaEmptyState"
-                                                            && (Uid(e)!.StartsWith("WorkloadDocker", StringComparison.Ordinal) || Uid(e)!.StartsWith("WorkloadServices", StringComparison.Ordinal))).ToList();
+                                                            && (Uid(e)?.StartsWith("WorkloadDocker", StringComparison.Ordinal) == true || Uid(e)?.StartsWith("WorkloadServices", StringComparison.Ordinal) == true)).ToList();
         Assert.Equal(9, sectionStates.Count);
         Assert.All(sectionStates, s => Assert.Equal("Level3", Attr(s, "TitleHeadingLevel")));
         var pageStates = workloads.Concat(Elements(History)).Where(e => e.Name.LocalName == "SaEmptyState").Except(sectionStates).ToList();

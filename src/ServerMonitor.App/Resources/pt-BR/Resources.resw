@@ -567,7 +567,12 @@
   <data name="WorkloadServiceDisplayAccessibleFormat" xml:space="preserve"><value>{0}, {1}, inicialização {2}</value></data>
   <data name="WorkloadNoResultsTitleFormat" xml:space="preserve"><value>Nenhum resultado para “{0}”</value></data>
   <data name="WorkloadNoProblemsTitle" xml:space="preserve"><value>Nenhum problema encontrado</value></data>
-  <data name="WorkloadNoResultsMessage" xml:space="preserve"><value>Tente outro nome ou remova os filtros&#10;para voltar a ver todos os serviços e containers.</value></data>
+  <data name="WorkloadNoResultsInFilterTitleFormat" xml:space="preserve"><value>Nenhum resultado para “{0}” em {1}</value></data>
+  <data name="WorkloadNoResultsSearchMessage" xml:space="preserve"><value>Tente outro nome.</value></data>
+  <data name="WorkloadNoResultsFilterMessage" xml:space="preserve"><value>Todos os serviços e containers estão funcionando.</value></data>
+  <data name="WorkloadNoResultsSearchAndFilterMessage" xml:space="preserve"><value>Tente outro nome ou mostre todos.</value></data>
+  <data name="WorkloadShowAll" xml:space="preserve"><value>Mostrar todos</value></data>
+  <data name="WorkloadClearSearchAndFilter" xml:space="preserve"><value>Limpar pesquisa e filtro</value></data>
   <data name="WorkloadClearSearch" xml:space="preserve"><value>Limpar pesquisa</value></data>
   <data name="WorkloadSectionNoResults" xml:space="preserve"><value>Sem resultados nesta seção</value></data>
   <data name="WorkloadNothingTitle" xml:space="preserve"><value>Nada para exibir</value></data>
@@ -594,7 +599,6 @@
   <data name="WorkloadLoadingPanel.Text" xml:space="preserve"><value>Carregando…</value></data>
   <data name="WorkloadRetryButton.Content" xml:space="preserve"><value>Tentar novamente</value></data>
   <data name="WorkloadNothingRefreshButton.Content" xml:space="preserve"><value>Atualizar</value></data>
-  <data name="WorkloadClearSearchButton.Content" xml:space="preserve"><value>Limpar pesquisa</value></data>
   <data name="HistoryUnavailableState.Title" xml:space="preserve"><value>Histórico indisponível</value></data>
   <data name="HistoryUnavailableState.Message" xml:space="preserve"><value>Não foi possível ler o histórico local agora. O monitoramento continua normalmente.</value></data>
   <data name="HistoryOfflineNotice.Title" xml:space="preserve"><value>Período offline</value></data>
@@ -608,7 +612,6 @@
   <data name="WorkloadNothingState.Message" xml:space="preserve"><value>A consulta terminou, mas não foram encontrados&#10;serviços ou containers disponíveis para monitoramento.</value></data>
   <data name="WorkloadUnavailableState.Title" xml:space="preserve"><value>Não foi possível obter os serviços</value></data>
   <data name="WorkloadUnavailableState.Message" xml:space="preserve"><value>Verifique a conexão e as permissões do usuário SSH.&#10;Os dados de serviços e containers não estão disponíveis.</value></data>
-  <data name="WorkloadNoResultsState.Message" xml:space="preserve"><value>Tente outro nome ou remova os filtros&#10;para voltar a ver todos os serviços e containers.</value></data>
   <data name="WorkloadDockerNotInstalledState.Title" xml:space="preserve"><value>Docker não instalado</value></data>
   <data name="WorkloadDockerNotInstalledState.Message" xml:space="preserve"><value>O Docker não está disponível neste servidor. São mostrados apenas os serviços.</value></data>
   <data name="WorkloadDockerPermissionState.Title" xml:space="preserve"><value>Sem permissão para acessar o Docker</value></data>

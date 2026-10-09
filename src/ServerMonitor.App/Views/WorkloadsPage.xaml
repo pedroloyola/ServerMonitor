@@ -10,6 +10,9 @@
          READ-ONLY (M11): no start/stop/restart anywhere. -->
     <Page.Resources>
         <converters:IndexToBooleanConverter x:Key="IndexToBooleanConverter" />
+        <!-- UI.10 F12: tick for the positive filter-only case (B), the search glass for A/C. -->
+        <converters:BooleanToStringConverter x:Key="NoResultsIconConverter" TrueValue="{StaticResource SaIconTick02Data}"
+                                             FalseValue="{StaticResource SaIconSearch01Data}" />
         <converters:WorkloadSeverityToStatusKindConverter x:Key="WorkloadSeverityToStatusKindConverter" />
         <converters:WorkloadSeverityToSaTextStyleConverter x:Key="WorkloadSeverityToSaTextStyleConverter" />
 
@@ -326,14 +329,17 @@
                 </ScrollViewer>
             </Border>
 
-            <!-- No results 112:15381: the query hid every row in both lists. -->
+            <!-- No results 112:15381: the query hid every row in both lists. UI.10 F12 (H06): icon, title, message and CTA per case
+                 (Figma A 112:15289, B 243:422, C 243:641) - the CTA undoes exactly what it says. -->
             <Border Style="{StaticResource SaStatePanelStyle}"
                     Visibility="{Binding ShowGlobalNoResults, Converter={StaticResource BooleanToVisibilityConverter}}">
                 <!-- Beacon L2: the pane is named by the state title, never by the action inside it. -->
                 <ScrollViewer VerticalScrollBarVisibility="Auto" VerticalContentAlignment="Center" AutomationProperties.Name="{Binding Title, ElementName=NoResultsState}">
-                    <primitives:SaEmptyState x:Name="NoResultsState" x:Uid="WorkloadNoResultsState" VerticalAlignment="Center" IconData="{StaticResource SaIconSearch01Data}"
-                                             Title="{Binding NoResultsTitle}">
-                        <Button x:Uid="WorkloadClearSearchButton" Width="200" HorizontalAlignment="Center" Style="{StaticResource SaSolidButtonStyle}" Command="{Binding ClearSearchCommand}"
+                    <primitives:SaEmptyState x:Name="NoResultsState" VerticalAlignment="Center"
+                                             IconData="{Binding IsNoResultsAllClear, Converter={StaticResource NoResultsIconConverter}}"
+                                             Title="{Binding NoResultsTitle}" Message="{Binding NoResultsMessage}">
+                        <Button x:Name="NoResultsActionButton" MinWidth="200" HorizontalAlignment="Center" Style="{StaticResource SaSolidButtonStyle}"
+                                Content="{Binding NoResultsActionLabel}" Command="{Binding NoResultsActionCommand}"
                                 Click="OnClearSearchClick" />
                     </primitives:SaEmptyState>
                 </ScrollViewer>
