@@ -170,12 +170,20 @@ public sealed class Ui5ServerDetailTests
 
         Assert.Equal(17, detail.MemoryLitSegments); // Figma 112:1855: 62% → 17/28
         Assert.Equal(7, detail.DiskLitSegments);    // Figma 112:1890: 48% → 7/14
-        var row = Assert.Single(kit.Dashboard.OverviewServers, r => r.Name == "db");
-        Assert.Equal(row.CpuSeverity, detail.CpuSeverity);
-        Assert.Equal(row.MemorySeverity, detail.MemorySeverity);
-        Assert.Equal(row.DiskSeverity, detail.DiskSeverity);
-        Assert.Equal(ServerHealth.Critical, detail.CpuSeverity); // 97% over the engine's critical limit
-        Assert.Equal(ServerHealth.Healthy, detail.MemorySeverity);
+
+        // Tests review L-7: every metric at a different severity (CPU critical, Memory warning, Disk critical) - each one
+        // equals its Servidores row, so no metric can borrow another's severity.
+        var mixed = new Ui4TestKit.Fleet().Add("mix", ServerHealth.Critical, cpu: 97, mem: 88, disk: 93);
+        var mixedKit = await LoadedAsync(mixed);
+        using var mixedDetail = Open(mixedKit, "mix");
+        var row = Assert.Single(mixedKit.Dashboard.OverviewServers, r => r.Name == "mix");
+        Assert.Equal(row.CpuSeverity, mixedDetail.CpuSeverity);
+        Assert.Equal(row.MemorySeverity, mixedDetail.MemorySeverity);
+        Assert.Equal(row.DiskSeverity, mixedDetail.DiskSeverity);
+        Assert.Equal(ServerHealth.Critical, mixedDetail.CpuSeverity); // 97 >= CPU critical 95
+        Assert.Equal(ServerHealth.Warning, mixedDetail.MemorySeverity); // 80 <= 88 < 95
+        Assert.Equal(ServerHealth.Critical, mixedDetail.DiskSeverity); // 93 >= disk critical 90
+        Assert.Equal(ServerHealth.Healthy, detail.MemorySeverity); // the Figma fleet: 62% under the limit
     }
 
     /// <summary>
@@ -203,13 +211,19 @@ public sealed class Ui5ServerDetailTests
     [Fact]
     public async Task DetailValues_SayTheirSeverityInWords()
     {
-        var fleet = new Ui4TestKit.Fleet().Add("db", ServerHealth.Critical, cpu: 97, mem: 62, disk: 48);
+        // Tests review L-7: CPU critical, Memory warning, Disk critical - each card says its own word.
+        var fleet = new Ui4TestKit.Fleet().Add("db", ServerHealth.Critical, cpu: 97, mem: 88, disk: 93);
         var kit = await LoadedAsync(fleet, new ResWLocalizationService("pt-PT"));
         using var detail = Open(kit, "db");
 
         Assert.StartsWith("CPU: 97% crítico", detail.CpuAccessibleName, StringComparison.Ordinal);
-        Assert.Equal("Memória: 62%", detail.MemoryAccessibleName);
-        Assert.DoesNotContain("atenção", detail.DiskAccessibleName, StringComparison.Ordinal);
+        Assert.Equal("Memória: 88% em atenção", detail.MemoryAccessibleName);
+        Assert.Equal("Disco: 93% crítico", detail.DiskAccessibleName);
+
+        var calm = new Ui4TestKit.Fleet().Add("ok", ServerHealth.Healthy, cpu: 20, mem: 62, disk: 48);
+        var calmKit = await LoadedAsync(calm, new ResWLocalizationService("pt-PT"));
+        using var calmDetail = Open(calmKit, "ok");
+        Assert.Equal("Memória: 62%", calmDetail.MemoryAccessibleName); // under the limit: no word
     }
 
     // ---- derived states -------------------------------------------------------------------------------------------

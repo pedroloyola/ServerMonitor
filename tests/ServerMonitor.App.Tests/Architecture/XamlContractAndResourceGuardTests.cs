@@ -33,7 +33,7 @@ public sealed partial class XamlContractAndResourceGuardTests
         ["MainWindow.xaml"] =
         [
             "RootLayout", "WindowBackground", "StandardRoot", "ShellDragRegion", "ShellSurface", "Sidebar", "FirstRunView", "SidebarColumn", "ContentFrame", "ModalOverlayHost",
-            "CompactRoot", "CompactCaptionColumn", "CompactDragRegion", "CompactBody",
+            "CompactRoot", "CompactDragRegion", "CompactBody", // UI.10 H07: no caption-reserve column any more
             // UI.8: the title strip's measured layout (CompactTitleLayout) and the Compact body host.
             "CompactBrandMark", "CompactWordmark", "CompactExpandButton", "CompactExpandText", "CompactShellView"
         ],

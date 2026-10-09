@@ -28,8 +28,9 @@
     <Thickness x:Key="SaOnboardingPadding">48,40,48,36</Thickness>
     <Thickness x:Key="SaOnboardingBenefitPadding">18</Thickness>
     <Thickness x:Key="SaOnboardingCardPadding">24</Thickness>
-    <!-- UI.8 Compact window (Figma 05 sec. 15, p20): title band 0-60 = top 20 + 40 (brand padding 20 left, g12 before the
-         button); body 16 below the strip, 20 on the other sides. -->
-    <Thickness x:Key="SaCompactTitlePadding">20,20,12,0</Thickness>
+    <!-- UI.8 Compact window (Figma 05 sec. 15, p20): brand padding 20 left, g12 before the button; body 16 below the strip,
+         20 on the other sides. UI.10 H07: the title strip's 40 line sits below the native captions - its top is set in code
+         from the MEASURED caption height + 2; 34 (= a 32 Standard caption + 2) is only the provisional value. -->
+    <Thickness x:Key="SaCompactTitlePadding">20,34,12,0</Thickness>
     <Thickness x:Key="SaCompactBodyPadding">20,16,20,20</Thickness>
 </ResourceDictionary>

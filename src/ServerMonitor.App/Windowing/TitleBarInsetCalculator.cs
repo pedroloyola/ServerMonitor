@@ -12,6 +12,24 @@ public static class TitleBarInsetCalculator
     // No real caption region is wider than this; guards against absurd/uninitialized inset values.
     internal const double MaxReserveDips = 400;
 
+    /// <summary>UI.10 H07: the gap between the native caption band and the compact title strip's 40 line.</summary>
+    public const double StripGapBelowCaption = 2;
+
+    /// <summary>UI.10 H07: a 36 button centred on the 40 strip line sits 2 below the line's top.</summary>
+    public const double ButtonInsetOnStripLine = 2;
+
+    /// <summary>
+    /// UI.10 H07: the top of the compact title strip's 40 line, in DIPs: the native caption height converted like the inset
+    /// (rounded up, never a 1 px overlap) + <see cref="StripGapBelowCaption"/>. The "Expandir" button then starts at that
+    /// + <see cref="ButtonInsetOnStripLine"/>, so its -3 focus ring top = caption height + 1: always below the captions.
+    /// Returns 0 when the caption height is not reported (the caller keeps its provisional layout).
+    /// </summary>
+    public static double ToTitleStripTopDips(int captionHeightPhysicalPixels, double rasterizationScale)
+    {
+        var caption = ToReservedDips(captionHeightPhysicalPixels, rasterizationScale);
+        return caption > 0 ? caption + StripGapBelowCaption : 0;
+    }
+
     /// <summary>
     /// Reserved width in DIPs for the native caption buttons. Returns 0 when nothing is reserved
     /// (e.g. the system title bar is not extended). A non-positive rasterization scale is treated

@@ -247,6 +247,36 @@ public sealed partial class Ui10PolishGuardTests
         });
     }
 
+    /// <summary>
+    /// UI.10 H07 (Prism option D): the Compact "Expandir" ends at the content's right edge and never reaches the native
+    /// caption band - its right margin = the body's right padding, no column reserves the caption width, the strip's top
+    /// comes from the MEASURED caption height (no literal), and the title layout gets the whole width minus the two edges.
+    /// </summary>
+    [Fact]
+    public void CompactExpand_IsRightAligned_BelowTheMeasuredCaption()
+    {
+        var window = AppSourceTree.LoadXaml("MainWindow.xaml");
+        var expand = window.Descendants(Ns + "Button").Single(b => (string?)b.Attribute(X + "Name") == "CompactExpandButton");
+        var strip = expand.Parent!;
+        Assert.Equal(2, strip.Element(Ns + "Grid.ColumnDefinitions")!.Elements(Ns + "ColumnDefinition").Count());
+        Assert.DoesNotContain(window.Descendants(Ns + "ColumnDefinition"), c => (string?)c.Attribute(X + "Name") == "CompactCaptionColumn");
+        Assert.Equal("Top", (string?)expand.Attribute("VerticalAlignment"));
+
+        var spacing = AppSourceTree.LoadXaml("Styles/Tokens/Spacing.xaml").Root!.Elements(Ns + "Thickness")
+            .ToDictionary(t => (string)t.Attribute(X + "Key")!, t => t.Value.Trim().Split(',').Select(v => double.Parse(v, CultureInfo.InvariantCulture)).ToArray());
+        var margin = ((string)expand.Attribute("Margin")!).Split(',').Select(v => double.Parse(v, CultureInfo.InvariantCulture)).ToArray();
+        Assert.Equal(spacing["SaCompactBodyPadding"][2], margin[2]); // right edge = the content's right edge (W - 20)
+        Assert.Equal(spacing["SaCompactTitlePadding"][1] + ServerMonitor.App.Windowing.TitleBarInsetCalculator.ButtonInsetOnStripLine, margin[1]);
+        Assert.Equal("{StaticResource SaCompactTitlePadding}", (string?)window.Descendants(Ns + "Grid")
+            .Single(g => (string?)g.Attribute(X + "Name") == "CompactDragRegion").Attribute("Padding"));
+
+        var code = AppSourceTree.CodeWithoutComments("MainWindow.xaml.cs");
+        Assert.Contains("_placementAdapter.GetCaptionHeight()", code, StringComparison.Ordinal);
+        Assert.Contains("TitleBarInsetCalculator.ToTitleStripTopDips(height, xamlRoot.RasterizationScale)", code, StringComparison.Ordinal);
+        Assert.Contains("CompactRoot.ActualWidth - CompactDragRegion.Padding.Left - CompactExpandButton.Margin.Right", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("GetCaptionRightInset", code, StringComparison.Ordinal);
+    }
+
     private static string? Setter(XElement style, string property) =>
         (string?)style.Elements(Ns + "Setter").FirstOrDefault(setter => (string?)setter.Attribute("Property") == property)?.Attribute("Value");
 

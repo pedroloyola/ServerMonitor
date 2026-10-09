@@ -27,12 +27,14 @@
         </Grid>
 
         <!-- ============================ COMPACT PRESENTATION ============================ -->
-        <!-- UI.8 (Figma 05 sec. 15, 112:9397 / 112:9589): the same window, client 432x704 DIP by default. Title strip = band
-             0-60 (p20 + 40; brand and "Expandir" centred on y40, Prism R-3) left of the measured native caption reserve
-             (CompactCaptionColumn, Min/Close stay native: G-3). The body is CompactShell (p20, 16 below the strip). -->
+        <!-- UI.8 (Figma 05 sec. 15, 112:9397 / 112:9589): the same window, client 432x704 DIP by default. The body is
+             CompactShell (p20, 16 below the strip). UI.10 H07 (Prism option D): the title strip sits BELOW the native caption
+             buttons (Min/Close stay native: G-3) - its 40 line starts at the MEASURED caption height + 2 (set in code from
+             AppWindow.TitleBar.Height; 34 is only the provisional value) - so "Expandir" ends at the content's right edge
+             (W - 20, like the rows and the footer) and no column reserves the caption width any more. -->
         <Grid x:Name="CompactRoot" Visibility="Collapsed">
             <Grid.RowDefinitions>
-                <RowDefinition Height="60" />
+                <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
@@ -40,11 +42,11 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition x:Name="CompactCaptionColumn" Width="96" />
                 </Grid.ColumnDefinitions>
 
-                <!-- The drag handle (SetTitleBar): the whole strip left of the button. Mark 23 · g12 · wordmark (trims, then
-                     collapses below its minimum); priority captions > Expandir > mark > wordmark (CompactTitleLayout). -->
+                <!-- The drag handle (SetTitleBar): the whole strip left of the button, caption band included. Mark 23 · g12 ·
+                     wordmark (trims, then collapses below its minimum); priority captions > Expandir > mark > wordmark
+                     (CompactTitleLayout). Top padding = the measured caption height + 2 (code). -->
                 <Grid x:Name="CompactDragRegion" Padding="{StaticResource SaCompactTitlePadding}" Background="Transparent">
                     <!-- A Grid, not a StackPanel: the wordmark gets the remaining width, so it trims with an ellipsis (never clipped). -->
                     <Grid x:Name="CompactBrand" Height="40" ColumnSpacing="{StaticResource SaSpace12}" VerticalAlignment="Top">
@@ -61,7 +63,9 @@
 
                 <!-- "Expandir" 112:9430: hugs its content (not 126 fixed, R-3); icon-only 36x36 below the MEASURED threshold,
                      same accessible name + tooltip. UI.10 F15: ArrowExpand01 (leave compact), the opposite of Entrar's ArrowShrink01. -->
-                <Button x:Name="CompactExpandButton" x:Uid="CompactExpandButton" Grid.Column="1" Margin="0,20,0,0" VerticalAlignment="Center"
+                <!-- H07: right margin 20 = the body padding; top = the strip line + 2 (a 36 button centred on the 40 line), so
+                     its -3 focus ring stays below the caption band. Outside the drag rectangle: always clickable. -->
+                <Button x:Name="CompactExpandButton" x:Uid="CompactExpandButton" Grid.Column="1" Margin="0,36,20,0" VerticalAlignment="Top"
                         Style="{StaticResource SaCompactButtonStyle}" Command="{x:Bind ModeView.ExitCompactCommand}">
                     <StackPanel Orientation="Horizontal" Spacing="6">
                         <TextBlock x:Name="CompactExpandText" x:Uid="CompactExpandButtonText" VerticalAlignment="Center" TextWrapping="NoWrap" />
