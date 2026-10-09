@@ -312,13 +312,20 @@ public sealed record ConnectionTestView(
     ConnectionFailureFamily Family,
     bool Routed)
 {
-    public string IconKey => Phase switch
+    /// <summary>
+    /// UI.10 one sign per state (F18/F20): "a testar" is progress (<see cref="ShowsProgress"/>, no icon - Refresh is an
+    /// ACTION), passed = Tick (as each passed stage), failed = Alert; the Shield stays for host identity only (F17).
+    /// </summary>
+    public string? IconKey => Phase switch
     {
-        ConnectionTestPhase.Testing => "SaIconRefreshData",
-        ConnectionTestPhase.Verified => "SaIconShield01Data",
+        ConnectionTestPhase.Testing => null,
+        ConnectionTestPhase.Verified => "SaIconTick02Data",
         ConnectionTestPhase.Cancelled => "SaIconInformationCircleData",
         _ => "SaIconAlert02Data"
     };
+
+    /// <summary>UI.10 F18: while testing, the title shows the progress indicator the stages already use.</summary>
+    public bool ShowsProgress => Phase == ConnectionTestPhase.Testing;
 
     public string TitleKey => Phase switch
     {

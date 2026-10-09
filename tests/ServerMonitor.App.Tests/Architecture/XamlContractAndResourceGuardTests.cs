@@ -125,7 +125,9 @@ public sealed partial class XamlContractAndResourceGuardTests
         [
             "TitleIcon", "TitleText", "BodyText", "SubjectText", "StageList", "VerifiedDetailText", "CloseButton", "RetryButton",
             // UI.7 final c2 (Prism C2-1): the command row that stacks in a narrow dialog.
-            "ActionRow"
+            "ActionRow",
+            // UI.10 F18: the title's progress indicator while testing.
+            "TitleProgress"
         ],
         ["Views/SshConfigImportPanel.xaml"] =
         [

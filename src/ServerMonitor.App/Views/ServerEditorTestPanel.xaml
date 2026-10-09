@@ -7,7 +7,8 @@
          112:5944 L, ProxyJump list style 160:413). Same chrome as the trust content (icon 25 + title, body, the endpoint
          inset, actions right-aligned, the safe one first); between them the FOUR real stages of the view model's checklist
          for a direct AND a routed server (G-6/G-7: the jump's name and cause live in stage 1, never six fake rows). Each
-         row: state icon (SaIcon Tick02 / Cancel01 / Alert02, a ProgressRing while running, a 1.5 ring while pending; G-18)
+         row: state icon (SaIcon Tick02 passed / Alert02 failed (danger) or to act on (attention) - UI.10 F20 one sign per state;
+         a ProgressRing while running, a 1.5 ring while pending, a dashed fainter ring when never reached (F42); G-18)
          + title + state written out; under a failed / action-required / warning row its hint, the copyable command and
          "Como preparo o meu servidor?". Drawing only: the page decides through its controller. -->
     <StackPanel Spacing="{StaticResource SaSpace16}">
@@ -17,6 +18,9 @@
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
             <primitives:SaIcon x:Name="TitleIcon" Size="25" VerticalAlignment="Center" Foreground="{ThemeResource SaTextBrush}" />
+            <!-- UI.10 F18: "a testar" is a progress state, not the Refresh action icon. -->
+            <ProgressRing x:Name="TitleProgress" Width="22" Height="22" Margin="1.5" VerticalAlignment="Center" IsActive="False"
+                          Visibility="Collapsed" Foreground="{ThemeResource SaTextBrush}" AutomationProperties.AccessibilityView="Raw" />
             <TextBlock x:Name="TitleText" Grid.Column="1" Style="{StaticResource SaTitleTextStyle}" VerticalAlignment="Center"
                        TextWrapping="Wrap" AutomationProperties.HeadingLevel="Level1" />
         </Grid>
@@ -55,12 +59,13 @@
                                 <Ellipse Width="13" Height="13" StrokeThickness="1.5" Stroke="{ThemeResource SaTextSecondaryBrush}"
                                          Visibility="{Binding IsPending, Converter={StaticResource BooleanToVisibilityConverter}}" />
                                 <Ellipse Width="13" Height="13" StrokeThickness="1.5" Stroke="{ThemeResource SaTextSecondaryBrush}"
+                                         StrokeDashArray="1.5 1.5" Opacity="0.6"
                                          Visibility="{Binding IsNotReached, Converter={StaticResource BooleanToVisibilityConverter}}" />
                                 <ProgressRing Width="14" Height="14" IsActive="{Binding IsRunning}" Foreground="{ThemeResource SaTextBrush}"
                                               Visibility="{Binding IsRunning, Converter={StaticResource BooleanToVisibilityConverter}}" />
                                 <primitives:SaIcon Data="{StaticResource SaIconTick02Data}" Size="16" Foreground="{ThemeResource SaTextBrush}"
                                                    Visibility="{Binding IsPassed, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                                <primitives:SaIcon Data="{StaticResource SaIconCancel01Data}" Size="16" Foreground="{ThemeResource SaDangerTextBrush}"
+                                <primitives:SaIcon Data="{StaticResource SaIconAlert02Data}" Size="16" Foreground="{ThemeResource SaDangerTextBrush}"
                                                    Visibility="{Binding IsFailed, Converter={StaticResource BooleanToVisibilityConverter}}" />
                                 <primitives:SaIcon Data="{StaticResource SaIconAlert02Data}" Size="16" Foreground="{ThemeResource SaAttentionTextBrush}"
                                                    Visibility="{Binding IsActionRequired, Converter={StaticResource BooleanToVisibilityConverter}}" />

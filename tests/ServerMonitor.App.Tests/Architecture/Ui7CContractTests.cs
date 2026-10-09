@@ -137,10 +137,13 @@ public sealed class Ui7CContractTests
     public void TheTestPanel_GlyphsAreSaIconsAndAProgressRing_NotTextGlyphs()
     {
         var panel = AppSourceTree.LoadXaml("Views/ServerEditorTestPanel.xaml").ToString();
-        foreach (var icon in new[] { "SaIconTick02Data", "SaIconCancel01Data", "SaIconAlert02Data" })
+        // UI.10 F20: one sign per state - Tick passed, Alert02 failed / to act on (the X of "close" is gone from the stages).
+        foreach (var icon in new[] { "SaIconTick02Data", "SaIconAlert02Data" })
         {
             Assert.Contains(icon, panel, StringComparison.Ordinal);
         }
+
+        Assert.DoesNotContain("SaIconCancel01Data", panel, StringComparison.Ordinal);
 
         Assert.Contains("<ProgressRing", panel, StringComparison.Ordinal);
         foreach (var glyph in new[] { "✓", "◌", "○", "×", "&#xE73E;", "&#xEA39;", "FontIcon" })
