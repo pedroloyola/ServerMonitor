@@ -267,13 +267,14 @@
                                 <TextBlock x:Uid="SettingsCompactDescription" Style="{StaticResource SaCaptionTextStyle}"
                                            Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap" />
                             </StackPanel>
-                            <!-- "Entrar ›" 112:7973: compact pill 152×34. -->
+                            <!-- "Entrar" 112:7973: compact pill 152×34. UI.10 F15: ArrowShrink01 (enter compact), not the chevron that
+                                 means "navigate in" - Expandir uses the opposite ArrowExpand01. -->
                             <Button x:Name="CompactControl" x:Uid="SettingsEnterCompactButton" Grid.Column="1" Width="152" VerticalAlignment="Center"
                                     Style="{StaticResource SaPillButtonXSmallStyle}"
                                     Command="{x:Bind WindowMode.EnterCompactCommand}">
                                 <StackPanel Orientation="Horizontal" Spacing="6">
                                     <TextBlock x:Uid="SettingsEnterCompactButtonText" VerticalAlignment="Center" />
-                                    <primitives:SaIcon Data="{StaticResource SaIconArrowRight01Data}" Size="15" VerticalAlignment="Center"
+                                    <primitives:SaIcon Data="{StaticResource SaIconArrowShrink01Data}" Size="15" VerticalAlignment="Center"
                                                        Foreground="{ThemeResource SaTextSecondaryBrush}" />
                                 </StackPanel>
                             </Button>

@@ -59,13 +59,13 @@
                     </Grid>
                 </Grid>
 
-                <!-- "Expandir ›" 112:9430: hugs its content (not 126 fixed, R-3); icon-only 36x36 below the MEASURED threshold,
-                     same accessible name + tooltip. -->
+                <!-- "Expandir" 112:9430: hugs its content (not 126 fixed, R-3); icon-only 36x36 below the MEASURED threshold,
+                     same accessible name + tooltip. UI.10 F15: ArrowExpand01 (leave compact), the opposite of Entrar's ArrowShrink01. -->
                 <Button x:Name="CompactExpandButton" x:Uid="CompactExpandButton" Grid.Column="1" Margin="0,20,0,0" VerticalAlignment="Center"
                         Style="{StaticResource SaCompactButtonStyle}" Command="{x:Bind ModeView.ExitCompactCommand}">
                     <StackPanel Orientation="Horizontal" Spacing="6">
                         <TextBlock x:Name="CompactExpandText" x:Uid="CompactExpandButtonText" VerticalAlignment="Center" TextWrapping="NoWrap" />
-                        <primitives:SaIcon Data="{StaticResource SaIconArrowRight01Data}" Size="16" VerticalAlignment="Center" />
+                        <primitives:SaIcon Data="{StaticResource SaIconArrowExpand01Data}" Size="16" VerticalAlignment="Center" />
                     </StackPanel>
                 </Button>
             </Grid>

@@ -298,9 +298,10 @@
                         </StackPanel>
                     </StackPanel>
                     <StackPanel x:Name="HeaderActions" Grid.Column="1" Style="{StaticResource SaPageHeaderActionsStyle}">
+                        <!-- UI.10 F16: entering compact = ArrowShrink01 (the same sign as Definições › Entrar; Segoe E73F retired). -->
                         <Button x:Uid="DashboardCompactModeButton" Style="{StaticResource SaIconButtonStyle}"
                                 Command="{x:Bind WindowMode.EnterCompactCommand}">
-                            <FontIcon Glyph="&#xE73F;" />
+                            <primitives:SaIcon Data="{StaticResource SaIconArrowShrink01Data}" Size="19" />
                         </Button>
                         <Button Visibility="{x:Bind ViewModel.HasVisibleServers, Mode=OneWay}" x:Uid="OverviewRefreshButton" Style="{StaticResource SaIconButtonStyle}"
                                 Command="{x:Bind ViewModel.RefreshAllCommand}">
@@ -418,16 +419,21 @@
                             <StackPanel Spacing="{StaticResource SaSpace8}">
                                 <StackPanel Orientation="Horizontal" Spacing="7">
                                     <!-- An explicit Style would replace SaIcon's implicit template style: the colour is set directly
-                                         (ThemeResource) on four icons and only their visibility follows metric × severity. -->
+                                         (ThemeResource) on six icons and only their visibility follows metric × severity (UI.10 F19:
+                                         one icon per metric). -->
                                     <Grid VerticalAlignment="Center">
                                         <primitives:SaIcon Size="17" Data="{StaticResource SaIconHardDriveData}" Foreground="{ThemeResource SaAttentionTextBrush}"
                                                            Visibility="{x:Bind converters:OverviewLayout.PriorityIcon(ViewModel.PriorityMetric, ViewModel.PrioritySeverity, 0), Mode=OneWay}" />
                                         <primitives:SaIcon Size="17" Data="{StaticResource SaIconHardDriveData}" Foreground="{ThemeResource SaDangerTextBrush}"
                                                            Visibility="{x:Bind converters:OverviewLayout.PriorityIcon(ViewModel.PriorityMetric, ViewModel.PrioritySeverity, 1), Mode=OneWay}" />
-                                        <primitives:SaIcon Size="17" Data="{StaticResource SaIconComputerData}" Foreground="{ThemeResource SaAttentionTextBrush}"
+                                        <primitives:SaIcon Size="17" Data="{StaticResource SaIconCpuData}" Foreground="{ThemeResource SaAttentionTextBrush}"
                                                            Visibility="{x:Bind converters:OverviewLayout.PriorityIcon(ViewModel.PriorityMetric, ViewModel.PrioritySeverity, 2), Mode=OneWay}" />
-                                        <primitives:SaIcon Size="17" Data="{StaticResource SaIconComputerData}" Foreground="{ThemeResource SaDangerTextBrush}"
+                                        <primitives:SaIcon Size="17" Data="{StaticResource SaIconCpuData}" Foreground="{ThemeResource SaDangerTextBrush}"
                                                            Visibility="{x:Bind converters:OverviewLayout.PriorityIcon(ViewModel.PriorityMetric, ViewModel.PrioritySeverity, 3), Mode=OneWay}" />
+                                        <primitives:SaIcon Size="17" Data="{StaticResource SaIconRamMemoryData}" Foreground="{ThemeResource SaAttentionTextBrush}"
+                                                           Visibility="{x:Bind converters:OverviewLayout.PriorityIcon(ViewModel.PriorityMetric, ViewModel.PrioritySeverity, 4), Mode=OneWay}" />
+                                        <primitives:SaIcon Size="17" Data="{StaticResource SaIconRamMemoryData}" Foreground="{ThemeResource SaDangerTextBrush}"
+                                                           Visibility="{x:Bind converters:OverviewLayout.PriorityIcon(ViewModel.PriorityMetric, ViewModel.PrioritySeverity, 5), Mode=OneWay}" />
                                     </Grid>
                                     <TextBlock VerticalAlignment="Center" Text="{x:Bind ViewModel.PriorityTitle, Mode=OneWay}"
                                                Style="{x:Bind ViewModel.PrioritySeverity, Mode=OneWay, Converter={StaticResource PriorityTitleStyleConverter}}" />
