@@ -35,7 +35,9 @@ namespace ServerMonitor.App.Services;
 /// <c>_forcePending</c> (under <c>_gate</c>) and BYPASS the throttle — they are rare and user-initiated —
 /// but go through the very same single-writer drain, so they coalesce (at most one write in flight plus
 /// one pending) and never overlap a cycle write. A forced write does not move the cycle throttle anchor,
-/// so cycle writes keep their exact cadence and the first cycle after startup is never held back.
+/// so cycle writes keep their exact cadence and the first cycle after startup is never held back. The one
+/// exception is a forced pass that also carries a cycle that was due anyway: that write IS the cycle's
+/// write and anchors like one, so the next completion stays throttled (UI9-RECORDER-RACE).
 /// </para>
 /// <para>
 /// <b>What a forced write may publish.</b> The STARTUP request only writes when the fleet is empty (Cortex
@@ -222,6 +224,21 @@ public sealed class WidgetSnapshotRecorder : IMonitoringCycleObserver, IAsyncDis
         _lastWriteTimestamp is not { } last ||
         _timeProvider.GetElapsedTime(last) >= _minWriteInterval;
 
+    /// <summary>
+    /// Test seam (App.Tests via InternalsVisibleTo): the current single-writer drain, read under
+    /// <c>_gate</c>. Awaiting it is an exact quiescence barrier. Read-only; no behaviour depends on it.
+    /// </summary>
+    internal Task DrainForTesting
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _drain;
+            }
+        }
+    }
+
     private async Task DrainAsync(CancellationToken cancellationToken)
     {
         try
@@ -247,13 +264,18 @@ public sealed class WidgetSnapshotRecorder : IMonitoringCycleObserver, IAsyncDis
                     startupOnly = _startupPending && !_forcePending && !_dirty;
                     fleetChanged = _fleetChangedSinceStart;
 
+                    // UI9-RECORDER-RACE: a forced pass that also consumes a cycle that was due anyway IS that
+                    // cycle's write, so it anchors like one. Evaluated before the flags are cleared.
+                    var cycleDue = _dirty && MayWriteNowLocked();
+
                     // One write reflects the live stores, so it satisfies every kind of pending request.
                     _forcePending = false;
                     _startupPending = false;
                     _dirty = false;
-                    if (!forced)
+                    if (!forced || cycleDue)
                     {
-                        // Only cycle writes anchor the cycle throttle (see class remarks).
+                        // Only cycle writes anchor the cycle throttle (see class remarks): a forced-only write,
+                        // or one that merely carries a not-yet-due cycle, never moves the cadence (DV-5).
                         _lastWriteTimestamp = _timeProvider.GetTimestamp();
                     }
                 }
