@@ -273,6 +273,10 @@ public sealed partial class Ui10PolishGuardTests
         var code = AppSourceTree.CodeWithoutComments("MainWindow.xaml.cs");
         Assert.Contains("_placementAdapter.GetCaptionHeight()", code, StringComparison.Ordinal);
         Assert.Contains("TitleBarInsetCalculator.ToTitleStripTopDips(height, xamlRoot.RasterizationScale)", code, StringComparison.Ordinal);
+        // L-8: BOTH the strip and the button are re-anchored to the measured top - a button left at the provisional XAML
+        // top would sit in a taller caption band while the strip moved below it.
+        Assert.Contains("CompactDragRegion.Padding = new Thickness(drag.Left, top, drag.Right, drag.Bottom)", code, StringComparison.Ordinal);
+        Assert.Contains("CompactExpandButton.Margin = new Thickness(button.Left, top + Windowing.TitleBarInsetCalculator.ButtonInsetOnStripLine, button.Right, button.Bottom)", code, StringComparison.Ordinal);
         Assert.Contains("CompactRoot.ActualWidth - CompactDragRegion.Padding.Left - CompactExpandButton.Margin.Right", code, StringComparison.Ordinal);
         Assert.DoesNotContain("GetCaptionRightInset", code, StringComparison.Ordinal);
     }
