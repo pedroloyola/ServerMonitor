@@ -59,4 +59,17 @@ public static class ServerMetricPresentation
     /// <summary>The accessible value ("22%", or "sem dados"), the one <see cref="ServerStatusPresentation.AccessiblePercent"/> spells.</summary>
     public static string Accessible(ServerMetricReading reading, ILocalizationService localization) =>
         ServerStatusPresentation.AccessiblePercent(reading.IsKnown, reading.Value, localization);
+
+    /// <summary>
+    /// "92% em atenção" / "97% crítico" / "22%" / "sem dados": a row metric's accessible value WITH its severity cue - the
+    /// cue is text, never colour alone (UI.8 G-14/R-5 for the Compact rows; UI.10 F24 the Servidores rows use the same).
+    /// </summary>
+    public static string AccessibleWithSeverity(ServerMetricReading reading, ILocalizationService localization)
+    {
+        var value = Accessible(reading, localization);
+        return reading.IsKnown && reading.Severity is ServerHealth.Warning or ServerHealth.Critical
+            ? string.Join(' ', value, localization.GetString(
+                reading.Severity == ServerHealth.Critical ? "CompactMetricCriticalAccessible" : "CompactMetricAttentionAccessible"))
+            : value;
+    }
 }

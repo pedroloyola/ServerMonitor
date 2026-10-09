@@ -93,14 +93,17 @@ public sealed class ServerDirectoryRowViewModel : ObservableObject, IDisposable
     /// <summary>"Ver detalhe de &lt;servidor&gt;" — the action's accessible name carries the server.</summary>
     public string DetailAutomationName => Format("ServerDetailOpenFor", Name);
 
-    /// <summary>The whole row read as one sentence ("prod-web-01, Saudável, CPU 22%, RAM 41%, Disco 52%").</summary>
+    /// <summary>
+    /// The whole row read as one sentence ("prod-web-01, Atenção, CPU 92% em atenção, RAM 41%, disco 52%"). UI.10 F24: the
+    /// metric over the limit says so (its colour + SemiBold are the visual cues; the name is the non-visual one).
+    /// </summary>
     public string RowAutomationName => Format(
         "ServerRowAutomationFormat",
         Name,
         StatusDisplay,
-        ServerMetricPresentation.Accessible(Cpu, _localization),
-        ServerMetricPresentation.Accessible(Memory, _localization),
-        ServerMetricPresentation.Accessible(Disk, _localization),
+        ServerMetricPresentation.AccessibleWithSeverity(Cpu, _localization),
+        ServerMetricPresentation.AccessibleWithSeverity(Memory, _localization),
+        ServerMetricPresentation.AccessibleWithSeverity(Disk, _localization),
         Address,
         OperatingSystemDisplay);
 

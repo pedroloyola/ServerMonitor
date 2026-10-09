@@ -12,6 +12,20 @@
          frame) use SaStatusIndicator / SaInlineNotice; nothing classifies health here (the VM reads the engine). -->
     <Page.Resources>
         <converters:ServerHealthToStatusKindConverter x:Key="ServerHealthToStatusKindConverter" />
+        <!-- UI.10 F25: the value over the limit in the attention / danger text colour, as on Servidores (the meters keep the
+             metric identity colour; the state is also the status text in the header). -->
+        <Style x:Key="DetailMetricValueAttentionTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SaMetricValueTextStyle}">
+            <Setter Property="Foreground" Value="{ThemeResource SaAttentionTextBrush}" />
+        </Style>
+        <Style x:Key="DetailMetricValueCriticalTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SaMetricValueTextStyle}">
+            <Setter Property="Foreground" Value="{ThemeResource SaDangerTextBrush}" />
+        </Style>
+        <converters:ServerHealthToStyleConverter
+            x:Key="DetailMetricValueStyleConverter"
+            HealthyStyle="{StaticResource SaMetricValueTextStyle}"
+            WarningStyle="{StaticResource DetailMetricValueAttentionTextStyle}"
+            CriticalStyle="{StaticResource DetailMetricValueCriticalTextStyle}"
+            UnknownStyle="{StaticResource SaMetricValueTextStyle}" />
     </Page.Resources>
 
     <Grid x:Name="DetailHost">
@@ -172,7 +186,11 @@
                             <MenuFlyout Placement="BottomEdgeAlignedRight">
                                 <MenuFlyoutItem x:Uid="ServerCardHideMenuItem" Command="{Binding HideCommand}"
                                                 AutomationProperties.Name="{Binding HideAutomationName}" />
+                                <!-- UI.10 F39: removing is permanent - set apart and in the danger text (the confirmation is unchanged);
+                                     hiding stays neutral. -->
+                                <MenuFlyoutSeparator />
                                 <MenuFlyoutItem x:Uid="ServerCardRemoveMenuItem" Command="{Binding RemoveCommand}"
+                                                Foreground="{ThemeResource SaDangerTextBrush}"
                                                 AutomationProperties.Name="{Binding RemoveAutomationName}" />
                             </MenuFlyout>
                         </Button.Flyout>
@@ -256,7 +274,7 @@
                     <StackPanel Spacing="10">
                         <TextBlock x:Uid="ServerMetricsCpuLabel" Style="{StaticResource SaPrimaryBodyTextStyle}" FontWeight="Medium" />
                         <StackPanel Orientation="Horizontal" Spacing="3" Height="56">
-                            <TextBlock Text="{Binding CpuValueText}" Style="{StaticResource SaMetricValueTextStyle}" VerticalAlignment="Center"
+                            <TextBlock Text="{Binding CpuValueText}" Style="{Binding CpuSeverity, Converter={StaticResource DetailMetricValueStyleConverter}}" VerticalAlignment="Center"
                                        AutomationProperties.Name="{Binding CpuAccessibleName}" />
                             <TextBlock x:Uid="ServerDetailMetricUnit" Style="{StaticResource SaMetricUnitTextStyle}" VerticalAlignment="Center"
                                        AutomationProperties.AccessibilityView="Raw"
@@ -271,7 +289,7 @@
                     <StackPanel Spacing="10">
                         <TextBlock x:Uid="ServerMetricsMemoryLabel" Style="{StaticResource SaPrimaryBodyTextStyle}" FontWeight="Medium" />
                         <StackPanel Orientation="Horizontal" Spacing="3" Height="56">
-                            <TextBlock Text="{Binding MemoryValueText}" Style="{StaticResource SaMetricValueTextStyle}" VerticalAlignment="Center"
+                            <TextBlock Text="{Binding MemoryValueText}" Style="{Binding MemorySeverity, Converter={StaticResource DetailMetricValueStyleConverter}}" VerticalAlignment="Center"
                                        AutomationProperties.Name="{Binding MemoryAccessibleName}" />
                             <TextBlock x:Uid="ServerDetailMetricUnit" Style="{StaticResource SaMetricUnitTextStyle}" VerticalAlignment="Center"
                                        AutomationProperties.AccessibilityView="Raw"
@@ -287,7 +305,7 @@
                     <StackPanel Spacing="10">
                         <TextBlock x:Uid="ServerMetricsDiskLabel" Style="{StaticResource SaPrimaryBodyTextStyle}" FontWeight="Medium" />
                         <StackPanel Orientation="Horizontal" Spacing="3" Height="56">
-                            <TextBlock Text="{Binding DiskValueText}" Style="{StaticResource SaMetricValueTextStyle}" VerticalAlignment="Center"
+                            <TextBlock Text="{Binding DiskValueText}" Style="{Binding DiskSeverity, Converter={StaticResource DetailMetricValueStyleConverter}}" VerticalAlignment="Center"
                                        AutomationProperties.Name="{Binding DiskAccessibleName}" />
                             <TextBlock x:Uid="ServerDetailMetricUnit" Style="{StaticResource SaMetricUnitTextStyle}" VerticalAlignment="Center"
                                        AutomationProperties.AccessibilityView="Raw"

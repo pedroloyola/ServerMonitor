@@ -198,15 +198,10 @@ public sealed class CompactServerRowViewModel : ObservableObject, IDisposable
         }
     }
 
-    // "92% em atenção" / "97% crítico" / "22%" / "sem dados": the cue is text, never colour alone (G-14, R-5).
-    private string AccessibleMetric(ServerMetricReading reading)
-    {
-        var value = ServerMetricPresentation.Accessible(reading, _localization);
-        return reading.IsKnown && reading.Severity is ServerHealth.Warning or ServerHealth.Critical
-            ? string.Join(' ', value, _localization.GetString(
-                reading.Severity == ServerHealth.Critical ? "CompactMetricCriticalAccessible" : "CompactMetricAttentionAccessible"))
-            : value;
-    }
+    // "92% em atenção" / "97% crítico" / "22%" / "sem dados": the cue is text, never colour alone (G-14, R-5) - the shared
+    // rule (UI.10 F24: the Servidores rows read the same).
+    private string AccessibleMetric(ServerMetricReading reading) =>
+        ServerMetricPresentation.AccessibleWithSeverity(reading, _localization);
 
     private string Format(string key, params object[] args) =>
         string.Format(CultureInfo.CurrentUICulture, _localization.GetString(key), args);

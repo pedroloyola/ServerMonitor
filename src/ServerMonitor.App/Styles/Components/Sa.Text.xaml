@@ -46,8 +46,10 @@
     <Style x:Key="SaTableCellSecondaryTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SaCaptionTextStyle}">
         <Setter Property="Foreground" Value="{ThemeResource SaTextSecondaryBrush}" />
     </Style>
+    <!-- UI.10 F24: a value over the limit is also SemiBold - a non-chromatic cue next to the colour (Figma 112:1434 "92%"). -->
     <Style x:Key="SaTableCellAttentionTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SaButtonTextStyle}">
         <Setter Property="Foreground" Value="{ThemeResource SaAttentionTextBrush}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
     <!-- UI.3 additive (D-UI3-8). Page subtitle 13 Regular muted, 112:2262 / 112:2437 (SaControlTextStyle is Medium). -->
     <Style x:Key="SaPageSubtitleTextStyle" TargetType="TextBlock">

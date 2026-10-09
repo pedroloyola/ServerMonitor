@@ -192,6 +192,37 @@ public sealed partial class Ui10PolishGuardTests
         Assert.Contains(footer.Descendants(Ns + "ToggleSwitch"), element => (string?)element.Attribute("Style") == "{StaticResource SaToggleSwitchStyle}");
     }
 
+    /// <summary>
+    /// F21/F37/F39 (+F08): an irreversible action looks destructive everywhere - the restore confirmation is an Sa
+    /// destructive dialog (no legacy dialog style left), "Repor histórico" is the danger pill like "Limpar histórico", and
+    /// "Remover" in the Detail menu is set apart in the danger text.
+    /// </summary>
+    [Fact]
+    public void IrreversibleActions_LookDestructive()
+    {
+        var restore = AppSourceTree.LoadXaml("Views/RestoreConfirmDialog.xaml").Root!;
+        Assert.Equal("Destructive", (string?)restore.Attributes().Single(a => a.Name.LocalName == "SaDialog.Kind").Value);
+        Assert.Contains(restore.Descendants(Ns + "StaticResource"), r => (string?)r.Attribute("ResourceKey") == "SaDialogStyle");
+        foreach (var file in AppSourceTree.Files(".xaml").Concat(AppSourceTree.Files(".cs")))
+        {
+            var text = File.ReadAllText(AppSourceTree.Full(file));
+            Assert.DoesNotContain("{StaticResource PremiumContentDialogStyle}", text, StringComparison.Ordinal);
+            Assert.DoesNotContain("[\"PremiumContentDialogStyle\"]", text, StringComparison.Ordinal);
+        }
+
+        var data = AppSourceTree.LoadXaml("Views/SettingsDataPage.xaml");
+        string? ButtonStyle(string name) => (string?)data.Descendants(Ns + "Button").Single(b => (string?)b.Attribute(X + "Name") == name).Attribute("Style");
+        Assert.Equal("{StaticResource SaPillButtonSmallDangerStyle}", ButtonStyle("ResetHistoryButton"));
+        Assert.Equal("{StaticResource SaPillButtonSmallDangerStyle}", ButtonStyle("ClearHistoryButton"));
+
+        var menu = AppSourceTree.LoadXaml("Views/ServerDetailPage.xaml").Descendants(Ns + "MenuFlyout").Single().Elements().ToList();
+        var remove = menu.Single(item => (string?)item.Attribute(X + "Uid") == "ServerCardRemoveMenuItem");
+        Assert.Equal("{ThemeResource SaDangerTextBrush}", (string?)remove.Attribute("Foreground"));
+        Assert.Equal("MenuFlyoutSeparator", menu[menu.IndexOf(remove) - 1].Name.LocalName);
+        var hide = menu.Single(item => (string?)item.Attribute(X + "Uid") == "ServerCardHideMenuItem");
+        Assert.Null(hide.Attribute("Foreground"));
+    }
+
     private static string? Setter(XElement style, string property) =>
         (string?)style.Elements(Ns + "Setter").FirstOrDefault(setter => (string?)setter.Attribute("Property") == property)?.Attribute("Value");
 

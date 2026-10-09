@@ -17,6 +17,7 @@
         <!-- Figma 112:1468: a value over the engine's attention limit in the attention text colour; critical in danger. -->
         <Style x:Key="ServersMetricCriticalTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SaButtonTextStyle}">
             <Setter Property="Foreground" Value="{ThemeResource SaDangerTextBrush}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
         </Style>
         <converters:ServerHealthToStyleConverter
             x:Key="MetricValueStyleConverter"

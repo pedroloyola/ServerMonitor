@@ -157,11 +157,12 @@ public sealed class Ui5ServerDetailTests
     }
 
     /// <summary>
-    /// Prism C1 N-4 decision (+ N-13, Cortex N-C5): the Detail paints no severity colour - its metric colours are identity,
-    /// stale or not - so it exposes no *Severity property a future view could bind without that rule.
+    /// Prism C1 N-4 decision (+ N-13, Cortex N-C5): the meters keep the metric identity colour, stale or not. UI.10 F25
+    /// (supersedes N-4 for the NUMBER only): the value takes the Servidores row's severity - the same shared rule and the
+    /// dashboard's engine thresholds, so the two pages never disagree about the same number.
     /// </summary>
     [Fact]
-    public async Task Segments_FollowA4_AndTheDetailExposesNoSeverity()
+    public async Task Segments_FollowA4_AndTheValuesTakeTheRowsSeverity()
     {
         var fleet = new Ui4TestKit.Fleet().Add("db", ServerHealth.Critical, cpu: 97, mem: 62, disk: 48);
         var kit = await LoadedAsync(fleet);
@@ -169,7 +170,30 @@ public sealed class Ui5ServerDetailTests
 
         Assert.Equal(17, detail.MemoryLitSegments); // Figma 112:1855: 62% → 17/28
         Assert.Equal(7, detail.DiskLitSegments);    // Figma 112:1890: 48% → 7/14
-        Assert.DoesNotContain(typeof(ServerDetailViewModel).GetProperties(), property => property.Name.EndsWith("Severity", StringComparison.Ordinal));
+        var row = Assert.Single(kit.Dashboard.OverviewServers, r => r.Name == "db");
+        Assert.Equal(row.CpuSeverity, detail.CpuSeverity);
+        Assert.Equal(row.MemorySeverity, detail.MemorySeverity);
+        Assert.Equal(row.DiskSeverity, detail.DiskSeverity);
+        Assert.Equal(ServerHealth.Critical, detail.CpuSeverity); // 97% over the engine's critical limit
+        Assert.Equal(ServerHealth.Healthy, detail.MemorySeverity);
+    }
+
+    /// <summary>
+    /// UI.10 F24: on Servidores a value over the limit is never colour alone - the row's accessible name carries the same
+    /// cue the Compact rows use ("97% crítico", "88% em atenção"); a value under the limit has none.
+    /// </summary>
+    [Fact]
+    public async Task ServerRows_NameTheMetricOverTheLimit()
+    {
+        var fleet = new Ui4TestKit.Fleet().Add("db", ServerHealth.Critical, cpu: 97, mem: 62, disk: 48);
+        var kit = await LoadedAsync(fleet);
+        var card = Assert.Single(kit.Dashboard.OverviewServers, r => r.Name == "db").Card;
+        using var row = new ServerDirectoryRowViewModel(card, new ServerMonitor.App.Tests.Fakes.ResWLocalizationService("pt-PT"), _ => { },
+            kit.Dashboard.Thresholds);
+
+        Assert.Contains("CPU 97% crítico", row.RowAutomationName, StringComparison.Ordinal);
+        Assert.Contains("RAM 62%,", row.RowAutomationName, StringComparison.Ordinal);
+        Assert.DoesNotContain("em atenção", row.RowAutomationName, StringComparison.Ordinal);
     }
 
     // ---- derived states -------------------------------------------------------------------------------------------
