@@ -1,4 +1,6 @@
+#if DEBUG
 using ServerMonitor.App.Qa;
+#endif
 using ServerMonitor.App.Services;
 using ServerMonitor.App.Tests.Architecture;
 
