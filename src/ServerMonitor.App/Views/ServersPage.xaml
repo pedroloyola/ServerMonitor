@@ -312,7 +312,7 @@
                 </Border>
 
                 <!-- Table 112:1434: header h34 10 Medium muted, rows h78, no dividers; the hidden-servers note under the rows. -->
-                <Border Style="{StaticResource SaGlassSurfaceStyle}" Visibility="{x:Bind ViewModel.ShowTable, Mode=OneWay}">
+                <Border Style="{StaticResource SaGlassSurfaceStyle}" primitives:SaMotion.Enter="Fade" Visibility="{x:Bind ViewModel.ShowTable, Mode=OneWay}">
                     <StackPanel>
                         <Border x:Name="TableHeader" Style="{StaticResource SaDataTableHeaderStyle}" AutomationProperties.AccessibilityView="Raw">
                             <Grid ColumnSpacing="10">
@@ -357,7 +357,7 @@
 
                 <!-- Empty §13 112:14007: no visible server; the note only when servers are hidden (Prism r1 c). UI.10 F06: the CTA is the
                      Primary h44 pill (112:14098 updated in UI.10B), the same shape as the header "+ Adicionar". -->
-                <Border Style="{StaticResource SaStatePanelStyle}" Visibility="{x:Bind ViewModel.ShowEmptyState, Mode=OneWay}">
+                <Border Style="{StaticResource SaStatePanelStyle}" primitives:SaMotion.Enter="Fade" Visibility="{x:Bind ViewModel.ShowEmptyState, Mode=OneWay}">
                     <StackPanel VerticalAlignment="Center" Spacing="{StaticResource SaSpace16}">
                         <primitives:SaEmptyState x:Name="EmptyState" x:Uid="ServersEmptyState" TitleHeadingLevel="Level2"
                                                  IconData="{StaticResource SaIconServerStack01Data}">

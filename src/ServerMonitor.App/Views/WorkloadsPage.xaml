@@ -317,7 +317,7 @@
                  so the failure reads Alert02 (= failed, F20) and the "nothing here" states (nothing / not installed / no
                  containers / unsupported / no services) read the neutral Package. -->
             <Border Style="{StaticResource SaStatePanelStyle}"
-                    Visibility="{Binding ShowAllUnavailable, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    primitives:SaMotion.Enter="Fade" Visibility="{Binding ShowAllUnavailable, Converter={StaticResource BooleanToVisibilityConverter}}">
                 <!-- Beacon L2: the pane is named by the state title, never by the action inside it. -->
                 <ScrollViewer VerticalScrollBarVisibility="Auto" VerticalContentAlignment="Center" AutomationProperties.Name="{Binding Title, ElementName=UnavailableState}">
                     <primitives:SaEmptyState x:Name="UnavailableState" x:Uid="WorkloadUnavailableState" VerticalAlignment="Center" IconData="{StaticResource SaIconAlert02Data}">
@@ -328,7 +328,7 @@
 
             <!-- Nothing 112:14939: both reads succeeded and found nothing. -->
             <Border Style="{StaticResource SaStatePanelStyle}"
-                    Visibility="{Binding ShowNothingToShow, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    primitives:SaMotion.Enter="Fade" Visibility="{Binding ShowNothingToShow, Converter={StaticResource BooleanToVisibilityConverter}}">
                 <!-- Beacon L2: the pane is named by the state title, never by the action inside it. -->
                 <ScrollViewer VerticalScrollBarVisibility="Auto" VerticalContentAlignment="Center" AutomationProperties.Name="{Binding Title, ElementName=NothingState}">
                     <primitives:SaEmptyState x:Name="NothingState" x:Uid="WorkloadNothingState" VerticalAlignment="Center" IconData="{StaticResource SaIconPackageData}">
@@ -358,7 +358,7 @@
             <Grid
                 x:Name="CardsGrid"
                 ColumnSpacing="{StaticResource SaSpace24}"
-                Visibility="{Binding ShowSectionCards, Converter={StaticResource BooleanToVisibilityConverter}}">
+                primitives:SaMotion.Enter="Fade" Visibility="{Binding ShowSectionCards, Converter={StaticResource BooleanToVisibilityConverter}}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition x:Name="CardsColumn2" Width="*" />

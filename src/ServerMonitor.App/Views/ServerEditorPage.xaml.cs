@@ -5,6 +5,7 @@ using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
+using ServerMonitor.App.Controls.Primitives;
 using ServerMonitor.App.Services;
 using ServerMonitor.App.ViewModels;
 using ServerMonitor.Core.Backup;
@@ -308,7 +309,26 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
             ServerEditorLayer.Trust => TrustPanel.Title,
             _ => ImportPanel.Title
         });
+        var wasOpen = DialogLayer.Visibility == Visibility.Visible;
         DialogLayer.Visibility = Visibility.Visible;
+        if (!wasOpen)
+        {
+            // UI.11 F08: the modal layer opens like every Sa dialog (gated by Reduced Motion inside SaMotion).
+            SaMotion.PlayEnter(DialogLayer, SaMotionEnter.Fade);
+            SaMotion.PlayEnter(DialogSurface, SaMotionEnter.Dialog);
+        }
+        else if (opening)
+        {
+            // UI.11 F14: Teste -> Confiança -> Import inside the open layer - the new step cross-fades in.
+            FrameworkElement step = layer switch
+            {
+                ServerEditorLayer.Test => TestPanel,
+                ServerEditorLayer.Trust => TrustPanel,
+                _ => ImportPanel
+            };
+            SaMotion.PlayEnter(step, SaMotionEnter.Fade);
+        }
+
         PageScroll.IsTabStop = false;
         if (opening)
         {
