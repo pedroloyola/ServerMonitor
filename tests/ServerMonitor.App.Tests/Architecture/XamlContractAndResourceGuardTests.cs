@@ -164,7 +164,8 @@ public sealed partial class XamlContractAndResourceGuardTests
             // UI.11 H01: the segmented items' "Highlight" left with their selection fill (the sliding indicator draws it).
             "RootGrid", "HoverOverlay", "FocusRing", "Shell", "StateOverlay", "ContentPresenter", "Box",
             "CheckGlyph", "IndeterminateGlyph", "SwitchAreaGrid", "SwitchKnobBounds", "KnobTranslateTransform",
-            "SwitchKnobOff" // UI.10 F26: the On state re-colours the thumb (SaToggleOnThumbBrush)
+            "SwitchKnobOff", // UI.10 F26: the On state re-colours the thumb (SaToggleOnThumbBrush)
+            "SwitchKnobOn" // UI.11 H02: the On thumb colour cross-fades as a second ellipse
         ],
         ["Styles/Components/Sa.Navigation.xaml"] = ["RootGrid", "Shell", "Highlight", "StateOverlay", "ContentPresenter"],
         // UI.2 R1 (Prism MF-3): the Sa ContentDialog template keeps the Fluent PART names - ContentDialog's own code resolves
