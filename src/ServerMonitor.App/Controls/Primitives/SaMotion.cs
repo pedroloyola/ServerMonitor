@@ -72,7 +72,7 @@ public static class SaMotion
     public static void PlayEnter(FrameworkElement element, SaMotionEnter enter)
     {
         ArgumentNullException.ThrowIfNull(element);
-        if (MotionRules.PlaysEnter(enter != SaMotionEnter.None, becameVisible: true, element.IsLoaded, MotionPolicy.IsReduced))
+        if (MotionRules.PlaysEnter(enter != SaMotionEnter.None, becameVisible: true, SaLiveTree.IsLive(element), MotionPolicy.IsReduced))
         {
             StateOf(element).Play(enter);
         }
@@ -149,7 +149,7 @@ public static class SaMotion
                 _visibilityToken = _element.RegisterPropertyChangedCallback(UIElement.VisibilityProperty, OnVisibilityChanged);
             }
 
-            if (_element.IsLoaded)
+            if (SaLiveTree.IsLive(_element))
             {
                 Subscribe();
             }
@@ -179,7 +179,7 @@ public static class SaMotion
             // A remount may raise the new Loaded before this stale Unloaded: resubscribe if the element is loaded again.
             _element.DispatcherQueue?.TryEnqueue(DispatcherQueuePriority.Low, () =>
             {
-                if (_element.IsLoaded)
+                if (SaLiveTree.IsLive(_element))
                 {
                     Subscribe();
                 }
@@ -254,7 +254,7 @@ public static class SaMotion
         private void OnVisibilityChanged(DependencyObject sender, DependencyProperty property)
         {
             var enter = GetEnter(_element);
-            if (!MotionRules.PlaysEnter(enter != SaMotionEnter.None, _element.Visibility == Visibility.Visible, _element.IsLoaded, MotionPolicy.IsReduced))
+            if (!MotionRules.PlaysEnter(enter != SaMotionEnter.None, _element.Visibility == Visibility.Visible, SaLiveTree.IsLive(_element), MotionPolicy.IsReduced))
             {
                 if (_element.Visibility == Visibility.Visible && enter != SaMotionEnter.None)
                 {

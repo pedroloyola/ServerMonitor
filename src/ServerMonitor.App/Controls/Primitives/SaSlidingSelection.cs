@@ -127,7 +127,7 @@ internal sealed class SlidingSelectionController
         _host.Unloaded += OnUnloaded;
         _host.SizeChanged += OnLayoutChanged;
         _host.ActualThemeChanged += OnThemeChanged;
-        if (_host.IsLoaded)
+        if (SaLiveTree.IsLive(_host))
         {
             OnLoaded(_host, null);
         }
@@ -155,7 +155,7 @@ internal sealed class SlidingSelectionController
     /// Idempotent: a remount (SaThemeRefresh: out of the tree and straight back in) can raise the new Loaded BEFORE the
     /// stale Unloaded (measured, UI.11C runtime: the sidebar indicator stopped following after a theme change). So Loaded
     /// always (re)collects and (re)subscribes, the item/host events live with the subtree (never dropped on Unloaded), and
-    /// Unloaded re-checks IsLoaded before giving up the process-wide subscriptions.
+    /// Unloaded re-checks that the host is live (SaLiveTree) before giving up the process-wide subscriptions.
     /// </summary>
     private void OnLoaded(object sender, RoutedEventArgs? e)
     {
@@ -175,7 +175,7 @@ internal sealed class SlidingSelectionController
         UnsubscribeExternal();
         _host.DispatcherQueue?.TryEnqueue(DispatcherQueuePriority.Low, () =>
         {
-            if (_host.IsLoaded)
+            if (SaLiveTree.IsLive(_host))
             {
                 SubscribeExternal();
             }
@@ -298,7 +298,7 @@ internal sealed class SlidingSelectionController
     /// </summary>
     private void QueueFlush()
     {
-        if (_flushQueued || !_host.IsLoaded)
+        if (_flushQueued || !SaLiveTree.IsLive(_host))
         {
             return;
         }
@@ -309,7 +309,7 @@ internal sealed class SlidingSelectionController
     private void Flush()
     {
         _flushQueued = false;
-        if (!_host.IsLoaded || _visual is null)
+        if (!SaLiveTree.IsLive(_host) || _visual is null)
         {
             return; // stays pending; the next Loaded re-plans
         }
