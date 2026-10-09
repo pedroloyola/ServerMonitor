@@ -2,7 +2,7 @@
 
 **Status: UI.10 READY_TO_MERGE — not merged (2026-10-09).** PR #36 stays DRAFT until the human GO.
 - **Branch:** `ui/ui10-global-visual-polish`, base `main` @ `9440118`.
-  - Code validated at `edbde65` (H07 + final batch).
+  - Code validated at `edbde65` (H07 + final batch); test-only L-8 guard at `0c2ea64`.
   - This document's commit adds docs only.
 - **Scope: polish, not redesign** (binding human GO, `.boss/tmp/ui10/human-go-prompt.md` §1, §8). Correct and refine the existing system; never replace it.
   - **Unchanged:**
@@ -169,7 +169,7 @@ Records: `.boss/tmp/ui10/figma-before.md`, `figma-after.md`, `sentry-ui10b-figma
 - compact footer ≥ toggle height;
 - irreversible actions look destructive;
 - Detail values bind severity and the meters stay severity-free;
-- H07 right edge + measured caption.
+- H07 right edge + measured caption, including the runtime re-anchoring of the strip and of "Expandir" to the measured top (L-8, `0c2ea64`; counterproofs: `button.Top` and `drag.Top` both fail the guard).
 
 Plus:
 - `ComponentR1GuardTests`: neutral toggle; on-track contrast ≥ 3:1.
@@ -190,7 +190,7 @@ Pins that changed value on purpose are commented with the UI.10 finding. Debt le
 |---|---|---|---|
 | Prism | UI.10A audit + addendum; UI.10B (R1 CHANGES_REQUESTED → R2 APPROVED); UI.10C (APPROVED_WITH_CHANGES → R2); H07 STEP 1; final batch | **APPROVED** | `prism-ui10a-audit.md`, `prism-ui10b-review(-r2).md`, `prism-ui10c-review(-r2).md`, `prism-h07-review.md`, `prism-final-review.md` |
 | Cortex | A-1 root cause; UI.10C structure; H07 caption/drag region | **APPROVED_WITH_NITS** (nits backlogged) | `cortex-a1-rootcause.md`, `cortex-ui10c-review.md`, `cortex-final-review.md` |
-| Tests review (Atlas fallback) | guards, counterproofs, pins | **APPROVED**; M-1, L-1, L-2, L-5, L-7 fixed; L-3, L-4, L-6 backlogged | `tests-ui10c-review.md` |
+| Tests review (Atlas fallback) | guards, counterproofs, pins | **APPROVED** (R3); M-1, L-1, L-2, L-5, L-7, L-8 fixed (L-8 in `0c2ea64`); L-3, L-4, L-6 backlogged | `tests-ui10c-review.md` |
 | Beacon | UI.10A baseline; UI.10D regression (612 PNG, 423 pairs); final Compact (24/24) | **PASS** / **PASS** | `beacon-ui10a-baseline.md`, `beacon-ui10d-regression.md`, `beacon-final-compact.md` |
 
 ## 11. NOT_RUN (with reason)
