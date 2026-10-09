@@ -1,6 +1,6 @@
 # UI.10 — Global Visual Polish
 
-**Status: UI.10 READY_TO_MERGE — not merged (2026-10-09).** PR #36 stays DRAFT until the human GO.
+**Status: UI.10 COMPLETE (2026-10-09).** PR #36 merged by merge commit pinned to `4f613ef` → `main` = `5244921` (parents `9440118` + `4f613ef`); post-merge CI run 37952942913 green (Debug build + tests, Release build + vulnerability scan). See §13.
 - **Branch:** `ui/ui10-global-visual-polish`, base `main` @ `9440118`.
   - Code validated at `edbde65` (H07 + final batch); test-only L-8 guard at `0c2ea64`.
   - This document's commit adds docs only.
@@ -229,3 +229,34 @@ Pins that changed value on purpose are commented with the UI.10 finding. Debt le
   - O-2 empty-fleet primary vs secondary contrast in Dark;
   - Compact maximize button shown as enabled.
 - **HD-1 / HD-2:** colour changes would need a Manual decision.
+
+## 13. Post-merge state and closeout
+
+- **Merge:** human GO "UI.10 — FINAL MERGE + CLOSEOUT".
+  - Pre-merge gate re-checked:
+    - head and base;
+    - CLEAN/MERGEABLE;
+    - CI green at the head;
+    - reviews valid;
+    - live Figma nodes persisted;
+    - no out-of-scope files;
+    - real data intact.
+  - PR description updated without moving the head; PR marked Ready for review.
+  - Merge commit pinned to `4f613ef` → `main` = `5244921`.
+- **Post-merge CI:** run 37952942913 green on the first attempt.
+- **Firewall:** the 4 "Query User" testhost rules created by the Floor's test gates (Infrastructure.Tests, Debug/Release) were removed by exact Name with human UAC.
+  - 715 → 711.
+  - The full before/after inventory compared by identity: 4 removed, all canonical; 0 collateral; 0 other changes.
+  - Application rules unchanged.
+- **Floor:** removed with keep-branch after a pre-check:
+  - clean;
+  - head reachable from `main`;
+  - 0 unique commits;
+  - inherited ignored files identical to the Ground's;
+  - 0 processes using the path.
+  - Triple-check PASS: floor list, worktree list, directory gone.
+  - Branch `ui/ui10-global-visual-polish` kept, local and remote.
+- **Evidence:** preserved in the operational workspace (manifests, reviews, findings, counterproofs, before/after captures outside the repo); not reproduced here.
+- **Not changed by the closeout:** the installed Developer build, widgets, credentials, SSH, servers, history, certificates and the UI.9 QA backups.
+- **NOT_RUN and backlog:** unchanged from §11/§12. Nothing NOT_RUN is reported as PASS. Hardening-class items are routed to UI.12.
+- **Next:** UI.11 has NOT started.
