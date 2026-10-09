@@ -58,9 +58,13 @@ internal static class QaWorkloadsComposition
         services.AddSingleton<IWorkloadRefreshCoordinator>(new QaWorkloadRefreshCoordinator(workloadStore));
     }
 
-    private sealed class QaWorkloadsServerService : IServerService
+    private sealed class QaWorkloadsServerService : IServerService, IServerLoadStatusSource
     {
         public event EventHandler? ServersChanged { add { } remove { } }
+
+        // UI10-A1: the shell graph (OnboardingViewModel) resolves IServerLoadStatusSource from this service.
+        public Task<ServerLoadStatus> GetLoadStatusAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult(ServerLoadStatus.Loaded);
 
         public Task<IReadOnlyList<Server>> GetAllAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult(QaWorkloadsCatalog.Servers);

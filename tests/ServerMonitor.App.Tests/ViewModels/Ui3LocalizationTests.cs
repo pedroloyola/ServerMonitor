@@ -23,7 +23,10 @@ public sealed partial class Ui3LocalizationTests
         "WorkloadServiceStartupAutomatic", "WorkloadServiceStartupStaticDisplay", "WorkloadServiceStartupManual",
         "WorkloadServiceStartupBlocked", "WorkloadContainerHealthNone", "WorkloadValueUnknown",
         "WorkloadValueUnknownAccessible", "WorkloadServiceDisplayAccessibleFormat", "WorkloadNoResultsTitleFormat",
-        "WorkloadNoProblemsTitle", "WorkloadNoResultsMessage", "WorkloadClearSearch", "WorkloadSectionNoResults",
+        "WorkloadNoProblemsTitle", "WorkloadClearSearch", "WorkloadSectionNoResults",
+        // UI.10 F12: the per-case "no results" copy (A/B/C) replaced the single static message.
+        "WorkloadNoResultsInFilterTitleFormat", "WorkloadNoResultsSearchMessage", "WorkloadNoResultsFilterMessage",
+        "WorkloadNoResultsSearchAndFilterMessage", "WorkloadShowAll", "WorkloadClearSearchAndFilter",
         "WorkloadNothingTitle", "WorkloadNothingMessage", "WorkloadUnavailableTitle", "WorkloadUnavailableMessage",
         "WorkloadRetry", "WorkloadSearchAllPlaceholder", "WorkloadReadOnlyNotice",
     ];

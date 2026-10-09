@@ -183,13 +183,10 @@ public sealed class AppWindowPlacementAdapter(ILogger<AppWindowPlacementAdapter>
     }
 
     /// <summary>
-    /// Width, in physical pixels, that the system reserves on the right of the title bar for the
-    /// native caption buttons. Meaningful only while the content is extended into the title bar;
-    /// it reflects the current DPI and the presenter's button set (e.g. maximize hidden), so a
-    /// custom title bar must derive its reserved space from this rather than a fixed constant.
-    /// Returns 0 when unavailable.
+    /// UI.10 H07: height, in physical pixels, of the title bar the native caption buttons occupy (meaningful while the
+    /// content is extended into the title bar). The compact title strip starts below it. Returns 0 when unavailable.
     /// </summary>
-    public int GetCaptionRightInset() => _appWindow?.TitleBar.RightInset ?? 0;
+    public int GetCaptionHeight() => _appWindow?.TitleBar.Height ?? 0;
 
     private int GetWindowDpiScalePercent()
     {

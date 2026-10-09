@@ -44,6 +44,17 @@ public sealed class Ui8CompactViewLogicTests
         Assert.False(CompactTitleLayout.Decide(240, Mark, Wordmark, 110).ShowExpandText);
     }
 
+    /// <summary>
+    /// UI.10 H07: the strip sits below the native captions, so at the minimum compact width (320) the title gets 320 - 20 -
+    /// 20 = 280 instead of 320 - 20 - 138 (the caption reserve) = 162: "Expandir" keeps its text and the full wordmark.
+    /// </summary>
+    [Fact]
+    public void AtTheMinimumWidth_TheStripBelowTheCaptions_KeepsTheTextAndTheWordmark()
+    {
+        Assert.Equal(new CompactTitleLayout.Decision(true, true, true), CompactTitleLayout.Decide(320 - 20 - 20, Mark, Wordmark, ButtonWithText));
+        Assert.Equal(new CompactTitleLayout.Decision(false, true, true), CompactTitleLayout.Decide(320 - 20 - 138, Mark, Wordmark, ButtonWithText));
+    }
+
     // ---- R-5 row styles / bar tone ----
 
     [Theory]

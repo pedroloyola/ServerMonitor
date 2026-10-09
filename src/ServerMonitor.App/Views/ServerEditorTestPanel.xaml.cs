@@ -52,7 +52,10 @@ public sealed partial class ServerEditorTestPanel : UserControl
         var localization = _localization ?? throw new InvalidOperationException("Configure the panel first.");
         Attach(viewModel.ConnectionChecklist);
 
-        TitleIcon.Data = Application.Current.Resources[view.IconKey] as string;
+        TitleIcon.Data = view.IconKey is { } icon ? Application.Current.Resources[icon] as string : null;
+        TitleIcon.Visibility = view.ShowsProgress ? Visibility.Collapsed : Visibility.Visible;
+        TitleProgress.IsActive = view.ShowsProgress;
+        TitleProgress.Visibility = view.ShowsProgress ? Visibility.Visible : Visibility.Collapsed;
         TitleText.Text = localization.GetString(view.TitleKey);
         var endpoint = viewModel.EndpointDisplay;
         BodyText.Text = view.Phase == ConnectionTestPhase.Testing

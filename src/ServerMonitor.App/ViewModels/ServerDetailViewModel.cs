@@ -78,8 +78,8 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
         _serversNotice = serversNotice;
         _savedNotice = savedNotice;
         _clock = clock ?? PresentationClock.System;
-        // Prism C1 N-4 decision: the Detail shows no severity colour (its metric colours are identity), so the engine's
-        // thresholds are not read here; the parameter stays for the composition root's constructor shape.
+        // UI.10 F25 (supersedes Prism C1 N-4): the big NUMBER takes the same severity the Servidores rows give it (the same
+        // ServerMetricPresentation rule and the dashboard's engine thresholds); the meters keep the metric identity colour.
         _ = monitoringOptions;
         _flushAction = Flush;
         GoBackCommand = new RelayCommand(() => Leave(serverGone: false));
@@ -367,7 +367,9 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
     {
         get
         {
-            var name = Format("ServerDetailMetricAccessibleFormat", _localization.GetString("ServerMetricsCpuLabel.Text"), CpuAccessibleValue);
+            // UI.10 L-2: the value says its severity in words too (the shared row rule), never only by its colour.
+            var name = Format("ServerDetailMetricAccessibleFormat", _localization.GetString("ServerMetricsCpuLabel.Text"),
+                ServerMetricPresentation.WithSeverityCue(CpuAccessibleValue, HasCpuPercent, CpuSeverity, _localization));
             return _cpuPulse.Count == 0
                 ? name
                 : string.Join(". ", name, Format("ServerDetailCpuPulseAccessibleFormat", _cpuPulse.Count, CpuPulseCeiling));
@@ -378,6 +380,9 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
     public int CpuPulseCeiling => MetricVisualPresentation.PulseCeiling(_cpuPulse);
 
     public string CpuAccessibleValue => AccessiblePercent(HasCpuPercent, _card?.CpuUsageValue ?? 0);
+
+    /// <summary>UI.10 F25: the CPU number's severity, exactly the Servidores row's (Healthy when unknown / offline).</summary>
+    public ServerHealth CpuSeverity => Severity(ServerMetricKind.Cpu);
 
     /// <summary>H-UI5-3: real CPU samples from local history (oldest → newest, ≤ 30). Empty draws no bars.</summary>
     public IReadOnlyList<double> CpuPulseSamples => _cpuPulse;
@@ -390,12 +395,16 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
 
     public string MemoryValueText => Number(HasMemoryPercent, _card?.MemoryUsageValue ?? 0);
 
-    public string MemoryAccessibleName => Format("ServerDetailMetricAccessibleFormat", _localization.GetString("ServerMetricsMemoryLabel.Text"), MemoryAccessibleValue);
+    public string MemoryAccessibleName => Format("ServerDetailMetricAccessibleFormat", _localization.GetString("ServerMetricsMemoryLabel.Text"),
+        ServerMetricPresentation.WithSeverityCue(MemoryAccessibleValue, HasMemoryPercent, MemorySeverity, _localization));
 
     /// <summary>Figma "9,9 GB de 16 GB": the snapshot's own byte counts, shown only when both are known (no % derived).</summary>
     public string? MemoryLegend => BytesOf(_card?.MetricsSnapshot?.MemoryUsedBytes, _card?.MetricsSnapshot?.MemoryTotalBytes);
 
     public string MemoryAccessibleValue => AccessiblePercent(HasMemoryPercent, _card?.MemoryUsageValue ?? 0);
+
+    /// <summary>UI.10 F25: the memory number's severity (see <see cref="CpuSeverity"/>).</summary>
+    public ServerHealth MemorySeverity => Severity(ServerMetricKind.Memory);
 
     /// <summary>A-4: lit memory segments out of 28; null = unknown (empty track + "—").</summary>
     public int? MemoryLitSegments => MetricVisualPresentation.LitSegments(
@@ -410,11 +419,18 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
 
     public string DiskValueText => Number(HasDiskPercent, _card?.DiskUsageValue ?? 0);
 
-    public string DiskAccessibleName => Format("ServerDetailMetricAccessibleFormat", _localization.GetString("ServerMetricsDiskLabel.Text"), DiskAccessibleValue);
+    public string DiskAccessibleName => Format("ServerDetailMetricAccessibleFormat", _localization.GetString("ServerMetricsDiskLabel.Text"),
+        ServerMetricPresentation.WithSeverityCue(DiskAccessibleValue, HasDiskPercent, DiskSeverity, _localization));
 
     public string? DiskLegend => BytesOf(_card?.MetricsSnapshot?.DiskUsedBytes, _card?.MetricsSnapshot?.DiskTotalBytes);
 
     public string DiskAccessibleValue => AccessiblePercent(HasDiskPercent, _card?.DiskUsageValue ?? 0);
+
+    /// <summary>UI.10 F25: the disk number's severity (see <see cref="CpuSeverity"/>).</summary>
+    public ServerHealth DiskSeverity => Severity(ServerMetricKind.Disk);
+
+    private ServerHealth Severity(ServerMetricKind kind) =>
+        _card is null ? ServerHealth.Healthy : ServerMetricPresentation.Read(_card, kind, _dashboard.Thresholds).Severity;
 
     /// <summary>A-4: lit disk segments out of 14; null = unknown (empty track + "—").</summary>
     public int? DiskLitSegments => MetricVisualPresentation.LitSegments(
@@ -813,6 +829,7 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
             Raise(Args.CpuValueText);
             Raise(Args.CpuAccessibleName);
             Raise(Args.CpuAccessibleValue);
+            Raise(Args.CpuSeverity);
         }
 
         if ((dirty & Change.Memory) != 0)
@@ -825,6 +842,7 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
             Raise(Args.MemoryAccessibleValue);
             Raise(Args.MemoryLitSegments);
             Raise(Args.MemoryLitCount);
+            Raise(Args.MemorySeverity);
         }
 
         if ((dirty & Change.Disk) != 0)
@@ -837,6 +855,7 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
             Raise(Args.DiskAccessibleValue);
             Raise(Args.DiskLitSegments);
             Raise(Args.DiskLitCount);
+            Raise(Args.DiskSeverity);
         }
 
         if ((dirty & Change.Reading) != 0)
@@ -1077,6 +1096,9 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
         public static readonly PropertyChangedEventArgs IsRouted = new(nameof(ServerDetailViewModel.IsRouted));
         public static readonly PropertyChangedEventArgs HasCpuPercent = new(nameof(ServerDetailViewModel.HasCpuPercent));
         public static readonly PropertyChangedEventArgs CpuDisplay = new(nameof(ServerDetailViewModel.CpuDisplay));
+        public static readonly PropertyChangedEventArgs CpuSeverity = new(nameof(ServerDetailViewModel.CpuSeverity));
+        public static readonly PropertyChangedEventArgs MemorySeverity = new(nameof(ServerDetailViewModel.MemorySeverity));
+        public static readonly PropertyChangedEventArgs DiskSeverity = new(nameof(ServerDetailViewModel.DiskSeverity));
         public static readonly PropertyChangedEventArgs CpuAccessibleValue = new(nameof(ServerDetailViewModel.CpuAccessibleValue));
         public static readonly PropertyChangedEventArgs CpuPulseSamples = new(nameof(ServerDetailViewModel.CpuPulseSamples));
         public static readonly PropertyChangedEventArgs HasCpuPulse = new(nameof(ServerDetailViewModel.HasCpuPulse));

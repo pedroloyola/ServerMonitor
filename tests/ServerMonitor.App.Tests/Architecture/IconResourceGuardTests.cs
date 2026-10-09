@@ -6,21 +6,23 @@ using ServerMonitor.App.Controls.Primitives;
 namespace ServerMonitor.App.Tests.Architecture;
 
 /// <summary>
-/// T-18 (UI.2 S5, Boss decision B-1). The icon set is closed, licensed and traceable: exactly the 22 decided
-/// Hugeicons Free icons, vendored as path data with a manifest entry each (package, version, integrity, MIT), the
-/// licence text in THIRD-PARTY-NOTICES.md, and no icon outside the manifest.
+/// T-18 (UI.2 S5, Boss decision B-1). The icon set is closed, licensed and traceable: exactly the decided
+/// Hugeicons Free icons (22 from B-1 + 5 from the accepted UI.10 plan), vendored as path data with a manifest entry
+/// each (package, version, integrity, MIT), the licence text in THIRD-PARTY-NOTICES.md, and no icon outside the manifest.
 /// </summary>
 public sealed partial class IconResourceGuardTests
 {
     private const string IconsXaml = "Styles/Components/Sa.Icons.xaml";
     private const string Manifest = "Styles/Components/Icons.manifest.json";
 
-    /// <summary>Boss B-1, verbatim.</summary>
+    /// <summary>Boss B-1, verbatim; then UI.10 (Figma A3 238:250/253/256/259: F15/F16 compact enter/exit, F19 Cpu/Ram;
+    /// F40 the neutral Package for "nothing to show" in Workloads).</summary>
     private static readonly string[] DecidedIcons =
     [
         "ServerStack01", "DashboardSquare01", "Clock01", "Settings01", "Refresh", "Add01", "Search01", "ArrowRight01",
         "ArrowDown01", "HardDrive", "Key01", "LockPassword", "Folder01", "Shield01", "View", "InformationCircle",
-        "Alert02", "Computer", "Sun03", "Moon02", "Cancel01", "Tick02"
+        "Alert02", "Computer", "Sun03", "Moon02", "Cancel01", "Tick02",
+        "Cpu", "RamMemory", "ArrowExpand01", "ArrowShrink01", "Package"
     ];
 
     [Fact]

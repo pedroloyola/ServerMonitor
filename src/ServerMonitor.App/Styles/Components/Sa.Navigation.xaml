@@ -25,6 +25,11 @@
         <Setter Property="FocusVisualPrimaryBrush" Value="{ThemeResource SaFocusRingBrush}" />
         <Setter Property="FocusVisualPrimaryThickness" Value="{StaticResource SaFocusRingThickness}" />
         <Setter Property="FocusVisualSecondaryThickness" Value="0" />
+        <!-- UI.10 F01 (H01) + Prism UI.10C RC-1: the keyboard ring sits ON the pill edge (160x46, r23 - concentric by
+             construction, normal and rail), never a frame larger than the selection (Figma Nav item Focus 235:243). The
+             inherited RadioButton default (-7,-3) made it 174x52 and off-centre; -3 still read as a bigger selection. Action
+             buttons keep -3 (they have no selection fill to be confused with the ring). -->
+        <Setter Property="FocusVisualMargin" Value="0" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="RadioButton">

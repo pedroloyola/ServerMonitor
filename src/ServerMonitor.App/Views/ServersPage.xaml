@@ -17,6 +17,7 @@
         <!-- Figma 112:1468: a value over the engine's attention limit in the attention text colour; critical in danger. -->
         <Style x:Key="ServersMetricCriticalTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SaButtonTextStyle}">
             <Setter Property="Foreground" Value="{ThemeResource SaDangerTextBrush}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
         </Style>
         <converters:ServerHealthToStyleConverter
             x:Key="MetricValueStyleConverter"
@@ -262,8 +263,9 @@
         <ScrollViewer x:Name="PageScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled">
             <StackPanel x:Name="PageRoot" Padding="{StaticResource SaPagePadding}" Spacing="{StaticResource SaSpace24}">
 
-                <!-- Header 112:1420: title 32 Semibold + summary 13 muted (or the §14 loading line), Adicionar 156×44. -->
-                <Grid x:Name="HeaderGrid" ColumnSpacing="{StaticResource SaSpace20}">
+                <!-- Header = the shared page header (UI.10 F09/F10, Figma Page header 240:588): title 32/40 + summary 13/18 muted (or
+                     the §14 loading line), Adicionar 156×44 centred on the title line - the same y as on Visão geral. -->
+                <Grid x:Name="HeaderGrid" Style="{StaticResource SaPageHeaderGridStyle}">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
@@ -272,21 +274,25 @@
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
-                    <StackPanel Spacing="6">
+                    <StackPanel Style="{StaticResource SaPageHeaderTitleBlockStyle}">
                         <primitives:SaHeadingHost AutomationProperties.HeadingLevel="Level1" IsTabStop="False">
                         <TextBlock x:Uid="ServersPageTitleText" AutomationProperties.AccessibilityView="Raw" IsTextSelectionEnabled="False" IsTabStop="False"
                                    Style="{StaticResource SaPageTitleTextStyle}" Foreground="{ThemeResource SaTextBrush}" />
                     </primitives:SaHeadingHost>
-                        <TextBlock Style="{StaticResource SaPageSubtitleTextStyle}" TextWrapping="Wrap"
-                                   Text="{x:Bind ViewModel.HeaderContextDisplay, Mode=OneWay}" AutomationProperties.LiveSetting="Polite" />
-                    </StackPanel>
-                    <Button x:Name="AddButton" x:Uid="ServersAddButton" Grid.Column="1" MinWidth="156" VerticalAlignment="Top"
-                            Style="{StaticResource SaPrimaryButtonStyle}" Command="{x:Bind ViewModel.AddServerCommand}">
-                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource SaSpace8}">
-                            <primitives:SaIcon Data="{StaticResource SaIconAdd01Data}" Size="18" VerticalAlignment="Center" />
-                            <TextBlock x:Uid="ServersAddText" VerticalAlignment="Center" />
+                        <StackPanel Style="{StaticResource SaPageHeaderLineTwoStyle}">
+                            <TextBlock Style="{StaticResource SaPageSubtitleTextStyle}" TextWrapping="Wrap"
+                                       Text="{x:Bind ViewModel.HeaderContextDisplay, Mode=OneWay}" AutomationProperties.LiveSetting="Polite" />
                         </StackPanel>
-                    </Button>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Style="{StaticResource SaPageHeaderActionsStyle}">
+                        <Button x:Name="AddButton" x:Uid="ServersAddButton" MinWidth="156"
+                                Style="{StaticResource SaPrimaryButtonStyle}" Command="{x:Bind ViewModel.AddServerCommand}">
+                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource SaSpace8}">
+                                <primitives:SaIcon Data="{StaticResource SaIconAdd01Data}" Size="18" VerticalAlignment="Center" />
+                                <TextBlock x:Uid="ServersAddText" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
                 </Grid>
 
                 <!-- Search 112:1429: 44 high, radius 14, full width; visible while loading too (§14). -->
@@ -349,12 +355,13 @@
                     </primitives:SaEmptyState>
                 </Border>
 
-                <!-- Empty §13 112:14007: no visible server; the note only when servers are hidden (Prism r1 c). -->
+                <!-- Empty §13 112:14007: no visible server; the note only when servers are hidden (Prism r1 c). UI.10 F06: the CTA is the
+                     Primary h44 pill (112:14098 updated in UI.10B), the same shape as the header "+ Adicionar". -->
                 <Border Style="{StaticResource SaStatePanelStyle}" Visibility="{x:Bind ViewModel.ShowEmptyState, Mode=OneWay}">
                     <StackPanel VerticalAlignment="Center" Spacing="{StaticResource SaSpace16}">
                         <primitives:SaEmptyState x:Name="EmptyState" x:Uid="ServersEmptyState" TitleHeadingLevel="Level2"
                                                  IconData="{StaticResource SaIconServerStack01Data}">
-                            <Button x:Name="EmptyAddButton" x:Uid="ServersEmptyAddButton" HorizontalAlignment="Center" Style="{StaticResource SaSolidButtonStyle}"
+                            <Button x:Name="EmptyAddButton" x:Uid="ServersEmptyAddButton" HorizontalAlignment="Center" Style="{StaticResource SaPrimaryButtonStyle}"
                                     Command="{x:Bind ViewModel.AddServerCommand}" />
                         </primitives:SaEmptyState>
                         <TextBlock x:Uid="ServersHiddenNote" HorizontalAlignment="Center" Style="{StaticResource SaTableCellSecondaryTextStyle}"

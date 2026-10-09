@@ -25,6 +25,8 @@ ICONS = [
     "ServerStack01", "DashboardSquare01", "Clock01", "Settings01", "Refresh", "Add01", "Search01", "ArrowRight01",
     "ArrowDown01", "HardDrive", "Key01", "LockPassword", "Folder01", "Shield01", "View", "InformationCircle",
     "Alert02", "Computer", "Sun03", "Moon02", "Cancel01", "Tick02",
+    # UI.10 (F15/F16 compact enter/exit pair, F19 one icon per metric, F40 neutral "nothing to show" box).
+    "Cpu", "RamMemory", "ArrowExpand01", "ArrowShrink01", "Package",
 ]
 
 ELEMENT = re.compile(r'\["(path|circle)",\s*\{([^}]*)\}\]')

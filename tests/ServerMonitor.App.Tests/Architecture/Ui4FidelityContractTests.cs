@@ -60,14 +60,16 @@ public sealed class Ui4FidelityContractTests
 
     // ---- overview ---------------------------------------------------------------------------------------------
 
-    /// <summary>B5: segments right after the text — Auto · Auto · spacer 75 · Auto(bar), the bar left-aligned in column 3.</summary>
+    /// <summary>B5: segments after the text — Auto · Auto · spacer · Auto(bar), the bar left-aligned in column 3. UI.10 F05
+    /// (H02, Figma 112:1017 Fill): the spacer takes the free width (min 75), so the bar ends at the card's right padding.</summary>
     [Fact]
-    public void HealthCountRow_PutsTheBarAfterTheTextBehindA75Spacer()
+    public void HealthCountRow_PutsTheBarAfterTheTextBehindAFillSpacer()
     {
         var elements = Elements(Overview);
         var row = Assert.Single(elements, e => Name(e) == "HealthCountRow");
         var columns = row.Descendants().Where(e => e.Name.LocalName == "ColumnDefinition").Select(c => Attr(c, "Width")).ToList();
-        Assert.Equal(["Auto", "Auto", "75", "Auto"], columns);
+        Assert.Equal(["Auto", "Auto", "*", "Auto"], columns);
+        Assert.Equal("75", Attr(row.Descendants().Single(c => Name(c) == "HealthSpacerColumn"), "MinWidth"));
 
         var bar = Assert.Single(elements, e => Name(e) == "HealthSegments");
         Assert.Equal("3", Attr(bar, "Grid.Column"));
@@ -173,14 +175,16 @@ public sealed class Ui4FidelityContractTests
 
     // ---- servidores ------------------------------------------------------------------------------------------
 
-    /// <summary>B8: "Adicionar" stays beside the title at every width (112:1420): no state moves it.</summary>
+    /// <summary>B8: "Adicionar" stays beside the title at every width (112:1420): no state moves it. UI.10 F09: it lives in
+    /// the shared header's actions slot (column 1).</summary>
     [Fact]
     public void Servers_AddStaysBesideTheTitle_AtEveryWidth()
     {
         var elements = Elements(Servers);
         Assert.DoesNotContain(elements, e => e.Name.LocalName == "Setter" && Attr(e, "Target")?.StartsWith("AddButton.", StringComparison.Ordinal) == true);
         var add = Assert.Single(elements, e => Name(e) == "AddButton");
-        Assert.Equal("1", Attr(add, "Grid.Column"));
+        Assert.Equal("1", Attr(add.Parent!, "Grid.Column"));
+        Assert.Equal("{StaticResource SaPageHeaderActionsStyle}", Attr(add.Parent!, "Style"));
     }
 
     // ---- Cortex r3 NIT-1: parity with the Core ------------------------------------------------------------------

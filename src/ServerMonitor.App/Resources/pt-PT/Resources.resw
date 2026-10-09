@@ -46,8 +46,8 @@
   <data name="SettingsHiddenServersTitle.Text" xml:space="preserve"><value>Servidores ocultos</value></data>
   <data name="SettingsHiddenServersDescription.Text" xml:space="preserve"><value>Continuam guardados, mas não aparecem no painel.</value></data>
   <data name="SettingsHiddenServersEmpty.Text" xml:space="preserve"><value>Não há servidores ocultos.</value></data>
-  <data name="HiddenServerRestoreButton.Content" xml:space="preserve"><value>Restaurar</value></data>
-  <data name="HiddenServerRestoreFor" xml:space="preserve"><value>Restaurar {0}</value></data>
+  <data name="HiddenServerRestoreButton.Content" xml:space="preserve"><value>Mostrar</value></data>
+  <data name="HiddenServerRestoreFor" xml:space="preserve"><value>Mostrar {0}</value></data>
   <data name="ServerFormRemoveSavedPassphrase.Content" xml:space="preserve"><value>Remover a frase-passe guardada</value></data>
   <data name="ServerFormTestConnectionButton.Content" xml:space="preserve"><value>Testar ligação</value></data>
   <data name="ServerFormCancelTestButton.Content" xml:space="preserve"><value>Cancelar teste</value></data>
@@ -61,7 +61,7 @@
   <data name="ConnectionStateUnreachable" xml:space="preserve"><value>Servidor inacessível</value></data>
   <data name="ConnectionStateCancelled" xml:space="preserve"><value>Teste cancelado</value></data>
   <data name="ConnectionStateError" xml:space="preserve"><value>Erro de ligação</value></data>
-  <data name="ConnectionErrorInvalidConfiguration" xml:space="preserve"><value>Reveja a configuração SSH.</value></data>
+  <data name="ConnectionErrorInvalidConfiguration" xml:space="preserve"><value>Revê a configuração SSH.</value></data>
   <data name="ConnectionErrorCredentialNotConfigured" xml:space="preserve"><value>Configure uma palavra-passe ou frase-passe válida.</value></data>
   <data name="ConnectionErrorCredentialUnavailable" xml:space="preserve"><value>A credencial guardada não está disponível. Volta a introduzi-la.</value></data>
   <data name="ConnectionErrorPrivateKeyUnavailable" xml:space="preserve"><value>O ficheiro da chave privada não foi encontrado.</value></data>
@@ -112,10 +112,10 @@
   <data name="DiscoveredServerAutomationSummary" xml:space="preserve"><value>{0}, SSH, {1}, encontrado na rede</value></data>
   <data name="SettingsIgnoredDiscoveriesTitle.Text" xml:space="preserve"><value>Dispositivos ignorados</value></data>
   <data name="SettingsIgnoredDiscoveriesDescription.Text" xml:space="preserve"><value>Volta a mostrar os dispositivos que ainda estão presentes na rede.</value></data>
-  <data name="SettingsResetIgnoredButton.Content" xml:space="preserve"><value>Repor dispositivos</value></data>
-  <data name="SettingsResetIgnoredSuccess.Title" xml:space="preserve"><value>Dispositivos repostos</value></data>
+  <data name="SettingsResetIgnoredButton.Content" xml:space="preserve"><value>Voltar a mostrar dispositivos ignorados</value></data>
+  <data name="SettingsResetIgnoredSuccess.Title" xml:space="preserve"><value>Dispositivos ignorados visíveis de novo</value></data>
   <data name="SettingsResetIgnoredSuccess.Message" xml:space="preserve"><value>Os dispositivos presentes na rede podem voltar a aparecer.</value></data>
-  <data name="SettingsResetIgnoredError.Title" xml:space="preserve"><value>Não foi possível repor os dispositivos ignorados</value></data>
+  <data name="SettingsResetIgnoredError.Title" xml:space="preserve"><value>Não foi possível voltar a mostrar os dispositivos ignorados</value></data>
   <data name="SettingsResetIgnoredError.Message" xml:space="preserve"><value>Tenta novamente dentro de momentos.</value></data>
   <data name="SettingsNotificationsTitle.Text" xml:space="preserve"><value>Alertas de estado</value></data>
   <data name="SettingsNotificationsDescription.Text" xml:space="preserve"><value>Recebe notificações quando a saúde de um servidor muda.</value></data>
@@ -127,7 +127,7 @@
   <data name="SettingsNotificationsSaveError.Title" xml:space="preserve"><value>Não foi possível guardar a preferência</value></data>
   <data name="SettingsNotificationsSaveError.Message" xml:space="preserve"><value>A configuração anterior de notificações foi mantida.</value></data>
   <data name="TrayFailSafeExitNotificationTitle" xml:space="preserve"><value>O ServerAlyzer foi encerrado</value></data>
-  <data name="TrayFailSafeExitNotificationBody" xml:space="preserve"><value>Não foi possível restaurar em segurança o ícone da área de notificação da barra de tarefas, por isso o ServerAlyzer encerrou. Abra o ServerAlyzer de novo para continuar a monitorização.</value></data>
+  <data name="TrayFailSafeExitNotificationBody" xml:space="preserve"><value>Não foi possível restaurar em segurança o ícone da área de notificação da barra de tarefas, por isso o ServerAlyzer encerrou. Abre o ServerAlyzer de novo para continuar a monitorização.</value></data>
   <data name="TrayToolTip" xml:space="preserve"><value>ServerAlyzer</value></data>
   <data name="TrayOpenMenuItem" xml:space="preserve"><value>Abrir o ServerAlyzer</value></data>
   <data name="TrayRefreshAllMenuItem" xml:space="preserve"><value>Atualizar todos</value></data>
@@ -145,7 +145,7 @@
   <data name="NotificationHealthyTitle" xml:space="preserve"><value>Servidor saudável</value></data>
   <data name="NotificationHealthyBodyFormat" xml:space="preserve"><value>{0} voltou a um estado saudável.</value></data>
   <data name="NotificationPlatformUnavailableTitle" xml:space="preserve"><value>Notificações indisponíveis</value></data>
-  <data name="NotificationPlatformUnavailableMessage" xml:space="preserve"><value>O Windows não permitiu ativar as notificações. Verifique as definições do sistema.</value></data>
+  <data name="NotificationPlatformUnavailableMessage" xml:space="preserve"><value>O Windows não permitiu ativar as notificações. Verifica as definições do sistema.</value></data>
   <data name="TrayCompactModeMenuItem" xml:space="preserve"><value>Modo compacto</value></data>
   <data name="DashboardCompactModeButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Modo compacto</value></data>
   <data name="DashboardCompactModeButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Modo compacto</value></data>
@@ -183,12 +183,12 @@
   <data name="HistoryUnavailableTitle.Text" xml:space="preserve"><value>Histórico indisponível</value></data>
   <data name="HistoryUnavailableDescription.Text" xml:space="preserve"><value>Não foi possível ler o histórico local agora. A monitorização continua normalmente.</value></data>
   <data name="HistoryEmptyTitle.Text" xml:space="preserve"><value>Ainda sem histórico</value></data>
-  <data name="HistoryEmptyDescription.Text" xml:space="preserve"><value>O histórico é recolhido enquanto o servidor é monitorizado. Volte dentro de alguns minutos.</value></data>
+  <data name="HistoryEmptyDescription.Text" xml:space="preserve"><value>O histórico é recolhido enquanto o servidor é monitorizado. Volta dentro de alguns minutos.</value></data>
   <data name="HistoryMetricCpu" xml:space="preserve"><value>CPU</value></data>
   <data name="HistoryMetricMemory" xml:space="preserve"><value>Memória</value></data>
   <data name="HistoryMetricDisk" xml:space="preserve"><value>Disco</value></data>
   <data name="HistoryValueUnknown" xml:space="preserve"><value>—</value></data>
-  <data name="HistoryValueUnknownAccessible" xml:space="preserve"><value>Desconhecido</value></data>
+  <data name="HistoryValueUnknownAccessible" xml:space="preserve"><value>Sem dados</value></data>
   <data name="HistoryOfflineNoticeTitle.Text" xml:space="preserve"><value>Período offline</value></data>
   <data name="HistoryOfflineNoticeDescription.Text" xml:space="preserve"><value>Este intervalo contém amostras de um período em que o servidor esteve offline. Os gráficos mostram-no como uma lacuna.</value></data>
   <data name="HistoryRangeNameLastHour" xml:space="preserve"><value>Última hora</value></data>
@@ -229,7 +229,7 @@
   <data name="WorkloadDockerNotInstalledTitle.Text" xml:space="preserve"><value>Docker não instalado</value></data>
   <data name="WorkloadDockerNotInstalledDescription.Text" xml:space="preserve"><value>O Docker não está disponível neste servidor. São mostrados apenas os serviços.</value></data>
   <data name="WorkloadDockerPermissionTitle.Text" xml:space="preserve"><value>Sem permissão para aceder ao Docker</value></data>
-  <data name="WorkloadDockerPermissionDescription.Text" xml:space="preserve"><value>Este utilizador não consegue aceder ao daemon do Docker. Adicione-o ao grupo docker para ver os containers.</value></data>
+  <data name="WorkloadDockerPermissionDescription.Text" xml:space="preserve"><value>Este utilizador não consegue aceder ao daemon do Docker. Adiciona-o ao grupo docker para ver os containers.</value></data>
   <data name="WorkloadDockerUnavailableTitle.Text" xml:space="preserve"><value>Docker indisponível</value></data>
   <data name="WorkloadDockerUnavailableDescription.Text" xml:space="preserve"><value>O Docker está instalado, mas o daemon não está a responder de momento.</value></data>
   <data name="WorkloadDockerErrorTitle.Text" xml:space="preserve"><value>Não foi possível ler o Docker</value></data>
@@ -293,7 +293,7 @@
   <data name="WorkloadSummaryWarningFormat" xml:space="preserve"><value>{0} a iniciar</value></data>
   <data name="WorkloadSummaryStoppedFormat" xml:space="preserve"><value>{0} parados</value></data>
   <data name="BackgroundNoticeTitle" xml:space="preserve"><value>O ServerAlyzer continua a monitorizar</value></data>
-  <data name="BackgroundNoticeBody" xml:space="preserve"><value>A janela foi fechada, mas a monitorização e o widget continuam ativos. Para sair mesmo, use "Sair do ServerAlyzer" no ícone da área de notificação da barra de tarefas — pode estar nos ícones ocultos (^). Pode alterar isto nas Definições.</value></data>
+  <data name="BackgroundNoticeBody" xml:space="preserve"><value>A janela foi fechada, mas a monitorização e o widget continuam ativos. Para sair mesmo, usa "Sair do ServerAlyzer" no ícone da área de notificação da barra de tarefas — pode estar nos ícones ocultos (^). Podes alterar isto nas Definições.</value></data>
   <data name="SettingsBackgroundTitle.Text" xml:space="preserve"><value>Continuar em segundo plano</value></data>
   <data name="SettingsBackgroundDescription.Text" xml:space="preserve"><value>Ao fechar a janela, a app fica na área de notificação.</value></data>
   <data name="SettingsBackgroundToggle.Header" xml:space="preserve"><value>Continuar em segundo plano ao fechar a janela</value></data>
@@ -302,7 +302,7 @@
   <data name="SettingsBackgroundToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Continuar em segundo plano ao fechar a janela</value></data>
   <data name="SettingsBackgroundToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.HelpText" xml:space="preserve"><value>Quando desativado, fechar a janela encerra o ServerAlyzer e para a monitorização e o widget.</value></data>
   <data name="BackgroundDegradedNotice.Title" xml:space="preserve"><value>Segundo plano indisponível nesta sessão</value></data>
-  <data name="BackgroundDegradedNotice.Message" xml:space="preserve"><value>O ServerAlyzer abriu esta janela porque não conseguiu colocar ou manter o seu ícone na área de notificação da barra de tarefas. Sem esse ícone não há forma de reabrir ou encerrar a app em segundo plano, por isso fechar esta janela agora encerra o ServerAlyzer. A tua preferência não foi alterada: abre o ServerAlyzer de novo mais tarde para tentares outra vez.</value></data>
+  <data name="BackgroundDegradedNotice.Message" xml:space="preserve"><value>O ServerAlyzer abriu esta janela porque não conseguiu colocar ou manter o ícone na área de notificação da barra de tarefas. Sem esse ícone não há forma de reabrir ou encerrar a app em segundo plano, por isso fechar esta janela agora encerra o ServerAlyzer. A tua preferência não foi alterada: abre o ServerAlyzer de novo mais tarde para tentares outra vez.</value></data>
   <data name="SettingsBackgroundDegradedCaption.Text" xml:space="preserve"><value>Indisponível nesta sessão: o ícone da área de notificação não pôde ser criado ou mantido. Fechar a janela encerra o ServerAlyzer. A tua preferência foi mantida e será usada na próxima abertura.</value></data>
   <data name="ServerFormSshConfigCloseButton.Content" xml:space="preserve"><value>Fechar</value></data>
   <data name="SshConfigHostUseForFormat" xml:space="preserve"><value>Usar {0}</value></data>
@@ -349,7 +349,7 @@
   <data name="SshConfigIncludeIssueUnsupportedPattern" xml:space="preserve"><value>padrão não suportado</value></data>
   <data name="SshConfigIncludeIssueUnsupportedExpansion" xml:space="preserve"><value>expansão não suportada</value></data>
   <data name="SshConfigIncludeIssueMissingArgument" xml:space="preserve"><value>caminho em falta ou mal formado</value></data>
-  <data name="SshConfigImportErrorConfigIsLink" xml:space="preserve"><value>O ~/.ssh ou o ~/.ssh/config é uma ligação (simbólica, junção ou ligação física), por isso não foi lido e nada foi importado. Gestores de dotfiles e o OneDrive podem criar estas ligações; por segurança, o ServerAlyzer nunca as segue. Para importar, copie a sua configuração SSH para um ficheiro normal em ~/.ssh/config.</value></data>
+  <data name="SshConfigImportErrorConfigIsLink" xml:space="preserve"><value>O ~/.ssh ou o ~/.ssh/config é uma ligação (simbólica, junção ou ligação física), por isso não foi lido e nada foi importado. Gestores de dotfiles e o OneDrive podem criar estas ligações; por segurança, o ServerAlyzer nunca as segue. Para importar, copia a tua configuração SSH para um ficheiro normal em ~/.ssh/config.</value></data>
   <data name="SshConfigIncludeIssueFinalPathMismatch" xml:space="preserve"><value>não foi possível confirmar que o ficheiro aberto é o verificado</value></data>
   <data name="SshConfigIncludeIssueHardLinked" xml:space="preserve"><value>ficheiro com ligação física não seguido</value></data>
   <data name="SshConfigHostAccessibleImportableFormat" xml:space="preserve"><value>{0} — importável</value></data>
@@ -430,37 +430,38 @@
   <data name="BackupFileTypeLabel" xml:space="preserve"><value>Cópia de segurança do ServerAlyzer</value></data>
   <data name="BackupCreateTitle" xml:space="preserve"><value>Criar cópia de segurança encriptada</value></data>
   <data name="BackupPassphraseLabel" xml:space="preserve"><value>Frase-passe</value></data>
-  <data name="BackupPassphraseConfirmLabel" xml:space="preserve"><value>Confirme a frase-passe</value></data>
+  <data name="BackupPassphraseConfirmLabel" xml:space="preserve"><value>Confirma a frase-passe</value></data>
   <data name="BackupPassphraseHint" xml:space="preserve"><value>Pelo menos 12 caracteres. Algumas palavras sem relação entre si funcionam bem.</value></data>
-  <data name="BackupNoRecoveryWarning" xml:space="preserve"><value>Se perder esta frase-passe, a cópia de segurança não poderá ser aberta. O ServerAlyzer não a guarda e não a consegue recuperar.</value></data>
-  <data name="BackupContainsSecretsNote" xml:space="preserve"><value>O ficheiro contém as suas palavras-passe guardadas, encriptadas. Guarde-o num local seguro.</value></data>
+  <data name="BackupNoRecoveryWarning" xml:space="preserve"><value>Se perderes esta frase-passe, a cópia de segurança não poderá ser aberta. O ServerAlyzer não a guarda e não a consegue recuperar.</value></data>
+  <data name="BackupContainsSecretsNote" xml:space="preserve"><value>O ficheiro contém as tuas palavras-passe guardadas, encriptadas. Guarda-o num local seguro.</value></data>
   <data name="BackupCreatePrimary" xml:space="preserve"><value>Escolher local e guardar</value></data>
   <data name="Cancel" xml:space="preserve"><value>Cancelar</value></data>
-  <data name="PassphraseTooShort" xml:space="preserve"><value>Use pelo menos 12 caracteres.</value></data>
-  <data name="PassphraseTooLong" xml:space="preserve"><value>Use no máximo 256 caracteres.</value></data>
+  <data name="PassphraseTooShort" xml:space="preserve"><value>Usa pelo menos 12 caracteres.</value></data>
+  <data name="PassphraseTooLong" xml:space="preserve"><value>Usa no máximo 256 caracteres.</value></data>
   <data name="PassphraseInvalidCharacters" xml:space="preserve"><value>A frase-passe contém caracteres que não podem ser usados.</value></data>
   <data name="PassphraseMismatch" xml:space="preserve"><value>As frases-passe não coincidem.</value></data>
-  <data name="PassphraseEmpty" xml:space="preserve"><value>Introduza a frase-passe.</value></data>
+  <data name="PassphraseEmpty" xml:space="preserve"><value>Introduz a frase-passe.</value></data>
   <data name="BackupCreatedTitle" xml:space="preserve"><value>Cópia de segurança criada</value></data>
+  <data name="BackupCreatedWithWarningsTitle" xml:space="preserve"><value>Cópia criada com avisos</value></data>
   <data name="BackupCreatedMessage" xml:space="preserve"><value>Cópia de segurança guardada em {3}. Servidores: {0} · Chaves de anfitrião confiáveis: {1} · Palavras-passe guardadas: {2}</value></data>
-  <data name="BackupMissingCredentialsWarning" xml:space="preserve"><value>Não foi encontrada nenhuma palavra-passe guardada para: {0}. Depois de restaurar, ser-lhe-á pedida.</value></data>
+  <data name="BackupMissingCredentialsWarning" xml:space="preserve"><value>Não foi encontrada nenhuma palavra-passe guardada para: {0}. Depois de restaurar, ser-te-á pedida.</value></data>
   <data name="BackupExcludedEntriesWarning" xml:space="preserve"><value>Entradas de servidor ilegíveis, não incluídas: {0}</value></data>
   <data name="BackupExcludedTrustNote" xml:space="preserve"><value>Chaves de anfitrião confiáveis não usadas por nenhum servidor, não incluídas: {0}</value></data>
   <data name="BackupFailedTitle" xml:space="preserve"><value>Cópia de segurança não criada</value></data>
-  <data name="BackupFailedWrite" xml:space="preserve"><value>Não foi possível gravar o ficheiro nesse local. Escolha outra pasta e tente novamente.</value></data>
+  <data name="BackupFailedWrite" xml:space="preserve"><value>Não foi possível guardar o ficheiro nesse local. Escolhe outra pasta e tenta novamente.</value></data>
   <data name="BackupFailedCredentialStore" xml:space="preserve"><value>Não foi possível ler as palavras-passe guardadas no Gestor de Credenciais do Windows. Nada foi guardado.</value></data>
   <data name="BackupFailedTrustStore" xml:space="preserve"><value>Não foi possível ler o ficheiro de chaves de anfitrião confiáveis. Nada foi guardado.</value></data>
-  <data name="BackupFailedTooLarge" xml:space="preserve"><value>A sua configuração é demasiado grande para a cópia de segurança.</value></data>
-  <data name="BackupFailedInvalidContent" xml:space="preserve"><value>A sua configuração atual contém valores que não podem ser incluídos na cópia de segurança. Nada foi guardado.</value></data>
+  <data name="BackupFailedTooLarge" xml:space="preserve"><value>A tua configuração é demasiado grande para a cópia de segurança.</value></data>
+  <data name="BackupFailedInvalidContent" xml:space="preserve"><value>A tua configuração atual contém valores que não podem ser incluídos na cópia de segurança. Nada foi guardado.</value></data>
   <data name="BackupUnsupported" xml:space="preserve"><value>A encriptação não está disponível neste sistema.</value></data>
   <data name="RestoreOpenTitle" xml:space="preserve"><value>Restaurar a partir de cópia de segurança</value></data>
-  <data name="RestoreOpenMessage" xml:space="preserve"><value>Introduza a frase-passe de {0}. Nada muda até rever e confirmar.</value></data>
+  <data name="RestoreOpenMessage" xml:space="preserve"><value>Introduz a frase-passe de {0}. Nada muda até reveres e confirmares.</value></data>
   <data name="RestoreOpenPrimary" xml:space="preserve"><value>Abrir cópia</value></data>
   <data name="RestoreOpening" xml:space="preserve"><value>A verificar a cópia de segurança…</value></data>
   <data name="RestoreErrorWrongPassphraseOrDamaged" xml:space="preserve"><value>A frase-passe está errada, ou o ficheiro está danificado ou foi modificado. Nada foi alterado.</value></data>
   <data name="RestoreErrorNotABackup" xml:space="preserve"><value>Este ficheiro não é uma cópia de segurança do ServerAlyzer. Nada foi alterado.</value></data>
   <data name="RestoreErrorDamaged" xml:space="preserve"><value>O ficheiro da cópia de segurança está danificado ou incompleto. Nada foi alterado.</value></data>
-  <data name="RestoreErrorIncompatible" xml:space="preserve"><value>Esta cópia de segurança foi criada por uma versão mais recente do ServerAlyzer. Atualize o ServerAlyzer e tente novamente. Nada foi alterado.</value></data>
+  <data name="RestoreErrorIncompatible" xml:space="preserve"><value>Esta cópia de segurança foi criada por uma versão mais recente do ServerAlyzer. Atualiza o ServerAlyzer e tenta novamente. Nada foi alterado.</value></data>
   <data name="RestoreErrorInvalidContent" xml:space="preserve"><value>A cópia de segurança contém dados que o ServerAlyzer não pode aceitar. Nada foi alterado.</value></data>
   <data name="RestoreErrorTooLarge" xml:space="preserve"><value>O ficheiro é demasiado grande para ser uma cópia de segurança do ServerAlyzer. Nada foi alterado.</value></data>
   <data name="RestoreErrorFileAccess" xml:space="preserve"><value>Não foi possível abrir o ficheiro. Nada foi alterado.</value></data>
@@ -469,9 +470,9 @@
   <data name="RestoreSummaryServers" xml:space="preserve"><value>Servidores: {0} atuais → {1} da cópia ({2} através de jump host)</value></data>
   <data name="RestoreSummaryTrust" xml:space="preserve"><value>Chaves de anfitrião confiáveis: {0} atuais → {1} da cópia</value></data>
   <data name="RestoreSummaryTrustRemoved" xml:space="preserve"><value>Chaves de anfitrião confiáveis neste computador que não estão na cópia e serão removidas: {0}</value></data>
-  <data name="RestoreSummaryTrustDelegated" xml:space="preserve"><value>As chaves de anfitrião confiáveis da cópia passarão a ser confiáveis sem nova confirmação. Restaure apenas cópias criadas por si.</value></data>
+  <data name="RestoreSummaryTrustDelegated" xml:space="preserve"><value>As chaves de anfitrião confiáveis da cópia passarão a ser confiáveis sem nova confirmação. Restaura apenas cópias criadas por ti.</value></data>
   <data name="RestoreSummaryPasswords" xml:space="preserve"><value>Palavras-passe guardadas: {0} (todas as palavras-passe guardadas atuais são substituídas)</value></data>
-  <data name="RestoreSummaryMissingPasswords" xml:space="preserve"><value>Não estão na cópia, ser-lhe-ão pedidas novamente: {0}</value></data>
+  <data name="RestoreSummaryMissingPasswords" xml:space="preserve"><value>Não estão na cópia, ser-te-ão pedidas novamente: {0}</value></data>
   <data name="RestoreSummaryMissingKeys" xml:space="preserve"><value>Ficheiros de chave não encontrados neste computador: {0}</value></data>
   <data name="RestoreSummaryNetworkKeys" xml:space="preserve"><value>Caminhos de chave de rede ou não suportados (não verificados, não poderão ser usados): {0}</value></data>
   <data name="RestoreSummaryUnsupportedKeys" xml:space="preserve"><value>Caminhos de chave que são ligações ou não são ficheiros (não poderão ser usados): {0}</value></data>
@@ -481,19 +482,19 @@
   <data name="RestoreSummarySome" xml:space="preserve"><value>algumas</value></data>
   <data name="RestoreConfirmNote" xml:space="preserve"><value>O ServerAlyzer será fechado quando o restauro terminar. Esta ação não pode ser anulada.</value></data>
   <data name="RestoreConfirmPrimary" xml:space="preserve"><value>Substituir configuração</value></data>
-  <data name="RestoreApplying" xml:space="preserve"><value>A restaurar… Não feche o ServerAlyzer.</value></data>
+  <data name="RestoreApplying" xml:space="preserve"><value>A restaurar… Não feches o ServerAlyzer.</value></data>
   <data name="RestoreCompletedTitle" xml:space="preserve"><value>Restauro concluído</value></data>
-  <data name="RestoreCompletedMessage" xml:space="preserve"><value>O ServerAlyzer vai fechar agora. Abra-o novamente para usar a configuração restaurada.</value></data>
-  <data name="RestoreCompletedPrimary" xml:space="preserve"><value>Fechar o ServerAlyzer</value></data>
+  <data name="RestoreCompletedMessage" xml:space="preserve"><value>O ServerAlyzer vai fechar agora. Abre-o novamente para usares a configuração restaurada.</value></data>
+  <data name="RestoreCompletedPrimary" xml:space="preserve"><value>Sair do ServerAlyzer</value></data>
   <data name="RestoreRolledBackTitle" xml:space="preserve"><value>O restauro falhou</value></data>
-  <data name="RestoreRolledBackMessage" xml:space="preserve"><value>Ocorreu um problema durante o restauro e todas as alterações foram anuladas. A sua configuração está exatamente como estava.</value></data>
-  <data name="RestorePartialPendingMessage" xml:space="preserve"><value>O restauro falhou e ainda não foi possível anulá-lo por completo. Feche e volte a abrir o ServerAlyzer para concluir.</value></data>
+  <data name="RestoreRolledBackMessage" xml:space="preserve"><value>Ocorreu um problema durante o restauro e todas as alterações foram anuladas. A tua configuração está exatamente como estava.</value></data>
+  <data name="RestorePartialPendingMessage" xml:space="preserve"><value>O restauro falhou e ainda não foi possível anulá-lo por completo. Fecha e volta a abrir o ServerAlyzer para concluir.</value></data>
   <data name="RestoreCanceled" xml:space="preserve"><value>Restauro cancelado. Nada foi alterado.</value></data>
-  <data name="RestoreBusy" xml:space="preserve"><value>O ServerAlyzer está ocupado a guardar alterações. Tente novamente dentro de momentos. Nada foi alterado.</value></data>
+  <data name="RestoreBusy" xml:space="preserve"><value>O ServerAlyzer está ocupado a guardar alterações. Tenta novamente dentro de momentos. Nada foi alterado.</value></data>
   <data name="ConfigurationLocked" xml:space="preserve"><value>Está em curso um restauro. Não é possível guardar alterações até o ServerAlyzer reiniciar.</value></data>
-  <data name="RestoreRecoveredUndone" xml:space="preserve"><value>Um restauro foi interrompido e foi anulado. A sua configuração está como estava antes.</value></data>
+  <data name="RestoreRecoveredUndone" xml:space="preserve"><value>Um restauro foi interrompido e foi anulado. A tua configuração está como estava antes.</value></data>
   <data name="RestoreRecoveredCompleted" xml:space="preserve"><value>Um restauro interrompido foi concluído.</value></data>
-  <data name="RestorePendingBlocked" xml:space="preserve"><value>A cópia de segurança e o restauro estão indisponíveis porque um restauro interrompido não pôde ser concluído nem anulado. Reinicie o ServerAlyzer para tentar novamente de forma automática. Se isto continuar a acontecer, feche o ServerAlyzer e elimine a pasta {0}. Eliminá-la abandona a anulação automática desse restauro.</value></data>
+  <data name="RestorePendingBlocked" xml:space="preserve"><value>A cópia de segurança e o restauro estão indisponíveis porque um restauro interrompido não pôde ser concluído nem anulado. Reinicia o ServerAlyzer para tentar novamente de forma automática. Se isto continuar a acontecer, fecha o ServerAlyzer e elimina a pasta {0}. Eliminá-la abandona a anulação automática desse restauro.</value></data>
   <data name="HistoryCurrentLabel" xml:space="preserve"><value>Atual</value></data>
   <data name="HistoryPercentUnit" xml:space="preserve"><value>%</value></data>
   <data name="HistoryPeakFormat" xml:space="preserve"><value>Pico no período {0}</value></data>
@@ -562,7 +563,12 @@
   <data name="WorkloadServiceDisplayAccessibleFormat" xml:space="preserve"><value>{0}, {1}, arranque {2}</value></data>
   <data name="WorkloadNoResultsTitleFormat" xml:space="preserve"><value>Nenhum resultado para “{0}”</value></data>
   <data name="WorkloadNoProblemsTitle" xml:space="preserve"><value>Nenhum problema encontrado</value></data>
-  <data name="WorkloadNoResultsMessage" xml:space="preserve"><value>Experimenta outro nome ou remove os filtros&#10;para voltar a ver todos os serviços e containers.</value></data>
+  <data name="WorkloadNoResultsInFilterTitleFormat" xml:space="preserve"><value>Nenhum resultado para “{0}” em {1}</value></data>
+  <data name="WorkloadNoResultsSearchMessage" xml:space="preserve"><value>Experimenta outro nome.</value></data>
+  <data name="WorkloadNoResultsFilterMessage" xml:space="preserve"><value>Todos os serviços e containers estão a funcionar.</value></data>
+  <data name="WorkloadNoResultsSearchAndFilterMessage" xml:space="preserve"><value>Experimenta outro nome ou mostra todos.</value></data>
+  <data name="WorkloadShowAll" xml:space="preserve"><value>Mostrar todos</value></data>
+  <data name="WorkloadClearSearchAndFilter" xml:space="preserve"><value>Limpar pesquisa e filtro</value></data>
   <data name="WorkloadClearSearch" xml:space="preserve"><value>Limpar pesquisa</value></data>
   <data name="WorkloadSectionNoResults" xml:space="preserve"><value>Sem resultados nesta secção</value></data>
   <data name="WorkloadNothingTitle" xml:space="preserve"><value>Nada para apresentar</value></data>
@@ -589,7 +595,6 @@
   <data name="WorkloadLoadingPanel.Text" xml:space="preserve"><value>A carregar…</value></data>
   <data name="WorkloadRetryButton.Content" xml:space="preserve"><value>Tentar novamente</value></data>
   <data name="WorkloadNothingRefreshButton.Content" xml:space="preserve"><value>Atualizar</value></data>
-  <data name="WorkloadClearSearchButton.Content" xml:space="preserve"><value>Limpar pesquisa</value></data>
   <data name="HistoryUnavailableState.Title" xml:space="preserve"><value>Histórico indisponível</value></data>
   <data name="HistoryUnavailableState.Message" xml:space="preserve"><value>Não foi possível ler o histórico local agora. A monitorização continua normalmente.</value></data>
   <data name="HistoryOfflineNotice.Title" xml:space="preserve"><value>Período offline</value></data>
@@ -603,7 +608,6 @@
   <data name="WorkloadNothingState.Message" xml:space="preserve"><value>A consulta terminou, mas não foram encontrados&#10;serviços ou containers disponíveis para monitorização.</value></data>
   <data name="WorkloadUnavailableState.Title" xml:space="preserve"><value>Não foi possível obter os serviços</value></data>
   <data name="WorkloadUnavailableState.Message" xml:space="preserve"><value>Verifica a ligação e as permissões do utilizador SSH.&#10;Os dados de serviços e containers não estão disponíveis.</value></data>
-  <data name="WorkloadNoResultsState.Message" xml:space="preserve"><value>Experimenta outro nome ou remove os filtros&#10;para voltar a ver todos os serviços e containers.</value></data>
   <data name="WorkloadDockerNotInstalledState.Title" xml:space="preserve"><value>Docker não instalado</value></data>
   <data name="WorkloadDockerNotInstalledState.Message" xml:space="preserve"><value>O Docker não está disponível neste servidor. São mostrados apenas os serviços.</value></data>
   <data name="WorkloadDockerPermissionState.Title" xml:space="preserve"><value>Sem permissão para aceder ao Docker</value></data>
@@ -679,10 +683,10 @@
   <data name="ServersEmptyState.Title" xml:space="preserve"><value>Ainda não há servidores</value></data>
   <data name="ServersEmptyState.Message" xml:space="preserve"><value>Adiciona o primeiro servidor para acompanhares a saúde e o consumo dos teus recursos.</value></data>
   <data name="ServersEmptyAddButton.Content" xml:space="preserve"><value>Adicionar servidor</value></data>
-  <data name="ServersHiddenNote.Text" xml:space="preserve"><value>Os servidores ocultos podem ser restaurados nas Definições.</value></data>
+  <data name="ServersHiddenNote.Text" xml:space="preserve"><value>Os servidores ocultos podem ser mostrados de novo nas Definições.</value></data>
   <!-- UI.4 phase 2 (views, Prism r1 copy). -->
   <data name="OverviewTitle.Text" xml:space="preserve"><value>Visão geral</value></data>
-  <data name="OverviewRefreshButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Atualizar tudo</value></data>
+  <data name="OverviewRefreshButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Atualizar todos</value></data>
   <data name="OverviewRefreshButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Atualizar</value></data>
   <data name="OverviewAddButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Adicionar servidor</value></data>
   <data name="OverviewAddText.Text" xml:space="preserve"><value>Adicionar</value></data>
@@ -780,7 +784,7 @@
   <data name="ServerDetailMetricsUnsupportedNotice.Title" xml:space="preserve"><value>Sem métricas para este sistema</value></data>
   <data name="ServerDetailMetricsUnsupportedNotice.Message" xml:space="preserve"><value>As métricas estão disponíveis para servidores Linux e macOS.</value></data>
   <data name="ServersNoticeHiddenTitle" xml:space="preserve"><value>Servidor ocultado</value></data>
-  <data name="ServersNoticeHiddenMessageFormat" xml:space="preserve"><value>Podes restaurar {0} nas Definições.</value></data>
+  <data name="ServersNoticeHiddenMessageFormat" xml:space="preserve"><value>Podes mostrar {0} de novo nas Definições.</value></data>
   <data name="ServersNoticeRemovedTitle" xml:space="preserve"><value>Servidor removido</value></data>
   <data name="ServersNoticeRemovedMessageFormat" xml:space="preserve"><value>{0} foi removido do ServerAlyzer.</value></data>
   <data name="ServersNoticeCloseName" xml:space="preserve"><value>Fechar aviso</value></data>
@@ -804,7 +808,7 @@
   <data name="SettingsOpenAboutText.Text" xml:space="preserve"><value>Sobre o ServerAlyzer</value></data>
   <data name="SettingsLocalPreferences.Text" xml:space="preserve"><value>Estas preferências ficam guardadas neste dispositivo.</value></data>
   <data name="SettingsDataParent.Text" xml:space="preserve"><value>Definições</value></data>
-  <data name="SettingsServerRestoredTitle" xml:space="preserve"><value>Servidor restaurado</value></data>
+  <data name="SettingsServerRestoredTitle" xml:space="preserve"><value>Servidor visível de novo</value></data>
   <data name="SettingsServerRestoredMessage" xml:space="preserve"><value>O servidor está novamente visível na lista.</value></data>
   <data name="SettingsAboutVersionFormat" xml:space="preserve"><value>Versão {0}</value></data>
   <data name="SettingsCredentialsCaption.Text" xml:space="preserve"><value>Palavras-passe e frases-passe ficam protegidas pelo Gestor de Credenciais do Windows.</value></data>
@@ -877,7 +881,7 @@ com métricas claras e acesso direto por SSH.</value></data>
 as métricas e o histórico do servidor.</value></data>
   <data name="FirstServerSubtitle.Text" xml:space="preserve"><value>O teu espaço de monitorização.</value></data>
   <data name="HiddenOverviewTitle.Text" xml:space="preserve"><value>Os teus servidores estão ocultos.</value></data>
-  <data name="HiddenOverviewBody.Text" xml:space="preserve"><value>Podes restaurá-los em Definições › Dados e servidores.</value></data>
+  <data name="HiddenOverviewBody.Text" xml:space="preserve"><value>Podes mostrá-los de novo em Definições › Dados e servidores.</value></data>
   <data name="HiddenOverviewAction.Content" xml:space="preserve"><value>Gerir servidores ocultos</value></data>
   <data name="ConfigurationUnavailableNotice.Message" xml:space="preserve"><value>Não foi possível ler a configuração dos servidores. A configuração não foi alterada.</value></data>
   <data name="ConfigurationUnavailableNotice.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Não foi possível ler a configuração dos servidores. A configuração não foi alterada.</value></data>
@@ -940,7 +944,7 @@ as métricas e o histórico do servidor.</value></data>
   <data name="ServerEditorJumpHostDescription.Text" xml:space="preserve"><value>Usa um servidor intermédio para chegar a redes que não aceitam uma ligação SSH direta.</value></data>
   <data name="ServerEditorJumpHostKind.Text" xml:space="preserve"><value>ProxyJump / bastion</value></data>
   <data name="ServerEditorJumpHostTitle.Text" xml:space="preserve"><value>Jump host</value></data>
-  <data name="ServerEditorJumpHostSubtitle.Text" xml:space="preserve"><value>Credenciais próprias do servidor intermédio.</value></data>
+  <data name="ServerEditorJumpHostSubtitle.Text" xml:space="preserve"><value>Credenciais próprias do jump host.</value></data>
   <data name="ServerEditorJumpHostField.Header" xml:space="preserve"><value>Jump host</value></data>
   <data name="ServerEditorJumpHostInput.PlaceholderText" xml:space="preserve"><value>Ex.: bastion.example.com</value></data>
   <data name="ServerEditorJumpUsernameField.Header" xml:space="preserve"><value>Utilizador SSH</value></data>
@@ -991,10 +995,10 @@ as métricas e o histórico do servidor.</value></data>
   <data name="ServerEditorTrustJumpChangedTitle" xml:space="preserve"><value>A chave do jump host mudou</value></data>
   <data name="ServerEditorTrustTargetChangedTitle" xml:space="preserve"><value>A chave do servidor mudou</value></data>
   <data name="ServerEditorTrustUnknownBody" xml:space="preserve"><value>É a primeira ligação a este endereço. Compara a impressão digital com a fornecida pelo administrador antes de confiar.</value></data>
-  <data name="ServerEditorTrustJumpBody" xml:space="preserve"><value>Esta é a identidade do servidor intermédio. Compara a impressão digital com a fornecida pelo administrador antes de confiar.</value></data>
+  <data name="ServerEditorTrustJumpBody" xml:space="preserve"><value>Esta é a identidade do jump host. Compara a impressão digital com a fornecida pelo administrador antes de confiar.</value></data>
   <data name="ServerEditorTrustTargetBody" xml:space="preserve"><value>Esta é a identidade do servidor final. É independente da chave do jump host; confirma também esta impressão digital.</value></data>
   <data name="ServerEditorTrustMismatchBody" xml:space="preserve"><value>A chave recebida é diferente da guardada. A ligação foi bloqueada. Confirma a alteração com o administrador do servidor.</value></data>
-  <data name="ServerEditorTrustJumpChangedBody" xml:space="preserve"><value>A ligação foi bloqueada: a identidade do servidor intermédio mudou. Confirma a nova chave com o administrador do jump host.</value></data>
+  <data name="ServerEditorTrustJumpChangedBody" xml:space="preserve"><value>A ligação foi bloqueada: a identidade do jump host mudou. Confirma a nova chave com o administrador do jump host.</value></data>
   <data name="ServerEditorTrustTargetChangedBody" xml:space="preserve"><value>A ligação foi bloqueada: a identidade do servidor final mudou. Confirma a nova chave com o administrador do servidor.</value></data>
   <data name="ServerEditorTrustUnknownScope" xml:space="preserve"><value>Ao confiar, esta identidade fica guardada neste dispositivo.</value></data>
   <data name="ServerEditorTrustJumpScope" xml:space="preserve"><value>A confiança fica guardada apenas para este jump host.</value></data>

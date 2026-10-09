@@ -264,17 +264,20 @@ public sealed class Ui4Phase2Tests
     }
 }
 
-/// <summary>The priority icon: exactly one of the four themed icons is visible for every metric × severity.</summary>
+/// <summary>The priority icon: exactly one of the six themed icons (UI.10 F19: one per metric) is visible for every
+/// metric × severity.</summary>
 public sealed class Ui4PriorityIconTests
 {
     [Theory]
     [InlineData(PriorityMetric.Disk, ServerHealth.Warning, 0)]
     [InlineData(PriorityMetric.Disk, ServerHealth.Critical, 1)]
     [InlineData(PriorityMetric.Cpu, ServerHealth.Warning, 2)]
-    [InlineData(PriorityMetric.Memory, ServerHealth.Critical, 3)]
+    [InlineData(PriorityMetric.Cpu, ServerHealth.Critical, 3)]
+    [InlineData(PriorityMetric.Memory, ServerHealth.Warning, 4)]
+    [InlineData(PriorityMetric.Memory, ServerHealth.Critical, 5)]
     public void ExactlyOneIconSlotIsVisible(PriorityMetric metric, ServerHealth severity, int visibleSlot)
     {
-        for (var slot = 0; slot < 4; slot++)
+        for (var slot = 0; slot < 6; slot++)
         {
             Assert.Equal(
                 slot == visibleSlot ? Microsoft.UI.Xaml.Visibility.Visible : Microsoft.UI.Xaml.Visibility.Collapsed,

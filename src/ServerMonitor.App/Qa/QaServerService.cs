@@ -9,10 +9,14 @@ namespace ServerMonitor.App.Qa;
 /// never persists anything — <c>servers.json</c> is never touched. Mutations are unsupported;
 /// the dashboard swallows the resulting exception, so the harness stays a pure viewer.
 /// </summary>
-internal sealed class QaServerService : IServerService
+internal sealed class QaServerService : IServerService, IServerLoadStatusSource
 {
     // Never raised in QA mode; empty accessors keep the contract without a backing field.
     public event EventHandler? ServersChanged { add { } remove { } }
+
+    // UI10-A1: the shell graph (OnboardingViewModel) resolves IServerLoadStatusSource from this service.
+    public Task<ServerLoadStatus> GetLoadStatusAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(ServerLoadStatus.Loaded);
 
     public Task<IReadOnlyList<Server>> GetAllAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<Server>>(QaHealthCatalog.Servers);

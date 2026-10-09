@@ -564,7 +564,8 @@
     </Style>
 
     <!-- ===== ToggleSwitch 112:7956 / 112:7982: track 44x26 radius 13, thumb 22 #FCFCFC (margin 2), On = SaToggleOnTrackBrush
-         (Boss B-2: SaHealthy colour in Dark/Light; R1 Cortex R-3: Highlight in HC, Off = WindowText - GrayText is disabled-only), Off = SaToggleOffTrackBrush. Thumb shadow not reproduced. WinUI part names kept (SwitchKnobBounds,
+         + SaToggleOnThumbBrush (UI.10 F26: the neutral primary, Figma Toggle 238:246 - no longer the healthy green of Boss B-2;
+         R1 Cortex R-3: Highlight in HC, Off = WindowText - GrayText is disabled-only), Off = SaToggleOffTrackBrush. Thumb shadow not reproduced. WinUI part names kept (SwitchKnobBounds,
          SwitchKnob, KnobTranslateTransform, SwitchThumb, OuterBorder) so tap, drag and keyboard behave natively. The
          setting row (label 14 Medium + description 12) is the consumer's. ===== -->
     <Style x:Key="SaToggleSwitchStyle" TargetType="ToggleSwitch">
@@ -602,6 +603,9 @@
                                 <VisualState x:Name="Dragging" />
                                 <VisualState x:Name="Off" />
                                 <VisualState x:Name="On">
+                                    <VisualState.Setters>
+                                        <Setter Target="SwitchKnobOff.Fill" Value="{ThemeResource SaToggleOnThumbBrush}" />
+                                    </VisualState.Setters>
                                     <Storyboard>
                                         <DoubleAnimation Storyboard.TargetName="KnobTranslateTransform" Storyboard.TargetProperty="X" To="18" Duration="0" />
                                         <DoubleAnimation Storyboard.TargetName="SwitchKnobBounds" Storyboard.TargetProperty="Opacity" To="1" Duration="0" />

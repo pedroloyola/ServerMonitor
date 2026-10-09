@@ -42,7 +42,8 @@ public sealed partial class ServerEditorTrustPanel : UserControl
         StepText.Text = prompt.Step is { } step
             ? string.Format(CultureInfo.CurrentCulture, localization.GetString("ServerEditorTrustStepFormat"), step, 2)
             : string.Empty;
-        TitleIcon.Data = Application.Current.Resources[prompt.CanAccept ? "SaIconKey01Data" : "SaIconAlert02Data"] as string;
+        // UI.10 F17: host identity = the Shield (as in onboarding); the Key means key authentication.
+        TitleIcon.Data = Application.Current.Resources[prompt.CanAccept ? "SaIconShield01Data" : "SaIconAlert02Data"] as string;
         TitleText.Text = localization.GetString(prompt.TitleKey);
         BodyText.Text = localization.GetString(prompt.BodyKey);
         SubjectText.Text = prompt.Subject;

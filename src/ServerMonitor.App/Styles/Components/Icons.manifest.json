@@ -162,6 +162,41 @@
       "source": "dist/esm/Tick02Icon.js",
       "elements": 1,
       "sha256": "b05275dab851e2354cb6f867c6d79f775a7bbac953b5e1b2321d5082f8b70d79"
+    },
+    {
+      "name": "Cpu",
+      "key": "SaIconCpuData",
+      "source": "dist/esm/CpuIcon.js",
+      "elements": 11,
+      "sha256": "939b889379791ddd021a6ebd790bb4476ab0f0482c83cd4819cd0eabb73700b2"
+    },
+    {
+      "name": "RamMemory",
+      "key": "SaIconRamMemoryData",
+      "source": "dist/esm/RamMemoryIcon.js",
+      "elements": 4,
+      "sha256": "6b6b1b3ceeb56c957969322440529b3d32cb3dacab99b8b4474d75a1068424c4"
+    },
+    {
+      "name": "ArrowExpand01",
+      "key": "SaIconArrowExpand01Data",
+      "source": "dist/esm/ArrowExpand01Icon.js",
+      "elements": 2,
+      "sha256": "68e99e2f6fd1a44f772d64abe18c83cab88af3a5ede6ed01c2572694ba39ae79"
+    },
+    {
+      "name": "ArrowShrink01",
+      "key": "SaIconArrowShrink01Data",
+      "source": "dist/esm/ArrowShrink01Icon.js",
+      "elements": 1,
+      "sha256": "9f7902b2fc208f3bedcf8c92cc209dc5b6cefc7bc90e6a2bf44e31c11eea7b75"
+    },
+    {
+      "name": "Package",
+      "key": "SaIconPackageData",
+      "source": "dist/esm/PackageIcon.js",
+      "elements": 4,
+      "sha256": "7f8125f27d3b7e1be1773fa92044f9be061baf2664c09bfc0cd0213b18755a5d"
     }
   ]
 }

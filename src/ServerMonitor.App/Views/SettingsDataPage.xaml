@@ -179,7 +179,8 @@
                             <TextBlock x:Uid="SettingsHistoryTitle" VerticalAlignment="Center" AutomationProperties.HeadingLevel="Level2"
                                        Style="{StaticResource SaCardTitleTextStyle}" TextWrapping="Wrap" />
                             <StackPanel x:Name="HistoryActions" Grid.Column="1" Orientation="Horizontal" Spacing="{StaticResource SaSpace12}">
-                                <Button x:Name="ResetHistoryButton" x:Uid="SettingsResetHistoryButton" MinWidth="180" Style="{StaticResource SaPillButtonSmallStyle}"
+                                <!-- UI.10 F37: resetting drops and recreates the history (cannot be undone) - danger, like "Limpar histórico". -->
+                                <Button x:Name="ResetHistoryButton" x:Uid="SettingsResetHistoryButton" MinWidth="180" Style="{StaticResource SaPillButtonSmallDangerStyle}"
                                         Command="{Binding ResetHistoryCommand}"
                                         Visibility="{Binding IsHistoryResetAvailable, Converter={StaticResource BooleanToVisibilityConverter}}" />
                                 <Button x:Name="ClearHistoryButton" x:Uid="SettingsClearHistoryButton" MinWidth="180" Style="{StaticResource SaPillButtonSmallDangerStyle}"

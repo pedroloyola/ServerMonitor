@@ -24,8 +24,9 @@ public sealed partial class SaSidebar : UserControl
         NavGrid.Padding = (Thickness)Application.Current.Resources[rail ? "SaRailPadding" : "SaSidebarPadding"];
         foreach (var item in new[] { OverviewItem, ServersItem, HistoryItem, SettingsItem })
         {
-            item.Width = rail ? 48 : 160;
-            item.Padding = new Thickness(rail ? 14 : 12, 0, rail ? 14 : 12, 0);
+            // UI.10 F46: the rail item is a true circle (46x46, radius 23), the icon centred (13 + 20 + 13).
+            item.Width = rail ? 46 : 160;
+            item.Padding = new Thickness(rail ? 13 : 12, 0, rail ? 13 : 12, 0);
             ToolTipService.SetToolTip(item, rail ? Microsoft.UI.Xaml.Automation.AutomationProperties.GetName(item) : null);
             if (item.Content is Grid grid) grid.ColumnSpacing = rail ? 0 : 10;
         }

@@ -165,8 +165,10 @@
                     Visibility="{x:Bind Presentation.ShowsHiddenAction, Mode=OneWay, FallbackValue=Collapsed}" />
         </StackPanel>
 
-        <!-- Footer 112:9580: "Sempre no topo" 12 secondary · the shared SaToggleSwitchStyle (the same preference as Settings). -->
-        <Grid x:Name="FooterRow" Grid.Row="2" Height="24" ColumnSpacing="{StaticResource SaSpace12}">
+        <!-- Footer 112:9580: "Sempre no topo" 12 secondary · the shared SaToggleSwitchStyle (the same preference as Settings).
+             UI.10 F11 (H05): at least the toggle's 34 (its 52x34 hover/focus area; track 44x26) - a fixed 24 clipped it
+             vertically in every size and language (Beacon UI.10A, 24/24). Figma 112:9580 row 34. -->
+        <Grid x:Name="FooterRow" Grid.Row="2" MinHeight="34" ColumnSpacing="{StaticResource SaSpace12}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />

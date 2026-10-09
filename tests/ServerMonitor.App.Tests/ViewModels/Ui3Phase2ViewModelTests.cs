@@ -131,7 +131,7 @@ public sealed class Ui3Phase2ViewModelTests
         Assert.True(vm.ShowGlobalNoResults);
         Assert.False(vm.ShowSectionCards);
 
-        vm.ClearSearchCommand.Execute(null);
+        vm.NoResultsActionCommand.Execute(null); // UI.10 F12: case A clears the search
         Assert.True(vm.ShowSectionCards);
     }
 

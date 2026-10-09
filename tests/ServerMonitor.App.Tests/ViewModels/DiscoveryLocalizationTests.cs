@@ -48,13 +48,14 @@ public sealed class DiscoveryLocalizationTests
         var europeanPortuguese = LoadResources("pt-PT");
         var english = LoadResources("en-US");
 
-        // UI.5 (Figma 112:8257 / 112:21538): shorter Data-page copy, still about DEVICES (never "servidores").
-        Assert.Equal("Redefinir dispositivos", brazilianPortuguese["SettingsResetIgnoredButton.Content"]);
-        Assert.Equal("Dispositivos redefinidos", brazilianPortuguese["SettingsResetIgnoredSuccess.Title"]);
-        Assert.Equal("Repor dispositivos", europeanPortuguese["SettingsResetIgnoredButton.Content"]);
-        Assert.Equal("Dispositivos repostos", europeanPortuguese["SettingsResetIgnoredSuccess.Title"]);
-        Assert.Equal("Reset devices", english["SettingsResetIgnoredButton.Content"]);
-        Assert.Equal("Devices reset", english["SettingsResetIgnoredSuccess.Title"]);
+        // UI.5 (Figma 112:8257 / 112:21538): Data-page copy about DEVICES (never "servidores"). UI.10 F28: the action only
+        // stops ignoring discovered devices, so it says that - "repor/redefinir/reset" read as destructive.
+        Assert.Equal("Mostrar novamente os dispositivos ignorados", brazilianPortuguese["SettingsResetIgnoredButton.Content"]);
+        Assert.Equal("Dispositivos ignorados visíveis novamente", brazilianPortuguese["SettingsResetIgnoredSuccess.Title"]);
+        Assert.Equal("Voltar a mostrar dispositivos ignorados", europeanPortuguese["SettingsResetIgnoredButton.Content"]);
+        Assert.Equal("Dispositivos ignorados visíveis de novo", europeanPortuguese["SettingsResetIgnoredSuccess.Title"]);
+        Assert.Equal("Show ignored devices again", english["SettingsResetIgnoredButton.Content"]);
+        Assert.Equal("Ignored devices shown again", english["SettingsResetIgnoredSuccess.Title"]);
 
         foreach (var culture in Cultures)
         {

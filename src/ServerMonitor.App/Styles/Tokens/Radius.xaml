@@ -9,11 +9,10 @@
     <CornerRadius x:Key="SaRadiusMiniBar">3</CornerRadius>
     <CornerRadius x:Key="SaRadiusSmall">4</CornerRadius>
     <CornerRadius x:Key="SaRadiusHealthSegment">6</CornerRadius>
-    <!-- UI.2 additive (Boss B-3): toast 112:19613 (also disclosure 112:7985); rect button / page search / segmented
-         track 112:1806 112:1429 112:2634; dialog button 112:8573; segment 112:2634; skeleton block 112:15602. -->
+    <!-- UI.2 additive (Boss B-3): toast 112:19613 (also disclosure 112:7985); page search / segmented track 112:1429
+         112:2634; segment 112:2634; skeleton block 112:15602. (UI.10 F06: the rect / dialog buttons are pills now.) -->
     <CornerRadius x:Key="SaRadiusToast">20</CornerRadius>
     <CornerRadius x:Key="SaRadiusRect">14</CornerRadius>
-    <CornerRadius x:Key="SaRadiusDialogButton">13</CornerRadius>
     <!-- UI.7 final c1 (Prism F-2): a selectable list row on an inset tint (Figma 04 import rows 112:4049). -->
     <CornerRadius x:Key="SaRadiusListRow">13</CornerRadius>
     <CornerRadius x:Key="SaRadiusSegment">11</CornerRadius>
@@ -22,10 +21,18 @@
     <CornerRadius x:Key="SaRadiusSelector">16</CornerRadius>
     <!-- UI.5: disk "segmented capacity" segment 16x18 r5, 112:1891 (the memory segments / CPU bars use SaRadiusMiniBar 3). -->
     <CornerRadius x:Key="SaRadiusDiskSegment">5</CornerRadius>
-    <!-- UI.6 112:665 / 112:317 / 112:659. -->
-    <CornerRadius x:Key="SaRadiusOnboardingButton">15</CornerRadius>
+    <!-- UI.6 112:317 / 112:659 (the onboarding buttons are pills since UI.10 F06). -->
     <CornerRadius x:Key="SaRadiusOnboardingBenefit">18</CornerRadius>
     <CornerRadius x:Key="SaRadiusOnboardingCard">22</CornerRadius>
     <!-- UI.8 Compact server row 392x80 r15, 112:9439 (Prism R-6). -->
     <CornerRadius x:Key="SaRadiusCompactRow">15</CornerRadius>
+    <!-- UI.10 F06 (H03, Figma Manual A1 234:182): every text button is a pill, radius = height / 2, one token per height
+         tier (the "+ Adicionar" anchor is the 44 tier); the circular icon-only buttons share the tiers. A radius above h/2
+         renders elliptical in WinUI, so a style's height and its tier must match (Ui10ButtonRadiusGuardTests). -->
+    <CornerRadius x:Key="SaRadiusButton44">22</CornerRadius>
+    <CornerRadius x:Key="SaRadiusButton42">21</CornerRadius>
+    <CornerRadius x:Key="SaRadiusButton40">20</CornerRadius>
+    <CornerRadius x:Key="SaRadiusButton36">18</CornerRadius>
+    <CornerRadius x:Key="SaRadiusButton34">17</CornerRadius>
+    <CornerRadius x:Key="SaRadiusButton28">14</CornerRadius>
 </ResourceDictionary>

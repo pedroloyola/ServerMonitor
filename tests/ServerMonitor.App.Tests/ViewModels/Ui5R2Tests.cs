@@ -85,8 +85,8 @@ public sealed class Ui5R2Tests
 
         settings.ViewModel.HiddenServers[0].RestoreCommand.Execute(null); // "Servidor restaurado" at t0
         clock.Advance(TimeSpan.FromSeconds(5));
-        settings.ViewModel.ResetIgnoredCommand.Execute(null);            // "Dispositivos repostos" at t0 + 5 s
-        Assert.Equal("Dispositivos repostos", settings.ViewModel.ToastTitle);
+        settings.ViewModel.ResetIgnoredCommand.Execute(null);            // "Dispositivos ignorados visíveis de novo" at t0 + 5 s
+        Assert.Equal("Dispositivos ignorados visíveis de novo", settings.ViewModel.ToastTitle);
 
         clock.Advance(TimeSpan.FromSeconds(5)); // the first toast's countdown (t0 + 8 s) must not close the newer one
         Assert.True(settings.ViewModel.IsToastOpen);
@@ -426,16 +426,19 @@ public sealed class Ui5R2Tests
     // ---- layout and keyboard contracts of the three pages (Prism C1 M-1/M-4/M-5/M-6/M-8, N-1/N-2/N-4/N-5, Beacon) ----
 
     [Fact]
-    public void TheMeters_HaveTheFigmaFixedTrack_AndThreeColumnsStartAt1120()
+    public void TheMeters_FillTheCard_AndThreeColumnsStartAt1120()
     {
         var page = AppSourceTree.LoadXaml("Views/ServerDetailPage.xaml");
         var meters = page.Descendants().Where(e => e.Name.LocalName is "SaPulseBars" or "SaSegmentMeter").ToList();
 
         Assert.Equal(3, meters.Count);
+        // UI.10 F04 (H02, Figma 112:1818/1855/1890 Fill): no fixed 288 track - each meter stretches over the card's interior
+        // (the same samples / segment counts, only wider).
         Assert.All(meters, meter =>
         {
-            Assert.Equal("288", (string?)meter.Attribute("Width"));
-            Assert.Equal("Left", (string?)meter.Attribute("HorizontalAlignment"));
+            Assert.Null(meter.Attribute("Width"));
+            Assert.Null(meter.Attribute("MaxWidth"));
+            Assert.Equal("Stretch", (string?)meter.Attribute("HorizontalAlignment"));
         });
         Assert.Equal("{Binding CpuPulseCeiling}", (string?)meters.Single(e => e.Name.LocalName == "SaPulseBars").Attribute("Ceiling"));
         var wide = page.Descendants().Single(e => e.Name.LocalName == "VisualState" && (string?)e.Attribute(AppSourceTree.Xaml + "Name") == "Wide");

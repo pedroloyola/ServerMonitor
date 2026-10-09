@@ -46,8 +46,10 @@
     <Style x:Key="SaTableCellSecondaryTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SaCaptionTextStyle}">
         <Setter Property="Foreground" Value="{ThemeResource SaTextSecondaryBrush}" />
     </Style>
+    <!-- UI.10 F24: a value over the limit is also SemiBold - a non-chromatic cue next to the colour (Figma 112:1434 "92%"). -->
     <Style x:Key="SaTableCellAttentionTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SaButtonTextStyle}">
         <Setter Property="Foreground" Value="{ThemeResource SaAttentionTextBrush}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
     <!-- UI.3 additive (D-UI3-8). Page subtitle 13 Regular muted, 112:2262 / 112:2437 (SaControlTextStyle is Medium). -->
     <Style x:Key="SaPageSubtitleTextStyle" TargetType="TextBlock">
@@ -90,5 +92,32 @@
     </Style>
     <Style x:Key="SaWorkloadDetailAttentionTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SaHelperTextStyle}">
         <Setter Property="Foreground" Value="{ThemeResource SaAttentionTextBrush}" />
+    </Style>
+    <!-- UI.10 F09/F10 (H04): ONE page header for Visão geral, Servidores and Definições (Figma component Page header 235:270,
+         instances 240:614 / 240:588 / 247:418). Title 32/40 + line 2 13/18 muted, gap 6, the block at the TOP; line 2 keeps
+         its 18 even when empty, so nothing jumps when the caption comes and goes. Actions (gap 16) sit centred on the title
+         LINE whatever line 2 holds: a 44 button over the 40 line = Margin -2 top; a status text (Definições) is centred on
+         the same 40 line. Column gap 16. Ui10PolishGuardTests pins the three pages to these styles. -->
+    <Style x:Key="SaPageHeaderGridStyle" TargetType="Grid">
+        <Setter Property="ColumnSpacing" Value="16" />
+    </Style>
+    <Style x:Key="SaPageHeaderTitleBlockStyle" TargetType="StackPanel">
+        <Setter Property="Spacing" Value="6" />
+        <Setter Property="VerticalAlignment" Value="Top" />
+    </Style>
+    <Style x:Key="SaPageHeaderLineTwoStyle" TargetType="StackPanel">
+        <Setter Property="MinHeight" Value="{StaticResource SaLineHeightControl}" />
+    </Style>
+    <Style x:Key="SaPageHeaderActionsStyle" TargetType="StackPanel">
+        <Setter Property="Orientation" Value="Horizontal" />
+        <Setter Property="Spacing" Value="16" />
+        <Setter Property="VerticalAlignment" Value="Top" />
+        <Setter Property="Margin" Value="0,-2,0,0" />
+    </Style>
+    <!-- The status text in the actions slot: 11/16 centred on the 40 title line = 12 above. -->
+    <Style x:Key="SaPageHeaderStatusTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SaHelperTextStyle}">
+        <Setter Property="Foreground" Value="{ThemeResource SaTextSecondaryBrush}" />
+        <Setter Property="VerticalAlignment" Value="Top" />
+        <Setter Property="Margin" Value="0,12,0,0" />
     </Style>
 </ResourceDictionary>

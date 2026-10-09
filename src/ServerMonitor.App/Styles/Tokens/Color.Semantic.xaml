@@ -64,7 +64,8 @@
             <!-- UI.2 R1 (Prism MF-4, Cortex R-3): REST fill of secondary/icon/search/selector controls, separate from SaSelectedBrush so High Contrast paints ButtonFace + ButtonText border at rest (Highlight only for selected/pressed); the toggle On track = state colour in Dark/Light, Highlight in HC. -->
             <SolidColorBrush x:Key="SaSecondaryFillBrush" Color="{StaticResource SaColorSelectedDark}" />
             <SolidColorBrush x:Key="SaSecondaryBorderBrush" Color="Transparent" />
-            <SolidColorBrush x:Key="SaToggleOnTrackBrush" Color="{StaticResource SaColorHealthyDark}" />
+            <SolidColorBrush x:Key="SaToggleOnTrackBrush" Color="{StaticResource SaColorToggleOnTrackDark}" />
+            <SolidColorBrush x:Key="SaToggleOnThumbBrush" Color="{StaticResource SaColorToggleOnThumbDark}" />
             <!-- UI.8 Compact (Prism R-6). -->
             <SolidColorBrush x:Key="SaCompactRowBrush" Color="{StaticResource SaColorCompactRowDark}" />
             <SolidColorBrush x:Key="SaCompactRowBorderBrush" Color="Transparent" />
@@ -127,7 +128,8 @@
             <SolidColorBrush x:Key="SaDialogButtonBorderBrush" Color="{StaticResource SaColorDialogButtonBorderLight}" />
             <SolidColorBrush x:Key="SaSecondaryFillBrush" Color="{StaticResource SaColorSelectedLight}" />
             <SolidColorBrush x:Key="SaSecondaryBorderBrush" Color="Transparent" />
-            <SolidColorBrush x:Key="SaToggleOnTrackBrush" Color="{StaticResource SaColorHealthyLight}" />
+            <SolidColorBrush x:Key="SaToggleOnTrackBrush" Color="{StaticResource SaColorToggleOnTrackLight}" />
+            <SolidColorBrush x:Key="SaToggleOnThumbBrush" Color="{StaticResource SaColorToggleOnThumbLight}" />
             <!-- UI.8 Compact (Prism R-6). -->
             <SolidColorBrush x:Key="SaCompactRowBrush" Color="{StaticResource SaColorCompactRowLight}" />
             <SolidColorBrush x:Key="SaCompactRowBorderBrush" Color="Transparent" />
@@ -191,6 +193,7 @@
             <SolidColorBrush x:Key="SaSecondaryFillBrush" Color="{ThemeResource SystemColorButtonFaceColor}" />
             <SolidColorBrush x:Key="SaSecondaryBorderBrush" Color="{ThemeResource SystemColorButtonTextColor}" />
             <SolidColorBrush x:Key="SaToggleOnTrackBrush" Color="{ThemeResource SystemColorHighlightColor}" />
+            <SolidColorBrush x:Key="SaToggleOnThumbBrush" Color="{ThemeResource SystemColorWindowColor}" />
             <!-- UI.8 Compact (Prism R-6): HC rows/buttons keep a 1 px WindowText/ButtonText edge (no fill to tell them apart). -->
             <SolidColorBrush x:Key="SaCompactRowBrush" Color="{ThemeResource SystemColorWindowColor}" />
             <SolidColorBrush x:Key="SaCompactRowBorderBrush" Color="{ThemeResource SystemColorWindowTextColor}" />

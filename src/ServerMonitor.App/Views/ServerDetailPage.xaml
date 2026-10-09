@@ -7,10 +7,25 @@
 >
     <!-- UI.5 Server Detail, Figma 112:1785 (D) / 112:2022 (L), first reading 112:16007 / 112:16164. Three metric columns
          from a 1120 window (content ≥ 1040, each card ≥ 336: the Figma geometry, Prism C1 M-1); below that the metric
-         cards and Ligação / Explorar stack (SPEC §5). The meters keep their fixed 288 track in every state. Derived states (no Figma
+         cards and Ligação / Explorar stack (SPEC §5). UI.10 F04 (H02): the meters FILL the card's interior in every state (Figma
+         112:1818/1855/1890 Fill + the medium-width variant 244:418) - the same 30 / 28 / 14 real samples, only wider. Derived states (no Figma
          frame) use SaStatusIndicator / SaInlineNotice; nothing classifies health here (the VM reads the engine). -->
     <Page.Resources>
         <converters:ServerHealthToStatusKindConverter x:Key="ServerHealthToStatusKindConverter" />
+        <!-- UI.10 F25: the value over the limit in the attention / danger text colour, as on Servidores (the meters keep the
+             metric identity colour; the state is also the status text in the header). -->
+        <Style x:Key="DetailMetricValueAttentionTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SaMetricValueTextStyle}">
+            <Setter Property="Foreground" Value="{ThemeResource SaAttentionTextBrush}" />
+        </Style>
+        <Style x:Key="DetailMetricValueCriticalTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SaMetricValueTextStyle}">
+            <Setter Property="Foreground" Value="{ThemeResource SaDangerTextBrush}" />
+        </Style>
+        <converters:ServerHealthToStyleConverter
+            x:Key="DetailMetricValueStyleConverter"
+            HealthyStyle="{StaticResource SaMetricValueTextStyle}"
+            WarningStyle="{StaticResource DetailMetricValueAttentionTextStyle}"
+            CriticalStyle="{StaticResource DetailMetricValueCriticalTextStyle}"
+            UnknownStyle="{StaticResource SaMetricValueTextStyle}" />
     </Page.Resources>
 
     <Grid x:Name="DetailHost">
@@ -171,7 +186,11 @@
                             <MenuFlyout Placement="BottomEdgeAlignedRight">
                                 <MenuFlyoutItem x:Uid="ServerCardHideMenuItem" Command="{Binding HideCommand}"
                                                 AutomationProperties.Name="{Binding HideAutomationName}" />
+                                <!-- UI.10 F39: removing is permanent - set apart and in the danger text (the confirmation is unchanged);
+                                     hiding stays neutral. -->
+                                <MenuFlyoutSeparator />
                                 <MenuFlyoutItem x:Uid="ServerCardRemoveMenuItem" Command="{Binding RemoveCommand}"
+                                                Foreground="{ThemeResource SaDangerTextBrush}"
                                                 AutomationProperties.Name="{Binding RemoveAutomationName}" />
                             </MenuFlyout>
                         </Button.Flyout>
@@ -255,13 +274,13 @@
                     <StackPanel Spacing="10">
                         <TextBlock x:Uid="ServerMetricsCpuLabel" Style="{StaticResource SaPrimaryBodyTextStyle}" FontWeight="Medium" />
                         <StackPanel Orientation="Horizontal" Spacing="3" Height="56">
-                            <TextBlock Text="{Binding CpuValueText}" Style="{StaticResource SaMetricValueTextStyle}" VerticalAlignment="Center"
+                            <TextBlock Text="{Binding CpuValueText}" Style="{Binding CpuSeverity, Converter={StaticResource DetailMetricValueStyleConverter}}" VerticalAlignment="Center"
                                        AutomationProperties.Name="{Binding CpuAccessibleName}" />
                             <TextBlock x:Uid="ServerDetailMetricUnit" Style="{StaticResource SaMetricUnitTextStyle}" VerticalAlignment="Center"
                                        AutomationProperties.AccessibilityView="Raw"
                                        Visibility="{Binding HasCpuPercent, Converter={StaticResource BooleanToVisibilityConverter}}" />
                         </StackPanel>
-                        <primitives:SaPulseBars Samples="{Binding CpuPulseSamples}" Ceiling="{Binding CpuPulseCeiling}" Width="288" HorizontalAlignment="Left" />
+                        <primitives:SaPulseBars Samples="{Binding CpuPulseSamples}" Ceiling="{Binding CpuPulseCeiling}" HorizontalAlignment="Stretch" />
                         <TextBlock x:Uid="ServerDetailCpuCaption" Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" />
                     </StackPanel>
                 </Border>
@@ -270,13 +289,13 @@
                     <StackPanel Spacing="10">
                         <TextBlock x:Uid="ServerMetricsMemoryLabel" Style="{StaticResource SaPrimaryBodyTextStyle}" FontWeight="Medium" />
                         <StackPanel Orientation="Horizontal" Spacing="3" Height="56">
-                            <TextBlock Text="{Binding MemoryValueText}" Style="{StaticResource SaMetricValueTextStyle}" VerticalAlignment="Center"
+                            <TextBlock Text="{Binding MemoryValueText}" Style="{Binding MemorySeverity, Converter={StaticResource DetailMetricValueStyleConverter}}" VerticalAlignment="Center"
                                        AutomationProperties.Name="{Binding MemoryAccessibleName}" />
                             <TextBlock x:Uid="ServerDetailMetricUnit" Style="{StaticResource SaMetricUnitTextStyle}" VerticalAlignment="Center"
                                        AutomationProperties.AccessibilityView="Raw"
                                        Visibility="{Binding HasMemoryPercent, Converter={StaticResource BooleanToVisibilityConverter}}" />
                         </StackPanel>
-                        <primitives:SaSegmentMeter Metric="Memory" SegmentCount="28" SegmentHeight="29" SegmentSpacing="4" Width="288" HorizontalAlignment="Left"
+                        <primitives:SaSegmentMeter Metric="Memory" SegmentCount="28" SegmentHeight="29" SegmentSpacing="4" HorizontalAlignment="Stretch"
                                                    SegmentCornerRadius="{StaticResource SaRadiusMiniBar}" LitCount="{Binding MemoryLitCount}" />
                         <TextBlock Text="{Binding MemoryLegend}" Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" />
                     </StackPanel>
@@ -286,13 +305,13 @@
                     <StackPanel Spacing="10">
                         <TextBlock x:Uid="ServerMetricsDiskLabel" Style="{StaticResource SaPrimaryBodyTextStyle}" FontWeight="Medium" />
                         <StackPanel Orientation="Horizontal" Spacing="3" Height="56">
-                            <TextBlock Text="{Binding DiskValueText}" Style="{StaticResource SaMetricValueTextStyle}" VerticalAlignment="Center"
+                            <TextBlock Text="{Binding DiskValueText}" Style="{Binding DiskSeverity, Converter={StaticResource DetailMetricValueStyleConverter}}" VerticalAlignment="Center"
                                        AutomationProperties.Name="{Binding DiskAccessibleName}" />
                             <TextBlock x:Uid="ServerDetailMetricUnit" Style="{StaticResource SaMetricUnitTextStyle}" VerticalAlignment="Center"
                                        AutomationProperties.AccessibilityView="Raw"
                                        Visibility="{Binding HasDiskPercent, Converter={StaticResource BooleanToVisibilityConverter}}" />
                         </StackPanel>
-                        <primitives:SaSegmentMeter Metric="Disk" SegmentCount="14" SegmentHeight="18" SegmentSpacing="5" Width="288" HorizontalAlignment="Left"
+                        <primitives:SaSegmentMeter Metric="Disk" SegmentCount="14" SegmentHeight="18" SegmentSpacing="5" HorizontalAlignment="Stretch"
                                                    SegmentCornerRadius="{StaticResource SaRadiusDiskSegment}" LitCount="{Binding DiskLitCount}" />
                         <TextBlock Text="{Binding DiskLegend}" Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" />
                     </StackPanel>

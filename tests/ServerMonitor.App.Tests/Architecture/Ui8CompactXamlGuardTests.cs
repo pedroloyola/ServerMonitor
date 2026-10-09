@@ -104,18 +104,17 @@ public sealed partial class Ui8CompactXamlGuardTests
     }
 
     [Fact]
-    public void TheTitleStrip_KeepsItsNamesAndTheNativeCaptionReserve_AndUsesTheShellMaterial()
+    public void TheTitleStrip_KeepsItsNames_AndUsesTheShellMaterial()
     {
         var window = AppSourceTree.LoadXaml("MainWindow.xaml");
         var drag = Named(window, "CompactDragRegion");
-        var reserve = Named(window, "CompactCaptionColumn");
         var expand = Named(window, "CompactExpandButton");
 
         Assert.Equal("{StaticResource SaCompactButtonStyle}", (string?)expand.Attribute("Style"));
         Assert.Equal("CompactExpandButton", (string?)expand.Attribute(AppSourceTree.Xaml + "Uid")); // accessible name + tooltip
-        Assert.Equal("1", (string?)expand.Attribute("Grid.Column"));                             // left of the reserve, outside drag
+        Assert.Equal("1", (string?)expand.Attribute("Grid.Column"));                             // outside the drag rectangle
         Assert.Null(drag.Attribute("Grid.Column"));
-        Assert.Same(drag.Parent, reserve.Parent!.Parent);
+        Assert.Same(drag.Parent, expand.Parent); // UI.10 H07: the caption reserve column is gone (Ui10PolishGuardTests)
         Assert.DoesNotContain(window.Descendants(), e => e.Name.LocalName == "ToggleButton");      // the pin left the title (D-UI8-11)
 
         var code = AppSourceTree.CodeWithoutComments("MainWindow.xaml.cs");

@@ -5,13 +5,6 @@
 # Never add or raise an entry; never baseline Qa/** or Controls/Primitives/** (UI.2 T-8 zero-debt).
 # Per-property totals are ALSO pinned in GeometryLiteralRatchetTests.PinnedLedgerTotals (raising this file alone fails).
 # Total at UI.3 start: 71 (22 CornerRadius, 49 Padding) in 14 files, 50 entries.
-Controls/DiscoveredServerCard.xaml	Padding	14,10	1
-Controls/DiscoveredServerCard.xaml	Padding	6,1	1
-Controls/EmptyStateControl.xaml	CornerRadius	26	1
-Styles/Controls.xaml	CornerRadius	18	3
-Styles/Controls.xaml	Padding	0	1
-Styles/Controls.xaml	Padding	14,7	1
-Styles/Controls.xaml	Padding	18,7	4
 Styles/DesignTokens.xaml	CornerRadius	12	1
 Styles/DesignTokens.xaml	CornerRadius	16	1
 Styles/DesignTokens.xaml	CornerRadius	20	1

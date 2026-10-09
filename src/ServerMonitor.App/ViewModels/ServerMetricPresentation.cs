@@ -59,4 +59,25 @@ public static class ServerMetricPresentation
     /// <summary>The accessible value ("22%", or "sem dados"), the one <see cref="ServerStatusPresentation.AccessiblePercent"/> spells.</summary>
     public static string Accessible(ServerMetricReading reading, ILocalizationService localization) =>
         ServerStatusPresentation.AccessiblePercent(reading.IsKnown, reading.Value, localization);
+
+    /// <summary>
+    /// "92% em atenção" / "97% crítico" / "22%" / "sem dados": a row metric's accessible value WITH its severity cue - the
+    /// cue is text, never colour alone (UI.8 G-14/R-5 for the Compact rows; UI.10 F24 the Servidores rows use the same).
+    /// </summary>
+    public static string AccessibleWithSeverity(ServerMetricReading reading, ILocalizationService localization) =>
+        WithSeverityCue(Accessible(reading, localization), reading.IsKnown, reading.Severity, localization);
+
+    /// <summary>
+    /// The ONE severity cue rule: a known value over the limit gets " em atenção" / " crítico" appended; anything else is
+    /// returned unchanged. Shared by the Compact and Servidores rows and the Server Detail values (UI.10 F24/F25, tests
+    /// review L-2: the Detail number's colour is never its only signal).
+    /// </summary>
+    public static string WithSeverityCue(string accessibleValue, bool isKnown, ServerHealth severity, ILocalizationService localization)
+    {
+        ArgumentNullException.ThrowIfNull(localization);
+        return isKnown && severity is ServerHealth.Warning or ServerHealth.Critical
+            ? string.Join(' ', accessibleValue, localization.GetString(
+                severity == ServerHealth.Critical ? "CompactMetricCriticalAccessible" : "CompactMetricAttentionAccessible"))
+            : accessibleValue;
+    }
 }

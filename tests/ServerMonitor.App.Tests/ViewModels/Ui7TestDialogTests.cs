@@ -166,7 +166,8 @@ public sealed class Ui7TestDialogTests : IDisposable
         Assert.Equal(ServerEditorLayer.Test, _world.Page.Layer());
         var testing = _world.Page.Controller.TestToShow()!;
         Assert.Equal(ConnectionTestPhase.Testing, testing.Phase);
-        Assert.Equal("SaIconRefreshData", testing.IconKey);
+        Assert.Null(testing.IconKey); // UI.10 F18: progress, not the Refresh action
+        Assert.True(testing.ShowsProgress);
         Assert.Equal("ServerFormCancelTestButton.Content", testing.CloseKey);
         Assert.Null(testing.RetryKey);
         Assert.Null(testing.VerifiedDetailKey);
@@ -182,7 +183,8 @@ public sealed class Ui7TestDialogTests : IDisposable
 
         var verified = _world.Page.Controller.TestToShow()!;
         Assert.Equal(ConnectionTestPhase.Verified, verified.Phase);
-        Assert.Equal("SaIconShield01Data", verified.IconKey);
+        Assert.Equal("SaIconTick02Data", verified.IconKey); // UI.10 F20: passed = Tick; the Shield is identity only
+        Assert.False(verified.ShowsProgress);
         Assert.Equal("ServerEditorTestVerifiedDetail", verified.VerifiedDetailKey);
         Assert.Equal("ServerEditorTrustBack", verified.CloseKey);
         Assert.Equal(ServerEditorLayer.Test, _world.Page.Layer());

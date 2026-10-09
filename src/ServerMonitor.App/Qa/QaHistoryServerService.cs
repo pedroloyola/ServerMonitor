@@ -5,9 +5,13 @@ using ServerMonitor.Core.Models;
 namespace ServerMonitor.App.Qa;
 
 /// <summary>QA-ONLY read-only <see cref="IServerService"/> serving the history catalog's servers.</summary>
-internal sealed class QaHistoryServerService : IServerService
+internal sealed class QaHistoryServerService : IServerService, IServerLoadStatusSource
 {
     public event EventHandler? ServersChanged { add { } remove { } }
+
+    // UI10-A1: the shell graph (OnboardingViewModel) resolves IServerLoadStatusSource from this service.
+    public Task<ServerLoadStatus> GetLoadStatusAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(ServerLoadStatus.Loaded);
 
     public Task<IReadOnlyList<Server>> GetAllAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<Server>>(QaHistoryCatalog.Servers);

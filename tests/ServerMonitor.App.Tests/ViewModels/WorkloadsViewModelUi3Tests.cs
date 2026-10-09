@@ -212,9 +212,13 @@ public sealed class WorkloadsViewModelUi3Tests
         Assert.True(vm.ShowDockerNotInstalled);
         Assert.False(vm.ShowGlobalNoResults);
 
+        // UI.10 F14 (Prism UI.10A, accepted): Docker is not a list here, so the page-wide "no results" would hide its
+        // "not installed" card - the cards stay, Docker says what it is, the services card says its own "no results".
         vm.SearchText = "zzz";
-        Assert.True(vm.ShowGlobalNoResults);
+        Assert.False(vm.ShowGlobalNoResults);
+        Assert.True(vm.ShowSectionCards);
         Assert.True(vm.ShowDockerNotInstalled);
+        Assert.True(vm.ShowServicesSectionNoResults);
     }
 
     [Fact]
@@ -325,13 +329,15 @@ public sealed class WorkloadsViewModelUi3Tests
     }
 
     [Fact]
-    public void ClearSearch_ClearsTheText_AndResetsTheFilterToAll()
+    public void NoResultsAction_ForSearchAndFilter_ClearsTheText_AndResetsTheFilterToAll()
     {
+        // UI.10 F12 case C: the CTA says "Limpar pesquisa e filtro" and does exactly that (cases A/B: Ui10WorkloadsNoResultsTests).
         var (vm, _, _) = New(Snapshot());
         vm.SearchText = "zzz";
         vm.GlobalFilter = WorkloadGlobalFilter.Problems;
+        Assert.Equal(WorkloadNoResultsCase.SearchAndFilter, vm.NoResultsCase);
 
-        vm.ClearSearchCommand.Execute(null);
+        vm.NoResultsActionCommand.Execute(null);
 
         Assert.Equal(string.Empty, vm.SearchText);
         Assert.Equal(WorkloadGlobalFilter.All, vm.GlobalFilter);

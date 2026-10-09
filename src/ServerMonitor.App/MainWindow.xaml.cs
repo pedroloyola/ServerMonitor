@@ -179,7 +179,7 @@ public sealed partial class MainWindow : Window
             xamlRoot.Changed += OnXamlRootChanged;
         }
 
-        UpdateCompactCaptionReserve();
+        UpdateCompactCaptionClearance();
         UpdateCompactTitleLayout();
 
         // Keep the standard dashboard navigated and its data loaded regardless of the starting mode,
@@ -225,7 +225,7 @@ public sealed partial class MainWindow : Window
             SetTitleBar(CompactDragRegion);
             // The presenter's caption set is now the compact one (maximize disabled); size the
             // reserve to whatever the system actually reserves at the current DPI.
-            UpdateCompactCaptionReserve();
+            UpdateCompactCaptionClearance();
             UpdateCompactTitleLayout();
         }
         else
@@ -339,7 +339,8 @@ public sealed partial class MainWindow : Window
         CompactExpandText.Measure(infinite);
         var padding = CompactExpandButton.Padding;
         var buttonWithText = padding.Left + CompactExpandText.DesiredSize.Width + 6 + 16 + padding.Right;
-        var available = CompactRoot.ActualWidth - CompactDragRegion.Padding.Left - CompactCaptionColumn.ActualWidth;
+        // UI.10 H07: the strip is below the native captions, so the whole width minus the two 20 edges is available.
+        var available = CompactRoot.ActualWidth - CompactDragRegion.Padding.Left - CompactExpandButton.Margin.Right;
         var decision = CompactTitleLayout.Decide(available, CompactBrandMark.Size, CompactWordmark.DesiredSize.Width, buttonWithText);
 
         CompactExpandText.Visibility = decision.ShowExpandText ? Visibility.Visible : Visibility.Collapsed;
@@ -350,26 +351,29 @@ public sealed partial class MainWindow : Window
     }
 
     private void OnXamlRootChanged(Microsoft.UI.Xaml.XamlRoot sender, Microsoft.UI.Xaml.XamlRootChangedEventArgs args) =>
-        UpdateCompactCaptionReserve();
+        UpdateCompactCaptionClearance();
 
     /// <summary>
-    /// Reserves exactly the native caption-button width in the compact title bar, derived from the
-    /// runtime <c>AppWindow.TitleBar.RightInset</c> (physical px) converted to DIPs. Never a hardcoded
-    /// constant, so it is correct across DPI, scaling and caption changes. When the inset is not yet
-    /// reported (0), the provisional width is kept and a later event recomputes it.
+    /// UI.10 H07: places the compact title strip BELOW the native caption buttons. Its 40 line starts at the caption height
+    /// (runtime <c>AppWindow.TitleBar.Height</c>, physical px -> DIPs) + 2, so "Expandir" can end at the content's right edge
+    /// without its focus ring reaching the caption band. Never a hardcoded constant: correct across DPI and caption heights.
+    /// While the height is not reported yet (0) the provisional XAML value is kept and a later event recomputes it.
     /// </summary>
-    private void UpdateCompactCaptionReserve()
+    private void UpdateCompactCaptionClearance()
     {
-        var inset = _placementAdapter.GetCaptionRightInset();
-        if (inset <= 0 || RootLayout.XamlRoot is not { } xamlRoot)
+        var height = _placementAdapter.GetCaptionHeight();
+        if (height <= 0 || RootLayout.XamlRoot is not { } xamlRoot)
         {
             return;
         }
 
-        var reserved = Windowing.TitleBarInsetCalculator.ToReservedDips(inset, xamlRoot.RasterizationScale);
-        if (reserved > 0)
+        var top = Windowing.TitleBarInsetCalculator.ToTitleStripTopDips(height, xamlRoot.RasterizationScale);
+        if (top > 0)
         {
-            CompactCaptionColumn.Width = new GridLength(reserved);
+            var drag = CompactDragRegion.Padding;
+            CompactDragRegion.Padding = new Thickness(drag.Left, top, drag.Right, drag.Bottom);
+            var button = CompactExpandButton.Margin;
+            CompactExpandButton.Margin = new Thickness(button.Left, top + Windowing.TitleBarInsetCalculator.ButtonInsetOnStripLine, button.Right, button.Bottom);
             UpdateCompactTitleLayout();
         }
     }

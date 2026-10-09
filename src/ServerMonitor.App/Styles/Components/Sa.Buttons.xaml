@@ -232,7 +232,8 @@
             </Border>
         </Grid>
     </ControlTemplate>
-    <!-- Pill radii are h/2 literals (Figma): a radius above h/2 - e.g. SaRadiusPill 99 - renders ELLIPTICAL in WinUI. -->
+    <!-- UI.10 F06: every text button is a pill - its radius is the SaRadiusButton<h> tier token of its height (Radius.xaml;
+         a radius above h/2, e.g. SaRadiusPill 99, renders ELLIPTICAL in WinUI). Ui10ButtonRadiusGuardTests pins it. -->
     <!-- Shared by every Sa button: focus is the SYSTEM focus visual (keyboard only) in SaFocusRingBrush, 2px
          (DERIVED, Boss B-4); text in the Segoe UI Variable Text family. -->
     <Style x:Key="SaButtonBaseStyle" TargetType="Button">
@@ -255,7 +256,7 @@
         <Setter Property="Template" Value="{StaticResource SaPrimaryButtonTemplate}" />
         <Setter Property="Height" Value="44" />
         <Setter Property="Padding" Value="20,0" />
-        <Setter Property="CornerRadius" Value="22" />
+        <Setter Property="CornerRadius" Value="{StaticResource SaRadiusButton44}" />
         <Setter Property="Background" Value="{ThemeResource SaPrimaryFillBrush}" />
         <Setter Property="BorderBrush" Value="{ThemeResource SaPrimaryBorderBrush}" />
         <Setter Property="BorderThickness" Value="{StaticResource SaBorderThickness}" />
@@ -266,16 +267,17 @@
     <Style x:Key="SaSecondaryButtonStyle" TargetType="Button" BasedOn="{StaticResource SaButtonBaseStyle}">
         <Setter Property="Height" Value="42" />
         <Setter Property="Padding" Value="18,0" />
-        <Setter Property="CornerRadius" Value="21" />
+        <Setter Property="CornerRadius" Value="{StaticResource SaRadiusButton42}" />
         <Setter Property="Background" Value="{ThemeResource SaSecondaryFillBrush}" />
         <Setter Property="BorderBrush" Value="{ThemeResource SaSecondaryBorderBrush}" />
         <Setter Property="BorderThickness" Value="{ThemeResource SaSecondaryBorderThickness}" />
     </Style>
-    <!-- Secondary rect 112:1806 / 112:2043 (Atualizar / Editar): h42, radius 14, same fill/highlight as the pill, gap 8, 13 Medium. -->
+    <!-- Secondary "rect" 112:1806 / 112:2043 (Atualizar / Editar): h42, same fill/highlight as the pill, gap 8, 13 Medium.
+         UI.10 F06: radius 14 -> the 42 pill tier (Figma 112:1806 updated in UI.10B); the key is kept for its consumers. -->
     <Style x:Key="SaSecondaryRectButtonStyle" TargetType="Button" BasedOn="{StaticResource SaButtonBaseStyle}">
         <Setter Property="Height" Value="42" />
         <Setter Property="Padding" Value="16,0" />
-        <Setter Property="CornerRadius" Value="{StaticResource SaRadiusRect}" />
+        <Setter Property="CornerRadius" Value="{StaticResource SaRadiusButton42}" />
         <Setter Property="Background" Value="{ThemeResource SaSecondaryFillBrush}" />
         <Setter Property="BorderBrush" Value="{ThemeResource SaSecondaryBorderBrush}" />
         <Setter Property="BorderThickness" Value="{ThemeResource SaSecondaryBorderThickness}" />
@@ -366,47 +368,54 @@
         <Setter Property="FocusVisualSecondaryThickness" Value="0" />
         <Setter Property="FocusVisualMargin" Value="-3" />
     </Style>
-    <!-- Dialog neutral 112:8573 / 112:8759: h42, radius 13, min width 168, fill .14/.12 + 1px border .14/.16, 13 Medium; no highlight. -->
+    <!-- Dialog neutral 112:8573 / 112:8759: h42, min width 168, fill .14/.12 + 1px border .14/.16, 13 Medium; no highlight.
+         UI.10 F06: radius 13 -> the 42 pill tier. -->
     <Style x:Key="SaDialogButtonStyle" TargetType="Button" BasedOn="{StaticResource SaButtonBaseStyle}">
         <Setter Property="Template" Value="{StaticResource SaFlatButtonTemplate}" />
         <Setter Property="Height" Value="42" />
         <Setter Property="MinWidth" Value="168" />
         <Setter Property="Padding" Value="16,0" />
-        <Setter Property="CornerRadius" Value="{StaticResource SaRadiusDialogButton}" />
+        <Setter Property="CornerRadius" Value="{StaticResource SaRadiusButton42}" />
         <Setter Property="Background" Value="{ThemeResource SaDialogButtonFillBrush}" />
         <Setter Property="BorderBrush" Value="{ThemeResource SaDialogButtonBorderBrush}" />
         <Setter Property="BorderThickness" Value="{StaticResource SaBorderThickness}" />
     </Style>
-    <!-- Destructive 112:8575 / 112:8761: h42, radius 13, min width 196, danger fill .12/.07 + border .22, danger text, 13 Medium; text colour kept in every state. -->
+    <!-- Destructive 112:8575 / 112:8761: h42, pill (UI.10 F06; was radius 13), min width 196, danger fill .12/.07 + border .22, danger text, 13 Medium; text colour kept in every state. -->
     <Style x:Key="SaDestructiveButtonStyle" TargetType="Button" BasedOn="{StaticResource SaButtonBaseStyle}">
         <Setter Property="Template" Value="{StaticResource SaKeepForegroundButtonTemplate}" />
         <Setter Property="Height" Value="42" />
         <Setter Property="MinWidth" Value="196" />
         <Setter Property="Padding" Value="16,0" />
-        <Setter Property="CornerRadius" Value="{StaticResource SaRadiusDialogButton}" />
+        <Setter Property="CornerRadius" Value="{StaticResource SaRadiusButton42}" />
         <Setter Property="Background" Value="{ThemeResource SaDangerFillBrush}" />
         <Setter Property="BorderBrush" Value="{ThemeResource SaDangerBorderBrush}" />
         <Setter Property="BorderThickness" Value="{StaticResource SaBorderThickness}" />
         <Setter Property="Foreground" Value="{ThemeResource SaDangerTextBrush}" />
     </Style>
-    <!-- Solid (Manual) 112:14098 / 112:14192: h40, radius 12, fill inset #313131/#E8E8E8, 1px border #484848/#D3D3D3, 14 Semibold text. -->
+    <!-- Solid (Manual) 112:14098 / 112:14192: h40, pill (UI.10 F06; was radius 12), fill inset #313131/#E8E8E8, 1px border #484848/#D3D3D3, 14 Semibold text. -->
     <Style x:Key="SaSolidButtonStyle" TargetType="Button" BasedOn="{StaticResource SaButtonBaseStyle}">
         <Setter Property="Template" Value="{StaticResource SaFlatButtonTemplate}" />
         <Setter Property="Height" Value="40" />
         <Setter Property="Padding" Value="16,0" />
-        <Setter Property="CornerRadius" Value="{StaticResource SaRadiusControl}" />
+        <Setter Property="CornerRadius" Value="{StaticResource SaRadiusButton40}" />
         <Setter Property="Background" Value="{ThemeResource SaInteriorBrush}" />
         <Setter Property="BorderBrush" Value="{ThemeResource SaBorderInsetBrush}" />
         <Setter Property="BorderThickness" Value="{StaticResource SaBorderThickness}" />
         <Setter Property="FontSize" Value="{StaticResource SaFontSizeButton}" />
         <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
+    <!-- UI.10 F06: the solid button at the 36 tier (the editor's inline "Abrir servidor existente" / "Tentar guardar de novo",
+         Figma 06 112:19265), so the height and its pill radius come from one style instead of a local Height override. -->
+    <Style x:Key="SaSolidButtonSmallStyle" TargetType="Button" BasedOn="{StaticResource SaSolidButtonStyle}">
+        <Setter Property="Height" Value="36" />
+        <Setter Property="CornerRadius" Value="{StaticResource SaRadiusButton36}" />
+    </Style>
     <!-- Icon button 112:1001 / 112:1213: 44x44 circle, Secondary fill + highlight, icon 19. Icon-only: the consumer MUST set AutomationProperties.Name (T-17). -->
     <Style x:Key="SaIconButtonStyle" TargetType="Button" BasedOn="{StaticResource SaButtonBaseStyle}">
         <Setter Property="Width" Value="44" />
         <Setter Property="Height" Value="44" />
         <Setter Property="Padding" Value="0" />
-        <Setter Property="CornerRadius" Value="22" />
+        <Setter Property="CornerRadius" Value="{StaticResource SaRadiusButton44}" />
         <Setter Property="Background" Value="{ThemeResource SaSecondaryFillBrush}" />
         <Setter Property="BorderBrush" Value="{ThemeResource SaSecondaryBorderBrush}" />
         <Setter Property="BorderThickness" Value="{ThemeResource SaSecondaryBorderThickness}" />
@@ -417,7 +426,7 @@
         <Setter Property="Width" Value="28" />
         <Setter Property="Height" Value="28" />
         <Setter Property="Padding" Value="0" />
-        <Setter Property="CornerRadius" Value="14" />
+        <Setter Property="CornerRadius" Value="{StaticResource SaRadiusButton28}" />
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="Foreground" Value="{ThemeResource SaTextSecondaryBrush}" />
     </Style>
@@ -426,13 +435,13 @@
     <Style x:Key="SaPillButtonSmallStyle" TargetType="Button" BasedOn="{StaticResource SaSecondaryButtonStyle}">
         <Setter Property="Height" Value="36" />
         <Setter Property="Padding" Value="16,0" />
-        <Setter Property="CornerRadius" Value="18" />
+        <Setter Property="CornerRadius" Value="{StaticResource SaRadiusButton36}" />
         <Setter Property="FontSize" Value="{StaticResource SaFontSizeLabel}" />
     </Style>
     <!-- UI.5 compact pill 112:7973 ("Entrar ›"): h34 (Figma r18 is above h/2 and would render elliptical - h/2 = 17). -->
     <Style x:Key="SaPillButtonXSmallStyle" TargetType="Button" BasedOn="{StaticResource SaPillButtonSmallStyle}">
         <Setter Property="Height" Value="34" />
-        <Setter Property="CornerRadius" Value="17" />
+        <Setter Property="CornerRadius" Value="{StaticResource SaRadiusButton34}" />
     </Style>
     <!-- UI.5 112:8263 "Limpar histórico": the small pill with the danger text (#FF8A96 / #AB404D measured; SaDangerTextBrush,
          Light a11y deviation accepted in UI.2). The text colour is kept in every state, like the destructive button. -->
@@ -445,7 +454,7 @@
     <Style x:Key="SaIconButtonSmallStyle" TargetType="Button" BasedOn="{StaticResource SaIconButtonStyle}">
         <Setter Property="Width" Value="36" />
         <Setter Property="Height" Value="36" />
-        <Setter Property="CornerRadius" Value="18" />
+        <Setter Property="CornerRadius" Value="{StaticResource SaRadiusButton36}" />
     </Style>
     <!-- UI.5 disclosure 112:7985 / 112:7993 ("Dados e servidores", "Sobre o ServerAlyzer"): h56 radius 20 (SaRadiusToast, the
          token recorded for this node), glass card fill + border + highlight, padding-left 20, content = icon 18 · text 13 Medium
@@ -460,13 +469,14 @@
         <Setter Property="BorderBrush" Value="{ThemeResource SaGlassBorderBrush}" />
         <Setter Property="BorderThickness" Value="{StaticResource SaBorderThickness}" />
     </Style>
-    <!-- UI.6 112:665/112:672/112:837: h46 r15; native button behaviour, no new animations. -->
+    <!-- UI.6 112:665/112:672/112:837; native button behaviour, no new animations. UI.10 F06 (Figma UI.10B RB-1): h46 r15 ->
+         the 44 pill tier, like the Primary (the 46 tier existed only here). -->
     <Style x:Key="SaOnboardingSecondaryButtonStyle" TargetType="Button" BasedOn="{StaticResource SaSecondaryRectButtonStyle}">
         <Setter Property="Background" Value="{ThemeResource SaOnboardingSecondaryFillBrush}" />
         <Setter Property="BorderBrush" Value="{ThemeResource SaOnboardingButtonBorderBrush}" />
         <Setter Property="BorderThickness" Value="{StaticResource SaBorderThickness}" />
-        <Setter Property="Height" Value="{StaticResource SaOnboardingButtonHeight}" />
-        <Setter Property="CornerRadius" Value="{StaticResource SaRadiusOnboardingButton}" />
+        <Setter Property="Height" Value="44" />
+        <Setter Property="CornerRadius" Value="{StaticResource SaRadiusButton44}" />
     </Style>
     <Style x:Key="SaOnboardingPrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource SaOnboardingSecondaryButtonStyle}">
         <Setter Property="Template" Value="{StaticResource SaKeepForegroundButtonTemplate}" />
