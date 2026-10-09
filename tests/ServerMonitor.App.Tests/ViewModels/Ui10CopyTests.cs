@@ -109,6 +109,6 @@ public sealed partial class Ui10CopyTests
     private static partial Regex ResetWord();
 
     // The formal imperatives / possessives the UI.10A audit found (F34), as whole words.
-    [GeneratedRegex(@"\b(Introduza|Escolha|Tente|tente|Feche|feche|Abra|Abra-o|Volte|Verifique|Adicione-o|Reveja|Reinicie|Atualize|Restaure|Guarde-o|Confirme a|Use pelo|Use no|use ""Sair|Pode alterar)\b|\bpor si\b|\b[Aa] sua\b|\b[Aa]s suas\b|ser-lhe-(á|ão)")]
+    [GeneratedRegex(@"\b(Introduza|Escolha|Tente|tente|Feche|feche|Abra|Abra-o|Volte|Verifique|Adicione-o|Reveja|Reinicie|Atualize|Restaure|Guarde-o|Confirme a|Use pelo|Use no|use ""Sair|Pode alterar)\b|\bpor si\b|\b[Oo]s? seus?\b|\b[Aa]s? suas?\b|ser-lhe-(á|ão)")]
     private static partial Regex FormalPtPt();
 }

@@ -110,6 +110,29 @@ public sealed class Ui10WorkloadsNoResultsTests
         Assert.True(vm.ShowServicesSectionNoResults); // the services card says its own "no results"
     }
 
+    /// <summary>
+    /// The F14 mirror (tests review M-1): Docker is a healthy list but Services is not a list (unavailable, denied,
+    /// unsupported, probe failed) - a search that matches nothing must keep the Services state card on screen, never hide
+    /// it behind the page-wide "no results".
+    /// </summary>
+    [Theory]
+    [InlineData(ServiceManager.Systemd, WorkloadServiceAvailability.Unavailable)]
+    [InlineData(ServiceManager.Systemd, WorkloadServiceAvailability.PermissionDenied)]
+    [InlineData(ServiceManager.Unsupported, WorkloadServiceAvailability.Available)]
+    [InlineData(ServiceManager.Systemd, WorkloadServiceAvailability.Unknown)]
+    public void F14_AServicesStateThatIsNotAList_IsNeverHiddenBehindTheGlobalNoResults(ServiceManager manager, WorkloadServiceAvailability services)
+    {
+        using var vm = Load(HealthyDocker(), new ServiceSnapshot { Manager = manager, Availability = services });
+        Assert.False(vm.ShowServicesList);
+
+        vm.SearchText = "zzz";
+
+        Assert.False(vm.ShowGlobalNoResults);
+        Assert.True(vm.ShowSectionCards);          // the Services card keeps saying what is wrong
+        Assert.True(vm.ShowDockerSectionNoResults); // the Docker card says its own "no results"
+        Assert.True(vm.ShowServicesUnavailable || vm.ShowServicesUnsupported || vm.ShowServicesError);
+    }
+
     [Fact]
     public void F14_WhileTheSectionsAreLoadingAgain_TheGlobalNoResultsWaits_AndSaysSo()
     {

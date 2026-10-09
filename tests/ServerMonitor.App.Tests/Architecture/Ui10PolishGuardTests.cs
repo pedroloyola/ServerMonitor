@@ -224,6 +224,29 @@ public sealed partial class Ui10PolishGuardTests
         Assert.Null(hide.Attribute("Foreground"));
     }
 
+    /// <summary>
+    /// F25 view binding + HD-1 (tests review L-1): on the Detail each big value takes its severity style through the shared
+    /// converter, and the three meters stay severity-free - their colour is the metric's identity, never a state.
+    /// </summary>
+    [Fact]
+    public void DetailValues_BindSeverity_AndTheMetersStaySeverityFree()
+    {
+        var page = AppSourceTree.LoadXaml("Views/ServerDetailPage.xaml");
+        foreach (var metric in new[] { "Cpu", "Memory", "Disk" })
+        {
+            var value = page.Descendants(Ns + "TextBlock").Single(t => (string?)t.Attribute("Text") == $"{{Binding {metric}ValueText}}");
+            Assert.Equal($"{{Binding {metric}Severity, Converter={{StaticResource DetailMetricValueStyleConverter}}}}", (string?)value.Attribute("Style"));
+        }
+
+        var meters = page.Descendants().Where(e => e.Name.LocalName is "SaPulseBars" or "SaSegmentMeter").ToList();
+        Assert.Equal(3, meters.Count);
+        Assert.All(meters, meter =>
+        {
+            Assert.DoesNotContain(meter.Attributes(), a => a.Value.Contains("Severity", StringComparison.Ordinal));
+            Assert.Null(meter.Attribute("Foreground"));
+        });
+    }
+
     private static string? Setter(XElement style, string property) =>
         (string?)style.Elements(Ns + "Setter").FirstOrDefault(setter => (string?)setter.Attribute("Property") == property)?.Attribute("Value");
 

@@ -367,7 +367,9 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
     {
         get
         {
-            var name = Format("ServerDetailMetricAccessibleFormat", _localization.GetString("ServerMetricsCpuLabel.Text"), CpuAccessibleValue);
+            // UI.10 L-2: the value says its severity in words too (the shared row rule), never only by its colour.
+            var name = Format("ServerDetailMetricAccessibleFormat", _localization.GetString("ServerMetricsCpuLabel.Text"),
+                ServerMetricPresentation.WithSeverityCue(CpuAccessibleValue, HasCpuPercent, CpuSeverity, _localization));
             return _cpuPulse.Count == 0
                 ? name
                 : string.Join(". ", name, Format("ServerDetailCpuPulseAccessibleFormat", _cpuPulse.Count, CpuPulseCeiling));
@@ -393,7 +395,8 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
 
     public string MemoryValueText => Number(HasMemoryPercent, _card?.MemoryUsageValue ?? 0);
 
-    public string MemoryAccessibleName => Format("ServerDetailMetricAccessibleFormat", _localization.GetString("ServerMetricsMemoryLabel.Text"), MemoryAccessibleValue);
+    public string MemoryAccessibleName => Format("ServerDetailMetricAccessibleFormat", _localization.GetString("ServerMetricsMemoryLabel.Text"),
+        ServerMetricPresentation.WithSeverityCue(MemoryAccessibleValue, HasMemoryPercent, MemorySeverity, _localization));
 
     /// <summary>Figma "9,9 GB de 16 GB": the snapshot's own byte counts, shown only when both are known (no % derived).</summary>
     public string? MemoryLegend => BytesOf(_card?.MetricsSnapshot?.MemoryUsedBytes, _card?.MetricsSnapshot?.MemoryTotalBytes);
@@ -416,7 +419,8 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
 
     public string DiskValueText => Number(HasDiskPercent, _card?.DiskUsageValue ?? 0);
 
-    public string DiskAccessibleName => Format("ServerDetailMetricAccessibleFormat", _localization.GetString("ServerMetricsDiskLabel.Text"), DiskAccessibleValue);
+    public string DiskAccessibleName => Format("ServerDetailMetricAccessibleFormat", _localization.GetString("ServerMetricsDiskLabel.Text"),
+        ServerMetricPresentation.WithSeverityCue(DiskAccessibleValue, HasDiskPercent, DiskSeverity, _localization));
 
     public string? DiskLegend => BytesOf(_card?.MetricsSnapshot?.DiskUsedBytes, _card?.MetricsSnapshot?.DiskTotalBytes);
 

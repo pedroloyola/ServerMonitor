@@ -196,6 +196,22 @@ public sealed class Ui5ServerDetailTests
         Assert.DoesNotContain("em atenção", row.RowAutomationName, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// UI.10 tests review L-2: on the Detail the severity colour of a value is never its only signal - the card's accessible
+    /// name carries the same cue the Servidores / Compact rows use ("97% crítico"); a value under the limit has none.
+    /// </summary>
+    [Fact]
+    public async Task DetailValues_SayTheirSeverityInWords()
+    {
+        var fleet = new Ui4TestKit.Fleet().Add("db", ServerHealth.Critical, cpu: 97, mem: 62, disk: 48);
+        var kit = await LoadedAsync(fleet, new ResWLocalizationService("pt-PT"));
+        using var detail = Open(kit, "db");
+
+        Assert.StartsWith("CPU: 97% crítico", detail.CpuAccessibleName, StringComparison.Ordinal);
+        Assert.Equal("Memória: 62%", detail.MemoryAccessibleName);
+        Assert.DoesNotContain("atenção", detail.DiskAccessibleName, StringComparison.Ordinal);
+    }
+
     // ---- derived states -------------------------------------------------------------------------------------------
 
     [Fact]
