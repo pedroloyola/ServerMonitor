@@ -358,7 +358,7 @@
             <Grid
                 x:Name="CardsGrid"
                 ColumnSpacing="{StaticResource SaSpace24}"
-                primitives:SaMotion.Enter="Fade" Visibility="{Binding ShowSectionCards, Converter={StaticResource BooleanToVisibilityConverter}}">
+                Visibility="{Binding ShowSectionCards, Converter={StaticResource BooleanToVisibilityConverter}}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition x:Name="CardsColumn2" Width="*" />

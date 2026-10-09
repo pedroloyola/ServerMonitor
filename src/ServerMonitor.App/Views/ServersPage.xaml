@@ -312,7 +312,8 @@
                 </Border>
 
                 <!-- Table 112:1434: header h34 10 Medium muted, rows h78, no dividers; the hidden-servers note under the rows. -->
-                <Border Style="{StaticResource SaGlassSurfaceStyle}" primitives:SaMotion.Enter="Fade" Visibility="{x:Bind ViewModel.ShowTable, Mode=OneWay}">
+                <!-- UI.11 P-1: no content-enter - ShowTable also flips on a search with/without results (a filter must stay instant). -->
+                <Border Style="{StaticResource SaGlassSurfaceStyle}" Visibility="{x:Bind ViewModel.ShowTable, Mode=OneWay}">
                     <StackPanel>
                         <Border x:Name="TableHeader" Style="{StaticResource SaDataTableHeaderStyle}" AutomationProperties.AccessibilityView="Raw">
                             <Grid ColumnSpacing="10">

@@ -99,9 +99,21 @@ public sealed class Ui11SelectorGuardTests
 
     private static IEnumerable<XElement> AllIndicatorHosts(XDocument document) => document.Descendants().Where(e => e.Attribute(IndicatorBrush) is not null);
 
+    /// <summary>Prism P-2: DD-UI11-1 covers the rect AND nav families - the sidebar pill (#FFF@.50) needs the Light hairline too.</summary>
     [Fact]
-    public void F20_TheSidebarIndicator_HasNoLightHairline()
+    public void F20_TheSidebarIndicator_HasTheLightHairline()
     {
-        Assert.DoesNotContain(AppSourceTree.LoadXaml("Controls/SaSidebar.xaml").Descendants(), e => e.Attributes().Any(a => a.Name.LocalName == "SaSlidingSelection.LightOutlineBrush"));
+        var host = Assert.Single(AllIndicatorHosts(AppSourceTree.LoadXaml("Controls/SaSidebar.xaml")));
+
+        Assert.Equal("{ThemeResource SaDialogButtonBorderBrush}", (string?)host.Attribute(Primitives + "SaSlidingSelection.LightOutlineBrush"));
+    }
+
+    /// <summary>Prism P-2: the theme and auth selectors stay without it (their pills are visible).</summary>
+    [Theory]
+    [InlineData("Views/SettingsPage.xaml")]
+    [InlineData("Controls/ServerFormControl.xaml")]
+    public void F20_PillFamilies_HaveNoLightHairline(string file)
+    {
+        Assert.All(AllIndicatorHosts(AppSourceTree.LoadXaml(file)), host => Assert.Null(host.Attribute(Primitives + "SaSlidingSelection.LightOutlineBrush")));
     }
 }
