@@ -78,6 +78,16 @@ public static class SaMotion
         }
     }
 
+    /// <summary>Lands a running enter on its final state at once (a reveal cut short, e.g. leaving Compact mid-fade).</summary>
+    public static void ResetEnter(FrameworkElement element)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        if (element.GetValue(StateProperty) is MotionState state)
+        {
+            state.Reset();
+        }
+    }
+
     private static void OnHoverFadeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
         if (d is FrameworkElement element)
@@ -293,6 +303,8 @@ public static class SaMotion
                 });
             }
         }
+
+        public void Reset() => ResetVisual();
 
         private void ResetVisual()
         {

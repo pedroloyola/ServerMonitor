@@ -37,6 +37,10 @@ public sealed class WindowModeCoordinator : IWindowModeCoordinator
 
     public event EventHandler<WindowMode>? ModeChanged;
 
+    public event EventHandler<WindowMode>? ModeChanging;
+
+    public event EventHandler<WindowModeChangeEnded>? ModeChangeEnded;
+
     public WindowMode CurrentMode => _mode;
 
     public bool CompactAlwaysOnTop => _settings.CompactAlwaysOnTop;
@@ -80,7 +84,7 @@ public sealed class WindowModeCoordinator : IWindowModeCoordinator
         CaptureBoundsInto(_mode);
         _mode = mode;
         _settings = _settings with { Mode = mode };
-        ApplyMode(mode);
+        ApplyMode(mode, announce: mode == WindowMode.Compact);
         _store.Save(_settings);
         _logger.LogInformation("Switched window to {Mode} mode.", mode);
     }
@@ -161,12 +165,20 @@ public sealed class WindowModeCoordinator : IWindowModeCoordinator
         return WindowSizeConstraints.For(_mode).ScaledTo(dpi, _adapter.GetFrame());
     }
 
-    private void ApplyMode(WindowMode mode)
+    private void ApplyMode(WindowMode mode, bool announce = false)
     {
         var constraints = WindowSizeConstraints.For(mode);
         _applyingBounds = true;
+        var succeeded = false;
         try
         {
+            // UI.11 F16 (Cortex D-B3 C-1/C-5): announced before the FIRST window step - a maximized Standard's Restore() is
+            // itself a visible resize - and synchronously: no await, yield or timer between this and the resize.
+            if (announce)
+            {
+                ModeChanging?.Invoke(this, mode);
+            }
+
             // c4 B-7 (measured): a MoveAndResize on a still-maximized window keeps it Maximized, and the later Restore()
             // returns it to the PREVIOUS mode's restored rect. So the presenter is restored first, then the mode applied.
             if (_adapter.IsMaximized)
@@ -190,10 +202,16 @@ public sealed class WindowModeCoordinator : IWindowModeCoordinator
             // Record what was actually applied so the in-memory preference always reflects reality,
             // even before the user moves the window (important for the minimize-then-close path).
             CaptureBoundsInto(mode);
+            succeeded = true;
         }
         finally
         {
             _applyingBounds = false;
+            // UI.11 F16 (Cortex D-B3 C-2): whatever happened, the announcement is closed (ModeChanged stays outside).
+            if (announce)
+            {
+                ModeChangeEnded?.Invoke(this, new WindowModeChangeEnded(mode, succeeded));
+            }
         }
 
         ModeChanged?.Invoke(this, mode);

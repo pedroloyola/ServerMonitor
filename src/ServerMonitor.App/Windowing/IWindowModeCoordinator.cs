@@ -1,5 +1,8 @@
 namespace ServerMonitor.App.Windowing;
 
+/// <summary>UI.11 F16: the end of a switch announced by ModeChanging (Succeeded = every window step completed).</summary>
+public readonly record struct WindowModeChangeEnded(WindowMode Target, bool Succeeded);
+
 /// <summary>
 /// Owns the Standard ⇄ Compact transition for the one application window: presenter capabilities,
 /// bounds (with off-screen/DPI recovery), always-on-top and placement persistence. The window's
@@ -18,6 +21,20 @@ public interface IWindowModeCoordinator
 
     /// <summary>Raised after the mode has been applied (including the initial application).</summary>
     event EventHandler<WindowMode>? ModeChanged;
+
+    /// <summary>
+    /// UI.11 F16 (Cortex D-B3 C-1): raised synchronously by a SWITCH to Compact, before the first window step (the Restore
+    /// of a maximized Standard, then presenter and bounds), so the Standard content can be hidden before the resize shows
+    /// it clipped. Never from Initialize, a same-mode switch or HoldCompactRestored; never for Compact->Standard.
+    /// Subscribers must not touch the window (Opacity only) and must not defer anything.
+    /// </summary>
+    event EventHandler<WindowMode>? ModeChanging;
+
+    /// <summary>
+    /// UI.11 F16 (Cortex D-B3 C-2): raised from the apply's finally after every <see cref="ModeChanging"/>, also when a
+    /// window step threw (Succeeded = false; then no ModeChanged follows, as before), so nothing hidden stays hidden.
+    /// </summary>
+    event EventHandler<WindowModeChangeEnded>? ModeChangeEnded;
 
     /// <summary>Applies the persisted mode and geometry once the window and its displays are ready.</summary>
     void Initialize();
