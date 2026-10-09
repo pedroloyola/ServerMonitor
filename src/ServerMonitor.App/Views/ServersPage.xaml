@@ -349,12 +349,13 @@
                     </primitives:SaEmptyState>
                 </Border>
 
-                <!-- Empty §13 112:14007: no visible server; the note only when servers are hidden (Prism r1 c). -->
+                <!-- Empty §13 112:14007: no visible server; the note only when servers are hidden (Prism r1 c). UI.10 F06: the CTA is the
+                     Primary h44 pill (112:14098 updated in UI.10B), the same shape as the header "+ Adicionar". -->
                 <Border Style="{StaticResource SaStatePanelStyle}" Visibility="{x:Bind ViewModel.ShowEmptyState, Mode=OneWay}">
                     <StackPanel VerticalAlignment="Center" Spacing="{StaticResource SaSpace16}">
                         <primitives:SaEmptyState x:Name="EmptyState" x:Uid="ServersEmptyState" TitleHeadingLevel="Level2"
                                                  IconData="{StaticResource SaIconServerStack01Data}">
-                            <Button x:Name="EmptyAddButton" x:Uid="ServersEmptyAddButton" HorizontalAlignment="Center" Style="{StaticResource SaSolidButtonStyle}"
+                            <Button x:Name="EmptyAddButton" x:Uid="ServersEmptyAddButton" HorizontalAlignment="Center" Style="{StaticResource SaPrimaryButtonStyle}"
                                     Command="{x:Bind ViewModel.AddServerCommand}" />
                         </primitives:SaEmptyState>
                         <TextBlock x:Uid="ServersHiddenNote" HorizontalAlignment="Center" Style="{StaticResource SaTableCellSecondaryTextStyle}"

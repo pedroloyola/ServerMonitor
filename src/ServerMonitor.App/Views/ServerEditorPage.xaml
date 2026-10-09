@@ -96,8 +96,8 @@
                     AnnouncePolitely="True"
                     AutomationProperties.LiveSetting="Polite"
                     Visibility="Collapsed">
-                    <Button x:Name="OpenDuplicateButton" x:Uid="ServerEditorDuplicateOpenButton" MinWidth="220" Height="36"
-                            Style="{StaticResource SaSolidButtonStyle}" Click="OnOpenDuplicateClick" />
+                    <Button x:Name="OpenDuplicateButton" x:Uid="ServerEditorDuplicateOpenButton" MinWidth="220"
+                            Style="{StaticResource SaSolidButtonSmallStyle}" Click="OnOpenDuplicateClick" />
                 </primitives:SaInlineNotice>
 
                 <!-- Figma 06 "Falha ao guardar" (112:19265): the form stays as typed; a consumed secret must be typed again. -->
@@ -106,8 +106,8 @@
                     Severity="Error"
                     AutomationProperties.LiveSetting="Assertive"
                     Visibility="Collapsed">
-                    <Button x:Name="RetrySaveButton" x:Uid="ServerEditorSaveRetryButton" MinWidth="160" Height="36"
-                            Style="{StaticResource SaSolidButtonStyle}" Click="OnPrimaryClick" />
+                    <Button x:Name="RetrySaveButton" x:Uid="ServerEditorSaveRetryButton" MinWidth="160"
+                            Style="{StaticResource SaSolidButtonSmallStyle}" Click="OnPrimaryClick" />
                 </primitives:SaInlineNotice>
 
                 <!-- Form actions 112:3404: not sticky (B-14); no primary button (G-2): the right-hand action is the default. -->

@@ -700,7 +700,7 @@
         <Setter Property="Foreground" Value="{ThemeResource SaOfflineBrush}" />
     </Style>
 
-    <!-- Compact "Expandir" 112:9430 / "Adicionar servidor" 112:9828: h36, SaRadiusControl, padding 14,0, 12 Medium, flat glass
+    <!-- Compact "Expandir" 112:9430 / "Adicionar servidor" 112:9828: h36, pill (UI.10 F06; was SaRadiusControl), padding 14,0, 12 Medium, flat glass
          fill (SaCompactButtonBrush @.18 / emphasis @.25), HC ButtonFace + ButtonText edge. Hover/pressed = the shared veil
          over the fill (DERIVED), disabled .58, keyboard focus = the Sa ring. -->
     <Style x:Key="SaCompactButtonStyle" TargetType="Button" BasedOn="{StaticResource SaButtonBaseStyle}">
@@ -708,7 +708,7 @@
         <Setter Property="Height" Value="36" />
         <Setter Property="MinWidth" Value="36" />
         <Setter Property="Padding" Value="14,0" />
-        <Setter Property="CornerRadius" Value="{StaticResource SaRadiusControl}" />
+        <Setter Property="CornerRadius" Value="{StaticResource SaRadiusButton36}" />
         <Setter Property="FontSize" Value="{StaticResource SaFontSizeLabel}" />
         <Setter Property="FontWeight" Value="Medium" />
         <Setter Property="Background" Value="{ThemeResource SaCompactButtonBrush}" />

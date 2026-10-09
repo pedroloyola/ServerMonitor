@@ -28,7 +28,6 @@
     <Thickness x:Key="SaOnboardingPadding">48,40,48,36</Thickness>
     <Thickness x:Key="SaOnboardingBenefitPadding">18</Thickness>
     <Thickness x:Key="SaOnboardingCardPadding">24</Thickness>
-    <x:Double x:Key="SaOnboardingButtonHeight">46</x:Double>
     <!-- UI.8 Compact window (Figma 05 sec. 15, p20): title band 0-60 = top 20 + 40 (brand padding 20 left, g12 before the
          button); body 16 below the strip, 20 on the other sides. -->
     <Thickness x:Key="SaCompactTitlePadding">20,20,12,0</Thickness>

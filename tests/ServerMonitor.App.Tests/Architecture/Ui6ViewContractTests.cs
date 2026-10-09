@@ -157,8 +157,9 @@ public sealed class Ui6ViewContractTests
         Assert.Contains(brand.Descendants(),e=>A(e,"Property")=="Foreground" && A(e,"Value")=="{ThemeResource SaTextBrush}");
         var buttons=AppSourceTree.LoadXaml("Styles/Components/Sa.Buttons.xaml");
         var variant=buttons.Descendants().Single(e=>A(e,AppSourceTree.Xaml+"Key")=="SaOnboardingSecondaryButtonStyle");
-        Assert.Contains(variant.Descendants(),e=>A(e,"Property")=="Height" && A(e,"Value")=="{StaticResource SaOnboardingButtonHeight}");
-        Assert.Contains(variant.Descendants(),e=>A(e,"Property")=="CornerRadius" && A(e,"Value")=="{StaticResource SaRadiusOnboardingButton}");
+        // UI.10 F06 (Figma UI.10B RB-1): the onboarding buttons moved from h46 r15 to the 44 pill tier.
+        Assert.Contains(variant.Descendants(),e=>A(e,"Property")=="Height" && A(e,"Value")=="44");
+        Assert.Contains(variant.Descendants(),e=>A(e,"Property")=="CornerRadius" && A(e,"Value")=="{StaticResource SaRadiusButton44}");
         var elevation=AppSourceTree.LoadXaml("Styles/Tokens/Elevation.xaml");
         foreach(var key in new[]{"SaWindowMaterialBrush","SaOnboardingPrimaryBrush","SaOnboardingPrimaryTextBrush","SaOnboardingBenefitBrush"})
             Assert.Equal(3,elevation.Descendants().Count(e=>A(e,AppSourceTree.Xaml+"Key")==key));
