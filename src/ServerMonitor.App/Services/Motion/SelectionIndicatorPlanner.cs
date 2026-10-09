@@ -138,3 +138,11 @@ public static class IndicatorHighlight
     public static IReadOnlyList<(float Offset, float Alpha)> Falloff { get; } =
         [(0f, 1f), (0.25f, 0.5625f), (0.5f, 0.25f), (0.75f, 0.0625f), (1f, 0f)];
 }
+
+/// <summary>UI.11 pure indicator paint rules (unit-tested).</summary>
+public static class SelectionIndicatorRules
+{
+    /// <summary>F20 / DD-UI11-1: the hairline is drawn only for a host that asks for it, in Light, outside High Contrast.</summary>
+    public static bool DrawsLightOutline(bool hostHasOutline, bool isLightTheme, bool isHighContrast) =>
+        hostHasOutline && isLightTheme && !isHighContrast;
+}

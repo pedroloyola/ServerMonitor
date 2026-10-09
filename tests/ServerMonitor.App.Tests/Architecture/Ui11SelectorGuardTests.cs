@@ -90,10 +90,18 @@ public sealed class Ui11SelectorGuardTests
         {
             Assert.Equal("{ThemeResource " + brush + "}", (string?)host.Attribute(IndicatorBrush));
             Assert.Equal(highlight ? "{ThemeResource SaGlassHighlightBrush}" : null, (string?)host.Attribute(Primitives + "SaSlidingSelection.HighlightBrush"));
+            // F20 / DD-UI11-1: the rect family (= the hosts with the glass highlight) also carries the Light-only hairline.
+            Assert.Equal(highlight ? "{ThemeResource SaDialogButtonBorderBrush}" : null, (string?)host.Attribute(Primitives + "SaSlidingSelection.LightOutlineBrush"));
         }
     }
 
     private static IEnumerable<XElement> IndicatorHosts(XElement cell) => cell.Elements().Where(e => e.Attribute(IndicatorBrush) is not null);
 
     private static IEnumerable<XElement> AllIndicatorHosts(XDocument document) => document.Descendants().Where(e => e.Attribute(IndicatorBrush) is not null);
+
+    [Fact]
+    public void F20_TheSidebarIndicator_HasNoLightHairline()
+    {
+        Assert.DoesNotContain(AppSourceTree.LoadXaml("Controls/SaSidebar.xaml").Descendants(), e => e.Attributes().Any(a => a.Name.LocalName == "SaSlidingSelection.LightOutlineBrush"));
+    }
 }

@@ -252,7 +252,7 @@
                 <Grid>
                     <Border IsHitTestVisible="False" AutomationProperties.AccessibilityView="Raw"
                             primitives:SaSlidingSelection.IndicatorBrush="{ThemeResource SaSelectedBrush}"
-                            primitives:SaSlidingSelection.HighlightBrush="{ThemeResource SaGlassHighlightBrush}" />
+                            primitives:SaSlidingSelection.HighlightBrush="{ThemeResource SaGlassHighlightBrush}" primitives:SaSlidingSelection.LightOutlineBrush="{ThemeResource SaDialogButtonBorderBrush}" />
                     <StackPanel
                         x:Uid="WorkloadGlobalFilter"
                         Orientation="Horizontal"

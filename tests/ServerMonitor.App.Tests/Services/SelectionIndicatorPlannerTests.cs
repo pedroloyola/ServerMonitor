@@ -259,4 +259,14 @@ public sealed class SelectionIndicatorPlannerTests
 
         Assert.Equal(IndicatorAction.NoOp, planner.Flush(noisy, 1, reducedMotion: false).Action);
     }
+
+    [Theory]
+    [InlineData(true, true, false, true)]   // rect host, Light
+    [InlineData(true, false, false, false)] // Dark: already visible (#242424 on #161616)
+    [InlineData(true, true, true, false)]   // High Contrast keeps the system Highlight mapping
+    [InlineData(false, true, false, false)] // pill / theme / nav hosts never ask for it
+    public void F20_TheLightHairline_IsLightOnly_RectOnly_NeverHighContrast(bool host, bool light, bool highContrast, bool draws)
+    {
+        Assert.Equal(draws, SelectionIndicatorRules.DrawsLightOutline(host, light, highContrast));
+    }
 }

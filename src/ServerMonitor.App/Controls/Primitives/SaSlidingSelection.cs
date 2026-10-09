@@ -42,6 +42,19 @@ public static class SaSlidingSelection
     public static readonly DependencyProperty HighlightBrushProperty = DependencyProperty.RegisterAttached(
         "HighlightBrush", typeof(Brush), typeof(SaSlidingSelection), new PropertyMetadata(null, OnBrushChanged));
 
+    /// <summary>
+    /// UI.11 F20 (Prism rev.4 D-B1, DD-UI11-1): a 1 px inner hairline drawn ONLY in the Light theme (not in Dark, not in High
+    /// Contrast). The rect family's Light fill (#FFF@.50) is Δ1 against its track - the Figma pill is separated by a drop
+    /// shadow the app does not reproduce - so without it the sliding pill would be invisible in Light. The rect hosts pass
+    /// SaDialogButtonBorderBrush (the dialog buttons' Light hairline); other families leave it unset.
+    /// </summary>
+    public static readonly DependencyProperty LightOutlineBrushProperty = DependencyProperty.RegisterAttached(
+        "LightOutlineBrush", typeof(Brush), typeof(SaSlidingSelection), new PropertyMetadata(null, OnBrushChanged));
+
+    public static Brush? GetLightOutlineBrush(FrameworkElement host) => (Brush?)host.GetValue(LightOutlineBrushProperty);
+
+    public static void SetLightOutlineBrush(FrameworkElement host, Brush? value) => host.SetValue(LightOutlineBrushProperty, value);
+
     private static readonly DependencyProperty ControllerProperty = DependencyProperty.RegisterAttached(
         "Controller", typeof(object), typeof(SaSlidingSelection), new PropertyMetadata(null));
 
@@ -102,6 +115,9 @@ internal sealed class SlidingSelectionController
     private CompositionRoundedRectangleGeometry? _highlightGeometry;
     private CompositionSpriteShape? _highlightShape;
     private CompositionLinearGradientBrush? _highlightBrush;
+    private CompositionSpriteShape? _outlineShape;
+    private CompositionColorBrush? _outlineBrush;
+    private static readonly Windows.UI.ViewManagement.AccessibilitySettings Accessibility = new();
     private float _radius = -1;
 
     public SlidingSelectionController(FrameworkElement host)
@@ -129,6 +145,7 @@ internal sealed class SlidingSelectionController
         }
 
         _fillBrush.Color = SaSlidingSelection.Effective(SaSlidingSelection.GetIndicatorBrush(_host));
+        UpdateOutline();
         UpdateHighlightStops();
     }
 
@@ -150,6 +167,7 @@ internal sealed class SlidingSelectionController
         }
 
         MotionPolicy.Source.Changed += OnReducedMotionChanged;
+        _host.ActualThemeChanged += OnThemeChanged;
         EnsureVisual();
         UpdateBrushes();
         _planner.Request(_planner.PresentedTarget is null ? IndicatorCause.FirstLayout : IndicatorCause.Remount);
@@ -169,6 +187,7 @@ internal sealed class SlidingSelectionController
         }
 
         MotionPolicy.Source.Changed -= OnReducedMotionChanged;
+        _host.ActualThemeChanged -= OnThemeChanged;
         ReleaseItems();
     }
 
@@ -247,6 +266,8 @@ internal sealed class SlidingSelectionController
         QueueFlush();
     }
 
+    private void OnThemeChanged(FrameworkElement sender, object args) => UpdateBrushes();
+
     private void OnItemEnabledChanged(object sender, DependencyPropertyChangedEventArgs e) => UpdateOpacity();
 
     /// <summary>
@@ -317,6 +338,12 @@ internal sealed class SlidingSelectionController
 
         _highlightGeometry = _compositor.CreateRoundedRectangleGeometry();
         _highlightGeometry.Offset = new Vector2(0.5f, 0.5f);
+        // F20: the Light hairline shares the inset geometry (a 1 px stroke centred 0.5 px inside = an inner border).
+        _outlineBrush = _compositor.CreateColorBrush();
+        _outlineShape = _compositor.CreateSpriteShape(_highlightGeometry);
+        _outlineShape.StrokeBrush = _outlineBrush;
+        _outlineShape.StrokeThickness = 0;
+        _container.Shapes.Add(_outlineShape);
         _highlightBrush = _compositor.CreateLinearGradientBrush();
         _highlightBrush.MappingMode = CompositionMappingMode.Absolute;
         _highlightShape = _compositor.CreateSpriteShape(_highlightGeometry);
@@ -408,6 +435,21 @@ internal sealed class SlidingSelectionController
         var inner = Math.Max(0, radius - 0.5f);
         _highlightGeometry.CornerRadius = new Vector2(inner, inner);
         UpdateHighlightStops();
+    }
+
+    private void UpdateOutline()
+    {
+        if (_outlineShape is null || _outlineBrush is null)
+        {
+            return;
+        }
+
+        var color = SelectionIndicatorRules.DrawsLightOutline(
+                SaSlidingSelection.GetLightOutlineBrush(_host) is not null, _host.ActualTheme == ElementTheme.Light, Accessibility.HighContrast)
+            ? SaSlidingSelection.Effective(SaSlidingSelection.GetLightOutlineBrush(_host))
+            : Color.FromArgb(0, 0, 0, 0);
+        _outlineBrush.Color = color;
+        _outlineShape.StrokeThickness = color.A == 0 ? 0 : 1;
     }
 
     private void UpdateHighlightStops()

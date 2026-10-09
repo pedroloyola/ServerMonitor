@@ -131,7 +131,7 @@
                     <!-- UI.11 H01: the ONE sliding selection indicator, behind the items, across every column. -->
                     <Border IsHitTestVisible="False" AutomationProperties.AccessibilityView="Raw" Grid.ColumnSpan="5"
                             primitives:SaSlidingSelection.IndicatorBrush="{ThemeResource SaSelectedBrush}"
-                            primitives:SaSlidingSelection.HighlightBrush="{ThemeResource SaGlassHighlightBrush}" />
+                            primitives:SaSlidingSelection.HighlightBrush="{ThemeResource SaGlassHighlightBrush}" primitives:SaSlidingSelection.LightOutlineBrush="{ThemeResource SaDialogButtonBorderBrush}" />
                     <RadioButton x:Uid="HistoryRangeLastHour" Grid.Column="0" GroupName="HistoryRange" MinWidth="74" Style="{StaticResource SaSegmentedRectCompactItemStyle}"
                                  IsChecked="{Binding SelectedRangeIndex, Mode=TwoWay, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=0}" />
                     <RadioButton x:Uid="HistoryRangeLast6Hours" Grid.Column="1" GroupName="HistoryRange" MinWidth="74" Style="{StaticResource SaSegmentedRectCompactItemStyle}"
