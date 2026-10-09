@@ -172,6 +172,26 @@ public sealed partial class Ui10PolishGuardTests
         Assert.Equal("0,12,0,0", Setter(styles["SaPageHeaderStatusTextStyle"], "Margin")); // 16 line on the 40 title line
     }
 
+    /// <summary>
+    /// F11 (H05): the compact footer row is never shorter than the toggle it hosts - no fixed Height, a MinHeight at least
+    /// the toggle template's switch area (52x34: hover/focus pill around the 44x26 track). A fixed 24 clipped it in 24/24
+    /// captures (Beacon UI.10A).
+    /// </summary>
+    [Fact]
+    public void CompactFooterRow_IsAtLeastTheToggleHeight()
+    {
+        var area = AppSourceTree.LoadXaml("Styles/Components/Sa.Forms.xaml").Descendants(Ns + "Grid")
+            .Single(grid => (string?)grid.Attribute(X + "Name") == "SwitchAreaGrid");
+        var toggle = double.Parse((string)area.Attribute("Height")!, CultureInfo.InvariantCulture);
+
+        var footer = AppSourceTree.LoadXaml("Controls/CompactShell.xaml").Descendants(Ns + "Grid")
+            .Single(grid => (string?)grid.Attribute(X + "Name") == "FooterRow");
+        Assert.Null(footer.Attribute("Height"));
+        Assert.True(double.Parse((string?)footer.Attribute("MinHeight") ?? "0", CultureInfo.InvariantCulture) >= toggle,
+            $"FooterRow MinHeight {(string?)footer.Attribute("MinHeight") ?? "-"} < the toggle's {toggle}");
+        Assert.Contains(footer.Descendants(Ns + "ToggleSwitch"), element => (string?)element.Attribute("Style") == "{StaticResource SaToggleSwitchStyle}");
+    }
+
     private static string? Setter(XElement style, string property) =>
         (string?)style.Elements(Ns + "Setter").FirstOrDefault(setter => (string?)setter.Attribute("Property") == property)?.Attribute("Value");
 

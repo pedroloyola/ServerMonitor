@@ -60,14 +60,16 @@ public sealed class Ui4FidelityContractTests
 
     // ---- overview ---------------------------------------------------------------------------------------------
 
-    /// <summary>B5: segments right after the text — Auto · Auto · spacer 75 · Auto(bar), the bar left-aligned in column 3.</summary>
+    /// <summary>B5: segments after the text — Auto · Auto · spacer · Auto(bar), the bar left-aligned in column 3. UI.10 F05
+    /// (H02, Figma 112:1017 Fill): the spacer takes the free width (min 75), so the bar ends at the card's right padding.</summary>
     [Fact]
-    public void HealthCountRow_PutsTheBarAfterTheTextBehindA75Spacer()
+    public void HealthCountRow_PutsTheBarAfterTheTextBehindAFillSpacer()
     {
         var elements = Elements(Overview);
         var row = Assert.Single(elements, e => Name(e) == "HealthCountRow");
         var columns = row.Descendants().Where(e => e.Name.LocalName == "ColumnDefinition").Select(c => Attr(c, "Width")).ToList();
-        Assert.Equal(["Auto", "Auto", "75", "Auto"], columns);
+        Assert.Equal(["Auto", "Auto", "*", "Auto"], columns);
+        Assert.Equal("75", Attr(row.Descendants().Single(c => Name(c) == "HealthSpacerColumn"), "MinWidth"));
 
         var bar = Assert.Single(elements, e => Name(e) == "HealthSegments");
         Assert.Equal("3", Attr(bar, "Grid.Column"));

@@ -373,12 +373,14 @@
                                              VerticalAlignment="Center" Fill="{ThemeResource SaHealthLabelDotBrush}" />
                                     <TextBlock x:Uid="OverviewHealthLabel" Style="{StaticResource SaPageSubtitleTextStyle}" VerticalAlignment="Center" />
                                 </StackPanel>
-                                <!-- 112:1014: "4" + 8 + "de 6 saudáveis" + 8 + spacer 75 + 8 + the 213 bar, left-aligned (B5). -->
+                                <!-- 112:1014: "4" + 8 + "de 6 saudáveis" + 8 + spacer + 8 + the 213 bar (B5). UI.10 F05 (H02, Figma 112:1017
+                                     Fill): the spacer takes the free width, so the bar ends at the card's right padding instead of
+                                     leaving a band there; the bar keeps its data-computed 213 (segment widths are the VM's). -->
                                 <Grid x:Name="HealthCountRow" MinHeight="47" ColumnSpacing="{StaticResource SaSpace8}">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition x:Name="HealthSpacerColumn" Width="75" />
+                                        <ColumnDefinition x:Name="HealthSpacerColumn" Width="*" MinWidth="75" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <Grid.RowDefinitions>
@@ -438,10 +440,11 @@
                                     <TextBlock VerticalAlignment="Center" Text="{x:Bind ViewModel.PriorityTitle, Mode=OneWay}"
                                                Style="{x:Bind ViewModel.PrioritySeverity, Mode=OneWay, Converter={StaticResource PriorityTitleStyleConverter}}" />
                                 </StackPanel>
+                                <!-- UI.10 F05 (Figma 112:1040 Fill): the capacity bar runs to the chevron column (no 186 cap). -->
                                 <Grid ColumnSpacing="10">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="*" MaxWidth="186" />
+                                        <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
                                     <TextBlock FontFamily="{StaticResource SaFontDisplay}" FontSize="{StaticResource SaFontSizePageTitle}"
                                                FontWeight="Light" LineHeight="{StaticResource SaLineHeightPageTitle}"
