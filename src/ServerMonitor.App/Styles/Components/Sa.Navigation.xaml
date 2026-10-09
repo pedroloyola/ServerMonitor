@@ -25,6 +25,9 @@
         <Setter Property="FocusVisualPrimaryBrush" Value="{ThemeResource SaFocusRingBrush}" />
         <Setter Property="FocusVisualPrimaryThickness" Value="{StaticResource SaFocusRingThickness}" />
         <Setter Property="FocusVisualSecondaryThickness" Value="0" />
+        <!-- UI.10 F01 (H01): the keyboard ring stands 3 px outside the pill on every side, concentric (Figma Nav item
+             Focus 235:243), like every Sa button - the inherited RadioButton default (-7,-3) made it 174x52 and off-centre. -->
+        <Setter Property="FocusVisualMargin" Value="-3" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="RadioButton">

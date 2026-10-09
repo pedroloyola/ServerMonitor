@@ -5,7 +5,7 @@
  <ScrollViewer x:Name="Scroller" HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" IsTabStop="False">
  <p:SaListHost x:Uid="ShellNavigationList" VerticalContentAlignment="Stretch">
  <Grid x:Name="NavGrid" Padding="{StaticResource SaSidebarPadding}" RowSpacing="12" p:SaGroupNavigation.Mode="FocusOnly">
- <Grid.RowDefinitions><RowDefinition Height="44"/><RowDefinition Height="46"/><RowDefinition Height="46"/><RowDefinition Height="46"/><RowDefinition Height="*"/><RowDefinition Height="44"/></Grid.RowDefinitions>
+ <Grid.RowDefinitions><RowDefinition Height="44"/><RowDefinition Height="46"/><RowDefinition Height="46"/><RowDefinition Height="46"/><RowDefinition Height="*"/><RowDefinition Height="46"/></Grid.RowDefinitions>
  <!-- 112:1360: 160x44, official symbol30 + gap6 + 16/22 brand. -->
  <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" x:Name="Brand"><p:SaBrandMark/><TextBlock x:Name="BrandText" Text="ServerAlyzer" Style="{StaticResource SaBrandTextStyle}" VerticalAlignment="Center"/></StackPanel>
  <!-- Figma 112:1392: 160x46 r23, icon20 + gap10; label area106. -->
@@ -26,8 +26,8 @@
    <Grid ColumnSpacing="10"><Grid.ColumnDefinitions><ColumnDefinition Width="20"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
    <p:SaIcon Data="{StaticResource SaIconClock01Data}" Size="20"/><TextBlock x:Name="HistoryLabel" x:Uid="ShellHistoryLabel" Grid.Column="1" MaxWidth="106" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/></Grid>
  </RadioButton>
- <!-- Figma 112:1414: 160x44 r23, icon20 + gap10; label area106. -->
- <RadioButton x:Name="SettingsItem" x:Uid="ShellSettings" Grid.Row="5" GroupName="ShellDestinations" Style="{StaticResource SaNavItemStyle}" Height="44"
+ <!-- Figma 112:1414: 160x46 r23 (UI.10 F02: 44 -> 46, the geometry of every selectable item), icon20 + gap10; label area106. -->
+ <RadioButton x:Name="SettingsItem" x:Uid="ShellSettings" Grid.Row="5" GroupName="ShellDestinations" Style="{StaticResource SaNavItemStyle}" Height="46"
    Tag="Settings" Click="OnItemClick" KeyDown="OnItemKeyDown" AutomationProperties.PositionInSet="4" AutomationProperties.SizeOfSet="4">
    <Grid ColumnSpacing="10"><Grid.ColumnDefinitions><ColumnDefinition Width="20"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
    <p:SaIcon Data="{StaticResource SaIconSettings01Data}" Size="20"/><TextBlock x:Name="SettingsLabel" x:Uid="ShellSettingsLabel" Grid.Column="1" MaxWidth="106" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/></Grid>

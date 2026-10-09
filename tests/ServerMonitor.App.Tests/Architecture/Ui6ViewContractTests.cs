@@ -50,7 +50,7 @@ public sealed class Ui6ViewContractTests
             Assert.Equal("OnItemKeyDown", A(items[i],"KeyDown"));
             Assert.Equal((i+1).ToString(),A(items[i],"AutomationProperties.PositionInSet"));
             Assert.Equal("4",A(items[i],"AutomationProperties.SizeOfSet"));
-            Assert.Equal(i==3?"44":"46",A(items[i],"Height"));
+            Assert.Equal("46",A(items[i],"Height")); // UI.10 F02: Definições 44 -> 46, one geometry for every item
             Assert.Equal("{StaticResource SaNavItemStyle}",A(items[i],"Style"));
         }
         Assert.Equal("FocusOnly",A(Named(doc,"NavGrid"),XName.Get("SaGroupNavigation.Mode","using:ServerMonitor.App.Controls.Primitives")));
