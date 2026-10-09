@@ -68,15 +68,19 @@ public sealed class ComponentR1GuardTests
         Assert.Equal("1", thickness["HighContrast"]);
     }
 
-    /// <summary>Cortex R-3: Off-active is never GrayText (disabled-only) in HC; On = Highlight in HC, the state colour otherwise.</summary>
+    /// <summary>Cortex R-3: Off-active is never GrayText (disabled-only) in HC; On = Highlight in HC. UI.10 F26: On is the
+    /// neutral primary (track + inverted thumb) in Dark/Light, no longer the healthy colour.</summary>
     [Fact]
     public void ToggleTracksUseStateColoursAndNeverGrayTextWhenEnabled()
     {
         var brushes = ThemeEntries("Styles/Tokens/Color.Semantic.xaml", "Color");
         Assert.Equal("{ThemeResource SystemColorWindowTextColor}", brushes["HighContrast"]["SaToggleOffTrackBrush"]);
         Assert.Equal("{ThemeResource SystemColorHighlightColor}", brushes["HighContrast"]["SaToggleOnTrackBrush"]);
-        Assert.Equal("{StaticResource SaColorHealthyDark}", brushes["Dark"]["SaToggleOnTrackBrush"]);
-        Assert.Equal("{StaticResource SaColorHealthyLight}", brushes["Light"]["SaToggleOnTrackBrush"]);
+        Assert.Equal("{StaticResource SaColorToggleOnTrackDark}", brushes["Dark"]["SaToggleOnTrackBrush"]);
+        Assert.Equal("{StaticResource SaColorToggleOnTrackLight}", brushes["Light"]["SaToggleOnTrackBrush"]);
+        Assert.Equal("{StaticResource SaColorToggleOnThumbDark}", brushes["Dark"]["SaToggleOnThumbBrush"]);
+        Assert.Equal("{StaticResource SaColorToggleOnThumbLight}", brushes["Light"]["SaToggleOnThumbBrush"]);
+        Assert.DoesNotContain(brushes.Values, theme => theme["SaToggleOnTrackBrush"].Contains("Healthy", StringComparison.Ordinal));
 
         var onTrack = AppSourceTree.LoadXaml("Styles/Components/Sa.Forms.xaml").Descendants()
             .Single(e => (string?)e.Attribute(AppSourceTree.Xaml + "Name") == "SwitchKnobBounds");
@@ -191,6 +195,31 @@ public sealed class ComponentR1GuardTests
         var failures = surfaces.Select(s => (s, Ratio: Contrast(track, s))).Where(r => r.Ratio < 3)
             .Select(r => $"track {track} on {r.s}: {r.Ratio:0.00}").ToList();
         var thumb = Contrast(colours[$"SaColorToggleThumb{theme}"], track);
+        if (thumb < 3)
+        {
+            failures.Add($"thumb on track {track}: {thumb:0.00}");
+        }
+
+        Assert.True(failures.Count == 0, string.Join(Environment.NewLine, failures));
+    }
+
+    /// <summary>
+    /// UI.10 F26 (WCAG 1.4.11): the neutral On track is >= 3:1 against every surface of its theme and its thumb is >= 3:1
+    /// against it - the state reads by luminance and thumb position, never by hue. Same glass extremes as the Off track.
+    /// </summary>
+    [Theory]
+    [InlineData("Dark", "#1F1F1F")]
+    [InlineData("Light", "#DEDEDE", "#EDEDED")]
+    public void ToggleOnTrackMeetsNonTextContrast(string theme, params string[] glass)
+    {
+        var colours = AppSourceTree.LoadXaml("Styles/Tokens/Color.Primitives.xaml").Root!.Elements()
+            .Where(e => e.Name.LocalName == "Color").ToDictionary(e => Key(e)!, e => e.Value.Trim(), StringComparer.Ordinal);
+        var track = colours[$"SaColorToggleOnTrack{theme}"];
+        var surfaces = new[] { "Canvas", "Surface", "Interior", "ModalSurface" }.Select(s => colours[$"SaColor{s}{theme}"]).Concat(glass);
+
+        var failures = surfaces.Select(s => (s, Ratio: Contrast(track, s))).Where(r => r.Ratio < 3)
+            .Select(r => $"track {track} on {r.s}: {r.Ratio:0.00}").ToList();
+        var thumb = Contrast(colours[$"SaColorToggleOnThumb{theme}"], track);
         if (thumb < 3)
         {
             failures.Add($"thumb on track {track}: {thumb:0.00}");

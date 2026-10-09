@@ -160,7 +160,8 @@ public sealed partial class XamlContractAndResourceGuardTests
         ["Styles/Components/Sa.Forms.xaml"] =
         [
             "RootGrid", "HoverOverlay", "FocusRing", "Shell", "Highlight", "StateOverlay", "ContentPresenter", "Box",
-            "CheckGlyph", "IndeterminateGlyph", "SwitchAreaGrid", "SwitchKnobBounds", "KnobTranslateTransform"
+            "CheckGlyph", "IndeterminateGlyph", "SwitchAreaGrid", "SwitchKnobBounds", "KnobTranslateTransform",
+            "SwitchKnobOff" // UI.10 F26: the On state re-colours the thumb (SaToggleOnThumbBrush)
         ],
         ["Styles/Components/Sa.Navigation.xaml"] = ["RootGrid", "Shell", "Highlight", "StateOverlay", "ContentPresenter"],
         // UI.2 R1 (Prism MF-3): the Sa ContentDialog template keeps the Fluent PART names - ContentDialog's own code resolves

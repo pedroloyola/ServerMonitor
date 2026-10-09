@@ -120,6 +120,13 @@
     <!-- toggle thumb 112:7956 / 112:8117 -->
     <Color x:Key="SaColorToggleThumbDark">#FCFCFC</Color>
     <Color x:Key="SaColorToggleThumbLight">#FCFCFC</Color>
+    <!-- UI.10 F26 (Prism UI.10B decision a; Figma Toggle 238:246): "on" is the NEUTRAL primary, not the healthy green - green
+         means health, a switch means "option active". D: light track + dark thumb; L: dark track + light thumb (inverted
+         luminance and the thumb position carry the state, never the hue; guard ToggleOnTrackMeetsNonTextContrast). -->
+    <Color x:Key="SaColorToggleOnTrackDark">#F5F5F5</Color>
+    <Color x:Key="SaColorToggleOnThumbDark">#242424</Color>
+    <Color x:Key="SaColorToggleOnTrackLight">#202020</Color>
+    <Color x:Key="SaColorToggleOnThumbLight">#F7F7F7</Color>
     <!-- skeleton = Manual secondary text @ .14, 112:15602 / 112:15726 -->
     <Color x:Key="SaColorSkeletonDark">#24ADADAD</Color>
     <Color x:Key="SaColorSkeletonLight">#24626262</Color>
