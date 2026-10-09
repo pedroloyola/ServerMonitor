@@ -448,7 +448,7 @@
   <data name="BackupExcludedEntriesWarning" xml:space="preserve"><value>Entradas de servidor ilegíveis, não incluídas: {0}</value></data>
   <data name="BackupExcludedTrustNote" xml:space="preserve"><value>Chaves de anfitrião confiáveis não usadas por nenhum servidor, não incluídas: {0}</value></data>
   <data name="BackupFailedTitle" xml:space="preserve"><value>Cópia de segurança não criada</value></data>
-  <data name="BackupFailedWrite" xml:space="preserve"><value>Não foi possível gravar o ficheiro nesse local. Escolhe outra pasta e tenta novamente.</value></data>
+  <data name="BackupFailedWrite" xml:space="preserve"><value>Não foi possível guardar o ficheiro nesse local. Escolhe outra pasta e tenta novamente.</value></data>
   <data name="BackupFailedCredentialStore" xml:space="preserve"><value>Não foi possível ler as palavras-passe guardadas no Gestor de Credenciais do Windows. Nada foi guardado.</value></data>
   <data name="BackupFailedTrustStore" xml:space="preserve"><value>Não foi possível ler o ficheiro de chaves de anfitrião confiáveis. Nada foi guardado.</value></data>
   <data name="BackupFailedTooLarge" xml:space="preserve"><value>A tua configuração é demasiado grande para a cópia de segurança.</value></data>
@@ -686,7 +686,7 @@
   <data name="ServersHiddenNote.Text" xml:space="preserve"><value>Os servidores ocultos podem ser mostrados de novo nas Definições.</value></data>
   <!-- UI.4 phase 2 (views, Prism r1 copy). -->
   <data name="OverviewTitle.Text" xml:space="preserve"><value>Visão geral</value></data>
-  <data name="OverviewRefreshButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Atualizar tudo</value></data>
+  <data name="OverviewRefreshButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Atualizar todos</value></data>
   <data name="OverviewRefreshButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Atualizar</value></data>
   <data name="OverviewAddButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Adicionar servidor</value></data>
   <data name="OverviewAddText.Text" xml:space="preserve"><value>Adicionar</value></data>
@@ -944,7 +944,7 @@ as métricas e o histórico do servidor.</value></data>
   <data name="ServerEditorJumpHostDescription.Text" xml:space="preserve"><value>Usa um servidor intermédio para chegar a redes que não aceitam uma ligação SSH direta.</value></data>
   <data name="ServerEditorJumpHostKind.Text" xml:space="preserve"><value>ProxyJump / bastion</value></data>
   <data name="ServerEditorJumpHostTitle.Text" xml:space="preserve"><value>Jump host</value></data>
-  <data name="ServerEditorJumpHostSubtitle.Text" xml:space="preserve"><value>Credenciais próprias do servidor intermédio.</value></data>
+  <data name="ServerEditorJumpHostSubtitle.Text" xml:space="preserve"><value>Credenciais próprias do jump host.</value></data>
   <data name="ServerEditorJumpHostField.Header" xml:space="preserve"><value>Jump host</value></data>
   <data name="ServerEditorJumpHostInput.PlaceholderText" xml:space="preserve"><value>Ex.: bastion.example.com</value></data>
   <data name="ServerEditorJumpUsernameField.Header" xml:space="preserve"><value>Utilizador SSH</value></data>
@@ -995,10 +995,10 @@ as métricas e o histórico do servidor.</value></data>
   <data name="ServerEditorTrustJumpChangedTitle" xml:space="preserve"><value>A chave do jump host mudou</value></data>
   <data name="ServerEditorTrustTargetChangedTitle" xml:space="preserve"><value>A chave do servidor mudou</value></data>
   <data name="ServerEditorTrustUnknownBody" xml:space="preserve"><value>É a primeira ligação a este endereço. Compara a impressão digital com a fornecida pelo administrador antes de confiar.</value></data>
-  <data name="ServerEditorTrustJumpBody" xml:space="preserve"><value>Esta é a identidade do servidor intermédio. Compara a impressão digital com a fornecida pelo administrador antes de confiar.</value></data>
+  <data name="ServerEditorTrustJumpBody" xml:space="preserve"><value>Esta é a identidade do jump host. Compara a impressão digital com a fornecida pelo administrador antes de confiar.</value></data>
   <data name="ServerEditorTrustTargetBody" xml:space="preserve"><value>Esta é a identidade do servidor final. É independente da chave do jump host; confirma também esta impressão digital.</value></data>
   <data name="ServerEditorTrustMismatchBody" xml:space="preserve"><value>A chave recebida é diferente da guardada. A ligação foi bloqueada. Confirma a alteração com o administrador do servidor.</value></data>
-  <data name="ServerEditorTrustJumpChangedBody" xml:space="preserve"><value>A ligação foi bloqueada: a identidade do servidor intermédio mudou. Confirma a nova chave com o administrador do jump host.</value></data>
+  <data name="ServerEditorTrustJumpChangedBody" xml:space="preserve"><value>A ligação foi bloqueada: a identidade do jump host mudou. Confirma a nova chave com o administrador do jump host.</value></data>
   <data name="ServerEditorTrustTargetChangedBody" xml:space="preserve"><value>A ligação foi bloqueada: a identidade do servidor final mudou. Confirma a nova chave com o administrador do servidor.</value></data>
   <data name="ServerEditorTrustUnknownScope" xml:space="preserve"><value>Ao confiar, esta identidade fica guardada neste dispositivo.</value></data>
   <data name="ServerEditorTrustJumpScope" xml:space="preserve"><value>A confiança fica guardada apenas para este jump host.</value></data>

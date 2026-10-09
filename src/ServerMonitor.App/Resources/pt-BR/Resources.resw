@@ -691,7 +691,7 @@
   <data name="ServersHiddenNote.Text" xml:space="preserve"><value>Os servidores ocultos podem ser exibidos novamente nas Configurações.</value></data>
   <!-- UI.4 phase 2 (views, Prism r1 copy). -->
   <data name="OverviewTitle.Text" xml:space="preserve"><value>Visão geral</value></data>
-  <data name="OverviewRefreshButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Atualizar tudo</value></data>
+  <data name="OverviewRefreshButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Atualizar todos</value></data>
   <data name="OverviewRefreshButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Atualizar</value></data>
   <data name="OverviewAddButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Adicionar servidor</value></data>
   <data name="OverviewAddText.Text" xml:space="preserve"><value>Adicionar</value></data>
@@ -896,7 +896,7 @@ as métricas e o histórico do servidor.</value></data>
   <data name="ServerEditorAddSubtitle" xml:space="preserve"><value>Conecte um servidor Linux ou macOS por SSH.</value></data>
   <data name="ServerEditorEditTitle" xml:space="preserve"><value>Editar servidor</value></data>
   <data name="ServerEditorEditSubtitleFormat" xml:space="preserve"><value>Atualize os dados de conexão de {0}.</value></data>
-  <data name="ServerEditorImportButton" xml:space="preserve"><value>Importar do SSH</value></data>
+  <data name="ServerEditorImportButton" xml:space="preserve"><value>Importar de SSH</value></data>
   <data name="ServerEditorBackToDetailButton" xml:space="preserve"><value>Voltar ao detalhe</value></data>
   <data name="ServerEditorAddButton" xml:space="preserve"><value>Adicionar servidor</value></data>
   <data name="ServerEditorSaveButton" xml:space="preserve"><value>Salvar alterações</value></data>
@@ -949,7 +949,7 @@ as métricas e o histórico do servidor.</value></data>
   <data name="ServerEditorJumpHostDescription.Text" xml:space="preserve"><value>Use um servidor intermediário para alcançar redes que não aceitam uma conexão SSH direta.</value></data>
   <data name="ServerEditorJumpHostKind.Text" xml:space="preserve"><value>ProxyJump / bastion</value></data>
   <data name="ServerEditorJumpHostTitle.Text" xml:space="preserve"><value>Jump host</value></data>
-  <data name="ServerEditorJumpHostSubtitle.Text" xml:space="preserve"><value>Credenciais próprias do servidor intermediário.</value></data>
+  <data name="ServerEditorJumpHostSubtitle.Text" xml:space="preserve"><value>Credenciais próprias do jump host.</value></data>
   <data name="ServerEditorJumpHostField.Header" xml:space="preserve"><value>Jump host</value></data>
   <data name="ServerEditorJumpHostInput.PlaceholderText" xml:space="preserve"><value>Ex.: bastion.example.com</value></data>
   <data name="ServerEditorJumpUsernameField.Header" xml:space="preserve"><value>Usuário SSH</value></data>
@@ -1000,10 +1000,10 @@ as métricas e o histórico do servidor.</value></data>
   <data name="ServerEditorTrustJumpChangedTitle" xml:space="preserve"><value>A chave do jump host mudou</value></data>
   <data name="ServerEditorTrustTargetChangedTitle" xml:space="preserve"><value>A chave do servidor mudou</value></data>
   <data name="ServerEditorTrustUnknownBody" xml:space="preserve"><value>É a primeira conexão a este endereço. Compare a impressão digital com a fornecida pelo administrador antes de confiar.</value></data>
-  <data name="ServerEditorTrustJumpBody" xml:space="preserve"><value>Esta é a identidade do servidor intermediário. Compare a impressão digital com a fornecida pelo administrador antes de confiar.</value></data>
+  <data name="ServerEditorTrustJumpBody" xml:space="preserve"><value>Esta é a identidade do jump host. Compare a impressão digital com a fornecida pelo administrador antes de confiar.</value></data>
   <data name="ServerEditorTrustTargetBody" xml:space="preserve"><value>Esta é a identidade do servidor final. É independente da chave do jump host; confirme também esta impressão digital.</value></data>
   <data name="ServerEditorTrustMismatchBody" xml:space="preserve"><value>A chave recebida é diferente da salva. A conexão foi bloqueada. Confirme a alteração com o administrador do servidor.</value></data>
-  <data name="ServerEditorTrustJumpChangedBody" xml:space="preserve"><value>A conexão foi bloqueada: a identidade do servidor intermediário mudou. Confirme a nova chave com o administrador do jump host.</value></data>
+  <data name="ServerEditorTrustJumpChangedBody" xml:space="preserve"><value>A conexão foi bloqueada: a identidade do jump host mudou. Confirme a nova chave com o administrador do jump host.</value></data>
   <data name="ServerEditorTrustTargetChangedBody" xml:space="preserve"><value>A conexão foi bloqueada: a identidade do servidor final mudou. Confirme a nova chave com o administrador do servidor.</value></data>
   <data name="ServerEditorTrustUnknownScope" xml:space="preserve"><value>Ao confiar, esta identidade fica salva neste dispositivo.</value></data>
   <data name="ServerEditorTrustJumpScope" xml:space="preserve"><value>A confiança fica salva apenas para este jump host.</value></data>
@@ -1038,7 +1038,7 @@ as métricas e o histórico do servidor.</value></data>
   <data name="ServerEditorImportNotFoundTitle" xml:space="preserve"><value>Não encontramos a configuração SSH</value></data>
   <data name="ServerEditorImportErrorTitle" xml:space="preserve"><value>Não foi possível ler a configuração SSH</value></data>
   <data name="ServerEditorImportNoHostsTitle" xml:space="preserve"><value>Nenhum perfil encontrado</value></data>
-  <data name="ServerEditorImportTitleText.Text" xml:space="preserve"><value>Importar do SSH</value></data>
+  <data name="ServerEditorImportTitleText.Text" xml:space="preserve"><value>Importar de SSH</value></data>
   <data name="ServerEditorImportCancelButton.Content" xml:space="preserve"><value>Cancelar</value></data>
   <data name="ServerEditorImportUseButton.Content" xml:space="preserve"><value>Usar perfil</value></data>
   <data name="ServerEditorErrorNameRequired" xml:space="preserve"><value>Digite um nome para identificar o servidor.</value></data>

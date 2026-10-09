@@ -489,7 +489,7 @@
   <data name="RestoreRolledBackTitle" xml:space="preserve"><value>Restore failed</value></data>
   <data name="RestoreRolledBackMessage" xml:space="preserve"><value>Something went wrong while restoring, and every change was undone. Your configuration is exactly as it was.</value></data>
   <data name="RestorePartialPendingMessage" xml:space="preserve"><value>The restore failed and couldn't be fully undone yet. Close and reopen ServerAlyzer to finish undoing it.</value></data>
-  <data name="RestoreCanceled" xml:space="preserve"><value>Restore canceled. Nothing was changed.</value></data>
+  <data name="RestoreCanceled" xml:space="preserve"><value>Restore cancelled. Nothing was changed.</value></data>
   <data name="RestoreBusy" xml:space="preserve"><value>ServerAlyzer is busy saving changes. Try again in a moment. Nothing was changed.</value></data>
   <data name="ConfigurationLocked" xml:space="preserve"><value>A restore is in progress. Changes can't be saved until ServerAlyzer restarts.</value></data>
   <data name="RestoreRecoveredUndone" xml:space="preserve"><value>A restore was interrupted and has been undone. Your configuration is as it was before.</value></data>
@@ -747,7 +747,7 @@
   <data name="SettingsDataBackButton.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Back</value></data>
   <data name="ServerDetailRefreshButtonText.Text" xml:space="preserve"><value>Refresh</value></data>
   <data name="ServerDetailEditButton.Content" xml:space="preserve"><value>Edit</value></data>
-  <data name="ServerDetailCpuCaption.Text" xml:space="preserve"><value>Processor usage</value></data>
+  <data name="ServerDetailCpuCaption.Text" xml:space="preserve"><value>CPU usage</value></data>
   <data name="ServerDetailMetricAccessibleFormat" xml:space="preserve"><value>{0}: {1}</value></data>
   <data name="ServerDetailBytesOfFormat" xml:space="preserve"><value>{0} of {1}</value></data>
   <data name="ServerDetailUptimeLabel.Text" xml:space="preserve"><value>Uptime</value></data>
@@ -944,7 +944,7 @@ status, metrics and history.</value></data>
   <data name="ServerEditorJumpHostDescription.Text" xml:space="preserve"><value>Use an intermediate server to reach networks that don't accept a direct SSH connection.</value></data>
   <data name="ServerEditorJumpHostKind.Text" xml:space="preserve"><value>ProxyJump / bastion</value></data>
   <data name="ServerEditorJumpHostTitle.Text" xml:space="preserve"><value>Jump host</value></data>
-  <data name="ServerEditorJumpHostSubtitle.Text" xml:space="preserve"><value>The intermediate server's own credentials.</value></data>
+  <data name="ServerEditorJumpHostSubtitle.Text" xml:space="preserve"><value>The jump host's own credentials.</value></data>
   <data name="ServerEditorJumpHostField.Header" xml:space="preserve"><value>Jump host</value></data>
   <data name="ServerEditorJumpHostInput.PlaceholderText" xml:space="preserve"><value>e.g. bastion.example.com</value></data>
   <data name="ServerEditorJumpUsernameField.Header" xml:space="preserve"><value>SSH user</value></data>
@@ -995,10 +995,10 @@ status, metrics and history.</value></data>
   <data name="ServerEditorTrustJumpChangedTitle" xml:space="preserve"><value>The jump host's key changed</value></data>
   <data name="ServerEditorTrustTargetChangedTitle" xml:space="preserve"><value>The server's key changed</value></data>
   <data name="ServerEditorTrustUnknownBody" xml:space="preserve"><value>This is the first connection to this address. Compare the fingerprint with the one your administrator gave you before trusting it.</value></data>
-  <data name="ServerEditorTrustJumpBody" xml:space="preserve"><value>This is the intermediate server's identity. Compare the fingerprint with the one your administrator gave you before trusting it.</value></data>
+  <data name="ServerEditorTrustJumpBody" xml:space="preserve"><value>This is the jump host's identity. Compare the fingerprint with the one your administrator gave you before trusting it.</value></data>
   <data name="ServerEditorTrustTargetBody" xml:space="preserve"><value>This is the final server's identity. It is independent of the jump host's key; confirm this fingerprint too.</value></data>
   <data name="ServerEditorTrustMismatchBody" xml:space="preserve"><value>The key received differs from the saved one. The connection was blocked. Confirm the change with the server's administrator.</value></data>
-  <data name="ServerEditorTrustJumpChangedBody" xml:space="preserve"><value>The connection was blocked: the intermediate server's identity changed. Confirm the new key with the jump host's administrator.</value></data>
+  <data name="ServerEditorTrustJumpChangedBody" xml:space="preserve"><value>The connection was blocked: the jump host's identity changed. Confirm the new key with the jump host's administrator.</value></data>
   <data name="ServerEditorTrustTargetChangedBody" xml:space="preserve"><value>The connection was blocked: the final server's identity changed. Confirm the new key with the server's administrator.</value></data>
   <data name="ServerEditorTrustUnknownScope" xml:space="preserve"><value>Once trusted, this identity is saved on this device.</value></data>
   <data name="ServerEditorTrustJumpScope" xml:space="preserve"><value>The trust is saved for this jump host only.</value></data>
