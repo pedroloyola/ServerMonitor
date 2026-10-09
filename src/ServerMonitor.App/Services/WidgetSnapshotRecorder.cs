@@ -224,6 +224,21 @@ public sealed class WidgetSnapshotRecorder : IMonitoringCycleObserver, IAsyncDis
         _lastWriteTimestamp is not { } last ||
         _timeProvider.GetElapsedTime(last) >= _minWriteInterval;
 
+    /// <summary>
+    /// Test seam (App.Tests via InternalsVisibleTo): the current single-writer drain, read under
+    /// <c>_gate</c>. Awaiting it is an exact quiescence barrier. Read-only; no behaviour depends on it.
+    /// </summary>
+    internal Task DrainForTesting
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _drain;
+            }
+        }
+    }
+
     private async Task DrainAsync(CancellationToken cancellationToken)
     {
         try

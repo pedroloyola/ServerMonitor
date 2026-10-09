@@ -555,16 +555,11 @@ public sealed class WidgetSnapshotRecorderTests
     /// Awaits the recorder's current single-writer drain: an exact quiescence barrier (the drain has taken its
     /// final decision and returned), never a timing guess. <see cref="WidgetSnapshotRecorder.DisposeAsync"/> is
     /// not usable for this because it cancels first, which could hide a write the drain was about to make.
-    /// Reads the private field (test-only); a rename fails loudly here, never silently.
+    /// The drain is read right after a synchronous trigger on this thread, so it is the drain that consumes
+    /// that trigger. A plain await, no timeout bound (Atlas P2): a regression hangs until the runner's own
+    /// limit, it never passes.
     /// </summary>
-    private static async Task WaitForIdleAsync(WidgetSnapshotRecorder recorder)
-    {
-        var field = typeof(WidgetSnapshotRecorder).GetField("_drain",
-            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
-        Assert.NotNull(field);
-        var drain = Assert.IsAssignableFrom<Task>(field.GetValue(recorder));
-        await drain.WaitAsync(SafetyNet);
-    }
+    private static Task WaitForIdleAsync(WidgetSnapshotRecorder recorder) => recorder.DrainForTesting;
 
     [Fact]
     public async Task A_due_cycle_coalesced_into_a_forced_write_anchors_the_throttle()
@@ -590,7 +585,7 @@ public sealed class WidgetSnapshotRecorderTests
         };
 
         h.Recorder.Start();
-        Assert.True(await entered.WaitAsync(SafetyNet));                    // startup-only pass is held
+        await entered.WaitAsync();                                          // startup-only pass is held
         h.Recorder.OnCycleCompleted(Completion(MonitoringOutcome.Success)); // first cycle: due
         h.Servers.RaiseChanged();                                           // forced, same pending pass
         release.SetResult();
@@ -616,10 +611,7 @@ public sealed class WidgetSnapshotRecorderTests
         // in both orderings rather than depending on scheduling.
         await using var h = new Harness();
         h.AddServer("Home", ServerHealth.Healthy);
-        var entered = SignalGetAll(h);
-
         h.Recorder.Start();
-        Assert.True(await entered.WaitAsync(SafetyNet));
         await WaitForIdleAsync(h.Recorder);                                 // startup decided, no write
         Assert.Equal(0, h.Writer.StartedCount);
 
