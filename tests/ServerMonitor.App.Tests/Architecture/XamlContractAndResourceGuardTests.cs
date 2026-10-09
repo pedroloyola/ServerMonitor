@@ -161,7 +161,8 @@ public sealed partial class XamlContractAndResourceGuardTests
         ["Styles/Components/Sa.Buttons.xaml"] = ["RootGrid", "StateOverlay", "ContentPresenter", "Underline", "FocusUnderline"],
         ["Styles/Components/Sa.Forms.xaml"] =
         [
-            "RootGrid", "HoverOverlay", "FocusRing", "Shell", "Highlight", "StateOverlay", "ContentPresenter", "Box",
+            // UI.11 H01: the segmented items' "Highlight" left with their selection fill (the sliding indicator draws it).
+            "RootGrid", "HoverOverlay", "FocusRing", "Shell", "StateOverlay", "ContentPresenter", "Box",
             "CheckGlyph", "IndeterminateGlyph", "SwitchAreaGrid", "SwitchKnobBounds", "KnobTranslateTransform",
             "SwitchKnobOff" // UI.10 F26: the On state re-colours the thumb (SaToggleOnThumbBrush)
         ],

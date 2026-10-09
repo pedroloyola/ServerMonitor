@@ -15,6 +15,7 @@
         <ResourceDictionary Source="ms-appx:///Styles/Tokens/Spacing.xaml" />
         <ResourceDictionary Source="ms-appx:///Styles/Components/Sa.Icons.xaml" />
         <ResourceDictionary Source="ms-appx:///Styles/Components/Sa.Surfaces.xaml" />
+        <ResourceDictionary Source="ms-appx:///Styles/Tokens/Motion.xaml" />
     </ResourceDictionary.MergedDictionaries>
 
     <!-- Pill radii are h/2 literals (Figma): a radius above h/2 (SaRadiusPill 99) renders ELLIPTICAL in WinUI. -->
@@ -706,17 +707,15 @@
                                 <VisualState x:Name="Indeterminate" />
                                 <VisualState x:Name="Checked">
                                     <VisualState.Setters>
-                                        <Setter Target="Shell.Background" Value="{ThemeResource SaSelectedBrush}" />
+                                        <!-- UI.11 H01: the fill + top highlight are painted by the track's ONE sliding indicator
+                                             (SaSlidingSelection, same brushes and radius), never by the item: text only here. -->
                                         <Setter Target="ContentPresenter.Foreground" Value="{ThemeResource SaSelectedTextBrush}" />
                                         <Setter Target="ContentPresenter.FontWeight" Value="Medium" />
-                            <Setter Target="Highlight.Opacity" Value="1" />
                                     </VisualState.Setters>
                                 </VisualState>
                             </VisualStateGroup>
                         </VisualStateManager.VisualStateGroups>
                         <Border x:Name="Shell" Background="{TemplateBinding Background}" CornerRadius="{TemplateBinding CornerRadius}" />
-            <Border x:Name="Highlight" Opacity="0" CornerRadius="{TemplateBinding CornerRadius}" BorderThickness="0,1,0,0"
-                    BorderBrush="{ThemeResource SaGlassHighlightBrush}" IsHitTestVisible="False" />
                         <Border x:Name="StateOverlay" CornerRadius="{TemplateBinding CornerRadius}" IsHitTestVisible="False" />
                         <ContentPresenter x:Name="ContentPresenter"
                                           Padding="{TemplateBinding Padding}"
@@ -790,7 +789,7 @@
                                 <VisualState x:Name="Indeterminate" />
                                 <VisualState x:Name="Checked">
                                     <VisualState.Setters>
-                                        <Setter Target="Shell.Background" Value="{ThemeResource SaSegmentedPillSelectedBrush}" />
+                                        <!-- UI.11 H01: the selection fill (SaSegmentedPillSelectedBrush) is the track's sliding indicator. -->
                                         <Setter Target="ContentPresenter.Foreground" Value="{ThemeResource SaSelectedTextBrush}" />
                                         <Setter Target="ContentPresenter.FontWeight" Value="Medium" />
                                     </VisualState.Setters>
@@ -864,7 +863,7 @@
                                 <VisualState x:Name="Indeterminate" />
                                 <VisualState x:Name="Checked">
                                     <VisualState.Setters>
-                                        <Setter Target="Shell.Background" Value="{ThemeResource SaSegmentedThemeSelectedBrush}" />
+                                        <!-- UI.11 H01: the selection fill (SaSegmentedThemeSelectedBrush) is the track's sliding indicator. -->
                                         <Setter Target="ContentPresenter.Foreground" Value="{ThemeResource SaSelectedTextBrush}" />
                                         <Setter Target="ContentPresenter.FontWeight" Value="Medium" />
                                     </VisualState.Setters>
