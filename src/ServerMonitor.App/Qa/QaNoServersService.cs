@@ -10,9 +10,13 @@ namespace ServerMonitor.App.Qa;
 /// section beneath it — the layout where discovery must render without any added servers. Never
 /// persists; mutations are inert.
 /// </summary>
-internal sealed class QaNoServersService : IServerService
+internal sealed class QaNoServersService : IServerService, IServerLoadStatusSource
 {
     public event EventHandler? ServersChanged { add { } remove { } }
+
+    // UI10-A1: the shell graph (OnboardingViewModel) resolves IServerLoadStatusSource from this service. NotFound = an honest first-run empty fleet (no configuration), the state discovery is designed for.
+    public Task<ServerLoadStatus> GetLoadStatusAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(ServerLoadStatus.NotFound);
 
     public Task<IReadOnlyList<Server>> GetAllAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<Server>>([]);

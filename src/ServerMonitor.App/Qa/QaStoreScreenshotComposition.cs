@@ -105,13 +105,17 @@ internal static class QaStoreScreenshotComposition
     private sealed record Entry(Server Server, ServerMetricsSnapshot Snapshot, ServerMonitoringState State);
 
     // Read-only server list; no persistence, no mutation (matches the QA health harness contract).
-    private sealed class ScreenshotServerService : IServerService
+    private sealed class ScreenshotServerService : IServerService, IServerLoadStatusSource
     {
         private readonly IReadOnlyList<Server> _servers;
 
         public ScreenshotServerService(IReadOnlyList<Server> servers) => _servers = servers;
 
         public event EventHandler? ServersChanged { add { } remove { } }
+
+        // UI10-A1: the shell graph (OnboardingViewModel) resolves IServerLoadStatusSource from this service.
+        public Task<ServerLoadStatus> GetLoadStatusAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult(ServerLoadStatus.Loaded);
 
         public Task<IReadOnlyList<Server>> GetAllAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult(_servers);

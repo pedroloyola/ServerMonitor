@@ -5,7 +5,7 @@ using ServerMonitor.Core.Models;
 
 namespace ServerMonitor.App.Qa;
 
-internal sealed class QaNotificationServerService : IServerService
+internal sealed class QaNotificationServerService : IServerService, IServerLoadStatusSource
 {
     public static readonly Guid ServerId = Guid.Parse("c4abf07d-8a5c-469c-a7d2-62a06b35de58");
 
@@ -22,6 +22,10 @@ internal sealed class QaNotificationServerService : IServerService
     };
 
     public event EventHandler? ServersChanged { add { } remove { } }
+
+    // UI10-A1: the shell graph (OnboardingViewModel) resolves IServerLoadStatusSource from this service.
+    public Task<ServerLoadStatus> GetLoadStatusAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(ServerLoadStatus.Loaded);
 
     public Task<IReadOnlyList<Server>> GetAllAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<Server>>([QaServer]);
