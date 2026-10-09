@@ -46,8 +46,10 @@ public sealed partial class GeometryLiteralRatchetTests
         new Dictionary<(string Ledger, string Property), int>
         {
             // UI.8 (D-UI8-15): the legacy compact card, the old compact chrome and its toggle style are gone (17 -> 8, 18 -> 12).
-            [("GeometryLiteralBaseline.tsv", "CornerRadius")] = 8,
-            [("GeometryLiteralBaseline.tsv", "Padding")] = 12, // UI.7C (B-22): modal deleted + the form's checklist/prep paddings gone (7B: 26, 7A: 33)
+            // UI.10 F43: the unused legacy EmptyStateControl / DiscoveredServerCard and the legacy button + dialog styles of
+            // Styles/Controls.xaml are gone (8 -> 4, 12 -> 4).
+            [("GeometryLiteralBaseline.tsv", "CornerRadius")] = 4,
+            [("GeometryLiteralBaseline.tsv", "Padding")] = 4, // UI.7C (B-22): modal deleted + the form's checklist/prep paddings gone (7B: 26, 7A: 33)
             [("GeometryLiteralAllowlist.tsv", "CornerRadius")] = 0,
             [("GeometryLiteralAllowlist.tsv", "Padding")] = 50
         };

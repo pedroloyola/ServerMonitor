@@ -94,37 +94,18 @@ public sealed class BackupRestoreDialogService(IWindowContext windowContext) : I
         var dialog = new ContentDialog
         {
             Content = content,
-            Style = (Style)Application.Current.Resources["PremiumContentDialogStyle"]
+            // UI.10 F08: the Sa dialog shell, like every other dialog (pill buttons, no accent primary).
+            Style = (Style)Application.Current.Resources["SaDialogStyle"]
         };
         ConfigureDialog(dialog);
         return dialog;
     }
 
-    // Same sizing contract as ServerDialogService: PremiumContentDialogStyle stretches over the window.
+    // Same hosting contract as ServerDialogService (UI.10 F08): SaDialogStyle sizes its own panel (620-720) over the
+    // window's smoke, so only the root and the theme are set - the legacy full-window Width/Height stretch is gone.
     private void ConfigureDialog(ContentDialog dialog)
     {
         dialog.XamlRoot = windowContext.XamlRoot;
         dialog.RequestedTheme = windowContext.ActualTheme;
-
-        void UpdateBounds()
-        {
-            if (dialog.XamlRoot is not null)
-            {
-                dialog.Width = dialog.XamlRoot.Size.Width;
-                dialog.Height = dialog.XamlRoot.Size.Height;
-            }
-        }
-
-        UpdateBounds();
-
-        void OnRootChanged(XamlRoot sender, XamlRootChangedEventArgs args) => UpdateBounds();
-        dialog.XamlRoot.Changed += OnRootChanged;
-        dialog.Closed += (_, _) =>
-        {
-            if (dialog.XamlRoot is not null)
-            {
-                dialog.XamlRoot.Changed -= OnRootChanged;
-            }
-        };
     }
 }

@@ -20,12 +20,12 @@ public sealed partial class UiDebtRatchetTests
     /// any new folder). Files not listed have a baseline of zero. Total today: 74 (UI.3 removed HistoryPage 7 + WorkloadsPage 38; UI.4 DashboardPage 8; UI.5 ServerFullCard 21 + ServerActionsButton 1 + SettingsPage 20; UI.8 ServerCompactCard 15 + MainWindow 7).</summary>
     private static readonly IReadOnlyDictionary<string, int> FontSizeLiteralBaseline = new Dictionary<string, int>(StringComparer.Ordinal)
     {
-        ["Controls/DiscoveredServerCard.xaml"] = 5,
-        ["Controls/EmptyStateControl.xaml"] = 3,
+        // UI.10 F43: the unused EmptyStateControl / DiscoveredServerCard and the legacy button + dialog styles of
+        // Styles/Controls.xaml are gone (win locked: 5 + 3 + 5).
         // UI.7C (B-22): ServerEditorModal deleted; ServerFormControl's last inline panels (checklist, prep helper) moved to
         // the type ramp / the test dialog - 43 + 1 literals gone (win locked).
         // UI.8 (D-UI8-15): the legacy compact card (15) and the old compact chrome (MainWindow 7) are gone (win locked).
-        ["Styles/Controls.xaml"] = 7,
+        ["Styles/Controls.xaml"] = 2,
         ["Views/BackupCreateDialog.xaml"] = 3,
         ["Views/RestoreConfirmDialog.xaml"] = 3,
         ["Views/RestoreOpenDialog.xaml"] = 2
@@ -45,10 +45,9 @@ public sealed partial class UiDebtRatchetTests
     /// C# code (comments excluded). Files not listed have a baseline of zero.</summary>
     private static readonly IReadOnlyDictionary<string, int> LegacyAccentBaseline = new Dictionary<string, int>(StringComparer.Ordinal)
     {
-        ["Controls/EmptyStateControl.xaml"] = 3,
         // UI.7C (B-22): ServerFormControl's last legacy accent dependency is gone (win locked).
+        // UI.10 F43: EmptyStateControl (3) and the legacy accent buttons of Styles/Controls.xaml (4) are gone (win locked).
         // UI.8 (D-UI8-15): the legacy compact card (3) and the old compact chrome's accent tile (MainWindow 4) are gone.
-        ["Styles/Controls.xaml"] = 4,
         ["Styles/DesignTokens.xaml"] = 92
     };
 
