@@ -347,7 +347,8 @@ internal sealed class SlidingSelectionController
             return;
         }
 
-        _compositor = ElementCompositionPreview.GetElementVisual(_host).Compositor;
+        // Cortex R-6: the compositor without taking the host's handoff visual (it stays free for XAML Translation/Scale).
+        _compositor = CompositionTarget.GetCompositorForCurrentThread();
         _visual = _compositor.CreateShapeVisual();
         _visual.RelativeSizeAdjustment = Vector2.One;
         _visual.IsVisible = false;

@@ -174,4 +174,32 @@ public sealed class ReducedMotionSourceTests
             Assert.Equal(Math.Pow(1 - offset, 2), alpha, precision: 4);
         }
     }
+
+    private sealed class DisposableSource : IReducedMotionSource, IDisposable
+    {
+        public bool Disposed { get; private set; }
+
+        public bool IsReduced => false;
+
+        public event EventHandler? Changed { add { } remove { } }
+
+        public void Dispose() => Disposed = true;
+    }
+
+    /// <summary>Cortex R-4: installing a new source releases the one it replaces (never twice the same one).</summary>
+    [Fact]
+    public void Install_DisposesTheSourceItReplaces()
+    {
+        var first = new DisposableSource();
+        var second = new DisposableSource();
+
+        MotionPolicy.Install(first);
+        MotionPolicy.Install(first);
+        Assert.False(first.Disposed);
+        MotionPolicy.Install(second);
+
+        Assert.True(first.Disposed);
+        Assert.False(second.Disposed);
+        Assert.Same(second, MotionPolicy.Source);
+    }
 }

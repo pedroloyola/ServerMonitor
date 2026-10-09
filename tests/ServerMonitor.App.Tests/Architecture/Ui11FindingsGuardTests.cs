@@ -108,7 +108,7 @@ public sealed class Ui11FindingsGuardTests
     {
         var entering = AllElements().Where(x => (string?)x.Element.Attribute(Enter) == "Fade" && x.File.StartsWith("Views/", StringComparison.Ordinal)).ToList();
 
-        Assert.True(entering.Count >= 15, $"expected the state blocks of the five pages (found {entering.Count})");
+        Assert.True(entering.Count >= 13, $"expected the state blocks of the five pages (found {entering.Count}; P-1 removed the two search-driven ones)");
         foreach (var (file, element) in entering)
         {
             var visibility = (string?)element.Attribute("Visibility") ?? "";
@@ -169,5 +169,90 @@ public sealed class Ui11FindingsGuardTests
         Assert.DoesNotContain(".IsLoaded", code, StringComparison.Ordinal);
         Assert.DoesNotContain("_loaded", code, StringComparison.Ordinal);
         Assert.Contains("SaLiveTree.IsLive(", code, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Prism P-1: a content-enter never follows a state that a search or filter can toggle. Each Fade block's Visibility
+    /// property is resolved in its view model (expression-bodied bool properties expanded transitively) and must not depend
+    /// on a query, a filter, a "no results" state or the filtered row collection.
+    /// </summary>
+    [Fact]
+    public void F11_ContentEnter_NeverOnAStateThatASearchOrFilterCanToggle()
+    {
+        var models = AppSourceTree.Files(".cs").Where(f => f.StartsWith("ViewModels/", StringComparison.Ordinal))
+            .Select(AppSourceTree.CodeWithoutComments).ToList();
+        var checkedBindings = 0;
+        foreach (var (file, element) in AllElements().Where(x => (string?)x.Element.Attribute(Enter) == "Fade" && x.File.StartsWith("Views/", StringComparison.Ordinal)))
+        {
+            var visibility = (string?)element.Attribute("Visibility") ?? "";
+            var match = System.Text.RegularExpressions.Regex.Match(visibility, @"\{(?:x:Bind ViewModel\.|Binding )(\w+)");
+            Assert.True(match.Success, $"{file}: unrecognised Visibility binding {visibility}");
+            var expanded = Expand(match.Groups[1].Value, models, depth: 0);
+            checkedBindings++;
+            foreach (var token in new[] { "Query", "Filter", "Search", "NoResults", "_rows" })
+            {
+                Assert.False(expanded.Contains(token, StringComparison.Ordinal), $"{file}: {match.Groups[1].Value} depends on '{token}' -> {expanded}");
+            }
+        }
+
+        Assert.True(checkedBindings >= 13, $"expected the state blocks (found {checkedBindings})");
+    }
+
+    private static string Expand(string property, IReadOnlyList<string> models, int depth)
+    {
+        foreach (var code in models)
+        {
+            var m = System.Text.RegularExpressions.Regex.Match(code, @"public bool " + property + @"\s*=>\s*([^;]+);");
+            if (m.Success)
+            {
+                var body = m.Groups[1].Value;
+                if (depth >= 3)
+                {
+                    return body;
+                }
+
+                var nested = System.Text.RegularExpressions.Regex.Matches(body, @"\b([A-Z]\w+)\b").Select(x => x.Groups[1].Value).Distinct()
+                    .Select(name => Expand(name, models, depth + 1));
+                return body + " | " + string.Join(" | ", nested);
+            }
+        }
+
+        return property; // a stored property (field-backed): its own name only
+    }
+
+    /// <summary>Cortex R-1: the deferred dialog scale re-checks the gate and a reset that landed before it.</summary>
+    [Fact]
+    public void R1_TheDeferredDialogScale_ReChecksTheGateAndStaleness()
+    {
+        var code = AppSourceTree.CodeWithoutComments("Controls/Primitives/SaMotion.cs");
+
+        Assert.Contains("if (generation != _generation || MotionPolicy.IsReduced || !SaLiveTree.IsLive(_element))", code, StringComparison.Ordinal);
+        Assert.Contains("var generation = ++_generation;", code, StringComparison.Ordinal);
+        var reset = code[code.IndexOf("private void ResetVisual()", StringComparison.Ordinal)..];
+        Assert.Contains("_generation++;", reset, StringComparison.Ordinal);
+    }
+
+    /// <summary>Cortex R-2/R-3: the deferred page-entrance subscription respects a closed window; the Compact switch is a flag.</summary>
+    [Fact]
+    public void R2_R3_MainWindow_ClosedGuard_AndAnnouncedSwitchFlag()
+    {
+        var code = AppSourceTree.CodeWithoutComments("MainWindow.xaml.cs");
+        var loaded = code.IndexOf("private async void OnRootLayoutLoaded(", StringComparison.Ordinal);
+        var lambda = code[loaded..code.IndexOf("ApplyPageEntrance();", loaded, StringComparison.Ordinal)];
+
+        Assert.Contains("if (_closed)", lambda, StringComparison.Ordinal);
+        Assert.Contains("_closed = true;", code[code.IndexOf("private void OnWindowClosed(", StringComparison.Ordinal)..], StringComparison.Ordinal);
+        Assert.Contains("var switchedToCompact = mode == WindowMode.Compact && _compactSwitchAnnounced;", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("StandardRoot.Opacity == 0", code, StringComparison.Ordinal);
+    }
+
+    /// <summary>Cortex R-6: the indicator takes the thread's compositor, never the host's handoff visual.</summary>
+    [Fact]
+    public void R6_TheIndicator_DoesNotTakeTheHostsHandoffVisual()
+    {
+        var code = AppSourceTree.CodeWithoutComments("Controls/Primitives/SaSlidingSelection.cs");
+
+        Assert.DoesNotContain("GetElementVisual(_host)", code, StringComparison.Ordinal);
+        Assert.Contains("CompositionTarget.GetCompositorForCurrentThread()", code, StringComparison.Ordinal);
     }
 }

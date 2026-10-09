@@ -115,7 +115,12 @@ public sealed class Ui11CompactEntryTests
     {
         var code = AppSourceTree.CodeWithoutComments("MainWindow.xaml.cs");
 
-        Assert.Contains("private void OnWindowModeChanging(object? sender, WindowMode target) => StandardRoot.Opacity = 0;", code, StringComparison.Ordinal);
+        // C-3 (+ Cortex R-3): the subscriber records the announced switch and hides with ONE Opacity write - nothing else.
+        var changing = Body(code, "private void OnWindowModeChanging(");
+        Assert.Equal(
+            ["_compactSwitchAnnounced = true;", "StandardRoot.Opacity = 0;"],
+            changing.Trim('{', '}').Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Where(statement => statement.Length > 0).Select(statement => statement + ";"));
         var ended = Body(code, "private void OnWindowModeChangeEnded(");
         Assert.Contains("StandardRoot.Opacity = 1;", ended, StringComparison.Ordinal);
         var changed = Body(code, "private void OnWindowModeChanged(");

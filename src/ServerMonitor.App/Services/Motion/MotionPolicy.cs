@@ -18,7 +18,17 @@ public static class MotionPolicy
     public static bool IsReduced => Source.IsReduced;
 
     /// <summary>Installs the process source (once, on the UI thread, before any window).</summary>
-    public static void Install(IReducedMotionSource source) => _source = source ?? throw new ArgumentNullException(nameof(source));
+    public static void Install(IReducedMotionSource source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        // Cortex R-4: a replaced source releases its UISettings subscription (the gallery path installs its own).
+        if (!ReferenceEquals(_source, source))
+        {
+            (_source as IDisposable)?.Dispose();
+        }
+
+        _source = source;
+    }
 
     /// <summary>The real source bound to the calling (UI) thread's dispatcher.</summary>
     public static SystemReducedMotionSource CreateSystemSource(bool forceReduced)

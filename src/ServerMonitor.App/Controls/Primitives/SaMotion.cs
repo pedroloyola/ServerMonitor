@@ -132,6 +132,7 @@ public static class SaMotion
         private bool _hasVisual;
         private bool _translationEnabled;
         private bool _scaled;
+        private int _generation;
 
         public MotionState(FrameworkElement element)
         {
@@ -271,6 +272,7 @@ public static class SaMotion
         {
             var visual = ElementCompositionPreview.GetElementVisual(_element);
             _hasVisual = true;
+            var generation = ++_generation;
             var compositor = visual.Compositor;
             var resources = Application.Current.Resources;
             var enterDuration = MotionTokens.GetTime(resources, MotionTokens.EnterDuration);
@@ -303,6 +305,12 @@ public static class SaMotion
                 visual.Scale = new Vector3(1.05f, 1.05f, 1f);
                 _element.DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
                 {
+                    // Cortex R-1: a reset or Reduced Motion that landed before this callback wins - never scale after it.
+                    if (generation != _generation || MotionPolicy.IsReduced || !SaLiveTree.IsLive(_element))
+                    {
+                        return;
+                    }
+
                     visual.CenterPoint = new Vector3((float)_element.ActualWidth / 2, (float)_element.ActualHeight / 2, 0);
                     var scale = compositor.CreateVector3KeyFrameAnimation();
                     scale.InsertKeyFrame(0f, new Vector3(1.05f, 1.05f, 1f));
@@ -322,6 +330,7 @@ public static class SaMotion
                 return; // nothing of ours ever touched this element's visual
             }
 
+            _generation++; // a pending deferred step of an earlier Play is now stale
             var visual = ElementCompositionPreview.GetElementVisual(_element);
             visual.StopAnimation("Opacity");
             visual.Opacity = 1f;

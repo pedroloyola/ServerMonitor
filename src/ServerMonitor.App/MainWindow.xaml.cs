@@ -203,6 +203,12 @@ public sealed partial class MainWindow : Window
         // UI.11 F06: page entrance on navigation - armed only AFTER the startup page is up (nothing animates at launch).
         DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
         {
+            // Cortex R-2: a window closed before this runs must not subscribe to the process-wide source (leak).
+            if (_closed)
+            {
+                return;
+            }
+
             Services.Motion.MotionPolicy.Source.Changed += OnReducedMotionChanged;
             ApplyPageEntrance();
         });
@@ -253,13 +259,22 @@ public sealed partial class MainWindow : Window
     /// so the resize never shows it clipped. Exactly one Opacity write: no Visibility, focus, layout, dispatcher or window
     /// call (the switch stays synchronous). Restored in both ModeChanged branches and on a failed switch.
     /// </summary>
-    private void OnWindowModeChanging(object? sender, WindowMode target) => StandardRoot.Opacity = 0;
+    private void OnWindowModeChanging(object? sender, WindowMode target)
+    {
+        _compactSwitchAnnounced = true; // Cortex R-3: the switch is a fact, not inferred from a visual property
+        StandardRoot.Opacity = 0;
+    }
+
+    private bool _compactSwitchAnnounced;
+
+    private bool _closed;
 
     /// <summary>UI.11 F16 (Cortex C-2): a switch whose window steps threw never leaves an invisible Standard shell.</summary>
     private void OnWindowModeChangeEnded(object? sender, WindowModeChangeEnded ended)
     {
         if (!ended.Succeeded)
         {
+            _compactSwitchAnnounced = false;
             StandardRoot.Opacity = 1;
         }
     }
@@ -269,7 +284,8 @@ public sealed partial class MainWindow : Window
         Onboarding.SetWindowMode(mode);
         ApplyShellBackground();
         // A SWITCH to Compact (announced by ModeChanging) - never the launch straight into Compact.
-        var switchedToCompact = mode == WindowMode.Compact && StandardRoot.Opacity == 0;
+        var switchedToCompact = mode == WindowMode.Compact && _compactSwitchAnnounced;
+        _compactSwitchAnnounced = false;
         if (mode == WindowMode.Compact)
         {
             StandardRoot.Visibility = Visibility.Collapsed;
@@ -611,6 +627,7 @@ public sealed partial class MainWindow : Window
     /// </summary>
     private void OnWindowClosed(object sender, WindowEventArgs args)
     {
+        _closed = true;
         Onboarding.PropertyChanged -= OnOnboardingChanged;
         _navigationService.Navigated -= OnShellNavigated;
         StandardRoot.SizeChanged -= OnStandardSizeChanged;
