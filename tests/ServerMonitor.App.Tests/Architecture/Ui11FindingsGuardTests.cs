@@ -154,4 +154,20 @@ public sealed class Ui11FindingsGuardTests
     {
         Assert.Equal(plays, MotionRules.PlaysEnter(hasEnter, becameVisible, isLoaded, reduced));
     }
+
+    /// <summary>
+    /// UI.11C runtime finding (F07): after a remount whose Loaded precedes the stale Unloaded, IsLoaded can stay false for an
+    /// element on screen. The motion behaviours gate on the live tree (SaLiveTree), never on IsLoaded / a Loaded flag.
+    /// </summary>
+    [Theory]
+    [InlineData("Controls/Primitives/SaSlidingSelection.cs")]
+    [InlineData("Controls/Primitives/SaMotion.cs")]
+    public void MotionBehaviours_GateOnTheLiveTree_NotIsLoaded(string file)
+    {
+        var code = AppSourceTree.CodeWithoutComments(file);
+
+        Assert.DoesNotContain(".IsLoaded", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("_loaded", code, StringComparison.Ordinal);
+        Assert.Contains("SaLiveTree.IsLive(", code, StringComparison.Ordinal);
+    }
 }
