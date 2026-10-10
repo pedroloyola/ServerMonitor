@@ -435,4 +435,89 @@ public sealed class Ui11FindingsGuardTests
     {
         Assert.Equal(expected, SelectionIndicatorRules.SelectedIndex(isChecked, checking));
     }
+
+    // ---------------- Tests review r2 (T2-1..T2-4) ----------------
+
+    /// <summary>
+    /// T2-1 (N1): the reverse direction of the F11 guard. For every Views block that enters (Fade or ContentFade), no view-model
+    /// method that filters or searches (name contains Filter/Search, or reads a *SearchText) may assign the block's property, any
+    /// property its expression is built from, or raise a change for any of them - e.g. ApplyOverviewFilter sets the stored
+    /// OverviewMoreCount and notifies HasOverviewMore, so the overview footer can never enter.
+    /// </summary>
+    [Fact]
+    public void T2_1_NoEnteringBlock_DependsOnAPropertyThatAFilterOrSearchMethodChanges()
+    {
+        var models = AppSourceTree.Files(".cs").Where(f => f.StartsWith("ViewModels/", StringComparison.Ordinal))
+            .Select(AppSourceTree.CodeWithoutComments).ToList();
+        var filterBodies = new List<(string Name, string Body)>();
+        foreach (var code in models)
+        {
+            foreach (System.Text.RegularExpressions.Match m in System.Text.RegularExpressions.Regex.Matches(
+                         code, @"(?:private|public|internal|protected)[^;{}()=]*\s(\w+)\s*\([^)]*\)\s*\{"))
+            {
+                var body = Body(code[m.Index..], m.Value.TrimEnd('{').Trim());
+                if (m.Groups[1].Value.Contains("Filter", StringComparison.Ordinal) || m.Groups[1].Value.Contains("Search", StringComparison.Ordinal)
+                    || body.Contains("SearchText", StringComparison.Ordinal))
+                {
+                    filterBodies.Add((m.Groups[1].Value, body));
+                }
+            }
+        }
+
+        Assert.Contains(filterBodies, f => f.Name == "ApplyOverviewFilter"); // the scan sees the known filter method
+        var checkedBlocks = 0;
+        foreach (var (file, element) in AllElements().Where(x => x.File.StartsWith("Views/", StringComparison.Ordinal)
+                     && ((string?)x.Element.Attribute(Enter) is "Fade" or "ContentFade")))
+        {
+            var binding = System.Text.RegularExpressions.Regex.Match((string?)element.Attribute("Visibility") ?? "", @"\{(?:x:Bind ViewModel\.|Binding )(\w+)");
+            if (!binding.Success)
+            {
+                continue;
+            }
+
+            checkedBlocks++;
+            var names = System.Text.RegularExpressions.Regex.Matches(Expand(binding.Groups[1].Value, models, depth: 0), @"\b([A-Z]\w+)\b")
+                .Select(x => x.Groups[1].Value).Append(binding.Groups[1].Value).Distinct().ToList();
+            foreach (var (method, body) in filterBodies)
+            {
+                foreach (var name in names)
+                {
+                    Assert.False(body.Contains("nameof(" + name + ")", StringComparison.Ordinal)
+                        || System.Text.RegularExpressions.Regex.IsMatch(body, @"(?<![\w.])" + name + @"\s*=(?![=>])"),
+                        $"{file}: {binding.Groups[1].Value} depends on {name}, which the filter/search method {method} changes");
+                }
+            }
+        }
+
+        Assert.True(checkedBlocks >= 13, $"expected the entering state blocks (found {checkedBlocks})");
+    }
+
+    /// <summary>T2-2 (N2): the Light-only hairline is decided with the live theme, Light, and High Contrast - exactly.</summary>
+    [Fact]
+    public void T2_2_TheHairlineCall_PassesTheLiveThemeAndHighContrast()
+    {
+        Assert.Contains(
+            "SelectionIndicatorRules.DrawsLightOutline( SaSlidingSelection.GetLightOutlineBrush(_host) is not null, _host.ActualTheme == ElementTheme.Light, Accessibility.HighContrast)",
+            Squash(AppSourceTree.CodeWithoutComments("Controls/Primitives/SaSlidingSelection.cs")), StringComparison.Ordinal);
+    }
+
+    /// <summary>T2-3 (N4): the deferred scale's FIRST statement is the staleness check, and the captured generation is never re-read.</summary>
+    [Fact]
+    public void T2_3_TheDeferredScale_StalenessCheckIsFirstAndTheGenerationIsCapturedOnce()
+    {
+        var code = Squash(AppSourceTree.CodeWithoutComments("Controls/Primitives/SaMotion.cs"));
+
+        Assert.Contains("_element.DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () => { if (generation != _generation) { return; }", code, StringComparison.Ordinal);
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(code, @"(?<![\w])generation\s*=(?!=)"));
+        Assert.Contains("var generation = ++_generation;", code, StringComparison.Ordinal);
+    }
+
+    /// <summary>T2-4 (N5): a closed window RETURNS before the page-entrance subscription.</summary>
+    [Fact]
+    public void T2_4_AClosedWindow_ReturnsBeforeSubscribing()
+    {
+        Assert.Contains(
+            "DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () => { if (_closed) { return; } Services.Motion.MotionPolicy.Source.Changed += OnReducedMotionChanged;",
+            Squash(AppSourceTree.CodeWithoutComments("MainWindow.xaml.cs")), StringComparison.Ordinal);
+    }
 }
