@@ -86,11 +86,11 @@ public sealed class Ui11SelectorGuardTests
     }
 
     [Theory]
-    [InlineData("Views/SettingsPage.xaml", "SaSegmentedThemeSelectedBrush", false)]
-    [InlineData("Views/HistoryPage.xaml", "SaSelectedBrush", true)]
-    [InlineData("Views/WorkloadsPage.xaml", "SaSelectedBrush", true)]
-    [InlineData("Controls/ServerFormControl.xaml", "SaSegmentedPillSelectedBrush", false)]
-    public void IndicatorHosts_PaintTheFamilysMeasuredSelectionBrush(string file, string brush, bool highlight)
+    [InlineData("Views/SettingsPage.xaml", "SaSegmentedThemeSelectedBrush", false, false)]
+    [InlineData("Views/HistoryPage.xaml", "SaSelectedBrush", true, true)]
+    [InlineData("Views/WorkloadsPage.xaml", "SaSelectedBrush", true, true)]
+    [InlineData("Controls/ServerFormControl.xaml", "SaSegmentedPillSelectedBrush", false, true)]
+    public void IndicatorHosts_PaintTheFamilysMeasuredSelectionBrush(string file, string brush, bool highlight, bool lightOutline)
     {
         var hosts = AllIndicatorHosts(AppSourceTree.LoadXaml(file)).ToList();
 
@@ -99,8 +99,8 @@ public sealed class Ui11SelectorGuardTests
         {
             Assert.Equal("{ThemeResource " + brush + "}", (string?)host.Attribute(IndicatorBrush));
             Assert.Equal(highlight ? "{ThemeResource SaGlassHighlightBrush}" : null, (string?)host.Attribute(Primitives + "SaSlidingSelection.HighlightBrush"));
-            // F20 / DD-UI11-1: the rect family (= the hosts with the glass highlight) also carries the Light-only hairline.
-            Assert.Equal(highlight ? "{ThemeResource SaDialogButtonBorderBrush}" : null, (string?)host.Attribute(Primitives + "SaSlidingSelection.LightOutlineBrush"));
+            // F20 / DD-UI11-1 = rect + nav + auth (Prism D2, B11-10): the Light-only hairline; the theme selector stays without.
+            Assert.Equal(lightOutline ? "{ThemeResource SaDialogButtonBorderBrush}" : null, (string?)host.Attribute(Primitives + "SaSlidingSelection.LightOutlineBrush"));
         }
     }
 
@@ -117,12 +117,12 @@ public sealed class Ui11SelectorGuardTests
         Assert.Equal("{ThemeResource SaDialogButtonBorderBrush}", (string?)host.Attribute(Primitives + "SaSlidingSelection.LightOutlineBrush"));
     }
 
-    /// <summary>Prism P-2: the theme and auth selectors stay without it (their pills are visible).</summary>
-    [Theory]
-    [InlineData("Views/SettingsPage.xaml")]
-    [InlineData("Controls/ServerFormControl.xaml")]
-    public void F20_PillFamilies_HaveNoLightHairline(string file)
+    /// <summary>Prism D2: only the theme selector stays without the hairline (its own brush is visible, user's reference).</summary>
+    [Fact]
+    public void F20_OnlyTheThemeSelector_HasNoLightHairline()
     {
-        Assert.All(AllIndicatorHosts(AppSourceTree.LoadXaml(file)), host => Assert.Null(host.Attribute(Primitives + "SaSlidingSelection.LightOutlineBrush")));
+        Assert.All(AllIndicatorHosts(AppSourceTree.LoadXaml("Views/SettingsPage.xaml")), host => Assert.Null(host.Attribute(Primitives + "SaSlidingSelection.LightOutlineBrush")));
+        Assert.Equal(2, AllIndicatorHosts(AppSourceTree.LoadXaml("Controls/ServerFormControl.xaml"))
+            .Count(host => (string?)host.Attribute(Primitives + "SaSlidingSelection.LightOutlineBrush") == "{ThemeResource SaDialogButtonBorderBrush}"));
     }
 }

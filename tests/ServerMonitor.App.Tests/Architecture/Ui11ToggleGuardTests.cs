@@ -31,20 +31,36 @@ public sealed class Ui11ToggleGuardTests
             var on = (string?)transition.Attribute("To") == "On";
             var animations = transition.Descendants(Presentation + "DoubleAnimationUsingKeyFrames").ToList();
             Assert.Equal(
-                ["KnobTranslateTransform.X", "SwitchKnobBounds.Opacity", "SwitchKnobOn.Opacity"],
+                ["KnobTranslateTransform.X", "SwitchKnobBounds.Opacity", "SwitchKnobOn.Opacity", "SwitchKnobOff.Opacity"],
                 animations.Select(a => $"{(string?)a.Attribute("Storyboard.TargetName")}.{(string?)a.Attribute("Storyboard.TargetProperty")}"));
             foreach (var animation in animations)
             {
                 Assert.Null(animation.Attribute("From")); // never restart from a fixed origin: a reversal turns around in place
-                var frame = Assert.Single(animation.Elements());
+                Assert.Single(animation.Elements());
+            }
+
+            // Position and track fill travel over the toggle token (spline); Prism D1 (B11-6): the thumb colour is a DISCRETE
+            // swap at mid-travel (SaMotionFadeDuration = 83 ms), never a crossfade that crosses the track in Dark.
+            foreach (var travel in animations.Take(2))
+            {
+                var frame = travel.Elements().Single();
                 Assert.Equal("SplineDoubleKeyFrame", frame.Name.LocalName);
                 Assert.Equal("{StaticResource SaMotionToggleDuration}", (string?)frame.Attribute("KeyTime"));
             }
 
+            foreach (var swap in animations.Skip(2))
+            {
+                var frame = swap.Elements().Single();
+                Assert.Equal("DiscreteDoubleKeyFrame", frame.Name.LocalName);
+                Assert.Equal("{StaticResource SaMotionFadeDuration}", (string?)frame.Attribute("KeyTime"));
+            }
+
             Assert.Equal(on ? "18" : "0", (string?)animations[0].Elements().Single().Attribute("Value"));
             Assert.Equal("{StaticResource SaMotionPointToPointKeySpline}", (string?)animations[0].Elements().Single().Attribute("KeySpline"));
+            Assert.Equal("{StaticResource SaMotionLinearKeySpline}", (string?)animations[1].Elements().Single().Attribute("KeySpline"));
             Assert.Equal(on ? "1" : "0", (string?)animations[1].Elements().Single().Attribute("Value"));
             Assert.Equal(on ? "1" : "0", (string?)animations[2].Elements().Single().Attribute("Value"));
+            Assert.Equal(on ? "0" : "1", (string?)animations[3].Elements().Single().Attribute("Value"));
         }
     }
 
@@ -67,5 +83,17 @@ public sealed class Ui11ToggleGuardTests
         var on = root.Descendants(Presentation + "Ellipse").Single(e => (string?)e.Attribute(AppSourceTree.Xaml + "Name") == "SwitchKnobOn");
         Assert.Equal("0", (string?)on.Attribute("Opacity"));
         Assert.Equal("{ThemeResource SaToggleOnThumbBrush}", (string?)on.Attribute("Fill"));
+    }
+
+    /// <summary>Prism D3 (B11-11): at rest exactly ONE thumb ellipse is visible - the On state hides the Off ellipse.</summary>
+    [Fact]
+    public void Toggle_OnState_ShowsExactlyOneThumbEllipse()
+    {
+        var on = ToggleTemplateRoot().Descendants(Presentation + "VisualState").Single(s => (string?)s.Attribute(AppSourceTree.Xaml + "Name") == "On");
+        var targets = on.Descendants(Presentation + "DoubleAnimation")
+            .ToDictionary(a => $"{(string?)a.Attribute("Storyboard.TargetName")}.{(string?)a.Attribute("Storyboard.TargetProperty")}", a => (string?)a.Attribute("To"));
+
+        Assert.Equal("1", targets["SwitchKnobOn.Opacity"]);
+        Assert.Equal("0", targets["SwitchKnobOff.Opacity"]);
     }
 }

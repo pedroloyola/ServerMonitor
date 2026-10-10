@@ -264,9 +264,10 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
-                            <!-- UI.11 H01: the ONE sliding selection indicator (dims with the items while testing). -->
+                            <!-- UI.11 H01: the ONE sliding selection indicator (dims with the items while testing). Prism D2 (B11-10): Light-only hairline (DD-UI11-1 = rect + nav + auth). -->
                             <Border IsHitTestVisible="False" AutomationProperties.AccessibilityView="Raw" Grid.ColumnSpan="2"
-                                    primitives:SaSlidingSelection.IndicatorBrush="{ThemeResource SaSegmentedPillSelectedBrush}" />
+                                    primitives:SaSlidingSelection.IndicatorBrush="{ThemeResource SaSegmentedPillSelectedBrush}"
+                                    primitives:SaSlidingSelection.LightOutlineBrush="{ThemeResource SaDialogButtonBorderBrush}" />
                             <!-- 112:3356: Key01 / LockPassword 16 + Medium 12; the SAME SelectedAuthenticationIndex setter as
                                  before, so changing the method still drops a staged secret (Vigil H4). -->
                             <RadioButton x:Uid="ServerEditorAuthKeyOption" GroupName="ServerEditorAuthentication" HorizontalAlignment="Stretch"
@@ -471,9 +472,10 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
-                            <!-- UI.11 H01: the ONE sliding selection indicator (dims with the items while testing). -->
+                            <!-- UI.11 H01: the ONE sliding selection indicator (dims with the items while testing). Prism D2 (B11-10): Light-only hairline (DD-UI11-1 = rect + nav + auth). -->
                             <Border IsHitTestVisible="False" AutomationProperties.AccessibilityView="Raw" Grid.ColumnSpan="2"
-                                    primitives:SaSlidingSelection.IndicatorBrush="{ThemeResource SaSegmentedPillSelectedBrush}" />
+                                    primitives:SaSlidingSelection.IndicatorBrush="{ThemeResource SaSegmentedPillSelectedBrush}"
+                                    primitives:SaSlidingSelection.LightOutlineBrush="{ThemeResource SaDialogButtonBorderBrush}" />
                             <RadioButton x:Uid="ServerEditorJumpAuthKeyOption" GroupName="ServerEditorJumpAuthentication" HorizontalAlignment="Stretch"
                                          Style="{StaticResource SaSegmentedPillItemStyle}" IsEnabled="{Binding IsNotTestingConnection}"
                                          IsChecked="{Binding SelectedJumpAuthenticationIndex, Mode=TwoWay, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=0}">
