@@ -1,7 +1,6 @@
 # UI.11 — Motion & Transitions
 
-**Status: READY FOR FINAL QA, NOT MERGED.** PR #38 (`ui/ui11-motion-transitions`) is a draft; code validated at `0777aba`.
-- Final runtime QA (UI.11D r2) is pending: §14, to be filled by Boss.
+**Status: final QA PASS (UI.11D r2, §14), NOT MERGED.** PR #38 (`ui/ui11-motion-transitions`) is a draft; code validated at `0777aba`.
 - No merge without a separate human GO.
 
 **Branch:** `ui/ui11-motion-transitions`, base `main` @ `3ec2473`. This document's commit adds docs only.
@@ -34,7 +33,7 @@
   - Prism: APPROVED_WITH_NITS (r3; N-1 = this document + report addendum).
   - Cortex: APPROVED (r3; R3-N1 optional).
   - Independent tests review, **internal subagent acting as Atlas fallback**: APPROVED (r2).
-  - Beacon UI.11D r1: FAIL on B11-1 / B11-2, both fixed in round 3; r2 pending.
+  - Beacon UI.11D r1: FAIL on B11-1 / B11-2, both fixed in round 3; r2: PASS with the accepted B11-4 limit (§14).
 - **Gates @ `0777aba`:**
   - `.slnx` Debug `--no-incremental` all green (App 3613, Infrastructure 887 + 1 skipped, others green);
   - Release all green (App 3131);
@@ -166,6 +165,8 @@ Hierarchy: 83 < 167 < 250. Nothing exceeds 250 ms. An exit is always shorter tha
 - Widget V3: no motion (Adaptive Cards / Widgets Host).
 - The theme change does not crossfade (remount + acrylic).
 - Popups and flyouts keep the WinUI defaults.
+- **B11-4 (heavy-page sidebar slide):** the slide starts in the input turn, but on heavy pages (History +247 ms, Servers +162 ms) the UI thread builds the page synchronously and blocks the composition commit, so no motion can appear before the build ends. Light pages start at +66–90 ms. Accepted as a platform limit (Prism `prism-ui11d-r2-ruling.md` §1a).
+- **B11-9 (F06 page entrance):** the system `EntranceThemeTransition` measures about 316–350 ms including its deceleration tail. The trigger is not met, so it is accepted and kept: Windows 11 parity, 12 px, no lateral offset, no replay on remount, cleared by Reduced Motion (Prism ruling §2).
 
 ## 7. Figma changes (file `Qvk5dUFgsWf4UOYzfAkiDV`; Relay r1–r5)
 
@@ -204,6 +205,7 @@ Pro is untouched. UI.10 decisions are preserved.
 - **PH-1:** live OS "Animation effects" toggle test. **NOT_RUN** (it would change the user's session setting). QA uses `--qa-reduced-motion`.
 - **PH-3:** switching navigation to `Frame.Navigate` / NavigationTransitionInfo is out of scope.
 - **Theme-apply debounce** during rapid H03 theme clicks (each click applies the theme, giving intermediate flashes, D-B4). Default: unchanged.
+- **Defer the page build by one frame** so the B11-4 sidebar slide can appear before a heavy page is built. It changes navigation timing. Default: no (Prism ruling §1b).
 - Skeleton delay on fast loads. Default: none.
 - Toast overlay conversion (removes the Auto-row jump; a layout change). Default: no.
 - Animated height with sibling reposition. Default: no (siblings instant).
@@ -242,10 +244,10 @@ Each counterproof breaks the rule, fails for the right reason, restores the SHA-
 
 | Reviewer | Rounds | Final |
 |---|---|---|
-| Prism (direction, consistency, semiotics, Figma) | UI.11B review; UI.11C r1 (CHANGES_REQUESTED: P-1, P-2) → r2 APPROVED → r3 APPROVED_WITH_NITS (N-1 = this record + report addendum); UI.11D decisions D1–D5 | APPROVED_WITH_NITS |
-| Cortex (architecture, lifecycle, performance) | feasibility; D-B3 verdict SAFE_WITH_CONDITIONS; UI.11C r1 / r2 APPROVED_WITH_NITS (R-1…R-6, R-1b) → r3 | APPROVED (R3-N1 optional) |
-| Tests & counterproofs: **internal subagent acting as Atlas fallback** (Atlas unavailable; not presented as Atlas's approval) | r1 CHANGES_REQUESTED (T-1…T-6) → r2 APPROVED (T2-1…T2-4, fixed in round 3) | APPROVED |
-| Beacon (runtime, a11y, Reduced Motion, visual QA) | UI.11A baseline; UI.11D r1 @ `6dd7870` (B11-1…B11-11) | **r2 pending (§14)** |
+| Prism (direction, consistency, semiotics, Figma) | UI.11B review; UI.11C r1 (CHANGES_REQUESTED: P-1, P-2) → r2 APPROVED → r3 APPROVED_WITH_NITS; UI.11D decisions D1–D5; UI.11D r2 ruling (B11-4, B11-9) | **r3 APPROVED_WITH_NITS, all nits closed** (N-1 = this record + report addendum) |
+| Cortex (architecture, lifecycle, performance) | feasibility; D-B3 verdict SAFE_WITH_CONDITIONS; UI.11C r1 / r2 APPROVED_WITH_NITS (R-1…R-6, R-1b) → r3 | **r3 APPROVED** (R3-N1 optional, backlog) |
+| Tests & counterproofs: **internal subagent acting as Atlas fallback** (Atlas unavailable; not presented as Atlas's approval) | r1 CHANGES_REQUESTED (T-1…T-6) → r2 APPROVED (T2-1…T2-4, fixed in round 3) → r3 on `0777aba` (T3-1 / T3-2 → backlog UI11-TEXTGUARD-CLASS) | **r3 APPROVED** |
+| Beacon (runtime, a11y, Reduced Motion, visual QA) | UI.11A baseline; UI.11D r1 @ `6dd7870` (B11-1…B11-11); UI.11D r2 @ `0777aba` | **UI.11D r2 PASS** with the accepted B11-4 limit (§14) |
 
 The implementer (Sentry) did not approve its own work.
 
@@ -263,14 +265,20 @@ The implementer (Sentry) did not approve its own work.
 ## 12. Backlog (not in UI.11)
 
 - **Cortex R-5:** per-selection Composition allocations (GC'd; no leak) could be cached.
-- **Cortex R3-N1:** `UpdateOpacity` picks the first checked item, which can still be the previous sibling during the immediate flush (opacity only).
+- **Cortex R3-N1:** the disabled-dim opacity can lag one frame. `UpdateOpacity` picks the first checked item, which can still be the previous sibling during the immediate flush.
+- **Page build cost of History and Servers** (performance, out of UI.11): the root of the B11-4 heavy-page limit.
+- **UI11-TEXTGUARD-CLASS:**
+  - T3-1: the `_shownOnce` reset;
+  - T3-2: the `SelectedIndex` argument at the call site.
+  - Source-text guards do not prove the wiring (the same class as T-1 / T2-1 / T2-2). Under BOSS §16 a third round of the same class is a decision gate, so these are declared a limitation. Both behaviours (B11-2, B11-4) passed at runtime.
+  - **UI.12:** replace them with behavioural tests on the real XAML tree.
+- **Prism F06 trigger rule:** replace the system entrance with the tokenised `SaMotion` Rise only if the median `settle − firstChange` is > 333 ms or any case is ≥ 354 ms (333 + one capture interval).
 - **F18 nits → UI.12:** unused `using …Media.Animation` in four primitives; `SaSkeleton` pulse not stopped on Collapsed and not reacting to setting changes.
 - **Firewall exception (pending human UAC).** Four inbound **Block** rules ("Query User" defaults, created when nobody answered the prompt), for `<Floor>\tests\ServerMonitor.Infrastructure.Tests\bin\{debug,release}\net10.0\testhost.exe`:
   - 2 Debug (pre-existing at my first listing);
   - 2 Release (created by the canonical Release `.slnx` test run).
   - The app created none. Rules are never removed without the human.
 - **Disk incident.** C: reached 0 bytes free during UI.11D r1 (full-frame captures plus builds). Boss freed regenerable `bin`/`obj`. Since then builds are `.slnx`-only, with temporary OutDirs deleted and ROI-only captures. About 6 GB free at `0777aba`. A human cleanup decision is advisable.
-- **B11-9:** F06 tokenised fallback, only if Beacon's offline `settle − firstChange` exceeds 333 ms (Prism D4).
 - **Shared-Floor build incident (UI.11A).** One early Sentry build attempt overwrote outputs Beacon was capturing from. Beacon superseded that pass and moved to a pinned export with a bin-manifest SHA. Lesson: QA on a fixed worktree / export.
 
 ## 13. Commits (`3ec2473..0777aba`)
@@ -295,15 +303,33 @@ The implementer (Sentry) did not approve its own work.
 | `6dd52e2` | fix round 3: F16 revert, B11-2, R-1b, B11-4 |
 | `0777aba` | fix round 3: T2-1…T2-4 (test only) |
 
-## 14. UI.11D r2 final QA
+## 14. UI.11D r2 final QA (Beacon, binary `0777aba`, fixed worktree, full-bin hash guard on every launch and capture)
 
-> **TBD — to be filled by Boss after Beacon's UI.11D r2 report.**
->
-> - Binary / worktree under test: TBD
-> - H01 / H02 / H03 re-check (incl. B11-4 start latency, D1 thumb swap, D3 rest pixel-identity, DD-UI11-1 nav + auth Δ ≥ 15/255): TBD
-> - B11-2 (History range change instant) and F11 first appearance: TBD
-> - Compact↔Standard after the F16 revert (UI.8 behaviour; A-7 as documented): TBD
-> - B11-9 offline `settle − firstChange`: TBD
-> - Reduced Motion: TBD
-> - Real data / Firewall / processes: TBD
-> - Verdict: TBD
+Verdict: **PASS**, except one sub-criterion (B11-4 residual). It is accepted as a platform limit by the Prism ruling (`prism-ui11d-r2-ruling.md`) and is listed below. Evidence is in `.boss/tmp/ui11/beacon-ui11d-qa-r2.md` (local) and `C:\Users\pfloy\wt\ui11-qa\after-r2\` (ROI captures only).
+
+| Item | Result |
+|---|---|
+| B11-1 F16 reverted | PASS. Standard↔Compact matches the baseline `3ec2473`, normal and maximized. There is 1 clipped Standard frame, which is the documented A-7 limit. |
+| B11-2 History range change | PASS. The cards change in 1 frame with 0 intermediates, in Dark and Light. They still fade on first appearance after loading. |
+| DD-UI11-1 Light hairline | PASS. Δ against the track: sidebar rail 21, sidebar normal 20, History 19, filter 19, auth 21, jump-host auth 20. The theme selector has no hairline (Δ7). Dark has no hairline. |
+| D1 / B11-6 Dark toggle thumb | PASS. Minimum contrast during travel is 70–80 (r1: 9–13). |
+| D3 / B11-11 Light toggle On at rest | PASS. Pixel-identical to the baseline (0 px). |
+| H01, re-scoped D-B5 | PASS. Dark: theme 8/8, History 18/18 (pt-PT, pt-BR, en-US), filter 8/8, auth 3/3, jump 3/3. Light: theme 8/8, jump 3/3, rect by edges 23/26 (the 3 others are a measurement limit: the same transition passes on a repeat). Always a single pill, monotonic, on target to ±3 px. |
+| H02 | PASS. 24/24 in Settings, plus Compact min/max 8/8. Duration 133–167 ms, 8–10 intermediates. |
+| H03 | PASS. Rapid theme at 50/80 ms, toggles on/off/on, History ping-pong: logical state == visual state, and the indicator converges to the last target. |
+| Reduced Motion (`--qa-reduced-motion`) | PASS 40/40. Snap, 0 intermediates, logical state correct. |
+| Resting look vs baseline | PASS. The only deltas are DD-UI11-1. |
+| P-1: no fade on search or filter | PASS for Servers, and for Workloads with data. |
+| pt-BR / en-US | PASS. Segment widths and slides follow the language. |
+| B11-4 sidebar slide start | Light pages (Settings, Overview): +66–90 ms, PASS. Heavy pages (History +247 ms, Servers +162 ms): **ACCEPTED LIMIT**. The UI thread builds the page synchronously and the window presents no frames meanwhile; the Composition animation starts in the input turn but commits only when the UI thread frees. Deferring the page build is out of scope and pending a human decision. The page build cost of History and Servers is in the backlog. |
+| B11-9 F06 entrance | 316–318 ms in 6/8 navigations; 335 and 350 ms in 2/8, which is within one capture interval (~17–20 ms) of 333. Trigger NOT met. The system `EntranceThemeTransition` is kept and documented. Future rule: the trigger fires if the median is > 333 ms or any case is ≥ 354 ms. |
+| Performance (exact PID) | Idle returns to 0 % after bursts. Memory: +33 / +77 MB against the base's +29 / +69 MB over 70 navigations, with no growth at idle. Burst CPU is higher only while interacting. No FPS claims. |
+| Real data / Firewall / processes | 0 diffs; Firewall 715→715 (0 new); 0 QA processes. |
+
+NOT_RUN in final QA:
+- Real keyboard and mouse, Tab order, A-5 retest, F05 hover and pressed with a real cursor, H02 latency with real input. The desktop foreground is held by the system `PickerHost`, and keys are never injected into other windows.
+- High Contrast and DPI ≠ 100 %: these would change the system session for every app.
+- Narrator.
+- Live OS "Animation effects" toggle (PH-1).
+
+Test review: the internal subagent (Atlas fallback, Codex quota exhausted) r3 on `0777aba` is **APPROVED**. Two Low guard gaps (T3-1, T3-2) remain from the same class as T-1 and T2-1/T2-2: source-text guards do not prove what the wiring does. Under BOSS §16, a third round of the same class is a decision gate, not another patch. They are declared a limitation and moved to the backlog as `UI11-TEXTGUARD-CLASS` (replace with behavioural tests on the real XAML tree in UI.12). Both behaviours (B11-2, B11-4) passed at runtime above.
