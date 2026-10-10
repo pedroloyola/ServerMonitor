@@ -17,7 +17,7 @@
 - **UI.11A:** independent motion & semiotic audit (Prism), feasibility (Cortex), runtime baseline (Beacon).
 - **UI.11B:** Motion System in Figma (Relay r1–r5).
 - **UI.11C:** implementation (Sentry) + fix rounds 1–3.
-- **UI.11D:** runtime motion QA (Beacon), r1 at `6dd7870`; r2 pending.
+- **UI.11D:** runtime motion QA (Beacon), r1 at `6dd7870`; r2 at `0777aba`: **PASS** (§14).
 
 **Evidence labels:** [CODE] · [FIGMA] live node · [MEASURED] runtime frame series at 55–60 captures/s (capture rate, **not** app FPS) · [INFERENCE].
 
@@ -57,7 +57,7 @@
 | F01–F03 | High | H01 / H02 / H03 | Implemented (§2) |
 | F04 | High | Theme selector vs theme remount | Composition objects are kept across Unloaded, and a remount on the same target is a NoOp. S-1 PASS, so the PH-2 fallback was not needed |
 | F05 | Medium | Hover / pressed hard cut | 83 ms `BrushTransition` on every Sa overlay, from an explicit Transparent. Never on a selection Shell. Removed under Reduced Motion |
-| F06 | Medium | Page cut | `EntranceThemeTransition` on `Frame.ContentTransitions`: vertical 12, **no lateral offset**, armed after the startup page, no replay on the theme remount (S-4). Settle timing is still under evaluation (B11-9, Prism D4: conditional) |
+| F06 | Medium | Page cut | `EntranceThemeTransition` on `Frame.ContentTransitions`: vertical 12, **no lateral offset**, armed after the startup page, no replay on the theme remount (S-4). **B11-9 resolved:** trigger not met (316–350 ms incl. tail); the system `EntranceThemeTransition` is accepted (Prism r2 ruling) |
 | F07 | Medium | Sidebar jump | Same primitive, vertical. Runtime fixes: remount lifecycle (live-tree gate) and B11-4 (the slide starts in the click's input turn) |
 | F08 / F14 | Medium / Low | Editor modal layer, step swap | SaDialogStyle pattern (fade 167 + scale 1.05→1 at 250 on open; fade-out 83 on close); new step fades in |
 | F09 | Medium | Dialog ignored Reduced Motion | `MotionVisualStateManager` gate |
@@ -65,7 +65,7 @@
 | F11 | Medium | Content-enter | **First appearance only** (`ContentFade`). Never on a filter, search, range change or refresh (P-1, B11-2) |
 | F12 / F13 | Low | Onboarding, editor reveals | Step fade + dot width (the one documented dependent animation); rise on reveals; siblings instant |
 | F15 | Low | Two-step theme change | Measured as baseline; kept (D-B4) |
-| F16 | Medium | Clipped Standard→Compact frame (A-7) | **Implemented, then REVERTED** (C-8 FAIL, B11-1). Platform limit (§6) |
+| F16 | Medium | Clipped Standard→Compact frame (A-7) | **REVERTED** (C-8 FAIL, B11-1): the switch is UI.8 again. A-7 is a platform limit (§6). It had been tried under Cortex C-1..C-7 in `7796a34` and was removed in `6dd52e2` |
 | F17 | Low | Indeterminate bars in idle | Bound to IsBusy: 0.00 % CPU with the backup dialog open (was 0.62 %) |
 | F18 | Nit | Hygiene | Stale MotionTokens comment fixed; the rest goes to UI.12 |
 | F19 | Nit | Animated ✓ | Not done (pending human, default no) |
@@ -79,11 +79,11 @@
 | B11-1 | High | F16 C-8 FAIL → **reverted**, A-7 platform limit |
 | B11-2 | Medium | History range change re-faded the metric cards → `ContentFade` (first appearance only) |
 | B11-3 | Medium | Light sidebar pill invisible → P-2 hairline (already in `7eab500`) |
-| B11-4 | Medium | F07 started after the page build → Checked flushes in the input turn. Measured firstChange +7..+30 ms (was +84..+356) |
+| B11-4 | Medium | F07 started after the page build → Checked flushes in the input turn. Final state (UI.11D r2): light pages +66–90 ms, **PASS**. Heavy pages (History +247 ms, Servers +162 ms): **accepted platform limit** (§6; a synchronous page build blocks the composition commit) |
 | B11-5 | Low | Toggle start latency → accepted (D4). Cause: UIA call + 1 frame + PtP slow start; no deferral in the code |
 | B11-6 | Low | Dark toggle thumb vanished mid-crossfade → discrete thumb swap at mid-travel (D1) |
 | B11-7 / B11-8 | Low | Theme remount and History start margins → accepted (D-B4 / D4) |
-| B11-9 | Low | F06 settle +370–710 ms → conditional on Beacon's offline `settle − firstChange` (Prism D4) |
+| B11-9 | Low | **B11-9 resolved:** trigger not met (316–350 ms incl. tail); the system `EntranceThemeTransition` is accepted (Prism r2 ruling) |
 | B11-10 | Low | Light auth pill Δ3 → hairline extended to auth (D2) |
 | B11-11 | Nit | Two ellipses at rest in Light On → On hides the Off ellipse (D3) |
 
