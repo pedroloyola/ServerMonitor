@@ -107,8 +107,6 @@ public sealed partial class MainWindow : Window
         _persistTimer.Tick += OnPersistTimerTick;
 
         _modeCoordinator.ModeChanged += OnWindowModeChanged;
-        _modeCoordinator.ModeChanging += OnWindowModeChanging;
-        _modeCoordinator.ModeChangeEnded += OnWindowModeChangeEnded;
 
         ConfigureWindow();
         // Apply the persisted mode and geometry now that the window and its displays are available.
@@ -254,49 +252,17 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    /// <summary>
-    /// UI.11 F16 (Prism rev.4 D-B3, Cortex C-3): a switch to Compact hides the Standard content BEFORE the window shrinks,
-    /// so the resize never shows it clipped. Exactly one Opacity write: no Visibility, focus, layout, dispatcher or window
-    /// call (the switch stays synchronous). Restored in both ModeChanged branches and on a failed switch.
-    /// </summary>
-    private void OnWindowModeChanging(object? sender, WindowMode target)
-    {
-        _compactSwitchAnnounced = true; // Cortex R-3: the switch is a fact, not inferred from a visual property
-        StandardRoot.Opacity = 0;
-    }
-
-    private bool _compactSwitchAnnounced;
-
+    // UI.11 R-2: set first in OnWindowClosed; the deferred page-entrance setup never subscribes a closed window.
     private bool _closed;
-
-    /// <summary>UI.11 F16 (Cortex C-2): a switch whose window steps threw never leaves an invisible Standard shell.</summary>
-    private void OnWindowModeChangeEnded(object? sender, WindowModeChangeEnded ended)
-    {
-        if (!ended.Succeeded)
-        {
-            _compactSwitchAnnounced = false;
-            StandardRoot.Opacity = 1;
-        }
-    }
 
     private void OnWindowModeChanged(object? sender, WindowMode mode)
     {
         Onboarding.SetWindowMode(mode);
         ApplyShellBackground();
-        // A SWITCH to Compact (announced by ModeChanging) - never the launch straight into Compact.
-        var switchedToCompact = mode == WindowMode.Compact && _compactSwitchAnnounced;
-        _compactSwitchAnnounced = false;
         if (mode == WindowMode.Compact)
         {
             StandardRoot.Visibility = Visibility.Collapsed;
-            StandardRoot.Opacity = 1;
             CompactRoot.Visibility = Visibility.Visible;
-            if (switchedToCompact)
-            {
-                // UI.11 F16 (Cortex C-6): the Compact content enters (167 ms opacity, Reduced Motion snaps) after a switch.
-                // Opacity only: no layout, drag region or capacity measurement touched.
-                SaMotion.PlayEnter(CompactRoot, SaMotionEnter.Fade);
-            }
 
             SetTitleBar(CompactDragRegion);
             // The presenter's caption set is now the compact one (maximize disabled); size the
@@ -306,10 +272,7 @@ public sealed partial class MainWindow : Window
         }
         else
         {
-            // UI.11 F16 (Cortex C-4/C-6): Compact->Standard stays instant; a Compact fade cut short is reset.
-            SaMotion.ResetEnter(CompactRoot);
             CompactRoot.Visibility = Visibility.Collapsed;
-            StandardRoot.Opacity = 1;
             StandardRoot.Visibility = Visibility.Visible;
             SetTitleBar(ShellDragRegion);
         }
@@ -640,8 +603,6 @@ public sealed partial class MainWindow : Window
         _persistTimer.Tick -= OnPersistTimerTick;
         _modeCoordinator.PersistCurrentBounds();
         _modeCoordinator.ModeChanged -= OnWindowModeChanged;
-        _modeCoordinator.ModeChanging -= OnWindowModeChanging;
-        _modeCoordinator.ModeChangeEnded -= OnWindowModeChangeEnded;
         if (RootLayout.XamlRoot is { } xamlRoot)
         {
             xamlRoot.Changed -= OnXamlRootChanged;

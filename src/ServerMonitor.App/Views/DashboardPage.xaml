@@ -352,7 +352,7 @@
                 </StackPanel>
 
                 <!-- Health and priority 112:1009: 624 : 392 with gap 24 (stacked under 900). -->
-                <Grid x:Name="HealthRow" ColumnSpacing="{StaticResource SaSpace24}" primitives:SaMotion.Enter="Fade" Visibility="{x:Bind ViewModel.ShowOverviewContent, Mode=OneWay}">
+                <Grid x:Name="HealthRow" ColumnSpacing="{StaticResource SaSpace24}" primitives:SaMotion.Enter="ContentFade" Visibility="{x:Bind ViewModel.ShowOverviewContent, Mode=OneWay}">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="624*" />
                         <ColumnDefinition x:Name="HealthColumn2" Width="392*" />
@@ -503,7 +503,7 @@
                 </Grid>
 
                 <!-- Servers 112:1047: toolbar (title 19 Semibold + "Ver todos" D-UI4-NAV + Procurar 214×38) and the list card. -->
-                <StackPanel Spacing="{StaticResource SaSpace12}" primitives:SaMotion.Enter="Fade" Visibility="{x:Bind ViewModel.ShowOverviewContent, Mode=OneWay}">
+                <StackPanel Spacing="{StaticResource SaSpace12}" primitives:SaMotion.Enter="ContentFade" Visibility="{x:Bind ViewModel.ShowOverviewContent, Mode=OneWay}">
                     <Grid x:Name="ServersToolbar" ColumnSpacing="{StaticResource SaSpace16}">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
@@ -562,7 +562,7 @@
                 </StackPanel>
 
                 <!-- UI.6 112:822/826: no card, centred block h620, icon48, title28, gap20; buttons202x46 r15. -->
-                <Grid x:Name="FirstServerStateBlock" MinHeight="620" primitives:SaMotion.Enter="Fade" Visibility="{x:Bind ViewModel.ShowFirstServerState, Mode=OneWay}">
+                <Grid x:Name="FirstServerStateBlock" MinHeight="620" primitives:SaMotion.Enter="ContentFade" Visibility="{x:Bind ViewModel.ShowFirstServerState, Mode=OneWay}">
                 <StackPanel VerticalAlignment="Center" Spacing="{StaticResource SaSpace20}">
                     <primitives:SaIcon Data="{StaticResource SaIconServerStack01Data}" Size="48" Foreground="{ThemeResource SaTextBrush}" HorizontalAlignment="Center"/>
                     <TextBlock x:Uid="FirstServerTitle" Style="{StaticResource SaFirstServerTitleTextStyle}" AutomationProperties.HeadingLevel="Level2" TextAlignment="Center"/>
@@ -583,7 +583,7 @@
 
                 </StackPanel></Grid>
                 <!-- G-15 derived: live hidden list, never first-server copy. -->
-                <Grid x:Name="HiddenStateBlock" MinHeight="620" primitives:SaMotion.Enter="Fade" Visibility="{x:Bind ViewModel.ShowAllHiddenState, Mode=OneWay}">
+                <Grid x:Name="HiddenStateBlock" MinHeight="620" primitives:SaMotion.Enter="ContentFade" Visibility="{x:Bind ViewModel.ShowAllHiddenState, Mode=OneWay}">
                 <StackPanel VerticalAlignment="Center" Spacing="{StaticResource SaSpace20}">
                     <primitives:SaIcon Data="{StaticResource SaIconViewData}" Size="48" Foreground="{ThemeResource SaTextBrush}" HorizontalAlignment="Center"/>
                     <TextBlock x:Uid="HiddenOverviewTitle" Style="{StaticResource SaFirstServerTitleTextStyle}" AutomationProperties.HeadingLevel="Level2" TextAlignment="Center"/>

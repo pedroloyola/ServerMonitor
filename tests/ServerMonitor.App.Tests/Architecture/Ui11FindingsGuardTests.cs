@@ -106,7 +106,7 @@ public sealed class Ui11FindingsGuardTests
     [Fact]
     public void F11_ContentEnter_FollowsStates_NeverAFilterResultOrTheSkeleton()
     {
-        var entering = AllElements().Where(x => (string?)x.Element.Attribute(Enter) == "Fade" && x.File.StartsWith("Views/", StringComparison.Ordinal)).ToList();
+        var entering = AllElements().Where(x => (string?)x.Element.Attribute(Enter) == "ContentFade" && x.File.StartsWith("Views/", StringComparison.Ordinal)).ToList();
 
         Assert.True(entering.Count >= 13, $"expected the state blocks of the five pages (found {entering.Count}; P-1 removed the two search-driven ones)");
         foreach (var (file, element) in entering)
@@ -182,7 +182,7 @@ public sealed class Ui11FindingsGuardTests
         var models = AppSourceTree.Files(".cs").Where(f => f.StartsWith("ViewModels/", StringComparison.Ordinal))
             .Select(AppSourceTree.CodeWithoutComments).ToList();
         var checkedBindings = 0;
-        foreach (var (file, element) in AllElements().Where(x => (string?)x.Element.Attribute(Enter) == "Fade" && x.File.StartsWith("Views/", StringComparison.Ordinal)))
+        foreach (var (file, element) in AllElements().Where(x => (string?)x.Element.Attribute(Enter) == "ContentFade" && x.File.StartsWith("Views/", StringComparison.Ordinal)))
         {
             var visibility = (string?)element.Attribute("Visibility") ?? "";
             var match = System.Text.RegularExpressions.Regex.Match(visibility, @"\{(?:x:Bind ViewModel\.|Binding )(\w+)");
@@ -226,13 +226,15 @@ public sealed class Ui11FindingsGuardTests
     {
         var code = AppSourceTree.CodeWithoutComments("Controls/Primitives/SaMotion.cs");
 
-        Assert.Contains("if (generation != _generation || MotionPolicy.IsReduced || !SaLiveTree.IsLive(_element))", code, StringComparison.Ordinal);
+        Assert.Contains("if (generation != _generation) { return; }", Squash(code), StringComparison.Ordinal);
+        // Cortex R-1b: the gate path lands the scale instead of leaving the surface 5 % enlarged.
+        Assert.Contains("if (MotionPolicy.IsReduced || !SaLiveTree.IsLive(_element)) { visual.Scale = Vector3.One; return; }", Squash(code), StringComparison.Ordinal);
         Assert.Contains("var generation = ++_generation;", code, StringComparison.Ordinal);
         var reset = code[code.IndexOf("private void ResetVisual()", StringComparison.Ordinal)..];
         Assert.Contains("_generation++;", reset, StringComparison.Ordinal);
     }
 
-    /// <summary>Cortex R-2/R-3: the deferred page-entrance subscription respects a closed window; the Compact switch is a flag.</summary>
+    /// <summary>Cortex R-2: the deferred page-entrance subscription respects a closed window (R-3 went with the F16 revert).</summary>
     [Fact]
     public void R2_R3_MainWindow_ClosedGuard_AndAnnouncedSwitchFlag()
     {
@@ -242,8 +244,6 @@ public sealed class Ui11FindingsGuardTests
 
         Assert.Contains("if (_closed)", lambda, StringComparison.Ordinal);
         Assert.Contains("_closed = true;", code[code.IndexOf("private void OnWindowClosed(", StringComparison.Ordinal)..], StringComparison.Ordinal);
-        Assert.Contains("var switchedToCompact = mode == WindowMode.Compact && _compactSwitchAnnounced;", code, StringComparison.Ordinal);
-        Assert.DoesNotContain("StandardRoot.Opacity == 0", code, StringComparison.Ordinal);
     }
 
     /// <summary>Cortex R-6: the indicator takes the thread's compositor, never the host's handoff visual.</summary>
@@ -312,10 +312,11 @@ public sealed class Ui11FindingsGuardTests
         {
             var body = Body(code, handler);
             Assert.Contains(request, body, StringComparison.Ordinal);
-            Assert.Single(System.Text.RegularExpressions.Regex.Matches(body, @"_planner\.Request\("));
+            // every request in a handler is that handler's cause (the selection handler requests Selection twice, B11-4)
+            Assert.All(System.Text.RegularExpressions.Regex.Matches(body, @"_planner\.Request\([^;]+;"), m => Assert.Equal(request, m.Value));
         }
 
-        Assert.Equal(5, System.Text.RegularExpressions.Regex.Matches(code, @"_planner\.Request\(").Count);
+        Assert.Equal(6, System.Text.RegularExpressions.Regex.Matches(code, @"_planner\.Request\(").Count);
     }
 
     /// <summary>T-1 (SaMotion): every enter/hover decision is fed the live Reduced Motion state.</summary>
@@ -330,13 +331,24 @@ public sealed class Ui11FindingsGuardTests
         Assert.Contains("if (MotionPolicy.IsReduced) { ElementCompositionPreview.SetImplicitHideAnimation(_element, null);", Squash(Body(code, "private void ApplyHideAnimation(")), StringComparison.Ordinal);
     }
 
-    /// <summary>T-2 (O6): the failure-path restore is exactly "only when NOT succeeded" (Cortex C-2).</summary>
+    /// <summary>
+    /// B11-1 (Beacon UI.11D C-8 FAIL): the F16 fallback - the Standard->Compact switch is UI.8 again. No announcement event,
+    /// no Opacity hide, no Compact content-enter (A-7 is a documented platform limit).
+    /// </summary>
     [Fact]
-    public void T2_ModeChangeEnded_RestoresOnlyAFailedSwitch()
+    public void B11_1_F16IsReverted_TheModeSwitchIsUi8Again()
     {
-        var body = Squash(Body(AppSourceTree.CodeWithoutComments("MainWindow.xaml.cs"), "private void OnWindowModeChangeEnded("));
+        var window = AppSourceTree.CodeWithoutComments("MainWindow.xaml.cs");
+        var contract = AppSourceTree.CodeWithoutComments("Windowing/IWindowModeCoordinator.cs")
+            + AppSourceTree.CodeWithoutComments("Windowing/WindowModeCoordinator.cs");
 
-        Assert.Equal("{ if (!ended.Succeeded) { _compactSwitchAnnounced = false; StandardRoot.Opacity = 1; } }", body);
+        foreach (var token in new[] { "ModeChanging", "ModeChangeEnded", "StandardRoot.Opacity", "PlayEnter(CompactRoot" })
+        {
+            Assert.DoesNotContain(token, window, StringComparison.Ordinal);
+        }
+
+        Assert.DoesNotContain("ModeChanging", contract, StringComparison.Ordinal);
+        Assert.DoesNotContain("ModeChangeEnded", contract, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -366,5 +378,61 @@ public sealed class Ui11FindingsGuardTests
         var motion = Body(AppSourceTree.CodeWithoutComments("Controls/Primitives/SaMotion.cs"), "private void OnUnloaded(");
         Assert.All(System.Text.RegularExpressions.Regex.Matches(motion, @"(\S+) -= ").Select(m => m.Groups[1].Value),
             target => Assert.Equal("MotionPolicy.Source.Changed", target));
+    }
+
+    // ---------------- Fix Round 3 (Beacon UI.11D) ----------------
+
+    /// <summary>
+    /// B11-2: every Views state block uses the F11 content-enter (first appearance only), never the every-time Fade; the
+    /// SaMotion ContentFade path feeds the live Reduced Motion state and the "shown before" memory to the pure rule.
+    /// </summary>
+    [Fact]
+    public void B11_2_StateBlocks_EnterOnlyOnTheirFirstAppearance()
+    {
+        Assert.DoesNotContain(AllElements(), x => x.File.StartsWith("Views/", StringComparison.Ordinal) && (string?)x.Element.Attribute(Enter) == "Fade");
+        Assert.True(AllElements().Count(x => (string?)x.Element.Attribute(Enter) == "ContentFade") >= 13);
+        var history = AppSourceTree.LoadXaml("Views/HistoryPage.xaml").Descendants().Single(e => ((string?)e.Attribute("Visibility") ?? "").Contains("ShowCharts", StringComparison.Ordinal));
+        Assert.Equal("ContentFade", (string?)history.Attribute(Enter));
+
+        var code = Squash(AppSourceTree.CodeWithoutComments("Controls/Primitives/SaMotion.cs"));
+        Assert.Contains("var plays = MotionRules.PlaysContentEnter(visible, live, MotionPolicy.IsReduced, _shownOnce);", code, StringComparison.Ordinal);
+        Assert.Contains("if (visible && live) { _shownOnce = true; }", code, StringComparison.Ordinal);
+        Assert.Contains("if (_element.Visibility == Visibility.Visible) { _shownOnce = true;", code, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(true, true, false, false, true)]  // first appearance after loading/empty/error
+    [InlineData(true, true, false, true, false)]  // a reload of content already shown (History range change)
+    [InlineData(true, true, true, false, false)]  // Reduced Motion
+    [InlineData(true, false, false, false, false)] // not on screen yet (first presentation)
+    [InlineData(false, true, false, false, false)] // collapsing
+    public void B11_2_ContentEnterRule(bool becameVisible, bool live, bool reduced, bool shownBefore, bool plays)
+    {
+        Assert.Equal(plays, MotionRules.PlaysContentEnter(becameVisible, live, reduced, shownBefore));
+    }
+
+    /// <summary>
+    /// B11-4 / first-change latency: a Checked flushes in the same input turn - before the click's synchronous navigation -
+    /// with the checked item as the target; the queued Low-priority flush still follows.
+    /// </summary>
+    [Fact]
+    public void B11_4_ACheckStartsTheSlideInTheSameInputTurn()
+    {
+        var body = Squash(Body(AppSourceTree.CodeWithoutComments("Controls/Primitives/SaSlidingSelection.cs"), "private void OnSelectionChanged("));
+
+        Assert.Equal(
+            "{ _planner.Request(IndicatorCause.Selection); if (sender is RadioButton { IsChecked: true } item) { Flush(item); _planner.Request(IndicatorCause.Selection); } QueueFlush(); }",
+            body);
+        Assert.Contains("var selected = SelectionIndicatorRules.SelectedIndex(", AppSourceTree.CodeWithoutComments("Controls/Primitives/SaSlidingSelection.cs"), StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(new[] { true, true, false }, 1, 1)]   // the old item still reports checked: the item being checked wins
+    [InlineData(new[] { false, false, true }, -1, 2)] // queued flush: the first checked item
+    [InlineData(new[] { false, false, false }, -1, -1)]
+    [InlineData(new[] { true, false }, 5, 0)]         // out-of-range checking index is ignored
+    public void B11_4_SelectedIndexRule(bool[] isChecked, int checking, int expected)
+    {
+        Assert.Equal(expected, SelectionIndicatorRules.SelectedIndex(isChecked, checking));
     }
 }

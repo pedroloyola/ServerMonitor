@@ -75,10 +75,6 @@ public sealed class WindowModeViewModelTests
 
         public event EventHandler<WindowMode>? ModeChanged;
 
-        public event EventHandler<WindowMode>? ModeChanging { add { } remove { } }
-
-        public event EventHandler<WindowModeChangeEnded>? ModeChangeEnded { add { } remove { } }
-
         public void Initialize() { }
 
         public void SwitchTo(WindowMode mode)

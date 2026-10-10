@@ -13,8 +13,14 @@ public enum SaMotionEnter
 {
     None,
 
-    /// <summary>content-enter / content-swap: opacity 0→1 (SaMotionEnterDuration, linear).</summary>
+    /// <summary>content-swap / reveal by fade: opacity 0→1 (SaMotionEnterDuration, linear), every time it appears.</summary>
     Fade,
+
+    /// <summary>
+    /// F11 content-enter (B11-2): the same fade, but only the FIRST time the block appears on screen - never again for a
+    /// reload of content already shown (History range change, refresh). See MotionRules.PlaysContentEnter.
+    /// </summary>
+    ContentFade,
 
     /// <summary>transient / reveal: opacity 0→1 plus a rise of 8 DIP (SaMotionEnterOffsetDuration, decelerate).</summary>
     Rise,
@@ -78,16 +84,6 @@ public static class SaMotion
         }
     }
 
-    /// <summary>Lands a running enter on its final state at once (a reveal cut short, e.g. leaving Compact mid-fade).</summary>
-    public static void ResetEnter(FrameworkElement element)
-    {
-        ArgumentNullException.ThrowIfNull(element);
-        if (element.GetValue(StateProperty) is MotionState state)
-        {
-            state.Reset();
-        }
-    }
-
     private static void OnHoverFadeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
         if (d is FrameworkElement element)
@@ -133,6 +129,7 @@ public static class SaMotion
         private bool _translationEnabled;
         private bool _scaled;
         private int _generation;
+        private bool _shownOnce;
 
         public MotionState(FrameworkElement element)
         {
@@ -161,6 +158,11 @@ public static class SaMotion
             Subscribe();
             ApplyHoverTransition();
             ApplyHideAnimation();
+            if (_element.Visibility == Visibility.Visible)
+            {
+                _shownOnce = true; // presented at load: a later reload is not "the data arrived"
+            }
+
             if ((GetExitFade(_element) || GetEnter(_element) != SaMotionEnter.None) && _element.Visibility == Visibility.Visible)
             {
                 // A remount (out of the tree and straight back) may have played the hide animation on a visible element:
@@ -255,7 +257,29 @@ public static class SaMotion
         private void OnVisibilityChanged(DependencyObject sender, DependencyProperty property)
         {
             var enter = GetEnter(_element);
-            if (!MotionRules.PlaysEnter(enter != SaMotionEnter.None, _element.Visibility == Visibility.Visible, SaLiveTree.IsLive(_element), MotionPolicy.IsReduced))
+            var visible = _element.Visibility == Visibility.Visible;
+            var live = SaLiveTree.IsLive(_element);
+            if (enter == SaMotionEnter.ContentFade)
+            {
+                var plays = MotionRules.PlaysContentEnter(visible, live, MotionPolicy.IsReduced, _shownOnce);
+                if (visible && live)
+                {
+                    _shownOnce = true;
+                }
+
+                if (plays)
+                {
+                    Play(enter);
+                }
+                else if (visible)
+                {
+                    ResetVisual();
+                }
+
+                return;
+            }
+
+            if (!MotionRules.PlaysEnter(enter != SaMotionEnter.None, visible, live, MotionPolicy.IsReduced))
             {
                 if (_element.Visibility == Visibility.Visible && enter != SaMotionEnter.None)
                 {
@@ -306,8 +330,14 @@ public static class SaMotion
                 _element.DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
                 {
                     // Cortex R-1: a reset or Reduced Motion that landed before this callback wins - never scale after it.
-                    if (generation != _generation || MotionPolicy.IsReduced || !SaLiveTree.IsLive(_element))
+                    if (generation != _generation)
                     {
+                        return; // a later Play or a reset owns the visual now
+                    }
+
+                    if (MotionPolicy.IsReduced || !SaLiveTree.IsLive(_element))
+                    {
+                        visual.Scale = Vector3.One; // Cortex R-1b: never leave the surface 5 % enlarged
                         return;
                     }
 
@@ -320,8 +350,6 @@ public static class SaMotion
                 });
             }
         }
-
-        public void Reset() => ResetVisual();
 
         private void ResetVisual()
         {

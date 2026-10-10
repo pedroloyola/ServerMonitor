@@ -225,12 +225,12 @@
             <primitives:SaInlineNotice
                 x:Uid="ServerDetailMetricsUnsupportedNotice"
                 Severity="Info"
-                primitives:SaMotion.Enter="Fade" Visibility="{Binding IsMetricsUnsupported, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                primitives:SaMotion.Enter="ContentFade" Visibility="{Binding IsMetricsUnsupported, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
             <!-- First reading 112:16100: one solid card 216 high (the metric cards' height: no jump when the reading
                  arrives, Prism C1 M-4), "A recolher métricas…" + three skeleton columns. -->
             <Border Style="{StaticResource SaSolidSurfaceStyle}" Height="216"
-                    primitives:SaMotion.Enter="Fade" Visibility="{Binding IsFirstReading, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    primitives:SaMotion.Enter="ContentFade" Visibility="{Binding IsFirstReading, Converter={StaticResource BooleanToVisibilityConverter}}">
                 <StackPanel Spacing="{StaticResource SaSpace20}">
                     <TextBlock x:Uid="ServerDetailCollectingTitle" Style="{StaticResource SaPrimaryBodyTextStyle}" />
                     <Grid x:Name="CollectingColumns" ColumnSpacing="{StaticResource SaSpace24}">
@@ -260,7 +260,7 @@
 
             <!-- Current metrics 112:1812: 3 glass cards 216 high, gap 16 (stacked below a 1120 window). -->
             <Grid x:Name="MetricsGrid" ColumnSpacing="{StaticResource SaSpace16}"
-                  primitives:SaMotion.Enter="Fade" Visibility="{Binding HasReading, Converter={StaticResource BooleanToVisibilityConverter}}">
+                  primitives:SaMotion.Enter="ContentFade" Visibility="{Binding HasReading, Converter={StaticResource BooleanToVisibilityConverter}}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition x:Name="MetricsColumn2" Width="*" />

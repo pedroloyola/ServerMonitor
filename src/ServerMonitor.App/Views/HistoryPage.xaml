@@ -172,7 +172,7 @@
 
             <!-- Unavailable (store degraded; not drawn in Figma -> same panel family, no action). -->
             <Border Style="{StaticResource SaStatePanelStyle}"
-                    primitives:SaMotion.Enter="Fade" Visibility="{Binding ShowUnavailable, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    primitives:SaMotion.Enter="ContentFade" Visibility="{Binding ShowUnavailable, Converter={StaticResource BooleanToVisibilityConverter}}">
                 <!-- Beacon L2: the pane is named by the state title, never by the action inside it. -->
                 <ScrollViewer VerticalScrollBarVisibility="Auto" VerticalContentAlignment="Center" AutomationProperties.Name="{Binding Title, ElementName=UnavailableState}">
                     <primitives:SaEmptyState
@@ -185,7 +185,7 @@
 
             <!-- Empty-ever 112:14478 / empty-period 112:14711 (D-UI3-10). -->
             <Border Style="{StaticResource SaStatePanelStyle}"
-                    primitives:SaMotion.Enter="Fade" Visibility="{Binding ShowEmpty, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    primitives:SaMotion.Enter="ContentFade" Visibility="{Binding ShowEmpty, Converter={StaticResource BooleanToVisibilityConverter}}">
                 <!-- Beacon L2: the pane is named by the state title, never by the action inside it. -->
                 <ScrollViewer VerticalScrollBarVisibility="Auto" VerticalContentAlignment="Center" AutomationProperties.Name="{Binding Title, ElementName=EmptyState}">
                     <primitives:SaEmptyState
@@ -216,7 +216,7 @@
             <!-- Charts 112:2290 / 112:2314 / 112:2338: gap 16. -->
             <ScrollViewer
                 VerticalScrollBarVisibility="Auto"
-                primitives:SaMotion.Enter="Fade" Visibility="{Binding ShowCharts, Converter={StaticResource BooleanToVisibilityConverter}}">
+                primitives:SaMotion.Enter="ContentFade" Visibility="{Binding ShowCharts, Converter={StaticResource BooleanToVisibilityConverter}}">
                 <StackPanel Spacing="{StaticResource SaSpace16}">
                     <!-- Beacon F3: the card is one read-only Tab stop named by the full chart summary (brought into view on focus). -->
                     <primitives:SaFocusableCard AutomationProperties.Name="{Binding CpuSummary}">

@@ -258,9 +258,24 @@ internal sealed class SlidingSelectionController
         _items.Clear();
     }
 
+    /// <summary>
+    /// B11-4 / first-change latency (Beacon UI.11D, measured: the slide began only after the destination page was built,
+    /// +84-356 ms, and a Low-priority hop cost 1-2 frames on every selector). A CHECK now flushes in the same input turn,
+    /// before the click's navigation builds the next page synchronously - the Composition animation then runs off the UI
+    /// thread during that build - measuring the checked item (the sender: its group sibling may not be unchecked yet).
+    /// The Low-priority flush still follows: if the item re-measured on its new state, the slide retargets (Selection,
+    /// from the presented value); otherwise it is a NoOp. An Unchecked only queues (flushing on it could hide the pill
+    /// between the old item's Unchecked and the new one's Checked).
+    /// </summary>
     private void OnSelectionChanged(object sender, RoutedEventArgs e)
     {
         _planner.Request(IndicatorCause.Selection);
+        if (sender is RadioButton { IsChecked: true } item)
+        {
+            Flush(item);
+            _planner.Request(IndicatorCause.Selection);
+        }
+
         QueueFlush();
     }
 
@@ -303,27 +318,29 @@ internal sealed class SlidingSelectionController
             return;
         }
 
-        _flushQueued = _host.DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, Flush);
+        _flushQueued = _host.DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () => Flush(null));
     }
 
-    private void Flush()
+    /// <param name="checkedItem">The item whose Checked is being handled (immediate flush), else null (queued flush).</param>
+    private void Flush(RadioButton? checkedItem)
     {
-        _flushQueued = false;
+        if (checkedItem is null)
+        {
+            _flushQueued = false;
+        }
+
         if (!SaLiveTree.IsLive(_host) || _visual is null)
         {
             return; // stays pending; the next Loaded re-plans
         }
 
         var rects = new List<IndicatorRect>(_items.Count);
-        var selected = -1;
         for (var index = 0; index < _items.Count; index++)
         {
             rects.Add(RectOf(_items[index]));
-            if (selected < 0 && _items[index].IsChecked == true)
-            {
-                selected = index;
-            }
         }
+
+        var selected = SelectionIndicatorRules.SelectedIndex(_items.Select(item => item.IsChecked == true).ToList(), checkedItem is null ? -1 : _items.IndexOf(checkedItem));
 
         var plan = _planner.Flush(rects, selected, MotionPolicy.IsReduced);
         Apply(plan, selected >= 0 ? _items[selected] : null);

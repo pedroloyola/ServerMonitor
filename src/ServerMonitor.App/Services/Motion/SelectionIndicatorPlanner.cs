@@ -146,4 +146,27 @@ public static class SelectionIndicatorRules
     /// <summary>F20 / DD-UI11-1: the hairline is drawn only for a host that asks for it, in Light, outside High Contrast.</summary>
     public static bool DrawsLightOutline(bool hostHasOutline, bool isLightTheme, bool isHighContrast) =>
         hostHasOutline && isLightTheme && !isHighContrast;
+
+    /// <summary>
+    /// B11-4: the index the indicator targets. While a Checked is being handled the group's previous item may still report
+    /// IsChecked (its Unchecked comes after), so the item being checked wins; otherwise the first checked item; -1 if none.
+    /// </summary>
+    public static int SelectedIndex(IReadOnlyList<bool> isChecked, int checkingIndex)
+    {
+        ArgumentNullException.ThrowIfNull(isChecked);
+        if (checkingIndex >= 0 && checkingIndex < isChecked.Count)
+        {
+            return checkingIndex;
+        }
+
+        for (var index = 0; index < isChecked.Count; index++)
+        {
+            if (isChecked[index])
+            {
+                return index;
+            }
+        }
+
+        return -1;
+    }
 }

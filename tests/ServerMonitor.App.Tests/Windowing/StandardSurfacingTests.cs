@@ -154,10 +154,6 @@ public sealed partial class StandardSurfacingTests
 
         public event EventHandler<WindowMode>? ModeChanged { add { } remove { } }
 
-        public event EventHandler<WindowMode>? ModeChanging { add { } remove { } }
-
-        public event EventHandler<WindowModeChangeEnded>? ModeChangeEnded { add { } remove { } }
-
         public void Initialize() { }
 
         public void SwitchTo(WindowMode mode) => SwitchRequests++;
