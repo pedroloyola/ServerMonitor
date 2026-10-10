@@ -163,7 +163,9 @@
         </Grid>
     </ScrollViewer>
 
-        <Border x:Name="DialogLayer" Style="{StaticResource SaOverlayStyle}" Visibility="Collapsed">
+        <!-- UI.11 F08: the SaDialogStyle pattern - the layer fades in (167) and the surface scales 1.05->1 (250, ShowLayer);
+             closing fades the layer out (83). F14: a step change inside the open layer cross-fades the new panel in. -->
+        <Border x:Name="DialogLayer" Style="{StaticResource SaOverlayStyle}" Visibility="Collapsed" primitives:SaMotion.ExitFade="True">
             <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                 <Border x:Name="DialogSurface" Style="{StaticResource SaModalSurfaceStyle}" Margin="{StaticResource SaPagePaddingCompact}"
                         HorizontalAlignment="Center" VerticalAlignment="Center"

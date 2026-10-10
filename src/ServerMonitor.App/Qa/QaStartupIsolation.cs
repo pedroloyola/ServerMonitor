@@ -62,7 +62,8 @@ internal static partial class QaStartupIsolation
         QaEditorComposition.SaveFlag,
         QaCompactComposition.ScenarioFlag,
         QaCompactComposition.StartFlag,
-        QaCompactComposition.TickerFlag
+        QaCompactComposition.TickerFlag,
+        QaReducedMotionPolicy.LaunchFlag
     ];
 
     /// <summary>
@@ -129,6 +130,9 @@ internal static partial class QaStartupIsolation
         }
 
         if (QaShellStartup.Refusal(commandLineArgs) is { } shellRefusal) return shellRefusal;
+
+        // UI.11: --qa-reduced-motion takes no value and appears at most once (a 'flag=value' form is refused, never ignored).
+        if (QaReducedMotionPolicy.Refusal(commandLineArgs) is { } reducedMotionRefusal) return reducedMotionRefusal;
 
         // UI.7 B-23: the editor harness's own modifiers - exact values, only next to --qa-editor, which needs --qa-backup.
         if (QaEditorComposition.Refusal(commandLineArgs) is { } editorRefusal) return editorRefusal;

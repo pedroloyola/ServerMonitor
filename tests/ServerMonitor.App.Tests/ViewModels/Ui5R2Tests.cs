@@ -516,7 +516,12 @@ public sealed class Ui5R2Tests
         var item = forms.Single(e => (string?)e.Attribute(AppSourceTree.Xaml + "Key") == "SaSegmentedThemeItemStyle");
 
         Assert.Contains(track.Elements(), e => (string?)e.Attribute("Property") == "Background" && (string?)e.Attribute("Value") == "{ThemeResource SaSegmentedThemeTrackBrush}");
-        Assert.Contains(item.Descendants(), e => (string?)e.Attribute("Target") == "Shell.Background" && (string?)e.Attribute("Value") == "{ThemeResource SaSegmentedThemeSelectedBrush}");
+        // UI.11 H01: the selection fill moved from the item's Checked Shell to the track's sliding indicator - the same
+        // measured brush, on the Settings theme track's indicator host (Ui11MotionGuardTests guards the item side).
+        Assert.DoesNotContain(item.Descendants(), e => (string?)e.Attribute("Target") == "Shell.Background");
+        Assert.Contains(AppSourceTree.LoadXaml("Views/SettingsPage.xaml").Descendants(), e =>
+            (string?)e.Attribute((System.Xml.Linq.XNamespace)"using:ServerMonitor.App.Controls.Primitives" + "SaSlidingSelection.IndicatorBrush")
+                == "{ThemeResource SaSegmentedThemeSelectedBrush}");
     }
 
     [Fact]

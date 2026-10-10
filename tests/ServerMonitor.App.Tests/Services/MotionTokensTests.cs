@@ -48,6 +48,28 @@ public sealed class MotionTokensTests
         Assert.Equal(new MotionKeySpline(0.55, 0.55, 0, 1), MotionTokens.ParseKeySpline(MotionTokens.PointToPointKeySpline, "0.55,0.55,0,1"));
     });
 
+    /// <summary>UI.11 (Prism §4.1): the semantic aliases sit on the Fluent 83/167/250 scale; exits are shorter than entrances.</summary>
+    [Fact]
+    public void Ui11SemanticAliases_StayOnTheFluentScale() => WithCulture("pt-PT", () =>
+    {
+        var tokens = MotionXaml();
+        TimeSpan Time(string key) => MotionTokens.ParseTime(key, tokens[key]);
+
+        Assert.Equal(Time(MotionTokens.FadeDuration), Time(MotionTokens.HoverDuration));
+        Assert.Equal(Time(MotionTokens.FastDuration), Time(MotionTokens.ToggleDuration));
+        Assert.Equal(Time(MotionTokens.NormalDuration), Time(MotionTokens.SelectDuration));
+        Assert.Equal(Time(MotionTokens.FastDuration), Time(MotionTokens.EnterDuration));
+        Assert.Equal(Time(MotionTokens.NormalDuration), Time(MotionTokens.EnterOffsetDuration));
+        Assert.Equal(Time(MotionTokens.FadeDuration), Time(MotionTokens.ExitDuration));
+        Assert.Equal(Time(MotionTokens.NormalDuration), Time(MotionTokens.ExpandDuration));
+        Assert.Equal(Time(MotionTokens.FastDuration), Time(MotionTokens.CollapseDuration));
+        Assert.True(Time(MotionTokens.ExitDuration) < Time(MotionTokens.EnterDuration));
+        Assert.True(Time(MotionTokens.CollapseDuration) < Time(MotionTokens.ExpandDuration));
+        Assert.True(Time(MotionTokens.HoverDuration) < Time(MotionTokens.ToggleDuration));
+        Assert.True(Time(MotionTokens.ToggleDuration) < Time(MotionTokens.SelectDuration));
+        Assert.Equal(new MotionKeySpline(1, 0, 1, 1), MotionTokens.ParseKeySpline(MotionTokens.ExitKeySpline, tokens[MotionTokens.ExitKeySpline]));
+    });
+
     [Fact]
     public void KeySplineTextIsInvariantAndRoundTrips() => WithCulture("pt-PT", () =>
     {

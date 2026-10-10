@@ -59,7 +59,8 @@ public static class QaGalleryPolicy
         "navigation", "data", "feedback", "materials-fallback", "popup-combo", "popup-flyout", "popup-dialog", "popup-dialog-confirm", "popup-dialog-input"];
 
     /// <summary>The only <c>--qa-*</c> switches that may accompany a gallery flag.</summary>
-    private static readonly string[] OwnFlags = [ComponentsFlag, TokensFlag, ThemeFlag, PageFlag, OutputFlag, QaUiLanguagePolicy.LaunchFlag];
+    private static readonly string[] OwnFlags =
+        [ComponentsFlag, TokensFlag, ThemeFlag, PageFlag, OutputFlag, QaUiLanguagePolicy.LaunchFlag, QaReducedMotionPolicy.LaunchFlag];
 
     /// <param name="commandLineArgs">The process arguments (element 0 may be the executable path).</param>
     /// <param name="isDebugBuild">False in Release: the gallery does not exist there.</param>
@@ -98,6 +99,12 @@ public static class QaGalleryPolicy
         if (foreign is not null)
         {
             return Refuse($"The gallery is exclusive; it cannot be combined with {foreign}.");
+        }
+
+        // UI.11: the motion gallery can pin Reduced Motion on; the same strict form as next to a harness.
+        if (QaReducedMotionPolicy.Refusal(commandLineArgs) is { } reducedMotionRefusal)
+        {
+            return Refuse(reducedMotionRefusal);
         }
 
         var theme = ValueOf(commandLineArgs, ThemeFlag, out var themeGiven);

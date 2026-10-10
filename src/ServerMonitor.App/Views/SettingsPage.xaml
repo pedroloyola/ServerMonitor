@@ -115,32 +115,37 @@
                                            Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap" />
                             </StackPanel>
                             <Border x:Name="ThemeControl" Grid.Column="1" Style="{StaticResource SaSegmentedThemeTrackStyle}" VerticalAlignment="Center">
-                                <!-- Beacon C1 N1: the UI.2 segmented keyboard contract - one Tab stop, entry on the selected item,
-                                     the arrows move AND select (SaGroupNavigation). -->
-                                <StackPanel x:Uid="SettingsThemeGroup" Orientation="Horizontal" Spacing="{StaticResource SaSpace4}"
-                                            primitives:SaGroupNavigation.Mode="SelectionFollowsFocus">
-                                    <RadioButton x:Uid="ThemeSystemOption" GroupName="SettingsTheme" Style="{StaticResource SaSegmentedThemeItemStyle}"
-                                                 IsChecked="{Binding SelectedThemeIndex, Mode=TwoWay, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=0}">
-                                        <StackPanel Orientation="Horizontal" Spacing="5">
-                                            <primitives:SaIcon Data="{StaticResource SaIconComputerData}" Size="14" VerticalAlignment="Center" />
-                                            <TextBlock x:Uid="ThemeSystemOptionText" VerticalAlignment="Center" />
-                                        </StackPanel>
-                                    </RadioButton>
-                                    <RadioButton x:Uid="ThemeLightOption" GroupName="SettingsTheme" Style="{StaticResource SaSegmentedThemeItemStyle}"
-                                                 IsChecked="{Binding SelectedThemeIndex, Mode=TwoWay, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=1}">
-                                        <StackPanel Orientation="Horizontal" Spacing="5">
-                                            <primitives:SaIcon Data="{StaticResource SaIconSun03Data}" Size="14" VerticalAlignment="Center" />
-                                            <TextBlock x:Uid="ThemeLightOptionText" VerticalAlignment="Center" />
-                                        </StackPanel>
-                                    </RadioButton>
-                                    <RadioButton x:Uid="ThemeDarkOption" GroupName="SettingsTheme" Style="{StaticResource SaSegmentedThemeItemStyle}"
-                                                 IsChecked="{Binding SelectedThemeIndex, Mode=TwoWay, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=2}">
-                                        <StackPanel Orientation="Horizontal" Spacing="5">
-                                            <primitives:SaIcon Data="{StaticResource SaIconMoon02Data}" Size="14" VerticalAlignment="Center" />
-                                            <TextBlock x:Uid="ThemeDarkOptionText" VerticalAlignment="Center" />
-                                        </StackPanel>
-                                    </RadioButton>
-                                </StackPanel>
+                                <!-- UI.11 H01: the ONE sliding selection indicator sits behind the items (SaSlidingSelection). -->
+                                <Grid>
+                                    <Border IsHitTestVisible="False" AutomationProperties.AccessibilityView="Raw"
+                                            primitives:SaSlidingSelection.IndicatorBrush="{ThemeResource SaSegmentedThemeSelectedBrush}" />
+                                    <!-- Beacon C1 N1: the UI.2 segmented keyboard contract - one Tab stop, entry on the selected item,
+                                         the arrows move AND select (SaGroupNavigation). -->
+                                    <StackPanel x:Uid="SettingsThemeGroup" Orientation="Horizontal" Spacing="{StaticResource SaSpace4}"
+                                                primitives:SaGroupNavigation.Mode="SelectionFollowsFocus">
+                                        <RadioButton x:Uid="ThemeSystemOption" GroupName="SettingsTheme" Style="{StaticResource SaSegmentedThemeItemStyle}"
+                                                     IsChecked="{Binding SelectedThemeIndex, Mode=TwoWay, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=0}">
+                                            <StackPanel Orientation="Horizontal" Spacing="5">
+                                                <primitives:SaIcon Data="{StaticResource SaIconComputerData}" Size="14" VerticalAlignment="Center" />
+                                                <TextBlock x:Uid="ThemeSystemOptionText" VerticalAlignment="Center" />
+                                            </StackPanel>
+                                        </RadioButton>
+                                        <RadioButton x:Uid="ThemeLightOption" GroupName="SettingsTheme" Style="{StaticResource SaSegmentedThemeItemStyle}"
+                                                     IsChecked="{Binding SelectedThemeIndex, Mode=TwoWay, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=1}">
+                                            <StackPanel Orientation="Horizontal" Spacing="5">
+                                                <primitives:SaIcon Data="{StaticResource SaIconSun03Data}" Size="14" VerticalAlignment="Center" />
+                                                <TextBlock x:Uid="ThemeLightOptionText" VerticalAlignment="Center" />
+                                            </StackPanel>
+                                        </RadioButton>
+                                        <RadioButton x:Uid="ThemeDarkOption" GroupName="SettingsTheme" Style="{StaticResource SaSegmentedThemeItemStyle}"
+                                                     IsChecked="{Binding SelectedThemeIndex, Mode=TwoWay, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=2}">
+                                            <StackPanel Orientation="Horizontal" Spacing="5">
+                                                <primitives:SaIcon Data="{StaticResource SaIconMoon02Data}" Size="14" VerticalAlignment="Center" />
+                                                <TextBlock x:Uid="ThemeDarkOptionText" VerticalAlignment="Center" />
+                                            </StackPanel>
+                                        </RadioButton>
+                                    </StackPanel>
+                                </Grid>
                             </Border>
                         </Grid>
                         <!-- Setting / Idioma 112:7939: selector pill 250×36 with the 4 options (A-14); fixed description (A-15),

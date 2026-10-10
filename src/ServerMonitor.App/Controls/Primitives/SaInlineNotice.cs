@@ -33,6 +33,8 @@ public sealed class SaInlineNotice : ContentControl
     {
         DefaultStyleKey = typeof(SaInlineNotice);
         IsTabStop = false;
+        // UI.11 F10 transient, entrance only: rises in when it appears (never at first presentation or on refresh).
+        SaMotion.SetEnter(this, SaMotionEnter.Rise);
     }
 
     public SaNoticeSeverity Severity
