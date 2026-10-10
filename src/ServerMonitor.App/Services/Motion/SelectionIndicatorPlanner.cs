@@ -20,7 +20,8 @@ public enum IndicatorCause
     Remount,
     Resize,
     DpiChange,
-    LanguageChange,
+    // No separate LanguageChange (tests review T-5): an x:Uid relayout re-measures the items, which reaches the planner as
+    // Resize through their SizeChanged - the same Snap.
     ReducedMotionChanged,
     Selection
 }

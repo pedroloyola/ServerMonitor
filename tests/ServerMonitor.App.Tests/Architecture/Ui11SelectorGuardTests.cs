@@ -40,6 +40,15 @@ public sealed class Ui11SelectorGuardTests
                     $"{key}: Checked paints {target}");
             }
 
+            // Tests review T-4: nor through an animation (a Storyboard targeting Shell/Highlight would paint a second pill).
+            foreach (var animated in style.Descendants(Presentation + "VisualState")
+                         .Where(s => (string?)s.Attribute(AppSourceTree.Xaml + "Name") == "Checked")
+                         .SelectMany(s => s.Descendants()).Where(e => e.Attribute("Storyboard.TargetName") is not null))
+            {
+                var name = (string?)animated.Attribute("Storyboard.TargetName");
+                Assert.False(name is "Shell" or "Highlight", $"{key}: Checked animates {name}");
+            }
+
             Assert.Empty(style.Descendants().Where(e => e.Name.LocalName == "BrushTransition"
                 && e.Parent?.Parent is { } owner && (string?)owner.Attribute(AppSourceTree.Xaml + "Name") == "Shell"));
         }

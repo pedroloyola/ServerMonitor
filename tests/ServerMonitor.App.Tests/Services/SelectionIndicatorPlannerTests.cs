@@ -144,7 +144,6 @@ public sealed class SelectionIndicatorPlannerTests
     [Theory]
     [InlineData(IndicatorCause.Resize)]
     [InlineData(IndicatorCause.DpiChange)]
-    [InlineData(IndicatorCause.LanguageChange)]
     [InlineData(IndicatorCause.Remount)]
     public void LayoutCauses_SnapToTheMovedTarget_NeverAnimate(IndicatorCause cause)
     {
@@ -158,7 +157,6 @@ public sealed class SelectionIndicatorPlannerTests
     [Theory]
     [InlineData(IndicatorCause.Resize)]
     [InlineData(IndicatorCause.DpiChange)]
-    [InlineData(IndicatorCause.LanguageChange)]
     public void LayoutCauses_MidSlide_SnapToTheNewBounds(IndicatorCause cause)
     {
         var planner = Presented(Range, 0);

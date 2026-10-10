@@ -255,4 +255,116 @@ public sealed class Ui11FindingsGuardTests
         Assert.DoesNotContain("GetElementVisual(_host)", code, StringComparison.Ordinal);
         Assert.Contains("CompositionTarget.GetCompositorForCurrentThread()", code, StringComparison.Ordinal);
     }
+
+    // ---------------- Fix Round 2 (independent tests review T-1..T-3): the runtime WIRING of the pure rules ----------------
+
+    private static string Body(string code, string signature)
+    {
+        var start = code.IndexOf(signature, StringComparison.Ordinal);
+        Assert.True(start >= 0, signature);
+        var open = code.IndexOf('{', start);
+        var arrow = code.IndexOf("=>", start, StringComparison.Ordinal);
+        if (arrow >= 0 && arrow < open)
+        {
+            return code[arrow..code.IndexOf(';', arrow)];
+        }
+
+        var depth = 0;
+        for (var i = open; i < code.Length; i++)
+        {
+            depth += code[i] == '{' ? 1 : code[i] == '}' ? -1 : 0;
+            if (depth == 0)
+            {
+                return code[open..(i + 1)];
+            }
+        }
+
+        throw new InvalidOperationException(signature);
+    }
+
+    private static string Squash(string text) => System.Text.RegularExpressions.Regex.Replace(text, @"\s+", " ").Trim();
+
+    /// <summary>
+    /// T-1: the presenter passes the live Reduced Motion state to the planner (O3), restarts every animation from the
+    /// PRESENTED value - the only keyframe at 0 is <c>this.StartingValue</c> (O2) - and each event requests exactly its
+    /// cause: Loaded only FirstLayout/Remount, never Selection (O5); a check change Selection; a size change Resize; a scale
+    /// change DpiChange; the setting change ReducedMotionChanged.
+    /// </summary>
+    [Fact]
+    public void T1_TheIndicatorPresenter_WiresThePlannerExactly()
+    {
+        var code = AppSourceTree.CodeWithoutComments("Controls/Primitives/SaSlidingSelection.cs");
+
+        Assert.Contains("_planner.Flush(rects, selected, MotionPolicy.IsReduced)", code, StringComparison.Ordinal);
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(code, @"_planner\.Flush\("));
+        Assert.Contains("animation.InsertExpressionKeyFrame(0f, \"this.StartingValue\");", code, StringComparison.Ordinal);
+        Assert.Empty(System.Text.RegularExpressions.Regex.Matches(code, @"InsertKeyFrame\(\s*0f"));
+
+        var requests = new Dictionary<string, string>
+        {
+            ["private void OnLoaded("] = "_planner.Request(_planner.PresentedTarget is null ? IndicatorCause.FirstLayout : IndicatorCause.Remount);",
+            ["private void OnSelectionChanged("] = "_planner.Request(IndicatorCause.Selection);",
+            ["private void OnLayoutChanged("] = "_planner.Request(IndicatorCause.Resize);",
+            ["private void OnXamlRootChanged("] = "_planner.Request(IndicatorCause.DpiChange);",
+            ["private void OnReducedMotionChanged("] = "_planner.Request(IndicatorCause.ReducedMotionChanged);",
+        };
+        foreach (var (handler, request) in requests)
+        {
+            var body = Body(code, handler);
+            Assert.Contains(request, body, StringComparison.Ordinal);
+            Assert.Single(System.Text.RegularExpressions.Regex.Matches(body, @"_planner\.Request\("));
+        }
+
+        Assert.Equal(5, System.Text.RegularExpressions.Regex.Matches(code, @"_planner\.Request\(").Count);
+    }
+
+    /// <summary>T-1 (SaMotion): every enter/hover decision is fed the live Reduced Motion state.</summary>
+    [Fact]
+    public void T1_SaMotion_FeedsTheLiveReducedMotionStateToEveryDecision()
+    {
+        var code = AppSourceTree.CodeWithoutComments("Controls/Primitives/SaMotion.cs");
+        // Both call sites, and each one's LAST argument is the live MotionPolicy.IsReduced (never a constant).
+        Assert.Equal(2, System.Text.RegularExpressions.Regex.Matches(code, @"MotionRules\.PlaysEnter\(").Count);
+        Assert.Equal(2, System.Text.RegularExpressions.Regex.Matches(code, @"MotionRules\.PlaysEnter\([^;]*?, MotionPolicy\.IsReduced\)").Count);
+        Assert.Contains("var transition = MotionPolicy.IsReduced ? null", Squash(Body(code, "private void ApplyHoverTransition(")), StringComparison.Ordinal);
+        Assert.Contains("if (MotionPolicy.IsReduced) { ElementCompositionPreview.SetImplicitHideAnimation(_element, null);", Squash(Body(code, "private void ApplyHideAnimation(")), StringComparison.Ordinal);
+    }
+
+    /// <summary>T-2 (O6): the failure-path restore is exactly "only when NOT succeeded" (Cortex C-2).</summary>
+    [Fact]
+    public void T2_ModeChangeEnded_RestoresOnlyAFailedSwitch()
+    {
+        var body = Squash(Body(AppSourceTree.CodeWithoutComments("MainWindow.xaml.cs"), "private void OnWindowModeChangeEnded("));
+
+        Assert.Equal("{ if (!ended.Succeeded) { _compactSwitchAnnounced = false; StandardRoot.Opacity = 1; } }", body);
+    }
+
+    /// <summary>
+    /// T-3 (O8/O9): the F07 remount fix's two load-bearing parts. SaLiveTree walks the ancestors to the XamlRoot content and
+    /// never reads IsLoaded; an Unloaded only gives up the process-wide subscriptions - never the subtree's own events.
+    /// </summary>
+    [Fact]
+    public void T3_TheRemountFix_LiveTreeWalk_AndAnUnloadedThatKeepsTheSubtreeEvents()
+    {
+        var live = AppSourceTree.CodeWithoutComments("Controls/Primitives/SaLiveTree.cs");
+        Assert.DoesNotContain("IsLoaded", live, StringComparison.Ordinal);
+        Assert.Contains("var root = element.XamlRoot?.Content;", live, StringComparison.Ordinal);
+        Assert.Contains("current = VisualTreeHelper.GetParent(current)", live, StringComparison.Ordinal);
+        Assert.Contains("if (ReferenceEquals(current, root))", live, StringComparison.Ordinal);
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(live, @"public static bool "));
+
+        var controller = AppSourceTree.CodeWithoutComments("Controls/Primitives/SaSlidingSelection.cs");
+        var unloaded = Body(controller, "private void OnUnloaded(");
+        Assert.DoesNotContain("ReleaseItems", unloaded, StringComparison.Ordinal);
+        Assert.DoesNotContain("-=", unloaded, StringComparison.Ordinal);
+        Assert.Contains("UnsubscribeExternal();", unloaded, StringComparison.Ordinal);
+        var external = Body(controller, "private void UnsubscribeExternal(");
+        Assert.All(System.Text.RegularExpressions.Regex.Matches(external, @"(\S+) -= ").Select(m => m.Groups[1].Value),
+            target => Assert.Contains(target, new[] { "_xamlRoot.Changed", "MotionPolicy.Source.Changed" }));
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(controller, @"ReleaseItems\(\);")); // only CollectItems re-collects
+
+        var motion = Body(AppSourceTree.CodeWithoutComments("Controls/Primitives/SaMotion.cs"), "private void OnUnloaded(");
+        Assert.All(System.Text.RegularExpressions.Regex.Matches(motion, @"(\S+) -= ").Select(m => m.Groups[1].Value),
+            target => Assert.Equal("MotionPolicy.Source.Changed", target));
+    }
 }
