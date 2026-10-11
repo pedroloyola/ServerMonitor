@@ -60,7 +60,8 @@ public static class SaThemeRefresh
     }
 
     /// <summary>Takes the page's content out of the tree and puts the same object back, keeping the focused element.</summary>
-    public static bool Remount(Page page)
+    /// <param name="restoreFocus">False inside a batch (<see cref="Services.ThemeRemountFocus"/>), which restores focus once.</param>
+    public static bool Remount(Page page, bool restoreFocus = true)
     {
         ArgumentNullException.ThrowIfNull(page);
         if (page.Content is not UIElement content || page.XamlRoot is null)
@@ -68,7 +69,7 @@ public static class SaThemeRefresh
             return false;
         }
 
-        var focused = FocusManager.GetFocusedElement(page.XamlRoot) as Control;
+        var focused = restoreFocus ? FocusManager.GetFocusedElement(page.XamlRoot) as Control : null;
         // Cortex C2 R-1: the page's scroller is part of the remounted content - its offset is kept explicitly.
         var scroller = FirstScrollViewer(content);
         var offset = scroller?.VerticalOffset ?? 0;
@@ -83,10 +84,10 @@ public static class SaThemeRefresh
         return true;
     }
 
-    public static bool Remount(FrameworkElement control, UIElement? content, Action<UIElement?> replaceContent)
+    public static bool Remount(FrameworkElement control, UIElement? content, Action<UIElement?> replaceContent, bool restoreFocus = true)
     {
         if (content is null || control.XamlRoot is null) return false;
-        var focused = FocusManager.GetFocusedElement(control.XamlRoot) as Control;
+        var focused = restoreFocus ? FocusManager.GetFocusedElement(control.XamlRoot) as Control : null;
         var scroller = FirstScrollViewer(content);
         var offset = scroller?.VerticalOffset ?? 0;
         replaceContent(null);

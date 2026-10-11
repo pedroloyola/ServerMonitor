@@ -433,12 +433,22 @@ public sealed partial class MainWindow : Window
         ApplyShellBackground();
         UpdateCaptionButtonColors();
         // R-4: remount page CONTENT, never the Frame's Page (Unloaded would dispose per-visit VMs).
+        // UI.11.1 H03: ONE focus capture before the first root leaves the tree and ONE restore after all of them (each remount
+        // capturing on its own restored "Sistema" last - Beacon S0).
         DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
         {
-            if (ContentFrame.Content is Microsoft.UI.Xaml.Controls.Page page) SaThemeRefresh.Remount(page);
-            SaThemeRefresh.Remount(Sidebar, Sidebar.Content, content => Sidebar.Content = content);
-            SaThemeRefresh.Remount(FirstRunView, FirstRunView.Content, content => FirstRunView.Content = content);
-            SaThemeRefresh.Remount(CompactShellView, CompactShellView.Content, content => CompactShellView.Content = content);
+            if (Content?.XamlRoot is not { } root)
+            {
+                return;
+            }
+
+            Services.ThemeRemountFocus.RemountAll(new XamlRemountFocusPort(root, DispatcherQueue),
+            [
+                () => ContentFrame.Content is Microsoft.UI.Xaml.Controls.Page page && SaThemeRefresh.Remount(page, restoreFocus: false),
+                () => SaThemeRefresh.Remount(Sidebar, Sidebar.Content, content => Sidebar.Content = content, restoreFocus: false),
+                () => SaThemeRefresh.Remount(FirstRunView, FirstRunView.Content, content => FirstRunView.Content = content, restoreFocus: false),
+                () => SaThemeRefresh.Remount(CompactShellView, CompactShellView.Content, content => CompactShellView.Content = content, restoreFocus: false)
+            ]);
         });
     }
 
