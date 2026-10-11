@@ -51,6 +51,17 @@ public static class SaSlidingSelection
     public static readonly DependencyProperty LightOutlineBrushProperty = DependencyProperty.RegisterAttached(
         "LightOutlineBrush", typeof(Brush), typeof(SaSlidingSelection), new PropertyMetadata(null, OnBrushChanged));
 
+    /// <summary>
+    /// UI.11.1 H01: the motion token (a key of Styles/Tokens/Motion.xaml) this track's slide-select uses. Unset = the shared
+    /// SaMotionSelectDuration (250: the sidebar, F07); the five segmented selectors set SaMotionSegmentSelectDuration (300).
+    /// </summary>
+    public static readonly DependencyProperty DurationKeyProperty = DependencyProperty.RegisterAttached(
+        "DurationKey", typeof(string), typeof(SaSlidingSelection), new PropertyMetadata(null));
+
+    public static string? GetDurationKey(FrameworkElement host) => (string?)host.GetValue(DurationKeyProperty);
+
+    public static void SetDurationKey(FrameworkElement host, string? value) => host.SetValue(DurationKeyProperty, value);
+
     public static Brush? GetLightOutlineBrush(FrameworkElement host) => (Brush?)host.GetValue(LightOutlineBrushProperty);
 
     public static void SetLightOutlineBrush(FrameworkElement host, Brush? value) => host.SetValue(LightOutlineBrushProperty, value);
@@ -432,7 +443,7 @@ internal sealed class SlidingSelectionController
         else
         {
             var resources = Application.Current.Resources;
-            var duration = MotionTokens.GetTime(resources, MotionTokens.SelectDuration);
+            var duration = MotionTokens.GetTime(resources, SelectionIndicatorRules.DurationKey(SaSlidingSelection.GetDurationKey(_host)));
             var spline = MotionTokens.GetKeySpline(resources, MotionTokens.PointToPointKeySpline);
             var easing = _compositor.CreateCubicBezierEasingFunction(
                 new Vector2((float)spline.X1, (float)spline.Y1), new Vector2((float)spline.X2, (float)spline.Y2));

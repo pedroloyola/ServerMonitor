@@ -16,12 +16,23 @@
     <x:String x:Key="SaMotionLinearKeySpline">0,0,1,1</x:String>
     <x:String x:Key="SaMotionDirectKeySpline">0,0,0,1</x:String>
     <x:String x:Key="SaMotionPointToPointKeySpline">0.55,0.55,0,1</x:String>
-    <!-- UI.11 Motion System (Prism UI11A §4.1/§4.2): semantic aliases over the same Fluent 83/167/250 scale. Consumers use
-         the role; a tuning decision changes the alias, never the scale. Hierarchy: hover 83 < toggle 167 < select 250;
-         an exit is always shorter than its entrance; no UI.11 pattern exceeds 250 ms (SaMotionSlowDuration stays unused). -->
+    <!-- UI.11 Motion System (Prism UI11A §4.1/§4.2): semantic aliases. Consumers use the role; a tuning decision changes the
+         alias, never the base scale above. Hierarchy: hover 83 < toggle swap 100 < toggle 200 = settle 200 < select 250
+         < segment select 300; an exit is always shorter than its entrance.
+         UI.11.1 H01 (human decision 2026-10-11, Prism UI11.1A §4.2-§4.4): the toggle (200), its thumb colour swap (100) and
+         the segmented selectors (300) are DELIBERATELY OFF the Fluent 83/167/250 scale. Only the five segmented selectors use
+         300 (the longest travel in the app, through SaSlidingSelection.DurationKey); the sidebar and the onboarding dot stay
+         on SaMotionSelectDuration (250). No pattern exceeds 300 ms (SaMotionSlowDuration stays unused). -->
     <x:String x:Key="SaMotionHoverDuration">0:0:0.083</x:String>
-    <x:String x:Key="SaMotionToggleDuration">0:0:0.167</x:String>
+    <x:String x:Key="SaMotionToggleDuration">0:0:0.200</x:String>
+    <!-- The toggle thumb's discrete colour swap at MID-travel = half of SaMotionToggleDuration (Prism D1: 92 % of the travel).
+         Its own key: never SaMotionFadeDuration, which belongs to hover/fade. -->
+    <x:String x:Key="SaMotionToggleSwapTime">0:0:0.100</x:String>
     <x:String x:Key="SaMotionSelectDuration">0:0:0.250</x:String>
+    <!-- The five segmented selectors' slide-select (and the drag cancel's return, Point to Point). -->
+    <x:String x:Key="SaMotionSegmentSelectDuration">0:0:0.300</x:String>
+    <!-- The settle after a drag-to-select release (with SaMotionDirectKeySpline: it continues the hand's motion). -->
+    <x:String x:Key="SaMotionSettleDuration">0:0:0.200</x:String>
     <x:String x:Key="SaMotionEnterDuration">0:0:0.167</x:String>
     <x:String x:Key="SaMotionEnterOffsetDuration">0:0:0.250</x:String>
     <x:String x:Key="SaMotionExitDuration">0:0:0.083</x:String>

@@ -148,6 +148,23 @@ public static class SelectionIndicatorRules
         hostHasOutline && isLightTheme && !isHighContrast;
 
     /// <summary>
+    /// UI.11.1 H01: the duration token a track's slide-select uses - the host's own key, or the shared SaMotionSelectDuration
+    /// (250, the sidebar) when the host sets none. Only a time token is accepted: anything else fails closed (a typo in a
+    /// host's XAML must never silently fall back to another duration).
+    /// </summary>
+    public static string DurationKey(string? hostKey)
+    {
+        if (string.IsNullOrEmpty(hostKey))
+        {
+            return MotionTokens.SelectDuration;
+        }
+
+        return MotionTokens.TimeKeys.Contains(hostKey, StringComparer.Ordinal)
+            ? hostKey
+            : throw new InvalidOperationException($"SaSlidingSelection.DurationKey '{hostKey}' is not a motion time token.");
+    }
+
+    /// <summary>
     /// B11-4: the index the indicator targets. While a Checked is being handled the group's previous item may still report
     /// IsChecked (its Unchecked comes after), so the item being checked wins; otherwise the first checked item; -1 if none.
     /// </summary>
