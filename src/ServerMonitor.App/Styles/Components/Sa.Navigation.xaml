@@ -1,6 +1,7 @@
 <ResourceDictionary
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:primitives="using:ServerMonitor.App.Controls.Primitives">
     <!-- UI.2 S4 navigation item on RadioButton (single selection, SelectionItem pattern for free). -->
     <ResourceDictionary.MergedDictionaries>
         <ResourceDictionary Source="ms-appx:///Styles/Tokens/Typography.xaml" />
@@ -59,18 +60,16 @@
                                 <VisualState x:Name="Indeterminate" />
                                 <VisualState x:Name="Checked">
                                     <VisualState.Setters>
-                                        <Setter Target="Shell.Background" Value="{ThemeResource SaSelectedBrush}" />
+                                        <!-- UI.11 F07: the fill + top highlight are the sidebar's ONE sliding indicator
+                                             (SaSlidingSelection, vertical), never the item's own: text only here. -->
                                         <Setter Target="ContentPresenter.Foreground" Value="{ThemeResource SaSelectedTextBrush}" />
                                         <Setter Target="ContentPresenter.FontWeight" Value="Medium" />
-                            <Setter Target="Highlight.Opacity" Value="1" />
                                     </VisualState.Setters>
                                 </VisualState>
                             </VisualStateGroup>
                         </VisualStateManager.VisualStateGroups>
                         <Border x:Name="Shell" Background="{TemplateBinding Background}" CornerRadius="{TemplateBinding CornerRadius}" />
-            <Border x:Name="Highlight" Opacity="0" CornerRadius="{TemplateBinding CornerRadius}" BorderThickness="0,1,0,0"
-                    BorderBrush="{ThemeResource SaGlassHighlightBrush}" IsHitTestVisible="False" />
-                        <Border x:Name="StateOverlay" CornerRadius="{TemplateBinding CornerRadius}" IsHitTestVisible="False" />
+                        <Border x:Name="StateOverlay" CornerRadius="{TemplateBinding CornerRadius}" IsHitTestVisible="False" Background="Transparent" primitives:SaMotion.HoverFade="True" />
                         <ContentPresenter x:Name="ContentPresenter"
                                           Padding="{TemplateBinding Padding}"
                                           HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"

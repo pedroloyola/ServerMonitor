@@ -48,6 +48,10 @@ internal static class QaGalleryComposition
 
         QaUiLanguageComposition.ApplyRequested();
 
+        // UI.11: the gallery also honours --qa-reduced-motion (the motion patterns' instant form).
+        Services.Motion.MotionPolicy.Install(Services.Motion.MotionPolicy.CreateSystemSource(
+            forceReduced: QaReducedMotionPolicy.IsRequested(Environment.GetCommandLineArgs(), isDebugBuild: true)));
+
         // The same language rule the application applies at startup, without a host: an explicit override wins,
         // an unsupported system culture falls back to the product default. Nothing is persisted.
         new LocalizationService(NullLogger<LocalizationService>.Instance).InitializeFromSystem();

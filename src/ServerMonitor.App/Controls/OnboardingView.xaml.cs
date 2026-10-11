@@ -4,12 +4,17 @@ using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media.Animation;
+using ServerMonitor.App.Controls.Primitives;
 using ServerMonitor.App.Services;
+using ServerMonitor.App.Services.Motion;
 using ServerMonitor.App.ViewModels;
 namespace ServerMonitor.App.Controls;
 public sealed partial class OnboardingView : UserControl
 {
     private OnboardingViewModel? _subscribed;
+    private int _shownStep;
+    private Storyboard? _dotMotion;
     public ILocalizationService? Localization { get; set; }
     public OnboardingView()
     {
@@ -32,6 +37,16 @@ public sealed partial class OnboardingView : UserControl
     private void UpdateStep()
     {
         var step = (DataContext as OnboardingViewModel)?.Step ?? 1;
+        // UI.11 F12 content-swap: a real step change (never the first presentation) fades the new step's text in; the
+        // step blocks (hero, benefits, principles, methods) fade in through SaMotion.Enter as they become visible.
+        var stepChanged = _shownStep != 0 && _shownStep != step;
+        _shownStep = step;
+        if (stepChanged)
+        {
+            SaMotion.PlayEnter(Heading, SaMotionEnter.Fade);
+            SaMotion.PlayEnter(Subtitle, SaMotionEnter.Fade);
+        }
+
         HeroBrand.Visibility = Benefits.Visibility = step == 1 ? Visibility.Visible : Visibility.Collapsed;
         HeroShield.Visibility = Principles.Visibility = step == 2 ? Visibility.Visible : Visibility.Collapsed;
         Methods.Visibility = step == 3 ? Visibility.Visible : Visibility.Collapsed;
@@ -48,10 +63,66 @@ public sealed partial class OnboardingView : UserControl
         NextButton.Content = Text(step == 1 ? "OnboardingStart.Content" : step == 2 ? "OnboardingContinue.Content" : "OnboardingExplore.Content");
         NextButton.Style = (Style)Application.Current.Resources[step == 3 ? "SaOnboardingSecondaryButtonStyle" : "SaOnboardingPrimaryButtonStyle"];
         var dots = new[] { Dot1, Dot2, Dot3 };
-        for (var i=0;i<dots.Length;i++) { dots[i].Width = i == step-1 ? 24 : 6; dots[i].Opacity = i == step-1 ? 1 : .25; }
+        UpdateDots(dots, step, animate: stepChanged && IsLoaded && !MotionPolicy.IsReduced);
         ProgressText.Text = string.Format(Text("OnboardingProgressFormat"), step);
         AutomationProperties.SetName(ProgressText, string.Format(Text("OnboardingStepNameFormat"), step));
     }
+    /// <summary>
+    /// UI.11 F12 (Prism §3): the active dot GROWS 6→24 (and the previous one shrinks) over SaMotionSelectDuration,
+    /// point-to-point, instead of snapping - the progress row's slide-select. Width is a layout property: this is the one
+    /// documented dependent animation of UI.11 (three 6 px dots, once per step change, onboarding only); the opacity is
+    /// independent. Reduced Motion / first presentation: set directly. A new step replaces a running one.
+    /// </summary>
+    private void UpdateDots(Border[] dots, int step, bool animate)
+    {
+        _dotMotion?.Stop();
+        _dotMotion = null;
+        if (!animate)
+        {
+            for (var i = 0; i < dots.Length; i++) { dots[i].Width = i == step - 1 ? 24 : 6; dots[i].Opacity = i == step - 1 ? 1 : .25; }
+            return;
+        }
+
+        var resources = Application.Current.Resources;
+        var duration = MotionTokens.GetTime(resources, MotionTokens.SelectDuration);
+        var spline = MotionTokens.GetKeySpline(resources, MotionTokens.PointToPointKeySpline);
+        var storyboard = new Storyboard();
+        for (var i = 0; i < dots.Length; i++)
+        {
+            var active = i == step - 1;
+            var current = (dots[i].ActualWidth, dots[i].Opacity);
+            dots[i].Width = current.ActualWidth > 0 ? current.ActualWidth : dots[i].Width; // start from the presented width
+            storyboard.Children.Add(Track(dots[i], "Width", active ? 24 : 6, duration, spline, dependent: true));
+            storyboard.Children.Add(Track(dots[i], "Opacity", active ? 1 : .25, duration, spline, dependent: false));
+        }
+
+        // The final values are the resting truth once the storyboard is done (HoldEnd keeps them; Stop restores locals).
+        storyboard.Completed += (_, _) =>
+        {
+            for (var i = 0; i < dots.Length; i++) { dots[i].Width = i == step - 1 ? 24 : 6; dots[i].Opacity = i == step - 1 ? 1 : .25; }
+        };
+        _dotMotion = storyboard;
+        storyboard.Begin();
+    }
+
+    private static DoubleAnimationUsingKeyFrames Track(DependencyObject target, string property, double to, TimeSpan duration, MotionKeySpline spline, bool dependent)
+    {
+        var animation = new DoubleAnimationUsingKeyFrames { EnableDependentAnimation = dependent };
+        animation.KeyFrames.Add(new SplineDoubleKeyFrame
+        {
+            KeyTime = KeyTime.FromTimeSpan(duration),
+            Value = to,
+            KeySpline = new KeySpline
+            {
+                ControlPoint1 = new Windows.Foundation.Point(spline.X1, spline.Y1),
+                ControlPoint2 = new Windows.Foundation.Point(spline.X2, spline.Y2)
+            }
+        });
+        Storyboard.SetTarget(animation, target);
+        Storyboard.SetTargetProperty(animation, property);
+        return animation;
+    }
+
     private void Reflow()
     {
         var panelWidth = Math.Min(1040, ActualWidth);

@@ -40,7 +40,8 @@
                 FontSize="12"
                 Foreground="{ThemeResource SaTextSecondaryBrush}"
                 Text="{x:Bind Session.BusyMessage}" />
-            <ProgressBar IsIndeterminate="True" />
+            <!-- UI.11 F17: the indeterminate animation runs only while busy. -->
+            <ProgressBar IsIndeterminate="{x:Bind Session.IsBusy, Mode=OneWay}" />
         </StackPanel>
     </StackPanel>
 </ContentDialog>

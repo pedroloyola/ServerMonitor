@@ -169,9 +169,47 @@ public sealed partial class MainWindow : Window
         AppWindow.TitleBar.ButtonInactiveForegroundColor = isLight ? Colors.DimGray : Colors.LightGray;
     }
 
+    /// <summary>
+    /// UI.11 F06 (Prism §4.3 page-enter, Cortex §5). Navigation sets Frame.Content directly (no Frame.Navigate, PH-3), and
+    /// the Frame's ContentTransitions fire on that content change: a neutral system entrance - a short rise, NO lateral
+    /// offset (the sidebar destinations have no spatial order). Entrance only; the old page is gone at once, as today. The
+    /// theme remount sets page.Content, not Frame.Content, so it does not replay (spike S-4). Cleared with Reduced Motion.
+    /// </summary>
+    private void ApplyPageEntrance()
+    {
+        ContentFrame.ContentTransitions = Services.Motion.MotionPolicy.IsReduced
+            ? null
+            : new Microsoft.UI.Xaml.Media.Animation.TransitionCollection
+            {
+                new Microsoft.UI.Xaml.Media.Animation.EntranceThemeTransition
+                {
+                    FromHorizontalOffset = 0,
+                    FromVerticalOffset = PageEntranceRise,
+                    IsStaggeringEnabled = false
+                }
+            };
+    }
+
+    /// <summary>The page entrance's rise in DIP (Prism §3 F06: fade with a 12 px rise, system timing).</summary>
+    internal const double PageEntranceRise = 12;
+
+    private void OnReducedMotionChanged(object? sender, EventArgs e) => ApplyPageEntrance();
+
     private async void OnRootLayoutLoaded(object sender, RoutedEventArgs e)
     {
         RootLayout.Loaded -= OnRootLayoutLoaded;
+        // UI.11 F06: page entrance on navigation - armed only AFTER the startup page is up (nothing animates at launch).
+        DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
+        {
+            // Cortex R-2: a window closed before this runs must not subscribe to the process-wide source (leak).
+            if (_closed)
+            {
+                return;
+            }
+
+            Services.Motion.MotionPolicy.Source.Changed += OnReducedMotionChanged;
+            ApplyPageEntrance();
+        });
         // The XamlRoot (and its rasterization scale) is available now; recompute the compact caption
         // reserve on every DPI/scale change so the custom controls stay clear of the native buttons.
         if (RootLayout.XamlRoot is { } xamlRoot)
@@ -214,6 +252,9 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    // UI.11 R-2: set first in OnWindowClosed; the deferred page-entrance setup never subscribes a closed window.
+    private bool _closed;
+
     private void OnWindowModeChanged(object? sender, WindowMode mode)
     {
         Onboarding.SetWindowMode(mode);
@@ -222,6 +263,7 @@ public sealed partial class MainWindow : Window
         {
             StandardRoot.Visibility = Visibility.Collapsed;
             CompactRoot.Visibility = Visibility.Visible;
+
             SetTitleBar(CompactDragRegion);
             // The presenter's caption set is now the compact one (maximize disabled); size the
             // reserve to whatever the system actually reserves at the current DPI.
@@ -548,6 +590,7 @@ public sealed partial class MainWindow : Window
     /// </summary>
     private void OnWindowClosed(object sender, WindowEventArgs args)
     {
+        _closed = true;
         Onboarding.PropertyChanged -= OnOnboardingChanged;
         _navigationService.Navigated -= OnShellNavigated;
         StandardRoot.SizeChanged -= OnStandardSizeChanged;
@@ -568,6 +611,7 @@ public sealed partial class MainWindow : Window
         AppWindow.Changed -= OnAppWindowChanged;
         AppWindow.Closing -= OnAppWindowClosing;
         RootLayout.ActualThemeChanged -= OnActualThemeChanged;
+        Services.Motion.MotionPolicy.Source.Changed -= OnReducedMotionChanged;
         Activated -= OnWindowActivated;
         Closed -= OnWindowClosed;
     }

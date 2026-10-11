@@ -50,8 +50,9 @@
             Foreground="{ThemeResource SaTextSecondaryBrush}"
             Text="{x:Bind Session.SecretsNote}"
             TextWrapping="Wrap" />
+        <!-- UI.11 F17: the indeterminate animation runs only while busy (never collapsed-but-animating). -->
         <ProgressBar
-            IsIndeterminate="True"
+            IsIndeterminate="{x:Bind Session.IsBusy, Mode=OneWay}"
             Visibility="{x:Bind Session.IsBusy, Mode=OneWay}" />
     </StackPanel>
 </ContentDialog>

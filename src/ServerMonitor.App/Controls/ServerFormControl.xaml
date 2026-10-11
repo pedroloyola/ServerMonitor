@@ -264,6 +264,10 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
+                            <!-- UI.11 H01: the ONE sliding selection indicator (dims with the items while testing). Prism D2 (B11-10): Light-only hairline (DD-UI11-1 = rect + nav + auth). -->
+                            <Border IsHitTestVisible="False" AutomationProperties.AccessibilityView="Raw" Grid.ColumnSpan="2"
+                                    primitives:SaSlidingSelection.IndicatorBrush="{ThemeResource SaSegmentedPillSelectedBrush}"
+                                    primitives:SaSlidingSelection.LightOutlineBrush="{ThemeResource SaDialogButtonBorderBrush}" />
                             <!-- 112:3356: Key01 / LockPassword 16 + Medium 12; the SAME SelectedAuthenticationIndex setter as
                                  before, so changing the method still drops a staged secret (Vigil H4). -->
                             <RadioButton x:Uid="ServerEditorAuthKeyOption" GroupName="ServerEditorAuthentication" HorizontalAlignment="Stretch"
@@ -288,7 +292,7 @@
                     <!-- SSH key (B-12): the 460x40 picker shows the file NAME; its menu lists the keys found in .ssh (metadata
                          only) + "Procurar ficheiro…"; the full path is in the tooltip and the UIA HelpText; the helper says
                          when the editor pre-selected a key (no silent choice). No editable path box. -->
-                    <StackPanel Spacing="14" Visibility="{Binding IsPrivateKeyAuthentication, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <StackPanel Spacing="14" primitives:SaMotion.Enter="Rise" Visibility="{Binding IsPrivateKeyAuthentication, Converter={StaticResource BooleanToVisibilityConverter}}">
                         <primitives:SaFormField x:Name="PrivateKeyField" x:Uid="ServerEditorPrivateKeyField">
                             <Button x:Name="KeyPickerButton" Style="{StaticResource SaPickerButtonStyle}"
                                     IsEnabled="{Binding IsNotTestingConnection}">
@@ -324,7 +328,7 @@
                     </StackPanel>
 
                     <!-- Password 112:3693: never bound; read and cleared by the page on Test/Save. A saved one: empty + "guardada". -->
-                    <StackPanel Spacing="14" Visibility="{Binding IsPasswordAuthentication, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <StackPanel Spacing="14" primitives:SaMotion.Enter="Rise" Visibility="{Binding IsPasswordAuthentication, Converter={StaticResource BooleanToVisibilityConverter}}">
                         <primitives:SaFormField x:Name="PasswordFormField" x:Uid="ServerEditorPasswordField">
                             <PasswordBox
                                 x:Name="PasswordField"
@@ -405,7 +409,7 @@
 
         <!-- Jump cards 155:1165: "Jump host" (host, user, port) | its own authentication. -->
         <Grid x:Name="JumpCardsGrid" ColumnSpacing="24"
-              Visibility="{Binding UseJumpHost, Converter={StaticResource BooleanToVisibilityConverter}}">
+              primitives:SaMotion.Enter="Rise" Visibility="{Binding UseJumpHost, Converter={StaticResource BooleanToVisibilityConverter}}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition x:Name="JumpCardsColumn2" Width="*" />
@@ -468,6 +472,10 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
+                            <!-- UI.11 H01: the ONE sliding selection indicator (dims with the items while testing). Prism D2 (B11-10): Light-only hairline (DD-UI11-1 = rect + nav + auth). -->
+                            <Border IsHitTestVisible="False" AutomationProperties.AccessibilityView="Raw" Grid.ColumnSpan="2"
+                                    primitives:SaSlidingSelection.IndicatorBrush="{ThemeResource SaSegmentedPillSelectedBrush}"
+                                    primitives:SaSlidingSelection.LightOutlineBrush="{ThemeResource SaDialogButtonBorderBrush}" />
                             <RadioButton x:Uid="ServerEditorJumpAuthKeyOption" GroupName="ServerEditorJumpAuthentication" HorizontalAlignment="Stretch"
                                          Style="{StaticResource SaSegmentedPillItemStyle}" IsEnabled="{Binding IsNotTestingConnection}"
                                          IsChecked="{Binding SelectedJumpAuthenticationIndex, Mode=TwoWay, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=0}">
@@ -487,7 +495,7 @@
                         </Grid>
                     </Border>
                     <!-- The same picker and the same found keys as the target; the jump host's key is NEVER pre-selected. -->
-                    <StackPanel Spacing="14" Visibility="{Binding IsJumpPrivateKeyAuthentication, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <StackPanel Spacing="14" primitives:SaMotion.Enter="Rise" Visibility="{Binding IsJumpPrivateKeyAuthentication, Converter={StaticResource BooleanToVisibilityConverter}}">
                         <primitives:SaFormField x:Name="JumpPrivateKeyField" x:Uid="ServerEditorJumpPrivateKeyField">
                             <Button x:Name="JumpKeyPickerButton" Style="{StaticResource SaPickerButtonStyle}"
                                     IsEnabled="{Binding IsNotTestingConnection}">
@@ -516,7 +524,7 @@
                     </StackPanel>
                     <!-- G-13 (156:478 draws dots): a saved jump secret stays an EMPTY box + "guardada" + "Deixa em branco…". -->
                     <primitives:SaFormField x:Name="JumpPasswordFormField" x:Uid="ServerEditorJumpPasswordField"
-                                            Visibility="{Binding IsJumpPasswordAuthentication, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                            primitives:SaMotion.Enter="Rise" Visibility="{Binding IsJumpPasswordAuthentication, Converter={StaticResource BooleanToVisibilityConverter}}">
                         <PasswordBox
                             x:Name="JumpPasswordField"
                             x:Uid="ServerEditorJumpPasswordInput"
@@ -536,7 +544,7 @@
             Foreground="{ThemeResource SaTextSecondaryBrush}"
             TextTrimming="CharacterEllipsis"
             AutomationProperties.LiveSetting="Polite"
-            Visibility="{Binding UseJumpHost, Converter={StaticResource BooleanToVisibilityConverter}}" />
+            primitives:SaMotion.Enter="Fade" Visibility="{Binding UseJumpHost, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
     </StackPanel>
 </UserControl>

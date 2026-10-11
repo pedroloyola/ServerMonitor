@@ -348,6 +348,15 @@ public static class QaTokenManifest
         new("SaMotionLinearKeySpline", QaTokenKind.MotionString),
         new("SaMotionDirectKeySpline", QaTokenKind.MotionString),
         new("SaMotionPointToPointKeySpline", QaTokenKind.MotionString),
+        new("SaMotionHoverDuration", QaTokenKind.MotionString),
+        new("SaMotionToggleDuration", QaTokenKind.MotionString),
+        new("SaMotionSelectDuration", QaTokenKind.MotionString),
+        new("SaMotionEnterDuration", QaTokenKind.MotionString),
+        new("SaMotionEnterOffsetDuration", QaTokenKind.MotionString),
+        new("SaMotionExitDuration", QaTokenKind.MotionString),
+        new("SaMotionExpandDuration", QaTokenKind.MotionString),
+        new("SaMotionCollapseDuration", QaTokenKind.MotionString),
+        new("SaMotionExitKeySpline", QaTokenKind.MotionString),
 
         // UI.6 shell and onboarding tokens
         new("SaBrandTextStyle", QaTokenKind.Style),

@@ -20,8 +20,9 @@ public readonly record struct MotionKeySpline(double X1, double Y1, double X2, d
 /// malformed throws an <see cref="InvalidOperationException"/> that names the key and the value instead of
 /// silently becoming zero.
 /// <para>
-/// Consumers must honour <c>UISettings.AnimationsEnabled</c>; this type only turns tokens into values.
-/// Compiled in every configuration. No production consumer since UI.5 removed the FullCard focus pulse; the tokens stay.
+/// Consumers must honour Reduced Motion (<see cref="MotionPolicy"/>); this type only turns tokens into values.
+/// Compiled in every configuration. UI.11 consumers: the sliding selection indicator (SaSlidingSelection), the toggle and
+/// dialog templates, and the enter/exit helpers (SaMotion).
 /// </para>
 /// </summary>
 public static partial class MotionTokens
@@ -37,12 +38,27 @@ public static partial class MotionTokens
     public const string DirectKeySpline = "SaMotionDirectKeySpline";
     public const string PointToPointKeySpline = "SaMotionPointToPointKeySpline";
 
+    // UI.11 semantic aliases (Prism UI11A §4.1/§4.2).
+    public const string HoverDuration = "SaMotionHoverDuration";
+    public const string ToggleDuration = "SaMotionToggleDuration";
+    public const string SelectDuration = "SaMotionSelectDuration";
+    public const string EnterDuration = "SaMotionEnterDuration";
+    public const string EnterOffsetDuration = "SaMotionEnterOffsetDuration";
+    public const string ExitDuration = "SaMotionExitDuration";
+    public const string ExpandDuration = "SaMotionExpandDuration";
+    public const string CollapseDuration = "SaMotionCollapseDuration";
+    public const string ExitKeySpline = "SaMotionExitKeySpline";
+
+    /// <summary>The vertical distance (DIP) an entering transient, revealed block or content swap rises from (Prism §4.3).</summary>
+    public const float EnterOffset = 8f;
+
     /// <summary>Every time/duration token, in Motion.xaml order.</summary>
     public static IReadOnlyList<string> TimeKeys { get; } =
-        [FocusPeakTime, FocusFadeEndTime, FocusReducedHoldTime, FadeDuration, FastDuration, NormalDuration, SlowDuration];
+        [FocusPeakTime, FocusFadeEndTime, FocusReducedHoldTime, FadeDuration, FastDuration, NormalDuration, SlowDuration,
+         HoverDuration, ToggleDuration, SelectDuration, EnterDuration, EnterOffsetDuration, ExitDuration, ExpandDuration, CollapseDuration];
 
     /// <summary>Every KeySpline token, in Motion.xaml order.</summary>
-    public static IReadOnlyList<string> KeySplineKeys { get; } = [LinearKeySpline, DirectKeySpline, PointToPointKeySpline];
+    public static IReadOnlyList<string> KeySplineKeys { get; } = [LinearKeySpline, DirectKeySpline, PointToPointKeySpline, ExitKeySpline];
 
     /// <summary>Parses a time token (<c>h:m:s</c> with an optional <c>.fraction</c>, invariant) into a positive TimeSpan.</summary>
     public static TimeSpan ParseTime(string key, object? value)

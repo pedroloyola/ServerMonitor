@@ -106,6 +106,15 @@ public partial class App : Application
         // engine, no tray and a frozen snapshot. Every true exit now reaches Application.Exit() exactly
         // once, and a termination watchdog backs it up.
         DispatcherShutdownMode = DispatcherShutdownMode.OnExplicitShutdown;
+
+        // UI.11 (Prism F09, Cortex §4): ONE Reduced Motion source for the process, on the UI thread, before any window or
+        // template asks it. Debug-only: --qa-reduced-motion pins it on without touching the system setting.
+#if DEBUG
+        Services.Motion.MotionPolicy.Install(Services.Motion.MotionPolicy.CreateSystemSource(
+            forceReduced: QaReducedMotionPolicy.IsRequested(Environment.GetCommandLineArgs(), isDebugBuild: true)));
+#else
+        Services.Motion.MotionPolicy.Install(Services.Motion.MotionPolicy.CreateSystemSource(forceReduced: false));
+#endif
 #if DEBUG
         // UI.3 gate 1A (fail-closed): a harness launch whose composition still reaches real user data aborts here,
         // before the host starts and before OnLaunched touches the trust store.

@@ -33,6 +33,9 @@ public sealed class SaToast : Control
     {
         DefaultStyleKey = typeof(SaToast);
         IsTabStop = false;
+        // UI.11 F10 transient: rises in (fade 167 + 8 px, 250) when shown, fades out (83) when it closes.
+        SaMotion.SetEnter(this, SaMotionEnter.Rise);
+        SaMotion.SetExitFade(this, true);
     }
 
     public event EventHandler? CloseRequested;

@@ -248,18 +248,24 @@
                 Style="{StaticResource SaPageSearchFieldStyle}"
                 Text="{Binding SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
             <Border x:Name="FilterTrack" Grid.Column="2" Style="{StaticResource SaSegmentedRectTrackStyle}">
-                <StackPanel
-                    x:Uid="WorkloadGlobalFilter"
-                    Orientation="Horizontal"
-                    Spacing="4"
-                    primitives:SaGroupNavigation.Mode="SelectionFollowsFocus">
-                    <RadioButton GroupName="WorkloadGlobalFilter" MinWidth="124" Style="{StaticResource SaSegmentedRectFilterItemStyle}"
-                                 Content="{Binding FilterAllLabel}"
-                                 IsChecked="{Binding GlobalFilterIndex, Mode=TwoWay, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=0}" />
-                    <RadioButton GroupName="WorkloadGlobalFilter" MinWidth="124" Style="{StaticResource SaSegmentedRectFilterItemStyle}"
-                                 Content="{Binding FilterProblemsLabel}"
-                                 IsChecked="{Binding GlobalFilterIndex, Mode=TwoWay, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=1}" />
-                </StackPanel>
+                <!-- UI.11 H01: one sliding indicator; it interpolates X AND width (the two items differ in width). -->
+                <Grid>
+                    <Border IsHitTestVisible="False" AutomationProperties.AccessibilityView="Raw"
+                            primitives:SaSlidingSelection.IndicatorBrush="{ThemeResource SaSelectedBrush}"
+                            primitives:SaSlidingSelection.HighlightBrush="{ThemeResource SaGlassHighlightBrush}" primitives:SaSlidingSelection.LightOutlineBrush="{ThemeResource SaDialogButtonBorderBrush}" />
+                    <StackPanel
+                        x:Uid="WorkloadGlobalFilter"
+                        Orientation="Horizontal"
+                        Spacing="4"
+                        primitives:SaGroupNavigation.Mode="SelectionFollowsFocus">
+                        <RadioButton GroupName="WorkloadGlobalFilter" MinWidth="124" Style="{StaticResource SaSegmentedRectFilterItemStyle}"
+                                     Content="{Binding FilterAllLabel}"
+                                     IsChecked="{Binding GlobalFilterIndex, Mode=TwoWay, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=0}" />
+                        <RadioButton GroupName="WorkloadGlobalFilter" MinWidth="124" Style="{StaticResource SaSegmentedRectFilterItemStyle}"
+                                     Content="{Binding FilterProblemsLabel}"
+                                     IsChecked="{Binding GlobalFilterIndex, Mode=TwoWay, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=1}" />
+                    </StackPanel>
+                </Grid>
             </Border>
         </Grid>
 
@@ -311,7 +317,7 @@
                  so the failure reads Alert02 (= failed, F20) and the "nothing here" states (nothing / not installed / no
                  containers / unsupported / no services) read the neutral Package. -->
             <Border Style="{StaticResource SaStatePanelStyle}"
-                    Visibility="{Binding ShowAllUnavailable, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    primitives:SaMotion.Enter="ContentFade" Visibility="{Binding ShowAllUnavailable, Converter={StaticResource BooleanToVisibilityConverter}}">
                 <!-- Beacon L2: the pane is named by the state title, never by the action inside it. -->
                 <ScrollViewer VerticalScrollBarVisibility="Auto" VerticalContentAlignment="Center" AutomationProperties.Name="{Binding Title, ElementName=UnavailableState}">
                     <primitives:SaEmptyState x:Name="UnavailableState" x:Uid="WorkloadUnavailableState" VerticalAlignment="Center" IconData="{StaticResource SaIconAlert02Data}">
@@ -322,7 +328,7 @@
 
             <!-- Nothing 112:14939: both reads succeeded and found nothing. -->
             <Border Style="{StaticResource SaStatePanelStyle}"
-                    Visibility="{Binding ShowNothingToShow, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    primitives:SaMotion.Enter="ContentFade" Visibility="{Binding ShowNothingToShow, Converter={StaticResource BooleanToVisibilityConverter}}">
                 <!-- Beacon L2: the pane is named by the state title, never by the action inside it. -->
                 <ScrollViewer VerticalScrollBarVisibility="Auto" VerticalContentAlignment="Center" AutomationProperties.Name="{Binding Title, ElementName=NothingState}">
                     <primitives:SaEmptyState x:Name="NothingState" x:Uid="WorkloadNothingState" VerticalAlignment="Center" IconData="{StaticResource SaIconPackageData}">

@@ -40,7 +40,7 @@ $ErrorActionPreference = 'Stop'
 
 # Mirrors QaStartupIsolation (tested against it).
 $HarnessFlags = @('--qa-health', '--qa-discovery', '--qa-notifications', '--qa-compact', '--qa-history', '--qa-workloads', '--qa-store-screenshot', '--qa-proxyjump', '--qa-overview', '--qa-editor')
-$ModifierFlags = @('--qa-ssh-config', '--qa-ui-language', '--qa-backup', '--qa-proxyjump-dir', '--qa-overview-scenario', '--qa-start', '--qa-activation', '--qa-editor-seed', '--qa-editor-ssh', '--qa-editor-save', '--qa-compact-scenario', '--qa-compact-start', '--qa-compact-ticker')
+$ModifierFlags = @('--qa-ssh-config', '--qa-ui-language', '--qa-backup', '--qa-proxyjump-dir', '--qa-overview-scenario', '--qa-start', '--qa-activation', '--qa-editor-seed', '--qa-editor-ssh', '--qa-editor-save', '--qa-compact-scenario', '--qa-compact-start', '--qa-compact-ticker', '--qa-reduced-motion')
 $GalleryFlags = @('--qa-components', '--qa-tokens')
 # UI.8 (Atlas c1 A-4): the compact harness's value rules, mirrored from QaCompactComposition / QaShellStartup so the launcher
 # refuses what the app refuses (exit 3) instead of starting it. 'scenario=visible servers', as QaCompactCatalog (tested).
@@ -65,6 +65,10 @@ function Get-QaLaunchRefusal([string[]]$arguments) {
     if (($qa -ccontains '--qa-editor') -and @($qa | Where-Object { $_ -ceq '--qa-activation' -or $_.StartsWith('--qa-activation=', [StringComparison]::Ordinal) }).Count -gt 0) {
         return '--qa-activation is not supported with --qa-editor (the app refuses it too: exit 3, no window)'
     }
+    # UI.11 QaReducedMotionPolicy: no value, at most once (mirrors the app's exit-3 refusal).
+    $reduced = @($qa | Where-Object { Test-IsFlagOccurrence $_ '--qa-reduced-motion' })
+    if (@($reduced | Where-Object { $_ -cne '--qa-reduced-motion' }).Count -gt 0) { return "--qa-reduced-motion takes no value and must be written exactly '--qa-reduced-motion'." }
+    if ($reduced.Count -gt 1) { return '--qa-reduced-motion may be given at most once.' }
     $compactRefusal = Get-QaCompactRefusal $arguments
     if ($compactRefusal) { return $compactRefusal }
     $null
