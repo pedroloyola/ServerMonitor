@@ -13,7 +13,10 @@ public readonly record struct IndicatorRect(double X, double Y, double Width, do
         && Math.Abs(Width - other.Width) < Tolerance && Math.Abs(Height - other.Height) < Tolerance;
 }
 
-/// <summary>Why the indicator is being re-planned. Only a <see cref="Selection"/> may animate.</summary>
+/// <summary>
+/// Why the indicator is being re-planned. Only a <see cref="Selection"/> or the end of a drag preview may animate. Ordered
+/// by strength: requests coalesced before one flush keep the strongest.
+/// </summary>
 public enum IndicatorCause
 {
     FirstLayout,
@@ -23,7 +26,21 @@ public enum IndicatorCause
     // No separate LanguageChange (tests review T-5): an x:Uid relayout re-measures the items, which reaches the planner as
     // Resize through their SizeChanged - the same Snap.
     ReducedMotionChanged,
-    Selection
+    Selection,
+
+    /// <summary>
+    /// UI.11.1 H02: a drag preview was cancelled - the indicator returns to the REAL selection with the selection animation
+    /// (Point to Point, the host's duration), even when that is the rect last planned (the preview displaced the visual
+    /// without the planner, Cortex R3). Stronger than Selection: an external selection that cancelled the drag animates once.
+    /// </summary>
+    DragCancel,
+
+    /// <summary>
+    /// UI.11.1 H02: a drag was released - the indicator settles on the selection (committed or not) with the settle motion
+    /// (200 ms Direct, Prism §3.3), even when that is the rect last planned. The strongest cause: the commit's Selection in
+    /// the same flush settles instead of restarting a full Point-to-Point slide.
+    /// </summary>
+    DragEnd
 }
 
 public enum IndicatorAction
@@ -31,7 +48,10 @@ public enum IndicatorAction
     NoOp,
     Snap,
     Animate,
-    Hide
+    Hide,
+
+    /// <summary>UI.11.1 H02: the post-release settle (SaMotionSettleDuration + SaMotionDirectKeySpline).</summary>
+    Settle
 }
 
 public readonly record struct IndicatorPlan(IndicatorAction Action, IndicatorRect Target);
@@ -49,6 +69,8 @@ public readonly record struct IndicatorPlan(IndicatorAction Action, IndicatorRec
 /// <item>Only a user/data selection animates. The first layout, a remount (theme refresh), a resize, a DPI or language
 /// change snap - or do nothing when the target did not move (a remount mid-slide keeps the running animation).</item>
 /// <item>Reduced Motion: every plan that would animate snaps, and the setting changing snaps the running animation.</item>
+/// <item>UI.11.1 H02: the end of a drag preview (DragEnd settle, DragCancel return) always moves - the preview displaced the
+/// visual outside the planner, so "target == last planned" is no reason for a NoOp there.</item>
 /// </list>
 /// </summary>
 public sealed class SelectionIndicatorPlanner
@@ -99,7 +121,7 @@ public sealed class SelectionIndicatorPlanner
         }
 
         var action = Decide(cause, target, reducedMotion);
-        if (action is IndicatorAction.Snap or IndicatorAction.Animate)
+        if (action is IndicatorAction.Snap or IndicatorAction.Animate or IndicatorAction.Settle)
         {
             _presented = target;
         }
@@ -117,6 +139,12 @@ public sealed class SelectionIndicatorPlanner
         if (cause == IndicatorCause.ReducedMotionChanged)
         {
             return IndicatorAction.Snap; // stop whatever runs and land on the target now
+        }
+
+        if (cause is IndicatorCause.DragEnd or IndicatorCause.DragCancel)
+        {
+            // The preview moved the visual without the planner: never a NoOp, even back onto the planned rect.
+            return reducedMotion ? IndicatorAction.Snap : cause == IndicatorCause.DragEnd ? IndicatorAction.Settle : IndicatorAction.Animate;
         }
 
         if (presented.SameAs(target))
