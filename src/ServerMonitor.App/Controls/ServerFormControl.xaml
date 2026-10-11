@@ -266,6 +266,7 @@
                             </Grid.ColumnDefinitions>
                             <!-- UI.11 H01: the ONE sliding selection indicator (dims with the items while testing). Prism D2 (B11-10): Light-only hairline (DD-UI11-1 = rect + nav + auth). -->
                             <Border IsHitTestVisible="False" AutomationProperties.AccessibilityView="Raw" Grid.ColumnSpan="2"
+                                    primitives:SaSlidingSelection.AllowDrag="True"
                                     primitives:SaSlidingSelection.DurationKey="SaMotionSegmentSelectDuration"
                                     primitives:SaSlidingSelection.IndicatorBrush="{ThemeResource SaSegmentedPillSelectedBrush}"
                                     primitives:SaSlidingSelection.LightOutlineBrush="{ThemeResource SaDialogButtonBorderBrush}" />
@@ -475,6 +476,7 @@
                             </Grid.ColumnDefinitions>
                             <!-- UI.11 H01: the ONE sliding selection indicator (dims with the items while testing). Prism D2 (B11-10): Light-only hairline (DD-UI11-1 = rect + nav + auth). -->
                             <Border IsHitTestVisible="False" AutomationProperties.AccessibilityView="Raw" Grid.ColumnSpan="2"
+                                    primitives:SaSlidingSelection.AllowDrag="True"
                                     primitives:SaSlidingSelection.DurationKey="SaMotionSegmentSelectDuration"
                                     primitives:SaSlidingSelection.IndicatorBrush="{ThemeResource SaSegmentedPillSelectedBrush}"
                                     primitives:SaSlidingSelection.LightOutlineBrush="{ThemeResource SaDialogButtonBorderBrush}" />

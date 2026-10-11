@@ -130,6 +130,7 @@
                     </Grid.ColumnDefinitions>
                     <!-- UI.11 H01: the ONE sliding selection indicator, behind the items, across every column. -->
                     <Border IsHitTestVisible="False" AutomationProperties.AccessibilityView="Raw" Grid.ColumnSpan="5"
+                            primitives:SaSlidingSelection.AllowDrag="True"
                             primitives:SaSlidingSelection.DurationKey="SaMotionSegmentSelectDuration"
                             primitives:SaSlidingSelection.IndicatorBrush="{ThemeResource SaSelectedBrush}"
                             primitives:SaSlidingSelection.HighlightBrush="{ThemeResource SaGlassHighlightBrush}" primitives:SaSlidingSelection.LightOutlineBrush="{ThemeResource SaDialogButtonBorderBrush}" />

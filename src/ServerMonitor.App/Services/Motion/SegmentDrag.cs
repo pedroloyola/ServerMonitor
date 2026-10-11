@@ -1,3 +1,5 @@
+using Microsoft.UI.Xaml.Input;
+
 namespace ServerMonitor.App.Services.Motion;
 
 /// <summary>The pointer kind of a drag gesture (mirrors Microsoft.UI.Input.PointerDeviceType without the WinUI type).</summary>
@@ -94,6 +96,14 @@ public static class SegmentDragRules
 
     /// <summary>The predicted label changes only this far past a boundary (Prism §2.3, mandatory in High Contrast).</summary>
     public const double HysteresisDip = 4;
+
+    /// <summary>
+    /// Beacon S0b verdict V2: the opted-in items' ManipulationMode. <c>System</c> keeps the page's vertical pan (the
+    /// ScrollViewer still owns Y); <c>TranslateX</c> keeps the horizontal pen/touch gesture out of DirectManipulation, so it
+    /// reaches the pointer events like the mouse (synthetic pen+touch: commit once, cancels zero, taps and scroll unchanged).
+    /// The same composition the ToggleSwitch template uses for its thumb. Real pen/touch: NOT_RUN.
+    /// </summary>
+    public const ManipulationModes ItemManipulation = ManipulationModes.System | ManipulationModes.TranslateX;
 
     /// <summary>
     /// The drag threshold in DIP. Mouse: the Windows drag rectangle (GetSystemMetricsForDpi SM_CXDRAG / SM_CYDRAG, in
@@ -449,7 +459,7 @@ public sealed class SegmentDragController
 }
 
 /// <summary>
-/// UI.11.1 H02 / Cortex S0 D1 (Atlas S0 §2): a window's activation, per window root, with explicit detach. The main window
+/// UI.11.1 H02 / Cortex S0 D1 (Atlas S0 §2): a window's activation, per window (its AppWindow id, compared by value), with explicit detach. The main window
 /// publishes; a drag adapter subscribes for ITS root while loaded, so another window never cancels it and an unloaded track
 /// leaves no handler behind. The window deactivating raises no CaptureLost (measured, S0 case 7), so this is the cancel path.
 /// </summary>
@@ -481,7 +491,7 @@ public sealed class WindowActivationHub
 
         foreach (var (owner, handler) in _subscribers.ToList())
         {
-            if (ReferenceEquals(owner, root))
+            if (Equals(owner, root))
             {
                 handler(active);
             }

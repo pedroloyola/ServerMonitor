@@ -219,6 +219,20 @@ public sealed class SegmentDragRulesTests
         Assert.Equal(0, hub.Count);
     }
 
+    /// <summary>Production keys are AppWindow ids (a struct): two boxes of the same id are the same window.</summary>
+    [Fact]
+    public void Hub_ComparesWindowIdsByValue()
+    {
+        var hub = new WindowActivationHub();
+        var seen = new List<bool>();
+        hub.Subscribe((object)42UL, seen.Add);
+
+        hub.Publish((object)42UL, false);
+        hub.Publish((object)43UL, false);
+
+        Assert.Equal([false], seen);
+    }
+
     [Fact]
     public void Hub_AHandlerThatDetachesWhilePublishing_DoesNotBreakTheOthers()
     {

@@ -251,6 +251,7 @@
                 <!-- UI.11 H01: one sliding indicator; it interpolates X AND width (the two items differ in width). -->
                 <Grid>
                     <Border IsHitTestVisible="False" AutomationProperties.AccessibilityView="Raw"
+                            primitives:SaSlidingSelection.AllowDrag="True"
                             primitives:SaSlidingSelection.DurationKey="SaMotionSegmentSelectDuration"
                             primitives:SaSlidingSelection.IndicatorBrush="{ThemeResource SaSelectedBrush}"
                             primitives:SaSlidingSelection.HighlightBrush="{ThemeResource SaGlassHighlightBrush}" primitives:SaSlidingSelection.LightOutlineBrush="{ThemeResource SaDialogButtonBorderBrush}" />

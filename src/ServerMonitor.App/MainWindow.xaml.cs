@@ -362,8 +362,12 @@ public sealed partial class MainWindow : Window
 
     private void OnCompactSizeChanged(object sender, SizeChangedEventArgs args) => UpdateCompactTitleLayout();
 
-    private void OnWindowActivated(object sender, WindowActivatedEventArgs args) =>
+    private void OnWindowActivated(object sender, WindowActivatedEventArgs args)
+    {
         _isWindowActive = args.WindowActivationState != WindowActivationState.Deactivated;
+        // UI.11.1 H02 (Cortex S0 D1): a deactivation raises no CaptureLost - a segmented drag in THIS window cancels from here.
+        Services.Motion.WindowActivationHub.Default.Publish(AppWindow.Id, _isWindowActive);
+    }
 
     /// <summary>
     /// Prism R-3: decides, from MEASURED widths, whether "Expandir" shows its text, and whether the mark / wordmark fit

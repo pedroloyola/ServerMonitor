@@ -60,6 +60,18 @@ public static class SaSlidingSelection
 
     public static string? GetDurationKey(FrameworkElement host) => (string?)host.GetValue(DurationKeyProperty);
 
+    /// <summary>
+    /// UI.11.1 H02: opt-in drag-to-select (false by default). Only the five horizontal segmented selectors set it; the sidebar
+    /// (vertical, Click-driven navigation - Cortex B4) and the toggles (not a sliding selection) are excluded by construction.
+    /// Read when the track loads. See <see cref="SegmentDragAdapter"/>.
+    /// </summary>
+    public static readonly DependencyProperty AllowDragProperty = DependencyProperty.RegisterAttached(
+        "AllowDrag", typeof(bool), typeof(SaSlidingSelection), new PropertyMetadata(false));
+
+    public static bool GetAllowDrag(FrameworkElement host) => (bool)host.GetValue(AllowDragProperty);
+
+    public static void SetAllowDrag(FrameworkElement host, bool value) => host.SetValue(AllowDragProperty, value);
+
     public static void SetDurationKey(FrameworkElement host, string? value) => host.SetValue(DurationKeyProperty, value);
 
     public static Brush? GetLightOutlineBrush(FrameworkElement host) => (Brush?)host.GetValue(LightOutlineBrushProperty);
@@ -108,13 +120,15 @@ public static class SaSlidingSelection
 }
 
 /// <summary>The per-host state of <see cref="SaSlidingSelection"/>. Lives as long as the host element.</summary>
-internal sealed class SlidingSelectionController
+internal sealed class SlidingSelectionController : ISegmentDragPresenter
 {
     private readonly FrameworkElement _host;
     private readonly SelectionIndicatorPlanner _planner = new();
     private readonly List<RadioButton> _items = [];
     private bool _externalSubscribed;
     private bool _flushQueued;
+    private bool _previewing;
+    private SegmentDragAdapter? _drag;
     private XamlRoot? _xamlRoot;
     private double _rasterizationScale;
 
@@ -150,6 +164,49 @@ internal sealed class SlidingSelectionController
     /// <summary>QA/test seam: how many indicator visuals this track owns (the H03 invariant: always at most one).</summary>
     public int IndicatorCount => _visual is null ? 0 : 1;
 
+    /// <summary>QA/test seam: the drag interaction of an opted-in track (null when the track does not allow dragging).</summary>
+    internal SegmentDragAdapter? Drag => _drag;
+
+    public IReadOnlyList<RadioButton> Items => _items;
+
+    public IndicatorRect Measure(RadioButton item) => RectOf(item);
+
+    /// <summary>UI.11.1 H02: the drag preview owns the indicator - running animations stop, planner flushes wait.</summary>
+    public void BeginPreview()
+    {
+        _previewing = true;
+        StopAll();
+    }
+
+    public void PresentPreview(IndicatorRect rect)
+    {
+        if (_visual is null || _container is null || _fillGeometry is null || _highlightGeometry is null)
+        {
+            return;
+        }
+
+        StopAll();
+        _container.Offset = new Vector2((float)rect.X, (float)rect.Y);
+        _fillGeometry.Size = new Vector2((float)rect.Width, (float)rect.Height);
+        _highlightGeometry.Size = new Vector2((float)Math.Max(0, rect.Width - 1), (float)Math.Max(0, rect.Height - 1));
+        _visual.IsVisible = true;
+    }
+
+    /// <summary>The preview ended: the planner leads again with the drag-end cause (forced even onto the planned rect).</summary>
+    public void EndPreview(IndicatorCause cause, bool flushNow)
+    {
+        _previewing = false;
+        _planner.Request(cause);
+        if (flushNow)
+        {
+            Flush(null);
+        }
+        else
+        {
+            QueueFlush(); // the commit's Checked flushes in the same turn (B11-4)
+        }
+    }
+
     public void UpdateBrushes()
     {
         if (_fillBrush is null)
@@ -171,6 +228,12 @@ internal sealed class SlidingSelectionController
     private void OnLoaded(object sender, RoutedEventArgs? e)
     {
         CollectItems();
+        if (_drag is null && SaSlidingSelection.GetAllowDrag(_host) && VisualTreeHelper.GetParent(_host) is Panel panel)
+        {
+            _drag = new SegmentDragAdapter(_host, panel, this);
+        }
+
+        _drag?.Attach();
         SubscribeExternal();
         EnsureVisual();
         UpdateBrushes();
@@ -189,6 +252,10 @@ internal sealed class SlidingSelectionController
             if (SaLiveTree.IsLive(_host))
             {
                 SubscribeExternal();
+            }
+            else
+            {
+                _drag?.Detach(); // a real unload (a remount's stale Unloaded finds the host live again)
             }
         });
     }
@@ -249,6 +316,11 @@ internal sealed class SlidingSelectionController
 
         foreach (var item in _items)
         {
+            if (SaSlidingSelection.GetAllowDrag(_host))
+            {
+                SegmentDragAdapter.PrepareItem(item);
+            }
+
             item.Checked += OnSelectionChanged;
             item.Unchecked += OnSelectionChanged;
             item.SizeChanged += OnLayoutChanged;
@@ -280,6 +352,7 @@ internal sealed class SlidingSelectionController
     /// </summary>
     private void OnSelectionChanged(object sender, RoutedEventArgs e)
     {
+        _drag?.OnSelectionChanged(); // an external selection wins over a preview (cancel first, then slide to it)
         _planner.Request(IndicatorCause.Selection);
         if (sender is RadioButton { IsChecked: true } item)
         {
@@ -292,6 +365,7 @@ internal sealed class SlidingSelectionController
 
     private void OnLayoutChanged(object sender, SizeChangedEventArgs e)
     {
+        _drag?.Cancel(DragCancelReason.Layout);
         _planner.Request(IndicatorCause.Resize);
         QueueFlush();
     }
@@ -304,19 +378,25 @@ internal sealed class SlidingSelectionController
         }
 
         _rasterizationScale = sender.RasterizationScale;
+        _drag?.Cancel(DragCancelReason.Layout);
         _planner.Request(IndicatorCause.DpiChange);
         QueueFlush();
     }
 
     private void OnReducedMotionChanged(object? sender, EventArgs e)
     {
+        _drag?.Cancel(DragCancelReason.ReducedMotionChanged);
         _planner.Request(IndicatorCause.ReducedMotionChanged);
         QueueFlush();
     }
 
     private void OnThemeChanged(FrameworkElement sender, object args) => UpdateBrushes();
 
-    private void OnItemEnabledChanged(object sender, DependencyPropertyChangedEventArgs e) => UpdateOpacity();
+    private void OnItemEnabledChanged(object sender, DependencyPropertyChangedEventArgs e)
+    {
+        _drag?.Cancel(DragCancelReason.Disabled);
+        UpdateOpacity();
+    }
 
     /// <summary>
     /// The target is measured AFTER the new visual state's layout (an auto-width item may re-measure on selection): at Low
@@ -340,9 +420,9 @@ internal sealed class SlidingSelectionController
             _flushQueued = false;
         }
 
-        if (!SaLiveTree.IsLive(_host) || _visual is null)
+        if (!SaLiveTree.IsLive(_host) || _visual is null || _previewing)
         {
-            return; // stays pending; the next Loaded re-plans
+            return; // stays pending; the next Loaded (or the end of the drag preview) re-plans
         }
 
         var rects = new List<IndicatorRect>(_items.Count);
@@ -442,9 +522,12 @@ internal sealed class SlidingSelectionController
         }
         else
         {
+            // UI.11.1: a drag release settles (200 ms Direct - it continues the hand, Prism §3.3); every other move is the
+            // track's slide-select (Point to Point, the host's duration: 300 segmented / 250 sidebar).
             var resources = Application.Current.Resources;
-            var duration = MotionTokens.GetTime(resources, SelectionIndicatorRules.DurationKey(SaSlidingSelection.GetDurationKey(_host)));
-            var spline = MotionTokens.GetKeySpline(resources, MotionTokens.PointToPointKeySpline);
+            var settle = plan.Action == IndicatorAction.Settle;
+            var duration = MotionTokens.GetTime(resources, settle ? MotionTokens.SettleDuration : SelectionIndicatorRules.DurationKey(SaSlidingSelection.GetDurationKey(_host)));
+            var spline = MotionTokens.GetKeySpline(resources, settle ? MotionTokens.DirectKeySpline : MotionTokens.PointToPointKeySpline);
             var easing = _compositor.CreateCubicBezierEasingFunction(
                 new Vector2((float)spline.X1, (float)spline.Y1), new Vector2((float)spline.X2, (float)spline.Y2));
             _container.StartAnimation("Offset", Animation(offset, duration, easing));
