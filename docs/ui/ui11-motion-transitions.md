@@ -333,3 +333,34 @@ NOT_RUN in final QA:
 - Live OS "Animation effects" toggle (PH-1).
 
 Test review: the internal subagent (Atlas fallback, Codex quota exhausted) r3 on `0777aba` is **APPROVED**. Two Low guard gaps (T3-1, T3-2) remain from the same class as T-1 and T2-1/T2-2: source-text guards do not prove what the wiring does. Under BOSS §16, a third round of the same class is a decision gate, not another patch. They are declared a limitation and moved to the backlog as `UI11-TEXTGUARD-CLASS` (replace with behavioural tests on the real XAML tree in UI.12). Both behaviours (B11-2, B11-4) passed at runtime above.
+
+## 15. Final acceptance, merge and closeout
+
+- **Final acceptance (human GO "UI.11 — CONDITIONAL MERGE AUTHORIZATION"), before the merge:**
+  - **A — real Windows "Animation effects": PASS.**
+    - Ran in one QA instance through the canonical harness, without `--qa-reduced-motion`, on a binary whose product code is identical to `85c0aec`. The human toggled the OS setting by hand.
+    - **Off:** selectors, sidebar and toggles snapped 10/10 with 0 intermediates and the correct logical state. Page entrances and dialogs were instant. The first snapped interaction came +2.8 s after the change (≤ 3.8 s with a 1 s poll).
+    - **On:** motion came back (5–13 intermediates) with correct states.
+    - The live-change detection (PH-1) is therefore **PASS**, superseding its earlier NOT_RUN.
+    - Real data 0 diffs; Firewall unchanged.
+  - **B — Figma Smart Animate prototypes: PASS** (human click-through: "funcionando muito bem, visualmente está tudo correto").
+- **Human feedback → UI.11.1 (separate follow-up, NOT started):**
+  - selectors 300 ms, toggles 200 ms, hover 83 ms;
+  - drag-to-select on the segmented selectors only, with continuous motion, snap-to-segment and cancel;
+  - click, keyboard and Reduced Motion preserved;
+  - no drag on the sidebar or the toggles;
+  - Figma updated.
+  - Drag feasibility must be analysed before implementation.
+- **Merge:** human GO "UI.11 — FINAL MERGE & CLOSEOUT".
+  - Pre-merge gate re-checked: head `85c0aec` exact; base `3ec2473`; CLEAN/MERGEABLE; CI 38017279117 green at the head; reviews valid; A + B PASS.
+  - PR #38 marked Ready for review, then merged by merge commit pinned to `85c0aec` → `main` = `a46a438` (tree == `85c0aec`).
+- **Post-merge CI:** run 38172727233.
+  - Attempt 1: Release green; Debug failed in **one** test outside UI.11's diff, `Infrastructure.Tests` `LoopbackOriginatorGateTests.A_connection_from_a_child_process_is_rejected_even_while_armed_and_does_not_consume_the_arm`. It hit a 30 s accept timeout waiting for a child process on the runner. UI.11 changes no Infrastructure file, and the identical tree passed at `85c0aec`.
+  - Attempt 2 (re-run of the failed job, as a measurement): **both jobs green**.
+  - The flake is in the backlog.
+- **Firewall:** the 4 Floor testhost "Query User" Block rules (Infrastructure.Tests Debug/Release, TCP/UDP) were removed by exact Name with human UAC. 715 → 711: 4 removed, all canonical; 0 added; 0 changed. Application rules unchanged.
+- **Floor:** removed with keep-branch after a pre-check (clean, head reachable from `main`, 0 unique commits, inherited ignored files identical to the Ground's, 0 processes). Triple-check PASS. Branch `ui/ui11-motion-transitions` kept, local and remote.
+- **Not changed by the closeout:** the installed Developer build 1.1.2.2, widgets, credentials, SSH, servers, history (22 tracked real-data files hash-identical), certificates and the UI.9 QA backups.
+- **Disk:** C: ~6.7 GB free. Inventory reported to the human; nothing deleted without a specific GO.
+- **NOT_RUN and backlog:** unchanged from §11/§12/§14, except PH-1, now PASS (above). Nothing NOT_RUN is reported as PASS.
+- **Next:** UI.11.1 has NOT started; UI.12 has NOT started.
