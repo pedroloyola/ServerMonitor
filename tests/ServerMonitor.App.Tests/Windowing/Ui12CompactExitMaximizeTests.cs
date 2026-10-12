@@ -132,6 +132,174 @@ public sealed partial class Ui12CompactExitMaximizeTests
         Assert.DoesNotContain("Restore", adapter.Calls);
     }
 
+    // ---- Cortex UI.12A C-W1: every surfacing path × every presenter state ----
+
+    /// <summary>The controller's surfacing methods, composed exactly as they are (the composition is pinned by source below).</summary>
+    public enum SurfacingPath
+    {
+        RestoreAndActivate,
+        RestoreAndActivateStandard,
+        OpenSettings,
+        OpenBackgroundSettings,
+        ToggleCompactMode,
+    }
+
+    public static TheoryData<SurfacingPath, Start> EveryPathFromStandard()
+    {
+        var data = new TheoryData<SurfacingPath, Start>();
+        foreach (var path in Enum.GetValues<SurfacingPath>())
+        {
+            foreach (var start in Enum.GetValues<Start>())
+            {
+                data.Add(path, start);
+            }
+        }
+
+        return data;
+    }
+
+    /// <summary>
+    /// From Standard in each presenter state: the window ends visible, never minimized, and maximized exactly when it was
+    /// maximized before (minimized ones come back to their pre-minimize state). The tray toggle is followed through the
+    /// round trip: "Standard maximized → tray Compact → expand (tray again) → maximized again".
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(EveryPathFromStandard))]
+    public void EveryPath_FromStandard_KeepsTheMaximizedState(SurfacingPath path, Start start)
+    {
+        var (adapter, coordinator) = StandardAtItsRect();
+        Put(adapter, start);
+        var wasMaximized = start is Start.Maximized or Start.MinimizedFromMaximized;
+        var navigations = new List<string>();
+
+        Surface(path, adapter, coordinator, navigations);
+
+        Assert.False(adapter.IsMinimized);
+        if (path == SurfacingPath.ToggleCompactMode)
+        {
+            Assert.Equal(WindowMode.Compact, coordinator.CurrentMode);
+            Assert.False(adapter.IsMaximized);
+            Surface(path, adapter, coordinator, navigations);
+        }
+
+        Assert.Equal(WindowMode.Standard, coordinator.CurrentMode);
+        Assert.Equal(wasMaximized, adapter.IsMaximized);
+        Assert.Equal(StandardRect, adapter.RestoredBounds);
+        Assert.Equal(ExpectedNavigations(path), navigations);
+    }
+
+    public static TheoryData<SurfacingPath, bool, bool> EveryStandardPathFromCompact()
+    {
+        var data = new TheoryData<SurfacingPath, bool, bool>();
+        foreach (var path in new[]
+        {
+            SurfacingPath.RestoreAndActivateStandard, SurfacingPath.OpenSettings,
+            SurfacingPath.OpenBackgroundSettings, SurfacingPath.ToggleCompactMode,
+        })
+        {
+            foreach (var standardWasMaximized in new[] { false, true })
+            {
+                data.Add(path, standardWasMaximized, false);
+                data.Add(path, standardWasMaximized, true);
+            }
+        }
+
+        return data;
+    }
+
+    /// <summary>From Compact (normal or minimized), every path that leads to Standard restores Standard's maximized state.</summary>
+    [Theory]
+    [MemberData(nameof(EveryStandardPathFromCompact))]
+    public void EveryPath_FromCompact_BackToStandard_RestoresItsMaximizedState(
+        SurfacingPath path, bool standardWasMaximized, bool compactMinimized)
+    {
+        var (adapter, coordinator) = StandardAtItsRect();
+        if (standardWasMaximized)
+        {
+            adapter.Maximize();
+        }
+
+        coordinator.SwitchTo(WindowMode.Compact);
+        if (compactMinimized)
+        {
+            adapter.Minimize();
+        }
+
+        var navigations = new List<string>();
+        Surface(path, adapter, coordinator, navigations);
+
+        Assert.Equal(WindowMode.Standard, coordinator.CurrentMode);
+        Assert.False(adapter.IsMinimized);
+        Assert.Equal(standardWasMaximized, adapter.IsMaximized);
+        Assert.Equal(StandardRect, adapter.RestoredBounds);
+        Assert.Equal(ExpectedNavigations(path), navigations);
+    }
+
+    /// <summary>Tray "Abrir" never switches the mode: a Compact window comes back Compact, restored if it was minimized.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RestoreAndActivate_FromCompact_StaysCompact(bool compactMinimized)
+    {
+        var (adapter, coordinator) = StandardAtItsRect();
+        adapter.Maximize();
+        coordinator.SwitchTo(WindowMode.Compact);
+        var compact = adapter.CurrentBounds;
+        if (compactMinimized)
+        {
+            adapter.Minimize();
+        }
+
+        Surface(SurfacingPath.RestoreAndActivate, adapter, coordinator, []);
+
+        Assert.Equal(WindowMode.Compact, coordinator.CurrentMode);
+        Assert.False(adapter.IsMinimized);
+        Assert.False(adapter.IsMaximized);
+        Assert.Equal(compact, adapter.CurrentBounds);
+    }
+
+    // Mirrors ApplicationWindowController (TryMaterialize = true: a materialized window).
+    private static void Surface(
+        SurfacingPath path, RecordingPlacementAdapter adapter, WindowModeCoordinator coordinator, List<string> navigations)
+    {
+        Action show = () => ShowAndActivate(adapter);
+        Func<bool> isMinimized = () => adapter.IsMinimized;
+        switch (path)
+        {
+            case SurfacingPath.RestoreAndActivate:
+                show();
+                break;
+            case SurfacingPath.RestoreAndActivateStandard:
+                Assert.True(StandardSurfacing.Run(() => true, coordinator, isMinimized, show));
+                break;
+            case SurfacingPath.OpenSettings:
+                Assert.True(StandardSurfacing.Run(() => true, coordinator, isMinimized, show));
+                navigations.Add("Settings");
+                break;
+            case SurfacingPath.OpenBackgroundSettings:
+                Assert.True(StandardSurfacing.Run(
+                    () => true,
+                    coordinator,
+                    isMinimized,
+                    show,
+                    navigateWhileHidden: () => navigations.Add("Settings›Background")));
+                break;
+            case SurfacingPath.ToggleCompactMode:
+                show();
+                coordinator.Toggle();
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(path));
+        }
+    }
+
+    private static List<string> ExpectedNavigations(SurfacingPath path) => path switch
+    {
+        SurfacingPath.OpenSettings => ["Settings"],
+        SurfacingPath.OpenBackgroundSettings => ["Settings›Background"],
+        _ => [],
+    };
+
     // ---- the wiring (WinUI types: pinned by source) ----
 
     [Fact]
@@ -142,7 +310,18 @@ public sealed partial class Ui12CompactExitMaximizeTests
         Assert.Matches(DelegatesToWindowActivation(), controller);
         Assert.Single(NormalAssignment().Matches(controller));
         Assert.Matches(NormalOnlyInRestore(), controller);
+
+        // The two paths that do not go through StandardSurfacing (whose call sites StandardSurfacingTests pins):
+        // "Abrir" only shows; the tray toggle shows, THEN toggles (the order the matrix above models).
+        Assert.Matches(RestoreAndActivateOnlyShows(), controller);
+        Assert.Matches(ToggleShowsThenToggles(), controller);
     }
+
+    [GeneratedRegex(@"public void RestoreAndActivate\(\) => RunOnUiThread\(\(\) =>\s*\{\s*if \(!TryMaterialize\(\)\)\s*\{\s*return;\s*\}\s*ShowAndActivate\(\);\s*logger\.")]
+    private static partial Regex RestoreAndActivateOnlyShows();
+
+    [GeneratedRegex(@"public void ToggleCompactMode\(\) => RunOnUiThread\(\(\) =>\s*\{\s*if \(!TryMaterialize\(\)\)\s*\{\s*return;\s*\}\s*ShowAndActivate\(\);\s*modeCoordinator\.Toggle\(\);")]
+    private static partial Regex ToggleShowsThenToggles();
 
     [GeneratedRegex(@"private void ShowAndActivate\(\) => WindowActivation\.ShowAndActivate\(")]
     private static partial Regex DelegatesToWindowActivation();
