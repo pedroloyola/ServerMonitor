@@ -336,7 +336,8 @@ public sealed class Ui7FinalC2Tests
         var surfaces = AppSourceTree.LoadXaml("Styles/Components/Sa.Surfaces.xaml");
         var style = surfaces.Descendants().Single(e => (string?)e.Attribute(X + "Key") == "SaInsetListItemStyle");
         var overlay = style.Descendants().Single(e => (string?)e.Attribute(X + "Name") == "SelectedOverlay");
-        Assert.Equal("{ThemeResource SaSelectedBrush}", (string?)overlay.Attribute("Background"));
+        // UI.12 HC-01: the veil = SaSelectedBrush's colour in Dark/Light, Transparent in HC (Ui12HighContrastStateGuardTests).
+        Assert.Equal("{ThemeResource SaSelectedVeilBrush}", (string?)overlay.Attribute("Background"));
         Assert.Equal("0", (string?)overlay.Attribute("Opacity"));
         foreach (var state in new[] { "Selected", "PointerOverSelected", "PressedSelected" })
         {
