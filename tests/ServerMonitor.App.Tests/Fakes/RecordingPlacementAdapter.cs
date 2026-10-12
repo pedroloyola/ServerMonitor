@@ -70,10 +70,38 @@ internal sealed class RecordingPlacementAdapter : IWindowPlacementAdapter
 
     public int MaximizeCount { get; private set; }
 
+    /// <summary>
+    /// UI.12 COMPACT-EXIT-MAXIMIZE: the presenter's Minimized state (fake-only; not on the interface). While minimized the
+    /// presenter reports Minimized, not Maximized; <see cref="Restore"/> then returns the window to the state it had before
+    /// minimizing - maximized included (DOCUMENTED Win32 semantics of SW_RESTORE / WPF_RESTORETOMAXIMIZED, not measured here).
+    /// </summary>
+    public bool IsMinimized { get; private set; }
+
+    private bool _restoreToMaximized;
+
+    public void Minimize()
+    {
+        Calls.Add("Minimize");
+        _restoreToMaximized = IsMaximized;
+        IsMaximized = false;
+        IsMinimized = true;
+    }
+
     public void Restore()
     {
         RestoreCount++;
         Calls.Add("Restore");
+        if (IsMinimized)
+        {
+            IsMinimized = false;
+            if (_restoreToMaximized)
+            {
+                IsMaximized = true;
+                CurrentBounds = MaximizedBounds;
+                return;
+            }
+        }
+
         IsMaximized = false;
         if (RestoredBounds is { } restored)
         {
