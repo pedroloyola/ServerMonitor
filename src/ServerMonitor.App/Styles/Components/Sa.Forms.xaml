@@ -607,7 +607,7 @@
                             </VisualStateGroup>
                             <VisualStateGroup x:Name="ToggleStates">
                                 <!-- UI.11 H02/H03 (Prism §2.4): the thumb travels end to end (X 0<->18) while the On fill cross-fades
-                                     over the same SaMotionToggleDuration and the thumb colour swaps at mid-travel (Prism D1). No keyframe at 0 and no From:
+                                     over the same SaMotionToggleDuration and the thumb colour swaps at mid-travel (Prism D1; SaMotionToggleSwapTime = half the toggle). No keyframe at 0 and no From:
                                      each transition starts from the PRESENTED value, so a reversal mid-travel turns around in place
                                      instead of jumping; a drag release animates from the dragged position. IsOn (and UI Automation
                                      Toggle) change on the click; the motion only follows. Entering Dragging is instant. -->
@@ -623,10 +623,10 @@
                                             <!-- Prism D1 (B11-6): the thumb colour SWAPS at mid-travel (no crossfade: a continuous fade crossed
                                                  the track in Dark and the thumb vanished); only the track fill crossfades. -->
                                             <DoubleAnimationUsingKeyFrames Storyboard.TargetName="SwitchKnobOn" Storyboard.TargetProperty="Opacity">
-                                                <DiscreteDoubleKeyFrame KeyTime="{StaticResource SaMotionFadeDuration}" Value="1" />
+                                                <DiscreteDoubleKeyFrame KeyTime="{StaticResource SaMotionToggleSwapTime}" Value="1" />
                                             </DoubleAnimationUsingKeyFrames>
                                             <DoubleAnimationUsingKeyFrames Storyboard.TargetName="SwitchKnobOff" Storyboard.TargetProperty="Opacity">
-                                                <DiscreteDoubleKeyFrame KeyTime="{StaticResource SaMotionFadeDuration}" Value="0" />
+                                                <DiscreteDoubleKeyFrame KeyTime="{StaticResource SaMotionToggleSwapTime}" Value="0" />
                                             </DoubleAnimationUsingKeyFrames>
                                         </Storyboard>
                                     </VisualTransition>
@@ -641,10 +641,10 @@
                                             <!-- Prism D1 (B11-6): the thumb colour SWAPS at mid-travel (no crossfade: a continuous fade crossed
                                                  the track in Dark and the thumb vanished); only the track fill crossfades. -->
                                             <DoubleAnimationUsingKeyFrames Storyboard.TargetName="SwitchKnobOn" Storyboard.TargetProperty="Opacity">
-                                                <DiscreteDoubleKeyFrame KeyTime="{StaticResource SaMotionFadeDuration}" Value="0" />
+                                                <DiscreteDoubleKeyFrame KeyTime="{StaticResource SaMotionToggleSwapTime}" Value="0" />
                                             </DoubleAnimationUsingKeyFrames>
                                             <DoubleAnimationUsingKeyFrames Storyboard.TargetName="SwitchKnobOff" Storyboard.TargetProperty="Opacity">
-                                                <DiscreteDoubleKeyFrame KeyTime="{StaticResource SaMotionFadeDuration}" Value="1" />
+                                                <DiscreteDoubleKeyFrame KeyTime="{StaticResource SaMotionToggleSwapTime}" Value="1" />
                                             </DoubleAnimationUsingKeyFrames>
                                         </Storyboard>
                                     </VisualTransition>
@@ -659,10 +659,10 @@
                                             <!-- Prism D1 (B11-6): the thumb colour SWAPS at mid-travel (no crossfade: a continuous fade crossed
                                                  the track in Dark and the thumb vanished); only the track fill crossfades. -->
                                             <DoubleAnimationUsingKeyFrames Storyboard.TargetName="SwitchKnobOn" Storyboard.TargetProperty="Opacity">
-                                                <DiscreteDoubleKeyFrame KeyTime="{StaticResource SaMotionFadeDuration}" Value="1" />
+                                                <DiscreteDoubleKeyFrame KeyTime="{StaticResource SaMotionToggleSwapTime}" Value="1" />
                                             </DoubleAnimationUsingKeyFrames>
                                             <DoubleAnimationUsingKeyFrames Storyboard.TargetName="SwitchKnobOff" Storyboard.TargetProperty="Opacity">
-                                                <DiscreteDoubleKeyFrame KeyTime="{StaticResource SaMotionFadeDuration}" Value="0" />
+                                                <DiscreteDoubleKeyFrame KeyTime="{StaticResource SaMotionToggleSwapTime}" Value="0" />
                                             </DoubleAnimationUsingKeyFrames>
                                         </Storyboard>
                                     </VisualTransition>
@@ -677,10 +677,10 @@
                                             <!-- Prism D1 (B11-6): the thumb colour SWAPS at mid-travel (no crossfade: a continuous fade crossed
                                                  the track in Dark and the thumb vanished); only the track fill crossfades. -->
                                             <DoubleAnimationUsingKeyFrames Storyboard.TargetName="SwitchKnobOn" Storyboard.TargetProperty="Opacity">
-                                                <DiscreteDoubleKeyFrame KeyTime="{StaticResource SaMotionFadeDuration}" Value="0" />
+                                                <DiscreteDoubleKeyFrame KeyTime="{StaticResource SaMotionToggleSwapTime}" Value="0" />
                                             </DoubleAnimationUsingKeyFrames>
                                             <DoubleAnimationUsingKeyFrames Storyboard.TargetName="SwitchKnobOff" Storyboard.TargetProperty="Opacity">
-                                                <DiscreteDoubleKeyFrame KeyTime="{StaticResource SaMotionFadeDuration}" Value="1" />
+                                                <DiscreteDoubleKeyFrame KeyTime="{StaticResource SaMotionToggleSwapTime}" Value="1" />
                                             </DoubleAnimationUsingKeyFrames>
                                         </Storyboard>
                                     </VisualTransition>

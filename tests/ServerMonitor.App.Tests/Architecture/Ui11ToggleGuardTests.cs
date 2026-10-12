@@ -40,7 +40,8 @@ public sealed class Ui11ToggleGuardTests
             }
 
             // Position and track fill travel over the toggle token (spline); Prism D1 (B11-6): the thumb colour is a DISCRETE
-            // swap at mid-travel (SaMotionFadeDuration = 83 ms), never a crossfade that crosses the track in Dark.
+            // swap at mid-travel, never a crossfade that crosses the track in Dark. UI.11.1 H01: mid-travel of the 200 ms toggle
+            // is its own key SaMotionToggleSwapTime (100) - never SaMotionFadeDuration (83, hover/fade).
             foreach (var travel in animations.Take(2))
             {
                 var frame = travel.Elements().Single();
@@ -52,7 +53,7 @@ public sealed class Ui11ToggleGuardTests
             {
                 var frame = swap.Elements().Single();
                 Assert.Equal("DiscreteDoubleKeyFrame", frame.Name.LocalName);
-                Assert.Equal("{StaticResource SaMotionFadeDuration}", (string?)frame.Attribute("KeyTime"));
+                Assert.Equal("{StaticResource SaMotionToggleSwapTime}", (string?)frame.Attribute("KeyTime"));
             }
 
             Assert.Equal(on ? "18" : "0", (string?)animations[0].Elements().Single().Attribute("Value"));

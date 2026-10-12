@@ -362,8 +362,12 @@ public sealed partial class MainWindow : Window
 
     private void OnCompactSizeChanged(object sender, SizeChangedEventArgs args) => UpdateCompactTitleLayout();
 
-    private void OnWindowActivated(object sender, WindowActivatedEventArgs args) =>
+    private void OnWindowActivated(object sender, WindowActivatedEventArgs args)
+    {
         _isWindowActive = args.WindowActivationState != WindowActivationState.Deactivated;
+        // UI.11.1 H02 (Cortex S0 D1): a deactivation raises no CaptureLost - a segmented drag in THIS window cancels from here.
+        Services.Motion.WindowActivationHub.Default.Publish(AppWindow.Id, _isWindowActive);
+    }
 
     /// <summary>
     /// Prism R-3: decides, from MEASURED widths, whether "Expandir" shows its text, and whether the mark / wordmark fit
@@ -428,17 +432,30 @@ public sealed partial class MainWindow : Window
         WindowBackground.Style = (Style)Application.Current.Resources[key];
     }
 
+    /// <summary>UI.11.1 H03: one focus capture / restore per theme pass, a newer pass superseding a pending restore.</summary>
+    private readonly Services.ThemeRemountFocus _themeRemountFocus = new();
+
     private void OnActualThemeChanged(FrameworkElement sender, object args)
     {
         ApplyShellBackground();
         UpdateCaptionButtonColors();
         // R-4: remount page CONTENT, never the Frame's Page (Unloaded would dispose per-visit VMs).
+        // UI.11.1 H03: ONE focus capture before the first root leaves the tree and ONE restore after all of them (each remount
+        // capturing on its own restored "Sistema" last - Beacon S0).
         DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
         {
-            if (ContentFrame.Content is Microsoft.UI.Xaml.Controls.Page page) SaThemeRefresh.Remount(page);
-            SaThemeRefresh.Remount(Sidebar, Sidebar.Content, content => Sidebar.Content = content);
-            SaThemeRefresh.Remount(FirstRunView, FirstRunView.Content, content => FirstRunView.Content = content);
-            SaThemeRefresh.Remount(CompactShellView, CompactShellView.Content, content => CompactShellView.Content = content);
+            if (Content?.XamlRoot is not { } root)
+            {
+                return;
+            }
+
+            _themeRemountFocus.RemountAll(new Services.RemountFocusPort(new XamlFocusSurface(root, DispatcherQueue)),
+            [
+                () => ContentFrame.Content is Microsoft.UI.Xaml.Controls.Page page && SaThemeRefresh.Remount(page, restoreFocus: false),
+                () => SaThemeRefresh.Remount(Sidebar, Sidebar.Content, content => Sidebar.Content = content, restoreFocus: false),
+                () => SaThemeRefresh.Remount(FirstRunView, FirstRunView.Content, content => FirstRunView.Content = content, restoreFocus: false),
+                () => SaThemeRefresh.Remount(CompactShellView, CompactShellView.Content, content => CompactShellView.Content = content, restoreFocus: false)
+            ]);
         });
     }
 

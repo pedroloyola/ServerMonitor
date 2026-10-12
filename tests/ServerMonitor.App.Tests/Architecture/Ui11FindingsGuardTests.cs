@@ -307,6 +307,8 @@ public sealed class Ui11FindingsGuardTests
             ["private void OnLayoutChanged("] = "_planner.Request(IndicatorCause.Resize);",
             ["private void OnXamlRootChanged("] = "_planner.Request(IndicatorCause.DpiChange);",
             ["private void OnReducedMotionChanged("] = "_planner.Request(IndicatorCause.ReducedMotionChanged);",
+            // UI.11.1 H02: the end of a drag preview hands the indicator back to the planner with the drag-end cause.
+            ["public void EndPreview("] = "_planner.Request(cause);",
         };
         foreach (var (handler, request) in requests)
         {
@@ -316,7 +318,7 @@ public sealed class Ui11FindingsGuardTests
             Assert.All(System.Text.RegularExpressions.Regex.Matches(body, @"_planner\.Request\([^;]+;"), m => Assert.Equal(request, m.Value));
         }
 
-        Assert.Equal(6, System.Text.RegularExpressions.Regex.Matches(code, @"_planner\.Request\(").Count);
+        Assert.Equal(7, System.Text.RegularExpressions.Regex.Matches(code, @"_planner\.Request\(").Count);
     }
 
     /// <summary>T-1 (SaMotion): every enter/hover decision is fed the live Reduced Motion state.</summary>
@@ -421,7 +423,8 @@ public sealed class Ui11FindingsGuardTests
         var body = Squash(Body(AppSourceTree.CodeWithoutComments("Controls/Primitives/SaSlidingSelection.cs"), "private void OnSelectionChanged("));
 
         Assert.Equal(
-            "{ _planner.Request(IndicatorCause.Selection); if (sender is RadioButton { IsChecked: true } item) { Flush(item); _planner.Request(IndicatorCause.Selection); } QueueFlush(); }",
+            // UI.11.1 H02: an external selection first cancels a running drag preview (which then hands the planner back).
+            "{ _drag?.OnSelectionChanged(); _planner.Request(IndicatorCause.Selection); if (sender is RadioButton { IsChecked: true } item) { Flush(item); _planner.Request(IndicatorCause.Selection); } QueueFlush(); }",
             body);
         Assert.Contains("var selected = SelectionIndicatorRules.SelectedIndex(", AppSourceTree.CodeWithoutComments("Controls/Primitives/SaSlidingSelection.cs"), StringComparison.Ordinal);
     }

@@ -41,7 +41,12 @@ public static partial class MotionTokens
     // UI.11 semantic aliases (Prism UI11A §4.1/§4.2).
     public const string HoverDuration = "SaMotionHoverDuration";
     public const string ToggleDuration = "SaMotionToggleDuration";
+    public const string ToggleSwapTime = "SaMotionToggleSwapTime";
     public const string SelectDuration = "SaMotionSelectDuration";
+
+    // UI.11.1 H01/H02 (human decision 2026-10-11).
+    public const string SegmentSelectDuration = "SaMotionSegmentSelectDuration";
+    public const string SettleDuration = "SaMotionSettleDuration";
     public const string EnterDuration = "SaMotionEnterDuration";
     public const string EnterOffsetDuration = "SaMotionEnterOffsetDuration";
     public const string ExitDuration = "SaMotionExitDuration";
@@ -55,7 +60,8 @@ public static partial class MotionTokens
     /// <summary>Every time/duration token, in Motion.xaml order.</summary>
     public static IReadOnlyList<string> TimeKeys { get; } =
         [FocusPeakTime, FocusFadeEndTime, FocusReducedHoldTime, FadeDuration, FastDuration, NormalDuration, SlowDuration,
-         HoverDuration, ToggleDuration, SelectDuration, EnterDuration, EnterOffsetDuration, ExitDuration, ExpandDuration, CollapseDuration];
+         HoverDuration, ToggleDuration, ToggleSwapTime, SelectDuration, SegmentSelectDuration, SettleDuration, EnterDuration, EnterOffsetDuration,
+         ExitDuration, ExpandDuration, CollapseDuration];
 
     /// <summary>Every KeySpline token, in Motion.xaml order.</summary>
     public static IReadOnlyList<string> KeySplineKeys { get; } = [LinearKeySpline, DirectKeySpline, PointToPointKeySpline, ExitKeySpline];

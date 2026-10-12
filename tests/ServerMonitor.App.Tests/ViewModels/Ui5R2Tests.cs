@@ -552,7 +552,7 @@ public sealed class Ui5R2Tests
     {
         Assert.Null(AppSourceTree.LoadXaml(file).Root!.Attribute(Primitives + "SaThemeRefresh.IsEnabled"));
         var shell = AppSourceTree.CodeWithoutComments("MainWindow.xaml.cs");
-        Assert.Contains("SaThemeRefresh.Remount(page)", shell);
+        Assert.Contains("SaThemeRefresh.Remount(page, restoreFocus: false)", shell); // UI.11.1 H03: inside the one-focus-capture batch
         Assert.Contains("SaThemeRefresh.Remount(Sidebar, Sidebar.Content", shell);
     }
 
