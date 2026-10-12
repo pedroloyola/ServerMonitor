@@ -12,8 +12,8 @@ namespace ServerMonitor.App.Controls.Primitives;
 /// the one place that raises it, with a peer created on demand: <c>FromElement</c> alone returns null for an element
 /// that was Collapsed until now, so the event silently never left (SaFormField, SaInlineNotice before UI.12).
 /// <para>
-/// <see cref="ChangesProperty"/> (attached, XAML) announces a state TextBlock whenever its text changes or it becomes
-/// visible, so a declarative live region needs no code-behind.
+/// <see cref="ChangesProperty"/> (attached, XAML) announces a state TextBlock whenever its text changes (any other element:
+/// its accessible name) or it becomes visible, so a declarative live region needs no code-behind.
 /// </para>
 /// </summary>
 public static class SaAnnounce
@@ -64,10 +64,7 @@ public static class SaAnnounce
         if (element.GetValue(TokensProperty) is long[] tokens)
         {
             element.UnregisterPropertyChangedCallback(UIElement.VisibilityProperty, tokens[0]);
-            if (element is TextBlock)
-            {
-                element.UnregisterPropertyChangedCallback(TextBlock.TextProperty, tokens[1]);
-            }
+            element.UnregisterPropertyChangedCallback(SpokenProperty(element), tokens[1]);
 
             element.ClearValue(TokensProperty);
         }
@@ -75,10 +72,15 @@ public static class SaAnnounce
         if (e.NewValue is true)
         {
             var visibility = element.RegisterPropertyChangedCallback(UIElement.VisibilityProperty, OnAnnouncedPropertyChanged);
-            var text = element is TextBlock ? element.RegisterPropertyChangedCallback(TextBlock.TextProperty, OnAnnouncedPropertyChanged) : 0;
-            element.SetValue(TokensProperty, new[] { visibility, text });
+            var spoken = element.RegisterPropertyChangedCallback(SpokenProperty(element), OnAnnouncedPropertyChanged);
+            element.SetValue(TokensProperty, new[] { visibility, spoken });
         }
     }
+
+    // What changes when the region has something new to say: a TextBlock's text, anything else's accessible name
+    // (a list host whose name is its count).
+    private static DependencyProperty SpokenProperty(FrameworkElement element) =>
+        element is TextBlock ? TextBlock.TextProperty : Microsoft.UI.Xaml.Automation.AutomationProperties.NameProperty;
 
     private static void OnAnnouncedPropertyChanged(DependencyObject sender, DependencyProperty property) =>
         RaiseAfterLayout((FrameworkElement)sender);

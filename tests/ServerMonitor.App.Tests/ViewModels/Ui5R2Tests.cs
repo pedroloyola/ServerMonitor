@@ -494,7 +494,10 @@ public sealed class Ui5R2Tests
 
         Assert.All(rowTitles, uid => Assert.Equal("Level3",
             (string?)page.Descendants().Single(e => (string?)e.Attribute(AppSourceTree.Xaml + "Uid") == uid).Attribute("AutomationProperties.HeadingLevel")));
-        var group = page.Descendants().Single(e => (string?)e.Attribute(AppSourceTree.Xaml + "Uid") == "SettingsThemeGroup");
+        // UI.12 PEER-01: the name is on the SaGroupHost; the keyboard group is the panel inside it.
+        var host = page.Descendants().Single(e => (string?)e.Attribute(AppSourceTree.Xaml + "Uid") == "SettingsThemeGroup");
+        Assert.Equal("SaGroupHost", host.Name.LocalName);
+        var group = host.Descendants().Single(e => e.Attributes().Any(a => a.Name.LocalName == "SaGroupNavigation.Mode"));
         Assert.Equal("SelectionFollowsFocus", (string?)group.Attribute(Primitives + "SaGroupNavigation.Mode"));
         var narrow = page.Descendants().Single(e => e.Name.LocalName == "VisualState" && (string?)e.Attribute(AppSourceTree.Xaml + "Name") == "Narrow");
         foreach (var row in new[] { "ThemeRow", "BackgroundSection", "CompactRow" })

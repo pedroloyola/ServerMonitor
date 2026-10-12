@@ -115,6 +115,8 @@
                                            Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap" />
                             </StackPanel>
                             <Border x:Name="ThemeControl" Grid.Column="1" Style="{StaticResource SaSegmentedThemeTrackStyle}" VerticalAlignment="Center">
+                                <!-- UI.12 PEER-01: the group name lives on a peer-bearing host around the indicator + items panel. -->
+                                <primitives:SaGroupHost x:Uid="SettingsThemeGroup">
                                 <!-- UI.11 H01: the ONE sliding selection indicator sits behind the items (SaSlidingSelection). -->
                                 <Grid>
                                     <Border IsHitTestVisible="False" AutomationProperties.AccessibilityView="Raw"
@@ -123,7 +125,7 @@
                                             primitives:SaSlidingSelection.IndicatorBrush="{ThemeResource SaSegmentedThemeSelectedBrush}" />
                                     <!-- Beacon C1 N1: the UI.2 segmented keyboard contract - one Tab stop, entry on the selected item,
                                          the arrows move AND select (SaGroupNavigation). -->
-                                    <StackPanel x:Uid="SettingsThemeGroup" Orientation="Horizontal" Spacing="{StaticResource SaSpace4}"
+                                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SaSpace4}"
                                                 primitives:SaGroupNavigation.Mode="SelectionFollowsFocus">
                                         <RadioButton x:Uid="ThemeSystemOption" GroupName="SettingsTheme" Style="{StaticResource SaSegmentedThemeItemStyle}"
                                                      IsChecked="{Binding SelectedThemeIndex, Mode=TwoWay, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=0}">
@@ -148,6 +150,7 @@
                                         </RadioButton>
                                     </StackPanel>
                                 </Grid>
+                                </primitives:SaGroupHost>
                             </Border>
                         </Grid>
                         <!-- Setting / Idioma 112:7939: selector pill 250×36 with the 4 options (A-14); fixed description (A-15),

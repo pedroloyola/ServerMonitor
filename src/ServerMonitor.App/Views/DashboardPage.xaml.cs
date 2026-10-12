@@ -1,5 +1,6 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using ServerMonitor.App.Controls.Primitives;
 using ServerMonitor.App.Services;
 using ServerMonitor.App.ViewModels;
 
@@ -110,7 +111,8 @@ public sealed partial class DashboardPage : Page
 
         foreach (var repeater in new[] { DiscoveredRepeater, EmptyDiscoveredRepeater })
         {
-            if (repeater.GetOrCreateElement(index) is Panel row && row.Children.OfType<Button>().FirstOrDefault() is { } add)
+            // UI.12 PEER-01: the row template is an SaGroupHost (the named group) around the row Grid.
+            if (repeater.GetOrCreateElement(index) is SaGroupHost { Content: Panel row } && row.Children.OfType<Button>().FirstOrDefault() is { } add)
             {
                 add.StartBringIntoView();
                 if (add.Focus(FocusState.Programmatic))

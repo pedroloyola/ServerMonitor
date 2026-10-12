@@ -88,7 +88,8 @@ public sealed class Ui4FidelityContractTests
         var host = Assert.Single(elements, e => Name(e) == "PriorityHost");
         var cards = host.Elements().ToList();
         Assert.Equal(3, cards.Count);
-        Assert.All(cards, c => Assert.Equal("156", Attr(c, "MinHeight")));
+        // UI.12 PEER-01: the two state panels sit in a named SaGroupHost; the 156 card is the Border inside it.
+        Assert.All(cards, c => Assert.Equal("156", Attr(c.Name.LocalName == "SaGroupHost" ? c.Elements().Single() : c, "MinHeight")));
     }
 
     /// <summary>

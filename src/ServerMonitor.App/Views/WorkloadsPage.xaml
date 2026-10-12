@@ -248,6 +248,8 @@
                 Style="{StaticResource SaPageSearchFieldStyle}"
                 Text="{Binding SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
             <Border x:Name="FilterTrack" Grid.Column="2" Style="{StaticResource SaSegmentedRectTrackStyle}">
+                <!-- UI.12 PEER-01: the group name lives on a peer-bearing host around the indicator + items panel. -->
+                <primitives:SaGroupHost x:Uid="WorkloadGlobalFilter">
                 <!-- UI.11 H01: one sliding indicator; it interpolates X AND width (the two items differ in width). -->
                 <Grid>
                     <Border IsHitTestVisible="False" AutomationProperties.AccessibilityView="Raw"
@@ -256,7 +258,6 @@
                             primitives:SaSlidingSelection.IndicatorBrush="{ThemeResource SaSelectedBrush}"
                             primitives:SaSlidingSelection.HighlightBrush="{ThemeResource SaGlassHighlightBrush}" primitives:SaSlidingSelection.LightOutlineBrush="{ThemeResource SaDialogButtonBorderBrush}" />
                     <StackPanel
-                        x:Uid="WorkloadGlobalFilter"
                         Orientation="Horizontal"
                         Spacing="4"
                         primitives:SaGroupNavigation.Mode="SelectionFollowsFocus">
@@ -268,6 +269,7 @@
                                      IsChecked="{Binding GlobalFilterIndex, Mode=TwoWay, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=1}" />
                     </StackPanel>
                 </Grid>
+                </primitives:SaGroupHost>
             </Border>
         </Grid>
 

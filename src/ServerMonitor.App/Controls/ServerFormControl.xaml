@@ -259,7 +259,9 @@
                         </HyperlinkButton>
                     </StackPanel>
                     <Border Style="{StaticResource SaSegmentedPillTrackStyle}" HorizontalAlignment="Stretch">
-                        <Grid x:Uid="ServerEditorAuthMethodGroup" ColumnSpacing="4" primitives:SaGroupNavigation.Mode="SelectionFollowsFocus">
+                        <!-- UI.12 PEER-01: the group name lives on a peer-bearing host (a Grid has no automation peer). -->
+                        <primitives:SaGroupHost x:Uid="ServerEditorAuthMethodGroup">
+                        <Grid ColumnSpacing="4" primitives:SaGroupNavigation.Mode="SelectionFollowsFocus">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="*" />
@@ -289,6 +291,7 @@
                                 </StackPanel>
                             </RadioButton>
                         </Grid>
+                        </primitives:SaGroupHost>
                     </Border>
 
                     <!-- SSH key (B-12): the 460x40 picker shows the file NAME; its menu lists the keys found in .ssh (metadata
@@ -469,7 +472,9 @@
                     <TextBlock x:Uid="ServerEditorJumpAuthSubtitle" Style="{StaticResource SaCaptionTextStyle}"
                                Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap" />
                     <Border Style="{StaticResource SaSegmentedPillTrackStyle}" HorizontalAlignment="Stretch">
-                        <Grid x:Uid="ServerEditorJumpAuthMethodGroup" ColumnSpacing="4" primitives:SaGroupNavigation.Mode="SelectionFollowsFocus">
+                        <!-- UI.12 PEER-01: the group name lives on a peer-bearing host (a Grid has no automation peer). -->
+                        <primitives:SaGroupHost x:Uid="ServerEditorJumpAuthMethodGroup">
+                        <Grid ColumnSpacing="4" primitives:SaGroupNavigation.Mode="SelectionFollowsFocus">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="*" />
@@ -497,6 +502,7 @@
                                 </StackPanel>
                             </RadioButton>
                         </Grid>
+                        </primitives:SaGroupHost>
                     </Border>
                     <!-- The same picker and the same found keys as the target; the jump host's key is NEVER pre-selected. -->
                     <StackPanel Spacing="14" primitives:SaMotion.Enter="Rise" Visibility="{Binding IsJumpPrivateKeyAuthentication, Converter={StaticResource BooleanToVisibilityConverter}}">
