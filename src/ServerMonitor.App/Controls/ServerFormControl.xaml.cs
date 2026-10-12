@@ -1,8 +1,10 @@
 using System.ComponentModel;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
+using ServerMonitor.App.Controls.Primitives;
 using ServerMonitor.App.Services;
 using ServerMonitor.App.ViewModels;
 using Windows.ApplicationModel.DataTransfer;
@@ -23,7 +25,13 @@ public sealed partial class ServerFormControl : UserControl
     {
         InitializeComponent();
         DataContextChanged += OnDataContextChanged;
-        Unloaded += (_, _) => Attach(null);
+        // UI.12 C-L1: a theme remount can raise the new Loaded before this stale Unloaded; detaching then would leave the
+        // form frozen (DataContext is set once, nothing re-attaches). Detach only if still not live one turn later.
+        var unloadDetach = new DeferredUnloadDetach(
+            isLive: () => SaLiveTree.IsLive(this),
+            post: action => DispatcherQueue?.TryEnqueue(DispatcherQueuePriority.Low, () => action()) == true,
+            detach: () => Attach(null));
+        Unloaded += (_, _) => unloadDetach.OnUnloaded();
         Loaded += (_, _) => Attach(DataContext as ServerEditorViewModel);
         PasswordField.PasswordChanged += OnPasswordChanged;
         PassphraseField.PasswordChanged += OnPasswordChanged;
