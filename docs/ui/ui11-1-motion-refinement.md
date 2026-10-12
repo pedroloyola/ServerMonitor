@@ -1,6 +1,6 @@
 # UI.11.1 — Motion Refinement
 
-**Status: DRAFT / BLOCKED. Not READY_TO_MERGE.** PR #40 (`ui/ui11-1-motion-refinement`) is a draft; code at `0e0c10d`.
+**Status: DRAFT / BLOCKED. Not READY_TO_MERGE.** PR #40 (`ui/ui11-1-motion-refinement`) is a draft; code at `6f9081d`.
 - The drag-to-select adapter (the core of H02) has **no runtime proof**: every real pointer and keyboard case of the UI.11.1D QA was blocked by the environment (§11).
 - No merge without a separate human GO.
 
@@ -34,9 +34,9 @@
 - **H03 focus after a theme change: implemented and unit-proven** (incl. the fix round 2 no-steal / supersede rules). Runtime check INCONCLUSIVE (§11).
 - **Fix round 2 (Atlas, §9a):** two real defects found by Atlas's deterministic probes are fixed — A-3 (a re-entrant cancel during the release frame threw a NullReferenceException) and A-2 (the delayed theme focus restore could steal a later user choice) — and three test gaps (A-1, AT-03, AT-05) are closed with behavioural seams.
 - **Reviews** (§10): Prism APPROVED_WITH_NITS; Cortex APPROVED_WITH_NITS (N-1, N-2), structure re-check of fix round 2 pending; Atlas pending (see its report).
-- **Gates @ `0e0c10d`:**
-  - `.slnx` Debug `--no-incremental --disable-build-servers` all green (App 3736, Infrastructure 887 + 1 skipped, others green);
-  - Release all green (App 3254);
+- **Gates @ `6f9081d`:**
+  - `.slnx` Debug `--no-incremental --disable-build-servers` all green (App 3742, Infrastructure 887 + 1 skipped, others green);
+  - Release all green (App 3260);
   - PR CI green on `d0cc3b8`, `8d9b6d1`, `54e7e05` and `f0686cd` (Debug build + tests; Release build + vulnerability scan); `0e0c10d` running when this was written.
 - **Real data:** identical before and after every QA window (S0, S0b, UI.11.1D). **Firewall:** the app added no rules; the Floor's test runs added four test-host rules (§13).
 
@@ -89,7 +89,8 @@
 
 - **Bug (Beacon S0):** after a theme change focus landed on "Sistema", not on the chosen theme. Root cause: `MainWindow.OnActualThemeChanged` remounts four roots in one pass, and each remount captured and restored focus on its own; once the first root left the tree focus had fallen to the first focusable item, so the later restores put it there.
 - **Fix:** `ThemeRemountFocus.RemountAll` captures focus once, before any root leaves the tree, and restores it once afterwards with the same focus kind (pointer stays ring-less, keyboard keeps its ring). Nothing focused, nothing restored.
-- **Fix round 2 (Atlas A-2):** `ThemeRemountFocus` is one instance per window (`MainWindow`). The later restore never steals a newer choice: it runs only if focus is still where the remounts left it, nowhere, on the captured element, or on another item of the captured element's group (where the remount dropped it). A newer theme pass supersedes a pending restore and inherits its capture, so rapid theme changes keep the original choice.
+- **Fix rounds 2 and 3 (Atlas A-2):** `ThemeRemountFocus` is one instance per window (`MainWindow`). The later restore never overrides a newer choice. **One rule, by identity:** focus is ours to move only while it sits exactly on the element OUR remount left it on (recorded per pass), nowhere, or on the captured element; any other element — another item of the same group included — is the user's. A newer theme pass supersedes a pending restore; it inherits the pending capture only under the same rule (focus still on the previous pass's exact fallback, or nowhere), otherwise the user's new choice is the new capture. (Round 2's "another item of the same group" rule could not tell the fallback from a keyboard choice and was removed in round 3.)
+- **Runtime caveat (by design):** if the platform moved focus *asynchronously* after the pass onto some element other than the recorded fallback, the restore does not run (it cannot be told from a user choice). Beacon's H03 runtime check decides whether that happens in practice.
 
 ## 3. S0 / S0b evidence (spike, throwaway branch)
 
@@ -205,6 +206,8 @@ Each counterproof breaks the rule in production code, fails the named tests, res
 | FR2-11 | A-2: a new pass recaptures instead of inheriting | KILLED |
 | FR2-12 | A-2: no same-group fallback | KILLED |
 
+**Round 3 (`6f9081d`, Atlas residual A-2 — the second fix in this class, BOSS §16):** two Atlas probes failed on intact `0e0c10d` through the real `RemountFocusPort`: a keyboard choice of "Claro" (same group) after the remount dropped focus on "Sistema" was overridden back to "Escuro", with or without a second theme pass. Fixed by the identity rule (§2 H03); the same-group rule and `SharesGroup` are gone from every interface. Permanent tests: `ANewChoiceInTheSameGroup_BeforeTheRestore_Wins` (both Atlas variants), `FocusArrivingLaterOnAnotherElement_IsNeverOverridden`, `ASecondPass_WithAnotherFallback_StillRestoresTheOriginalChoice`, `ANewChoice_ThenAPassWithoutRemount_KeepsTheChoice`, `FocusLostEntirely_IsRestored`, `FocusLostAfterTheFallback_IsRestored`. Counterproofs FR3-01…04 (any element is ours; unconditional inheritance; inherited instead of per-pass fallback; "nowhere" not ours) all KILLED — FR3-04 first SURVIVED, which exposed a missing test (focus lost after a non-null fallback); the test was added and FR3-04 re-run KILLED.
+
 **Honest limit:** the one-call WinUI surface leaves are runtime-only — e.g. emptying `SegmentDragAdapter.SetItemManipulation` or `ReleaseItemCapture` would still pass the unit tests. Their proof is the UI.11.1D real-input matrix (§11), still blocked.
 
 ## 10. Reviews
@@ -258,7 +261,7 @@ The implementer (Sentry) did not approve its own work.
 - **Firewall exception:** four Inbound Block rules for the Floor's `ServerMonitor.Infrastructure.Tests` test host (`…servermonitor--uiui11-1-motion-refinement\tests\servermonitor.infrastructure.tests\bin\{debug,release}\…\testhost.exe`, Debug + Release), created by the Floor's test runs; removal pending the human (UAC). The app itself added none.
 - Carried from UI.11: UI11-TEXTGUARD-CLASS; FLAKE-INFRA-LOOPBACK-CHILD.
 
-## 14. Commits (`c69d0a0..0e0c10d`, code)
+## 14. Commits (`c69d0a0..6f9081d`, code)
 
 | Commit | Slice |
 |---|---|
@@ -270,5 +273,7 @@ The implementer (Sentry) did not approve its own work.
 | `54e7e05` | Fix round 1 — review C-1 (width-stable AllowDrag hosts + guard), C-3 adapter constant |
 | `f0686cd` | Docs — this record (first version) |
 | `0e0c10d` | Fix round 2 — Atlas A-1 / AT-03 / AT-05 (behavioural seams `SegmentDragWiring` / `ISegmentDragSurface`, `RemountFocusPort` / `IFocusSurface`) and real defects A-2 / A-3; one commit on purpose (every state compiles) |
+| `2206eb5` | Docs — this record, fix round 2 |
+| `6f9081d` | Fix round 3 — Atlas residual A-2: restore only onto our own fallback, by identity; inheritance under the same rule |
 
 Evidence: `.boss/tmp/ui11-1/` — `sentry-implementation-report.md`, `sentry-cp/`, `beacon-s0-matrix.md`, `beacon-s0b-matrix.md`, `beacon-ui11-1d-qa.md`, `cortex-ui11-1-review.md`, `prism-ui11-1-review.md`, `prism-ui11-1-figma-review.md`, `atlas-ui11-1-review.md`, `relay-ui11-1-figma.md`.
