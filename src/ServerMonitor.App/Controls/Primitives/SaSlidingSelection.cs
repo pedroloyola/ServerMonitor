@@ -316,11 +316,6 @@ internal sealed class SlidingSelectionController : ISegmentDragPresenter
 
         foreach (var item in _items)
         {
-            if (SaSlidingSelection.GetAllowDrag(_host))
-            {
-                SegmentDragAdapter.PrepareItem(item);
-            }
-
             item.Checked += OnSelectionChanged;
             item.Unchecked += OnSelectionChanged;
             item.SizeChanged += OnLayoutChanged;

@@ -310,7 +310,15 @@ public sealed class SegmentDragController
             return;
         }
 
+        var session = _session;
         Follow(pointer); // the release point decides, even without a final Move
+        if (session != _session)
+        {
+            // Atlas review A-3: the frame's Present re-entered a conclusion (a layout change, a deactivation...) - that
+            // conclusion already ended the gesture with zero writes; nothing of the old session may be read or committed.
+            return;
+        }
+
         var geometry = _geometry!;
         var target = Predicted;
         var commit = target != geometry.Confirmed && target >= 0 && geometry.Enabled[target];

@@ -8,7 +8,7 @@ using ServerMonitor.App.Services.Motion;
 
 namespace ServerMonitor.App.Controls.Primitives;
 
-/// <summary>What the drag adapter needs from the track's indicator (implemented by <see cref="SlidingSelectionController"/>).</summary>
+/// <summary>What the drag needs from the track's indicator (implemented by <see cref="SlidingSelectionController"/>).</summary>
 internal interface ISegmentDragPresenter
 {
     IReadOnlyList<RadioButton> Items { get; }
@@ -26,22 +26,297 @@ internal interface ISegmentDragPresenter
 }
 
 /// <summary>
-/// UI.11.1 H02 - the WinUI adapter of <see cref="SegmentDragController"/> on ONE opted-in segmented track
-/// (<see cref="SaSlidingSelection.AllowDragProperty"/>). It observes the track's parent panel with handledEventsToo (the
-/// RadioButton marks its pointer events handled), turns pointer/key/activation/lifecycle events into controller inputs, and
-/// implements the controller's effects on the real controls:
+/// UI.11.1 (Atlas review A-1 / AT-03): the real controls of ONE opted-in track, reduced to index-based member accesses with
+/// no decision in them, so <see cref="SegmentDragWiring"/> - every decision of the adapter - runs in unit tests against a
+/// fake. The production implementation is <see cref="SegmentDragAdapter"/>; each member is one WinUI call.
+/// </summary>
+internal interface ISegmentDragSurface
+{
+    int ItemCount { get; }
+
+    IndicatorRect Measure(int index);
+
+    bool IsChecked(int index);
+
+    /// <summary>The item is enabled and visible.</summary>
+    bool IsSelectable(int index);
+
+    /// <summary>No ancestor control of the track is disabled.</summary>
+    bool IsGroupEnabled { get; }
+
+    double RasterizationScale { get; }
+
+    /// <summary>GetSystemMetricsForDpi(SM_CXDRAG / SM_CYDRAG, dpi), physical pixels.</summary>
+    (int Cx, int Cy) DragMetrics(uint dpi);
+
+    void SetItemManipulation(int index, ManipulationModes mode);
+
+    /// <summary><c>items[index].ReleasePointerCapture(pointer)</c>.</summary>
+    void ReleaseItemCapture(int index, object pointer);
+
+    /// <summary><c>panel.CapturePointer(pointer)</c>.</summary>
+    bool CapturePanel(object pointer);
+
+    /// <summary><c>panel.ReleasePointerCapture(pointer)</c>.</summary>
+    void ReleasePanelCapture(object pointer);
+
+    /// <summary><c>VisualStateManager.GoToState(items[index], lit ? "Checked" : "Unchecked", false)</c>.</summary>
+    void ShowCheckState(int index, bool lit);
+
+    /// <summary><c>items[index].IsChecked = true</c>.</summary>
+    void Check(int index);
+
+    /// <summary>The window's focused element is inside the track's panel.</summary>
+    bool IsFocusInGroup { get; }
+
+    /// <summary><c>items[index].Focus(FocusState.Pointer)</c>.</summary>
+    void FocusPointer(int index);
+
+    void BeginPreview();
+
+    void PresentPreview(IndicatorRect rect);
+
+    void EndPreview(IndicatorCause cause, bool flushNow);
+}
+
+/// <summary>
+/// UI.11.1 H02 - the adapter's decisions between the real controls (<see cref="ISegmentDragSurface"/>) and
+/// <see cref="SegmentDragController"/>, with no WinUI object in it:
 /// <list type="bullet">
-/// <item>Option B (Cortex S0 B0): past the threshold the pressed item releases the pointer and the PANEL captures it, so the
-/// item never raises a Click for the drag (S0 case 5) and the panel keeps the gesture outside the control and the window.</item>
-/// <item>The ONE write is <c>IsChecked = true</c> on the target - no Click (B4) - and focus follows it when it was in the group,
-/// as a pointer focus without a ring (B3).</item>
+/// <item>Pen and touch (Beacon S0b V2): every opted-in item gets <see cref="ItemManipulation"/> - the ScrollViewer keeps the
+/// vertical pan, the horizontal gesture reaches the pointer events. Same path for every device.</item>
+/// <item>Option B (Cortex S0 B0): past the threshold the PRESSED item releases the press's pointer and the panel captures
+/// it, so the item never raises a Click for the drag (S0 case 5).</item>
+/// <item>The ONE write is <c>IsChecked = true</c> on the target - no Click (B4) - and focus follows it when it was in the
+/// group, as a pointer focus without a ring (B3).</item>
 /// <item>The predicted label (Prism P2, mandatory in High Contrast) shows the Checked visual state on the predicted item and
-/// Unchecked on the others while the confirmed IsChecked / view model / UI Automation stay untouched.</item>
-/// <item>Pen and touch (Beacon S0b V2): the opted-in items carry <c>ManipulationMode = System, TranslateX</c> - the
-/// ScrollViewer keeps the vertical pan, the horizontal gesture reaches the pointer events. Same path for every device.</item>
+/// Unchecked on the others while the confirmed IsChecked / view model / UI Automation stay untouched. Cortex review C-1: a
+/// label state must never change an item's geometry - every AllowDrag host has width-stable items (guarded by
+/// Ui111DragContractTests.EveryAllowDragHost_HasWidthStableItems).</item>
 /// </list>
 /// </summary>
-internal sealed class SegmentDragAdapter : ISegmentDragPort
+internal sealed class SegmentDragWiring : ISegmentDragPort
+{
+    /// <summary>
+    /// Beacon S0b verdict V2: the opted-in items' ManipulationMode. <c>System</c> keeps the page's vertical pan (the
+    /// ScrollViewer still owns Y); <c>TranslateX</c> keeps the horizontal pen/touch gesture out of DirectManipulation, so it
+    /// reaches the pointer events like the mouse (synthetic pen+touch: commit once, cancels zero, taps and scroll unchanged).
+    /// The same composition the ToggleSwitch template uses for its thumb. Real pen/touch: NOT_RUN.
+    /// </summary>
+    internal const ManipulationModes ItemManipulation = ManipulationModes.System | ManipulationModes.TranslateX;
+
+    private readonly ISegmentDragSurface _surface;
+    private readonly WindowActivationHub _hub;
+    private IDisposable? _activation;
+    private object? _pointer;
+    private int _origin = -1;
+    private int _predicted = -1;
+    private bool _committing;
+
+    public SegmentDragWiring(ISegmentDragSurface surface, WindowActivationHub? hub = null)
+    {
+        _surface = surface;
+        _hub = hub ?? WindowActivationHub.Default;
+        Controller = new SegmentDragController(this);
+    }
+
+    /// <summary>QA/test seam: the interaction's state.</summary>
+    public SegmentDragController Controller { get; }
+
+    /// <summary>
+    /// Loaded (idempotent, a remount raises it again): V2 on the (re)collected items, and ONE subscription to the owning
+    /// window's activation (null key = no window known: no subscription).
+    /// </summary>
+    public void Attach(object? windowKey)
+    {
+        PrepareItems();
+        _activation?.Dispose();
+        _activation = windowKey is null ? null : _hub.Subscribe(windowKey, WindowActivation);
+    }
+
+    /// <summary>A real unload: cancel, and drop the window subscription.</summary>
+    public void Detach()
+    {
+        Controller.Cancel(DragCancelReason.Unloaded);
+        _activation?.Dispose();
+        _activation = null;
+    }
+
+    /// <summary>The V2 pen/touch arbitration on every collected item.</summary>
+    public void PrepareItems()
+    {
+        for (var index = 0; index < _surface.ItemCount; index++)
+        {
+            _surface.SetItemManipulation(index, ItemManipulation);
+        }
+    }
+
+    public void Pressed(DragPointer sample, int index, object pointer)
+    {
+        if (Controller.IsActive)
+        {
+            return; // one pointer at a time
+        }
+
+        _pointer = pointer;
+        _origin = index;
+        Controller.Press(sample, index);
+    }
+
+    public void Moved(DragPointer sample)
+    {
+        if (Controller.IsActive)
+        {
+            Controller.Move(sample);
+        }
+    }
+
+    public void Released(DragPointer sample)
+    {
+        if (Controller.IsActive)
+        {
+            Controller.Release(sample);
+        }
+    }
+
+    public void Canceled(uint pointerId) => Controller.Canceled(pointerId);
+
+    public void CaptureLost(uint pointerId, bool panelOwned) => Controller.CaptureLost(pointerId, panelOwned);
+
+    /// <summary>Escape cancels a drag and is consumed; arrows/Tab cancel first and keep their meaning.</summary>
+    /// <returns>True when the key must be marked handled.</returns>
+    public bool Key(bool isEscape) => Controller.Key(isEscape) && isEscape;
+
+    public void WindowActivation(bool active) => Controller.WindowActivation(active);
+
+    public void Cancel(DragCancelReason reason) => Controller.Cancel(reason);
+
+    /// <summary>A Checked/Unchecked the wiring did not write: an external selection wins over the preview.</summary>
+    public void OnSelectionChanged()
+    {
+        if (!_committing)
+        {
+            Controller.Cancel(DragCancelReason.ExternalSelection);
+        }
+    }
+
+    // ---- ISegmentDragPort ----------------------------------------------------------------------------------------------
+
+    public DragGeometry? Snapshot()
+    {
+        var count = _surface.ItemCount;
+        if (count < 2)
+        {
+            return null;
+        }
+
+        var rects = Enumerable.Range(0, count).Select(_surface.Measure).ToList();
+        // Horizontal tracks only (structural: the vertical sidebar can never drag, even if mis-opted).
+        if (rects.Any(r => Math.Abs(r.Y - rects[0].Y) > 0.5 || Math.Abs(r.Height - rects[0].Height) > 0.5))
+        {
+            return null;
+        }
+
+        var confirmed = Enumerable.Range(0, count).FirstOrDefault(_surface.IsChecked, -1);
+        return confirmed < 0
+            ? null
+            : new DragGeometry(rects, Enumerable.Range(0, count).Select(_surface.IsSelectable).ToList(), confirmed, _surface.IsGroupEnabled);
+    }
+
+    public DragThreshold Threshold(DragPointerDevice device)
+    {
+        var scale = _surface.RasterizationScale;
+        var dpi = (uint)Math.Round(96 * (double.IsFinite(scale) && scale > 0 ? scale : 1));
+        var (cx, cy) = _surface.DragMetrics(dpi);
+        return SegmentDragRules.Threshold(device, cx, cy, scale);
+    }
+
+    public void ReleaseOriginCapture(uint pointerId)
+    {
+        if (_origin >= 0 && _pointer is not null)
+        {
+            _surface.ReleaseItemCapture(_origin, _pointer);
+        }
+    }
+
+    public bool CapturePanel(uint pointerId) => _pointer is not null && _surface.CapturePanel(_pointer);
+
+    public void ReleasePanelCapture(uint pointerId)
+    {
+        if (_pointer is not null)
+        {
+            _surface.ReleasePanelCapture(_pointer);
+        }
+    }
+
+    public void BeginPreview()
+    {
+        _predicted = -1;
+        _surface.BeginPreview();
+    }
+
+    public void Present(IndicatorRect rect, int predicted)
+    {
+        _surface.PresentPreview(rect);
+        if (predicted != _predicted)
+        {
+            _predicted = predicted;
+            ShowLabels(predicted);
+        }
+    }
+
+    public void EndPreview(DragOutcome outcome)
+    {
+        _predicted = -1;
+        if (outcome != DragOutcome.Committed)
+        {
+            ShowLabels(-1); // back to the confirmed states (a commit updates them itself)
+        }
+
+        _surface.EndPreview(outcome == DragOutcome.Cancelled ? IndicatorCause.DragCancel : IndicatorCause.DragEnd, flushNow: outcome != DragOutcome.Committed);
+    }
+
+    public void Commit(int index)
+    {
+        if (index < 0 || index >= _surface.ItemCount)
+        {
+            return;
+        }
+
+        var focusInGroup = _surface.IsFocusInGroup;
+        _committing = true;
+        try
+        {
+            _surface.Check(index);
+        }
+        finally
+        {
+            _committing = false;
+        }
+
+        if (focusInGroup && _surface.IsSelectable(index))
+        {
+            _surface.FocusPointer(index);
+        }
+    }
+
+    /// <summary>The predicted label lit (Checked state) and every other item Unchecked; -1 = each item's real state.</summary>
+    private void ShowLabels(int predicted)
+    {
+        for (var index = 0; index < _surface.ItemCount; index++)
+        {
+            _surface.ShowCheckState(index, predicted < 0 ? _surface.IsChecked(index) : index == predicted);
+        }
+    }
+}
+
+/// <summary>
+/// UI.11.1 H02 - the WinUI side of the drag on ONE opted-in segmented track (<see cref="SaSlidingSelection.AllowDragProperty"/>):
+/// it observes the track's parent panel with handledEventsToo (the RadioButton marks its pointer events handled), turns the
+/// routed events into <see cref="SegmentDragWiring"/> inputs, and implements <see cref="ISegmentDragSurface"/> with one
+/// WinUI call per member. Every decision lives in the wiring (unit-tested); this class is runtime-proven only (UI.11.1D).
+/// </summary>
+internal sealed class SegmentDragAdapter : ISegmentDragSurface
 {
     private const int SmCxDrag = 68;
     private const int SmCyDrag = 69;
@@ -49,19 +324,13 @@ internal sealed class SegmentDragAdapter : ISegmentDragPort
     private readonly FrameworkElement _host;
     private readonly Panel _panel;
     private readonly ISegmentDragPresenter _presenter;
-    private readonly SegmentDragController _controller;
-    private IDisposable? _activation;
-    private Pointer? _pointer;
-    private RadioButton? _origin;
-    private int _predicted = -1;
-    private bool _committing;
 
     public SegmentDragAdapter(FrameworkElement host, Panel panel, ISegmentDragPresenter presenter)
     {
         _host = host;
         _panel = panel;
         _presenter = presenter;
-        _controller = new SegmentDragController(this);
+        Wiring = new SegmentDragWiring(this);
 
         // Once per adapter (the panel lives as long as the host): a remount keeps these.
         panel.AddHandler(UIElement.PointerPressedEvent, new PointerEventHandler(OnPressed), handledEventsToo: true);
@@ -72,90 +341,41 @@ internal sealed class SegmentDragAdapter : ISegmentDragPort
         panel.AddHandler(UIElement.KeyDownEvent, new KeyEventHandler(OnKeyDown), handledEventsToo: true);
     }
 
-    /// <summary>QA/test seam: the interaction's state.</summary>
-    public SegmentDragController Controller => _controller;
+    /// <summary>QA/test seam: the decisions of this track's drag.</summary>
+    public SegmentDragWiring Wiring { get; }
 
-    /// <summary>Loaded (idempotent): (re)subscribes to the owning window's activation.</summary>
-    public void Attach()
-    {
-        _activation?.Dispose();
-        _activation = _host.XamlRoot?.ContentIslandEnvironment?.AppWindowId is { } window
-            ? WindowActivationHub.Default.Subscribe(window, OnWindowActivation)
-            : null;
-    }
+    /// <summary>QA/test seam: the interaction's state.</summary>
+    public SegmentDragController Controller => Wiring.Controller;
+
+    /// <summary>Loaded (idempotent): V2 on the (re)collected items; (re)subscribes to the owning window's activation.</summary>
+    public void Attach() => Wiring.Attach(_host.XamlRoot?.ContentIslandEnvironment?.AppWindowId);
 
     /// <summary>Unloaded (a real one - not the stale Unloaded of a remount): cancel, and drop the window subscription.</summary>
-    public void Detach()
-    {
-        _controller.Cancel(DragCancelReason.Unloaded);
-        _activation?.Dispose();
-        _activation = null;
-    }
+    public void Detach() => Wiring.Detach();
 
-    /// <summary>
-    /// Beacon S0b verdict V2: the opted-in items' ManipulationMode. <c>System</c> keeps the page's vertical pan (the
-    /// ScrollViewer still owns Y); <c>TranslateX</c> keeps the horizontal pen/touch gesture out of DirectManipulation, so it
-    /// reaches the pointer events like the mouse (synthetic pen+touch: commit once, cancels zero, taps and scroll unchanged).
-    /// The same composition the ToggleSwitch template uses for its thumb. Real pen/touch: NOT_RUN.
-    /// </summary>
-    internal const ManipulationModes ItemManipulation = ManipulationModes.System | ManipulationModes.TranslateX;
+    public void Cancel(DragCancelReason reason) => Wiring.Cancel(reason);
 
-    /// <summary>Called by the controller for every item it collects: the V2 pen/touch arbitration.</summary>
-    public static void PrepareItem(RadioButton item) => item.ManipulationMode = ItemManipulation;
+    public void OnSelectionChanged() => Wiring.OnSelectionChanged();
 
-    public void Cancel(DragCancelReason reason) => _controller.Cancel(reason);
+    // ---- routed events -------------------------------------------------------------------------------------------------
 
-    /// <summary>A Checked/Unchecked the adapter did not write: an external selection wins over the preview.</summary>
-    public void OnSelectionChanged()
-    {
-        if (!_committing)
-        {
-            _controller.Cancel(DragCancelReason.ExternalSelection);
-        }
-    }
+    private void OnPressed(object sender, PointerRoutedEventArgs e) => Wiring.Pressed(Sample(e), ItemOf(e.OriginalSource), e.Pointer);
 
-    // ---- input ---------------------------------------------------------------------------------------------------------
+    private void OnMoved(object sender, PointerRoutedEventArgs e) => Wiring.Moved(Sample(e));
 
-    private void OnPressed(object sender, PointerRoutedEventArgs e)
-    {
-        if (_controller.IsActive)
-        {
-            return; // one pointer at a time
-        }
+    private void OnReleased(object sender, PointerRoutedEventArgs e) => Wiring.Released(Sample(e));
 
-        var index = ItemOf(e.OriginalSource);
-        _pointer = e.Pointer;
-        _origin = index >= 0 ? _presenter.Items[index] : null;
-        _controller.Press(Sample(e), index);
-    }
-
-    private void OnMoved(object sender, PointerRoutedEventArgs e)
-    {
-        if (_controller.IsActive)
-        {
-            _controller.Move(Sample(e));
-        }
-    }
-
-    private void OnReleased(object sender, PointerRoutedEventArgs e)
-    {
-        if (_controller.IsActive)
-        {
-            _controller.Release(Sample(e));
-        }
-    }
-
-    private void OnCanceled(object sender, PointerRoutedEventArgs e) => _controller.Canceled(e.Pointer.PointerId);
+    private void OnCanceled(object sender, PointerRoutedEventArgs e) => Wiring.Canceled(e.Pointer.PointerId);
 
     private void OnCaptureLost(object sender, PointerRoutedEventArgs e) =>
-        _controller.CaptureLost(e.Pointer.PointerId, panelOwned: ReferenceEquals(e.OriginalSource, _panel));
+        Wiring.CaptureLost(e.Pointer.PointerId, panelOwned: ReferenceEquals(e.OriginalSource, _panel));
 
     private void OnKeyDown(object sender, KeyRoutedEventArgs e)
     {
         var key = e.Key;
         if (key == Windows.System.VirtualKey.Escape)
         {
-            if (_controller.Key(isEscape: true))
+            if (Wiring.Key(isEscape: true))
             {
                 e.Handled = true;
             }
@@ -163,11 +383,9 @@ internal sealed class SegmentDragAdapter : ISegmentDragPort
         else if (key is Windows.System.VirtualKey.Left or Windows.System.VirtualKey.Right or Windows.System.VirtualKey.Up
                  or Windows.System.VirtualKey.Down or Windows.System.VirtualKey.Tab)
         {
-            _controller.Key(isEscape: false); // cancel first; the key keeps its normal meaning
+            Wiring.Key(isEscape: false); // cancel first; the key keeps its normal meaning
         }
     }
-
-    private void OnWindowActivation(bool active) => _controller.WindowActivation(active);
 
     private DragPointer Sample(PointerRoutedEventArgs e)
     {
@@ -210,157 +428,76 @@ internal sealed class SegmentDragAdapter : ISegmentDragPort
         return -1;
     }
 
-    // ---- ISegmentDragPort ----------------------------------------------------------------------------------------------
+    // ---- ISegmentDragSurface: one WinUI call each ----------------------------------------------------------------------
 
-    public DragGeometry? Snapshot()
+    public int ItemCount => _presenter.Items.Count;
+
+    public IndicatorRect Measure(int index) => _presenter.Measure(_presenter.Items[index]);
+
+    public bool IsChecked(int index) => _presenter.Items[index].IsChecked == true;
+
+    public bool IsSelectable(int index) => _presenter.Items[index] is { IsEnabled: true, Visibility: Visibility.Visible };
+
+    public bool IsGroupEnabled
     {
-        var items = _presenter.Items;
-        if (items.Count < 2)
+        get
         {
-            return null;
-        }
-
-        var rects = items.Select(_presenter.Measure).ToList();
-        // Horizontal tracks only (structural: the vertical sidebar can never drag, even if mis-opted).
-        if (rects.Any(r => Math.Abs(r.Y - rects[0].Y) > 0.5 || Math.Abs(r.Height - rects[0].Height) > 0.5))
-        {
-            return null;
-        }
-
-        var confirmed = -1;
-        for (var index = 0; index < items.Count; index++)
-        {
-            if (items[index].IsChecked == true)
+            for (DependencyObject? node = _panel; node is not null; node = VisualTreeHelper.GetParent(node))
             {
-                confirmed = index;
-                break;
+                if (node is Control { IsEnabled: false })
+                {
+                    return false;
+                }
             }
-        }
 
-        return confirmed < 0
-            ? null
-            : new DragGeometry(rects, items.Select(item => item.IsEnabled && item.Visibility == Visibility.Visible).ToList(), confirmed, IsGroupEnabled());
+            return true;
+        }
     }
 
-    private bool IsGroupEnabled()
+    public double RasterizationScale => _host.XamlRoot?.RasterizationScale ?? 1;
+
+    public (int Cx, int Cy) DragMetrics(uint dpi) => (GetSystemMetricsForDpi(SmCxDrag, dpi), GetSystemMetricsForDpi(SmCyDrag, dpi));
+
+    public void SetItemManipulation(int index, ManipulationModes mode) => _presenter.Items[index].ManipulationMode = mode;
+
+    public void ReleaseItemCapture(int index, object pointer) => _presenter.Items[index].ReleasePointerCapture((Pointer)pointer);
+
+    public bool CapturePanel(object pointer) => _panel.CapturePointer((Pointer)pointer);
+
+    public void ReleasePanelCapture(object pointer) => _panel.ReleasePointerCapture((Pointer)pointer);
+
+    public void ShowCheckState(int index, bool lit) => VisualStateManager.GoToState(_presenter.Items[index], lit ? "Checked" : "Unchecked", false);
+
+    public void Check(int index) => _presenter.Items[index].IsChecked = true;
+
+    public bool IsFocusInGroup
     {
-        for (DependencyObject? node = _panel; node is not null; node = VisualTreeHelper.GetParent(node))
+        get
         {
-            if (node is Control { IsEnabled: false })
+            if (_host.XamlRoot is not { } root || FocusManager.GetFocusedElement(root) is not DependencyObject focused)
             {
                 return false;
             }
-        }
 
-        return true;
-    }
-
-    public DragThreshold Threshold(DragPointerDevice device)
-    {
-        var scale = _host.XamlRoot?.RasterizationScale ?? 1;
-        var dpi = (uint)Math.Round(96 * (double.IsFinite(scale) && scale > 0 ? scale : 1));
-        return SegmentDragRules.Threshold(device, GetSystemMetricsForDpi(SmCxDrag, dpi), GetSystemMetricsForDpi(SmCyDrag, dpi), scale);
-    }
-
-    public void ReleaseOriginCapture(uint pointerId)
-    {
-        if (_origin is not null && _pointer is not null)
-        {
-            _origin.ReleasePointerCapture(_pointer);
-        }
-    }
-
-    public bool CapturePanel(uint pointerId) => _pointer is not null && _panel.CapturePointer(_pointer);
-
-    public void ReleasePanelCapture(uint pointerId)
-    {
-        if (_pointer is not null)
-        {
-            _panel.ReleasePointerCapture(_pointer);
-        }
-    }
-
-    public void BeginPreview()
-    {
-        _predicted = -1;
-        _presenter.BeginPreview();
-    }
-
-    public void Present(IndicatorRect rect, int predicted)
-    {
-        _presenter.PresentPreview(rect);
-        if (predicted != _predicted)
-        {
-            _predicted = predicted;
-            ShowLabels(predicted);
-        }
-    }
-
-    public void EndPreview(DragOutcome outcome)
-    {
-        _predicted = -1;
-        if (outcome != DragOutcome.Committed)
-        {
-            ShowLabels(-1); // back to the confirmed states (a commit updates them itself)
-        }
-
-        _presenter.EndPreview(outcome == DragOutcome.Cancelled ? IndicatorCause.DragCancel : IndicatorCause.DragEnd, flushNow: outcome != DragOutcome.Committed);
-    }
-
-    public void Commit(int index)
-    {
-        var items = _presenter.Items;
-        if (index < 0 || index >= items.Count)
-        {
-            return;
-        }
-
-        var target = items[index];
-        var focusInGroup = _host.XamlRoot is { } root && FocusManager.GetFocusedElement(root) is DependencyObject focused && IsInside(focused, _panel);
-        _committing = true;
-        try
-        {
-            target.IsChecked = true;
-        }
-        finally
-        {
-            _committing = false;
-        }
-
-        if (focusInGroup && target.IsEnabled)
-        {
-            target.Focus(FocusState.Pointer);
-        }
-    }
-
-    /// <summary>
-    /// The predicted label lit (Checked state) and every other item Unchecked; -1 = each item's real state.
-    /// Cortex review C-1: a label state must never change an item's geometry - a re-measure raises SizeChanged, which cancels
-    /// the drag (Layout). Every AllowDrag host therefore has width-stable items (fixed width, a stretched star column, or the
-    /// same weight in both states) - guarded by Ui111DragContractTests.EveryAllowDragHost_HasWidthStableItems.
-    /// </summary>
-    private void ShowLabels(int predicted)
-    {
-        var items = _presenter.Items;
-        for (var index = 0; index < items.Count; index++)
-        {
-            var lit = predicted < 0 ? items[index].IsChecked == true : index == predicted;
-            VisualStateManager.GoToState(items[index], lit ? "Checked" : "Unchecked", false);
-        }
-    }
-
-    private static bool IsInside(DependencyObject node, DependencyObject ancestor)
-    {
-        for (DependencyObject? current = node; current is not null; current = VisualTreeHelper.GetParent(current))
-        {
-            if (ReferenceEquals(current, ancestor))
+            for (DependencyObject? node = focused; node is not null; node = VisualTreeHelper.GetParent(node))
             {
-                return true;
+                if (ReferenceEquals(node, _panel))
+                {
+                    return true;
+                }
             }
-        }
 
-        return false;
+            return false;
+        }
     }
+
+    public void FocusPointer(int index) => _presenter.Items[index].Focus(FocusState.Pointer);
+
+    public void BeginPreview() => _presenter.BeginPreview();
+
+    public void PresentPreview(IndicatorRect rect) => _presenter.PresentPreview(rect);
+
+    public void EndPreview(IndicatorCause cause, bool flushNow) => _presenter.EndPreview(cause, flushNow);
 
     [DllImport("user32.dll")]
     private static extern int GetSystemMetricsForDpi(int index, uint dpi);

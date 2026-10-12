@@ -68,9 +68,9 @@ public sealed class Ui111DragContractTests
     [Fact]
     public void TheOptedInItems_UseSystemPlusTranslateX()
     {
-        Assert.Equal(ManipulationModes.System | ManipulationModes.TranslateX, SegmentDragAdapter.ItemManipulation);
-        Assert.True(SegmentDragAdapter.ItemManipulation.HasFlag(ManipulationModes.System));
-        Assert.False(SegmentDragAdapter.ItemManipulation.HasFlag(ManipulationModes.TranslateY));
+        Assert.Equal(ManipulationModes.System | ManipulationModes.TranslateX, SegmentDragWiring.ItemManipulation);
+        Assert.True(SegmentDragWiring.ItemManipulation.HasFlag(ManipulationModes.System));
+        Assert.False(SegmentDragWiring.ItemManipulation.HasFlag(ManipulationModes.TranslateY));
     }
 
     /// <summary>
@@ -153,7 +153,9 @@ public sealed class Ui111DragContractTests
 
         Assert.Contains("\"AllowDrag\", typeof(bool), typeof(SaSlidingSelection), new PropertyMetadata(false))", code, StringComparison.Ordinal);
         Assert.Contains("if (_drag is null && SaSlidingSelection.GetAllowDrag(_host)", code, StringComparison.Ordinal);
-        Assert.Contains("if (SaSlidingSelection.GetAllowDrag(_host))", code, StringComparison.Ordinal); // V2 on items only when opted in
+        // V2 reaches the items only through the adapter (SegmentDragWiring.PrepareItems - behaviourally tested), which exists
+        // only for an opted-in track: the opt-in is read in exactly one place.
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(code, @"GetAllowDrag\(_host\)"));
     }
 
     /// <summary>
@@ -165,7 +167,7 @@ public sealed class Ui111DragContractTests
     {
         var code = AppSourceTree.CodeWithoutComments("MainWindow.xaml.cs");
 
-        Assert.Single(System.Text.RegularExpressions.Regex.Matches(code, @"ThemeRemountFocus\.RemountAll\("));
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(code, @"_themeRemountFocus\.RemountAll\("));
         Assert.Equal(4, System.Text.RegularExpressions.Regex.Matches(code, @"SaThemeRefresh\.Remount\([^;\n]*?restoreFocus: false\)").Count);
         Assert.Equal(4, System.Text.RegularExpressions.Regex.Matches(code, @"SaThemeRefresh\.Remount\(").Count);
         Assert.Contains("WindowActivationHub.Default.Publish(AppWindow.Id, _isWindowActive);", code, StringComparison.Ordinal);

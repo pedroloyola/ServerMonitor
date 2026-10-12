@@ -432,6 +432,9 @@ public sealed partial class MainWindow : Window
         WindowBackground.Style = (Style)Application.Current.Resources[key];
     }
 
+    /// <summary>UI.11.1 H03: one focus capture / restore per theme pass, a newer pass superseding a pending restore.</summary>
+    private readonly Services.ThemeRemountFocus _themeRemountFocus = new();
+
     private void OnActualThemeChanged(FrameworkElement sender, object args)
     {
         ApplyShellBackground();
@@ -446,7 +449,7 @@ public sealed partial class MainWindow : Window
                 return;
             }
 
-            Services.ThemeRemountFocus.RemountAll(new XamlRemountFocusPort(root, DispatcherQueue),
+            _themeRemountFocus.RemountAll(new Services.RemountFocusPort(new XamlFocusSurface(root, DispatcherQueue)),
             [
                 () => ContentFrame.Content is Microsoft.UI.Xaml.Controls.Page page && SaThemeRefresh.Remount(page, restoreFocus: false),
                 () => SaThemeRefresh.Remount(Sidebar, Sidebar.Content, content => Sidebar.Content = content, restoreFocus: false),

@@ -30,6 +30,8 @@ public sealed class ThemeRemountFocusTests
 
         public void Post(Action action) => _queue.Enqueue(action);
 
+        public bool SharesGroup(object a, object b) => ThemeItems.Contains(a) && ThemeItems.Contains(b);
+
         public void Drain()
         {
             while (_queue.Count > 0)
@@ -40,6 +42,9 @@ public sealed class ThemeRemountFocusTests
     }
 
     private const string Sistema = "Sistema";
+    private const string Claro = "Claro";
+    private const string OtherControl = "OtherControl";
+    private static readonly HashSet<object> ThemeItems = ["Sistema", "Claro", "Escuro"];
     private const string Escuro = "Escuro";
 
     /// <summary>Four roots remounted in one pass; each one moves focus to "Sistema" like the real remount did.</summary>
@@ -59,7 +64,7 @@ public sealed class ThemeRemountFocusTests
     {
         var window = new FakeWindow { FocusedElement = Escuro, Kind = kind };
 
-        Assert.Equal(4, ThemeRemountFocus.RemountAll(window, FourRootsMovingFocusTo(window, Sistema)));
+        Assert.Equal(4, new ThemeRemountFocus().RemountAll(window, FourRootsMovingFocusTo(window, Sistema)));
         window.Drain();
 
         Assert.Equal([(Escuro, kind)], window.Restores);
@@ -71,7 +76,7 @@ public sealed class ThemeRemountFocusTests
     {
         var window = new FakeWindow();
 
-        ThemeRemountFocus.RemountAll(window, FourRootsMovingFocusTo(window, Sistema));
+        new ThemeRemountFocus().RemountAll(window, FourRootsMovingFocusTo(window, Sistema));
         window.Drain();
 
         Assert.Empty(window.Restores);
@@ -82,7 +87,7 @@ public sealed class ThemeRemountFocusTests
     {
         var window = new FakeWindow { FocusedElement = Escuro, Kind = RemountFocusKind.Pointer };
 
-        Assert.Equal(0, ThemeRemountFocus.RemountAll(window, [() => false, () => false]));
+        Assert.Equal(0, new ThemeRemountFocus().RemountAll(window, [() => false, () => false]));
         window.Drain();
 
         Assert.Empty(window.Restores);
@@ -93,10 +98,174 @@ public sealed class ThemeRemountFocusTests
     {
         var window = new FakeWindow { FocusedElement = Escuro, Kind = RemountFocusKind.Pointer };
 
-        ThemeRemountFocus.RemountAll(window, FourRootsMovingFocusTo(window, Sistema));
+        new ThemeRemountFocus().RemountAll(window, FourRootsMovingFocusTo(window, Sistema));
 
         Assert.Empty(window.Restores); // queued, not run inline
         window.Drain();
         Assert.Single(window.Restores);
+    }
+
+    // ---- the production port (Atlas review AT-05) ---------------------------------------------------------------------
+
+    /// <summary>A window whose focus falls to "Sistema" whenever a root leaves the tree, seen through the one-call surface.</summary>
+    private sealed class FakeFocusSurface : IFocusSurface
+    {
+        private readonly Queue<Action> _queue = new();
+
+        public object? FocusedElement { get; set; }
+
+        public Dictionary<object, RemountFocusKind> Kinds { get; } = [];
+
+        public HashSet<object> Detached { get; } = [];
+
+        public List<(object Element, RemountFocusKind Kind)> Focuses { get; } = [];
+
+        public RemountFocusKind KindOf(object element) => Kinds.GetValueOrDefault(element, RemountFocusKind.Programmatic);
+
+        public bool CanFocus(object element) => !Detached.Contains(element);
+
+        public bool SharesGroup(object a, object b) => ThemeItems.Contains(a) && ThemeItems.Contains(b);
+
+        public void Focus(object element, RemountFocusKind kind)
+        {
+            Focuses.Add((element, kind));
+            FocusedElement = element;
+            Kinds[element] = kind;
+        }
+
+        public void Post(Action action) => _queue.Enqueue(action);
+
+        public void Drain()
+        {
+            while (_queue.Count > 0)
+            {
+                _queue.Dequeue()();
+            }
+        }
+    }
+
+    private static Func<bool>[] FourRootsMovingFocusTo(FakeFocusSurface window, object fallback) =>
+        Enumerable.Range(0, 4).Select(_ => (Func<bool>)(() =>
+        {
+            window.FocusedElement = fallback;
+            window.Kinds[fallback] = RemountFocusKind.Pointer;
+            return true;
+        })).ToArray();
+
+    /// <summary>The restore targets the CAPTURED element, never whatever holds focus when the restore runs.</summary>
+    [Theory]
+    [InlineData(RemountFocusKind.Pointer)]
+    [InlineData(RemountFocusKind.Keyboard)]
+    public void ThePort_RestoresTheCapturedElement_NotTheCurrentFocus(RemountFocusKind kind)
+    {
+        var window = new FakeFocusSurface { FocusedElement = Escuro };
+        window.Kinds[Escuro] = kind;
+
+        new ThemeRemountFocus().RemountAll(new RemountFocusPort(window), FourRootsMovingFocusTo(window, Sistema));
+        Assert.Equal(Sistema, window.FocusedElement); // what the remounts left
+        window.Drain();
+
+        Assert.Equal([(Escuro, kind)], window.Focuses);
+        Assert.Equal(Escuro, window.FocusedElement);
+    }
+
+    [Fact]
+    public void ThePort_NeverFocusesAnElementThatLeftTheTree()
+    {
+        var window = new FakeFocusSurface { FocusedElement = Escuro };
+        window.Kinds[Escuro] = RemountFocusKind.Pointer;
+        window.Detached.Add(Escuro);
+
+        new ThemeRemountFocus().RemountAll(new RemountFocusPort(window), FourRootsMovingFocusTo(window, Sistema));
+        window.Drain();
+
+        Assert.Empty(window.Focuses);
+    }
+
+    [Fact]
+    public void ThePort_NothingFocused_NothingRestored()
+    {
+        var window = new FakeFocusSurface();
+
+        new ThemeRemountFocus().RemountAll(new RemountFocusPort(window), FourRootsMovingFocusTo(window, Sistema));
+        window.Drain();
+
+        Assert.Empty(window.Focuses);
+    }
+
+    // ---- Atlas review A-2: the later restore never steals a newer choice ----------------------------------------------
+
+    /// <summary>Atlas probe (permanent): a user focus choice after the remount and before the Low-priority restore wins.</summary>
+    [Fact]
+    public void AQueuedThemeRestore_DoesNotStealFocusFromALaterUserChoice()
+    {
+        var window = new FakeWindow { FocusedElement = Escuro, Kind = RemountFocusKind.Keyboard };
+        new ThemeRemountFocus().RemountAll(window, [() => { window.FocusedElement = Sistema; return true; }]);
+
+        window.FocusedElement = OtherControl; // the user moves on before the restore runs
+        window.Drain();
+
+        Assert.Empty(window.Restores);
+        Assert.Equal(OtherControl, window.FocusedElement);
+    }
+
+    [Fact]
+    public void ThePort_AQueuedRestore_DoesNotStealFocusFromALaterUserChoice()
+    {
+        var window = new FakeFocusSurface { FocusedElement = Escuro };
+        window.Kinds[Escuro] = RemountFocusKind.Pointer;
+        new ThemeRemountFocus().RemountAll(new RemountFocusPort(window), FourRootsMovingFocusTo(window, Sistema));
+
+        window.FocusedElement = OtherControl;
+        window.Drain();
+
+        Assert.Empty(window.Focuses);
+    }
+
+    /// <summary>
+    /// Two theme passes before the first restore ran (rapid theme changes): the second pass must not capture "Sistema",
+    /// where the first pass dropped focus - the original choice is restored, once.
+    /// </summary>
+    [Fact]
+    public void ASecondPass_BeforeTheRestore_KeepsTheOriginalChoice_AndRestoresOnce()
+    {
+        var window = new FakeWindow { FocusedElement = Escuro, Kind = RemountFocusKind.Pointer };
+        var focus = new ThemeRemountFocus();
+
+        focus.RemountAll(window, FourRootsMovingFocusTo(window, Sistema));
+        focus.RemountAll(window, FourRootsMovingFocusTo(window, Sistema));
+        window.Drain();
+
+        Assert.Equal([(Escuro, RemountFocusKind.Pointer)], window.Restores);
+    }
+
+    /// <summary>After a completed restore, the next pass captures afresh (no stale pending capture).</summary>
+    [Fact]
+    public void APassAfterACompletedRestore_CapturesAfresh()
+    {
+        var window = new FakeWindow { FocusedElement = Escuro, Kind = RemountFocusKind.Pointer };
+        var focus = new ThemeRemountFocus();
+        focus.RemountAll(window, FourRootsMovingFocusTo(window, Sistema));
+        window.Drain();
+
+        window.FocusedElement = Claro; // the user chose another theme item
+        window.Kind = RemountFocusKind.Keyboard;
+        focus.RemountAll(window, FourRootsMovingFocusTo(window, Sistema));
+        window.Drain();
+
+        Assert.Equal([(Escuro, RemountFocusKind.Pointer), (Claro, RemountFocusKind.Keyboard)], window.Restores);
+    }
+
+    /// <summary>Focus that falls onto another item of the same group only after the pass returned is still restored.</summary>
+    [Fact]
+    public void FocusFallingLateOntoTheSameGroup_IsStillRestored()
+    {
+        var window = new FakeWindow { FocusedElement = Escuro, Kind = RemountFocusKind.Pointer };
+        new ThemeRemountFocus().RemountAll(window, [() => { window.FocusedElement = null; return true; }]);
+
+        window.FocusedElement = Sistema; // the platform's own focus restoration, after the pass
+        window.Drain();
+
+        Assert.Equal([(Escuro, RemountFocusKind.Pointer)], window.Restores);
     }
 }

@@ -374,6 +374,39 @@ public sealed class SegmentDragControllerTests
         Assert.Equal(["ReleaseOrigin(1)", "CapturePanel(1)"], port.Effects.Skip(2));
     }
 
+    /// <summary>
+    /// Atlas review A-3 (probe, permanent): the release's own Present re-enters a conclusion (a layout change) - the gesture
+    /// ends there with zero writes, and the release reads nothing of the ended session (it threw a NullReferenceException).
+    /// </summary>
+    [Fact]
+    public void Release_APresentThatCancelsReentrantly_EndsWithoutCommit()
+    {
+        var (controller, port) = Armed();
+        controller.Move(Mouse(136));
+        port.OnPresent = () => controller.Cancel(DragCancelReason.Layout);
+        controller.Release(Mouse(40));
+
+        Assert.False(controller.IsActive);
+        Assert.DoesNotContain(port.Effects, e => e.StartsWith("Commit", StringComparison.Ordinal));
+        Assert.Single(port.Effects, e => e.StartsWith("EndPreview", StringComparison.Ordinal));
+        Assert.Equal("EndPreview(Cancelled)", port.Effects.Single(e => e.StartsWith("EndPreview", StringComparison.Ordinal)));
+    }
+
+    /// <summary>The same re-entrancy on a Move frame: the move ends, nothing else is touched.</summary>
+    [Fact]
+    public void Move_APresentThatCancelsReentrantly_LeavesTheGestureEnded()
+    {
+        var (controller, port) = Armed();
+        controller.Move(Mouse(200));
+        port.OnPresent = () => controller.WindowActivation(active: false);
+        controller.Move(Mouse(136));
+        port.OnPresent = null;
+        controller.Release(Mouse(136));
+
+        Assert.False(controller.IsActive);
+        Assert.DoesNotContain(port.Effects, e => e.StartsWith("Commit", StringComparison.Ordinal));
+    }
+
     // ---- press-phase conclusions --------------------------------------------------------------------------------------
 
     /// <summary>S0 case 9 (synthetic pen, before V2): Pressed, no Move, the item loses the contact - a safe end, not a drag.</summary>
@@ -474,6 +507,8 @@ public sealed class SegmentDragControllerTests
 
         public Action<int>? OnCommit { get; set; }
 
+        public Action? OnPresent { get; set; }
+
         public DragGeometry? Snapshot()
         {
             Effects.Add("Snapshot");
@@ -507,8 +542,11 @@ public sealed class SegmentDragControllerTests
 
         public void BeginPreview() => Effects.Add("BeginPreview");
 
-        public void Present(IndicatorRect rect, int predicted) =>
+        public void Present(IndicatorRect rect, int predicted)
+        {
             Effects.Add(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Present({rect.X:F1},{rect.Width:F1}|{predicted})"));
+            OnPresent?.Invoke();
+        }
 
         public void EndPreview(DragOutcome outcome) => Effects.Add($"EndPreview({outcome})");
 
