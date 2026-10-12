@@ -134,7 +134,7 @@
                             primitives:SaSlidingSelection.AllowDrag="True"
                             primitives:SaSlidingSelection.DurationKey="SaMotionSegmentSelectDuration"
                             primitives:SaSlidingSelection.IndicatorBrush="{ThemeResource SaSelectedBrush}"
-                            primitives:SaSlidingSelection.HighlightBrush="{ThemeResource SaGlassHighlightBrush}" primitives:SaSlidingSelection.LightOutlineBrush="{ThemeResource SaDialogButtonBorderBrush}" />
+                            primitives:SaSlidingSelection.HighlightBrush="{ThemeResource SaGlassHighlightBrush}" primitives:SaSlidingSelection.LightOutlineBrush="{ThemeResource SaSegmentedSelectedOutlineBrush}" />
                     <RadioButton x:Uid="HistoryRangeLastHour" Grid.Column="0" GroupName="HistoryRange" MinWidth="74" Style="{StaticResource SaSegmentedRectCompactItemStyle}"
                                  IsChecked="{Binding SelectedRangeIndex, Mode=TwoWay, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=0}" />
                     <RadioButton x:Uid="HistoryRangeLast6Hours" Grid.Column="1" GroupName="HistoryRange" MinWidth="74" Style="{StaticResource SaSegmentedRectCompactItemStyle}"

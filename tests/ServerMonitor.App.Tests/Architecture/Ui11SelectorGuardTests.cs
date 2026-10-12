@@ -86,7 +86,7 @@ public sealed class Ui11SelectorGuardTests
     }
 
     [Theory]
-    [InlineData("Views/SettingsPage.xaml", "SaSegmentedThemeSelectedBrush", false, false)]
+    [InlineData("Views/SettingsPage.xaml", "SaSegmentedThemeSelectedBrush", false, true)]
     [InlineData("Views/HistoryPage.xaml", "SaSelectedBrush", true, true)]
     [InlineData("Views/WorkloadsPage.xaml", "SaSelectedBrush", true, true)]
     [InlineData("Controls/ServerFormControl.xaml", "SaSegmentedPillSelectedBrush", false, true)]
@@ -99,8 +99,9 @@ public sealed class Ui11SelectorGuardTests
         {
             Assert.Equal("{ThemeResource " + brush + "}", (string?)host.Attribute(IndicatorBrush));
             Assert.Equal(highlight ? "{ThemeResource SaGlassHighlightBrush}" : null, (string?)host.Attribute(Primitives + "SaSlidingSelection.HighlightBrush"));
-            // F20 / DD-UI11-1 = rect + nav + auth (Prism D2, B11-10): the Light-only hairline; the theme selector stays without.
-            Assert.Equal(lightOutline ? "{ThemeResource SaDialogButtonBorderBrush}" : null, (string?)host.Attribute(Primitives + "SaSlidingSelection.LightOutlineBrush"));
+            // F20 / DD-UI11-1 (Prism D2, B11-10) superseded by UI.12 B12-01 (Prism spec): every segmented selector, the theme
+            // one included, draws the Light-only outline with SaSegmentedSelectedOutlineBrush (>=3:1, Ui12SegmentedOutlineContrastTests).
+            Assert.Equal(lightOutline ? "{ThemeResource SaSegmentedSelectedOutlineBrush}" : null, (string?)host.Attribute(Primitives + "SaSlidingSelection.LightOutlineBrush"));
         }
     }
 
@@ -117,12 +118,14 @@ public sealed class Ui11SelectorGuardTests
         Assert.Equal("{ThemeResource SaDialogButtonBorderBrush}", (string?)host.Attribute(Primitives + "SaSlidingSelection.LightOutlineBrush"));
     }
 
-    /// <summary>Prism D2: only the theme selector stays without the hairline (its own brush is visible, user's reference).</summary>
+    /// <summary>UI.12 B12-01 (Prism spec) supersedes Prism D2: the theme selector now carries the Light outline too (Beacon
+    /// measured 1.04:1 without it); the editor's two auth selectors use the same token.</summary>
     [Fact]
-    public void F20_OnlyTheThemeSelector_HasNoLightHairline()
+    public void F20_TheThemeSelector_NowHasTheLightOutline()
     {
-        Assert.All(AllIndicatorHosts(AppSourceTree.LoadXaml("Views/SettingsPage.xaml")), host => Assert.Null(host.Attribute(Primitives + "SaSlidingSelection.LightOutlineBrush")));
+        Assert.All(AllIndicatorHosts(AppSourceTree.LoadXaml("Views/SettingsPage.xaml")),
+            host => Assert.Equal("{ThemeResource SaSegmentedSelectedOutlineBrush}", (string?)host.Attribute(Primitives + "SaSlidingSelection.LightOutlineBrush")));
         Assert.Equal(2, AllIndicatorHosts(AppSourceTree.LoadXaml("Controls/ServerFormControl.xaml"))
-            .Count(host => (string?)host.Attribute(Primitives + "SaSlidingSelection.LightOutlineBrush") == "{ThemeResource SaDialogButtonBorderBrush}"));
+            .Count(host => (string?)host.Attribute(Primitives + "SaSlidingSelection.LightOutlineBrush") == "{ThemeResource SaSegmentedSelectedOutlineBrush}"));
     }
 }

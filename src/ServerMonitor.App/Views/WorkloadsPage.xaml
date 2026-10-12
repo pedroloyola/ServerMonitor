@@ -256,7 +256,7 @@
                             primitives:SaSlidingSelection.AllowDrag="True"
                             primitives:SaSlidingSelection.DurationKey="SaMotionSegmentSelectDuration"
                             primitives:SaSlidingSelection.IndicatorBrush="{ThemeResource SaSelectedBrush}"
-                            primitives:SaSlidingSelection.HighlightBrush="{ThemeResource SaGlassHighlightBrush}" primitives:SaSlidingSelection.LightOutlineBrush="{ThemeResource SaDialogButtonBorderBrush}" />
+                            primitives:SaSlidingSelection.HighlightBrush="{ThemeResource SaGlassHighlightBrush}" primitives:SaSlidingSelection.LightOutlineBrush="{ThemeResource SaSegmentedSelectedOutlineBrush}" />
                     <StackPanel
                         Orientation="Horizontal"
                         Spacing="4"

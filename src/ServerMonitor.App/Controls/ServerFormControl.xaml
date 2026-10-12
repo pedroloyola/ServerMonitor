@@ -271,7 +271,7 @@
                                     primitives:SaSlidingSelection.AllowDrag="True"
                                     primitives:SaSlidingSelection.DurationKey="SaMotionSegmentSelectDuration"
                                     primitives:SaSlidingSelection.IndicatorBrush="{ThemeResource SaSegmentedPillSelectedBrush}"
-                                    primitives:SaSlidingSelection.LightOutlineBrush="{ThemeResource SaDialogButtonBorderBrush}" />
+                                    primitives:SaSlidingSelection.LightOutlineBrush="{ThemeResource SaSegmentedSelectedOutlineBrush}" />
                             <!-- 112:3356: Key01 / LockPassword 16 + Medium 12; the SAME SelectedAuthenticationIndex setter as
                                  before, so changing the method still drops a staged secret (Vigil H4). -->
                             <RadioButton x:Uid="ServerEditorAuthKeyOption" GroupName="ServerEditorAuthentication" HorizontalAlignment="Stretch"
@@ -484,7 +484,7 @@
                                     primitives:SaSlidingSelection.AllowDrag="True"
                                     primitives:SaSlidingSelection.DurationKey="SaMotionSegmentSelectDuration"
                                     primitives:SaSlidingSelection.IndicatorBrush="{ThemeResource SaSegmentedPillSelectedBrush}"
-                                    primitives:SaSlidingSelection.LightOutlineBrush="{ThemeResource SaDialogButtonBorderBrush}" />
+                                    primitives:SaSlidingSelection.LightOutlineBrush="{ThemeResource SaSegmentedSelectedOutlineBrush}" />
                             <RadioButton x:Uid="ServerEditorJumpAuthKeyOption" GroupName="ServerEditorJumpAuthentication" HorizontalAlignment="Stretch"
                                          Style="{StaticResource SaSegmentedPillItemStyle}" IsEnabled="{Binding IsNotTestingConnection}"
                                          IsChecked="{Binding SelectedJumpAuthenticationIndex, Mode=TwoWay, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=0}">

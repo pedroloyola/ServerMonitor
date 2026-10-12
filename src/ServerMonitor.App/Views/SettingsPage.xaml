@@ -122,7 +122,8 @@
                                     <Border IsHitTestVisible="False" AutomationProperties.AccessibilityView="Raw"
                                             primitives:SaSlidingSelection.AllowDrag="True"
                                             primitives:SaSlidingSelection.DurationKey="SaMotionSegmentSelectDuration"
-                                            primitives:SaSlidingSelection.IndicatorBrush="{ThemeResource SaSegmentedThemeSelectedBrush}" />
+                                            primitives:SaSlidingSelection.IndicatorBrush="{ThemeResource SaSegmentedThemeSelectedBrush}"
+                                            primitives:SaSlidingSelection.LightOutlineBrush="{ThemeResource SaSegmentedSelectedOutlineBrush}" />
                                     <!-- Beacon C1 N1: the UI.2 segmented keyboard contract - one Tab stop, entry on the selected item,
                                          the arrows move AND select (SaGroupNavigation). -->
                                     <StackPanel Orientation="Horizontal" Spacing="{StaticResource SaSpace4}"
