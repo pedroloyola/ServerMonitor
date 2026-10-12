@@ -30,8 +30,6 @@ public sealed class ThemeRemountFocusTests
 
         public void Post(Action action) => _queue.Enqueue(action);
 
-        public bool SharesGroup(object a, object b) => ThemeItems.Contains(a) && ThemeItems.Contains(b);
-
         public void Drain()
         {
             while (_queue.Count > 0)
@@ -44,7 +42,6 @@ public sealed class ThemeRemountFocusTests
     private const string Sistema = "Sistema";
     private const string Claro = "Claro";
     private const string OtherControl = "OtherControl";
-    private static readonly HashSet<object> ThemeItems = ["Sistema", "Claro", "Escuro"];
     private const string Escuro = "Escuro";
 
     /// <summary>Four roots remounted in one pass; each one moves focus to "Sistema" like the real remount did.</summary>
@@ -123,8 +120,6 @@ public sealed class ThemeRemountFocusTests
         public RemountFocusKind KindOf(object element) => Kinds.GetValueOrDefault(element, RemountFocusKind.Programmatic);
 
         public bool CanFocus(object element) => !Detached.Contains(element);
-
-        public bool SharesGroup(object a, object b) => ThemeItems.Contains(a) && ThemeItems.Contains(b);
 
         public void Focus(object element, RemountFocusKind kind)
         {
@@ -256,16 +251,99 @@ public sealed class ThemeRemountFocusTests
         Assert.Equal([(Escuro, RemountFocusKind.Pointer), (Claro, RemountFocusKind.Keyboard)], window.Restores);
     }
 
-    /// <summary>Focus that falls onto another item of the same group only after the pass returned is still restored.</summary>
+    /// <summary>Remounts that leave NO element focused: focus is restored (nothing to override).</summary>
     [Fact]
-    public void FocusFallingLateOntoTheSameGroup_IsStillRestored()
+    public void FocusLostEntirely_IsRestored()
+    {
+        var window = new FakeWindow { FocusedElement = Escuro, Kind = RemountFocusKind.Keyboard };
+        new ThemeRemountFocus().RemountAll(window, [() => { window.FocusedElement = null; return true; }]);
+        window.Drain();
+
+        Assert.Equal([(Escuro, RemountFocusKind.Keyboard)], window.Restores);
+    }
+
+    /// <summary>The remount dropped focus on "Sistema", then focus was lost entirely before the restore: nothing to override.</summary>
+    [Fact]
+    public void FocusLostAfterTheFallback_IsRestored()
+    {
+        var window = new FakeWindow { FocusedElement = Escuro, Kind = RemountFocusKind.Pointer };
+        new ThemeRemountFocus().RemountAll(window, [() => { window.FocusedElement = Sistema; return true; }]);
+
+        window.FocusedElement = null;
+        window.Drain();
+
+        Assert.Equal([(Escuro, RemountFocusKind.Pointer)], window.Restores);
+    }
+
+    // ---- Atlas review A-2, round 3: identity, never position --------------------------------------------------------
+
+    /// <summary>
+    /// Atlas probes (permanent): after the remount dropped focus on "Sistema", the user picks "Claro" with the keyboard -
+    /// the SAME group - before the restore runs; with or without a second theme pass in between, "Claro" stays.
+    /// </summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ANewChoiceInTheSameGroup_BeforeTheRestore_Wins(bool anotherPass)
+    {
+        var window = new FakeFocusSurface { FocusedElement = Escuro };
+        window.Kinds[Escuro] = RemountFocusKind.Keyboard;
+        window.Kinds[Claro] = RemountFocusKind.Keyboard;
+        var focus = new ThemeRemountFocus();
+        var port = new RemountFocusPort(window);
+
+        focus.RemountAll(port, [() => { window.FocusedElement = Sistema; return true; }]);
+        window.FocusedElement = Claro; // an explicit keyboard choice in the same group
+        if (anotherPass)
+        {
+            focus.RemountAll(port, [() => { window.FocusedElement = Sistema; return true; }]);
+        }
+
+        window.Drain();
+
+        Assert.Equal(Claro, window.FocusedElement);
+        Assert.DoesNotContain(window.Focuses, f => Equals(f.Element, Escuro));
+    }
+
+    /// <summary>A focus that arrives later on ANY other element - same group included - is never overridden.</summary>
+    [Fact]
+    public void FocusArrivingLaterOnAnotherElement_IsNeverOverridden()
     {
         var window = new FakeWindow { FocusedElement = Escuro, Kind = RemountFocusKind.Pointer };
         new ThemeRemountFocus().RemountAll(window, [() => { window.FocusedElement = null; return true; }]);
 
-        window.FocusedElement = Sistema; // the platform's own focus restoration, after the pass
+        window.FocusedElement = Sistema; // not the element our remount left focus on (that was nothing)
+        window.Drain();
+
+        Assert.Empty(window.Restores);
+    }
+
+    /// <summary>Each pass records its OWN fallback: a second pass that drops focus elsewhere still restores the original choice.</summary>
+    [Fact]
+    public void ASecondPass_WithAnotherFallback_StillRestoresTheOriginalChoice()
+    {
+        var window = new FakeWindow { FocusedElement = Escuro, Kind = RemountFocusKind.Pointer };
+        var focus = new ThemeRemountFocus();
+
+        focus.RemountAll(window, [() => { window.FocusedElement = Sistema; return true; }]);
+        focus.RemountAll(window, [() => { window.FocusedElement = OtherControl; return true; }]);
         window.Drain();
 
         Assert.Equal([(Escuro, RemountFocusKind.Pointer)], window.Restores);
+    }
+
+    /// <summary>A new choice followed by a pass whose remounts change nothing: the earlier restore does not override it.</summary>
+    [Fact]
+    public void ANewChoice_ThenAPassWithoutRemount_KeepsTheChoice()
+    {
+        var window = new FakeWindow { FocusedElement = Escuro, Kind = RemountFocusKind.Pointer };
+        var focus = new ThemeRemountFocus();
+        focus.RemountAll(window, [() => { window.FocusedElement = Sistema; return true; }]);
+
+        window.FocusedElement = Claro;
+        focus.RemountAll(window, [() => false]);
+        window.Drain();
+
+        Assert.Empty(window.Restores);
     }
 }

@@ -25,9 +25,6 @@ public interface IFocusSurface
 
     void Focus(object element, RemountFocusKind kind);
 
-    /// <summary>Both elements are children of the same panel (the items of one group).</summary>
-    bool SharesGroup(object a, object b);
-
     void Post(Action action);
 }
 
@@ -48,8 +45,6 @@ public sealed class RemountFocusPort(IFocusSurface surface) : IRemountFocusPort
         }
     }
 
-    public bool SharesGroup(object a, object b) => surface.SharesGroup(a, b);
-
     public void Post(Action action) => surface.Post(action);
 }
 
@@ -61,9 +56,6 @@ public interface IRemountFocusPort
 
     /// <summary>Gives focus back to <paramref name="element"/> with the same kind (no ring for a pointer focus).</summary>
     void Restore(object element, RemountFocusKind kind);
-
-    /// <summary>Both elements are items of one group (focus that fell from one to the other during a remount).</summary>
-    bool SharesGroup(object a, object b);
 
     /// <summary>Runs <paramref name="action"/> after the remounted content is laid out (Low priority in production).</summary>
     void Post(Action action);
@@ -78,24 +70,29 @@ public interface IRemountFocusPort
 /// of them, with the SAME focus kind (a pointer focus stays ring-less, a keyboard focus keeps its ring). Nothing focused,
 /// nothing restored: focus is never pulled into a group it was not in.
 /// <para>
-/// Atlas review A-2: the restore runs later (after layout), so it must never steal a newer choice. It restores only when
-/// focus is still where the remounts left it, nowhere, on the captured element, or on another item of the captured
-/// element's group (where the remount dropped it). A newer pass supersedes a pending restore and inherits its capture -
-/// after the first pass focus already sits on the fallen item, so the second pass must not capture that.
-/// One instance per window (MainWindow).
+/// Atlas review A-2 (rounds 2 and 3): the restore runs later (after layout), so it must never override a newer choice.
+/// ONE rule, by identity: focus is ours to move only while it sits exactly on the element OUR remount dropped it on (the
+/// fallback, recorded per pass), or nowhere, or already on the captured element. Any other element - another item of the
+/// same group included (a keyboard choice there is indistinguishable from a fallback by position) - is the user's.
+/// A newer pass supersedes a pending restore. It inherits the pending capture only while focus is still on the previous
+/// pass's fallback (or nowhere): the user has not chosen anything since, and the fallen item must not become the capture.
+/// Otherwise the user's new choice is the capture. Each pass records its own fallback. One instance per window (MainWindow).
 /// </para>
 /// </summary>
 public sealed class ThemeRemountFocus
 {
     private int _generation;
-    private (object Element, RemountFocusKind Kind)? _pending;
+    private (object Element, RemountFocusKind Kind, object? Fallback)? _pending;
 
     /// <returns>How many remounts happened.</returns>
     public int RemountAll(IRemountFocusPort port, IReadOnlyList<Func<bool>> remounts)
     {
         ArgumentNullException.ThrowIfNull(port);
         ArgumentNullException.ThrowIfNull(remounts);
-        var captured = _pending ?? Capture(port);
+        var focused = port.Focused();
+        var captured = _pending is { } pending && IsOurs(focused.Element, pending.Fallback, pending.Element)
+            ? (pending.Element, pending.Kind)
+            : Capture(focused);
         var count = 0;
         foreach (var remount in remounts)
         {
@@ -110,19 +107,18 @@ public sealed class ThemeRemountFocus
             return count; // a pending restore (if any) still runs, its generation is still current
         }
 
-        _pending = restore;
+        var fallback = port.Focused().Element; // exactly where THIS pass's remounts left focus
+        _pending = (restore.Element, restore.Kind, fallback);
         var generation = ++_generation;
-        var left = port.Focused().Element;
         port.Post(() =>
         {
             if (generation != _generation)
             {
-                return; // superseded by a newer pass, which carries the same capture
+                return; // superseded by a newer pass
             }
 
             _pending = null;
-            var current = port.Focused().Element;
-            if (current is null || Equals(current, left) || Equals(current, restore.Element) || port.SharesGroup(current, restore.Element))
+            if (IsOurs(port.Focused().Element, fallback, restore.Element))
             {
                 port.Restore(restore.Element, restore.Kind);
             }
@@ -131,9 +127,10 @@ public sealed class ThemeRemountFocus
         return count;
     }
 
-    private static (object Element, RemountFocusKind Kind)? Capture(IRemountFocusPort port)
-    {
-        var (element, kind) = port.Focused();
-        return element is not null && kind != RemountFocusKind.None ? (element, kind) : null;
-    }
+    /// <summary>Focus is still ours to move: nowhere, exactly on our fallback, or already on the captured element.</summary>
+    private static bool IsOurs(object? current, object? fallback, object captured) =>
+        current is null || Equals(current, fallback) || Equals(current, captured);
+
+    private static (object Element, RemountFocusKind Kind)? Capture((object? Element, RemountFocusKind Kind) focused) =>
+        focused.Element is not null && focused.Kind != RemountFocusKind.None ? (focused.Element, focused.Kind) : null;
 }

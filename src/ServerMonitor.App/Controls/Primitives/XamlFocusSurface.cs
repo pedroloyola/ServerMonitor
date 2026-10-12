@@ -2,7 +2,6 @@ using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
-using Microsoft.UI.Xaml.Media;
 using ServerMonitor.App.Services;
 
 namespace ServerMonitor.App.Controls.Primitives;
@@ -30,10 +29,6 @@ internal sealed class XamlFocusSurface(XamlRoot root, DispatcherQueue dispatcher
         RemountFocusKind.Keyboard => FocusState.Keyboard,
         _ => FocusState.Programmatic
     });
-
-    public bool SharesGroup(object a, object b) =>
-        a is DependencyObject first && b is DependencyObject second
-        && VisualTreeHelper.GetParent(first) is { } parent && ReferenceEquals(parent, VisualTreeHelper.GetParent(second));
 
     public void Post(Action action) => dispatcher.TryEnqueue(DispatcherQueuePriority.Low, () => action());
 }
