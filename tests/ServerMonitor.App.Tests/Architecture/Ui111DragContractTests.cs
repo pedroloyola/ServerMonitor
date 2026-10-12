@@ -1,5 +1,6 @@
 using System.Xml.Linq;
 using Microsoft.UI.Xaml.Input;
+using ServerMonitor.App.Controls.Primitives;
 using ServerMonitor.App.Services.Motion;
 
 namespace ServerMonitor.App.Tests.Architecture;
@@ -67,9 +68,78 @@ public sealed class Ui111DragContractTests
     [Fact]
     public void TheOptedInItems_UseSystemPlusTranslateX()
     {
-        Assert.Equal(ManipulationModes.System | ManipulationModes.TranslateX, SegmentDragRules.ItemManipulation);
-        Assert.True(SegmentDragRules.ItemManipulation.HasFlag(ManipulationModes.System));
-        Assert.False(SegmentDragRules.ItemManipulation.HasFlag(ManipulationModes.TranslateY));
+        Assert.Equal(ManipulationModes.System | ManipulationModes.TranslateX, SegmentDragAdapter.ItemManipulation);
+        Assert.True(SegmentDragAdapter.ItemManipulation.HasFlag(ManipulationModes.System));
+        Assert.False(SegmentDragAdapter.ItemManipulation.HasFlag(ManipulationModes.TranslateY));
+    }
+
+    /// <summary>
+    /// Cortex review C-1: the predicted label switches an item to its Checked visual state while dragging. If that changes the
+    /// item's width (Normal -> Medium text on an auto-width item), the item re-measures and SizeChanged cancels the drag. Every
+    /// AllowDrag host (production AND gallery) must have items whose width cannot follow the label: the Checked state keeps
+    /// the effective FontWeight, or the width is fixed, or the item stretches in a star grid column.
+    /// </summary>
+    [Fact]
+    public void EveryAllowDragHost_HasWidthStableItems()
+    {
+        var styles = AppSourceTree.LoadXaml("Styles/Components/Sa.Forms.xaml").Descendants(Presentation + "Style")
+            .Where(s => s.Attribute(AppSourceTree.Xaml + "Key") is not null)
+            .ToDictionary(s => (string)s.Attribute(AppSourceTree.Xaml + "Key")!, StringComparer.Ordinal);
+
+        static string KeyOf(string reference) => reference.Replace("{StaticResource ", "", StringComparison.Ordinal).TrimEnd('}');
+
+        // The first non-null answer up the BasedOn chain.
+        string? Up(string key, Func<XElement, string?> read)
+        {
+            for (XElement? style = styles[key]; style is not null; style = (string?)style.Attribute("BasedOn") is { } basedOn ? styles[KeyOf(basedOn)] : null)
+            {
+                if (read(style) is { } value)
+                {
+                    return value;
+                }
+            }
+
+            return null;
+        }
+
+        string? Setter(string key, string property) =>
+            Up(key, style => (string?)style.Elements(Presentation + "Setter").FirstOrDefault(s => (string?)s.Attribute("Property") == property)?.Attribute("Value"));
+
+        string? CheckedWeight(string key) =>
+            Up(key, style => (string?)style.Descendants(Presentation + "VisualState")
+                .FirstOrDefault(s => (string?)s.Attribute(AppSourceTree.Xaml + "Name") == "Checked")?
+                .Descendants(Presentation + "Setter").FirstOrDefault(s => (string?)s.Attribute("Target") == "ContentPresenter.FontWeight")?
+                .Attribute("Value"));
+
+        var hosts = 0;
+        foreach (var file in AppSourceTree.Files(".xaml").Where(f => !AppSourceTree.IsUnderStyles(f)))
+        {
+            foreach (var host in AppSourceTree.LoadXaml(file).Descendants().Where(e => (string?)e.Attribute(AllowDrag) == "True"))
+            {
+                hosts++;
+                var cell = host.Parent!;
+                var items = cell.Elements(Presentation + "RadioButton")
+                    .Concat(cell.Elements(Presentation + "StackPanel").SelectMany(p => p.Elements(Presentation + "RadioButton")))
+                    .ToList();
+                Assert.True(items.Count >= 2, $"{file}: an AllowDrag host without its items");
+                foreach (var item in items)
+                {
+                    var key = KeyOf((string)item.Attribute("Style")!);
+                    var weight = (string?)item.Attribute("FontWeight") ?? Setter(key, "FontWeight") ?? "Normal";
+                    var sameWeight = (CheckedWeight(key) ?? weight) == weight;
+                    var fixedWidth = item.Attribute("Width") is not null || Setter(key, "Width") is not null;
+                    var stretch = ((string?)item.Attribute("HorizontalAlignment") ?? Setter(key, "HorizontalAlignment")) == "Stretch";
+                    var column = int.Parse((string?)item.Attribute("Grid.Column") ?? "0", System.Globalization.CultureInfo.InvariantCulture);
+                    var starColumn = cell.Name == Presentation + "Grid"
+                        && cell.Elements(Presentation + "Grid.ColumnDefinitions").Elements().ElementAtOrDefault(column) is { } definition
+                        && (string?)definition.Attribute("Width") == "*";
+                    Assert.True(sameWeight || fixedWidth || (stretch && starColumn),
+                        $"{file}: an AllowDrag item ({key}) whose width can follow the predicted label (Checked {CheckedWeight(key)} vs {weight})");
+                }
+            }
+        }
+
+        Assert.Equal(7, hosts); // the five production selectors + the two width-stable gallery samples (Filter variant, Pill)
     }
 
     /// <summary>

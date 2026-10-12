@@ -92,8 +92,16 @@ internal sealed class SegmentDragAdapter : ISegmentDragPort
         _activation = null;
     }
 
+    /// <summary>
+    /// Beacon S0b verdict V2: the opted-in items' ManipulationMode. <c>System</c> keeps the page's vertical pan (the
+    /// ScrollViewer still owns Y); <c>TranslateX</c> keeps the horizontal pen/touch gesture out of DirectManipulation, so it
+    /// reaches the pointer events like the mouse (synthetic pen+touch: commit once, cancels zero, taps and scroll unchanged).
+    /// The same composition the ToggleSwitch template uses for its thumb. Real pen/touch: NOT_RUN.
+    /// </summary>
+    internal const ManipulationModes ItemManipulation = ManipulationModes.System | ManipulationModes.TranslateX;
+
     /// <summary>Called by the controller for every item it collects: the V2 pen/touch arbitration.</summary>
-    public static void PrepareItem(RadioButton item) => item.ManipulationMode = SegmentDragRules.ItemManipulation;
+    public static void PrepareItem(RadioButton item) => item.ManipulationMode = ItemManipulation;
 
     public void Cancel(DragCancelReason reason) => _controller.Cancel(reason);
 
@@ -325,7 +333,12 @@ internal sealed class SegmentDragAdapter : ISegmentDragPort
         }
     }
 
-    /// <summary>The predicted label lit (Checked state) and every other item Unchecked; -1 = each item's real state.</summary>
+    /// <summary>
+    /// The predicted label lit (Checked state) and every other item Unchecked; -1 = each item's real state.
+    /// Cortex review C-1: a label state must never change an item's geometry - a re-measure raises SizeChanged, which cancels
+    /// the drag (Layout). Every AllowDrag host therefore has width-stable items (fixed width, a stretched star column, or the
+    /// same weight in both states) - guarded by Ui111DragContractTests.EveryAllowDragHost_HasWidthStableItems.
+    /// </summary>
     private void ShowLabels(int predicted)
     {
         var items = _presenter.Items;
