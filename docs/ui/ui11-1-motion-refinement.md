@@ -1,6 +1,6 @@
 # UI.11.1 — Motion Refinement
 
-**Status: DRAFT / BLOCKED. Not READY_TO_MERGE.** PR #40 (`ui/ui11-1-motion-refinement`) is a draft; code at `54e7e05`.
+**Status: DRAFT / BLOCKED. Not READY_TO_MERGE.** PR #40 (`ui/ui11-1-motion-refinement`) is a draft; code at `0e0c10d`.
 - The drag-to-select adapter (the core of H02) has **no runtime proof**: every real pointer and keyboard case of the UI.11.1D QA was blocked by the environment (§11).
 - No merge without a separate human GO.
 
@@ -30,18 +30,19 @@
 ## 1. Outcome
 
 - **H01 timings: implemented and measured** in runtime (UIA-driven, §11).
-- **H02 drag-to-select on the five segmented selectors: implemented and unit-proven** (pure controller through its handlers with a re-entrant fake port; 46 + 5 counterproofs). **The WinUI adapter is not runtime-proven.**
-- **H03 focus after a theme change: implemented and unit-proven.** Runtime check INCONCLUSIVE (§11).
-- **Reviews** (§10): Prism APPROVED_WITH_NITS; Cortex APPROVED_WITH_NITS (N-1, N-2); Atlas pending (see its report).
-- **Gates @ `54e7e05`:**
-  - `.slnx` Debug `--no-incremental --disable-build-servers` all green (App 3709, Infrastructure 887 + 1 skipped, others green);
-  - Release all green (App 3227);
-  - PR CI green on `d0cc3b8`, `8d9b6d1` and `54e7e05` (Debug build + tests; Release build + vulnerability scan).
+- **H02 drag-to-select on the five segmented selectors: implemented and unit-proven.** The pure controller and, since fix round 2, the adapter's decisions (`SegmentDragWiring`) are driven through their handlers against re-entrant fakes; 46 + 5 + 12 counterproofs (§9). **The WinUI adapter's one-call surface is not runtime-proven.**
+- **H03 focus after a theme change: implemented and unit-proven** (incl. the fix round 2 no-steal / supersede rules). Runtime check INCONCLUSIVE (§11).
+- **Fix round 2 (Atlas, §9a):** two real defects found by Atlas's deterministic probes are fixed — A-3 (a re-entrant cancel during the release frame threw a NullReferenceException) and A-2 (the delayed theme focus restore could steal a later user choice) — and three test gaps (A-1, AT-03, AT-05) are closed with behavioural seams.
+- **Reviews** (§10): Prism APPROVED_WITH_NITS; Cortex APPROVED_WITH_NITS (N-1, N-2), structure re-check of fix round 2 pending; Atlas pending (see its report).
+- **Gates @ `0e0c10d`:**
+  - `.slnx` Debug `--no-incremental --disable-build-servers` all green (App 3736, Infrastructure 887 + 1 skipped, others green);
+  - Release all green (App 3254);
+  - PR CI green on `d0cc3b8`, `8d9b6d1`, `54e7e05` and `f0686cd` (Debug build + tests; Release build + vulnerability scan); `0e0c10d` running when this was written.
 - **Real data:** identical before and after every QA window (S0, S0b, UI.11.1D). **Firewall:** the app added no rules; the Floor's test runs added four test-host rules (§13).
 
 **Blockers before READY_TO_MERGE:**
 1. The real pointer / keyboard matrix of UI.11.1D (incl. Cortex C-2, Prism P-2 / P-3, the P-1 diagonal grab, H03 focus) must run on the final head. It needs the human to close the Windows Firewall notification dialog first (§11).
-2. Atlas's final verdict.
+2. Atlas's final verdict, and the Cortex re-check of the fix round 2 structure.
 3. Merge-strategy decision for the non-compiling intermediate commit `ac36036` (§13).
 
 ## 2. Human priorities H01–H03
@@ -88,6 +89,7 @@
 
 - **Bug (Beacon S0):** after a theme change focus landed on "Sistema", not on the chosen theme. Root cause: `MainWindow.OnActualThemeChanged` remounts four roots in one pass, and each remount captured and restored focus on its own; once the first root left the tree focus had fallen to the first focusable item, so the later restores put it there.
 - **Fix:** `ThemeRemountFocus.RemountAll` captures focus once, before any root leaves the tree, and restores it once afterwards with the same focus kind (pointer stays ring-less, keyboard keeps its ring). Nothing focused, nothing restored.
+- **Fix round 2 (Atlas A-2):** `ThemeRemountFocus` is one instance per window (`MainWindow`). The later restore never steals a newer choice: it runs only if focus is still where the remounts left it, nowhere, on the captured element, or on another item of the captured element's group (where the remount dropped it). A newer theme pass supersedes a pending restore and inherits its capture, so rapid theme changes keep the original choice.
 
 ## 3. S0 / S0b evidence (spike, throwaway branch)
 
@@ -113,8 +115,9 @@
 | Tokens | `Styles/Tokens/Motion.xaml`, `Services/Motion/MotionTokens.cs`, `Styles/Components/Sa.Forms.xaml` (toggle swap keyframes), QA token manifest / probe |
 | Pure drag engine | `Services/Motion/SegmentDrag.cs` (`SegmentDragRules`, `SegmentDragController`, `ISegmentDragPort`, `WindowActivationHub`) |
 | Planner | `Services/Motion/SelectionIndicatorPlanner.cs` (`DragEnd`, `DragCancel`, `Settle`, `DurationKey`) |
-| WinUI adapter | `Controls/Primitives/SaSegmentDrag.cs` (`SegmentDragAdapter`), `Controls/Primitives/SaSlidingSelection.cs` (`AllowDrag`, `DurationKey`, preview presenter) |
-| Focus | `Services/ThemeRemountFocus.cs`, `Controls/Primitives/XamlRemountFocusPort.cs`, `Controls/Primitives/SaThemeRefresh.cs`, `MainWindow.xaml.cs` |
+| Adapter decisions (WinUI-free) | `Controls/Primitives/SaSegmentDrag.cs`: `SegmentDragWiring` over `ISegmentDragSurface` |
+| WinUI adapter (one call per member) | `Controls/Primitives/SaSegmentDrag.cs`: `SegmentDragAdapter` (routed events + `ISegmentDragSurface`); `Controls/Primitives/SaSlidingSelection.cs` (`AllowDrag`, `DurationKey`, preview presenter) |
+| Focus | `Services/ThemeRemountFocus.cs` (`ThemeRemountFocus`, `RemountFocusPort` over `IFocusSurface`), `Controls/Primitives/XamlFocusSurface.cs`, `Controls/Primitives/SaThemeRefresh.cs`, `MainWindow.xaml.cs` |
 | Hosts | `Views/SettingsPage.xaml`, `Views/HistoryPage.xaml`, `Views/WorkloadsPage.xaml`, `Controls/ServerFormControl.xaml` ×2; gallery `Qa/Gallery/QaFormsPage.xaml` (width-stable samples only) |
 
 ## 5. Deliberate differences and accepted behaviour
@@ -169,15 +172,48 @@ Each counterproof breaks the rule in production code, fails the named tests, res
 - **C3 (focus), C3-01…05:** `ThemeRemountFocusTests` (fake window whose focus falls to "Sistema" on every remount).
 - **Fix round 1, FR-01…05:** P-1 both directions; C-1 width-stability guard (`EveryAllowDragHost_HasWidthStableItems`).
 - UI.11 wiring guards were **extended, not relaxed** (`T1_TheIndicatorPresenter_WiresThePlannerExactly` 6→7 requests incl. `EndPreview`; `B11_4` with the cancel-first line; `Ui5R2Tests` with the batched remount).
-- **Limit:** the unit tests prove the controller and its port; the WinUI adapter's routed-event wiring, capture, visual states and window-id match are runtime-only (§11).
+- **Fix round 2, FR2-01…12:** see §9a.
+- **Limit:** the unit tests prove the controller, the adapter's decisions (`SegmentDragWiring`) and the focus port (`RemountFocusPort`). The one-call WinUI leaves stay runtime-only (§11): the routed-event registration, the surface members themselves (e.g. `SetItemManipulation`, `ReleaseItemCapture`, `GoToState`, `Focus`), and the window-id match.
+
+## 9a. Fix round 2 (Atlas review, `0e0c10d`)
+
+**Test gaps closed with behavioural seams** (no new source-text guards — UI11-TEXTGUARD-CLASS):
+- **A-1 (High) / AT-03:** emptying the V2 `PrepareItem` or removing the origin's capture release survived every test. The adapter is now split:
+  - `SegmentDragWiring` (no WinUI types) holds every decision: V2 on every item at attach, the PRESSED item releasing the PRESS's pointer before the panel captures it, snapshot, threshold from the real metrics, predicted labels, commit + focus, external selection, window subscription;
+  - `ISegmentDragSurface`, implemented by `SegmentDragAdapter` with one WinUI call per member;
+  - `SegmentDragWiringTests` drive the real wiring against a recording fake.
+- **AT-05:** restoring the *current* focus instead of the captured element survived. The focus port is now `RemountFocusPort` over a one-call `IFocusSurface` (`XamlFocusSurface`); tests drive the real port.
+
+**Real defects** (Atlas's deterministic probes are now permanent tests; restoring each defect makes its probe fail):
+- **A-3 (Medium):** `Release → Follow → Present` could re-enter a conclusion (e.g. a layout cancel) that cleared the geometry; the release then threw a NullReferenceException. The release now re-checks the session after the frame's effect and stops with zero writes (`Release_APresentThatCancelsReentrantly_EndsWithoutCommit`, `Move_APresentThatCancelsReentrantly_LeavesTheGestureEnded`).
+- **A-2 (Medium):** the Low-priority theme focus restore could steal a later user choice. Fixed as in §2 H03 (`AQueuedThemeRestore_DoesNotStealFocusFromALaterUserChoice` + its port variant, `ASecondPass_BeforeTheRestore_KeepsTheOriginalChoice_AndRestoresOnce`, `APassAfterACompletedRestore_CapturesAfresh`, `FocusFallingLateOntoTheSameGroup_IsStillRestored`).
+
+**Counterproofs FR2-01…12** (byte-exact restores):
+
+| CP | Mutation | Result |
+|---|---|---|
+| FR2-01 | Atlas AT-04 at its new location: V2 not applied | KILLED |
+| FR2-02 | Attach without preparing the items | KILLED |
+| FR2-03 | Atlas AT-03: the origin keeps its capture | KILLED |
+| FR2-04 | A second press overwrites the pointer / origin | KILLED |
+| FR2-05 | Atlas AT-05: restore the current focus | KILLED |
+| FR2-06 | Commit focus ignores whether focus was in the group | KILLED |
+| FR2-07 | The `_committing` flag cleared | **SURVIVED — equivalent mutant**: the session is already terminal when the commit's own Checked arrives; the flag is kept as defence in depth |
+| FR2-08 | A-3: no session re-check after the release frame | KILLED (the probe fails) |
+| FR2-09 | A-2: always restore | KILLED (both probes fail) |
+| FR2-10 | A-2: no generation (a superseded restore runs) | KILLED |
+| FR2-11 | A-2: a new pass recaptures instead of inheriting | KILLED |
+| FR2-12 | A-2: no same-group fallback | KILLED |
+
+**Honest limit:** the one-call WinUI surface leaves are runtime-only — e.g. emptying `SegmentDragAdapter.SetItemManipulation` or `ReleaseItemCapture` would still pass the unit tests. Their proof is the UI.11.1D real-input matrix (§11), still blocked.
 
 ## 10. Reviews
 
 | Reviewer | Rounds | Final |
 |---|---|---|
 | Prism (direction, motion, semiotics, Figma) | 1A UX; S0 review; UI.11.1 r1 CHANGES_REQUESTED (P-1 blocking) → re-check after fix round 1; Figma review (F-1…F-3, applied by Relay r2) | **APPROVED_WITH_NITS** (P-2 / P-3 runtime checks for Beacon; P-4 / P-5 accepted; P-6 optional) |
-| Cortex (architecture, lifecycle, platform) | 1A feasibility; S0 review (B0–B4, D1, P1 / P2, U1, X1); UI.11.1 r1 (C-1…C-6) → re-check after fix round 1 | **APPROVED_WITH_NITS**: C-1 / C-3 / C-4 closed, P-1 approved; open: C-2 (runtime), **N-1** (the C-1 guard checks FontWeight only; optional: assert drag styles' Checked setters target only Foreground / FontWeight), **N-2** (`ac36036` does not compile alone → squash merge or fixup) |
-| Atlas (tests, counterproofs) | 1A testability; S0 review; UI.11.1 final review on `8d9b6d1` | **Pending** — IN_PROGRESS at the time of writing (reproduced C1-01 / C1-09 / C1-15; own mutations running); see `.boss/tmp/ui11-1/atlas-ui11-1-review.md` |
+| Cortex (architecture, lifecycle, platform) | 1A feasibility; S0 review (B0–B4, D1, P1 / P2, U1, X1); UI.11.1 r1 (C-1…C-6) → re-check after fix round 1; **structure re-check of fix round 2 pending** | **APPROVED_WITH_NITS** (before fix round 2): C-1 / C-3 / C-4 closed, P-1 approved; open: C-2 (runtime), **N-1** (the C-1 guard checks FontWeight only; optional: assert drag styles' Checked setters target only Foreground / FontWeight), **N-2** (`ac36036` does not compile alone → squash merge or fixup) |
+| Atlas (tests, counterproofs) | 1A testability; S0 review; UI.11.1 final review on `8d9b6d1`: reproduced C1-01 / C1-09 / C1-15; findings A-1, AT-03, AT-05 (test gaps) and A-2, A-3 (real defects) → fixed in fix round 2 (§9a) | **Pending** — re-check of `0e0c10d` and final verdict; see `.boss/tmp/ui11-1/atlas-ui11-1-review.md` |
 | Beacon (runtime) | S0, S0b, UI.11.1D @ `8d9b6d1` | **PARTIAL** (§11) |
 
 The implementer (Sentry) did not approve its own work.
@@ -222,7 +258,7 @@ The implementer (Sentry) did not approve its own work.
 - **Firewall exception:** four Inbound Block rules for the Floor's `ServerMonitor.Infrastructure.Tests` test host (`…servermonitor--uiui11-1-motion-refinement\tests\servermonitor.infrastructure.tests\bin\{debug,release}\…\testhost.exe`, Debug + Release), created by the Floor's test runs; removal pending the human (UAC). The app itself added none.
 - Carried from UI.11: UI11-TEXTGUARD-CLASS; FLAKE-INFRA-LOOPBACK-CHILD.
 
-## 14. Commits (`c69d0a0..54e7e05`)
+## 14. Commits (`c69d0a0..0e0c10d`, code)
 
 | Commit | Slice |
 |---|---|
@@ -232,5 +268,7 @@ The implementer (Sentry) did not approve its own work.
 | `8d9b6d1` | C2 — drag-to-select on the five selectors: `AllowDrag`, adapter, V2, activation publish |
 | `ac36036` | Fix round 1 — review P-1 (mouse starts the drag on either axis); C-3 / C-4 (**does not compile alone**, §13) |
 | `54e7e05` | Fix round 1 — review C-1 (width-stable AllowDrag hosts + guard), C-3 adapter constant |
+| `f0686cd` | Docs — this record (first version) |
+| `0e0c10d` | Fix round 2 — Atlas A-1 / AT-03 / AT-05 (behavioural seams `SegmentDragWiring` / `ISegmentDragSurface`, `RemountFocusPort` / `IFocusSurface`) and real defects A-2 / A-3; one commit on purpose (every state compiles) |
 
 Evidence: `.boss/tmp/ui11-1/` — `sentry-implementation-report.md`, `sentry-cp/`, `beacon-s0-matrix.md`, `beacon-s0b-matrix.md`, `beacon-ui11-1d-qa.md`, `cortex-ui11-1-review.md`, `prism-ui11-1-review.md`, `prism-ui11-1-figma-review.md`, `atlas-ui11-1-review.md`, `relay-ui11-1-figma.md`.
