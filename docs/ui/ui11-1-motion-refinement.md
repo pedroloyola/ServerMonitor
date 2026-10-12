@@ -1,6 +1,6 @@
 # UI.11.1 — Motion Refinement
 
-**Status: DRAFT / BLOCKED. Not READY_TO_MERGE.** PR #40 (`ui/ui11-1-motion-refinement`) is a draft; code at `6f9081d`.
+**Status: DRAFT / BLOCKED. Not READY_TO_MERGE.** PR #40 (`ui/ui11-1-motion-refinement`) is a draft; code at `280c300` (B111-1 fix, §11a).
 - The drag-to-select adapter (the core of H02) has **no runtime proof**: every real pointer and keyboard case of the UI.11.1D QA was blocked by the environment (§11).
 - No merge without a separate human GO.
 
@@ -241,6 +241,13 @@ The implementer (Sentry) did not approve its own work.
 
 **Consequence: the WinUI drag adapter (`SegmentDragAdapter`) has NO runtime proof.** Pending once the human closes the dialog (scripts ready): click / slow / fast drag, release on origin / elsewhere / outside, Escape, deactivation (Cortex C-2: window-id match), resize, the five hosts with ≥ 2 predicted-label changes (C-1), focus after drag, Prism P-2 / P-3, the P-1 diagonal grab, synthetic pen / touch on the theme (V2) and History, keyboard from the restored focus, sidebar / toggles not draggable with a pointer, H03. The re-run must target the final head (`8d9b6d1` predates fix round 1).
 
+## 11a. B111-1 — crash on a window width change mid-drag (Beacon final QA, `fac20d4`; fixed in `280c300`)
+
+- **Defect (High):** an active drag on the editor's Auth / jump-host Auth selector + a window width change (`SetWindowPos`, Win+← snap) killed the app: `0xc000027b`, `E_UNEXPECTED` in `Microsoft.UI.Xaml.dll` +0x3a9c5d. Regression of PR #40 (base `c69d0a0`: no crash).
+- **Root cause (reproduced under a call trace, Sentry):** only the editor's items stretch with the window, so only they raise `SizeChanged` mid-drag. That handler runs inside the resize's layout pass and cancels the drag (`DragCancelReason.Layout`); the cancel called `panel.ReleasePointerCapture` there, and that call never returned (native fail-fast, no managed exception).
+- **Fix:** a layout cancel still ends the drag synchronously (no preview write after it; `EndPreview` unchanged), but the panel's capture release is posted to the dispatcher, out of the layout pass; it is skipped if a new drag owns the panel by then. Other cancels are unchanged.
+- **Proof:** `SegmentDragWiringTests` (2 new; counterproof mutant KILLED). Runtime (instrumented Floor build, real `SendInput`): auth +120 / +10 px, jump-host +120 px, Win+← snap: no crash, 0 commits; the posted release returns. **Beacon's focused re-QA on the five hosts is pending.**
+
 ## 12. NOT_RUN (with reason)
 
 - **Entire real pointer / keyboard matrix:** blocked by the Firewall notification dialog (§11).
@@ -261,7 +268,7 @@ The implementer (Sentry) did not approve its own work.
 - **Firewall exception:** four Inbound Block rules for the Floor's `ServerMonitor.Infrastructure.Tests` test host (`…servermonitor--uiui11-1-motion-refinement\tests\servermonitor.infrastructure.tests\bin\{debug,release}\…\testhost.exe`, Debug + Release), created by the Floor's test runs; removal pending the human (UAC). The app itself added none.
 - Carried from UI.11: UI11-TEXTGUARD-CLASS; FLAKE-INFRA-LOOPBACK-CHILD.
 
-## 14. Commits (`c69d0a0..6f9081d`, code)
+## 14. Commits (`c69d0a0..280c300`, code)
 
 | Commit | Slice |
 |---|---|
@@ -275,5 +282,6 @@ The implementer (Sentry) did not approve its own work.
 | `0e0c10d` | Fix round 2 — Atlas A-1 / AT-03 / AT-05 (behavioural seams `SegmentDragWiring` / `ISegmentDragSurface`, `RemountFocusPort` / `IFocusSurface`) and real defects A-2 / A-3; one commit on purpose (every state compiles) |
 | `2206eb5` | Docs — this record, fix round 2 |
 | `6f9081d` | Fix round 3 — Atlas residual A-2: restore only onto our own fallback, by identity; inheritance under the same rule |
+| `280c300` | B111-1 — a layout cancel releases the panel capture outside the layout pass (crash on a width change mid-drag) |
 
 Evidence: `.boss/tmp/ui11-1/` — `sentry-implementation-report.md`, `sentry-cp/`, `beacon-s0-matrix.md`, `beacon-s0b-matrix.md`, `beacon-ui11-1d-qa.md`, `cortex-ui11-1-review.md`, `prism-ui11-1-review.md`, `prism-ui11-1-figma-review.md`, `atlas-ui11-1-review.md`, `relay-ui11-1-figma.md`.
