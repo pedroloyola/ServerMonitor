@@ -167,6 +167,7 @@
   <data name="CompactMetricDiskLabel.Text" xml:space="preserve"><value>DISCO</value></data>
   <data name="CompactAlwaysOnTopLabel.Text" xml:space="preserve"><value>Sempre no topo</value></data>
   <data name="CompactRowAccessibleFormat" xml:space="preserve"><value>{0}, {1}. CPU {2}, RAM {3}, disco {4}. Abrir detalhes</value></data>
+  <data name="CompactRowAccessibleStaleFormat" xml:space="preserve"><value>{0}, {1}. {5}. CPU {2}, RAM {3}, disco {4}. Abrir detalhes</value></data>
   <data name="CompactMetricAttentionAccessible" xml:space="preserve"><value>em atenção</value></data>
   <data name="CompactMetricCriticalAccessible" xml:space="preserve"><value>crítico</value></data>
   <data name="SettingsCompactTitle.Text" xml:space="preserve"><value>Modo compacto</value></data>

@@ -180,6 +180,29 @@ public sealed class Ui8CompactPresentationTests
         Assert.NotNull(row.StaleAgeText);
     }
 
+    /// <summary>UI.12 STATE-02 (Prism UI12A): the stale age is Raw on screen; the row's accessible name carries it.</summary>
+    [Fact]
+    public async Task AStaleRow_NamesItsAge_AndAFreshOneDoesNot()
+    {
+        var fleet = new Ui4TestKit.Fleet().Add("old", ServerHealth.Healthy, cpu: 28, mem: 44, disk: 55);
+        var harness = Ui4TestKit.Create(fleet, localization: new ResWLocalizationService("en-US"));
+        await harness.Dashboard.LoadAsync();
+        using var compact = Compact(harness);
+        var row = compact.Rows.Single();
+        Assert.Equal("old, Healthy. CPU 28%, RAM 44%, disk 55%. Open details", row.AccessibleName);
+
+        var raised = Changes(row);
+        harness.States.Set(harness.States.Get(fleet.IdOf("old")) with
+        {
+            IsStale = true,
+            LastSuccessAt = Ui4TestKit.Now.AddHours(-2),
+            LastAttemptAt = Ui4TestKit.Now
+        });
+
+        Assert.Equal("old, Healthy. Last updated 2 h ago. CPU 28%, RAM 44%, disk 55%. Open details", row.AccessibleName);
+        Assert.Contains(nameof(CompactServerRowViewModel.AccessibleName), raised);
+    }
+
     // ---- §4.4 hidden ---------------------------------------------------------------------------------------------
 
     [Fact]
