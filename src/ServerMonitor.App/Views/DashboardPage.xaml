@@ -294,7 +294,7 @@
                             <TextBlock Style="{StaticResource SaPageSubtitleTextStyle}"
                                        Text="{x:Bind ViewModel.HeaderContextDisplay, Mode=OneWay}"
                                        Visibility="{x:Bind ViewModel.HasHeaderContext, Mode=OneWay}"
-                                       AutomationProperties.LiveSetting="Polite" />
+                                       primitives:SaAnnounce.Changes="True" AutomationProperties.LiveSetting="Polite" />
                         </StackPanel>
                     </StackPanel>
                     <StackPanel x:Name="HeaderActions" Grid.Column="1" Style="{StaticResource SaPageHeaderActionsStyle}">

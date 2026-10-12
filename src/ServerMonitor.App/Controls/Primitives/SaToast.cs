@@ -36,6 +36,8 @@ public sealed class SaToast : Control
         // UI.11 F10 transient: rises in (fade 167 + 8 px, 250) when shown, fades out (83) when it closes.
         SaMotion.SetEnter(this, SaMotionEnter.Rise);
         SaMotion.SetExitFade(this, true);
+        // UI.12 LIVE-01: a toast is shown by Visibility; it is announced then (it closes on a timer, never focused).
+        RegisterPropertyChangedCallback(VisibilityProperty, (_, _) => SaAnnounce.RaiseAfterLayout(this));
     }
 
     public event EventHandler? CloseRequested;
@@ -75,15 +77,31 @@ public sealed class SaToast : Control
         UpdateName();
     }
 
+    // UI.12 LIVE-01: without a peer the toast (its text is Raw) was not in the UIA tree, so its LiveSetting meant nothing.
+    protected override AutomationPeer OnCreateAutomationPeer() => new SaToastAutomationPeer(this);
+
     private void OnCloseClick(object sender, RoutedEventArgs e) => CloseRequested?.Invoke(this, EventArgs.Empty);
 
     private void UpdateName()
     {
-        AutomationProperties.SetName(this, $"{Title}. {Message}");
+        AutomationProperties.SetName(this, SaInlineNotice.AccessibleName(Title, Message));
         AutomationProperties.SetLiveSetting(this, AutomationLiveSetting.Polite);
         if (_close is not null)
         {
             AutomationProperties.SetName(_close, CloseButtonAutomationName);
         }
+
+        if (IsLoaded)
+        {
+            SaAnnounce.RaiseAfterLayout(this);
+        }
     }
+}
+
+/// <summary>UI.12 LIVE-01: the toast is one named status group ("Título. Mensagem") holding its close button.</summary>
+public sealed class SaToastAutomationPeer(SaToast owner) : FrameworkElementAutomationPeer(owner)
+{
+    protected override AutomationControlType GetAutomationControlTypeCore() => AutomationControlType.Group;
+
+    protected override string GetClassNameCore() => nameof(SaToast);
 }

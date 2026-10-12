@@ -281,7 +281,7 @@
                     </primitives:SaHeadingHost>
                         <StackPanel Style="{StaticResource SaPageHeaderLineTwoStyle}">
                             <TextBlock Style="{StaticResource SaPageSubtitleTextStyle}" TextWrapping="Wrap"
-                                       Text="{x:Bind ViewModel.HeaderContextDisplay, Mode=OneWay}" AutomationProperties.LiveSetting="Polite" />
+                                       Text="{x:Bind ViewModel.HeaderContextDisplay, Mode=OneWay}" primitives:SaAnnounce.Changes="True" AutomationProperties.LiveSetting="Polite" />
                         </StackPanel>
                     </StackPanel>
                     <StackPanel Grid.Column="1" Style="{StaticResource SaPageHeaderActionsStyle}">

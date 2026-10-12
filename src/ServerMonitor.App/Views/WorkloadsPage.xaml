@@ -207,7 +207,7 @@
                     Style="{StaticResource SaPageSubtitleTextStyle}"
                     Text="{Binding ContextDisplay}"
                     TextWrapping="Wrap"
-                    AutomationProperties.LiveSetting="Polite" />
+                    primitives:SaAnnounce.Changes="True" AutomationProperties.LiveSetting="Polite" />
             </StackPanel>
             <Button
                 Grid.Column="1"

@@ -151,7 +151,7 @@
                                Visibility="{x:Bind Presentation.ShowsAlertIcon, Mode=OneWay, FallbackValue=Collapsed}" />
             <TextBlock x:Name="StateTitleText" Style="{StaticResource SaSectionTitleTextStyle}" Foreground="{ThemeResource SaTextBrush}"
                        Text="{x:Bind Presentation.StateTitle, Mode=OneWay}" TextAlignment="Center" TextWrapping="Wrap" HorizontalAlignment="Center"
-                       AutomationProperties.HeadingLevel="Level2" AutomationProperties.LiveSetting="Polite" />
+                       AutomationProperties.HeadingLevel="Level2" primitives:SaAnnounce.Changes="True" AutomationProperties.LiveSetting="Polite" />
             <TextBlock Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}"
                        Text="{x:Bind Presentation.StateBody, Mode=OneWay}" TextAlignment="Center" TextWrapping="Wrap" HorizontalAlignment="Center"
                        Visibility="{x:Bind Presentation.HasStateBody, Mode=OneWay, FallbackValue=Collapsed}" />

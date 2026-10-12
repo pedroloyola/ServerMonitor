@@ -29,7 +29,7 @@
             <ProgressRing x:Name="LoadingRing" Width="18" Height="18" IsActive="False" Foreground="{ThemeResource SaTextBrush}"
                           AutomationProperties.AccessibilityView="Raw" />
             <TextBlock x:Uid="ServerEditorImportLoading" Style="{StaticResource SaCaptionTextStyle}" VerticalAlignment="Center"
-                       Foreground="{ThemeResource SaTextSecondaryBrush}" AutomationProperties.LiveSetting="Polite" />
+                       Foreground="{ThemeResource SaTextSecondaryBrush}" primitives:SaAnnounce.Changes="True" AutomationProperties.LiveSetting="Polite" />
         </StackPanel>
 
         <!-- 07 states: no file / unreadable / no profiles. The body is the view model's own message. -->
@@ -42,13 +42,13 @@
                        HorizontalTextAlignment="Center" TextWrapping="Wrap" AutomationProperties.HeadingLevel="Level2" />
             <TextBlock x:Name="StateBody" Style="{StaticResource SaSecondaryBodyTextStyle}" HorizontalAlignment="Center"
                        HorizontalTextAlignment="Center" TextWrapping="Wrap" IsTextSelectionEnabled="True"
-                       AutomationProperties.LiveSetting="Polite" />
+                       primitives:SaAnnounce.Changes="True" AutomationProperties.LiveSetting="Polite" />
         </StackPanel>
 
         <!-- Profiles: "N disponíveis · M bloqueados", then the list (the resolver caps it at 500; virtualized). -->
         <StackPanel x:Name="ListPanel" Spacing="8" Visibility="Collapsed">
             <TextBlock x:Name="CountText" Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}"
-                       AutomationProperties.LiveSetting="Polite" />
+                       primitives:SaAnnounce.Changes="True" AutomationProperties.LiveSetting="Polite" />
             <ListView
                 x:Name="HostList"
                 x:Uid="ServerEditorImportList"

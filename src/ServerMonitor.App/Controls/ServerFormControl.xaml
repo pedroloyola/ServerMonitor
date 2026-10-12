@@ -91,7 +91,7 @@
              import itself is the page's dialog (Figma 04 chrome, 07 states); no inline list any more. -->
         <TextBlock
             x:Name="ImportStatusText"
-            AutomationProperties.LiveSetting="Polite"
+            primitives:SaAnnounce.Changes="True" AutomationProperties.LiveSetting="Polite"
             Style="{StaticResource SaCaptionTextStyle}"
             Foreground="{ThemeResource SaTextSecondaryBrush}"
             Text="{Binding SshConfigStatusMessage}"

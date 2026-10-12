@@ -213,7 +213,7 @@
                         <TextBlock
                             x:Uid="SettingsBackgroundDegradedCaption"
                             Margin="0,4,0,0"
-                            AutomationProperties.LiveSetting="Polite"
+                            primitives:SaAnnounce.Changes="True" AutomationProperties.LiveSetting="Polite"
                             Style="{StaticResource SaCaptionTextStyle}"
                             Foreground="{ThemeResource SaTextSecondaryBrush}"
                             TextWrapping="Wrap"
