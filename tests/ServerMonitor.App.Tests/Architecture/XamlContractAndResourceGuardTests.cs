@@ -157,7 +157,7 @@ public sealed partial class XamlContractAndResourceGuardTests
         ],
         // UI.2 S4 control templates: names targeted by VisualState setters / storyboards (G-3).
         // UI.7 final c2 (Prism C2-4): the inset list row template (selected / hover overlays over the tint).
-        ["Styles/Components/Sa.Surfaces.xaml"] = ["RowRoot", "SelectedOverlay", "HoverOverlay", "ContentPresenter"],
+        ["Styles/Components/Sa.Surfaces.xaml"] = ["RowRoot", "SelectedOverlay", "HoverOverlay", "SelectedOutline", "ContentPresenter"],
         ["Styles/Components/Sa.Buttons.xaml"] = ["RootGrid", "StateOverlay", "ContentPresenter", "Underline", "FocusUnderline"],
         ["Styles/Components/Sa.Forms.xaml"] =
         [
