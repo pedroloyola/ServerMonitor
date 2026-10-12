@@ -60,6 +60,9 @@ internal interface ISegmentDragSurface
     /// <summary><c>panel.ReleasePointerCapture(pointer)</c>.</summary>
     void ReleasePanelCapture(object pointer);
 
+    /// <summary><c>DispatcherQueue.TryEnqueue(action)</c>: runs it on a later UI-thread turn, outside the current layout pass.</summary>
+    void Post(Action action);
+
     /// <summary><c>VisualStateManager.GoToState(items[index], lit ? "Checked" : "Unchecked", false)</c>.</summary>
     void ShowCheckState(int index, bool lit);
 
@@ -93,6 +96,10 @@ internal interface ISegmentDragSurface
 /// Unchecked on the others while the confirmed IsChecked / view model / UI Automation stay untouched. Cortex review C-1: a
 /// label state must never change an item's geometry - every AllowDrag host has width-stable items (guarded by
 /// Ui111DragContractTests.EveryAllowDragHost_HasWidthStableItems).</item>
+/// <item>B111-1 (Beacon UI.11.1 final, measured under trace): a layout cancel arrives from SizeChanged / XamlRoot.Changed, inside
+/// the layout pass of a window resize, and <c>panel.ReleasePointerCapture</c> there fail-fasts WinUI (0xc000027b, E_UNEXPECTED
+/// in Microsoft.UI.Xaml.dll). So a layout cancel ends the drag synchronously - no preview write after it - and only the panel's
+/// capture release is posted out of the layout pass; it is skipped if a new drag owns the panel by then.</item>
 /// </list>
 /// </summary>
 internal sealed class SegmentDragWiring : ISegmentDragPort
@@ -112,6 +119,7 @@ internal sealed class SegmentDragWiring : ISegmentDragPort
     private int _origin = -1;
     private int _predicted = -1;
     private bool _committing;
+    private bool _inLayout;
 
     public SegmentDragWiring(ISegmentDragSurface surface, WindowActivationHub? hub = null)
     {
@@ -189,7 +197,19 @@ internal sealed class SegmentDragWiring : ISegmentDragPort
 
     public void WindowActivation(bool active) => Controller.WindowActivation(active);
 
-    public void Cancel(DragCancelReason reason) => Controller.Cancel(reason);
+    /// <summary>A lifecycle cancel; <see cref="DragCancelReason.Layout"/> comes from inside a layout pass (B111-1).</summary>
+    public void Cancel(DragCancelReason reason)
+    {
+        _inLayout = reason == DragCancelReason.Layout;
+        try
+        {
+            Controller.Cancel(reason);
+        }
+        finally
+        {
+            _inLayout = false;
+        }
+    }
 
     /// <summary>A Checked/Unchecked the wiring did not write: an external selection wins over the preview.</summary>
     public void OnSelectionChanged()
@@ -243,10 +263,25 @@ internal sealed class SegmentDragWiring : ISegmentDragPort
 
     public void ReleasePanelCapture(uint pointerId)
     {
-        if (_pointer is not null)
+        if (_pointer is not { } pointer)
         {
-            _surface.ReleasePanelCapture(_pointer);
+            return;
         }
+
+        if (!_inLayout)
+        {
+            _surface.ReleasePanelCapture(pointer);
+            return;
+        }
+
+        // B111-1: never inside the layout pass. A new drag that owns the panel by then keeps its capture.
+        _surface.Post(() =>
+        {
+            if (!Controller.IsDragging)
+            {
+                _surface.ReleasePanelCapture(pointer);
+            }
+        });
     }
 
     public void BeginPreview()
@@ -465,6 +500,8 @@ internal sealed class SegmentDragAdapter : ISegmentDragSurface
     public bool CapturePanel(object pointer) => _panel.CapturePointer((Pointer)pointer);
 
     public void ReleasePanelCapture(object pointer) => _panel.ReleasePointerCapture((Pointer)pointer);
+
+    public void Post(Action action) => _panel.DispatcherQueue.TryEnqueue(() => action());
 
     public void ShowCheckState(int index, bool lit) => VisualStateManager.GoToState(_presenter.Items[index], lit ? "Checked" : "Unchecked", false);
 

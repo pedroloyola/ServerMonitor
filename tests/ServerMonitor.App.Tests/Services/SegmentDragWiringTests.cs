@@ -61,6 +61,22 @@ public sealed class SegmentDragWiringTests
 
         public void ReleasePanelCapture(object pointer) => Log.Add($"ReleasePanelCapture({pointer})");
 
+        public Queue<Action> Posted { get; } = new();
+
+        public void Post(Action action)
+        {
+            Log.Add("Post");
+            Posted.Enqueue(action);
+        }
+
+        public void RunPosted()
+        {
+            while (Posted.TryDequeue(out var action))
+            {
+                action();
+            }
+        }
+
         public void ShowCheckState(int index, bool lit) => Log.Add($"State({index},{(lit ? "Checked" : "Unchecked")})");
 
         public void Check(int index)
@@ -321,5 +337,48 @@ public sealed class SegmentDragWiringTests
         wiring.Detach();
 
         Assert.Equal(["ReleasePanelCapture(P1)", "EndPreview(DragCancel,True)"], surface.Log.TakeLast(5).Where(e => !e.StartsWith("State", StringComparison.Ordinal)));
+    }
+
+    // ---- B111-1: a layout cancel comes from inside the layout pass ----------------------------------------------------
+
+    [Fact]
+    public void ALayoutCancel_EndsTheDragNow_ButReleasesThePanelCaptureOutsideTheLayoutPass()
+    {
+        var (wiring, surface) = Track();
+        wiring.Pressed(Mouse(228), 2, "P1");
+        wiring.Moved(Mouse(136));
+        surface.Log.Clear();
+
+        wiring.Cancel(DragCancelReason.Layout); // raised by SizeChanged during a window resize
+
+        Assert.False(wiring.Controller.IsActive);
+        Assert.DoesNotContain("ReleasePanelCapture(P1)", surface.Log); // the call that fail-fasts WinUI inside layout
+        Assert.Equal(["Post", "EndPreview(DragCancel,True)"], surface.Log.Where(e => !e.StartsWith("State", StringComparison.Ordinal)));
+
+        wiring.Moved(Mouse(100)); // the panel still holds the pointer until the post runs: no preview write
+        Assert.DoesNotContain(surface.Log, e => e.StartsWith("Present", StringComparison.Ordinal));
+
+        surface.RunPosted();
+        Assert.Equal("ReleasePanelCapture(P1)", surface.Log[^1]);
+    }
+
+    [Fact]
+    public void ALayoutCancelsPostedRelease_LeavesANewDragsCapture_AndOtherCancelsStaySynchronous()
+    {
+        var (wiring, surface) = Track();
+        wiring.Pressed(Mouse(228), 2, "P1");
+        wiring.Moved(Mouse(136));
+        wiring.Cancel(DragCancelReason.Layout);
+        wiring.Pressed(Mouse(228), 2, "P2");
+        wiring.Moved(Mouse(136));
+        surface.Log.Clear();
+
+        surface.RunPosted();
+        Assert.Empty(surface.Log);
+        Assert.True(wiring.Controller.IsDragging);
+
+        wiring.Cancel(DragCancelReason.Disabled);
+        Assert.Equal(["ReleasePanelCapture(P2)", "EndPreview(DragCancel,True)"], surface.Log.Where(e => !e.StartsWith("State", StringComparison.Ordinal)));
+        Assert.Empty(surface.Posted);
     }
 }
