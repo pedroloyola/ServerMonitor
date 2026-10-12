@@ -1,6 +1,6 @@
 # UI.11.1 — Motion Refinement
 
-**Status: READY_TO_MERGE — pending the human GO.** PR #40 (`ui/ui11-1-motion-refinement`); code at `280c300`. Merge method approved: **squash merge** (§13, N-2).
+**Status: COMPLETE — squash-merged as `d7c626c` (PR #40); post-merge CI green (§15).** Code at `280c300`. Merge method: **squash merge** (human exception for this PR; §13, N-2).
 - Real-input runtime QA PASS on the five selectors (Beacon final, §11b); B111-1 found and fixed (§11a); focused re-QA on `42ee796` PASS (§11c).
 - Reviews: Prism APPROVED_WITH_NITS, Cortex APPROVED_WITH_NITS, Atlas APPROVED, all on `280c300` (§10).
 - No merge without the human GO.
@@ -307,3 +307,51 @@ Real `SendInput` (mouse + keyboard) only into the verified QA window; commits co
 | `42ee796` | Docs — this record, B111-1 |
 
 Evidence: `.boss/tmp/ui11-1/` — `sentry-implementation-report.md`, `sentry-cp/`, `beacon-s0-matrix.md`, `beacon-s0b-matrix.md`, `beacon-ui11-1d-qa.md`, `cortex-ui11-1-review.md`, `prism-ui11-1-review.md`, `prism-ui11-1-figma-review.md`, `atlas-ui11-1-review.md`, `relay-ui11-1-figma.md`, `beacon-ui11-1d-final.md`, `beacon-ui11-1d-recheck.md`, `sentry-b111-1/`, `atlas-cp-b111/`.
+
+## 15. Merge, post-merge state and closeout
+
+- **Merge:** human GO "UI.11.1 — FINAL MERGE & CLOSEOUT".
+  - The pre-merge gate was re-checked:
+    - PR open;
+    - head `08a4ae1` exact;
+    - base `c69d0a0`;
+    - CLEAN/MERGEABLE;
+    - CI 38314990473 green at the head;
+    - Prism/Cortex/Atlas valid on `280c300`;
+    - Beacon re-QA PASS;
+    - the diff after `280c300` is docs only;
+    - Ground and Floor clean.
+  - PR #40 was marked Ready, then **squash-merged** pinned to `08a4ae1` → `main` = `d7c626c`.
+    - Single parent `c69d0a0`; tree identical to `08a4ae1`.
+    - The squash is a human exception for this PR only, because the intermediate commit `ac36036` did not compile on its own. It does not change the project's merge policy.
+- **Post-merge CI:** run 38316131967 green on the first attempt (Debug build + tests, Release build + vulnerability scan).
+  - All suites at 0 failures.
+  - `ServerMonitor.App.Tests` 3744/3744, which includes the drag and focus tests.
+  - `Infrastructure.Tests` 888/888.
+- **Firewall:** the 4 Floor testhost Block rules were removed with human UAC during QA: 713 → 709, removed 4, added 0, changed 0. Unchanged after the merge.
+- **Unchanged:**
+  - real data (22 tracked files hash-identical);
+  - the installed Developer build 1.1.2.2 (Ok);
+  - widgets and pins;
+  - SSH, known-hosts and Credential Manager.
+- **Floor:** removed with keep-branch after the pre-check:
+  - clean;
+  - tree == `main`;
+  - 0 commits not preserved on `origin/ui/ui11-1-motion-refinement`;
+  - inherited ignored files identical to the Ground's;
+  - 0 processes.
+  - Triple-check PASS.
+- **Auxiliary worktrees** (`wt/ui11-1-qa`, `wt/ui11-1-atlas-review`, `wt/ui11-1-s0`) were removed without `--force`. They were clean, and their commits are preserved on the PR branch or on the local branch `spike/ui11-1-s0-drag`.
+- **Branches kept:**
+  - `ui/ui11-1-motion-refinement` (local and remote, `08a4ae1`);
+  - `spike/ui11-1-s0-drag` (local only, `d79962e`, never pushed, not for merge).
+- **Evidence:** preserved in the operational workspace (QA logs, captures, reviews, counterproofs); not reproduced here.
+- **NOT_RUN and backlog:** unchanged from §12/§13. These are routed to UI.12 where applicable:
+  - real pen;
+  - real touch;
+  - High Contrast;
+  - capture lost to a modal (isolated case);
+  - Figma prototype playback.
+
+  Nothing NOT_RUN is reported as PASS.
+- **Next:** UI.12 has NOT started.
