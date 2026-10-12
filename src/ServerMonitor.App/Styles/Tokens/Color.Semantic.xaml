@@ -36,6 +36,10 @@
             <SolidColorBrush x:Key="SaSelectedTextBrush" Color="{StaticResource SaColorSelectedTextDark}" />
             <SolidColorBrush x:Key="SaFocusRingBrush" Color="{StaticResource SaColorFocusRingDark}" />
             <SolidColorBrush x:Key="SaHoverTextBrush" Color="{StaticResource SaColorTextDark}" />
+            <!-- UI.12 HC-01/HC-02 (Prism UI12A): state veils for templates whose content keeps its own text colour; same colour as SaHoverBrush/SaSelectedBrush here, Transparent in HC (a Highlight fill under WindowText is illegible). -->
+            <SolidColorBrush x:Key="SaHoverVeilBrush" Color="{StaticResource SaColorHoverDark}" />
+            <SolidColorBrush x:Key="SaSelectedVeilBrush" Color="{StaticResource SaColorSelectedDark}" />
+            <SolidColorBrush x:Key="SaSelectedOutlineBrush" Color="Transparent" />
             <SolidColorBrush x:Key="SaBorderInsetBrush" Color="{StaticResource SaColorDividerDark}" />
             <SolidColorBrush x:Key="SaGlassBorderBrush" Color="{StaticResource SaColorGlassBorderDark}" />
             <SolidColorBrush x:Key="SaGlassHighlightBrush" Color="{StaticResource SaColorGlassHighlightDark}" />
@@ -101,6 +105,9 @@
             <SolidColorBrush x:Key="SaSelectedTextBrush" Color="{StaticResource SaColorSelectedTextLight}" />
             <SolidColorBrush x:Key="SaFocusRingBrush" Color="{StaticResource SaColorFocusRingLight}" />
             <SolidColorBrush x:Key="SaHoverTextBrush" Color="{StaticResource SaColorTextLight}" />
+            <SolidColorBrush x:Key="SaHoverVeilBrush" Color="{StaticResource SaColorHoverLight}" />
+            <SolidColorBrush x:Key="SaSelectedVeilBrush" Color="{StaticResource SaColorSelectedLight}" />
+            <SolidColorBrush x:Key="SaSelectedOutlineBrush" Color="Transparent" />
             <SolidColorBrush x:Key="SaBorderInsetBrush" Color="{StaticResource SaColorDividerLight}" />
             <SolidColorBrush x:Key="SaGlassBorderBrush" Color="{StaticResource SaColorGlassBorderLight}" />
             <SolidColorBrush x:Key="SaGlassHighlightBrush" Color="{StaticResource SaColorGlassHighlightLight}" />
@@ -165,6 +172,10 @@
             <SolidColorBrush x:Key="SaSelectedTextBrush" Color="{ThemeResource SystemColorHighlightTextColor}" />
             <SolidColorBrush x:Key="SaFocusRingBrush" Color="{ThemeResource SystemColorHighlightColor}" />
             <SolidColorBrush x:Key="SaHoverTextBrush" Color="{ThemeResource SystemColorHighlightTextColor}" />
+            <!-- UI.12 HC-01/HC-02: no veil in HC; a persistent selection is drawn as a Highlight outline instead. -->
+            <SolidColorBrush x:Key="SaHoverVeilBrush" Color="Transparent" />
+            <SolidColorBrush x:Key="SaSelectedVeilBrush" Color="Transparent" />
+            <SolidColorBrush x:Key="SaSelectedOutlineBrush" Color="{ThemeResource SystemColorHighlightColor}" />
             <SolidColorBrush x:Key="SaBorderInsetBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
             <SolidColorBrush x:Key="SaGlassBorderBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
             <SolidColorBrush x:Key="SaGlassHighlightBrush" Color="Transparent" />

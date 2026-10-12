@@ -40,13 +40,13 @@
                                 <VisualState x:Name="Normal" />
                                 <VisualState x:Name="PointerOver">
                                     <VisualState.Setters>
-                                        <Setter Target="StateOverlay.Background" Value="{ThemeResource SaHoverBrush}" />
+                                        <Setter Target="StateOverlay.Background" Value="{ThemeResource SaHoverVeilBrush}" />
                                     </VisualState.Setters>
                                 </VisualState>
                                 <VisualState x:Name="Pressed">
                                     <VisualState.Setters>
                                         <!-- R1 (Beacon F-5): pressed = overlay only (one step above hover), no content opacity. -->
-                                        <Setter Target="StateOverlay.Background" Value="{ThemeResource SaSelectedBrush}" />
+                                        <Setter Target="StateOverlay.Background" Value="{ThemeResource SaSelectedVeilBrush}" />
                                     </VisualState.Setters>
                                 </VisualState>
                                 <VisualState x:Name="Disabled">

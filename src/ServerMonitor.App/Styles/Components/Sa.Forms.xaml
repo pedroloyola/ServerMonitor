@@ -29,7 +29,7 @@
                     <!-- DERIVED: hover = SaHoverBrush veil over the fill. -->
                     <VisualState x:Name="PointerOver">
                         <VisualState.Setters>
-                            <Setter Target="HoverOverlay.Background" Value="{ThemeResource SaHoverBrush}" />
+                            <Setter Target="HoverOverlay.Background" Value="{ThemeResource SaHoverVeilBrush}" />
                         </VisualState.Setters>
                     </VisualState>
                     <!-- DERIVED (no Figma focus node): 2px SaFocusRingBrush ring over the border, so an Error border survives. -->
@@ -85,7 +85,7 @@
                     <!-- DERIVED: hover = SaHoverBrush veil over the fill. -->
                     <VisualState x:Name="PointerOver">
                         <VisualState.Setters>
-                            <Setter Target="HoverOverlay.Background" Value="{ThemeResource SaHoverBrush}" />
+                            <Setter Target="HoverOverlay.Background" Value="{ThemeResource SaHoverVeilBrush}" />
                         </VisualState.Setters>
                     </VisualState>
                     <!-- DERIVED (no Figma focus node): 2px SaFocusRingBrush ring over the border, so an Error border survives. -->
@@ -141,7 +141,7 @@
                     <!-- DERIVED: hover = SaHoverBrush veil over the fill. -->
                     <VisualState x:Name="PointerOver">
                         <VisualState.Setters>
-                            <Setter Target="HoverOverlay.Background" Value="{ThemeResource SaHoverBrush}" />
+                            <Setter Target="HoverOverlay.Background" Value="{ThemeResource SaHoverVeilBrush}" />
                         </VisualState.Setters>
                     </VisualState>
                     <!-- DERIVED (no Figma focus node): 2px SaFocusRingBrush ring over the border, so an Error border survives. -->
@@ -197,7 +197,7 @@
                     <!-- DERIVED: hover = SaHoverBrush veil over the fill. -->
                     <VisualState x:Name="PointerOver">
                         <VisualState.Setters>
-                            <Setter Target="HoverOverlay.Background" Value="{ThemeResource SaHoverBrush}" />
+                            <Setter Target="HoverOverlay.Background" Value="{ThemeResource SaHoverVeilBrush}" />
                         </VisualState.Setters>
                     </VisualState>
                     <!-- DERIVED (no Figma focus node): 2px SaFocusRingBrush ring over the border, so an Error border survives. -->
@@ -330,12 +330,12 @@
                                 <VisualState x:Name="Normal" />
                                 <VisualState x:Name="PointerOver">
                                     <VisualState.Setters>
-                                        <Setter Target="RootGrid.Background" Value="{ThemeResource SaHoverBrush}" />
+                                        <Setter Target="RootGrid.Background" Value="{ThemeResource SaHoverVeilBrush}" />
                                     </VisualState.Setters>
                                 </VisualState>
                                 <VisualState x:Name="Pressed">
                                     <VisualState.Setters>
-                                        <Setter Target="RootGrid.Background" Value="{ThemeResource SaSelectedBrush}" />
+                                        <Setter Target="RootGrid.Background" Value="{ThemeResource SaSelectedVeilBrush}" />
                                     </VisualState.Setters>
                                 </VisualState>
                                 <VisualState x:Name="Disabled">
@@ -350,13 +350,13 @@
                                 </VisualState>
                                 <VisualState x:Name="CheckedPointerOver">
                                     <VisualState.Setters>
-                                        <Setter Target="RootGrid.Background" Value="{ThemeResource SaHoverBrush}" />
+                                        <Setter Target="RootGrid.Background" Value="{ThemeResource SaHoverVeilBrush}" />
                                         <Setter Target="ContentPresenter.Foreground" Value="{ThemeResource SaTextBrush}" />
                                     </VisualState.Setters>
                                 </VisualState>
                                 <VisualState x:Name="CheckedPressed">
                                     <VisualState.Setters>
-                                        <Setter Target="RootGrid.Background" Value="{ThemeResource SaSelectedBrush}" />
+                                        <Setter Target="RootGrid.Background" Value="{ThemeResource SaSelectedVeilBrush}" />
                                         <Setter Target="ContentPresenter.Foreground" Value="{ThemeResource SaTextBrush}" />
                                     </VisualState.Setters>
                                 </VisualState>
@@ -470,12 +470,12 @@
                                 <VisualState x:Name="UncheckedNormal" />
                                 <VisualState x:Name="UncheckedPointerOver">
                                     <VisualState.Setters>
-                                        <Setter Target="Box.Background" Value="{ThemeResource SaHoverBrush}" />
+                                        <Setter Target="Box.Background" Value="{ThemeResource SaHoverVeilBrush}" />
                                     </VisualState.Setters>
                                 </VisualState>
                                 <VisualState x:Name="UncheckedPressed">
                                     <VisualState.Setters>
-                                        <Setter Target="Box.Background" Value="{ThemeResource SaSelectedBrush}" />
+                                        <Setter Target="Box.Background" Value="{ThemeResource SaSelectedVeilBrush}" />
                                     </VisualState.Setters>
                                 </VisualState>
                                 <VisualState x:Name="UncheckedDisabled">
@@ -522,13 +522,13 @@
                                 <VisualState x:Name="IndeterminatePointerOver">
                                     <VisualState.Setters>
                                         <Setter Target="IndeterminateGlyph.Opacity" Value="1" />
-                                        <Setter Target="Box.Background" Value="{ThemeResource SaHoverBrush}" />
+                                        <Setter Target="Box.Background" Value="{ThemeResource SaHoverVeilBrush}" />
                                     </VisualState.Setters>
                                 </VisualState>
                                 <VisualState x:Name="IndeterminatePressed">
                                     <VisualState.Setters>
                                         <Setter Target="IndeterminateGlyph.Opacity" Value="1" />
-                                        <Setter Target="Box.Background" Value="{ThemeResource SaSelectedBrush}" />
+                                        <Setter Target="Box.Background" Value="{ThemeResource SaSelectedVeilBrush}" />
                                     </VisualState.Setters>
                                 </VisualState>
                                 <VisualState x:Name="IndeterminateDisabled">
@@ -591,12 +591,12 @@
                                 <VisualState x:Name="Normal" />
                                 <VisualState x:Name="PointerOver">
                                     <VisualState.Setters>
-                                        <Setter Target="SwitchAreaGrid.Background" Value="{ThemeResource SaHoverBrush}" />
+                                        <Setter Target="SwitchAreaGrid.Background" Value="{ThemeResource SaHoverVeilBrush}" />
                                     </VisualState.Setters>
                                 </VisualState>
                                 <VisualState x:Name="Pressed">
                                     <VisualState.Setters>
-                                        <Setter Target="SwitchAreaGrid.Background" Value="{ThemeResource SaSelectedBrush}" />
+                                        <Setter Target="SwitchAreaGrid.Background" Value="{ThemeResource SaSelectedVeilBrush}" />
                                     </VisualState.Setters>
                                 </VisualState>
                                 <VisualState x:Name="Disabled">
@@ -774,13 +774,13 @@
                                 <VisualState x:Name="Normal" />
                                 <VisualState x:Name="PointerOver">
                                     <VisualState.Setters>
-                                        <Setter Target="StateOverlay.Background" Value="{ThemeResource SaHoverBrush}" />
+                                        <Setter Target="StateOverlay.Background" Value="{ThemeResource SaHoverVeilBrush}" />
                                     </VisualState.Setters>
                                 </VisualState>
                                 <VisualState x:Name="Pressed">
                                     <VisualState.Setters>
                                         <!-- R1 (Beacon F-5): pressed = overlay only (one step above hover), no content opacity. -->
-                                        <Setter Target="StateOverlay.Background" Value="{ThemeResource SaSelectedBrush}" />
+                                        <Setter Target="StateOverlay.Background" Value="{ThemeResource SaSelectedVeilBrush}" />
                                     </VisualState.Setters>
                                 </VisualState>
                                 <VisualState x:Name="Disabled">
@@ -856,13 +856,13 @@
                                 <VisualState x:Name="Normal" />
                                 <VisualState x:Name="PointerOver">
                                     <VisualState.Setters>
-                                        <Setter Target="StateOverlay.Background" Value="{ThemeResource SaHoverBrush}" />
+                                        <Setter Target="StateOverlay.Background" Value="{ThemeResource SaHoverVeilBrush}" />
                                     </VisualState.Setters>
                                 </VisualState>
                                 <VisualState x:Name="Pressed">
                                     <VisualState.Setters>
                                         <!-- R1 (Beacon F-5): pressed = overlay only (one step above hover), no content opacity. -->
-                                        <Setter Target="StateOverlay.Background" Value="{ThemeResource SaSelectedBrush}" />
+                                        <Setter Target="StateOverlay.Background" Value="{ThemeResource SaSelectedVeilBrush}" />
                                     </VisualState.Setters>
                                 </VisualState>
                                 <VisualState x:Name="Disabled">
@@ -930,13 +930,13 @@
                                 <VisualState x:Name="Normal" />
                                 <VisualState x:Name="PointerOver">
                                     <VisualState.Setters>
-                                        <Setter Target="StateOverlay.Background" Value="{ThemeResource SaHoverBrush}" />
+                                        <Setter Target="StateOverlay.Background" Value="{ThemeResource SaHoverVeilBrush}" />
                                     </VisualState.Setters>
                                 </VisualState>
                                 <VisualState x:Name="Pressed">
                                     <VisualState.Setters>
                                         <!-- R1 (Beacon F-5): pressed = overlay only (one step above hover), no content opacity. -->
-                                        <Setter Target="StateOverlay.Background" Value="{ThemeResource SaSelectedBrush}" />
+                                        <Setter Target="StateOverlay.Background" Value="{ThemeResource SaSelectedVeilBrush}" />
                                     </VisualState.Setters>
                                 </VisualState>
                                 <VisualState x:Name="Disabled">

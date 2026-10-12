@@ -69,7 +69,7 @@
     </Style>
     <!-- UI.7 final c1 (Prism F-2, Figma 04 112:4049): a selectable row of a short list (the SSH-config import) - inset tint,
          r13, 8 between rows. Final c2 (Prism C2-4, Figma 112:4067 @.20 vs @.05): its own template - the selected fill
-         (SaSelectedBrush; HC Highlight) is drawn OVER the tint in every focus state, hover is the SaHoverBrush veil; no
+         (SaSelectedVeilBrush; HC = a Highlight outline, UI.12 HC-01) is drawn OVER the tint in every focus state, hover is the veil; no
          accent selection pill. Keyboard focus = the system focus ring (the Sa 2 px ring). -->
     <Style x:Key="SaInsetListItemStyle" TargetType="ListViewItem">
         <Setter Property="Background" Value="{ThemeResource SaInsetTintedBrush}" />
@@ -103,17 +103,20 @@
                                 <VisualState x:Name="Selected">
                                     <VisualState.Setters>
                                         <Setter Target="SelectedOverlay.Opacity" Value="1" />
+                                        <Setter Target="SelectedOutline.Opacity" Value="1" />
                                     </VisualState.Setters>
                                 </VisualState>
                                 <VisualState x:Name="PointerOverSelected">
                                     <VisualState.Setters>
                                         <Setter Target="SelectedOverlay.Opacity" Value="1" />
+                                        <Setter Target="SelectedOutline.Opacity" Value="1" />
                                         <Setter Target="HoverOverlay.Opacity" Value="1" />
                                     </VisualState.Setters>
                                 </VisualState>
                                 <VisualState x:Name="PressedSelected">
                                     <VisualState.Setters>
                                         <Setter Target="SelectedOverlay.Opacity" Value="1" />
+                                        <Setter Target="SelectedOutline.Opacity" Value="1" />
                                         <Setter Target="HoverOverlay.Opacity" Value="1" />
                                     </VisualState.Setters>
                                 </VisualState>
@@ -127,10 +130,14 @@
                                 </VisualState>
                             </VisualStateGroup>
                         </VisualStateManager.VisualStateGroups>
-                        <Border x:Name="SelectedOverlay" Background="{ThemeResource SaSelectedBrush}" CornerRadius="{TemplateBinding CornerRadius}"
+                        <Border x:Name="SelectedOverlay" Background="{ThemeResource SaSelectedVeilBrush}" CornerRadius="{TemplateBinding CornerRadius}"
                                 Opacity="0" IsHitTestVisible="False" />
-                        <Border x:Name="HoverOverlay" Background="{ThemeResource SaHoverBrush}" CornerRadius="{TemplateBinding CornerRadius}"
+                        <Border x:Name="HoverOverlay" Background="{ThemeResource SaHoverVeilBrush}" CornerRadius="{TemplateBinding CornerRadius}"
                                 Opacity="0" IsHitTestVisible="False" />
+                        <!-- UI.12 HC-01 (Prism UI12A): the row text keeps its own colours, so HC marks the selection with a
+                             2 px Highlight outline instead of a Highlight fill under WindowText; Transparent in Dark/Light. -->
+                        <Border x:Name="SelectedOutline" BorderBrush="{ThemeResource SaSelectedOutlineBrush}" BorderThickness="2"
+                                CornerRadius="{TemplateBinding CornerRadius}" Opacity="0" IsHitTestVisible="False" />
                         <ContentPresenter x:Name="ContentPresenter"
                                           Padding="{TemplateBinding Padding}"
                                           HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"

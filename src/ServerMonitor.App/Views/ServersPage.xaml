@@ -43,12 +43,12 @@
                                     <VisualState x:Name="Normal" />
                                     <VisualState x:Name="PointerOver">
                                         <VisualState.Setters>
-                                            <Setter Target="RootGrid.Background" Value="{ThemeResource SaHoverBrush}" />
+                                            <Setter Target="RootGrid.Background" Value="{ThemeResource SaHoverVeilBrush}" />
                                         </VisualState.Setters>
                                     </VisualState>
                                     <VisualState x:Name="Pressed">
                                         <VisualState.Setters>
-                                            <Setter Target="RootGrid.Background" Value="{ThemeResource SaSelectedBrush}" />
+                                            <Setter Target="RootGrid.Background" Value="{ThemeResource SaSelectedVeilBrush}" />
                                         </VisualState.Setters>
                                     </VisualState>
                                     <VisualState x:Name="Disabled" />
