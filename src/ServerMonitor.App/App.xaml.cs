@@ -365,23 +365,42 @@ public partial class App : Application
         }
         catch (Exception exception)
         {
-            ServicesHost.Services
+            HandleStartupFailure(ServicesHost.Services, exception, Program.StartupExitCode, Exit);
+        }
+    }
+
+    /// <summary>
+    /// The body of <c>OnLaunched</c>'s catch, invocable for the same reason <see cref="EvaluateStartupAffordance"/> is:
+    /// <c>OnLaunched</c> needs a XAML runtime. UI.12 C-S1a: the failure is recorded in the process exit code FIRST, before
+    /// anything that can throw (resolving the logger, the exit itself), so <c>Main</c> never returns 0 after it.
+    /// </summary>
+    internal static void HandleStartupFailure(
+        IServiceProvider services,
+        Exception exception,
+        StartupExitCode exitCode,
+        Action exitApplication)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(exitCode);
+        ArgumentNullException.ThrowIfNull(exitApplication);
+
+        exitCode.RecordStartupFailure();
+        services
+            .GetRequiredService<ILogger<App>>()
+            .LogCritical(exception, "Server Monitor could not start.");
+        try
+        {
+            // The same authoritative exit as every other path: one drain, one Exit, one watchdog.
+            services
+                .GetRequiredService<IAppLifecycleController>()
+                .RequestExit(ExitReason.StartupFailure);
+        }
+        catch (Exception shutdownException)
+        {
+            services
                 .GetRequiredService<ILogger<App>>()
-                .LogCritical(exception, "Server Monitor could not start.");
-            try
-            {
-                // The same authoritative exit as every other path: one drain, one Exit, one watchdog.
-                ServicesHost.Services
-                    .GetRequiredService<IAppLifecycleController>()
-                    .RequestExit(ExitReason.StartupFailure);
-            }
-            catch (Exception shutdownException)
-            {
-                ServicesHost.Services
-                    .GetRequiredService<ILogger<App>>()
-                    .LogError(shutdownException, "Server Monitor startup cleanup failed.");
-                Exit();
-            }
+                .LogError(shutdownException, "Server Monitor startup cleanup failed.");
+            exitApplication();
         }
     }
     /// <summary>
