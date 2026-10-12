@@ -67,7 +67,12 @@ public interface IUserNotificationService
     /// <summary>Synchronously rejects new delivery/activation work before hosted-service drain.</summary>
     void BeginShutdown() { }
 
-    Task ShowAsync(UserNotification notification, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Hands one health notification to Windows. UI.12 C-E2: returns <c>true</c> only when it was handed to the platform
+    /// (registered, accepting, OS setting enabled, and the platform call did not throw) and <c>false</c> when it went
+    /// nowhere, so a failed delivery never arms the alert cooldown or reads as "sent". Display remains Windows' decision.
+    /// </summary>
+    Task<bool> ShowAsync(UserNotification notification, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Shows the single first-close background notice (M13 S2 §D.1). Separate from

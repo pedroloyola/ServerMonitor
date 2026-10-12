@@ -117,6 +117,35 @@ public sealed class ServerAlertCoordinatorTests
         Assert.Equal(2, harness.Notifications.Items.Count(item => item.Category == ServerAlertCategory.Warning));
     }
 
+    /// <summary>
+    /// UI.12 C-E2 (Cortex UI.12A, P2). A delivery that reached nothing (not registered, OS setting off, platform threw)
+    /// used to reserve the cooldown and log "Sent" - against the coordinator's own rule that a failed delivery must not
+    /// suppress the next real transition. Now only a delivered notification reserves it.
+    /// </summary>
+    [Fact]
+    public async Task AFailedDelivery_ReservesNoCooldown_SoTheNextTransitionNotifies()
+    {
+        await using var harness = await Harness.CreateAsync(ServerHealth.Healthy);
+        harness.Notifications.Delivers = false;
+        harness.SetHealth(ServerHealth.Warning);
+        await harness.WaitForNotificationsAsync(1);  // attempted, not delivered
+        harness.SetHealth(ServerHealth.Healthy);
+        await harness.WaitForNotificationsAsync(2);
+
+        harness.Notifications.Delivers = true;
+        harness.SetHealth(ServerHealth.Warning);     // same category, same instant: inside the cooldown window
+        await harness.WaitForNotificationsAsync(3);
+
+        Assert.Equal(2, harness.Notifications.Items.Count(item => item.Category == ServerAlertCategory.Warning));
+
+        // ...and a DELIVERED one still arms it as before.
+        harness.SetHealth(ServerHealth.Healthy);
+        await harness.WaitForNotificationsAsync(4);
+        harness.SetHealth(ServerHealth.Warning);
+        await harness.SettleAsync();
+        Assert.Equal(2, harness.Notifications.Items.Count(item => item.Category == ServerAlertCategory.Warning));
+    }
+
     [Fact]
     public async Task HigherSeverityCategories_BypassOtherCategoryCooldowns()
     {
@@ -453,11 +482,15 @@ public sealed class ServerAlertCoordinatorTests
 
         public void BeginShutdown() => BeginShutdownCount++;
 
-        public Task ShowAsync(UserNotification notification, CancellationToken cancellationToken = default)
+        /// <summary>UI.12 C-E2: what the platform boundary reports - false = nothing reached Windows.</summary>
+        public bool Delivers { get; set; } = true;
+
+        /// <summary>Every call is recorded (an attempt), delivered or not.</summary>
+        public Task<bool> ShowAsync(UserNotification notification, CancellationToken cancellationToken = default)
         {
             _items.Enqueue(notification);
             _calls.Release();
-            return Task.CompletedTask;
+            return Task.FromResult(Delivers);
         }
 
         /// <summary>Waits for the coordinator's worker to deliver <paramref name="expected"/> notifications; each
@@ -479,7 +512,7 @@ public sealed class ServerAlertCoordinatorTests
         public TaskCompletionSource Cancelled { get; } =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        public async Task ShowAsync(UserNotification notification, CancellationToken cancellationToken = default)
+        public async Task<bool> ShowAsync(UserNotification notification, CancellationToken cancellationToken = default)
         {
             Entered.TrySetResult();
             try
@@ -491,6 +524,8 @@ public sealed class ServerAlertCoordinatorTests
                 Cancelled.TrySetResult();
                 throw;
             }
+
+            return true;
         }
     }
 }

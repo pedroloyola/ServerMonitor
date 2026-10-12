@@ -390,8 +390,8 @@ public sealed class FailSafeExitNoticeTests
     {
         public List<(string Title, string Body)> FailSafeNotices { get; } = [];
 
-        public Task ShowAsync(UserNotification notification, CancellationToken cancellationToken = default) =>
-            Task.CompletedTask;
+        public Task<bool> ShowAsync(UserNotification notification, CancellationToken cancellationToken = default) =>
+            Task.FromResult(true);
 
         public void ShowFailSafeExitNotice(string title, string body)
         {

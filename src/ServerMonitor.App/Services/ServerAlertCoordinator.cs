@@ -331,7 +331,18 @@ public sealed class ServerAlertCoordinator : IServerAlertCoordinator, IAsyncDisp
             }
 
             var notification = CreateNotification(server.Name, intent);
-            await _notificationService.ShowAsync(notification, cancellationToken).ConfigureAwait(false);
+            var delivered = await _notificationService.ShowAsync(notification, cancellationToken).ConfigureAwait(false);
+            if (!delivered)
+            {
+                // UI.12 C-E2: nothing reached Windows (not registered, OS setting off, platform failure). Not "Sent", and
+                // no cooldown: the next real transition must be able to notify.
+                _logger.LogDebug(
+                    "{Category} notification for server {ServerId} was not delivered; no cooldown reserved.",
+                    intent.Decision.Category,
+                    intent.ServerId);
+                return;
+            }
+
             lock (_gate)
             {
                 // Reserve cooldown only after the notification boundary completed. An intent
