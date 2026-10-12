@@ -1,5 +1,3 @@
-using Microsoft.UI.Xaml.Input;
-
 namespace ServerMonitor.App.Services.Motion;
 
 /// <summary>The pointer kind of a drag gesture (mirrors Microsoft.UI.Input.PointerDeviceType without the WinUI type).</summary>
@@ -96,14 +94,6 @@ public static class SegmentDragRules
 
     /// <summary>The predicted label changes only this far past a boundary (Prism §2.3, mandatory in High Contrast).</summary>
     public const double HysteresisDip = 4;
-
-    /// <summary>
-    /// Beacon S0b verdict V2: the opted-in items' ManipulationMode. <c>System</c> keeps the page's vertical pan (the
-    /// ScrollViewer still owns Y); <c>TranslateX</c> keeps the horizontal pen/touch gesture out of DirectManipulation, so it
-    /// reaches the pointer events like the mouse (synthetic pen+touch: commit once, cancels zero, taps and scroll unchanged).
-    /// The same composition the ToggleSwitch template uses for its thumb. Real pen/touch: NOT_RUN.
-    /// </summary>
-    public const ManipulationModes ItemManipulation = ManipulationModes.System | ManipulationModes.TranslateX;
 
     /// <summary>
     /// The drag threshold in DIP. Mouse: the Windows drag rectangle (GetSystemMetricsForDpi SM_CXDRAG / SM_CYDRAG, in
@@ -206,8 +196,9 @@ public static class SegmentDragRules
 /// <list type="bullet">
 /// <item>Only a press on the CONFIRMED, enabled segment of an enabled group, with the primary button/contact, arms a drag;
 /// anything else stays the item's native click (C1).</item>
-/// <item>Below the threshold nothing happens (a click). A vertical move past the threshold first abandons (the page scrolls).
-/// Past the horizontal threshold the capture moves from the item to the panel (Option B, B0) - the phase is marked BEFORE
+/// <item>Below the threshold nothing happens (a click). Mouse: leaving the Windows drag rectangle on EITHER axis starts the
+/// drag (SM_CYDRAG semantics; a mouse drag has no system gesture to give back - Prism review P-1). Pen/touch: a vertical move
+/// past the threshold first abandons, so the page keeps its vertical pan (S0b). Past the horizontal threshold the capture moves from the item to the panel (Option B, B0) - the phase is marked BEFORE
 /// the origin lets go, so the origin's own CaptureLost is expected; a refused capture abandons (B1).</item>
 /// <item>The confirmed selection never changes while dragging. Release = at most ONE commit, computed from the release
 /// point, and only when the target differs from the confirmation (B4: no Click). The session is terminal BEFORE any effect,
@@ -231,6 +222,7 @@ public sealed class SegmentDragController
     private Phase _phase;
     private int _session;
     private uint _pointerId;
+    private DragPointerDevice _device;
     private double _pressX;
     private double _pressY;
     private double _grabOffset;
@@ -267,6 +259,7 @@ public sealed class SegmentDragController
 
         _phase = Phase.Pressed;
         _pointerId = pointer.Id;
+        _device = pointer.Device;
         _pressX = pointer.X;
         _pressY = pointer.Y;
         _geometry = geometry;
@@ -286,13 +279,13 @@ public sealed class SegmentDragController
         {
             var dx = Math.Abs(pointer.X - _pressX);
             var dy = Math.Abs(pointer.Y - _pressY);
-            if (dx >= _threshold.X)
+            if (dx >= _threshold.X || (_device == DragPointerDevice.Mouse && dy >= _threshold.Y))
             {
-                BeginDrag(pointer);
+                BeginDrag(pointer); // the pill still follows X only
             }
             else if (dy >= _threshold.Y)
             {
-                Terminate(); // vertical first: the system (page scroll) keeps the gesture
+                Terminate(); // pen/touch, vertical first: the system (page scroll) keeps the gesture
             }
 
             return;
@@ -481,7 +474,8 @@ public sealed class WindowActivationHub
         return new Subscription(this, entry);
     }
 
-    /// <param name="root">The window's content root (its XamlRoot); null publishes nothing.</param>
+    /// <param name="root">The window's key - its AppWindow id (MainWindow publishes <c>AppWindow.Id</c>, the adapter subscribes
+    /// with its XamlRoot's <c>ContentIslandEnvironment.AppWindowId</c>), compared by value; null publishes nothing.</param>
     public void Publish(object? root, bool active)
     {
         if (root is null)

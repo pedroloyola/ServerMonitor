@@ -104,15 +104,39 @@ public sealed class SegmentDragControllerTests
         Assert.Equal(["Snapshot", "Threshold(Mouse)", "ReleaseOrigin(1)", "CapturePanel(1)", "BeginPreview", "Present(180.0,88.0|2)"], port.Effects);
     }
 
-    [Fact]
-    public void VerticalFirst_Abandons_AndNeverTransfers()
+    /// <summary>Pen/touch (S0b): a vertical-first move leaves the gesture to the page's vertical pan.</summary>
+    [Theory]
+    [InlineData(DragPointerDevice.Touch)]
+    [InlineData(DragPointerDevice.Pen)]
+    public void PenTouch_VerticalFirst_Abandons_AndNeverTransfers(DragPointerDevice device)
     {
-        var (controller, port) = Armed();
-        controller.Move(Mouse(228 - 2, 16 + 4));
-        controller.Move(Mouse(100, 16 + 4)); // later horizontal travel does not revive it
+        var port = new FakePort(Theme, 2) { ThresholdFor = _ => new DragThreshold(8, 8) };
+        var controller = new SegmentDragController(port);
+        controller.Press(new DragPointer(3, device, 228, 16, true), 2);
+        controller.Move(new DragPointer(3, device, 228 - 3, 16 + 8, true));
+        controller.Move(new DragPointer(3, device, 100, 16 + 8, true)); // later horizontal travel does not revive it
 
         Assert.False(controller.IsActive);
         Assert.DoesNotContain(port.Effects, e => e.StartsWith("ReleaseOrigin", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// Prism review P-1: a slightly diagonal MOUSE grab leaves the drag rectangle vertically first - that starts the drag
+    /// (SM_CYDRAG: "can move before a drag operation begins"); the mouse has no system gesture to give back.
+    /// </summary>
+    [Fact]
+    public void Mouse_VerticalFirstExit_StartsTheDrag_AndCommitsOnce()
+    {
+        var (controller, port) = Armed();
+        controller.Move(Mouse(228 - 3, 16 + 5));
+
+        Assert.True(controller.IsDragging);
+        Assert.Equal("Present(181.0,88.0|2)", port.Effects[^1]); // X follows the pointer; Y is ignored
+
+        controller.Move(Mouse(228 - 40 - 52, 16 + 5));
+        controller.Release(Mouse(136, 16 + 5));
+        Assert.Single(port.Effects, e => e.StartsWith("Commit", StringComparison.Ordinal));
+        Assert.Equal("Commit(1)", port.Effects[^1]);
     }
 
     // ---- preview ------------------------------------------------------------------------------------------------------
