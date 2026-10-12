@@ -35,6 +35,8 @@
             <SolidColorBrush x:Key="SaSelectedBrush" Color="{StaticResource SaColorSelectedDark}" />
             <SolidColorBrush x:Key="SaSelectedTextBrush" Color="{StaticResource SaColorSelectedTextDark}" />
             <SolidColorBrush x:Key="SaFocusRingBrush" Color="{StaticResource SaColorFocusRingDark}" />
+            <!-- UI.12 FOCUS-01 (Prism UI12A): inner ring of the system double focus visual, HC only (thickness 0 in Dark/Light, SaFocusVisualSecondaryThickness); separates the Highlight ring from a Highlight selected fill. -->
+            <SolidColorBrush x:Key="SaFocusRingSecondaryBrush" Color="Transparent" />
             <SolidColorBrush x:Key="SaHoverTextBrush" Color="{StaticResource SaColorTextDark}" />
             <!-- UI.12 HC-01/HC-02 (Prism UI12A): state veils for templates whose content keeps its own text colour; same colour as SaHoverBrush/SaSelectedBrush here, Transparent in HC (a Highlight fill under WindowText is illegible). -->
             <SolidColorBrush x:Key="SaHoverVeilBrush" Color="{StaticResource SaColorHoverDark}" />
@@ -104,6 +106,7 @@
             <SolidColorBrush x:Key="SaSelectedBrush" Color="{StaticResource SaColorSelectedLight}" />
             <SolidColorBrush x:Key="SaSelectedTextBrush" Color="{StaticResource SaColorSelectedTextLight}" />
             <SolidColorBrush x:Key="SaFocusRingBrush" Color="{StaticResource SaColorFocusRingLight}" />
+            <SolidColorBrush x:Key="SaFocusRingSecondaryBrush" Color="Transparent" />
             <SolidColorBrush x:Key="SaHoverTextBrush" Color="{StaticResource SaColorTextLight}" />
             <SolidColorBrush x:Key="SaHoverVeilBrush" Color="{StaticResource SaColorHoverLight}" />
             <SolidColorBrush x:Key="SaSelectedVeilBrush" Color="{StaticResource SaColorSelectedLight}" />
@@ -171,6 +174,7 @@
             <SolidColorBrush x:Key="SaSelectedBrush" Color="{ThemeResource SystemColorHighlightColor}" />
             <SolidColorBrush x:Key="SaSelectedTextBrush" Color="{ThemeResource SystemColorHighlightTextColor}" />
             <SolidColorBrush x:Key="SaFocusRingBrush" Color="{ThemeResource SystemColorHighlightColor}" />
+            <SolidColorBrush x:Key="SaFocusRingSecondaryBrush" Color="{ThemeResource SystemColorWindowColor}" />
             <SolidColorBrush x:Key="SaHoverTextBrush" Color="{ThemeResource SystemColorHighlightTextColor}" />
             <!-- UI.12 HC-01/HC-02: no veil in HC; a persistent selection is drawn as a Highlight outline instead. -->
             <SolidColorBrush x:Key="SaHoverVeilBrush" Color="Transparent" />

@@ -174,6 +174,7 @@ public static class QaTokenManifest
         new("SaSelectedBrush", QaTokenKind.Brush),
         new("SaSelectedTextBrush", QaTokenKind.Brush),
         new("SaFocusRingBrush", QaTokenKind.Brush),
+        new("SaFocusRingSecondaryBrush", QaTokenKind.Brush),
         new("SaHoverTextBrush", QaTokenKind.Brush),
         new("SaHoverVeilBrush", QaTokenKind.Brush),
         new("SaSelectedVeilBrush", QaTokenKind.Brush),

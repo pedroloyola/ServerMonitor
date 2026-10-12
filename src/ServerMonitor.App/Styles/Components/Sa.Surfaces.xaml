@@ -15,14 +15,17 @@
          ButtonText border (SaSecondaryBorderBrush) in High Contrast. -->
     <ResourceDictionary.ThemeDictionaries>
         <ResourceDictionary x:Key="Dark">
+            <Thickness x:Key="SaFocusVisualSecondaryThickness">0</Thickness>
             <Thickness x:Key="SaModalBorderThickness">1</Thickness>
             <Thickness x:Key="SaSecondaryBorderThickness">0</Thickness>
         </ResourceDictionary>
         <ResourceDictionary x:Key="Light">
+            <Thickness x:Key="SaFocusVisualSecondaryThickness">0</Thickness>
             <Thickness x:Key="SaModalBorderThickness">1</Thickness>
             <Thickness x:Key="SaSecondaryBorderThickness">0</Thickness>
         </ResourceDictionary>
         <ResourceDictionary x:Key="HighContrast">
+            <Thickness x:Key="SaFocusVisualSecondaryThickness">1</Thickness>
             <Thickness x:Key="SaModalBorderThickness">2</Thickness>
             <Thickness x:Key="SaSecondaryBorderThickness">1</Thickness>
         </ResourceDictionary>
@@ -82,7 +85,8 @@
         <Setter Property="UseSystemFocusVisuals" Value="True" />
         <Setter Property="FocusVisualPrimaryBrush" Value="{ThemeResource SaFocusRingBrush}" />
         <Setter Property="FocusVisualPrimaryThickness" Value="{StaticResource SaFocusRingThickness}" />
-        <Setter Property="FocusVisualSecondaryThickness" Value="0" />
+        <Setter Property="FocusVisualSecondaryThickness" Value="{ThemeResource SaFocusVisualSecondaryThickness}" />
+        <Setter Property="FocusVisualSecondaryBrush" Value="{ThemeResource SaFocusRingSecondaryBrush}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ListViewItem">
