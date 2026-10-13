@@ -82,11 +82,14 @@
             <Setter.Value>
                 <ControlTemplate TargetType="primitives:SaIcon">
                     <Grid Width="{TemplateBinding Size}" Height="{TemplateBinding Size}" Background="Transparent">
-                        <!-- UI.12 B12B-01 (measured, Dark: the checked sidebar icon's Foreground follows its ContentPresenter
-                             by inheritance, but a TemplateBinding does not track inherited changes - the stroke kept the
-                             rest colour). Light / Dark keep exactly today's TemplateBinding path. In High Contrast the
-                             {Binding} path draws instead and tracks the inherited state text (HighlightText on Highlight,
-                             GrayText when disabled). -->
+                        <!-- UI.12 B12B-01. Measured: a host's visual state (checked / hover / pressed / disabled) sets ITS
+                             ContentPresenter.Foreground; the icon inherits the value, but WinUI notifies that change only to
+                             IconElement descendants (InheritedProperties::GetCorrespondingInheritedProperty), so nothing bound
+                             to the icon's own Foreground ever updates. Light / Dark keep exactly today's TemplateBinding path.
+                             In High Contrast PART_StatePath draws instead; SaIcon binds its Stroke (in code: ElementName does
+                             not resolve inside this template, measured) to PART_ForegroundProbe, a collapsed IconElement that
+                             does receive the notification - so the icon follows the state text (HighlightText on Highlight,
+                             GrayText when disabled). The probe must carry no Foreground of its own. -->
                         <Path x:Name="PART_Path"
                               Visibility="{ThemeResource SaIconRestPathVisibility}"
                               Stroke="{TemplateBinding Foreground}"
@@ -94,9 +97,9 @@
                               StrokeStartLineCap="Round"
                               StrokeEndLineCap="Round"
                               StrokeLineJoin="Round" />
+                        <PathIcon x:Name="PART_ForegroundProbe" Visibility="Collapsed" />
                         <Path x:Name="PART_StatePath"
                               Visibility="{ThemeResource SaIconStatePathVisibility}"
-                              Stroke="{Binding Foreground, RelativeSource={RelativeSource TemplatedParent}}"
                               StrokeThickness="1.5"
                               StrokeStartLineCap="Round"
                               StrokeEndLineCap="Round"

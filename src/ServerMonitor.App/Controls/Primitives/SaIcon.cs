@@ -1,7 +1,9 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Data;
 using Microsoft.UI.Xaml.Markup;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Shapes;
 using Path = Microsoft.UI.Xaml.Shapes.Path;
 
 namespace ServerMonitor.App.Controls.Primitives;
@@ -18,6 +20,7 @@ namespace ServerMonitor.App.Controls.Primitives;
 /// </summary>
 [TemplatePart(Name = PathPartName, Type = typeof(Path))]
 [TemplatePart(Name = StatePathPartName, Type = typeof(Path))]
+[TemplatePart(Name = ForegroundProbePartName, Type = typeof(IconElement))]
 public sealed class SaIcon : Control
 {
     /// <summary>The design grid of the vendored icons.</summary>
@@ -30,6 +33,9 @@ public sealed class SaIcon : Control
 
     // UI.12 B12B-01: the High Contrast twin of PART_Path (same geometry; the theme dictionaries show one of the two).
     private const string StatePathPartName = "PART_StatePath";
+
+    // UI.12 B12B-01: a collapsed IconElement in the template - WinUI's only receiver of ContentPresenter.Foreground changes.
+    private const string ForegroundProbePartName = "PART_ForegroundProbe";
 
     public static readonly DependencyProperty DataProperty = DependencyProperty.Register(
         nameof(Data), typeof(string), typeof(SaIcon), new PropertyMetadata(null, (d, _) => ((SaIcon)d).UpdateGeometry()));
@@ -77,7 +83,19 @@ public sealed class SaIcon : Control
         base.OnApplyTemplate();
         _path = GetTemplateChild(PathPartName) as Path;
         _statePath = GetTemplateChild(StatePathPartName) as Path;
+        BindStatePathToProbe();
         UpdateGeometry();
+    }
+
+    // UI.12 B12B-01: the HC state path follows the probe, which (an IconElement) is notified when the host's
+    // ContentPresenter.Foreground changes; the binding belongs to this template instance, so there is nothing to undo.
+    // A template without the probe or the state path just keeps today's rest path.
+    private void BindStatePathToProbe()
+    {
+        if (_statePath is not null && GetTemplateChild(ForegroundProbePartName) is IconElement probe)
+        {
+            _statePath.SetBinding(Shape.StrokeProperty, new Binding { Source = probe, Path = new PropertyPath(nameof(IconElement.Foreground)) });
+        }
     }
 
     private void UpdateGeometry()
