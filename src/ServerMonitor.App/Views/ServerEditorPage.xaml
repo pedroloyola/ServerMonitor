@@ -57,6 +57,9 @@
                 </VisualState>
             </VisualStateGroup>
         </VisualStateManager.VisualStateGroups>
+    <!-- UI.12 B12F-01: while the modal layer is open this host is inert - the whole page under it leaves the UIA tree
+         (AccessibilityView Raw on PageScroll hid only that node; its descendants re-parented and stayed reachable). -->
+    <primitives:SaInertHost x:Name="PageHost">
     <ScrollViewer x:Name="PageScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
         <Grid x:Name="PageRoot" Padding="{StaticResource SaPagePadding}" RowSpacing="{StaticResource SaSpace16}">
             <Grid.RowDefinitions>
@@ -162,6 +165,7 @@
                     Style="{StaticResource SaSecondaryButtonStyle}" Click="OnHeaderButtonClick" />
         </Grid>
     </ScrollViewer>
+    </primitives:SaInertHost>
 
         <!-- UI.11 F08: the SaDialogStyle pattern - the layer fades in (167) and the surface scales 1.05->1 (250, ShowLayer);
              closing fades the layer out (83). F14: a step change inside the open layer cross-fades the new panel in. -->

@@ -95,8 +95,11 @@ public sealed class Ui7FinalC2Tests
         var xaml = AppSourceTree.LoadXaml("Views/ServerEditorPage.xaml");
         var scroll = Named(xaml, "PageScroll");
         var layer = Named(xaml, "DialogLayer");
-        Assert.Equal(scroll.Parent, layer.Parent); // siblings: the layer is not disabled with the page
-        Assert.True(scroll.ElementsAfterSelf().Contains(layer), "the layer is drawn over the page");
+        // UI.12 B12F-01: the page sits in its inert host (out of UIA while the layer is open); host and layer are siblings.
+        var page = scroll.Parent!;
+        Assert.Equal("PageHost", (string?)page.Attribute(AppSourceTree.Xaml + "Name"));
+        Assert.Equal(page.Parent, layer.Parent); // siblings: the layer is not disabled with the page
+        Assert.True(page.ElementsAfterSelf().Contains(layer), "the layer is drawn over the page");
         foreach (var name in new[] { "ServerForm", "ActionArea", "TestButton", "CancelButton", "PrimaryButton", "HeaderButton", "OpenDuplicateButton", "RetrySaveButton" })
         {
             Assert.Contains(Named(xaml, name).Ancestors(), e => e == scroll);

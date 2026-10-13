@@ -106,6 +106,8 @@ public sealed partial class XamlContractAndResourceGuardTests
             "CredentialNoteTitle", "HeaderButton",
             // UI.7B: the in-page modal layer (Cortex §8) and its two panels.
             "PageScroll", "DialogLayer", "DialogSurface", "DialogContent", "TrustPanel", "ImportPanel",
+            // UI.12 B12F-01: the inert host the page leaves UIA through while the layer is open.
+            "PageHost",
             // UI.7C: the test panel in the same layer, the duplicate notice (H-UI7-2) and "Tentar guardar".
             "TestPanel", "DuplicateNotice", "OpenDuplicateButton", "RetrySaveButton",
             // UI.7A fix c1 (M-1): Cancelar is disabled while a Save is persisted.
