@@ -108,6 +108,58 @@ public sealed class JsonIgnoredDeviceStoreTests : IDisposable
         Assert.Equal([valid], await store.LoadAsync());
     }
 
+    /// <summary>
+    /// UI.12 C-E5 (Cortex UI.12A, data loss). A transient I/O failure on the first read cached an EMPTY set; the next
+    /// IgnoreAsync then wrote "empty ∪ {new}" over the file and every previously ignored device was silently lost. The
+    /// failure here is a real sharing violation (the file held open with FileShare.None by the test), on a temp path.
+    /// </summary>
+    [Fact]
+    public async Task ATransientReadFailure_ThenIgnore_KeepsEveryPreviouslyIgnoredDevice()
+    {
+        var path = Path.Combine(_testDirectory, "ignored-devices.json");
+        var a = Hash("device-a");
+        var b = Hash("device-b");
+        var c = Hash("device-c");
+        using (var seed = Create(path))
+        {
+            Assert.True(await seed.IgnoreAsync(a));
+            Assert.True(await seed.IgnoreAsync(b));
+        }
+
+        using var store = Create(path);
+        using (new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.None))
+        {
+            Assert.Empty(await store.LoadAsync()); // unreadable right now: nothing shown as ignored, nothing cached
+        }
+
+        Assert.True(await store.IgnoreAsync(c));    // the file is readable again: re-read, then add
+
+        using var restarted = Create(path);
+        Assert.Equal(new HashSet<string> { a, b, c }, await restarted.LoadAsync());
+    }
+
+    [Fact]
+    public async Task IgnoreWhileTheFileIsUnreadable_IsRefused_AndTheFileIsUntouched()
+    {
+        var path = Path.Combine(_testDirectory, "ignored-devices.json");
+        var a = Hash("device-a");
+        using (var seed = Create(path))
+        {
+            Assert.True(await seed.IgnoreAsync(a));
+        }
+
+        var before = await File.ReadAllBytesAsync(path);
+        using var store = Create(path);
+        using (new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.None))
+        {
+            Assert.False(await store.IgnoreAsync(Hash("device-b")));
+        }
+
+        Assert.Equal(before, await File.ReadAllBytesAsync(path));
+        Assert.False(File.Exists(path + ".tmp"));
+        Assert.Equal([a], await store.LoadAsync());
+    }
+
     [Fact]
     public async Task MalformedFile_LoadsEmptyAndResetRepairsIt()
     {
