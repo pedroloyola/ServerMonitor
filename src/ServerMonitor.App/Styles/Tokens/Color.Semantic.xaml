@@ -26,6 +26,8 @@
             <SolidColorBrush x:Key="SaSuccessBrush" Color="{StaticResource SaColorSuccessDark}" />
             <SolidColorBrush x:Key="SaErrorBrush" Color="{StaticResource SaColorErrorDark}" />
             <SolidColorBrush x:Key="SaOfflineBrush" Color="{StaticResource SaColorOfflineDark}" />
+            <!-- UI.12 CONTRAST-01 (Prism UI12A): "Sem ligação" as TEXT. Dark keeps the dot coral (already >=4.5:1 there); Light uses the darkened danger text (#BD5766 measured 3.60-4.15:1 as 10 px text); the dot keeps SaOfflineBrush. -->
+            <SolidColorBrush x:Key="SaOfflineTextBrush" Color="{StaticResource SaColorOfflineDark}" />
             <SolidColorBrush x:Key="SaBorderNeutralBrush" Color="{StaticResource SaColorBorderNeutralDark}" />
             <SolidColorBrush x:Key="SaBorderSubtleBrush" Color="{StaticResource SaColorBorderSubtleDark}" />
             <SolidColorBrush x:Key="SaDividerBrush" Color="{StaticResource SaColorDividerDark}" />
@@ -98,6 +100,7 @@
             <SolidColorBrush x:Key="SaSuccessBrush" Color="{StaticResource SaColorSuccessLight}" />
             <SolidColorBrush x:Key="SaErrorBrush" Color="{StaticResource SaColorErrorLight}" />
             <SolidColorBrush x:Key="SaOfflineBrush" Color="{StaticResource SaColorOfflineLight}" />
+            <SolidColorBrush x:Key="SaOfflineTextBrush" Color="{StaticResource SaColorDangerTextLight}" />
             <SolidColorBrush x:Key="SaBorderNeutralBrush" Color="{StaticResource SaColorBorderNeutralLight}" />
             <SolidColorBrush x:Key="SaBorderSubtleBrush" Color="{StaticResource SaColorBorderSubtleLight}" />
             <SolidColorBrush x:Key="SaDividerBrush" Color="{StaticResource SaColorDividerLight}" />
@@ -168,6 +171,7 @@
             <SolidColorBrush x:Key="SaSuccessBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
             <SolidColorBrush x:Key="SaErrorBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
             <SolidColorBrush x:Key="SaOfflineBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="SaOfflineTextBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
             <SolidColorBrush x:Key="SaBorderNeutralBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
             <SolidColorBrush x:Key="SaBorderSubtleBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
             <SolidColorBrush x:Key="SaDividerBrush" Color="{ThemeResource SystemColorWindowTextColor}" />

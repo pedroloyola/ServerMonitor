@@ -166,6 +166,7 @@ public static class QaTokenManifest
         new("SaSuccessBrush", QaTokenKind.Brush),
         new("SaErrorBrush", QaTokenKind.Brush),
         new("SaOfflineBrush", QaTokenKind.Brush),
+        new("SaOfflineTextBrush", QaTokenKind.Brush),
         new("SaBorderNeutralBrush", QaTokenKind.Brush),
         new("SaBorderSubtleBrush", QaTokenKind.Brush),
         new("SaDividerBrush", QaTokenKind.Brush),

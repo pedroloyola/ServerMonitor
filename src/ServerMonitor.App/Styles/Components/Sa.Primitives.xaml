@@ -712,7 +712,8 @@
         <Setter Property="Foreground" Value="{ThemeResource SaDangerTextBrush}" />
     </Style>
     <Style x:Key="SaCompactStatusOfflineTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SaCompactStatusTextStyle}">
-        <Setter Property="Foreground" Value="{ThemeResource SaOfflineBrush}" />
+        <!-- UI.12 CONTRAST-01: a text token (Light >=4.5:1); the row dot keeps the coral SaOfflineBrush. -->
+        <Setter Property="Foreground" Value="{ThemeResource SaOfflineTextBrush}" />
     </Style>
 
     <!-- Compact "Expandir" 112:9430 / "Adicionar servidor" 112:9828: h36, pill (UI.10 F06; was SaRadiusControl), padding 14,0, 12 Medium, flat glass
