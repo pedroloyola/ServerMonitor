@@ -2,6 +2,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Controls;
+using ServerMonitor.App.Controls.Primitives;
 using ServerMonitor.App.Services;
 using ServerMonitor.App.ViewModels;
 
@@ -18,6 +19,12 @@ public sealed partial class ServersPage : Page, IDisposable
         _editorReturnFocus = editorReturnFocus;
         ViewModel = viewModel;
         DataContext = viewModel;
+        _returnNotice = new ReturnNoticeAnnouncer(
+            run => DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () => run()),
+            () => ViewModel.IsNoticeOpen,
+            () => ReturnNotice.Visibility == Visibility.Visible && SaLiveTree.IsLive(ReturnNotice),
+            () => AutomationProperties.GetName(ReturnNotice),
+            RaiseReturnNotice);
         // Released on Unloaded AND when navigation replaces the page (a page replaced before Loaded never unloads).
         Unloaded += (_, _) => Dispose();
         Loaded += OnLoaded;
@@ -47,7 +54,7 @@ public sealed partial class ServersPage : Page, IDisposable
         var editorOpener = _editorReturnFocus?.Take(NavigationDestination.Servers);
         if (ShellPageFocus.GetKeepSidebar(this))
         {
-            AnnounceReturnNoticeAfterFocus();
+            _returnNotice.AfterFocus();
             return;
         }
 
@@ -58,7 +65,7 @@ public sealed partial class ServersPage : Page, IDisposable
                 ShellPageFocus.FocusHeading(this);
             }
 
-            AnnounceReturnNoticeAfterFocus();
+            _returnNotice.AfterFocus();
         });
     }
 
@@ -68,36 +75,15 @@ public sealed partial class ServersPage : Page, IDisposable
     /// <summary>UI.12 B12B-02-R (Cortex: WinUI InfoBar's choice for success): do not cut off the heading being read.</summary>
     internal const AutomationNotificationProcessing ReturnNoticeProcessing = AutomationNotificationProcessing.CurrentThenMostRecent;
 
-    private bool _returnNoticeAnnounced;
-
     // UI.12 B12B-02-R (real Narrator: only the page heading was heard after Ocultar): the notice arrives with the page entry,
     // and a polite live region raised in the same turn as the focus change is dropped. So the toast does not announce
-    // itself (AnnouncesItself="False"); the page raises its text once as a notification in the turn AFTER its focus
-    // decision. Only when the Detail's own Ocultar / Remover succeeded (the notice exists only then).
-    private void AnnounceReturnNoticeAfterFocus()
-    {
-        if (!ViewModel.IsNoticeOpen)
-        {
-            return;
-        }
+    // itself (AnnouncesItself="False"); after the focus decision the page raises its text once as a notification, in a
+    // later turn (ReturnNoticeAnnouncer). Only when the Detail's own Ocultar / Remover succeeded (the notice exists only then).
+    private readonly ReturnNoticeAnnouncer _returnNotice;
 
-        DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
-        {
-            var content = AutomationProperties.GetName(ReturnNotice);
-            if (!ShouldAnnounceReturnNotice(_returnNoticeAnnounced, ViewModel.IsNoticeOpen, content)
-                || (FrameworkElementAutomationPeer.FromElement(ReturnNotice) ?? FrameworkElementAutomationPeer.CreatePeerForElement(ReturnNotice)) is not { } peer)
-            {
-                return;
-            }
-
-            _returnNoticeAnnounced = true;
-            peer.RaiseNotificationEvent(AutomationNotificationKind.ActionCompleted, ReturnNoticeProcessing, content, ReturnNoticeActivityId);
-        });
-    }
-
-    /// <summary>Pure rule (unit-tested): once per page, only while the notice is open and has something to say.</summary>
-    internal static bool ShouldAnnounceReturnNotice(bool announced, bool noticeOpen, string? content) =>
-        !announced && noticeOpen && !string.IsNullOrWhiteSpace(content);
+    private void RaiseReturnNotice(string content) =>
+        (FrameworkElementAutomationPeer.FromElement(ReturnNotice) ?? FrameworkElementAutomationPeer.CreatePeerForElement(ReturnNotice))
+            ?.RaiseNotificationEvent(AutomationNotificationKind.ActionCompleted, ReturnNoticeProcessing, content, ReturnNoticeActivityId);
 
     // Beacon r1 SHOULD-5: Wide/Mid/Stacked swap the row template, which recreates the rows and would drop focus to the
     // top of the window; the focused row keeps focus across the reflow.
@@ -141,7 +127,11 @@ public sealed partial class ServersPage : Page, IDisposable
     public ServersViewModel ViewModel { get; }
 
     /// <summary>Idempotent: the view model unsubscribes once.</summary>
-    public void Dispose() => ViewModel.Dispose();
+    public void Dispose()
+    {
+        _returnNotice.Close(); // Atlas L1: an announcement still queued for this page is never said after it left
+        ViewModel.Dispose();
+    }
 
 
     // "Limpar pesquisa" disappears once it worked; focus returns to the search box (UI.3 pattern).
