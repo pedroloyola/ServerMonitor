@@ -364,17 +364,10 @@ public sealed partial class ServerFormControl : UserControl
                 }
 
                 var browse = new MenuFlyoutItem { Text = option.Label };
-                browse.Click += async (_, _) =>
-                {
-                    if (jump)
-                    {
-                        await viewModel.SelectJumpPrivateKeyAsync();
-                    }
-                    else
-                    {
-                        await viewModel.SelectPrivateKeyAsync();
-                    }
-                };
+                // UI.12 C-L8: the picker is a platform call; a failure must not end the process.
+                browse.Click += async (_, _) => await UiFireAndForget.RunAsync(
+                    "editor key picker",
+                    jump ? viewModel.SelectJumpPrivateKeyAsync : viewModel.SelectPrivateKeyAsync);
                 menu.Items.Add(browse);
                 continue;
             }

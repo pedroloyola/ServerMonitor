@@ -132,9 +132,10 @@ public sealed class Ui7FinalC2Tests
         Assert.Contains("if (!_disposed && !_saving && Request is not null)", controller, StringComparison.Ordinal);
         var header = Method(page, "private async void OnHeaderButtonClick", "private async void Submit()");
         Assert.Matches(new Regex(@"if \(_controller\.IsSaving\)\s*\{\s*return;\s*\}"), header); // final c3: the check AND its return
+        // UI.12 C-L8: the import is now passed to the fire-and-forget guard (method group), hence the prefix below.
         var guard = header.IndexOf("if (_controller.IsSaving)", StringComparison.Ordinal);
         Assert.True(guard >= 0 && guard < header.IndexOf("_controller.Cancel();", StringComparison.Ordinal)
-            && guard < header.IndexOf("_controller.OpenImportAsync();", StringComparison.Ordinal), "the header button refuses while saving, first");
+            && guard < header.IndexOf("_controller.OpenImportAsync", StringComparison.Ordinal), "the header button refuses while saving, first");
     }
 
     // ---- B-2: "Continuar a editar" puts the focus back, every cycle ----

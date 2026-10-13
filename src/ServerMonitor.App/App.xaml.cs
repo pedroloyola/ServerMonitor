@@ -90,6 +90,10 @@ public partial class App : Application
         ServicesHost.Services
             .GetRequiredService<ILocalizationService>()
             .InitializeFromSystem();
+        // UI.12 C-L8: fire-and-forget UI failures are reported here (operation + exception type only, no message).
+        var uiFailureLogger = ServicesHost.Services.GetRequiredService<ILogger<App>>();
+        UiFireAndForget.Report = (operation, exceptionType) =>
+            uiFailureLogger.LogError("Unhandled failure in {Operation} ({ExceptionType}); the app keeps running.", operation, exceptionType);
         // Attach the router to the single activation hand-off now that it exists: this atomically flushes
         // the latest intent buffered before this App object was built (the cold launch, or a redirect that
         // raced construction). The router buffers it internally until the shell signals ready (§M-1).

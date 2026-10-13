@@ -63,7 +63,7 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
         };
         TestPanel.Configure(localization);
         TestPanel.CloseRequested += (_, _) => CloseLayer();
-        TestPanel.RetryRequested += async (_, _) => await StartTestAsync();
+        TestPanel.RetryRequested += async (_, _) => await UiFireAndForget.RunAsync("editor retest", StartTestAsync);
         TestPanel.PrepHelpRequested += (_, anchor) => ServerForm.ShowPrepHelp(anchor);
         TrustPanel.Configure(localization);
         TrustPanel.AcceptRequested += OnTrustAcceptRequested;
@@ -470,7 +470,9 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
         TrustPanel.SetWorking(true, acceptAllowed: false);
         try
         {
-            await _controller.AcceptTrustAsync(shown);
+            // UI.12 C-L8: a failure here (e.g. an unreadable trust file, C-E15) must not end the process; the layer is
+            // re-evaluated from the view model's state either way.
+            await UiFireAndForget.RunAsync("editor trust", () => _controller.AcceptTrustAsync(shown));
         }
         finally
         {
@@ -625,7 +627,8 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
         }
     }
 
-    private async void OnTestClick(object sender, RoutedEventArgs e) => await StartTestAsync();
+    private async void OnTestClick(object sender, RoutedEventArgs e) =>
+        await UiFireAndForget.RunAsync("editor test", StartTestAsync);
 
     private void OnCancelClick(object sender, RoutedEventArgs e) => _controller.Cancel();
 
@@ -647,14 +650,19 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
         }
         else
         {
-            await _controller.OpenImportAsync();
+            await UiFireAndForget.RunAsync("editor import", _controller.OpenImportAsync);
         }
     }
 
     private async void Submit()
     {
         SetSaveFailed(null);
-        var outcome = await _controller.SubmitAsync(ServerForm.CaptureSecret);
+        ServerEditorSubmitOutcome? outcome = null;
+        // UI.12 C-L8: an unexpected exception reads as "not saved" (the existing notice), never as a crash.
+        await UiFireAndForget.RunAsync(
+            "editor save",
+            async () => outcome = await _controller.SubmitAsync(ServerForm.CaptureSecret),
+            onFailed: () => outcome = new ServerEditorSubmitOutcome(ServerEditorSaveStatus.Failed));
         if (outcome is null || _disposed)
         {
             return;
