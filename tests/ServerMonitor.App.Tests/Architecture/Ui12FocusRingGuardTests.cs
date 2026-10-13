@@ -57,6 +57,21 @@ public sealed class Ui12FocusRingGuardTests
         Assert.Equal("{ThemeResource SystemColorWindowColor}", brush["HighContrast"]);
     }
 
+    /// <summary>UI.12 B12-10 (Beacon): the programmatic heading focus draws the app ring, not the square system default.</summary>
+    [Fact]
+    public void HeadingHostDrawsTheAppRing()
+    {
+        var style = AppSourceTree.LoadXaml("Styles/Components/Sa.Primitives.xaml").Descendants()
+            .Single(e => e.Name.LocalName == "Style" && (string?)e.Attribute("TargetType") == "primitives:SaHeadingHost");
+        var setters = style.Elements().Where(e => e.Name.LocalName == "Setter")
+            .ToDictionary(s => (string)s.Attribute("Property")!, s => (string?)s.Attribute("Value") ?? "", StringComparer.Ordinal);
+
+        Assert.Equal("{ThemeResource SaFocusRingBrush}", setters["FocusVisualPrimaryBrush"]);
+        Assert.Equal("{StaticResource SaFocusRingThickness}", setters["FocusVisualPrimaryThickness"]);
+        Assert.Equal("{StaticResource SaRadiusSmall}", setters["CornerRadius"]);
+        Assert.DoesNotContain("DefaultStyleKey = typeof(SaHeadingHost)", AppSourceTree.CodeWithoutComments("Controls/Primitives/SaHeadingHost.cs"), StringComparison.Ordinal);
+    }
+
     private static Dictionary<string, string> ThemeEntries(string file, string key, Func<XElement, string> value) =>
         AppSourceTree.LoadXaml(file).Descendants()
             .Where(e => e.Name.LocalName == "ResourceDictionary" && e.Attribute(AppSourceTree.Xaml + "Key") is not null)

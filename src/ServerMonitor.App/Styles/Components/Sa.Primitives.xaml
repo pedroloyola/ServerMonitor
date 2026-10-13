@@ -626,6 +626,18 @@
         <Setter Property="CornerRadius" Value="{StaticResource SaRadiusSmall}" />
     </Style>
 
+    <!-- UI.12 B12-10 (Beacon): the programmatic heading focus (SaHeadingHost.FocusHeading, launches/activations without
+         input) drew the default square system rectangle; it now draws the app ring (SaFocusRingBrush 2 px, HC-only inner
+         ring, small radius) like every other Sa focus target. Implicit style: the template stays ContentControl's. -->
+    <Style TargetType="primitives:SaHeadingHost">
+        <Setter Property="UseSystemFocusVisuals" Value="True" />
+        <Setter Property="FocusVisualPrimaryBrush" Value="{ThemeResource SaFocusRingBrush}" />
+        <Setter Property="FocusVisualPrimaryThickness" Value="{StaticResource SaFocusRingThickness}" />
+        <Setter Property="FocusVisualSecondaryThickness" Value="{ThemeResource SaFocusVisualSecondaryThickness}" />
+        <Setter Property="FocusVisualSecondaryBrush" Value="{ThemeResource SaFocusRingSecondaryBrush}" />
+        <Setter Property="CornerRadius" Value="{StaticResource SaRadiusSmall}" />
+    </Style>
+
     <!-- Breadcrumb 112:1786 / 112:2023: h22, gap 8, parent 12 muted, chevron 14, current 12 text. -->
     <Style TargetType="primitives:SaBreadcrumb">
         <Setter Property="IsTabStop" Value="False" />
