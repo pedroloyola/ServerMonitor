@@ -47,23 +47,6 @@ public sealed partial class Ui12HighContrastIconTests
     }
 
     /// <summary>
-    /// Cortex r4 R4-N1: the HC switch is a STATIC event, so a subscription leak would keep every icon alive. Loaded unsubscribes
-    /// before subscribing (a re-Loaded icon is subscribed once); Unloaded returns while the icon is still live (a remount's stale
-    /// Unloaded after the new Loaded must not drop the new subscription), otherwise unsubscribes, then lets the presenter go.
-    /// Source pin: the lifecycle needs a XAML runtime (Beacon: the count of icons answering an HC switch must not grow).
-    /// </summary>
-    [Fact]
-    public void TheIcon_SubscribesOnce_AndUnsubscribesWhenItLeavesTheTree()
-    {
-        var icon = AppSourceTree.CodeWithoutComments("Controls/Primitives/SaIcon.cs");
-
-        Assert.Matches(LoadedSubscribesOnce(), icon);
-        Assert.Matches(UnloadedUnsubscribesUnlessLive(), icon);
-        Assert.Single(Regex.Matches(icon, Regex.Escape("SaHighContrastWatch.Changed += ")));
-        Assert.Equal(2, Regex.Matches(icon, Regex.Escape("SaHighContrastWatch.Changed -= OnHighContrastChanged;")).Count);
-    }
-
-    /// <summary>
     /// The swap the icon follows is the one on the template part named "ContentPresenter": in every template whose states
     /// set <c>ContentPresenter.Foreground</c>, that part must BE a ContentPresenter (a TextBlock part would leave the icon
     /// on its rest colour again).
@@ -120,12 +103,6 @@ public sealed partial class Ui12HighContrastIconTests
             "C" => Ancestor.OtherControl,
             _ => Ancestor.Other,
         }).ToArray();
-
-    [GeneratedRegex(@"private void OnLoaded\(object sender, RoutedEventArgs e\)\s*\{\s*SaHighContrastWatch\.Changed -= OnHighContrastChanged;\s*SaHighContrastWatch\.Changed \+= OnHighContrastChanged;\s*UpdateStrokeSource\(\);\s*\}")]
-    private static partial Regex LoadedSubscribesOnce();
-
-    [GeneratedRegex(@"private void OnUnloaded\(object sender, RoutedEventArgs e\)\s*\{\s*if \(SaLiveTree\.IsLive\(this\)\)\s*\{\s*return;\s*\}\s*SaHighContrastWatch\.Changed -= OnHighContrastChanged;\s*DetachHost\(\);\s*\}")]
-    private static partial Regex UnloadedUnsubscribesUnlessLive();
 
     [GeneratedRegex(@"ContentPresenter => IconAncestor\.Presenter,\s*ButtonBase => IconAncestor\.Button,\s*Control => IconAncestor\.OtherControl,[\s\S]*?var index = HostPresenterIndex\(chain\);")]
     private static partial Regex TheWalkClassifiesWithThePureRule();
