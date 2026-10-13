@@ -36,25 +36,45 @@ public sealed partial class Ui12StatusTextContrastTests
         Assert.True(failures.Count == 0, string.Join(Environment.NewLine, failures));
     }
 
+    /// <summary>
+    /// R2 N1 (Cortex): the brush is resolved IN EACH THEME'S DICTIONARY and measured against THAT theme's row and surfaces -
+    /// a Dark/Light swap of the token (Light text #FF858D on a light surface) must fail, not pass on "some entry matches".
+    /// </summary>
     [Theory]
-    [InlineData("SaColorDangerTextLight", "SaColorCompactRowLight", "SaColorCanvasLight")]
-    [InlineData("SaColorDangerTextLight", "SaColorCompactRowLight", "SaColorSurfaceLight")]
-    [InlineData("SaColorDangerTextLight", "SaColorCompactRowLight", "SaColorElevatedSurfaceLight")]
-    [InlineData("SaColorOfflineDark", "SaColorCompactRowDark", "SaColorCanvasDark")]
-    [InlineData("SaColorOfflineDark", "SaColorCompactRowDark", "SaColorSurfaceDark")]
-    [InlineData("SaColorOfflineDark", "SaColorCompactRowDark", "SaColorElevatedSurfaceDark")]
-    public void OfflineStatusTextMeetsTextContrastOnTheCompactRow(string text, string row, string surface)
+    [InlineData("Light", "SaColorCanvasLight")]
+    [InlineData("Light", "SaColorSurfaceLight")]
+    [InlineData("Light", "SaColorElevatedSurfaceLight")]
+    [InlineData("Dark", "SaColorCanvasDark")]
+    [InlineData("Dark", "SaColorSurfaceDark")]
+    [InlineData("Dark", "SaColorElevatedSurfaceDark")]
+    public void OfflineStatusTextMeetsTextContrastOnTheCompactRow(string theme, string surface)
     {
         var colours = AppSourceTree.LoadXaml("Styles/Tokens/Color.Primitives.xaml").Descendants()
             .Where(e => e.Name.LocalName == "Color")
             .ToDictionary(e => (string)e.Attribute(AppSourceTree.Xaml + "Key")!, e => e.Value.Trim(), StringComparer.Ordinal);
-        var semantic = AppSourceTree.LoadXaml("Styles/Tokens/Color.Semantic.xaml").Descendants()
-            .Where(e => e.Name.LocalName == "SolidColorBrush" && (string?)e.Attribute(AppSourceTree.Xaml + "Key") == "SaOfflineTextBrush")
-            .Select(e => (string)e.Attribute("Color")!).ToList();
-        Assert.Contains("{StaticResource " + text + "}", semantic);
+        var text = colours[PrimitiveOf(ThemeBrushColour(theme, "SaOfflineTextBrush"))];
+        var row = colours[PrimitiveOf(ThemeBrushColour(theme, "SaCompactRowBrush"))];
 
-        var ratio = Contrast(colours[text], Over(colours[row], colours[surface]));
-        Assert.True(ratio >= 4.5, $"{text} on {row} over {surface}: {ratio:0.00}:1");
+        var ratio = Contrast(text, Over(row, colours[surface]));
+        Assert.True(ratio >= 4.5, $"{theme}: SaOfflineTextBrush {text} on the Compact row over {surface}: {ratio:0.00}:1");
+    }
+
+    [Fact]
+    public void OfflineStatusTextIsWindowTextInHighContrast() =>
+        Assert.Equal("{ThemeResource SystemColorWindowTextColor}", ThemeBrushColour("HighContrast", "SaOfflineTextBrush"));
+
+    // The Color attribute of a brush key inside ONE theme dictionary of Color.Semantic.xaml.
+    private static string ThemeBrushColour(string theme, string key) =>
+        (string)AppSourceTree.LoadXaml("Styles/Tokens/Color.Semantic.xaml").Descendants()
+            .Single(d => d.Name.LocalName == "ResourceDictionary" && (string?)d.Attribute(AppSourceTree.Xaml + "Key") == theme)
+            .Elements().Single(b => (string?)b.Attribute(AppSourceTree.Xaml + "Key") == key)
+            .Attribute("Color")!;
+
+    private static string PrimitiveOf(string markup)
+    {
+        var match = Regex.Match(markup, @"\A\{StaticResource (Sa\w+)\}\z");
+        Assert.True(match.Success, $"expected a primitive colour reference, got {markup}");
+        return match.Groups[1].Value;
     }
 
     [GeneratedRegex(@"\{ThemeResource Sa(Healthy|Attention|Error|Offline|Cpu|Memory|Disk)Brush\}")]
