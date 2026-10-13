@@ -83,7 +83,7 @@ public sealed class Ui6C1ContractTests
     public void ReturnSlot_IsConsumedBeforeKeepingSidebar(string page, string take)
     {
         var code=AppSourceTree.CodeWithoutComments("Views/"+page+"Page.xaml.cs");
-        Assert.True(code.IndexOf(take,StringComparison.Ordinal)<code.IndexOf("if (ShellPageFocus.GetKeepSidebar(this)) return;",StringComparison.Ordinal));
+        Assert.True(code.IndexOf(take,StringComparison.Ordinal)<code.IndexOf("if (ShellPageFocus.GetKeepSidebar(this))",StringComparison.Ordinal)); // UI.12 B12B-02-R: Servers announces its notice there
     }
     [Fact]
     public void Sidebar_ConnectsProjectionAndRailOnlyTooltip()

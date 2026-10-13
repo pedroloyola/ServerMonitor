@@ -30,8 +30,10 @@ public sealed class JsonIgnoredDeviceStore(
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            await EnsureLoadedAsync(cancellationToken).ConfigureAwait(false);
-            return new HashSet<string>(_entries!, StringComparer.Ordinal);
+            // A transient read failure shows nothing as ignored this time and is retried on the next load (UI.12 C-E5).
+            return await EnsureLoadedAsync(cancellationToken).ConfigureAwait(false)
+                ? new HashSet<string>(_entries!, StringComparer.Ordinal)
+                : new HashSet<string>(StringComparer.Ordinal);
         }
         finally
         {
@@ -50,7 +52,14 @@ public sealed class JsonIgnoredDeviceStore(
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            await EnsureLoadedAsync(cancellationToken).ConfigureAwait(false);
+            if (!await EnsureLoadedAsync(cancellationToken).ConfigureAwait(false))
+            {
+                // UI.12 C-E5: the persisted set is unknown (transient read failure). Writing "unknown ∪ {new}" would
+                // replace the file and silently drop every device ignored before; refuse until a read succeeds.
+                logger.LogWarning("Ignored-devices file is unreadable right now; not ignoring a new device until it can be read.");
+                return false;
+            }
+
             if (_entries!.Contains(identityHash))
             {
                 return true; // Already ignored and persisted.
@@ -87,8 +96,8 @@ public sealed class JsonIgnoredDeviceStore(
         try
         {
             // Always rewrite to a clean empty file, even if the loaded set is already empty: a
-            // corrupt or oversize file is ignored on load, so only an unconditional save repairs it.
-            await EnsureLoadedAsync(cancellationToken).ConfigureAwait(false);
+            // corrupt or oversize file is ignored on load, so only an unconditional save repairs it. The user asked to
+            // clear the list, so an unreadable file does not block it.
             var candidate = new HashSet<string>(StringComparer.Ordinal);
             await SaveAsync(candidate, cancellationToken).ConfigureAwait(false);
             _entries = candidate;
@@ -101,17 +110,22 @@ public sealed class JsonIgnoredDeviceStore(
 
     public void Dispose() => _gate.Dispose();
 
-    private async Task EnsureLoadedAsync(CancellationToken cancellationToken)
+    /// <summary>
+    /// Loads the committed set once. Returns false - and caches NOTHING - when the file exists but could not be read for
+    /// an I/O reason (sharing violation, transient storage error): the set on disk is unknown, not empty (UI.12 C-E5).
+    /// A malformed or oversize file is still treated as empty, as before (only an explicit reset repairs it).
+    /// </summary>
+    private async Task<bool> EnsureLoadedAsync(CancellationToken cancellationToken)
     {
         if (_entries is not null)
         {
-            return;
+            return true;
         }
 
         if (!File.Exists(storageOptions.FilePath))
         {
             _entries = new HashSet<string>(StringComparer.Ordinal);
-            return;
+            return true;
         }
 
         try
@@ -123,7 +137,7 @@ public sealed class JsonIgnoredDeviceStore(
                     "Ignored-devices file exceeds {Max} bytes; starting from an empty ignore set.",
                     DiscoveryInputPolicy.MaxIgnoreFileBytes);
                 _entries = new HashSet<string>(StringComparer.Ordinal);
-                return;
+                return true;
             }
 
             await using var stream = new FileStream(
@@ -154,13 +168,22 @@ public sealed class JsonIgnoredDeviceStore(
             }
 
             _entries = loaded;
+            return true;
         }
-        catch (Exception exception) when (exception is JsonException or IOException)
+        catch (JsonException exception)
         {
             logger.LogWarning(
                 "Ignored-devices file could not be read ({Type}); starting from an empty ignore set.",
                 exception.GetType().Name);
             _entries = new HashSet<string>(StringComparer.Ordinal);
+            return true;
+        }
+        catch (IOException exception)
+        {
+            logger.LogWarning(
+                "Ignored-devices file could not be read ({Type}); it will be read again on the next use.",
+                exception.GetType().Name);
+            return false;
         }
     }
 

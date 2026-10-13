@@ -35,6 +35,8 @@ public sealed class SaInlineNotice : ContentControl
         IsTabStop = false;
         // UI.11 F10 transient, entrance only: rises in when it appears (never at first presentation or on refresh).
         SaMotion.SetEnter(this, SaMotionEnter.Rise);
+        // UI.12 LIVE-01: most notices have fixed x:Uid text and only toggle Visibility; announce when they appear.
+        RegisterPropertyChangedCallback(VisibilityProperty, (_, _) => SaAnnounce.RaiseAfterLayout(this));
     }
 
     public SaNoticeSeverity Severity
@@ -87,7 +89,7 @@ public sealed class SaInlineNotice : ContentControl
         VisualStateManager.GoToState(this, error ? "Error" : "Info", useTransitions: false);
         if (IsLoaded)
         {
-            FrameworkElementAutomationPeer.FromElement(this)?.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
+            SaAnnounce.RaiseAfterLayout(this);
         }
     }
 }

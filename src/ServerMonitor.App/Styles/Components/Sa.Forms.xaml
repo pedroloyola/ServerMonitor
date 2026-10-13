@@ -29,13 +29,14 @@
                     <!-- DERIVED: hover = SaHoverBrush veil over the fill. -->
                     <VisualState x:Name="PointerOver">
                         <VisualState.Setters>
-                            <Setter Target="HoverOverlay.Background" Value="{ThemeResource SaHoverBrush}" />
+                            <Setter Target="HoverOverlay.Background" Value="{ThemeResource SaHoverVeilBrush}" />
                         </VisualState.Setters>
                     </VisualState>
                     <!-- DERIVED (no Figma focus node): 2px SaFocusRingBrush ring over the border, so an Error border survives. -->
                     <VisualState x:Name="Focused">
                         <VisualState.Setters>
                             <Setter Target="FocusRing.Opacity" Value="1" />
+                            <Setter Target="OuterFocusRing.Opacity" Value="1" />
                         </VisualState.Setters>
                     </VisualState>
                     <VisualState x:Name="Disabled">
@@ -75,6 +76,15 @@
                     BorderThickness="{StaticResource SaFocusRingThickness}"
                     Opacity="0"
                     IsHitTestVisible="False" />
+            <!-- UI.12 FOCUS-02 (Prism UI12A): on an INVALID field the inner ring keeps the danger edge, so focus is shown by a
+                 second ring 4 px outside it (SaFieldChrome.OuterFocusRingBrush; null = not drawn, every non-error style). -->
+            <Border x:Name="OuterFocusRing"
+                    Margin="-4"
+                    CornerRadius="{TemplateBinding CornerRadius}"
+                    BorderBrush="{Binding Path=(primitives:SaFieldChrome.OuterFocusRingBrush), RelativeSource={RelativeSource TemplatedParent}}"
+                    BorderThickness="{StaticResource SaFocusRingThickness}"
+                    Opacity="0"
+                    IsHitTestVisible="False" />
         </Grid>
     </ControlTemplate>
     <ControlTemplate x:Key="SaPageSearchFieldTemplate" TargetType="TextBox">
@@ -85,7 +95,7 @@
                     <!-- DERIVED: hover = SaHoverBrush veil over the fill. -->
                     <VisualState x:Name="PointerOver">
                         <VisualState.Setters>
-                            <Setter Target="HoverOverlay.Background" Value="{ThemeResource SaHoverBrush}" />
+                            <Setter Target="HoverOverlay.Background" Value="{ThemeResource SaHoverVeilBrush}" />
                         </VisualState.Setters>
                     </VisualState>
                     <!-- DERIVED (no Figma focus node): 2px SaFocusRingBrush ring over the border, so an Error border survives. -->
@@ -141,7 +151,7 @@
                     <!-- DERIVED: hover = SaHoverBrush veil over the fill. -->
                     <VisualState x:Name="PointerOver">
                         <VisualState.Setters>
-                            <Setter Target="HoverOverlay.Background" Value="{ThemeResource SaHoverBrush}" />
+                            <Setter Target="HoverOverlay.Background" Value="{ThemeResource SaHoverVeilBrush}" />
                         </VisualState.Setters>
                     </VisualState>
                     <!-- DERIVED (no Figma focus node): 2px SaFocusRingBrush ring over the border, so an Error border survives. -->
@@ -197,13 +207,14 @@
                     <!-- DERIVED: hover = SaHoverBrush veil over the fill. -->
                     <VisualState x:Name="PointerOver">
                         <VisualState.Setters>
-                            <Setter Target="HoverOverlay.Background" Value="{ThemeResource SaHoverBrush}" />
+                            <Setter Target="HoverOverlay.Background" Value="{ThemeResource SaHoverVeilBrush}" />
                         </VisualState.Setters>
                     </VisualState>
                     <!-- DERIVED (no Figma focus node): 2px SaFocusRingBrush ring over the border, so an Error border survives. -->
                     <VisualState x:Name="Focused">
                         <VisualState.Setters>
                             <Setter Target="FocusRing.Opacity" Value="1" />
+                            <Setter Target="OuterFocusRing.Opacity" Value="1" />
                         </VisualState.Setters>
                     </VisualState>
                     <VisualState x:Name="Disabled">
@@ -243,6 +254,15 @@
                     BorderThickness="{StaticResource SaFocusRingThickness}"
                     Opacity="0"
                     IsHitTestVisible="False" />
+            <!-- UI.12 FOCUS-02 (Prism UI12A): on an INVALID field the inner ring keeps the danger edge, so focus is shown by a
+                 second ring 4 px outside it (SaFieldChrome.OuterFocusRingBrush; null = not drawn, every non-error style). -->
+            <Border x:Name="OuterFocusRing"
+                    Margin="-4"
+                    CornerRadius="{TemplateBinding CornerRadius}"
+                    BorderBrush="{Binding Path=(primitives:SaFieldChrome.OuterFocusRingBrush), RelativeSource={RelativeSource TemplatedParent}}"
+                    BorderThickness="{StaticResource SaFocusRingThickness}"
+                    Opacity="0"
+                    IsHitTestVisible="False" />
         </Grid>
     </ControlTemplate>
 
@@ -268,6 +288,7 @@
         <Setter Property="BorderBrush" Value="{ThemeResource SaErrorBrush}" />
         <Setter Property="BorderThickness" Value="{StaticResource SaErrorBorderThickness}" />
         <Setter Property="primitives:SaFieldChrome.FocusRingBrush" Value="{ThemeResource SaErrorBrush}" />
+        <Setter Property="primitives:SaFieldChrome.OuterFocusRingBrush" Value="{ThemeResource SaFocusRingBrush}" />
     </Style>
     <!-- SearchField Page 112:1429 / 112:1611: h44, radius 14, pad-L 16, gap 10, search fill, no border, icon 18. -->
     <Style x:Key="SaPageSearchFieldStyle" TargetType="TextBox" BasedOn="{StaticResource SaTextFieldStyle}">
@@ -309,6 +330,7 @@
         <Setter Property="BorderBrush" Value="{ThemeResource SaErrorBrush}" />
         <Setter Property="BorderThickness" Value="{StaticResource SaErrorBorderThickness}" />
         <Setter Property="primitives:SaFieldChrome.FocusRingBrush" Value="{ThemeResource SaErrorBrush}" />
+        <Setter Property="primitives:SaFieldChrome.OuterFocusRingBrush" Value="{ThemeResource SaFocusRingBrush}" />
     </Style>
     <!-- Eye toggle of SaPasswordField: 28x28, no fill, muted icon; checked (revealed) = text colour. DERIVED states. -->
     <Style x:Key="SaRevealToggleStyle" TargetType="ToggleButton">
@@ -320,7 +342,8 @@
         <Setter Property="UseSystemFocusVisuals" Value="True" />
         <Setter Property="FocusVisualPrimaryBrush" Value="{ThemeResource SaFocusRingBrush}" />
         <Setter Property="FocusVisualPrimaryThickness" Value="{StaticResource SaFocusRingThickness}" />
-        <Setter Property="FocusVisualSecondaryThickness" Value="0" />
+        <Setter Property="FocusVisualSecondaryThickness" Value="{ThemeResource SaFocusVisualSecondaryThickness}" />
+        <Setter Property="FocusVisualSecondaryBrush" Value="{ThemeResource SaFocusRingSecondaryBrush}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ToggleButton">
@@ -330,12 +353,12 @@
                                 <VisualState x:Name="Normal" />
                                 <VisualState x:Name="PointerOver">
                                     <VisualState.Setters>
-                                        <Setter Target="RootGrid.Background" Value="{ThemeResource SaHoverBrush}" />
+                                        <Setter Target="RootGrid.Background" Value="{ThemeResource SaHoverVeilBrush}" />
                                     </VisualState.Setters>
                                 </VisualState>
                                 <VisualState x:Name="Pressed">
                                     <VisualState.Setters>
-                                        <Setter Target="RootGrid.Background" Value="{ThemeResource SaSelectedBrush}" />
+                                        <Setter Target="RootGrid.Background" Value="{ThemeResource SaSelectedVeilBrush}" />
                                     </VisualState.Setters>
                                 </VisualState>
                                 <VisualState x:Name="Disabled">
@@ -350,13 +373,13 @@
                                 </VisualState>
                                 <VisualState x:Name="CheckedPointerOver">
                                     <VisualState.Setters>
-                                        <Setter Target="RootGrid.Background" Value="{ThemeResource SaHoverBrush}" />
+                                        <Setter Target="RootGrid.Background" Value="{ThemeResource SaHoverVeilBrush}" />
                                         <Setter Target="ContentPresenter.Foreground" Value="{ThemeResource SaTextBrush}" />
                                     </VisualState.Setters>
                                 </VisualState>
                                 <VisualState x:Name="CheckedPressed">
                                     <VisualState.Setters>
-                                        <Setter Target="RootGrid.Background" Value="{ThemeResource SaSelectedBrush}" />
+                                        <Setter Target="RootGrid.Background" Value="{ThemeResource SaSelectedVeilBrush}" />
                                         <Setter Target="ContentPresenter.Foreground" Value="{ThemeResource SaTextBrush}" />
                                     </VisualState.Setters>
                                 </VisualState>
@@ -389,7 +412,8 @@
         <Setter Property="UseSystemFocusVisuals" Value="True" />
         <Setter Property="FocusVisualPrimaryBrush" Value="{ThemeResource SaFocusRingBrush}" />
         <Setter Property="FocusVisualPrimaryThickness" Value="{StaticResource SaFocusRingThickness}" />
-        <Setter Property="FocusVisualSecondaryThickness" Value="0" />
+        <Setter Property="FocusVisualSecondaryThickness" Value="{ThemeResource SaFocusVisualSecondaryThickness}" />
+        <Setter Property="FocusVisualSecondaryBrush" Value="{ThemeResource SaFocusRingSecondaryBrush}" />
         <Setter Property="Height" Value="40" />
         <Setter Property="MinWidth" Value="200" />
         <Setter Property="Padding" Value="14,0,0,0" />
@@ -456,7 +480,8 @@
         <Setter Property="UseSystemFocusVisuals" Value="True" />
         <Setter Property="FocusVisualPrimaryBrush" Value="{ThemeResource SaFocusRingBrush}" />
         <Setter Property="FocusVisualPrimaryThickness" Value="{StaticResource SaFocusRingThickness}" />
-        <Setter Property="FocusVisualSecondaryThickness" Value="0" />
+        <Setter Property="FocusVisualSecondaryThickness" Value="{ThemeResource SaFocusVisualSecondaryThickness}" />
+        <Setter Property="FocusVisualSecondaryBrush" Value="{ThemeResource SaFocusRingSecondaryBrush}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="CheckBox">
@@ -470,12 +495,12 @@
                                 <VisualState x:Name="UncheckedNormal" />
                                 <VisualState x:Name="UncheckedPointerOver">
                                     <VisualState.Setters>
-                                        <Setter Target="Box.Background" Value="{ThemeResource SaHoverBrush}" />
+                                        <Setter Target="Box.Background" Value="{ThemeResource SaHoverVeilBrush}" />
                                     </VisualState.Setters>
                                 </VisualState>
                                 <VisualState x:Name="UncheckedPressed">
                                     <VisualState.Setters>
-                                        <Setter Target="Box.Background" Value="{ThemeResource SaSelectedBrush}" />
+                                        <Setter Target="Box.Background" Value="{ThemeResource SaSelectedVeilBrush}" />
                                     </VisualState.Setters>
                                 </VisualState>
                                 <VisualState x:Name="UncheckedDisabled">
@@ -522,13 +547,13 @@
                                 <VisualState x:Name="IndeterminatePointerOver">
                                     <VisualState.Setters>
                                         <Setter Target="IndeterminateGlyph.Opacity" Value="1" />
-                                        <Setter Target="Box.Background" Value="{ThemeResource SaHoverBrush}" />
+                                        <Setter Target="Box.Background" Value="{ThemeResource SaHoverVeilBrush}" />
                                     </VisualState.Setters>
                                 </VisualState>
                                 <VisualState x:Name="IndeterminatePressed">
                                     <VisualState.Setters>
                                         <Setter Target="IndeterminateGlyph.Opacity" Value="1" />
-                                        <Setter Target="Box.Background" Value="{ThemeResource SaSelectedBrush}" />
+                                        <Setter Target="Box.Background" Value="{ThemeResource SaSelectedVeilBrush}" />
                                     </VisualState.Setters>
                                 </VisualState>
                                 <VisualState x:Name="IndeterminateDisabled">
@@ -576,7 +601,8 @@
         <Setter Property="UseSystemFocusVisuals" Value="True" />
         <Setter Property="FocusVisualPrimaryBrush" Value="{ThemeResource SaFocusRingBrush}" />
         <Setter Property="FocusVisualPrimaryThickness" Value="{StaticResource SaFocusRingThickness}" />
-        <Setter Property="FocusVisualSecondaryThickness" Value="0" />
+        <Setter Property="FocusVisualSecondaryThickness" Value="{ThemeResource SaFocusVisualSecondaryThickness}" />
+        <Setter Property="FocusVisualSecondaryBrush" Value="{ThemeResource SaFocusRingSecondaryBrush}" />
         <Setter Property="FocusVisualMargin" Value="-3" />
         <Setter Property="Template">
             <Setter.Value>
@@ -591,12 +617,12 @@
                                 <VisualState x:Name="Normal" />
                                 <VisualState x:Name="PointerOver">
                                     <VisualState.Setters>
-                                        <Setter Target="SwitchAreaGrid.Background" Value="{ThemeResource SaHoverBrush}" />
+                                        <Setter Target="SwitchAreaGrid.Background" Value="{ThemeResource SaHoverVeilBrush}" />
                                     </VisualState.Setters>
                                 </VisualState>
                                 <VisualState x:Name="Pressed">
                                     <VisualState.Setters>
-                                        <Setter Target="SwitchAreaGrid.Background" Value="{ThemeResource SaSelectedBrush}" />
+                                        <Setter Target="SwitchAreaGrid.Background" Value="{ThemeResource SaSelectedVeilBrush}" />
                                     </VisualState.Setters>
                                 </VisualState>
                                 <VisualState x:Name="Disabled">
@@ -764,7 +790,8 @@
         <Setter Property="UseSystemFocusVisuals" Value="True" />
         <Setter Property="FocusVisualPrimaryBrush" Value="{ThemeResource SaFocusRingBrush}" />
         <Setter Property="FocusVisualPrimaryThickness" Value="{StaticResource SaFocusRingThickness}" />
-        <Setter Property="FocusVisualSecondaryThickness" Value="0" />
+        <Setter Property="FocusVisualSecondaryThickness" Value="{ThemeResource SaFocusVisualSecondaryThickness}" />
+        <Setter Property="FocusVisualSecondaryBrush" Value="{ThemeResource SaFocusRingSecondaryBrush}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="RadioButton">
@@ -774,13 +801,13 @@
                                 <VisualState x:Name="Normal" />
                                 <VisualState x:Name="PointerOver">
                                     <VisualState.Setters>
-                                        <Setter Target="StateOverlay.Background" Value="{ThemeResource SaHoverBrush}" />
+                                        <Setter Target="StateOverlay.Background" Value="{ThemeResource SaHoverVeilBrush}" />
                                     </VisualState.Setters>
                                 </VisualState>
                                 <VisualState x:Name="Pressed">
                                     <VisualState.Setters>
                                         <!-- R1 (Beacon F-5): pressed = overlay only (one step above hover), no content opacity. -->
-                                        <Setter Target="StateOverlay.Background" Value="{ThemeResource SaSelectedBrush}" />
+                                        <Setter Target="StateOverlay.Background" Value="{ThemeResource SaSelectedVeilBrush}" />
                                     </VisualState.Setters>
                                 </VisualState>
                                 <VisualState x:Name="Disabled">
@@ -846,7 +873,8 @@
         <Setter Property="UseSystemFocusVisuals" Value="True" />
         <Setter Property="FocusVisualPrimaryBrush" Value="{ThemeResource SaFocusRingBrush}" />
         <Setter Property="FocusVisualPrimaryThickness" Value="{StaticResource SaFocusRingThickness}" />
-        <Setter Property="FocusVisualSecondaryThickness" Value="0" />
+        <Setter Property="FocusVisualSecondaryThickness" Value="{ThemeResource SaFocusVisualSecondaryThickness}" />
+        <Setter Property="FocusVisualSecondaryBrush" Value="{ThemeResource SaFocusRingSecondaryBrush}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="RadioButton">
@@ -856,13 +884,13 @@
                                 <VisualState x:Name="Normal" />
                                 <VisualState x:Name="PointerOver">
                                     <VisualState.Setters>
-                                        <Setter Target="StateOverlay.Background" Value="{ThemeResource SaHoverBrush}" />
+                                        <Setter Target="StateOverlay.Background" Value="{ThemeResource SaHoverVeilBrush}" />
                                     </VisualState.Setters>
                                 </VisualState>
                                 <VisualState x:Name="Pressed">
                                     <VisualState.Setters>
                                         <!-- R1 (Beacon F-5): pressed = overlay only (one step above hover), no content opacity. -->
-                                        <Setter Target="StateOverlay.Background" Value="{ThemeResource SaSelectedBrush}" />
+                                        <Setter Target="StateOverlay.Background" Value="{ThemeResource SaSelectedVeilBrush}" />
                                     </VisualState.Setters>
                                 </VisualState>
                                 <VisualState x:Name="Disabled">
@@ -930,13 +958,13 @@
                                 <VisualState x:Name="Normal" />
                                 <VisualState x:Name="PointerOver">
                                     <VisualState.Setters>
-                                        <Setter Target="StateOverlay.Background" Value="{ThemeResource SaHoverBrush}" />
+                                        <Setter Target="StateOverlay.Background" Value="{ThemeResource SaHoverVeilBrush}" />
                                     </VisualState.Setters>
                                 </VisualState>
                                 <VisualState x:Name="Pressed">
                                     <VisualState.Setters>
                                         <!-- R1 (Beacon F-5): pressed = overlay only (one step above hover), no content opacity. -->
-                                        <Setter Target="StateOverlay.Background" Value="{ThemeResource SaSelectedBrush}" />
+                                        <Setter Target="StateOverlay.Background" Value="{ThemeResource SaSelectedVeilBrush}" />
                                     </VisualState.Setters>
                                 </VisualState>
                                 <VisualState x:Name="Disabled">

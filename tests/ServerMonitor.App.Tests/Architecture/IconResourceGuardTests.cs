@@ -131,15 +131,21 @@ public sealed partial class IconResourceGuardTests
         Assert.Equal(identity, SaIcon.IsIdentityScale(SaIcon.ScaleFor(size)));
     }
 
-    /// <summary>The template draws the stroke at exactly the constant width, never a Viewbox.</summary>
+    /// <summary>The template draws the stroke at exactly the constant width, never a Viewbox. UI.12 B12B-01: two paths
+    /// (today's and its High Contrast twin, Ui12HighContrastIconTests), both at the constant width.</summary>
     [Fact]
     public void IconTemplateStrokesAtTheConstantWidthWithoutAViewbox()
     {
         var style = AppSourceTree.LoadXaml("Styles/Components/Sa.Primitives.xaml").Descendants()
-            .Single(e => e.Name.LocalName == "Style" && (string?)e.Attribute("TargetType") == "primitives:SaIcon");
-        var path = style.Descendants().Single(e => e.Name.LocalName == "Path");
-        Assert.Equal("1.5", (string?)path.Attribute("StrokeThickness"));
-        Assert.Null(path.Attribute("Fill"));
+            .Single(e => e.Name.LocalName == "Style" && (string?)e.Attribute(AppSourceTree.Xaml + "Key") == "SaIconBaseStyle");
+        var paths = style.Descendants().Where(e => e.Name.LocalName == "Path").ToList();
+        Assert.Equal(2, paths.Count);
+        foreach (var path in paths)
+        {
+            Assert.Equal("1.5", (string?)path.Attribute("StrokeThickness"));
+            Assert.Null(path.Attribute("Fill"));
+        }
+
         Assert.DoesNotContain(style.Descendants(), e => e.Name.LocalName is "Viewbox" or "ScaleTransform");
     }
 

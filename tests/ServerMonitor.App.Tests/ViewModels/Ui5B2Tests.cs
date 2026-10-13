@@ -562,7 +562,10 @@ public sealed class Ui5B2Tests
         foreach (var file in new[] { "Views/ServersPage.xaml", "Views/SettingsDataPage.xaml" })
         {
             var toast = Assert.Single(AppSourceTree.LoadXaml(file).Descendants(), e => e.Name.LocalName == "SaToast");
-            Assert.Equal("Polite", (string?)toast.Attribute(XName.Get("AutomationProperties.LiveSetting")));
+            // UI.12 B12B-02-R: the Servidores return notice is not a live region; its page announces it after focus.
+            var byPage = file == "Views/ServersPage.xaml";
+            Assert.Equal(byPage ? null : "Polite", (string?)toast.Attribute(XName.Get("AutomationProperties.LiveSetting")));
+            Assert.Equal(byPage ? "False" : null, (string?)toast.Attribute("AnnouncesItself"));
             Assert.NotNull(toast.Attribute("CloseButtonAutomationName"));
         }
     }

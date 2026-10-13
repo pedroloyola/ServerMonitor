@@ -90,6 +90,10 @@ public partial class App : Application
         ServicesHost.Services
             .GetRequiredService<ILocalizationService>()
             .InitializeFromSystem();
+        // UI.12 C-L8: fire-and-forget UI failures are reported here (operation + exception type only, no message).
+        var uiFailureLogger = ServicesHost.Services.GetRequiredService<ILogger<App>>();
+        UiFireAndForget.Report = (operation, exceptionType) =>
+            uiFailureLogger.LogError("Unhandled failure in {Operation} ({ExceptionType}); the app keeps running.", operation, exceptionType);
         // Attach the router to the single activation hand-off now that it exists: this atomically flushes
         // the latest intent buffered before this App object was built (the cold launch, or a redirect that
         // raced construction). The router buffers it internally until the shell signals ready (§M-1).
@@ -365,23 +369,42 @@ public partial class App : Application
         }
         catch (Exception exception)
         {
-            ServicesHost.Services
+            HandleStartupFailure(ServicesHost.Services, exception, Program.StartupExitCode, Exit);
+        }
+    }
+
+    /// <summary>
+    /// The body of <c>OnLaunched</c>'s catch, invocable for the same reason <see cref="EvaluateStartupAffordance"/> is:
+    /// <c>OnLaunched</c> needs a XAML runtime. UI.12 C-S1a: the failure is recorded in the process exit code FIRST, before
+    /// anything that can throw (resolving the logger, the exit itself), so <c>Main</c> never returns 0 after it.
+    /// </summary>
+    internal static void HandleStartupFailure(
+        IServiceProvider services,
+        Exception exception,
+        StartupExitCode exitCode,
+        Action exitApplication)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(exitCode);
+        ArgumentNullException.ThrowIfNull(exitApplication);
+
+        exitCode.RecordStartupFailure();
+        services
+            .GetRequiredService<ILogger<App>>()
+            .LogCritical(exception, "Server Monitor could not start.");
+        try
+        {
+            // The same authoritative exit as every other path: one drain, one Exit, one watchdog.
+            services
+                .GetRequiredService<IAppLifecycleController>()
+                .RequestExit(ExitReason.StartupFailure);
+        }
+        catch (Exception shutdownException)
+        {
+            services
                 .GetRequiredService<ILogger<App>>()
-                .LogCritical(exception, "Server Monitor could not start.");
-            try
-            {
-                // The same authoritative exit as every other path: one drain, one Exit, one watchdog.
-                ServicesHost.Services
-                    .GetRequiredService<IAppLifecycleController>()
-                    .RequestExit(ExitReason.StartupFailure);
-            }
-            catch (Exception shutdownException)
-            {
-                ServicesHost.Services
-                    .GetRequiredService<ILogger<App>>()
-                    .LogError(shutdownException, "Server Monitor startup cleanup failed.");
-                Exit();
-            }
+                .LogError(shutdownException, "Server Monitor startup cleanup failed.");
+            exitApplication();
         }
     }
     /// <summary>
@@ -611,7 +634,15 @@ public partial class App : Application
         services.AddSingleton<IServerCredentialStore>(sp => new GatedCredentialStore(
             sp.GetRequiredService<UngatedCredentialStore>().Store,
             sp.GetRequiredService<IConfigurationWriteGate>()));
-        services.AddSingleton<IServerProfileService, ServerProfileService>();
+        services.AddSingleton<IServerProfileService>(sp => new ServerProfileService(
+            sp.GetRequiredService<IServerService>(),
+            sp.GetRequiredService<IServerCredentialStore>(),
+            sp.GetRequiredService<IConfigurationWriteGate>(),
+            failure => sp.GetRequiredService<ILogger<ServerProfileService>>().LogWarning(
+                "The {Operation} was saved, but retiring the old credential failed ({ExceptionType}, 0x{HResult:X8}); it is left orphaned.",
+                failure.Operation,
+                failure.ExceptionType,
+                failure.HResult)));
         services.AddSingleton<JsonHostKeyTrustStore>();
         services.AddSingleton<IHostKeyTrustStore>(sp => sp.GetRequiredService<JsonHostKeyTrustStore>());
         services.AddSingleton<JsonRoutedHostKeyTrustStore>();

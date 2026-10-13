@@ -192,7 +192,7 @@ public sealed class WindowsAppNotificationService : IUserNotificationService, IH
         return Task.CompletedTask;
     }
 
-    public Task ShowAsync(UserNotification notification, CancellationToken cancellationToken = default)
+    public Task<bool> ShowAsync(UserNotification notification, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(notification);
         cancellationToken.ThrowIfCancellationRequested();
@@ -201,7 +201,7 @@ public sealed class WindowsAppNotificationService : IUserNotificationService, IH
         {
             if (!IsRegistered || !_accepting || _stopping)
             {
-                return Task.CompletedTask;
+                return Task.FromResult(false);
             }
 
             try
@@ -209,7 +209,7 @@ public sealed class WindowsAppNotificationService : IUserNotificationService, IH
                 if (_platform.Setting != AppNotificationSetting.Enabled)
                 {
                     _logger.LogDebug("Windows suppressed an app notification because its OS setting is disabled.");
-                    return Task.CompletedTask;
+                    return Task.FromResult(false);
                 }
 
                 _platform.Show(
@@ -222,6 +222,7 @@ public sealed class WindowsAppNotificationService : IUserNotificationService, IH
                     "Windows app notification sent for {ServerId} ({Category}).",
                     notification.ServerId,
                     notification.Category);
+                return Task.FromResult(true);
             }
             catch (Exception exception)
             {
@@ -229,10 +230,9 @@ public sealed class WindowsAppNotificationService : IUserNotificationService, IH
                     exception,
                     "Windows could not display an app notification for {ServerId}.",
                     notification.ServerId);
+                return Task.FromResult(false);
             }
         }
-
-        return Task.CompletedTask;
     }
 
     /// <summary>

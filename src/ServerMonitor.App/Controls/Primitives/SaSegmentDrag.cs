@@ -200,14 +200,17 @@ internal sealed class SegmentDragWiring : ISegmentDragPort
     /// <summary>A lifecycle cancel; <see cref="DragCancelReason.Layout"/> comes from inside a layout pass (B111-1).</summary>
     public void Cancel(DragCancelReason reason)
     {
-        _inLayout = reason == DragCancelReason.Layout;
+        // UI.12 N-3: saved and restored, so a cancel re-entered from inside a layout cancel (still in its layout pass) never
+        // clears the flag half-way and releases a capture synchronously inside layout.
+        var previous = _inLayout;
+        _inLayout = previous || reason == DragCancelReason.Layout;
         try
         {
             Controller.Cancel(reason);
         }
         finally
         {
-            _inLayout = false;
+            _inLayout = previous;
         }
     }
 

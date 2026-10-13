@@ -197,17 +197,20 @@
             </Grid.ColumnDefinitions>
             <StackPanel Spacing="6">
                 <primitives:SaHeadingHost AutomationProperties.HeadingLevel="Level1" IsTabStop="False">
+                        <!-- UI.12 B12-11 (Beacon): at the minimum width (pt-PT) the title next to Atualizar was cut; it may take a
+                             second line there (one line whenever it fits, so the wide layout is unchanged). -->
                         <TextBlock
                     x:Uid="WorkloadsPageTitle"
                     AutomationProperties.AccessibilityView="Raw" IsTextSelectionEnabled="False" IsTabStop="False"
                     Style="{StaticResource SaPageTitleTextStyle}"
+                    TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis"
                     Foreground="{ThemeResource SaTextBrush}" />
                     </primitives:SaHeadingHost>
                 <TextBlock
                     Style="{StaticResource SaPageSubtitleTextStyle}"
                     Text="{Binding ContextDisplay}"
-                    TextWrapping="Wrap"
-                    AutomationProperties.LiveSetting="Polite" />
+                    TextWrapping="Wrap" />
+                <!-- UI.12 R1-02 (Prism r1): not a live region - the context carries "Atualizado há…", which ticks periodically. -->
             </StackPanel>
             <Button
                 Grid.Column="1"
@@ -248,15 +251,16 @@
                 Style="{StaticResource SaPageSearchFieldStyle}"
                 Text="{Binding SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
             <Border x:Name="FilterTrack" Grid.Column="2" Style="{StaticResource SaSegmentedRectTrackStyle}">
+                <!-- UI.12 PEER-01: the group name lives on a peer-bearing host around the indicator + items panel. -->
+                <primitives:SaGroupHost x:Uid="WorkloadGlobalFilter">
                 <!-- UI.11 H01: one sliding indicator; it interpolates X AND width (the two items differ in width). -->
                 <Grid>
                     <Border IsHitTestVisible="False" AutomationProperties.AccessibilityView="Raw"
                             primitives:SaSlidingSelection.AllowDrag="True"
                             primitives:SaSlidingSelection.DurationKey="SaMotionSegmentSelectDuration"
                             primitives:SaSlidingSelection.IndicatorBrush="{ThemeResource SaSelectedBrush}"
-                            primitives:SaSlidingSelection.HighlightBrush="{ThemeResource SaGlassHighlightBrush}" primitives:SaSlidingSelection.LightOutlineBrush="{ThemeResource SaDialogButtonBorderBrush}" />
+                            primitives:SaSlidingSelection.HighlightBrush="{ThemeResource SaGlassHighlightBrush}" primitives:SaSlidingSelection.LightOutlineBrush="{ThemeResource SaSegmentedSelectedOutlineBrush}" />
                     <StackPanel
-                        x:Uid="WorkloadGlobalFilter"
                         Orientation="Horizontal"
                         Spacing="4"
                         primitives:SaGroupNavigation.Mode="SelectionFollowsFocus">
@@ -268,6 +272,7 @@
                                      IsChecked="{Binding GlobalFilterIndex, Mode=TwoWay, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=1}" />
                     </StackPanel>
                 </Grid>
+                </primitives:SaGroupHost>
             </Border>
         </Grid>
 

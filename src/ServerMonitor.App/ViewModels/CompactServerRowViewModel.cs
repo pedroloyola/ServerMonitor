@@ -19,6 +19,7 @@ public sealed class CompactServerRowViewModel : ObservableObject, IDisposable
     private static readonly HashSet<string> RelevantCardProperties = new(StringComparer.Ordinal)
     {
         nameof(ServerCardViewModel.Health),
+        nameof(ServerCardViewModel.LastError),
         nameof(ServerCardViewModel.IsStale),
         nameof(ServerCardViewModel.HasMetrics),
         nameof(ServerCardViewModel.StaleAgeDisplay),
@@ -132,8 +133,9 @@ public sealed class CompactServerRowViewModel : ObservableObject, IDisposable
         var cpu = ServerMetricPresentation.Read(Card, ServerMetricKind.Cpu, _thresholds);
         var memory = ServerMetricPresentation.Read(Card, ServerMetricKind.Memory, _thresholds);
         var disk = ServerMetricPresentation.Read(Card, ServerMetricKind.Disk, _thresholds);
-        var stale = !ServerStatusPresentation.RowHidesRetainedMetrics(health)
-            && ServerStatusPresentation.ShowsRetainedReadingAsStale(health, Card.IsStale, Card.HasMetrics);
+        var failed = Card.LastError is not null;
+        var stale = !ServerStatusPresentation.RowHidesRetainedMetrics(health, failed)
+            && ServerStatusPresentation.ShowsRetainedReadingAsStale(health, Card.IsStale, Card.HasMetrics, failed);
         var statusText = ServerStatusPresentation.StatusText(health, _localization);
 
         Set(ref _health, health, nameof(Health), notify);
@@ -143,9 +145,13 @@ public sealed class CompactServerRowViewModel : ObservableObject, IDisposable
         SetMetric(ref _disk, ref _diskText, disk, nameof(DiskText), nameof(IsDiskKnown), nameof(DiskBarValue), nameof(DiskSeverity), notify);
         Set(ref _showsStaleCue, stale, nameof(ShowsStaleCue), notify);
         Set(ref _staleAgeText, stale ? Card.StaleAgeDisplay : null, nameof(StaleAgeText), notify);
+        // UI.12 STATE-02 (Prism UI12A): the stale age is Raw on screen, so a stale row names it - retained values are
+        // never read as current.
         Set(
             ref _accessibleName,
-            Format("CompactRowAccessibleFormat", Name, statusText, AccessibleMetric(cpu), AccessibleMetric(memory), AccessibleMetric(disk)),
+            _staleAgeText is { Length: > 0 } age
+                ? Format("CompactRowAccessibleStaleFormat", Name, statusText, AccessibleMetric(cpu), AccessibleMetric(memory), AccessibleMetric(disk), age)
+                : Format("CompactRowAccessibleFormat", Name, statusText, AccessibleMetric(cpu), AccessibleMetric(memory), AccessibleMetric(disk)),
             nameof(AccessibleName),
             notify);
     }

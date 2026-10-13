@@ -66,7 +66,10 @@ public sealed class Ui7CContractTests
         var surface = xaml.Descendants().Single(e => (string?)e.Attribute(AppSourceTree.Xaml + "Name") == "DialogSurface");
         var panels = surface.Descendants().Where(e => e.Name.LocalName is "ServerEditorTestPanel" or "ServerEditorTrustPanel" or "SshConfigImportPanel").ToList();
         Assert.Equal(3, panels.Count); // the test, the trust prompt it meets, and the import: ONE layer
-        Assert.Equal("True", (string?)surface.Attribute(XName.Get("AutomationProperties.IsDialog")));
+        // UI.12 PEER-01: IsDialog sits on the peer-bearing host that fills the surface (a Border has no automation peer).
+        var dialog = surface.Descendants().Single(e => (string?)e.Attribute(AppSourceTree.Xaml + "Name") == "DialogContent");
+        Assert.Equal("True", (string?)dialog.Attribute(XName.Get("AutomationProperties.IsDialog")));
+        Assert.Equal(3, dialog.Descendants().Count(e => e.Name.LocalName is "ServerEditorTestPanel" or "ServerEditorTrustPanel" or "SshConfigImportPanel"));
         Assert.Equal("Cycle", (string?)surface.Attribute("TabFocusNavigation"));
     }
 

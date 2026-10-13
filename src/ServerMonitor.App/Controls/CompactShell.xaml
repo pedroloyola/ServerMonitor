@@ -141,6 +141,7 @@
             <!-- Native ring (no motion of our own); neutral, never the system accent blue (D-UI8-5). Prism c1 P-6: measured
                  sub-legible in Light with the secondary text colour, so it takes the primary text colour. -->
             <ProgressRing Width="20" Height="20" HorizontalAlignment="Center" Foreground="{ThemeResource SaTextBrush}"
+                          AutomationProperties.Name="{x:Bind Presentation.StateTitle, Mode=OneWay}"
                           IsActive="{x:Bind Presentation.ShowsLoading, Mode=OneWay}"
                           Visibility="{x:Bind Presentation.ShowsLoading, Mode=OneWay, FallbackValue=Collapsed}" />
             <primitives:SaIcon Data="{StaticResource SaIconServerStack01Data}" Size="28" HorizontalAlignment="Center"
@@ -151,7 +152,7 @@
                                Visibility="{x:Bind Presentation.ShowsAlertIcon, Mode=OneWay, FallbackValue=Collapsed}" />
             <TextBlock x:Name="StateTitleText" Style="{StaticResource SaSectionTitleTextStyle}" Foreground="{ThemeResource SaTextBrush}"
                        Text="{x:Bind Presentation.StateTitle, Mode=OneWay}" TextAlignment="Center" TextWrapping="Wrap" HorizontalAlignment="Center"
-                       AutomationProperties.HeadingLevel="Level2" AutomationProperties.LiveSetting="Polite" />
+                       AutomationProperties.HeadingLevel="Level1" primitives:SaAnnounce.Changes="True" AutomationProperties.LiveSetting="Polite" />
             <TextBlock Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}"
                        Text="{x:Bind Presentation.StateBody, Mode=OneWay}" TextAlignment="Center" TextWrapping="Wrap" HorizontalAlignment="Center"
                        Visibility="{x:Bind Presentation.HasStateBody, Mode=OneWay, FallbackValue=Collapsed}" />

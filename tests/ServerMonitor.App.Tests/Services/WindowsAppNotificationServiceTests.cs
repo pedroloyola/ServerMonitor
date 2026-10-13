@@ -223,7 +223,7 @@ public sealed class WindowsAppNotificationServiceTests
         var service = Create(platform, new FakeWindowController());
 
         await service.StartAsync(default);
-        await service.ShowAsync(Notification());
+        Assert.False(await service.ShowAsync(Notification()));
 
         Assert.Equal(0, platform.RegisterCount);
         Assert.Equal(0, platform.ShowCount);
@@ -236,9 +236,19 @@ public sealed class WindowsAppNotificationServiceTests
         var service = Create(platform, new FakeWindowController());
         await service.StartAsync(default);
 
-        await service.ShowAsync(Notification());
+        Assert.False(await service.ShowAsync(Notification())); // UI.12 C-E2: not delivered
 
         Assert.Equal(0, platform.ShowCount);
+    }
+
+    [Fact]
+    public async Task APlatformShowFailure_IsReportedAsNotDelivered()
+    {
+        var platform = new FakePlatform { ShowThrows = true };
+        var service = Create(platform, new FakeWindowController());
+        await service.StartAsync(default);
+
+        Assert.False(await service.ShowAsync(Notification()));
     }
 
     [Fact]
@@ -248,7 +258,7 @@ public sealed class WindowsAppNotificationServiceTests
         var service = Create(platform, new FakeWindowController());
         await service.StartAsync(default);
 
-        await service.ShowAsync(Notification());
+        Assert.True(await service.ShowAsync(Notification())); // UI.12 C-E2: handed to Windows
 
         Assert.Equal(1, platform.ShowCount);
         Assert.Equal("Offline", platform.Title);
@@ -280,7 +290,7 @@ public sealed class WindowsAppNotificationServiceTests
 
         await service.StopAsync(default);
         await service.StopAsync(default);
-        await service.ShowAsync(Notification());
+        Assert.False(await service.ShowAsync(Notification()));
 
         Assert.Equal(1, platform.UnregisterCount);
         Assert.Equal(0, platform.ShowCount);
@@ -295,7 +305,7 @@ public sealed class WindowsAppNotificationServiceTests
         await service.StartAsync(default);
 
         service.BeginShutdown();
-        await service.ShowAsync(Notification());
+        Assert.False(await service.ShowAsync(Notification()));
         platform.RaiseInvoked();
 
         Assert.Equal(0, platform.ShowCount);
@@ -516,6 +526,9 @@ public sealed class WindowsAppNotificationServiceTests
         public int RegisterCount { get; private set; }
         public int UnregisterCount { get; private set; }
         public int ShowCount { get; private set; }
+
+        /// <summary>UI.12 C-E2: the platform's Show throws (the service must report "not delivered").</summary>
+        public bool ShowThrows { get; set; }
         public bool HandlerWasAttachedAtRegister { get; private set; }
         public string? Title { get; private set; }
         public string? Body { get; private set; }
@@ -551,6 +564,11 @@ public sealed class WindowsAppNotificationServiceTests
             bool expiresOnReboot,
             TimeSpan? expiresAfter)
         {
+            if (ShowThrows)
+            {
+                throw new InvalidOperationException("platform show failed");
+            }
+
             ShowCount++;
             Title = title;
             Body = body;

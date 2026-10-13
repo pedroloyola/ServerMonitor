@@ -1,5 +1,6 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
+using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Controls;
 
 namespace ServerMonitor.App.Controls.Primitives;
@@ -64,6 +65,14 @@ public sealed class SaStatusIndicator : Control
         // geral) is out of the tree while the theme is changed in Definições.
         ActualThemeChanged += (_, _) => RefreshStatusStateForTheme();
         Loaded += (_, _) => RefreshStatusStateForTheme();
+        // UI.12 LIVE-01: a live status that appears (Detail "Leitura desatualizada") is announced when shown.
+        RegisterPropertyChangedCallback(VisibilityProperty, (_, _) =>
+        {
+            if (AutomationProperties.GetLiveSetting(this) != AutomationLiveSetting.Off)
+            {
+                SaAnnounce.RaiseAfterLayout(this);
+            }
+        });
     }
 
     public SaStatusKind Status
@@ -97,6 +106,10 @@ public sealed class SaStatusIndicator : Control
         UpdateLabelState(useTransitions: false);
     }
 
+    // UI.12 PEER-01: a Control has no peer of its own, so the label (Raw in the template) and a consumer's LiveSetting
+    // (Detail header) never reached UI Automation.
+    protected override AutomationPeer OnCreateAutomationPeer() => new SaStatusIndicatorAutomationPeer(this);
+
     private void ApplyAutomationName(string label)
     {
         var current = AutomationProperties.GetName(this);
@@ -104,6 +117,12 @@ public sealed class SaStatusIndicator : Control
         {
             AutomationProperties.SetName(this, label);
             _appliedAutomationName = label;
+        }
+
+        // UI.12 LIVE-01: a status declared as a live region (Detail header) announces its new label.
+        if (IsLoaded && AutomationProperties.GetLiveSetting(this) != AutomationLiveSetting.Off)
+        {
+            SaAnnounce.RaiseAfterLayout(this);
         }
     }
 
@@ -126,4 +145,12 @@ public sealed class SaStatusIndicator : Control
 
     private void UpdateLabelState(bool useTransitions) =>
         VisualStateManager.GoToState(this, IsLabelVisible ? LabelVisibleState : LabelHiddenState, useTransitions);
+}
+
+/// <summary>UI.12 PEER-01: the status is one Text element named by its label (colour is never the only signal).</summary>
+public sealed class SaStatusIndicatorAutomationPeer(SaStatusIndicator owner) : FrameworkElementAutomationPeer(owner)
+{
+    protected override AutomationControlType GetAutomationControlTypeCore() => AutomationControlType.Text;
+
+    protected override string GetClassNameCore() => nameof(SaStatusIndicator);
 }

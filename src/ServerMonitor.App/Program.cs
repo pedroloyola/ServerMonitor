@@ -42,6 +42,12 @@ public static class Program
     /// <summary>Process-scoped too, for the same reason: the terminal action must outlive the host.</summary>
     public static IProcessTerminator ProcessTerminator { get; } = new ProcessTerminator();
 
+    /// <summary>
+    /// UI.12 C-S1a: what <see cref="Main"/> returns after <c>Application.Start</c>. Process-scoped for the same reason as
+    /// the watchdog: it must outlive the host the startup failure tears down.
+    /// </summary>
+    internal static StartupExitCode StartupExitCode { get; } = new();
+
     // OWNERSHIP (M13 S2 §F.2). There is deliberately NO method to release the single-instance key while
     // this process is alive. Releasing it early used to be the recommendation, so that a launch racing
     // the teardown became the new primary instead of redirecting into a dying process — but
@@ -75,7 +81,8 @@ public static class Program
             _ = new App();
         });
 
-        return 0;
+        // UI.12 C-S1a: non-zero when OnLaunched caught a startup failure (StartupExitCode.StartupFailure), else 0.
+        return StartupExitCode.Value;
     }
 
     // Returns true when this launch should redirect to an existing instance and exit.

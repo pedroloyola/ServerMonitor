@@ -26,6 +26,8 @@
             <SolidColorBrush x:Key="SaSuccessBrush" Color="{StaticResource SaColorSuccessDark}" />
             <SolidColorBrush x:Key="SaErrorBrush" Color="{StaticResource SaColorErrorDark}" />
             <SolidColorBrush x:Key="SaOfflineBrush" Color="{StaticResource SaColorOfflineDark}" />
+            <!-- UI.12 CONTRAST-01 (Prism UI12A): "Sem ligação" as TEXT. Dark keeps the dot coral (already >=4.5:1 there); Light uses the darkened danger text (#BD5766 measured 3.60-4.15:1 as 10 px text); the dot keeps SaOfflineBrush. -->
+            <SolidColorBrush x:Key="SaOfflineTextBrush" Color="{StaticResource SaColorOfflineDark}" />
             <SolidColorBrush x:Key="SaBorderNeutralBrush" Color="{StaticResource SaColorBorderNeutralDark}" />
             <SolidColorBrush x:Key="SaBorderSubtleBrush" Color="{StaticResource SaColorBorderSubtleDark}" />
             <SolidColorBrush x:Key="SaDividerBrush" Color="{StaticResource SaColorDividerDark}" />
@@ -35,7 +37,13 @@
             <SolidColorBrush x:Key="SaSelectedBrush" Color="{StaticResource SaColorSelectedDark}" />
             <SolidColorBrush x:Key="SaSelectedTextBrush" Color="{StaticResource SaColorSelectedTextDark}" />
             <SolidColorBrush x:Key="SaFocusRingBrush" Color="{StaticResource SaColorFocusRingDark}" />
+            <!-- UI.12 FOCUS-01 (Prism UI12A): inner ring of the system double focus visual, HC only (thickness 0 in Dark/Light, SaFocusVisualSecondaryThickness); separates the Highlight ring from a Highlight selected fill. -->
+            <SolidColorBrush x:Key="SaFocusRingSecondaryBrush" Color="Transparent" />
             <SolidColorBrush x:Key="SaHoverTextBrush" Color="{StaticResource SaColorTextDark}" />
+            <!-- UI.12 HC-01/HC-02 (Prism UI12A): state veils for templates whose content keeps its own text colour; same colour as SaHoverBrush/SaSelectedBrush here, Transparent in HC (a Highlight fill under WindowText is illegible). -->
+            <SolidColorBrush x:Key="SaHoverVeilBrush" Color="{StaticResource SaColorHoverDark}" />
+            <SolidColorBrush x:Key="SaSelectedVeilBrush" Color="{StaticResource SaColorSelectedDark}" />
+            <SolidColorBrush x:Key="SaSelectedOutlineBrush" Color="Transparent" />
             <SolidColorBrush x:Key="SaBorderInsetBrush" Color="{StaticResource SaColorDividerDark}" />
             <SolidColorBrush x:Key="SaGlassBorderBrush" Color="{StaticResource SaColorGlassBorderDark}" />
             <SolidColorBrush x:Key="SaGlassHighlightBrush" Color="{StaticResource SaColorGlassHighlightDark}" />
@@ -53,6 +61,7 @@
             <SolidColorBrush x:Key="SaSegmentedPillSelectedBrush" Color="{StaticResource SaColorSegmentedPillSelectedDark}" />
             <SolidColorBrush x:Key="SaSegmentedThemeTrackBrush" Color="{StaticResource SaColorSegmentedThemeTrackDark}" />
             <SolidColorBrush x:Key="SaSegmentedThemeSelectedBrush" Color="{StaticResource SaColorSegmentedThemeSelectedDark}" />
+            <SolidColorBrush x:Key="SaSegmentedSelectedOutlineBrush" Color="Transparent" />
             <SolidColorBrush x:Key="SaToggleOffTrackBrush" Color="{StaticResource SaColorToggleOffTrackDark}" />
             <SolidColorBrush x:Key="SaToggleThumbBrush" Color="{StaticResource SaColorToggleThumbDark}" />
             <SolidColorBrush x:Key="SaSkeletonBrush" Color="{StaticResource SaColorSkeletonDark}" />
@@ -91,6 +100,7 @@
             <SolidColorBrush x:Key="SaSuccessBrush" Color="{StaticResource SaColorSuccessLight}" />
             <SolidColorBrush x:Key="SaErrorBrush" Color="{StaticResource SaColorErrorLight}" />
             <SolidColorBrush x:Key="SaOfflineBrush" Color="{StaticResource SaColorOfflineLight}" />
+            <SolidColorBrush x:Key="SaOfflineTextBrush" Color="{StaticResource SaColorDangerTextLight}" />
             <SolidColorBrush x:Key="SaBorderNeutralBrush" Color="{StaticResource SaColorBorderNeutralLight}" />
             <SolidColorBrush x:Key="SaBorderSubtleBrush" Color="{StaticResource SaColorBorderSubtleLight}" />
             <SolidColorBrush x:Key="SaDividerBrush" Color="{StaticResource SaColorDividerLight}" />
@@ -100,7 +110,11 @@
             <SolidColorBrush x:Key="SaSelectedBrush" Color="{StaticResource SaColorSelectedLight}" />
             <SolidColorBrush x:Key="SaSelectedTextBrush" Color="{StaticResource SaColorSelectedTextLight}" />
             <SolidColorBrush x:Key="SaFocusRingBrush" Color="{StaticResource SaColorFocusRingLight}" />
+            <SolidColorBrush x:Key="SaFocusRingSecondaryBrush" Color="Transparent" />
             <SolidColorBrush x:Key="SaHoverTextBrush" Color="{StaticResource SaColorTextLight}" />
+            <SolidColorBrush x:Key="SaHoverVeilBrush" Color="{StaticResource SaColorHoverLight}" />
+            <SolidColorBrush x:Key="SaSelectedVeilBrush" Color="{StaticResource SaColorSelectedLight}" />
+            <SolidColorBrush x:Key="SaSelectedOutlineBrush" Color="Transparent" />
             <SolidColorBrush x:Key="SaBorderInsetBrush" Color="{StaticResource SaColorDividerLight}" />
             <SolidColorBrush x:Key="SaGlassBorderBrush" Color="{StaticResource SaColorGlassBorderLight}" />
             <SolidColorBrush x:Key="SaGlassHighlightBrush" Color="{StaticResource SaColorGlassHighlightLight}" />
@@ -118,6 +132,8 @@
             <SolidColorBrush x:Key="SaSegmentedPillSelectedBrush" Color="{StaticResource SaColorSegmentedPillSelectedLight}" />
             <SolidColorBrush x:Key="SaSegmentedThemeTrackBrush" Color="{StaticResource SaColorSegmentedThemeTrackLight}" />
             <SolidColorBrush x:Key="SaSegmentedThemeSelectedBrush" Color="{StaticResource SaColorSegmentedThemeSelectedLight}" />
+            <!-- UI.12 B12-01 (Prism spec): 1 px inner outline of the selected segment, drawn by SaSlidingSelection in Light only (DrawsLightOutline); Dark/HC entries exist for theme coverage. -->
+            <SolidColorBrush x:Key="SaSegmentedSelectedOutlineBrush" Color="{StaticResource SaColorSegmentedSelectedOutlineLight}" />
             <SolidColorBrush x:Key="SaToggleOffTrackBrush" Color="{StaticResource SaColorToggleOffTrackLight}" />
             <SolidColorBrush x:Key="SaToggleThumbBrush" Color="{StaticResource SaColorToggleThumbLight}" />
             <SolidColorBrush x:Key="SaSkeletonBrush" Color="{StaticResource SaColorSkeletonLight}" />
@@ -155,6 +171,7 @@
             <SolidColorBrush x:Key="SaSuccessBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
             <SolidColorBrush x:Key="SaErrorBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
             <SolidColorBrush x:Key="SaOfflineBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="SaOfflineTextBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
             <SolidColorBrush x:Key="SaBorderNeutralBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
             <SolidColorBrush x:Key="SaBorderSubtleBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
             <SolidColorBrush x:Key="SaDividerBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
@@ -164,7 +181,12 @@
             <SolidColorBrush x:Key="SaSelectedBrush" Color="{ThemeResource SystemColorHighlightColor}" />
             <SolidColorBrush x:Key="SaSelectedTextBrush" Color="{ThemeResource SystemColorHighlightTextColor}" />
             <SolidColorBrush x:Key="SaFocusRingBrush" Color="{ThemeResource SystemColorHighlightColor}" />
+            <SolidColorBrush x:Key="SaFocusRingSecondaryBrush" Color="{ThemeResource SystemColorWindowColor}" />
             <SolidColorBrush x:Key="SaHoverTextBrush" Color="{ThemeResource SystemColorHighlightTextColor}" />
+            <!-- UI.12 HC-01/HC-02: no veil in HC; a persistent selection is drawn as a Highlight outline instead. -->
+            <SolidColorBrush x:Key="SaHoverVeilBrush" Color="Transparent" />
+            <SolidColorBrush x:Key="SaSelectedVeilBrush" Color="Transparent" />
+            <SolidColorBrush x:Key="SaSelectedOutlineBrush" Color="{ThemeResource SystemColorHighlightColor}" />
             <SolidColorBrush x:Key="SaBorderInsetBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
             <SolidColorBrush x:Key="SaGlassBorderBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
             <SolidColorBrush x:Key="SaGlassHighlightBrush" Color="Transparent" />
@@ -182,6 +204,7 @@
             <SolidColorBrush x:Key="SaSegmentedPillSelectedBrush" Color="{ThemeResource SystemColorHighlightColor}" />
             <SolidColorBrush x:Key="SaSegmentedThemeTrackBrush" Color="{ThemeResource SystemColorWindowColor}" />
             <SolidColorBrush x:Key="SaSegmentedThemeSelectedBrush" Color="{ThemeResource SystemColorHighlightColor}" />
+            <SolidColorBrush x:Key="SaSegmentedSelectedOutlineBrush" Color="{ThemeResource SystemColorWindowColor}" />
             <SolidColorBrush x:Key="SaToggleOffTrackBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
             <SolidColorBrush x:Key="SaToggleThumbBrush" Color="{ThemeResource SystemColorWindowColor}" />
             <SolidColorBrush x:Key="SaSkeletonBrush" Color="{ThemeResource SystemColorGrayTextColor}" />

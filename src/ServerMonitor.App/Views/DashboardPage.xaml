@@ -79,12 +79,12 @@
                                     <VisualState x:Name="Normal" />
                                     <VisualState x:Name="PointerOver">
                                         <VisualState.Setters>
-                                            <Setter Target="StateOverlay.Background" Value="{ThemeResource SaHoverBrush}" />
+                                            <Setter Target="StateOverlay.Background" Value="{ThemeResource SaHoverVeilBrush}" />
                                         </VisualState.Setters>
                                     </VisualState>
                                     <VisualState x:Name="Pressed">
                                         <VisualState.Setters>
-                                            <Setter Target="StateOverlay.Background" Value="{ThemeResource SaSelectedBrush}" />
+                                            <Setter Target="StateOverlay.Background" Value="{ThemeResource SaSelectedVeilBrush}" />
                                         </VisualState.Setters>
                                     </VisualState>
                                     <VisualState x:Name="Disabled" />
@@ -115,11 +115,19 @@
                 ToolTipService.ToolTip="{x:Bind Name}">
                 <primitives:SaListRow.Trailing>
                     <!-- 112:1066: state 13 (B7); 198 from its start to the chevron (C2: 186 + the row's 12 gap). -->
-                    <primitives:SaStatusIndicator
-                        MinWidth="186"
-                        FontSize="{StaticResource SaFontSizeControl}"
-                        Status="{x:Bind Health, Mode=OneWay, Converter={StaticResource ServerHealthToStatusKindConverter}}"
-                        Label="{x:Bind StatusDisplay, Mode=OneWay}" />
+                    <StackPanel MinWidth="186" Spacing="2">
+                        <primitives:SaStatusIndicator
+                            FontSize="{StaticResource SaFontSizeControl}"
+                            Status="{x:Bind Health, Mode=OneWay, Converter={StaticResource ServerHealthToStatusKindConverter}}"
+                            Label="{x:Bind StatusDisplay, Mode=OneWay}" />
+                        <!-- UI.12 B12-06: retained values shown stale (not Offline) - the Compact R-7 cue: clock 12 + "Última atualização há N min". -->
+                        <StackPanel Orientation="Horizontal" Spacing="4" Visibility="{x:Bind ShowsStaleCue, Mode=OneWay}">
+                            <primitives:SaIcon Data="{StaticResource SaIconClock01Data}" Size="12" VerticalAlignment="Center"
+                                               Foreground="{ThemeResource SaAttentionTextBrush}" />
+                            <TextBlock VerticalAlignment="Center" Style="{StaticResource SaHelperTextStyle}" Foreground="{ThemeResource SaAttentionTextBrush}"
+                                       Text="{x:Bind StaleAgeDisplay, Mode=OneWay}" TextTrimming="CharacterEllipsis" AutomationProperties.AccessibilityView="Raw" />
+                        </StackPanel>
+                    </StackPanel>
                 </primitives:SaListRow.Trailing>
             </primitives:SaListRow>
         </DataTemplate>
@@ -142,7 +150,9 @@
 
         <!-- Found on the network (DERIVED position, Prism r1): one SaListRow-like row, Adicionar + Ignorar. -->
         <DataTemplate x:Key="DiscoveredRowTemplate" x:DataType="vm:DiscoveredServerViewModel">
-            <Grid MinHeight="48" ColumnSpacing="{StaticResource SaSpace12}" AutomationProperties.Name="{x:Bind AutomationSummary}">
+            <!-- UI.12 PEER-01: the row summary is the name of a peer-bearing group (a Grid has no automation peer). -->
+            <primitives:SaGroupHost AutomationProperties.Name="{x:Bind AutomationSummary}">
+            <Grid MinHeight="48" ColumnSpacing="{StaticResource SaSpace12}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
@@ -165,6 +175,7 @@
                     <primitives:SaIcon Data="{StaticResource SaIconCancel01Data}" Size="16" />
                 </Button>
             </Grid>
+            </primitives:SaGroupHost>
         </DataTemplate>
 
         <!-- §14 112:15594 "Linha em carregamento": 40 block, 160×16 + 110×12 lines, three 72×16 values (gap 24). -->
@@ -293,8 +304,8 @@
                             <TextBlock x:Uid="FirstServerSubtitle" Style="{StaticResource SaPageSubtitleTextStyle}" Visibility="{x:Bind ViewModel.ShowEmptyState, Mode=OneWay}"/>
                             <TextBlock Style="{StaticResource SaPageSubtitleTextStyle}"
                                        Text="{x:Bind ViewModel.HeaderContextDisplay, Mode=OneWay}"
-                                       Visibility="{x:Bind ViewModel.HasHeaderContext, Mode=OneWay}"
-                                       AutomationProperties.LiveSetting="Polite" />
+                                       Visibility="{x:Bind ViewModel.HasHeaderContext, Mode=OneWay}" />
+                            <!-- UI.12 R1-02 (Prism r1): not a live region - "Atualizado há…" is recomputed on every engine cycle. -->
                         </StackPanel>
                     </StackPanel>
                     <StackPanel x:Name="HeaderActions" Grid.Column="1" Style="{StaticResource SaPageHeaderActionsStyle}">
@@ -471,8 +482,9 @@
                         </Button>
 
                         <!-- "Sem problemas" (DERIVED, Prism r1 e): green dot + label, message; not interactive. -->
-                        <Border Style="{StaticResource SaGlassSurfaceStyle}" x:Uid="OverviewNoProblemsPanel" MinHeight="156"
-                                Visibility="{x:Bind ViewModel.ShowNoProblems, Mode=OneWay}">
+                        <!-- UI.12 PEER-01: the panel text is Raw; its name now reaches UIA through a peer-bearing host. -->
+                        <primitives:SaGroupHost x:Uid="OverviewNoProblemsPanel" Visibility="{x:Bind ViewModel.ShowNoProblems, Mode=OneWay}">
+                        <Border Style="{StaticResource SaGlassSurfaceStyle}" MinHeight="156">
                             <StackPanel Spacing="{StaticResource SaSpace8}">
                                 <StackPanel Orientation="Horizontal" Spacing="7">
                                     <Ellipse Width="{StaticResource SaStatusDotSize}" Height="{StaticResource SaStatusDotSize}"
@@ -484,10 +496,12 @@
                                            TextWrapping="Wrap" AutomationProperties.AccessibilityView="Raw" />
                             </StackPanel>
                         </Border>
+                        </primitives:SaGroupHost>
 
                         <!-- "Sem leituras" (Prism r1 e): nothing to judge yet — grey dot, never "Sem problemas". -->
-                        <Border Style="{StaticResource SaGlassSurfaceStyle}" x:Uid="OverviewNoReadingsPanel" MinHeight="156"
-                                Visibility="{x:Bind ViewModel.ShowNoReadings, Mode=OneWay}">
+                        <!-- UI.12 PEER-01: the panel text is Raw; its name now reaches UIA through a peer-bearing host. -->
+                        <primitives:SaGroupHost x:Uid="OverviewNoReadingsPanel" Visibility="{x:Bind ViewModel.ShowNoReadings, Mode=OneWay}">
+                        <Border Style="{StaticResource SaGlassSurfaceStyle}" MinHeight="156">
                             <StackPanel Spacing="{StaticResource SaSpace8}">
                                 <StackPanel Orientation="Horizontal" Spacing="7">
                                     <Ellipse Width="{StaticResource SaStatusDotSize}" Height="{StaticResource SaStatusDotSize}"
@@ -499,6 +513,7 @@
                                            TextWrapping="Wrap" AutomationProperties.AccessibilityView="Raw" />
                             </StackPanel>
                         </Border>
+                        </primitives:SaGroupHost>
                     </Grid>
                 </Grid>
 
@@ -555,9 +570,12 @@
                                    Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap" />
                     </StackPanel>
                     <Border Style="{StaticResource SaGlassSurfaceStyle}">
-                        <ItemsRepeater x:Name="DiscoveredRepeater" AutomationProperties.LiveSetting="Polite"
-                                       AutomationProperties.Name="{x:Bind ViewModel.DiscoveredCountAutomationName, Mode=OneWay}"
-                                       ItemsSource="{x:Bind ViewModel.DiscoveredServers}" ItemTemplate="{StaticResource DiscoveredRowTemplate}" />
+                        <!-- UI.12 PEER-01: the count name + live region on a List host (an ItemsRepeater has no peer). -->
+                        <primitives:SaListHost AutomationProperties.LiveSetting="Polite" primitives:SaAnnounce.Changes="True"
+                                               AutomationProperties.Name="{x:Bind ViewModel.DiscoveredCountAutomationName, Mode=OneWay}">
+                            <ItemsRepeater x:Name="DiscoveredRepeater"
+                                           ItemsSource="{x:Bind ViewModel.DiscoveredServers}" ItemTemplate="{StaticResource DiscoveredRowTemplate}" />
+                        </primitives:SaListHost>
                     </Border>
                 </StackPanel>
 
@@ -577,9 +595,12 @@
                                 <TextBlock x:Uid="DashboardEmptyDiscoverySearching" Style="{StaticResource SaCaptionTextStyle}"
                                            Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap" />
                             </StackPanel>
-                            <ItemsRepeater x:Name="EmptyDiscoveredRepeater" MaxWidth="560" AutomationProperties.LiveSetting="Polite"
-                                           ItemsSource="{x:Bind ViewModel.DiscoveredServers}" ItemTemplate="{StaticResource DiscoveredRowTemplate}"
-                                           Visibility="{x:Bind ViewModel.ShowEmptyStateDiscoveries, Mode=OneWay}" />
+                            <primitives:SaListHost MaxWidth="560" AutomationProperties.LiveSetting="Polite" primitives:SaAnnounce.Changes="True"
+                                                   AutomationProperties.Name="{x:Bind ViewModel.DiscoveredCountAutomationName, Mode=OneWay}"
+                                                   Visibility="{x:Bind ViewModel.ShowEmptyStateDiscoveries, Mode=OneWay}">
+                                <ItemsRepeater x:Name="EmptyDiscoveredRepeater"
+                                               ItemsSource="{x:Bind ViewModel.DiscoveredServers}" ItemTemplate="{StaticResource DiscoveredRowTemplate}" />
+                            </primitives:SaListHost>
 
                 </StackPanel></Grid>
                 <!-- G-15 derived: live hidden list, never first-server copy. -->

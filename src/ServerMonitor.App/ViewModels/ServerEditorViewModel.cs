@@ -612,6 +612,35 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
     /// </summary>
     public ServerConnectionState? LastTestState => _lastConnectionResult?.State;
 
+    /// <summary>
+    /// UI.12 B12-05 (presentation only, Vigil-reviewed): a typed target secret (password or passphrase) was captured and is
+    /// held for the next Test/Save, while its box was cleared (R-2 / Vigil H5). Says only THAT one is held - never anything
+    /// derived from the value. The lifecycle of the secret itself is unchanged.
+    /// </summary>
+    public bool HasCapturedSecret => _secret is not null;
+
+    /// <summary>UI.12 B12-05: the same for the jump host's secret.</summary>
+    public bool HasCapturedJumpSecret => _jumpSecret is not null;
+
+    private bool _raisedHasCapturedSecret;
+    private bool _raisedHasCapturedJumpSecret;
+
+    // UI.12 B12-05: called after every place that sets, hands over or disposes a staged secret; raises only on a change.
+    private void RaiseCapturedSecrets()
+    {
+        if (_raisedHasCapturedSecret != HasCapturedSecret)
+        {
+            _raisedHasCapturedSecret = HasCapturedSecret;
+            OnPropertyChanged(nameof(HasCapturedSecret));
+        }
+
+        if (_raisedHasCapturedJumpSecret != HasCapturedJumpSecret)
+        {
+            _raisedHasCapturedJumpSecret = HasCapturedJumpSecret;
+            OnPropertyChanged(nameof(HasCapturedJumpSecret));
+        }
+    }
+
     /// <summary>UI.7C (presentation only): the last result's error code (its family words the test dialog; never text).</summary>
     public SshConnectionErrorCode LastTestErrorCode => _lastConnectionResult?.ErrorCode ?? SshConnectionErrorCode.None;
 
@@ -627,6 +656,7 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
         _jumpSecretContext = TryCreateJumpCredentialContext(out var context) ? context : null;
         InvalidateConnectionResult();
         RefreshDirty();
+        RaiseCapturedSecrets();
     }
 
     public async Task SelectJumpPrivateKeyAsync()
@@ -1091,6 +1121,7 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
         RemoveSavedPassphrase = false;
         InvalidateConnectionResult();
         RefreshDirty();
+        RaiseCapturedSecrets();
     }
 
     public async Task SelectPrivateKeyAsync()
@@ -1432,6 +1463,7 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
         };
         // UI.7A fix c1 (Cortex n-2): the staged secrets were just handed over, so the dirty state is recomputed (additive).
         RefreshDirty();
+        RaiseCapturedSecrets();
         return true;
     }
 
@@ -1663,6 +1695,7 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
         _jumpSecret?.Dispose();
         _jumpSecret = null;
         _jumpSecretContext = null;
+        RaiseCapturedSecrets();
     }
 
     private bool SetJumpContextProperty<T>(
@@ -1826,6 +1859,7 @@ public sealed class ServerEditorViewModel : ObservableObject, IDisposable
         _secret?.Dispose();
         _secret = null;
         _secretContext = null;
+        RaiseCapturedSecrets();
     }
 
     private void EnsureStagedSecretMatchesCurrentContext()

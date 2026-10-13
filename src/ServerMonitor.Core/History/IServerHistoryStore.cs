@@ -25,7 +25,8 @@ public interface IServerHistoryStore
     Task WriteAsync(IReadOnlyList<ServerHistorySample> batch, CancellationToken cancellationToken = default);
 
     /// <summary>Returns samples for one server within [start,end] UTC, ascending by time. Empty when
-    /// unavailable or none found. Never leaks other servers' rows.</summary>
+    /// unavailable or none found. Throws when the query itself fails (a failure is never reported as
+    /// "no samples"; a fatal one also marks the store unavailable). Never leaks other servers' rows.</summary>
     Task<IReadOnlyList<ServerHistorySample>> QueryAsync(
         Guid serverId,
         DateTimeOffset startUtc,

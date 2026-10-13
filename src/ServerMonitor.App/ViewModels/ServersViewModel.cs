@@ -94,8 +94,14 @@ public sealed class ServersViewModel : ObservableObject, IDisposable
 
     public bool HasServers => TotalCount > 0;
 
-    /// <summary>No configured visible server at all (once loaded): the page's empty state.</summary>
-    public bool ShowEmptyState => !IsLoading && !HasServers;
+    /// <summary>
+    /// UI.12 STATE-01: the server configuration could not be read (the dashboard's startup diagnosis, the same flag the
+    /// Overview's notice uses). Then "no servers" is unknown, not zero: the empty state and "0 servidores" never show.
+    /// </summary>
+    public bool ShowConfigurationUnavailable => !IsLoading && _dashboard.ShowConfigurationUnavailable;
+
+    /// <summary>No configured visible server at all (once loaded): the page's empty state - unless the configuration is unreadable.</summary>
+    public bool ShowEmptyState => !IsLoading && !HasServers && !_dashboard.ShowConfigurationUnavailable;
 
     public bool ShowTable => !IsLoading && HasServers && _rows.Count > 0;
 
@@ -119,6 +125,11 @@ public sealed class ServersViewModel : ObservableObject, IDisposable
         get
         {
             var summary = _dashboard.HealthSummary;
+            if (summary.Total == 0 && _dashboard.ShowConfigurationUnavailable)
+            {
+                return _localization.GetString("ServersSummaryConfigurationUnavailable"); // UI.12 STATE-01: unknown, not "0"
+            }
+
             var total = Format(WorkloadPresentation.PluralKey("ServersSummaryTotal", summary.Total), summary.Total);
             if (summary.Total == 0)
             {
@@ -159,6 +170,7 @@ public sealed class ServersViewModel : ObservableObject, IDisposable
 
         _disposed = true;
         _noticeTimer.Dispose();
+        _notice = null; // UI.12 B12B-02-R (Atlas L1): a visit that ended has no notice left to announce
         _dashboard.ServersReloaded -= OnServersReloaded;
         _dashboard.PropertyChanged -= OnDashboardPropertyChanged;
         DisposeRows();
@@ -192,6 +204,11 @@ public sealed class ServersViewModel : ObservableObject, IDisposable
             case nameof(DashboardViewModel.HiddenServerCount):
                 OnPropertyChanged(nameof(ShowHiddenServersNote));
                 break;
+            case nameof(DashboardViewModel.ShowConfigurationUnavailable):
+                OnPropertyChanged(nameof(ShowConfigurationUnavailable));
+                OnPropertyChanged(nameof(SummaryDisplay));
+                RaiseStates();
+                break;
         }
     }
 
@@ -220,6 +237,7 @@ public sealed class ServersViewModel : ObservableObject, IDisposable
     private void RaiseStates()
     {
         OnPropertyChanged(nameof(IsLoading));
+        OnPropertyChanged(nameof(ShowConfigurationUnavailable));
         OnPropertyChanged(nameof(ShowEmptyState));
         OnPropertyChanged(nameof(ShowTable));
         OnPropertyChanged(nameof(HasNoResults));

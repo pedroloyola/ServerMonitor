@@ -32,20 +32,26 @@ public sealed class Ui5PresentationTests
         }
     }
 
+    /// <summary>UI.5 rule, extended in UI.12 STATE-03: Offline, and "Sem dados" after a FAILED cycle (retained snapshot).</summary>
     [Theory]
-    [InlineData(ServerHealth.Offline, true)]
-    [InlineData(ServerHealth.Unknown, false)]
-    [InlineData(ServerHealth.Healthy, false)]
-    public void OnlyOffline_HidesTheRowsRetainedMetrics(ServerHealth health, bool hides) =>
-        Assert.Equal(hides, ServerStatusPresentation.RowHidesRetainedMetrics(health));
+    [InlineData(ServerHealth.Offline, false, true)]
+    [InlineData(ServerHealth.Unknown, false, false)] // "Sem dados" with no failure (e.g. first reading): nothing retained to hide
+    [InlineData(ServerHealth.Healthy, false, false)]
+    [InlineData(ServerHealth.Unknown, true, true)]   // UI.12 STATE-03
+    [InlineData(ServerHealth.Healthy, true, false)]
+    [InlineData(ServerHealth.Warning, true, false)]
+    public void OfflineAndFailedNoData_HideTheRowsRetainedMetrics(ServerHealth health, bool hasLastError, bool hides) =>
+        Assert.Equal(hides, ServerStatusPresentation.RowHidesRetainedMetrics(health, hasLastError));
 
     [Theory]
-    [InlineData(ServerHealth.Offline, false, true, true)]
-    [InlineData(ServerHealth.Healthy, true, true, true)]
-    [InlineData(ServerHealth.Healthy, false, true, false)]
-    [InlineData(ServerHealth.Offline, true, false, false)] // nothing retained → nothing to mark
-    public void H_UI5_2_ARetainedReadingIsMarkedStale(ServerHealth health, bool isStale, bool hasMetrics, bool expected) =>
-        Assert.Equal(expected, ServerStatusPresentation.ShowsRetainedReadingAsStale(health, isStale, hasMetrics));
+    [InlineData(ServerHealth.Offline, false, true, false, true)]
+    [InlineData(ServerHealth.Healthy, true, true, false, true)]
+    [InlineData(ServerHealth.Healthy, false, true, false, false)]
+    [InlineData(ServerHealth.Offline, true, false, false, false)] // nothing retained → nothing to mark
+    [InlineData(ServerHealth.Unknown, false, true, true, true)]   // UI.12 STATE-03: failed "Sem dados" → the Detail marks it stale
+    [InlineData(ServerHealth.Unknown, false, true, false, false)]
+    public void H_UI5_2_ARetainedReadingIsMarkedStale(ServerHealth health, bool isStale, bool hasMetrics, bool hasLastError, bool expected) =>
+        Assert.Equal(expected, ServerStatusPresentation.ShowsRetainedReadingAsStale(health, isStale, hasMetrics, hasLastError));
 
     /// <summary>A-4 (Boss): round, minimum 1 when p &gt; 0; 0, 1, 99, 100 and unknown are mandatory cases.</summary>
     [Theory]

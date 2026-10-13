@@ -105,7 +105,9 @@ public sealed partial class XamlContractAndResourceGuardTests
             "ActionBar", "TestButton", "ActionHint", "ActionEnd", "PrimaryButton",
             "CredentialNoteTitle", "HeaderButton",
             // UI.7B: the in-page modal layer (Cortex §8) and its two panels.
-            "PageScroll", "DialogLayer", "DialogSurface", "TrustPanel", "ImportPanel",
+            "PageScroll", "DialogLayer", "DialogSurface", "DialogContent", "TrustPanel", "ImportPanel",
+            // UI.12 B12F-01: the inert host the page leaves UIA through while the layer is open.
+            "PageHost",
             // UI.7C: the test panel in the same layer, the duplicate notice (H-UI7-2) and "Tentar guardar".
             "TestPanel", "DuplicateNotice", "OpenDuplicateButton", "RetrySaveButton",
             // UI.7A fix c1 (M-1): Cancelar is disabled while a Save is persisted.
@@ -146,7 +148,7 @@ public sealed partial class XamlContractAndResourceGuardTests
         // UI.2 primitive templates: names resolved at runtime by VisualState setters (G-3).
         ["Styles/Components/Sa.Primitives.xaml"] =
         [
-            "PART_Dot", "PART_Label", "PART_Path", "PART_Header", "PART_Helper", "PART_Error", "PART_PasswordBox", "PART_RevealButton",
+            "PART_Dot", "PART_Label", "PART_Path", "PART_StatePath", "PART_ForegroundProbe", "PART_Header", "PART_Helper", "PART_Error", "PART_PasswordBox", "PART_RevealButton",
             // S6
             "RootGrid", "KeyColumn", "PART_Key", "PART_Value", "PART_Fill", "PART_Track", "PART_Text", "PART_Icon", "PART_Chevron",
             "PART_Detail", "PART_Trailing", "PART_InfoLayout", "PART_ErrorLayout", "PART_ErrorTitle", "PART_CloseButton", "PART_Parent",
@@ -157,12 +159,12 @@ public sealed partial class XamlContractAndResourceGuardTests
         ],
         // UI.2 S4 control templates: names targeted by VisualState setters / storyboards (G-3).
         // UI.7 final c2 (Prism C2-4): the inset list row template (selected / hover overlays over the tint).
-        ["Styles/Components/Sa.Surfaces.xaml"] = ["RowRoot", "SelectedOverlay", "HoverOverlay", "ContentPresenter"],
+        ["Styles/Components/Sa.Surfaces.xaml"] = ["RowRoot", "SelectedOverlay", "HoverOverlay", "SelectedOutline", "ContentPresenter"],
         ["Styles/Components/Sa.Buttons.xaml"] = ["RootGrid", "StateOverlay", "ContentPresenter", "Underline", "FocusUnderline"],
         ["Styles/Components/Sa.Forms.xaml"] =
         [
             // UI.11 H01: the segmented items' "Highlight" left with their selection fill (the sliding indicator draws it).
-            "RootGrid", "HoverOverlay", "FocusRing", "Shell", "StateOverlay", "ContentPresenter", "Box",
+            "RootGrid", "HoverOverlay", "FocusRing", "OuterFocusRing" /* UI.12 FOCUS-02 */, "Shell", "StateOverlay", "ContentPresenter", "Box",
             "CheckGlyph", "IndeterminateGlyph", "SwitchAreaGrid", "SwitchKnobBounds", "KnobTranslateTransform",
             "SwitchKnobOff", // UI.10 F26: the On state re-colours the thumb (SaToggleOnThumbBrush)
             "SwitchKnobOn" // UI.11 H02: the On thumb colour cross-fades as a second ellipse

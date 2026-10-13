@@ -211,7 +211,10 @@ public sealed class SqliteServerHistoryStore : IServerHistoryStore, IDisposable
         {
             cancellationToken.ThrowIfCancellationRequested();
             DegradeIfFatal(exception, "query");
-            return Array.Empty<ServerHistorySample>();
+
+            // UI.12 C-E1 (unknown ≠ zero): a failed query is not "no samples". Returning empty here made History say
+            // nothing was ever recorded; the caller maps the exception to "history unavailable".
+            throw;
         }
     }
 

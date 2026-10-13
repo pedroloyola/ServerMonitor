@@ -95,8 +95,11 @@ public sealed class Ui7FinalC2Tests
         var xaml = AppSourceTree.LoadXaml("Views/ServerEditorPage.xaml");
         var scroll = Named(xaml, "PageScroll");
         var layer = Named(xaml, "DialogLayer");
-        Assert.Equal(scroll.Parent, layer.Parent); // siblings: the layer is not disabled with the page
-        Assert.True(scroll.ElementsAfterSelf().Contains(layer), "the layer is drawn over the page");
+        // UI.12 B12F-01: the page sits in its inert host (out of UIA while the layer is open); host and layer are siblings.
+        var page = scroll.Parent!;
+        Assert.Equal("PageHost", (string?)page.Attribute(AppSourceTree.Xaml + "Name"));
+        Assert.Equal(page.Parent, layer.Parent); // siblings: the layer is not disabled with the page
+        Assert.True(page.ElementsAfterSelf().Contains(layer), "the layer is drawn over the page");
         foreach (var name in new[] { "ServerForm", "ActionArea", "TestButton", "CancelButton", "PrimaryButton", "HeaderButton", "OpenDuplicateButton", "RetrySaveButton" })
         {
             Assert.Contains(Named(xaml, name).Ancestors(), e => e == scroll);
@@ -132,9 +135,10 @@ public sealed class Ui7FinalC2Tests
         Assert.Contains("if (!_disposed && !_saving && Request is not null)", controller, StringComparison.Ordinal);
         var header = Method(page, "private async void OnHeaderButtonClick", "private async void Submit()");
         Assert.Matches(new Regex(@"if \(_controller\.IsSaving\)\s*\{\s*return;\s*\}"), header); // final c3: the check AND its return
+        // UI.12 C-L8: the import is now passed to the fire-and-forget guard (method group), hence the prefix below.
         var guard = header.IndexOf("if (_controller.IsSaving)", StringComparison.Ordinal);
         Assert.True(guard >= 0 && guard < header.IndexOf("_controller.Cancel();", StringComparison.Ordinal)
-            && guard < header.IndexOf("_controller.OpenImportAsync();", StringComparison.Ordinal), "the header button refuses while saving, first");
+            && guard < header.IndexOf("_controller.OpenImportAsync", StringComparison.Ordinal), "the header button refuses while saving, first");
     }
 
     // ---- B-2: "Continuar a editar" puts the focus back, every cycle ----
@@ -336,7 +340,8 @@ public sealed class Ui7FinalC2Tests
         var surfaces = AppSourceTree.LoadXaml("Styles/Components/Sa.Surfaces.xaml");
         var style = surfaces.Descendants().Single(e => (string?)e.Attribute(X + "Key") == "SaInsetListItemStyle");
         var overlay = style.Descendants().Single(e => (string?)e.Attribute(X + "Name") == "SelectedOverlay");
-        Assert.Equal("{ThemeResource SaSelectedBrush}", (string?)overlay.Attribute("Background"));
+        // UI.12 HC-01: the veil = SaSelectedBrush's colour in Dark/Light, Transparent in HC (Ui12HighContrastStateGuardTests).
+        Assert.Equal("{ThemeResource SaSelectedVeilBrush}", (string?)overlay.Attribute("Background"));
         Assert.Equal("0", (string?)overlay.Attribute("Opacity"));
         foreach (var state in new[] { "Selected", "PointerOverSelected", "PressedSelected" })
         {

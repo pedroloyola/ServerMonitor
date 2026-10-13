@@ -82,6 +82,7 @@ public sealed class Ui4AtlasTests
         Assert.False(typeof(IDisposable).IsAssignableFrom(typeof(SettingsPage)));
         Assert.True(typeof(IDisposable).IsAssignableFrom(typeof(ServersPage)));
         Assert.True(typeof(IDisposable).IsAssignableFrom(typeof(ServerDetailPage)));
+        Assert.True(typeof(IDisposable).IsAssignableFrom(typeof(WorkloadsPage))); // UI.12 C-L2
     }
 
     /// <summary>SHOULD-2: the rows colour metrics with the engine's thresholds instance, not a default copy (A4).</summary>

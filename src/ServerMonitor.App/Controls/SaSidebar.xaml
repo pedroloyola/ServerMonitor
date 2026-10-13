@@ -12,7 +12,7 @@
    p:SaSlidingSelection.IndicatorBrush="{ThemeResource SaSelectedBrush}" p:SaSlidingSelection.HighlightBrush="{ThemeResource SaGlassHighlightBrush}"
    p:SaSlidingSelection.LightOutlineBrush="{ThemeResource SaDialogButtonBorderBrush}"/>
  <!-- 112:1360: 160x44, official symbol30 + gap6 + 16/22 brand. -->
- <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" x:Name="Brand"><p:SaBrandMark/><TextBlock x:Name="BrandText" Text="ServerAlyzer" Style="{StaticResource SaBrandTextStyle}" VerticalAlignment="Center"/></StackPanel>
+ <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" x:Name="Brand"><p:SaBrandMark/><TextBlock x:Name="BrandText" Text="ServerAlyzer" Style="{StaticResource SaBrandTextStyle}" AutomationProperties.AccessibilityView="Raw" VerticalAlignment="Center"/></StackPanel>
  <!-- Figma 112:1392: 160x46 r23, icon20 + gap10; label area106. -->
  <RadioButton x:Name="OverviewItem" x:Uid="ShellOverview" Grid.Row="1" GroupName="ShellDestinations" Style="{StaticResource SaNavItemStyle}" Height="46"
    Tag="Overview" Click="OnItemClick" KeyDown="OnItemKeyDown" AutomationProperties.PositionInSet="1" AutomationProperties.SizeOfSet="4">

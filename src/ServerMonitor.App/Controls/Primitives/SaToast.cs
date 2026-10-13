@@ -27,7 +27,12 @@ public sealed class SaToast : Control
     public static readonly DependencyProperty CloseButtonAutomationNameProperty = DependencyProperty.Register(
         nameof(CloseButtonAutomationName), typeof(string), typeof(SaToast), new PropertyMetadata(string.Empty, (d, _) => ((SaToast)d).UpdateName()));
 
+    // UI.12 B12B-02-R: true (default, every caller but one) = a polite live region; false = its page announces it.
+    public static readonly DependencyProperty AnnouncesItselfProperty = DependencyProperty.Register(
+        nameof(AnnouncesItself), typeof(bool), typeof(SaToast), new PropertyMetadata(true, (d, _) => ((SaToast)d).UpdateName()));
+
     private Button? _close;
+    private readonly ToastAnnouncement _announcement = new();
 
     public SaToast()
     {
@@ -36,6 +41,21 @@ public sealed class SaToast : Control
         // UI.11 F10 transient: rises in (fade 167 + 8 px, 250) when shown, fades out (83) when it closes.
         SaMotion.SetEnter(this, SaMotionEnter.Rise);
         SaMotion.SetExitFade(this, true);
+        // UI.12 LIVE-01: a toast is shown by Visibility; it is announced then (it closes on a timer, never focused).
+        RegisterPropertyChangedCallback(VisibilityProperty, (_, _) =>
+        {
+            _announcement.VisibilityChanged(Visibility == Visibility.Visible);
+            AnnounceLive();
+        });
+        // UI.12 B12B-02: a toast made Visible while its page was not live yet (shown during the navigation, x:Bind before
+        // Loaded) had its raise dropped - it is announced once the page is live, unless it already was.
+        Loaded += (_, _) =>
+        {
+            if (_announcement.ShouldAnnounceOnLoaded(Visibility == Visibility.Visible))
+            {
+                AnnounceLive();
+            }
+        };
     }
 
     public event EventHandler? CloseRequested;
@@ -58,6 +78,18 @@ public sealed class SaToast : Control
         set => SetValue(CloseButtonAutomationNameProperty, value);
     }
 
+    /// <summary>
+    /// UI.12 B12B-02-R: false for a toast that arrives together with a page entry. The focus change that the entry makes
+    /// (the page heading) is spoken and polite live regions raised in that instant are dropped (real Narrator), so such a
+    /// toast raises no LiveRegionChanged at all (LiveSetting Off); its page announces it once, after focus, as a UIA
+    /// notification (ServersPage.ReturnNotice). Default true: every other toast is unchanged.
+    /// </summary>
+    public bool AnnouncesItself
+    {
+        get => (bool)GetValue(AnnouncesItselfProperty);
+        set => SetValue(AnnouncesItselfProperty, value);
+    }
+
     protected override void OnApplyTemplate()
     {
         if (_close is not null)
@@ -75,15 +107,74 @@ public sealed class SaToast : Control
         UpdateName();
     }
 
+    // UI.12 LIVE-01: without a peer the toast (its text is Raw) was not in the UIA tree, so its LiveSetting meant nothing.
+    protected override AutomationPeer OnCreateAutomationPeer() => new SaToastAutomationPeer(this);
+
     private void OnCloseClick(object sender, RoutedEventArgs e) => CloseRequested?.Invoke(this, EventArgs.Empty);
 
     private void UpdateName()
     {
-        AutomationProperties.SetName(this, $"{Title}. {Message}");
-        AutomationProperties.SetLiveSetting(this, AutomationLiveSetting.Polite);
+        var name = SaInlineNotice.AccessibleName(Title, Message);
+        AutomationProperties.SetName(this, name);
+        AutomationProperties.SetLiveSetting(this, AnnouncesItself ? AutomationLiveSetting.Polite : AutomationLiveSetting.Off);
         if (_close is not null)
         {
             AutomationProperties.SetName(_close, CloseButtonAutomationName);
         }
+
+        _announcement.ContentChanged(name);
+        if (IsLoaded)
+        {
+            AnnounceLive();
+        }
     }
+
+    private void AnnounceLive()
+    {
+        if (AnnouncesItself)
+        {
+            SaAnnounce.RaiseAfterLayout(this, _announcement.Announced);
+        }
+    }
+}
+
+/// <summary>
+/// UI.12 B12B-02 (Beacon: the "Servidor ocultado" toast raised 0 LiveRegionChanged): whether the toast's current content
+/// still has to be said. Shown or changed = not said yet; said once the event actually left; hidden = the next showing is
+/// new. A toast already said is never repeated on a later Loaded (navigating back while it is open), nor when the same
+/// content is set again (a template re-applied).
+/// </summary>
+internal sealed class ToastAnnouncement
+{
+    private bool _announced;
+    private string? _content;
+
+    public void VisibilityChanged(bool visible)
+    {
+        if (!visible)
+        {
+            _announced = false;
+        }
+    }
+
+    public void ContentChanged(string? content)
+    {
+        if (!string.Equals(content, _content, StringComparison.Ordinal))
+        {
+            _content = content;
+            _announced = false;
+        }
+    }
+
+    public void Announced() => _announced = true;
+
+    public bool ShouldAnnounceOnLoaded(bool visible) => visible && !_announced;
+}
+
+/// <summary>UI.12 LIVE-01: the toast is one named status group ("Título. Mensagem") holding its close button.</summary>
+public sealed class SaToastAutomationPeer(SaToast owner) : FrameworkElementAutomationPeer(owner)
+{
+    protected override AutomationControlType GetAutomationControlTypeCore() => AutomationControlType.Group;
+
+    protected override string GetClassNameCore() => nameof(SaToast);
 }

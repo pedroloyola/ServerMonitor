@@ -127,8 +127,12 @@ public sealed class Ui5R2Tests
 
         Assert.Equal(new[] { "*", "Auto" }, rows.Select(row => (string?)row.Attribute("Height")));
         Assert.Equal("1", (string?)toast.Attribute("Grid.Row"));
-        Assert.Equal("Polite", (string?)toast.Attribute("AutomationProperties.LiveSetting"));
+        // UI.12 B12B-02-R: the Servidores return notice is announced by its page (a notification after focus), not live.
+        Assert.Equal(ServersPageAnnouncesTheToast(file) ? null : "Polite", (string?)toast.Attribute("AutomationProperties.LiveSetting"));
+        Assert.Equal(ServersPageAnnouncesTheToast(file) ? "False" : null, (string?)toast.Attribute("AnnouncesItself"));
     }
+
+    private static bool ServersPageAnnouncesTheToast(string file) => file == "Views/ServersPage.xaml";
 
     // ---- Boss decision 3: an error about one server never shows on another server's Detail ---------------------------
 
@@ -494,7 +498,10 @@ public sealed class Ui5R2Tests
 
         Assert.All(rowTitles, uid => Assert.Equal("Level3",
             (string?)page.Descendants().Single(e => (string?)e.Attribute(AppSourceTree.Xaml + "Uid") == uid).Attribute("AutomationProperties.HeadingLevel")));
-        var group = page.Descendants().Single(e => (string?)e.Attribute(AppSourceTree.Xaml + "Uid") == "SettingsThemeGroup");
+        // UI.12 PEER-01: the name is on the SaGroupHost; the keyboard group is the panel inside it.
+        var host = page.Descendants().Single(e => (string?)e.Attribute(AppSourceTree.Xaml + "Uid") == "SettingsThemeGroup");
+        Assert.Equal("SaGroupHost", host.Name.LocalName);
+        var group = host.Descendants().Single(e => e.Attributes().Any(a => a.Name.LocalName == "SaGroupNavigation.Mode"));
         Assert.Equal("SelectionFollowsFocus", (string?)group.Attribute(Primitives + "SaGroupNavigation.Mode"));
         var narrow = page.Descendants().Single(e => e.Name.LocalName == "VisualState" && (string?)e.Attribute(AppSourceTree.Xaml + "Name") == "Narrow");
         foreach (var row in new[] { "ThemeRow", "BackgroundSection", "CompactRow" })
@@ -505,7 +512,13 @@ public sealed class Ui5R2Tests
         var icons = page.Descendants().Where(e => e.Name.LocalName == "SaIcon"
             && e.Ancestors().Any(a => a.Name.LocalName == "Button")).ToList();
         Assert.Equal(5, icons.Count); // Entrar chevron + 2 disclosures × (icon, chevron) - Prism C1 N-5
-        Assert.All(icons, icon => Assert.Equal("{ThemeResource SaTextSecondaryBrush}", (string?)icon.Attribute("Foreground")));
+        // UI.12 B12B-01 (Prism P3): muted via SaIconSecondaryStyle (SaTextSecondaryBrush in Light / Dark / Default, the host's
+        // state text in High Contrast - Ui12HighContrastIconTests), never a local Foreground.
+        Assert.All(icons, icon =>
+        {
+            Assert.Equal("{ThemeResource SaIconSecondaryStyle}", (string?)icon.Attribute("Style"));
+            Assert.Null(icon.Attribute("Foreground"));
+        });
     }
 
     [Fact]

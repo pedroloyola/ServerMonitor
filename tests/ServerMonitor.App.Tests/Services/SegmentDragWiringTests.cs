@@ -98,7 +98,16 @@ public sealed class SegmentDragWiringTests
 
         public void PresentPreview(IndicatorRect rect) => Log.Add(string.Create(CultureInfo.InvariantCulture, $"Present({rect.X:F1})"));
 
-        public void EndPreview(IndicatorCause cause, bool flushNow) => Log.Add($"EndPreview({cause},{flushNow})");
+        public void EndPreview(IndicatorCause cause, bool flushNow)
+        {
+            Log.Add($"EndPreview({cause},{flushNow})");
+            var reentry = OnEndPreview;
+            OnEndPreview = null; // once
+            reentry?.Invoke();
+        }
+
+        /// <summary>UI.12 N-3: work re-entered from inside a cancel's own surface call - still inside its layout pass (fires once).</summary>
+        public Action? OnEndPreview { get; set; }
     }
 
     private static DragPointer Mouse(double x, double y = 16, uint id = 1) => new(id, DragPointerDevice.Mouse, x, y, true);
@@ -380,5 +389,43 @@ public sealed class SegmentDragWiringTests
         wiring.Cancel(DragCancelReason.Disabled);
         Assert.Equal(["ReleasePanelCapture(P2)", "EndPreview(DragCancel,True)"], surface.Log.Where(e => !e.StartsWith("State", StringComparison.Ordinal)));
         Assert.Empty(surface.Posted);
+    }
+
+    /// <summary>
+    /// UI.12 N-3 (Cortex UI.12A C-W5): a Layout cancel runs inside the layout pass. Work re-entered from inside it (here: from
+    /// its EndPreview, still in the pass) that starts a new drag and cancels it for a NON-layout reason used to reset the
+    /// "in layout" flag to that reason, releasing the new drag's panel capture synchronously inside the layout pass - the
+    /// call that fail-fasts WinUI (B111-1). The flag is now saved and restored: inside a layout cancel, every release is posted.
+    /// </summary>
+    [Fact]
+    public void ACancelReEnteredInsideALayoutCancel_StillPostsItsPanelRelease()
+    {
+        var (wiring, surface) = Track();
+        wiring.Pressed(Mouse(228), 2, "P1");
+        wiring.Moved(Mouse(136));
+        surface.OnEndPreview = () =>
+        {
+            wiring.Pressed(Mouse(228), 2, "P2");
+            wiring.Moved(Mouse(136));
+            wiring.Cancel(DragCancelReason.Disabled);
+        };
+        surface.Log.Clear();
+
+        wiring.Cancel(DragCancelReason.Layout);
+
+        Assert.Null(surface.OnEndPreview); // the re-entry did happen
+        Assert.DoesNotContain(surface.Log, e => e.StartsWith("ReleasePanelCapture", StringComparison.Ordinal));
+        Assert.Equal(2, surface.Log.Count(e => e == "Post"));
+
+        surface.RunPosted();
+        Assert.Contains("ReleasePanelCapture(P1)", surface.Log);
+        Assert.Contains("ReleasePanelCapture(P2)", surface.Log);
+
+        // Outside any layout cancel, a non-layout cancel stays synchronous (the flag was restored, not left set).
+        wiring.Pressed(Mouse(228), 2, "P3");
+        wiring.Moved(Mouse(136));
+        surface.Log.Clear();
+        wiring.Cancel(DragCancelReason.Disabled);
+        Assert.Equal("ReleasePanelCapture(P3)", surface.Log.First(e => !e.StartsWith("State", StringComparison.Ordinal)));
     }
 }

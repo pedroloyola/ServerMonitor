@@ -98,7 +98,10 @@ public sealed partial class Ui3PageContractTests
     [Fact]
     public void History_RangeIsOneKeyboardGroupOfFiveSegments_BoundToTheSelectedIndex()
     {
-        var group = Assert.Single(Elements(History), e => Uid(e) == "HistoryRangeSelector");
+        // UI.12 PEER-01: the name is on the SaGroupHost; the keyboard group is the panel inside it.
+        var host = Assert.Single(Elements(History), e => Uid(e) == "HistoryRangeSelector");
+        Assert.Equal("SaGroupHost", host.Name.LocalName);
+        var group = Assert.Single(host.Descendants(), e => e.Attributes().Any(a => a.Name.LocalName == "SaGroupNavigation.Mode"));
         Assert.Equal("SelectionFollowsFocus", group.Attributes().First(a => a.Name.LocalName == "SaGroupNavigation.Mode").Value);
         var segments = group.Elements().Where(e => e.Name.LocalName == "RadioButton").ToList();
         Assert.Equal(5, segments.Count);
@@ -322,7 +325,10 @@ public sealed partial class Ui3PageContractTests
         Assert.Contains("SearchText, Mode=TwoWay", Attr(search, "Text"), StringComparison.Ordinal);
         Assert.Equal("Left", Attr(search, "HorizontalAlignment"));   // Prism R1 F2: never centred when it spans < 900
 
-        var group = Assert.Single(Elements(Workloads), e => Uid(e) == "WorkloadGlobalFilter");
+        // UI.12 PEER-01: the name is on the SaGroupHost; the keyboard group is the panel inside it.
+        var host = Assert.Single(Elements(Workloads), e => Uid(e) == "WorkloadGlobalFilter");
+        Assert.Equal("SaGroupHost", host.Name.LocalName);
+        var group = Assert.Single(host.Descendants(), e => e.Attributes().Any(a => a.Name.LocalName == "SaGroupNavigation.Mode"));
         Assert.Equal("SelectionFollowsFocus", group.Attributes().First(a => a.Name.LocalName == "SaGroupNavigation.Mode").Value);
         var segments = group.Elements().Where(e => e.Name.LocalName == "RadioButton").ToList();
         Assert.Equal(new[] { "{Binding FilterAllLabel}", "{Binding FilterProblemsLabel}" }, segments.Select(s => Attr(s, "Content")));
@@ -333,6 +339,9 @@ public sealed partial class Ui3PageContractTests
     public void Workloads_TitleIsLevel1_AndSectionTitlesAreLevel2()
     {
         Assert.Equal("Level1", Attr(Assert.Single(Elements(Workloads), e => Uid(e) == "WorkloadsPageTitle").Parent!, "AutomationProperties.HeadingLevel"));
+        // UI.12 B12-11: the title may wrap to a second line at the minimum width instead of being cut.
+        var title = Assert.Single(Elements(Workloads), e => Uid(e) == "WorkloadsPageTitle");
+        Assert.Equal(("Wrap", "2"), (Attr(title, "TextWrapping"), Attr(title, "MaxLines")));
         Assert.Equal("Level2", Attr(Assert.Single(Elements(Workloads), e => Uid(e) == "WorkloadDockerSectionTitle"), "AutomationProperties.HeadingLevel"));
         Assert.Equal("Level2", Attr(Assert.Single(Elements(Workloads), e => Uid(e) == "WorkloadServicesSectionTitle"), "AutomationProperties.HeadingLevel"));
     }

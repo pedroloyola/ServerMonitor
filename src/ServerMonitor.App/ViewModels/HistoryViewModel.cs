@@ -8,6 +8,7 @@ using ServerMonitor.Core.Enums;
 using ServerMonitor.Core.History;
 using ServerMonitor.Core.Interfaces;
 using ServerMonitor.Core.Models;
+using ServerMonitor.Core.Monitoring;
 
 namespace ServerMonitor.App.ViewModels;
 
@@ -790,7 +791,9 @@ public sealed class HistoryViewModel : ObservableObject, IDisposable
 
     private void RefreshCurrentValues()
     {
-        var snapshot = _metricsStore.GetLastSnapshot(_serverId);
+        var snapshot = CurrentSnapshot(
+            _metricsStore.GetLastSnapshot(_serverId),
+            _monitoringStateStore.TryGet(_serverId, out var state) ? state : null);
         CpuCurrentDisplay = FormatCurrent(snapshot?.CpuUsagePercent);
         MemoryCurrentDisplay = FormatCurrent(snapshot?.MemoryUsagePercent);
         DiskCurrentDisplay = FormatCurrent(snapshot?.DiskUsagePercent);
@@ -799,6 +802,18 @@ public sealed class HistoryViewModel : ObservableObject, IDisposable
         SetCurrentValue(ref _memoryCurrentValue, snapshot?.MemoryUsagePercent, nameof(MemoryCurrentValue), nameof(HasMemoryCurrent));
         SetCurrentValue(ref _diskCurrentValue, snapshot?.DiskUsagePercent, nameof(DiskCurrentValue), nameof(HasDiskCurrent));
     }
+
+    /// <summary>
+    /// UI.12 UI12A-STATE-04 (Prism): "Atual" is only the CURRENT reading. A retained snapshot the engine marks stale, or one
+    /// held for an Offline server or a failed "Sem dados" (the rows' rule, <see cref="ServerStatusPresentation.RowHidesRetainedMetrics"/>),
+    /// reads "—" there and in the summary - never an old value unqualified. With no engine state known, the snapshot stands.
+    /// </summary>
+    internal static ServerMetricsSnapshot? CurrentSnapshot(ServerMetricsSnapshot? snapshot, ServerMonitoringState? state) =>
+        snapshot is not null
+        && state is not null
+        && (state.IsStale || ServerStatusPresentation.RowHidesRetainedMetrics(state.Health, state.LastError is not null))
+            ? null
+            : snapshot;
 
     private void SetCurrentValue(ref string? field, double? value, string valueProperty, string hasProperty)
     {

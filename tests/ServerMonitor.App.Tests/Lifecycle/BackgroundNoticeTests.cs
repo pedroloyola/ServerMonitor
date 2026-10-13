@@ -27,8 +27,8 @@ public sealed class BackgroundNoticeTests
 
         public void BeginShutdown() { }
 
-        public Task ShowAsync(UserNotification notification, CancellationToken cancellationToken = default) =>
-            Task.CompletedTask;
+        public Task<bool> ShowAsync(UserNotification notification, CancellationToken cancellationToken = default) =>
+            Task.FromResult(true);
 
         /// <summary>Registered, handed the notice, and Windows declined to show it. Still a RESULT.</summary>
         public bool DeclineDelivery { get; set; }

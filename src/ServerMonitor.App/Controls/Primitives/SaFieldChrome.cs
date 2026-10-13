@@ -16,4 +16,16 @@ public static class SaFieldChrome
     public static Brush? GetFocusRingBrush(DependencyObject element) => (Brush?)element.GetValue(FocusRingBrushProperty);
 
     public static void SetFocusRingBrush(DependencyObject element, Brush? value) => element.SetValue(FocusRingBrushProperty, value);
+
+    /// <summary>
+    /// UI.12 FOCUS-02 (Prism UI12A): with the danger edge on the inner ring, a focused invalid field looked like an unfocused
+    /// one (1.5 -> 2 px, and identical in HC where the error brush is WindowText). The error styles set this to
+    /// SaFocusRingBrush: the templates then draw it as a second ring 4 px outside the field while focused. Null = no ring.
+    /// </summary>
+    public static readonly DependencyProperty OuterFocusRingBrushProperty = DependencyProperty.RegisterAttached(
+        "OuterFocusRingBrush", typeof(Brush), typeof(SaFieldChrome), new PropertyMetadata(null));
+
+    public static Brush? GetOuterFocusRingBrush(DependencyObject element) => (Brush?)element.GetValue(OuterFocusRingBrushProperty);
+
+    public static void SetOuterFocusRingBrush(DependencyObject element, Brush? value) => element.SetValue(OuterFocusRingBrushProperty, value);
 }

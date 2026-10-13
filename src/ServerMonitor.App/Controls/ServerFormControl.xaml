@@ -91,7 +91,7 @@
              import itself is the page's dialog (Figma 04 chrome, 07 states); no inline list any more. -->
         <TextBlock
             x:Name="ImportStatusText"
-            AutomationProperties.LiveSetting="Polite"
+            primitives:SaAnnounce.Changes="True" AutomationProperties.LiveSetting="Polite"
             Style="{StaticResource SaCaptionTextStyle}"
             Foreground="{ThemeResource SaTextSecondaryBrush}"
             Text="{Binding SshConfigStatusMessage}"
@@ -259,7 +259,9 @@
                         </HyperlinkButton>
                     </StackPanel>
                     <Border Style="{StaticResource SaSegmentedPillTrackStyle}" HorizontalAlignment="Stretch">
-                        <Grid x:Uid="ServerEditorAuthMethodGroup" ColumnSpacing="4" primitives:SaGroupNavigation.Mode="SelectionFollowsFocus">
+                        <!-- UI.12 PEER-01: the group name lives on a peer-bearing host (a Grid has no automation peer). -->
+                        <primitives:SaGroupHost x:Uid="ServerEditorAuthMethodGroup">
+                        <Grid ColumnSpacing="4" primitives:SaGroupNavigation.Mode="SelectionFollowsFocus">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="*" />
@@ -269,7 +271,7 @@
                                     primitives:SaSlidingSelection.AllowDrag="True"
                                     primitives:SaSlidingSelection.DurationKey="SaMotionSegmentSelectDuration"
                                     primitives:SaSlidingSelection.IndicatorBrush="{ThemeResource SaSegmentedPillSelectedBrush}"
-                                    primitives:SaSlidingSelection.LightOutlineBrush="{ThemeResource SaDialogButtonBorderBrush}" />
+                                    primitives:SaSlidingSelection.LightOutlineBrush="{ThemeResource SaSegmentedSelectedOutlineBrush}" />
                             <!-- 112:3356: Key01 / LockPassword 16 + Medium 12; the SAME SelectedAuthenticationIndex setter as
                                  before, so changing the method still drops a staged secret (Vigil H4). -->
                             <RadioButton x:Uid="ServerEditorAuthKeyOption" GroupName="ServerEditorAuthentication" HorizontalAlignment="Stretch"
@@ -289,6 +291,7 @@
                                 </StackPanel>
                             </RadioButton>
                         </Grid>
+                        </primitives:SaGroupHost>
                     </Border>
 
                     <!-- SSH key (B-12): the 460x40 picker shows the file NAME; its menu lists the keys found in .ssh (metadata
@@ -304,7 +307,7 @@
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
                                     <primitives:SaIcon Data="{StaticResource SaIconFolder01Data}" Size="18" VerticalAlignment="Center"
-                                                       Foreground="{ThemeResource SaTextSecondaryBrush}" />
+                                                       Style="{ThemeResource SaIconSecondaryStyle}" />
                                     <TextBlock x:Name="KeyPickerText" Grid.Column="1" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                                 </Grid>
                                 <Button.Flyout>
@@ -469,7 +472,9 @@
                     <TextBlock x:Uid="ServerEditorJumpAuthSubtitle" Style="{StaticResource SaCaptionTextStyle}"
                                Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap" />
                     <Border Style="{StaticResource SaSegmentedPillTrackStyle}" HorizontalAlignment="Stretch">
-                        <Grid x:Uid="ServerEditorJumpAuthMethodGroup" ColumnSpacing="4" primitives:SaGroupNavigation.Mode="SelectionFollowsFocus">
+                        <!-- UI.12 PEER-01: the group name lives on a peer-bearing host (a Grid has no automation peer). -->
+                        <primitives:SaGroupHost x:Uid="ServerEditorJumpAuthMethodGroup">
+                        <Grid ColumnSpacing="4" primitives:SaGroupNavigation.Mode="SelectionFollowsFocus">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="*" />
@@ -479,7 +484,7 @@
                                     primitives:SaSlidingSelection.AllowDrag="True"
                                     primitives:SaSlidingSelection.DurationKey="SaMotionSegmentSelectDuration"
                                     primitives:SaSlidingSelection.IndicatorBrush="{ThemeResource SaSegmentedPillSelectedBrush}"
-                                    primitives:SaSlidingSelection.LightOutlineBrush="{ThemeResource SaDialogButtonBorderBrush}" />
+                                    primitives:SaSlidingSelection.LightOutlineBrush="{ThemeResource SaSegmentedSelectedOutlineBrush}" />
                             <RadioButton x:Uid="ServerEditorJumpAuthKeyOption" GroupName="ServerEditorJumpAuthentication" HorizontalAlignment="Stretch"
                                          Style="{StaticResource SaSegmentedPillItemStyle}" IsEnabled="{Binding IsNotTestingConnection}"
                                          IsChecked="{Binding SelectedJumpAuthenticationIndex, Mode=TwoWay, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=0}">
@@ -497,6 +502,7 @@
                                 </StackPanel>
                             </RadioButton>
                         </Grid>
+                        </primitives:SaGroupHost>
                     </Border>
                     <!-- The same picker and the same found keys as the target; the jump host's key is NEVER pre-selected. -->
                     <StackPanel Spacing="14" primitives:SaMotion.Enter="Rise" Visibility="{Binding IsJumpPrivateKeyAuthentication, Converter={StaticResource BooleanToVisibilityConverter}}">
@@ -509,7 +515,7 @@
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
                                     <primitives:SaIcon Data="{StaticResource SaIconFolder01Data}" Size="18" VerticalAlignment="Center"
-                                                       Foreground="{ThemeResource SaTextSecondaryBrush}" />
+                                                       Style="{ThemeResource SaIconSecondaryStyle}" />
                                     <TextBlock x:Name="JumpKeyPickerText" Grid.Column="1" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                                 </Grid>
                                 <Button.Flyout>

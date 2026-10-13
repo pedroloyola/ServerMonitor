@@ -1,0 +1,105 @@
+using System.Xml.Linq;
+
+namespace ServerMonitor.App.Tests.Architecture;
+
+/// <summary>
+/// UI.12 FOCUS-01 (Prism UI12A): in High Contrast SaFocusRingBrush and the selected fills are both Highlight, and the Sa
+/// styles put the ring ON the fill edge (FocusVisualMargin 0) - the ring vanished on the selected item (2.4.7 for HC
+/// users). The system's inner (secondary) ring is restored in HC only, in the Window colour; Dark/Light keep thickness 0,
+/// so the approved UI.10 F01 ring is unchanged there. Static guard; real HC stays NOT_RUN (Beacon R-6).
+/// </summary>
+public sealed class Ui12FocusRingGuardTests
+{
+    [Fact]
+    public void EverySaStyleTakesTheSecondaryRingFromTheThemedTokens()
+    {
+        var failures = new List<string>();
+        var styles = 0;
+        foreach (var file in AppSourceTree.Files(".xaml").Where(f => f.StartsWith("Styles/", StringComparison.Ordinal)
+                     || f.StartsWith("Views/", StringComparison.Ordinal) || f.StartsWith("Controls/", StringComparison.Ordinal)))
+        {
+            foreach (var style in AppSourceTree.LoadXaml(file).Descendants().Where(e => e.Name.LocalName == "Style"))
+            {
+                var setters = style.Elements().Where(e => e.Name.LocalName == "Setter")
+                    .ToDictionary(s => (string)s.Attribute("Property")!, s => (string?)s.Attribute("Value") ?? "", StringComparer.Ordinal);
+                if (!setters.TryGetValue("FocusVisualSecondaryThickness", out var thickness))
+                {
+                    continue;
+                }
+
+                styles++;
+                var key = (string?)style.Attribute(AppSourceTree.Xaml + "Key") ?? "<implicit>";
+                if (thickness != "{ThemeResource SaFocusVisualSecondaryThickness}")
+                {
+                    failures.Add($"{file} {key}: FocusVisualSecondaryThickness = {thickness}");
+                }
+
+                if (!setters.TryGetValue("FocusVisualSecondaryBrush", out var brush) || brush != "{ThemeResource SaFocusRingSecondaryBrush}")
+                {
+                    failures.Add($"{file} {key}: FocusVisualSecondaryBrush must be SaFocusRingSecondaryBrush");
+                }
+            }
+        }
+
+        Assert.True(styles >= 13, $"Only {styles} styles set the secondary ring; the guard would be vacuous.");
+        Assert.True(failures.Count == 0, string.Join(Environment.NewLine, failures));
+    }
+
+    [Fact]
+    public void SecondaryRingIsHighContrastOnly()
+    {
+        var thickness = ThemeEntries("Styles/Components/Sa.Surfaces.xaml", "SaFocusVisualSecondaryThickness", e => e.Value.Trim());
+        Assert.Equal("0", thickness["Dark"]);
+        Assert.Equal("0", thickness["Light"]);
+        Assert.Equal("1", thickness["HighContrast"]);
+
+        var brush = ThemeEntries("Styles/Tokens/Color.Semantic.xaml", "SaFocusRingSecondaryBrush", e => (string)e.Attribute("Color")!);
+        Assert.Equal("{ThemeResource SystemColorWindowColor}", brush["HighContrast"]);
+    }
+
+    /// <summary>UI.12 FOCUS-02 (Prism UI12A): an invalid field keeps the danger edge AND shows the app ring outside it when
+    /// focused; no other field style draws the outer ring (unchanged look everywhere else).</summary>
+    [Fact]
+    public void InvalidFieldsDrawTheAppRingOutsideTheDangerEdgeWhenFocused()
+    {
+        var forms = AppSourceTree.LoadXaml("Styles/Components/Sa.Forms.xaml");
+        foreach (var template in new[] { "SaTextFieldTemplate", "SaPasswordBoxTemplate" })
+        {
+            var t = forms.Descendants().Single(e => e.Name.LocalName == "ControlTemplate" && (string?)e.Attribute(AppSourceTree.Xaml + "Key") == template);
+            var ring = t.Descendants().Single(e => (string?)e.Attribute(AppSourceTree.Xaml + "Name") == "OuterFocusRing");
+            Assert.Equal("-4", (string?)ring.Attribute("Margin"));
+            Assert.Equal("0", (string?)ring.Attribute("Opacity"));
+            var focused = t.Descendants().Single(e => e.Name.LocalName == "VisualState" && (string?)e.Attribute(AppSourceTree.Xaml + "Name") == "Focused");
+            Assert.Contains(focused.Descendants(), s => (string?)s.Attribute("Target") == "OuterFocusRing.Opacity" && (string?)s.Attribute("Value") == "1");
+        }
+
+        var outerSetters = forms.Descendants().Where(e => e.Name.LocalName == "Setter" && (string?)e.Attribute("Property") == "primitives:SaFieldChrome.OuterFocusRingBrush")
+            .Select(s => ((string?)s.Parent!.Attribute(AppSourceTree.Xaml + "Key"), (string?)s.Attribute("Value"))).OrderBy(x => x.Item1).ToList();
+        Assert.Equal(
+            [("SaPasswordBoxErrorStyle", "{ThemeResource SaFocusRingBrush}"), ("SaTextFieldErrorStyle", "{ThemeResource SaFocusRingBrush}")],
+            outerSetters);
+    }
+
+    /// <summary>UI.12 B12-10 (Beacon): the programmatic heading focus draws the app ring, not the square system default.</summary>
+    [Fact]
+    public void HeadingHostDrawsTheAppRing()
+    {
+        var style = AppSourceTree.LoadXaml("Styles/Components/Sa.Primitives.xaml").Descendants()
+            .Single(e => e.Name.LocalName == "Style" && (string?)e.Attribute("TargetType") == "primitives:SaHeadingHost");
+        var setters = style.Elements().Where(e => e.Name.LocalName == "Setter")
+            .ToDictionary(s => (string)s.Attribute("Property")!, s => (string?)s.Attribute("Value") ?? "", StringComparer.Ordinal);
+
+        Assert.Equal("{ThemeResource SaFocusRingBrush}", setters["FocusVisualPrimaryBrush"]);
+        Assert.Equal("{StaticResource SaFocusRingThickness}", setters["FocusVisualPrimaryThickness"]);
+        Assert.Equal("{StaticResource SaRadiusSmall}", setters["CornerRadius"]);
+        Assert.DoesNotContain("DefaultStyleKey = typeof(SaHeadingHost)", AppSourceTree.CodeWithoutComments("Controls/Primitives/SaHeadingHost.cs"), StringComparison.Ordinal);
+    }
+
+    private static Dictionary<string, string> ThemeEntries(string file, string key, Func<XElement, string> value) =>
+        AppSourceTree.LoadXaml(file).Descendants()
+            .Where(e => e.Name.LocalName == "ResourceDictionary" && e.Attribute(AppSourceTree.Xaml + "Key") is not null)
+            .ToDictionary(
+                e => (string)e.Attribute(AppSourceTree.Xaml + "Key")!,
+                e => value(e.Elements().Single(x => (string?)x.Attribute(AppSourceTree.Xaml + "Key") == key)),
+                StringComparer.Ordinal);
+}

@@ -276,8 +276,14 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
 
     // --- States ----------------------------------------------------------------------------------------------------
 
-    /// <summary>Figma "Primeira leitura": a metrics-capable server still waiting for its first snapshot.</summary>
-    public bool IsFirstReading => _card?.IsMetricsPending == true;
+    /// <summary>
+    /// Figma "Primeira leitura": a metrics-capable server still waiting for its first snapshot - INCLUDING while that first
+    /// collection runs (UI.12 UI12A-STATE-05: the card's IsMetricsPending excludes a running refresh, so the Detail showed no
+    /// skeleton, "—" and "Sem dados" exactly while the first reading was being taken). Prism r3 R3-03: "first" means NO
+    /// attempt has failed yet - LastError is cleared only by a success (which brings a snapshot), so a never-read server
+    /// that is failing does not flip back to "A ligar…" + skeleton on every retry (HasMetricsError is false while refreshing).
+    /// </summary>
+    public bool IsFirstReading => _card is { SupportsMetrics: true, HasMetrics: false } && _card.LastError is null;
 
     public bool IsRefreshing => _card?.IsRefreshingMetrics == true;
 
@@ -297,7 +303,7 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
 
     /// <summary>H-UI5-2: a retained reading is shown, marked stale (StaleAgeDisplay semantics), legible without colour.</summary>
     public bool IsReadingStale => _card is not null
-        && ServerStatusPresentation.ShowsRetainedReadingAsStale(_card.Health, _card.IsStale, _card.HasMetrics);
+        && ServerStatusPresentation.ShowsRetainedReadingAsStale(_card.Health, _card.IsStale, _card.HasMetrics, _card.LastError is not null);
 
     /// <summary>
     /// Prism C1 N-6: the stale chip always says "Leitura desatualizada"; the age is said once, by the "Última atualização"

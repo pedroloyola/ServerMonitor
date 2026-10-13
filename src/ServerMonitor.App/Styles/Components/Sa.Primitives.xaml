@@ -75,15 +75,31 @@
     <!-- Icon (Boss B-1): one stroke-only path, 1.5 DIP stroke at every size (the geometry is scaled in code, never the
          element), round caps and joins, no fill, Foreground inherited from the host so it follows theme and HC.
          Decorative: Raw in UI Automation and not a tab stop. -->
-    <Style TargetType="primitives:SaIcon">
+    <Style x:Key="SaIconBaseStyle" TargetType="primitives:SaIcon">
         <Setter Property="IsTabStop" Value="False" />
         <Setter Property="AutomationProperties.AccessibilityView" Value="Raw" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="primitives:SaIcon">
                     <Grid Width="{TemplateBinding Size}" Height="{TemplateBinding Size}" Background="Transparent">
+                        <!-- UI.12 B12B-01. Measured: a host's visual state (checked / hover / pressed / disabled) sets ITS
+                             ContentPresenter.Foreground; the icon inherits the value, but WinUI notifies that change only to
+                             IconElement descendants (InheritedProperties::GetCorrespondingInheritedProperty), so nothing bound
+                             to the icon's own Foreground ever updates. Light / Dark keep exactly today's TemplateBinding path.
+                             In High Contrast PART_StatePath draws instead; SaIcon binds its Stroke (in code: ElementName does
+                             not resolve inside this template, measured) to PART_ForegroundProbe, a collapsed IconElement that
+                             does receive the notification - so the icon follows the state text (HighlightText on Highlight,
+                             GrayText when disabled). The probe must carry no Foreground of its own. -->
                         <Path x:Name="PART_Path"
+                              Visibility="{ThemeResource SaIconRestPathVisibility}"
                               Stroke="{TemplateBinding Foreground}"
+                              StrokeThickness="1.5"
+                              StrokeStartLineCap="Round"
+                              StrokeEndLineCap="Round"
+                              StrokeLineJoin="Round" />
+                        <PathIcon x:Name="PART_ForegroundProbe" Visibility="Collapsed" />
+                        <Path x:Name="PART_StatePath"
+                              Visibility="{ThemeResource SaIconStatePathVisibility}"
                               StrokeThickness="1.5"
                               StrokeStartLineCap="Round"
                               StrokeEndLineCap="Round"
@@ -93,6 +109,8 @@
             </Setter.Value>
         </Setter>
     </Style>
+    <!-- The implicit icon style IS the base, so an icon given SaIconSecondaryStyle keeps the same template. -->
+    <Style TargetType="primitives:SaIcon" BasedOn="{StaticResource SaIconBaseStyle}" />
 
     <!-- Status dot + label (Figma 112:1066 / 112:1448: dot 6, gap 7, 12 Regular muted). Colour is never the only
          signal: the Label is always rendered and is the automation name (the visible text is Raw for UIA so it is
@@ -190,7 +208,8 @@
         <Setter Property="UseSystemFocusVisuals" Value="True" />
         <Setter Property="FocusVisualPrimaryBrush" Value="{ThemeResource SaFocusRingBrush}" />
         <Setter Property="FocusVisualPrimaryThickness" Value="{StaticResource SaFocusRingThickness}" />
-        <Setter Property="FocusVisualSecondaryThickness" Value="0" />
+        <Setter Property="FocusVisualSecondaryThickness" Value="{ThemeResource SaFocusVisualSecondaryThickness}" />
+        <Setter Property="FocusVisualSecondaryBrush" Value="{ThemeResource SaFocusRingSecondaryBrush}" />
         <Setter Property="FocusVisualMargin" Value="0" />
         <Setter Property="Template">
             <Setter.Value>
@@ -217,7 +236,8 @@
         <Setter Property="UseSystemFocusVisuals" Value="True" />
         <Setter Property="FocusVisualPrimaryBrush" Value="{ThemeResource SaFocusRingBrush}" />
         <Setter Property="FocusVisualPrimaryThickness" Value="{StaticResource SaFocusRingThickness}" />
-        <Setter Property="FocusVisualSecondaryThickness" Value="0" />
+        <Setter Property="FocusVisualSecondaryThickness" Value="{ThemeResource SaFocusVisualSecondaryThickness}" />
+        <Setter Property="FocusVisualSecondaryBrush" Value="{ThemeResource SaFocusRingSecondaryBrush}" />
         <!-- Prism R2-1: ring = SaFocusRingBrush 2 px, control radius 12; OUTSET 8 horizontally (the dot and the last glyph
              touch the row edges and must stay clear; card pad 24 leaves 16), inset 2 vertically (rows are 64 apart). -->
         <Setter Property="FocusVisualMargin" Value="-8,2,-8,2" />
@@ -408,7 +428,8 @@
         <Setter Property="UseSystemFocusVisuals" Value="True" />
         <Setter Property="FocusVisualPrimaryBrush" Value="{ThemeResource SaFocusRingBrush}" />
         <Setter Property="FocusVisualPrimaryThickness" Value="{StaticResource SaFocusRingThickness}" />
-        <Setter Property="FocusVisualSecondaryThickness" Value="0" />
+        <Setter Property="FocusVisualSecondaryThickness" Value="{ThemeResource SaFocusVisualSecondaryThickness}" />
+        <Setter Property="FocusVisualSecondaryBrush" Value="{ThemeResource SaFocusRingSecondaryBrush}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="primitives:SaListRow">
@@ -425,12 +446,12 @@
                                 <VisualState x:Name="Normal" />
                                 <VisualState x:Name="PointerOver">
                                     <VisualState.Setters>
-                                        <Setter Target="RootGrid.Background" Value="{ThemeResource SaHoverBrush}" />
+                                        <Setter Target="RootGrid.Background" Value="{ThemeResource SaHoverVeilBrush}" />
                                     </VisualState.Setters>
                                 </VisualState>
                                 <VisualState x:Name="Pressed">
                                     <VisualState.Setters>
-                                        <Setter Target="RootGrid.Background" Value="{ThemeResource SaSelectedBrush}" />
+                                        <Setter Target="RootGrid.Background" Value="{ThemeResource SaSelectedVeilBrush}" />
                                     </VisualState.Setters>
                                 </VisualState>
                                 <VisualState x:Name="Disabled">
@@ -536,7 +557,9 @@
          message 12 muted, close 28. Shadow not reproduced (deviation). -->
     <Style TargetType="primitives:SaToast">
         <Setter Property="IsTabStop" Value="False" />
-        <Setter Property="Width" Value="600" />
+        <!-- UI.12 LAYOUT-02 (Prism UI12A): at most 600, never a fixed 600 (the Detail "Guardado" toast was cut at the
+             minimum window width, ~384 DIP of content). -->
+        <Setter Property="MaxWidth" Value="600" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="primitives:SaToast">
@@ -623,6 +646,18 @@
         <Setter Property="CornerRadius" Value="{StaticResource SaRadiusSmall}" />
     </Style>
 
+    <!-- UI.12 B12-10 (Beacon): the programmatic heading focus (SaHeadingHost.FocusHeading, launches/activations without
+         input) drew the default square system rectangle; it now draws the app ring (SaFocusRingBrush 2 px, HC-only inner
+         ring, small radius) like every other Sa focus target. Implicit style: the template stays ContentControl's. -->
+    <Style TargetType="primitives:SaHeadingHost">
+        <Setter Property="UseSystemFocusVisuals" Value="True" />
+        <Setter Property="FocusVisualPrimaryBrush" Value="{ThemeResource SaFocusRingBrush}" />
+        <Setter Property="FocusVisualPrimaryThickness" Value="{StaticResource SaFocusRingThickness}" />
+        <Setter Property="FocusVisualSecondaryThickness" Value="{ThemeResource SaFocusVisualSecondaryThickness}" />
+        <Setter Property="FocusVisualSecondaryBrush" Value="{ThemeResource SaFocusRingSecondaryBrush}" />
+        <Setter Property="CornerRadius" Value="{StaticResource SaRadiusSmall}" />
+    </Style>
+
     <!-- Breadcrumb 112:1786 / 112:2023: h22, gap 8, parent 12 muted, chevron 14, current 12 text. -->
     <Style TargetType="primitives:SaBreadcrumb">
         <Setter Property="IsTabStop" Value="False" />
@@ -697,7 +732,8 @@
         <Setter Property="Foreground" Value="{ThemeResource SaDangerTextBrush}" />
     </Style>
     <Style x:Key="SaCompactStatusOfflineTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SaCompactStatusTextStyle}">
-        <Setter Property="Foreground" Value="{ThemeResource SaOfflineBrush}" />
+        <!-- UI.12 CONTRAST-01: a text token (Light >=4.5:1); the row dot keeps the coral SaOfflineBrush. -->
+        <Setter Property="Foreground" Value="{ThemeResource SaOfflineTextBrush}" />
     </Style>
 
     <!-- Compact "Expandir" 112:9430 / "Adicionar servidor" 112:9828: h36, pill (UI.10 F06; was SaRadiusControl), padding 14,0, 12 Medium, flat glass
@@ -745,12 +781,12 @@
                                 <VisualState x:Name="Normal" />
                                 <VisualState x:Name="PointerOver">
                                     <VisualState.Setters>
-                                        <Setter Target="StateOverlay.Background" Value="{ThemeResource SaHoverBrush}" />
+                                        <Setter Target="StateOverlay.Background" Value="{ThemeResource SaHoverVeilBrush}" />
                                     </VisualState.Setters>
                                 </VisualState>
                                 <VisualState x:Name="Pressed">
                                     <VisualState.Setters>
-                                        <Setter Target="StateOverlay.Background" Value="{ThemeResource SaSelectedBrush}" />
+                                        <Setter Target="StateOverlay.Background" Value="{ThemeResource SaSelectedVeilBrush}" />
                                     </VisualState.Setters>
                                 </VisualState>
                                 <VisualState x:Name="Disabled" />
@@ -805,4 +841,40 @@
             <Style x:Key="SaShellWindowBackgroundStyle" TargetType="Border"><Setter Property="Background" Value="{ThemeResource SaWindowMaterialBrush}"/></Style>
             <Style x:Key="SaOpaqueWindowBackgroundStyle" TargetType="Border"><Setter Property="Background" Value="{ThemeResource AppBackgroundBrush}"/></Style>
 
+    <!-- UI.12 B12B-01: which SaIcon path draws (see the SaIcon style). Light / Dark / Default = today's rest path only;
+         High Contrast = the path that follows the host's state text. Chosen by the framework's theme resolution, never
+         by code or a system event (85a6b08 subscribed AccessibilitySettings.HighContrastChanged, which throws 0x80070490
+         in this WinUI 3 desktop app and fail-fasted every launch).
+         SaIconSecondaryStyle (Prism P3): the muted icon inside a Glass / Flat / selected host. Light / Dark / Default set the
+         same SaTextSecondaryBrush the icons carried locally; High Contrast sets none, so the icon inherits the host's state
+         text (HighlightText on Highlight, GrayText when disabled) - a local Foreground would beat that inheritance.
+         At the end of the file so its BasedOn (SaIconBaseStyle) is already defined. -->
+    <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="Default">
+            <Visibility x:Key="SaIconRestPathVisibility">Visible</Visibility>
+            <Visibility x:Key="SaIconStatePathVisibility">Collapsed</Visibility>
+            <Style x:Key="SaIconSecondaryStyle" TargetType="primitives:SaIcon" BasedOn="{StaticResource SaIconBaseStyle}">
+                <Setter Property="Foreground" Value="{ThemeResource SaTextSecondaryBrush}" />
+            </Style>
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="Dark">
+            <Visibility x:Key="SaIconRestPathVisibility">Visible</Visibility>
+            <Visibility x:Key="SaIconStatePathVisibility">Collapsed</Visibility>
+            <Style x:Key="SaIconSecondaryStyle" TargetType="primitives:SaIcon" BasedOn="{StaticResource SaIconBaseStyle}">
+                <Setter Property="Foreground" Value="{ThemeResource SaTextSecondaryBrush}" />
+            </Style>
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="Light">
+            <Visibility x:Key="SaIconRestPathVisibility">Visible</Visibility>
+            <Visibility x:Key="SaIconStatePathVisibility">Collapsed</Visibility>
+            <Style x:Key="SaIconSecondaryStyle" TargetType="primitives:SaIcon" BasedOn="{StaticResource SaIconBaseStyle}">
+                <Setter Property="Foreground" Value="{ThemeResource SaTextSecondaryBrush}" />
+            </Style>
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="HighContrast">
+            <Visibility x:Key="SaIconRestPathVisibility">Collapsed</Visibility>
+            <Visibility x:Key="SaIconStatePathVisibility">Visible</Visibility>
+            <Style x:Key="SaIconSecondaryStyle" TargetType="primitives:SaIcon" BasedOn="{StaticResource SaIconBaseStyle}" />
+        </ResourceDictionary>
+    </ResourceDictionary.ThemeDictionaries>
 </ResourceDictionary>

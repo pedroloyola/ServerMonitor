@@ -1,8 +1,10 @@
 using System.ComponentModel;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
+using ServerMonitor.App.Controls.Primitives;
 using ServerMonitor.App.Services;
 using ServerMonitor.App.ViewModels;
 using Windows.ApplicationModel.DataTransfer;
@@ -23,7 +25,13 @@ public sealed partial class ServerFormControl : UserControl
     {
         InitializeComponent();
         DataContextChanged += OnDataContextChanged;
-        Unloaded += (_, _) => Attach(null);
+        // UI.12 C-L1: a theme remount can raise the new Loaded before this stale Unloaded; detaching then would leave the
+        // form frozen (DataContext is set once, nothing re-attaches). Detach only if still not live one turn later.
+        var unloadDetach = new DeferredUnloadDetach(
+            isLive: () => SaLiveTree.IsLive(this),
+            post: action => DispatcherQueue?.TryEnqueue(DispatcherQueuePriority.Low, () => action()) == true,
+            detach: () => Attach(null));
+        Unloaded += (_, _) => unloadDetach.OnUnloaded();
         Loaded += (_, _) => Attach(DataContext as ServerEditorViewModel);
         PasswordField.PasswordChanged += OnPasswordChanged;
         PassphraseField.PasswordChanged += OnPasswordChanged;
@@ -239,6 +247,8 @@ public sealed partial class ServerFormControl : UserControl
             or nameof(ServerEditorViewModel.HasSavedPassphrase)
             or nameof(ServerEditorViewModel.HasSavedPassword)
             or nameof(ServerEditorViewModel.HasSavedJumpSecret)
+            or nameof(ServerEditorViewModel.HasCapturedSecret)
+            or nameof(ServerEditorViewModel.HasCapturedJumpSecret)
             or nameof(ServerEditorViewModel.SelectedAuthenticationIndex)
             or nameof(ServerEditorViewModel.SelectedJumpAuthenticationIndex)
             or nameof(ServerEditorViewModel.UseJumpHost)
@@ -283,13 +293,13 @@ public sealed partial class ServerFormControl : UserControl
             localization.GetString("ServerEditorJumpKeyPickerHelper"),
             localization.GetString("ServerEditorJumpKeyPickerAccessibleHeader"));
 
-        SetSavedSecretLabels(PassphraseFormField, PassphraseField, viewModel.HasSavedPassphrase,
+        SetSavedSecretLabels(PassphraseFormField, PassphraseField, viewModel.HasSavedPassphrase, viewModel.HasCapturedSecret,
             "ServerEditorPassphraseHeader", "ServerEditorPassphrasePlaceholder", "ServerEditorPassphraseSavedHeader");
-        SetSavedSecretLabels(PasswordFormField, PasswordField, viewModel.HasSavedPassword,
+        SetSavedSecretLabels(PasswordFormField, PasswordField, viewModel.HasSavedPassword, viewModel.HasCapturedSecret,
             "ServerEditorPasswordHeader", "ServerEditorPasswordPlaceholder", "ServerEditorPasswordSavedHeader");
-        SetSavedSecretLabels(JumpPassphraseFormField, JumpPassphraseField, viewModel.HasSavedJumpSecret,
+        SetSavedSecretLabels(JumpPassphraseFormField, JumpPassphraseField, viewModel.HasSavedJumpSecret, viewModel.HasCapturedJumpSecret,
             "ServerEditorPassphraseHeader", "ServerEditorJumpPassphrasePlaceholder", "ServerEditorPassphraseSavedHeader");
-        SetSavedSecretLabels(JumpPasswordFormField, JumpPasswordField, viewModel.HasSavedJumpSecret,
+        SetSavedSecretLabels(JumpPasswordFormField, JumpPasswordField, viewModel.HasSavedJumpSecret, viewModel.HasCapturedJumpSecret,
             "ServerEditorPasswordHeader", "ServerEditorJumpPasswordPlaceholder", "ServerEditorPasswordSavedHeader");
 
         RouteLine.Text = ServerEditorRouteLine.Describe(viewModel.JumpHost, viewModel.Host, localization);
@@ -316,18 +326,28 @@ public sealed partial class ServerFormControl : UserControl
     }
 
     // A saved secret is never shown: the box stays empty, the label says "guardada" and the placeholder says how to keep it.
+    // UI.12 B12-05: a secret typed, captured (box cleared) and retained for the next Test/Save says so instead - the same
+    // text in the UIA HelpText (the placeholder is not reliably read); never in the Name, never anything from the value.
     private void SetSavedSecretLabels(
         Primitives.SaFormField field,
         PasswordBox box,
         bool saved,
+        bool captured,
         string headerKey,
         string placeholderKey,
         string savedHeaderKey)
     {
         var localization = _localization!;
         field.Header = localization.GetString(saved ? savedHeaderKey : headerKey);
-        box.PlaceholderText = localization.GetString(saved ? "ServerEditorSecretKeepPlaceholder" : placeholderKey);
+        box.PlaceholderText = localization.GetString(SecretPlaceholderKey(saved, captured, placeholderKey));
+        AutomationProperties.SetHelpText(box, captured ? localization.GetString(RetainedSecretPlaceholderKey) : string.Empty);
     }
+
+    internal const string RetainedSecretPlaceholderKey = "ServerEditorSecretRetainedPlaceholder";
+
+    /// <summary>UI.12 B12-05: retained (captured) wins over saved ("keep") over the field's own placeholder.</summary>
+    internal static string SecretPlaceholderKey(bool saved, bool captured, string placeholderKey) =>
+        captured ? RetainedSecretPlaceholderKey : saved ? "ServerEditorSecretKeepPlaceholder" : placeholderKey;
 
     private void OnKeyPickerMenuOpening(object? sender, object e) =>
         FillKeyMenu(KeyPickerMenu, jump: false);
@@ -356,17 +376,10 @@ public sealed partial class ServerFormControl : UserControl
                 }
 
                 var browse = new MenuFlyoutItem { Text = option.Label };
-                browse.Click += async (_, _) =>
-                {
-                    if (jump)
-                    {
-                        await viewModel.SelectJumpPrivateKeyAsync();
-                    }
-                    else
-                    {
-                        await viewModel.SelectPrivateKeyAsync();
-                    }
-                };
+                // UI.12 C-L8: the picker is a platform call; a failure must not end the process.
+                browse.Click += async (_, _) => await UiFireAndForget.RunAsync(
+                    "editor key picker",
+                    jump ? viewModel.SelectJumpPrivateKeyAsync : viewModel.SelectPrivateKeyAsync);
                 menu.Items.Add(browse);
                 continue;
             }

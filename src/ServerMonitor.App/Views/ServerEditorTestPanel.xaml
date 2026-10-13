@@ -34,8 +34,9 @@
                 </Grid.ColumnDefinitions>
                 <primitives:SaIcon Data="{StaticResource SaIconServerStack01Data}" Size="17" VerticalAlignment="Center"
                                    Foreground="{ThemeResource SaTextSecondaryBrush}" />
+                <!-- UI.12 FORM-01 (Prism UI12A): the subject of the decision is never cut on one line - it wraps (up to 3). -->
                 <TextBlock x:Name="SubjectText" Grid.Column="1" Style="{StaticResource SaControlTextStyle}" VerticalAlignment="Center"
-                           TextTrimming="CharacterEllipsis" />
+                           TextWrapping="Wrap" MaxLines="3" TextTrimming="CharacterEllipsis" />
             </Grid>
         </Border>
 
@@ -49,7 +50,9 @@
             <ItemsControl.ItemTemplate>
                 <DataTemplate>
                     <StackPanel Spacing="6">
-                        <Grid ColumnSpacing="10" AutomationProperties.Name="{Binding AccessibleName}">
+                        <!-- UI.12 PEER-01: the step is a named group (a Grid has no peer). R1-03: its name already reads "title: state", so both texts stay Raw. -->
+                        <primitives:SaGroupHost AutomationProperties.Name="{Binding AccessibleName}">
+                        <Grid ColumnSpacing="10">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="16" />
                                 <ColumnDefinition Width="*" />
@@ -73,10 +76,11 @@
                                                    Visibility="{Binding IsWarning, Converter={StaticResource BooleanToVisibilityConverter}}" />
                             </Grid>
                             <TextBlock Grid.Column="1" Style="{StaticResource SaLabelTextStyle}" Foreground="{ThemeResource SaTextBrush}"
-                                       Text="{Binding Title}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                                       Text="{Binding Title}" TextWrapping="Wrap" VerticalAlignment="Center" AutomationProperties.AccessibilityView="Raw" />
                             <TextBlock Grid.Column="2" Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}"
                                        Text="{Binding StateText}" VerticalAlignment="Center" AutomationProperties.AccessibilityView="Raw" />
                         </Grid>
+                        </primitives:SaGroupHost>
                         <StackPanel Margin="26,0,0,0" Spacing="6"
                                     Visibility="{Binding HasDetail, Converter={StaticResource BooleanToVisibilityConverter}}">
                             <TextBlock Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}"

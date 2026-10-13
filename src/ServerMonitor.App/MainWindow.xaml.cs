@@ -405,6 +405,10 @@ public sealed partial class MainWindow : Window
     /// without its focus ring reaching the caption band. Never a hardcoded constant: correct across DPI and caption heights.
     /// While the height is not reported yet (0) the provisional XAML value is kept and a later event recomputes it.
     /// </summary>
+    /// <summary>UI.12 C-W4: a Compact window's move/resize also refreshes the caption clearance (pure; see OnAppWindowChanged).</summary>
+    internal static bool RefreshesCompactClearanceOnAppWindowChange(WindowMode mode, bool didSizeChange, bool didPositionChange) =>
+        mode == WindowMode.Compact && (didSizeChange || didPositionChange);
+
     private void UpdateCompactCaptionClearance()
     {
         var height = _placementAdapter.GetCaptionHeight();
@@ -532,6 +536,14 @@ public sealed partial class MainWindow : Window
         if (!args.DidSizeChange && !args.DidPositionChange)
         {
             return;
+        }
+
+        // UI.12 C-W4 (UI10-H07-DPI-ORDER): moving to a monitor with another DPI changes AppWindow.TitleBar.Height and the
+        // XamlRoot scale, in an order that is neither documented nor measured. Recomputing here too (idempotent) makes the
+        // final clearance follow the LAST reading whichever event comes last.
+        if (RefreshesCompactClearanceOnAppWindowChange(_modeCoordinator.CurrentMode, args.DidSizeChange, args.DidPositionChange))
+        {
+            UpdateCompactCaptionClearance();
         }
 
         // Keep the in-memory placement current on every move/resize; the disk write is debounced.

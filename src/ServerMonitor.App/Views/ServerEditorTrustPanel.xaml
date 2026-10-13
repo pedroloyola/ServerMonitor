@@ -32,8 +32,9 @@
                 </Grid.ColumnDefinitions>
                 <primitives:SaIcon Data="{StaticResource SaIconServerStack01Data}" Size="17" VerticalAlignment="Center"
                                    Foreground="{ThemeResource SaTextSecondaryBrush}" />
+                <!-- UI.12 FORM-01 (Prism UI12A): the subject of the decision is never cut on one line - it wraps (up to 3). -->
                 <TextBlock x:Name="SubjectText" Grid.Column="1" Style="{StaticResource SaControlTextStyle}" VerticalAlignment="Center"
-                           TextTrimming="CharacterEllipsis" />
+                           TextWrapping="Wrap" MaxLines="3" TextTrimming="CharacterEllipsis" />
             </Grid>
         </Border>
         <!-- Mismatch only: the trusted key, then the received one. -->
@@ -54,7 +55,7 @@
             <ProgressRing x:Name="WorkingRing" Width="16" Height="16" IsActive="False" Foreground="{ThemeResource SaTextBrush}"
                           AutomationProperties.AccessibilityView="Raw" />
             <TextBlock x:Name="WorkingText" Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}"
-                       VerticalAlignment="Center" AutomationProperties.LiveSetting="Polite" />
+                       VerticalAlignment="Center" primitives:SaAnnounce.Changes="True" AutomationProperties.LiveSetting="Polite" />
         </StackPanel>
         <StackPanel x:Name="ActionRow" Orientation="Horizontal" Spacing="{StaticResource SaSpace12}" HorizontalAlignment="Right">
             <Button x:Name="CloseButton" Style="{StaticResource SaDialogCommandButtonStyle}" Click="OnCloseClick" />

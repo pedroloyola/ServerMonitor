@@ -43,12 +43,12 @@
                                     <VisualState x:Name="Normal" />
                                     <VisualState x:Name="PointerOver">
                                         <VisualState.Setters>
-                                            <Setter Target="RootGrid.Background" Value="{ThemeResource SaHoverBrush}" />
+                                            <Setter Target="RootGrid.Background" Value="{ThemeResource SaHoverVeilBrush}" />
                                         </VisualState.Setters>
                                     </VisualState>
                                     <VisualState x:Name="Pressed">
                                         <VisualState.Setters>
-                                            <Setter Target="RootGrid.Background" Value="{ThemeResource SaSelectedBrush}" />
+                                            <Setter Target="RootGrid.Background" Value="{ThemeResource SaSelectedVeilBrush}" />
                                         </VisualState.Setters>
                                     </VisualState>
                                     <VisualState x:Name="Disabled" />
@@ -89,9 +89,23 @@
                         </StackPanel>
                         <TextBlock Grid.Column="1" VerticalAlignment="Center" Style="{StaticResource SaTableCellSecondaryTextStyle}"
                                    Text="{x:Bind OperatingSystemDisplay}" TextTrimming="CharacterEllipsis" />
-                        <primitives:SaStatusIndicator Grid.Column="2" VerticalAlignment="Center"
-                            Status="{x:Bind Health, Mode=OneWay, Converter={StaticResource ServerHealthToStatusKindConverter}}"
-                            Label="{x:Bind StatusDisplay, Mode=OneWay}" />
+                        <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="5">
+                            <primitives:SaStatusIndicator
+                                Status="{x:Bind Health, Mode=OneWay, Converter={StaticResource ServerHealthToStatusKindConverter}}"
+                                Label="{x:Bind StatusDisplay, Mode=OneWay}" />
+                            <!-- UI.12 B12-06 (+ Prism r3 R3-01): the Compact R-7 cue under the state; it wraps in the 150 column (2 lines max) instead of losing the age. -->
+                            <Grid ColumnSpacing="4" Visibility="{x:Bind ShowsStaleCue, Mode=OneWay}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <primitives:SaIcon Data="{StaticResource SaIconClock01Data}" Size="12" VerticalAlignment="Top" Margin="0,2,0,0"
+                                                   Foreground="{ThemeResource SaAttentionTextBrush}" />
+                                <TextBlock Grid.Column="1" Style="{StaticResource SaHelperTextStyle}" Foreground="{ThemeResource SaAttentionTextBrush}"
+                                           Text="{x:Bind StaleAgeDisplay, Mode=OneWay}" TextWrapping="WrapWholeWords" MaxLines="2" TextTrimming="CharacterEllipsis"
+                                           AutomationProperties.AccessibilityView="Raw" />
+                            </Grid>
+                        </StackPanel>
                         <TextBlock Grid.Column="3" VerticalAlignment="Center" Text="{x:Bind CpuDisplay, Mode=OneWay}"
                                    Style="{x:Bind CpuSeverity, Mode=OneWay, Converter={StaticResource MetricValueStyleConverter}}" />
                         <TextBlock Grid.Column="4" VerticalAlignment="Center" Text="{x:Bind MemoryDisplay, Mode=OneWay}"
@@ -130,9 +144,23 @@
                             <TextBlock Style="{StaticResource SaTableCellSecondaryTextStyle}" Text="{x:Bind AddressAndSystemDisplay}"
                                        TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{x:Bind AddressAndSystemDisplay}" />
                         </StackPanel>
-                        <primitives:SaStatusIndicator Grid.Column="1" VerticalAlignment="Center"
-                            Status="{x:Bind Health, Mode=OneWay, Converter={StaticResource ServerHealthToStatusKindConverter}}"
-                            Label="{x:Bind StatusDisplay, Mode=OneWay}" />
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="5">
+                            <primitives:SaStatusIndicator
+                                Status="{x:Bind Health, Mode=OneWay, Converter={StaticResource ServerHealthToStatusKindConverter}}"
+                                Label="{x:Bind StatusDisplay, Mode=OneWay}" />
+                            <!-- UI.12 B12-06 (+ Prism r3 R3-01): the Compact R-7 cue under the state; it wraps in the 150 column (2 lines max) instead of losing the age. -->
+                            <Grid ColumnSpacing="4" Visibility="{x:Bind ShowsStaleCue, Mode=OneWay}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <primitives:SaIcon Data="{StaticResource SaIconClock01Data}" Size="12" VerticalAlignment="Top" Margin="0,2,0,0"
+                                                   Foreground="{ThemeResource SaAttentionTextBrush}" />
+                                <TextBlock Grid.Column="1" Style="{StaticResource SaHelperTextStyle}" Foreground="{ThemeResource SaAttentionTextBrush}"
+                                           Text="{x:Bind StaleAgeDisplay, Mode=OneWay}" TextWrapping="WrapWholeWords" MaxLines="2" TextTrimming="CharacterEllipsis"
+                                           AutomationProperties.AccessibilityView="Raw" />
+                            </Grid>
+                        </StackPanel>
                         <TextBlock Grid.Column="2" VerticalAlignment="Center" Text="{x:Bind CpuDisplay, Mode=OneWay}"
                                    Style="{x:Bind CpuSeverity, Mode=OneWay, Converter={StaticResource MetricValueStyleConverter}}" />
                         <TextBlock Grid.Column="3" VerticalAlignment="Center" Text="{x:Bind MemoryDisplay, Mode=OneWay}"
@@ -184,6 +212,18 @@
                             <TextBlock Text="{x:Bind DiskDisplay, Mode=OneWay}" VerticalAlignment="Center"
                                        Style="{x:Bind DiskSeverity, Mode=OneWay, Converter={StaticResource MetricValueStyleConverter}}" />
                         </StackPanel>
+                        <!-- UI.12 B12-06 (Prism r3 R3-02): a 4th line after the metrics it qualifies - the same cue as Wide/Mid. -->
+                        <Grid ColumnSpacing="4" Visibility="{x:Bind ShowsStaleCue, Mode=OneWay}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <primitives:SaIcon Data="{StaticResource SaIconClock01Data}" Size="12" VerticalAlignment="Top" Margin="0,2,0,0"
+                                               Foreground="{ThemeResource SaAttentionTextBrush}" />
+                            <TextBlock Grid.Column="1" Style="{StaticResource SaHelperTextStyle}" Foreground="{ThemeResource SaAttentionTextBrush}"
+                                       Text="{x:Bind StaleAgeDisplay, Mode=OneWay}" TextWrapping="WrapWholeWords" MaxLines="2" TextTrimming="CharacterEllipsis"
+                                       AutomationProperties.AccessibilityView="Raw" />
+                        </Grid>
                     </StackPanel>
                     <primitives:SaIcon Grid.Column="1" Data="{StaticResource SaIconArrowRight01Data}" Size="16" VerticalAlignment="Center"
                                        Foreground="{ThemeResource SaTextSecondaryBrush}" />
@@ -281,7 +321,7 @@
                     </primitives:SaHeadingHost>
                         <StackPanel Style="{StaticResource SaPageHeaderLineTwoStyle}">
                             <TextBlock Style="{StaticResource SaPageSubtitleTextStyle}" TextWrapping="Wrap"
-                                       Text="{x:Bind ViewModel.HeaderContextDisplay, Mode=OneWay}" AutomationProperties.LiveSetting="Polite" />
+                                       Text="{x:Bind ViewModel.HeaderContextDisplay, Mode=OneWay}" primitives:SaAnnounce.Changes="True" AutomationProperties.LiveSetting="Polite" />
                         </StackPanel>
                     </StackPanel>
                     <StackPanel Grid.Column="1" Style="{StaticResource SaPageHeaderActionsStyle}">
@@ -356,6 +396,10 @@
                     </primitives:SaEmptyState>
                 </Border>
 
+                <!-- UI.12 STATE-01: the Overview's notice, when the configuration could not be read (never the empty state then). -->
+                <primitives:SaInlineNotice x:Uid="ConfigurationUnavailableNotice" Severity="Error" AnnouncePolitely="True" AutomationProperties.LiveSetting="Polite"
+                                           Visibility="{x:Bind ViewModel.ShowConfigurationUnavailable, Mode=OneWay}"/>
+
                 <!-- Empty §13 112:14007: no visible server; the note only when servers are hidden (Prism r1 c). UI.10 F06: the CTA is the
                      Primary h44 pill (112:14098 updated in UI.10B), the same shape as the header "+ Adicionar". -->
                 <Border Style="{StaticResource SaStatePanelStyle}" primitives:SaMotion.Enter="ContentFade" Visibility="{x:Bind ViewModel.ShowEmptyState, Mode=OneWay}">
@@ -375,21 +419,21 @@
 
         <!-- UI.5 H-UI5-1 / Boss B2 answer 1: the one-shot notice the Server Detail left after its own Ocultar / Remover
              (Figma 112:21833 / 112:20994, toast anatomy §3.2: bottom-right, 40 from the content edge, 36 from the bottom).
-             Announced politely; closed by the user or after TransientNoticeTimer.Duration; never re-shown (taken once by
-             the view model). In its own row: it never covers the table. -->
+             UI.12 B12B-02-R: not a live region (a polite one is dropped by the page-entry focus change); the page announces it
+             once as a notification after its focus. Closed by the user or after TransientNoticeTimer.Duration; never re-shown
+             (taken once by the view model). In its own row: it never covers the table. -->
         <primitives:SaToast
             x:Name="ReturnNotice"
             Grid.Row="1"
             Margin="40,12,40,36"
             MaxWidth="600"
-            Width="NaN"
             HorizontalAlignment="Right"
             VerticalAlignment="Bottom"
             Title="{x:Bind ViewModel.NoticeTitle, Mode=OneWay}"
             Message="{x:Bind ViewModel.NoticeMessage, Mode=OneWay}"
             CloseButtonAutomationName="{x:Bind ViewModel.NoticeCloseAutomationName}"
             CloseRequested="OnReturnNoticeCloseRequested"
-            AutomationProperties.LiveSetting="Polite"
+            AnnouncesItself="False"
             Visibility="{x:Bind ViewModel.IsNoticeOpen, Mode=OneWay}" />
     </Grid>
 </Page>

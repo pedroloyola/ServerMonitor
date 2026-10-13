@@ -2,7 +2,6 @@ using System.ComponentModel;
 using System.Globalization;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
-using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using ServerMonitor.App.Controls.Primitives;
@@ -63,7 +62,7 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
         };
         TestPanel.Configure(localization);
         TestPanel.CloseRequested += (_, _) => CloseLayer();
-        TestPanel.RetryRequested += async (_, _) => await StartTestAsync();
+        TestPanel.RetryRequested += async (_, _) => await UiFireAndForget.RunAsync("editor retest", StartTestAsync);
         TestPanel.PrepHelpRequested += (_, anchor) => ServerForm.ShowPrepHelp(anchor);
         TrustPanel.Configure(localization);
         TrustPanel.AcceptRequested += OnTrustAcceptRequested;
@@ -303,7 +302,7 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
         ImportPanel.Visibility = layer == ServerEditorLayer.Import ? Visibility.Visible : Visibility.Collapsed;
         DialogSurface.Width = DialogWidth(layer);
         UpdateDialogMaxWidth();
-        AutomationProperties.SetName(DialogSurface, layer switch
+        AutomationProperties.SetName(DialogContent, layer switch
         {
             ServerEditorLayer.Test => TestPanel.Title,
             ServerEditorLayer.Trust => TrustPanel.Title,
@@ -368,6 +367,10 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
     {
         PageRoot.IsHitTestVisible = interactive;
         PageScroll.IsEnabled = interactive;
+        // UI.12 B12F-01: while the layer is open the whole page behind it leaves the UIA tree (its host's peer has no
+        // children), so a screen reader's browse mode stays inside the dialog (Tab is already trapped by
+        // TabFocusNavigation=Cycle). Every close path comes through HideLayer -> SetPageInteractive(true).
+        PageHost.IsInert = !interactive;
     }
 
     private void FocusWhenLaidOut(Func<bool> tryFocus, Action<bool>? completed = null)
@@ -429,6 +432,12 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
         SetPageInteractive(true);
         if (!_disposed)
         {
+            // B12F-01 follow-up: the page's live regions were held while the layer was open; they catch up now.
+            if (_viewModel is { } viewModel)
+            {
+                SetSubtitle(SubtitleText(viewModel));
+            }
+
             UpdateActionState();
             // B-4: back to the control that opened the layer - "Importar de SSH" for the import, "Testar ligação" for the
             // test and the trust prompt it met.
@@ -467,10 +476,15 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
         }
 
         _acceptingTrust = true;
+        // UI.12 UI12A-MODAL-01: the gesture came from "Confiar e …", which is about to be disabled - move the focus to the
+        // safe button FIRST, or disabling the focused button throws the focus out of the layer (and Esc stops reaching it).
+        TrustPanel.FocusSafeButton();
         TrustPanel.SetWorking(true, acceptAllowed: false);
         try
         {
-            await _controller.AcceptTrustAsync(shown);
+            // UI.12 C-L8: a failure here (e.g. an unreadable trust file, C-E15) must not end the process; the layer is
+            // re-evaluated from the view model's state either way.
+            await UiFireAndForget.RunAsync("editor trust", () => _controller.AcceptTrustAsync(shown));
         }
         finally
         {
@@ -516,9 +530,19 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
         SetEnabled(RetrySaveButton, !busy);
         SetEnabled(CancelButton, !saving);
         SetEnabled(HeaderButton, !saving && (!busy || _controller.IsEdit));
-        var hint = _controller.ActionHintKey();
-        ActionHint.Text = hint.Length == 0 ? string.Empty : _localization.GetString(hint);
+        if (PageAnnounces(_layer))
+        {
+            var hint = _controller.ActionHintKey();
+            ActionHint.Text = hint.Length == 0 ? string.Empty : _localization.GetString(hint);
+        }
     }
+
+    /// <summary>
+    /// UI.12 B12F-01 follow-up (Cortex N1 / Prism P3): the page behind an open layer is out of the UIA tree, but its live
+    /// regions (ActionHint polite, EditorSubtitle assertive) would still raise LiveRegionChanged - announced over the
+    /// layer (e.g. the test result twice). They are not rewritten while a layer is open; HideLayer brings them up to date.
+    /// </summary>
+    internal static bool PageAnnounces(ServerEditorLayer layer) => layer == ServerEditorLayer.None;
 
     /// <summary>
     /// Final c2 (Beacon B-1 c / B-3): the control that has the focus is never disabled under it - WinUI would throw the
@@ -540,18 +564,20 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
         }
 
         ServerForm.ShowErrors(viewModel.FieldErrors);
-        var summary = viewModel.HasFieldErrors
+        SetSubtitle(SubtitleText(viewModel));
+        UpdateActionState();
+    }
+
+    private string SubtitleText(ServerEditorViewModel viewModel) =>
+        viewModel.HasFieldErrors
             ? _localization.GetString("ServerEditorValidationSummary")
             : _saveFailed
                 ? _localization.GetString(_controller.IsEdit ? "ServerEditorSaveFailedSubtitleEdit" : "ServerEditorSaveFailedSubtitleAdd")
                 : _subtitle;
-        SetSubtitle(summary);
-        UpdateActionState();
-    }
 
     private void SetSubtitle(string text)
     {
-        if (string.Equals(EditorSubtitle.Text, text, StringComparison.Ordinal))
+        if (!PageAnnounces(_layer) || string.Equals(EditorSubtitle.Text, text, StringComparison.Ordinal))
         {
             return;
         }
@@ -559,8 +585,9 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
         EditorSubtitle.Text = text;
         if (!string.Equals(text, _subtitle, StringComparison.Ordinal))
         {
-            // Switched to the error summary: said at once (assertive live region).
-            FrameworkElementAutomationPeer.FromElement(EditorSubtitle)?.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
+            // Switched to the error summary: said at once (assertive live region). UI.12 LIVE-01 (Relay handover): through
+            // SaAnnounce, which falls back to creating the peer - FromElement alone is null for an element without one.
+            SaAnnounce.Raise(EditorSubtitle);
         }
     }
 
@@ -617,7 +644,7 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
         }
         else if (e.Key == VirtualKey.Enter && _viewModel is { IsConnectionWorkInProgress: false })
         {
-            if (FocusManager.GetFocusedElement(XamlRoot) is not TextBox { AcceptsReturn: true })
+            if (ShouldSubmitOnEnter(ClassifyEnterTarget(FocusManager.GetFocusedElement(XamlRoot))))
             {
                 e.Handled = true;
                 Submit();
@@ -625,7 +652,35 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
         }
     }
 
-    private async void OnTestClick(object sender, RoutedEventArgs e) => await StartTestAsync();
+    /// <summary>UI.12 UI12A-KBD-01: what has the focus when Enter reaches the page.</summary>
+    internal enum EnterTarget
+    {
+        Other,
+        SingleLineText,
+        MultiLineText,
+        SecretField,
+        SaveButton,
+    }
+
+    /// <summary>
+    /// UI.12 UI12A-KBD-01 (Prism): Enter submits only from a single-line text field, a password field or Save itself. On a
+    /// CheckBox, RadioButton, ToggleSwitch, ComboBox (or any other control) it used to submit too - a keyboard user toggling
+    /// "Usar jump host" or picking an authentication method saved the form.
+    /// </summary>
+    internal static bool ShouldSubmitOnEnter(EnterTarget target) =>
+        target is EnterTarget.SingleLineText or EnterTarget.SecretField or EnterTarget.SaveButton;
+
+    private EnterTarget ClassifyEnterTarget(object? focused) => focused switch
+    {
+        TextBox { AcceptsReturn: true } => EnterTarget.MultiLineText,
+        TextBox => EnterTarget.SingleLineText,
+        PasswordBox => EnterTarget.SecretField,
+        _ when ReferenceEquals(focused, PrimaryButton) => EnterTarget.SaveButton,
+        _ => EnterTarget.Other,
+    };
+
+    private async void OnTestClick(object sender, RoutedEventArgs e) =>
+        await UiFireAndForget.RunAsync("editor test", StartTestAsync);
 
     private void OnCancelClick(object sender, RoutedEventArgs e) => _controller.Cancel();
 
@@ -647,14 +702,14 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
         }
         else
         {
-            await _controller.OpenImportAsync();
+            await UiFireAndForget.RunAsync("editor import", _controller.OpenImportAsync);
         }
     }
 
     private async void Submit()
     {
         SetSaveFailed(null);
-        var outcome = await _controller.SubmitAsync(ServerForm.CaptureSecret);
+        var outcome = await SubmitGuardedAsync(() => _controller.SubmitAsync(ServerForm.CaptureSecret));
         if (outcome is null || _disposed)
         {
             return;
@@ -674,6 +729,20 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
         {
             SetSaveFailed(outcome);
         }
+    }
+
+    /// <summary>
+    /// UI.12 C-L8: an unexpected exception from the submit reads as "not saved" (Failed: the existing notice), never as a
+    /// crash; cancellation is no outcome (null), like a submit that did not run.
+    /// </summary>
+    internal static async Task<ServerEditorSubmitOutcome?> SubmitGuardedAsync(Func<Task<ServerEditorSubmitOutcome?>> submit)
+    {
+        ServerEditorSubmitOutcome? outcome = null;
+        await UiFireAndForget.RunAsync(
+            "editor save",
+            async () => outcome = await submit(),
+            onFailed: () => outcome = new ServerEditorSubmitOutcome(ServerEditorSaveStatus.Failed));
+        return outcome;
     }
 
     // B-4 / Figma 06 112:19116: the page stays with the form as typed; a secret the editor gave up must be typed again

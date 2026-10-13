@@ -214,14 +214,20 @@ public sealed class ApplicationWindowController(
     });
 
     // The one "bring it back" block every surfacing path shares. Must run on the UI thread with a materialized window.
-    private void ShowAndActivate()
-    {
-        _appWindow!.IsShownInSwitchers = true;
-        _appWindow.Show();
-        WindowManager.Get(_window!).WindowState = WindowState.Normal;
-        _window!.Activate();
-        _window.SetForegroundWindow();
-    }
+    // UI.12 COMPACT-EXIT-MAXIMIZE: restores only a minimized window, so a maximized one stays maximized (WindowActivation).
+    private void ShowAndActivate() => WindowActivation.ShowAndActivate(
+        show: () =>
+        {
+            _appWindow!.IsShownInSwitchers = true;
+            _appWindow.Show();
+        },
+        isMinimized: IsMinimized,
+        restore: () => WindowManager.Get(_window!).WindowState = WindowState.Normal,
+        activate: () =>
+        {
+            _window!.Activate();
+            _window.SetForegroundWindow();
+        });
 
     private bool IsMinimized() => _appWindow?.Presenter is OverlappedPresenter { State: OverlappedPresenterState.Minimized };
 
