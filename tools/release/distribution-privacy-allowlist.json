@@ -1,0 +1,448 @@
+[
+  {
+    "file": "DirectML.dll",
+    "sha256": "257c75b2f607940c986d0b96d9309a2c897e57ef3192b6c678d707c22d747611",
+    "categories": [
+      "ci-runner-root"
+    ],
+    "reason": "Windows App SDK 2.3.1 machine-learning native payload: hundreds of compiled-in upstream source paths from the Microsoft build agent. Bound to these exact bytes."
+  },
+  {
+    "file": "e_sqlite3.dll",
+    "tokens": [
+      "12e64e97e934"
+    ],
+    "categories": [
+      "ci-runner-root"
+    ],
+    "reason": "SQLitePCLRaw native e_sqlite3 build: CodeView path of the upstream GitHub Actions runner."
+  },
+  {
+    "file": "Microsoft.Graphics.Imaging.Projection.dll",
+    "tokens": [
+      "f2ce3648a68b"
+    ],
+    "categories": [
+      "ci-runner-root"
+    ],
+    "reason": "Windows App SDK 2.3.1 NuGet payload: CodeView path of the Microsoft build agent."
+  },
+  {
+    "file": "Microsoft.ML.OnnxRuntime.dll",
+    "tokens": [
+      "c87ebdee4793"
+    ],
+    "categories": [
+      "ci-runner-root"
+    ],
+    "reason": "Windows App SDK 2.3.1 NuGet payload: CodeView path of the Microsoft build agent."
+  },
+  {
+    "file": "Microsoft.Security.Authentication.OAuth.Projection.dll",
+    "tokens": [
+      "54c209cb6982"
+    ],
+    "categories": [
+      "ci-runner-root"
+    ],
+    "reason": "Windows App SDK 2.3.1 NuGet payload: CodeView path of the Microsoft build agent."
+  },
+  {
+    "file": "Microsoft.Web.WebView2.Core.dll",
+    "tokens": [
+      "5f6a0821614e"
+    ],
+    "categories": [
+      "ci-runner-root"
+    ],
+    "reason": [
+      "Microsoft.Web.WebView2 (transitive through the Windows App SDK): path of the Microsoft build agent.",
+      "Windows App SDK 2.3.1 NuGet payload: CodeView path of the Microsoft build agent."
+    ]
+  },
+  {
+    "file": "Microsoft.Web.WebView2.Core.Projection.dll",
+    "tokens": [
+      "d03b0e611541"
+    ],
+    "categories": [
+      "ci-runner-root"
+    ],
+    "reason": [
+      "Microsoft.Web.WebView2 (transitive through the Windows App SDK): path of the Microsoft build agent.",
+      "Windows App SDK 2.3.1 NuGet payload: CodeView path of the Microsoft build agent."
+    ]
+  },
+  {
+    "file": "Microsoft.Windows.AI.ContentSafety.Projection.dll",
+    "tokens": [
+      "18cd86a3d2cb"
+    ],
+    "categories": [
+      "ci-runner-root"
+    ],
+    "reason": "Windows App SDK 2.3.1 NuGet payload: CodeView path of the Microsoft build agent."
+  },
+  {
+    "file": "Microsoft.Windows.AI.Foundation.Projection.dll",
+    "tokens": [
+      "93d6639e3409"
+    ],
+    "categories": [
+      "ci-runner-root"
+    ],
+    "reason": "Windows App SDK 2.3.1 NuGet payload: CodeView path of the Microsoft build agent."
+  },
+  {
+    "file": "Microsoft.Windows.AI.Imaging.Projection.dll",
+    "tokens": [
+      "1c9685edda27"
+    ],
+    "categories": [
+      "ci-runner-root"
+    ],
+    "reason": "Windows App SDK 2.3.1 NuGet payload: CodeView path of the Microsoft build agent."
+  },
+  {
+    "file": "Microsoft.Windows.AI.MachineLearning.dll",
+    "sha256": "bbbb34415d8ce303f8a2a2c524c46bd749e21423ccabeb7d38c5fc7334a7848f",
+    "categories": [
+      "ci-runner-root"
+    ],
+    "reason": [
+      "Windows App SDK 2.3.1 machine-learning native payload: hundreds of compiled-in upstream source paths from the Microsoft build agent. Bound to these exact bytes.",
+      "Windows App SDK 2.3.1 NuGet payload: CodeView path of the Microsoft build agent."
+    ]
+  },
+  {
+    "file": "Microsoft.Windows.AI.MachineLearning.Projection.dll",
+    "tokens": [
+      "e041e751c52f"
+    ],
+    "categories": [
+      "ci-runner-root"
+    ],
+    "reason": "Windows App SDK 2.3.1 NuGet payload: CodeView path of the Microsoft build agent."
+  },
+  {
+    "file": "Microsoft.Windows.AI.Projection.dll",
+    "tokens": [
+      "176d5804b442"
+    ],
+    "categories": [
+      "ci-runner-root"
+    ],
+    "reason": "Windows App SDK 2.3.1 NuGet payload: CodeView path of the Microsoft build agent."
+  },
+  {
+    "file": "Microsoft.Windows.AI.Text.Projection.dll",
+    "tokens": [
+      "6d2c19840b6d"
+    ],
+    "categories": [
+      "ci-runner-root"
+    ],
+    "reason": "Windows App SDK 2.3.1 NuGet payload: CodeView path of the Microsoft build agent."
+  },
+  {
+    "file": "Microsoft.Windows.AI.Video.Projection.dll",
+    "tokens": [
+      "ba95eab3ede8"
+    ],
+    "categories": [
+      "ci-runner-root"
+    ],
+    "reason": "Windows App SDK 2.3.1 NuGet payload: CodeView path of the Microsoft build agent."
+  },
+  {
+    "file": "Microsoft.Windows.ApplicationModel.Background.Projection.dll",
+    "tokens": [
+      "6bcb2fb11bdf"
+    ],
+    "categories": [
+      "ci-runner-root"
+    ],
+    "reason": "Windows App SDK 2.3.1 NuGet payload: CodeView path of the Microsoft build agent."
+  },
+  {
+    "file": "Microsoft.Windows.ApplicationModel.DynamicDependency.Projection.dll",
+    "tokens": [
+      "04356cd2ed5f"
+    ],
+    "categories": [
+      "ci-runner-root"
+    ],
+    "reason": "Windows App SDK 2.3.1 NuGet payload: CodeView path of the Microsoft build agent."
+  },
+  {
+    "file": "Microsoft.Windows.ApplicationModel.Resources.Projection.dll",
+    "tokens": [
+      "b142ca7cbbab"
+    ],
+    "categories": [
+      "ci-runner-root"
+    ],
+    "reason": "Windows App SDK 2.3.1 NuGet payload: CodeView path of the Microsoft build agent."
+  },
+  {
+    "file": "Microsoft.Windows.ApplicationModel.WindowsAppRuntime.Projection.dll",
+    "tokens": [
+      "0572b9471ff7"
+    ],
+    "categories": [
+      "ci-runner-root"
+    ],
+    "reason": "Windows App SDK 2.3.1 NuGet payload: CodeView path of the Microsoft build agent."
+  },
+  {
+    "file": "Microsoft.Windows.AppLifecycle.Projection.dll",
+    "tokens": [
+      "26aa32f1e710"
+    ],
+    "categories": [
+      "ci-runner-root"
+    ],
+    "reason": "Windows App SDK 2.3.1 NuGet payload: CodeView path of the Microsoft build agent."
+  },
+  {
+    "file": "Microsoft.Windows.AppNotifications.Builder.Projection.dll",
+    "tokens": [
+      "6d3bb7ef7c8a"
+    ],
+    "categories": [
+      "ci-runner-root"
+    ],
+    "reason": "Windows App SDK 2.3.1 NuGet payload: CodeView path of the Microsoft build agent."
+  },
+  {
+    "file": "Microsoft.Windows.AppNotifications.Projection.dll",
+    "tokens": [
+      "4f4629b6143b"
+    ],
+    "categories": [
+      "ci-runner-root"
+    ],
+    "reason": "Windows App SDK 2.3.1 NuGet payload: CodeView path of the Microsoft build agent."
+  },
+  {
+    "file": "Microsoft.Windows.BadgeNotifications.Projection.dll",
+    "tokens": [
+      "ed0ffd9cd25b"
+    ],
+    "categories": [
+      "ci-runner-root"
+    ],
+    "reason": "Windows App SDK 2.3.1 NuGet payload: CodeView path of the Microsoft build agent."
+  },
+  {
+    "file": "Microsoft.Windows.Foundation.Projection.dll",
+    "tokens": [
+      "d93834e086bf"
+    ],
+    "categories": [
+      "ci-runner-root"
+    ],
+    "reason": "Windows App SDK 2.3.1 NuGet payload: CodeView path of the Microsoft build agent."
+  },
+  {
+    "file": "Microsoft.Windows.Management.Deployment.Projection.dll",
+    "tokens": [
+      "991741b0eca4"
+    ],
+    "categories": [
+      "ci-runner-root"
+    ],
+    "reason": "Windows App SDK 2.3.1 NuGet payload: CodeView path of the Microsoft build agent."
+  },
+  {
+    "file": "Microsoft.Windows.Media.Capture.Projection.dll",
+    "tokens": [
+      "5e207fc4dcd1"
+    ],
+    "categories": [
+      "ci-runner-root"
+    ],
+    "reason": "Windows App SDK 2.3.1 NuGet payload: CodeView path of the Microsoft build agent."
+  },
+  {
+    "file": "Microsoft.Windows.PushNotifications.Projection.dll",
+    "tokens": [
+      "35aea70ec6e9"
+    ],
+    "categories": [
+      "ci-runner-root"
+    ],
+    "reason": "Windows App SDK 2.3.1 NuGet payload: CodeView path of the Microsoft build agent."
+  },
+  {
+    "file": "Microsoft.Windows.SDK.NET.dll",
+    "tokens": [
+      "13a2d4566785"
+    ],
+    "categories": [
+      "ci-runner-root"
+    ],
+    "reason": [
+      "Windows SDK .NET projection / CsWinRT runtime shipped by the .NET SDK: CodeView path of the Microsoft build agent.",
+      "Windows App SDK 2.3.1 NuGet payload: CodeView path of the Microsoft build agent."
+    ]
+  },
+  {
+    "file": "Microsoft.Windows.Security.AccessControl.Projection.dll",
+    "tokens": [
+      "6ce137c2589d"
+    ],
+    "categories": [
+      "ci-runner-root"
+    ],
+    "reason": "Windows App SDK 2.3.1 NuGet payload: CodeView path of the Microsoft build agent."
+  },
+  {
+    "file": "Microsoft.Windows.Storage.Pickers.Projection.dll",
+    "tokens": [
+      "e9d8354d4dc4"
+    ],
+    "categories": [
+      "ci-runner-root"
+    ],
+    "reason": "Windows App SDK 2.3.1 NuGet payload: CodeView path of the Microsoft build agent."
+  },
+  {
+    "file": "Microsoft.Windows.Storage.Projection.dll",
+    "tokens": [
+      "3f0b936d1969"
+    ],
+    "categories": [
+      "ci-runner-root"
+    ],
+    "reason": "Windows App SDK 2.3.1 NuGet payload: CodeView path of the Microsoft build agent."
+  },
+  {
+    "file": "Microsoft.Windows.System.Power.Projection.dll",
+    "tokens": [
+      "1b02f912395d"
+    ],
+    "categories": [
+      "ci-runner-root"
+    ],
+    "reason": "Windows App SDK 2.3.1 NuGet payload: CodeView path of the Microsoft build agent."
+  },
+  {
+    "file": "Microsoft.Windows.System.Projection.dll",
+    "tokens": [
+      "c83a3997bae4"
+    ],
+    "categories": [
+      "ci-runner-root"
+    ],
+    "reason": "Windows App SDK 2.3.1 NuGet payload: CodeView path of the Microsoft build agent."
+  },
+  {
+    "file": "Microsoft.Windows.Widgets.Projection.dll",
+    "tokens": [
+      "ddf3e0162c33"
+    ],
+    "categories": [
+      "ci-runner-root"
+    ],
+    "reason": "Windows App SDK 2.3.1 NuGet payload: CodeView path of the Microsoft build agent."
+  },
+  {
+    "file": "Microsoft.WindowsAppRuntime.Bootstrap.Net.dll",
+    "tokens": [
+      "fd5ee6efe61d"
+    ],
+    "categories": [
+      "ci-runner-root"
+    ],
+    "reason": "Windows App SDK 2.3.1 NuGet payload: CodeView path of the Microsoft build agent."
+  },
+  {
+    "file": "Microsoft.WinUI.dll",
+    "tokens": [
+      "e70120758eef"
+    ],
+    "categories": [
+      "ci-runner-root"
+    ],
+    "reason": "Windows App SDK 2.3.1 NuGet payload: CodeView path of the Microsoft build agent."
+  },
+  {
+    "file": "onnxruntime.dll",
+    "sha256": "3cffeff2d7c25b247a814212baab70eb1f37d727335d4c813ed73785df80a794",
+    "categories": [
+      "ci-runner-root"
+    ],
+    "reason": "Windows App SDK 2.3.1 machine-learning native payload: hundreds of compiled-in upstream source paths from the Microsoft build agent. Bound to these exact bytes."
+  },
+  {
+    "file": "ServerAlyzer.WidgetProvider.exe",
+    "tokens": [
+      "6fa4f4f02075"
+    ],
+    "categories": [
+      "ci-runner-root"
+    ],
+    "reason": ".NET SDK apphost template: the CodeView path is the dotnet/runtime official build agent. The SDK re-stamps this file every build, so only that exact path is excused."
+  },
+  {
+    "file": "ServerMonitor.App.exe",
+    "tokens": [
+      "6fa4f4f02075"
+    ],
+    "categories": [
+      "ci-runner-root"
+    ],
+    "reason": ".NET SDK apphost template: the CodeView path is the dotnet/runtime official build agent. The SDK re-stamps this file every build, so only that exact path is excused."
+  },
+  {
+    "file": "SQLitePCLRaw.batteries_v2.dll",
+    "tokens": [
+      "2954d07363a0"
+    ],
+    "categories": [
+      "profile-dir"
+    ],
+    "reason": "SQLitePCLRaw 2.1.13 managed assembly: CodeView path of the upstream maintainer's build machine, as published on NuGet."
+  },
+  {
+    "file": "SQLitePCLRaw.core.dll",
+    "tokens": [
+      "cd4942b5cce1"
+    ],
+    "categories": [
+      "profile-dir"
+    ],
+    "reason": "SQLitePCLRaw 2.1.13 managed assembly: CodeView path of the upstream maintainer's build machine, as published on NuGet."
+  },
+  {
+    "file": "SQLitePCLRaw.provider.e_sqlite3.dll",
+    "tokens": [
+      "4da65a97f6da"
+    ],
+    "categories": [
+      "profile-dir"
+    ],
+    "reason": "SQLitePCLRaw 2.1.13 managed assembly: CodeView path of the upstream maintainer's build machine, as published on NuGet."
+  },
+  {
+    "file": "WinRT.Runtime.dll",
+    "tokens": [
+      "9ca2d1e80f93"
+    ],
+    "categories": [
+      "ci-runner-root"
+    ],
+    "reason": "Windows SDK .NET projection / CsWinRT runtime shipped by the .NET SDK: CodeView path of the Microsoft build agent."
+  },
+  {
+    "file": "WinUIEx.dll",
+    "tokens": [
+      "4a30bfba5a50"
+    ],
+    "categories": [
+      "ci-runner-root"
+    ],
+    "reason": "WinUIEx 2.9.3: CodeView path of the upstream GitHub Actions runner."
+  }
+]

@@ -117,6 +117,22 @@ jobs:
       - name: Build (Release)
         run: dotnet build ServerMonitor.slnx -c Release --no-restore --no-incremental --disable-build-servers
 
+      # PRIV-PDBPATH on every PR: the gate's own counterproofs, then the gate on the first-party
+      # Release binaries and PDBs this build just wrote (the runner's checkout path must not be in
+      # them). The packaged MSIX is checked in full by release-build.yml before anything ships.
+      - name: Distribution privacy (Release binaries)
+        shell: pwsh
+        run: |
+          ./tools/release/Test-DistributionPrivacy.ps1
+          $firstParty = @(Get-ChildItem -Path src -Recurse -File |
+            Where-Object { $_.FullName -match '[\\/]bin[\\/](x64[\\/])?Release[\\/]' -and
+              $_.Name -match '^(ServerMonitor|ServerAlyzer)\..+\.(dll|pdb|json)$' })
+          ./tools/release/Assert-DistributionPrivacy.ps1 -Path ($firstParty.FullName) -RequiredArtifacts @(
+            'ServerMonitor.App.dll', 'ServerMonitor.App.pdb',
+            'ServerAlyzer.WidgetProvider.dll', 'ServerAlyzer.WidgetProvider.pdb',
+            'ServerMonitor.Core.dll', 'ServerMonitor.Infrastructure.dll', 'ServerMonitor.Collectors.dll',
+            'ServerMonitor.Features.dll', 'ServerMonitor.WidgetContract.dll', 'ServerMonitor.ActivationContract.dll')
+
       - name: Vulnerability scan (fail on any vulnerable package)
         shell: pwsh
         run: |

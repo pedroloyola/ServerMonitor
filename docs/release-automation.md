@@ -34,8 +34,11 @@ Builds the shippable MSIX from an exact tag and proves it is what the tag says.
 7. `Assert-PackageIdentity.ps1` — reads the package, not the source tree: identity name,
    publisher, version, architecture, app-level capabilities, payload hygiene, the exact set
    of executables, and that **every executable is PE subsystem 2 (Windows GUI)**.
-8. Writes the SHA-256 next to the package and uploads both as a workflow artifact.
-9. Creates the GitHub Release **only if it does not already exist**, and by default
+8. `Assert-DistributionPrivacy.ps1` — opens everything about to be uploaded and fails closed
+   if any file carries an absolute development path (see *Distribution privacy* below).
+   It runs before the upload and before the GitHub Release, so a failure publishes nothing.
+9. Writes the SHA-256 next to the package and uploads both as a workflow artifact.
+10. Creates the GitHub Release **only if it does not already exist**, and by default
    **does not attach the MSIX**: the Microsoft Store is the distribution channel.
 
 ### 2. `store-submit.yml`
@@ -49,7 +52,9 @@ built and checked.
 Order of operations, and why:
 
 1. Confirmation phrase `SUBMIT`, plus shape checks on the version and digest.
-2. Download the artifact from the named run; re-run the full package identity check on it.
+2. Download the artifact from the named run; re-run the full package identity check and the
+   distribution privacy check on it, with this checkout's gate, so a run from before the
+   gate existed cannot be submitted.
 3. `msstore reconfigure` from environment secrets.
 4. `msstore apps get 9N6ZBSBN1TD2` — the product must report identity
    `PedroLoy.ServerAlyzer`, or the run stops.
@@ -89,6 +94,37 @@ Read-only. Reports one of:
 `Published` is not the same as public. A product whose visibility is `Private` is published
 to its audience and to nobody else, and the report says so rather than claiming the product
 is live.
+
+## Distribution privacy
+
+A build records where it ran. Without care, every Release DLL carried the PDB path of the
+developer's checkout (the PE CodeView entry), and `ServerMonitor.App.dll` a `CallerFilePath`
+constant: a user profile and folder layout, shipped inside the MSIX (`PRIV-PDBPATH`).
+
+**The fix** is `src/Directory.Build.props`: Release builds of every project under `src/` set
+`ContinuousIntegrationBuild`, which turns on the SDK's deterministic source paths. The git
+checkout is mapped to `/_/` in the PE, the PDB and `CallerFilePath`, and Source Link is written
+against the mapped paths, so the PDB still resolves to the exact commit on GitHub. Debug is not
+affected: breakpoints and source stepping keep the real local paths.
+
+**The gate** is `tools/release/Assert-DistributionPrivacy.ps1`. It opens zip containers
+(recursively), parses every PE (CodeView path, embedded portable PDB, `#US` strings) and every
+portable PDB (documents, Source Link) with System.Reflection.Metadata, then byte-scans every
+file as UTF-8 and UTF-16. It fails on absolute drive, UNC, profile (`\Users\`, `/home/`) and CI
+runner paths, and on the current machine's own profile, user name, checkout and CI workspace,
+read from the environment at run time. It also fails if it cannot parse something, if a Windows
+PDB is present, or if a required file is missing. Its output names the file, the channel and a
+hashed token — never the path itself.
+
+It runs in `release-build.yml` (before the upload), in `store-submit.yml` (before the Store) and
+in CI on the Release binaries of every PR.
+
+**Third-party binaries** carry their vendors' build paths (Microsoft build agents, NuGet
+authors' machines). `tools/release/distribution-privacy-allowlist.json` excuses each one by file
+name plus either its exact bytes (SHA-256) or the exact path tokens, for the categories reviewed.
+Files this repository builds, and environment matches, can never be allowlisted. After a
+dependency update the gate fails closed; regenerate the candidates with
+`-AllowlistCandidatesPath`, review each entry, write its real reason, and commit it.
 
 ## The publishing hold
 
@@ -209,6 +245,7 @@ Everything the workflows rely on runs offline:
 
 ```powershell
 ./tools/release/Test-ReleaseChecks.ps1          # package checks, 12 cases
+./tools/release/Test-DistributionPrivacy.ps1    # distribution privacy, 29 cases
 ./tools/release/Test-StoreSubmissionUpdate.ps1  # publishing hold, 12 cases
 ./tools/release/Get-SubmissionState.ps1 -SelfTest        # status mapping, 18 cases
 ./tools/release/Assert-NoPendingSubmission.ps1 -SelfTest # in-flight guard, 19 cases
@@ -222,3 +259,8 @@ Everything the workflows rely on runs offline:
 * [Manage app submissions (submission resource, `targetPublishMode`, status values)](https://learn.microsoft.com/en-us/windows/uwp/monetize/manage-app-submissions)
 * [Add and manage app credentials in Microsoft Entra ID](https://learn.microsoft.com/en-us/entra/identity-platform/how-to-add-credentials)
 * [microsoft/microsoft-store-apppublisher](https://github.com/microsoft/microsoft-store-apppublisher)
+* [.NET SDK MSBuild properties — `ContinuousIntegrationBuild`](https://learn.microsoft.com/en-us/dotnet/core/project-sdk/msbuild-props#continuousintegrationbuild)
+* [C# compiler options — `Deterministic`, `PathMap`](https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/compiler-options/code-generation)
+* [dotnet/sourcelink — deterministic builds and `ContinuousIntegrationBuild`](https://github.com/dotnet/sourcelink/blob/main/docs/README.md)
+* [PE/COFF debug directory entries (CodeView, embedded portable PDB)](https://github.com/dotnet/runtime/blob/main/src/libraries/System.Reflection.Metadata/specs/PE-COFF.md)
+* [Portable PDB metadata (Document table, Source Link record)](https://github.com/dotnet/runtime/blob/main/src/libraries/System.Reflection.Metadata/specs/PortablePdb-Metadata.md)
