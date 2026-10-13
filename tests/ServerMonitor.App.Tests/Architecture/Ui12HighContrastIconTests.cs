@@ -55,9 +55,15 @@ public sealed partial class Ui12HighContrastIconTests
         }
 
         Assert.Equal("1.5", (string?)rest.Attribute("StrokeThickness"));
-        Assert.Equal(
-            ["Name", "Stroke", "StrokeEndLineCap", "StrokeLineJoin", "StrokeStartLineCap", "StrokeThickness", "Visibility"],
-            rest.Attributes().Select(a => a.Name.LocalName).Order(StringComparer.Ordinal));
+        // Closed attribute list on BOTH paths (Atlas A-B12B-01: an Opacity / Fill / transform on the HC twin would hide or
+        // change the HC icon while every other check passed).
+        foreach (var path in new[] { rest, state })
+        {
+            Assert.Equal(
+                ["Name", "Stroke", "StrokeEndLineCap", "StrokeLineJoin", "StrokeStartLineCap", "StrokeThickness", "Visibility"],
+                path.Attributes().Select(a => a.Name.LocalName).Order(StringComparer.Ordinal));
+            Assert.Empty(path.Elements());
+        }
     }
 
     [Fact]
