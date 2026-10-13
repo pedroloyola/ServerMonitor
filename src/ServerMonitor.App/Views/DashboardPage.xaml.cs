@@ -111,7 +111,7 @@ public sealed partial class DashboardPage : Page
 
         foreach (var repeater in new[] { DiscoveredRepeater, EmptyDiscoveredRepeater })
         {
-            // UI.12 PEER-01: the row template is an SaGroupHost (the named group) around the row Grid.
+            // UI.12 PEER-01: the row template is an SaGroupHost (the named group) around the row Grid.
             if (repeater.GetOrCreateElement(index) is SaGroupHost { Content: Panel row } && row.Children.OfType<Button>().FirstOrDefault() is { } add)
             {
                 add.StartBringIntoView();
