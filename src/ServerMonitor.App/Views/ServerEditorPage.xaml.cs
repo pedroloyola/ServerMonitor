@@ -685,12 +685,7 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
     private async void Submit()
     {
         SetSaveFailed(null);
-        ServerEditorSubmitOutcome? outcome = null;
-        // UI.12 C-L8: an unexpected exception reads as "not saved" (the existing notice), never as a crash.
-        await UiFireAndForget.RunAsync(
-            "editor save",
-            async () => outcome = await _controller.SubmitAsync(ServerForm.CaptureSecret),
-            onFailed: () => outcome = new ServerEditorSubmitOutcome(ServerEditorSaveStatus.Failed));
+        var outcome = await SubmitGuardedAsync(() => _controller.SubmitAsync(ServerForm.CaptureSecret));
         if (outcome is null || _disposed)
         {
             return;
@@ -710,6 +705,20 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
         {
             SetSaveFailed(outcome);
         }
+    }
+
+    /// <summary>
+    /// UI.12 C-L8: an unexpected exception from the submit reads as "not saved" (Failed: the existing notice), never as a
+    /// crash; cancellation is no outcome (null), like a submit that did not run.
+    /// </summary>
+    internal static async Task<ServerEditorSubmitOutcome?> SubmitGuardedAsync(Func<Task<ServerEditorSubmitOutcome?>> submit)
+    {
+        ServerEditorSubmitOutcome? outcome = null;
+        await UiFireAndForget.RunAsync(
+            "editor save",
+            async () => outcome = await submit(),
+            onFailed: () => outcome = new ServerEditorSubmitOutcome(ServerEditorSaveStatus.Failed));
+        return outcome;
     }
 
     // B-4 / Figma 06 112:19116: the page stays with the form as typed; a secret the editor gave up must be typed again

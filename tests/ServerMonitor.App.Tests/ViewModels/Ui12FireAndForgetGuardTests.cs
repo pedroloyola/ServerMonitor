@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using ServerMonitor.App.Services;
 using ServerMonitor.App.Tests.Architecture;
 using ServerMonitor.App.ViewModels;
 
@@ -54,6 +55,22 @@ public sealed partial class Ui12FireAndForgetGuardTests
         Assert.Equal(1, failed);
     }
 
+    /// <summary>Relay r2 R2-03: the Save path, behaviourally - a throwing submit becomes the "not saved" outcome.</summary>
+    [Fact]
+    public async Task ASubmitThatThrows_BecomesTheNotSavedOutcome_AndCancellationIsNone()
+    {
+        var failed = await Views.ServerEditorPage.SubmitGuardedAsync(
+            () => Task.FromException<ServerEditorSubmitOutcome?>(new InvalidOperationException("boom")));
+        Assert.Equal(ServerEditorSaveStatus.Failed, failed?.Status);
+        Assert.False(failed!.SecretsConsumed);
+
+        Assert.Null(await Views.ServerEditorPage.SubmitGuardedAsync(
+            () => Task.FromCanceled<ServerEditorSubmitOutcome?>(new CancellationToken(true))));
+
+        var saved = new ServerEditorSubmitOutcome(ServerEditorSaveStatus.Saved);
+        Assert.Same(saved, await Views.ServerEditorPage.SubmitGuardedAsync(() => Task.FromResult<ServerEditorSubmitOutcome?>(saved)));
+    }
+
     [Fact]
     public void TheEditorsFireAndForgetHandlers_AllGoThroughTheGuard()
     {
@@ -77,7 +94,7 @@ public sealed partial class Ui12FireAndForgetGuardTests
         Assert.Contains("UiFireAndForget.Report = (operation, exceptionType) =>", app, StringComparison.Ordinal);
     }
 
-    [GeneratedRegex(@"await UiFireAndForget\.RunAsync\(\s*""editor save"",\s*async \(\) => outcome = await _controller\.SubmitAsync\(ServerForm\.CaptureSecret\),\s*onFailed: \(\) => outcome = new ServerEditorSubmitOutcome\(ServerEditorSaveStatus\.Failed\)\);")]
+    [GeneratedRegex(@"var outcome = await SubmitGuardedAsync\(\(\) => _controller\.SubmitAsync\(ServerForm\.CaptureSecret\)\);")]
     private static partial Regex SubmitIsGuarded();
 
     [GeneratedRegex(@"\+= async \(_, _\) => await (?!UiFireAndForget)")]

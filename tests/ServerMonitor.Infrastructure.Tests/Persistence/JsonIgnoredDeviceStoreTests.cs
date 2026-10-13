@@ -160,6 +160,39 @@ public sealed class JsonIgnoredDeviceStoreTests : IDisposable
         Assert.Equal([a], await store.LoadAsync());
     }
 
+    /// <summary>
+    /// UI.12 Relay r2 R2-01: "Repor" is an explicit request to clear the list, so it must not depend on reading it (an
+    /// unreadable file must not block the user's reset). Pinned STRUCTURALLY: no lock was found that makes the read fail
+    /// while the rename-based replace still succeeds - measured here, File.Move(overwrite) is denied against any open handle
+    /// on the destination, FileShare.Delete included. So ResetAsync must not call EnsureLoadedAsync at all.
+    /// </summary>
+    [Fact]
+    public void Reset_DoesNotReadTheFileFirst()
+    {
+        var source = File.ReadAllText(StoreSource());
+        var start = source.IndexOf("public async Task ResetAsync(", StringComparison.Ordinal);
+        var end = source.IndexOf("public void Dispose()", start, StringComparison.Ordinal);
+        Assert.True(start >= 0 && end > start);
+        var reset = source[start..end];
+
+        Assert.DoesNotContain("EnsureLoadedAsync", reset, StringComparison.Ordinal);
+        Assert.Contains("await SaveAsync(candidate, cancellationToken)", reset, StringComparison.Ordinal);
+    }
+
+    private static string StoreSource()
+    {
+        for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)
+        {
+            var candidate = Path.Combine(dir.FullName, "src", "ServerMonitor.Infrastructure", "Persistence", "JsonIgnoredDeviceStore.cs");
+            if (File.Exists(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        throw new FileNotFoundException("JsonIgnoredDeviceStore.cs not found above the test output.");
+    }
+
     [Fact]
     public async Task MalformedFile_LoadsEmptyAndResetRepairsIt()
     {
