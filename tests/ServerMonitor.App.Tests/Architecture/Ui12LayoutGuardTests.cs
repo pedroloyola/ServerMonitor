@@ -31,6 +31,7 @@ public sealed class Ui12LayoutGuardTests
     /// side by side. Padding 28 + border 1 (SaDialogStyle, Dark/Light).</summary>
     [Theory]
     [InlineData(1280, 800, 2, 620, 720, 768, false)]   // roomy window: the approved 620..720 surface, side by side
+    [InlineData(1280, 800, 3, 620, 720, 768, true)]    // R2 N3 (Cortex): min and max surfaces disagree (562 < 612 <= 662) - the NARROWEST decides
     [InlineData(373, 627, 2, 341, 341, 595, true)]     // 560x640 physical at 150 %: clamped, commands stacked
     [InlineData(560, 600, 2, 528, 528, 568, false)]    // 560 at 100 %: clamped, two commands still fit (470 >= 404)
     [InlineData(560, 600, 3, 528, 528, 568, true)]     // ... three do not (612 needed)
