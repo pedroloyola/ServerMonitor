@@ -1,4 +1,6 @@
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
+using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Controls;
 using ServerMonitor.App.Services;
 using ServerMonitor.App.ViewModels;
@@ -43,17 +45,59 @@ public sealed partial class ServersPage : Page, IDisposable
         var index = ViewModel.TakeReturnFocusIndex();
         // UI.7 B-5: back from the editor without saving, focus returns to the control that opened it.
         var editorOpener = _editorReturnFocus?.Take(NavigationDestination.Servers);
-        if (ShellPageFocus.GetKeepSidebar(this)) return;
+        if (ShellPageFocus.GetKeepSidebar(this))
+        {
+            AnnounceReturnNoticeAfterFocus();
+            return;
+        }
+
         DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
         {
-            if (EditorReturnFocus.TryFocusNow(this, editorOpener) || RepeaterFocus.FocusIndex(ServersRepeater, index))
+            if (!EditorReturnFocus.TryFocusNow(this, editorOpener) && !RepeaterFocus.FocusIndex(ServersRepeater, index))
+            {
+                ShellPageFocus.FocusHeading(this);
+            }
+
+            AnnounceReturnNoticeAfterFocus();
+        });
+    }
+
+    /// <summary>UI.12 B12B-02-R: fixed, never localized - the "most recent" source of the Hidden / Removed notice.</summary>
+    internal const string ReturnNoticeActivityId = "ServersNoticeShown";
+
+    /// <summary>UI.12 B12B-02-R (Cortex: WinUI InfoBar's choice for success): do not cut off the heading being read.</summary>
+    internal const AutomationNotificationProcessing ReturnNoticeProcessing = AutomationNotificationProcessing.CurrentThenMostRecent;
+
+    private bool _returnNoticeAnnounced;
+
+    // UI.12 B12B-02-R (real Narrator: only the page heading was heard after Ocultar): the notice arrives with the page entry,
+    // and a polite live region raised in the same turn as the focus change is dropped. So the toast does not announce
+    // itself (AnnouncesItself="False"); the page raises its text once as a notification in the turn AFTER its focus
+    // decision. Only when the Detail's own Ocultar / Remover succeeded (the notice exists only then).
+    private void AnnounceReturnNoticeAfterFocus()
+    {
+        if (!ViewModel.IsNoticeOpen)
+        {
+            return;
+        }
+
+        DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+        {
+            var content = AutomationProperties.GetName(ReturnNotice);
+            if (!ShouldAnnounceReturnNotice(_returnNoticeAnnounced, ViewModel.IsNoticeOpen, content)
+                || (FrameworkElementAutomationPeer.FromElement(ReturnNotice) ?? FrameworkElementAutomationPeer.CreatePeerForElement(ReturnNotice)) is not { } peer)
             {
                 return;
             }
 
-            ShellPageFocus.FocusHeading(this);
+            _returnNoticeAnnounced = true;
+            peer.RaiseNotificationEvent(AutomationNotificationKind.ActionCompleted, ReturnNoticeProcessing, content, ReturnNoticeActivityId);
         });
     }
+
+    /// <summary>Pure rule (unit-tested): once per page, only while the notice is open and has something to say.</summary>
+    internal static bool ShouldAnnounceReturnNotice(bool announced, bool noticeOpen, string? content) =>
+        !announced && noticeOpen && !string.IsNullOrWhiteSpace(content);
 
     // Beacon r1 SHOULD-5: Wide/Mid/Stacked swap the row template, which recreates the rows and would drop focus to the
     // top of the window; the focused row keeps focus across the reflow.
