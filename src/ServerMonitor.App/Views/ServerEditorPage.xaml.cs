@@ -2,7 +2,6 @@ using System.ComponentModel;
 using System.Globalization;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
-using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using ServerMonitor.App.Controls.Primitives;
@@ -368,14 +367,11 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
     {
         PageRoot.IsHitTestVisible = interactive;
         PageScroll.IsEnabled = interactive;
-        // UI.12 UI12A-MODAL-01: while the layer is open the form behind it leaves the UIA control/content views, so a
-        // screen reader's browse mode stays inside the dialog (Tab is already trapped by TabFocusNavigation=Cycle).
-        AutomationProperties.SetAccessibilityView(PageScroll, PageAccessibilityView(interactive));
+        // UI.12 B12F-01: while the layer is open the whole page behind it leaves the UIA tree (its host's peer has no
+        // children), so a screen reader's browse mode stays inside the dialog (Tab is already trapped by
+        // TabFocusNavigation=Cycle). Every close path comes through HideLayer -> SetPageInteractive(true).
+        PageHost.IsInert = !interactive;
     }
-
-    /// <summary>UI.12 UI12A-MODAL-01: the page content is Raw (out of the UIA tree) exactly while the modal layer is open.</summary>
-    internal static AccessibilityView PageAccessibilityView(bool interactive) =>
-        interactive ? AccessibilityView.Content : AccessibilityView.Raw;
 
     private void FocusWhenLaidOut(Func<bool> tryFocus, Action<bool>? completed = null)
     {
@@ -436,6 +432,12 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
         SetPageInteractive(true);
         if (!_disposed)
         {
+            // B12F-01 follow-up: the page's live regions were held while the layer was open; they catch up now.
+            if (_viewModel is { } viewModel)
+            {
+                SetSubtitle(SubtitleText(viewModel));
+            }
+
             UpdateActionState();
             // B-4: back to the control that opened the layer - "Importar de SSH" for the import, "Testar ligação" for the
             // test and the trust prompt it met.
@@ -528,9 +530,19 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
         SetEnabled(RetrySaveButton, !busy);
         SetEnabled(CancelButton, !saving);
         SetEnabled(HeaderButton, !saving && (!busy || _controller.IsEdit));
-        var hint = _controller.ActionHintKey();
-        ActionHint.Text = hint.Length == 0 ? string.Empty : _localization.GetString(hint);
+        if (PageAnnounces(_layer))
+        {
+            var hint = _controller.ActionHintKey();
+            ActionHint.Text = hint.Length == 0 ? string.Empty : _localization.GetString(hint);
+        }
     }
+
+    /// <summary>
+    /// UI.12 B12F-01 follow-up (Cortex N1 / Prism P3): the page behind an open layer is out of the UIA tree, but its live
+    /// regions (ActionHint polite, EditorSubtitle assertive) would still raise LiveRegionChanged - announced over the
+    /// layer (e.g. the test result twice). They are not rewritten while a layer is open; HideLayer brings them up to date.
+    /// </summary>
+    internal static bool PageAnnounces(ServerEditorLayer layer) => layer == ServerEditorLayer.None;
 
     /// <summary>
     /// Final c2 (Beacon B-1 c / B-3): the control that has the focus is never disabled under it - WinUI would throw the
@@ -552,18 +564,20 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
         }
 
         ServerForm.ShowErrors(viewModel.FieldErrors);
-        var summary = viewModel.HasFieldErrors
+        SetSubtitle(SubtitleText(viewModel));
+        UpdateActionState();
+    }
+
+    private string SubtitleText(ServerEditorViewModel viewModel) =>
+        viewModel.HasFieldErrors
             ? _localization.GetString("ServerEditorValidationSummary")
             : _saveFailed
                 ? _localization.GetString(_controller.IsEdit ? "ServerEditorSaveFailedSubtitleEdit" : "ServerEditorSaveFailedSubtitleAdd")
                 : _subtitle;
-        SetSubtitle(summary);
-        UpdateActionState();
-    }
 
     private void SetSubtitle(string text)
     {
-        if (string.Equals(EditorSubtitle.Text, text, StringComparison.Ordinal))
+        if (!PageAnnounces(_layer) || string.Equals(EditorSubtitle.Text, text, StringComparison.Ordinal))
         {
             return;
         }
