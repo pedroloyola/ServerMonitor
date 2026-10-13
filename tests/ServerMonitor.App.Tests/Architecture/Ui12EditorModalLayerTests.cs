@@ -2,6 +2,8 @@ using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using Microsoft.UI.Xaml.Automation.Peers;
 using ServerMonitor.App.Controls.Primitives;
+using ServerMonitor.App.ViewModels;
+using ServerMonitor.App.Views;
 
 namespace ServerMonitor.App.Tests.Architecture;
 
@@ -91,4 +93,55 @@ public sealed partial class Ui12EditorModalLayerTests
 
     [GeneratedRegex(@"_acceptingTrust = true;\s*TrustPanel\.FocusSafeButton\(\);\s*TrustPanel\.SetWorking\(true, acceptAllowed: false\);")]
     private static partial Regex FocusSafeBeforeDisablingAccept();
+
+    // ---- B12F-01 follow-up (Cortex N1 / Prism P3): the inert page raises no live-region change over the open layer ----
+
+    [Theory]
+    [InlineData(ServerEditorLayer.None, true)]
+    [InlineData(ServerEditorLayer.Test, false)]
+    [InlineData(ServerEditorLayer.Trust, false)]
+    [InlineData(ServerEditorLayer.Import, false)]
+    public void ThePageAnnounces_OnlyWithNoLayerOpen(ServerEditorLayer layer, bool announces) =>
+        Assert.Equal(announces, ServerEditorPage.PageAnnounces(layer));
+
+    [Fact]
+    public void BothLiveRegions_AreWrittenOnlyThroughTheGate()
+    {
+        var page = AppSourceTree.CodeWithoutComments("Views/ServerEditorPage.xaml.cs");
+
+        // ActionHint (polite, SaAnnounce.Changes): its one writer sits inside the gate.
+        Assert.Single(HintWrites().Matches(page));
+        Assert.Matches(HintBehindTheGate(), page);
+        // EditorSubtitle (assertive): the initial text (no layer exists yet) and SetSubtitle, which starts with the gate.
+        Assert.Equal(2, SubtitleWrites().Matches(page).Count);
+        Assert.Contains("EditorSubtitle.Text = _subtitle;", page, StringComparison.Ordinal);
+        Assert.Matches(SubtitleBehindTheGate(), page);
+    }
+
+    [Fact]
+    public void ClosingTheLayer_BringsBothLiveRegionsUpToDate_BeforeTheFocusReturns()
+    {
+        var page = AppSourceTree.CodeWithoutComments("Views/ServerEditorPage.xaml.cs");
+        var start = page.IndexOf("private void HideLayer()", StringComparison.Ordinal);
+        var hide = page[start..page.IndexOf("internal static bool LayerReturnsToHeaderButton", start, StringComparison.Ordinal)];
+
+        int At(string text) => hide.IndexOf(text, StringComparison.Ordinal);
+        var none = At("_layer = ServerEditorLayer.None;");
+        var subtitle = At("SetSubtitle(SubtitleText(viewModel));");
+        var hint = At("UpdateActionState();");
+        var focus = At("FocusWhenLaidOut(");
+        Assert.True(none > 0 && subtitle > none && hint > subtitle && focus > hint, "order: layer None, subtitle, hint, then the focus");
+    }
+
+    [GeneratedRegex(@"\bActionHint\.Text\s*=")]
+    private static partial Regex HintWrites();
+
+    [GeneratedRegex(@"\bEditorSubtitle\.Text\s*=")]
+    private static partial Regex SubtitleWrites();
+
+    [GeneratedRegex(@"if \(PageAnnounces\(_layer\)\)\s*\{\s*var hint = _controller\.ActionHintKey\(\);\s*ActionHint\.Text = ")]
+    private static partial Regex HintBehindTheGate();
+
+    [GeneratedRegex(@"private void SetSubtitle\(string text\)\s*\{\s*if \(!PageAnnounces\(_layer\) \|\| ")]
+    private static partial Regex SubtitleBehindTheGate();
 }
