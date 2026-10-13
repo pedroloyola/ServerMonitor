@@ -40,9 +40,10 @@ public static class SaAnnounce
 
     /// <summary>
     /// Raises after the pending layout pass (an element that just became Visible has no UIA bounds before it), and only
-    /// if it is still shown and on the live tree then.
+    /// if it is still shown and on the live tree then. <paramref name="announced"/> runs when the event actually left
+    /// (UI.12 B12B-02: a toast shown before its page was live is announced again on Loaded, never twice).
     /// </summary>
-    public static void RaiseAfterLayout(FrameworkElement element) =>
+    public static void RaiseAfterLayout(FrameworkElement element, Action? announced = null) =>
         Coalesce(
             () => (bool)element.GetValue(PendingProperty),
             pending => element.SetValue(PendingProperty, pending),
@@ -52,6 +53,7 @@ public static class SaAnnounce
                 if (ShouldAnnounce(element.Visibility == Visibility.Visible, SaLiveTree.IsLive(element), ContentOf(element)))
                 {
                     Raise(element);
+                    announced?.Invoke();
                 }
             });
 
