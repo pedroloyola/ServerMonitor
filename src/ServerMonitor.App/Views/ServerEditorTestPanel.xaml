@@ -49,7 +49,7 @@
             <ItemsControl.ItemTemplate>
                 <DataTemplate>
                     <StackPanel Spacing="6">
-                        <!-- UI.12 PEER-01: the step is a named group (a Grid has no peer); its state text is read, not Raw. -->
+                        <!-- UI.12 PEER-01: the step is a named group (a Grid has no peer). R1-03: its name already reads "title: state", so both texts stay Raw. -->
                         <primitives:SaGroupHost AutomationProperties.Name="{Binding AccessibleName}">
                         <Grid ColumnSpacing="10">
                             <Grid.ColumnDefinitions>
@@ -75,9 +75,9 @@
                                                    Visibility="{Binding IsWarning, Converter={StaticResource BooleanToVisibilityConverter}}" />
                             </Grid>
                             <TextBlock Grid.Column="1" Style="{StaticResource SaLabelTextStyle}" Foreground="{ThemeResource SaTextBrush}"
-                                       Text="{Binding Title}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                                       Text="{Binding Title}" TextWrapping="Wrap" VerticalAlignment="Center" AutomationProperties.AccessibilityView="Raw" />
                             <TextBlock Grid.Column="2" Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}"
-                                       Text="{Binding StateText}" VerticalAlignment="Center" />
+                                       Text="{Binding StateText}" VerticalAlignment="Center" AutomationProperties.AccessibilityView="Raw" />
                         </Grid>
                         </primitives:SaGroupHost>
                         <StackPanel Margin="26,0,0,0" Spacing="6"

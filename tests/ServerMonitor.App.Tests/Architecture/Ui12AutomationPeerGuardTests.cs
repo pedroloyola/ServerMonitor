@@ -83,12 +83,17 @@ public sealed class Ui12AutomationPeerGuardTests
         Assert.Contains(host.Descendants(), e => e.Attributes().Any(a => a.Name.LocalName == "SaSlidingSelection.IndicatorBrush"));
     }
 
+    /// <summary>R1-03 (Prism r1): the step group's name is "título: estado"; its two texts are Raw so scan mode does not
+    /// read them a second time.</summary>
     [Fact]
-    public void TestPanelStepStateIsReadNotRaw()
+    public void TestPanelStepIsOneNamedGroupWithRawTexts()
     {
         var step = AppSourceTree.LoadXaml("Views/ServerEditorTestPanel.xaml").Descendants()
             .Single(e => e.Name.LocalName == "SaGroupHost" && e.Attributes().Any(a => a.Name.LocalName == "AutomationProperties.Name"));
-        var state = step.Descendants().Single(e => e.Name.LocalName == "TextBlock" && (string?)e.Attribute("Text") == "{Binding StateText}");
-        Assert.DoesNotContain(state.Attributes(), a => a.Name.LocalName == "AutomationProperties.AccessibilityView");
+        foreach (var text in new[] { "{Binding Title}", "{Binding StateText}" })
+        {
+            var block = step.Descendants().Single(e => e.Name.LocalName == "TextBlock" && (string?)e.Attribute("Text") == text);
+            Assert.Equal("Raw", block.Attributes().Single(a => a.Name.LocalName == "AutomationProperties.AccessibilityView").Value);
+        }
     }
 }
