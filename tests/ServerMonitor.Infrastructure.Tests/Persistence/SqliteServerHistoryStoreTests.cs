@@ -475,16 +475,40 @@ public sealed class SqliteServerHistoryStoreTests : IDisposable
         // reset then cannot complete until both leave the read gate: a deterministic "not yet", not a timing guess.
         var firstQuery = RunOnDedicatedThread(() => store.QueryAsync(firstId, now - TimeSpan.FromMinutes(1), now + TimeSpan.FromMinutes(1)));
         var secondQuery = RunOnDedicatedThread(() => store.QueryAsync(secondId, now - TimeSpan.FromMinutes(1), now + TimeSpan.FromMinutes(1)));
-        await bothOpened.Task.WaitAsync(DeadlockGuard);
+        Task<bool>? reset = null;
+        var failed = false;
+        try
+        {
+            await bothOpened.Task.WaitAsync(DeadlockGuard);
 
-        var reset = store.ResetAsync();
-        Assert.False(reset.IsCompleted);
-        releaseReaders.Set();
+            reset = store.ResetAsync();
+            Assert.False(reset.IsCompleted);
+            releaseReaders.Set();
 
-        Assert.Single(await firstQuery.WaitAsync(DeadlockGuard));
-        Assert.Single(await secondQuery.WaitAsync(DeadlockGuard));
-        Assert.True(await reset.WaitAsync(DeadlockGuard));
-        Assert.True(store.IsAvailable);
+            Assert.Single(await firstQuery.WaitAsync(DeadlockGuard));
+            Assert.Single(await secondQuery.WaitAsync(DeadlockGuard));
+            Assert.True(await reset.WaitAsync(DeadlockGuard));
+            Assert.True(store.IsAvailable);
+        }
+        catch
+        {
+            failed = true;
+            throw;
+        }
+        finally
+        {
+            // UI.12 ATLAS-SQLITE-CLEANUP: whatever failed above, the parked readers are released and both queries (and a
+            // started reset) are drained before the event is disposed - never left blocked on a dedicated thread. A
+            // cleanup problem never masks the original failure; on a passing run it is reported.
+            releaseReaders.Set();
+            try
+            {
+                await Task.WhenAll(reset is null ? [firstQuery, secondQuery] : [firstQuery, secondQuery, reset]).WaitAsync(DeadlockGuard);
+            }
+            catch (Exception) when (failed)
+            {
+            }
+        }
     }
 
     [Fact]
