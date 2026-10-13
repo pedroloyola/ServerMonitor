@@ -35,6 +35,8 @@ public sealed class BackupRestoreDialogService(IWindowContext windowContext) : I
         // The progress bar takes the keyboard focus: with nothing focusable inside, the focus would stay
         // on the page behind the dialog, where Enter could still act.
         var progress = new ProgressBar { IsIndeterminate = true, IsTabStop = true, UseSystemFocusVisuals = false };
+        // UI.12 P3-14 (Prism UI12A): the focused bar is what a screen reader lands on - it carries the restoring message.
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(progress, message);
         var content = new StackPanel { Spacing = 12, MinWidth = 320 };
         content.Children.Add(new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap });
         content.Children.Add(progress);
