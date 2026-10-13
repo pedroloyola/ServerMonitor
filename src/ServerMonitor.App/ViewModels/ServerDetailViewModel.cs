@@ -297,7 +297,7 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
 
     /// <summary>H-UI5-2: a retained reading is shown, marked stale (StaleAgeDisplay semantics), legible without colour.</summary>
     public bool IsReadingStale => _card is not null
-        && ServerStatusPresentation.ShowsRetainedReadingAsStale(_card.Health, _card.IsStale, _card.HasMetrics);
+        && ServerStatusPresentation.ShowsRetainedReadingAsStale(_card.Health, _card.IsStale, _card.HasMetrics, _card.LastError is not null);
 
     /// <summary>
     /// Prism C1 N-6: the stale chip always says "Leitura desatualizada"; the age is said once, by the "Última atualização"

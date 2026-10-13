@@ -40,8 +40,9 @@ public static class ServerMetricPresentation
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null)
         };
 
-        // An Offline server shows "—", not its retained (stale) snapshot (ServerStatusPresentation.RowHidesRetainedMetrics).
-        var known = hasPercent && !ServerStatusPresentation.RowHidesRetainedMetrics(card.Health);
+        // An Offline server, or "Sem dados" after a failed cycle (UI.12 STATE-03), shows "—", not its retained snapshot
+        // (ServerStatusPresentation.RowHidesRetainedMetrics).
+        var known = hasPercent && !ServerStatusPresentation.RowHidesRetainedMetrics(card.Health, card.LastError is not null);
         return known
             ? new ServerMetricReading(true, value, OverviewPresentation.MetricSeverity(value, warning, critical))
             : new ServerMetricReading(false, 0, ServerHealth.Healthy);

@@ -115,11 +115,19 @@
                 ToolTipService.ToolTip="{x:Bind Name}">
                 <primitives:SaListRow.Trailing>
                     <!-- 112:1066: state 13 (B7); 198 from its start to the chevron (C2: 186 + the row's 12 gap). -->
-                    <primitives:SaStatusIndicator
-                        MinWidth="186"
-                        FontSize="{StaticResource SaFontSizeControl}"
-                        Status="{x:Bind Health, Mode=OneWay, Converter={StaticResource ServerHealthToStatusKindConverter}}"
-                        Label="{x:Bind StatusDisplay, Mode=OneWay}" />
+                    <StackPanel MinWidth="186" Spacing="2">
+                        <primitives:SaStatusIndicator
+                            FontSize="{StaticResource SaFontSizeControl}"
+                            Status="{x:Bind Health, Mode=OneWay, Converter={StaticResource ServerHealthToStatusKindConverter}}"
+                            Label="{x:Bind StatusDisplay, Mode=OneWay}" />
+                        <!-- UI.12 B12-06: retained values shown stale (not Offline) - the Compact R-7 cue: clock 12 + "Última atualização há N min". -->
+                        <StackPanel Orientation="Horizontal" Spacing="4" Visibility="{x:Bind ShowsStaleCue, Mode=OneWay}">
+                            <primitives:SaIcon Data="{StaticResource SaIconClock01Data}" Size="12" VerticalAlignment="Center"
+                                               Foreground="{ThemeResource SaAttentionTextBrush}" />
+                            <TextBlock VerticalAlignment="Center" Style="{StaticResource SaHelperTextStyle}" Foreground="{ThemeResource SaAttentionTextBrush}"
+                                       Text="{x:Bind StaleAgeDisplay, Mode=OneWay}" TextTrimming="CharacterEllipsis" AutomationProperties.AccessibilityView="Raw" />
+                        </StackPanel>
+                    </StackPanel>
                 </primitives:SaListRow.Trailing>
             </primitives:SaListRow>
         </DataTemplate>

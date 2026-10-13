@@ -87,8 +87,18 @@ public sealed class ServerDirectoryRowViewModel : ObservableObject, IDisposable
 
     private ServerMetricReading Disk => ServerMetricPresentation.Read(Card, ServerMetricKind.Disk, _thresholds);
 
-    /// <summary>The summary-list row (112:1057) read as "prod-web-01, Saudável".</summary>
-    public string ListAutomationName => string.Join(", ", Name, StatusDisplay);
+    /// <summary>
+    /// UI.12 B12-06: "Última atualização há N min" under the state while retained values are shown stale (never for Offline
+    /// or a failed "Sem dados", whose values are already "—"). Null otherwise.
+    /// </summary>
+    public string? StaleAgeDisplay => ServerStatusPresentation.RowStaleAge(Card);
+
+    public bool ShowsStaleCue => StaleAgeDisplay is not null;
+
+    /// <summary>The summary-list row (112:1057) read as "prod-web-01, Saudável" (+ ", Última atualização há N min" when stale).</summary>
+    public string ListAutomationName => StaleAgeDisplay is { } age
+        ? string.Join(", ", Name, StatusDisplay, age)
+        : string.Join(", ", Name, StatusDisplay);
 
     /// <summary>"Ver detalhe de &lt;servidor&gt;" — the action's accessible name carries the server.</summary>
     public string DetailAutomationName => Format("ServerDetailOpenFor", Name);
@@ -97,15 +107,22 @@ public sealed class ServerDirectoryRowViewModel : ObservableObject, IDisposable
     /// The whole row read as one sentence ("prod-web-01, Atenção, CPU 92% em atenção, RAM 41%, disco 52%"). UI.10 F24: the
     /// metric over the limit says so (its colour + SemiBold are the visual cues; the name is the non-visual one).
     /// </summary>
-    public string RowAutomationName => Format(
-        "ServerRowAutomationFormat",
-        Name,
-        StatusDisplay,
-        ServerMetricPresentation.AccessibleWithSeverity(Cpu, _localization),
-        ServerMetricPresentation.AccessibleWithSeverity(Memory, _localization),
-        ServerMetricPresentation.AccessibleWithSeverity(Disk, _localization),
-        Address,
-        OperatingSystemDisplay);
+    public string RowAutomationName
+    {
+        get
+        {
+            var row = Format(
+                "ServerRowAutomationFormat",
+                Name,
+                StatusDisplay,
+                ServerMetricPresentation.AccessibleWithSeverity(Cpu, _localization),
+                ServerMetricPresentation.AccessibleWithSeverity(Memory, _localization),
+                ServerMetricPresentation.AccessibleWithSeverity(Disk, _localization),
+                Address,
+                OperatingSystemDisplay);
+            return StaleAgeDisplay is { } age ? string.Join(", ", row, age) : row; // UI.12 B12-06
+        }
+    }
 
     public ICommand OpenDetailCommand { get; }
 
@@ -125,8 +142,17 @@ public sealed class ServerDirectoryRowViewModel : ObservableObject, IDisposable
         switch (e.PropertyName)
         {
             case nameof(ServerCardViewModel.Health):
-                // Offline also hides the metrics, so every metric presentation follows the health.
+            case nameof(ServerCardViewModel.LastError):
+                // Offline (and a failed "Sem dados", UI.12 STATE-03) also hides the metrics, so every metric presentation
+                // follows the health and the last error.
                 OnPropertyChanged(string.Empty);
+                break;
+            case nameof(ServerCardViewModel.HasStaleIndicator):
+            case nameof(ServerCardViewModel.StaleAgeDisplay):
+                OnPropertyChanged(nameof(StaleAgeDisplay));
+                OnPropertyChanged(nameof(ShowsStaleCue));
+                OnPropertyChanged(nameof(ListAutomationName));
+                OnPropertyChanged(nameof(RowAutomationName));
                 break;
             case nameof(ServerCardViewModel.HasCpuPercent):
             case nameof(ServerCardViewModel.CpuUsageValue):
