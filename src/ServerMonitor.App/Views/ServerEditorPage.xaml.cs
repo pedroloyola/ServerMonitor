@@ -619,13 +619,40 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
         }
         else if (e.Key == VirtualKey.Enter && _viewModel is { IsConnectionWorkInProgress: false })
         {
-            if (FocusManager.GetFocusedElement(XamlRoot) is not TextBox { AcceptsReturn: true })
+            if (ShouldSubmitOnEnter(ClassifyEnterTarget(FocusManager.GetFocusedElement(XamlRoot))))
             {
                 e.Handled = true;
                 Submit();
             }
         }
     }
+
+    /// <summary>UI.12 UI12A-KBD-01: what has the focus when Enter reaches the page.</summary>
+    internal enum EnterTarget
+    {
+        Other,
+        SingleLineText,
+        MultiLineText,
+        SecretField,
+        SaveButton,
+    }
+
+    /// <summary>
+    /// UI.12 UI12A-KBD-01 (Prism): Enter submits only from a single-line text field, a password field or Save itself. On a
+    /// CheckBox, RadioButton, ToggleSwitch, ComboBox (or any other control) it used to submit too - a keyboard user toggling
+    /// "Usar jump host" or picking an authentication method saved the form.
+    /// </summary>
+    internal static bool ShouldSubmitOnEnter(EnterTarget target) =>
+        target is EnterTarget.SingleLineText or EnterTarget.SecretField or EnterTarget.SaveButton;
+
+    private EnterTarget ClassifyEnterTarget(object? focused) => focused switch
+    {
+        TextBox { AcceptsReturn: true } => EnterTarget.MultiLineText,
+        TextBox => EnterTarget.SingleLineText,
+        PasswordBox => EnterTarget.SecretField,
+        _ when ReferenceEquals(focused, PrimaryButton) => EnterTarget.SaveButton,
+        _ => EnterTarget.Other,
+    };
 
     private async void OnTestClick(object sender, RoutedEventArgs e) =>
         await UiFireAndForget.RunAsync("editor test", StartTestAsync);
