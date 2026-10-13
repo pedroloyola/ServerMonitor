@@ -209,8 +209,8 @@
                 <TextBlock
                     Style="{StaticResource SaPageSubtitleTextStyle}"
                     Text="{Binding ContextDisplay}"
-                    TextWrapping="Wrap"
-                    primitives:SaAnnounce.Changes="True" AutomationProperties.LiveSetting="Polite" />
+                    TextWrapping="Wrap" />
+                <!-- UI.12 R1-02 (Prism r1): not a live region - the context carries "Atualizado há…", which ticks periodically. -->
             </StackPanel>
             <Button
                 Grid.Column="1"

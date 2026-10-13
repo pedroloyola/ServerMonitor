@@ -296,8 +296,8 @@
                             <TextBlock x:Uid="FirstServerSubtitle" Style="{StaticResource SaPageSubtitleTextStyle}" Visibility="{x:Bind ViewModel.ShowEmptyState, Mode=OneWay}"/>
                             <TextBlock Style="{StaticResource SaPageSubtitleTextStyle}"
                                        Text="{x:Bind ViewModel.HeaderContextDisplay, Mode=OneWay}"
-                                       Visibility="{x:Bind ViewModel.HasHeaderContext, Mode=OneWay}"
-                                       primitives:SaAnnounce.Changes="True" AutomationProperties.LiveSetting="Polite" />
+                                       Visibility="{x:Bind ViewModel.HasHeaderContext, Mode=OneWay}" />
+                            <!-- UI.12 R1-02 (Prism r1): not a live region - "Atualizado há…" is recomputed on every engine cycle. -->
                         </StackPanel>
                     </StackPanel>
                     <StackPanel x:Name="HeaderActions" Grid.Column="1" Style="{StaticResource SaPageHeaderActionsStyle}">

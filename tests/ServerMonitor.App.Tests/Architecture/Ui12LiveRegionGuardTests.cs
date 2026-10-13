@@ -99,6 +99,27 @@ public sealed partial class Ui12LiveRegionGuardTests
     public void OnlyAShownConnectedRegionWithContentIsAnnounced(bool visible, bool live, string? content, bool expected) =>
         Assert.Equal(expected, SaAnnounce.ShouldAnnounce(visible, live, content));
 
+    /// <summary>
+    /// R1-02 (Prism r1): a text recomputed on every engine cycle ("Atualizado há…") must never be a live region, or the
+    /// page chatters while the user reads it. The Overview header context and the Workloads context carry it.
+    /// </summary>
+    [Theory]
+    [InlineData("Views/DashboardPage.xaml", "HeaderContextDisplay")]
+    [InlineData("Views/WorkloadsPage.xaml", "ContextDisplay")]
+    [InlineData(null, "UpdatedAgo")]
+    public void PeriodicFreshnessTextIsNeverALiveRegion(string? file, string boundProperty)
+    {
+        var offenders = AppSourceTree.Files(".xaml")
+            .Where(f => (file is null || f == file) && !f.StartsWith("Qa/", StringComparison.Ordinal))
+            .SelectMany(f => AppSourceTree.LoadXaml(f).Descendants()
+                .Where(e => ((string?)e.Attribute("Text"))?.Contains(boundProperty, StringComparison.Ordinal) == true)
+                .Where(e => e.Attributes().Any(a => a.Name.LocalName is "AutomationProperties.LiveSetting" or "SaAnnounce.Changes"))
+                .Select(e => $"{f}: {(string?)e.Attribute("Text")}"))
+            .ToList();
+
+        Assert.True(offenders.Count == 0, string.Join(Environment.NewLine, offenders));
+    }
+
     /// <summary>R1-01 (Prism r1): a text change and a visibility change in the same turn queue ONE raise, not two.</summary>
     [Fact]
     public void TwoRequestsInTheSameTurnQueueOneRaise()
