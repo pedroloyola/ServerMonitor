@@ -1,6 +1,6 @@
 # UI.12 — Final UX Hardening
 
-**Status: UI.12 — DRAFT / BLOCKED (2026-10-13).** Code head `d36becb`, PR #42 (draft), CI `38352809526` green on `d36becb`. Blocked on human action (§3 "Open for the human"): a Windows Firewall notification dialog left open by an accidental test run blocks real-input QA on the final head, and two P2s stay open (B12B-01, B12F-01). Ceiling of the run: READY_TO_MERGE; no merge without the human GO.
+**Status: UI.12 — DRAFT, recovery done (2026-10-13).** Code head `6f66910` (local, **not pushed**); PR #42 (draft) and CI `38352809526` are still on `d36becb`, so CI has **not** run on the recovery commits. The recovery run (§0, human present) closed the Firewall blocker, fixed and runtime-proved both open P2s (B12B-01 in real High Contrast, B12F-01 by UIA + real input), and ran the stress cycles, the real-input pass and part of the Narrator script. Ceiling of the run: READY_TO_MERGE; no push / merge without the human GO.
 
 **Branch:** `ui/ui12-final-ux-hardening`, base `main` @ `baa6401`. Relay's accessibility work was done on `ui/ui12-a11y` (same base) and merged into the branch four times (`b328a07`, `6e62664`, `118c044`, `f7fe881`), each conflict-free and identical to a recomputed merge-tree. This document's commit adds docs only.
 
@@ -34,10 +34,59 @@
 
 `.boss/**` paths are evidence. No personal data, real hosts or real screenshots are reproduced here; the QA harnesses use fixture data.
 
+## 0. Recovery run (2026-10-13, human present)
+
+Commits on the branch after `75b47eb` (all local, not pushed):
+
+| Commit | What |
+|---|---|
+| `ab575d3`, `879c079`, `5016f2a` (Relay, `ui/ui12-modal`), merged in `717b520` | B12F-01: the page behind the editor's modal layer leaves the UIA tree; no live-region change from the inert page; Atlas setter pins |
+| `2753ace`, `0bc6ad8`, `389dc7e` | B12B-01 first recovery fix: an HC-only twin path in the SaIcon template + `SaIconSecondaryStyle` for muted icons in state-text hosts + Atlas pin. **Measured later: no effect in HC** (root cause below) |
+| `843771e` | B12B-01 final fix: a collapsed `IconElement` probe in the SaIcon template drives the HC path |
+| `6f66910` | test-only: Atlas A-B12B-FINAL-01 (`OnApplyTemplate` pinned statement by statement) |
+
+### Firewall exception — closed
+- The 2 inbound **Block** rules added by the accidental `Infrastructure.Tests` testhost run (`wt\ui12-review\…\testhost.exe`, TCP + UDP "Query User") were removed by the human with UAC: **711 → 709**, removed 2, added 0, changed 0, `RESULT=PASS` (`.boss/evidence/ui12/firewall-removal.log`, 09:22–09:24). The notification dialog is gone; real-input QA was possible again. Firewall stayed 709 in every later QA window.
+
+### B12B-01 — High Contrast icons on Highlight: **FIXED** (`843771e`), proven in real HC
+- **The P0 of `85a6b08`, measured** [EMP] (spike worktree, variants, life probe 40 s with HC off, no input): `AccessibilitySettings.HighContrastChanged +=` throws **COMException 0x80070490 synchronously on the UI thread**; it escaped `SaIcon.Loaded` through a `Lazy` factory → stowed-exception fail-fast `0xc000027b`. Subscription only → crash; `AccessibilitySettings` created and read without subscribing → alive; subscription in try/catch → alive (the throw logged). [DOC] The event is **not supported in WinUI 3 desktop apps** (Project Reunion 0.5 known issues; `microsoft-ui-xaml#4163`; replacement `ThemeSettings.Changed`) — Cortex `cortex-platform-research.md` §1. A guard forbids `HighContrastChanged` in App code.
+- **Why `2753ace` had no effect** [EMP + SRC]: a host's visual state (checked / hover / pressed / disabled) sets **its `ContentPresenter.Foreground`**. The icon inherits the value (`GetValue` is right), but WinUI notifies that change **only to `IconElement` descendants** (`InheritedProperties::GetCorrespondingInheritedProperty`, `InheritedProperties.cpp` L579-598; deliberate since Windows 8.1 for `AppBarButton`). SaIcon is a `Control`, so nothing bound to its Foreground ever updates — neither `{TemplateBinding}` nor `{Binding … TemplatedParent}` nor a property-changed callback. Measured with a diagnostic build in Dark and in real Night sky: `icon.Foreground` = HighlightText, the HC path visible (theme-resource visibility resolves correctly), yet its Stroke stays at the value from template time (WindowText). The Beacon "PASS 11.81 / 7.27" rows of the `717b520` final QA were a **measurement artefact** (the "dominant colour" was the HC text backplate, not the icon) and were corrected (`beacon-final-qa.md` §5).
+- **Fix `843771e`:** the SaIcon template carries `<PathIcon x:Name="PART_ForegroundProbe" Visibility="Collapsed" />` (no Foreground of its own); `OnApplyTemplate` binds `PART_StatePath.Stroke` to the probe's Foreground with a **Source** binding (an `ElementName` binding does not resolve inside this template — measured: `DataItem` null, icon empty). The HC path has no XAML Stroke (single source). No events, no `AccessibilitySettings`, no lifecycle code; Light / Dark keep the pre-UI.12 TemplateBinding path (the HC path stays Collapsed outside HC). Cost: +1 collapsed `PathIcon` and +1 binding per icon, on top of the `2753ace` twin path.
+- **Real HC on the Floor build** [HC-REAL, REAL-INPUT] (`843771e`, dll `886406EF…`, Beacon `beacon-hcdiag.md` §6d; HC switched by the human): icon stroke measured on the **icon crop** — Glass icon-only "Modo compacto" hover and pressed, checked sidebar item, selected theme segment, "Dados e servidores" and "Sobre" disclosures on hover: **Night sky #2B2B2B on #D6B4FD ≈ 7.8:1** (was #FFFFFF, 1.78:1), **Desert #FFF5E3 on #903909 ≈ 6.5:1** (was #3D3D3D, 1.44:1). At rest WindowText on Window. Servers page (`many-100`): row icons legible before and after PgDn recycling. Diagnostic build (same mechanism, Sentry `sentry-hcfix-proto.md` §6): also the auth segment, the key picker on hover, "Atualizar todos" hover / pressed (7.96:1), disabled = GrayText 8.63:1, and **OFF → Night sky with the window open** follows (7.96:1).
+- **Light / Dark identity** (Cortex C1, Beacon `beacon-hcdiag.md` §6b): Floor `843771e` vs `717b520`, 26 surfaces × 2 runs: 19/26 identical (0 px), the rest within the run-to-run noise of the baseline itself (backdrop) or a keyboard-focus ring present in one baseline run → **0/26 above noise**.
+- **Not fixed by this (pre-existing, new ID):** B12G-01 (P3) — switching one HC theme to another with the app open leaves the checked item's **fill** in the previous theme; the icon follows the new theme. `baa6401` does the same.
+
+### B12F-01 — modal layer background in UIA: **FIXED** (`ab575d3` + `879c079` + `5016f2a`, merged `717b520`)
+- **Cause** [DOC + SRC]: the UIA Control view is a filter over the raw tree; `AccessibilityView=Raw` removes one node, not its descendants (`CUIElement::GetAPChildren` prunes only on Visibility). Even WinUI's `ContentDialog` does not hide the background.
+- **Fix:** `SaInertHost` wraps the editor's `PageScroll`; its automation peer returns **no children** while inert and is never a control / content element; each switch raises `StructureChanged(ChildrenInvalidated)` (only when a listener exists). `SetPageInteractive` is the only writer; every close path restores it before focus. `879c079`: the inert page writes neither `ActionHint` nor `EditorSubtitle` while a layer is open (no live-region change over the layer); the held summary is said once after close.
+- **Runtime** [REAL-INPUT + UIA] (Beacon final QA @ `717b520`, `ControlViewWalker`): **10/10 paths PASS** — Import → Cancel / Esc / use a profile; test OK → back; test failed → Esc; trust → Cancel; trust → trust and test → back; navigate away (discard guard: keep editing / discard); close the window → tray Open; Tab / Shift+Tab. With the layer open, **0 page elements** in the Control view; on close the form returns and focus goes to the invoker. Note (P3, Prism decision): after "Continuar a editar" in the navigation guard, focus stays on the clicked sidebar item (outside the layer); one Tab re-enters it.
+
+### Narrator session (human, Beacon `beacon-final-qa.md` §7)
+- **Steps 1–6 with the human** [HUMAN]: PASS — 1.1–1.4 (active nav item, Tab through the command bar and page, Shift+Tab, 1 min idle without periodic announcements), 2.1–2.3 (sidebar by arrows, "x de 4"), 3.1 (Overview list, name + state + position), 4.2–4.5 (editor fields, 14 named stops in order; empty Add; Test OK announced, password read as already entered **without its value**; Esc → focus on a named target).
+- **FAIL 4B → B12B-02-R** (below). 4A, 4C and Q1/Q2 not reported by the human.
+- **Steps 7–10 and 4A: UIA + real keyboard, "UIA-verified; Narrator NOT_RUN"** (the human declined further Narrator steps): theme / History range / auth segments, toggles, failed test, failed server state and reason as text, Edit › Save (1 live event), Data toast, Compact Tab and rows, ticker 60 s without spam, Enter on a row → PASS.
+
+### New or re-opened findings (all pre-existing at `baa6401` unless stated)
+
+| ID | Sev | Finding | Decision |
+|---|---|---|---|
+| B12B-02-R | **P2 proposed** (P3 defensible; Boss / Prism) | "Servidor ocultado…" is **not read by the real Narrator**: after Hide, 2 polite `LiveRegionChanged` (summary + toast) arrive in the same instant as focus moves to the Servers title; the Narrator speaks the focus change only. The UIA-level fix (B12B-02) holds; at `baa6401` the toast was never announced | **OPEN** → decision. Direction: `RaiseNotificationEvent(ActionCompleted, …)` after focus settles, or put the notice in the focused title's name / description |
+| B12H-01 | P3 | pt-PT Narrator reads the placeholder "Ex.:" as "Excelência" (`Resources.resw`, the editor's name / host / user / jump fields; same in pt-BR) | **BACKLOG** (copy: "Por exemplo: …") |
+| B12G-01 | P3 | HC → HC switch with the app open: the checked item's fill stays in the previous theme | **BACKLOG** |
+| R1-01-R | P3 | Data toast: 2 identical `LiveRegionChanged` 4 ms apart in 1 of 4 runs (coalescing residue) | **BACKLOG** |
+| Focus note | P3 | after "Continuar a editar" in the navigation guard, focus stays on the sidebar item outside the layer | **Prism decision** |
+| B12F-02 | P3 | Servers stale cue not in the row's accessible name (re-confirmed by real keyboard) | **OPEN** → backlog (unchanged) |
+
+### Stress and real input (Beacon `beacon-stress-r1.md` @ `d36becb` vs `baa6401`; `beacon-final-qa.md` @ `717b520`)
+- **Stress C1W–C10:** 0 crashes, 0 not-responding, 0 Firewall / UAC dialogs; handles / GDI / USER stable. **No UI.12 regression.** Per-visit memory growth (navigation, editor, History, rapid selection: ~3–4.5 MB per visit, C8 +41 MB) is **identical on `baa6401` → pre-existing** (Cortex: cache vs retention, backlog). C2c modal test ×50: +32.8 MB vs +28.0 MB on the baseline, not monotonic → note for Cortex. C2b / C3 / C4 / C7 / C10: PASS (focus restored 5/5, maximized kept 10/10, 0 fail-fast in 110 real drags).
+- **C-W1 tray menu with real keys** (W3 / W4 / W7b): **PASS** (maximized restored).
+- **Real-input pass:** K1–K7 (editor, test / trust / import layers, STATE-03 / 04 / 05, B12-04 / 05) PASS; drag on the selector; Reduced Motion; Compact "Sempre no topo" and row click PASS. Smoke Dark 75/75 surfaces × pt-PT / pt-BR / en-US and Light 3 × 8 pages: 0 unnamed interactive elements. Life probe: 14 harnesses > 35 s with HC off.
+- **Guards:** real data diff 0 in every window; Firewall 709; HC restored to the recorded state (diff 0; the default HC scheme also back to "Branco de alto contraste"); 0 QA apps left; 0 crashes (event 1000) of QA executables (the only crash events were Sentry's deliberate spike probes of the `85a6b08` mechanism).
+
 ## 1. Outcome
 
 - **No P0 in the audit.** UI12A-STATE-01 (Prism P1, "no servers yet" shown when the configuration is unreadable) was fixed and Cortex ruled out the feared P0 ("Adicionar" overwriting an unreadable configuration).
-- **One P0 introduced during the run and reverted:** `85a6b08` (B12B-01, HC icon colour) made the app fail-fast (0xc000027b, Microsoft.UI.Xaml.dll) 4–5 s after every launch, with High Contrast **off** and no input. Every unit test and CI were green. Beacon found it in the final runtime pass and bisected it (parent good, `870b64c` good); it was reverted in `41f8c59` (its test guard) and `d36becb`. `SaIcon.cs` is byte-identical to its pre-`85a6b08` content. Static hypothesis (Relay, unconfirmed): the new `AccessibilitySettings.HighContrastChanged` subscription created inside every icon's Loaded.
+- **One P0 introduced during the run and reverted:** `85a6b08` (B12B-01, HC icon colour) made the app fail-fast (0xc000027b, Microsoft.UI.Xaml.dll) 4–5 s after every launch, with High Contrast **off** and no input. Every unit test and CI were green. Beacon found it in the final runtime pass and bisected it (parent good, `870b64c` good); it was reverted in `41f8c59` (its test guard) and `d36becb`. **Root cause measured in the recovery (§0):** the `AccessibilitySettings.HighContrastChanged` subscription throws COMException 0x80070490 (unsupported in WinUI 3 desktop apps).
 - **Fixed:** about 60 commits on the branch; every fix has a regression test and a counterproof (§7).
   - High Contrast: HC-01 / HC-02 / FOCUS-01.
   - Screen readers: LIVE-01, PEER-01, STATE-02, TEXT-01.
@@ -50,7 +99,8 @@
   - Lifecycle: C-L1, C-L8 and the startup exit code (C-S1a).
   - States: STATE-01 / 03 / 04 / 05.
   - Layout: LAYOUT-01 / 02, FORM-01.
-  - Keyboard and modal layer: KBD-01, FOCUS-02, MODAL-01 (**partially**: focus kept in the layer on Accept works; hiding the background form from UIA does not — B12F-01).
+  - Keyboard and modal layer: KBD-01, FOCUS-02, MODAL-01 (focus kept in the layer on Accept; the background's removal from UIA completed by B12F-01 in the recovery, §0).
+  - Recovery (§0): **B12B-01** (`843771e`, real HC) and **B12F-01** (`ab575d3` / `879c079` / `5016f2a`).
   - Beacon findings: B12-01 / 04 / 05 / 06 / 10 / 11, B12B-02.
   - Small P3s: N-3 (`575abb5`), C-W4 (`f9446db`, unit only), C-L2 (`870b64c`).
 - **By design / reverted:** B12-07 editor Tab order (UI.7 DV-26, §3).
@@ -60,17 +110,21 @@
   - C-S1b (persisted startup-failure record);
   - the open P3 sweep items (§2);
   - the loopback CI flake, as a separate test-only PR proposal.
-- **Open P2s (decision: backlog, human to confirm):**
-  - **B12B-01** — HC icons and glyphs on Highlight at 1.44–1.78:1 (labels stay legible via the system backplate). The fix caused the P0 and was reverted.
-  - **B12F-01** — MODAL-01's `AccessibilityView=Raw` on `PageScroll` hides only that container: with the editor layer open, Name/Host/User/Port/Test/header button stay in the UIA control view (Beacon final pass; Cortex predicted it in r3). The code is harmless but ineffective for that part.
+- **Former open P2s — FIXED in the recovery (§0):**
+  - **B12B-01** — HC icons on Highlight were 1.44–1.78:1; now ≈7.8:1 (Night sky) / ≈6.5:1 (Desert), measured on the icon crop in real HC on `843771e`.
+  - **B12F-01** — with the editor layer open, 0 page elements in the UIA control view (10/10 paths, real input).
+- **Open after the recovery:**
+  - **B12B-02-R** (P2 proposed, pre-existing) — the "Servidor ocultado" toast is raised at UIA level but not read by the real Narrator (decision Boss / Prism).
   - **B12F-02** (P3) — the Servers stale cue TextBlock is Raw-only and in no control-view name (the Overview row name has it).
+  - P3s B12H-01, B12G-01, R1-01-R and a focus note (§0).
 - **Gates:**
   - every commit was gated on the Debug `.slnx` build `--disable-build-servers` + App.Tests (+ Core.Tests when touched);
   - from fix round r3 on, also the **Release** `.slnx` build, because CI went red once on a Debug-only QA reference in a test (run `38342264081`, fixed in `b568c24`);
   - final local counts on `d36becb`: **Release** App.Tests 3473/3473, Core 682/682; **Debug** App.Tests 3955/3955, Core 682/682 (0 build errors both);
+  - recovery: every Floor commit additionally needed an **HC-off launch smoke** (Start-QaApp, ≥ 40–60 s, no input) when it touched XAML or a control; final local counts on `6f66910`: **Release** App.Tests 3491/3491, Core 682/682; **Debug** App.Tests 3973/3973, Core 682/682 (0 build errors both);
   - Infrastructure.Tests ran only as filtered store classes, never in full locally (§6).
 - **Real data:** identical before and after every QA window.
-- **Firewall:** the app added no rules. An accidental full `Infrastructure.Tests` run in a review worktree (not a QA run) added 2 inbound **Block** rules for its testhost (709 → 711) and opened a Firewall notification dialog at 04:40, which blocked part of the stress run and all real-input QA after 04:40 (§9). The dialog was never answered. Removing those rules needs the human (UAC).
+- **Firewall:** the app added no rules. An accidental full `Infrastructure.Tests` run in a review worktree (not a QA run) added 2 inbound **Block** rules for its testhost (709 → 711) and opened a Firewall notification dialog at 04:40, which blocked part of the stress run and all real-input QA after 04:40 (§9). **Closed in the recovery:** the human removed both rules with UAC (711 → 709, §0); 709 in every later window.
 
 ## 2. Findings and decisions
 
@@ -92,9 +146,11 @@ Severity per the common format (P0 data loss / security / critical crash · P1 i
 | B12-10 | P3 | Programmatic heading focus drew the square system rectangle | **FIXED** `c89fc7c`: app ring, radius 4 |
 | B12-11 | P3 | "Serviços e containers" title cut at 560 px | **FIXED** `2fd64c4`: 2 lines, ellipsis after 2 |
 | B12-12…14 | INFO | focusable cards; modal background in UIA; harness-only loading quirks | B12-13 → MODAL-01 `e033b50`, **not effective** for the background (= B12F-01); the rest no change |
-| B12B-01 | P2 | HC: icons and glyphs on Highlight (selected sidebar item, selected segments, icon-only Glass buttons on hover) at 1.44–1.78:1 | **OPEN** — fix `85a6b08` caused the P0 startup crash and was **reverted** (`41f8c59`, `d36becb`) → backlog |
+| B12B-01 | P2 | HC: icons and glyphs on Highlight (selected sidebar item, selected segments, icon-only Glass buttons on hover) at 1.44–1.78:1 | **FIXED** `843771e` (recovery, §0; real HC ≈7.8 / 6.5:1). History: `85a6b08` caused the P0 and was reverted (`41f8c59`, `d36becb`); `2753ace` / `0bc6ad8` had no HC effect (ContentPresenter → Control Foreground changes are not notified) |
 | B12B-02 | P3 | "Servidor ocultado" toast raises no LiveRegionChanged | **FIXED** `5058c79`: announced once when the page becomes live (UIA listener: 1 event) |
-| B12F-01 | P2 | Editor modal layer open: background form still in the UIA control view | **OPEN** → backlog (MODAL-01 Raw on one container does not hide descendants) |
+| B12F-01 | P2 | Editor modal layer open: background form still in the UIA control view | **FIXED** `ab575d3` + `879c079` + `5016f2a` (merged `717b520`): `SaInertHost` peer with no children while inert; runtime 10/10 PASS (§0) |
+| B12B-02-R | P2 proposed | "Servidor ocultado…" not read by the real Narrator (focus change wins over 2 simultaneous polite live regions) | **OPEN** → Boss / Prism (pre-existing, §0) |
+| B12H-01 · B12G-01 · R1-01-R | P3 | "Ex.:" read as "Excelência" · HC→HC fill stale · rare duplicate Data-toast event | **BACKLOG** (pre-existing / intermittent, §0) |
 | B12F-02 | P3 | Servers stale cue Raw-only, not in any control-view name | **OPEN** → backlog |
 
 ### Prism static audit (UI12A-*, `prism-ui12a-audit.md`)
@@ -119,7 +175,7 @@ Severity per the common format (P0 data loss / security / critical crash · P1 i
 | LAYOUT-04 | P2 | **BACKLOG** (Windows text scaling; needs a system setting to measure) |
 | KBD-01 | P2 | **FIXED** `94f6777`: Enter submits only from a text field, a secret field or Save |
 | FORM-01 | P2 | **FIXED** `a16d9bc`: host-key subject and the destructive "affected" line wrap |
-| MODAL-01 | P2 | **PARTIAL** `e033b50`: focus kept in the layer on Accept (fixed); background still in the UIA control view (B12F-01, open) |
+| MODAL-01 | P2 | **FIXED** `e033b50` (focus kept in the layer on Accept) + B12F-01 in the recovery (background out of the UIA control view) |
 | CONTRAST-01 | P2 | **FIXED** `ebb1ae6` (+ `3ca97bf`): Compact "Sem ligação" text uses a text token (Light #A83E36) |
 | TEXT-01 | P2 | **FIXED** `9bfbaac`: toggle name = visible label; notifications say "Sem ligação" / "Ligação restabelecida" |
 | P3-14 / P3-21 / P3-24 / P3-31 | P3 | **FIXED** `a330a9a` / `a8f6956` / `3b52640` / `d8f67b8` |
@@ -170,11 +226,16 @@ Severity per the common format (P0 data loss / security / critical crash · P1 i
 - **MODAL-01 / B12F-01:** no further fix round overnight (needs runtime proof); kept the effective part, background hiding → backlog.
 - **Merge:** not done (human GO). Note: the commits from `416d734` up to the parent of `b568c24` do not build in Release (CS0234), so a squash merge avoids carrying them into `main`.
 
+- **Recovery (2026-10-13, human present):**
+  - Firewall rules removed by the human (UAC); runtime QA re-granted (real input, stress, Narrator).
+  - B12B-01 and B12F-01 fixed in UI.12 (not deferred). For B12B-01: a diagnostic HC session with conditions — the **human** switched HC on and off; original theme recorded and restored (diff 0); no repeat of the `85a6b08` mechanism; PASS only from pixels measured on the icon crop in real HC.
+  - The Narrator session stopped after step 6 (human's choice); steps 7–10 recorded as "UIA-verified; Narrator NOT_RUN".
+  - A temporary difference (default HC scheme) was accepted by the human during the diagnostic and disappeared at the final restore.
+
 ### Open for the human
-1. Close the open Windows Firewall notification dialog without allowing anything, and remove the 2 inbound Block rules (exact Names in the backlog) with UAC.
-2. Then re-grant runtime QA on the final head: real-input pass (MODAL-01, STATE-03…05, B12-04/05/06 by keyboard; C-W1 W3/W4/W7b) and candidate stress C2–C10 (scripts ready).
-3. Narrator pass (script ready).
-4. Decide B12B-01 / B12F-01 (fix in a follow-up vs accept as known issues) and the merge method.
+1. Decide **B12B-02-R** severity (P2 proposed / P3 defensible) and whether it is fixed in UI.12 or a follow-up.
+2. GO for push (CI has not run on the recovery commits) and the merge method (squash recommended, see the Release note above).
+3. Optional: the remaining Narrator steps (3.2–3.4, 3.6, 5–11).
 
 ## 4. Platform limitations (documented vs empirical)
 
@@ -188,7 +249,11 @@ Severity per the common format (P0 data loss / security / critical crash · P1 i
   - `Border` / `Grid` / `StackPanel` / `ItemsRepeater` have no automation peer. Names, `IsDialog` and `LiveSetting` set on them never reach UIA, which is why `SaGroupHost` / `SaListHost` exist (PEER-01).
   - Whether WinUI raises `LiveRegionChanged` by itself for a TextBlock with `LiveSetting` is **not documented** either way. The app raises it explicitly (`SaAnnounce`, LIVE-01); measured by a listener in §9.
   - The managed UIA client cannot read `LiveSetting` / `FullDescription` (QA limitation, not product).
-- **High Contrast text backplate:** in HC, Windows draws its own text backplate behind labels whose foreground is not a system brush. That keeps text legible where icons are not (B12B-01).
+- **High Contrast text backplate:** in HC, Windows draws its own text backplate behind labels whose foreground is not a system brush. That keeps text legible where icons are not (B12B-01), and it fooled a "dominant colour" contrast probe (§0).
+- **`AccessibilitySettings.HighContrastChanged`:** [DOC] not supported in WinUI 3 desktop apps (Project Reunion 0.5 known issues; `microsoft-ui-xaml#4163`); [EMP] subscribing throws 0x80070490 here (the `85a6b08` P0). Reading `AccessibilitySettings.HighContrast` works. Replacement for code that really needs a notification: `ThemeSettings.Changed` (known gap: not raised between two HC themes). The app needs neither: theme dictionaries re-resolve.
+- **Inherited Foreground notifications:** [SRC] a `ContentPresenter.Foreground` change is notified only to `IconElement` descendants (`InheritedProperties.cpp` L579-598); a `Control` child reads the new value but gets no change notification, so no binding on it updates. [EMP] measured in Dark and real HC. Workaround used: a collapsed `IconElement` probe in the template (B12B-01).
+- **`ElementName` inside the SaIcon ControlTemplate:** [EMP] did not resolve (`DataItem` null); the binding is created in `OnApplyTemplate` with a `Source`.
+- **UIA Raw view:** [DOC + SRC] `AccessibilityView=Raw` removes one node from the Control view, not its descendants; only a peer whose `GetChildrenCore` returns no children prunes a subtree (B12F-01).
 
 ## 5. Visible changes (all to fix a demonstrated defect)
 
@@ -258,6 +323,10 @@ Each counterproof breaks the rule in production code, fails the named tests for 
   - MODAL-01 Raw restored on every close path;
   - B12-04 hint;
   - B12-05 retained-secret flags.
+- **Recovery:**
+  - `Ui12HighContrastIconTests` (static, reads the sources): theme-dictionary visibility of the two paths; closed attribute lists of both paths, the HC path without a XAML Stroke; the collapsed `PathIcon` probe without a Foreground of its own and no app style giving one; `OnApplyTemplate` and the binding helper pinned statement by statement (Atlas A-B12B-FINAL-01); no `HighContrastChanged`, no `ElementName`; no local Foreground on an icon inside a state-text host; `SaIconSecondaryStyle` sets no Foreground in HC. Counterproofs F1–F14 (`.boss/tmp/ui12/sentry/rec/cp-final.py`: baseline must pass, each case must fail the **expected** test, restore verified, exit ≠ 0 on a survivor) — **14/14 killed**. Static guards: the real re-template and HC rendering are runtime evidence (§0).
+  - `Ui12EditorModalLayerTests` (B12F-01): peer child rule, layout-only peer, StructureChanged, XAML placement, single `IsInert` writer, setter body pinned (Atlas), live-region gate; counterproofs 6/6, 4/4 and Atlas A1 / A3 / R1 / R4 / X1 killed (Relay).
+  - `XamlContractAndResourceGuardTests`: `PageHost` and `PART_ForegroundProbe` in the contract inventory (the guard caught the probe on the first run).
 - **Survivors:** none accepted against BOSS §10 at the end of each round (Atlas r1 survivors were closed in `5e1df48`; Cortex a11y-r2 N1 / N3 in `3ca97bf` / `41271b1`; Relay r2 M4b in `ac996b3` — pinned structurally, because no behavioural file lock reproduces it).
 
 ## 8. Reviews
@@ -275,6 +344,10 @@ Each counterproof breaks the rule in production code, fails the named tests for 
 | Cortex r3 | Sentry `5e1df48..fff3f90` | **APPROVED_WITH_NITS** (R3-C1 = R3-03, closed in `6f5b2e0`; R3-C2 MODAL-01 runtime gate → confirmed as B12F-01) |
 | Relay r3 | Sentry `5e1df48..fff3f90` (Atlas stand-in; `7cf9358` is Relay's own handover, disclosed) | **APPROVE** (5 × P3 test gaps → backlog) |
 | Prism r4 / Cortex r4 | Relay fix-r3 `85a6b08`, `5058c79` | Prism APPROVE · Cortex APPROVED_WITH_NITS (R4-N1 → `4d5510b`) — **`85a6b08` later reverted (P0)** |
+| Recovery: Cortex / Prism / Atlas on B12F-01 | `ab575d3` (+ `879c079`) | Cortex **APPROVED** · Prism **APPROVE** (1 P3 for the Narrator) · Atlas CHANGES_REQUESTED (2 surviving mutants) → closed by `5016f2a` |
+| Recovery: Cortex / Prism / Atlas on B12B-01 | `2753ace` | Cortex APPROVED_WITH_CONDITIONS · Prism APPROVE + P3 (→ `0bc6ad8`) · Atlas CHANGES_REQUESTED (Opacity mutant) → `389dc7e`. **Superseded:** the mechanism had no HC effect (§0) |
+| Recovery: Cortex HC-fix review | P′ probe (prototype) and `843771e` | **APPROVE_WITH_CONDITIONS** — conditions 1 (single Stroke source) and 2 (guards + killed mutations) met in `843771e`; condition 3 (real HC on the Floor build) met by Beacon §6d |
+| Recovery: Atlas final | `843771e` | CHANGES_REQUESTED (A-B12B-FINAL-01: a `??=` mutant survived the `OnApplyTemplate` guard) → closed by `6f66910` (F11–F14 killed) |
 
 ## 9. Runtime evidence
 
@@ -314,18 +387,27 @@ Each counterproof breaks the rule in production code, fails the named tests for 
 
 - **Final pass @ `118c044` — FAIL (P0):** every harness died 4.4–5.3 s after launch with no input (0xc000027b, `Microsoft.UI.Xaml.dll`). Bisect on git-archive exports: `b328a07` / `97715d8` / `870b64c` good, `85a6b08` bad (parent good). Real data diff 0.
 - **Final pass @ `d36becb` — UIA only, no `SendInput` (Firewall dialog in the foreground):** life probe 13 harnesses > 15 s + overview 60 s, 0 crashes in 114 launches; smoke Dark 75/75 surfaces × pt-PT / pt-BR / en-US and Light 3 × 8 pages, 0 unnamed interactive; PASS B12B-02 (1 event), B12-04, B12-05, STATE-05 retry (0/8 "A ligar"), STATE-01 (exactly 1 event), stale cue visible without clipping, C-W1 W1/W2/W5/W6/W7a/W9; **FAIL B12F-01**; P3 B12F-02; NOT_RUN W3/W4/W7b (tray menu needs real input). Prism check: Servers header "Adicionar servidor" still visible in the config-unavailable state (the decision named the empty-state CTA) → backlog. Real data diff 0, Firewall 711 unchanged.
+- **Recovery (2026-10-13, details in §0):**
+  - stress C1W–C10, tray W3 / W4 / W7b and the keyboard pass @ `d36becb` vs `baa6401` (`beacon-stress-r1.md`);
+  - final QA @ `717b520` (`beacon-final-qa.md`): life probe 14 / 14, B12F-01 10 / 10, C1 identity, real input, Narrator 1–6 with the human, 7–10 by UIA;
+  - B12B-01 diagnostic (Dark + real Night sky, diagnostic build) and HC validation of the prototype (`sentry-hcdiag.md`, `sentry-hcfix-proto.md`);
+  - B12B-01 on the Floor build `843771e`: real HC Night sky + Desert, icon-crop pixels, Servers rows with recycling; C1 0 / 26 above noise (`beacon-hcdiag.md` §6b / §6d);
+  - Floor launch smokes with HC off on `843771e` (overview detail, settings, compact, editor; 62 s each, 0 WER).
 - **Final CI:** `38352809526` @ `d36becb` green on attempt 1 (Debug + tests incl. Infrastructure; Release + vulnerability scan). Earlier: `38342264081` Release red (fixed `b568c24`); `38350167959` attempt 1 red on FLAKE-INFRA-CREDMIG-POOL (credential-migration test, code untouched), attempt 2 green.
 
 ## 10. NOT_RUN (accepted unless the human decides otherwise)
 
-- **Narrator:** human script ready (`.boss/tmp/ui12/beacon-ui12a-narrator-script.md`, section G for the pass-B points). UIA properties and the listener are not a Narrator PASS.
+Updated after the recovery (§0): the Firewall blocker is gone, so the real-input pass, C-W1 W3 / W4 / W7b and stress C1W–C10 **were run**; Narrator steps 1–6 were run with the human.
+
+- **Narrator:** steps 3.2 / 3.3 / 3.4 / 3.6, 5, 6 and 7–11 (incl. the B12F-01 scan-mode check) were not done with the Narrator — 7–10 and 4A are "UIA-verified; Narrator NOT_RUN". UIA properties and the listener are not a Narrator PASS.
+- **High Contrast:** a disabled item in GrayText measured only in the diagnostic build (no stable disabled icon state on the Floor build); HC theme transitions with the window open measured only in the diagnostic build (OFF → Night sky → Desert → OFF); Light measured by Beacon C1 only, not by a separate Light HC run (HC replaces Light).
+- **B12B-01 re-template at run time** (template A → B on one icon): not exercised; covered by a static guard only.
+- **C9W CPU after leaving History:** not measured (stop rule hit first on both builds). C5 / C6 / idle not requested in the recovery.
 - **DPI ≠ 100 %:** not granted. This includes C-W4 and LAYOUT-01 at 150 %.
 - **Real pen, real touch:** no touch digitizer; the human's real-pen pass was not available.
 - **Windows toasts:** packaged-only registration; this covers TEXT-01 notification wording and C-E2 at runtime.
 - **Widget Medium with ≥ 3 servers:** needs the installed MSIX.
 - **Startup exit code at runtime:** no new QA fault-injection flag (decision).
-- **Candidate stress C2–C10:** blocked by the Firewall notification dialog from the accidental Infrastructure.Tests run. Baseline numbers exist for C2b / C2c / C3 / C4 / C7 / C8.
-- **Real-input QA after `b328a07`:** everything after it was checked by UIA only (Firewall dialog), incl. C-W1 W3/W4/W7b.
 - **Onboarding in Light:** follows the Windows app theme.
 - **Windows text scaling (LAYOUT-04):** needs a system setting.
 
@@ -346,7 +428,10 @@ Optional notes not applied (Boss decides): CONTRAST-01 (Compact offline text in 
 
 - `KBD-BACK-ACCEL` (B12-08)
 - C-S1b persisted startup-failure record
-- B12B-01 (HC icons; reverted fix — retry without an `AccessibilitySettings` event, with an HC-off launch smoke in the gate), B12F-01 (modal background in UIA), B12F-02
+- ~~B12B-01~~ / ~~B12F-01~~ (fixed in the recovery, §0); B12F-02
+- B12B-02-R (if not fixed in UI.12: Narrator announcement after Hide), B12H-01 ("Ex.:" copy), B12G-01 (HC → HC fill), R1-01-R (duplicate Data-toast event), focus note after "Continuar a editar" (Prism)
+- QA harness: `--qa-start=servers` never loads data (`Qa/QaShellStartup.cs`) — the Servers page stays "A carregar…"; use overview / history and navigate
+- Light / Dark: the checked item's icon keeps its rest colour while its text uses the selected colour (same mechanism as B12B-01; deliberately unchanged in UI.12 — Prism to decide)
 - N-4 / W-1
 - C-L3…C-L6, C-L9
 - C-E3, C-E6, C-E9…C-E14
@@ -359,7 +444,6 @@ Optional notes not applied (Boss decides): CONTRAST-01 (Compact offline text in 
 - FLAKE-INFRA-LOOPBACK-CHILD (separate PR)
 - reconcile the CI-FLAKE-WALLCLOCK-2 entry
 - C1 / C8 memory growth (pre-existing, Cortex)
-- the stress cycles not run (§10)
-- removal of the 2 testhost Firewall Block rules (human, UAC)
+- C2c modal-test memory (+32.8 vs +28.0 MB, not monotonic) — Cortex note
 - FLAKE-INFRA-CREDMIG-POOL (new CI flake, separate test-only PR)
 - implementer gates must include an HC-off launch smoke (the P0 passed every unit test and CI)
