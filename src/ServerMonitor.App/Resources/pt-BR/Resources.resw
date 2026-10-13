@@ -846,7 +846,7 @@
   <data name="ShellSettings.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Configurações</value></data>
   <data name="ShellSettingsLabel.Text" xml:space="preserve"><value>Configurações</value></data>
   <data name="ShellNavigation.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Navegação principal</value></data>
-  <data name="ShellNavigationList.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Navegação principal</value></data>
+  <data name="ShellNavigationList.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Páginas</value></data>
   <data name="OnboardingWelcomeTitle.Text" xml:space="preserve"><value>Seus servidores.
 Em um só lugar.</value></data>
   <data name="OnboardingWelcomeBody.Text" xml:space="preserve"><value>Acompanhe o estado dos seus servidores Linux e macOS,
