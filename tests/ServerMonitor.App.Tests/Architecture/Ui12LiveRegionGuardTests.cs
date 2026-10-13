@@ -72,10 +72,9 @@ public sealed partial class Ui12LiveRegionGuardTests
         var field = AppSourceTree.CodeWithoutComments("Controls/Primitives/SaFormField.cs");
 
         Assert.Contains("protected override AutomationPeer OnCreateAutomationPeer() => new SaToastAutomationPeer(this);", toast, StringComparison.Ordinal);
-        foreach (var code in new[] { toast, notice })
-        {
-            Assert.Contains("RegisterPropertyChangedCallback(VisibilityProperty, (_, _) => SaAnnounce.RaiseAfterLayout(this));", code, StringComparison.Ordinal);
-        }
+        Assert.Contains("RegisterPropertyChangedCallback(VisibilityProperty, (_, _) => SaAnnounce.RaiseAfterLayout(this));", notice, StringComparison.Ordinal);
+        // UI.12 B12B-02: the toast's raise reports when it actually left (Ui12ToastAnnouncementTests pins the Loaded catch-up).
+        Assert.Matches(@"RegisterPropertyChangedCallback\(VisibilityProperty, \(_, _\) =>\s*\{\s*_announcement\.VisibilityChanged\(Visibility == Visibility\.Visible\);\s*SaAnnounce\.RaiseAfterLayout\(this, _announcement\.Announced\);", toast);
 
         Assert.Contains("SaAnnounce.RaiseAfterLayout(_error);", field, StringComparison.Ordinal);
         Assert.Contains("AutomationProperties.SetFullDescription(input, ErrorText);", field, StringComparison.Ordinal);
