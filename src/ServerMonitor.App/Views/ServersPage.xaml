@@ -356,6 +356,10 @@
                     </primitives:SaEmptyState>
                 </Border>
 
+                <!-- UI.12 STATE-01: the Overview's notice, when the configuration could not be read (never the empty state then). -->
+                <primitives:SaInlineNotice x:Uid="ConfigurationUnavailableNotice" Severity="Error" AnnouncePolitely="True" AutomationProperties.LiveSetting="Polite"
+                                           Visibility="{x:Bind ViewModel.ShowConfigurationUnavailable, Mode=OneWay}"/>
+
                 <!-- Empty §13 112:14007: no visible server; the note only when servers are hidden (Prism r1 c). UI.10 F06: the CTA is the
                      Primary h44 pill (112:14098 updated in UI.10B), the same shape as the header "+ Adicionar". -->
                 <Border Style="{StaticResource SaStatePanelStyle}" primitives:SaMotion.Enter="ContentFade" Visibility="{x:Bind ViewModel.ShowEmptyState, Mode=OneWay}">

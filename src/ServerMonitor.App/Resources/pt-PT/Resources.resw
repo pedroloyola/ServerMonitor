@@ -734,6 +734,7 @@
   <data name="ServersNoResultsTitle" xml:space="preserve"><value>Nenhum servidor encontrado</value></data>
   <data name="ServersNoResultsMessageFormat" xml:space="preserve"><value>Não há servidores com o nome ou endereço “{0}”. Experimenta outra pesquisa.</value></data>
   <data name="ServersLoadingSubtitle" xml:space="preserve"><value>A carregar os teus servidores…</value></data>
+  <data name="ServersSummaryConfigurationUnavailable" xml:space="preserve"><value>Configuração dos servidores indisponível</value></data>
   <data name="ServerDetailEditFor" xml:space="preserve"><value>Editar {0}</value></data>
   <data name="ServerDetailHideFor" xml:space="preserve"><value>Ocultar {0}</value></data>
   <data name="ServerDetailRemoveFor" xml:space="preserve"><value>Remover {0}</value></data>
