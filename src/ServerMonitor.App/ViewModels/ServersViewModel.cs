@@ -170,6 +170,7 @@ public sealed class ServersViewModel : ObservableObject, IDisposable
 
         _disposed = true;
         _noticeTimer.Dispose();
+        _notice = null; // UI.12 B12B-02-R (Atlas L1): a visit that ended has no notice left to announce
         _dashboard.ServersReloaded -= OnServersReloaded;
         _dashboard.PropertyChanged -= OnDashboardPropertyChanged;
         DisposeRows();

@@ -72,12 +72,14 @@ public sealed partial class Ui12ToastAnnouncementTests
 
         Assert.Matches(CatchUpOnLoaded(), toast);
         Assert.Contains("_announcement.ContentChanged(name);", toast, StringComparison.Ordinal);
-        Assert.Equal(3, Regex.Matches(toast, Regex.Escape("SaAnnounce.RaiseAfterLayout(this, _announcement.Announced);")).Count);
+        // UI.12 B12B-02-R: the three raises (visibility, Loaded, content) go through AnnounceLive, the one raise site.
+        Assert.Equal(3, Regex.Matches(toast, Regex.Escape("AnnounceLive();")).Count);
+        Assert.Single(Regex.Matches(toast, Regex.Escape("SaAnnounce.RaiseAfterLayout(this, _announcement.Announced);")));
         Assert.DoesNotContain("SaAnnounce.RaiseAfterLayout(this);", toast, StringComparison.Ordinal);
         Assert.Matches(ReportsOnlyARaiseThatLeft(), announce);
     }
 
-    [GeneratedRegex(@"Loaded \+= \(_, _\) =>\s*\{\s*if \(_announcement\.ShouldAnnounceOnLoaded\(Visibility == Visibility\.Visible\)\)\s*\{\s*SaAnnounce\.RaiseAfterLayout\(this, _announcement\.Announced\);")]
+    [GeneratedRegex(@"Loaded \+= \(_, _\) =>\s*\{\s*if \(_announcement\.ShouldAnnounceOnLoaded\(Visibility == Visibility\.Visible\)\)\s*\{\s*AnnounceLive\(\);")]
     private static partial Regex CatchUpOnLoaded();
 
     [GeneratedRegex(@"if \(ShouldAnnounce\(element\.Visibility == Visibility\.Visible, SaLiveTree\.IsLive\(element\), ContentOf\(element\)\)\)\s*\{\s*Raise\(element\);\s*announced\?\.Invoke\(\);\s*\}")]

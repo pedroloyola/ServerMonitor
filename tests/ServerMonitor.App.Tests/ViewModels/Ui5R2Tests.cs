@@ -127,8 +127,12 @@ public sealed class Ui5R2Tests
 
         Assert.Equal(new[] { "*", "Auto" }, rows.Select(row => (string?)row.Attribute("Height")));
         Assert.Equal("1", (string?)toast.Attribute("Grid.Row"));
-        Assert.Equal("Polite", (string?)toast.Attribute("AutomationProperties.LiveSetting"));
+        // UI.12 B12B-02-R: the Servidores return notice is announced by its page (a notification after focus), not live.
+        Assert.Equal(ServersPageAnnouncesTheToast(file) ? null : "Polite", (string?)toast.Attribute("AutomationProperties.LiveSetting"));
+        Assert.Equal(ServersPageAnnouncesTheToast(file) ? "False" : null, (string?)toast.Attribute("AnnouncesItself"));
     }
+
+    private static bool ServersPageAnnouncesTheToast(string file) => file == "Views/ServersPage.xaml";
 
     // ---- Boss decision 3: an error about one server never shows on another server's Detail ---------------------------
 
