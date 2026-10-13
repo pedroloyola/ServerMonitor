@@ -48,6 +48,43 @@ public sealed partial class Ui12CompactExitMaximizeTests
         Assert.Equal(minimized ? ["show", "Restore", "activate"] : ["show", "activate"], adapter.Calls);
     }
 
+    /// <summary>
+    /// Atlas r1 (ATLAS-R1-WINDOW-ORDER): minimized is probed AFTER showing. A window that showing alone brings back - here
+    /// to maximized - must not be restored again (that would un-maximize it); probing before showing gets this wrong.
+    /// </summary>
+    [Fact]
+    public void ShowAndActivate_ProbesAfterShowing_AWindowShowingBroughtBackMaximized_IsNotRestored()
+    {
+        var log = new List<string>();
+        var minimized = true;
+        var maximized = false;
+
+        WindowActivation.ShowAndActivate(
+            show: () => { log.Add("show"); minimized = false; maximized = true; },
+            isMinimized: () => { log.Add($"probe:{minimized}"); return minimized; },
+            restore: () => { log.Add("restore"); maximized = false; },
+            activate: () => log.Add("activate"));
+
+        Assert.Equal(["show", "probe:False", "activate"], log);
+        Assert.True(maximized);
+    }
+
+    [Fact]
+    public void ShowAndActivate_AWindowStillMinimizedOnceShown_IsRestoredOnce_BeforeActivation()
+    {
+        var log = new List<string>();
+        var minimized = true;
+
+        WindowActivation.ShowAndActivate(
+            show: () => log.Add("show"),
+            isMinimized: () => { log.Add($"probe:{minimized}"); return minimized; },
+            restore: () => { log.Add("restore"); minimized = false; },
+            activate: () => log.Add("activate"));
+
+        Assert.Equal(["show", "probe:True", "restore", "activate"], log);
+        Assert.False(minimized);
+    }
+
     /// <summary>The C3-1 path: Compact → a Standard-only destination, from a Standard that was maximized when it left.</summary>
     [Theory]
     [InlineData(false)]

@@ -45,6 +45,41 @@ public sealed partial class Ui12FormDetachOnRemountTests
         Assert.Equal(ViewModel, form.Attached);
     }
 
+    /// <summary>
+    /// Atlas r1 (ATLAS-R1-DETACH-LIVENESS): liveness is read when the deferred check RUNS, not when Unloaded is raised. Not
+    /// live at Unloaded but live again (remounted) by the time the check runs → stays attached.
+    /// </summary>
+    [Fact]
+    public void NotLiveAtUnloaded_LiveAgainBeforeTheCheckRuns_StaysAttached()
+    {
+        var form = new FormModel();
+        form.Loaded();
+        form.IsLive = false;
+
+        form.Unloaded();
+        Assert.Equal(ViewModel, form.Attached);
+        form.IsLive = true;
+        form.Loaded();
+        form.RunQueue();
+
+        Assert.Equal(ViewModel, form.Attached);
+    }
+
+    /// <summary>The other direction: live at Unloaded, gone by the time the check runs → detaches.</summary>
+    [Fact]
+    public void LiveAtUnloaded_GoneBeforeTheCheckRuns_Detaches()
+    {
+        var form = new FormModel();
+        form.Loaded();
+        form.IsLive = true;
+
+        form.Unloaded();
+        form.IsLive = false;
+        form.RunQueue();
+
+        Assert.Null(form.Attached);
+    }
+
     [Fact]
     public void ARealUnload_StillDetaches_OneTurnLater()
     {
