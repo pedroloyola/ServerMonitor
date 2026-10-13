@@ -39,6 +39,7 @@ public sealed class SaFormField : ContentControl
     private TextBlock? _header;
     private TextBlock? _helper;
     private TextBlock? _error;
+    private UIElement? _describedInput;
 
     public SaFormField()
     {
@@ -86,6 +87,7 @@ public sealed class SaFormField : ContentControl
             var oldInput = old is SaPasswordField password ? (UIElement?)password.PasswordBox ?? password : old;
             oldInput.ClearValue(AutomationProperties.LabeledByProperty);
             AutomationProperties.GetDescribedBy(oldInput).Clear();
+            ClearErrorDescription(oldInput);
         }
 
         if (newContent is FrameworkElement element)
@@ -104,7 +106,8 @@ public sealed class SaFormField : ContentControl
         UpdateParts();
         if (HasError && _error is not null && !string.Equals(oldValue, ErrorText, StringComparison.Ordinal))
         {
-            FrameworkElementAutomationPeer.FromElement(_error)?.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
+            // UI.12 LIVE-01: PART_Error was Collapsed until now, so it had no peer and FromElement alone raised nothing.
+            SaAnnounce.RaiseAfterLayout(_error);
         }
     }
 
@@ -149,6 +152,27 @@ public sealed class SaFormField : ContentControl
             {
                 describedBy.Add(part);
             }
+        }
+
+        // UI.12 LIVE-01 (Prism UI12A): Narrator does not read DescribedBy reliably on focus, so the error is also the
+        // input's FullDescription while it stands (and only a description this field set is ever cleared).
+        if (HasError)
+        {
+            AutomationProperties.SetFullDescription(input, ErrorText);
+            _describedInput = input;
+        }
+        else
+        {
+            ClearErrorDescription(input);
+        }
+    }
+
+    private void ClearErrorDescription(UIElement input)
+    {
+        if (ReferenceEquals(_describedInput, input))
+        {
+            input.ClearValue(AutomationProperties.FullDescriptionProperty);
+            _describedInput = null;
         }
     }
 }

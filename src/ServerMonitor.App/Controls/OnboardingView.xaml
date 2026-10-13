@@ -48,7 +48,7 @@
  <Border x:Name="Dot1" Height="6" Width="24" CornerRadius="{StaticResource SaRadiusMiniBar}" Background="{ThemeResource SaTextBrush}"/>
  <Border x:Name="Dot2" Height="6" Width="6" CornerRadius="{StaticResource SaRadiusMiniBar}" Background="{ThemeResource SaTextBrush}"/>
  <Border x:Name="Dot3" Height="6" Width="6" CornerRadius="{StaticResource SaRadiusMiniBar}" Background="{ThemeResource SaTextBrush}"/>
- <TextBlock x:Name="ProgressText" Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" AutomationProperties.LiveSetting="Polite"/>
+ <TextBlock x:Name="ProgressText" Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}" p:SaAnnounce.Changes="True" AutomationProperties.LiveSetting="Polite"/>
  </StackPanel>
  <Button x:Name="NextButton" Grid.Column="2" HorizontalAlignment="Stretch" Click="OnNext" Style="{StaticResource SaOnboardingPrimaryButtonStyle}"/>
  </Grid></Grid></ScrollViewer>

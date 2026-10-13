@@ -281,7 +281,6 @@
             Grid.Row="1"
             Margin="40,12,40,36"
             MaxWidth="600"
-            Width="NaN"
             HorizontalAlignment="Right"
             VerticalAlignment="Bottom"
             Title="{Binding ToastTitle}"

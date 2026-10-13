@@ -105,7 +105,8 @@ public sealed class SaDataTableRowContractTests
         Assert.Equal("True", setters["UseSystemFocusVisuals"]);
         Assert.Equal("{ThemeResource SaFocusRingBrush}", setters["FocusVisualPrimaryBrush"]);
         Assert.Equal("{StaticResource SaFocusRingThickness}", setters["FocusVisualPrimaryThickness"]);
-        Assert.Equal("0", setters["FocusVisualSecondaryThickness"]);
+        // UI.12 FOCUS-01: 0 in Dark/Light, 1 in HC (SaFocusVisualSecondaryThickness; Ui12FocusRingGuardTests).
+        Assert.Equal("{ThemeResource SaFocusVisualSecondaryThickness}", setters["FocusVisualSecondaryThickness"]);
         foreach (var key in new[] { "SaSelectorPillStyle", "SaSelectorRichStyle" })
         {
             var derived = forms.Single(s => (string?)s.Attribute(Architecture.AppSourceTree.Xaml + "Key") == key);

@@ -43,12 +43,12 @@
                                     <VisualState x:Name="Normal" />
                                     <VisualState x:Name="PointerOver">
                                         <VisualState.Setters>
-                                            <Setter Target="RootGrid.Background" Value="{ThemeResource SaHoverBrush}" />
+                                            <Setter Target="RootGrid.Background" Value="{ThemeResource SaHoverVeilBrush}" />
                                         </VisualState.Setters>
                                     </VisualState>
                                     <VisualState x:Name="Pressed">
                                         <VisualState.Setters>
-                                            <Setter Target="RootGrid.Background" Value="{ThemeResource SaSelectedBrush}" />
+                                            <Setter Target="RootGrid.Background" Value="{ThemeResource SaSelectedVeilBrush}" />
                                         </VisualState.Setters>
                                     </VisualState>
                                     <VisualState x:Name="Disabled" />
@@ -281,7 +281,7 @@
                     </primitives:SaHeadingHost>
                         <StackPanel Style="{StaticResource SaPageHeaderLineTwoStyle}">
                             <TextBlock Style="{StaticResource SaPageSubtitleTextStyle}" TextWrapping="Wrap"
-                                       Text="{x:Bind ViewModel.HeaderContextDisplay, Mode=OneWay}" AutomationProperties.LiveSetting="Polite" />
+                                       Text="{x:Bind ViewModel.HeaderContextDisplay, Mode=OneWay}" primitives:SaAnnounce.Changes="True" AutomationProperties.LiveSetting="Polite" />
                         </StackPanel>
                     </StackPanel>
                     <StackPanel Grid.Column="1" Style="{StaticResource SaPageHeaderActionsStyle}">
@@ -386,7 +386,6 @@
             Grid.Row="1"
             Margin="40,12,40,36"
             MaxWidth="600"
-            Width="NaN"
             HorizontalAlignment="Right"
             VerticalAlignment="Bottom"
             Title="{x:Bind ViewModel.NoticeTitle, Mode=OneWay}"

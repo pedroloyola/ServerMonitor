@@ -122,8 +122,9 @@
                 Grid.Column="2"
                 VerticalAlignment="Center"
                 Style="{StaticResource SaSegmentedRectTrackStyle}">
-                <Grid x:Name="RangeItems"
-                    x:Uid="HistoryRangeSelector" ColumnSpacing="4"
+                <!-- UI.12 PEER-01: the group name lives on a peer-bearing host (a Grid has no automation peer). -->
+                <primitives:SaGroupHost x:Uid="HistoryRangeSelector">
+                <Grid x:Name="RangeItems" ColumnSpacing="4"
                     primitives:SaGroupNavigation.Mode="SelectionFollowsFocus">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/>
@@ -133,7 +134,7 @@
                             primitives:SaSlidingSelection.AllowDrag="True"
                             primitives:SaSlidingSelection.DurationKey="SaMotionSegmentSelectDuration"
                             primitives:SaSlidingSelection.IndicatorBrush="{ThemeResource SaSelectedBrush}"
-                            primitives:SaSlidingSelection.HighlightBrush="{ThemeResource SaGlassHighlightBrush}" primitives:SaSlidingSelection.LightOutlineBrush="{ThemeResource SaDialogButtonBorderBrush}" />
+                            primitives:SaSlidingSelection.HighlightBrush="{ThemeResource SaGlassHighlightBrush}" primitives:SaSlidingSelection.LightOutlineBrush="{ThemeResource SaSegmentedSelectedOutlineBrush}" />
                     <RadioButton x:Uid="HistoryRangeLastHour" Grid.Column="0" GroupName="HistoryRange" MinWidth="74" Style="{StaticResource SaSegmentedRectCompactItemStyle}"
                                  IsChecked="{Binding SelectedRangeIndex, Mode=TwoWay, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=0}" />
                     <RadioButton x:Uid="HistoryRangeLast6Hours" Grid.Column="1" GroupName="HistoryRange" MinWidth="74" Style="{StaticResource SaSegmentedRectCompactItemStyle}"
@@ -145,6 +146,7 @@
                     <RadioButton x:Name="RangeLast30Days" x:Uid="HistoryRangeLast30Days" Grid.Column="4" GroupName="HistoryRange" MinWidth="74" Style="{StaticResource SaSegmentedRectCompactItemStyle}"
                                  IsChecked="{Binding SelectedRangeIndex, Mode=TwoWay, Converter={StaticResource IndexToBooleanConverter}, ConverterParameter=4}" />
                 </Grid>
+                </primitives:SaGroupHost>
             </Border>
         </Grid>
 

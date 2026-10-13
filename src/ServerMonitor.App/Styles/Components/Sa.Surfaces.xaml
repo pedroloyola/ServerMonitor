@@ -15,14 +15,17 @@
          ButtonText border (SaSecondaryBorderBrush) in High Contrast. -->
     <ResourceDictionary.ThemeDictionaries>
         <ResourceDictionary x:Key="Dark">
+            <Thickness x:Key="SaFocusVisualSecondaryThickness">0</Thickness>
             <Thickness x:Key="SaModalBorderThickness">1</Thickness>
             <Thickness x:Key="SaSecondaryBorderThickness">0</Thickness>
         </ResourceDictionary>
         <ResourceDictionary x:Key="Light">
+            <Thickness x:Key="SaFocusVisualSecondaryThickness">0</Thickness>
             <Thickness x:Key="SaModalBorderThickness">1</Thickness>
             <Thickness x:Key="SaSecondaryBorderThickness">0</Thickness>
         </ResourceDictionary>
         <ResourceDictionary x:Key="HighContrast">
+            <Thickness x:Key="SaFocusVisualSecondaryThickness">1</Thickness>
             <Thickness x:Key="SaModalBorderThickness">2</Thickness>
             <Thickness x:Key="SaSecondaryBorderThickness">1</Thickness>
         </ResourceDictionary>
@@ -69,7 +72,7 @@
     </Style>
     <!-- UI.7 final c1 (Prism F-2, Figma 04 112:4049): a selectable row of a short list (the SSH-config import) - inset tint,
          r13, 8 between rows. Final c2 (Prism C2-4, Figma 112:4067 @.20 vs @.05): its own template - the selected fill
-         (SaSelectedBrush; HC Highlight) is drawn OVER the tint in every focus state, hover is the SaHoverBrush veil; no
+         (SaSelectedVeilBrush; HC = a Highlight outline, UI.12 HC-01) is drawn OVER the tint in every focus state, hover is the veil; no
          accent selection pill. Keyboard focus = the system focus ring (the Sa 2 px ring). -->
     <Style x:Key="SaInsetListItemStyle" TargetType="ListViewItem">
         <Setter Property="Background" Value="{ThemeResource SaInsetTintedBrush}" />
@@ -82,7 +85,8 @@
         <Setter Property="UseSystemFocusVisuals" Value="True" />
         <Setter Property="FocusVisualPrimaryBrush" Value="{ThemeResource SaFocusRingBrush}" />
         <Setter Property="FocusVisualPrimaryThickness" Value="{StaticResource SaFocusRingThickness}" />
-        <Setter Property="FocusVisualSecondaryThickness" Value="0" />
+        <Setter Property="FocusVisualSecondaryThickness" Value="{ThemeResource SaFocusVisualSecondaryThickness}" />
+        <Setter Property="FocusVisualSecondaryBrush" Value="{ThemeResource SaFocusRingSecondaryBrush}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ListViewItem">
@@ -103,17 +107,20 @@
                                 <VisualState x:Name="Selected">
                                     <VisualState.Setters>
                                         <Setter Target="SelectedOverlay.Opacity" Value="1" />
+                                        <Setter Target="SelectedOutline.Opacity" Value="1" />
                                     </VisualState.Setters>
                                 </VisualState>
                                 <VisualState x:Name="PointerOverSelected">
                                     <VisualState.Setters>
                                         <Setter Target="SelectedOverlay.Opacity" Value="1" />
+                                        <Setter Target="SelectedOutline.Opacity" Value="1" />
                                         <Setter Target="HoverOverlay.Opacity" Value="1" />
                                     </VisualState.Setters>
                                 </VisualState>
                                 <VisualState x:Name="PressedSelected">
                                     <VisualState.Setters>
                                         <Setter Target="SelectedOverlay.Opacity" Value="1" />
+                                        <Setter Target="SelectedOutline.Opacity" Value="1" />
                                         <Setter Target="HoverOverlay.Opacity" Value="1" />
                                     </VisualState.Setters>
                                 </VisualState>
@@ -127,10 +134,14 @@
                                 </VisualState>
                             </VisualStateGroup>
                         </VisualStateManager.VisualStateGroups>
-                        <Border x:Name="SelectedOverlay" Background="{ThemeResource SaSelectedBrush}" CornerRadius="{TemplateBinding CornerRadius}"
+                        <Border x:Name="SelectedOverlay" Background="{ThemeResource SaSelectedVeilBrush}" CornerRadius="{TemplateBinding CornerRadius}"
                                 Opacity="0" IsHitTestVisible="False" />
-                        <Border x:Name="HoverOverlay" Background="{ThemeResource SaHoverBrush}" CornerRadius="{TemplateBinding CornerRadius}"
+                        <Border x:Name="HoverOverlay" Background="{ThemeResource SaHoverVeilBrush}" CornerRadius="{TemplateBinding CornerRadius}"
                                 Opacity="0" IsHitTestVisible="False" />
+                        <!-- UI.12 HC-01 (Prism UI12A): the row text keeps its own colours, so HC marks the selection with a
+                             2 px Highlight outline instead of a Highlight fill under WindowText; Transparent in Dark/Light. -->
+                        <Border x:Name="SelectedOutline" BorderBrush="{ThemeResource SaSelectedOutlineBrush}" BorderThickness="2"
+                                CornerRadius="{TemplateBinding CornerRadius}" Opacity="0" IsHitTestVisible="False" />
                         <ContentPresenter x:Name="ContentPresenter"
                                           Padding="{TemplateBinding Padding}"
                                           HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"

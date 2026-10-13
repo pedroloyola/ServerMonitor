@@ -117,6 +117,8 @@
          theme AND the #FCFCFC thumb against the track (guard ToggleOffTrackMeetsNonTextContrast). -->
     <Color x:Key="SaColorToggleOffTrackDark">#7A7A7A</Color>
     <Color x:Key="SaColorToggleOffTrackLight">#7E7E7E</Color>
+    <!-- UI.12 B12-01, a11y > Figma (deliberate deviation): >=3:1 vs track and fill on every Light surface. Same value as SaColorToggleOffTrackLight (neutral control boundary). -->
+    <Color x:Key="SaColorSegmentedSelectedOutlineLight">#7E7E7E</Color>
     <!-- toggle thumb 112:7956 / 112:8117 -->
     <Color x:Key="SaColorToggleThumbDark">#FCFCFC</Color>
     <Color x:Key="SaColorToggleThumbLight">#FCFCFC</Color>

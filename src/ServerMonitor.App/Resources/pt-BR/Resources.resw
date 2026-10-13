@@ -127,7 +127,7 @@
   <data name="SettingsNotificationsToggle.Header" xml:space="preserve"><value>Notificações de saúde</value></data>
   <data name="SettingsNotificationsToggle.OnContent" xml:space="preserve"><value>Ativadas</value></data>
   <data name="SettingsNotificationsToggle.OffContent" xml:space="preserve"><value>Desativadas</value></data>
-  <data name="SettingsNotificationsToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Ativar notificações de saúde dos servidores</value></data>
+  <data name="SettingsNotificationsToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Alertas de status</value></data>
   <data name="SettingsNotificationsToggle.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.HelpText" xml:space="preserve"><value>Controla todos os alertas de mudança de saúde dos servidores monitorados.</value></data>
   <data name="SettingsNotificationsSaveError.Title" xml:space="preserve"><value>Não foi possível salvar a preferência</value></data>
   <data name="SettingsNotificationsSaveError.Message" xml:space="preserve"><value>A configuração anterior de notificações foi mantida.</value></data>
@@ -143,10 +143,10 @@
   <data name="NotificationWarningBodyFormat" xml:space="preserve"><value>{0} está em estado de atenção.</value></data>
   <data name="NotificationCriticalTitle" xml:space="preserve"><value>Servidor em estado crítico</value></data>
   <data name="NotificationCriticalBodyFormat" xml:space="preserve"><value>{0} atingiu um estado crítico.</value></data>
-  <data name="NotificationOfflineTitle" xml:space="preserve"><value>Servidor offline</value></data>
+  <data name="NotificationOfflineTitle" xml:space="preserve"><value>Sem conexão</value></data>
   <data name="NotificationOfflineBodyFormat" xml:space="preserve"><value>{0} deixou de responder.</value></data>
-  <data name="NotificationRecoveryTitle" xml:space="preserve"><value>Servidor novamente online</value></data>
-  <data name="NotificationRecoveryOnlineBodyFormat" xml:space="preserve"><value>{0} voltou a ficar online.</value></data>
+  <data name="NotificationRecoveryTitle" xml:space="preserve"><value>Conexão restabelecida</value></data>
+  <data name="NotificationRecoveryOnlineBodyFormat" xml:space="preserve"><value>{0} voltou a responder.</value></data>
   <data name="NotificationHealthyTitle" xml:space="preserve"><value>Servidor saudável</value></data>
   <data name="NotificationHealthyBodyFormat" xml:space="preserve"><value>{0} voltou a um estado saudável.</value></data>
   <data name="NotificationPlatformUnavailableTitle" xml:space="preserve"><value>Notificações indisponíveis</value></data>
@@ -167,6 +167,7 @@
   <data name="CompactMetricDiskLabel.Text" xml:space="preserve"><value>DISCO</value></data>
   <data name="CompactAlwaysOnTopLabel.Text" xml:space="preserve"><value>Sempre no topo</value></data>
   <data name="CompactRowAccessibleFormat" xml:space="preserve"><value>{0}, {1}. CPU {2}, RAM {3}, disco {4}. Abrir detalhes</value></data>
+  <data name="CompactRowAccessibleStaleFormat" xml:space="preserve"><value>{0}, {1}. {5}. CPU {2}, RAM {3}, disco {4}. Abrir detalhes</value></data>
   <data name="CompactMetricAttentionAccessible" xml:space="preserve"><value>em atenção</value></data>
   <data name="CompactMetricCriticalAccessible" xml:space="preserve"><value>crítico</value></data>
   <data name="SettingsCompactTitle.Text" xml:space="preserve"><value>Modo compacto</value></data>
@@ -846,7 +847,7 @@
   <data name="ShellSettings.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Configurações</value></data>
   <data name="ShellSettingsLabel.Text" xml:space="preserve"><value>Configurações</value></data>
   <data name="ShellNavigation.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Navegação principal</value></data>
-  <data name="ShellNavigationList.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Navegação principal</value></data>
+  <data name="ShellNavigationList.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Páginas</value></data>
   <data name="OnboardingWelcomeTitle.Text" xml:space="preserve"><value>Seus servidores.
 Em um só lugar.</value></data>
   <data name="OnboardingWelcomeBody.Text" xml:space="preserve"><value>Acompanhe o estado dos seus servidores Linux e macOS,

@@ -2,6 +2,7 @@
     x:Class="ServerMonitor.App.Views.BackupCreateDialog"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:primitives="using:ServerMonitor.App.Controls.Primitives"
     DefaultButton="Primary"
     PrimaryButtonClick="OnPrimaryButtonClick"
     Closing="OnClosing">
@@ -34,7 +35,7 @@
             PasswordChanged="OnPasswordChanged"
             PasswordRevealMode="Peek" />
         <TextBlock
-            AutomationProperties.LiveSetting="Polite"
+            primitives:SaAnnounce.Changes="True" AutomationProperties.LiveSetting="Polite"
             FontSize="12"
             Foreground="{ThemeResource SaDangerTextBrush}"
             Text="{x:Bind Session.ProblemMessage, Mode=OneWay}"
