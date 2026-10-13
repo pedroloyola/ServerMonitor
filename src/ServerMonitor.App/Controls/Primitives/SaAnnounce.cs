@@ -24,6 +24,11 @@ public static class SaAnnounce
     private static readonly DependencyProperty TokensProperty = DependencyProperty.RegisterAttached(
         "Tokens", typeof(long[]), typeof(SaAnnounce), new PropertyMetadata(null));
 
+    // UI.12 R1-01 (Prism r1): one queued announcement per element at a time (a toast shown with a new message changes
+    // its name AND its visibility in the same turn - two queued raises meant two LiveRegionChanged for one content).
+    private static readonly DependencyProperty PendingProperty = DependencyProperty.RegisterAttached(
+        "Pending", typeof(bool), typeof(SaAnnounce), new PropertyMetadata(false));
+
     public static bool GetChanges(FrameworkElement element) => (bool)element.GetValue(ChangesProperty);
 
     public static void SetChanges(FrameworkElement element, bool value) => element.SetValue(ChangesProperty, value);
@@ -38,13 +43,43 @@ public static class SaAnnounce
     /// if it is still shown and on the live tree then.
     /// </summary>
     public static void RaiseAfterLayout(FrameworkElement element) =>
-        element.DispatcherQueue?.TryEnqueue(DispatcherQueuePriority.Low, () =>
-        {
-            if (ShouldAnnounce(element.Visibility == Visibility.Visible, SaLiveTree.IsLive(element), ContentOf(element)))
+        Coalesce(
+            () => (bool)element.GetValue(PendingProperty),
+            pending => element.SetValue(PendingProperty, pending),
+            run => element.DispatcherQueue?.TryEnqueue(DispatcherQueuePriority.Low, () => run()) ?? false,
+            () =>
             {
-                Raise(element);
-            }
-        });
+                if (ShouldAnnounce(element.Visibility == Visibility.Visible, SaLiveTree.IsLive(element), ContentOf(element)))
+                {
+                    Raise(element);
+                }
+            });
+
+    /// <summary>
+    /// Pure scheduling rule (unit-tested, R1-01): while a raise is queued for the element, further requests in the same
+    /// turn join it; the flag clears just before the queued raise runs, so a later change is announced again.
+    /// Returns whether a new raise was queued.
+    /// </summary>
+    internal static bool Coalesce(Func<bool> isPending, Action<bool> setPending, Func<Action, bool> enqueue, Action raise)
+    {
+        if (isPending())
+        {
+            return false;
+        }
+
+        setPending(true);
+        if (enqueue(() =>
+            {
+                setPending(false);
+                raise();
+            }))
+        {
+            return true;
+        }
+
+        setPending(false);
+        return false;
+    }
 
     /// <summary>Pure rule (unit-tested): only a shown, connected region with something to say is announced.</summary>
     internal static bool ShouldAnnounce(bool isVisible, bool isLive, string? content) =>

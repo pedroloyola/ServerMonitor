@@ -99,6 +99,36 @@ public sealed partial class Ui12LiveRegionGuardTests
     public void OnlyAShownConnectedRegionWithContentIsAnnounced(bool visible, bool live, string? content, bool expected) =>
         Assert.Equal(expected, SaAnnounce.ShouldAnnounce(visible, live, content));
 
+    /// <summary>R1-01 (Prism r1): a text change and a visibility change in the same turn queue ONE raise, not two.</summary>
+    [Fact]
+    public void TwoRequestsInTheSameTurnQueueOneRaise()
+    {
+        var pending = false;
+        var queue = new List<Action>();
+        var raised = 0;
+
+        Assert.True(Request());   // e.g. the toast's name changed
+        Assert.False(Request());  // ... and it became Visible, same turn
+        Assert.Single(queue);
+
+        queue[0]();
+        Assert.Equal(1, raised);
+        Assert.False(pending);
+
+        Assert.True(Request());   // a later change is announced again
+        Assert.Equal(2, queue.Count);
+
+        bool Request() => SaAnnounce.Coalesce(() => pending, value => pending = value, run => { queue.Add(run); return true; }, () => raised++);
+    }
+
+    [Fact]
+    public void AFailedEnqueueLeavesNothingPending()
+    {
+        var pending = false;
+        Assert.False(SaAnnounce.Coalesce(() => pending, value => pending = value, _ => false, () => { }));
+        Assert.False(pending);
+    }
+
     [GeneratedRegex(@"FromElement\([^()]*\)\s*\?\.\s*RaiseAutomationEvent")]
     private static partial Regex BarePeerRaise();
 }
