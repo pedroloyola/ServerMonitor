@@ -1,4 +1,5 @@
 using ServerMonitor.App.Services;
+using ServerMonitor.Core.Enums;
 using ServerMonitor.Core.Models;
 using ServerMonitor.Core.SshConfig;
 
@@ -431,8 +432,10 @@ public sealed class ServerEditorPageController : IDisposable
 
     /// <summary>
     /// The action-bar hint (Figma 04/05/06, advice only - nothing is gated by a test, G-10): fields to fix after a failed
-    /// attempt; unsaved edits; a profile just imported; an edit switched to a password it must receive; an add without
-    /// host or user; otherwise "test before saving".
+    /// attempt; (UI.12 B12-04) a connection verified by the last test - every edit to a connection field or secret
+    /// invalidates that result in the view model, so "Connected" means "tested and unchanged since"; unsaved edits; a
+    /// profile just imported; an edit switched to a password it must receive; an add without host or user; otherwise
+    /// "test before saving".
     /// </summary>
     public string ActionHintKey()
     {
@@ -446,6 +449,11 @@ public sealed class ServerEditorPageController : IDisposable
             return viewModel.FieldErrors.Keys.All(ServerEditorValidation.IsJumpField)
                 ? "ServerEditorHintFixJumpFields"
                 : "ServerEditorHintFixFields";
+        }
+
+        if (viewModel.LastTestState == ServerConnectionState.Connected)
+        {
+            return "ServerEditorHintTested";
         }
 
         if (IsEdit)

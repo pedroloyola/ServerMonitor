@@ -900,6 +900,7 @@ status, metrics and history.</value></data>
   <data name="ServerEditorCancelButton.Content" xml:space="preserve"><value>Cancel</value></data>
   <data name="ServerEditorHintFillToTest" xml:space="preserve"><value>Fill in the fields to test.</value></data>
   <data name="ServerEditorHintTestBeforeSave" xml:space="preserve"><value>Test the connection before saving.</value></data>
+  <data name="ServerEditorHintTested" xml:space="preserve"><value>Connection verified. You can save.</value></data>
   <data name="ServerEditorHintUnsaved" xml:space="preserve"><value>You have unsaved changes.</value></data>
   <data name="ServerEditorCredentialNoteAdd" xml:space="preserve"><value>Your key stays on this device.</value></data>
   <data name="ServerEditorCredentialNoteEdit" xml:space="preserve"><value>Your credentials stay on this device.</value></data>

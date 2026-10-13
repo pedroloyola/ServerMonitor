@@ -905,6 +905,7 @@ as métricas e o histórico do servidor.</value></data>
   <data name="ServerEditorCancelButton.Content" xml:space="preserve"><value>Cancelar</value></data>
   <data name="ServerEditorHintFillToTest" xml:space="preserve"><value>Preencha os campos para testar.</value></data>
   <data name="ServerEditorHintTestBeforeSave" xml:space="preserve"><value>Teste a conexão antes de salvar.</value></data>
+  <data name="ServerEditorHintTested" xml:space="preserve"><value>Conexão verificada. Você pode salvar.</value></data>
   <data name="ServerEditorHintUnsaved" xml:space="preserve"><value>Você tem alterações não salvas.</value></data>
   <data name="ServerEditorCredentialNoteAdd" xml:space="preserve"><value>Sua chave permanece neste dispositivo.</value></data>
   <data name="ServerEditorCredentialNoteEdit" xml:space="preserve"><value>Suas credenciais permanecem neste dispositivo.</value></data>
