@@ -4,7 +4,12 @@ using ServerMonitor.App.ViewModels;
 
 namespace ServerMonitor.App.Views;
 
-public sealed partial class WorkloadsPage : Page
+/// <remarks>
+/// UI.12 C-L2 (Cortex UI.12A): IDisposable like the other per-visit pages, so a page REPLACED before it was ever loaded (two
+/// navigations in one dispatcher turn - it then never raises Unloaded) is still released by NavigationService.Show and its
+/// view model leaves the singleton workload store. The view model's Dispose is idempotent (Unloaded may follow).
+/// </remarks>
+public sealed partial class WorkloadsPage : Page, IDisposable
 {
     public WorkloadsPage(WorkloadsViewModel viewModel)
     {
@@ -16,6 +21,8 @@ public sealed partial class WorkloadsPage : Page
     }
 
     public WorkloadsViewModel ViewModel { get; }
+
+    public void Dispose() => ViewModel.Dispose();
 
     /// <summary>Binds the page to a server and renders its current workload snapshot.</summary>
     public void Load(Guid serverId, string serverName) => ViewModel.Load(serverId, serverName);
