@@ -93,13 +93,18 @@
                             <primitives:SaStatusIndicator
                                 Status="{x:Bind Health, Mode=OneWay, Converter={StaticResource ServerHealthToStatusKindConverter}}"
                                 Label="{x:Bind StatusDisplay, Mode=OneWay}" />
-                            <!-- UI.12 B12-06: retained values shown stale (not Offline) - the Compact R-7 cue: clock 12 + "Última atualização há N min". -->
-                            <StackPanel Orientation="Horizontal" Spacing="4" Visibility="{x:Bind ShowsStaleCue, Mode=OneWay}">
-                                <primitives:SaIcon Data="{StaticResource SaIconClock01Data}" Size="12" VerticalAlignment="Center"
+                            <!-- UI.12 B12-06 (+ Prism r3 R3-01): the Compact R-7 cue under the state; it wraps in the 150 column (2 lines max) instead of losing the age. -->
+                            <Grid ColumnSpacing="4" Visibility="{x:Bind ShowsStaleCue, Mode=OneWay}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <primitives:SaIcon Data="{StaticResource SaIconClock01Data}" Size="12" VerticalAlignment="Top" Margin="0,2,0,0"
                                                    Foreground="{ThemeResource SaAttentionTextBrush}" />
-                                <TextBlock VerticalAlignment="Center" Style="{StaticResource SaHelperTextStyle}" Foreground="{ThemeResource SaAttentionTextBrush}"
-                                           Text="{x:Bind StaleAgeDisplay, Mode=OneWay}" TextTrimming="CharacterEllipsis" AutomationProperties.AccessibilityView="Raw" />
-                            </StackPanel>
+                                <TextBlock Grid.Column="1" Style="{StaticResource SaHelperTextStyle}" Foreground="{ThemeResource SaAttentionTextBrush}"
+                                           Text="{x:Bind StaleAgeDisplay, Mode=OneWay}" TextWrapping="WrapWholeWords" MaxLines="2" TextTrimming="CharacterEllipsis"
+                                           AutomationProperties.AccessibilityView="Raw" />
+                            </Grid>
                         </StackPanel>
                         <TextBlock Grid.Column="3" VerticalAlignment="Center" Text="{x:Bind CpuDisplay, Mode=OneWay}"
                                    Style="{x:Bind CpuSeverity, Mode=OneWay, Converter={StaticResource MetricValueStyleConverter}}" />
@@ -143,13 +148,18 @@
                             <primitives:SaStatusIndicator
                                 Status="{x:Bind Health, Mode=OneWay, Converter={StaticResource ServerHealthToStatusKindConverter}}"
                                 Label="{x:Bind StatusDisplay, Mode=OneWay}" />
-                            <!-- UI.12 B12-06: retained values shown stale (not Offline) - the Compact R-7 cue: clock 12 + "Última atualização há N min". -->
-                            <StackPanel Orientation="Horizontal" Spacing="4" Visibility="{x:Bind ShowsStaleCue, Mode=OneWay}">
-                                <primitives:SaIcon Data="{StaticResource SaIconClock01Data}" Size="12" VerticalAlignment="Center"
+                            <!-- UI.12 B12-06 (+ Prism r3 R3-01): the Compact R-7 cue under the state; it wraps in the 150 column (2 lines max) instead of losing the age. -->
+                            <Grid ColumnSpacing="4" Visibility="{x:Bind ShowsStaleCue, Mode=OneWay}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <primitives:SaIcon Data="{StaticResource SaIconClock01Data}" Size="12" VerticalAlignment="Top" Margin="0,2,0,0"
                                                    Foreground="{ThemeResource SaAttentionTextBrush}" />
-                                <TextBlock VerticalAlignment="Center" Style="{StaticResource SaHelperTextStyle}" Foreground="{ThemeResource SaAttentionTextBrush}"
-                                           Text="{x:Bind StaleAgeDisplay, Mode=OneWay}" TextTrimming="CharacterEllipsis" AutomationProperties.AccessibilityView="Raw" />
-                            </StackPanel>
+                                <TextBlock Grid.Column="1" Style="{StaticResource SaHelperTextStyle}" Foreground="{ThemeResource SaAttentionTextBrush}"
+                                           Text="{x:Bind StaleAgeDisplay, Mode=OneWay}" TextWrapping="WrapWholeWords" MaxLines="2" TextTrimming="CharacterEllipsis"
+                                           AutomationProperties.AccessibilityView="Raw" />
+                            </Grid>
                         </StackPanel>
                         <TextBlock Grid.Column="2" VerticalAlignment="Center" Text="{x:Bind CpuDisplay, Mode=OneWay}"
                                    Style="{x:Bind CpuSeverity, Mode=OneWay, Converter={StaticResource MetricValueStyleConverter}}" />

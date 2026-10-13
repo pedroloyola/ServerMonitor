@@ -105,6 +105,26 @@ public sealed class Ui12RetainedReadingRowTests
         Assert.Contains(cue.Parent!.Elements(), e => e.Name.LocalName == "SaStatusIndicator"); // under the state
     }
 
+    /// <summary>
+    /// Prism r3 R3-01: in the Servers table the cue sits in a 150 px column; inside a horizontal StackPanel its text got
+    /// infinite width, so it was clipped mid-age instead of trimmed or wrapped. It is a Grid (Auto, *) whose text wraps.
+    /// </summary>
+    [Theory]
+    [InlineData("ServerRowWideTemplate")]
+    [InlineData("ServerRowMidTemplate")]
+    public void TheServersCue_Wraps_InsteadOfBeingClipped(string template)
+    {
+        var xaml = Architecture.AppSourceTree.LoadXaml("Views/ServersPage.xaml");
+        var node = xaml.Descendants().Single(e => (string?)e.Attribute(Architecture.AppSourceTree.Xaml + "Key") == template);
+        var cue = node.Descendants().Single(e => (string?)e.Attribute("Visibility") == "{x:Bind ShowsStaleCue, Mode=OneWay}");
+
+        Assert.Equal("Grid", cue.Name.LocalName);
+        var text = cue.Descendants().Single(e => e.Name.LocalName == "TextBlock");
+        Assert.Equal("WrapWholeWords", (string?)text.Attribute("TextWrapping"));
+        Assert.Equal("2", (string?)text.Attribute("MaxLines"));
+        Assert.Equal("1", (string?)text.Attribute("Grid.Column"));
+    }
+
     [Fact]
     public async Task AnOfflineRow_HasNoAgeCue_ItsValuesAreAlreadyDashes()
     {
