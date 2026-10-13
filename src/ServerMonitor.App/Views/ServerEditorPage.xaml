@@ -84,6 +84,12 @@
                     TextWrapping="Wrap" />
             </StackPanel>
 
+            <!-- Header button 112:3324 (Add: "Importar de SSH"; Edit: "Voltar ao detalhe"), drawn in the header row. UI.12 B12-07
+                 (Prism): declared right after the title so the Tab order follows the reading order - title → this button →
+                 form → footer (it used to be declared last and so came after the footer). Layout unchanged (same row). -->
+            <Button x:Name="HeaderButton" MinWidth="204" HorizontalAlignment="Right" VerticalAlignment="Center"
+                    Style="{StaticResource SaSecondaryButtonStyle}" Click="OnHeaderButtonClick" />
+
             <controls:ServerFormControl x:Name="ServerForm" Grid.Row="1" />
 
             <!-- Final c1 (Prism F-6): the two notices and the action bar share one StackPanel - a Collapsed notice takes no
@@ -157,9 +163,6 @@
                 </StackPanel>
             </Grid>
 
-            <!-- Header button 112:3324 (Add: "Importar de SSH"; Edit: "Voltar ao detalhe"). Last in the tree = last Tab stop. -->
-            <Button x:Name="HeaderButton" MinWidth="204" HorizontalAlignment="Right" VerticalAlignment="Center"
-                    Style="{StaticResource SaSecondaryButtonStyle}" Click="OnHeaderButtonClick" />
         </Grid>
     </ScrollViewer>
 
