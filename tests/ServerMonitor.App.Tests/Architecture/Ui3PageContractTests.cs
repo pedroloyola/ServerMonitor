@@ -339,6 +339,9 @@ public sealed partial class Ui3PageContractTests
     public void Workloads_TitleIsLevel1_AndSectionTitlesAreLevel2()
     {
         Assert.Equal("Level1", Attr(Assert.Single(Elements(Workloads), e => Uid(e) == "WorkloadsPageTitle").Parent!, "AutomationProperties.HeadingLevel"));
+        // UI.12 B12-11: the title may wrap to a second line at the minimum width instead of being cut.
+        var title = Assert.Single(Elements(Workloads), e => Uid(e) == "WorkloadsPageTitle");
+        Assert.Equal(("Wrap", "2"), (Attr(title, "TextWrapping"), Attr(title, "MaxLines")));
         Assert.Equal("Level2", Attr(Assert.Single(Elements(Workloads), e => Uid(e) == "WorkloadDockerSectionTitle"), "AutomationProperties.HeadingLevel"));
         Assert.Equal("Level2", Attr(Assert.Single(Elements(Workloads), e => Uid(e) == "WorkloadServicesSectionTitle"), "AutomationProperties.HeadingLevel"));
     }

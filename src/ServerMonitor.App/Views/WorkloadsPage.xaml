@@ -197,10 +197,13 @@
             </Grid.ColumnDefinitions>
             <StackPanel Spacing="6">
                 <primitives:SaHeadingHost AutomationProperties.HeadingLevel="Level1" IsTabStop="False">
+                        <!-- UI.12 B12-11 (Beacon): at the minimum width (pt-PT) the title next to Atualizar was cut; it may take a
+                             second line there (one line whenever it fits, so the wide layout is unchanged). -->
                         <TextBlock
                     x:Uid="WorkloadsPageTitle"
                     AutomationProperties.AccessibilityView="Raw" IsTextSelectionEnabled="False" IsTabStop="False"
                     Style="{StaticResource SaPageTitleTextStyle}"
+                    TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis"
                     Foreground="{ThemeResource SaTextBrush}" />
                     </primitives:SaHeadingHost>
                 <TextBlock
