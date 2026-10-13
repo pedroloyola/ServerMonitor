@@ -53,4 +53,22 @@ public sealed class Ui12LayoutGuardTests
         Assert.Single(style.Descendants(), e => (string?)e.Attribute(AppSourceTree.Xaml + "Name") == "CommandStack");
         Assert.Single(style.Descendants(), e => (string?)e.Attribute(AppSourceTree.Xaml + "Name") == "BackgroundElement");
     }
+
+    /// <summary>FORM-01: the subject of a security / destructive decision is never cut to one line (host-key trust, the
+    /// connection test endpoint, "what will be removed"): it wraps, up to 3 lines.</summary>
+    [Theory]
+    [InlineData("Views/ServerEditorTrustPanel.xaml", "SubjectText")]
+    [InlineData("Views/ServerEditorTestPanel.xaml", "SubjectText")]
+    [InlineData("Views/DestructiveConfirmDialog.xaml", null)]
+    public void DecisionSubjectsWrapInsteadOfTrimming(string file, string? name)
+    {
+        var document = AppSourceTree.LoadXaml(file);
+        var text = name is not null
+            ? document.Descendants().Single(e => (string?)e.Attribute(AppSourceTree.Xaml + "Name") == name)
+            : document.Descendants().Single(e => (string?)e.Attribute(AppSourceTree.Xaml + "Name") == "AffectedRow")
+                .Descendants().Single(e => e.Name.LocalName == "TextBlock");
+        Assert.Equal("Wrap", (string?)text.Attribute("TextWrapping"));
+        Assert.Equal("3", (string?)text.Attribute("MaxLines"));
+        Assert.NotEqual("StackPanel", text.Parent!.Name.LocalName); // a horizontal StackPanel never lets text wrap
+    }
 }
