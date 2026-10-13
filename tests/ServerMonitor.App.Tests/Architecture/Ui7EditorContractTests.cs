@@ -47,20 +47,15 @@ public sealed class Ui7EditorContractTests
         Assert.Contains("IServerEditorView, INavigationExitGuard, IDisposable", AppSourceTree.CodeWithoutComments("Views/ServerEditorPage.xaml.cs"), StringComparison.Ordinal);
     }
 
-    /// <summary>
-    /// B-20: H1 on entry (programmatic); Nome is the form's first stop. UI.12 B12-07 (Prism decision §5) supersedes the
-    /// "header button tabbed last" half: it now follows the title (title → header button → form → footer), still drawn in
-    /// the header row. Ui12EditorHeaderTabOrderTests pins the full order.
-    /// </summary>
+    /// <summary>B-20: H1 on entry (programmatic), then Nome first; the header button is drawn in the header but tabbed last.</summary>
     [Fact]
-    public void TabOrder_TheHeaderButtonFollowsTheTitle_AndNomeIsTheFormsFirstStop()
+    public void TabOrder_NomeIsTheFirstStop_AndTheHeaderButtonTheLast()
     {
         var page = AppSourceTree.LoadXaml("Views/ServerEditorPage.xaml");
         var pageRoot = page.Descendants().Single(e => (string?)e.Attribute(X + "Name") == "PageRoot");
         var children = pageRoot.Elements().Where(e => !e.Name.LocalName.Contains('.', StringComparison.Ordinal)).ToList();
-        Assert.Equal("HeaderTitle", (string?)children[0].Attribute(X + "Name"));
-        Assert.Equal("HeaderButton", (string?)children[1].Attribute(X + "Name"));
-        Assert.Null(children[1].Attribute("Grid.Row")); // drawn in row 0, the header
+        Assert.Equal("HeaderButton", (string?)children[^1].Attribute(X + "Name"));
+        Assert.Null(children[^1].Attribute("Grid.Row")); // drawn in row 0, the header
 
         var form = AppSourceTree.LoadXaml("Controls/ServerFormControl.xaml");
         var cards = form.Descendants().Single(e => (string?)e.Attribute(X + "Name") == "CardsGrid");
