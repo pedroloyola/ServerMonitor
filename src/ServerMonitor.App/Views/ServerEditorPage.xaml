@@ -129,7 +129,7 @@
                                 Style="{StaticResource SaSecondaryButtonStyle}" Click="OnTestClick" />
                         <TextBlock x:Name="ActionHint" Grid.Column="1" Style="{StaticResource SaCaptionTextStyle}" VerticalAlignment="Center"
                                    Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap"
-                                   AutomationProperties.LiveSetting="Polite" />
+                                   AutomationProperties.LiveSetting="Polite" primitives:SaAnnounce.Changes="True" />
                     </Grid>
                     <StackPanel x:Name="ActionEnd" Grid.Column="1" Orientation="Horizontal" Spacing="{StaticResource SaSpace12}"
                                 HorizontalAlignment="Right" VerticalAlignment="Center">
@@ -169,12 +169,15 @@
             <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                 <Border x:Name="DialogSurface" Style="{StaticResource SaModalSurfaceStyle}" Margin="{StaticResource SaPagePaddingCompact}"
                         HorizontalAlignment="Center" VerticalAlignment="Center"
-                        AutomationProperties.IsDialog="True" TabFocusNavigation="Cycle">
+                        TabFocusNavigation="Cycle">
+                    <!-- UI.12 PEER-01: IsDialog + the layer name on a peer-bearing host (a Border has no automation peer). -->
+                    <primitives:SaGroupHost x:Name="DialogContent" AutomationProperties.IsDialog="True">
                     <Grid>
                         <local:ServerEditorTestPanel x:Name="TestPanel" Visibility="Collapsed" />
                         <local:ServerEditorTrustPanel x:Name="TrustPanel" Visibility="Collapsed" />
                         <local:SshConfigImportPanel x:Name="ImportPanel" Visibility="Collapsed" />
                     </Grid>
+                    </primitives:SaGroupHost>
                 </Border>
             </ScrollViewer>
         </Border>

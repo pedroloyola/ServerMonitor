@@ -20,8 +20,8 @@ public sealed class Ui12AutomationPeerGuardTests
         "AutomationProperties.LocalizedControlType",
     ];
 
-    /// <summary>ServerEditorPage is Sentry's in UI.12: its DialogSurface (Border + IsDialog) is handed over in the Relay log.</summary>
-    private static readonly string[] HandedOver = ["Views/ServerEditorPage.xaml:DialogSurface"];
+    /// <summary>Nothing is handed over any more (UI.12: the editor's DialogSurface now carries IsDialog on DialogContent).</summary>
+    private static readonly string[] HandedOver = [];
 
     [Fact]
     public void NoPeerlessElementCarriesAutomationSemantics()

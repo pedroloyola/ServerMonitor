@@ -303,7 +303,7 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
         ImportPanel.Visibility = layer == ServerEditorLayer.Import ? Visibility.Visible : Visibility.Collapsed;
         DialogSurface.Width = DialogWidth(layer);
         UpdateDialogMaxWidth();
-        AutomationProperties.SetName(DialogSurface, layer switch
+        AutomationProperties.SetName(DialogContent, layer switch
         {
             ServerEditorLayer.Test => TestPanel.Title,
             ServerEditorLayer.Trust => TrustPanel.Title,
@@ -561,8 +561,9 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
         EditorSubtitle.Text = text;
         if (!string.Equals(text, _subtitle, StringComparison.Ordinal))
         {
-            // Switched to the error summary: said at once (assertive live region).
-            FrameworkElementAutomationPeer.FromElement(EditorSubtitle)?.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
+            // Switched to the error summary: said at once (assertive live region). UI.12 LIVE-01 (Relay handover): through
+            // SaAnnounce, which falls back to creating the peer - FromElement alone is null for an element without one.
+            SaAnnounce.Raise(EditorSubtitle);
         }
     }
 

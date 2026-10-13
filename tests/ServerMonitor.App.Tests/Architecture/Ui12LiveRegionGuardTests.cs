@@ -13,14 +13,15 @@ public sealed partial class Ui12LiveRegionGuardTests
     /// <summary>
     /// Declarative live TextBlocks raised elsewhere: PART_Error (SaFormField raises it), RefreshingText (ServerDetailPage
     /// code-behind), RouteLine (rewritten on every keystroke of the jump-host fields: announcing each would be noise),
-    /// and the editor page, which is Sentry's in UI.12 (handover in the Relay log).
+    /// and EditorSubtitle (ServerEditorPage code-behind raises it through SaAnnounce only when it switches to the error
+    /// summary - UI.12 LIVE-01 handover).
     /// </summary>
     private static readonly (string File, string? Name)[] RaisedElsewhere =
     [
         ("Styles/Components/Sa.Primitives.xaml", "PART_Error"),
         ("Views/ServerDetailPage.xaml", "RefreshingText"),
         ("Controls/ServerFormControl.xaml", "RouteLine"),
-        ("Views/ServerEditorPage.xaml", null),
+        ("Views/ServerEditorPage.xaml", "EditorSubtitle"),
     ];
 
     [Fact]
@@ -57,7 +58,6 @@ public sealed partial class Ui12LiveRegionGuardTests
     public void LiveRegionEventsNeverDependOnAnExistingPeerOnly()
     {
         var failures = AppSourceTree.Files(".cs")
-            .Where(f => f != "Views/ServerEditorPage.xaml.cs") // Sentry-owned in UI.12; handover in the Relay log
             .Where(f => BarePeerRaise().IsMatch(AppSourceTree.CodeWithoutComments(f)))
             .ToList();
 

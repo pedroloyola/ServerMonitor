@@ -185,7 +185,10 @@ public sealed partial class Ui7SecretAndDialogGuardTests
         var layer = page.Descendants().Single(e => (string?)e.Attribute(AppSourceTree.Xaml + "Name") == "DialogLayer");
         var surface = layer.Descendants().Single(e => (string?)e.Attribute(AppSourceTree.Xaml + "Name") == "DialogSurface");
         Assert.Equal("Cycle", (string?)surface.Attribute("TabFocusNavigation")); // focus trap
-        Assert.Equal("True", (string?)surface.Attribute("AutomationProperties.IsDialog"));
+        // UI.12 PEER-01: IsDialog on the peer-bearing host inside the surface (a Border has no automation peer).
+        var dialog = surface.Descendants().Single(e => (string?)e.Attribute(AppSourceTree.Xaml + "Name") == "DialogContent");
+        Assert.Equal("SaGroupHost", dialog.Name.LocalName);
+        Assert.Equal("True", (string?)dialog.Attribute("AutomationProperties.IsDialog"));
         Assert.Equal("{StaticResource SaModalSurfaceStyle}", (string?)surface.Attribute("Style"));
         Assert.Contains(surface.Descendants(), e => e.Name.LocalName == "ServerEditorTrustPanel");
         Assert.Contains(surface.Descendants(), e => e.Name.LocalName == "SshConfigImportPanel");
