@@ -52,6 +52,29 @@ public sealed class Ui12DetailFirstReadingTests
         Assert.True(detail.HasCollectionError);
     }
 
+    /// <summary>Prism r3 R3-03: a never-read server that is FAILING stays in its failure state while it retries.</summary>
+    [Fact]
+    public async Task ANeverReadFailingServer_IsNotTheFirstReading_WhileItRetries()
+    {
+        var fleet = new Ui4TestKit.Fleet().Add("down", ServerHealth.Unknown, snapshot: false);
+        var kit = Ui4TestKit.Create(fleet, new ResWLocalizationService("pt-PT"));
+        await kit.Dashboard.LoadAsync();
+        using var detail = Open(kit, "down");
+        kit.States.Set(kit.States.Get(fleet.IdOf("down")) with
+        {
+            Health = ServerHealth.Offline,
+            LastError = MetricsCollectionErrorCode.ConnectionFailed,
+            LastAttemptAt = Ui4TestKit.Now,
+        });
+        Assert.False(detail.IsFirstReading);
+
+        kit.States.Set(kit.States.Get(fleet.IdOf("down")) with { IsRefreshing = true }); // the next attempt keeps LastError
+
+        Assert.True(detail.IsRefreshing);
+        Assert.False(detail.IsFirstReading);
+        Assert.NotEqual(kit.Localization.GetString("ServerDetailConnecting"), detail.StatusLabel);
+    }
+
     [Fact]
     public async Task AReading_EndsTheFirstReading()
     {

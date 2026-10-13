@@ -279,9 +279,11 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
     /// <summary>
     /// Figma "Primeira leitura": a metrics-capable server still waiting for its first snapshot - INCLUDING while that first
     /// collection runs (UI.12 UI12A-STATE-05: the card's IsMetricsPending excludes a running refresh, so the Detail showed no
-    /// skeleton, "—" and "Sem dados" exactly while the first reading was being taken).
+    /// skeleton, "—" and "Sem dados" exactly while the first reading was being taken). Prism r3 R3-03: "first" means NO
+    /// attempt has failed yet - LastError is cleared only by a success (which brings a snapshot), so a never-read server
+    /// that is failing does not flip back to "A ligar…" + skeleton on every retry (HasMetricsError is false while refreshing).
     /// </summary>
-    public bool IsFirstReading => _card is { SupportsMetrics: true, HasMetrics: false, HasMetricsError: false };
+    public bool IsFirstReading => _card is { SupportsMetrics: true, HasMetrics: false } && _card.LastError is null;
 
     public bool IsRefreshing => _card?.IsRefreshingMetrics == true;
 
