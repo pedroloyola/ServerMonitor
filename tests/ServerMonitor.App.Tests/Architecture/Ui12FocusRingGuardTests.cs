@@ -57,6 +57,29 @@ public sealed class Ui12FocusRingGuardTests
         Assert.Equal("{ThemeResource SystemColorWindowColor}", brush["HighContrast"]);
     }
 
+    /// <summary>UI.12 FOCUS-02 (Prism UI12A): an invalid field keeps the danger edge AND shows the app ring outside it when
+    /// focused; no other field style draws the outer ring (unchanged look everywhere else).</summary>
+    [Fact]
+    public void InvalidFieldsDrawTheAppRingOutsideTheDangerEdgeWhenFocused()
+    {
+        var forms = AppSourceTree.LoadXaml("Styles/Components/Sa.Forms.xaml");
+        foreach (var template in new[] { "SaTextFieldTemplate", "SaPasswordBoxTemplate" })
+        {
+            var t = forms.Descendants().Single(e => e.Name.LocalName == "ControlTemplate" && (string?)e.Attribute(AppSourceTree.Xaml + "Key") == template);
+            var ring = t.Descendants().Single(e => (string?)e.Attribute(AppSourceTree.Xaml + "Name") == "OuterFocusRing");
+            Assert.Equal("-4", (string?)ring.Attribute("Margin"));
+            Assert.Equal("0", (string?)ring.Attribute("Opacity"));
+            var focused = t.Descendants().Single(e => e.Name.LocalName == "VisualState" && (string?)e.Attribute(AppSourceTree.Xaml + "Name") == "Focused");
+            Assert.Contains(focused.Descendants(), s => (string?)s.Attribute("Target") == "OuterFocusRing.Opacity" && (string?)s.Attribute("Value") == "1");
+        }
+
+        var outerSetters = forms.Descendants().Where(e => e.Name.LocalName == "Setter" && (string?)e.Attribute("Property") == "primitives:SaFieldChrome.OuterFocusRingBrush")
+            .Select(s => ((string?)s.Parent!.Attribute(AppSourceTree.Xaml + "Key"), (string?)s.Attribute("Value"))).OrderBy(x => x.Item1).ToList();
+        Assert.Equal(
+            [("SaPasswordBoxErrorStyle", "{ThemeResource SaFocusRingBrush}"), ("SaTextFieldErrorStyle", "{ThemeResource SaFocusRingBrush}")],
+            outerSetters);
+    }
+
     /// <summary>UI.12 B12-10 (Beacon): the programmatic heading focus draws the app ring, not the square system default.</summary>
     [Fact]
     public void HeadingHostDrawsTheAppRing()

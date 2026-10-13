@@ -162,7 +162,7 @@ public sealed partial class XamlContractAndResourceGuardTests
         ["Styles/Components/Sa.Forms.xaml"] =
         [
             // UI.11 H01: the segmented items' "Highlight" left with their selection fill (the sliding indicator draws it).
-            "RootGrid", "HoverOverlay", "FocusRing", "Shell", "StateOverlay", "ContentPresenter", "Box",
+            "RootGrid", "HoverOverlay", "FocusRing", "OuterFocusRing" /* UI.12 FOCUS-02 */, "Shell", "StateOverlay", "ContentPresenter", "Box",
             "CheckGlyph", "IndeterminateGlyph", "SwitchAreaGrid", "SwitchKnobBounds", "KnobTranslateTransform",
             "SwitchKnobOff", // UI.10 F26: the On state re-colours the thumb (SaToggleOnThumbBrush)
             "SwitchKnobOn" // UI.11 H02: the On thumb colour cross-fades as a second ellipse

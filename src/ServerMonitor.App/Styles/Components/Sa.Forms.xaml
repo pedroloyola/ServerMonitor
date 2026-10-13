@@ -36,6 +36,7 @@
                     <VisualState x:Name="Focused">
                         <VisualState.Setters>
                             <Setter Target="FocusRing.Opacity" Value="1" />
+                            <Setter Target="OuterFocusRing.Opacity" Value="1" />
                         </VisualState.Setters>
                     </VisualState>
                     <VisualState x:Name="Disabled">
@@ -72,6 +73,15 @@
             <Border x:Name="FocusRing"
                     CornerRadius="{TemplateBinding CornerRadius}"
                     BorderBrush="{Binding Path=(primitives:SaFieldChrome.FocusRingBrush), RelativeSource={RelativeSource TemplatedParent}}"
+                    BorderThickness="{StaticResource SaFocusRingThickness}"
+                    Opacity="0"
+                    IsHitTestVisible="False" />
+            <!-- UI.12 FOCUS-02 (Prism UI12A): on an INVALID field the inner ring keeps the danger edge, so focus is shown by a
+                 second ring 4 px outside it (SaFieldChrome.OuterFocusRingBrush; null = not drawn, every non-error style). -->
+            <Border x:Name="OuterFocusRing"
+                    Margin="-4"
+                    CornerRadius="{TemplateBinding CornerRadius}"
+                    BorderBrush="{Binding Path=(primitives:SaFieldChrome.OuterFocusRingBrush), RelativeSource={RelativeSource TemplatedParent}}"
                     BorderThickness="{StaticResource SaFocusRingThickness}"
                     Opacity="0"
                     IsHitTestVisible="False" />
@@ -204,6 +214,7 @@
                     <VisualState x:Name="Focused">
                         <VisualState.Setters>
                             <Setter Target="FocusRing.Opacity" Value="1" />
+                            <Setter Target="OuterFocusRing.Opacity" Value="1" />
                         </VisualState.Setters>
                     </VisualState>
                     <VisualState x:Name="Disabled">
@@ -243,6 +254,15 @@
                     BorderThickness="{StaticResource SaFocusRingThickness}"
                     Opacity="0"
                     IsHitTestVisible="False" />
+            <!-- UI.12 FOCUS-02 (Prism UI12A): on an INVALID field the inner ring keeps the danger edge, so focus is shown by a
+                 second ring 4 px outside it (SaFieldChrome.OuterFocusRingBrush; null = not drawn, every non-error style). -->
+            <Border x:Name="OuterFocusRing"
+                    Margin="-4"
+                    CornerRadius="{TemplateBinding CornerRadius}"
+                    BorderBrush="{Binding Path=(primitives:SaFieldChrome.OuterFocusRingBrush), RelativeSource={RelativeSource TemplatedParent}}"
+                    BorderThickness="{StaticResource SaFocusRingThickness}"
+                    Opacity="0"
+                    IsHitTestVisible="False" />
         </Grid>
     </ControlTemplate>
 
@@ -268,6 +288,7 @@
         <Setter Property="BorderBrush" Value="{ThemeResource SaErrorBrush}" />
         <Setter Property="BorderThickness" Value="{StaticResource SaErrorBorderThickness}" />
         <Setter Property="primitives:SaFieldChrome.FocusRingBrush" Value="{ThemeResource SaErrorBrush}" />
+        <Setter Property="primitives:SaFieldChrome.OuterFocusRingBrush" Value="{ThemeResource SaFocusRingBrush}" />
     </Style>
     <!-- SearchField Page 112:1429 / 112:1611: h44, radius 14, pad-L 16, gap 10, search fill, no border, icon 18. -->
     <Style x:Key="SaPageSearchFieldStyle" TargetType="TextBox" BasedOn="{StaticResource SaTextFieldStyle}">
@@ -309,6 +330,7 @@
         <Setter Property="BorderBrush" Value="{ThemeResource SaErrorBrush}" />
         <Setter Property="BorderThickness" Value="{StaticResource SaErrorBorderThickness}" />
         <Setter Property="primitives:SaFieldChrome.FocusRingBrush" Value="{ThemeResource SaErrorBrush}" />
+        <Setter Property="primitives:SaFieldChrome.OuterFocusRingBrush" Value="{ThemeResource SaFocusRingBrush}" />
     </Style>
     <!-- Eye toggle of SaPasswordField: 28x28, no fill, muted icon; checked (revealed) = text colour. DERIVED states. -->
     <Style x:Key="SaRevealToggleStyle" TargetType="ToggleButton">
