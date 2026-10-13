@@ -144,4 +144,66 @@ public sealed partial class Ui12EditorModalLayerTests
 
     [GeneratedRegex(@"private void SetSubtitle\(string text\)\s*\{\s*if \(!PageAnnounces\(_layer\) \|\| ")]
     private static partial Regex SubtitleBehindTheGate();
+
+    // ---- Atlas A-B12F-01: the IsInert setter (transition + notification branch). STATIC proof: App.Tests has no XAML
+    // runtime, so SaInertHost cannot be instantiated here and no UIA StructureChanged event is observed; the received event
+    // and the real tree are runtime checks (QA). The whole body is pinned so that any change to the state write, the
+    // repeated-value guard, the order or the listener condition fails. ----
+
+    [Fact]
+    public void TheIsInertSetter_IsExactly_GuardRepeat_WriteState_ThenNotifyWhenAPeerExistsAndSomeoneListens()
+    {
+        var code = Normalized(AppSourceTree.CodeWithoutComments("Controls/Primitives/SaInertHost.cs"));
+
+        Assert.Contains(Normalized("""
+            public bool IsInert
+            {
+                get => _isInert;
+                set
+                {
+                    if (_isInert == value)
+                    {
+                        return;
+                    }
+
+                    _isInert = value;
+                    if (FrameworkElementAutomationPeer.FromElement(this) is { } peer
+                        && AutomationPeer.ListenerExists(AutomationEvents.StructureChanged))
+                    {
+                        peer.RaiseStructureChangedEvent(AutomationStructureChangeType.ChildrenInvalidated, peer);
+                    }
+                }
+            }
+            """), code, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TheSetter_WritesTheStateThePeerReads_ExactlyOnce_AndNeverNegatesTheListenerCheck()
+    {
+        var code = AppSourceTree.CodeWithoutComments("Controls/Primitives/SaInertHost.cs");
+
+        // The one field the peer's rule reads (through IsInert) is written in one place: the setter, from value.
+        Assert.Single(StateWrites().Matches(code));
+        Assert.Contains("_isInert = value;", code, StringComparison.Ordinal);
+        Assert.Contains("get => _isInert;", code, StringComparison.Ordinal);
+        Assert.Contains("Children(((SaInertHost)Owner).IsInert, base.GetChildrenCore)", code, StringComparison.Ordinal);
+        // The event is raised only while a UIA client listens (and only then): never the negated check.
+        Assert.Single(ListenerChecks().Matches(code));
+        Assert.DoesNotContain("!AutomationPeer.ListenerExists", code, StringComparison.Ordinal);
+        Assert.Single(StructureEvents().Matches(code));
+    }
+
+    private static string Normalized(string code) => WhiteSpace().Replace(code, " ").Trim();
+
+    [GeneratedRegex(@"\s+")]
+    private static partial Regex WhiteSpace();
+
+    [GeneratedRegex(@"\b_isInert\s*=(?!=)")]
+    private static partial Regex StateWrites();
+
+    [GeneratedRegex(@"ListenerExists\(")]
+    private static partial Regex ListenerChecks();
+
+    [GeneratedRegex(@"RaiseStructureChangedEvent\(")]
+    private static partial Regex StructureEvents();
 }
