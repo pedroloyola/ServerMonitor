@@ -247,6 +247,8 @@ public sealed partial class ServerFormControl : UserControl
             or nameof(ServerEditorViewModel.HasSavedPassphrase)
             or nameof(ServerEditorViewModel.HasSavedPassword)
             or nameof(ServerEditorViewModel.HasSavedJumpSecret)
+            or nameof(ServerEditorViewModel.HasCapturedSecret)
+            or nameof(ServerEditorViewModel.HasCapturedJumpSecret)
             or nameof(ServerEditorViewModel.SelectedAuthenticationIndex)
             or nameof(ServerEditorViewModel.SelectedJumpAuthenticationIndex)
             or nameof(ServerEditorViewModel.UseJumpHost)
@@ -291,13 +293,13 @@ public sealed partial class ServerFormControl : UserControl
             localization.GetString("ServerEditorJumpKeyPickerHelper"),
             localization.GetString("ServerEditorJumpKeyPickerAccessibleHeader"));
 
-        SetSavedSecretLabels(PassphraseFormField, PassphraseField, viewModel.HasSavedPassphrase,
+        SetSavedSecretLabels(PassphraseFormField, PassphraseField, viewModel.HasSavedPassphrase, viewModel.HasCapturedSecret,
             "ServerEditorPassphraseHeader", "ServerEditorPassphrasePlaceholder", "ServerEditorPassphraseSavedHeader");
-        SetSavedSecretLabels(PasswordFormField, PasswordField, viewModel.HasSavedPassword,
+        SetSavedSecretLabels(PasswordFormField, PasswordField, viewModel.HasSavedPassword, viewModel.HasCapturedSecret,
             "ServerEditorPasswordHeader", "ServerEditorPasswordPlaceholder", "ServerEditorPasswordSavedHeader");
-        SetSavedSecretLabels(JumpPassphraseFormField, JumpPassphraseField, viewModel.HasSavedJumpSecret,
+        SetSavedSecretLabels(JumpPassphraseFormField, JumpPassphraseField, viewModel.HasSavedJumpSecret, viewModel.HasCapturedJumpSecret,
             "ServerEditorPassphraseHeader", "ServerEditorJumpPassphrasePlaceholder", "ServerEditorPassphraseSavedHeader");
-        SetSavedSecretLabels(JumpPasswordFormField, JumpPasswordField, viewModel.HasSavedJumpSecret,
+        SetSavedSecretLabels(JumpPasswordFormField, JumpPasswordField, viewModel.HasSavedJumpSecret, viewModel.HasCapturedJumpSecret,
             "ServerEditorPasswordHeader", "ServerEditorJumpPasswordPlaceholder", "ServerEditorPasswordSavedHeader");
 
         RouteLine.Text = ServerEditorRouteLine.Describe(viewModel.JumpHost, viewModel.Host, localization);
@@ -324,18 +326,28 @@ public sealed partial class ServerFormControl : UserControl
     }
 
     // A saved secret is never shown: the box stays empty, the label says "guardada" and the placeholder says how to keep it.
+    // UI.12 B12-05: a secret typed, captured (box cleared) and retained for the next Test/Save says so instead - the same
+    // text in the UIA HelpText (the placeholder is not reliably read); never in the Name, never anything from the value.
     private void SetSavedSecretLabels(
         Primitives.SaFormField field,
         PasswordBox box,
         bool saved,
+        bool captured,
         string headerKey,
         string placeholderKey,
         string savedHeaderKey)
     {
         var localization = _localization!;
         field.Header = localization.GetString(saved ? savedHeaderKey : headerKey);
-        box.PlaceholderText = localization.GetString(saved ? "ServerEditorSecretKeepPlaceholder" : placeholderKey);
+        box.PlaceholderText = localization.GetString(SecretPlaceholderKey(saved, captured, placeholderKey));
+        AutomationProperties.SetHelpText(box, captured ? localization.GetString(RetainedSecretPlaceholderKey) : string.Empty);
     }
+
+    internal const string RetainedSecretPlaceholderKey = "ServerEditorSecretRetainedPlaceholder";
+
+    /// <summary>UI.12 B12-05: retained (captured) wins over saved ("keep") over the field's own placeholder.</summary>
+    internal static string SecretPlaceholderKey(bool saved, bool captured, string placeholderKey) =>
+        captured ? RetainedSecretPlaceholderKey : saved ? "ServerEditorSecretKeepPlaceholder" : placeholderKey;
 
     private void OnKeyPickerMenuOpening(object? sender, object e) =>
         FillKeyMenu(KeyPickerMenu, jump: false);

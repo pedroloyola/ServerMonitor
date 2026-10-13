@@ -987,6 +987,7 @@ status, metrics and history.</value></data>
   <data name="ServerEditorPassphraseSavedHeader" xml:space="preserve"><value>Passphrase · saved</value></data>
   <data name="ServerEditorPasswordSavedHeader" xml:space="preserve"><value>Password · saved</value></data>
   <data name="ServerEditorSecretKeepPlaceholder" xml:space="preserve"><value>Leave blank to keep the current one</value></data>
+  <data name="ServerEditorSecretRetainedPlaceholder" xml:space="preserve"><value>Already entered · type to replace</value></data>
   <data name="ServerEditorRouteJumpPending" xml:space="preserve"><value>Jump host not filled in yet</value></data>
   <data name="ServerEditorRouteFormat" xml:space="preserve"><value>This device   →   {0}   →   {1}</value></data>
   <data name="ServerEditorRouteTargetPending" xml:space="preserve"><value>server not filled in yet</value></data>

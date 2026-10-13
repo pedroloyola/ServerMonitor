@@ -987,6 +987,7 @@ as métricas e o histórico do servidor.</value></data>
   <data name="ServerEditorPassphraseSavedHeader" xml:space="preserve"><value>Frase-passe · guardada</value></data>
   <data name="ServerEditorPasswordSavedHeader" xml:space="preserve"><value>Palavra-passe · guardada</value></data>
   <data name="ServerEditorSecretKeepPlaceholder" xml:space="preserve"><value>Deixa em branco para manter a atual</value></data>
+  <data name="ServerEditorSecretRetainedPlaceholder" xml:space="preserve"><value>Já introduzida · escreve para mudar</value></data>
   <data name="ServerEditorRouteJumpPending" xml:space="preserve"><value>Jump host por preencher</value></data>
   <data name="ServerEditorRouteFormat" xml:space="preserve"><value>Este dispositivo   →   {0}   →   {1}</value></data>
   <data name="ServerEditorRouteTargetPending" xml:space="preserve"><value>servidor por preencher</value></data>
