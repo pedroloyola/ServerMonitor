@@ -368,7 +368,14 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
     {
         PageRoot.IsHitTestVisible = interactive;
         PageScroll.IsEnabled = interactive;
+        // UI.12 UI12A-MODAL-01: while the layer is open the form behind it leaves the UIA control/content views, so a
+        // screen reader's browse mode stays inside the dialog (Tab is already trapped by TabFocusNavigation=Cycle).
+        AutomationProperties.SetAccessibilityView(PageScroll, PageAccessibilityView(interactive));
     }
+
+    /// <summary>UI.12 UI12A-MODAL-01: the page content is Raw (out of the UIA tree) exactly while the modal layer is open.</summary>
+    internal static AccessibilityView PageAccessibilityView(bool interactive) =>
+        interactive ? AccessibilityView.Content : AccessibilityView.Raw;
 
     private void FocusWhenLaidOut(Func<bool> tryFocus, Action<bool>? completed = null)
     {
@@ -467,6 +474,9 @@ public sealed partial class ServerEditorPage : Page, IServerEditorView, INavigat
         }
 
         _acceptingTrust = true;
+        // UI.12 UI12A-MODAL-01: the gesture came from "Confiar e …", which is about to be disabled - move the focus to the
+        // safe button FIRST, or disabling the focused button throws the focus out of the layer (and Esc stops reaching it).
+        TrustPanel.FocusSafeButton();
         TrustPanel.SetWorking(true, acceptAllowed: false);
         try
         {
