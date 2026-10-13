@@ -1,6 +1,6 @@
 # UI.12 — Final UX Hardening
 
-**Status: UI.12 — DRAFT, recovery done (2026-10-13).** Code head `90cb99c` (merge of B12B-02-R; local, **not pushed**); PR #42 (draft) and CI `38352809526` are still on `d36becb`, so CI has **not** run on the recovery commits. The recovery run (§0, human present) closed the Firewall blocker, fixed and runtime-proved both open P2s (B12B-01 in real High Contrast, B12F-01 by UIA + real input), and ran the stress cycles, the real-input pass and part of the Narrator script. Ceiling of the run: READY_TO_MERGE; no push / merge without the human GO.
+**Status: UI.12 — COMPLETE (2026-10-13).** PR #42 squash-merged with a specific human GO on head `894a21a` (CI `38451798976` green) → **main `3433bdc`** (single parent `baa6401`; tree identical to `894a21a`). Post-merge CI `38452947919` green on the first attempt. Post-merge startup smoke on `3433bdc` passed (see "Post-merge" below). The recovery run (§0, human present) closed the Firewall blocker and fixed and runtime-proved B12B-01, B12F-01 and B12B-02-R. Squash was a one-off exception for this PR, because intermediate commits do not build in Release. It does not change the merge policy.
 
 **Branch:** `ui/ui12-final-ux-hardening`, base `main` @ `baa6401`. Relay's accessibility work was done on `ui/ui12-a11y` (same base) and merged into the branch four times (`b328a07`, `6e62664`, `118c044`, `f7fe881`), each conflict-free and identical to a recomputed merge-tree. This document's commit adds docs only.
 
@@ -33,6 +33,33 @@
 **Evidence labels:** [CODE] · [UNIT] test + counterproof · [UIA] programmatic UI Automation · [REAL-INPUT] `SendInput` into the verified QA window · [HC-REAL] a real Windows contrast theme · [HUMAN] · [STATIC] reading only.
 
 `.boss/**` paths are evidence. No personal data, real hosts or real screenshots are reproduced here; the QA harnesses use fixture data.
+
+## Post-merge (2026-10-13)
+- **Merge:** squash `3433bdc` ("UI.12 — Final UX Hardening (#42)"). Its only parent is `baa6401`, and `git diff 894a21a 3433bdc` is empty.
+- **CI on main:** run `38452947919`, attempt 1. Release build + vulnerability scan ✓, Debug build + tests ✓.
+- **Startup smoke** (Beacon `beacon-postmerge-smoke.md`; QA worktree at `3433bdc`, App Debug rebuilt, launched only through `tools/qa/Start-QaApp.ps1`; HC off; real input). Every item PASS:
+  - the app starts and Overview opens;
+  - Servers opens by a sidebar click and shows 6 rows;
+  - Add server opens the editor, Esc closes it and focus returns to "Adicionar servidor";
+  - the app stays alive and responding for ≥ 60 s;
+  - closing the window sends it to the tray;
+  - tray menu "Sair do ServerAlyzer" (keyboard) exits the process by itself in 0.24 s with exit code 0;
+  - 0 Application Error/Hang/WER events.
+
+  One earlier run could not reach the tray menu item through UIA because the native menu exposes no items. That was a harness limitation; the next targeted keyboard run closed the item.
+- **Guards:**
+  - real data diff 0;
+  - the Developer-signed 1.1.2.2 install was not touched;
+  - Firewall 709, with no new rules;
+  - High Contrast restored;
+  - 0 QA processes.
+- **Still NOT_RUN:**
+  - DPI ≠ 100 %;
+  - Narrator steps 7–10 (UIA only);
+  - B12B-02-R Narrator in pt-BR/en-US, in High Contrast and on Remove;
+  - the remaining items in §10.
+
+  The pre-existing P3s stay in the backlog.
 
 ## 0. Recovery run (2026-10-13, human present)
 
