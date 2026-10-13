@@ -276,8 +276,12 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
 
     // --- States ----------------------------------------------------------------------------------------------------
 
-    /// <summary>Figma "Primeira leitura": a metrics-capable server still waiting for its first snapshot.</summary>
-    public bool IsFirstReading => _card?.IsMetricsPending == true;
+    /// <summary>
+    /// Figma "Primeira leitura": a metrics-capable server still waiting for its first snapshot - INCLUDING while that first
+    /// collection runs (UI.12 UI12A-STATE-05: the card's IsMetricsPending excludes a running refresh, so the Detail showed no
+    /// skeleton, "—" and "Sem dados" exactly while the first reading was being taken).
+    /// </summary>
+    public bool IsFirstReading => _card is { SupportsMetrics: true, HasMetrics: false, HasMetricsError: false };
 
     public bool IsRefreshing => _card?.IsRefreshingMetrics == true;
 
