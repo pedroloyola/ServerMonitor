@@ -1,6 +1,16 @@
 <Project>
 
   <!--
+    MSBuild imports only the NEAREST Directory.Build.props. If a repository-level one is ever added,
+    this file would silently shadow it for every project under src/; chaining to it keeps both.
+    Deliberately the repository root only, not GetPathOfFileAbove: that walks on above the checkout and
+    would pull in whatever Directory.Build.props happens to sit in a parent folder of the machine.
+    Today there is none at the root, so the condition is false and nothing is imported.
+  -->
+  <Import Project="$(MSBuildThisFileDirectory)..\Directory.Build.props"
+          Condition="Exists('$(MSBuildThisFileDirectory)..\Directory.Build.props')" />
+
+  <!--
     PRIV-PDBPATH (REL.0A): no absolute development path in a Release binary.
 
     By default the compiler records where the build ran: the PE debug directory carries the full PDB
@@ -18,8 +28,9 @@
 
     Release only, on every machine, not only on CI: the leak was found in a Release MSIX built on a
     developer machine for QA, and any Release package can end up shared. Debug keeps real local
-    paths, so breakpoints and source stepping are unchanged. Tests are deliberately not covered: they
-    are never distributed, and tools/release/Assert-DistributionPrivacy.ps1 checks the package anyway.
+    paths, so breakpoints and source stepping are unchanged - which also means a Debug package must
+    never leave the machine. Tests are deliberately not covered: they are never distributed, and
+    tools/release/Assert-DistributionPrivacy.ps1 checks the package anyway.
   -->
   <PropertyGroup Condition="'$(Configuration)' == 'Release'">
     <Deterministic>true</Deterministic>

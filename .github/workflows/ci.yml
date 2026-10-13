@@ -119,15 +119,25 @@ jobs:
 
       # PRIV-PDBPATH on every PR: the gate's own counterproofs, then the gate on the first-party
       # Release binaries and PDBs this build just wrote (the runner's checkout path must not be in
-      # them). The packaged MSIX is checked in full by release-build.yml before anything ships.
+      # them). The packaged MSIX is checked by the package-privacy job below. The same assembly is
+      # copied into several bin folders, and the gate refuses two artifacts with one name, so the
+      # selection is staged under its src-relative path and inspected as ONE input.
       - name: Distribution privacy (Release binaries)
         shell: pwsh
         run: |
           ./tools/release/Test-DistributionPrivacy.ps1
-          $firstParty = @(Get-ChildItem -Path src -Recurse -File |
+          $source = (Resolve-Path 'src').Path
+          $stage = Join-Path ([System.IO.Path]::GetTempPath()) 'first-party-release'
+          Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction SilentlyContinue
+          $firstParty = @(Get-ChildItem -Path $source -Recurse -File |
             Where-Object { $_.FullName -match '[\\/]bin[\\/](x64[\\/])?Release[\\/]' -and
               $_.Name -match '^(ServerMonitor|ServerAlyzer)\..+\.(dll|pdb|json)$' })
-          ./tools/release/Assert-DistributionPrivacy.ps1 -Path ($firstParty.FullName) -RequiredArtifacts @(
+          foreach ($file in $firstParty) {
+            $target = Join-Path $stage ([System.IO.Path]::GetRelativePath($source, $file.FullName))
+            New-Item -ItemType Directory -Force -Path (Split-Path $target) | Out-Null
+            Copy-Item -LiteralPath $file.FullName -Destination $target
+          }
+          ./tools/release/Assert-DistributionPrivacy.ps1 -Path $stage -RequiredArtifacts @(
             'ServerMonitor.App.dll', 'ServerMonitor.App.pdb',
             'ServerAlyzer.WidgetProvider.dll', 'ServerAlyzer.WidgetProvider.pdb',
             'ServerMonitor.Core.dll', 'ServerMonitor.Infrastructure.dll', 'ServerMonitor.Collectors.dll',
@@ -155,3 +165,43 @@ jobs:
             '- Exact cache hit (`true` = hit; empty = miss): `${{ steps.nuget-cache.outputs.cache-hit }}`'
             '- Job and step wall-clock: GitHub Actions timestamps (authoritative)'
           ) | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+
+  # PRIV-PDBPATH on the PACKAGE itself, on every PR: the same packaged build release-build.yml makes
+  # (production identity, unsigned), then the gate with the reviewed third-party allowlist on the
+  # .msix. This is what proves the allowlist holds for the runner's SDK, before a release depends on
+  # it. Nothing is signed, uploaded or published, and no secret is involved.
+  package-privacy:
+    name: Packaged build + distribution privacy
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-${{ runner.arch }}-nuget-${{ hashFiles('**/*.csproj', 'global.json', '**/Directory.Packages.props', '**/Directory.Build.props', '**/Directory.Build.targets', '**/NuGet.Config', '**/nuget.config', '**/packages.lock.json') }}
+
+      - name: Restore
+        run: dotnet restore ServerMonitor.slnx
+
+      - name: Build the MSIX package (unsigned, as release-build.yml does)
+        run: >
+          dotnet build src/ServerMonitor.App/ServerMonitor.App.csproj
+          -c Release -p:Packaged=true --no-incremental --disable-build-servers
+
+      - name: Distribution privacy (package)
+        shell: pwsh
+        run: |
+          $candidates = @(Get-ChildItem -Recurse -Filter '*.msix' -Path 'src/ServerMonitor.App/AppPackages' |
+            Where-Object { $_.FullName -notmatch '[\\/]Dependencies[\\/]' })
+          if ($candidates.Count -ne 1) { throw "Expected exactly one app MSIX, found $($candidates.Count)." }
+          ./tools/release/Assert-DistributionPrivacy.ps1 `
+            -Path $candidates[0].FullName `
+            -AllowlistPath 'tools/release/distribution-privacy-allowlist.json'

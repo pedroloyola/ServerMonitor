@@ -105,26 +105,44 @@ constant: a user profile and folder layout, shipped inside the MSIX (`PRIV-PDBPA
 `ContinuousIntegrationBuild`, which turns on the SDK's deterministic source paths. The git
 checkout is mapped to `/_/` in the PE, the PDB and `CallerFilePath`, and Source Link is written
 against the mapped paths, so the PDB still resolves to the exact commit on GitHub. Debug is not
-affected: breakpoints and source stepping keep the real local paths.
+affected: breakpoints and source stepping keep the real local paths — so a **Debug package must
+never leave the machine**, and any package that is shared goes through the gate first. The file
+chains to a repository-root `Directory.Build.props` if one is ever added (and only that one).
 
-**The gate** is `tools/release/Assert-DistributionPrivacy.ps1`. It opens zip containers
-(recursively), parses every PE (CodeView path, embedded portable PDB, `#US` strings) and every
-portable PDB (documents, Source Link) with System.Reflection.Metadata, then byte-scans every
-file as UTF-8 and UTF-16. It fails on absolute drive, UNC, profile (`\Users\`, `/home/`) and CI
-runner paths, and on the current machine's own profile, user name, checkout and CI workspace,
-read from the environment at run time. It also fails if it cannot parse something, if a Windows
-PDB is present, or if a required file is missing. Its output names the file, the channel and a
-hashed token — never the path itself.
+**The gate** is `tools/release/Assert-DistributionPrivacy.ps1`.
 
-It runs in `release-build.yml` (before the upload), in `store-submit.yml` (before the Store) and
-in CI on the Release binaries of every PR.
+* *Channels:* zip containers are opened recursively and entry names are checked; every PE is
+  parsed with System.Reflection.Metadata (CodeView PDB path, embedded portable PDB — decompressed
+  and checked against its declared size — and every `#US` string, where `CallerFilePath` lands);
+  every portable PDB is parsed (documents, then Source Link and the rest of its bytes); every file
+  is then byte-scanned as UTF-8 and UTF-16 (both alignments).
+* *Detectors:* absolute drive, UNC, profile (`\Users\`, `/home/`, `/Users/`) and CI runner paths,
+  plus this machine's own profile, user name, computer/domain name, checkout and CI workspace, read
+  from the environment at run time. A path made only of non-ASCII folder names is caught only by
+  those environment literals, on the machine it came from.
+* *Fail-closed:* no input, a missing input, an empty directory, anything it cannot parse (reported
+  with its exception type or a fixed reason), a Windows/MSF PDB, nesting deeper than 4, a file or
+  zip entry over 1 GiB or a run over 2 GiB decompressed (`-MaxEntryBytes`, `-MaxTotalBytes`), a
+  missing required file, an internal error, and **two artifacts or two inputs with the same name**
+  (so nothing keyed by a name — the allowlist, the report — can confuse them).
+* *Redaction:* the output names the artifact, the channel, the category and a 12-hex SHA-256 token
+  of the matched text. Any part of an artifact name (input, file or zip entry) that itself matches
+  a detector is printed as `<redacted:token>`, in the console, in `-ReportPath` JSON and in the
+  allowlist candidates. Errors never carry an exception message.
+
+It runs in `release-build.yml` (before the upload), in `store-submit.yml` (before the Store), and
+in CI on every PR twice: on the first-party Release binaries, and on a **packaged** Release build
+made exactly as `release-build.yml` makes it (unsigned, nothing uploaded), with the allowlist — the
+proof that the allowlist holds for the runner's SDK before a release depends on it.
 
 **Third-party binaries** carry their vendors' build paths (Microsoft build agents, NuGet
-authors' machines). `tools/release/distribution-privacy-allowlist.json` excuses each one by file
-name plus either its exact bytes (SHA-256) or the exact path tokens, for the categories reviewed.
-Files this repository builds, and environment matches, can never be allowlisted. After a
-dependency update the gate fails closed; regenerate the candidates with
-`-AllowlistCandidatesPath`, review each entry, write its real reason, and commit it.
+authors' machines). `tools/release/distribution-privacy-allowlist.json` excuses each one by exact
+file name plus either the SHA-256 of the very bytes that produced the finding or the exact path
+tokens, for the categories reviewed; `reason` is a single string. Files this repository builds, and
+environment matches, can never be allowlisted. After a dependency update the gate fails closed;
+regenerate the candidates with `-AllowlistCandidatesPath` (written redacted, reason `REVIEW`, which
+the loader refuses), review each entry, write its real reason, and commit it. Never widen a
+category to make a run pass.
 
 ## The publishing hold
 
@@ -245,7 +263,7 @@ Everything the workflows rely on runs offline:
 
 ```powershell
 ./tools/release/Test-ReleaseChecks.ps1          # package checks, 12 cases
-./tools/release/Test-DistributionPrivacy.ps1    # distribution privacy, 29 cases
+./tools/release/Test-DistributionPrivacy.ps1    # distribution privacy, 52 cases
 ./tools/release/Test-StoreSubmissionUpdate.ps1  # publishing hold, 12 cases
 ./tools/release/Get-SubmissionState.ps1 -SelfTest        # status mapping, 18 cases
 ./tools/release/Assert-NoPendingSubmission.ps1 -SelfTest # in-flight guard, 19 cases

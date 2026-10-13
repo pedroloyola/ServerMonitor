@@ -55,10 +55,7 @@
     "categories": [
       "ci-runner-root"
     ],
-    "reason": [
-      "Microsoft.Web.WebView2 (transitive through the Windows App SDK): path of the Microsoft build agent.",
-      "Windows App SDK 2.3.1 NuGet payload: CodeView path of the Microsoft build agent."
-    ]
+    "reason": "Microsoft.Web.WebView2 (transitive through the Windows App SDK): path of the Microsoft build agent."
   },
   {
     "file": "Microsoft.Web.WebView2.Core.Projection.dll",
@@ -68,10 +65,7 @@
     "categories": [
       "ci-runner-root"
     ],
-    "reason": [
-      "Microsoft.Web.WebView2 (transitive through the Windows App SDK): path of the Microsoft build agent.",
-      "Windows App SDK 2.3.1 NuGet payload: CodeView path of the Microsoft build agent."
-    ]
+    "reason": "Microsoft.Web.WebView2 (transitive through the Windows App SDK): path of the Microsoft build agent."
   },
   {
     "file": "Microsoft.Windows.AI.ContentSafety.Projection.dll",
@@ -109,10 +103,7 @@
     "categories": [
       "ci-runner-root"
     ],
-    "reason": [
-      "Windows App SDK 2.3.1 machine-learning native payload: hundreds of compiled-in upstream source paths from the Microsoft build agent. Bound to these exact bytes.",
-      "Windows App SDK 2.3.1 NuGet payload: CodeView path of the Microsoft build agent."
-    ]
+    "reason": "Windows App SDK 2.3.1 machine-learning native payload: hundreds of compiled-in upstream source paths from the Microsoft build agent. Bound to these exact bytes."
   },
   {
     "file": "Microsoft.Windows.AI.MachineLearning.Projection.dll",
@@ -282,10 +273,7 @@
     "categories": [
       "ci-runner-root"
     ],
-    "reason": [
-      "Windows SDK .NET projection / CsWinRT runtime shipped by the .NET SDK: CodeView path of the Microsoft build agent.",
-      "Windows App SDK 2.3.1 NuGet payload: CodeView path of the Microsoft build agent."
-    ]
+    "reason": "Windows SDK .NET projection / CsWinRT runtime shipped by the .NET SDK: CodeView path of the Microsoft build agent."
   },
   {
     "file": "Microsoft.Windows.Security.AccessControl.Projection.dll",
