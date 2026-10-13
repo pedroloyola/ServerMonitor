@@ -81,6 +81,133 @@ public sealed partial class Ui12HighContrastIconTests
         Assert.True(offenders.Count == 0, string.Join(", ", offenders));
     }
 
+    /// <summary>
+    /// UI.12 B12B-01 follow-up (Prism P3): a LOCAL Foreground on an icon beats the inherited state text, so inside a host
+    /// whose template swaps ContentPresenter.Foreground on hover / pressed / checked (Glass, Flat, nav item, segments) the
+    /// icon stayed WindowText on Highlight in HC. Such icons take SaIconSecondaryStyle (a theme style whose HighContrast
+    /// version sets no Foreground) instead of a local Foreground.
+    /// </summary>
+    [Fact]
+    public void NoIconInsideAStateTextHostCarriesALocalForeground()
+    {
+        var hosts = StateTextHostStyles();
+        Assert.Contains("SaGlassButtonTemplate", hosts.Templates);
+        Assert.Contains("SaFlatButtonTemplate", hosts.Templates);
+        foreach (var expected in new[] { "SaDisclosureButtonStyle", "SaPillButtonXSmallStyle", "SaPickerButtonStyle", "SaNavItemStyle", "SaSegmentedThemeItemStyle" })
+        {
+            Assert.Contains(expected, hosts.Styles);
+        }
+
+        var offenders = new List<string>();
+        var checkedIcons = 0;
+        foreach (var file in AppSourceTree.Files(".xaml").Where(f => f.StartsWith("Views/", StringComparison.Ordinal)
+                     || f.StartsWith("Controls/", StringComparison.Ordinal) || f.StartsWith("Styles/", StringComparison.Ordinal)))
+        {
+            foreach (var icon in AppSourceTree.LoadXaml(file).Descendants().Where(e => e.Name.LocalName == "SaIcon"))
+            {
+                var host = icon.Ancestors().FirstOrDefault(a => a.Name.LocalName is "Button" or "RadioButton" or "ToggleButton");
+                var key = host is null ? null : StaticKey((string?)host.Attribute("Style"));
+                if (key is null || !hosts.Styles.Contains(key))
+                {
+                    continue;
+                }
+
+                checkedIcons++;
+                if (icon.Attribute("Foreground") is not null)
+                {
+                    offenders.Add($"{file} {(string?)icon.Attribute("Data")} ({key})");
+                }
+            }
+        }
+
+        Assert.True(checkedIcons >= 15, $"Only {checkedIcons} icons inside state-text hosts; the guard would be vacuous.");
+        Assert.True(offenders.Count == 0, "Local Foreground on an icon inside a state-text host: " + string.Join("; ", offenders));
+    }
+
+    [Fact]
+    public void TheSecondaryIconStyleSetsItsColourEverywhereButHighContrast()
+    {
+        var themes = AppSourceTree.LoadXaml(Primitives).Root!
+            .Elements().Single(e => e.Name.LocalName == "ResourceDictionary.ThemeDictionaries")
+            .Elements().ToDictionary(d => (string)d.Attribute(AppSourceTree.Xaml + "Key")!, StringComparer.Ordinal);
+        foreach (var (theme, dictionary) in themes)
+        {
+            var style = dictionary.Elements().Single(e => (string?)e.Attribute(AppSourceTree.Xaml + "Key") == "SaIconSecondaryStyle");
+            Assert.Equal("primitives:SaIcon", (string?)style.Attribute("TargetType"));
+            Assert.Equal("{StaticResource SaIconBaseStyle}", (string?)style.Attribute("BasedOn"));
+            var setters = style.Elements().Select(e => ((string?)e.Attribute("Property"), (string?)e.Attribute("Value"))).ToList();
+            if (theme == "HighContrast")
+            {
+                Assert.Empty(setters);
+            }
+            else
+            {
+                Assert.Equal([("Foreground", "{ThemeResource SaTextSecondaryBrush}")], setters);
+            }
+        }
+
+        // The implicit icon style is the keyed base (template included), so an explicit SaIconSecondaryStyle keeps the template.
+        var implicitStyle = AppSourceTree.LoadXaml(Primitives).Root!.Elements()
+            .Single(e => e.Name.LocalName == "Style" && (string?)e.Attribute("TargetType") == "primitives:SaIcon" && e.Attribute(AppSourceTree.Xaml + "Key") is null);
+        Assert.Equal("{StaticResource SaIconBaseStyle}", (string?)implicitStyle.Attribute("BasedOn"));
+        Assert.Empty(implicitStyle.Elements());
+    }
+
+    private static (HashSet<string> Styles, HashSet<string> Templates) StateTextHostStyles()
+    {
+        var templates = new HashSet<string>(StringComparer.Ordinal);
+        var styles = new Dictionary<string, XElement>(StringComparer.Ordinal);
+        foreach (var file in AppSourceTree.Files(".xaml").Where(f => f.StartsWith("Styles/", StringComparison.Ordinal)
+                     || f.StartsWith("Views/", StringComparison.Ordinal) || f.StartsWith("Controls/", StringComparison.Ordinal)))
+        {
+            foreach (var element in AppSourceTree.LoadXaml(file).Descendants())
+            {
+                var key = (string?)element.Attribute(AppSourceTree.Xaml + "Key");
+                if (key is null)
+                {
+                    continue;
+                }
+
+                if (element.Name.LocalName == "ControlTemplate" && SwapsPresenterForeground(element))
+                {
+                    templates.Add(key);
+                }
+                else if (element.Name.LocalName == "Style")
+                {
+                    styles[key] = element;
+                }
+            }
+        }
+
+        bool IsHost(string key, int depth)
+        {
+            if (depth > 16 || !styles.TryGetValue(key, out var style))
+            {
+                return false;
+            }
+
+            var template = style.Elements().FirstOrDefault(s => (string?)s.Attribute("Property") == "Template");
+            if (template is not null)
+            {
+                return StaticKey((string?)template.Attribute("Value")) is { } referenced
+                    ? templates.Contains(referenced)
+                    : template.Descendants().Any(e => e.Name.LocalName == "ControlTemplate" && SwapsPresenterForeground(e));
+            }
+
+            return StaticKey((string?)style.Attribute("BasedOn")) is { } basedOn && IsHost(basedOn, depth + 1);
+        }
+
+        return (styles.Keys.Where(k => IsHost(k, 0)).ToHashSet(StringComparer.Ordinal), templates);
+    }
+
+    private static bool SwapsPresenterForeground(XElement template) =>
+        template.Descendants().Any(e => e.Name.LocalName == "Setter" && (string?)e.Attribute("Target") == "ContentPresenter.Foreground");
+
+    private static string? StaticKey(string? value) =>
+        value is not null && value.StartsWith("{StaticResource ", StringComparison.Ordinal) && value.EndsWith('}')
+            ? value["{StaticResource ".Length..^1].Trim()
+            : null;
+
     private static XElement IconTemplate() =>
         AppSourceTree.LoadXaml(Primitives).Descendants()
             .Single(e => e.Name.LocalName == "ControlTemplate" && (string?)e.Attribute("TargetType") == "primitives:SaIcon");

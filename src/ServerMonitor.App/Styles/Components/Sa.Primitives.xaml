@@ -17,28 +17,6 @@
         <ResourceDictionary Source="ms-appx:///Styles/Tokens/Radius.xaml" />
         <ResourceDictionary Source="ms-appx:///Styles/Tokens/Borders.xaml" />
     </ResourceDictionary.MergedDictionaries>
-    <!-- UI.12 B12B-01: which SaIcon path draws (see the SaIcon style). Light / Dark / Default = today's rest path only;
-         High Contrast = the path that follows the host's state text. Chosen by the framework's theme resolution, never
-         by code or a system event (85a6b08 subscribed AccessibilitySettings.HighContrastChanged, which throws 0x80070490
-         in this WinUI 3 desktop app and fail-fasted every launch). -->
-    <ResourceDictionary.ThemeDictionaries>
-        <ResourceDictionary x:Key="Default">
-            <Visibility x:Key="SaIconRestPathVisibility">Visible</Visibility>
-            <Visibility x:Key="SaIconStatePathVisibility">Collapsed</Visibility>
-        </ResourceDictionary>
-        <ResourceDictionary x:Key="Dark">
-            <Visibility x:Key="SaIconRestPathVisibility">Visible</Visibility>
-            <Visibility x:Key="SaIconStatePathVisibility">Collapsed</Visibility>
-        </ResourceDictionary>
-        <ResourceDictionary x:Key="Light">
-            <Visibility x:Key="SaIconRestPathVisibility">Visible</Visibility>
-            <Visibility x:Key="SaIconStatePathVisibility">Collapsed</Visibility>
-        </ResourceDictionary>
-        <ResourceDictionary x:Key="HighContrast">
-            <Visibility x:Key="SaIconRestPathVisibility">Collapsed</Visibility>
-            <Visibility x:Key="SaIconStatePathVisibility">Visible</Visibility>
-        </ResourceDictionary>
-    </ResourceDictionary.ThemeDictionaries>
 
     <!-- FormField 112:3337 / error 112:16924: label 12 Medium (text), gap 6, input, helper 11 Regular muted (112:3376) or
          the error 12 Regular in danger text (assertive live region). LabeledBy/DescribedBy are wired in code. -->
@@ -97,7 +75,7 @@
     <!-- Icon (Boss B-1): one stroke-only path, 1.5 DIP stroke at every size (the geometry is scaled in code, never the
          element), round caps and joins, no fill, Foreground inherited from the host so it follows theme and HC.
          Decorative: Raw in UI Automation and not a tab stop. -->
-    <Style TargetType="primitives:SaIcon">
+    <Style x:Key="SaIconBaseStyle" TargetType="primitives:SaIcon">
         <Setter Property="IsTabStop" Value="False" />
         <Setter Property="AutomationProperties.AccessibilityView" Value="Raw" />
         <Setter Property="Template">
@@ -128,6 +106,8 @@
             </Setter.Value>
         </Setter>
     </Style>
+    <!-- The implicit icon style IS the base, so an icon given SaIconSecondaryStyle keeps the same template. -->
+    <Style TargetType="primitives:SaIcon" BasedOn="{StaticResource SaIconBaseStyle}" />
 
     <!-- Status dot + label (Figma 112:1066 / 112:1448: dot 6, gap 7, 12 Regular muted). Colour is never the only
          signal: the Label is always rendered and is the automation name (the visible text is Raw for UIA so it is
@@ -858,4 +838,40 @@
             <Style x:Key="SaShellWindowBackgroundStyle" TargetType="Border"><Setter Property="Background" Value="{ThemeResource SaWindowMaterialBrush}"/></Style>
             <Style x:Key="SaOpaqueWindowBackgroundStyle" TargetType="Border"><Setter Property="Background" Value="{ThemeResource AppBackgroundBrush}"/></Style>
 
+    <!-- UI.12 B12B-01: which SaIcon path draws (see the SaIcon style). Light / Dark / Default = today's rest path only;
+         High Contrast = the path that follows the host's state text. Chosen by the framework's theme resolution, never
+         by code or a system event (85a6b08 subscribed AccessibilitySettings.HighContrastChanged, which throws 0x80070490
+         in this WinUI 3 desktop app and fail-fasted every launch).
+         SaIconSecondaryStyle (Prism P3): the muted icon inside a Glass / Flat / selected host. Light / Dark / Default set the
+         same SaTextSecondaryBrush the icons carried locally; High Contrast sets none, so the icon inherits the host's state
+         text (HighlightText on Highlight, GrayText when disabled) - a local Foreground would beat that inheritance.
+         At the end of the file so its BasedOn (SaIconBaseStyle) is already defined. -->
+    <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="Default">
+            <Visibility x:Key="SaIconRestPathVisibility">Visible</Visibility>
+            <Visibility x:Key="SaIconStatePathVisibility">Collapsed</Visibility>
+            <Style x:Key="SaIconSecondaryStyle" TargetType="primitives:SaIcon" BasedOn="{StaticResource SaIconBaseStyle}">
+                <Setter Property="Foreground" Value="{ThemeResource SaTextSecondaryBrush}" />
+            </Style>
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="Dark">
+            <Visibility x:Key="SaIconRestPathVisibility">Visible</Visibility>
+            <Visibility x:Key="SaIconStatePathVisibility">Collapsed</Visibility>
+            <Style x:Key="SaIconSecondaryStyle" TargetType="primitives:SaIcon" BasedOn="{StaticResource SaIconBaseStyle}">
+                <Setter Property="Foreground" Value="{ThemeResource SaTextSecondaryBrush}" />
+            </Style>
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="Light">
+            <Visibility x:Key="SaIconRestPathVisibility">Visible</Visibility>
+            <Visibility x:Key="SaIconStatePathVisibility">Collapsed</Visibility>
+            <Style x:Key="SaIconSecondaryStyle" TargetType="primitives:SaIcon" BasedOn="{StaticResource SaIconBaseStyle}">
+                <Setter Property="Foreground" Value="{ThemeResource SaTextSecondaryBrush}" />
+            </Style>
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="HighContrast">
+            <Visibility x:Key="SaIconRestPathVisibility">Collapsed</Visibility>
+            <Visibility x:Key="SaIconStatePathVisibility">Visible</Visibility>
+            <Style x:Key="SaIconSecondaryStyle" TargetType="primitives:SaIcon" BasedOn="{StaticResource SaIconBaseStyle}" />
+        </ResourceDictionary>
+    </ResourceDictionary.ThemeDictionaries>
 </ResourceDictionary>

@@ -286,7 +286,7 @@
                                 <StackPanel Orientation="Horizontal" Spacing="6">
                                     <TextBlock x:Uid="SettingsEnterCompactButtonText" VerticalAlignment="Center" />
                                     <primitives:SaIcon Data="{StaticResource SaIconArrowShrink01Data}" Size="15" VerticalAlignment="Center"
-                                                       Foreground="{ThemeResource SaTextSecondaryBrush}" />
+                                                       Style="{ThemeResource SaIconSecondaryStyle}" />
                                 </StackPanel>
                             </Button>
                         </Grid>
@@ -330,9 +330,9 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <primitives:SaIcon Data="{StaticResource SaIconHardDriveData}" Size="18" VerticalAlignment="Center" Foreground="{ThemeResource SaTextSecondaryBrush}" />
+                        <primitives:SaIcon Data="{StaticResource SaIconHardDriveData}" Size="18" VerticalAlignment="Center" Style="{ThemeResource SaIconSecondaryStyle}" />
                         <TextBlock x:Uid="SettingsOpenDataText" Grid.Column="1" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                        <primitives:SaIcon Grid.Column="2" Data="{StaticResource SaIconArrowRight01Data}" Size="17" VerticalAlignment="Center" Foreground="{ThemeResource SaTextSecondaryBrush}" />
+                        <primitives:SaIcon Grid.Column="2" Data="{StaticResource SaIconArrowRight01Data}" Size="17" VerticalAlignment="Center" Style="{ThemeResource SaIconSecondaryStyle}" />
                     </Grid>
                 </Button>
                 <Button x:Name="AboutDisclosure" x:Uid="SettingsOpenAboutButton" Grid.Column="1" Style="{StaticResource SaDisclosureButtonStyle}" Command="{Binding OpenAboutCommand}">
@@ -342,9 +342,9 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <primitives:SaIcon Data="{StaticResource SaIconInformationCircleData}" Size="18" VerticalAlignment="Center" Foreground="{ThemeResource SaTextSecondaryBrush}" />
+                        <primitives:SaIcon Data="{StaticResource SaIconInformationCircleData}" Size="18" VerticalAlignment="Center" Style="{ThemeResource SaIconSecondaryStyle}" />
                         <TextBlock x:Uid="SettingsOpenAboutText" Grid.Column="1" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                        <primitives:SaIcon Grid.Column="2" Data="{StaticResource SaIconArrowRight01Data}" Size="17" VerticalAlignment="Center" Foreground="{ThemeResource SaTextSecondaryBrush}" />
+                        <primitives:SaIcon Grid.Column="2" Data="{StaticResource SaIconArrowRight01Data}" Size="17" VerticalAlignment="Center" Style="{ThemeResource SaIconSecondaryStyle}" />
                     </Grid>
                 </Button>
             </Grid>

@@ -137,7 +137,7 @@ public sealed partial class IconResourceGuardTests
     public void IconTemplateStrokesAtTheConstantWidthWithoutAViewbox()
     {
         var style = AppSourceTree.LoadXaml("Styles/Components/Sa.Primitives.xaml").Descendants()
-            .Single(e => e.Name.LocalName == "Style" && (string?)e.Attribute("TargetType") == "primitives:SaIcon");
+            .Single(e => e.Name.LocalName == "Style" && (string?)e.Attribute(AppSourceTree.Xaml + "Key") == "SaIconBaseStyle");
         var paths = style.Descendants().Where(e => e.Name.LocalName == "Path").ToList();
         Assert.Equal(2, paths.Count);
         foreach (var path in paths)

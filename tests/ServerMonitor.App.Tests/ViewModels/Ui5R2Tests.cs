@@ -508,7 +508,13 @@ public sealed class Ui5R2Tests
         var icons = page.Descendants().Where(e => e.Name.LocalName == "SaIcon"
             && e.Ancestors().Any(a => a.Name.LocalName == "Button")).ToList();
         Assert.Equal(5, icons.Count); // Entrar chevron + 2 disclosures × (icon, chevron) - Prism C1 N-5
-        Assert.All(icons, icon => Assert.Equal("{ThemeResource SaTextSecondaryBrush}", (string?)icon.Attribute("Foreground")));
+        // UI.12 B12B-01 (Prism P3): muted via SaIconSecondaryStyle (SaTextSecondaryBrush in Light / Dark / Default, the host's
+        // state text in High Contrast - Ui12HighContrastIconTests), never a local Foreground.
+        Assert.All(icons, icon =>
+        {
+            Assert.Equal("{ThemeResource SaIconSecondaryStyle}", (string?)icon.Attribute("Style"));
+            Assert.Null(icon.Attribute("Foreground"));
+        });
     }
 
     [Fact]

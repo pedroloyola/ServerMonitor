@@ -307,7 +307,7 @@
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
                                     <primitives:SaIcon Data="{StaticResource SaIconFolder01Data}" Size="18" VerticalAlignment="Center"
-                                                       Foreground="{ThemeResource SaTextSecondaryBrush}" />
+                                                       Style="{ThemeResource SaIconSecondaryStyle}" />
                                     <TextBlock x:Name="KeyPickerText" Grid.Column="1" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                                 </Grid>
                                 <Button.Flyout>
@@ -515,7 +515,7 @@
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
                                     <primitives:SaIcon Data="{StaticResource SaIconFolder01Data}" Size="18" VerticalAlignment="Center"
-                                                       Foreground="{ThemeResource SaTextSecondaryBrush}" />
+                                                       Style="{ThemeResource SaIconSecondaryStyle}" />
                                     <TextBlock x:Name="JumpKeyPickerText" Grid.Column="1" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                                 </Grid>
                                 <Button.Flyout>
