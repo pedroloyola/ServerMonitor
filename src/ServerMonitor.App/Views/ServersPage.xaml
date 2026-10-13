@@ -212,6 +212,18 @@
                             <TextBlock Text="{x:Bind DiskDisplay, Mode=OneWay}" VerticalAlignment="Center"
                                        Style="{x:Bind DiskSeverity, Mode=OneWay, Converter={StaticResource MetricValueStyleConverter}}" />
                         </StackPanel>
+                        <!-- UI.12 B12-06 (Prism r3 R3-02): a 4th line after the metrics it qualifies - the same cue as Wide/Mid. -->
+                        <Grid ColumnSpacing="4" Visibility="{x:Bind ShowsStaleCue, Mode=OneWay}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <primitives:SaIcon Data="{StaticResource SaIconClock01Data}" Size="12" VerticalAlignment="Top" Margin="0,2,0,0"
+                                               Foreground="{ThemeResource SaAttentionTextBrush}" />
+                            <TextBlock Grid.Column="1" Style="{StaticResource SaHelperTextStyle}" Foreground="{ThemeResource SaAttentionTextBrush}"
+                                       Text="{x:Bind StaleAgeDisplay, Mode=OneWay}" TextWrapping="WrapWholeWords" MaxLines="2" TextTrimming="CharacterEllipsis"
+                                       AutomationProperties.AccessibilityView="Raw" />
+                        </Grid>
                     </StackPanel>
                     <primitives:SaIcon Grid.Column="1" Data="{StaticResource SaIconArrowRight01Data}" Size="16" VerticalAlignment="Center"
                                        Foreground="{ThemeResource SaTextSecondaryBrush}" />

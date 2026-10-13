@@ -112,6 +112,7 @@ public sealed class Ui12RetainedReadingRowTests
     [Theory]
     [InlineData("ServerRowWideTemplate")]
     [InlineData("ServerRowMidTemplate")]
+    [InlineData("ServerRowStackedTemplate")] // Prism r3 R3-02
     public void TheServersCue_Wraps_InsteadOfBeingClipped(string template)
     {
         var xaml = Architecture.AppSourceTree.LoadXaml("Views/ServersPage.xaml");
@@ -123,6 +124,21 @@ public sealed class Ui12RetainedReadingRowTests
         Assert.Equal("WrapWholeWords", (string?)text.Attribute("TextWrapping"));
         Assert.Equal("2", (string?)text.Attribute("MaxLines"));
         Assert.Equal("1", (string?)text.Attribute("Grid.Column"));
+    }
+
+    /// <summary>Prism r3 R3-02: the narrow (Stacked) row carries the cue as a 4th line, right after the metrics it qualifies.</summary>
+    [Fact]
+    public void TheStackedRow_CarriesTheCue_RightAfterItsMetricsLine()
+    {
+        var xaml = Architecture.AppSourceTree.LoadXaml("Views/ServersPage.xaml");
+        var node = xaml.Descendants().Single(e => (string?)e.Attribute(Architecture.AppSourceTree.Xaml + "Key") == "ServerRowStackedTemplate");
+        var cue = node.Descendants().Single(e => (string?)e.Attribute("Visibility") == "{x:Bind ShowsStaleCue, Mode=OneWay}");
+        var previous = cue.ElementsBeforeSelf().Last();
+
+        Assert.Equal("StackPanel", previous.Name.LocalName);
+        Assert.Contains(previous.Descendants(), e => (string?)e.Attribute("Text") == "{x:Bind DiskDisplay, Mode=OneWay}");
+        Assert.Contains(cue.Descendants(), e => (string?)e.Attribute("Data") == "{StaticResource SaIconClock01Data}");
+        Assert.Empty(cue.ElementsAfterSelf());
     }
 
     [Fact]
