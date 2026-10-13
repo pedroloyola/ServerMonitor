@@ -1,7 +1,8 @@
 <ResourceDictionary
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:motion="using:ServerMonitor.App.Services.Motion">
+    xmlns:motion="using:ServerMonitor.App.Services.Motion"
+    xmlns:primitives="using:ServerMonitor.App.Controls.Primitives">
     <!-- UI.2 dialog shell on the native ContentDialog (focus trap, Esc, Enter = DefaultButton, UIA stay WinUI's), applied
          per dialog. R1 (Prism MF-3, Cortex R-2): an Sa template that keeps every Fluent PART and visual-state NAME
          (ContentDialog's code drives them) but (1) one surface - no separate command band, (2) title 24 Semibold
@@ -28,6 +29,8 @@
         <Setter Property="BorderThickness" Value="{ThemeResource SaModalBorderThickness}" />
         <Setter Property="CornerRadius" Value="{StaticResource SaRadiusPanel}" />
         <Setter Property="Padding" Value="28" />
+        <!-- UI.12 LAYOUT-01 (Prism UI12A): clamp the surface to the window (width, height + scroll, stacked commands). -->
+        <Setter Property="primitives:SaDialog.FitsWindow" Value="True" />
         <Setter Property="Foreground" Value="{ThemeResource SaTextBrush}" />
         <Setter Property="IsTabStop" Value="False" />
         <!-- R2 (Cortex C2-1): Enter confirms even when no SaDialog.Kind is set; Kind=Destructive overrides it (local value). -->
@@ -182,8 +185,9 @@
                                         <RowDefinition Height="*" />
                                         <RowDefinition Height="Auto" />
                                     </Grid.RowDefinitions>
+                                    <!-- UI.12 LAYOUT-01: Auto (was Disabled) - content taller than the clamped surface scrolls instead of being cut. -->
                                     <ScrollViewer x:Name="ContentScrollViewer" HorizontalScrollBarVisibility="Disabled"
-                                                  VerticalScrollBarVisibility="Disabled" ZoomMode="Disabled" IsTabStop="False">
+                                                  VerticalScrollBarVisibility="Auto" ZoomMode="Disabled" IsTabStop="False">
                                         <StackPanel Spacing="16">
                                             <ContentControl x:Name="Title"
                                                             Content="{TemplateBinding Title}"
@@ -211,7 +215,7 @@
                                     </ScrollViewer>
                                     <Grid x:Name="CommandSpace" Grid.Row="1" HorizontalAlignment="Stretch" VerticalAlignment="Bottom"
                                           XYFocusKeyboardNavigation="Enabled">
-                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="12">
+                                        <StackPanel x:Name="CommandStack" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="12">
                                             <Button x:Name="PrimaryButton" IsTabStop="False" Content="{TemplateBinding PrimaryButtonText}"
                                                     IsEnabled="{TemplateBinding IsPrimaryButtonEnabled}" Style="{TemplateBinding PrimaryButtonStyle}"
                                                     ElementSoundMode="FocusOnly" />
