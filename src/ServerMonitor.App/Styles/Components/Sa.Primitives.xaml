@@ -17,6 +17,28 @@
         <ResourceDictionary Source="ms-appx:///Styles/Tokens/Radius.xaml" />
         <ResourceDictionary Source="ms-appx:///Styles/Tokens/Borders.xaml" />
     </ResourceDictionary.MergedDictionaries>
+    <!-- UI.12 B12B-01: which SaIcon path draws (see the SaIcon style). Light / Dark / Default = today's rest path only;
+         High Contrast = the path that follows the host's state text. Chosen by the framework's theme resolution, never
+         by code or a system event (85a6b08 subscribed AccessibilitySettings.HighContrastChanged, which throws 0x80070490
+         in this WinUI 3 desktop app and fail-fasted every launch). -->
+    <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="Default">
+            <Visibility x:Key="SaIconRestPathVisibility">Visible</Visibility>
+            <Visibility x:Key="SaIconStatePathVisibility">Collapsed</Visibility>
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="Dark">
+            <Visibility x:Key="SaIconRestPathVisibility">Visible</Visibility>
+            <Visibility x:Key="SaIconStatePathVisibility">Collapsed</Visibility>
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="Light">
+            <Visibility x:Key="SaIconRestPathVisibility">Visible</Visibility>
+            <Visibility x:Key="SaIconStatePathVisibility">Collapsed</Visibility>
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="HighContrast">
+            <Visibility x:Key="SaIconRestPathVisibility">Collapsed</Visibility>
+            <Visibility x:Key="SaIconStatePathVisibility">Visible</Visibility>
+        </ResourceDictionary>
+    </ResourceDictionary.ThemeDictionaries>
 
     <!-- FormField 112:3337 / error 112:16924: label 12 Medium (text), gap 6, input, helper 11 Regular muted (112:3376) or
          the error 12 Regular in danger text (assertive live region). LabeledBy/DescribedBy are wired in code. -->
@@ -82,8 +104,21 @@
             <Setter.Value>
                 <ControlTemplate TargetType="primitives:SaIcon">
                     <Grid Width="{TemplateBinding Size}" Height="{TemplateBinding Size}" Background="Transparent">
+                        <!-- UI.12 B12B-01 (measured, Dark: the checked sidebar icon's Foreground follows its ContentPresenter
+                             by inheritance, but a TemplateBinding does not track inherited changes - the stroke kept the
+                             rest colour). Light / Dark keep exactly today's TemplateBinding path. In High Contrast the
+                             {Binding} path draws instead and tracks the inherited state text (HighlightText on Highlight,
+                             GrayText when disabled). -->
                         <Path x:Name="PART_Path"
+                              Visibility="{ThemeResource SaIconRestPathVisibility}"
                               Stroke="{TemplateBinding Foreground}"
+                              StrokeThickness="1.5"
+                              StrokeStartLineCap="Round"
+                              StrokeEndLineCap="Round"
+                              StrokeLineJoin="Round" />
+                        <Path x:Name="PART_StatePath"
+                              Visibility="{ThemeResource SaIconStatePathVisibility}"
+                              Stroke="{Binding Foreground, RelativeSource={RelativeSource TemplatedParent}}"
                               StrokeThickness="1.5"
                               StrokeStartLineCap="Round"
                               StrokeEndLineCap="Round"
