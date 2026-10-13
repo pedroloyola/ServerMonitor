@@ -1,6 +1,6 @@
 # UI.12 — Final UX Hardening
 
-**Status: UI.12 — DRAFT, recovery done (2026-10-13).** Code head `6f66910` (local, **not pushed**); PR #42 (draft) and CI `38352809526` are still on `d36becb`, so CI has **not** run on the recovery commits. The recovery run (§0, human present) closed the Firewall blocker, fixed and runtime-proved both open P2s (B12B-01 in real High Contrast, B12F-01 by UIA + real input), and ran the stress cycles, the real-input pass and part of the Narrator script. Ceiling of the run: READY_TO_MERGE; no push / merge without the human GO.
+**Status: UI.12 — DRAFT, recovery done (2026-10-13).** Code head `90cb99c` (merge of B12B-02-R; local, **not pushed**); PR #42 (draft) and CI `38352809526` are still on `d36becb`, so CI has **not** run on the recovery commits. The recovery run (§0, human present) closed the Firewall blocker, fixed and runtime-proved both open P2s (B12B-01 in real High Contrast, B12F-01 by UIA + real input), and ran the stress cycles, the real-input pass and part of the Narrator script. Ceiling of the run: READY_TO_MERGE; no push / merge without the human GO.
 
 **Branch:** `ui/ui12-final-ux-hardening`, base `main` @ `baa6401`. Relay's accessibility work was done on `ui/ui12-a11y` (same base) and merged into the branch four times (`b328a07`, `6e62664`, `118c044`, `f7fe881`), each conflict-free and identical to a recomputed merge-tree. This document's commit adds docs only.
 
@@ -44,6 +44,7 @@ Commits on the branch after `75b47eb` (all local, not pushed):
 | `2753ace`, `0bc6ad8`, `389dc7e` | B12B-01 first recovery fix: an HC-only twin path in the SaIcon template + `SaIconSecondaryStyle` for muted icons in state-text hosts + Atlas pin. **Measured later: no effect in HC** (root cause below) |
 | `843771e` | B12B-01 final fix: a collapsed `IconElement` probe in the SaIcon template drives the HC path |
 | `6f66910` | test-only: Atlas A-B12B-FINAL-01 (`OnApplyTemplate` pinned statement by statement) |
+| `45188b0`, `5352fb5` (Relay, `ui/ui12-b12b02`), merged in `90cb99c` | B12B-02-R: the Servers return notice is announced by one UIA notification after the page focus; review fixes (per-page `ReturnNoticeAnnouncer`, never after the page left) |
 
 ### Firewall exception — closed
 - The 2 inbound **Block** rules added by the accidental `Infrastructure.Tests` testhost run (`wt\ui12-review\…\testhost.exe`, TCP + UDP "Query User") were removed by the human with UAC: **711 → 709**, removed 2, added 0, changed 0, `RESULT=PASS` (`.boss/evidence/ui12/firewall-removal.log`, 09:22–09:24). The notification dialog is gone; real-input QA was possible again. Firewall stayed 709 in every later QA window.
@@ -61,16 +62,28 @@ Commits on the branch after `75b47eb` (all local, not pushed):
 - **Fix:** `SaInertHost` wraps the editor's `PageScroll`; its automation peer returns **no children** while inert and is never a control / content element; each switch raises `StructureChanged(ChildrenInvalidated)` (only when a listener exists). `SetPageInteractive` is the only writer; every close path restores it before focus. `879c079`: the inert page writes neither `ActionHint` nor `EditorSubtitle` while a layer is open (no live-region change over the layer); the held summary is said once after close.
 - **Runtime** [REAL-INPUT + UIA] (Beacon final QA @ `717b520`, `ControlViewWalker`): **10/10 paths PASS** — Import → Cancel / Esc / use a profile; test OK → back; test failed → Esc; trust → Cancel; trust → trust and test → back; navigate away (discard guard: keep editing / discard); close the window → tray Open; Tab / Shift+Tab. With the layer open, **0 page elements** in the Control view; on close the form returns and focus goes to the invoker. Note (P3, Prism decision): after "Continuar a editar" in the navigation guard, focus stays on the clicked sidebar item (outside the layer); one Tab re-enters it.
 
+### B12B-02-R — "Servidor ocultado…" not read by the real Narrator: **FIXED** (`45188b0` + `5352fb5`, merged `90cb99c`)
+- **Root cause** [UIA + REAL-INPUT, Beacon @ `4ac418e`; Cortex research]: after Hide, two **Polite** `LiveRegionChanged` (the Servers summary and the `ReturnNotice` toast) were raised in the **same DispatcherQueue Low turn** as `FocusHeading`; they arrived 0–1 ms before the `FocusChanged` to the page title, and the focus change interrupts them. The Narrator spoke the title only; 0 notifications.
+- **Fix:** after the focus decision (editor opener → row → heading, and on the KeepSidebar path), **one** UIA notification in **one more Low turn**: `RaiseNotificationEvent(ActionCompleted, CurrentThenMostRecent, <the toast's accessible name>, "ServersNoticeShown")` on the `ReturnNotice` peer. Text = the toast's own name (no new strings, same in pt-PT / pt-BR / en-US). `SaToast.AnnouncesItself` (default **true**) is set to **false only on `ReturnNotice`**, which then raises no live-region event and has `LiveSetting=Off`; the other toasts are unchanged. The per-page `ReturnNoticeAnnouncer` (`5352fb5`, Atlas A02-01 / A02-02 / L1) announces once per page instance and never after the page closed or the notice was cleared. Success only: a failed Hide posts no notice and keeps the InfoBar's own notification.
+- **Evidence:**
+  - [UIA + REAL-INPUT] Beacon @ `5352fb5`: **15/15** — pt-PT hide (keyboard, mouse), hide twice, hide → navigate back (no repeat), Remove, Remove cancelled (0), failed hide (InfoBar only, unchanged), Light, stress 10 hides (10/10, 0 duplicates); pt-BR and en-US hide / Remove / failed hide. Each success: exactly 1 notification after the title focus, 0 toast live-region events.
+  - [HUMAN] real Narrator, pt-PT, normal theme: **PASS** (baseline: FAIL heard at `4ac418e`).
+  - [HC-REAL] Night sky and Desert: **PASS** (1 notification after the focus; toast legible).
+  - [UNIT] `Ui12ReturnNoticeNotificationTests` + updated pins; Relay counterproofs (15 for `45188b0`, plus the `5352fb5` review mutants) all killed.
+  - Reviews: Cortex **APPROVE**, Prism **APPROVE**; Atlas CHANGES_REQUESTED on `45188b0` (A02-01, A02-02, L1) fixed in `5352fb5` and **re-checked by Cortex** (Atlas terminal unavailable).
+- **NOT_RUN:** Narrator in pt-BR / en-US, with HC on, and for Remove (UIA PASS only).
+- Sources: `.boss/tmp/ui12/recovery/{relay,beacon,cortex-review,prism-review}-b12b02.md`.
+
 ### Narrator session (human, Beacon `beacon-final-qa.md` §7)
 - **Steps 1–6 with the human** [HUMAN]: PASS — 1.1–1.4 (active nav item, Tab through the command bar and page, Shift+Tab, 1 min idle without periodic announcements), 2.1–2.3 (sidebar by arrows, "x de 4"), 3.1 (Overview list, name + state + position), 4.2–4.5 (editor fields, 14 named stops in order; empty Add; Test OK announced, password read as already entered **without its value**; Esc → focus on a named target).
-- **FAIL 4B → B12B-02-R** (below). 4A, 4C and Q1/Q2 not reported by the human.
+- **FAIL 4B → B12B-02-R** (fixed above; human Narrator PASS on `5352fb5`). 4A, 4C and Q1/Q2 not reported by the human.
 - **Steps 7–10 and 4A: UIA + real keyboard, "UIA-verified; Narrator NOT_RUN"** (the human declined further Narrator steps): theme / History range / auth segments, toggles, failed test, failed server state and reason as text, Edit › Save (1 live event), Data toast, Compact Tab and rows, ticker 60 s without spam, Enter on a row → PASS.
 
 ### New or re-opened findings (all pre-existing at `baa6401` unless stated)
 
 | ID | Sev | Finding | Decision |
 |---|---|---|---|
-| B12B-02-R | **P2 proposed** (P3 defensible; Boss / Prism) | "Servidor ocultado…" is **not read by the real Narrator**: after Hide, 2 polite `LiveRegionChanged` (summary + toast) arrive in the same instant as focus moves to the Servers title; the Narrator speaks the focus change only. The UIA-level fix (B12B-02) holds; at `baa6401` the toast was never announced | **OPEN** → decision. Direction: `RaiseNotificationEvent(ActionCompleted, …)` after focus settles, or put the notice in the focused title's name / description |
+| B12B-02-R | P2 | "Servidor ocultado…" is **not read by the real Narrator**: after Hide, 2 polite `LiveRegionChanged` (summary + toast) arrive in the same instant as focus moves to the Servers title; the Narrator speaks the focus change only. At `baa6401` the toast was never announced | **FIXED** `45188b0` + `5352fb5` (merged `90cb99c`): one UIA notification after the focus (above) |
 | B12H-01 | P3 | pt-PT Narrator reads the placeholder "Ex.:" as "Excelência" (`Resources.resw`, the editor's name / host / user / jump fields; same in pt-BR) | **BACKLOG** (copy: "Por exemplo: …") |
 | B12G-01 | P3 | HC → HC switch with the app open: the checked item's fill stays in the previous theme | **BACKLOG** |
 | R1-01-R | P3 | Data toast: 2 identical `LiveRegionChanged` 4 ms apart in 1 of 4 runs (coalescing residue) | **BACKLOG** |
@@ -113,8 +126,8 @@ Commits on the branch after `75b47eb` (all local, not pushed):
 - **Former open P2s — FIXED in the recovery (§0):**
   - **B12B-01** — HC icons on Highlight were 1.44–1.78:1; now ≈7.8:1 (Night sky) / ≈6.5:1 (Desert), measured on the icon crop in real HC on `843771e`.
   - **B12F-01** — with the editor layer open, 0 page elements in the UIA control view (10/10 paths, real input).
+  - **B12B-02-R** (pre-existing) — "Servidor ocultado…" is now read by the real Narrator (one UIA notification after the page focus; human PASS, UIA 15/15).
 - **Open after the recovery:**
-  - **B12B-02-R** (P2 proposed, pre-existing) — the "Servidor ocultado" toast is raised at UIA level but not read by the real Narrator (decision Boss / Prism).
   - **B12F-02** (P3) — the Servers stale cue TextBlock is Raw-only and in no control-view name (the Overview row name has it).
   - P3s B12H-01, B12G-01, R1-01-R and a focus note (§0).
 - **Gates:**
@@ -122,6 +135,7 @@ Commits on the branch after `75b47eb` (all local, not pushed):
   - from fix round r3 on, also the **Release** `.slnx` build, because CI went red once on a Debug-only QA reference in a test (run `38342264081`, fixed in `b568c24`);
   - final local counts on `d36becb`: **Release** App.Tests 3473/3473, Core 682/682; **Debug** App.Tests 3955/3955, Core 682/682 (0 build errors both);
   - recovery: every Floor commit additionally needed an **HC-off launch smoke** (Start-QaApp, ≥ 40–60 s, no input) when it touched XAML or a control; final local counts on `6f66910`: **Release** App.Tests 3491/3491, Core 682/682; **Debug** App.Tests 3973/3973, Core 682/682 (0 build errors both);
+  - after the B12B-02-R merge, on `90cb99c`: **Release** App.Tests 3515/3515, Core 682/682; **Debug** App.Tests 3997/3997, Core 682/682 (0 build errors both; no Floor launch smoke, the QA window was held by Beacon — runtime evidence for this fix is Beacon's on `5352fb5`);
   - Infrastructure.Tests ran only as filtered store classes, never in full locally (§6).
 - **Real data:** identical before and after every QA window.
 - **Firewall:** the app added no rules. An accidental full `Infrastructure.Tests` run in a review worktree (not a QA run) added 2 inbound **Block** rules for its testhost (709 → 711) and opened a Firewall notification dialog at 04:40, which blocked part of the stress run and all real-input QA after 04:40 (§9). **Closed in the recovery:** the human removed both rules with UAC (711 → 709, §0); 709 in every later window.
@@ -149,7 +163,7 @@ Severity per the common format (P0 data loss / security / critical crash · P1 i
 | B12B-01 | P2 | HC: icons and glyphs on Highlight (selected sidebar item, selected segments, icon-only Glass buttons on hover) at 1.44–1.78:1 | **FIXED** `843771e` (recovery, §0; real HC ≈7.8 / 6.5:1). History: `85a6b08` caused the P0 and was reverted (`41f8c59`, `d36becb`); `2753ace` / `0bc6ad8` had no HC effect (ContentPresenter → Control Foreground changes are not notified) |
 | B12B-02 | P3 | "Servidor ocultado" toast raises no LiveRegionChanged | **FIXED** `5058c79`: announced once when the page becomes live (UIA listener: 1 event) |
 | B12F-01 | P2 | Editor modal layer open: background form still in the UIA control view | **FIXED** `ab575d3` + `879c079` + `5016f2a` (merged `717b520`): `SaInertHost` peer with no children while inert; runtime 10/10 PASS (§0) |
-| B12B-02-R | P2 proposed | "Servidor ocultado…" not read by the real Narrator (focus change wins over 2 simultaneous polite live regions) | **OPEN** → Boss / Prism (pre-existing, §0) |
+| B12B-02-R | P2 | "Servidor ocultado…" not read by the real Narrator (focus change wins over 2 simultaneous polite live regions) | **FIXED** `45188b0` + `5352fb5` (merged `90cb99c`, §0): one UIA notification after the focus; human Narrator PASS |
 | B12H-01 · B12G-01 · R1-01-R | P3 | "Ex.:" read as "Excelência" · HC→HC fill stale · rare duplicate Data-toast event | **BACKLOG** (pre-existing / intermittent, §0) |
 | B12F-02 | P3 | Servers stale cue Raw-only, not in any control-view name | **OPEN** → backlog |
 
@@ -161,7 +175,7 @@ Severity per the common format (P0 data loss / security / critical crash · P1 i
 | STATE-02 | P1 | **FIXED** `8db9de2`: a stale Compact row names its age to screen readers |
 | HC-01 | P1 | **FIXED** `331a4c6` (+ `ecc438b`, `8cd1570`): HC-only veil tokens; the import's selected row keeps an HC outline |
 | FOCUS-01 | P1 (HC) | **FIXED** `fe51b74`: HC-only inner Window-coloured ring on Highlight-selected items |
-| LIVE-01 | P2 | **FIXED** `0bf2e9d` + `73223a9` (one raise per element per turn) + `abb7f89` (periodic "Atualizado há" texts are not live regions) + `7cf9358` (editor handover); B12B-02 open |
+| LIVE-01 | P2 | **FIXED** `0bf2e9d` + `73223a9` (one raise per element per turn) + `abb7f89` (periodic "Atualizado há" texts are not live regions) + `7cf9358` (editor handover); B12B-02-R fixed in the recovery (§0) |
 | PEER-01 | P2 | **FIXED** `8fe3bb2` (+ `cb078db`, `d87bd1b`, `7cf9358` editor `DialogContent`) |
 | HC-02 | P2 | **FIXED** with HC-01 (veil) |
 | HC-03 | P2 | **BACKLOG** (switching HC with the app open: measured OK in §9, caption colours not changed) |
@@ -233,7 +247,7 @@ Severity per the common format (P0 data loss / security / critical crash · P1 i
   - A temporary difference (default HC scheme) was accepted by the human during the diagnostic and disappeared at the final restore.
 
 ### Open for the human
-1. Decide **B12B-02-R** severity (P2 proposed / P3 defensible) and whether it is fixed in UI.12 or a follow-up.
+1. ~~Decide B12B-02-R~~ — fixed in UI.12 (§0).
 2. GO for push (CI has not run on the recovery commits) and the merge method (squash recommended, see the Release note above).
 3. Optional: the remaining Narrator steps (3.2–3.4, 3.6, 5–11).
 
@@ -399,7 +413,7 @@ Each counterproof breaks the rule in production code, fails the named tests for 
 
 Updated after the recovery (§0): the Firewall blocker is gone, so the real-input pass, C-W1 W3 / W4 / W7b and stress C1W–C10 **were run**; Narrator steps 1–6 were run with the human.
 
-- **Narrator:** steps 3.2 / 3.3 / 3.4 / 3.6, 5, 6 and 7–11 (incl. the B12F-01 scan-mode check) were not done with the Narrator — 7–10 and 4A are "UIA-verified; Narrator NOT_RUN". UIA properties and the listener are not a Narrator PASS.
+- **Narrator:** steps 3.2 / 3.3 / 3.4 / 3.6, 5, 6 and 7–11 (incl. the B12F-01 scan-mode check) were not done with the Narrator — 7–10 and 4A are "UIA-verified; Narrator NOT_RUN". UIA properties and the listener are not a Narrator PASS. B12B-02-R: Narrator heard only in pt-PT with the normal theme for Hide; pt-BR / en-US, HC on and Remove are UIA PASS, Narrator NOT_RUN.
 - **High Contrast:** a disabled item in GrayText measured only in the diagnostic build (no stable disabled icon state on the Floor build); HC theme transitions with the window open measured only in the diagnostic build (OFF → Night sky → Desert → OFF); Light measured by Beacon C1 only, not by a separate Light HC run (HC replaces Light).
 - **B12B-01 re-template at run time** (template A → B on one icon): not exercised; covered by a static guard only.
 - **C9W CPU after leaving History:** not measured (stop rule hit first on both builds). C5 / C6 / idle not requested in the recovery.
@@ -429,7 +443,7 @@ Optional notes not applied (Boss decides): CONTRAST-01 (Compact offline text in 
 - `KBD-BACK-ACCEL` (B12-08)
 - C-S1b persisted startup-failure record
 - ~~B12B-01~~ / ~~B12F-01~~ (fixed in the recovery, §0); B12F-02
-- B12B-02-R (if not fixed in UI.12: Narrator announcement after Hide), B12H-01 ("Ex.:" copy), B12G-01 (HC → HC fill), R1-01-R (duplicate Data-toast event), focus note after "Continuar a editar" (Prism)
+- ~~B12B-02-R~~ (fixed in the recovery, §0); B12H-01 ("Ex.:" copy), B12G-01 (HC → HC fill), R1-01-R (duplicate Data-toast event), focus note after "Continuar a editar" (Prism)
 - QA harness: `--qa-start=servers` never loads data (`Qa/QaShellStartup.cs`) — the Servers page stays "A carregar…"; use overview / history and navigate
 - Light / Dark: the checked item's icon keeps its rest colour while its text uses the selected colour (same mechanism as B12B-01; deliberately unchanged in UI.12 — Prism to decide)
 - N-4 / W-1
