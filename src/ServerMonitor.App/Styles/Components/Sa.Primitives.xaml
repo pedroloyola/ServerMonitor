@@ -539,7 +539,9 @@
          message 12 muted, close 28. Shadow not reproduced (deviation). -->
     <Style TargetType="primitives:SaToast">
         <Setter Property="IsTabStop" Value="False" />
-        <Setter Property="Width" Value="600" />
+        <!-- UI.12 LAYOUT-02 (Prism UI12A): at most 600, never a fixed 600 (the Detail "Guardado" toast was cut at the
+             minimum window width, ~384 DIP of content). -->
+        <Setter Property="MaxWidth" Value="600" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="primitives:SaToast">
