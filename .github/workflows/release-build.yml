@@ -105,6 +105,7 @@ jobs:
         shell: pwsh
         run: |
           ./tools/release/Test-ReleaseChecks.ps1
+          ./tools/release/Test-DistributionPrivacy.ps1
           ./tools/release/Test-StoreSubmissionUpdate.ps1
           ./tools/release/Get-SubmissionState.ps1 -SelfTest
 
@@ -141,6 +142,17 @@ jobs:
             -PackagePath "artifacts/release/${{ steps.collect.outputs.packageName }}" `
             -ExpectedVersion '${{ steps.tagcheck.outputs.packageVersion }}' `
             -WriteChecksumFile
+
+      # PRIV-PDBPATH: nothing that leaves this job may carry an absolute development path (user
+      # profile, checkout, runner workspace) in a PE debug entry, PDB, string or file. It inspects
+      # every file the upload below would publish, opening the MSIX, and fails closed. It runs
+      # before the upload and before the GitHub Release, so a failure publishes nothing.
+      - name: Distribution privacy
+        shell: pwsh
+        run: |
+          ./tools/release/Assert-DistributionPrivacy.ps1 `
+            -Path 'artifacts/release' `
+            -AllowlistPath 'tools/release/distribution-privacy-allowlist.json'
 
       - name: Summary
         shell: pwsh

@@ -34,8 +34,11 @@ Builds the shippable MSIX from an exact tag and proves it is what the tag says.
 7. `Assert-PackageIdentity.ps1` — reads the package, not the source tree: identity name,
    publisher, version, architecture, app-level capabilities, payload hygiene, the exact set
    of executables, and that **every executable is PE subsystem 2 (Windows GUI)**.
-8. Writes the SHA-256 next to the package and uploads both as a workflow artifact.
-9. Creates the GitHub Release **only if it does not already exist**, and by default
+8. `Assert-DistributionPrivacy.ps1` — opens everything about to be uploaded and fails closed
+   if any file carries an absolute development path (see *Distribution privacy* below).
+   It runs before the upload and before the GitHub Release, so a failure publishes nothing.
+9. Writes the SHA-256 next to the package and uploads both as a workflow artifact.
+10. Creates the GitHub Release **only if it does not already exist**, and by default
    **does not attach the MSIX**: the Microsoft Store is the distribution channel.
 
 ### 2. `store-submit.yml`
@@ -49,7 +52,9 @@ built and checked.
 Order of operations, and why:
 
 1. Confirmation phrase `SUBMIT`, plus shape checks on the version and digest.
-2. Download the artifact from the named run; re-run the full package identity check on it.
+2. Download the artifact from the named run; re-run the full package identity check and the
+   distribution privacy check on it, with this checkout's gate, so a run from before the
+   gate existed cannot be submitted.
 3. `msstore reconfigure` from environment secrets.
 4. `msstore apps get 9N6ZBSBN1TD2` — the product must report identity
    `PedroLoy.ServerAlyzer`, or the run stops.
@@ -89,6 +94,55 @@ Read-only. Reports one of:
 `Published` is not the same as public. A product whose visibility is `Private` is published
 to its audience and to nobody else, and the report says so rather than claiming the product
 is live.
+
+## Distribution privacy
+
+A build records where it ran. Without care, every Release DLL carried the PDB path of the
+developer's checkout (the PE CodeView entry), and `ServerMonitor.App.dll` a `CallerFilePath`
+constant: a user profile and folder layout, shipped inside the MSIX (`PRIV-PDBPATH`).
+
+**The fix** is `src/Directory.Build.props`: Release builds of every project under `src/` set
+`ContinuousIntegrationBuild`, which turns on the SDK's deterministic source paths. The git
+checkout is mapped to `/_/` in the PE, the PDB and `CallerFilePath`, and Source Link is written
+against the mapped paths, so the PDB still resolves to the exact commit on GitHub. Debug is not
+affected: breakpoints and source stepping keep the real local paths — so a **Debug package must
+never leave the machine**, and any package that is shared goes through the gate first. The file
+chains to a repository-root `Directory.Build.props` if one is ever added (and only that one).
+
+**The gate** is `tools/release/Assert-DistributionPrivacy.ps1`.
+
+* *Channels:* zip containers are opened recursively and entry names are checked; every PE is
+  parsed with System.Reflection.Metadata (CodeView PDB path, embedded portable PDB — decompressed
+  and checked against its declared size — and every `#US` string, where `CallerFilePath` lands);
+  every portable PDB is parsed (documents, then Source Link and the rest of its bytes); every file
+  is then byte-scanned as UTF-8 and UTF-16 (both alignments).
+* *Detectors:* absolute drive, UNC, profile (`\Users\`, `/home/`, `/Users/`) and CI runner paths,
+  plus this machine's own profile, user name, computer/domain name, checkout and CI workspace, read
+  from the environment at run time. A path made only of non-ASCII folder names is caught only by
+  those environment literals, on the machine it came from.
+* *Fail-closed:* no input, a missing input, an empty directory, anything it cannot parse (reported
+  with its exception type or a fixed reason), a Windows/MSF PDB, nesting deeper than 4, a file or
+  zip entry over 1 GiB or a run over 2 GiB decompressed (`-MaxEntryBytes`, `-MaxTotalBytes`), a
+  missing required file, an internal error, and **two artifacts or two inputs with the same name**
+  (so nothing keyed by a name — the allowlist, the report — can confuse them).
+* *Redaction:* the output names the artifact, the channel, the category and a 12-hex SHA-256 token
+  of the matched text. Any part of an artifact name (input, file or zip entry) that itself matches
+  a detector is printed as `<redacted:token>`, in the console, in `-ReportPath` JSON and in the
+  allowlist candidates. Errors never carry an exception message.
+
+It runs in `release-build.yml` (before the upload), in `store-submit.yml` (before the Store), and
+in CI on every PR twice: on the first-party Release binaries, and on a **packaged** Release build
+made exactly as `release-build.yml` makes it (unsigned, nothing uploaded), with the allowlist — the
+proof that the allowlist holds for the runner's SDK before a release depends on it.
+
+**Third-party binaries** carry their vendors' build paths (Microsoft build agents, NuGet
+authors' machines). `tools/release/distribution-privacy-allowlist.json` excuses each one by exact
+file name plus either the SHA-256 of the very bytes that produced the finding or the exact path
+tokens, for the categories reviewed; `reason` is a single string. Files this repository builds, and
+environment matches, can never be allowlisted. After a dependency update the gate fails closed;
+regenerate the candidates with `-AllowlistCandidatesPath` (written redacted, reason `REVIEW`, which
+the loader refuses), review each entry, write its real reason, and commit it. Never widen a
+category to make a run pass.
 
 ## The publishing hold
 
@@ -209,6 +263,7 @@ Everything the workflows rely on runs offline:
 
 ```powershell
 ./tools/release/Test-ReleaseChecks.ps1          # package checks, 12 cases
+./tools/release/Test-DistributionPrivacy.ps1    # distribution privacy, 52 cases
 ./tools/release/Test-StoreSubmissionUpdate.ps1  # publishing hold, 12 cases
 ./tools/release/Get-SubmissionState.ps1 -SelfTest        # status mapping, 18 cases
 ./tools/release/Assert-NoPendingSubmission.ps1 -SelfTest # in-flight guard, 19 cases
@@ -222,3 +277,8 @@ Everything the workflows rely on runs offline:
 * [Manage app submissions (submission resource, `targetPublishMode`, status values)](https://learn.microsoft.com/en-us/windows/uwp/monetize/manage-app-submissions)
 * [Add and manage app credentials in Microsoft Entra ID](https://learn.microsoft.com/en-us/entra/identity-platform/how-to-add-credentials)
 * [microsoft/microsoft-store-apppublisher](https://github.com/microsoft/microsoft-store-apppublisher)
+* [.NET SDK MSBuild properties — `ContinuousIntegrationBuild`](https://learn.microsoft.com/en-us/dotnet/core/project-sdk/msbuild-props#continuousintegrationbuild)
+* [C# compiler options — `Deterministic`, `PathMap`](https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/compiler-options/code-generation)
+* [dotnet/sourcelink — deterministic builds and `ContinuousIntegrationBuild`](https://github.com/dotnet/sourcelink/blob/main/docs/README.md)
+* [PE/COFF debug directory entries (CodeView, embedded portable PDB)](https://github.com/dotnet/runtime/blob/main/src/libraries/System.Reflection.Metadata/specs/PE-COFF.md)
+* [Portable PDB metadata (Document table, Source Link record)](https://github.com/dotnet/runtime/blob/main/src/libraries/System.Reflection.Metadata/specs/PortablePdb-Metadata.md)
