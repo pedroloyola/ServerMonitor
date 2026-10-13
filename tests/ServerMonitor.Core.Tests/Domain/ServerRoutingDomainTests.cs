@@ -284,7 +284,9 @@ public sealed class ServerRoutingDomainTests
         var created = await fixture.CreateRoutedAsync();
         fixture.Credentials.FailDeletesOf = ServerCredentialKind.Password;
 
-        await Assert.ThrowsAsync<IOException>(() => fixture.Profiles.RemoveAsync(created));
+        // UI.12 C-E5bis: the removal is committed before the secrets are retired, so a failed retirement no longer
+        // reports it as failed (it was thrown before); every secret is still attempted.
+        Assert.True(await fixture.Profiles.RemoveAsync(created));
 
         Assert.DoesNotContain(fixture.Credentials.Values.Keys, reference => reference.Kind == ServerCredentialKind.JumpPassword);
     }

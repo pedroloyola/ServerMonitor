@@ -630,7 +630,15 @@ public partial class App : Application
         services.AddSingleton<IServerCredentialStore>(sp => new GatedCredentialStore(
             sp.GetRequiredService<UngatedCredentialStore>().Store,
             sp.GetRequiredService<IConfigurationWriteGate>()));
-        services.AddSingleton<IServerProfileService, ServerProfileService>();
+        services.AddSingleton<IServerProfileService>(sp => new ServerProfileService(
+            sp.GetRequiredService<IServerService>(),
+            sp.GetRequiredService<IServerCredentialStore>(),
+            sp.GetRequiredService<IConfigurationWriteGate>(),
+            failure => sp.GetRequiredService<ILogger<ServerProfileService>>().LogWarning(
+                "The {Operation} was saved, but retiring the old credential failed ({ExceptionType}, 0x{HResult:X8}); it is left orphaned.",
+                failure.Operation,
+                failure.ExceptionType,
+                failure.HResult)));
         services.AddSingleton<JsonHostKeyTrustStore>();
         services.AddSingleton<IHostKeyTrustStore>(sp => sp.GetRequiredService<JsonHostKeyTrustStore>());
         services.AddSingleton<JsonRoutedHostKeyTrustStore>();

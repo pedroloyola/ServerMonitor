@@ -6,10 +6,22 @@ using ServerMonitor.Core.Security;
 
 namespace ServerMonitor.Core.Domain;
 
+/// <summary>
+/// UI.12 C-E4: a post-commit retirement of an old secret failed. Sanitized by construction - the operation, the exception
+/// TYPE and its HResult only, never the message (which can carry a target name) - so the observer can log it safely.
+/// </summary>
+public sealed record CredentialRetirementFailure(string Operation, string ExceptionType, int HResult);
+
+/// <param name="onRetirementFailed">
+/// UI.12 C-E4/C-E5bis: told when retiring an old secret fails AFTER the edit/removal was committed. The committed operation
+/// is still reported as succeeded (it did); the leftover secret is an orphan, never a dangling reference. Optional: Core
+/// has no logging dependency, the composition root wires its logger here.
+/// </param>
 public sealed class ServerProfileService(
     IServerService serverService,
     IServerCredentialStore credentialStore,
-    IConfigurationWriteGate writeGate) : IServerProfileService
+    IConfigurationWriteGate writeGate,
+    Action<CredentialRetirementFailure>? onRetirementFailed = null) : IServerProfileService
 {
     public async Task<ServerOperationResult> AddAsync(
         ServerProfileInput input,
@@ -183,7 +195,8 @@ public sealed class ServerProfileService(
                 ? oldJumpReference
                 : null;
 
-        await DeleteAllAsync(retiredReference, retiredJumpReference);
+        // Post-commit: the update is on disk. A failure to retire the old secrets must not turn it into "not saved".
+        await RetireAfterCommitAsync("update", retiredReference, retiredJumpReference);
         return result;
     }
 
@@ -200,8 +213,22 @@ public sealed class ServerProfileService(
             return false;
         }
 
-        await DeleteAllAsync(CreateReference(server), CreateJumpReference(server));
+        // Post-commit: the server is gone. A failure to retire its secrets must not report the removal as failed (the
+        // caller would skip its state/metrics cleanup and offer a retry of something already done).
+        await RetireAfterCommitAsync("remove", CreateReference(server), CreateJumpReference(server));
         return true;
+    }
+
+    private async Task RetireAfterCommitAsync(string operation, params CredentialReference?[] references)
+    {
+        try
+        {
+            await DeleteAllAsync(references);
+        }
+        catch (Exception exception)
+        {
+            onRetirementFailed?.Invoke(new CredentialRetirementFailure(operation, exception.GetType().Name, exception.HResult));
+        }
     }
 
     private async Task<JumpCredentialOutcome> ApplyJumpCredentialChangeAsync(
