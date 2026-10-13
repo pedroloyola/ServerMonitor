@@ -1,9 +1,9 @@
 using Microsoft.Extensions.Logging.Abstractions;
-using ServerMonitor.App.Qa;
 using ServerMonitor.App.Services;
 using ServerMonitor.App.Tests.Fakes;
 using ServerMonitor.App.ViewModels;
 using ServerMonitor.Core.Enums;
+using ServerMonitor.Core.History;
 using ServerMonitor.Core.Models;
 using ServerMonitor.Core.Monitoring;
 
@@ -71,7 +71,7 @@ public sealed class Ui12HistoryCurrentValueTests
             LastError = failed ? MetricsCollectionErrorCode.NoMetricsAvailable : null,
         });
         var vm = new HistoryViewModel(
-            new QaServerHistoryQueryService(),
+            new EmptyHistory(),
             metrics,
             states,
             new FakeServerService(),
@@ -80,5 +80,17 @@ public sealed class Ui12HistoryCurrentValueTests
             NullLogger<HistoryViewModel>.Instance);
         vm.Load(Server, "db");
         return vm;
+    }
+
+    /// <summary>"Atual" never comes from the history query; a Release-safe empty one (the Qa double is Debug-only).</summary>
+    private sealed class EmptyHistory : IServerHistoryQueryService
+    {
+        public bool IsAvailable => true;
+
+        public Task<ServerHistoryResult> GetHistoryAsync(Guid serverId, HistoryTimeRange range, CancellationToken cancellationToken = default)
+        {
+            var end = DateTimeOffset.UtcNow;
+            return Task.FromResult(ServerHistoryResult.Empty(serverId, range, end - range.ToDuration(), end));
+        }
     }
 }
