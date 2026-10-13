@@ -99,23 +99,101 @@ public sealed partial class Ui12HighContrastIconTests
         Assert.True(offenders.Count == 0, "A PathIcon / IconElement style sets Foreground: " + string.Join(", ", offenders));
     }
 
+    /// <summary>
+    /// STATIC guard on SaIcon.cs (it reads the source; it does not apply a template - a re-template at run time is a
+    /// separate, runtime check). Atlas A-B12B-FINAL-01: every OnApplyTemplate must re-read the CURRENT parts and only then
+    /// bind - a `_statePath ??= ...` would keep the previous template's path and bind the old path to the new probe. So the
+    /// method body is pinned statement by statement, and so is the binding helper (no later overwrite of the Stroke).
+    /// </summary>
     [Fact]
-    public void TheStatePathIsBoundToTheProbeInCode_AndATemplateWithoutItDoesNotThrow()
+    public void OnApplyTemplateRereadsEveryPartThenBindsTheStatePathToTheProbe_StaticGuard()
     {
         var code = AppSourceTree.CodeWithoutComments("Controls/Primitives/SaIcon.cs");
         Assert.Contains("private const string ForegroundProbePartName = \"PART_ForegroundProbe\";", code, StringComparison.Ordinal);
-        var apply = Regex.Match(code, @"protected override void OnApplyTemplate\(\)\s*\{(?<body>[^}]*)\}").Groups["body"].Value;
-        Assert.Contains("BindStatePathToProbe();", apply, StringComparison.Ordinal);
-        Assert.True(apply.IndexOf("_statePath = ", StringComparison.Ordinal) < apply.IndexOf("BindStatePathToProbe();", StringComparison.Ordinal));
 
-        // A Source binding (the probe object), on the state path's Stroke, to the probe's Foreground.
-        Assert.Contains(
-            "_statePath.SetBinding(Shape.StrokeProperty, new Binding { Source = probe, Path = new PropertyPath(nameof(IconElement.Foreground)) });",
-            code, StringComparison.Ordinal);
-        // Tolerant of a template without the parts (a restyle): pattern-matched, never cast, and only with a state path.
-        Assert.Contains("if (_statePath is not null && GetTemplateChild(ForegroundProbePartName) is IconElement probe)", code, StringComparison.Ordinal);
+        Assert.Equal(
+            [
+                "base.OnApplyTemplate();",
+                "_path = GetTemplateChild(PathPartName) as Path;",
+                "_statePath = GetTemplateChild(StatePathPartName) as Path;",
+                "BindStatePathToProbe();",
+                "UpdateGeometry();",
+            ],
+            Statements(MethodBody(code, "protected override void OnApplyTemplate()")));
+
+        // A Source binding (the probe object) on the state path's Stroke, to the probe's Foreground - and nothing else.
+        // Pattern-matched parts, guarded by the state path, never cast: a restyle without the parts keeps the rest path.
+        Assert.Equal(
+            [
+                "if (_statePath is not null && GetTemplateChild(ForegroundProbePartName) is IconElement probe) {",
+                "_statePath.SetBinding(Shape.StrokeProperty, new Binding { Source = probe, Path = new PropertyPath(nameof(IconElement.Foreground)) });",
+                "}",
+            ],
+            Statements(MethodBody(code, "private void BindStatePathToProbe()")));
+        Assert.Single(Regex.Matches(code, @"\bBindStatePathToProbe\(\);"));
+        Assert.Single(Regex.Matches(code, @"\.SetBinding\("));
         Assert.DoesNotMatch(@"\(\s*IconElement\s*\)\s*GetTemplateChild", code);
         Assert.DoesNotContain("ElementName", code, StringComparison.Ordinal);
+    }
+
+    // The text between a method's signature and its matching closing brace (brace-balanced; comments already stripped).
+    private static string MethodBody(string code, string signature)
+    {
+        var start = code.IndexOf(signature, StringComparison.Ordinal);
+        Assert.True(start >= 0, $"'{signature}' not found");
+        var open = code.IndexOf('{', start);
+        Assert.True(open > start, $"No body after '{signature}'");
+        var depth = 0;
+        for (var i = open; i < code.Length; i++)
+        {
+            depth += code[i] switch { '{' => 1, '}' => -1, _ => 0 };
+            if (depth == 0)
+            {
+                return code[(open + 1)..i];
+            }
+        }
+
+        throw new Xunit.Sdk.XunitException($"Unbalanced body after '{signature}'");
+    }
+
+    // Statements with whitespace collapsed; a block opener keeps its '{' on the statement, a closer is its own entry.
+    // Braces and semicolons inside parentheses (an object initializer in an argument) do not split.
+    private static List<string> Statements(string body)
+    {
+        var text = Regex.Replace(body, @"\s+", " ");
+        var statements = new List<string>();
+        var current = new System.Text.StringBuilder();
+        var parens = 0;
+        foreach (var c in text)
+        {
+            parens += c switch { '(' => 1, ')' => -1, _ => 0 };
+            if (parens == 0 && c == '}')
+            {
+                Flush();
+                statements.Add("}");
+                continue;
+            }
+
+            current.Append(c);
+            if (parens == 0 && c is ';' or '{')
+            {
+                Flush();
+            }
+        }
+
+        Flush();
+        return statements;
+
+        void Flush()
+        {
+            var statement = current.ToString().Trim();
+            if (statement.Length > 0)
+            {
+                statements.Add(statement);
+            }
+
+            current.Clear();
+        }
     }
 
     [Fact]
