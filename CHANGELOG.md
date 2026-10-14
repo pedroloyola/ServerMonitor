@@ -3,6 +3,37 @@
 Todas as alterações relevantes deste projeto são documentadas aqui. O formato inspira-se em
 [Keep a Changelog](https://keepachangelog.com/) e o versionamento segue [SemVer](https://semver.org/).
 
+## [1.1.7] (release candidate, unreleased)
+
+Candidata a versão do programa REL.0 Recovery. **Não publicada**: nada nesta entrada está na Store,
+e a promoção depende dos testes em máquina limpa e da aprovação humana. A Store tem publicada a 1.1.1.0.
+
+- **Privacidade da distribuição.** Os builds Release são determinísticos e já não incluem caminhos da
+  máquina de build (PDB, `CallerFilePath`, Source Link). Um gate fail-closed verifica binários e o MSIX
+  antes de qualquer upload ou passo da Store (#44).
+- **.NET incluído no pacote.** O MSIX passa a ser self-contained para a app e para o WidgetProvider, por
+  isso deixa de depender de um .NET 10 instalado na máquina; o Windows App Runtime continua a ser uma
+  dependência de framework da Store. Um gate verifica o runtime incluído (#48). Ainda não medido numa
+  máquina limpa.
+- **Inglês (en-US) como idioma por omissão.** No primeiro arranque: pt-BR → pt-BR, outro `pt*` →
+  pt-PT, qualquer outro idioma → en-US. Uma escolha de idioma já guardada nunca é substituída (#46).
+- **Pesquisa mDNS apenas a pedido.** A app deixa de abrir um listener UDP no arranque ou em segundo
+  plano. A pesquisa na rede local só começa por ação explícita na Visão geral vazia, para quando a
+  janela é escondida e é limitada (indica que nada foi encontrado ao fim de 40 s sem resultados; termina ao fim de 10 minutos). Quem já tem
+  servidores deixa de ver sugestões automáticas da rede (#47).
+- **Piso de versão do pacote.** `release/min-package-version.txt` = 1.1.7.0 (acima da Developer
+  1.1.2.2 e das versões de QA local 1.1.3.0–1.1.6.0); o pipeline recusa versões abaixo do piso ou com
+  revisão diferente de zero (#49).
+- **Endurecimento do pipeline de release.** Um push de tag já não cria uma GitHub Release; a submissão
+  à Store verifica a proveniência do build consumido e corre os gates de piso, identidade, privacidade
+  e runtime antes de configurar a Store; o estado da Store falha se o modo de publicação não for
+  Manual; actions fixadas por SHA; CODEOWNERS (#50). A proteção de branch continua a ser um passo
+  humano.
+- Documentação de preparação da release, transição da Store e remoção do certificado de teste (#45).
+
+> **Nota de versão.** Produto **1.1.7**, pacote **1.1.7.0** (revisão 0). `AssemblyVersion` mantém-se em
+> 1.0.0.0.
+
 ## [1.1.0] — 2026-08-31
 
 Integração com os **Widgets do Windows 11**. A app continua local-first, sem conta e sem telemetria.
