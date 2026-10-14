@@ -98,9 +98,14 @@ certificate). Nothing from the maintainer's machine is copied into either VM exc
 |---|---|---|
 | Candidate (`P-RC`) | (a) after a tag: the `release-build` workflow artifact `serveralyzer-msix-<version>`, downloaded by the human (`gh run download <run-id> -n serveralyzer-msix-<version>`), SHA-256 equal to the run summary; (b) before a tag: a local build in the signing VM of the candidate commit (below) | the CI `package-privacy` job (it builds the package but uploads no artifact); any package built on the maintainer's machine; Debug builds |
 | Counterproof (`P-X`) | a local build in the signing VM of commit **`e5ceb26`** (framework-dependent, before the runtime change; package version 1.1.1.0) | the retained 1.1.2.2 QA package (pre-privacy-gate, never leaves the maintainer's machine) |
-| Windows App Runtime (`P-WAR`) | the dependency produced by the same local build: `src/ServerMonitor.App/AppPackages/**/Dependencies/x64/Microsoft.WindowsAppRuntime*.msix`; or `tools/MSIX/win10-x64/Microsoft.WindowsAppRuntime.2.msix` from the `Microsoft.WindowsAppSDK.Runtime` NuGet package at the version in `ServerMonitor.App.csproj` (2.3.1) | an unrelated runtime version; the Store (only for the POST variant) |
+| Windows App Runtime set (`P-WAR`) | the **complete** 2.3.1 set — Framework, Main, Singleton, DDLM — from one source of that exact version: (a) the folder `tools/MSIX/win10-x64/` of the `Microsoft.WindowsAppSDK.Runtime` NuGet package at the version in `ServerMonitor.App.csproj` (2.3.1): `Microsoft.WindowsAppRuntime.2.msix`, `Microsoft.WindowsAppRuntime.Main.2.msix`, `Microsoft.WindowsAppRuntime.Singleton.2.msix`, `Microsoft.WindowsAppRuntime.DDLM.2.msix` (identities listed in that folder's `MSIX.inventory`); or (b) Microsoft's official Windows App Runtime installer for 2.3.1 (`WindowsAppRuntimeInstall-x64.exe`), which installs the same set | the framework alone; mixed versions; the build's `Dependencies` folder alone (framework only); the Store (only for the POST variant) |
 
-Local build in the signing VM, for each commit (`<commit>` = the candidate or `e5ceb26`):
+Local build in the signing VM, for each commit (`<commit>` = the candidate or `e5ceb26`). Install the **same
+.NET SDK version** that CI used for the candidate commit (read it from that CI run's "Setup .NET" step) and
+record it: the packaged build embeds the runtime bundled with the SDK, and the privacy allowlist has
+version-specific entries for the .NET runtime (today 10.0.11–10.0.13). A different SDK can embed a runtime
+the allowlist does not cover, and the privacy gate then fails **closed, correctly** — that is a source
+mismatch to fix (use the CI SDK), never a reason to edit the allowlist for the test.
 
 ```powershell
 git clone https://github.com/pedroloyola/ServerMonitor.git sm; cd sm; git checkout <commit>
@@ -150,7 +155,9 @@ foreach ($scope in 'Machine','User','Process') {
     if ([Environment]::GetEnvironmentVariable($v, $scope)) { $hits += "${scope}:$v" } } }
 if (Get-Command dotnet -ErrorAction SilentlyContinue) { $hits += 'dotnet on PATH' }
 $hits    # must be empty
-Get-AppxPackage Microsoft.WindowsAppRuntime* | Select-Object Name, Version   # record (inbox apps may bring some)
+$WarSet = { Get-AppxPackage | Where-Object Name -match 'WindowsAppRuntime|WinAppRuntime' |
+            Sort-Object Name, Version | Select-Object Name, Version, Status }
+& $WarSet | Export-Csv war-before.csv -NoTypeInformation   # record (inbox apps may already bring some)
 ```
 
 The registry `InstalledVersions\<arch>\InstallLocation` value and `DOTNET_ROOT` are how a
@@ -160,9 +167,37 @@ framework-dependent app finds a global runtime outside the default folder, so al
 
 ```powershell
 Import-Certificate -FilePath vm-test-signing.cer -CertStoreLocation Cert:\LocalMachine\TrustedPeople
-Add-AppxPackage -Path <P-RC.msix> -DependencyPath <P-WAR.msix>
-Get-AppxPackage PedroLoy.ServerAlyzer, Microsoft.WindowsAppRuntime* | Select-Object Name, Version, Status
+
+# 1) Windows App Runtime 2.3.1, framework first (Main, Singleton and DDLM depend on it)
+$War = '<folder with the P-WAR set>'
+Add-AppxPackage -Path "$War\Microsoft.WindowsAppRuntime.2.msix"
+Add-AppxPackage -Path "$War\Microsoft.WindowsAppRuntime.Main.2.msix"
+Add-AppxPackage -Path "$War\Microsoft.WindowsAppRuntime.Singleton.2.msix"
+Add-AppxPackage -Path "$War\Microsoft.WindowsAppRuntime.DDLM.2.msix"
+#    (or, instead of these four lines: the official WindowsAppRuntimeInstall-x64.exe for 2.3.1)
+
+# 2) verify the set before installing the app - all four present at 2.3.1.0, Status Ok
+& $WarSet | Export-Csv war-after.csv -NoTypeInformation
+#    expected names (from MSIX.inventory): Microsoft.WindowsAppRuntime.2, MicrosoftCorporationII.WinAppRuntime.Main.2,
+#    MicrosoftCorporationII.WinAppRuntime.Singleton, Microsoft.WindowsAppRuntime.DDLM.2  - each Version 2.3.1.0
+
+# 3) the app
+Add-AppxPackage -Path <P-RC.msix>
+Get-AppxPackage PedroLoy.ServerAlyzer | Select-Object Name, Version, Status
 ```
+
+Any failure in step 1 or 2 (for example `0x80073CF3`, a missing prerequisite) is an **environment** failure:
+record the code and stop; R1–R5 are not run on an incomplete runtime set.
+
+Why the full set: the framework package is the only one an app manifest can declare. Main and Singleton
+cannot be declared; the Windows App SDK deploys them through its Deployment API, which the default
+auto-initializer calls at app start (`WindowsAppSdkDeploymentManagerInitialize` defaults to `true`), and
+Singleton is needed for features outside the framework (DOC, [deployment guide for framework-dependent
+packaged apps](https://learn.microsoft.com/windows/apps/windows-app-sdk/deploy-packaged-apps)). The app
+code notes that `AppNotificationManager` may need Singleton in the unpackaged deployment
+(`App/Services/WindowsAppNotificationService.cs:534-537`); whether the packaged toast path (R4/R5) needs it =
+HYPOTHESIS, which the full set makes irrelevant for this test.
+Installing the set up front removes "runtime set incomplete" as an explanation for an R1–R5 failure.
 
 **Cases, in this order** (each: PASS / FAIL / NOT_RUN; no case is skipped silently):
 
@@ -181,8 +216,17 @@ Without a test SSH host, R4/R5 are **NOT_RUN** (never PASS).
   HYPOTHESIS; screenshot it);
 - pin the widget → expected: the provider does not activate (no card / error card).
 
-If X1 starts normally, T2 missed a .NET install and **CLEAN-1 is invalid** (FAIL of the procedure, not of
-the product).
+X1 counts only if the failure is the **.NET host's**: the .NET host's install-.NET dialog, and/or a `.NET
+Runtime` event, and/or a host error code `0x80008083` (`CoreHostLibMissingFailure`, a hosting component
+such as hostfxr is missing) or `0x80008096` (`FrameworkMissingFailure`, no compatible framework) — DOC
+[host error codes](https://github.com/dotnet/runtime/blob/main/docs/design/features/host-error-codes.md);
+which of the two the apphost reports when no .NET exists at all = HYPOTHESIS, record the one seen.
+
+| X1 outcome | Verdict |
+|---|---|
+| .NET host failure as above | **PASS** (the counterproof can fail, so CLEAN-1's PASS means something) |
+| app starts normally | **CLEAN-1 invalid**: T2 missed a .NET install (FAIL of the procedure, not of the product) |
+| any other failure (Windows App Runtime / DeploymentManager / bootstrap error, `0x80073CF3`, signature or deployment error) | **INCONCLUSIVE**: fix the environment (P-WAR set, trust) and rerun X1 from `clean` |
 
 **Evidence for every case** (redacted; no personal paths):
 ```powershell
@@ -200,8 +244,17 @@ plus screenshots (card, window, any dialog), process lists, and the T2 output.
 **CLEAN-2:** restore `clean`, install the official .NET 10 Desktop Runtime x64, then T3 with `P-RC` and
 R1–R5. Expected: identical results (the package's own runtime is used; no conflict).
 
-**POST variant (Store, private audience):** restore `clean`, T2, install from the Store (the Store
-provisions the Windows App Runtime; no S2/T3), then R1–R5 and `SignatureKind Store`. X1 is not repeated.
+**POST variant (Store, private audience):** restore `clean`, T2 (including `war-before.csv`), install from
+the Store (no S2/T3), then R1–R5 and `SignatureKind Store`. X1 is not repeated. Record the Windows App
+Runtime set **after the install and again after R2** (`& $WarSet`, `war-store-install.csv`,
+`war-store-after-launch.csv`) and compare with the PRE set:
+- the **framework** package is installed by the Store as the declared `PackageDependency` — DOC (deployment
+  guide above: the package dependency "ensures that the Framework package is installed when your app is
+  deployed");
+- **Main and Singleton** arrive through the Deployment API at first app start, not from the manifest — DOC
+  for the mechanism; that the Store install plus our auto-initializer yields the same four packages as the
+  PRE set = HYPOTHESIS, measured by these two recordings;
+- **DDLM** = HYPOTHESIS (record whether it appears).
 
 ## 3. Clean-machine plan
 
