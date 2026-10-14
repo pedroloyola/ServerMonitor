@@ -166,6 +166,11 @@ jobs:
             'Test-PackageTrace.ps1'
             'Test-RuntimeServicing.ps1 -SelfTest'
             'Test-PackageResources.ps1'
+            'Test-StoreSubmissionUpdate.ps1'
+            'Assert-NoPendingSubmission.ps1 -SelfTest'
+            'Get-SubmissionState.ps1 -SelfTest'
+            'Assert-StagedSubmission.ps1 -SelfTest'
+            'Test-StoreStageCertify.ps1'
           )
 
       - name: Vulnerability scan (fail on any vulnerable package)

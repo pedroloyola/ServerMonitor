@@ -118,13 +118,23 @@ $raw = Get-Content -LiteralPath $SubmissionPath -Raw
 $result = Test-SubmissionIdle -Raw $raw -AllowedStatuses $AllowedStatuses
 
 if (-not $result.Idle) {
+    # REL.0E P-1: a draft (PendingCommit) is most often one store-submit staged and a person is completing.
+    $draftAdvice = if ($result.Status -ceq 'PendingCommit') {
+        @"
+
+A draft already exists. If store-submit staged it, do NOT stage again: send it to certification
+with store-certify.yml (its submission id is in the store-submit run summary) once the listing is
+reviewed. To start the staging over, a person deletes that draft in Partner Center first, after
+exporting its listings if they hold work worth keeping.
+"@
+    } else { '' }
     throw @"
 STOP: $($result.Reason).
 
 This workflow will not touch a product that already has a submission in flight, because
 'msstore publish' deletes the pending draft and rebuilds it from the last published
 submission. Running now could discard work someone is doing in Partner Center.
-
+$draftAdvice
 Nothing has been changed. Let the current submission finish, or deal with it by hand in
 Partner Center, then run this again.
 "@

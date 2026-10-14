@@ -44,6 +44,13 @@ $selfTesting = @(
     @{ Name = 'G2 condition matched loosely (review R50-14, || true)'; Guard = 'Test-ReleaseWorkflowShape.ps1'
        Old = '$conditions[0].Value -cnotmatch "\A    if:\s*\$\{\{\s*github\.event_name == ''workflow_dispatch'' && inputs\.create_release == true\s*\}\}\s*\z"'
        New = '$conditions[0].Value -notmatch "if:.*github\.event_name == ''workflow_dispatch''.*&&.*inputs\.create_release == true"'; Marker = 'SURVIVED: release-build.yml / tautology' }
+    # REL.0E P-1: the stage-only and certification wiring.
+    @{ Name = 'P-1 upload checked for --noCommit anywhere, not on the upload line'; Guard = 'Test-ReleaseWorkflowShape.ps1'
+       Old = "if (`$uploads[0].Value -notmatch '\s--noCommit\s*`$')"; New = "if (`$all -notmatch '--noCommit')"; Marker = 'SURVIVED: store-submit.yml / upload without --noCommit' }
+    @{ Name = 'P-1 certify proof accepted without the submission id'; Guard = 'Test-ReleaseWorkflowShape.ps1'
+       Old = '\s*\n\s+-ExpectedSubmissionId \$env:SUBMISSION_ID\b'''; New = ''''; Marker = 'SURVIVED: store-certify.yml / staged draft not bound by id' }
+    @{ Name = 'P-1 any step may be conditional'; Guard = 'Test-ReleaseWorkflowShape.ps1'
+       Old = "if (`$step -match '(?m)^        if:' -and"; New = "if (`$false -and"; Marker = 'SURVIVED: store-submit.yml / upload runs after a failed guard' }
 )
 
 function Assert-Suites {
