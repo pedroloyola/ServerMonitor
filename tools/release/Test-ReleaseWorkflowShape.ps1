@@ -78,6 +78,15 @@ function Assert-SharedConcurrency([string] $Text) {
 # messages name the commands too). Prefix for the patterns below; mentions still count as forbidden.
 $command = '(?m)^[^''"\n]*?'
 
+# Vigil P-1 L-1: the staged draft's package must be the file store-submit uploaded from the tag commit
+# G4 proved, in BOTH reads of the draft (stage read-back, certify proof).
+$tagBoundFileName = '-ExpectedPackageFileName "ServerAlyzer_${env:PACKAGE_VERSION}_x64_$($env:TAG_COMMIT.Substring(0, 7)).msix" `'
+
+# Index of the Assert-StagedSubmission call whose continuation lines include $Argument, or -1.
+function Get-StagedCall([string] $Text, [string] $Argument) {
+    return Get-Index $Text ('(?s)\./tools/release/Assert-StagedSubmission\.ps1 `(?:\s*\n\s+-[A-Za-z]+[^\n]*`)*?\s*\n\s+' + [regex]::Escape($Argument))
+}
+
 function Get-Index([string] $Text, [string] $Pattern) {
     $match = [regex]::Match($Text, $Pattern)
     if (-not $match.Success) { return -1 }
@@ -96,15 +105,24 @@ function Assert-StoreSubmit([string] $Text) {
     if ($all -match '\bmsstore\s+submission\s+(publish|delete|updateMetadata)\b') { throw 'Shape P-1: store-submit must never commit, delete or replace a submission; certification is store-certify.yml.' }
     $confirm = $submit.IndexOf("if (`$env:SUBMIT_CONFIRM -cne 'STAGE') {")
     if ($confirm -lt 0 -or $confirm -gt $configure) { throw 'Shape P-1: store-submit must require the phrase STAGE before the Store CLI is configured.' }
+    # Vigil N-1: and in the provenance job, so a wrong phrase fails before the environment approval is requested.
+    if ((Strip-Comments $jobs['provenance']) -notmatch "(?m)^\s+if \(\`$env:STAGE_CONFIRM -cne 'STAGE'\) \{ throw") { throw 'Shape P-1: the provenance job must refuse a phrase other than STAGE (before the approval).' }
     $uploads = @([regex]::Matches($all, "$command\bmsstore\s+publish\b[^\n]*$"))
     if ($uploads.Count -ne 1) { throw 'Shape P-1: store-submit must upload exactly once.' }
     if ($uploads[0].Value -notmatch '\s--noCommit\s*$') { throw 'Shape P-1: the upload must keep the submission in draft (--noCommit).' }
     $upload = Get-Index $submit "$command\bmsstore\s+publish\b"
-    $pending = $submit.IndexOf('./tools/release/Assert-NoPendingSubmission.ps1 -SubmissionPath before.json')
-    if ($pending -lt 0 -or $pending -gt $upload) { throw 'Shape P-1: the in-flight refusal must run before the upload (msstore publish deletes a pending draft).' }
+    # Relay M-1: the exact call, with the guard's DEFAULT allowed statuses (its self-test pins that default).
+    # An -AllowedStatuses here could let a PendingCommit draft through, and the upload would delete it.
+    $pendingCalls = @([regex]::Matches($submit, '(?m)^.*Assert-NoPendingSubmission\.ps1.*$'))
+    if ($pendingCalls.Count -ne 1 -or $pendingCalls[0].Value -cnotmatch '\A\s+\./tools/release/Assert-NoPendingSubmission\.ps1 -SubmissionPath before\.json\s*\z') {
+        throw 'Shape P-1: the in-flight refusal must be exactly "./tools/release/Assert-NoPendingSubmission.ps1 -SubmissionPath before.json" (default allowed statuses).'
+    }
+    $pending = $pendingCalls[0].Index
+    if ($pending -gt $upload) { throw 'Shape P-1: the in-flight refusal must run before the upload (msstore publish deletes a pending draft).' }
     $update = Get-Index $submit '\bmsstore\s+submission\s+update\b'
     $staged = $submit.IndexOf('./tools/release/Assert-StagedSubmission.ps1 `')
     if ($update -lt 0 -or $staged -lt $update) { throw 'Shape P-1: the read-back must prove an uncommitted draft after the metadata update.' }
+    if ((Get-StagedCall $submit $tagBoundFileName) -lt 0) { throw 'Shape P-1: the read-back must bind the package file name to the tag commit.' }
 
     foreach ($marker in @('Assert-PackageVersionFloor.ps1', 'Assert-PackageIdentity.ps1', 'Assert-DistributionPrivacy.ps1', 'Assert-PackageRuntime.ps1', '$expectedName')) {
         $at = $submit.IndexOf($marker)
@@ -127,8 +145,25 @@ function Assert-StoreCertify([string] $Text) {
     $commits = @([regex]::Matches($all, "$command\bmsstore\s+submission\s+publish\b"))
     if ($commits.Count -ne 1) { throw 'Shape P-1: store-certify must commit exactly once.' }
     $commit = Get-Index $certify "$command\bmsstore\s+submission\s+publish\b"
-    $staged = Get-Index $certify '(?s)\./tools/release/Assert-StagedSubmission\.ps1 `(?:\s*\n\s+-[A-Za-z]+[^\n]*`)*?\s*\n\s+-ExpectedSubmissionId \$env:SUBMISSION_ID\b'
+    $staged = Get-StagedCall $certify '-ExpectedSubmissionId $env:SUBMISSION_ID `'
     if ($staged -lt 0 -or $staged -lt $configure -or $staged -gt $commit) { throw 'Shape P-1: the staged draft must be proven by its submission id right before the commit.' }
+    $named = Get-StagedCall $certify $tagBoundFileName
+    if ($named -ne $staged) { throw 'Shape P-1: the certify proof must bind the package file name to the tag commit (L-1).' }
+
+    # Relay W4: the id binding comes only from the dispatch input. SUBMISSION_ID is declared once per job,
+    # as the input, and nothing reassigns it (no assignment, no GITHUB_ENV, no environment API).
+    foreach ($name in @('provenance', 'certify')) {
+        $declared = @([regex]::Matches((Strip-Comments $jobs[$name]), '(?m)^\s+SUBMISSION_ID:[^\n]*$'))
+        if ($declared.Count -ne 1 -or $declared[0].Value -cnotmatch '\A\s+SUBMISSION_ID: \$\{\{ inputs\.submission_id \}\}\s*\z') { throw "Shape P-1: the $name job must take SUBMISSION_ID once, from inputs.submission_id." }
+    }
+    if ($all -match '(?i)\$env:SUBMISSION_ID\s*[-+*/]?=(?!=)|\$\{env:SUBMISSION_ID\}\s*=(?!=)|GITHUB_ENV|SetEnvironmentVariable|(Set|New)-Item\b[^\n]*env:') {
+        throw 'Shape P-1: store-certify must never reassign SUBMISSION_ID or write the job environment.'
+    }
+
+    # Vigil N-1: phrase and id refused in the provenance job too, before the environment approval is requested.
+    $provenance = Strip-Comments $jobs['provenance']
+    if ($provenance -notmatch '(?m)^\s+if \(\$env:SUBMISSION_ID -cnotmatch ''\\A\[0-9\]\{1,30\}\\z''\) \{ throw') { throw 'Shape P-1: the provenance job must refuse a malformed submission_id (before the approval).' }
+    if ($provenance -notmatch '(?m)^\s+if \(\$env:CERTIFY_CONFIRM -cne "CERTIFY \$env:PACKAGE_VERSION"\) \{ throw') { throw 'Shape P-1: the provenance job must refuse a phrase other than "CERTIFY <version>" (before the approval).' }
 }
 
 function Assert-StoreStatus([string] $Text) {
@@ -167,6 +202,10 @@ $mutations = @{
         @{ Old = './tools/release/Assert-StagedSubmission.ps1 `'; New = 'Write-Host `'; Name = 'read-back draft proof removed' }
         @{ Old = "  group: store-submit`n"; New = "  group: store-submit-`${{ github.run_id }}`n"; Name = 'concurrency group not shared' }
         @{ Old = "    environment:`n      name: microsoft-store`n"; New = ''; Name = 'submit outside the Store environment' }
+        # PR #56 fix round 1.
+        @{ Old = './tools/release/Assert-NoPendingSubmission.ps1 -SubmissionPath before.json'; New = './tools/release/Assert-NoPendingSubmission.ps1 -SubmissionPath before.json -AllowedStatuses None,Published,Canceled,PendingCommit'; Name = 'W3 call site lets PendingCommit through (Relay M-1)' }
+        @{ Old = "          if (`$env:STAGE_CONFIRM -cne 'STAGE') { throw"; New = "          if (`$false) { throw"; Name = 'phrase not checked before the approval (Vigil N-1)' }
+        @{ Old = '$($env:TAG_COMMIT.Substring(0, 7)).msix" `'; New = '0000000.msix" `'; Name = 'read-back file name not bound to the tag commit (Vigil L-1)' }
     )
     'store-certify.yml' = @(
         @{ Old = "  certify:`n    needs: provenance`n"; New = "  certify:`n"; Name = 'certify without provenance' }
@@ -180,6 +219,13 @@ $mutations = @{
         @{ Old = "      - name: Prove the draft is still the staged draft`n"; New = "      - name: Early commit`n        shell: pwsh`n        run: msstore submission publish x`n`n      - name: Prove the draft is still the staged draft`n"; Name = 'commit before the draft is proven' }
         @{ Old = "          msstore submission publish `${{ env.STORE_PRODUCT_ID }}`n"; New = "          msstore publish incoming -id `${{ env.STORE_PRODUCT_ID }} --noCommit`n          msstore submission publish `${{ env.STORE_PRODUCT_ID }}`n"; Name = 'certify uploads (re-creates the draft)' }
         @{ Old = "  group: store-submit`n"; New = "  group: store-certify`n"; Name = 'concurrency group not shared' }
+        # PR #56 fix round 1.
+        @{ Old = '$($env:TAG_COMMIT.Substring(0, 7)).msix" `'; New = '0000000.msix" `'; Name = 'proof file name not bound to the tag commit (Vigil L-1)' }
+        @{ Old = "          if (`$env:SUBMISSION_ID -cnotmatch '\A[0-9]{1,30}\z') { throw 'submission_id must be the numeric id from the store-submit summary.' }`n          if (`$env:CERTIFY_CONFIRM"; New = "          if (`$env:CERTIFY_CONFIRM"; Name = 'id not checked before the approval (Vigil N-1)' }
+        @{ Old = '          if ($env:CERTIFY_CONFIRM -cne "CERTIFY $env:PACKAGE_VERSION") { throw "Confirmation'; New = '          if ($false) { throw "Confirmation'; Name = 'phrase not checked before the approval (Vigil N-1)' }
+        @{ Old = "          ./tools/release/Assert-StagedSubmission.ps1 ```n            -SubmissionPath draft.json"; New = "          `$env:SUBMISSION_ID = (Get-Content -Raw draft.json | ConvertFrom-Json).id`n          ./tools/release/Assert-StagedSubmission.ps1 ```n            -SubmissionPath draft.json"; Name = 'W4 id reassigned from the draft (Relay W4)' }
+        @{ Old = "        run: ./tools/release/Assert-PackageVersionFloor.ps1 -PackageVersion `$env:PACKAGE_VERSION"; New = "        run: |`n          ./tools/release/Assert-PackageVersionFloor.ps1 -PackageVersion `$env:PACKAGE_VERSION`n          'SUBMISSION_ID=1' | Out-File -Append `$env:GITHUB_ENV"; Name = 'W4 id rewritten through GITHUB_ENV' }
+        @{ Old = "      - name: Prove the draft is still the staged draft`n        shell: pwsh"; New = "      - name: Prove the draft is still the staged draft`n        env:`n          SUBMISSION_ID: `${{ steps.draft.outputs.id }}`n        shell: pwsh"; Name = 'W4 id redefined in a step env' }
     )
     'store-status.yml' = @(
         @{ Old = 'if ($publishModeError) { throw'; New = 'if ($publishModeError) { Write-Warning'; Name = 'publish mode only warns' }

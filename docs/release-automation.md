@@ -121,6 +121,10 @@ Order of operations, and why:
    `Canceled`), and fails closed on unparseable output. A `PendingCommit` draft (typically one
    this workflow staged and a person is completing) gets an explicit refusal that says what to do
    instead: certify it with `store-certify`, or delete it by hand in Partner Center to stage again.
+   The workflow calls the guard **exactly** as `Assert-NoPendingSubmission.ps1 -SubmissionPath
+   before.json`, with its default allowed statuses; the shape guard refuses any other call (an extra
+   `-AllowedStatuses`), and the guard's self-test runs through that default and pins it, so neither
+   side can quietly let a `PendingCommit` draft through (PR #56 Relay M-1).
 6. `msstore publish <msix> -id <productId> --noCommit` — uploads the package and leaves the
    submission in draft. This must come **before** metadata edits, because `publish`
    recreates the draft.
@@ -131,8 +135,10 @@ Order of operations, and why:
 9. **Read back from the Store and prove the draft is staged, not committed**
    (`Assert-StagedSubmission.ps1`, on what the Store actually stored, not on the file that was
    sent): status exactly `PendingCommit`, `targetPublishMode` `Manual`, visibility unchanged, the
-   expected package present and **no newer live package**. It also prints, per language, the lengths
-   and counts of the listing fields and whether the release notes equal the repository's.
+   expected package present **under the file name this run uploaded**
+   (`ServerAlyzer_<version>_x64_<first 7 of the tag commit>.msix`, which `msstore publish` writes into
+   `applicationPackages[].fileName`) and **no newer live package**. It also prints, per language, the
+   lengths and counts of the listing fields and whether the release notes equal the repository's.
 10. **Hand over.** The run summary reports the draft's **submission id**, the package and the next
     steps. Nothing has been sent to certification. The localized listing and screenshots are applied
     by a person, to this draft, only now (after the upload phase), and reviewed in Partner Center:
@@ -167,8 +173,14 @@ workflow ever calls `msstore publish` except that one upload with `--noCommit`. 
 Partner Center *between* the in-flight check and the upload (seconds) would still be deleted; the
 procedure below says not to edit the product in Partner Center while a stage run is in progress.
 
-The Store CLI version is not pinned: `microsoft-store-apppublisher` installs the latest CLI. The
-behaviour above is the one documented today; re-read it when the CLI changes.
+**Gate on the first real dispatch (open, pre-existing Medium):** the Store CLI version is not pinned.
+`microsoft-store-apppublisher` installs the **latest** `msstore`, and that CLI receives the Store
+client secret in `reconfigure` and decides what is deleted or committed. Before the first real
+`store-submit` run, a person chooses a reviewed `msstore-cli` release and either pins the action's
+`version` input to it or adds a step between *Setup* and *Configure* that compares `msstore --version`
+with an allowlist in the repository and fails closed (Vigil, PR #56). The behaviour described above is
+the one documented today and read from `5f15f06`; re-read it whenever the pinned version changes.
+This is a gate on the dispatch, not on merging the workflows.
 
 ### 2b. `store-certify.yml` (the certification gate)
 
@@ -181,21 +193,36 @@ Inputs: the release tag, the run id of that tag's `release-build` run, the packa
 **submission id** from the stage run's summary, and the phrase **`CERTIFY <version>`** (for example
 `CERTIFY 1.1.7.0`, so a phrase typed for another release cannot certify this one).
 
-0. The same provenance job (G4) as `store-submit`, before the environment is reached.
-1. Confirmation phrase, version, submission id and tag commit checked before any secret is used;
-   the version floor is re-checked.
+0. The same provenance job (G4) as `store-submit`, before the environment is reached. It also refuses a
+   malformed `submission_id` or a phrase other than `CERTIFY <version>` (and `store-submit`'s
+   provenance job a phrase other than `STAGE`), so a doomed run fails **before** anyone is asked to
+   approve the environment.
+1. Confirmation phrase, version, submission id and tag commit checked again before any secret is used;
+   the version floor is re-checked. `SUBMISSION_ID` comes **only** from the dispatch input: the shape
+   guard refuses a second declaration, an assignment, a `GITHUB_ENV` write or an environment API call
+   that could rebind it to the draft itself (PR #56 Relay W4).
 2. `msstore reconfigure`, `msstore apps get` (identity), as in `store-submit`.
 3. **`Assert-StagedSubmission.ps1 -ExpectedSubmissionId`**, on a fresh `msstore submission get`,
    immediately before the commit: the pending draft must be exactly the staged submission id, still
    `PendingCommit`, on the publishing hold (`Manual`), with the visibility unchanged, carrying the
-   package version and no newer live package. Otherwise nothing is committed. The listing report is
-   printed again (what is about to be certified).
+   package version **as the file uploaded from the tag commit** that the provenance job proved
+   (`TAG_COMMIT`, PR #56 Vigil L-1; another package of the same version under another name is refused)
+   and no newer live package. Otherwise nothing is committed. The listing report is printed again
+   (what is about to be certified).
 4. `msstore submission publish` — the only commit in the pipeline. The publishing hold stays in
    force, so certification never means publication.
 5. Report the resulting state.
 
 No step of either Store job may be conditional (other than the final report) or `continue-on-error`,
 so a later Store call can never run past a failed guard.
+
+**Limits of the shape guard.** `Test-ReleaseWorkflowShape.ps1` reads the workflow **text**. It catches
+regressions written the ordinary way: a commit step put back, `--noCommit` dropped, a guard removed,
+reordered, made conditional or widened. It does not try to recognise a deliberately disguised command,
+for example a verb held in a variable (`msstore submission $verb`) or a direct REST call to the
+submission's `commit` endpoint (PR #56 Relay W1/W2). Against a hostile edit the controls are the pull
+request review and the branch protection on `main`, which the Store environment's deployment rule
+depends on. Chasing disguises with more patterns is deliberately not attempted.
 
 ### 3. `store-status.yml`
 
@@ -580,15 +607,15 @@ Everything the workflows rely on runs offline:
 ./tools/release/Test-DistributionPrivacy.ps1    # distribution privacy, 52 cases
 ./tools/release/Test-StoreSubmissionUpdate.ps1  # publishing hold, 12 cases
 ./tools/release/Get-SubmissionState.ps1 -SelfTest        # status mapping, 18 cases
-./tools/release/Assert-NoPendingSubmission.ps1 -SelfTest # in-flight guard, 19 cases
-./tools/release/Assert-StagedSubmission.ps1 -SelfTest    # staged draft (P-1): PendingCommit, id, hold, visibility, package, 31 cases
-./tools/release/Test-StoreStageCertify.ps1                # weaken each staged-draft check in a copy; the named case must fail, 11 mutations
+./tools/release/Assert-NoPendingSubmission.ps1 -SelfTest # in-flight guard through its default allowed statuses (pinned), 20 cases
+./tools/release/Assert-StagedSubmission.ps1 -SelfTest    # staged draft (P-1): PendingCommit, id, hold, visibility, package + tag-bound file name, 36 cases
+./tools/release/Test-StoreStageCertify.ps1                # weaken each staged-draft / in-flight check in a copy; the named case must fail, 15 mutations
 ./tools/release/Test-ReleaseRunProvenance.ps1             # release run provenance (G4), 40 cases
 ./tools/release/Test-ManualPublishMode.ps1                # publishing hold in store-status (G6), 20 cases
 ./tools/release/Test-HardeningMutations.ps1               # weaken each G4/G6 check and the pin/wiring guards; require detection
 ./tools/release/Test-WorkflowRunInterpolation.ps1 -SelfTest # no inputs/steps/needs/event in run blocks
 ./tools/release/Test-WorkflowActionPins.ps1 -SelfTest     # actions pinned by full SHA (G8)
-./tools/release/Test-ReleaseWorkflowShape.ps1 -SelfTest   # G2/G4/G6/runtime + P-1 stage/certify wiring, 32 mutations
+./tools/release/Test-ReleaseWorkflowShape.ps1 -SelfTest   # G2/G4/G6/runtime + P-1 stage/certify wiring, 41 mutations
 ```
 
 CI runs the version, provenance, publishing-hold, submission-update, in-flight, staged-draft, interpolation,

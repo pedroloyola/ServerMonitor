@@ -75,7 +75,10 @@ function Test-SubmissionIdle {
 }
 
 if ($SelfTest) {
-    $allowed = @('None', 'Published', 'Canceled')
+    # REL.0E P-1 (Relay M-1): store-submit calls this guard WITHOUT -AllowedStatuses, so the cases run
+    # through the parameter's DEFAULT, never through a list of the self-test's own. Widening the default
+    # (for example to let a PendingCommit draft through, which msstore publish would then delete) fails here.
+    $allowed = $AllowedStatuses
     $cases = @(
         @{ Name = 'published, nothing pending';        Raw = '{"status":"Published"}';         Idle = $true }
         @{ Name = 'no submission at all';              Raw = '{"status":"None"}';              Idle = $true }
@@ -98,17 +101,21 @@ if ($SelfTest) {
         @{ Name = 'unknown future status';             Raw = '{"status":"SomethingNew"}';      Idle = $false }
     )
 
-    $failed = 0
+    $failedNames = @()
+    # The default itself, exactly: only a finished or absent submission is idle.
+    $defaultOk = (($allowed -join ',') -ceq 'None,Published,Canceled')
+    if (-not $defaultOk) { $failedNames += 'default allowed statuses' }
+    Write-Host ("  {0}  {1,-32} [{2}]" -f $(if ($defaultOk) { 'ok  ' } else { 'FAIL' }), 'default allowed statuses', ($allowed -join ', '))
     foreach ($case in $cases) {
         $result = Test-SubmissionIdle -Raw $case.Raw -AllowedStatuses $allowed
         $ok = ($result.Idle -eq $case.Idle)
-        if (-not $ok) { $failed++ }
+        if (-not $ok) { $failedNames += $case.Name }
         $mark = if ($ok) { 'ok  ' } else { 'FAIL' }
         Write-Host ("  {0}  {1,-32} idle={2,-5}  {3}" -f $mark, $case.Name, $result.Idle, $result.Reason)
     }
 
-    if ($failed -gt 0) { throw "$failed of $($cases.Count) pending-submission cases are wrong." }
-    Write-Host "All $($cases.Count) pending-submission cases behaved as required."
+    if ($failedNames.Count -gt 0) { throw "Pending-submission cases failed: $($failedNames -join '; ')" }
+    Write-Host "All $($cases.Count + 1) pending-submission cases behaved as required (through the default allowed statuses)."
     exit 0  # explicit success for the Actions wrapper (PR #53 B-1)
 }
 

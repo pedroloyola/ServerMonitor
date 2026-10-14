@@ -17,7 +17,12 @@
       * the expected visibility, asserted and never written;
       * the expected package version among the draft's live packages, and NO newer live package. The
         draft keeps the packages of the last published submission, which are older; a newer one would
-        be the one customers get, and it is not the package this run vouches for.
+        be the one customers get, and it is not the package this run vouches for;
+      * that package under the file name store-submit uploaded, ServerAlyzer_<version>_x64_<tag commit
+        first 7>.msix, which binds the draft to the tag commit G4 proved (Vigil P-1 L-1). msstore publish
+        writes the uploaded file's name into the draft's applicationPackages[].fileName
+        (msstore-cli PublishAsync: new ApplicationPackage { FileStatus = PendingUpload, FileName = file.Name }).
+        Another package of the same version under another name is refused too.
 
     It fails closed: empty output, unparseable JSON, missing fields and unknown values are refusals.
 
@@ -30,6 +35,9 @@
 
 .PARAMETER ExpectedSubmissionId
     store-certify: the submission id that store-submit reported for the staged draft.
+
+.PARAMETER ExpectedPackageFileName
+    The file name store-submit uploaded: ServerAlyzer_<version>_x64_<first 7 of the tag commit>.msix.
 #>
 [CmdletBinding(DefaultParameterSetName = 'Check')]
 param(
@@ -37,6 +45,7 @@ param(
     [Parameter(Mandatory, ParameterSetName = 'Check')] [string] $ExpectedPackageVersion,
     [Parameter(Mandatory, ParameterSetName = 'Check')] [string] $ExpectedVisibility,
     [Parameter(ParameterSetName = 'Check')] [string] $ExpectedSubmissionId = '',
+    [Parameter(Mandatory, ParameterSetName = 'Check')] [string] $ExpectedPackageFileName,
     [Parameter(ParameterSetName = 'Check')] [switch] $ListingReport,
     [Parameter(ParameterSetName = 'Check')] [string] $StoreListingRoot = (Join-Path (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path 'release/store'),
     [Parameter(Mandatory, ParameterSetName = 'SelfTest')] [switch] $SelfTest
@@ -63,13 +72,14 @@ function ConvertFrom-CliJson([string] $Raw) {
 
 function Test-StagedSubmission {
     <# Returns a result object instead of throwing, so the self-test exercises the same decision. #>
-    param([string] $Raw, [string] $ExpectedPackageVersion, [string] $ExpectedVisibility, [string] $ExpectedSubmissionId)
+    param([string] $Raw, [string] $ExpectedPackageVersion, [string] $ExpectedVisibility, [string] $ExpectedSubmissionId, [string] $ExpectedPackageFileName)
 
     $fail = { param($reason) [pscustomobject] @{ Ok = $false; Reason = $reason; Id = ''; Versions = @() } }
 
     if ($ExpectedPackageVersion -cnotmatch '\A[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\z') { return & $fail 'the expected package version is not a four-part version' }
     if ([string]::IsNullOrWhiteSpace($ExpectedVisibility)) { return & $fail 'no expected visibility was given' }
     if ($ExpectedSubmissionId -and $ExpectedSubmissionId -cnotmatch '\A[0-9]{1,30}\z') { return & $fail 'the expected submission id is not numeric' }
+    if ($ExpectedPackageFileName -cnotmatch '\AServerAlyzer_[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+_x64_[0-9a-f]{7}\.msix\z') { return & $fail 'the expected package file name is not ServerAlyzer_<version>_x64_<sha7>.msix' }
 
     try { $submission = ConvertFrom-CliJson $Raw } catch { return & $fail $_.Exception.Message }
     if ($submission -isnot [pscustomobject]) { return & $fail 'the CLI output is not a JSON object' }
@@ -99,20 +109,28 @@ function Test-StagedSubmission {
     if ($null -eq $packages) { return & $fail 'the draft has no applicationPackages' }
     $expected = [version] $ExpectedPackageVersion
     $versions = @()
+    $namedPackage = $false
     foreach ($package in @($packages)) {
         if ([string]::Equals([string] (Get-Field $package 'fileStatus'), 'PendingDelete', [StringComparison]::OrdinalIgnoreCase)) { continue }
         $text = [string] (Get-Field $package 'version')
         if ($text -cnotmatch '\A[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\z') { return & $fail "a live package has an unreadable version ('$text')" }
         $versions += $text
+        if ([string]::Equals($text, $ExpectedPackageVersion, [StringComparison]::Ordinal)) {
+            $fileName = [string] (Get-Field $package 'fileName')
+            if (-not [string]::Equals($fileName, $ExpectedPackageFileName, [StringComparison]::Ordinal)) {
+                return & $fail "the draft's package $text is '$fileName', not '$ExpectedPackageFileName' uploaded from the tag commit"
+            }
+            $namedPackage = $true
+        }
         if (([version] $text) -gt $expected) {
             return & $fail "the draft carries package $text, newer than $ExpectedPackageVersion; customers would get a package this run did not verify"
         }
     }
-    if ($versions -cnotcontains $ExpectedPackageVersion) {
+    if ($versions -cnotcontains $ExpectedPackageVersion -or -not $namedPackage) {
         return & $fail "the draft carries package version(s) [$($versions -join ', ')], not $ExpectedPackageVersion"
     }
 
-    return [pscustomobject] @{ Ok = $true; Reason = "draft $id is uncommitted, on the publishing hold, visibility $visibility, package $ExpectedPackageVersion"; Id = $id; Versions = $versions }
+    return [pscustomobject] @{ Ok = $true; Reason = "draft $id is uncommitted, on the publishing hold, visibility $visibility, package $ExpectedPackageVersion ($ExpectedPackageFileName)"; Id = $id; Versions = $versions }
 }
 
 function Write-ListingReport($Submission, [string] $ListingRoot) {
@@ -161,7 +179,7 @@ if ($SelfTest) {
             visibility          = 'Public'
             applicationPackages = @(
                 [ordered] @{ version = '1.1.2.0'; fileStatus = 'Uploaded' }
-                [ordered] @{ version = '1.1.7.0'; fileStatus = 'PendingUpload' }
+                [ordered] @{ version = '1.1.7.0'; fileName = 'ServerAlyzer_1.1.7.0_x64_300116d.msix'; fileStatus = 'PendingUpload' }
             )
             listings            = [ordered] @{ 'en-us' = [ordered] @{ baseListing = [ordered] @{ description = 'd'; releaseNotes = 'n' } } }
         }
@@ -182,7 +200,7 @@ if ($SelfTest) {
         @{ Name = 'PascalCase fields';                    Raw = (New-Draft -Pascal); Id = $id; Ok = $true }
         @{ Name = 'JSON wrapped in CLI chatter';          Raw = "Retrieving Submission`n$(New-Draft)`nDone."; Id = $id; Ok = $true }
         @{ Name = 'manual (case) hold';                   Raw = (New-Draft @{ targetPublishMode = 'manual' }); Id = $id; Ok = $true }
-        @{ Name = 'newer package marked PendingDelete';   Raw = (New-Draft -Packages @([ordered] @{ version = '1.1.7.0'; fileStatus = 'PendingUpload' }, [ordered] @{ version = '1.1.9.0'; fileStatus = 'PendingDelete' })); Id = $id; Ok = $true }
+        @{ Name = 'newer package marked PendingDelete';   Raw = (New-Draft -Packages @([ordered] @{ version = '1.1.7.0'; fileName = 'ServerAlyzer_1.1.7.0_x64_300116d.msix'; fileStatus = 'PendingUpload' }, [ordered] @{ version = '1.1.9.0'; fileStatus = 'PendingDelete' })); Id = $id; Ok = $true }
         @{ Name = 'no draft: last published returned';    Raw = (New-Draft @{ status = 'Published' }); Id = $id; Ok = $false }
         @{ Name = 'already committed';                    Raw = (New-Draft @{ status = 'CommitStarted' }); Id = $id; Ok = $false }
         @{ Name = 'in certification';                     Raw = (New-Draft @{ status = 'Certification' }); Id = $id; Ok = $false }
@@ -202,16 +220,22 @@ if ($SelfTest) {
         @{ Name = 'visibility missing';                   Raw = (New-Draft -Remove 'visibility'); Id = $id; Ok = $false }
         @{ Name = 'no packages field';                    Raw = (New-Draft -Remove 'applicationPackages'); Id = $id; Ok = $false }
         @{ Name = 'expected package absent';              Raw = (New-Draft -Packages @([ordered] @{ version = '1.1.2.0'; fileStatus = 'Uploaded' })); Id = $id; Ok = $false }
-        @{ Name = 'expected package only PendingDelete';  Raw = (New-Draft -Packages @([ordered] @{ version = '1.1.7.0'; fileStatus = 'PendingDelete' })); Id = $id; Ok = $false }
-        @{ Name = 'newer live package in the draft';      Raw = (New-Draft -Packages @([ordered] @{ version = '1.1.7.0'; fileStatus = 'Uploaded' }, [ordered] @{ version = '1.1.10.0'; fileStatus = 'PendingUpload' })); Id = $id; Ok = $false }
-        @{ Name = 'unreadable package version';           Raw = (New-Draft -Packages @([ordered] @{ version = '1.1.7.0'; fileStatus = 'Uploaded' }, [ordered] @{ version = 'v2'; fileStatus = 'Uploaded' })); Id = $id; Ok = $false }
+        @{ Name = 'expected package only PendingDelete';  Raw = (New-Draft -Packages @([ordered] @{ version = '1.1.7.0'; fileName = 'ServerAlyzer_1.1.7.0_x64_300116d.msix'; fileStatus = 'PendingDelete' })); Id = $id; Ok = $false }
+        @{ Name = 'newer live package in the draft';      Raw = (New-Draft -Packages @([ordered] @{ version = '1.1.7.0'; fileName = 'ServerAlyzer_1.1.7.0_x64_300116d.msix'; fileStatus = 'Uploaded' }, [ordered] @{ version = '1.1.10.0'; fileStatus = 'PendingUpload' })); Id = $id; Ok = $false }
+        @{ Name = 'unreadable package version';           Raw = (New-Draft -Packages @([ordered] @{ version = '1.1.7.0'; fileName = 'ServerAlyzer_1.1.7.0_x64_300116d.msix'; fileStatus = 'Uploaded' }, [ordered] @{ version = 'v2'; fileStatus = 'Uploaded' })); Id = $id; Ok = $false }
+        @{ Name = 'package of another commit (same version)'; Raw = (New-Draft -Packages @([ordered] @{ version = '1.1.7.0'; fileName = 'ServerAlyzer_1.1.7.0_x64_abcdef0.msix'; fileStatus = 'PendingUpload' })); Id = $id; Ok = $false }
+        @{ Name = 'package file name missing';            Raw = (New-Draft -Packages @([ordered] @{ version = '1.1.7.0'; fileStatus = 'PendingUpload' })); Id = $id; Ok = $false }
+        @{ Name = 'package file name in other case';      Raw = (New-Draft -Packages @([ordered] @{ version = '1.1.7.0'; fileName = 'ServerAlyzer_1.1.7.0_X64_300116D.msix'; fileStatus = 'PendingUpload' })); Id = $id; Ok = $false }
+        @{ Name = 'second live package, same version';    Raw = (New-Draft -Packages @([ordered] @{ version = '1.1.7.0'; fileName = 'ServerAlyzer_1.1.7.0_x64_300116d.msix'; fileStatus = 'PendingUpload' }, [ordered] @{ version = '1.1.7.0'; fileName = 'manual-upload.msix'; fileStatus = 'Uploaded' })); Id = $id; Ok = $false }
+        @{ Name = 'expected file name malformed';         Raw = (New-Draft); Id = $id; File = '..\ServerAlyzer_1.1.7.0_x64_300116d.msix'; Ok = $false }
         @{ Name = 'empty output';                         Raw = ''; Id = $id; Ok = $false }
         @{ Name = 'not JSON';                             Raw = 'error: could not reach the service'; Id = $id; Ok = $false }
         @{ Name = 'malformed JSON';                       Raw = '{"status": '; Id = $id; Ok = $false }
     )
     $failedNames = @()
     foreach ($case in $cases) {
-        $result = Test-StagedSubmission -Raw $case.Raw -ExpectedPackageVersion '1.1.7.0' -ExpectedVisibility 'Public' -ExpectedSubmissionId $case.Id
+        $file = if ($case.ContainsKey('File')) { $case.File } else { 'ServerAlyzer_1.1.7.0_x64_300116d.msix' }
+        $result = Test-StagedSubmission -Raw $case.Raw -ExpectedPackageVersion '1.1.7.0' -ExpectedVisibility 'Public' -ExpectedSubmissionId $case.Id -ExpectedPackageFileName $file
         $ok = ($result.Ok -eq $case.Ok)
         if (-not $ok) { $failedNames += $case.Name }
         Write-Host ("  {0}  {1,-38} ok={2,-5}  {3}" -f $(if ($ok) { 'ok  ' } else { 'FAIL' }), $case.Name, $result.Ok, $result.Reason)
@@ -223,7 +247,7 @@ if ($SelfTest) {
 
 if (-not (Test-Path -LiteralPath $SubmissionPath -PathType Leaf)) { throw "Submission output not found: $SubmissionPath" }
 $raw = Get-Content -LiteralPath $SubmissionPath -Raw
-$result = Test-StagedSubmission -Raw $raw -ExpectedPackageVersion $ExpectedPackageVersion -ExpectedVisibility $ExpectedVisibility -ExpectedSubmissionId $ExpectedSubmissionId
+$result = Test-StagedSubmission -Raw $raw -ExpectedPackageVersion $ExpectedPackageVersion -ExpectedVisibility $ExpectedVisibility -ExpectedSubmissionId $ExpectedSubmissionId -ExpectedPackageFileName $ExpectedPackageFileName
 if (-not $result.Ok) {
     throw @"
 STOP: $($result.Reason).

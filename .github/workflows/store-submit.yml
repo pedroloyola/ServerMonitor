@@ -78,6 +78,7 @@ jobs:
       RELEASE_TAG: ${{ inputs.release_tag }}
       PACKAGE_VERSION: ${{ inputs.package_version }}
       RELEASE_RUN_ID: ${{ inputs.release_run_id }}
+      STAGE_CONFIRM: ${{ inputs.confirm }}
       REPOSITORY: ${{ github.repository }}
       GH_TOKEN: ${{ github.token }}
     outputs:
@@ -91,6 +92,9 @@ jobs:
           if ($env:RELEASE_RUN_ID -cnotmatch '\A[1-9][0-9]*\z') { throw 'release_run_id must be a positive decimal run ID.' }
           if ($env:PACKAGE_VERSION -cnotmatch '\A[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\z') { throw 'package_version is not a four-part version.' }
           if ($env:REPOSITORY -cnotmatch '\A[A-Za-z0-9-]+/[A-Za-z0-9._-]+\z') { throw 'Unexpected repository name.' }
+          # Vigil P-1 N-1: a wrong phrase fails here, before anyone is asked to approve the Store environment.
+          # The submit job checks it again before any secret is used.
+          if ($env:STAGE_CONFIRM -cne 'STAGE') { throw 'Confirmation phrase was not STAGE. Nothing has been done.' }
 
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -297,6 +301,7 @@ jobs:
           ./tools/release/Assert-StagedSubmission.ps1 `
             -SubmissionPath readback.json `
             -ExpectedPackageVersion $env:PACKAGE_VERSION `
+            -ExpectedPackageFileName "ServerAlyzer_${env:PACKAGE_VERSION}_x64_$($env:TAG_COMMIT.Substring(0, 7)).msix" `
             -ExpectedVisibility '${{ env.STORE_VISIBILITY }}' `
             -ListingReport
 

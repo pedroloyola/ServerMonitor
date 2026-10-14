@@ -1,14 +1,19 @@
-<# REL.0E P-1 counterproofs (BOSS section 10) for the staged-draft guard that both store-submit (read-back) and
-   store-certify (last read before the commit) rely on. Baseline: the guard's own -SelfTest passes. Then
-   each check is weakened in a temporary COPY, and the copy's -SelfTest must fail on the NAMED case;
-   finally the untouched guard passes again. Synthetic JSON only; nothing talks to the Store. #>
+<# REL.0E P-1 counterproofs (BOSS section 10) for the draft guards the Store workflows rely on: the staged-draft
+   guard (store-submit read-back, store-certify last read before the commit) and the in-flight guard
+   (store-submit refuses to re-stage over a draft, because msstore publish deletes it). Baseline: each
+   guard's own -SelfTest passes. Then each check is weakened in a temporary COPY, and the copy's -SelfTest
+   must fail on the NAMED case; finally the untouched guards pass again. Synthetic JSON only; nothing talks
+   to the Store. #>
 [CmdletBinding()]
 param()
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$guard = Join-Path $PSScriptRoot 'Assert-StagedSubmission.ps1'
-if (-not (Test-Path -LiteralPath $guard -PathType Leaf)) { throw 'Assert-StagedSubmission.ps1 is missing.' }
+$guards = @{
+    'Assert-StagedSubmission.ps1'    = 'Staged submission cases failed:'
+    'Assert-NoPendingSubmission.ps1' = 'Pending-submission cases failed:'
+}
+foreach ($name in $guards.Keys) { if (-not (Test-Path -LiteralPath (Join-Path $PSScriptRoot $name) -PathType Leaf)) { throw "$name is missing." } }
 $temp = Join-Path ([IO.Path]::GetTempPath()) ('stage-certify-mutations-' + [guid]::NewGuid().ToString('n'))
 New-Item -ItemType Directory -Path $temp | Out-Null
 
@@ -32,31 +37,41 @@ $mutations = @(
     @{ Name = 'PendingDelete package counted as live'
        Old = "if ([string]::Equals([string] (Get-Field `$package 'fileStatus'), 'PendingDelete', [StringComparison]::OrdinalIgnoreCase)) { continue }"; New = ''; Case = 'expected package only PendingDelete' }
     @{ Name = 'expected package not required'
-       Old = 'if ($versions -cnotcontains $ExpectedPackageVersion) {'; New = 'if ($false) {'; Case = 'expected package absent' }
+       Old = 'if ($versions -cnotcontains $ExpectedPackageVersion -or -not $namedPackage) {'; New = 'if ($false) {'; Case = 'expected package absent' }
     @{ Name = 'empty CLI output parsed as nothing to refuse'
-       Old = "if ([string]::IsNullOrWhiteSpace(`$Raw)) { throw 'the CLI returned nothing' }"; New = "if ([string]::IsNullOrWhiteSpace(`$Raw)) { return [pscustomobject] @{ status = 'PendingCommit'; id = '1152921505701819999'; targetPublishMode = 'Manual'; visibility = 'Public'; applicationPackages = @([pscustomobject] @{ version = '1.1.7.0' }) } }"; Case = 'empty output' }
+       Old = "if ([string]::IsNullOrWhiteSpace(`$Raw)) { throw 'the CLI returned nothing' }"; New = "if ([string]::IsNullOrWhiteSpace(`$Raw)) { return [pscustomobject] @{ status = 'PendingCommit'; id = '1152921505701819999'; targetPublishMode = 'Manual'; visibility = 'Public'; applicationPackages = @([pscustomobject] @{ version = '1.1.7.0'; fileName = 'ServerAlyzer_1.1.7.0_x64_300116d.msix' }) } }"; Case = 'empty output' }
+    # PR #56 fix round 1 (Vigil L-1): the package must be the file uploaded from the tag commit.
+    @{ Name = 'package file name not bound to the tag commit'
+       Old = "if (-not [string]::Equals(`$fileName, `$ExpectedPackageFileName, [StringComparison]::Ordinal)) {"; New = 'if ($false) {'; Case = 'package of another commit (same version)' }
+    @{ Name = 'package file name compared case-insensitively'
+       Old = "[string]::Equals(`$fileName, `$ExpectedPackageFileName, [StringComparison]::Ordinal)"; New = "[string]::Equals(`$fileName, `$ExpectedPackageFileName, [StringComparison]::OrdinalIgnoreCase)"; Case = 'package file name in other case' }
+    # PR #56 fix round 1 (Relay M-1, W5): the in-flight guard's DEFAULT, which store-submit relies on.
+    @{ Name = 'W5 default allowed statuses widened to PendingCommit'; Guard = 'Assert-NoPendingSubmission.ps1'
+       Old = "[string[]] `$AllowedStatuses = @('None', 'Published', 'Canceled')"; New = "[string[]] `$AllowedStatuses = @('None', 'Published', 'Canceled', 'PendingCommit')"; Case = 'draft a human is still editing' }
+    @{ Name = 'default allowed statuses widened to CommitStarted'; Guard = 'Assert-NoPendingSubmission.ps1'
+       Old = "[string[]] `$AllowedStatuses = @('None', 'Published', 'Canceled')"; New = "[string[]] `$AllowedStatuses = @('None', 'Published', 'Canceled', 'CommitStarted')"; Case = 'commit under way' }
 )
 
 try {
-    & $guard -SelfTest 6> $null | Out-Null
-    Write-Host 'BASELINE: Assert-StagedSubmission.ps1 -SelfTest passes.'
-    $source = Get-Content -LiteralPath $guard -Raw
+    foreach ($name in $guards.Keys) { & (Join-Path $PSScriptRoot $name) -SelfTest 6> $null | Out-Null; Write-Host "BASELINE: $name -SelfTest passes." }
     foreach ($mutation in $mutations) {
+        $name = if ($mutation.ContainsKey('Guard')) { $mutation.Guard } else { 'Assert-StagedSubmission.ps1' }
+        $source = Get-Content -LiteralPath (Join-Path $PSScriptRoot $name) -Raw
         if (-not $source.Contains($mutation.Old)) { throw "Mutation target missing: $($mutation.Name)" }
-        $copy = Join-Path $temp 'Assert-StagedSubmission.ps1'
+        $copy = Join-Path $temp $name
         Set-Content -LiteralPath $copy -Value $source.Replace($mutation.Old, $mutation.New)
         $detected = $false
         try { & $copy -SelfTest 6> $null | Out-Null }
         catch {
             # Only a failure of the NAMED case counts; a parse error or another case does not kill the mutation.
-            if ($_.Exception.Message.StartsWith('Staged submission cases failed:') -and $_.Exception.Message.Contains($mutation.Case)) { $detected = $true }
+            if ($_.Exception.Message.StartsWith($guards[$name]) -and $_.Exception.Message.Contains($mutation.Case)) { $detected = $true }
             else { throw "Mutation '$($mutation.Name)' failed for another reason: $($_.Exception.Message)" }
         }
         if (-not $detected) { throw "SURVIVED: $($mutation.Name)" }
         Write-Host "MUTATION DETECTED: $($mutation.Name) [$($mutation.Case)]"
     }
-    & $guard -SelfTest 6> $null | Out-Null
-    Write-Host "All $($mutations.Count) staged-draft mutations detected; the original guard passed again."
+    foreach ($name in $guards.Keys) { & (Join-Path $PSScriptRoot $name) -SelfTest 6> $null | Out-Null }
+    Write-Host "All $($mutations.Count) draft-guard mutations detected; the original guards passed again."
 }
 finally {
     $resolved = [IO.Path]::GetFullPath($temp)

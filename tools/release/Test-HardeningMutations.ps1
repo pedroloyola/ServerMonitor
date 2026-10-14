@@ -48,7 +48,14 @@ $selfTesting = @(
     @{ Name = 'P-1 upload checked for --noCommit anywhere, not on the upload line'; Guard = 'Test-ReleaseWorkflowShape.ps1'
        Old = "if (`$uploads[0].Value -notmatch '\s--noCommit\s*`$')"; New = "if (`$all -notmatch '--noCommit')"; Marker = 'SURVIVED: store-submit.yml / upload without --noCommit' }
     @{ Name = 'P-1 certify proof accepted without the submission id'; Guard = 'Test-ReleaseWorkflowShape.ps1'
-       Old = '\s*\n\s+-ExpectedSubmissionId \$env:SUBMISSION_ID\b'''; New = ''''; Marker = 'SURVIVED: store-certify.yml / staged draft not bound by id' }
+       Old = "`$staged = Get-StagedCall `$certify '-ExpectedSubmissionId `$env:SUBMISSION_ID ``'"; New = "`$staged = `$certify.IndexOf('./tools/release/Assert-StagedSubmission.ps1 ``')"; Marker = 'SURVIVED: store-certify.yml / staged draft not bound by id' }
+    # PR #56 fix round 1.
+    @{ Name = 'P-1 staged-call matcher ignores the arguments (file name, id)'; Guard = 'Test-ReleaseWorkflowShape.ps1'
+       Old = "'(?s)\./tools/release/Assert-StagedSubmission\.ps1 ``(?:\s*\n\s+-[A-Za-z]+[^\n]*``)*?\s*\n\s+' + [regex]::Escape(`$Argument)"; New = "'(?s)\./tools/release/Assert-StagedSubmission\.ps1 ``'"; Marker = 'SURVIVED: store-submit.yml / read-back file name not bound to the tag commit' }
+    @{ Name = 'P-1 in-flight call matched by substring (extra -AllowedStatuses accepted)'; Guard = 'Test-ReleaseWorkflowShape.ps1'
+       Old = "-cnotmatch '\A\s+\./tools/release/Assert-NoPendingSubmission\.ps1 -SubmissionPath before\.json\s*\z'"; New = "-cnotmatch 'Assert-NoPendingSubmission\.ps1 -SubmissionPath before\.json'"; Marker = 'SURVIVED: store-submit.yml / W3 call site lets PendingCommit through' }
+    @{ Name = 'P-1 SUBMISSION_ID reassignment not refused'; Guard = 'Test-ReleaseWorkflowShape.ps1'
+       Old = "if (`$all -match '(?i)\`$env:SUBMISSION_ID\s*[-+*/]?=(?!=)|"; New = "if (`$false -and `$all -match '(?i)\`$env:SUBMISSION_ID\s*[-+*/]?=(?!=)|"; Marker = 'SURVIVED: store-certify.yml / W4 id reassigned from the draft' }
     @{ Name = 'P-1 any step may be conditional'; Guard = 'Test-ReleaseWorkflowShape.ps1'
        Old = "if (`$step -match '(?m)^        if:' -and"; New = "if (`$false -and"; Marker = 'SURVIVED: store-submit.yml / upload runs after a failed guard' }
 )
