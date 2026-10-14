@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag to build (must already exist, e.g. v1.1.2)'
+        description: 'Tag to build (must already exist, e.g. v1.1.7)'
         required: true
         type: string
       create_release:
@@ -49,12 +49,15 @@ jobs:
     steps:
       - name: Resolve the tag
         id: resolve
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+          REF_NAME: ${{ github.ref_name }}
         shell: pwsh
         run: |
-          $tag = '${{ inputs.tag }}'
-          if (-not $tag) { $tag = '${{ github.ref_name }}' }
+          $tag = $env:INPUT_TAG
+          if (-not $tag) { $tag = $env:REF_NAME }
           if (-not $tag) { throw 'No tag to build.' }
-          if ($tag -notmatch '^v\d+\.\d+\.\d+$') { throw "Refusing to build '$tag': not a vMAJOR.MINOR.PATCH release tag." }
+          if ($tag -notmatch '\Av[0-9]+\.[0-9]+\.[0-9]+\z') { throw "Refusing to build '$tag': not a vMAJOR.MINOR.PATCH release tag." }
           "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           Write-Host "Building tag $tag"
 
@@ -72,6 +75,12 @@ jobs:
         run: |
           $commit = (git rev-parse HEAD).Trim()
           ./tools/release/Assert-TagVersion.ps1 -Tag '${{ steps.resolve.outputs.tag }}' -ExpectedCommit $commit
+
+      - name: Package version floor and Store revision
+        shell: pwsh
+        env:
+          PACKAGE_VERSION: ${{ steps.tagcheck.outputs.packageVersion }}
+        run: ./tools/release/Assert-PackageVersionFloor.ps1 -PackageVersion $env:PACKAGE_VERSION
 
       - name: Setup .NET 10 SDK
         uses: actions/setup-dotnet@v4
@@ -104,6 +113,10 @@ jobs:
       - name: Self-test the release checks
         shell: pwsh
         run: |
+          ./tools/release/Test-PackageVersionFloor.ps1
+          ./tools/release/Test-TagVersion.ps1
+          ./tools/release/Test-VersionGuardMutations.ps1
+          ./tools/release/Assert-NoPendingSubmission.ps1 -SelfTest
           ./tools/release/Test-ReleaseChecks.ps1
           ./tools/release/Test-DistributionPrivacy.ps1
           ./tools/release/Test-StoreSubmissionUpdate.ps1

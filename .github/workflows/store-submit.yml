@@ -23,7 +23,7 @@ on:
         required: true
         type: string
       package_version:
-        description: 'Expected package version, e.g. 1.1.2.0'
+        description: 'Expected package version, Revision 0 and at least the tracked floor, e.g. 1.1.7.0'
         required: true
         type: string
       expected_sha256:
@@ -54,6 +54,11 @@ env:
 jobs:
   submit:
     runs-on: windows-latest
+    env:
+      INPUT_CONFIRM: ${{ inputs.confirm }}
+      PACKAGE_VERSION: ${{ inputs.package_version }}
+      EXPECTED_SHA256: ${{ inputs.expected_sha256 }}
+      RELEASE_RUN_ID: ${{ inputs.release_run_id }}
 
     # Gate. The environment carries the Store secrets AND the required reviewer, so nothing
     # below runs until a human approves this specific run.
@@ -69,13 +74,14 @@ jobs:
       - name: Check the confirmation phrase
         shell: pwsh
         run: |
-          if ('${{ inputs.confirm }}' -cne 'SUBMIT') {
+          if ($env:RELEASE_RUN_ID -notmatch '\A[1-9][0-9]*\z') { throw 'release_run_id must be a positive decimal run ID.' }
+          if ($env:INPUT_CONFIRM -cne 'SUBMIT') {
             throw "Confirmation phrase was not SUBMIT. Nothing has been done."
           }
-          if ('${{ inputs.package_version }}' -notmatch '^\d+\.\d+\.\d+\.\d+$') {
-            throw "package_version '${{ inputs.package_version }}' is not a four-part version."
+          if ($env:PACKAGE_VERSION -notmatch '\A[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\z') {
+            throw "package_version is not a four-part version."
           }
-          if ('${{ inputs.expected_sha256 }}' -notmatch '^[0-9a-fA-F]{64}$') {
+          if ($env:EXPECTED_SHA256 -notmatch '\A[0-9a-fA-F]{64}\z') {
             throw 'expected_sha256 is not a 64-character hex digest.'
           }
 
@@ -85,15 +91,16 @@ jobs:
       - name: Download the package from the release-build run
         uses: actions/download-artifact@v4
         with:
-          run-id: ${{ inputs.release_run_id }}
+          run-id: ${{ env.RELEASE_RUN_ID }}
           github-token: ${{ github.token }}
-          name: serveralyzer-msix-${{ inputs.package_version }}
+          name: serveralyzer-msix-${{ env.PACKAGE_VERSION }}
           path: incoming
 
       - name: Re-verify the package before anything touches the Store
         id: verify
         shell: pwsh
         run: |
+          ./tools/release/Assert-PackageVersionFloor.ps1 -PackageVersion $env:PACKAGE_VERSION
           $packages = @(Get-ChildItem -Path incoming -Filter '*.msix' -Recurse)
           if ($packages.Count -ne 1) {
             throw "Expected exactly one MSIX in the artifact, found $($packages.Count)."
@@ -104,9 +111,9 @@ jobs:
           # Independent of the checksum file that travelled with the artifact.
           ./tools/release/Assert-PackageIdentity.ps1 `
             -PackagePath $package `
-            -ExpectedVersion '${{ inputs.package_version }}' `
+            -ExpectedVersion $env:PACKAGE_VERSION `
             -ExpectedIdentityName '${{ env.STORE_IDENTITY_NAME }}' `
-            -ExpectedSha256 '${{ inputs.expected_sha256 }}'
+            -ExpectedSha256 $env:EXPECTED_SHA256
 
           # PRIV-PDBPATH, re-checked with THIS checkout's gate: a release-build run from before the
           # gate existed (artifacts are kept 90 days) must not be submittable just because it is
@@ -167,7 +174,7 @@ jobs:
           ./tools/release/Update-StoreSubmission.ps1 `
             -SubmissionPath draft.json `
             -OutputPath updated.json `
-            -ExpectedPackageVersion '${{ inputs.package_version }}' `
+            -ExpectedPackageVersion $env:PACKAGE_VERSION `
             -ExpectedVisibility '${{ env.STORE_VISIBILITY }}'
 
       - name: Apply the metadata

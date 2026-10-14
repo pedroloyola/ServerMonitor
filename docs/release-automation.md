@@ -95,6 +95,30 @@ Read-only. Reports one of:
 to its audience and to nobody else, and the report says so rather than claiming the product
 is live.
 
+## Package version floor
+
+`release/min-package-version.txt` tracks the minimum acceptable package version, currently
+**1.1.7.0**. It exceeds the installed Developer version 1.1.2.2 and the local QA versions
+1.1.3.0 through 1.1.6.0, preserving the upgrade path. This is the provisional REL.0
+candidate, not a reservation for a commercial release; a future release may use 1.2.0.0.
+
+`Assert-PackageVersionFloor.ps1` requires exactly four canonical decimal components,
+MSIX component bounds and **Revision = 0** (a nonzero revision was rejected by Partner
+Center). Missing, malformed or ambiguous floor files stop the run. Equality is allowed
+for a retry of the same candidate; this tracked floor is not a live Store history query.
+
+The release workflow checks the floor after tag/source coherence and before building or
+uploading. The submission workflow checks it again with the current checkout's floor,
+before any Store CLI or secret use, and verifies that the actual package identity matches
+that checked version. An older artifact cannot bypass the current submission gate.
+
+To raise the floor, review all previously used Developer, QA and Store versions, select a
+strictly higher four-part version ending in `.0`, update the single version line in the
+floor file and explain the reason in its comments. Never lower it to accept an old artifact.
+Run the floor, tag and mutation suites below. The RC preparation updates the project and
+both manifests together and creates the matching `vMAJOR.MINOR.PATCH` tag separately;
+changing the floor alone does not bump those files or authorize a release.
+
 ## Distribution privacy
 
 A build records where it ran. Without care, every Release DLL carried the PDB path of the
@@ -262,6 +286,9 @@ repository, not in an issue, not in a run log.
 Everything the workflows rely on runs offline:
 
 ```powershell
+./tools/release/Test-PackageVersionFloor.ps1   # synthetic floor and revision cases
+./tools/release/Test-TagVersion.ps1            # synthetic tag/source coherence cases
+./tools/release/Test-VersionGuardMutations.ps1 # remove checks; require suite failures; rerun originals
 ./tools/release/Test-ReleaseChecks.ps1          # package checks, 12 cases
 ./tools/release/Test-DistributionPrivacy.ps1    # distribution privacy, 52 cases
 ./tools/release/Test-StoreSubmissionUpdate.ps1  # publishing hold, 12 cases
