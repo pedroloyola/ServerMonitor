@@ -1,0 +1,9 @@
+01-overview: See at a glance which servers are healthy and which one needs attention.
+02-server-detail: One server in detail, with its system information and latest readings.
+03-history: Local history with charts from the last hour to the last 30 days.
+04-services-containers: In Services and containers, see system services and Docker containers, read-only.
+05-compact-mode: Compact mode: a small view of your servers that can stay on top.
+06-add-server: Add a server and test the connection step by step.
+07-settings: Choose the theme, status alerts and background mode in Settings.
+08-widget: The Windows 11 widget shows your servers on the Widgets board.
+09-backup: Create an encrypted backup and restore it from Data and servers in Settings.

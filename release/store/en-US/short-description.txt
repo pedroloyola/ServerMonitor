@@ -1,0 +1,1 @@
+Monitor the Linux and macOS servers you run, straight from Windows 11 over SSH: no agent, no account. See health, CPU, memory, disk and uptime at a glance, keep 30 days of local history, and check Docker containers and services read-only.

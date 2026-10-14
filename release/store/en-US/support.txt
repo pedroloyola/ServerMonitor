@@ -1,0 +1,21 @@
+Support contact
+https://github.com/pedroloyola/ServerMonitor/issues
+
+Website
+https://github.com/pedroloyola/ServerMonitor
+
+Privacy policy
+https://github.com/pedroloyola/ServerMonitor/blob/main/PRIVACY.md
+GATED: do not enter this URL until PRIVACY.md has been rewritten (see listing-requirements.md, Gated lines).
+
+Security issues
+Report them privately through GitHub Security Advisories on the repository (Security tab), not in a public issue.
+
+Additional system requirements (minimum hardware)
+Windows 11, x64
+Windows 11 version 22H2 or later for the Windows 11 widget
+Network access from this PC to your servers over SSH
+Servers running Linux or macOS with SSH enabled
+
+Copyright and trademark info
+Copyright (c) 2026 ServerAlyzer contributors
