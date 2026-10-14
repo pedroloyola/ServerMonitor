@@ -13,24 +13,29 @@ namespace ServerMonitor.App.Services;
 /// left alone.
 /// </para>
 /// <para>
-/// No override means the Windows display language is already the UI language: nothing is changed. The Windows culture
+/// WHICH culture is <see cref="ILocalizationService.FormattingCultureName"/> (fix round 1, Cortex M-1): null - no
+/// override, or one the app wrote for a regional variant of the Windows language - changes nothing. The Windows culture
 /// itself stays readable for the language decisions through the snapshot the real <see cref="IUiLanguagePlatform"/>
 /// takes when it is built, before this runs.
 /// </para>
 /// </summary>
 internal static class AppFormattingCulture
 {
-    /// <summary>The culture to format in for <paramref name="languageOverride"/>; null when there is none to apply.</summary>
-    public static CultureInfo? For(string? languageOverride)
+    /// <summary>
+    /// The culture to format in for <paramref name="cultureName"/>; null when there is none to apply. Built with the
+    /// user's Region customisations (Sentry nit): .NET applies them only when the name is the user's own regional format,
+    /// exactly as it did for the Windows culture this replaces; read-only, as a shared process culture should be.
+    /// </summary>
+    public static CultureInfo? For(string? cultureName)
     {
-        if (string.IsNullOrWhiteSpace(languageOverride))
+        if (string.IsNullOrWhiteSpace(cultureName))
         {
             return null;
         }
 
         try
         {
-            return CultureInfo.GetCultureInfo(languageOverride);
+            return CultureInfo.ReadOnly(new CultureInfo(cultureName, useUserOverride: true));
         }
         catch (CultureNotFoundException)
         {
@@ -38,11 +43,11 @@ internal static class AppFormattingCulture
         }
     }
 
-    /// <summary>Hands the culture for <paramref name="languageOverride"/>, if any, to <paramref name="applyUiCulture"/>.</summary>
-    public static void Apply(string? languageOverride, Action<CultureInfo> applyUiCulture)
+    /// <summary>Hands the culture for <paramref name="cultureName"/>, if any, to <paramref name="applyUiCulture"/>.</summary>
+    public static void Apply(string? cultureName, Action<CultureInfo> applyUiCulture)
     {
         ArgumentNullException.ThrowIfNull(applyUiCulture);
-        if (For(languageOverride) is { } culture)
+        if (For(cultureName) is { } culture)
         {
             applyUiCulture(culture);
         }

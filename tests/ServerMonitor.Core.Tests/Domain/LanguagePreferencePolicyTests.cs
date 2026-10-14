@@ -158,6 +158,61 @@ public sealed class LanguagePreferencePolicyTests
     public void TheHint_IsOfferedWhenOnlyAnotherWriterHasARecord(string systemCulture, string expected) =>
         Assert.Equal(expected, LanguagePreferencePolicy.LegacyHintTarget("pt-BR", systemCulture, OtherWriter));
 
+    // ---- REL.0E (PR #57 fix round 1, Cortex M-1): the formatting culture ----------------------------------------------
+
+    /// <summary>The app's own override for a regional variant of the Windows language changes only the resources.</summary>
+    [Theory]
+    [InlineData("en-GB", "en-US")]
+    [InlineData("en-ZA", "en-US")]
+    [InlineData("en-IN", "en-US")]
+    [InlineData("pt-AO", "pt-PT")]
+    [InlineData("pt-MZ", "pt-PT")]
+    [InlineData("pt", "pt-PT")]
+    public void TheAppsOwnOverride_ForARegionalVariant_KeepsTheWindowsFormat(string systemCulture, string written) =>
+        Assert.Null(LanguagePreferencePolicy.FormattingCulture(written, systemCulture, Following(written)));
+
+    /// <summary>A language the app does not have formats in the default it shows (the text and the numbers agree).</summary>
+    [Theory]
+    [InlineData("fr-FR")]
+    [InlineData("de-DE")]
+    [InlineData("")]
+    public void TheAppsOwnOverride_ForAnotherLanguage_FormatsInIt(string systemCulture) =>
+        Assert.Equal("en-US", LanguagePreferencePolicy.FormattingCulture("en-US", systemCulture, Following("en-US")));
+
+    /// <summary>The user's choice formats in the choice, even in the same base language as Windows.</summary>
+    [Theory]
+    [InlineData("en-US", "en-GB")]
+    [InlineData("pt-PT", "pt-BR")]
+    [InlineData("pt-BR", "pt-PT")]
+    [InlineData("en-US", "pt-BR")]
+    [InlineData("pt-PT", "en-US")]
+    public void AnExplicitChoice_FormatsInTheChoice(string choice, string systemCulture) =>
+        Assert.Equal(choice, LanguagePreferencePolicy.FormattingCulture(choice, systemCulture, ExplicitRecord));
+
+    /// <summary>
+    /// #55 semantics, kept on purpose: without a valid record of this identity (none, unreadable, another identity's,
+    /// or one that no longer matches) the override is the user's choice, and formats in it.
+    /// </summary>
+    [Fact]
+    public void WithoutAValidMatchingRecord_TheOverrideIsAChoice_AndFormatsInIt()
+    {
+        Assert.Equal("en-US", LanguagePreferencePolicy.FormattingCulture("en-US", "en-GB", Absent));
+        Assert.Equal("en-US", LanguagePreferencePolicy.FormattingCulture("en-US", "en-GB", Unreadable));
+        Assert.Equal("en-US", LanguagePreferencePolicy.FormattingCulture("en-US", "en-GB", OtherWriter));
+        Assert.Equal("en-US", LanguagePreferencePolicy.FormattingCulture("en-US", "en-GB", Following("pt-PT")));
+        Assert.Equal("pt-BR", LanguagePreferencePolicy.FormattingCulture("pt-BR", "pt-PT", Absent)); // v1.x legacy
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("  ")]
+    public void NoOverride_KeepsTheWindowsFormat(string? persisted)
+    {
+        Assert.Null(LanguagePreferencePolicy.FormattingCulture(persisted, "en-GB", Following("")));
+        Assert.Null(LanguagePreferencePolicy.FormattingCulture(persisted, "fr-FR", Absent));
+    }
+
     // ---- follows the system (the picker's first item) ---------------------------------------------------------------
 
     [Theory]

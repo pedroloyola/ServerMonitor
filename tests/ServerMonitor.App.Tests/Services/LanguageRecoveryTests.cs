@@ -294,7 +294,9 @@ public sealed class LanguageRecoveryTests : IDisposable
 
         Assert.Equal(["en-US", "pt-PT"], platform.Writes);
         Assert.True(next.Services.GetRequiredService<ILocalizationService>().FollowsSystemLanguage);
-        Assert.Equal(["en-US", "pt-PT"], _formattingCultures);
+        // REL.0E fix round 1 (Cortex M-1): fr-FR formats in en-US, the language it shows; on pt-AO the app's own pt-PT is
+        // a regional variant of the Windows language, which keeps its own format - nothing is applied.
+        Assert.Equal(["en-US"], _formattingCultures);
     }
 
     [Fact]

@@ -11,6 +11,13 @@ public interface ILocalizationService
     bool FollowsSystemLanguage => CurrentLanguageOverride is null;
 
     /// <summary>
+    /// REL.0E: the culture numbers and dates format in (null = the Windows UI culture), the ONE decision the launch
+    /// applies to the process and History formats with. The real service keeps a regional variant of the Windows language
+    /// (Cortex M-1); the default is the override itself.
+    /// </summary>
+    string? FormattingCultureName => CurrentLanguageOverride;
+
+    /// <summary>
     /// REL.0D: the language the one-time legacy hint offers (the effective system language, e.g. en-US on fr-FR), or
     /// null when no hint is due. Only the real service can tell; the default is never.
     /// </summary>

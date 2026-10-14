@@ -18,6 +18,7 @@ public sealed class LocalizationService : ILocalizationService
     private readonly IUiLanguagePlatform _platform;
     private readonly ILanguageSettingsStore _settings;
     private readonly Lazy<ResourceLoader> _resourceLoader = new(() => new ResourceLoader());
+    private readonly Lazy<string?> _formattingCulture;
 
     public LocalizationService(ILogger<LocalizationService> logger, ILanguageSettingsStore settings)
         : this(logger, new WindowsUiLanguagePlatform(), settings)
@@ -30,6 +31,8 @@ public sealed class LocalizationService : ILocalizationService
         _logger = logger;
         _platform = platform;
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
+        _formattingCulture = new(() =>
+            LanguagePreferencePolicy.FormattingCulture(CurrentLanguageOverride, _platform.SystemUiCultureName, _settings.Read()));
     }
 
     public string? CurrentLanguageOverride =>
@@ -42,6 +45,12 @@ public sealed class LocalizationService : ILocalizationService
 
     public string? PendingLegacyLanguageHint =>
         LanguagePreferencePolicy.LegacyHintTarget(CurrentLanguageOverride, _platform.SystemUiCultureName, _settings.Read());
+
+    /// <summary>
+    /// REL.0E: decided once, on first read - after <see cref="InitializeFromSystem"/> in the launch - and kept for the
+    /// process, like the text: a language picked in Settings applies after the restart.
+    /// </summary>
+    public string? FormattingCultureName => _formattingCulture.Value;
 
     public void InitializeFromSystem()
     {

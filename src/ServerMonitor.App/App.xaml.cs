@@ -458,7 +458,8 @@ public partial class App : Application
         localization.InitializeFromSystem();
         // REL.0E: only now, with the language final for this process. The real platform read the Windows culture when
         // the service was resolved just above, so the recovery hint and "Use system language" keep seeing Windows.
-        AppFormattingCulture.Apply(localization.CurrentLanguageOverride, applyUiCulture);
+        // Fix round 1 (Cortex M-1): the service's formatting decision, not the raw override.
+        AppFormattingCulture.Apply(localization.FormattingCultureName, applyUiCulture);
         return host;
     }
 
