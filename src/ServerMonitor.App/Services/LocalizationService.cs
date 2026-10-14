@@ -128,15 +128,22 @@ public sealed class LocalizationService : ILocalizationService
         }
     }
 
-    /// <summary>The real platform: the Windows App SDK override and the current Windows UI culture.</summary>
-    private sealed class WindowsUiLanguagePlatform : IUiLanguagePlatform
+    /// <summary>
+    /// The real platform: the Windows App SDK override and the Windows UI culture.
+    /// REL.0E: the culture is read ONCE, when the platform is built (with the service, before
+    /// <see cref="AppFormattingCulture"/> points .NET's UI culture at the app language), so the recovery hint and
+    /// "Use system language" keep seeing Windows. .NET caches it per process anyway: nothing more recent was ever seen.
+    /// </summary>
+    internal sealed class WindowsUiLanguagePlatform : IUiLanguagePlatform
     {
+        private readonly string _systemUiCultureName = CultureInfo.CurrentUICulture.Name;
+
         public string? PrimaryLanguageOverride
         {
             get => ApplicationLanguages.PrimaryLanguageOverride;
             set => ApplicationLanguages.PrimaryLanguageOverride = value;
         }
 
-        public string SystemUiCultureName => CultureInfo.CurrentUICulture.Name;
+        public string SystemUiCultureName => _systemUiCultureName;
     }
 }

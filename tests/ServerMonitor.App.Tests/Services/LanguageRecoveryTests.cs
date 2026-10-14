@@ -20,6 +20,9 @@ public sealed class LanguageRecoveryTests : IDisposable
 {
     private readonly string _directory = Path.Combine(Path.GetTempPath(), "sm-language-recovery-" + Guid.NewGuid().ToString("N"));
 
+    // REL.0E: the launch host's process UI culture, recorded instead of changed under the parallel suite.
+    private readonly List<string> _formattingCultures = [];
+
     public void Dispose()
     {
         try
@@ -281,16 +284,17 @@ public sealed class LanguageRecoveryTests : IDisposable
     {
         var platform = new FakeUiLanguagePlatform("fr-FR");
 
-        using (App.BuildServicesHost(services => services.AddSingleton<ILocalizationService>(Service(platform, FileStore()))))
+        using (App.BuildServicesHost(services => services.AddSingleton<ILocalizationService>(Service(platform, FileStore())), RecordCulture))
         {
         }
 
         Assert.Equal(LanguageRecordRead.Of(LanguageProvenance.System("en-US")), FileStore().Read());
         platform.SystemUiCultureName = "pt-AO";
-        using var next = App.BuildServicesHost(services => services.AddSingleton<ILocalizationService>(Service(platform, FileStore())));
+        using var next = App.BuildServicesHost(services => services.AddSingleton<ILocalizationService>(Service(platform, FileStore())), RecordCulture);
 
         Assert.Equal(["en-US", "pt-PT"], platform.Writes);
         Assert.True(next.Services.GetRequiredService<ILocalizationService>().FollowsSystemLanguage);
+        Assert.Equal(["en-US", "pt-PT"], _formattingCultures);
     }
 
     [Fact]
@@ -298,11 +302,12 @@ public sealed class LanguageRecoveryTests : IDisposable
     {
         var platform = new FakeUiLanguagePlatform("fr-FR", "pt-BR");
 
-        using var host = App.BuildServicesHost(services => services.AddSingleton<ILocalizationService>(Service(platform, FileStore())));
+        using var host = App.BuildServicesHost(services => services.AddSingleton<ILocalizationService>(Service(platform, FileStore())), RecordCulture);
 
         Assert.Empty(platform.Writes);
         Assert.Equal(LanguageRecordRead.Absent, FileStore().Read());
         Assert.Equal("en-US", host.Services.GetRequiredService<ILocalizationService>().PendingLegacyLanguageHint);
+        Assert.Equal(["pt-BR"], _formattingCultures); // the legacy pt-BR is the language shown until the user decides
     }
 
     [Fact]
@@ -632,6 +637,8 @@ public sealed class LanguageRecoveryTests : IDisposable
     /// <summary>The hint over the real service; strings come from the en-US resw (the real ResourceLoader needs a package).</summary>
     private static LanguageRecoveryHintViewModel Hint(FakeUiLanguagePlatform platform, ILanguageSettingsStore store) =>
         new(new ResWStrings(Service(platform, store), new ResWLocalizationService("en-US")));
+
+    private void RecordCulture(System.Globalization.CultureInfo culture) => _formattingCultures.Add(culture.Name);
 
     private JsonLanguageSettingsStore FileStore(string writer = "unpackaged") =>
         new(new LanguageSettingsStorageOptions { FilePath = Path.Combine(_directory, "language-settings.json"), Writer = writer },
