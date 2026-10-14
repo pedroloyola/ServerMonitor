@@ -3,6 +3,7 @@ using Microsoft.UI.Dispatching;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using ServerMonitor.App.Windowing;
+using ServerMonitor.Core.Interfaces;
 using WinUIEx;
 
 namespace ServerMonitor.App.Services;
@@ -10,6 +11,7 @@ namespace ServerMonitor.App.Services;
 public sealed class ApplicationWindowController(
     INavigationService navigationService,
     IWindowModeCoordinator modeCoordinator,
+    IServerDiscoveryService discoveryService,
     ILogger<ApplicationWindowController> logger) : IApplicationWindowController
 {
     /// <summary>
@@ -115,33 +117,45 @@ public sealed class ApplicationWindowController(
         }
     }
 
-    private void HideForMinimizeCore() => RunOnUiThread(() =>
+    private void HideForMinimizeCore()
     {
-        if (_appWindow is null)
+        // REL.0B: no local-network listener while hidden; a later explicit search starts it again. Requested BEFORE and
+        // independently of the UI-thread hop, so it holds even with no window/dispatcher attached (thread-safe, never throws).
+        LocalNetworkSearchLifetime.StopForBackground(discoveryService, logger);
+        RunOnUiThread(() =>
         {
-            return;
-        }
+            if (_appWindow is null)
+            {
+                return;
+            }
 
-        _appWindow.IsShownInSwitchers = false;
-        _appWindow.Hide();
-        logger.LogDebug("Main window hidden after minimize.");
-    });
+            _appWindow.IsShownInSwitchers = false;
+            _appWindow.Hide();
+            logger.LogDebug("Main window hidden after minimize.");
+        });
+    }
 
     /// <summary>
     /// The BACKGROUND transition. Identical window mechanics to the minimize path; a headless process
     /// with no window is already in the target state, so this is a no-op there rather than an error.
     /// </summary>
-    private void HideToBackgroundCore() => RunOnUiThread(() =>
+    private void HideToBackgroundCore()
     {
-        if (_appWindow is null)
+        // REL.0B: no local-network listener in the background; a later explicit search starts it again. Requested BEFORE
+        // and independently of the UI-thread hop (see HideForMinimizeCore).
+        LocalNetworkSearchLifetime.StopForBackground(discoveryService, logger);
+        RunOnUiThread(() =>
         {
-            return;
-        }
+            if (_appWindow is null)
+            {
+                return;
+            }
 
-        _appWindow.IsShownInSwitchers = false;
-        _appWindow.Hide();
-        logger.LogDebug("Main window hidden to background.");
-    });
+            _appWindow.IsShownInSwitchers = false;
+            _appWindow.Hide();
+            logger.LogDebug("Main window hidden to background.");
+        });
+    }
 
     /// <summary>
     /// Tray "Abrir", the OpenDashboard notification and the second-instance redirect: shows the window in the mode it is

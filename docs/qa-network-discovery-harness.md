@@ -10,7 +10,7 @@ O harness existe apenas em builds Debug:
 dotnet run --project src/ServerMonitor.App/ServerMonitor.App.csproj -c Debug -- --qa-discovery
 ```
 
-O modo `--qa-discovery` substitui a data plane por doubles inertes e apresenta dois anúncios `_ssh._tcp` em memória:
+O modo `--qa-discovery` substitui a data plane por doubles inertes e, depois de **Procurar na rede local**, apresenta dois anúncios `_ssh._tcp` em memória:
 
 - `Mac Studio` (`mac-studio.local:22`);
 - `Raspberry Pi` (`raspberrypi.local:22`).
@@ -19,6 +19,7 @@ Não abre sockets mDNS, não lê persistência, credenciais ou host-trust, não 
 
 ## Cenários visuais
 
+0. (REL.0B) ao abrir, **nada** é sugerido e não há indicador de pesquisa: o empty state mostra **Procurar na rede local** e a nota de que o Windows pode pedir permissão de rede. Clicar → indicador "A procurar…" durante ~3 s → os dois anúncios aparecem. Fechar para o tray e reabrir → a pesquisa parou e a acção volta a aparecer (igual à produção: discovery só arranca por acção explícita, nunca no arranque nem em `--background`);
 1. confirmar a hierarquia secundária, contador `2`, cards e scroll em Light e Dark;
 2. clicar **Ignorar** num item e confirmar contador `1` e independência do outro;
 3. ignorar ambos e confirmar que a secção desaparece;

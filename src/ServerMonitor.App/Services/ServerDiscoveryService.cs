@@ -12,9 +12,15 @@ namespace ServerMonitor.App.Services;
 /// the fakeable browser seam (<see cref="IMdnsServiceBrowser"/>), merges per-interface
 /// observations of the same instance by <see cref="ServiceInstanceIdentity"/> (never by IP),
 /// tracks first/last seen, expires silent observations and applies a short grace to removals —
-/// all through an injected <see cref="TimeProvider"/>. It runs as an <see cref="IHostedService"/>
-/// tied to the app host, raises <see cref="DiscoveredChanged"/> only on material changes, and
-/// never touches SSH, credentials, trust or metrics.
+/// all through an injected <see cref="TimeProvider"/>. It raises <see cref="DiscoveredChanged"/> only
+/// on material changes, and never touches SSH, credentials, trust or metrics.
+/// <para>
+/// REL.0B (UI9-FW-PROMPT): it is still registered as an <see cref="IHostedService"/>, but only so the host
+/// STOPS it on exit, in the documented reverse order. The host's start is deliberately a no-op: the browser
+/// binds UDP listeners on 0.0.0.0:5353 / [::]:5353, which is what raises the Windows Firewall prompt, so it
+/// starts only through <see cref="StartSearchAsync"/> from an explicit user action - never at launch and never
+/// in <c>--background</c>.
+/// </para>
 /// </summary>
 /// <remarks>
 /// The lifecycle (start/stop/dispose) is serialized behind a dedicated async gate and a small
@@ -62,6 +68,18 @@ public sealed class ServerDiscoveryService : IServerDiscoveryService, IServerDis
     private Task _notificationTask = Task.CompletedTask;
     private long _materialChangeVersion;
     private volatile bool _isSearching;
+    private DateTimeOffset _searchStartedAt;
+    // N-r2-2: something was visible at some point in THIS search (reset on start), so "nothing found" is never claimed
+    // for a search that showed a result which later expired.
+    private bool _sawResults;
+    // Vigil NIT-A / Cortex addendum: one automatic stop at a time; cleared when it fails so the next sweep retries.
+    private int _autoStopInFlight;
+    // Cortex addendum: the browser's own stop threw. Guarded by the lifecycle gate; every later stop/start/dispose and a
+    // bounded retry loop try again, so a failed Stop() never leaves the 5353 listener open with the service "stopped".
+    private bool _browserStopPending;
+    private Task _browserStopRetry = Task.CompletedTask;
+    internal const int MaxBrowserStopRetries = 600;
+    private volatile DiscoverySearchEnd _lastSearchEnd = DiscoverySearchEnd.None;
 
     public ServerDiscoveryService(
         IMdnsServiceBrowser browser,
@@ -85,9 +103,19 @@ public sealed class ServerDiscoveryService : IServerDiscoveryService, IServerDis
     /// <inheritdoc />
     public event EventHandler? IsSearchingChanged;
 
-    Task IHostedService.StartAsync(CancellationToken cancellationToken) => StartAsync(cancellationToken);
+    /// <inheritdoc />
+    public DiscoverySearchEnd LastSearchEnd => _lastSearchEnd;
+
+    /// <summary>The host never starts discovery (REL.0B); see the type remarks.</summary>
+    Task IHostedService.StartAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
     Task IHostedService.StopAsync(CancellationToken cancellationToken) => StopAsync(cancellationToken);
+
+    /// <inheritdoc />
+    public Task StartSearchAsync(CancellationToken cancellationToken = default) => StartAsync(cancellationToken);
+
+    /// <inheritdoc />
+    public Task StopSearchAsync(CancellationToken cancellationToken = default) => StopAsync(cancellationToken);
 
     public async Task StartAsync(CancellationToken cancellationToken = default)
     {
@@ -109,10 +137,19 @@ public sealed class ServerDiscoveryService : IServerDiscoveryService, IServerDis
                 {
                     _ignored = new HashSet<string>(ignored, StringComparer.Ordinal);
                     generation = ++_lifecycleGeneration;
+                    _searchStartedAt = _timeProvider.GetUtcNow();
+                    _sawResults = false;
+                    Volatile.Write(ref _autoStopInFlight, 0);
                     _acceptBrowserCallbacks = true;
                     _foundHandler = (_, observation) => OnFoundOrUpdated(generation, observation);
                     _updatedHandler = (_, observation) => OnFoundOrUpdated(generation, observation);
                     _removedHandler = (_, observation) => OnRemoved(generation, observation);
+                }
+
+                // A previous session whose stop failed is closed before a new one opens (never two listeners).
+                if (_browserStopPending && !TryStopBrowser())
+                {
+                    throw new InvalidOperationException("The previous discovery session could not be stopped.");
                 }
 
                 _browser.Found += _foundHandler;
@@ -126,6 +163,7 @@ public sealed class ServerDiscoveryService : IServerDiscoveryService, IServerDis
                 _sweepLoop = Task.Run(() => SweepLoopAsync(generation, token), CancellationToken.None);
 
                 _state = LifecycleState.Started;
+                _lastSearchEnd = DiscoverySearchEnd.None;
                 SetSearching(true);
                 _logger.LogDebug("Discovery service started.");
             }
@@ -141,6 +179,10 @@ public sealed class ServerDiscoveryService : IServerDiscoveryService, IServerDis
                 _logger.LogError(
                     "Discovery service failed to start; discovery is disabled for now. Exception type: {Type}.",
                     exception.GetType().Name);
+
+                // REL.0B (Cortex N-3): a failed user-started search is reported, not silently reset.
+                _lastSearchEnd = DiscoverySearchEnd.Failed;
+                RaiseActivityChanged();
             }
         }
         finally
@@ -235,15 +277,20 @@ public sealed class ServerDiscoveryService : IServerDiscoveryService, IServerDis
         }
     }
 
-    private async Task StopWhileHeldAsync(CancellationToken cancellationToken)
+    private async Task StopWhileHeldAsync(CancellationToken cancellationToken, DiscoverySearchEnd end = DiscoverySearchEnd.Stopped)
     {
         if (_state != LifecycleState.Started)
         {
-            return; // idempotent: already stopped or disposed.
+            // Idempotent: already stopped or disposed - but a browser whose stop failed earlier is retried here.
+            if (_browserStopPending)
+            {
+                TryStopBrowser();
+            }
+
+            return;
         }
 
         _state = LifecycleState.Stopped;
-        SetSearching(false);
         EventHandler<DiscoveryObservation>? foundHandler;
         EventHandler<DiscoveryObservation>? updatedHandler;
         EventHandler<DiscoveryObservation>? removedHandler;
@@ -270,6 +317,13 @@ public sealed class ServerDiscoveryService : IServerDiscoveryService, IServerDis
             _materialChangeVersion = 0;
         }
 
+        // REL.0B (Cortex C-1): signal only AFTER the store is empty. IsSearchingChanged is raised synchronously and a
+        // subscriber on the same thread (the hide path runs on the UI thread) rebuilds from GetDiscovered(); signalling
+        // first showed the stopped search's suggestions with no listener and hid the search action. No
+        // DiscoveredChanged follows a stop (the notification worker was just cancelled), so this is the one signal.
+        _lastSearchEnd = end;
+        SetSearching(false);
+
         if (foundHandler is not null)
         {
             _browser.Found -= foundHandler;
@@ -282,7 +336,13 @@ public sealed class ServerDiscoveryService : IServerDiscoveryService, IServerDis
         {
             _browser.Removed -= removedHandler;
         }
-        _browser.Stop();
+
+        // The service-side state is already final (store cleared, callbacks fenced by the generation, UI told). The
+        // listener itself is closed by the browser; if that throws, it is retried until it succeeds (never assumed).
+        if (!TryStopBrowser())
+        {
+            StartBrowserStopRetry();
+        }
 
         var sweepCts = _sweepCts;
         var sweepLoop = _sweepLoop;
@@ -344,13 +404,9 @@ public sealed class ServerDiscoveryService : IServerDiscoveryService, IServerDis
         {
             _browser.Removed -= removedHandler;
         }
-        try
+        if (!TryStopBrowser())
         {
-            _browser.Stop();
-        }
-        catch (Exception exception)
-        {
-            _logger.LogDebug("Discovery browser stop during rollback raised {Type}.", exception.GetType().Name);
+            StartBrowserStopRetry();
         }
 
         sweepCts?.Cancel();
@@ -380,6 +436,62 @@ public sealed class ServerDiscoveryService : IServerDiscoveryService, IServerDis
         }
 
         _isSearching = value;
+        RaiseActivityChanged();
+    }
+
+    /// <summary>Called only while the lifecycle gate is held. True when the browser is known to be stopped.</summary>
+    private bool TryStopBrowser()
+    {
+        try
+        {
+            _browser.Stop();
+            _browserStopPending = false;
+            return true;
+        }
+        catch (Exception exception)
+        {
+            _browserStopPending = true;
+            _logger.LogWarning("Discovery browser stop failed; it will be retried. Exception type: {Type}.", exception.GetType().Name);
+            return false;
+        }
+    }
+
+    /// <summary>Called only while the lifecycle gate is held. One bounded retry loop at a time, on the injected clock.</summary>
+    private void StartBrowserStopRetry()
+    {
+        if (!_browserStopRetry.IsCompleted)
+        {
+            return;
+        }
+
+        _browserStopRetry = Task.Run(BrowserStopRetryLoopAsync, CancellationToken.None);
+    }
+
+    private async Task BrowserStopRetryLoopAsync()
+    {
+        for (var attempt = 0; attempt < MaxBrowserStopRetries; attempt++)
+        {
+            await Task.Delay(_options.SweepInterval, _timeProvider).ConfigureAwait(false);
+            await _lifecycleGate.WaitAsync().ConfigureAwait(false);
+            try
+            {
+                // Settled meanwhile (a later stop, start or dispose retried it), or settled now.
+                if (!_browserStopPending || TryStopBrowser())
+                {
+                    return;
+                }
+            }
+            finally
+            {
+                _lifecycleGate.Release();
+            }
+        }
+
+        _logger.LogError("Discovery browser stop kept failing; giving up after {Attempts} retries.", MaxBrowserStopRetries);
+    }
+
+    private void RaiseActivityChanged()
+    {
         try
         {
             IsSearchingChanged?.Invoke(this, EventArgs.Empty);
@@ -451,6 +563,12 @@ public sealed class ServerDiscoveryService : IServerDiscoveryService, IServerDis
             {
                 await Task.Delay(_options.SweepInterval, _timeProvider, token).ConfigureAwait(false);
                 Sweep(generation);
+                if (SearchLimitReached(generation) is { } end && Interlocked.Exchange(ref _autoStopInFlight, 1) == 0)
+                {
+                    // Not awaited: the stop drains THIS loop. The loop keeps ticking until that stop cancels it, so a
+                    // failed automatic stop is retried on a later tick instead of leaving the search unbounded.
+                    _ = Task.Run(() => AutoStopAsync(generation, end), CancellationToken.None);
+                }
             }
         }
         catch (OperationCanceledException)
@@ -460,6 +578,64 @@ public sealed class ServerDiscoveryService : IServerDiscoveryService, IServerDis
         catch (Exception exception)
         {
             _logger.LogError("Discovery sweep loop ended unexpectedly. Exception type: {Type}.", exception.GetType().Name);
+        }
+    }
+
+    /// <summary>REL.0B (Vigil L-1, Prism N-5): a user-started search is bounded; see <see cref="DiscoveryOptions"/>.</summary>
+    private DiscoverySearchEnd? SearchLimitReached(long generation)
+    {
+        var now = _timeProvider.GetUtcNow();
+        lock (_sync)
+        {
+            if (!IsActiveGenerationLocked(generation))
+            {
+                return null;
+            }
+
+            var elapsed = now - _searchStartedAt;
+            if (elapsed >= _options.MaxSearchDuration)
+            {
+                return DiscoverySearchEnd.TimeLimit;
+            }
+
+            if (elapsed >= _options.NothingFoundTimeout && !_sawResults && BuildVisibleSnapshotsLocked(now).Count == 0)
+            {
+                return DiscoverySearchEnd.NothingFound;
+            }
+
+            return null;
+        }
+    }
+
+    private async Task AutoStopAsync(long generation, DiscoverySearchEnd end)
+    {
+        try
+        {
+            await _lifecycleGate.WaitAsync().ConfigureAwait(false);
+            try
+            {
+                bool current;
+                lock (_sync)
+                {
+                    current = IsActiveGenerationLocked(generation);
+                }
+
+                // A manual stop, a newer start or dispose already won: never stop a search this loop did not own.
+                if (current && _state == LifecycleState.Started)
+                {
+                    await StopWhileHeldAsync(CancellationToken.None, end).ConfigureAwait(false);
+                    _logger.LogDebug("Discovery search ended by itself ({End}).", end);
+                }
+            }
+            finally
+            {
+                _lifecycleGate.Release();
+            }
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError("Discovery automatic stop failed; the next sweep retries. Exception type: {Type}.", exception.GetType().Name);
+            Volatile.Write(ref _autoStopInFlight, 0);
         }
     }
 
@@ -515,6 +691,11 @@ public sealed class ServerDiscoveryService : IServerDiscoveryService, IServerDis
         foreach (var snapshot in BuildVisibleSnapshotsLocked(now))
         {
             current[snapshot.Identity] = Signature(snapshot);
+        }
+
+        if (current.Count > 0)
+        {
+            _sawResults = true;
         }
 
         if (current.Count == _published.Count)

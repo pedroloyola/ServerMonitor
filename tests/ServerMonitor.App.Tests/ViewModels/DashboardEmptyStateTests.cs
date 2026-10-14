@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Time.Testing;
 using ServerMonitor.App.Services;
 using ServerMonitor.App.Tests.Fakes;
 using ServerMonitor.App.ViewModels;
@@ -90,6 +91,177 @@ public sealed class DashboardEmptyStateTests
         Assert.True(dashboard.IsSearchingLocalNetwork);
         Assert.False(dashboard.ShowEmptyStateDiscoveries);
     }
+
+    // ---- REL.0B (UI9-FW-PROMPT): discovery starts only from the explicit action, through the real service ----
+
+    [Fact]
+    public async Task DashboardLoad_NeverStartsDiscovery_AndOffersTheExplicitSearch()
+    {
+        var browser = new FakeMdnsServiceBrowser();
+        await using var service = RealDiscovery(browser);
+        using var dashboard = Dashboard(discovery: service);
+
+        await dashboard.LoadAsync();
+
+        Assert.Equal(0, browser.StartCount);
+        Assert.True(dashboard.CanStartLocalNetworkSearch);
+        Assert.False(dashboard.IsSearchingLocalNetwork);
+    }
+
+    [Fact]
+    public async Task SearchCommand_StartsTheRealServiceOnce_AndSwapsTheActionForTheIndicator()
+    {
+        var browser = new FakeMdnsServiceBrowser();
+        await using var service = RealDiscovery(browser);
+        using var dashboard = Dashboard(discovery: service);
+        await dashboard.LoadAsync();
+        var raised = new List<string?>();
+        dashboard.PropertyChanged += (_, args) => raised.Add(args.PropertyName);
+
+        var command = Assert.IsType<AsyncRelayCommand>(dashboard.StartLocalNetworkSearchCommand);
+        await command.ExecuteAsync(null);
+        await command.ExecuteAsync(null);
+
+        Assert.Equal(1, browser.StartCount);
+        Assert.True(service.IsSearching);
+        Assert.False(dashboard.CanStartLocalNetworkSearch);
+        Assert.True(dashboard.IsSearchingLocalNetwork);
+        Assert.Contains(nameof(DashboardViewModel.CanStartLocalNetworkSearch), raised);
+        Assert.Contains(nameof(DashboardViewModel.IsSearchingLocalNetwork), raised);
+        Assert.False(dashboard.IsOperationErrorOpen);
+
+        // Window to background: the search stops and the explicit action is offered again.
+        await LocalNetworkSearchLifetime.StopForBackground(service, NullLogger.Instance);
+        Assert.Equal(1, browser.StopCount);
+        Assert.True(dashboard.CanStartLocalNetworkSearch);
+        Assert.False(dashboard.IsSearchingLocalNetwork);
+    }
+
+    [Fact]
+    public async Task ExplicitSearch_IsOfferedOnlyOnTheEmptyDashboardWithIdleLiveDiscovery()
+    {
+        using var inert = Dashboard(discovery: new NullServerDiscoveryService());
+        await inert.LoadAsync();
+        Assert.False(inert.CanStartLocalNetworkSearch);
+        inert.StartLocalNetworkSearchCommand.Execute(null);
+        Assert.False(inert.IsOperationErrorOpen);
+
+        var live = new LiveDiscovery { IsSearching = false };
+        using var empty = Dashboard(discovery: live);
+        await empty.LoadAsync();
+        Assert.True(empty.CanStartLocalNetworkSearch);
+
+        // Found something: the suggestions replace the action.
+        live.Set(DiscoveredServerViewModelTests.Service("Mac Studio", "mac-studio.local", 22));
+        Assert.False(empty.CanStartLocalNetworkSearch);
+
+        var servers = new FakeServerService();
+        servers.Servers.Add(DashboardDiscoveryViewModelTests.ServerForTest("10.0.0.5", 22));
+        using var withServers = Dashboard(servers: servers, discovery: new LiveDiscovery { IsSearching = false });
+        await withServers.LoadAsync();
+        Assert.False(withServers.CanStartLocalNetworkSearch);
+    }
+
+    /// <summary>
+    /// Cortex C-1, through the REAL service (the fake that used to stand in here cleared before signalling, the
+    /// opposite of the service, so it could not see the defect). The hide stop raises IsSearchingChanged
+    /// synchronously and the dashboard rebuilds from GetDiscovered() right there; no DiscoveredChanged follows a stop.
+    /// </summary>
+    [Fact]
+    public async Task RealStop_AfterSomethingWasFound_LeavesNoStaleSuggestionsAndOffersTheSearchAgain()
+    {
+        var browser = new FakeMdnsServiceBrowser();
+        var time = new FakeTimeProvider(DateTimeOffset.Parse("2026-10-14T10:00:00Z"));
+        await using var service = new ServerDiscoveryService(
+            browser, new GatedIgnoredDeviceStore(), NullLogger<ServerDiscoveryService>.Instance, time, DiscoveryOptions.Default);
+        using var dashboard = Dashboard(discovery: service);
+        await dashboard.LoadAsync();
+        await service.StartSearchAsync();
+
+        browser.EmitFound(DiscoveryInputPolicy.TryCreateObservation(
+            "Mac Studio", "_ssh._tcp", "local.", "mac-studio.local", 22,
+            [System.Net.IPAddress.Parse("192.168.1.20")], "nic-a", time.GetUtcNow())!);
+        await AdvanceUntilAsync(time, () => dashboard.ShowEmptyStateDiscoveries);
+        Assert.Single(dashboard.DiscoveredServers);
+        Assert.False(dashboard.CanStartLocalNetworkSearch);
+
+        await LocalNetworkSearchLifetime.StopForBackground(service, NullLogger.Instance);
+
+        Assert.False(service.IsSearching);
+        Assert.Equal(DiscoverySearchEnd.Stopped, service.LastSearchEnd);
+        Assert.Empty(dashboard.DiscoveredServers);
+        Assert.False(dashboard.ShowEmptyStateDiscoveries);
+        Assert.True(dashboard.CanStartLocalNetworkSearch);
+        Assert.False(dashboard.ShowLocalNetworkNothingFound);
+    }
+
+    [Fact]
+    public async Task EndStates_NothingFoundAndFailed_ShowTheirCaptionWithTheActionAgain()
+    {
+        var live = new LiveDiscovery { IsSearching = false, LastSearchEnd = DiscoverySearchEnd.NothingFound };
+        using var dashboard = Dashboard(discovery: live);
+        await dashboard.LoadAsync();
+        Assert.True(dashboard.CanStartLocalNetworkSearch);
+        Assert.True(dashboard.ShowLocalNetworkNothingFound);
+        Assert.False(dashboard.ShowLocalNetworkSearchFailed);
+
+        live.LastSearchEnd = DiscoverySearchEnd.Failed;
+        live.SetSearching(false);
+        Assert.True(dashboard.ShowLocalNetworkSearchFailed);
+        Assert.False(dashboard.ShowLocalNetworkNothingFound);
+
+        // N-r2-1: the time limit has its own caption (its suggestions went with the stop).
+        live.LastSearchEnd = DiscoverySearchEnd.TimeLimit;
+        live.SetSearching(false);
+        Assert.True(dashboard.ShowLocalNetworkSearchTimeLimit);
+        Assert.False(dashboard.ShowLocalNetworkSearchFailed);
+        Assert.False(dashboard.ShowLocalNetworkNothingFound);
+        Assert.True(dashboard.CanStartLocalNetworkSearch);
+
+        // While searching, neither caption nor the action.
+        live.LastSearchEnd = DiscoverySearchEnd.None;
+        live.SetSearching(true);
+        Assert.False(dashboard.ShowLocalNetworkNothingFound);
+        Assert.False(dashboard.ShowLocalNetworkSearchFailed);
+        Assert.False(dashboard.ShowLocalNetworkSearchTimeLimit);
+        Assert.False(dashboard.CanStartLocalNetworkSearch);
+    }
+
+    [Fact]
+    public async Task RealFailedStart_IsReportedAndTheSearchCanBeRetried()
+    {
+        var browser = new FakeMdnsServiceBrowser { StartException = new InvalidOperationException("synthetic") };
+        await using var service = RealDiscovery(browser);
+        using var dashboard = Dashboard(discovery: service);
+        await dashboard.LoadAsync();
+
+        await Assert.IsType<AsyncRelayCommand>(dashboard.StartLocalNetworkSearchCommand).ExecuteAsync(null);
+
+        Assert.False(service.IsSearching);
+        Assert.Equal(DiscoverySearchEnd.Failed, service.LastSearchEnd);
+        Assert.True(dashboard.ShowLocalNetworkSearchFailed);
+        Assert.True(dashboard.CanStartLocalNetworkSearch);
+
+        browser.StartException = null;
+        await Assert.IsType<AsyncRelayCommand>(dashboard.StartLocalNetworkSearchCommand).ExecuteAsync(null);
+        Assert.True(service.IsSearching);
+        Assert.False(dashboard.ShowLocalNetworkSearchFailed);
+    }
+
+    /// <summary>Advances fake time in small steps until the condition holds (the service's workers run on the pool).</summary>
+    internal static async Task AdvanceUntilAsync(FakeTimeProvider time, Func<bool> condition, int maxSteps = 600)
+    {
+        for (var step = 0; step < maxSteps && !condition(); step++)
+        {
+            time.Advance(TimeSpan.FromMilliseconds(100));
+            await Task.Delay(5);
+        }
+
+        Assert.True(condition(), "condition not reached");
+    }
+
+    private static ServerDiscoveryService RealDiscovery(FakeMdnsServiceBrowser browser) =>
+        new(browser, new GatedIgnoredDeviceStore(), NullLogger<ServerDiscoveryService>.Instance);
 
     [Fact]
     public async Task EmptyStateSuggestion_AddsThroughTheExistingPrefillPath()
@@ -233,6 +405,8 @@ public sealed class DashboardEmptyStateTests
 
         public bool IsSearching { get; set; }
 
+        public DiscoverySearchEnd LastSearchEnd { get; set; }
+
         public int ActivitySubscribers => _isSearchingChanged?.GetInvocationList().Length ?? 0;
 
         public event EventHandler? DiscoveredChanged;
@@ -253,6 +427,18 @@ public sealed class DashboardEmptyStateTests
         {
             _discovered = discovered;
             DiscoveredChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        public Task StartSearchAsync(CancellationToken cancellationToken = default)
+        {
+            SetSearching(true);
+            return Task.CompletedTask;
+        }
+
+        public Task StopSearchAsync(CancellationToken cancellationToken = default)
+        {
+            SetSearching(false);
+            return Task.CompletedTask;
         }
 
         public IReadOnlyList<DiscoveredService> GetDiscovered() => _discovered;

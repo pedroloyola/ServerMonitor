@@ -359,6 +359,12 @@
   <data name="HostKeySubjectJumpFormat" xml:space="preserve"><value>Jump host {0}</value></data>
   <data name="HostKeySubjectTargetFormat" xml:space="preserve"><value>Destino {0} via {1}</value></data>
   <data name="DashboardEmptyDiscoverySearching.Text" xml:space="preserve"><value>A procurar servidores SSH na tua rede local…</value></data>
+  <data name="DashboardEmptyDiscoveryStartButton.Content" xml:space="preserve"><value>Procurar na rede local</value></data>
+  <data name="DashboardEmptyDiscoveryPermissionNote.Text" xml:space="preserve"><value>Encontra servidores SSH que se anunciam na tua rede local. O Windows pode pedir permissão de rede.</value></data>
+  <data name="DashboardEmptyDiscoveryStartButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.HelpText" xml:space="preserve"><value>Encontra servidores SSH que se anunciam na tua rede local. O Windows pode pedir permissão de rede.</value></data>
+  <data name="DashboardEmptyDiscoveryNothingFound.Text" xml:space="preserve"><value>Nada encontrado na rede local.</value></data>
+  <data name="DashboardEmptyDiscoveryFailed.Text" xml:space="preserve"><value>Não foi possível procurar na rede local.</value></data>
+  <data name="DashboardEmptyDiscoveryTimeLimit.Text" xml:space="preserve"><value>A pesquisa terminou ao fim de 10 minutos.</value></data>
   <data name="DashboardEmptyDiscoveryFoundFormat" xml:space="preserve"><value>Encontrado na rede local: {0}</value></data>
   <data name="LocalKeyOptionRecommendedFormat" xml:space="preserve"><value>{0} · Recomendada</value></data>
   <data name="LocalKeyOptionBrowse" xml:space="preserve"><value>Procurar outro ficheiro…</value></data>
