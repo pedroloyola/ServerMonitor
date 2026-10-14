@@ -75,6 +75,11 @@ Sem projeto `.wapproj` separado. O `ServerMonitor.App.csproj` ganha `Package.app
 
 ### 3. Modelo de runtime — framework-dependent no pacote de produção
 
+> **Emenda REL.0C (proposta, 2026-10-14, aguarda decisão humana).** Esta secção confunde dois runtimes.
+> O que vale para o Windows App Runtime **não** vale para o .NET: ver
+> [Emenda REL.0C — runtime .NET self-contained](#emenda-rel0c--runtime-net-self-contained-no-msix-proposta)
+> no fim deste ADR.
+
 O MSIX de produção é **framework-dependent**: depende do *framework package* do Windows App Runtime, que
 a Store provisiona automaticamente. Vantagens: pacote menor, arranque limpo garantido pela Store, e
 **elimina o workaround P-009 no build packaged**. O build **Debug/unpackaged** mantém
@@ -213,3 +218,52 @@ deixa a identity pronta mas **não** implementa qualquer widget.
 Reserva/criação da app na Store · Partner Center · **Publisher ID / Package Family Name / Store Product ID**
 reais · certificado/assinatura de produção · segredos de CI · pagamento · aceitação de termos · publicação
 pública · mudança de nome comercial. Valores de Store **não** são inventados; entram por checkpoint.
+
+## Emenda REL.0C — runtime .NET self-contained no MSIX (proposta)
+
+Estado: **proposta**, para decisão humana (REL.0 Recovery, 2026-10-14). Não altera identidade, publisher,
+versão, assinatura, capabilities nem o modelo de distribuição (§1/§2 mantêm-se: um único MSIX da Store).
+
+**Problema (VERIFIED).** O §3 tratou o pacote como "framework-dependent" sem separar os dois runtimes. Para
+o **Windows App Runtime** isso está certo: o manifesto declara `PackageDependency
+Microsoft.WindowsAppRuntime.2` e a Store instala esse *framework package*. Para o **.NET** está errado. Os
+`runtimeconfig.json` da app e do widget provider em 1.1.2.2 (e num build limpo de `e5ceb26`) referenciam o
+shared framework `Microsoft.NETCore.App 10.0.0`, e o pacote não traz `hostfxr`/`hostpolicy`/`coreclr`.
+O Windows 11 só traz o .NET Framework 4.8.1. O .NET 10 não vem com o Windows nem é instalado pelo Windows
+Update. A Store também não tem um *framework package* de .NET que um MSIX possa declarar (dotnet/runtime#51574,
+aberta). O pacote só arranca numa máquina onde alguém instalou o .NET 10 machine-wide. Foi o caso da máquina
+de desenvolvimento, por isso a QA nunca o viu. Numa máquina limpa, a app mostra "You must install .NET…" e não
+abre. O widget provider é ativado pelo COM sem janela e falha sem contexto.
+
+**Decisão proposta.**
+- **.NET: self-contained** no perfil `Packaged=true` (`SelfContained=true`, RID `win-x64` já fixo). O
+  apphost carrega o `hostfxr` app-local e o host corre em modo self-contained. Nunca procura um runtime
+  machine-wide (prova por trace do host no relatório REL.0C).
+- **Windows App Runtime: continua framework package** (`WindowsAppSDKSelfContained=false`), como no §3.
+- **Widget provider** publicado também self-contained, com o mesmo RID e o mesmo host `dotnet`
+  (`DOTNET_HOST_PATH`). Continua a acrescentar só os seus 4 ficheiros: partilha o runtime .NET da app na
+  raiz do pacote, sem segundo payload.
+- **`createdump.exe`** (helper de consola do runtime pack, só usado com `DOTNET_DbgEnableMiniDump`) é
+  excluído do pacote, nas duas publicações. O pacote mantém exatamente dois executáveis GUI. O WER continua a
+  recolher dumps.
+- **Sem trimming, ReadyToRun ou single-file.** Nada disto é necessário para a correção. Cada um muda o
+  comportamento de runtime (reflection, COM/WinRT interop) num ponto que os testes não cobrem.
+- **Guardas.** `tools/release/Assert-PackageRuntime.ps1` corre sobre o `.msix` em `release-build.yml` e no job
+  `package-privacy` do CI, com o self-test `Test-PackageRuntime.ps1`. `PackagedRuntimeGuardTests` corre nos
+  testes da app. A allowlist de privacidade ganha entradas revistas para os binários do runtime .NET,
+  presas a tokens (estáveis entre 10.0.11 e 10.0.13).
+
+**Consequências.**
+- Tamanho: 34,7 MB → 70,9 MB comprimido; 95,9 MB → 176,2 MB descomprimido (+186 ficheiros do runtime).
+- **Servicing passa a ser nosso.** Um runtime self-contained não recebe as correções de segurança do .NET
+  pelo Microsoft Update. Cada patch de segurança do .NET 10 relevante obriga a reconstruir e submeter uma
+  atualização na Store. Também obriga a rever as entradas da allowlist que mudam por versão:
+  `mscordaccore_amd64_amd64_<versão>.dll` e um token do `Microsoft.DiaSymReader.Native.amd64.dll`. O gate de
+  privacidade falha fechado até isso ser feito. O CI usa o SDK `10.0.x` mais recente, por isso essa falha
+  aparece no primeiro PR depois de um patch do .NET.
+- O SDK que constrói o pacote determina a versão do runtime embutido: `BundledNETCoreAppPackageVersion`, hoje
+  10.0.11 localmente (SDK 10.0.400) e 10.0.13 com o SDK 10.0.402. Fixar o SDK de release é uma decisão
+  separada, deixada à decisão humana.
+- Clean-machine continua **NOT_RUN** até haver uma VM descartável (REL.0D). O procedimento está no relatório
+  REL.0C.
+
