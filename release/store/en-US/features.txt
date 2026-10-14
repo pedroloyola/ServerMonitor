@@ -1,0 +1,18 @@
+Health, CPU, memory, disk and uptime for Linux and macOS servers over SSH
+No agent on your servers and no account: connects directly from your PC
+30 days of local history with charts from the last hour to the last 30 days
+Read-only view of Docker containers and systemd or launchd services
+Host keys checked by SHA-256 fingerprint; a changed key blocks the connection
+Passwords and passphrases stored in Windows Credential Manager
+Fixed set of read-only commands on your servers, with no sudo
+Add servers from your SSH config file, with a step-by-step connection test
+Servers behind a single jump host (ProxyJump)
+Windows notifications when a server's health changes
+Runs from the notification area when you close the window
+Compact mode that can stay always on top
+Windows 11 widget in three sizes (Windows 11 22H2 or later)
+Encrypted backup and restore, protected by your own passphrase
+Local network search for SSH servers, only when you ask
+No telemetry: your servers, history and credentials stay on your PC
+Light, dark and system themes; keyboard, screen reader and high contrast support
+English, Portuguese (Portugal) and Portuguese (Brazil)

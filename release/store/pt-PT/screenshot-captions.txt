@@ -1,0 +1,8 @@
+01-overview: Todos os teus servidores num relance: estado, CPU, memória, disco e uptime.
+02-server-detail: Um servidor em detalhe, com a informação do sistema e as leituras mais recentes.
+03-history: Histórico local, com gráficos da última hora aos últimos 30 dias.
+04-services-containers: Containers Docker e serviços do sistema, só em leitura.
+05-compact-mode: O modo compacto mantém uma vista pequena dos teus servidores sempre no topo.
+06-add-server: Adiciona um servidor e testa a ligação passo a passo.
+07-settings: Temas, alertas de estado, segundo plano e cópia de segurança encriptada nas Definições.
+08-widget: O widget do Windows 11 mostra os teus servidores no painel de Widgets.

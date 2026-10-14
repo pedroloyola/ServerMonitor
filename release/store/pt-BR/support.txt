@@ -1,0 +1,20 @@
+Contato de suporte
+https://github.com/pedroloyola/ServerMonitor/issues
+
+Site
+https://github.com/pedroloyola/ServerMonitor
+
+Política de privacidade
+https://github.com/pedroloyola/ServerMonitor/blob/main/PRIVACY.md
+
+Problemas de segurança
+Reporte em particular pelo GitHub Security Advisories do repositório (aba Security), não em uma issue pública.
+
+Requisitos de sistema adicionais (hardware mínimo)
+Windows 11, x64
+Windows 11 versão 22H2 ou mais recente para o widget do Windows 11
+Acesso de rede deste PC aos seus servidores via SSH
+Servidores com Linux ou macOS e SSH ativado
+
+Informações de direitos autorais e marca registrada
+Copyright (c) 2026 ServerAlyzer contributors

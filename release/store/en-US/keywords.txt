@@ -1,0 +1,7 @@
+server monitoring
+SSH monitor
+homelab
+self-hosted
+Linux server
+system dashboard
+uptime

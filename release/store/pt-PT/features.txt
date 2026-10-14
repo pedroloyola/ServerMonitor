@@ -1,0 +1,18 @@
+Estado, CPU, memória, disco e uptime de servidores Linux e macOS por SSH
+Sem agente nos servidores e sem conta: liga-se diretamente a partir do teu PC
+30 dias de histórico local, com gráficos da última hora aos últimos 30 dias
+Containers Docker e serviços systemd ou launchd, só em leitura
+Chaves de host verificadas por impressão digital SHA-256; uma chave diferente bloqueia a ligação
+Palavras-passe e frases-passe guardadas no Gestor de Credenciais do Windows
+Conjunto fixo de comandos de leitura nos servidores, sem sudo
+Adiciona servidores a partir do teu ficheiro de configuração SSH, com teste de ligação passo a passo
+Servidores atrás de um único jump host (ProxyJump)
+Notificações do Windows quando o estado de um servidor muda
+Continua na área de notificação quando fechas a janela
+Modo compacto que pode ficar sempre no topo
+Widget do Windows 11 em três tamanhos (Windows 11 22H2 ou mais recente)
+Cópia de segurança encriptada e restauro, protegidos pela tua frase-passe
+Pesquisa de servidores SSH na rede local, só quando pedes
+Sem telemetria: servidores, histórico e credenciais ficam no teu PC
+Temas claro, escuro e do sistema; suporte a teclado, leitores de ecrã e alto contraste
+Português (Portugal), português (Brasil) e inglês

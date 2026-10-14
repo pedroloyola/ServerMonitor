@@ -1,0 +1,7 @@
+monitoramento de servidores
+monitor SSH
+homelab
+self-hosted
+servidor Linux
+painel de sistema
+uptime
