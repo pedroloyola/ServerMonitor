@@ -36,4 +36,5 @@ Store listing.
 
 ## Current contents
 
-The notes for **1.1.1**, matching what was submitted for that version.
+Draft notes for the next release candidate, covering what changed since 1.1.x. Not submitted yet;
+review them again before the version bump.

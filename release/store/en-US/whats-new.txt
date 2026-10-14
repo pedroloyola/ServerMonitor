@@ -1,13 +1,15 @@
-This update fixes how the Windows 11 widget and the notification area icon behave. There are no new features: nothing changes in the way you use the app.
+A redesigned interface and new features since ServerAlyzer 1.1.
 
-The widget keeps updating while the window is closed. Previously, closing the ServerAlyzer window froze the widget on its last reading. Monitoring now continues and the widget receives fresh values, even with the widgets board open in front of you.
+A new look. A sidebar takes you to Overview, Servers, History and Settings, each server has its own detail page, and compact mode and the Windows 11 widget were redesigned. Keyboard use, screen readers and high contrast were reviewed across the app.
 
-A more reliable notification area menu. The menu is now the native Windows menu, and it opens on the first try, complete, whether the window is open, minimized, behind another app or hidden.
+Easier setup. A first-run guide helps you add your first server. You can import hosts from your SSH config file, the app suggests private keys it finds in your .ssh folder, and the connection test shows each step so you can see what failed.
 
-The icon comes back after Windows Explorer restarts. If the taskbar is restarted, the ServerAlyzer icon reappears on its own and the menu works again — you are never left with an app monitoring in the background and no way to close it.
+Jump hosts. Servers reached through one ProxyJump host are now supported, and the jump host's key is checked separately.
 
-The first-close notice is back. The first time you close the window with background monitoring active, ServerAlyzer tells you it is still running and points you to the exit command. The notice appears only once.
+Encrypted backup. In Settings you can save your servers, trusted host keys and saved passwords to a file protected by a passphrase you choose, and restore it on this or another computer. Private key files are never included.
 
-More predictable shutdown. "Exit ServerAlyzer" really does close the app and removes the icon. With background monitoring turned off, closing the window is a full exit again.
+Language. If Windows is not set to Portuguese, the app now opens in English. A language you already chose in Settings is kept. If the app opens in Brazilian Portuguese and you prefer another language, change it in Settings > Language.
 
-No console windows. The process that draws the widget can no longer show a console window.
+The local network search only runs when you ask. With no servers added yet, choose "Search local network"; Windows may ask for network permission.
+
+The .NET runtime is now included, so the app works on PCs without .NET installed.
