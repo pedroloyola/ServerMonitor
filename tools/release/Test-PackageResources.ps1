@@ -91,6 +91,8 @@ exit $exit
 
     $failure = $null
     try { & $CheckScript @arguments 6> $null } catch { $failure = $_.Exception.Message }
+    # The makepri stub of the failure cases exits 1; that exit code belongs to the case, not to the suite.
+    $global:LASTEXITCODE = 0
     $verdict = 'OK'; $detail = ''
     if ($ExpectedReason) {
         if ($null -eq $failure) { $verdict = 'TEST ERROR'; $detail = 'accepted' }
@@ -145,3 +147,6 @@ $results | Format-Table -AutoSize Case, Verdict, Detail | Out-String -Width 220 
 $broken = @($results | Where-Object Verdict -ne 'OK')
 if ($broken.Count -gt 0) { throw "$($broken.Count) of $($results.Count) package resources case(s) did not behave as required." }
 Write-Host "All $($results.Count) package resources cases behaved as required."
+# Explicit success. A native command or a stub inside the suite may have left $LASTEXITCODE non-zero,
+# and the GitHub Actions pwsh wrapper ends a step with `exit $LASTEXITCODE` (PR #53 B-1).
+exit 0

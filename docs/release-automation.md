@@ -243,9 +243,9 @@ It runs in `release-build.yml` (before the upload), in `store-submit.yml` (befor
 in CI on every PR twice: on the first-party Release binaries, and on a **packaged** Release build
 made exactly as `release-build.yml` makes it (unsigned, nothing uploaded), with the allowlist — the
 proof that the allowlist holds for the runner's SDK before a release depends on it. That CI
-package job also runs, on the same package, `Assert-PackageIdentity.ps1` (with the version the
-repository declares: `Get-RepositoryPackageVersion.ps1` reads the csproj `FileVersion` and both
-manifests and refuses any disagreement), `Assert-PackageRuntime.ps1`, `Assert-PackageResources.ps1`
+package job also runs, on the same package, `Assert-PackageVersionFloor.ps1` and
+`Assert-PackageIdentity.ps1` (with the version the repository declares: `Get-RepositoryPackageVersion.ps1`
+reads the csproj `FileVersion` and both manifests and refuses any disagreement), `Assert-PackageRuntime.ps1`, `Assert-PackageResources.ps1`
 and `Write-PackageTrace.ps1`, so every gate `release-build.yml` applies to the package is exercised on
 every PR, not first on release day.
 
@@ -453,7 +453,8 @@ Everything the workflows rely on runs offline:
 ./tools/release/Test-ReleaseChecks.ps1          # package checks, 12 cases
 ./tools/release/Test-PackageRuntime.ps1         # .NET self-contained package runtime + runtime floor, 58 cases
 ./tools/release/Test-PackageTrace.ps1           # package build record, 17 cases
-./tools/release/Test-RuntimeServicing.ps1 -SelfTest # SDK pin, setup-dotnet wiring, floor, allowlist vs floor, build record + CI identity wiring, 24 mutations
+./tools/release/Test-RuntimeServicing.ps1 -SelfTest # SDK pin, setup-dotnet wiring, floor, allowlist vs floor, build record + CI identity/floor wiring, self-tests only via the runner and ending in `exit 0`, 29 mutations
+./tools/release/Invoke-ReleaseSelfTests.ps1 -SelfTest # the runner catches a leaked exit code, a throw, a non-zero exit, 8 cases
 ./tools/release/Test-RepositoryPackageVersion.ps1 # csproj + both manifests declare one package version, 9 cases
 ./tools/release/Test-PackageResources.ps1       # en-US default + manifest strings in 3 languages (makepri stubbed), 23 cases
 ./tools/release/Test-DistributionPrivacy.ps1    # distribution privacy, 52 cases
@@ -470,6 +471,14 @@ Everything the workflows rely on runs offline:
 
 CI runs the version, provenance, publishing-hold, interpolation, pinning and wiring suites on every
 pull request (job *Release build + vulnerability scan*), not only on release day.
+
+**A self-test passes only if it exits 0.** The workflows never call a `Test-*.ps1` directly: they hand
+the list to `Invoke-ReleaseSelfTests.ps1`, which runs each one in its own `pwsh`, wrapped exactly like an
+Actions step (`$ErrorActionPreference = 'stop'`, then `exit $LASTEXITCODE`), and fails on any exit code
+other than 0. A suite that prints its success line but leaks `$LASTEXITCODE` from a stub or native
+command (PR #53 B-1, `Test-PackageResources.ps1`) is named and fails the run, instead of failing a release
+build on tag day. Every self-test also ends with an explicit `exit 0`. `Test-RuntimeServicing.ps1` (S7)
+enforces both.
 
 ## Sources
 

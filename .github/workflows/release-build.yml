@@ -119,25 +119,30 @@ jobs:
       - name: Self-test the release checks
         shell: pwsh
         run: |
-          ./tools/release/Test-WorkflowRunInterpolation.ps1 -SelfTest
-          ./tools/release/Test-WorkflowActionPins.ps1 -SelfTest
-          ./tools/release/Test-ReleaseRunProvenance.ps1
-          ./tools/release/Test-ManualPublishMode.ps1
-          ./tools/release/Test-HardeningMutations.ps1
-          ./tools/release/Test-ReleaseWorkflowShape.ps1 -SelfTest
-          ./tools/release/Test-ValidatedPackagePath.ps1
-          ./tools/release/Test-PackageVersionFloor.ps1
-          ./tools/release/Test-TagVersion.ps1
-          ./tools/release/Test-VersionGuardMutations.ps1
-          ./tools/release/Assert-NoPendingSubmission.ps1 -SelfTest
-          ./tools/release/Test-ReleaseChecks.ps1
-          ./tools/release/Test-PackageRuntime.ps1
-          ./tools/release/Test-PackageTrace.ps1
-          ./tools/release/Test-RuntimeServicing.ps1 -SelfTest
-          ./tools/release/Test-PackageResources.ps1
-          ./tools/release/Test-DistributionPrivacy.ps1
-          ./tools/release/Test-StoreSubmissionUpdate.ps1
-          ./tools/release/Get-SubmissionState.ps1 -SelfTest
+          # Each self-test in its own pwsh, wrapped like an Actions step: it must EXIT 0, not only print its
+          # success line (PR #53 B-1). The runner's own counterproofs run first.
+          ./tools/release/Invoke-ReleaseSelfTests.ps1 -SelfTest
+          ./tools/release/Invoke-ReleaseSelfTests.ps1 -Test @(
+            'Test-WorkflowRunInterpolation.ps1 -SelfTest'
+            'Test-WorkflowActionPins.ps1 -SelfTest'
+            'Test-ReleaseRunProvenance.ps1'
+            'Test-ManualPublishMode.ps1'
+            'Test-HardeningMutations.ps1'
+            'Test-ReleaseWorkflowShape.ps1 -SelfTest'
+            'Test-ValidatedPackagePath.ps1'
+            'Test-PackageVersionFloor.ps1'
+            'Test-TagVersion.ps1'
+            'Test-VersionGuardMutations.ps1'
+            'Assert-NoPendingSubmission.ps1 -SelfTest'
+            'Test-ReleaseChecks.ps1'
+            'Test-PackageRuntime.ps1'
+            'Test-PackageTrace.ps1'
+            'Test-RuntimeServicing.ps1 -SelfTest'
+            'Test-PackageResources.ps1'
+            'Test-DistributionPrivacy.ps1'
+            'Test-StoreSubmissionUpdate.ps1'
+            'Get-SubmissionState.ps1 -SelfTest'
+          )
 
       - name: Build the MSIX package
         run: >

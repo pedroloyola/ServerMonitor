@@ -90,7 +90,7 @@ if ($SelfTest) {
 
     if ($failed -gt 0) { throw "$failed of $($cases.Count) status mappings are wrong." }
     Write-Host "All $($cases.Count) status mappings behaved as required."
-    return
+    exit 0  # explicit success for the Actions wrapper (PR #53 B-1)
 }
 
 $state = Get-SubmissionState -Status $Status -Visibility $Visibility

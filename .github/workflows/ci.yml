@@ -125,7 +125,7 @@ jobs:
       - name: Distribution privacy (Release binaries)
         shell: pwsh
         run: |
-          ./tools/release/Test-DistributionPrivacy.ps1
+          ./tools/release/Invoke-ReleaseSelfTests.ps1 -Test 'Test-DistributionPrivacy.ps1'
           $source = (Resolve-Path 'src').Path
           $stage = Join-Path ([System.IO.Path]::GetTempPath()) 'first-party-release'
           Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction SilentlyContinue
@@ -149,19 +149,24 @@ jobs:
       - name: Release guards and their counterproofs
         shell: pwsh
         run: |
-          ./tools/release/Test-ValidatedPackagePath.ps1
-          ./tools/release/Test-PackageVersionFloor.ps1
-          ./tools/release/Test-TagVersion.ps1
-          ./tools/release/Test-VersionGuardMutations.ps1
-          ./tools/release/Test-ReleaseRunProvenance.ps1
-          ./tools/release/Test-ManualPublishMode.ps1
-          ./tools/release/Test-HardeningMutations.ps1
-          ./tools/release/Test-WorkflowRunInterpolation.ps1 -SelfTest
-          ./tools/release/Test-WorkflowActionPins.ps1 -SelfTest
-          ./tools/release/Test-ReleaseWorkflowShape.ps1 -SelfTest
-          ./tools/release/Test-PackageTrace.ps1
-          ./tools/release/Test-RuntimeServicing.ps1 -SelfTest
-          ./tools/release/Test-PackageResources.ps1
+          # Each self-test in its own pwsh, wrapped like an Actions step: it must EXIT 0, not only print its
+          # success line (PR #53 B-1). The runner's own counterproofs run first.
+          ./tools/release/Invoke-ReleaseSelfTests.ps1 -SelfTest
+          ./tools/release/Invoke-ReleaseSelfTests.ps1 -Test @(
+            'Test-ValidatedPackagePath.ps1'
+            'Test-PackageVersionFloor.ps1'
+            'Test-TagVersion.ps1'
+            'Test-VersionGuardMutations.ps1'
+            'Test-ReleaseRunProvenance.ps1'
+            'Test-ManualPublishMode.ps1'
+            'Test-HardeningMutations.ps1'
+            'Test-WorkflowRunInterpolation.ps1 -SelfTest'
+            'Test-WorkflowActionPins.ps1 -SelfTest'
+            'Test-ReleaseWorkflowShape.ps1 -SelfTest'
+            'Test-PackageTrace.ps1'
+            'Test-RuntimeServicing.ps1 -SelfTest'
+            'Test-PackageResources.ps1'
+          )
 
       - name: Vulnerability scan (fail on any vulnerable package)
         shell: pwsh
@@ -222,7 +227,7 @@ jobs:
       - name: Package runtime (.NET self-contained, Windows App Runtime framework)
         shell: pwsh
         run: |
-          ./tools/release/Test-PackageRuntime.ps1
+          ./tools/release/Invoke-ReleaseSelfTests.ps1 -Test 'Test-PackageRuntime.ps1'
           $candidates = @(Get-ChildItem -Recurse -Filter '*.msix' -Path 'src/ServerMonitor.App/AppPackages' |
             Where-Object { $_.FullName -notmatch '[\\/]Dependencies[\\/]' })
           if ($candidates.Count -ne 1) { throw "Expected exactly one app MSIX, found $($candidates.Count)." }
@@ -235,8 +240,11 @@ jobs:
       - name: Package identity, capabilities and GUI subsystem
         shell: pwsh
         run: |
-          ./tools/release/Test-RepositoryPackageVersion.ps1
+          ./tools/release/Invoke-ReleaseSelfTests.ps1 -Test 'Test-RepositoryPackageVersion.ps1', 'Test-PackageVersionFloor.ps1'
           $version = ./tools/release/Get-RepositoryPackageVersion.ps1
+          # G3 on every PR (Vigil PR #53 NIT-1): the version the repository declares is at or above the
+          # tracked package floor, the same check release-build.yml makes from the tag.
+          ./tools/release/Assert-PackageVersionFloor.ps1 -PackageVersion $version
           $candidates = @(Get-ChildItem -Recurse -Filter '*.msix' -Path 'src/ServerMonitor.App/AppPackages' |
             Where-Object { $_.FullName -notmatch '[\\/]Dependencies[\\/]' })
           if ($candidates.Count -ne 1) { throw "Expected exactly one app MSIX, found $($candidates.Count)." }

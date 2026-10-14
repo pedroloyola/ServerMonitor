@@ -56,3 +56,6 @@ $results | Format-Table -AutoSize Case, Verdict, Detail | Out-String -Width 200 
 $broken = @($results | Where-Object Verdict -ne 'OK')
 if ($broken.Count -gt 0) { throw "$($broken.Count) of $($results.Count) repository version case(s) did not behave as required." }
 Write-Host "All $($results.Count) repository version cases behaved as required."
+# Explicit success. A native command or a stub inside the suite may have left $LASTEXITCODE non-zero,
+# and the GitHub Actions pwsh wrapper ends a step with `exit $LASTEXITCODE` (PR #53 B-1).
+exit 0

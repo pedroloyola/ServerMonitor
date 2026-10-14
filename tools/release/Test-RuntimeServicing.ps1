@@ -127,8 +127,11 @@ function Assert-CiIdentity([string] $Text) {
     $body = (($Text -split '\n') | Where-Object { $_ -notmatch '^\s*#' }) -join "`n"
     $build = Get-StepIndex $body '-c Release -p:Packaged=true' 'ci: the packaged build' 'S6'
     $version = Get-StepIndex $body '$version = ./tools/release/Get-RepositoryPackageVersion.ps1' 'ci: the repository package version' 'S6'
+    $floorCheck = Get-StepIndex $body './tools/release/Assert-PackageVersionFloor.ps1 -PackageVersion $version' 'ci: the package version floor on the repository version' 'S6'
     $identity = Get-StepIndex $body './tools/release/Assert-PackageIdentity.ps1 -PackagePath $candidates[0].FullName -ExpectedVersion $version' 'ci: the package identity check' 'S6'
-    if (-not ($build -lt $version -and $version -lt $identity)) { throw 'Servicing S6: ci must build the package, read the repository version, then check the identity.' }
+    if (-not ($build -lt $version -and $version -lt $floorCheck -and $floorCheck -lt $identity)) {
+        throw 'Servicing S6: ci must build the package, read the repository version, check it against the floor, then check the identity.'
+    }
     # Exact line: the script's own defaults are the Store identity; any extra argument overrides them.
     $calls = @([regex]::Matches($body, '(?m)^.*Assert-PackageIdentity\.ps1.*$'))
     if ($calls.Count -ne 1 -or $calls[0].Value -cnotmatch '\A\s+\./tools/release/Assert-PackageIdentity\.ps1 -PackagePath \$candidates\[0\]\.FullName -ExpectedVersion \$version\s*\z') {
@@ -136,12 +139,39 @@ function Assert-CiIdentity([string] $Text) {
     }
 }
 
+# S7 (PR #53 B-1): a self-test may print its success line and still fail the Actions step through a leaked
+# $LASTEXITCODE. So (a) the workflows never call a tools/release/Test-*.ps1 directly: every self-test goes
+# through Invoke-ReleaseSelfTests.ps1, which runs it in its own pwsh wrapped like a step and requires exit 0,
+# and whose own counterproofs run in both workflows; (b) every self-test script ends with an explicit `exit 0`.
+function Assert-SelfTestExits([string] $Name, [string] $Text) {
+    $body = (($Text -split '\n') | Where-Object { $_ -notmatch '^\s*#' }) -join "`n"
+    $direct = @([regex]::Matches($body, '(?m)^.*\./tools/release/Test-[A-Za-z-]+\.ps1.*$'))
+    if ($direct.Count -gt 0) { throw "Servicing S7: $Name calls a self-test directly ($($direct[0].Value.Trim())); run it through Invoke-ReleaseSelfTests.ps1." }
+    if ($body -notmatch '(?m)^\s+\./tools/release/Invoke-ReleaseSelfTests\.ps1 -SelfTest\s*$') { throw "Servicing S7: $Name does not run the self-test runner's own counterproofs." }
+}
+
+function Assert-ExplicitExit([string] $Endings) {
+    foreach ($line in ($Endings -split '\n' | Where-Object { $_ })) {
+        $name, $last = $line -split '\|', 2
+        if ($last -cne 'exit 0') { throw "Servicing S7: $name does not end with an explicit 'exit 0'." }
+    }
+}
+
+$selfTestScripts = @(Get-ChildItem -LiteralPath (Join-Path $RepositoryRoot 'tools/release') -Filter 'Test-*.ps1' -File) +
+    @(Get-Item -LiteralPath (Join-Path $RepositoryRoot 'tools/release/Invoke-ReleaseSelfTests.ps1'))
+if ($selfTestScripts.Count -lt 2) { throw 'Servicing S7: no self-test scripts found; review this guard.' }
+$endings = ($selfTestScripts | Sort-Object Name | ForEach-Object {
+        $last = @((Get-Content -LiteralPath $_.FullName) | Where-Object { $_.Trim() }) | Select-Object -Last 1
+        "$($_.Name)|$($last.Trim())"
+    }) -join "`n"
+
 $inputs = [ordered] @{
     'global.json'                          = Read-Text 'global.json'
     '.github/workflows/ci.yml'             = Read-Text '.github/workflows/ci.yml'
     '.github/workflows/release-build.yml'  = Read-Text '.github/workflows/release-build.yml'
     'release/min-dotnet-runtime.txt'       = Read-Text 'release/min-dotnet-runtime.txt'
     'tools/release/distribution-privacy-allowlist.json' = Read-Text 'tools/release/distribution-privacy-allowlist.json'
+    'self-test endings'                    = $endings
 }
 
 function Invoke-Checks($i) {
@@ -153,6 +183,9 @@ function Invoke-Checks($i) {
     Assert-ReleaseTrace $i['.github/workflows/release-build.yml']
     Assert-CiTrace $i['.github/workflows/ci.yml']
     Assert-CiIdentity $i['.github/workflows/ci.yml']
+    Assert-SelfTestExits 'ci.yml' $i['.github/workflows/ci.yml']
+    Assert-SelfTestExits 'release-build.yml' $i['.github/workflows/release-build.yml']
+    Assert-ExplicitExit $i['self-test endings']
     return $floor
 }
 
@@ -185,6 +218,11 @@ if ($SelfTest) {
         @{ File = '.github/workflows/ci.yml'; Old = '-ExpectedVersion $version'; New = "-ExpectedVersion '1.1.1.0'"; Reason = 'S6: ci: the package identity check is missing'; Name = 'ci identity against a literal version' }
         @{ File = '.github/workflows/ci.yml'; Old = '$version = ./tools/release/Get-RepositoryPackageVersion.ps1'; New = "`$version = '1.1.1.0'"; Reason = 'S6: ci: the repository package version is missing'; Name = 'ci version hard-coded' }
         @{ File = '.github/workflows/ci.yml'; Old = '-ExpectedVersion $version'; New = '-ExpectedVersion $version -ExpectedIdentityName Other'; Reason = 'S6: .*exact'; Name = 'ci identity with an overridden identity name' }
+        @{ File = '.github/workflows/ci.yml'; Old = './tools/release/Assert-PackageVersionFloor.ps1 -PackageVersion $version'; New = 'Write-Host -Object $version'; Reason = 'S6: ci: the package version floor on the repository version is missing'; Name = 'ci without the package version floor' }
+        @{ File = '.github/workflows/ci.yml'; Old = "./tools/release/Invoke-ReleaseSelfTests.ps1 -Test 'Test-PackageRuntime.ps1'"; New = './tools/release/Test-PackageRuntime.ps1'; Reason = 'S7: ci\.yml calls a self-test directly'; Name = 'ci: a self-test called directly (B-1 shape)' }
+        @{ File = '.github/workflows/release-build.yml'; Old = "./tools/release/Invoke-ReleaseSelfTests.ps1 -Test @("; New = "./tools/release/Test-PackageResources.ps1`n          ./tools/release/Invoke-ReleaseSelfTests.ps1 -Test @("; Reason = 'S7: release-build\.yml calls a self-test directly'; Name = 'release-build: a self-test called directly' }
+        @{ File = '.github/workflows/release-build.yml'; Old = './tools/release/Invoke-ReleaseSelfTests.ps1 -SelfTest'; New = 'Write-Host runner'; Reason = 'S7: release-build\.yml does not run the self-test runner'; Name = 'release-build: runner counterproofs dropped' }
+        @{ File = 'self-test endings'; Old = 'Test-PackageResources.ps1|exit 0'; New = 'Test-PackageResources.ps1|Write-Host "All 23 package resources cases behaved as required."'; Reason = 'S7: Test-PackageResources\.ps1 does not end with an explicit'; Name = 'self-test without the explicit exit 0' }
     )
     $count = 0
     foreach ($mutation in $mutations) {
@@ -221,3 +259,6 @@ if ($SelfTest) {
     Invoke-Checks $inputs | Out-Null
     Write-Host "All $count runtime servicing mutations detected; the repository passed again."
 }
+# Explicit success. A native command or a stub inside the suite may have left $LASTEXITCODE non-zero,
+# and the GitHub Actions pwsh wrapper ends a step with `exit $LASTEXITCODE` (PR #53 B-1).
+exit 0
