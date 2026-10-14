@@ -5,6 +5,7 @@ using ServerMonitor.App.Tests.Fakes;
 using ServerMonitor.App.ViewModels;
 using ServerMonitor.Core.Backup;
 using ServerMonitor.Core.Discovery;
+using ServerMonitor.Core.Domain;
 using ServerMonitor.Core.Enums;
 using ServerMonitor.Core.Interfaces;
 using ServerMonitor.Core.Models;
@@ -83,6 +84,27 @@ public sealed class Ui5SettingsTests
 
         Assert.Empty(world.Localization.Set);
         Assert.False(world.ViewModel.IsRestartNoticeOpen);
+    }
+
+    /// <summary>
+    /// REL.0C: on first run the picker shows the language the app actually starts in. An exactly supported Windows
+    /// language needs no override ("system"); any other culture shows the language the startup resolution wrote;
+    /// a persisted choice (also the old pt-BR default) is shown as it is.
+    /// </summary>
+    [Theory]
+    [InlineData(null, "en-US", 0)]
+    [InlineData(null, "pt-PT", 0)]
+    [InlineData(null, "pt-BR", 0)]
+    [InlineData(null, "en-GB", 3)]
+    [InlineData(null, "fr-FR", 3)]
+    [InlineData(null, "", 3)]
+    [InlineData(null, "pt-AO", 2)]
+    [InlineData("pt-BR", "fr-FR", 1)]
+    public void OnFirstRun_TheLanguageIndex_ShowsTheStartupLanguage(string? persisted, string systemCulture, int index)
+    {
+        var current = persisted ?? SupportedCultures.StartupOverride(persisted, systemCulture);
+
+        Assert.Equal(index, new World(language: current).ViewModel.SelectedLanguageIndex);
     }
 
     // ---- idempotent, concurrency-safe load ------------------------------------------------------------------------

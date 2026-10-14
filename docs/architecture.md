@@ -21,7 +21,7 @@ ServerMonitor.Collectors     ──→ ServerMonitor.Core
 - MVVM simples, sem framework MVVM adicional;
 - `Microsoft.Extensions.Hosting` para DI e lifecycle;
 - `Microsoft.Extensions.Logging.Debug` para logging sem ficheiros ou dados sensíveis;
-- recursos RESW externos e `pt-BR` como idioma padrão/fallback;
+- recursos RESW externos; `en-US` é o idioma padrão/fallback do pacote (REL.0C); no primeiro arranque o idioma do Windows resolve por língua base (`pt-BR` → pt-BR, outro `pt-*` → pt-PT, resto → en-US) e uma escolha persistida nunca é substituída;
 - `DesktopAcrylicBackdrop` para o backdrop da janela, Acrylic interno com tint subtil e fallback opaco/alto contraste;
 - shell leve com `Frame`, sem sidebar permanente;
 - A página Server Detail (`ServerDetailViewModel`, UI.5) e o `ServerCompactCard` partilham o mesmo `ServerCardViewModel` vivo; o Detail compõe-no e só acrescenta apresentação.

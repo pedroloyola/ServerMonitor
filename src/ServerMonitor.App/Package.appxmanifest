@@ -52,9 +52,9 @@
   </Dependencies>
 
   <Resources>
-    <Resource Language="pt-BR" />
-    <Resource Language="pt-PT" />
     <Resource Language="en-US" />
+    <Resource Language="pt-PT" />
+    <Resource Language="pt-BR" />
   </Resources>
 
   <Applications>
@@ -64,7 +64,7 @@
       EntryPoint="Windows.FullTrustApplication">
       <uap:VisualElements
         DisplayName="ServerAlyzer"
-        Description="Painel local de monitorização de servidores Linux e macOS por SSH."
+        Description="ms-resource:AppDescription"
         BackgroundColor="transparent"
         Square150x150Logo="Images\Square150x150Logo.png"
         Square44x44Logo="Images\Square44x44Logo.png">

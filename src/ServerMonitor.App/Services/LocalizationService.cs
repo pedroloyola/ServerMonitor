@@ -24,13 +24,13 @@ public sealed class LocalizationService(ILogger<LocalizationService> logger) : I
         }
 
         var systemCulture = CultureInfo.CurrentUICulture.Name;
-        if (!SupportedCultures.IsSupported(systemCulture))
+        if (SupportedCultures.StartupOverride(CurrentLanguageOverride, systemCulture) is { } resolved)
         {
-            ApplicationLanguages.PrimaryLanguageOverride = SupportedCultures.Default;
+            ApplicationLanguages.PrimaryLanguageOverride = resolved;
             logger.LogInformation(
-                "The Windows UI culture {SystemCulture} is unsupported; using {FallbackCulture}.",
+                "The Windows UI culture {SystemCulture} is not a supported language; using {ResolvedCulture}.",
                 systemCulture,
-                SupportedCultures.Default);
+                resolved);
         }
     }
 

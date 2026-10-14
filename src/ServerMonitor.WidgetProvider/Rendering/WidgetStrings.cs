@@ -79,22 +79,20 @@ public sealed class WidgetStrings
     /// <summary>Resolves the strings for the current UI culture, defaulting to English.</summary>
     public static WidgetStrings Current() => ForCulture(CultureInfo.CurrentUICulture);
 
+    /// <summary>
+    /// The app's table (REL.0C, <c>SupportedCultures.Resolve</c>; a parity test keeps them equal): pt-BR → PtBr,
+    /// any other Portuguese → PtPt, everything else → En. It follows the Windows culture, not the app's
+    /// in-app language choice (the provider is a separate process).
+    /// </summary>
     public static WidgetStrings ForCulture(CultureInfo? culture)
     {
-        var name = culture?.Name ?? string.Empty;
-
-        if (name.Equals("pt-BR", StringComparison.OrdinalIgnoreCase))
+        var subtags = (culture?.Name ?? string.Empty).Split(['-', '_'], StringSplitOptions.RemoveEmptyEntries);
+        if (subtags.Length == 0 || !subtags[0].Equals("pt", StringComparison.OrdinalIgnoreCase))
         {
-            return PtBr;
+            return En;
         }
 
-        if (name.StartsWith("pt", StringComparison.OrdinalIgnoreCase))
-        {
-            // pt-PT and any other Portuguese variant fall back to European Portuguese.
-            return PtPt;
-        }
-
-        return En;
+        return subtags.Skip(1).Any(subtag => subtag.Equals("BR", StringComparison.OrdinalIgnoreCase)) ? PtBr : PtPt;
     }
 
     private static readonly WidgetStrings En = new()
