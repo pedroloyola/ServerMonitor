@@ -36,4 +36,22 @@ Store listing.
 
 ## Current contents
 
-The notes for **1.1.1**, matching what was submitted for that version.
+Draft notes for the next release candidate, covering what changed since 1.1.x. Not submitted yet;
+review them again before the version bump.
+
+**DRAFT-GATE — check each line before submission.** Some sentences are only true once a gate
+passes. Rows refer to `docs/release/rel0d-preparation.md` §2. If a gate has not passed, edit the
+sentence in all three files as described, then re-check the 1500-character limit.
+
+* **.NET included** (last paragraph, all three files): keep it only if the self-contained .NET
+  change (PR #48) is merged **and** CLEAN-1 passes, with counterproof X1 failing as expected.
+  Otherwise remove the paragraph.
+* **Local network search on request** (search paragraph, all three files): keep it only if the
+  on-demand discovery change (PR #47) is merged. Re-read it against the merged behaviour: an
+  empty Overview, the button label, and that users who already have servers get no suggestions.
+  Otherwise remove the paragraph.
+* **Language** (language paragraph): needs the language change (PR #46) merged. Otherwise remove
+  the paragraph.
+* **Backup on another computer:** the text deliberately says only "restore them later". If
+  BACKUP-XM passes, you may mention restoring on another computer, but then also say that servers
+  using a key file need that file on the other computer, if the length allows.
