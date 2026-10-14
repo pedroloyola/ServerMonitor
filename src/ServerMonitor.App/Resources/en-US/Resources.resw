@@ -1117,4 +1117,11 @@ status, metrics and history.</value></data>
   <data name="WidgetScreenshotAltText" xml:space="preserve"><value>ServerAlyzer widget showing server health and CPU, RAM and disk use.</value></data>
   <!-- REL.0C: app Description in Package*.appxmanifest (ms-resource:AppDescription). -->
   <data name="AppDescription" xml:space="preserve"><value>Local dashboard for monitoring Linux and macOS servers over SSH.</value></data>
+  <!-- REL.0D: one-time legacy language hint on Overview (LanguageRecoveryHintViewModel). -->
+  <data name="LanguageRecoveryHintTitle" xml:space="preserve"><value>Use the system language?</value></data>
+  <data name="LanguageRecoveryHintMessageFormat" xml:space="preserve"><value>ServerAlyzer is in Portuguese (Brazil) because an earlier version chose it automatically. Your Windows language isn't available in ServerAlyzer, so with the system language it will use {0}. The change applies after a restart, and you can change the language later in Settings › Language.</value></data>
+  <data name="LanguageRecoveryHintUseSystemButton.Content" xml:space="preserve"><value>Use the system language</value></data>
+  <data name="LanguageRecoveryHintKeepButton.Content" xml:space="preserve"><value>Keep Portuguese (Brazil)</value></data>
+  <data name="LanguageRecoveryHintSaveError.Title" xml:space="preserve"><value>The language choice couldn't be saved</value></data>
+  <data name="LanguageRecoveryHintSaveError.Message" xml:space="preserve"><value>Nothing was changed. Try again, or choose the language in Settings › Language.</value></data>
 </root>

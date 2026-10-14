@@ -10,12 +10,17 @@ public sealed partial class DashboardPage : Page
 {
     private readonly ServerEditorReturnFocus? _editorReturnFocus;
 
-    public DashboardPage(DashboardViewModel viewModel, WindowModeViewModel windowMode, ServerEditorReturnFocus? editorReturnFocus = null)
+    public DashboardPage(
+        DashboardViewModel viewModel,
+        WindowModeViewModel windowMode,
+        LanguageRecoveryHintViewModel languageHint,
+        ServerEditorReturnFocus? editorReturnFocus = null)
     {
         InitializeComponent();
         _editorReturnFocus = editorReturnFocus;
         ViewModel = viewModel;
         WindowMode = windowMode;
+        LanguageHint = languageHint;
         DataContext = ViewModel;
 
         // The page and the view model are BOTH registered as singletons (App.xaml.cs), so they share one app-length
@@ -31,6 +36,9 @@ public sealed partial class DashboardPage : Page
 
     /// <summary>Backs the discreet "compact mode" entry in the header (D-UI4-NAV, until UI.6).</summary>
     public WindowModeViewModel WindowMode { get; }
+
+    /// <summary>REL.0D: the one-time legacy language hint (closed for everyone else).</summary>
+    public LanguageRecoveryHintViewModel LanguageHint { get; }
 
     internal static double EmptyStateMinimumHeight(double usableHeight) => usableHeight >= 700 ? 620 : 0;
 

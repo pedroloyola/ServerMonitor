@@ -343,6 +343,32 @@
                              Message="{x:Bind ViewModel.ConfigurationLockedMessage}" />
                 </StackPanel>
 
+                <!-- REL.0D (D-B1 + D-B2): the one-time legacy language hint. Non-blocking, no close button (each action is the
+                     decision that retires it), and it never changes the language on its own. The restart notice is
+                     Settings' own text (x:Uid SettingsRestartNotice). -->
+                <StackPanel Spacing="{StaticResource SaSpace12}" primitives:SaMotion.Enter="Rise"
+                            Visibility="{x:Bind LanguageHint.HasVisibleNotice, Mode=OneWay}">
+                    <InfoBar Severity="Informational" IsClosable="False"
+                             IsOpen="{x:Bind LanguageHint.IsOpen, Mode=OneWay}"
+                             Title="{x:Bind LanguageHint.Title}"
+                             Message="{x:Bind LanguageHint.Message}">
+                        <InfoBar.Content>
+                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource SaSpace8}" Margin="0,0,0,12">
+                                <Button x:Uid="LanguageRecoveryHintUseSystemButton"
+                                        Style="{StaticResource SaPrimaryButtonStyle}"
+                                        Command="{x:Bind LanguageHint.UseSystemLanguageCommand}" />
+                                <Button x:Uid="LanguageRecoveryHintKeepButton"
+                                        Style="{StaticResource SaSecondaryButtonStyle}"
+                                        Command="{x:Bind LanguageHint.KeepCurrentLanguageCommand}" />
+                            </StackPanel>
+                        </InfoBar.Content>
+                    </InfoBar>
+                    <InfoBar x:Uid="LanguageRecoveryHintSaveError" Severity="Error" IsClosable="True"
+                             IsOpen="{x:Bind LanguageHint.IsSaveErrorOpen, Mode=TwoWay}" />
+                    <InfoBar x:Uid="SettingsRestartNotice" Severity="Informational" IsClosable="True"
+                             IsOpen="{x:Bind LanguageHint.IsRestartNoticeOpen, Mode=TwoWay}" />
+                </StackPanel>
+
                 <!-- Loading §14 112:15592 / 112:15602: solid panels, "A carregar…" + skeleton rows (1 and 4). -->
                 <StackPanel Spacing="{StaticResource SaSpace28}" Visibility="{x:Bind ViewModel.IsLoading, Mode=OneWay}">
                     <Border Style="{StaticResource SaSolidSurfaceStyle}">

@@ -40,6 +40,7 @@ public sealed class QaStartupIsolationTests
         "BackgroundSettingsStorageOptions.FilePath",
         "NotificationSettingsStorageOptions.FilePath",
         "WindowPlacementStorageOptions.FilePath",
+        "LanguageSettingsStorageOptions.FilePath",
         "SshConfigFileImportSource.ConfigPath",
         "LocalSshKeyDiscovery.SshDirectory",
         "PrivateKeyFilePicker.UserProfile"
@@ -148,6 +149,24 @@ public sealed class QaStartupIsolationTests
 
         Assert.True(refusal < build && build < verify, "VerifyOrThrow must follow the host build (and the refusal)");
         Assert.True(initialize > verify && initialize < start, "VerifyOrThrow must precede the App's InitializeComponent and the host start");
+    }
+
+    /// <summary>
+    /// REL.0D: the startup language step writes language-settings.json, so inside App.BuildServicesHost the isolation
+    /// check runs BEFORE InitializeFromSystem (a harness that missed the re-root dies before anything is written).
+    /// </summary>
+    [Fact]
+    public void VerifyOrThrow_AlsoRunsInsideBuildServicesHost_BeforeTheStartupLanguageStep()
+    {
+        var source = AppSourceWithoutComments();
+        var body = source[Single(source, "internal static IHost BuildServicesHost(")..];
+        body = body[..body.IndexOf("return host;", StringComparison.Ordinal)];
+        var built = body.IndexOf(".Build();", StringComparison.Ordinal);
+        var verify = body.IndexOf("Qa.QaStartupIsolation.VerifyOrThrow(host.Services);", StringComparison.Ordinal);
+        var language = body.IndexOf(".InitializeFromSystem();", StringComparison.Ordinal);
+
+        Assert.True(built >= 0 && verify > built, "BuildServicesHost must verify the isolation after the host is built");
+        Assert.True(language > verify, "BuildServicesHost must verify the isolation before the startup language step writes");
     }
 
     [Fact]
@@ -267,6 +286,7 @@ public sealed class QaStartupIsolationTests
         services.AddSingleton(new BackgroundSettingsStorageOptions { FilePath = Path.Combine(Sentinel, "background-settings.json") });
         services.AddSingleton(new NotificationSettingsStorageOptions { FilePath = Path.Combine(Sentinel, "notification-settings.json") });
         services.AddSingleton(new WindowPlacementStorageOptions { FilePath = Path.Combine(Sentinel, "window-placement.json") });
+        services.AddSingleton(new LanguageSettingsStorageOptions { FilePath = Path.Combine(Sentinel, "language-settings.json") });
         services.AddSingleton(new UngatedCredentialStore(UninitializedCredentialManager()));
         services.AddSingleton<ISshConfigImportSource>(new SshConfigFileImportSource(Sentinel));
         services.AddSingleton<ILocalSshKeyDiscovery>(new LocalSshKeyDiscovery(Sentinel));

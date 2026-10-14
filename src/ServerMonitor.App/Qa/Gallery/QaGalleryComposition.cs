@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Microsoft.Extensions.Logging.Abstractions;
 using ServerMonitor.App.Services;
+using ServerMonitor.Core.Domain;
 
 namespace ServerMonitor.App.Qa.Gallery;
 
@@ -54,7 +55,21 @@ internal static class QaGalleryComposition
 
         // The same language rule the application applies at startup, without a host: an explicit override wins,
         // an unsupported system culture falls back to the product default. Nothing is persisted.
-        new LocalizationService(NullLogger<LocalizationService>.Instance).InitializeFromSystem();
+        new LocalizationService(NullLogger<LocalizationService>.Instance, new TransientLanguageSettings()).InitializeFromSystem();
+    }
+
+    /// <summary>REL.0D: the gallery keeps the language provenance in memory only - it never writes language-settings.json.</summary>
+    private sealed class TransientLanguageSettings : ILanguageSettingsStore
+    {
+        private LanguageRecordRead _record = LanguageRecordRead.Absent;
+
+        public LanguageRecordRead Read() => _record;
+
+        public bool TryWrite(LanguageProvenance record)
+        {
+            _record = LanguageRecordRead.Of(record);
+            return true;
+        }
     }
 
     /// <summary>Runs in OnLaunched instead of the application startup.</summary>
