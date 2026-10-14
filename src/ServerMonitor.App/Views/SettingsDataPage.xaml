@@ -3,7 +3,39 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:primitives="using:ServerMonitor.App.Controls.Primitives"
+    xmlns:vm="using:ServerMonitor.App.ViewModels"
 >
+    <Page.Resources>
+        <!-- REL.0D: a suggestion found from Settings - the overview's "Encontrados na rede" row (Adicionar + Ignorar),
+             bound to the SAME item view models, so Add opens the normal add editor pre-filled. -->
+        <DataTemplate x:Key="SettingsDiscoveredRowTemplate" x:DataType="vm:DiscoveredServerViewModel">
+            <primitives:SaGroupHost AutomationProperties.Name="{x:Bind AutomationSummary}">
+            <Grid MinHeight="48" ColumnSpacing="{StaticResource SaSpace12}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <primitives:SaIcon Data="{StaticResource SaIconServerStack01Data}" Size="20" VerticalAlignment="Center"
+                                   Foreground="{ThemeResource SaTextSecondaryBrush}" />
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                    <TextBlock Text="{x:Bind DisplayName}" Style="{StaticResource SaPrimaryBodyTextStyle}" FontWeight="Medium" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="{x:Bind Endpoint}" Style="{StaticResource SaHelperTextStyle}"
+                               Foreground="{ThemeResource SaTextSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+                <Button Grid.Column="2" x:Uid="DiscoveredServerAddButton" VerticalAlignment="Center"
+                        Style="{StaticResource SaPillButtonSmallStyle}"
+                        Command="{x:Bind AddCommand}" AutomationProperties.Name="{x:Bind AddAutomationName}" />
+                <Button Grid.Column="3" VerticalAlignment="Center" Style="{StaticResource SaGhostIconButtonStyle}"
+                        Command="{x:Bind IgnoreCommand}" AutomationProperties.Name="{x:Bind IgnoreAutomationName}"
+                        ToolTipService.ToolTip="{x:Bind IgnoreAutomationName}">
+                    <primitives:SaIcon Data="{StaticResource SaIconCancel01Data}" Size="16" />
+                </Button>
+            </Grid>
+            </primitives:SaGroupHost>
+        </DataTemplate>
+    </Page.Resources>
     <!-- UI.5 "Dados e servidores", Figma 112:8230 (D) / 112:8276 (L): back + title, glass cards (hidden servers, ignored
          devices, history, Backup/Restore - DERIVED, H-UI5-4, between History and About - and About), footer. Successes
          show the page-local toast (Figma §3.2); errors stay inline next to their card. -->
@@ -28,6 +60,9 @@
                         </VisualState.StateTriggers>
                         <VisualState.Setters>
                             <Setter Target="PageRoot.Padding" Value="{StaticResource SaPagePaddingCompact}" />
+                            <Setter Target="LocalNetworkSearchButton.(Grid.Row)" Value="1" />
+                            <Setter Target="LocalNetworkSearchButton.(Grid.Column)" Value="0" />
+                            <Setter Target="LocalNetworkSearchButton.HorizontalAlignment" Value="Left" />
                             <Setter Target="ResetIgnoredButton.(Grid.Row)" Value="1" />
                             <Setter Target="ResetIgnoredButton.(Grid.Column)" Value="0" />
                             <Setter Target="ResetIgnoredButton.HorizontalAlignment" Value="Left" />
@@ -133,6 +168,57 @@
                                 </DataTemplate>
                             </ItemsRepeater.ItemTemplate>
                         </ItemsRepeater>
+                        </primitives:SaListHost>
+                    </StackPanel>
+                </Border>
+
+                <!-- REL.0D (Prism, prism-review-pr47 §4 b): "Procurar na rede local" next to the ignored devices. The only other
+                     way into discovery besides the empty overview, through the SAME command (mDNS starts only on this explicit
+                     action; same 40 s / 10 min bounds, same stop when the window hides), the same permission note, and the
+                     suggestions listed right here. Hidden when live discovery is not composed. -->
+                <Border x:Name="LocalNetworkSearchSection" Style="{StaticResource SaGlassSurfaceStyle}"
+                        Visibility="{x:Bind Discovery.IsLocalNetworkSearchAvailable}">
+                    <StackPanel Spacing="10">
+                        <Grid MinHeight="36" ColumnSpacing="{StaticResource SaSpace16}" RowSpacing="{StaticResource SaSpace8}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <TextBlock x:Uid="SettingsLocalNetworkTitle" VerticalAlignment="Center" AutomationProperties.HeadingLevel="Level2"
+                                       Style="{StaticResource SaCardTitleTextStyle}" TextWrapping="Wrap" />
+                            <!-- Prism N-1 (as on the overview): the permission note is also the button's HelpText (resw). Disabled while a
+                                 search runs through the command's CanExecute (CanStartLocalNetworkSearchFromSettings). -->
+                            <Button x:Name="LocalNetworkSearchButton" x:Uid="SettingsLocalNetworkSearchButton" Grid.Column="1" MinWidth="180"
+                                    Style="{StaticResource SaPillButtonSmallStyle}"
+                                    Command="{x:Bind Discovery.StartLocalNetworkSearchCommand}" />
+                        </Grid>
+                        <TextBlock x:Name="LocalNetworkPermissionNote" x:Uid="SettingsLocalNetworkDescription" Style="{StaticResource SaCaptionTextStyle}"
+                                   Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap" />
+                        <StackPanel x:Name="LocalNetworkSearchingRow" Orientation="Horizontal" Spacing="{StaticResource SaSpace8}"
+                                    Visibility="{x:Bind Discovery.IsLocalNetworkSearchRunning, Mode=OneWay}">
+                            <ProgressRing Width="14" Height="14" IsActive="{x:Bind Discovery.IsLocalNetworkSearchRunning, Mode=OneWay}" />
+                            <TextBlock x:Uid="DashboardEmptyDiscoverySearching" Style="{StaticResource SaCaptionTextStyle}"
+                                       Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <TextBlock x:Name="LocalNetworkNothingFound" x:Uid="DashboardEmptyDiscoveryNothingFound" Style="{StaticResource SaCaptionTextStyle}"
+                                   Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap"
+                                   Visibility="{x:Bind Discovery.LocalNetworkSearchEndedNothingFound, Mode=OneWay}" />
+                        <TextBlock x:Name="LocalNetworkTimeLimit" x:Uid="DashboardEmptyDiscoveryTimeLimit" Style="{StaticResource SaCaptionTextStyle}"
+                                   Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap"
+                                   Visibility="{x:Bind Discovery.LocalNetworkSearchEndedTimeLimit, Mode=OneWay}" />
+                        <TextBlock x:Name="LocalNetworkFailed" x:Uid="DashboardEmptyDiscoveryFailed" Style="{StaticResource SaCaptionTextStyle}"
+                                   Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap"
+                                   Visibility="{x:Bind Discovery.LocalNetworkSearchEndedFailed, Mode=OneWay}" />
+                        <!-- UI.12 PEER-01: the count name + live region on a List host (an ItemsRepeater has no peer). -->
+                        <primitives:SaListHost x:Name="LocalNetworkResults" AutomationProperties.LiveSetting="Polite" primitives:SaAnnounce.Changes="True"
+                                               AutomationProperties.Name="{x:Bind Discovery.DiscoveredCountAutomationName, Mode=OneWay}"
+                                               Visibility="{x:Bind Discovery.HasDiscoveredServers, Mode=OneWay}">
+                            <ItemsRepeater x:Name="LocalNetworkResultsRepeater" TabFocusNavigation="Local"
+                                           ItemsSource="{x:Bind Discovery.DiscoveredServers}" ItemTemplate="{StaticResource SettingsDiscoveredRowTemplate}" />
                         </primitives:SaListHost>
                     </StackPanel>
                 </Border>

@@ -86,13 +86,21 @@ public sealed partial class Rel0cLanguageGuardTests
         Assert.Equal(keys["en-US"].Count, keys["en-US"].Distinct(StringComparer.Ordinal).Count());
     }
 
+    /// <summary>
+    /// REL.0D: the service decides through the pure <c>LanguagePreferencePolicy</c> (persisted override, Windows culture,
+    /// provenance record), and the policy maps the culture through the shared table. The behaviour itself is proved by
+    /// LanguagePreferencePolicyTests and the real-service tests (LanguageRecoveryTests); this keeps the wiring visible.
+    /// </summary>
     [Fact]
     public void Startup_resolves_the_language_through_the_shared_table_that_keeps_a_persisted_choice()
     {
         var code = AppSourceTree.CodeWithoutComments("Services/LocalizationService.cs");
+        var policy = File.ReadAllText(Path.Combine(
+            Path.GetDirectoryName(AppSourceTree.Full("App.xaml.cs"))!, "..", "ServerMonitor.Core", "Domain", "LanguagePreferencePolicy.cs"));
 
-        Assert.Contains("SupportedCultures.StartupOverride(CurrentLanguageOverride, systemCulture)", code, StringComparison.Ordinal);
+        Assert.Contains("LanguagePreferencePolicy.AtStartup(current, systemCulture, _settings.Read())", code, StringComparison.Ordinal);
         Assert.DoesNotContain("SupportedCultures.IsSupported", code, StringComparison.Ordinal);
+        Assert.Contains("SupportedCultures.StartupOverride(null, systemCulture)", policy, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -102,7 +110,8 @@ public sealed partial class Rel0cLanguageGuardTests
             .Where(path => OverrideWrite().IsMatch(AppSourceTree.CodeWithoutComments(path)))
             .ToList();
 
-        Assert.Equal(["Qa/QaUiLanguageComposition.cs", "Services/LocalizationService.cs"], writers);
+        // REL.0D: the --qa-system-culture platform forwards the REAL service's writes (Debug-only, excluded from Release).
+        Assert.Equal(["Qa/QaSystemCultureComposition.cs", "Qa/QaUiLanguageComposition.cs", "Services/LocalizationService.cs"], writers);
     }
 
     private static XDocument Resources(string language) =>

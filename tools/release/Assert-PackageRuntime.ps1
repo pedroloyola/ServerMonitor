@@ -27,6 +27,19 @@
         PackageDependency on Microsoft.WindowsAppRuntime.*, and the self-contained Windows App SDK
         payload (Microsoft.WindowsAppRuntime.dll) is NOT in the package.
 
+    Servicing floor (REL.0D, ADR-017 amendment). Windows Update and Microsoft Update never patch a
+    self-contained runtime: the package keeps the runtime it was built with until we ship a new one.
+    So the check also fails closed when the bundled Microsoft.NETCore.App is below the tracked floor
+    in release/min-dotnet-runtime.txt:
+
+      * the version every runtimeconfig.json (includedFrameworks) and deps.json declares must be a
+        canonical MAJOR.MINOR.PATCH (a preview or malformed version is refused) and >= the floor;
+      * the runtime files themselves must report that same version in their version resource
+        (ProductVersion of hostfxr, hostpolicy, System.Private.CoreLib, System.Runtime), so a package
+        whose JSON says one runtime while the payload is another cannot pass on the JSON alone.
+
+    -PassThru returns the checked runtime version, for the traceability record.
+
     Nothing here touches a real install, the network or Partner Center.
 #>
 [CmdletBinding()]
@@ -41,7 +54,18 @@ param(
         'System.Private.CoreLib.dll',
         'System.Runtime.dll'
     ),
-    [string] $RuntimeIdentifier = 'win-x64'
+    [string] $RuntimeIdentifier = 'win-x64',
+    # Runtime files whose ProductVersion starts with the runtime's MAJOR.MINOR.PATCH. coreclr.dll and
+    # clrjit.dll are not listed: their version resource carries the encoded file version
+    # ("10,0,1326,50504"), not the runtime version.
+    [string[]] $VersionedRuntimeFiles = @(
+        'hostfxr.dll',
+        'hostpolicy.dll',
+        'System.Private.CoreLib.dll',
+        'System.Runtime.dll'
+    ),
+    [string] $RuntimeFloorPath = (Join-Path $PSScriptRoot '../../release/min-dotnet-runtime.txt'),
+    [switch] $PassThru
 )
 
 Set-StrictMode -Version Latest
@@ -57,6 +81,29 @@ function Read-EntryText($entry) {
     try { return $reader.ReadToEnd() } finally { $reader.Dispose() }
 }
 
+# FileVersionInfo reads a file on disk: the entry is copied to a private temporary file, read, and that
+# temporary file is removed again.
+function Get-EntryProductVersion($entry) {
+    $temp = Join-Path ([System.IO.Path]::GetTempPath()) ("package-runtime-file-" + [guid]::NewGuid().ToString('n') + '.dll')
+    try {
+        $source = $entry.Open()
+        try {
+            $target = [System.IO.File]::Create($temp)
+            try { $source.CopyTo($target) } finally { $target.Dispose() }
+        }
+        finally { $source.Dispose() }
+        return [string] [System.Diagnostics.FileVersionInfo]::GetVersionInfo($temp).ProductVersion
+    }
+    finally { Remove-Item -LiteralPath $temp -Force -ErrorAction SilentlyContinue }
+}
+
+# Canonical runtime version: three decimal components, no leading zeros, no suffix. A preview runtime
+# ("10.0.0-rc.2...") is refused on purpose: production never ships one.
+function ConvertTo-RuntimeVersion([string] $Value) {
+    if ($Value -cnotmatch '\A(0|[1-9][0-9]{0,4})\.(0|[1-9][0-9]{0,4})\.(0|[1-9][0-9]{0,4})\z') { return $null }
+    return [version] $Value
+}
+
 function Get-Property($object, [string] $name) {
     if ($null -eq $object) { return $null }
     $property = $object.PSObject.Properties[$name]
@@ -64,11 +111,20 @@ function Get-Property($object, [string] $name) {
     return $property.Value
 }
 
+# The floor is read first: without it nothing can be proven, so the check stops before the package.
+if (-not (Test-Path -LiteralPath $RuntimeFloorPath -PathType Leaf)) { throw 'Runtime floor: the tracked .NET runtime floor (release/min-dotnet-runtime.txt) is missing.' }
+# Only full-line comments and blank lines are ignored; exactly one version is required.
+$floorLines = @(Get-Content -LiteralPath $RuntimeFloorPath | Where-Object { $_ -notmatch '^\s*(#.*)?$' })
+if ($floorLines.Count -ne 1) { throw 'Runtime floor: the tracked .NET runtime floor must contain exactly one version.' }
+$runtimeFloor = ConvertTo-RuntimeVersion $floorLines[0]
+if ($null -eq $runtimeFloor) { throw 'Runtime floor: the tracked .NET runtime floor is not a canonical MAJOR.MINOR.PATCH version.' }
+
 if (-not (Test-Path -LiteralPath $PackagePath)) { throw "Package not found: $PackagePath" }
 $package = (Resolve-Path -LiteralPath $PackagePath).Path
 
 Write-Host 'Package runtime check'
 Write-Host "  package: $(Split-Path -Leaf $package)"
+Write-Host "  runtime floor: $runtimeFloor"
 
 $runtimePackName = "runtimepack.Microsoft.NETCore.App.Runtime.$RuntimeIdentifier"
 $versions = @{}
@@ -121,6 +177,15 @@ try {
         }
         $configVersion = [string] (Get-Property $netCore[0] 'version')
         if (-not $configVersion) { Add-Failure "$exeName`: includedFrameworks Microsoft.NETCore.App has no version"; continue }
+        $parsedVersion = ConvertTo-RuntimeVersion $configVersion
+        if ($null -eq $parsedVersion) {
+            Add-Failure "$exeName`: includedFrameworks Microsoft.NETCore.App version is not a canonical MAJOR.MINOR.PATCH release"
+            continue
+        }
+        if ($parsedVersion -lt $runtimeFloor) {
+            Add-Failure "$exeName`: bundled Microsoft.NETCore.App $parsedVersion is below the tracked runtime floor $runtimeFloor (Windows Update never patches a self-contained runtime; rebuild with a serviced SDK)"
+            continue
+        }
         if ($null -eq $framework -and $null -eq $frameworks) {
             Add-Pass "$exeName`: self-contained, includedFrameworks Microsoft.NETCore.App $configVersion"
         }
@@ -195,6 +260,22 @@ try {
         $where = if ($directory) { $directory } else { 'the package root' }
         if ($missing.Count -gt 0) { Add-Failure "runtime file(s) missing next to the executables in ${where}: $($missing -join ', ')" }
         else { Add-Pass "runtime files present in ${where}: $($RequiredRuntimeFiles -join ', ')" }
+
+        # The payload must be the runtime the JSON names; only meaningful once the executables agree on one.
+        if ($distinct.Count -ne 1) { continue }
+        foreach ($file in $VersionedRuntimeFiles) {
+            $key = ($directory + $file).ToLowerInvariant()
+            if (-not $entries.ContainsKey($key)) { Add-Failure "runtime file $file is missing in ${where}, so its runtime version cannot be proven"; continue }
+            $reported = Get-EntryProductVersion $entries[$key]
+            $core = if ($reported -cmatch '\A([0-9]+\.[0-9]+\.[0-9]+)(?:[-+ ]|\z)') { $Matches[1] } else { $null }
+            if ($null -eq $core) {
+                Add-Failure "runtime file $file in ${where} reports no runtime version in its version resource"
+            }
+            elseif ($core -cne $distinct[0]) {
+                Add-Failure "runtime file $file in ${where} reports runtime $core, but the executables declare Microsoft.NETCore.App $($distinct[0])"
+            }
+            else { Add-Pass "runtime file $file reports $core" }
+        }
     }
 
     # ------------------------------------- Windows App Runtime stays a framework package
@@ -224,4 +305,5 @@ if ($failures.Count -gt 0) {
 }
 
 Write-Host ''
-Write-Host 'PACKAGE RUNTIME CHECK PASSED'
+Write-Host "PACKAGE RUNTIME CHECK PASSED (Microsoft.NETCore.App $($distinct[0]) >= floor $runtimeFloor)"
+if ($PassThru) { return [pscustomobject] @{ RuntimeVersion = [string] $distinct[0]; RuntimeFloor = [string] $runtimeFloor } }

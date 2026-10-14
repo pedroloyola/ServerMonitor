@@ -532,3 +532,6 @@ if ($broken.Count -gt 0) {
 }
 
 Write-Host "All $($results.Count) distribution privacy counterproof cases behaved as required."
+# Explicit success. A native command or a stub inside the suite may have left $LASTEXITCODE non-zero,
+# and the GitHub Actions pwsh wrapper ends a step with `exit $LASTEXITCODE` (PR #53 B-1).
+exit 0

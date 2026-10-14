@@ -63,7 +63,8 @@ internal static partial class QaStartupIsolation
         QaCompactComposition.ScenarioFlag,
         QaCompactComposition.StartFlag,
         QaCompactComposition.TickerFlag,
-        QaReducedMotionPolicy.LaunchFlag
+        QaReducedMotionPolicy.LaunchFlag,
+        QaSystemCulturePolicy.LaunchFlag
     ];
 
     /// <summary>
@@ -134,6 +135,9 @@ internal static partial class QaStartupIsolation
         // UI.11: --qa-reduced-motion takes no value and appears at most once (a 'flag=value' form is refused, never ignored).
         if (QaReducedMotionPolicy.Refusal(commandLineArgs) is { } reducedMotionRefusal) return reducedMotionRefusal;
 
+        // REL.0D: --qa-system-culture takes one culture-shaped value, at most once (never a silent default).
+        if (QaSystemCulturePolicy.Refusal(commandLineArgs) is { } systemCultureRefusal) return systemCultureRefusal;
+
         // UI.7 B-23: the editor harness's own modifiers - exact values, only next to --qa-editor, which needs --qa-backup.
         if (QaEditorComposition.Refusal(commandLineArgs) is { } editorRefusal) return editorRefusal;
 
@@ -193,6 +197,7 @@ internal static partial class QaStartupIsolation
         services.AddSingleton(new BackgroundSettingsStorageOptions { FilePath = Path.Combine(root, "background-settings.json") });
         services.AddSingleton(new NotificationSettingsStorageOptions { FilePath = Path.Combine(root, "notification-settings.json") });
         services.AddSingleton(new WindowPlacementStorageOptions { FilePath = Path.Combine(root, "window-placement.json") });
+        services.AddSingleton(new LanguageSettingsStorageOptions { FilePath = Path.Combine(root, "language-settings.json") });
 
         // The raw store is swapped; ordinary callers still get it through the gated decorator (M14.6 §5.5).
         services.AddSingleton(new UngatedCredentialStore(new QaInMemoryCredentialStore()));
@@ -268,7 +273,8 @@ internal static partial class QaStartupIsolation
         typeof(RoutedHostKeyTrustStorageOptions),
         typeof(BackgroundSettingsStorageOptions),
         typeof(NotificationSettingsStorageOptions),
-        typeof(WindowPlacementStorageOptions)
+        typeof(WindowPlacementStorageOptions),
+        typeof(LanguageSettingsStorageOptions)
     ];
 
     /// <summary>
@@ -398,6 +404,7 @@ internal static partial class QaStartupIsolation
         DirectoryOf(BackgroundSettingsStorageOptions.ForCurrentUser().FilePath),
         DirectoryOf(NotificationSettingsStorageOptions.ForCurrentUser().FilePath),
         DirectoryOf(WindowPlacementStorageOptions.ForCurrentUser().FilePath),
+        DirectoryOf(LanguageSettingsStorageOptions.ForCurrentUser().FilePath),
         DirectoryOf(HistoryStorageOptions.ForCurrentUser().DatabasePath),
         DirectoryOf(IgnoredDeviceStorageOptions.ForCurrentUser().FilePath),
         DirectoryOf(WidgetStateOptions.ForCurrentUser().SnapshotPath),

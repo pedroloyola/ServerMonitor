@@ -110,6 +110,11 @@
   <data name="DiscoveredServerAddFor" xml:space="preserve"><value>Adicionar {0}</value></data>
   <data name="DiscoveredServerIgnoreFor" xml:space="preserve"><value>Ignorar {0}</value></data>
   <data name="DiscoveredServerAutomationSummary" xml:space="preserve"><value>{0}, SSH, {1}, encontrado na rede</value></data>
+  <data name="SettingsLocalNetworkTitle.Text" xml:space="preserve"><value>Procurar na rede local</value></data>
+  <data name="SettingsLocalNetworkDescription.Text" xml:space="preserve"><value>Encontra servidores SSH que se anunciam na tua rede local. O Windows pode pedir permissão de rede.</value></data>
+  <data name="SettingsLocalNetworkSearchButton.Content" xml:space="preserve"><value>Procurar</value></data>
+  <data name="SettingsLocalNetworkSearchButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Procurar na rede local</value></data>
+  <data name="SettingsLocalNetworkSearchButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.HelpText" xml:space="preserve"><value>Encontra servidores SSH que se anunciam na tua rede local. O Windows pode pedir permissão de rede.</value></data>
   <data name="SettingsIgnoredDiscoveriesTitle.Text" xml:space="preserve"><value>Dispositivos ignorados</value></data>
   <data name="SettingsIgnoredDiscoveriesDescription.Text" xml:space="preserve"><value>Volta a mostrar os dispositivos que ainda estão presentes na rede.</value></data>
   <data name="SettingsResetIgnoredButton.Content" xml:space="preserve"><value>Voltar a mostrar dispositivos ignorados</value></data>
@@ -1117,4 +1122,11 @@ as métricas e o histórico do servidor.</value></data>
   <data name="WidgetScreenshotAltText" xml:space="preserve"><value>Widget do ServerAlyzer com a saúde dos servidores e o uso de CPU, RAM e disco.</value></data>
   <!-- REL.0C: app Description in Package*.appxmanifest (ms-resource:AppDescription). -->
   <data name="AppDescription" xml:space="preserve"><value>Painel local de monitorização de servidores Linux e macOS por SSH.</value></data>
+  <!-- REL.0D: one-time legacy language hint on Overview (LanguageRecoveryHintViewModel). -->
+  <data name="LanguageRecoveryHintTitle" xml:space="preserve"><value>Utilizar o idioma do sistema?</value></data>
+  <data name="LanguageRecoveryHintMessageFormat" xml:space="preserve"><value>O ServerAlyzer está em português (Brasil) porque uma versão anterior o escolheu automaticamente. O idioma do teu Windows não está disponível no ServerAlyzer, por isso, com o idioma do sistema, passa a ser usado {0}. A alteração é aplicada ao reiniciar e podes mudar o idioma mais tarde em Definições › Idioma.</value></data>
+  <data name="LanguageRecoveryHintUseSystemButton.Content" xml:space="preserve"><value>Utilizar o idioma do sistema</value></data>
+  <data name="LanguageRecoveryHintKeepButton.Content" xml:space="preserve"><value>Manter português (Brasil)</value></data>
+  <data name="LanguageRecoveryHintSaveError.Title" xml:space="preserve"><value>Não foi possível guardar a escolha de idioma</value></data>
+  <data name="LanguageRecoveryHintSaveError.Message" xml:space="preserve"><value>Nada foi alterado. Tenta novamente ou escolhe o idioma em Definições › Idioma.</value></data>
 </root>

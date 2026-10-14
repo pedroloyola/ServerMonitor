@@ -21,7 +21,11 @@ nunca no MSIX de produção.
 ## Pacote
 
 - [x] Modelo de empacotamento: **MSIX single-project** (sem `.wapproj`), x64. Windows App Runtime como
-  *framework package*; runtime **.NET self-contained** no pacote (REL.0C, emenda ao ADR-017, proposta).
+  *framework package*; runtime **.NET self-contained** no pacote (REL.0C, emenda ao ADR-017, aceite
+  2026-10-14).
+- [ ] Runtime .NET servido: o `Microsoft.NETCore.App` do pacote está no floor
+  (`release/min-dotnet-runtime.txt`) ou acima, e a última release de servicing do .NET 10 foi avaliada
+  (registo do build: `<pacote>.build.json`; ver `docs/release-automation.md`, *.NET runtime servicing*).
 - [x] Build reproduzível: `dotnet build src/ServerMonitor.App/ServerMonitor.App.csproj -c Release -p:Packaged=true`.
 - [x] Manifesto mínimo: capability única `runFullTrust`; **sem** `broadFileSystemAccess`.
 - [x] Payload auditado: sem código-fonte, testes, harness QA, fixtures, `.boss`, `.git`, PII, cert/chave DEV.

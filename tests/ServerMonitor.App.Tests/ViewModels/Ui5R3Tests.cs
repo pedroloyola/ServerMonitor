@@ -166,7 +166,9 @@ public sealed class Ui5R3Tests
     public void TheHiddenServersList_IsANamedListForUiAutomation()
     {
         var page = AppSourceTree.LoadXaml("Views/SettingsDataPage.xaml");
-        var host = page.Descendants().Single(e => e.Name.LocalName == "SaListHost");
+        // REL.0D: the page has a second list (the local-network suggestions); this is the hidden servers' host.
+        var host = page.Descendants().Single(e => e.Name.LocalName == "SaListHost"
+            && e.Elements().Any(child => (string?)child.Attribute(AppSourceTree.Xaml + "Name") == "HiddenServersList"));
 
         Assert.Equal("{Binding HiddenServersListName}", (string?)host.Attribute("AutomationProperties.Name"));
         var repeater = Assert.Single(host.Elements(), e => e.Name.LocalName == "ItemsRepeater");

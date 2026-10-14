@@ -442,6 +442,9 @@ public partial class App : Application
         // Debug-only QA: --qa-ui-language <tag> forces the UI language before the first ResourceLoader
         // (LocalizationService loads lazily) and before InitializeComponent resolves any x:Uid.
         Qa.QaUiLanguageComposition.ApplyRequested();
+        // REL.0D: the startup language step now writes a file (language-settings.json), so a harness launch is checked
+        // for real data roots BEFORE it, not only in the constructor afterwards. Inert outside a --qa* launch.
+        Qa.QaStartupIsolation.VerifyOrThrow(host.Services);
 #endif
         host.Services
             .GetRequiredService<ILocalizationService>()
@@ -466,7 +469,12 @@ public partial class App : Application
     /// </summary>
     internal static void ConfigureApplicationServices(IServiceCollection services)
     {
+        // REL.0D: the language override's provenance (language-settings.json) - "Use system language" persists, and only an
+        // override the app itself wrote is ever re-resolved.
+        services.AddSingleton(LanguageSettingsStorageOptions.ForCurrentUser());
+        services.AddSingleton<ILanguageSettingsStore, JsonLanguageSettingsStore>();
         services.AddSingleton<ILocalizationService, LocalizationService>();
+        services.AddSingleton<LanguageRecoveryHintViewModel>();
         services.AddSingleton<IThemeService, ThemeService>();
         services.AddSingleton<IAppVersionProvider, AppVersionProvider>();
         services.AddSingleton<INavigationService, NavigationService>();
@@ -853,6 +861,13 @@ public partial class App : Application
         if ((qaMode && !qaProxyJump) || Qa.QaSshConfigComposition.RequestedProfile() is not null)
         {
             Qa.QaBackupComposition.ApplyIsolated(services, Qa.QaBackupComposition.DefaultDirectory());
+        }
+
+        // REL.0D: --qa-system-culture <name> - the real language service reads <name> as the Windows UI culture (the
+        // legacy language hint and "Use system language" without touching the user's Windows language).
+        if (qaMode && Qa.QaSystemCultureComposition.RequestedCulture() is { } qaSystemCulture)
+        {
+            Qa.QaSystemCultureComposition.Apply(services, qaSystemCulture);
         }
 #endif
 

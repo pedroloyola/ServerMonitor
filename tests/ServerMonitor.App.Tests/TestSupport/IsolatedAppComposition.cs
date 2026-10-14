@@ -109,6 +109,7 @@ internal sealed class IsolatedAppComposition : IDisposable
         services.AddSingleton(new NotificationSettingsStorageOptions { FilePath = Path.Combine(dataDirectory, "notification-settings.json") });
         services.AddSingleton(new BackgroundSettingsStorageOptions { FilePath = Path.Combine(dataDirectory, "background-settings.json") });
         services.AddSingleton(new WindowPlacementStorageOptions { FilePath = Path.Combine(dataDirectory, "window-placement.json") });
+        services.AddSingleton(new LanguageSettingsStorageOptions { FilePath = Path.Combine(dataDirectory, "language-settings.json") });
         services.AddSingleton(new HistoryStorageOptions { DatabasePath = Path.Combine(dataDirectory, "history.db") });
         services.AddSingleton(new WidgetStateOptions { SnapshotPath = Path.Combine(dataDirectory, "widget-state.json") });
         services.AddSingleton(new IgnoredDeviceStorageOptions { FilePath = Path.Combine(dataDirectory, "ignored-devices.json") });

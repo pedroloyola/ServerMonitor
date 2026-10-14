@@ -6,22 +6,30 @@ using ServerMonitor.Core.Domain;
 
 namespace ServerMonitor.App.Services;
 
+/// <summary>
+/// The UI language: the Windows App SDK override (<see cref="IUiLanguagePlatform"/>) plus, since REL.0D, its provenance
+/// (<see cref="ILanguageSettingsStore"/>). The decisions are the pure <see cref="LanguagePreferencePolicy"/>; this class
+/// only reads, applies them in order (record first, then the override) and never writes the override when its record
+/// could not be saved.
+/// </summary>
 public sealed class LocalizationService : ILocalizationService
 {
     private readonly ILogger<LocalizationService> _logger;
     private readonly IUiLanguagePlatform _platform;
+    private readonly ILanguageSettingsStore _settings;
     private readonly Lazy<ResourceLoader> _resourceLoader = new(() => new ResourceLoader());
 
-    public LocalizationService(ILogger<LocalizationService> logger)
-        : this(logger, new WindowsUiLanguagePlatform())
+    public LocalizationService(ILogger<LocalizationService> logger, ILanguageSettingsStore settings)
+        : this(logger, new WindowsUiLanguagePlatform(), settings)
     {
     }
 
     /// <summary>REL.0C test seam: the same service over a fake platform (never the user's real preferences).</summary>
-    internal LocalizationService(ILogger<LocalizationService> logger, IUiLanguagePlatform platform)
+    internal LocalizationService(ILogger<LocalizationService> logger, IUiLanguagePlatform platform, ILanguageSettingsStore settings)
     {
         _logger = logger;
         _platform = platform;
+        _settings = settings ?? throw new ArgumentNullException(nameof(settings));
     }
 
     public string? CurrentLanguageOverride =>
@@ -29,36 +37,82 @@ public sealed class LocalizationService : ILocalizationService
             ? null
             : _platform.PrimaryLanguageOverride;
 
+    public bool FollowsSystemLanguage =>
+        LanguagePreferencePolicy.FollowsSystem(CurrentLanguageOverride, _settings.Read());
+
+    public string? PendingLegacyLanguageHint =>
+        LanguagePreferencePolicy.LegacyHintTarget(CurrentLanguageOverride, _platform.SystemUiCultureName, _settings.Read());
+
     public void InitializeFromSystem()
     {
-        if (CurrentLanguageOverride is not null)
+        var current = CurrentLanguageOverride;
+        var systemCulture = _platform.SystemUiCultureName;
+        var plan = LanguagePreferencePolicy.AtStartup(current, systemCulture, _settings.Read());
+        if (plan.IsEmpty)
         {
-            _logger.LogInformation("Using the explicit UI language {Language}.", CurrentLanguageOverride);
+            if (current is not null)
+            {
+                _logger.LogInformation("Using the UI language {Language}.", current);
+            }
+
             return;
         }
 
-        var systemCulture = _platform.SystemUiCultureName;
-        if (SupportedCultures.StartupOverride(CurrentLanguageOverride, systemCulture) is { } resolved)
+        // REL.0D: the record goes first. If it cannot be saved the override is not written either, so nothing the app
+        // writes can later be mistaken for the user's choice.
+        if (plan.RecordToWrite is { } record && !_settings.TryWrite(record))
         {
-            _platform.PrimaryLanguageOverride = resolved;
+            return;
+        }
+
+        if (plan.OverrideToWrite is { } language)
+        {
+            _platform.PrimaryLanguageOverride = language;
             _logger.LogInformation(
-                "The Windows UI culture {SystemCulture} is not a supported language; using {ResolvedCulture}.",
+                "Following the Windows UI culture {SystemCulture}: using {ResolvedCulture}.",
                 systemCulture,
-                resolved);
+                language.Length == 0 ? "the system language" : language);
         }
     }
 
-    public void SetLanguage(string? languageTag)
+    public void SetLanguage(string? languageTag) => TrySetLanguage(languageTag);
+
+    public bool TrySetLanguage(string? languageTag)
     {
         if (string.IsNullOrWhiteSpace(languageTag))
         {
-            _platform.PrimaryLanguageOverride = string.Empty;
-            InitializeFromSystem();
-            return;
+            // REL.0D (Cortex N-1): "Use system language" is recorded, so it persists and keeps following Windows.
+            var target = LanguagePreferencePolicy.SystemOverride(_platform.SystemUiCultureName);
+            if (!_settings.TryWrite(LanguageProvenance.System(target)))
+            {
+                return false;
+            }
+
+            _platform.PrimaryLanguageOverride = target;
+            _logger.LogInformation("UI language set to follow the system; it will apply after restart.");
+            return true;
         }
 
-        _platform.PrimaryLanguageOverride = SupportedCultures.Resolve(languageTag);
-        _logger.LogInformation("UI language changed to {Language}; it will apply after restart.", languageTag);
+        var resolved = SupportedCultures.Resolve(languageTag);
+        if (!_settings.TryWrite(LanguageProvenance.Explicit))
+        {
+            return false;
+        }
+
+        _platform.PrimaryLanguageOverride = resolved;
+        _logger.LogInformation("UI language changed to {Language}; it will apply after restart.", resolved);
+        return true;
+    }
+
+    public bool KeepCurrentLanguage()
+    {
+        if (!_settings.TryWrite(LanguageProvenance.Explicit))
+        {
+            return false;
+        }
+
+        _logger.LogInformation("The UI language {Language} was kept as the user's choice.", CurrentLanguageOverride);
+        return true;
     }
 
     public string GetString(string resourceKey)

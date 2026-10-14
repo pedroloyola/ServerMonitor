@@ -109,7 +109,7 @@ if ($SelfTest) {
 
     if ($failed -gt 0) { throw "$failed of $($cases.Count) pending-submission cases are wrong." }
     Write-Host "All $($cases.Count) pending-submission cases behaved as required."
-    return
+    exit 0  # explicit success for the Actions wrapper (PR #53 B-1)
 }
 
 if (-not (Test-Path -LiteralPath $SubmissionPath)) { throw "Submission output not found: $SubmissionPath" }

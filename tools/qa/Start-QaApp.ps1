@@ -40,7 +40,7 @@ $ErrorActionPreference = 'Stop'
 
 # Mirrors QaStartupIsolation (tested against it).
 $HarnessFlags = @('--qa-health', '--qa-discovery', '--qa-notifications', '--qa-compact', '--qa-history', '--qa-workloads', '--qa-store-screenshot', '--qa-proxyjump', '--qa-overview', '--qa-editor')
-$ModifierFlags = @('--qa-ssh-config', '--qa-ui-language', '--qa-backup', '--qa-proxyjump-dir', '--qa-overview-scenario', '--qa-start', '--qa-activation', '--qa-editor-seed', '--qa-editor-ssh', '--qa-editor-save', '--qa-compact-scenario', '--qa-compact-start', '--qa-compact-ticker', '--qa-reduced-motion')
+$ModifierFlags = @('--qa-ssh-config', '--qa-ui-language', '--qa-backup', '--qa-proxyjump-dir', '--qa-overview-scenario', '--qa-start', '--qa-activation', '--qa-editor-seed', '--qa-editor-ssh', '--qa-editor-save', '--qa-compact-scenario', '--qa-compact-start', '--qa-compact-ticker', '--qa-reduced-motion', '--qa-system-culture')
 $GalleryFlags = @('--qa-components', '--qa-tokens')
 # UI.8 (Atlas c1 A-4): the compact harness's value rules, mirrored from QaCompactComposition / QaShellStartup so the launcher
 # refuses what the app refuses (exit 3) instead of starting it. 'scenario=visible servers', as QaCompactCatalog (tested).
@@ -69,6 +69,10 @@ function Get-QaLaunchRefusal([string[]]$arguments) {
     $reduced = @($qa | Where-Object { Test-IsFlagOccurrence $_ '--qa-reduced-motion' })
     if (@($reduced | Where-Object { $_ -cne '--qa-reduced-motion' }).Count -gt 0) { return "--qa-reduced-motion takes no value and must be written exactly '--qa-reduced-motion'." }
     if ($reduced.Count -gt 1) { return '--qa-reduced-motion may be given at most once.' }
+    # REL.0D QaSystemCulturePolicy: one culture-shaped value, at most once (mirrors the app's exit-3 refusal).
+    $systemCulture = Get-QaCompactValue $arguments '--qa-system-culture'
+    if ($systemCulture.Refusal) { return $systemCulture.Refusal }
+    if ($systemCulture.Present -and $systemCulture.Value -cnotmatch '^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8}){0,2}$') { return '--qa-system-culture needs a culture name such as fr-FR, en-GB or pt-AO.' }
     $compactRefusal = Get-QaCompactRefusal $arguments
     if ($compactRefusal) { return $compactRefusal }
     $null

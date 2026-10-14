@@ -119,3 +119,6 @@ foreach ($name in $checks.Keys) {
     }
 }
 if ($SelfTest) { Write-Host "All $total workflow shape mutations detected; original workflows passed again." }
+# Explicit success. A native command or a stub inside the suite may have left $LASTEXITCODE non-zero,
+# and the GitHub Actions pwsh wrapper ends a step with `exit $LASTEXITCODE` (PR #53 B-1).
+exit 0
