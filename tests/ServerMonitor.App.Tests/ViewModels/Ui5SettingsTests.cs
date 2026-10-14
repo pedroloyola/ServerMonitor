@@ -5,7 +5,6 @@ using ServerMonitor.App.Tests.Fakes;
 using ServerMonitor.App.ViewModels;
 using ServerMonitor.Core.Backup;
 using ServerMonitor.Core.Discovery;
-using ServerMonitor.Core.Domain;
 using ServerMonitor.Core.Enums;
 using ServerMonitor.Core.Interfaces;
 using ServerMonitor.Core.Models;
@@ -89,7 +88,8 @@ public sealed class Ui5SettingsTests
     /// <summary>
     /// REL.0C: on first run the picker shows the language the app actually starts in. An exactly supported Windows
     /// language needs no override ("system"); any other culture shows the language the startup resolution wrote;
-    /// a persisted choice (also the old pt-BR default) is shown as it is.
+    /// a persisted choice (also the old pt-BR default) is shown as it is. The override comes from the REAL
+    /// LocalizationService startup over a fake platform (Atlas PR46-01), not from the table helper.
     /// </summary>
     [Theory]
     [InlineData(null, "en-US", 0)]
@@ -102,9 +102,10 @@ public sealed class Ui5SettingsTests
     [InlineData("pt-BR", "fr-FR", 1)]
     public void OnFirstRun_TheLanguageIndex_ShowsTheStartupLanguage(string? persisted, string systemCulture, int index)
     {
-        var current = persisted ?? SupportedCultures.StartupOverride(persisted, systemCulture);
+        var startup = new LocalizationService(NullLogger<LocalizationService>.Instance, new FakeUiLanguagePlatform(systemCulture, persisted));
+        startup.InitializeFromSystem();
 
-        Assert.Equal(index, new World(language: current).ViewModel.SelectedLanguageIndex);
+        Assert.Equal(index, new World(language: startup.CurrentLanguageOverride).ViewModel.SelectedLanguageIndex);
     }
 
     // ---- idempotent, concurrency-safe load ------------------------------------------------------------------------
