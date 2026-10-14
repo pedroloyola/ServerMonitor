@@ -131,6 +131,7 @@ jobs:
           ./tools/release/Test-VersionGuardMutations.ps1
           ./tools/release/Assert-NoPendingSubmission.ps1 -SelfTest
           ./tools/release/Test-ReleaseChecks.ps1
+          ./tools/release/Test-PackageRuntime.ps1
           ./tools/release/Test-DistributionPrivacy.ps1
           ./tools/release/Test-StoreSubmissionUpdate.ps1
           ./tools/release/Get-SubmissionState.ps1 -SelfTest
@@ -181,6 +182,20 @@ jobs:
             -PackagePath "artifacts/release/${env:PACKAGE_NAME}" `
             -ExpectedVersion $env:PACKAGE_VERSION `
             -WriteChecksumFile
+
+      # REL.0C: the package must carry its own .NET runtime (Windows does not ship .NET 10 and the Store
+      # has no .NET framework package), both executables on the same runtime, every deps.json asset
+      # present, and the Windows App Runtime still a framework package. Read from the .msix itself.
+      # The step output reaches the script only through env and is validated first; it is never
+      # interpolated into the run block.
+      - name: Package runtime (.NET self-contained, Windows App Runtime framework)
+        shell: pwsh
+        env:
+          PACKAGE_NAME: ${{ steps.collect.outputs.packageName }}
+        run: |
+          if ($env:PACKAGE_NAME -cnotmatch '\A[A-Za-z0-9._-]+\.msix\z') { throw 'Invalid package file name.' }
+          ./tools/release/Assert-PackageRuntime.ps1 `
+            -PackagePath "artifacts/release/${env:PACKAGE_NAME}"
 
       # PRIV-PDBPATH: nothing that leaves this job may carry an absolute development path (user
       # profile, checkout, runner workspace) in a PE debug entry, PDB, string or file. It inspects

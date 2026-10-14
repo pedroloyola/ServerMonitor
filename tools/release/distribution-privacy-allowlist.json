@@ -1,5 +1,66 @@
 [
   {
+    "file": "clretwrc.dll",
+    "tokens": [
+      "212a292a0d6e"
+    ],
+    "categories": [
+      "ci-runner-root"
+    ],
+    "reason": "Microsoft.NETCore.App.Runtime.win-x64 (REL.0C self-contained .NET runtime): CoreCLR ETW resource dll. Paths of the Microsoft build agent; bound to the matched paths, which are identical across runtime patches 10.0.11-10.0.13."
+  },
+  {
+    "file": "clrgc.dll",
+    "tokens": [
+      "544e949271ca"
+    ],
+    "categories": [
+      "ci-runner-root"
+    ],
+    "reason": "Microsoft.NETCore.App.Runtime.win-x64 (REL.0C self-contained .NET runtime): CoreCLR standalone GC. Paths of the Microsoft build agent; bound to the matched paths, which are identical across runtime patches 10.0.11-10.0.13."
+  },
+  {
+    "file": "clrgcexp.dll",
+    "tokens": [
+      "1ef694622829"
+    ],
+    "categories": [
+      "ci-runner-root"
+    ],
+    "reason": "Microsoft.NETCore.App.Runtime.win-x64 (REL.0C self-contained .NET runtime): CoreCLR experimental standalone GC. Paths of the Microsoft build agent; bound to the matched paths, which are identical across runtime patches 10.0.11-10.0.13."
+  },
+  {
+    "file": "clrjit.dll",
+    "tokens": [
+      "274f8cdfd79b",
+      "78e4707bfca7",
+      "91350c5c839c",
+      "9536ee9ceead"
+    ],
+    "categories": [
+      "ci-runner-root"
+    ],
+    "reason": "Microsoft.NETCore.App.Runtime.win-x64 (REL.0C self-contained .NET runtime): CoreCLR JIT. Paths of the Microsoft build agent; bound to the matched paths, which are identical across runtime patches 10.0.11-10.0.13."
+  },
+  {
+    "file": "coreclr.dll",
+    "tokens": [
+      "05a5ecd220cf",
+      "0a1280735b3e",
+      "52349d75f4a6",
+      "6fc3c0b423bb",
+      "747f4ffee715",
+      "791e908c71bb",
+      "8246af46fce6",
+      "e05486747c96",
+      "f6e1c17f3c0e"
+    ],
+    "categories": [
+      "ci-runner-root"
+    ],
+    "reason": "Microsoft.NETCore.App.Runtime.win-x64 (REL.0C self-contained .NET runtime): CoreCLR runtime. Paths of the Microsoft build agent; bound to the matched paths, which are identical across runtime patches 10.0.11-10.0.13."
+  },
+  {
     "file": "DirectML.dll",
     "sha256": "257c75b2f607940c986d0b96d9309a2c897e57ef3192b6c678d707c22d747611",
     "categories": [
@@ -16,6 +77,38 @@
       "ci-runner-root"
     ],
     "reason": "SQLitePCLRaw native e_sqlite3 build: CodeView path of the upstream GitHub Actions runner."
+  },
+  {
+    "file": "hostfxr.dll",
+    "tokens": [
+      "e99db19a0166"
+    ],
+    "categories": [
+      "ci-runner-root"
+    ],
+    "reason": "Microsoft.NETCore.App.Runtime.win-x64 (REL.0C self-contained .NET runtime): .NET host resolver (app-local, self-contained). Paths of the Microsoft build agent; bound to the matched paths, which are identical across runtime patches 10.0.11-10.0.13."
+  },
+  {
+    "file": "hostpolicy.dll",
+    "tokens": [
+      "3e6bdcf5aa2f"
+    ],
+    "categories": [
+      "ci-runner-root"
+    ],
+    "reason": "Microsoft.NETCore.App.Runtime.win-x64 (REL.0C self-contained .NET runtime): .NET host policy (app-local, self-contained). Paths of the Microsoft build agent; bound to the matched paths, which are identical across runtime patches 10.0.11-10.0.13."
+  },
+  {
+    "file": "Microsoft.DiaSymReader.Native.amd64.dll",
+    "tokens": [
+      "0825ef2ab9f0",
+      "2b48e2a208c6",
+      "95b4566984e3"
+    ],
+    "categories": [
+      "ci-runner-root"
+    ],
+    "reason": "Microsoft.NETCore.App.Runtime.win-x64 (REL.0C self-contained .NET runtime): native PDB reader shipped in the runtime pack (one token carries the build of each patch; 10.0.11, 10.0.12 and 10.0.13 reviewed). Paths of the Microsoft build agent; bound to the matched paths, which are identical across runtime patches 10.0.11-10.0.13."
   },
   {
     "file": "Microsoft.Graphics.Imaging.Projection.dll",
@@ -356,6 +449,130 @@
     "reason": "Windows App SDK 2.3.1 NuGet payload: CodeView path of the Microsoft build agent."
   },
   {
+    "file": "mscordaccore_amd64_amd64_10.0.1126.37416.dll",
+    "tokens": [
+      "8246af46fce6",
+      "869fa6a41045",
+      "c17ce1f591e9",
+      "d78bcf3519e0",
+      "ee275552a43a",
+      "feb10995cd1d"
+    ],
+    "categories": [
+      "ci-runner-root"
+    ],
+    "reason": "Microsoft.NETCore.App.Runtime.win-x64 (REL.0C self-contained .NET runtime): CoreCLR data access component, versioned copy for debuggers (Microsoft.NETCore.App 10.0.11); its name changes with every runtime patch. Paths of the Microsoft build agent; bound to the matched paths, which are identical across runtime patches 10.0.11-10.0.13."
+  },
+  {
+    "file": "mscordaccore_amd64_amd64_10.0.1226.42308.dll",
+    "tokens": [
+      "8246af46fce6",
+      "869fa6a41045",
+      "c17ce1f591e9",
+      "d78bcf3519e0",
+      "ee275552a43a",
+      "feb10995cd1d"
+    ],
+    "categories": [
+      "ci-runner-root"
+    ],
+    "reason": "Microsoft.NETCore.App.Runtime.win-x64 (REL.0C self-contained .NET runtime): CoreCLR data access component, versioned copy for debuggers (Microsoft.NETCore.App 10.0.12); its name changes with every runtime patch. Paths of the Microsoft build agent; bound to the matched paths, which are identical across runtime patches 10.0.11-10.0.13."
+  },
+  {
+    "file": "mscordaccore_amd64_amd64_10.0.1326.50504.dll",
+    "tokens": [
+      "8246af46fce6",
+      "869fa6a41045",
+      "c17ce1f591e9",
+      "d78bcf3519e0",
+      "ee275552a43a",
+      "feb10995cd1d"
+    ],
+    "categories": [
+      "ci-runner-root"
+    ],
+    "reason": "Microsoft.NETCore.App.Runtime.win-x64 (REL.0C self-contained .NET runtime): CoreCLR data access component, versioned copy for debuggers (Microsoft.NETCore.App 10.0.13); its name changes with every runtime patch. Paths of the Microsoft build agent; bound to the matched paths, which are identical across runtime patches 10.0.11-10.0.13."
+  },
+  {
+    "file": "mscordaccore.dll",
+    "tokens": [
+      "8246af46fce6",
+      "869fa6a41045",
+      "c17ce1f591e9",
+      "d78bcf3519e0",
+      "ee275552a43a",
+      "feb10995cd1d"
+    ],
+    "categories": [
+      "ci-runner-root"
+    ],
+    "reason": "Microsoft.NETCore.App.Runtime.win-x64 (REL.0C self-contained .NET runtime): CoreCLR data access component (debugging/dump support). Paths of the Microsoft build agent; bound to the matched paths, which are identical across runtime patches 10.0.11-10.0.13."
+  },
+  {
+    "file": "mscordbi.dll",
+    "tokens": [
+      "9d7a9c56e6e3",
+      "a30e28ff5a6d",
+      "ae4d5524f13c",
+      "b7800c6ee825",
+      "c301f49d2954",
+      "c41defbb9758",
+      "d72c689e5e72",
+      "dad155fc8a1e"
+    ],
+    "categories": [
+      "ci-runner-root"
+    ],
+    "reason": "Microsoft.NETCore.App.Runtime.win-x64 (REL.0C self-contained .NET runtime): CoreCLR debugger interface. Paths of the Microsoft build agent; bound to the matched paths, which are identical across runtime patches 10.0.11-10.0.13."
+  },
+  {
+    "file": "mscorrc.dll",
+    "tokens": [
+      "64ccc132c798"
+    ],
+    "categories": [
+      "ci-runner-root"
+    ],
+    "reason": "Microsoft.NETCore.App.Runtime.win-x64 (REL.0C self-contained .NET runtime): CoreCLR resource dll. Paths of the Microsoft build agent; bound to the matched paths, which are identical across runtime patches 10.0.11-10.0.13."
+  },
+  {
+    "file": "msquic.dll",
+    "tokens": [
+      "008b8924747e",
+      "11d379602af7",
+      "140352b6e77c",
+      "1f78de8147eb",
+      "2897d7f77c1e",
+      "3005e031de3f",
+      "3ea15c1b514f",
+      "4ee03ac9da45",
+      "6ee12c842230",
+      "7009b16a9253",
+      "72fb62217232",
+      "756e91be14e1",
+      "77569ba614a7",
+      "891521b320ca",
+      "8d28f4b6a3c0",
+      "9592e4c322b8",
+      "9954627182a5",
+      "a0ad19a2a282",
+      "a170e1f14e07",
+      "a8832fdaed92",
+      "b394624d25d9",
+      "b847f147213e",
+      "cd9f0945cf0b",
+      "cf4011b9732f",
+      "eceb4c8f6777",
+      "f2be83f477ad",
+      "fe2777918aed",
+      "fef0c86faaa0"
+    ],
+    "categories": [
+      "ci-runner-root"
+    ],
+    "reason": "Microsoft.NETCore.App.Runtime.win-x64 (REL.0C self-contained .NET runtime): MsQuic native library. Paths of the Microsoft build agent; bound to the matched paths, which are identical across runtime patches 10.0.11-10.0.13."
+  },
+  {
     "file": "onnxruntime.dll",
     "sha256": "3cffeff2d7c25b247a814212baab70eb1f37d727335d4c813ed73785df80a794",
     "categories": [
@@ -412,6 +629,16 @@
       "profile-dir"
     ],
     "reason": "SQLitePCLRaw 2.1.13 managed assembly: CodeView path of the upstream maintainer's build machine, as published on NuGet."
+  },
+  {
+    "file": "System.IO.Compression.Native.dll",
+    "tokens": [
+      "19354153ca59"
+    ],
+    "categories": [
+      "ci-runner-root"
+    ],
+    "reason": "Microsoft.NETCore.App.Runtime.win-x64 (REL.0C self-contained .NET runtime): native compression shim. Paths of the Microsoft build agent; bound to the matched paths, which are identical across runtime patches 10.0.11-10.0.13."
   },
   {
     "file": "WinRT.Runtime.dll",

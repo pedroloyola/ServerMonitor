@@ -73,15 +73,24 @@
     <SelfContained>true</SelfContained>
   </PropertyGroup>
 
-  <!-- Packaged profile (production single-project MSIX). Framework-dependent: the Store /
-       framework package provisions the Windows App Runtime, so the P-009 resource DLL is
-       already present and its workaround is NOT staged here (ADR-017 §3/§8). Signing is left
-       off in the build; a DEV certificate signs the .msix out-of-band for local sideload QA. -->
+  <!-- Packaged profile (production single-project MSIX). Two runtimes, two different models:
+       * Windows App Runtime: FRAMEWORK package. The Store provisions Microsoft.WindowsAppRuntime.2
+         from the manifest's PackageDependency, so the P-009 resource DLL is already present and its
+         workaround is NOT staged here (ADR-017 §3/§8).
+       * .NET runtime: SELF-CONTAINED (REL.0C, ADR-017 amendment). Windows does not ship .NET 10 and
+         there is no Store framework package for it, so a framework-dependent package only starts
+         where somebody installed .NET 10 machine-wide (1.1.2.2 did exactly that). The runtime pack
+         for $(RuntimeIdentifier) is carried in the package and the apphost loads the app-local
+         hostfxr; tools/release/Assert-PackageRuntime.ps1 enforces it on the built .msix.
+         No trimming, ReadyToRun or single-file: none is needed for correctness, and each changes
+         runtime behaviour (reflection/COM/WinRT interop) that the test suite does not cover.
+       Signing is left off in the build; a DEV certificate signs the .msix out-of-band for local
+       sideload QA. -->
   <PropertyGroup Condition="'$(Packaged)' == 'true'">
     <WindowsPackageType>MSIX</WindowsPackageType>
     <EnableMsixTooling>true</EnableMsixTooling>
     <WindowsAppSDKSelfContained>false</WindowsAppSDKSelfContained>
-    <SelfContained>false</SelfContained>
+    <SelfContained>true</SelfContained>
     <AppxPackage>true</AppxPackage>
     <GenerateAppxPackageOnBuild>true</GenerateAppxPackageOnBuild>
     <AppxBundle>Never</AppxBundle>
@@ -98,6 +107,20 @@
     <AppxManifestFile Condition="'$(DevIdentity)' == 'true'">Package.Dev.appxmanifest</AppxManifestFile>
     <AppxManifestFile Condition="'$(AppxManifestFile)' == ''">Package.appxmanifest</AppxManifestFile>
   </PropertyGroup>
+
+  <!-- REL.0C. The self-contained runtime pack carries createdump.exe, a CONSOLE-subsystem helper the runtime
+       only spawns when crash-dump collection is opted into through DOTNET_DbgEnableMiniDump. The package
+       gate allows only the two GUI-subsystem executables (Assert-PackageIdentity), and Windows Error
+       Reporting still collects crash dumps without it, so it is dropped from the runtime pack assets
+       BEFORE deps.json and copy-local are computed: no file, and no deps.json entry naming a missing file.
+       The widget provider's packaged publish drops it the same way (ServerMonitor.WidgetProvider.csproj). -->
+  <Target Name="ExcludeCreateDumpFromPackage" AfterTargets="ResolveRuntimePackAssets"
+          Condition="'$(Packaged)' == 'true'">
+    <ItemGroup>
+      <RuntimePackAsset Remove="@(RuntimePackAsset)" Condition="'%(Filename)%(Extension)' == 'createdump.exe'" />
+      <ReferenceCopyLocalPaths Remove="@(ReferenceCopyLocalPaths)" Condition="'%(Filename)%(Extension)' == 'createdump.exe'" />
+    </ItemGroup>
+  </Target>
 
   <!-- Package manifest + visual assets are part of the app project only in the packaged
        profile (single-project MSIX; no separate .wapproj). Exactly one manifest is included. -->
@@ -149,11 +172,17 @@
     ExeServer, so its executable must be added to the package payload explicitly. Microsoft's documented
     multi-exe path is a Windows Application Packaging Project (.wapproj), but this app is deliberately a
     single-project MSIX — so the provider is added through supported Content inclusion instead.
-    The provider is published FRAMEWORK-DEPENDENT so the whole package shares the app's single Windows App
-    SDK 2.3.1 line: only the four provider-UNIQUE files (exe/dll/deps.json/runtimeconfig.json) are added at
-    the package root; every WinAppSDK/WinUI/Widgets-projection dll and both contract dlls are ALREADY shipped
-    by the app, so there is NO second (self-contained) runtime payload. That is a BLOCKING release invariant
-    — audit it in the EXTRACTED package, never from this file alone.
+    The provider shares the app's runtimes instead of carrying its own: the Windows App SDK 2.3.1 framework
+    package, and (REL.0C) the app's self-contained .NET runtime at the package root. It is published
+    SELF-CONTAINED for .NET, so its runtimeconfig.json declares includedFrameworks and its apphost loads the
+    app-local hostfxr next to it, never a machine-wide runtime; but only the four provider-UNIQUE files
+    (exe/dll/deps.json/runtimeconfig.json) are added at the package root. Every .NET runtime file, every
+    WinAppSDK/WinUI/Widgets-projection dll and both contract dlls are ALREADY shipped by the app, so there is
+    NO second runtime payload. The nested publish runs on the SAME dotnet host as this build
+    (DOTNET_HOST_PATH), so both executables resolve the same SDK and therefore the same runtime pack version.
+    That is a BLOCKING release invariant — audited in the EXTRACTED package by
+    tools/release/Assert-PackageRuntime.ps1 (same runtime version, every deps.json asset present), never
+    from this file alone.
     DEV and production packages differ only in identity, notification-activator CLSID and display strings
     (the two Package*.appxmanifest files); the widget payload is identical, so what board QA exercised is
     exactly what the Store package ships.
@@ -227,8 +256,15 @@
     <!-- Clean the stage first: dotnet publish -o does NOT remove obsolete files, so a renamed/removed
          provider output could otherwise leave a stale file that gets packaged (Atlas M-1). -->
     <RemoveDir Directories="$(WidgetProviderPackageStage)" />
-    <!-- Framework-dependent publish (no self-contained WinAppSDK/.NET payload): shares the app's runtime. -->
-    <Exec Command="dotnet publish &quot;$(WidgetProviderProject)&quot; -c $(Configuration) -p:WindowsAppSDKSelfContained=false -p:SelfContained=false -p:WindowsPackageType=MSIX --disable-build-servers -o &quot;$(WidgetProviderPackageStage)&quot;" />
+    <!-- WinAppSDK framework-dependent, .NET self-contained for the same RID as the app (REL.0C). Run through
+         the dotnet host that runs THIS build: a bare `dotnet` resolves through PATH, which can be a different
+         SDK with a different runtime pack, and the provider would then describe runtime files that are not
+         the ones the app put in the package. -->
+    <PropertyGroup>
+      <WidgetProviderDotnet>$(DOTNET_HOST_PATH)</WidgetProviderDotnet>
+      <WidgetProviderDotnet Condition="'$(WidgetProviderDotnet)' == ''">dotnet</WidgetProviderDotnet>
+    </PropertyGroup>
+    <Exec Command="&quot;$(WidgetProviderDotnet)&quot; publish &quot;$(WidgetProviderProject)&quot; -c $(Configuration) -p:WindowsAppSDKSelfContained=false -p:SelfContained=true -p:RuntimeIdentifier=$(RuntimeIdentifier) -p:WindowsPackageType=MSIX --disable-build-servers -o &quot;$(WidgetProviderPackageStage)&quot;" />
     <!-- Validate ALL four provider-unique files are present before packaging, so a build can never silently
          ship a partial/stale provider (Atlas M-1). -->
     <Error Condition="!Exists('$(WidgetProviderPackageStage)ServerAlyzer.WidgetProvider.exe')"

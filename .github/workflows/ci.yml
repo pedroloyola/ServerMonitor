@@ -213,6 +213,18 @@ jobs:
           dotnet build src/ServerMonitor.App/ServerMonitor.App.csproj
           -c Release -p:Packaged=true --no-incremental --disable-build-servers
 
+      # REL.0C on every PR: the same package must carry its own .NET runtime (Windows does not ship
+      # .NET 10 and the Store has no .NET framework package), with the Windows App Runtime still a
+      # framework package. The check's counterproofs run first.
+      - name: Package runtime (.NET self-contained, Windows App Runtime framework)
+        shell: pwsh
+        run: |
+          ./tools/release/Test-PackageRuntime.ps1
+          $candidates = @(Get-ChildItem -Recurse -Filter '*.msix' -Path 'src/ServerMonitor.App/AppPackages' |
+            Where-Object { $_.FullName -notmatch '[\\/]Dependencies[\\/]' })
+          if ($candidates.Count -ne 1) { throw "Expected exactly one app MSIX, found $($candidates.Count)." }
+          ./tools/release/Assert-PackageRuntime.ps1 -PackagePath $candidates[0].FullName
+
       - name: Distribution privacy (package)
         shell: pwsh
         run: |

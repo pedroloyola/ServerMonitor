@@ -36,11 +36,19 @@ Builds the shippable MSIX from an exact tag and proves it is what the tag says.
 7. `Assert-PackageIdentity.ps1` — reads the package, not the source tree: identity name,
    publisher, version, architecture, app-level capabilities, payload hygiene, the exact set
    of executables, and that **every executable is PE subsystem 2 (Windows GUI)**.
-8. `Assert-DistributionPrivacy.ps1` — opens everything about to be uploaded and fails closed
+8. `Assert-PackageRuntime.ps1` — also reads the package. Both executables are **self-contained
+   for .NET**: each `runtimeconfig.json` has `includedFrameworks` and no shared-framework reference,
+   and each `deps.json` is RID-specific and names the same runtime pack. Both are on the same
+   runtime version. Every asset their `deps.json` names is present next to them, and so are the
+   runtime files. The Windows App Runtime is still a **framework package**: the `PackageDependency`
+   is declared, and `Microsoft.WindowsAppRuntime.dll` is not in the payload. Windows does not ship
+   .NET 10 and the Store has no .NET framework package, so a framework-dependent package would not
+   start on a clean machine (REL.0C).
+9. `Assert-DistributionPrivacy.ps1` — opens everything about to be uploaded and fails closed
    if any file carries an absolute development path (see *Distribution privacy* below).
    It runs before the upload and before the GitHub Release, so a failure publishes nothing.
-9. Writes the SHA-256 next to the package and uploads both as a workflow artifact.
-10. Creates the GitHub Release **only if it does not already exist**, and by default
+10. Writes the SHA-256 next to the package and uploads both as a workflow artifact.
+11. Creates the GitHub Release **only if it does not already exist**, and by default
    **does not attach the MSIX**: the Microsoft Store is the distribution channel.
 
 **The GitHub Release is never a side effect of a tag push (G2).** A push of `vX.Y.Z` runs every
@@ -231,6 +239,15 @@ regenerate the candidates with `-AllowlistCandidatesPath` (written redacted, rea
 the loader refuses), review each entry, write its real reason, and commit it. Never widen a
 category to make a run pass.
 
+The package carries the **.NET runtime** (REL.0C), so its native binaries (`coreclr.dll`,
+`clrjit.dll`, `hostfxr.dll`, `mscordaccore*.dll`, `msquic.dll`, …) carry Microsoft build-agent paths.
+Their allowlist entries are bound to path tokens, which stayed identical across runtime patches
+10.0.11 to 10.0.13. Two things change with every .NET patch: the file name
+`mscordaccore_amd64_amd64_<version>.dll`, and one token of `Microsoft.DiaSymReader.Native.amd64.dll`.
+After a .NET patch, the first package build fails closed on those, and only on those. That build is
+also the release the patch obliges anyway, because a self-contained runtime is serviced only by
+shipping a new package. Review the candidates and add them.
+
 ## The publishing hold
 
 `targetPublishMode` in the submission resource takes `Immediate`, `Manual` or
@@ -359,6 +376,7 @@ Everything the workflows rely on runs offline:
 ./tools/release/Test-TagVersion.ps1            # synthetic tag/source coherence cases
 ./tools/release/Test-VersionGuardMutations.ps1 # remove checks; require suite failures; rerun originals
 ./tools/release/Test-ReleaseChecks.ps1          # package checks, 12 cases
+./tools/release/Test-PackageRuntime.ps1         # .NET self-contained package runtime, 24 cases
 ./tools/release/Test-DistributionPrivacy.ps1    # distribution privacy, 52 cases
 ./tools/release/Test-StoreSubmissionUpdate.ps1  # publishing hold, 12 cases
 ./tools/release/Get-SubmissionState.ps1 -SelfTest        # status mapping, 18 cases
