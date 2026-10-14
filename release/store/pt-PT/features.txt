@@ -1,4 +1,4 @@
-Estado, CPU, memória, disco e uptime de servidores Linux e macOS por SSH
+Estado, CPU, memória, disco e tempo de atividade de servidores Linux e macOS por SSH
 Sem agente nos servidores e sem conta: liga-se diretamente a partir do teu PC
 30 dias de histórico local, com gráficos da última hora aos últimos 30 dias
 Containers Docker e serviços systemd ou launchd, só em leitura
@@ -13,6 +13,6 @@ Modo compacto que pode ficar sempre no topo
 Widget do Windows 11 em três tamanhos (Windows 11 22H2 ou mais recente)
 Cópia de segurança encriptada e restauro, protegidos pela tua frase-passe
 Pesquisa de servidores SSH na rede local, só quando pedes
-Sem telemetria: servidores, histórico e credenciais ficam no teu PC
+Não recolhe telemetria; servidores, histórico e credenciais ficam no teu PC, salvo se exportares uma cópia de segurança
 Temas claro, escuro e do sistema; suporte a teclado, leitores de ecrã e alto contraste
 Português (Portugal), português (Brasil) e inglês

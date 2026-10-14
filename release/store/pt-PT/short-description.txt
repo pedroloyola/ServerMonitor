@@ -1,1 +1,1 @@
-Monitoriza os servidores Linux e macOS que geres, diretamente do Windows 11 por SSH: sem agente e sem conta. Vê o estado, CPU, memória, disco e uptime num relance, guarda 30 dias de histórico local e consulta containers Docker e serviços só em leitura.
+Monitoriza os servidores Linux e macOS que geres, diretamente do Windows 11 por SSH: sem agente e sem conta. Vê o estado, CPU, memória, disco e tempo de atividade num relance, guarda 30 dias de histórico local e consulta containers Docker e serviços só em leitura.

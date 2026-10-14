@@ -54,8 +54,12 @@ only features that are in the release being submitted.
 
 **Folder conflict.** `Update-StoreSubmission.ps1` treats every folder under `release/store/` as a
 listing language and stops if one has no `whats-new.txt`. A `release/store/screenshots/` folder
-would therefore stop every Store submission. Final screenshots need to live outside
-`release/store/`, or the script must learn to skip that folder, before any screenshot is added.
+would therefore stop every Store submission. Final screenshots go in
+`release/store-screenshots/<lang>/NN-slug.png`, outside `release/store/`, with no change to the
+script.
+
+Each caption must describe exactly one screen. Slot 07 is Settings. Slot 09 is Settings › Data and
+servers (backup and restore).
 
 ## Category
 
@@ -102,6 +106,31 @@ DRAFT-GATE block in `README.md`.
   requires.
 - **Restoring a backup on another computer**: not claimed. The backup text says "restore them
   later" until BACKUP-XM passes.
+- **Local network search entry points** (`description.md`, "Local network search" paragraph, all
+  three files). The current text says the search is available "with no servers added yet". That is
+  true while the empty Overview is the only entry point. If the pull request that adds the search
+  to Settings › Data and servers (#52) is merged before submission, replace that sentence pair in
+  all three files with the text below, and reconcile `whats-new.txt` through its own DRAFT-GATE
+  block. "Only when you ask" stays true either way.
+  - en-US: "You can search your local network for SSH servers that announce themselves (mDNS/DNS-SD), from the empty Overview or from Settings › Data and servers. The search runs only when you choose it and never scans ports or address ranges."
+  - pt-PT: "Podes procurar na tua rede local servidores SSH que se anunciam (mDNS/DNS-SD), a partir da Visão geral vazia ou em Definições › Dados e servidores. A pesquisa só corre quando a escolhes e nunca varre portas nem intervalos de endereços."
+  - pt-BR: "Você pode procurar na sua rede local servidores SSH que se anunciam (mDNS/DNS-SD), a partir da Visão geral vazia ou em Configurações › Dados e servidores. A pesquisa só é feita quando você escolhe e nunca varre portas nem faixas de endereços."
+  - Check the Settings labels against the merged resource strings before pasting.
+- **Privacy policy URL (submission gate)**: `support.txt` in all three files carries the URL with
+  a `GATED:` line. Do not enter it in Partner Center, and do not submit the listing, until
+  `PRIVACY.md` has been updated. Today it is pt-PT only and predates the current product. It does
+  not cover:
+  - the on-demand local network search;
+  - the encrypted backup file, which is saved where the user chooses;
+  - the widget snapshot file.
+
+  Its uninstall and data-location statements are unmeasured for a Store install. The update is an
+  English policy (the Store uses one policy for every market) plus pt. It is written after the
+  clean-VM measurement, in its own docs pull request. Then point the URL at it and remove the
+  `GATED:` lines.
+- **Widget screenshot (slot 08)**: it can only be captured from an installed package in the VM.
+  If no VM capture exists at submission time, remove the `08-widget` line from all three caption
+  files. Slot 09 keeps its name; only the order of the uploaded images matters.
 
 ## Sources
 

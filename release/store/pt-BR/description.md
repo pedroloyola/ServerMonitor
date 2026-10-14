@@ -1,13 +1,13 @@
 O ServerAlyzer é um painel tranquilo e compacto para Windows 11 que mostra o status dos servidores Linux e macOS que você mantém: seu homelab, os serviços que você hospeda por conta própria ou as máquinas que você administra. Ele se conecta a cada servidor direto do seu PC, via SSH. Você não instala nenhum agente nos servidores, não cria conta e não existe nenhuma nuvem do ServerAlyzer no meio do caminho.
 
 Todos os servidores em uma olhada
-A Visão geral mostra a saúde de cada servidor, com CPU, memória, disco e tempo de atividade (uptime). Os servidores são verificados automaticamente em segundo plano, e você pode atualizar quando quiser. Quando um valor não pode ser lido, o ServerAlyzer avisa em vez de mostrar zero.
+A Visão geral mostra como está cada servidor, destaca o que precisa de atenção e indica quando uma leitura está desatualizada. A lista de Servidores traz CPU, memória e disco de cada servidor, e a página de cada servidor mostra o tempo ativo. Os servidores são verificados automaticamente em segundo plano, e você pode atualizar quando quiser. Quando um valor não pode ser lido, o ServerAlyzer avisa em vez de mostrar zero.
 
 Histórico no seu PC
 As leituras de CPU, memória e disco ficam em um histórico local por 30 dias. Os gráficos vão da última hora até os últimos 30 dias.
 
 Serviços e containers, somente leitura
-Veja seus containers Docker e os serviços do sistema (systemd no Linux, launchd no macOS) junto com as métricas do host. O ServerAlyzer apenas lê: ele nunca inicia, para ou altera nada nos seus servidores.
+Na página de cada servidor, veja os containers Docker e os serviços do sistema (systemd no Linux, launchd no macOS). O ServerAlyzer apenas lê: ele nunca inicia, para ou altera nada nos seus servidores.
 
 SSH confiável
 Antes de confiar em um servidor, o ServerAlyzer mostra a impressão digital SHA-256 da chave do host e pede que você a confirme. Se a chave mudar depois, a conexão é bloqueada. Senhas e frases secretas ficam no Gerenciador de Credenciais do Windows. Na autenticação por chave, só o local da sua chave privada é salvo, nunca o conteúdo dela. Nos servidores, o aplicativo executa apenas um conjunto fixo de comandos de leitura, sem sudo e sem comandos digitados por você.
@@ -25,7 +25,7 @@ Backup criptografado
 Salve seus servidores, chaves de host confiáveis e senhas salvas em um arquivo protegido por uma frase secreta escolhida por você, e restaure tudo depois. Os arquivos de chave privada nunca são incluídos.
 
 Privacidade desde a origem
-Sem conta e sem telemetria. Sua lista de servidores, o histórico e as credenciais ficam no seu PC. O ServerAlyzer só usa a rede para chegar aos servidores que você adiciona (e à sua rede local quando você inicia uma pesquisa); ele não envia seus dados para o ServerAlyzer.
+Sem conta, e o ServerAlyzer não coleta telemetria. Sua lista de servidores, o histórico e as credenciais salvas ficam no seu PC, a menos que você exporte um backup criptografado, que fica onde você salvar. O ServerAlyzer só usa a rede para chegar aos servidores que você adiciona (e à sua rede local quando você inicia uma pesquisa); ele não envia seus dados para o ServerAlyzer.
 
 Requisitos
 Um PC com Windows 11 (x64). O widget precisa do Windows 11 versão 22H2 ou mais recente. Os servidores precisam rodar Linux ou macOS e estar acessíveis via SSH a partir do seu PC; a lista de serviços precisa de systemd (Linux) ou launchd (macOS). O ServerAlyzer funciona só no Windows: ele monitora Macs, mas não existe versão do aplicativo para macOS.

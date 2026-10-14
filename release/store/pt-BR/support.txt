@@ -6,6 +6,7 @@ https://github.com/pedroloyola/ServerMonitor
 
 Política de privacidade
 https://github.com/pedroloyola/ServerMonitor/blob/main/PRIVACY.md
+GATED: do not enter this URL until PRIVACY.md has been rewritten (see listing-requirements.md, Gated lines).
 
 Problemas de segurança
 Reporte em particular pelo GitHub Security Advisories do repositório (aba Security), não em uma issue pública.

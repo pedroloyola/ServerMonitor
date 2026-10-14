@@ -13,6 +13,6 @@ Compact mode that can stay always on top
 Windows 11 widget in three sizes (Windows 11 22H2 or later)
 Encrypted backup and restore, protected by your own passphrase
 Local network search for SSH servers, only when you ask
-No telemetry: your servers, history and credentials stay on your PC
+Collects no telemetry; servers, history and credentials stay on your PC unless you export a backup
 Light, dark and system themes; keyboard, screen reader and high contrast support
 English, Portuguese (Portugal) and Portuguese (Brazil)
