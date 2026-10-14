@@ -1,7 +1,9 @@
 name: Release build
 
 # Builds the production MSIX from an exact tag, proves the package is the one the tag
-# claims, and publishes it as a workflow artifact plus (optionally) a GitHub Release.
+# claims, and publishes it as a workflow artifact. A GitHub Release is created only by an
+# explicit manual dispatch with create_release=true (G2): a tag push builds and checks, and
+# never publishes anything outside the run.
 #
 # This workflow never talks to the Microsoft Store. It holds no Store secrets and has no
 # access to the `microsoft-store` environment. Submitting is store-submit.yml's job, and it
@@ -14,13 +16,13 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag to build (must already exist, e.g. v1.1.2)'
+        description: 'Tag to build (must already exist, e.g. v1.1.7)'
         required: true
         type: string
       create_release:
-        description: 'Create the GitHub Release if it does not exist'
+        description: 'Also create the GitHub Release for this tag, after every gate passed (a tag push never does)'
         required: false
-        default: true
+        default: false
         type: boolean
       attach_package:
         description: 'Attach the MSIX to the GitHub Release (the Store is the distribution channel; normally false)'
@@ -39,28 +41,32 @@ jobs:
   build:
     runs-on: windows-latest
     permissions:
-      contents: write        # only to create/read the GitHub Release for this tag
+      contents: read         # building and checking needs no write access; the release job has it
     outputs:
       version: ${{ steps.tagcheck.outputs.version }}
       packageVersion: ${{ steps.tagcheck.outputs.packageVersion }}
       sha256: ${{ steps.identity.outputs.sha256 }}
       packageName: ${{ steps.collect.outputs.packageName }}
+      tag: ${{ steps.resolve.outputs.tag }}
 
     steps:
       - name: Resolve the tag
         id: resolve
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+          REF_NAME: ${{ github.ref_name }}
         shell: pwsh
         run: |
-          $tag = '${{ inputs.tag }}'
-          if (-not $tag) { $tag = '${{ github.ref_name }}' }
+          $tag = $env:INPUT_TAG
+          if (-not $tag) { $tag = $env:REF_NAME }
           if (-not $tag) { throw 'No tag to build.' }
-          if ($tag -notmatch '^v\d+\.\d+\.\d+$') { throw "Refusing to build '$tag': not a vMAJOR.MINOR.PATCH release tag." }
+          if ($tag -notmatch '\Av[0-9]+\.[0-9]+\.[0-9]+\z') { throw "Refusing to build '$tag': not a vMAJOR.MINOR.PATCH release tag." }
           "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           Write-Host "Building tag $tag"
 
       # Full history and tags, so the tag can be resolved to a commit and compared.
       - name: Checkout the exact tag
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ steps.resolve.outputs.tag }}
           fetch-depth: 0
@@ -69,12 +75,21 @@ jobs:
       - name: Tag, commit and version coherence
         id: tagcheck
         shell: pwsh
+        env:
+          RELEASE_TAG: ${{ steps.resolve.outputs.tag }}
         run: |
+          if ($env:RELEASE_TAG -cnotmatch '\Av[0-9]+\.[0-9]+\.[0-9]+\z') { throw 'Invalid release tag.' }
           $commit = (git rev-parse HEAD).Trim()
-          ./tools/release/Assert-TagVersion.ps1 -Tag '${{ steps.resolve.outputs.tag }}' -ExpectedCommit $commit
+          ./tools/release/Assert-TagVersion.ps1 -Tag $env:RELEASE_TAG -ExpectedCommit $commit
+
+      - name: Package version floor and Store revision
+        shell: pwsh
+        env:
+          PACKAGE_VERSION: ${{ steps.tagcheck.outputs.packageVersion }}
+        run: ./tools/release/Assert-PackageVersionFloor.ps1 -PackageVersion $env:PACKAGE_VERSION
 
       - name: Setup .NET 10 SDK
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
         with:
           dotnet-version: '10.0.x'
 
@@ -104,7 +119,19 @@ jobs:
       - name: Self-test the release checks
         shell: pwsh
         run: |
+          ./tools/release/Test-WorkflowRunInterpolation.ps1 -SelfTest
+          ./tools/release/Test-WorkflowActionPins.ps1 -SelfTest
+          ./tools/release/Test-ReleaseRunProvenance.ps1
+          ./tools/release/Test-ManualPublishMode.ps1
+          ./tools/release/Test-HardeningMutations.ps1
+          ./tools/release/Test-ReleaseWorkflowShape.ps1 -SelfTest
+          ./tools/release/Test-ValidatedPackagePath.ps1
+          ./tools/release/Test-PackageVersionFloor.ps1
+          ./tools/release/Test-TagVersion.ps1
+          ./tools/release/Test-VersionGuardMutations.ps1
+          ./tools/release/Assert-NoPendingSubmission.ps1 -SelfTest
           ./tools/release/Test-ReleaseChecks.ps1
+          ./tools/release/Test-PackageRuntime.ps1
           ./tools/release/Test-DistributionPrivacy.ps1
           ./tools/release/Test-StoreSubmissionUpdate.ps1
           ./tools/release/Get-SubmissionState.ps1 -SelfTest
@@ -117,7 +144,10 @@ jobs:
       - name: Collect the package
         id: collect
         shell: pwsh
+        env:
+          PACKAGE_VERSION: ${{ steps.tagcheck.outputs.packageVersion }}
         run: |
+          ./tools/release/Assert-PackageVersionFloor.ps1 -PackageVersion $env:PACKAGE_VERSION
           $candidates = @(Get-ChildItem -Recurse -Filter '*.msix' -Path 'src/ServerMonitor.App/AppPackages' |
             Where-Object { $_.FullName -notmatch '\\Dependencies\\' })
           if ($candidates.Count -eq 0) { throw 'No app MSIX was produced.' }
@@ -125,8 +155,13 @@ jobs:
             throw "Expected exactly one app MSIX, found $($candidates.Count): $(($candidates | ForEach-Object { $_.FullName }) -join ', '). Refusing to guess which one to ship."
           }
 
-          $version = '${{ steps.tagcheck.outputs.packageVersion }}'
-          $shortSha = '${{ github.sha }}'.Substring(0, 7)
+          $version = $env:PACKAGE_VERSION
+          # The commit actually built (the checked-out tag), not github.sha: on a manual dispatch
+          # github.sha is the commit of the ref the dispatch ran on. store-submit binds this name to
+          # the tag commit (G4).
+          $builtCommit = (git rev-parse HEAD).Trim()
+          if ($builtCommit -cnotmatch '\A[0-9a-f]{40}\z') { throw 'Could not resolve the built commit.' }
+          $shortSha = $builtCommit.Substring(0, 7)
           $name = "ServerAlyzer_${version}_x64_$shortSha.msix"
 
           New-Item -ItemType Directory -Force -Path 'artifacts/release' | Out-Null
@@ -137,11 +172,30 @@ jobs:
       - name: Package identity, capabilities and GUI subsystem
         id: identity
         shell: pwsh
+        env:
+          PACKAGE_VERSION: ${{ steps.tagcheck.outputs.packageVersion }}
+          PACKAGE_NAME: ${{ steps.collect.outputs.packageName }}
         run: |
+          ./tools/release/Assert-PackageVersionFloor.ps1 -PackageVersion $env:PACKAGE_VERSION
+          if ($env:PACKAGE_NAME -cnotmatch '\A[A-Za-z0-9._-]+\.msix\z') { throw 'Invalid package file name.' }
           ./tools/release/Assert-PackageIdentity.ps1 `
-            -PackagePath "artifacts/release/${{ steps.collect.outputs.packageName }}" `
-            -ExpectedVersion '${{ steps.tagcheck.outputs.packageVersion }}' `
+            -PackagePath "artifacts/release/${env:PACKAGE_NAME}" `
+            -ExpectedVersion $env:PACKAGE_VERSION `
             -WriteChecksumFile
+
+      # REL.0C: the package must carry its own .NET runtime (Windows does not ship .NET 10 and the Store
+      # has no .NET framework package), both executables on the same runtime, every deps.json asset
+      # present, and the Windows App Runtime still a framework package. Read from the .msix itself.
+      # The step output reaches the script only through env and is validated first; it is never
+      # interpolated into the run block.
+      - name: Package runtime (.NET self-contained, Windows App Runtime framework)
+        shell: pwsh
+        env:
+          PACKAGE_NAME: ${{ steps.collect.outputs.packageName }}
+        run: |
+          if ($env:PACKAGE_NAME -cnotmatch '\A[A-Za-z0-9._-]+\.msix\z') { throw 'Invalid package file name.' }
+          ./tools/release/Assert-PackageRuntime.ps1 `
+            -PackagePath "artifacts/release/${env:PACKAGE_NAME}"
 
       # PRIV-PDBPATH: nothing that leaves this job may carry an absolute development path (user
       # profile, checkout, runner workspace) in a PE debug entry, PDB, string or file. It inspects
@@ -156,37 +210,81 @@ jobs:
 
       - name: Summary
         shell: pwsh
+        env:
+          RELEASE_TAG: ${{ steps.resolve.outputs.tag }}
+          PRODUCT_VERSION: ${{ steps.tagcheck.outputs.version }}
+          PACKAGE_VERSION: ${{ steps.tagcheck.outputs.packageVersion }}
+          PACKAGE_NAME: ${{ steps.collect.outputs.packageName }}
+          PACKAGE_SHA256: ${{ steps.identity.outputs.sha256 }}
         run: |
+          if ($env:RELEASE_TAG -cnotmatch '\Av[0-9]+\.[0-9]+\.[0-9]+\z') { throw 'Invalid release tag.' }
+          if ($env:PRODUCT_VERSION -cnotmatch '\A[0-9]+\.[0-9]+\.[0-9]+\z') { throw 'Invalid product version.' }
+          ./tools/release/Assert-PackageVersionFloor.ps1 -PackageVersion $env:PACKAGE_VERSION
+          if ($env:PACKAGE_NAME -cnotmatch '\A[A-Za-z0-9._-]+\.msix\z') { throw 'Invalid package file name.' }
+          if ($env:PACKAGE_SHA256 -cnotmatch '\A[0-9a-fA-F]{64}\z') { throw 'Invalid package checksum.' }
           @(
             '## Release build'
             ''
             '| field | value |'
             '| --- | --- |'
-            '| tag | `${{ steps.resolve.outputs.tag }}` |'
-            '| commit | `${{ github.sha }}` |'
-            '| product version | `${{ steps.tagcheck.outputs.version }}` |'
-            '| package version | `${{ steps.tagcheck.outputs.packageVersion }}` |'
-            '| package | `${{ steps.collect.outputs.packageName }}` |'
-            '| sha-256 | `${{ steps.identity.outputs.sha256 }}` |'
+            "| tag | ``${env:RELEASE_TAG}`` |"
+            "| commit | ``$((git rev-parse HEAD).Trim())`` |"
+            "| product version | ``${env:PRODUCT_VERSION}`` |"
+            "| package version | ``${env:PACKAGE_VERSION}`` |"
+            "| package | ``${env:PACKAGE_NAME}`` |"
+            "| sha-256 | ``${env:PACKAGE_SHA256}`` |"
           ) | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
 
       - name: Upload the package artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: serveralyzer-msix-${{ steps.tagcheck.outputs.packageVersion }}
           path: artifacts/release/
           if-no-files-found: error
           retention-days: 90
 
+  # G2. A GitHub Release is public and permanent enough to matter, so it is never a side effect of
+  # pushing a tag. It needs a manual dispatch with create_release=true, runs only after the build
+  # job (and therefore every gate in it) succeeded, and is the only job with write access.
+  release:
+    needs: build
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.create_release == true }}
+    runs-on: windows-latest
+    permissions:
+      contents: write        # only to create/read the GitHub Release for this tag
+
+    steps:
+      - name: Checkout the exact tag
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ needs.build.outputs.tag }}
+
+      - name: Download the checked package
+        if: ${{ inputs.attach_package == true }}
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: serveralyzer-msix-${{ needs.build.outputs.packageVersion }}
+          path: artifacts/release/
+
       # Creating a Release is additive. Updating one that already exists would rewrite
       # published notes, so this refuses instead and says so.
       - name: Create the GitHub Release
-        if: ${{ inputs.create_release != false }}
         shell: pwsh
         env:
+          RELEASE_TAG: ${{ needs.build.outputs.tag }}
+          PRODUCT_VERSION: ${{ needs.build.outputs.version }}
+          PACKAGE_NAME: ${{ needs.build.outputs.packageName }}
+          ATTACH_PACKAGE: ${{ inputs.attach_package }}
+          EVENT_NAME: ${{ github.event_name }}
           GH_TOKEN: ${{ github.token }}
         run: |
-          $tag = '${{ steps.resolve.outputs.tag }}'
+          if ($env:RELEASE_TAG -cnotmatch '\Av[0-9]+\.[0-9]+\.[0-9]+\z') { throw 'Invalid release tag.' }
+          if ($env:PRODUCT_VERSION -cnotmatch '\A[0-9]+\.[0-9]+\.[0-9]+\z') { throw 'Invalid product version.' }
+          if ($env:PACKAGE_NAME -cnotmatch '\A[A-Za-z0-9._-]+\.msix\z') { throw 'Invalid package file name.' }
+          if ($env:ATTACH_PACKAGE -cnotmatch '\A(true|false)?\z') { throw 'Invalid attach_package boolean.' }
+          # Defence in depth for the job condition above: never from a tag push.
+          if ($env:EVENT_NAME -cne 'workflow_dispatch') { throw 'A GitHub Release is only created by a manual dispatch.' }
+          $tag = $env:RELEASE_TAG
 
           $existing = gh release view $tag --json tagName 2>$null
           if ($LASTEXITCODE -eq 0) {
@@ -195,8 +293,8 @@ jobs:
             exit 0
           }
 
-          $notesPath = "docs/release-notes-${{ steps.tagcheck.outputs.version }}.md"
-          $arguments = @('release', 'create', $tag, '--title', "ServerAlyzer ${{ steps.tagcheck.outputs.version }}")
+          $notesPath = "docs/release-notes-${env:PRODUCT_VERSION}.md"
+          $arguments = @('release', 'create', $tag, '--title', "ServerAlyzer ${env:PRODUCT_VERSION}")
           if (Test-Path -LiteralPath $notesPath) {
             Write-Host "Using $notesPath for the release notes."
             $arguments += @('--notes-file', $notesPath)
@@ -206,8 +304,8 @@ jobs:
             $arguments += @('--notes', 'Release notes for this version are not in the repository yet.')
           }
 
-          if ('${{ inputs.attach_package }}' -eq 'true') {
-            $arguments += "artifacts/release/${{ steps.collect.outputs.packageName }}"
+          if ($env:ATTACH_PACKAGE -eq 'true') {
+            $arguments += "artifacts/release/${env:PACKAGE_NAME}"
           }
           else {
             Write-Host 'Not attaching the package: the Microsoft Store is the distribution channel.'

@@ -115,7 +115,7 @@ dotnet test ServerMonitor.slnx
 # Correr a app (unpackaged, self-contained)
 dotnet run --project src/ServerMonitor.App
 
-# Construir o pacote MSIX de produção (framework-dependent)
+# Construir o pacote MSIX de produção (.NET self-contained; Windows App Runtime como framework package)
 dotnet build src/ServerMonitor.App/ServerMonitor.App.csproj -c Release -p:Packaged=true
 ```
 

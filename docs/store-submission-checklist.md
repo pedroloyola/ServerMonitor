@@ -20,7 +20,8 @@ nunca no MSIX de produção.
 
 ## Pacote
 
-- [x] Modelo de empacotamento: **MSIX single-project** (sem `.wapproj`), framework-dependent, x64.
+- [x] Modelo de empacotamento: **MSIX single-project** (sem `.wapproj`), x64. Windows App Runtime como
+  *framework package*; runtime **.NET self-contained** no pacote (REL.0C, emenda ao ADR-017, proposta).
 - [x] Build reproduzível: `dotnet build src/ServerMonitor.App/ServerMonitor.App.csproj -c Release -p:Packaged=true`.
 - [x] Manifesto mínimo: capability única `runFullTrust`; **sem** `broadFileSystemAccess`.
 - [x] Payload auditado: sem código-fonte, testes, harness QA, fixtures, `.boss`, `.git`, PII, cert/chave DEV.
