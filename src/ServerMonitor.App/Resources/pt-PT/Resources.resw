@@ -110,6 +110,11 @@
   <data name="DiscoveredServerAddFor" xml:space="preserve"><value>Adicionar {0}</value></data>
   <data name="DiscoveredServerIgnoreFor" xml:space="preserve"><value>Ignorar {0}</value></data>
   <data name="DiscoveredServerAutomationSummary" xml:space="preserve"><value>{0}, SSH, {1}, encontrado na rede</value></data>
+  <data name="SettingsLocalNetworkTitle.Text" xml:space="preserve"><value>Procurar na rede local</value></data>
+  <data name="SettingsLocalNetworkDescription.Text" xml:space="preserve"><value>Encontra servidores SSH que se anunciam na tua rede local. O Windows pode pedir permissão de rede.</value></data>
+  <data name="SettingsLocalNetworkSearchButton.Content" xml:space="preserve"><value>Procurar</value></data>
+  <data name="SettingsLocalNetworkSearchButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Procurar na rede local</value></data>
+  <data name="SettingsLocalNetworkSearchButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.HelpText" xml:space="preserve"><value>Encontra servidores SSH que se anunciam na tua rede local. O Windows pode pedir permissão de rede.</value></data>
   <data name="SettingsIgnoredDiscoveriesTitle.Text" xml:space="preserve"><value>Dispositivos ignorados</value></data>
   <data name="SettingsIgnoredDiscoveriesDescription.Text" xml:space="preserve"><value>Volta a mostrar os dispositivos que ainda estão presentes na rede.</value></data>
   <data name="SettingsResetIgnoredButton.Content" xml:space="preserve"><value>Voltar a mostrar dispositivos ignorados</value></data>

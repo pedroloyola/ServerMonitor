@@ -110,6 +110,11 @@
   <data name="DiscoveredServerAddFor" xml:space="preserve"><value>Add {0}</value></data>
   <data name="DiscoveredServerIgnoreFor" xml:space="preserve"><value>Ignore {0}</value></data>
   <data name="DiscoveredServerAutomationSummary" xml:space="preserve"><value>{0}, SSH, {1}, found on the network</value></data>
+  <data name="SettingsLocalNetworkTitle.Text" xml:space="preserve"><value>Search local network</value></data>
+  <data name="SettingsLocalNetworkDescription.Text" xml:space="preserve"><value>Looks for SSH servers announced on your local network. Windows may ask for network access permission.</value></data>
+  <data name="SettingsLocalNetworkSearchButton.Content" xml:space="preserve"><value>Search</value></data>
+  <data name="SettingsLocalNetworkSearchButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Search local network</value></data>
+  <data name="SettingsLocalNetworkSearchButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.HelpText" xml:space="preserve"><value>Looks for SSH servers announced on your local network. Windows may ask for network access permission.</value></data>
   <data name="SettingsIgnoredDiscoveriesTitle.Text" xml:space="preserve"><value>Ignored devices</value></data>
   <data name="SettingsIgnoredDiscoveriesDescription.Text" xml:space="preserve"><value>Shows devices still on the network again.</value></data>
   <data name="SettingsResetIgnoredButton.Content" xml:space="preserve"><value>Show ignored devices again</value></data>

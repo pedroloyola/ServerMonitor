@@ -297,6 +297,10 @@ public sealed class ServerEditorSession : IServerEditorSession
                 case NavigationDestination.Servers:
                     _navigation.GoToServers();
                     break;
+                case NavigationDestination.SettingsData:
+                    // REL.0D: a suggestion added from Settings › "Procurar na rede local"; Back returns there.
+                    _navigation.GoToSettings(SettingsSection.Data);
+                    break;
                 default:
                     _navigation.GoToDashboard();
                     break;
@@ -347,6 +351,7 @@ public sealed class ServerEditorSession : IServerEditorSession
         return _navigation.CurrentDestination switch
         {
             NavigationDestination.Servers => new ServerEditorOrigin(NavigationDestination.Servers),
+            NavigationDestination.SettingsData => new ServerEditorOrigin(NavigationDestination.SettingsData),
             NavigationDestination.ServerEditor when _live is { } live => live.Request.Origin with { },
             _ => ServerEditorOrigin.Overview
         };

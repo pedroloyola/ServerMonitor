@@ -219,6 +219,72 @@ public sealed class DiscoveryOnDemandTests
         Assert.Contains(block.Ancestors(), e => (string?)e.Attribute(x + "Name") == "FirstServerStateBlock");
     }
 
+    /// <summary>
+    /// REL.0D: Settings › Data "Procurar na rede local" binds the overview's ONE command and suggestion list (no second
+    /// start path), sits right before "Dispositivos ignorados", carries the same permission note and the end captions.
+    /// </summary>
+    [Fact]
+    public void Settings_entry_binds_the_same_command_next_to_the_ignored_devices()
+    {
+        var xaml = XDocument.Load(Path.Combine(RepositoryRoot(), "src", "ServerMonitor.App", "Views", "SettingsDataPage.xaml"));
+        XNamespace x = "http://schemas.microsoft.com/winfx/2006/xaml";
+        XElement Named(string name) => Assert.Single(xaml.Descendants(), e => (string?)e.Attribute(x + "Name") == name);
+
+        var section = Named("LocalNetworkSearchSection");
+        Assert.Equal("{x:Bind Discovery.IsLocalNetworkSearchAvailable}", (string?)section.Attribute("Visibility"));
+        var next = section.ElementsAfterSelf().First();
+        Assert.Contains(next.Descendants(), e => (string?)e.Attribute(x + "Uid") == "SettingsIgnoredDiscoveriesTitle");
+
+        var button = Named("LocalNetworkSearchButton");
+        Assert.Equal("Button", button.Name.LocalName);
+        Assert.Equal("SettingsLocalNetworkSearchButton", (string?)button.Attribute(x + "Uid"));
+        Assert.Equal("{x:Bind Discovery.StartLocalNetworkSearchCommand}", (string?)button.Attribute("Command"));
+        Assert.Contains(button, section.Descendants());
+        Assert.Equal("SettingsLocalNetworkDescription", (string?)Named("LocalNetworkPermissionNote").Attribute(x + "Uid"));
+
+        foreach (var (name, binding) in new[]
+                 {
+                     ("LocalNetworkSearchingRow", "{x:Bind Discovery.IsLocalNetworkSearchRunning, Mode=OneWay}"),
+                     ("LocalNetworkNothingFound", "{x:Bind Discovery.LocalNetworkSearchEndedNothingFound, Mode=OneWay}"),
+                     ("LocalNetworkTimeLimit", "{x:Bind Discovery.LocalNetworkSearchEndedTimeLimit, Mode=OneWay}"),
+                     ("LocalNetworkFailed", "{x:Bind Discovery.LocalNetworkSearchEndedFailed, Mode=OneWay}"),
+                     ("LocalNetworkResults", "{x:Bind Discovery.HasDiscoveredServers, Mode=OneWay}")
+                 })
+        {
+            var element = Named(name);
+            Assert.Equal(binding, (string?)element.Attribute("Visibility"));
+            Assert.Contains(element, section.Descendants());
+        }
+
+        Assert.Equal("{x:Bind Discovery.DiscoveredServers}", (string?)Named("LocalNetworkResultsRepeater").Attribute("ItemsSource"));
+        Assert.Equal("{x:Bind Discovery.DiscoveredCountAutomationName, Mode=OneWay}",
+            (string?)Named("LocalNetworkResults").Attribute("AutomationProperties.Name"));
+
+        // The page only binds the command: visiting Settings never starts a search.
+        var code = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "ServerMonitor.App", "Views", "SettingsDataPage.xaml.cs"));
+        Assert.DoesNotContain("StartLocalNetworkSearch", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("StartSearchAsync", code, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("pt-PT")]
+    [InlineData("pt-BR")]
+    [InlineData("en-US")]
+    public void Every_language_carries_the_settings_entry_with_the_same_permission_note(string language)
+    {
+        var resw = XDocument.Load(Path.Combine(RepositoryRoot(), "src", "ServerMonitor.App", "Resources", language, "Resources.resw"));
+        var values = resw.Root!.Elements("data").ToDictionary(e => (string)e.Attribute("name")!, e => (string)e.Element("value")!);
+        const string automation = "[using:Microsoft.UI.Xaml.Automation]AutomationProperties.";
+
+        var note = values["DashboardEmptyDiscoveryPermissionNote.Text"];
+        Assert.Equal(note, values["SettingsLocalNetworkDescription.Text"]);
+        Assert.Equal(note, values["SettingsLocalNetworkSearchButton." + automation + "HelpText"]);
+        // The short visible "Procurar"/"Search" is announced with its full name (the card title).
+        Assert.False(string.IsNullOrWhiteSpace(values["SettingsLocalNetworkSearchButton.Content"]));
+        Assert.Equal(values["SettingsLocalNetworkTitle.Text"], values["SettingsLocalNetworkSearchButton." + automation + "Name"]);
+        Assert.Equal(values["DashboardEmptyDiscoveryStartButton.Content"], values["SettingsLocalNetworkTitle.Text"]);
+    }
+
     [Theory]
     [InlineData("pt-PT")]
     [InlineData("pt-BR")]

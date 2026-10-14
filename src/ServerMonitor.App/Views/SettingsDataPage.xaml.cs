@@ -11,10 +11,11 @@ namespace ServerMonitor.App.Views;
 /// </summary>
 public sealed partial class SettingsDataPage : Page, ISettingsNavigationTarget
 {
-    public SettingsDataPage(SettingsViewModel viewModel, BackupRestoreViewModel backup)
+    public SettingsDataPage(SettingsViewModel viewModel, BackupRestoreViewModel backup, DashboardViewModel discovery)
     {
-        // Set before InitializeComponent: the Backup section binds with x:Bind.
+        // Set before InitializeComponent: the Backup and local-network sections bind with x:Bind.
         Backup = backup;
+        Discovery = discovery;
         InitializeComponent();
         ViewModel = viewModel;
         DataContext = ViewModel;
@@ -38,6 +39,12 @@ public sealed partial class SettingsDataPage : Page, ISettingsNavigationTarget
 
     /// <summary>Backs the Backup and restore section (M14.6).</summary>
     public BackupRestoreViewModel Backup { get; }
+
+    /// <summary>
+    /// REL.0D: backs "Procurar na rede local". The overview's singleton owns the one start command, the suggestions and
+    /// their Add/Ignore, so this entry and the empty overview are the same search, never a second discovery path.
+    /// </summary>
+    public DashboardViewModel Discovery { get; }
 
     /// <summary>Cortex #6: navigated to while already shown (no Loaded) — honour a pending About request now.</summary>
     public void OnNavigatedToAgain() => BringRequestedSectionIntoView();
