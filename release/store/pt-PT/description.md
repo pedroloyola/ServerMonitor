@@ -24,7 +24,7 @@ Enquanto ainda não tens servidores, podes procurar na tua rede local servidores
 Cópia de segurança encriptada
 Guarda os teus servidores, chaves de host confiáveis e palavras-passe guardadas num ficheiro protegido por uma frase-passe à tua escolha, e restaura-os mais tarde. Os ficheiros de chave privada nunca são incluídos.
 
-Privacidade desde a origem
+Privacidade desde a conceção
 Sem conta, e o ServerAlyzer não recolhe telemetria. A lista de servidores, o histórico e as credenciais guardadas ficam no teu PC, a não ser que exportes uma cópia de segurança encriptada, que fica onde a guardares. O ServerAlyzer só usa a rede para chegar aos servidores que adicionas (e à tua rede local quando inicias uma pesquisa); não envia os teus dados para o ServerAlyzer.
 
 Requisitos

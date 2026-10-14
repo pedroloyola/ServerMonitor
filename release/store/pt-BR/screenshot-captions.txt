@@ -1,7 +1,7 @@
-01-overview: Veja em uma olhada quais servidores estão bem e qual precisa de atenção.
+01-overview: Veja de relance quais servidores estão bem e qual precisa de atenção.
 02-server-detail: Um servidor em detalhes, com as informações do sistema e as leituras mais recentes.
 03-history: Histórico local, com gráficos da última hora até os últimos 30 dias.
-04-services-containers: Containers Docker e serviços do sistema, somente leitura.
+04-services-containers: Em Serviços e containers, veja os serviços do sistema e os containers Docker, somente leitura.
 05-compact-mode: Modo compacto: uma visão pequena dos seus servidores, que pode ficar sempre no topo.
 06-add-server: Adicione um servidor e teste a conexão etapa por etapa.
 07-settings: Escolha o tema, os alertas de status e o segundo plano em Configurações.

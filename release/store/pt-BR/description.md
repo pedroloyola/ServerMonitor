@@ -1,6 +1,6 @@
 O ServerAlyzer é um painel tranquilo e compacto para Windows 11 que mostra o status dos servidores Linux e macOS que você mantém: seu homelab, os serviços que você hospeda por conta própria ou as máquinas que você administra. Ele se conecta a cada servidor direto do seu PC, via SSH. Você não instala nenhum agente nos servidores, não cria conta e não existe nenhuma nuvem do ServerAlyzer no meio do caminho.
 
-Todos os servidores em uma olhada
+Todos os servidores de relance
 A Visão geral mostra como está cada servidor, destaca o que precisa de atenção e indica quando uma leitura está desatualizada. A lista de Servidores traz CPU, memória e disco de cada servidor, e a página de cada servidor mostra o tempo ativo. Os servidores são verificados automaticamente em segundo plano, e você pode atualizar quando quiser. Quando um valor não pode ser lido, o ServerAlyzer avisa em vez de mostrar zero.
 
 Histórico no seu PC
@@ -24,7 +24,7 @@ Enquanto você ainda não tem servidores, é possível procurar na sua rede loca
 Backup criptografado
 Salve seus servidores, chaves de host confiáveis e senhas salvas em um arquivo protegido por uma frase secreta escolhida por você, e restaure tudo depois. Os arquivos de chave privada nunca são incluídos.
 
-Privacidade desde a origem
+Privacidade desde a concepção
 Sem conta, e o ServerAlyzer não coleta telemetria. Sua lista de servidores, o histórico e as credenciais salvas ficam no seu PC, a menos que você exporte um backup criptografado, que fica onde você salvar. O ServerAlyzer só usa a rede para chegar aos servidores que você adiciona (e à sua rede local quando você inicia uma pesquisa); ele não envia seus dados para o ServerAlyzer.
 
 Requisitos
