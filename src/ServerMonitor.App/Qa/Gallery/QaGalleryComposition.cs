@@ -53,8 +53,9 @@ internal static class QaGalleryComposition
             forceReduced: QaReducedMotionPolicy.IsRequested(Environment.GetCommandLineArgs(), isDebugBuild: true)));
 
         // The same language rule the application applies at startup, without a host: an explicit override wins,
-        // an unsupported system culture falls back to the product default. Nothing is persisted.
-        new LocalizationService(NullLogger<LocalizationService>.Instance).InitializeFromSystem();
+        // an unsupported system culture falls back to the product default. Nothing is persisted (REL.0D: not even the
+        // language provenance - it stays in memory).
+        new LocalizationService(NullLogger<LocalizationService>.Instance, new InMemoryLanguageSettingsStore()).InitializeFromSystem();
     }
 
     /// <summary>Runs in OnLaunched instead of the application startup.</summary>
