@@ -28,10 +28,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup .NET 10 SDK
+      - name: Setup .NET SDK (exact version from global.json)
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '10.0.x'
+          global-json-file: global.json
 
       # Cache packages only, never bin/, obj/, test outputs, or assemblies. The Directory.*,
       # NuGet.Config, and lock-file patterns intentionally match nothing today: they are kept
@@ -89,10 +89,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup .NET 10 SDK
+      - name: Setup .NET SDK (exact version from global.json)
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '10.0.x'
+          global-json-file: global.json
 
       - name: Cache NuGet packages
         id: nuget-cache
@@ -159,6 +159,9 @@ jobs:
           ./tools/release/Test-WorkflowRunInterpolation.ps1 -SelfTest
           ./tools/release/Test-WorkflowActionPins.ps1 -SelfTest
           ./tools/release/Test-ReleaseWorkflowShape.ps1 -SelfTest
+          ./tools/release/Test-PackageTrace.ps1
+          ./tools/release/Test-RuntimeServicing.ps1 -SelfTest
+          ./tools/release/Test-PackageResources.ps1
 
       - name: Vulnerability scan (fail on any vulnerable package)
         shell: pwsh
@@ -194,10 +197,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup .NET 10 SDK
+      - name: Setup .NET SDK (exact version from global.json)
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '10.0.x'
+          global-json-file: global.json
 
       - name: Cache NuGet packages
         uses: actions/cache@v4
@@ -224,6 +227,42 @@ jobs:
             Where-Object { $_.FullName -notmatch '[\\/]Dependencies[\\/]' })
           if ($candidates.Count -ne 1) { throw "Expected exactly one app MSIX, found $($candidates.Count)." }
           ./tools/release/Assert-PackageRuntime.ps1 -PackagePath $candidates[0].FullName
+
+      # Vigil PR #51 L-1: the integrated package's identity on every PR, not only on release day. Identity
+      # Name/Publisher/Version/architecture, app capabilities, the exact executable set and the GUI subsystem,
+      # read from the .msix; the version is the one the repository declares (csproj FileVersion and both
+      # manifests, which must agree), never a hard-coded value.
+      - name: Package identity, capabilities and GUI subsystem
+        shell: pwsh
+        run: |
+          ./tools/release/Test-RepositoryPackageVersion.ps1
+          $version = ./tools/release/Get-RepositoryPackageVersion.ps1
+          $candidates = @(Get-ChildItem -Recurse -Filter '*.msix' -Path 'src/ServerMonitor.App/AppPackages' |
+            Where-Object { $_.FullName -notmatch '[\\/]Dependencies[\\/]' })
+          if ($candidates.Count -ne 1) { throw "Expected exactly one app MSIX, found $($candidates.Count)." }
+          ./tools/release/Assert-PackageIdentity.ps1 -PackagePath $candidates[0].FullName -ExpectedVersion $version
+
+      # The package's default (fallback) language is en-US and every ms-resource: string of the manifest
+      # (AppDescription first) resolves in en-US, pt-PT and pt-BR, read from resources.pri with makepri.
+      - name: Package resources (en-US default, manifest strings in en-US/pt-PT/pt-BR)
+        shell: pwsh
+        run: |
+          $candidates = @(Get-ChildItem -Recurse -Filter '*.msix' -Path 'src/ServerMonitor.App/AppPackages' |
+            Where-Object { $_.FullName -notmatch '[\\/]Dependencies[\\/]' })
+          if ($candidates.Count -ne 1) { throw "Expected exactly one app MSIX, found $($candidates.Count)." }
+          ./tools/release/Assert-PackageResources.ps1 -PackagePath $candidates[0].FullName
+
+      # REL.0D servicing traceability on every PR: the same record release-build.yml writes (commit, the
+      # SDK global.json pins, bundled .NET runtime, Windows App Runtime dependency, SHA-256), next to the
+      # package and in the job summary. Nothing is uploaded.
+      - name: Package build record
+        shell: pwsh
+        run: |
+          $candidates = @(Get-ChildItem -Recurse -Filter '*.msix' -Path 'src/ServerMonitor.App/AppPackages' |
+            Where-Object { $_.FullName -notmatch '[\\/]Dependencies[\\/]' })
+          if ($candidates.Count -ne 1) { throw "Expected exactly one app MSIX, found $($candidates.Count)." }
+          ./tools/release/Write-PackageTrace.ps1 -PackagePath $candidates[0].FullName -SummaryPath $env:GITHUB_STEP_SUMMARY | Out-Null
+          Get-Content -LiteralPath "$($candidates[0].FullName).build.json"
 
       - name: Distribution privacy (package)
         shell: pwsh

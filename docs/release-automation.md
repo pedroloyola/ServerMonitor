@@ -28,7 +28,8 @@ Builds the shippable MSIX from an exact tag and proves it is what the tag says.
    all agree with it. `AssemblyVersion` is deliberately excluded; it is pinned at `1.0.0.0`.
    Then `Assert-PackageVersionFloor.ps1` on that version (see *Package version floor*), before
    anything is built.
-4. Restore, non-incremental Release build, full test run, vulnerability scan.
+4. Installs exactly the SDK `global.json` pins (`global-json-file`; see *.NET runtime servicing*),
+   then restore, non-incremental Release build, full test run, vulnerability scan.
 5. Runs the release checks' own counterproof suites, so a green package check means
    something.
 6. Builds the MSIX and refuses to continue if the build produced anything other than
@@ -43,12 +44,25 @@ Builds the shippable MSIX from an exact tag and proves it is what the tag says.
    runtime files. The Windows App Runtime is still a **framework package**: the `PackageDependency`
    is declared, and `Microsoft.WindowsAppRuntime.dll` is not in the payload. Windows does not ship
    .NET 10 and the Store has no .NET framework package, so a framework-dependent package would not
-   start on a clean machine (REL.0C).
-9. `Assert-DistributionPrivacy.ps1` — opens everything about to be uploaded and fails closed
-   if any file carries an absolute development path (see *Distribution privacy* below).
-   It runs before the upload and before the GitHub Release, so a failure publishes nothing.
-10. Writes the SHA-256 next to the package and uploads both as a workflow artifact.
-11. Creates the GitHub Release **only if it does not already exist**, and by default
+   start on a clean machine (REL.0C). The bundled `Microsoft.NETCore.App` must also be at or above
+   the **runtime floor** in `release/min-dotnet-runtime.txt`, and the runtime files themselves
+   (`hostfxr`, `hostpolicy`, `System.Private.CoreLib`, `System.Runtime`) must report that same
+   version in their version resource (see *.NET runtime servicing*).
+   Then `Assert-PackageResources.ps1`: the package's default (fallback) language — the first manifest
+   `<Resource Language>` and the `scoreAsDefault="1.0"` candidate of each string in `resources.pri` —
+   is **en-US**, and every `ms-resource:` string of the manifest (`AppDescription` always) resolves,
+   non-empty, in en-US, pt-PT and pt-BR. It dumps `resources.pri` with the build's own `makepri`
+   (Microsoft.Windows.SDK.BuildTools, else the Windows SDK) and fails closed when there is none.
+9. `Write-PackageTrace.ps1` — the **build record**: commit, SDK (must equal the `global.json` pin),
+   bundled .NET runtime and floor (re-proven from the package), Windows App Runtime dependency and
+   SHA-256, written as `<package>.build.json` next to the package and into the run summary.
+10. `Assert-DistributionPrivacy.ps1` — opens everything about to be uploaded (the build record
+   included) and fails closed if any file carries an absolute development path (see *Distribution
+   privacy* below). It runs before the upload and before the GitHub Release, so a failure publishes
+   nothing.
+11. Writes the SHA-256 next to the package and uploads the package, the checksum and the build
+   record as a workflow artifact.
+12. Creates the GitHub Release **only if it does not already exist**, and by default
    **does not attach the MSIX**: the Microsoft Store is the distribution channel.
 
 **The GitHub Release is never a side effect of a tag push (G2).** A push of `vX.Y.Z` runs every
@@ -228,7 +242,12 @@ chains to a repository-root `Directory.Build.props` if one is ever added (and on
 It runs in `release-build.yml` (before the upload), in `store-submit.yml` (before the Store), and
 in CI on every PR twice: on the first-party Release binaries, and on a **packaged** Release build
 made exactly as `release-build.yml` makes it (unsigned, nothing uploaded), with the allowlist — the
-proof that the allowlist holds for the runner's SDK before a release depends on it.
+proof that the allowlist holds for the runner's SDK before a release depends on it. That CI
+package job also runs, on the same package, `Assert-PackageIdentity.ps1` (with the version the
+repository declares: `Get-RepositoryPackageVersion.ps1` reads the csproj `FileVersion` and both
+manifests and refuses any disagreement), `Assert-PackageRuntime.ps1`, `Assert-PackageResources.ps1`
+and `Write-PackageTrace.ps1`, so every gate `release-build.yml` applies to the package is exercised on
+every PR, not first on release day.
 
 **Third-party binaries** carry their vendors' build paths (Microsoft build agents, NuGet
 authors' machines). `tools/release/distribution-privacy-allowlist.json` excuses each one by exact
@@ -242,11 +261,66 @@ category to make a run pass.
 The package carries the **.NET runtime** (REL.0C), so its native binaries (`coreclr.dll`,
 `clrjit.dll`, `hostfxr.dll`, `mscordaccore*.dll`, `msquic.dll`, …) carry Microsoft build-agent paths.
 Their allowlist entries are bound to path tokens, which stayed identical across runtime patches
-10.0.11 to 10.0.13. Two things change with every .NET patch: the file name
-`mscordaccore_amd64_amd64_<version>.dll`, and one token of `Microsoft.DiaSymReader.Native.amd64.dll`.
-After a .NET patch, the first package build fails closed on those, and only on those. That build is
-also the release the patch obliges anyway, because a self-contained runtime is serviced only by
-shipping a new package. Review the candidates and add them.
+10.0.11 to 10.0.13. Two things can change with a .NET patch: the file name
+`mscordaccore_amd64_amd64_<file version>.dll`, and a token of `Microsoft.DiaSymReader.Native.amd64.dll`
+(10.0.11 had its own; 10.0.12 and 10.0.13 share theirs). The SDK is pinned, so this happens only
+in the pull request that moves `global.json` to a new SDK: its package job fails closed on those
+files, and only on those. Review the candidates and add them in that same pull request. When the
+runtime floor rises, **prune** the entries below it: `Test-RuntimeServicing.ps1` (S4) refuses a
+versioned `mscordaccore` entry under the floor (the runtime patch is the file version's build
+number divided by 100: `10.0.1326.x` is 10.0.13) and one whose `reason` does not name its runtime.
+Such a package is refused by the runtime check anyway, so a stale entry could only widen the gate.
+
+## .NET runtime servicing
+
+Decision: ADR-017, amendment REL.0C (accepted 2026-10-14). The production MSIX carries its own .NET
+runtime (self-contained); the Windows App Runtime stays a framework package that the Store keeps up
+to date. **Windows Update and Microsoft Update do not patch a self-contained .NET runtime**: an
+installed package keeps the runtime it was built with until we ship a new package. Servicing the
+runtime is therefore a release obligation of this project.
+
+**Controls.**
+
+* **SDK pinned.** `global.json` pins one exact SDK (`10.0.402`, `rollForward: disable`,
+  `allowPrerelease: false`). The SDK decides which runtime pack a self-contained build bundles
+  (SDK 10.0.402 bundles `Microsoft.NETCore.App` 10.0.13; SDK 10.0.400 bundled 10.0.11), so a commit
+  always builds with the same runtime. Every `actions/setup-dotnet` step in `ci.yml` and
+  `release-build.yml` installs from `global-json-file: global.json`; none names a version of its own.
+  `disable` rather than `latestPatch`: the runner image may already carry a newer SDK of the same
+  band, and `latestPatch` would pick it and silently change the bundled runtime.
+* **Runtime floor.** `release/min-dotnet-runtime.txt` holds the lowest runtime a package may bundle.
+  `Assert-PackageRuntime.ps1` fails closed below it (CI package job, `release-build.yml`, and again in
+  `store-submit.yml` with the **current** checkout's floor, so an older artifact that is still
+  downloadable cannot be submitted once the floor has moved past it).
+* **Build record.** Every packaged build writes what it is made of (see step 9 above), so "which
+  runtime is in the package the Store has?" is answered from the artifact, not from memory.
+* **The vulnerability scan does not cover the runtime.** `dotnet list package --vulnerable` reports
+  NuGet package references; the runtime pack a self-contained build bundles is not one of them. The
+  floor and the monthly review below are the control for the runtime.
+* **Repository wiring** is itself checked on every PR: `Test-RuntimeServicing.ps1 -SelfTest` (SDK pin,
+  `setup-dotnet` wiring, floor file, allowlist vs floor, build record placement).
+
+**Process.**
+
+* **Monthly:** .NET servicing releases ship monthly (normally on Patch Tuesday). Each month, read
+  the .NET 10 release notes and decide whether to move. Target: a package with the new runtime
+  submitted **within 7 days** of the regular release, when QA and distribution allow (the human
+  decides; a Store submission stays a human action).
+* **Critical CVE in the runtime:** evaluate **immediately**, not at the next monthly review.
+* **Moving to a new runtime (one pull request):**
+  1. Set `global.json` `version` to the SDK that bundles it (the release notes list SDK and runtime
+     together).
+  2. Raise `release/min-dotnet-runtime.txt` to that runtime, with a comment naming the release.
+  3. Let the CI package job fail on the version-named runtime files; review the allowlist
+     candidates, add the new `mscordaccore_amd64_amd64_<file version>.dll` entry (its `reason` names
+     `Microsoft.NETCore.App <version>)`), prune the entries below the new floor.
+  4. Green CI, review, merge, then the normal release path (version bump, tag, `release-build`,
+     `store-submit`).
+* **Local consequence:** with `rollForward: disable`, building this repository needs exactly the
+  pinned SDK. On a development machine use the SDK installed machine-wide
+  (`C:\Program Files\dotnet\dotnet.exe`, which has 10.0.402); an older user-scoped SDK (for example
+  10.0.400 under `~/.dotnet`) now stops with "A compatible .NET SDK was not found". Install the new
+  SDK on development machines in the same change that moves the pin.
 
 ## The publishing hold
 
@@ -357,7 +431,8 @@ repository, not in an issue, not in a run log.
 
 1. Land the version bump on `main` and tag that commit (`vX.Y.Z`).
 2. `release-build.yml` runs on the tag push. Record the **run id**, the package name and the
-   SHA-256 from the run summary. No GitHub Release is created; if one is wanted, dispatch
+   SHA-256 from the run summary, and keep the build record (SDK, bundled .NET runtime, commit) with
+   the release notes. No GitHub Release is created; if one is wanted, dispatch
    `release-build.yml` for the tag with `create_release: true` (it rebuilds and re-checks first).
 3. Run `store-status.yml` and confirm the product is idle and on the publishing hold.
 4. Dispatch `store-submit.yml` with the tag, the run id **of the tag-push run**, the package
@@ -376,7 +451,11 @@ Everything the workflows rely on runs offline:
 ./tools/release/Test-TagVersion.ps1            # synthetic tag/source coherence cases
 ./tools/release/Test-VersionGuardMutations.ps1 # remove checks; require suite failures; rerun originals
 ./tools/release/Test-ReleaseChecks.ps1          # package checks, 12 cases
-./tools/release/Test-PackageRuntime.ps1         # .NET self-contained package runtime, 24 cases
+./tools/release/Test-PackageRuntime.ps1         # .NET self-contained package runtime + runtime floor, 58 cases
+./tools/release/Test-PackageTrace.ps1           # package build record, 17 cases
+./tools/release/Test-RuntimeServicing.ps1 -SelfTest # SDK pin, setup-dotnet wiring, floor, allowlist vs floor, build record + CI identity wiring, 24 mutations
+./tools/release/Test-RepositoryPackageVersion.ps1 # csproj + both manifests declare one package version, 9 cases
+./tools/release/Test-PackageResources.ps1       # en-US default + manifest strings in 3 languages (makepri stubbed), 23 cases
 ./tools/release/Test-DistributionPrivacy.ps1    # distribution privacy, 52 cases
 ./tools/release/Test-StoreSubmissionUpdate.ps1  # publishing hold, 12 cases
 ./tools/release/Get-SubmissionState.ps1 -SelfTest        # status mapping, 18 cases
@@ -403,6 +482,9 @@ pull request (job *Release build + vulnerability scan*), not only on release day
 * [GitHub REST — workflow runs (`path`, `event`, `head_branch`, `head_sha`, `conclusion`)](https://docs.github.com/en/rest/actions/workflow-runs#get-a-workflow-run)
 * [GitHub REST — git references and tag objects](https://docs.github.com/en/rest/git/refs) · [tags](https://docs.github.com/en/rest/git/tags)
 * [GitHub — security hardening for GitHub Actions (pinning to a full-length commit SHA, untrusted input)](https://docs.github.com/en/actions/security-for-github-actions/security-guides/security-hardening-for-github-actions)
+* [global.json overview (`version`, `rollForward`, `allowPrerelease`)](https://learn.microsoft.com/en-us/dotnet/core/tools/global-json)
+* [actions/setup-dotnet — `global-json-file`](https://github.com/actions/setup-dotnet)
+* [.NET release notes (SDK and runtime per servicing release)](https://github.com/dotnet/core/tree/main/release-notes) · [.NET support policy](https://dotnet.microsoft.com/platform/support/policy/dotnet-core)
 * [.NET SDK MSBuild properties — `ContinuousIntegrationBuild`](https://learn.microsoft.com/en-us/dotnet/core/project-sdk/msbuild-props#continuousintegrationbuild)
 * [C# compiler options — `Deterministic`, `PathMap`](https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/compiler-options/code-generation)
 * [dotnet/sourcelink — deterministic builds and `ContinuousIntegrationBuild`](https://github.com/dotnet/sourcelink/blob/main/docs/README.md)

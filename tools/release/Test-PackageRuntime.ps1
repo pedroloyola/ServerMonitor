@@ -5,24 +5,66 @@
 
 .DESCRIPTION
     Each case mutates exactly one property of an otherwise valid synthetic self-contained package;
-    the baseline case asserts the unmutated one is accepted. The synthetic runtime files are
-    placeholders: the check reads their presence and the two JSON files, never their contents.
+    the baseline case asserts the unmutated one is accepted. coreclr and clrjit are placeholders (the
+    check reads only their presence). The four runtime files whose version the check reads (hostfxr,
+    hostpolicy, System.Private.CoreLib, System.Runtime) are real, tiny PE files compiled here with a
+    Win32 version resource whose ProductVersion has the shape the real runtime files carry
+    ("10.0.13 @Commit: <sha>", "10.0.13-servicing.<build>+<sha>", "10.0.13+<sha>").
+
+    Every case uses its own synthetic runtime floor file (default 10.0.13), never the tracked one.
 
     Nothing here touches a real package, a real install, the network or Partner Center.
 #>
 [CmdletBinding()]
-param()
+param([string] $CheckScript = (Join-Path $PSScriptRoot 'Assert-PackageRuntime.ps1'))
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.IO.Compression.FileSystem
+# Roslyn ships with PowerShell 7 (Add-Type uses it); loaded explicitly to emit the version resources.
+Add-Type -Path (Join-Path $PSHOME 'Microsoft.CodeAnalysis.CSharp.dll')
 
-$checkScript = Join-Path $PSScriptRoot 'Assert-PackageRuntime.ps1'
-if (-not (Test-Path -LiteralPath $checkScript)) { throw "Cannot find $checkScript" }
+if (-not (Test-Path -LiteralPath $CheckScript -PathType Leaf)) { throw "Cannot find $CheckScript" }
+$checkScript = $CheckScript
 
-$Version = '10.0.11'
+$Version = '10.0.13'
+$Floor = '10.0.13'
 $RuntimeFiles = @('hostfxr.dll', 'hostpolicy.dll', 'coreclr.dll', 'clrjit.dll', 'System.Private.CoreLib.dll', 'System.Runtime.dll')
+$VersionedRuntimeFiles = @('hostfxr.dll', 'hostpolicy.dll', 'System.Private.CoreLib.dll', 'System.Runtime.dll')
 $Executables = @('ServerMonitor.App', 'ServerAlyzer.WidgetProvider')
+
+# A minimal PE (an empty class library) with a Win32 version resource: FileVersionInfo reads its
+# ProductVersion exactly as it reads the real runtime files'. Cached per version string.
+$script:peCache = @{}
+function New-VersionedPe([Parameter(Mandatory)] [string] $ProductVersion) {
+    if ($script:peCache.ContainsKey($ProductVersion)) { return ,$script:peCache[$ProductVersion] }
+    $escaped = $ProductVersion.Replace('\', '\\').Replace('"', '\"')
+    $source = "[assembly: System.Reflection.AssemblyInformationalVersion(`"$escaped`")] [assembly: System.Reflection.AssemblyFileVersion(`"10.0.1.1`")]"
+    $tree = [Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree]::ParseText($source)
+    $reference = [Microsoft.CodeAnalysis.MetadataReference]::CreateFromFile([object].Assembly.Location)
+    $options = [Microsoft.CodeAnalysis.CSharp.CSharpCompilationOptions]::new([Microsoft.CodeAnalysis.OutputKind]::DynamicallyLinkedLibrary)
+    $compilation = [Microsoft.CodeAnalysis.CSharp.CSharpCompilation]::Create(
+        'SyntheticRuntimeFile', [Microsoft.CodeAnalysis.SyntaxTree[]] @($tree), [Microsoft.CodeAnalysis.MetadataReference[]] @($reference), $options)
+    $resources = $compilation.CreateDefaultWin32Resources($true, $true, $null, $null)
+    $stream = New-Object System.IO.MemoryStream
+    $result = $compilation.Emit($stream, $null, $null, $resources)
+    if (-not $result.Success) { throw "Could not compile the synthetic runtime file for '$ProductVersion'." }
+    $script:peCache[$ProductVersion] = $stream.ToArray()
+    return ,$script:peCache[$ProductVersion]
+}
+
+# The ProductVersion shapes the real .NET 10.0.13 runtime files carry (VERIFIED on the runtime files).
+function Get-RuntimeFileVersionString([string] $File, [string] $Version) {
+    switch ($File) {
+        'System.Private.CoreLib.dll' { return "$Version-servicing.26504.104+4099f83977f4d29604a9aeb971fb0a7bc1d5f699" }
+        'System.Runtime.dll' { return "$Version+4099f83977f4d29604a9aeb971fb0a7bc1d5f699" }
+        default { return "$Version @Commit: 4099f83977f4d29604a9aeb971fb0a7bc1d5f699" }
+    }
+}
+
+function Set-RuntimeFileVersion($Entries, [string] $Version, [string] $Prefix = '') {
+    foreach ($file in $VersionedRuntimeFiles) { $Entries["$Prefix$file"] = New-VersionedPe (Get-RuntimeFileVersionString $file $Version) }
+}
 
 function New-RuntimeConfig {
     param([string] $Version = $script:Version, [switch] $FrameworkDependent, [switch] $Both)
@@ -71,6 +113,7 @@ function Get-DefaultEntries {
         $entries["$exe.deps.json"] = (New-Deps -Exe $exe)
     }
     foreach ($file in $RuntimeFiles) { $entries[$file] = 'MZ' }
+    Set-RuntimeFileVersion $entries $Version
     return $entries
 }
 
@@ -83,7 +126,7 @@ function New-SyntheticPackage {
             if ($null -eq $Entries[$name]) { continue }
             $stream = $archive.CreateEntry($name).Open()
             try {
-                $bytes = [System.Text.Encoding]::UTF8.GetBytes([string] $Entries[$name])
+                $bytes = if ($Entries[$name] -is [byte[]]) { $Entries[$name] } else { [System.Text.Encoding]::UTF8.GetBytes([string] $Entries[$name]) }
                 $stream.Write($bytes, 0, $bytes.Length)
             }
             finally { $stream.Dispose() }
@@ -101,25 +144,39 @@ function Invoke-Case {
         [Parameter(Mandatory)] [string] $Name,
         [Parameter(Mandatory)] [scriptblock] $Mutate,
         [Parameter(Mandatory)] [ValidateSet('pass', 'fail')] [string] $Expected,
-        [string] $ExpectedMessagePattern
+        [string] $ExpectedMessagePattern,
+        # Content of this case's runtime floor file.
+        [AllowEmptyString()] [string] $FloorContent = "# synthetic floor`n$script:Floor",
+        [switch] $NoFloorFile,
+        # For a 'pass' case: the runtime version -PassThru must report.
+        [string] $ExpectedRuntime = $script:Version
     )
 
     $entries = Get-DefaultEntries
     & $Mutate $entries
     $packagePath = Join-Path $workDir ("$([guid]::NewGuid().ToString('n')).msix")
     New-SyntheticPackage -Path $packagePath -Entries $entries
+    $floorPath = Join-Path $workDir ("$([guid]::NewGuid().ToString('n')).floor.txt")
+    if (-not $NoFloorFile) { [System.IO.File]::WriteAllText($floorPath, $FloorContent) }
 
-    $outcome = 'pass'; $message = ''
-    try { & $checkScript -PackagePath $packagePath *> $null }
+    $outcome = 'pass'; $message = ''; $reported = $null
+    try { $reported = & $checkScript -PackagePath $packagePath -RuntimeFloorPath $floorPath -PassThru 6> $null }
     catch { $outcome = 'fail'; $message = $_.Exception.Message }
 
     $verdict = if ($outcome -eq $Expected) { 'OK' } else { 'TEST ERROR' }
-    if ($verdict -eq 'OK' -and $Expected -eq 'fail' -and $ExpectedMessagePattern -and $message -notmatch $ExpectedMessagePattern) {
-        $verdict = 'TEST ERROR'
-        $message = "rejected, but for the wrong reason: $message"
+    if ($verdict -eq 'OK' -and $Expected -eq 'fail') {
+        # A rejection only counts for the reason the case is about.
+        if (-not $ExpectedMessagePattern) { $verdict = 'TEST ERROR'; $message = "case has no expected reason: $message" }
+        elseif ($message -notmatch $ExpectedMessagePattern) { $verdict = 'TEST ERROR'; $message = "rejected, but for the wrong reason: $message" }
+    }
+    if ($verdict -eq 'OK' -and $Expected -eq 'pass') {
+        $runtime = @($reported | Where-Object { $null -ne $_ -and $_.PSObject.Properties['RuntimeVersion'] })
+        if ($runtime.Count -ne 1 -or $runtime[0].RuntimeVersion -cne $ExpectedRuntime) {
+            $verdict = 'TEST ERROR'; $message = "accepted, but -PassThru did not report runtime $ExpectedRuntime"
+        }
     }
     $results.Add([pscustomobject] @{ Case = $Name; Expected = $Expected; Actual = $outcome; Verdict = $verdict; Detail = $message }) | Out-Null
-    Remove-Item -LiteralPath $packagePath -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $packagePath, $floorPath -Force -ErrorAction SilentlyContinue
 }
 
 try {
@@ -163,13 +220,68 @@ try {
     }
 
     Invoke-Case -Name 'deps.json and runtimeconfig.json disagree' -Expected 'fail' -ExpectedMessagePattern 'differs from runtimeconfig' -Mutate {
-        param($e) $e['ServerMonitor.App.deps.json'] = (New-Deps -Version '10.0.12')
+        param($e) $e['ServerMonitor.App.deps.json'] = (New-Deps -Version '10.0.14')
     }
 
     Invoke-Case -Name 'app and provider built against different runtimes' -Expected 'fail' -ExpectedMessagePattern 'different \.NET runtimes' -Mutate {
         param($e)
+        $e['ServerAlyzer.WidgetProvider.runtimeconfig.json'] = (New-RuntimeConfig -Version '10.0.14')
+        $e['ServerAlyzer.WidgetProvider.deps.json'] = (New-Deps -Exe 'ServerAlyzer.WidgetProvider' -Version '10.0.14')
+    }
+
+    # ------------------------------------------------------------- servicing floor (REL.0D)
+    function Set-WholeRuntime($e, [string] $v) {
+        foreach ($exe in $Executables) {
+            $e["$exe.runtimeconfig.json"] = (New-RuntimeConfig -Version $v)
+            $e["$exe.deps.json"] = (New-Deps -Exe $exe -Version $v)
+        }
+        Set-RuntimeFileVersion $e $v
+    }
+
+    Invoke-Case -Name 'floor: newer patch accepted' -Expected 'pass' -ExpectedRuntime '10.0.14' -Mutate { param($e) Set-WholeRuntime $e '10.0.14' }
+    Invoke-Case -Name 'floor: newer minor/major accepted' -Expected 'pass' -ExpectedRuntime '11.0.0' -Mutate { param($e) Set-WholeRuntime $e '11.0.0' }
+    Invoke-Case -Name 'floor: numeric, not text (10.0.13 >= 10.0.9)' -Expected 'pass' -FloorContent '10.0.9' -Mutate { param($e) }
+
+    Invoke-Case -Name 'floor: whole runtime one patch below (10.0.12)' -Expected 'fail' -ExpectedMessagePattern 'ServerMonitor\.App\.exe: bundled Microsoft\.NETCore\.App 10\.0\.12 is below the tracked runtime floor 10\.0\.13' -Mutate {
+        param($e) Set-WholeRuntime $e '10.0.12'
+    }
+    Invoke-Case -Name 'floor: numeric, not text (10.0.2 < 10.0.13)' -Expected 'fail' -ExpectedMessagePattern 'bundled Microsoft\.NETCore\.App 10\.0\.2 is below the tracked runtime floor 10\.0\.13' -Mutate {
+        param($e) Set-WholeRuntime $e '10.0.2'
+    }
+    Invoke-Case -Name 'floor: older major above the floor patch (9.0.20)' -Expected 'fail' -ExpectedMessagePattern 'bundled Microsoft\.NETCore\.App 9\.0\.20 is below the tracked runtime floor' -Mutate {
+        param($e) Set-WholeRuntime $e '9.0.20'
+    }
+    Invoke-Case -Name 'floor: only the widget provider below' -Expected 'fail' -ExpectedMessagePattern 'ServerAlyzer\.WidgetProvider\.exe: bundled Microsoft\.NETCore\.App 10\.0\.12 is below' -Mutate {
+        param($e)
         $e['ServerAlyzer.WidgetProvider.runtimeconfig.json'] = (New-RuntimeConfig -Version '10.0.12')
         $e['ServerAlyzer.WidgetProvider.deps.json'] = (New-Deps -Exe 'ServerAlyzer.WidgetProvider' -Version '10.0.12')
+    }
+
+    foreach ($bad in @('10.0.13-rc.1', '10.0', '10.0.13.0', ' 10.0.13', '10.0.013', 'v10.0.13')) {
+        Invoke-Case -Name "runtime version not canonical [$bad]" -Expected 'fail' -ExpectedMessagePattern 'version is not a canonical MAJOR\.MINOR\.PATCH release' -Mutate (
+            [scriptblock]::Create("param(`$e) `$e['ServerMonitor.App.runtimeconfig.json'] = (New-RuntimeConfig -Version '$bad')"))
+    }
+
+    foreach ($badFloor in @('', '# comment only', "10.0.13`n10.0.14", 'broken', '10.0', '10.0.13.0', ' 10.0.13', '10.0.013', '10.0.13-rc.1')) {
+        Invoke-Case -Name "invalid floor [$($badFloor -replace "`n", '\n')]" -Expected 'fail' -FloorContent $badFloor -ExpectedMessagePattern '^Runtime floor: ' -Mutate { param($e) }
+    }
+    Invoke-Case -Name 'missing floor file' -Expected 'fail' -NoFloorFile -ExpectedMessagePattern '^Runtime floor: .*missing' -Mutate { param($e) }
+
+    # ------------------------------------------------- the payload is the runtime the JSON names
+    foreach ($file in $VersionedRuntimeFiles) {
+        Invoke-Case -Name "runtime file older than the JSON: $file" -Expected 'fail' -ExpectedMessagePattern ("runtime file $([regex]::Escape($file)) in the package root reports runtime 10\.0\.12, but the executables declare Microsoft\.NETCore\.App 10\.0\.13") -Mutate (
+            [scriptblock]::Create("param(`$e) `$e['$file'] = New-VersionedPe (Get-RuntimeFileVersionString '$file' '10.0.12')"))
+        Invoke-Case -Name "runtime file without a version resource: $file" -Expected 'fail' -ExpectedMessagePattern ("runtime file $([regex]::Escape($file)) in the package root reports no runtime version") -Mutate (
+            [scriptblock]::Create("param(`$e) `$e['$file'] = 'MZ'"))
+    }
+    Invoke-Case -Name 'runtime file version only shares a prefix (10.0.130)' -Expected 'fail' -ExpectedMessagePattern 'System\.Runtime\.dll in the package root reports runtime 10\.0\.130' -Mutate {
+        param($e) $e['System.Runtime.dll'] = New-VersionedPe '10.0.130+4099f83977f4d29604a9aeb971fb0a7bc1d5f699'
+    }
+    Invoke-Case -Name 'runtime file version with a fourth part (10.0.13.5)' -Expected 'fail' -ExpectedMessagePattern 'System\.Runtime\.dll in the package root reports no runtime version' -Mutate {
+        param($e) $e['System.Runtime.dll'] = New-VersionedPe '10.0.13.5'
+    }
+    Invoke-Case -Name 'JSON rewritten to a newer runtime over an old payload' -Expected 'fail' -ExpectedMessagePattern 'reports runtime 10\.0\.12, but the executables declare Microsoft\.NETCore\.App 10\.0\.13' -Mutate {
+        param($e) Set-RuntimeFileVersion $e '10.0.12'
     }
 
     foreach ($file in $RuntimeFiles) {

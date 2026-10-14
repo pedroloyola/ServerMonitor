@@ -88,10 +88,10 @@ jobs:
           PACKAGE_VERSION: ${{ steps.tagcheck.outputs.packageVersion }}
         run: ./tools/release/Assert-PackageVersionFloor.ps1 -PackageVersion $env:PACKAGE_VERSION
 
-      - name: Setup .NET 10 SDK
+      - name: Setup .NET SDK (exact version from global.json)
         uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
         with:
-          dotnet-version: '10.0.x'
+          global-json-file: global.json
 
       - name: Restore
         run: dotnet restore ServerMonitor.slnx
@@ -132,6 +132,9 @@ jobs:
           ./tools/release/Assert-NoPendingSubmission.ps1 -SelfTest
           ./tools/release/Test-ReleaseChecks.ps1
           ./tools/release/Test-PackageRuntime.ps1
+          ./tools/release/Test-PackageTrace.ps1
+          ./tools/release/Test-RuntimeServicing.ps1 -SelfTest
+          ./tools/release/Test-PackageResources.ps1
           ./tools/release/Test-DistributionPrivacy.ps1
           ./tools/release/Test-StoreSubmissionUpdate.ps1
           ./tools/release/Get-SubmissionState.ps1 -SelfTest
@@ -196,6 +199,33 @@ jobs:
           if ($env:PACKAGE_NAME -cnotmatch '\A[A-Za-z0-9._-]+\.msix\z') { throw 'Invalid package file name.' }
           ./tools/release/Assert-PackageRuntime.ps1 `
             -PackagePath "artifacts/release/${env:PACKAGE_NAME}"
+
+      # The package's default (fallback) language is en-US and every ms-resource: string of the manifest
+      # (AppDescription first) resolves in en-US, pt-PT and pt-BR, read from resources.pri with makepri.
+      # No makepri fails the step; it never skips.
+      - name: Package resources (en-US default, manifest strings in en-US/pt-PT/pt-BR)
+        shell: pwsh
+        env:
+          PACKAGE_NAME: ${{ steps.collect.outputs.packageName }}
+        run: |
+          if ($env:PACKAGE_NAME -cnotmatch '\A[A-Za-z0-9._-]+\.msix\z') { throw 'Invalid package file name.' }
+          ./tools/release/Assert-PackageResources.ps1 `
+            -PackagePath "artifacts/release/${env:PACKAGE_NAME}"
+
+      # REL.0D servicing traceability: commit, SDK (must be the one global.json pins), bundled .NET
+      # runtime (re-proven from the package, floor included), Windows App Runtime dependency and SHA-256,
+      # as <package>.build.json next to the package (it travels with the artifact and is checked by the
+      # privacy gate below) and in the job summary. No path, no secret.
+      - name: Package build record
+        shell: pwsh
+        env:
+          PACKAGE_NAME: ${{ steps.collect.outputs.packageName }}
+        run: |
+          if ($env:PACKAGE_NAME -cnotmatch '\A[A-Za-z0-9._-]+\.msix\z') { throw 'Invalid package file name.' }
+          ./tools/release/Write-PackageTrace.ps1 `
+            -PackagePath "artifacts/release/${env:PACKAGE_NAME}" `
+            -SummaryPath $env:GITHUB_STEP_SUMMARY | Out-Null
+          Get-Content -LiteralPath "artifacts/release/${env:PACKAGE_NAME}.build.json"
 
       # PRIV-PDBPATH: nothing that leaves this job may carry an absolute development path (user
       # profile, checkout, runner workspace) in a PE debug entry, PDB, string or file. It inspects

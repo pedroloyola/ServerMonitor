@@ -102,13 +102,12 @@
     "file": "Microsoft.DiaSymReader.Native.amd64.dll",
     "tokens": [
       "0825ef2ab9f0",
-      "2b48e2a208c6",
       "95b4566984e3"
     ],
     "categories": [
       "ci-runner-root"
     ],
-    "reason": "Microsoft.NETCore.App.Runtime.win-x64 (REL.0C self-contained .NET runtime): native PDB reader shipped in the runtime pack (one token carries the build of each patch; 10.0.11, 10.0.12 and 10.0.13 reviewed). Paths of the Microsoft build agent; bound to the matched paths, which are identical across runtime patches 10.0.11-10.0.13."
+    "reason": "Microsoft.NETCore.App.Runtime.win-x64 (REL.0C self-contained .NET runtime): native PDB reader shipped in the runtime pack (10.0.12 and 10.0.13 carry these two tokens; the 10.0.11-only token was pruned when the runtime floor reached 10.0.13). Paths of the Microsoft build agent; bound to the matched paths, which are identical across runtime patches 10.0.11-10.0.13."
   },
   {
     "file": "Microsoft.Graphics.Imaging.Projection.dll",
@@ -447,36 +446,6 @@
       "ci-runner-root"
     ],
     "reason": "Windows App SDK 2.3.1 NuGet payload: CodeView path of the Microsoft build agent."
-  },
-  {
-    "file": "mscordaccore_amd64_amd64_10.0.1126.37416.dll",
-    "tokens": [
-      "8246af46fce6",
-      "869fa6a41045",
-      "c17ce1f591e9",
-      "d78bcf3519e0",
-      "ee275552a43a",
-      "feb10995cd1d"
-    ],
-    "categories": [
-      "ci-runner-root"
-    ],
-    "reason": "Microsoft.NETCore.App.Runtime.win-x64 (REL.0C self-contained .NET runtime): CoreCLR data access component, versioned copy for debuggers (Microsoft.NETCore.App 10.0.11); its name changes with every runtime patch. Paths of the Microsoft build agent; bound to the matched paths, which are identical across runtime patches 10.0.11-10.0.13."
-  },
-  {
-    "file": "mscordaccore_amd64_amd64_10.0.1226.42308.dll",
-    "tokens": [
-      "8246af46fce6",
-      "869fa6a41045",
-      "c17ce1f591e9",
-      "d78bcf3519e0",
-      "ee275552a43a",
-      "feb10995cd1d"
-    ],
-    "categories": [
-      "ci-runner-root"
-    ],
-    "reason": "Microsoft.NETCore.App.Runtime.win-x64 (REL.0C self-contained .NET runtime): CoreCLR data access component, versioned copy for debuggers (Microsoft.NETCore.App 10.0.12); its name changes with every runtime patch. Paths of the Microsoft build agent; bound to the matched paths, which are identical across runtime patches 10.0.11-10.0.13."
   },
   {
     "file": "mscordaccore_amd64_amd64_10.0.1326.50504.dll",
