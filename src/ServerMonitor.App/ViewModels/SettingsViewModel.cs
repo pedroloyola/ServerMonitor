@@ -285,8 +285,25 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
     /// can land on the right section, and a request nobody consumes is the same class of defect as a
     /// RefreshAll nobody calls.
     /// </summary>
-    public void NotifyNavigatedTo() =>
+    public void NotifyNavigatedTo()
+    {
         IsBackgroundSectionRequested = _navigationService.ConsumeBackgroundSettingsFocus();
+        RefreshLanguageIndex();
+    }
+
+    /// <summary>
+    /// REL.0D: the language can now also change outside this page (the Overview's one-time language hint), and this view
+    /// model is a singleton: each visit shows the choice in effect. Display only - nothing is written, no restart notice.
+    /// </summary>
+    private void RefreshLanguageIndex()
+    {
+        var current = LanguageIndexOf(_localizationService);
+        if (current != _selectedLanguageIndex)
+        {
+            _selectedLanguageIndex = current;
+            OnPropertyChanged(nameof(SelectedLanguageIndex));
+        }
+    }
 
     private bool _isAboutSectionRequested;
 

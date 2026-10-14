@@ -71,8 +71,34 @@ public sealed class JsonLanguageSettingsStoreTests : IDisposable
     [InlineData("""{"schemaVersion":1,"followSystem":false,"autoOverride":"en-US"}""")] // explicit cannot carry one
     public void AnythingNotExactlyUnderstood_IsUnreadable(string content)
     {
+        WriteRaw(content);
+
+        Assert.Equal(LanguageRecordRead.Unreadable, Store().Read());
+    }
+
+    /// <summary>
+    /// The positive control for the theory above (K10): the same hand-written shape with the CURRENT schema reads as
+    /// valid, so each Unreadable case fails for its own reason - not because of how the test wrote the file.
+    /// </summary>
+    [Theory]
+    [InlineData("""{"schemaVersion":1,"followSystem":true,"autoOverride":"en-US"}""", true, "en-US")]
+    [InlineData("""{"schemaVersion":1,"followSystem":true,"autoOverride":""}""", true, "")]
+    [InlineData("""{"schemaVersion":1,"followSystem":false}""", false, null)]
+    [InlineData("""{"schemaVersion":1,"followSystem":false,"autoOverride":null}""", false, null)]
+    public void AHandWrittenRecordOfTheCurrentSchema_IsRead(string content, bool followSystem, string? autoOverride)
+    {
+        WriteRaw(content);
+
+        var expected = followSystem ? LanguageProvenance.System(autoOverride!) : LanguageProvenance.Explicit;
+        Assert.Equal(LanguageRecordRead.Of(expected), Store().Read());
+    }
+
+    /// <summary>The app never writes a BOM; a file saved with one (e.g. by an editor) proves nothing and is Unreadable.</summary>
+    [Fact]
+    public void AFileWithAByteOrderMark_IsUnreadable()
+    {
         Directory.CreateDirectory(_directory);
-        File.WriteAllText(FilePath, content, Encoding.UTF8);
+        File.WriteAllText(FilePath, """{"schemaVersion":1,"followSystem":false}""", new UTF8Encoding(encoderShouldEmitUTF8Identifier: true));
 
         Assert.Equal(LanguageRecordRead.Unreadable, Store().Read());
     }
@@ -119,14 +145,11 @@ public sealed class JsonLanguageSettingsStoreTests : IDisposable
         }
     }
 
-    [Fact]
-    public void TheProductionPath_IsNextToTheOtherSettingsFiles()
+    /// <summary>Exactly these bytes (UTF-8, no byte order mark), as the app itself writes them.</summary>
+    private void WriteRaw(string content)
     {
-        var language = LanguageSettingsStorageOptions.ForCurrentUser().FilePath;
-        var notification = NotificationSettingsStorageOptions.ForCurrentUser().FilePath;
-
-        Assert.Equal(Path.GetDirectoryName(notification), Path.GetDirectoryName(language));
-        Assert.Equal("language-settings.json", Path.GetFileName(language));
+        Directory.CreateDirectory(_directory);
+        File.WriteAllBytes(FilePath, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false).GetBytes(content));
     }
 
     private JsonLanguageSettingsStore Store() =>

@@ -135,6 +135,24 @@ public sealed partial class DashboardPage : Page
 
     private void FocusContent() => ShellPageFocus.FocusHeading(this);
 
+    // REL.0D: the language hint disappears once its decision is saved; focus returns to the page heading (top of the page,
+    // where the restart notice now shows) instead of jumping down the page. A failed save keeps the hint and the focus.
+    private void OnLanguageHintActionClick(object sender, RoutedEventArgs e)
+    {
+        var source = (Control)sender;
+        // Low: after the layout pass that collapses the hint (and moves the stray focus), not before it.
+        source.DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+        {
+            if (!LanguageHint.IsOpen)
+            {
+                // The collapsing button already handed focus further down (and the viewport followed it): bring the top
+                // back first - focusing the heading alone does not scroll it into view.
+                ShellPageFocus.FindHeading(this)?.StartBringIntoView();
+                ShellPageFocus.FocusHeading(this, force: true);
+            }
+        });
+    }
+
     // "Limpar pesquisa" disappears once it worked; focus returns to the search box (UI.3 pattern).
     private void OnClearSearchClick(object sender, RoutedEventArgs e) => FocusAfterAction.MoveTo((Control)sender, OverviewSearchBox);
 }

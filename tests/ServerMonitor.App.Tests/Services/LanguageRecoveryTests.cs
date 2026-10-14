@@ -167,6 +167,27 @@ public sealed class LanguageRecoveryTests : IDisposable
         Assert.Empty(store.Writes);
     }
 
+    /// <summary>
+    /// K3: a downgrade to v1.1.x leaves the record but lets the user pick another language there; back on this version that
+    /// override differs from the recorded one, so it is the user's choice and never follows Windows.
+    /// </summary>
+    [Theory]
+    [InlineData("pt-PT", "en-US", "fr-FR")]
+    [InlineData("pt-BR", "en-US", "pt-AO")]
+    [InlineData("en-US", "pt-PT", "pt-MZ")]
+    public void A4_AnOverrideThatDiffersFromTheRecord_IsTheUsersChoice(string persisted, string recorded, string systemCulture)
+    {
+        var platform = new FakeUiLanguagePlatform(systemCulture, persisted);
+        var store = FakeLanguageSettingsStore.Following(recorded);
+        var service = Service(platform, store);
+
+        service.InitializeFromSystem();
+
+        Assert.Empty(platform.Writes);
+        Assert.Empty(store.Writes);
+        Assert.False(service.FollowsSystemLanguage);
+    }
+
     // ---- A5: corrupt provenance proves nothing -----------------------------------------------------------------------
 
     [Theory]
@@ -292,8 +313,13 @@ public sealed class LanguageRecoveryTests : IDisposable
         var store = Assert.Single(descriptors, d => d.ServiceType == typeof(ILanguageSettingsStore));
         Assert.Equal(typeof(JsonLanguageSettingsStore), store.ImplementationType);
         Assert.Equal(ServiceLifetime.Singleton, store.Lifetime);
-        var options = Assert.Single(descriptors, d => d.ServiceType == typeof(LanguageSettingsStorageOptions));
-        Assert.Equal(LanguageSettingsStorageOptions.ForCurrentUser(), options.ImplementationInstance);
+        // The production path, read from the root's own registration (never constructed here): next to the other settings.
+        var language = Assert.IsType<LanguageSettingsStorageOptions>(
+            Assert.Single(descriptors, d => d.ServiceType == typeof(LanguageSettingsStorageOptions)).ImplementationInstance).FilePath;
+        var notification = Assert.IsType<NotificationSettingsStorageOptions>(
+            Assert.Single(descriptors, d => d.ServiceType == typeof(NotificationSettingsStorageOptions)).ImplementationInstance).FilePath;
+        Assert.Equal("language-settings.json", Path.GetFileName(language));
+        Assert.Equal(Path.GetDirectoryName(notification), Path.GetDirectoryName(language));
         var hint = Assert.Single(descriptors, d => d.ServiceType == typeof(LanguageRecoveryHintViewModel));
         Assert.Equal(ServiceLifetime.Singleton, hint.Lifetime);
         Assert.Contains(

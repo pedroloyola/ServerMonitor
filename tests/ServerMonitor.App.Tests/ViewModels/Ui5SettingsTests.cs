@@ -147,6 +147,35 @@ public sealed class Ui5SettingsTests
         Assert.Equal(2, raised.Count(name => name == nameof(SettingsViewModel.SelectedLanguageIndex)));
     }
 
+    /// <summary>
+    /// REL.0D (visual QA finding): Settings is a singleton, so a language decided on the Overview hint after Settings was
+    /// first opened must show on the next visit - display only, no write, no restart notice.
+    /// </summary>
+    [Fact]
+    public void ADecisionTakenElsewhere_IsShownOnTheNextVisit_WithoutWritingAgain()
+    {
+        var platform = new FakeUiLanguagePlatform("fr-FR", "pt-BR");
+        var store = new FakeLanguageSettingsStore();
+        var service = RealLocalization(platform, store);
+        var world = new World(localization: service);
+        Assert.Equal(1, world.ViewModel.SelectedLanguageIndex);
+        var raised = new List<string?>();
+        world.ViewModel.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        Assert.True(service.TrySetLanguage(null)); // the hint's "Use the system language"
+        world.ViewModel.NotifyNavigatedTo();
+
+        Assert.Equal(0, world.ViewModel.SelectedLanguageIndex);
+        Assert.Contains(nameof(SettingsViewModel.SelectedLanguageIndex), raised);
+        Assert.False(world.ViewModel.IsRestartNoticeOpen);
+        Assert.Equal(["en-US"], platform.Writes);
+        Assert.Single(store.Writes);
+
+        raised.Clear();
+        world.ViewModel.NotifyNavigatedTo(); // nothing changed since: no notification
+        Assert.DoesNotContain(nameof(SettingsViewModel.SelectedLanguageIndex), raised);
+    }
+
     private static LocalizationService RealLocalization(FakeUiLanguagePlatform platform, FakeLanguageSettingsStore store) =>
         new(NullLogger<LocalizationService>.Instance, platform, store);
 
