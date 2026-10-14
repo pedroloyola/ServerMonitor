@@ -102,6 +102,32 @@ public sealed class AppFormattingCultureTests
         Assert.Equal(CultureInfo.CurrentUICulture.Name, HistoryPresentation.FormatCulture(service.FormattingCultureName).Name);
     }
 
+    /// <summary>
+    /// Cortex N-2 (round 2): the formatting decision is the process's, like the text - a language picked in Settings
+    /// (or "Use system language") in the same session changes it only after the restart, so History never switches
+    /// format mid-session while every other screen keeps the applied culture.
+    /// </summary>
+    [Theory]
+    [InlineData("en-GB", null)]
+    [InlineData("fr-FR", "en-US")]
+    [InlineData("pt-BR", null)]
+    public void TheFormattingDecision_StaysForTheProcess_AfterALanguageChange(string windows, string? decided)
+    {
+        var platform = new FakeUiLanguagePlatform(windows);
+        var store = new FakeLanguageSettingsStore();
+        var service = new LocalizationService(NullLogger<LocalizationService>.Instance, platform, store);
+        service.InitializeFromSystem();
+        Assert.Equal(decided, service.FormattingCultureName);
+
+        Assert.True(service.TrySetLanguage("pt-PT"));
+        Assert.Equal(decided, service.FormattingCultureName);
+        // The next launch (a new service over the same preferences) decides again: the explicit pt-PT.
+        Assert.Equal("pt-PT", new LocalizationService(NullLogger<LocalizationService>.Instance, platform, store).FormattingCultureName);
+
+        Assert.True(service.TrySetLanguage(null));
+        Assert.Equal(decided, service.FormattingCultureName);
+    }
+
     /// <summary>Cortex L-1: History reads the service's formatting decision, never the raw override.</summary>
     [Fact]
     public void History_FormatsWithTheServicesFormattingDecision()

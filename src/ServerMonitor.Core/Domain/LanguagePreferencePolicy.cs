@@ -142,6 +142,9 @@ public static class LanguagePreferencePolicy
     /// language changes only the resources. Any other override - the user's choice, or the default for a language the app
     /// does not have (fr-FR → en-US) - formats in the override, like the text. As in #55, only a valid record of this
     /// identity makes an override the app's own: a legacy, unreadable or foreign record leaves it the user's choice.
+    /// That never turns a regional variant's format into en-US in the field: v1.0.0-v1.1.1 auto-wrote only
+    /// <c>pt-BR</c> (their <c>SupportedCultures.Default</c>), so an override without a record is either that legacy pt-BR
+    /// (formats like its text; the #55 hint offers the way back) or a language the user picked in Settings.
     /// </summary>
     public static string? FormattingCulture(string? persistedOverride, string? systemCulture, LanguageRecordRead record)
     {
