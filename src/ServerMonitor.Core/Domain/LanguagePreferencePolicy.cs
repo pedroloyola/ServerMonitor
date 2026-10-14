@@ -135,6 +135,38 @@ public static class LanguagePreferencePolicy
         return Same(effective, SupportedCultures.BrazilianPortuguese) ? null : effective;
     }
 
+    /// <summary>
+    /// REL.0E (PR #57 fix round 1, Cortex M-1): the culture numbers and dates format in, or null to keep the Windows UI
+    /// culture. Microsoft's model: a user language that is a regional variant of the app language keeps its own format
+    /// (en-GB user, en-US resources → en-GB dates), so an override the app wrote for the system language in the SAME base
+    /// language changes only the resources. Any other override - the user's choice, or the default for a language the app
+    /// does not have (fr-FR → en-US) - formats in the override, like the text. As in #55, only a valid record of this
+    /// identity makes an override the app's own: a legacy, unreadable or foreign record leaves it the user's choice.
+    /// That never turns a regional variant's format into en-US in the field: v1.0.0-v1.1.1 auto-wrote only
+    /// <c>pt-BR</c> (their <c>SupportedCultures.Default</c>), so an override without a record is either that legacy pt-BR
+    /// (formats like its text; the #55 hint offers the way back) or a language the user picked in Settings.
+    /// </summary>
+    public static string? FormattingCulture(string? persistedOverride, string? systemCulture, LanguageRecordRead record)
+    {
+        ArgumentNullException.ThrowIfNull(record);
+        if (string.IsNullOrWhiteSpace(persistedOverride)
+            || (IsAppWritten(persistedOverride, record) && SameLanguage(persistedOverride, systemCulture)))
+        {
+            return null;
+        }
+
+        return persistedOverride;
+    }
+
+    private static bool SameLanguage(string left, string? right)
+    {
+        var language = LanguageSubtag(left);
+        return language.Length > 0 && string.Equals(language, LanguageSubtag(right), StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string LanguageSubtag(string? cultureName) =>
+        (cultureName ?? string.Empty).Split(['-', '_'], StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? string.Empty;
+
     private static bool IsAppWritten(string? persistedOverride, LanguageRecordRead record) =>
         record is { State: LanguageRecordState.Valid, Record: { FollowSystem: true, AutoOverride: { } written } }
         && Same(persistedOverride, written);

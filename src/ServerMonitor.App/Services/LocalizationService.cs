@@ -18,6 +18,7 @@ public sealed class LocalizationService : ILocalizationService
     private readonly IUiLanguagePlatform _platform;
     private readonly ILanguageSettingsStore _settings;
     private readonly Lazy<ResourceLoader> _resourceLoader = new(() => new ResourceLoader());
+    private readonly Lazy<string?> _formattingCulture;
 
     public LocalizationService(ILogger<LocalizationService> logger, ILanguageSettingsStore settings)
         : this(logger, new WindowsUiLanguagePlatform(), settings)
@@ -30,6 +31,8 @@ public sealed class LocalizationService : ILocalizationService
         _logger = logger;
         _platform = platform;
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
+        _formattingCulture = new(() =>
+            LanguagePreferencePolicy.FormattingCulture(CurrentLanguageOverride, _platform.SystemUiCultureName, _settings.Read()));
     }
 
     public string? CurrentLanguageOverride =>
@@ -42,6 +45,12 @@ public sealed class LocalizationService : ILocalizationService
 
     public string? PendingLegacyLanguageHint =>
         LanguagePreferencePolicy.LegacyHintTarget(CurrentLanguageOverride, _platform.SystemUiCultureName, _settings.Read());
+
+    /// <summary>
+    /// REL.0E: decided once, on first read - after <see cref="InitializeFromSystem"/> in the launch - and kept for the
+    /// process, like the text: a language picked in Settings applies after the restart.
+    /// </summary>
+    public string? FormattingCultureName => _formattingCulture.Value;
 
     public void InitializeFromSystem()
     {
@@ -128,15 +137,22 @@ public sealed class LocalizationService : ILocalizationService
         }
     }
 
-    /// <summary>The real platform: the Windows App SDK override and the current Windows UI culture.</summary>
-    private sealed class WindowsUiLanguagePlatform : IUiLanguagePlatform
+    /// <summary>
+    /// The real platform: the Windows App SDK override and the Windows UI culture.
+    /// REL.0E: the culture is read ONCE, when the platform is built (with the service, before
+    /// <see cref="AppFormattingCulture"/> points .NET's UI culture at the app language), so the recovery hint and
+    /// "Use system language" keep seeing Windows. .NET caches it per process anyway: nothing more recent was ever seen.
+    /// </summary>
+    internal sealed class WindowsUiLanguagePlatform : IUiLanguagePlatform
     {
+        private readonly string _systemUiCultureName = CultureInfo.CurrentUICulture.Name;
+
         public string? PrimaryLanguageOverride
         {
             get => ApplicationLanguages.PrimaryLanguageOverride;
             set => ApplicationLanguages.PrimaryLanguageOverride = value;
         }
 
-        public string SystemUiCultureName => CultureInfo.CurrentUICulture.Name;
+        public string SystemUiCultureName => _systemUiCultureName;
     }
 }

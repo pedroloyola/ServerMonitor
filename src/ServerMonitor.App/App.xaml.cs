@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
@@ -422,10 +423,17 @@ public partial class App : Application
     /// obtain its services without the startup language resolution (REL.0C). An invocable method for the same reason
     /// as <see cref="ConfigureApplicationServices"/>: the App constructor needs a XAML runtime, this does not, so a
     /// test runs it with its own composition.
+    /// <para>
+    /// REL.0E: the final UI language then becomes the process UI culture (<see cref="AppFormattingCulture"/>), so numbers
+    /// and dates format in the language of the text. <paramref name="applyUiCulture"/> is a test seam (null = the process
+    /// setter): the culture is process-wide, so a test that does not assert it records it instead of changing it under
+    /// the parallel suite.
+    /// </para>
     /// </summary>
-    internal static IHost BuildServicesHost(Action<IServiceCollection> configureServices)
+    internal static IHost BuildServicesHost(Action<IServiceCollection> configureServices, Action<CultureInfo>? applyUiCulture = null)
     {
         ArgumentNullException.ThrowIfNull(configureServices);
+        applyUiCulture ??= AppFormattingCulture.SetProcessUiCulture;
 
         var host = Microsoft.Extensions.Hosting.Host
             .CreateDefaultBuilder()
@@ -446,9 +454,12 @@ public partial class App : Application
         // for real data roots BEFORE it, not only in the constructor afterwards. Inert outside a --qa* launch.
         Qa.QaStartupIsolation.VerifyOrThrow(host.Services);
 #endif
-        host.Services
-            .GetRequiredService<ILocalizationService>()
-            .InitializeFromSystem();
+        var localization = host.Services.GetRequiredService<ILocalizationService>();
+        localization.InitializeFromSystem();
+        // REL.0E: only now, with the language final for this process. The real platform read the Windows culture when
+        // the service was resolved just above, so the recovery hint and "Use system language" keep seeing Windows.
+        // Fix round 1 (Cortex M-1): the service's formatting decision, not the raw override.
+        AppFormattingCulture.Apply(localization.FormattingCultureName, applyUiCulture);
         return host;
     }
 

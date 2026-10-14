@@ -3,7 +3,8 @@ namespace ServerMonitor.App.Services;
 /// <summary>
 /// REL.0C: the platform boundary of <see cref="LocalizationService"/> - the persisted app language override and the
 /// Windows UI culture. Production uses the Windows App SDK (<c>ApplicationLanguages.PrimaryLanguageOverride</c>, which
-/// persists in a packaged app) and <c>CultureInfo.CurrentUICulture</c>; tests use a fake, so the real startup
+/// persists in a packaged app) and <c>CultureInfo.CurrentUICulture</c> as it was at startup (REL.0E: before the app
+/// language becomes the process UI culture); tests use a fake, so the real startup
 /// resolution runs without touching the user's Windows language preferences.
 /// </summary>
 internal interface IUiLanguagePlatform
