@@ -128,6 +128,7 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
 
         AddServerCommand = new AsyncRelayCommand(AddServerAsync);
         ImportFromSshCommand = new AsyncRelayCommand(ImportFromSshAsync);
+        StartLocalNetworkSearchCommand = new AsyncRelayCommand(StartLocalNetworkSearchAsync);
         OpenServerDirectoryCommand = new RelayCommand(() =>
         {
             RememberReturnFocus(OverviewReturnTarget.DirectoryLink, Guid.Empty);
@@ -240,6 +241,13 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
     /// <summary>Empty state "Import from SSH": the normal add editor with the ssh-config import panel open.</summary>
     public ICommand ImportFromSshCommand { get; }
 
+    /// <summary>
+    /// REL.0B (UI9-FW-PROMPT): the empty state's explicit "Search local network". The ONLY product path that starts
+    /// mDNS discovery - starting it binds the listener that makes Windows ask for network permission, so it never
+    /// happens at launch or in the background.
+    /// </summary>
+    public ICommand StartLocalNetworkSearchCommand { get; }
+
 
     public bool HasVisibleServers
     {
@@ -277,6 +285,13 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
     public bool IsSearchingLocalNetwork =>
         !HasVisibleServers && !HasDiscoveredServers && _discoveryActivity?.IsSearching == true;
 
+    /// <summary>
+    /// Empty dashboard, live discovery available but not running: offer the explicit search (with the note that
+    /// Windows may ask for network permission). False for the inert default and the QA stand-ins without it.
+    /// </summary>
+    public bool CanStartLocalNetworkSearch =>
+        !HasVisibleServers && !HasDiscoveredServers && _discoveryActivity is { IsSearching: false };
+
     /// <summary>Empty dashboard with suggestions: they are listed inside the empty state.</summary>
     public bool ShowEmptyStateDiscoveries => !HasVisibleServers && HasDiscoveredServers;
 
@@ -286,6 +301,7 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
     private void OnEmptyStateDiscoveryChanged()
     {
         OnPropertyChanged(nameof(IsSearchingLocalNetwork));
+        OnPropertyChanged(nameof(CanStartLocalNetworkSearch));
         OnPropertyChanged(nameof(ShowEmptyStateDiscoveries));
         OnPropertyChanged(nameof(ShowDiscoverySection));
     }
@@ -1109,16 +1125,41 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         }
     }
 
-    // Raised on the discovery service's lifecycle thread; marshal to the UI thread first.
+    // Raised on the discovery service's lifecycle thread; marshal to the UI thread first. A stop clears the
+    // service's suggestions without a DiscoveredChanged, so the list is rebuilt here too.
     private void OnDiscoverySearchingChanged(object? sender, EventArgs args)
     {
         if (_dispatcherQueue is null || _dispatcherQueue.HasThreadAccess)
         {
-            OnPropertyChanged(nameof(IsSearchingLocalNetwork));
+            ApplyDiscoverySearchingChanged();
         }
         else
         {
-            _dispatcherQueue.TryEnqueue(() => OnPropertyChanged(nameof(IsSearchingLocalNetwork)));
+            _dispatcherQueue.TryEnqueue(ApplyDiscoverySearchingChanged);
+        }
+    }
+
+    private void ApplyDiscoverySearchingChanged()
+    {
+        RebuildDiscovered();
+        OnPropertyChanged(nameof(IsSearchingLocalNetwork));
+        OnPropertyChanged(nameof(CanStartLocalNetworkSearch));
+    }
+
+    private async Task StartLocalNetworkSearchAsync()
+    {
+        if (_discoveryActivity is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await _discoveryActivity.StartSearchAsync();
+        }
+        catch (Exception exception)
+        {
+            HandleError(exception, "search the local network");
         }
     }
 

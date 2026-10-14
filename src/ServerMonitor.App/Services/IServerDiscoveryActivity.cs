@@ -2,9 +2,15 @@ namespace ServerMonitor.App.Services;
 
 /// <summary>
 /// M14.5 — whether local network discovery is ACTUALLY running, for the dashboard's empty state
-/// ("Looking for SSH servers on your local network…"). Implemented only by the real discovery service:
-/// the inert default and the QA stand-ins do not implement it, so a composition without live discovery
-/// never shows a search indicator.
+/// ("Looking for SSH servers on your local network…"). Implemented only by the real discovery service and the
+/// on-demand <c>--qa-discovery</c> stand-in: the inert default and the other QA stand-ins do not implement it, so
+/// a composition without live discovery never shows a search indicator or a search action.
+/// <para>
+/// REL.0B (UI9-FW-PROMPT): the host never starts discovery. Starting the mDNS browser binds UDP listeners on
+/// 0.0.0.0:5353 and [::]:5353, which is what makes Windows Firewall ask for network permission, so the ONLY way
+/// in is <see cref="StartSearchAsync"/>, from an explicit user action. <see cref="StopSearchAsync"/> runs when the
+/// window goes to the background; the host stops it on exit.
+/// </para>
 /// </summary>
 public interface IServerDiscoveryActivity
 {
@@ -13,4 +19,13 @@ public interface IServerDiscoveryActivity
 
     /// <summary>Raised on the thread that started or stopped discovery, after <see cref="IsSearching"/> changed.</summary>
     event EventHandler? IsSearchingChanged;
+
+    /// <summary>
+    /// Starts searching the local network. Explicit user action ONLY. Idempotent while searching; a failed start
+    /// leaves <see cref="IsSearching"/> false and does not throw (cancellation excepted).
+    /// </summary>
+    Task StartSearchAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Stops searching. Idempotent; a later explicit action may start it again.</summary>
+    Task StopSearchAsync(CancellationToken cancellationToken = default);
 }

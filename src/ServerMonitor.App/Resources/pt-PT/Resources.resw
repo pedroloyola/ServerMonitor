@@ -359,6 +359,8 @@
   <data name="HostKeySubjectJumpFormat" xml:space="preserve"><value>Jump host {0}</value></data>
   <data name="HostKeySubjectTargetFormat" xml:space="preserve"><value>Destino {0} via {1}</value></data>
   <data name="DashboardEmptyDiscoverySearching.Text" xml:space="preserve"><value>A procurar servidores SSH na tua rede local…</value></data>
+  <data name="DashboardEmptyDiscoveryStartButton.Content" xml:space="preserve"><value>Procurar na rede local</value></data>
+  <data name="DashboardEmptyDiscoveryPermissionNote.Text" xml:space="preserve"><value>Procura servidores SSH anunciados na tua rede local. O Windows pode pedir permissão de acesso à rede.</value></data>
   <data name="DashboardEmptyDiscoveryFoundFormat" xml:space="preserve"><value>Encontrado na rede local: {0}</value></data>
   <data name="LocalKeyOptionRecommendedFormat" xml:space="preserve"><value>{0} · Recomendada</value></data>
   <data name="LocalKeyOptionBrowse" xml:space="preserve"><value>Procurar outro ficheiro…</value></data>

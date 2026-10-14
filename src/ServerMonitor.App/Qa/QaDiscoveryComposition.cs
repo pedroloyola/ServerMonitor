@@ -8,7 +8,8 @@ namespace ServerMonitor.App.Qa;
 /// QA-ONLY wiring for the network-discovery harness, activated only under <see cref="LaunchFlag"/>.
 /// It registers a no-servers data plane plus inert monitoring, so no SSH, scheduling, persistence
 /// or credential access ever runs, and a seeded in-memory <see cref="IServerDiscoveryService"/> so
-/// the real dashboard discovery section and card can be driven with two deterministic suggestions.
+/// the real dashboard discovery section and card can be driven with two deterministic suggestions,
+/// revealed only after the explicit "Search local network" (REL.0B, as in production).
 /// Excluded from Release.
 /// </summary>
 internal static class QaDiscoveryComposition
@@ -28,6 +29,7 @@ internal static class QaDiscoveryComposition
         services.AddSingleton<IServerMonitoringStateStore, ServerMonitoringStateStore>();
         services.AddSingleton<IMonitoringEngine, QaMonitoringEngine>();
 
-        services.AddSingleton<IServerDiscoveryService>(new QaDiscoveryService(QaDiscoveryCatalog.Seed()));
+        // REL.0B: on demand, like production - the seed appears only after the empty state's explicit search.
+        services.AddSingleton<IServerDiscoveryService>(new QaOnDemandDiscoveryService(QaDiscoveryCatalog.Seed()));
     }
 }

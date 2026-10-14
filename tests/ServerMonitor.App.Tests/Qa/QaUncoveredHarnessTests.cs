@@ -74,7 +74,16 @@ public sealed class QaUncoveredHarnessTests
         AssertQa(provider.GetRequiredService<IServerService>());
         AssertQa(provider.GetRequiredService<IServerMetricsStore>());
         Assert.IsType<QaMonitoringEngine>(provider.GetRequiredService<IMonitoringEngine>());
-        Assert.IsType<QaDiscoveryService>(provider.GetRequiredService<IServerDiscoveryService>());
+        // REL.0B: the discovery harness is on demand, like production; the others keep the always-inert stand-in.
+        if (harness == "discovery")
+        {
+            Assert.IsType<QaOnDemandDiscoveryService>(provider.GetRequiredService<IServerDiscoveryService>());
+        }
+        else
+        {
+            Assert.IsType<QaDiscoveryService>(provider.GetRequiredService<IServerDiscoveryService>());
+        }
+
         Assert.IsType<ServerMonitoringStateStore>(provider.GetRequiredService<IServerMonitoringStateStore>());
         if (harness == "history")
         {
@@ -111,14 +120,36 @@ public sealed class QaUncoveredHarnessTests
     }
 
     [Fact]
-    public void Discovery_CompositionServesTheSeedThroughTheQaService()
+    public async Task Discovery_CompositionServesTheSeedOnlyAfterTheExplicitSearch()
     {
         using var provider = Provider("discovery");
+        var discovery = provider.GetRequiredService<IServerDiscoveryService>();
+        var activity = Assert.IsAssignableFrom<IServerDiscoveryActivity>(discovery);
+        var revealed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        discovery.DiscoveredChanged += (_, _) =>
+        {
+            if (discovery.GetDiscovered().Count > 0)
+            {
+                revealed.TrySetResult();
+            }
+        };
 
         Assert.Empty(provider.GetRequiredService<IServerService>().GetAllAsync().GetAwaiter().GetResult());
+        // REL.0B: nothing is searching or suggested until the user asks, exactly like production.
+        Assert.False(activity.IsSearching);
+        Assert.Empty(discovery.GetDiscovered());
+
+        await activity.StartSearchAsync();
+        Assert.True(activity.IsSearching);
+        await revealed.Task.WaitAsync(TimeSpan.FromSeconds(30));
+
         Assert.Equal(
             QaDiscoveryCatalog.Seed().Select(s => s.DisplayName),
-            provider.GetRequiredService<IServerDiscoveryService>().GetDiscovered().Select(s => s.DisplayName).Order());
+            discovery.GetDiscovered().Select(s => s.DisplayName).Order());
+
+        await activity.StopSearchAsync();
+        Assert.False(activity.IsSearching);
+        Assert.Empty(discovery.GetDiscovered());
     }
 
     // ---- history catalogue ---------------------------------------------------------------------------

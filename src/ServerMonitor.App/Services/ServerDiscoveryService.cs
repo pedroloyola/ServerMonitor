@@ -12,9 +12,15 @@ namespace ServerMonitor.App.Services;
 /// the fakeable browser seam (<see cref="IMdnsServiceBrowser"/>), merges per-interface
 /// observations of the same instance by <see cref="ServiceInstanceIdentity"/> (never by IP),
 /// tracks first/last seen, expires silent observations and applies a short grace to removals —
-/// all through an injected <see cref="TimeProvider"/>. It runs as an <see cref="IHostedService"/>
-/// tied to the app host, raises <see cref="DiscoveredChanged"/> only on material changes, and
-/// never touches SSH, credentials, trust or metrics.
+/// all through an injected <see cref="TimeProvider"/>. It raises <see cref="DiscoveredChanged"/> only
+/// on material changes, and never touches SSH, credentials, trust or metrics.
+/// <para>
+/// REL.0B (UI9-FW-PROMPT): it is still registered as an <see cref="IHostedService"/>, but only so the host
+/// STOPS it on exit, in the documented reverse order. The host's start is deliberately a no-op: the browser
+/// binds UDP listeners on 0.0.0.0:5353 / [::]:5353, which is what raises the Windows Firewall prompt, so it
+/// starts only through <see cref="StartSearchAsync"/> from an explicit user action - never at launch and never
+/// in <c>--background</c>.
+/// </para>
 /// </summary>
 /// <remarks>
 /// The lifecycle (start/stop/dispose) is serialized behind a dedicated async gate and a small
@@ -85,9 +91,16 @@ public sealed class ServerDiscoveryService : IServerDiscoveryService, IServerDis
     /// <inheritdoc />
     public event EventHandler? IsSearchingChanged;
 
-    Task IHostedService.StartAsync(CancellationToken cancellationToken) => StartAsync(cancellationToken);
+    /// <summary>The host never starts discovery (REL.0B); see the type remarks.</summary>
+    Task IHostedService.StartAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
     Task IHostedService.StopAsync(CancellationToken cancellationToken) => StopAsync(cancellationToken);
+
+    /// <inheritdoc />
+    public Task StartSearchAsync(CancellationToken cancellationToken = default) => StartAsync(cancellationToken);
+
+    /// <inheritdoc />
+    public Task StopSearchAsync(CancellationToken cancellationToken = default) => StopAsync(cancellationToken);
 
     public async Task StartAsync(CancellationToken cancellationToken = default)
     {

@@ -3,6 +3,7 @@ using Microsoft.UI.Dispatching;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using ServerMonitor.App.Windowing;
+using ServerMonitor.Core.Interfaces;
 using WinUIEx;
 
 namespace ServerMonitor.App.Services;
@@ -10,6 +11,7 @@ namespace ServerMonitor.App.Services;
 public sealed class ApplicationWindowController(
     INavigationService navigationService,
     IWindowModeCoordinator modeCoordinator,
+    IServerDiscoveryService discoveryService,
     ILogger<ApplicationWindowController> logger) : IApplicationWindowController
 {
     /// <summary>
@@ -117,6 +119,8 @@ public sealed class ApplicationWindowController(
 
     private void HideForMinimizeCore() => RunOnUiThread(() =>
     {
+        // REL.0B: no local-network listener while hidden; a later explicit search starts it again.
+        LocalNetworkSearchLifetime.StopForBackground(discoveryService, logger);
         if (_appWindow is null)
         {
             return;
@@ -133,6 +137,8 @@ public sealed class ApplicationWindowController(
     /// </summary>
     private void HideToBackgroundCore() => RunOnUiThread(() =>
     {
+        // REL.0B: no local-network listener in the background; a later explicit search starts it again.
+        LocalNetworkSearchLifetime.StopForBackground(discoveryService, logger);
         if (_appWindow is null)
         {
             return;

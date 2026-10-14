@@ -589,6 +589,14 @@
                         <Button x:Name="EmptyAddButton" x:Uid="OverviewEmptyAddButton" Width="202" Style="{StaticResource SaOnboardingPrimaryButtonStyle}" Command="{x:Bind ViewModel.AddServerCommand}"/>
                         <Button x:Name="OverviewEmptyImportButton" x:Uid="OverviewEmptyImportButton" Width="202" Style="{StaticResource SaOnboardingSecondaryButtonStyle}" Command="{x:Bind ViewModel.ImportFromSshCommand}"/>
                     </VariableSizedWrapGrid>
+                            <!-- REL.0B UI9-FW-PROMPT: discovery starts only here, on request; the note sets the Windows permission expectation first. -->
+                            <StackPanel x:Name="EmptyDiscoveryStartBlock" HorizontalAlignment="Center" MaxWidth="560" Spacing="{StaticResource SaSpace4}"
+                                        Visibility="{x:Bind ViewModel.CanStartLocalNetworkSearch, Mode=OneWay}">
+                                <HyperlinkButton x:Name="EmptyDiscoveryStartButton" x:Uid="DashboardEmptyDiscoveryStartButton" HorizontalAlignment="Center"
+                                                 Style="{StaticResource SaTextLinkButtonStyle}" Command="{x:Bind ViewModel.StartLocalNetworkSearchCommand}" />
+                                <TextBlock x:Uid="DashboardEmptyDiscoveryPermissionNote" Style="{StaticResource SaCaptionTextStyle}" TextAlignment="Center"
+                                           Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap" />
+                            </StackPanel>
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="{StaticResource SaSpace8}"
                                         Visibility="{x:Bind ViewModel.IsSearchingLocalNetwork, Mode=OneWay}">
                                 <ProgressRing Width="14" Height="14" IsActive="{x:Bind ViewModel.IsSearchingLocalNetwork, Mode=OneWay}" />

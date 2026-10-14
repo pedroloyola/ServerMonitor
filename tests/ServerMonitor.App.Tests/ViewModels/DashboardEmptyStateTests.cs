@@ -91,6 +91,96 @@ public sealed class DashboardEmptyStateTests
         Assert.False(dashboard.ShowEmptyStateDiscoveries);
     }
 
+    // ---- REL.0B (UI9-FW-PROMPT): discovery starts only from the explicit action, through the real service ----
+
+    [Fact]
+    public async Task DashboardLoad_NeverStartsDiscovery_AndOffersTheExplicitSearch()
+    {
+        var browser = new FakeMdnsServiceBrowser();
+        await using var service = RealDiscovery(browser);
+        using var dashboard = Dashboard(discovery: service);
+
+        await dashboard.LoadAsync();
+
+        Assert.Equal(0, browser.StartCount);
+        Assert.True(dashboard.CanStartLocalNetworkSearch);
+        Assert.False(dashboard.IsSearchingLocalNetwork);
+    }
+
+    [Fact]
+    public async Task SearchCommand_StartsTheRealServiceOnce_AndSwapsTheActionForTheIndicator()
+    {
+        var browser = new FakeMdnsServiceBrowser();
+        await using var service = RealDiscovery(browser);
+        using var dashboard = Dashboard(discovery: service);
+        await dashboard.LoadAsync();
+        var raised = new List<string?>();
+        dashboard.PropertyChanged += (_, args) => raised.Add(args.PropertyName);
+
+        var command = Assert.IsType<AsyncRelayCommand>(dashboard.StartLocalNetworkSearchCommand);
+        await command.ExecuteAsync(null);
+        await command.ExecuteAsync(null);
+
+        Assert.Equal(1, browser.StartCount);
+        Assert.True(service.IsSearching);
+        Assert.False(dashboard.CanStartLocalNetworkSearch);
+        Assert.True(dashboard.IsSearchingLocalNetwork);
+        Assert.Contains(nameof(DashboardViewModel.CanStartLocalNetworkSearch), raised);
+        Assert.Contains(nameof(DashboardViewModel.IsSearchingLocalNetwork), raised);
+        Assert.False(dashboard.IsOperationErrorOpen);
+
+        // Window to background: the search stops and the explicit action is offered again.
+        await LocalNetworkSearchLifetime.StopForBackground(service, NullLogger.Instance);
+        Assert.Equal(1, browser.StopCount);
+        Assert.True(dashboard.CanStartLocalNetworkSearch);
+        Assert.False(dashboard.IsSearchingLocalNetwork);
+    }
+
+    [Fact]
+    public async Task ExplicitSearch_IsOfferedOnlyOnTheEmptyDashboardWithIdleLiveDiscovery()
+    {
+        using var inert = Dashboard(discovery: new NullServerDiscoveryService());
+        await inert.LoadAsync();
+        Assert.False(inert.CanStartLocalNetworkSearch);
+        inert.StartLocalNetworkSearchCommand.Execute(null);
+        Assert.False(inert.IsOperationErrorOpen);
+
+        var live = new LiveDiscovery { IsSearching = false };
+        using var empty = Dashboard(discovery: live);
+        await empty.LoadAsync();
+        Assert.True(empty.CanStartLocalNetworkSearch);
+
+        // Found something: the suggestions replace the action.
+        live.Set(DiscoveredServerViewModelTests.Service("Mac Studio", "mac-studio.local", 22));
+        Assert.False(empty.CanStartLocalNetworkSearch);
+
+        var servers = new FakeServerService();
+        servers.Servers.Add(DashboardDiscoveryViewModelTests.ServerForTest("10.0.0.5", 22));
+        using var withServers = Dashboard(servers: servers, discovery: new LiveDiscovery { IsSearching = false });
+        await withServers.LoadAsync();
+        Assert.False(withServers.CanStartLocalNetworkSearch);
+    }
+
+    [Fact]
+    public async Task StoppedSearch_ClearsTheSuggestionsShownInTheEmptyState()
+    {
+        var live = new LiveDiscovery { IsSearching = true };
+        using var dashboard = Dashboard(discovery: live);
+        await dashboard.LoadAsync();
+        live.Set(DiscoveredServerViewModelTests.Service("Mac Studio", "mac-studio.local", 22));
+        Assert.True(dashboard.ShowEmptyStateDiscoveries);
+
+        // A real stop clears the service's store without a DiscoveredChanged; only IsSearchingChanged arrives.
+        live.StopSilently();
+
+        Assert.False(dashboard.ShowEmptyStateDiscoveries);
+        Assert.Empty(dashboard.DiscoveredServers);
+        Assert.True(dashboard.CanStartLocalNetworkSearch);
+    }
+
+    private static ServerDiscoveryService RealDiscovery(FakeMdnsServiceBrowser browser) =>
+        new(browser, new GatedIgnoredDeviceStore(), NullLogger<ServerDiscoveryService>.Instance);
+
     [Fact]
     public async Task EmptyStateSuggestion_AddsThroughTheExistingPrefillPath()
     {
@@ -253,6 +343,25 @@ public sealed class DashboardEmptyStateTests
         {
             _discovered = discovered;
             DiscoveredChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        /// <summary>Like the real service's stop: the store empties and only the activity event is raised.</summary>
+        public void StopSilently()
+        {
+            _discovered = [];
+            SetSearching(false);
+        }
+
+        public Task StartSearchAsync(CancellationToken cancellationToken = default)
+        {
+            SetSearching(true);
+            return Task.CompletedTask;
+        }
+
+        public Task StopSearchAsync(CancellationToken cancellationToken = default)
+        {
+            SetSearching(false);
+            return Task.CompletedTask;
         }
 
         public IReadOnlyList<DiscoveredService> GetDiscovered() => _discovered;
