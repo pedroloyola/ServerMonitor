@@ -63,6 +63,8 @@ public sealed partial class XamlContractAndResourceGuardTests
         // UI.5 §4: the Data sub-page brings the backup status and (H-UI5-4) the About card into view from code-behind.
         ["Views/SettingsDataPage.xaml"] = ["PageViewport", "BackupStatusBar", "AboutSection", "PageRoot", "ResetIgnoredButton", "HistoryActions", "BackupActions",
             "GitHubButton", "SuccessToast",
+            // REL.0D: "Procurar na rede local" moves under its title when narrow, like every card action.
+            "LocalNetworkSearchButton",
             // UI.5 fix round 3 (Beacon C2 R2-M1): focus returns to the history button that opened its dialog.
             "ClearHistoryButton", "ResetHistoryButton"],
         // UI.3: adaptive VisualState setters reflow these (no code-behind dependency).

@@ -49,6 +49,9 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
     // Normalized "host|port" of every configured server (visible and hidden), so a suggestion
     // already added is suppressed. This is a UX de-duplication only — never a trust decision.
     private HashSet<string> _configuredEndpoints = new(StringComparer.Ordinal);
+    // REL.0D: true once _configuredEndpoints reflects the stored servers. The Settings entry can start a search before
+    // the overview ever loaded (a --background launch opened on Settings from the tray).
+    private bool _configuredEndpointsKnown;
     private bool _hasVisibleServers;
     private bool _hasDiscoveredServers;
     private int _discoveredCount;
@@ -128,7 +131,9 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
 
         AddServerCommand = new AsyncRelayCommand(AddServerAsync);
         ImportFromSshCommand = new AsyncRelayCommand(ImportFromSshAsync);
-        StartLocalNetworkSearchCommand = new AsyncRelayCommand(StartLocalNetworkSearchAsync);
+        // REL.0D: not offered while a search runs (the Settings button stays visible, so it is disabled instead).
+        StartLocalNetworkSearchCommand = new AsyncRelayCommand(
+            StartLocalNetworkSearchAsync, () => CanStartLocalNetworkSearchFromSettings);
         OpenServerDirectoryCommand = new RelayCommand(() =>
         {
             RememberReturnFocus(OverviewReturnTarget.DirectoryLink, Guid.Empty);
@@ -242,9 +247,9 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
     public ICommand ImportFromSshCommand { get; }
 
     /// <summary>
-    /// REL.0B (UI9-FW-PROMPT): the empty state's explicit "Search local network". The ONLY product path that starts
-    /// mDNS discovery - starting it binds the listener that makes Windows ask for network permission, so it never
-    /// happens at launch or in the background.
+    /// REL.0B (UI9-FW-PROMPT): the explicit "Search local network" - in the empty state and (REL.0D) in Settings › Data.
+    /// The ONLY product path that starts mDNS discovery - starting it binds the listener that makes Windows ask for
+    /// network permission, so it never happens at launch or in the background.
     /// </summary>
     public ICommand StartLocalNetworkSearchCommand { get; }
 
@@ -309,6 +314,37 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
 
     /// <summary>The separate "Encontrados na rede" section, exactly as before, once a server exists.</summary>
     public bool ShowDiscoverySection => HasVisibleServers && HasDiscoveredServers;
+
+    // ---- REL.0D: the Settings › Data entry ("Procurar na rede local"). The same command, the same suggestions and the
+    // same Add/Ignore as the overview; NOT gated on the empty state, so a user with servers can search too.
+
+    /// <summary>Live discovery is composed (the inert default and the QA stand-ins without it hide the entry).</summary>
+    public bool IsLocalNetworkSearchAvailable => _discoveryActivity is not null;
+
+    /// <summary>A search is running (wherever it was started).</summary>
+    public bool IsLocalNetworkSearchRunning => _discoveryActivity?.IsSearching == true;
+
+    /// <summary>The entry's action is offered: live discovery, not already searching.</summary>
+    public bool CanStartLocalNetworkSearchFromSettings => _discoveryActivity is { IsSearching: false };
+
+    public bool LocalNetworkSearchEndedNothingFound =>
+        CanStartLocalNetworkSearchFromSettings && _discoveryActivity?.LastSearchEnd == DiscoverySearchEnd.NothingFound;
+
+    public bool LocalNetworkSearchEndedTimeLimit =>
+        CanStartLocalNetworkSearchFromSettings && _discoveryActivity?.LastSearchEnd == DiscoverySearchEnd.TimeLimit;
+
+    public bool LocalNetworkSearchEndedFailed =>
+        CanStartLocalNetworkSearchFromSettings && _discoveryActivity?.LastSearchEnd == DiscoverySearchEnd.Failed;
+
+    private void NotifyLocalNetworkSearchEntry()
+    {
+        OnPropertyChanged(nameof(IsLocalNetworkSearchRunning));
+        OnPropertyChanged(nameof(CanStartLocalNetworkSearchFromSettings));
+        OnPropertyChanged(nameof(LocalNetworkSearchEndedNothingFound));
+        OnPropertyChanged(nameof(LocalNetworkSearchEndedTimeLimit));
+        OnPropertyChanged(nameof(LocalNetworkSearchEndedFailed));
+        (StartLocalNetworkSearchCommand as AsyncRelayCommand)?.NotifyCanExecuteChanged();
+    }
 
     private void OnEmptyStateDiscoveryChanged()
     {
@@ -599,6 +635,7 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
             var servers = await _serverService.GetAllAsync();
             var all = servers.ToList();
             _configuredEndpoints = BuildConfiguredEndpoints(all);
+            _configuredEndpointsKnown = true;
             HiddenServerCount = all.Count(server => server.IsHidden);
             SetServers(all.Where(server => !server.IsHidden));
             RebuildDiscovered();
@@ -1162,6 +1199,7 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(ShowLocalNetworkNothingFound));
         OnPropertyChanged(nameof(ShowLocalNetworkSearchFailed));
         OnPropertyChanged(nameof(ShowLocalNetworkSearchTimeLimit));
+        NotifyLocalNetworkSearchEntry();
     }
 
     private async Task StartLocalNetworkSearchAsync()
@@ -1173,11 +1211,39 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
 
         try
         {
+            // Vigil PR #52 L-1: the start goes FIRST, straight into the service's lifecycle gate, so a hide while the
+            // configured servers are read below queues its stop behind this start and always wins. Awaiting the read
+            // first let a hide's stop run as a no-op and the start land after it, with the window hidden.
             await _discoveryActivity.StartSearchAsync();
+            if (!_configuredEndpointsKnown)
+            {
+                await EnsureConfiguredEndpointsAsync();
+                RebuildDiscovered(); // suggestions that arrived during the read are filtered now
+            }
         }
         catch (Exception exception)
         {
             HandleError(exception, "search the local network");
+        }
+    }
+
+    // REL.0D: a search started from Settings before the overview loaded must still hide servers already added.
+    // A failed read only loses that de-duplication (advice, never trust); the search the user asked for still runs.
+    private async Task EnsureConfiguredEndpointsAsync()
+    {
+        if (_configuredEndpointsKnown)
+        {
+            return;
+        }
+
+        try
+        {
+            _configuredEndpoints = BuildConfiguredEndpoints(await _serverService.GetAllAsync());
+            _configuredEndpointsKnown = true;
+        }
+        catch (Exception exception)
+        {
+            _logger.LogDebug("No server list for discovery de-duplication. Exception type: {ExceptionType}.", exception.GetType().Name);
         }
     }
 
