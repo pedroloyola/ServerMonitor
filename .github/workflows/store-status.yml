@@ -44,20 +44,25 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Setup the Microsoft Store Developer CLI
-        # microsoft/microsoft-store-apppublisher@v1.4, pinned to its commit.
-        uses: microsoft/microsoft-store-apppublisher@cc9910a8d59f2eb55cbb83df0a3800cf3b5300e0
+        uses: microsoft/microsoft-store-apppublisher@cc9910a8d59f2eb55cbb83df0a3800cf3b5300e0 # v1.4
 
       - name: Configure the CLI
         shell: pwsh
+        # Passed as environment values, not interpolated into the generated script (still masked).
+        env:
+          STORE_TENANT_ID: ${{ secrets.AZURE_AD_TENANT_ID }}
+          STORE_SELLER_ID: ${{ secrets.SELLER_ID }}
+          STORE_CLIENT_ID: ${{ secrets.AZURE_AD_APPLICATION_CLIENT_ID }}
+          STORE_CLIENT_SECRET: ${{ secrets.AZURE_AD_APPLICATION_SECRET }}
         run: |
           msstore reconfigure `
-            --tenantId ${{ secrets.AZURE_AD_TENANT_ID }} `
-            --sellerId ${{ secrets.SELLER_ID }} `
-            --clientId ${{ secrets.AZURE_AD_APPLICATION_CLIENT_ID }} `
-            --clientSecret ${{ secrets.AZURE_AD_APPLICATION_SECRET }}
+            --tenantId $env:STORE_TENANT_ID `
+            --sellerId $env:STORE_SELLER_ID `
+            --clientId $env:STORE_CLIENT_ID `
+            --clientSecret $env:STORE_CLIENT_SECRET
           if ($LASTEXITCODE -ne 0) { throw 'msstore reconfigure failed.' }
 
       - name: Confirm the product
@@ -110,9 +115,13 @@ jobs:
             "| targetPublishMode | ``$publishMode`` |"
           ) | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
 
-          if ($publishMode -ne 'Manual') {
-            Write-Warning "targetPublishMode is '$publishMode', not 'Manual'. This submission would publish itself once certification passes."
-          }
+          # G6: decided here, enforced at the end of this step, after the report below is printed.
+          # A submission in flight (or with an unknown status) must be on the publishing hold; an
+          # idle product (None/Published/Canceled/*Failed) is reported, not failed, so this run
+          # still answers "is the product idle?" before a new submission.
+          $publishModeError = $null
+          try { ./tools/release/Assert-ManualPublishMode.ps1 -PublishMode $publishMode -Status $status }
+          catch { $publishModeError = $_.Exception.Message; Write-Warning $publishModeError }
 
           # The shape of the response, which is what the parser depends on. Names only, no
           # values, so this is safe to print unconditionally and is the thing worth reading
@@ -168,3 +177,6 @@ jobs:
             Write-Host '--- submission JSON (credentials redacted) ---'
             Write-Host ((Protect-Value -Node $submission) | ConvertTo-Json -Depth 100)
           }
+
+          # G6: a submission that is not on the publishing hold fails this run (it used to only warn).
+          if ($publishModeError) { throw "STOP: $publishModeError" }

@@ -25,7 +25,8 @@ function Assert-RunText([string] $Text) {
     if ($runs -eq 0) { throw 'No run blocks found; refusing an unverified workflow.' }
     # Check complete expressions, including bracket access and expressions spanning lines.
     foreach ($expression in [regex]::Matches($body, '(?s)\$\{\{.*?\}\}')) {
-        if ($expression.Value -match '\b(inputs|steps)\s*[.\[]') { throw 'Unsafe workflow interpolation in run block.' }
+        # needs.* carries another job's outputs; github.event.inputs is the dispatch payload by another name.
+        if ($expression.Value -match '\b(inputs|steps|needs)\s*[.\[]|\bgithub\s*\.\s*event\s*[.\[]') { throw 'Unsafe workflow interpolation in run block.' }
     }
 }
 $names = @('store-submit.yml', 'store-status.yml', 'release-build.yml')
@@ -34,7 +35,7 @@ foreach ($name in $names) {
     Assert-RunText $text
     Write-Host "PASS run interpolation: $name"
     if ($SelfTest) {
-        foreach ($expression in @('${{ inputs.attach_package }}', '${{ steps.verify.outputs.packagePath }}')) {
+        foreach ($expression in @('${{ inputs.attach_package }}', '${{ steps.verify.outputs.packagePath }}', '${{ needs.provenance.outputs.tagCommit }}', '${{ github.event.inputs.release_tag }}')) {
             # Reintroduce the defect in memory, into an actual run block of each workflow.
             $mutant = [regex]::new('(?m)^(\s*run:\s*\|)\r?$').Replace($text, ('$1' + "`n          Write-Host '" + $expression + "'"), 1)
             if ($mutant -eq $text) { throw 'Mutation insertion failed.' }
@@ -55,5 +56,5 @@ if ($SelfTest) {
         try { Assert-RunText $text } catch { if ($_.Exception.Message -ne 'Unsafe workflow interpolation in run block.') { throw }; $caught = $true }
         if (-not $caught) { throw 'Inline/folded/bracket regression survived.' }
     }
-    Write-Host 'All 6 workflow mutations and 3 scalar/access cases rejected; original workflows passed again.'
+    Write-Host "All $(4 * $names.Count) workflow mutations and 3 scalar/access cases rejected; original workflows passed again."
 }

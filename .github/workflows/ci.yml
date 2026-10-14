@@ -143,6 +143,23 @@ jobs:
             'ServerMonitor.Core.dll', 'ServerMonitor.Infrastructure.dll', 'ServerMonitor.Collectors.dll',
             'ServerMonitor.Features.dll', 'ServerMonitor.WidgetContract.dll', 'ServerMonitor.ActivationContract.dll')
 
+      # The release guards and their counterproofs on every PR, not only on release day: a change that
+      # breaks the version floor, tag coherence, run provenance, the publishing hold, action pinning or
+      # the release workflows' wiring fails here first. Offline: synthetic fixtures, no secret, no network.
+      - name: Release guards and their counterproofs
+        shell: pwsh
+        run: |
+          ./tools/release/Test-ValidatedPackagePath.ps1
+          ./tools/release/Test-PackageVersionFloor.ps1
+          ./tools/release/Test-TagVersion.ps1
+          ./tools/release/Test-VersionGuardMutations.ps1
+          ./tools/release/Test-ReleaseRunProvenance.ps1
+          ./tools/release/Test-ManualPublishMode.ps1
+          ./tools/release/Test-HardeningMutations.ps1
+          ./tools/release/Test-WorkflowRunInterpolation.ps1 -SelfTest
+          ./tools/release/Test-WorkflowActionPins.ps1 -SelfTest
+          ./tools/release/Test-ReleaseWorkflowShape.ps1 -SelfTest
+
       - name: Vulnerability scan (fail on any vulnerable package)
         shell: pwsh
         run: |
