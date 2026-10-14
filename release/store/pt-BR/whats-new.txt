@@ -1,15 +1,15 @@
 Interface redesenhada e novos recursos desde o ServerAlyzer 1.1.
 
-Um novo visual. Uma barra lateral leva você à Visão geral, Servidores, Histórico e Configurações, cada servidor tem sua página de detalhes e o modo compacto e o widget do Windows 11 foram refeitos. O teclado, os leitores de tela e o alto contraste foram revisados em todo o aplicativo.
+Um novo visual. Uma barra lateral leva você à Visão geral, Servidores, Histórico e Configurações, cada servidor tem sua página de detalhes e o modo compacto e o widget do Windows 11 foram refeitos. O suporte a teclado, leitores de tela e alto contraste foi melhorado.
 
-Configuração mais simples. Um guia inicial ajuda você a adicionar o primeiro servidor. Você pode importar hosts do arquivo de configuração SSH, o aplicativo sugere as chaves privadas que encontra na sua pasta .ssh e o teste de conexão mostra cada etapa, para você ver o que falhou.
+Configuração mais simples. Um guia inicial ajuda você a adicionar o primeiro servidor. Você pode preencher um servidor com um host do seu arquivo de configuração SSH, o aplicativo sugere suas chaves privadas padrão da pasta .ssh e o teste de conexão mostra cada etapa, para você ver o que falhou.
 
-Jump hosts. Agora você pode usar servidores acessados por um único jump host (ProxyJump); a chave do jump host é verificada separadamente.
+Jump hosts. Agora você pode usar servidores acessados por um único jump host (ProxyJump); a chave do jump host é verificada à parte.
 
-Backup criptografado. Em Configurações você pode salvar servidores, chaves de host confiáveis e senhas em um arquivo protegido por uma frase secreta escolhida por você, e restaurá-lo neste ou em outro computador. Os arquivos de chave privada nunca são incluídos.
+Backup criptografado. Em Configurações você pode salvar servidores, chaves de host confiáveis e senhas em um arquivo protegido por uma frase secreta escolhida por você, e restaurá-los depois. Os arquivos de chave privada nunca são incluídos.
 
-Idioma. Se o Windows não estiver em português, o aplicativo passa a abrir em inglês. Um idioma que você já escolheu em Configurações é mantido. Para mudar, use Configurações > Idioma.
+Idioma. Em uma instalação nova, se o Windows não estiver em português, o aplicativo abre em inglês. Um idioma já definido é mantido. Para mudar, use Configurações > Idioma e reinicie o aplicativo.
 
-A pesquisa na rede local só é feita quando você pede. Sem servidores adicionados, escolha "Procurar na rede local"; o Windows pode pedir permissão de acesso à rede.
+A pesquisa na rede local só é feita quando você pede: na Visão geral vazia, escolha "Procurar na rede local"; o Windows pode pedir permissão de rede. Se você já tem servidores, os dispositivos da rede deixam de ser sugeridos.
 
-O runtime .NET agora vem incluído, então o aplicativo funciona em PCs sem o .NET instalado.
+O .NET agora vem incluído: você não precisa mais instalá-lo.

@@ -1,15 +1,15 @@
 A redesigned interface and new features since ServerAlyzer 1.1.
 
-A new look. A sidebar takes you to Overview, Servers, History and Settings, each server has its own detail page, and compact mode and the Windows 11 widget were redesigned. Keyboard use, screen readers and high contrast were reviewed across the app.
+A new look. A sidebar takes you to Overview, Servers, History and Settings, each server has its own detail page, and compact mode and the Windows 11 widget were redesigned. Keyboard, screen reader and high contrast support was improved.
 
-Easier setup. A first-run guide helps you add your first server. You can import hosts from your SSH config file, the app suggests private keys it finds in your .ssh folder, and the connection test shows each step so you can see what failed.
+Easier setup. A first-run guide helps you add your first server. You can fill in a server from a host in your SSH config file, the app suggests your standard private keys from your .ssh folder, and the connection test shows each step so you can see what failed.
 
 Jump hosts. Servers reached through one ProxyJump host are now supported, and the jump host's key is checked separately.
 
-Encrypted backup. In Settings you can save your servers, trusted host keys and saved passwords to a file protected by a passphrase you choose, and restore it on this or another computer. Private key files are never included.
+Encrypted backup. In Settings you can save your servers, trusted host keys and saved passwords to a file protected by a passphrase you choose, and restore them later. Private key files are never included.
 
-Language. If Windows is not set to Portuguese, the app now opens in English. A language you already chose in Settings is kept. If the app opens in Brazilian Portuguese and you prefer another language, change it in Settings > Language.
+Language. On a new install, if Windows is not in Portuguese, the app opens in English. A language already set is kept, including Brazilian Portuguese chosen automatically by earlier versions: to change it, pick English or "Use system language" in Settings > Language and restart the app.
 
-The local network search only runs when you ask. With no servers added yet, choose "Search local network"; Windows may ask for network permission.
+Local network search now runs only when you ask: on an empty Overview, choose "Search local network"; Windows may ask for network permission. If you already have servers, devices on your network are no longer suggested.
 
-The .NET runtime is now included, so the app works on PCs without .NET installed.
+The .NET runtime is now included, so you no longer need to install .NET.

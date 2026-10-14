@@ -1,15 +1,15 @@
 Interface redesenhada e novas funcionalidades desde o ServerAlyzer 1.1.
 
-Um novo visual. Uma barra lateral leva-te à Visão geral, Servidores, Histórico e Definições, cada servidor tem a sua página de detalhe e o modo compacto e o widget do Windows 11 foram refeitos. O teclado, os leitores de ecrã e o alto contraste foram revistos em toda a aplicação.
+Um novo visual. Uma barra lateral leva-te à Visão geral, Servidores, Histórico e Definições, cada servidor tem a sua página de detalhe e o modo compacto e o widget do Windows 11 foram refeitos. O suporte a teclado, leitores de ecrã e alto contraste foi melhorado.
 
-Configuração mais simples. Um guia de início ajuda-te a adicionar o primeiro servidor. Podes importar hosts do teu ficheiro de configuração SSH, a aplicação sugere as chaves privadas que encontra na tua pasta .ssh e o teste de ligação mostra cada passo, para veres o que falhou.
+Configuração mais simples. Um guia de início ajuda-te a adicionar o primeiro servidor. Podes preencher um servidor com um host do teu ficheiro de configuração SSH, a aplicação sugere as tuas chaves privadas habituais da pasta .ssh e o teste de ligação mostra cada passo, para veres o que falhou.
 
 Jump hosts. Já podes usar servidores alcançados através de um único jump host (ProxyJump); a chave do jump host é verificada à parte.
 
-Cópia de segurança encriptada. Nas Definições podes guardar servidores, chaves de host confiáveis e palavras-passe num ficheiro protegido por uma frase-passe à tua escolha, e restaurá-lo neste ou noutro computador. Os ficheiros de chave privada nunca são incluídos.
+Cópia de segurança encriptada. Nas Definições podes guardar servidores, chaves de host confiáveis e palavras-passe num ficheiro protegido por uma frase-passe à tua escolha, e restaurá-los depois. Os ficheiros de chave privada nunca são incluídos.
 
-Idioma. Se o Windows não estiver em português, a aplicação passa a abrir em inglês. Um idioma que já escolheste nas Definições mantém-se. Para mudar, vai a Definições > Idioma.
+Idioma. Numa instalação nova, se o Windows não estiver em português, a aplicação abre em inglês. Um idioma já definido mantém-se. Para mudar, vai a Definições > Idioma e reinicia a aplicação.
 
-A pesquisa na rede local só corre quando pedes. Sem servidores adicionados, escolhe "Procurar na rede local"; o Windows pode pedir permissão de acesso à rede.
+A pesquisa na rede local só corre quando pedes: na Visão geral vazia, escolhe "Procurar na rede local"; o Windows pode pedir permissão de rede. Se já tens servidores, os dispositivos da rede deixam de ser sugeridos.
 
-O runtime .NET passa a vir incluído, por isso a aplicação funciona em PCs sem .NET instalado.
+O .NET passa a vir incluído: já não precisas de o instalar.
