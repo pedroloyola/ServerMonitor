@@ -75,9 +75,10 @@ Sem projeto `.wapproj` separado. O `ServerMonitor.App.csproj` ganha `Package.app
 
 ### 3. Modelo de runtime — framework-dependent no pacote de produção
 
-> **Emenda REL.0C (proposta, 2026-10-14, aguarda decisão humana).** Esta secção confunde dois runtimes.
-> O que vale para o Windows App Runtime **não** vale para o .NET: ver
-> [Emenda REL.0C — runtime .NET self-contained](#emenda-rel0c--runtime-net-self-contained-no-msix-proposta)
+> **Emenda REL.0C (aceite, decisão humana de 2026-10-14).** Esta secção confunde dois runtimes.
+> O que vale para o Windows App Runtime **não** vale para o .NET. No pacote de produção, o .NET passa a
+> ser self-contained e o Windows App Runtime continua a ser um framework package: ver
+> [Emenda REL.0C — runtime .NET self-contained](#emenda-rel0c--runtime-net-self-contained-no-msix-aceite)
 > no fim deste ADR.
 
 O MSIX de produção é **framework-dependent**: depende do *framework package* do Windows App Runtime, que
@@ -219,10 +220,13 @@ Reserva/criação da app na Store · Partner Center · **Publisher ID / Package 
 reais · certificado/assinatura de produção · segredos de CI · pagamento · aceitação de termos · publicação
 pública · mudança de nome comercial. Valores de Store **não** são inventados; entram por checkpoint.
 
-## Emenda REL.0C — runtime .NET self-contained no MSIX (proposta)
+## Emenda REL.0C — runtime .NET self-contained no MSIX (aceite)
 
-Estado: **proposta**, para decisão humana (REL.0 Recovery, 2026-10-14). Não altera identidade, publisher,
-versão, assinatura, capabilities nem o modelo de distribuição (§1/§2 mantêm-se: um único MSIX da Store).
+Estado: **aceite**. Decisão humana de 2026-10-14 (REL.0 Integration & RC Preparation): *manter o .NET
+self-contained no MSIX de produção; o Windows App Runtime continua uma dependência de framework.* Com
+ela foram aceites os controlos de servicing descritos no fim desta emenda. Não altera identidade,
+publisher, versão, assinatura, capabilities nem o modelo de distribuição (§1/§2 mantêm-se: um único MSIX
+da Store).
 
 **Problema (VERIFIED).** O §3 tratou o pacote como "framework-dependent" sem separar os dois runtimes. Para
 o **Windows App Runtime** isso está certo: o manifesto declara `PackageDependency
@@ -235,7 +239,7 @@ aberta). O pacote só arranca numa máquina onde alguém instalou o .NET 10 mach
 de desenvolvimento, por isso a QA nunca o viu. Numa máquina limpa, a app mostra "You must install .NET…" e não
 abre. O widget provider é ativado pelo COM sem janela e falha sem contexto.
 
-**Decisão proposta.**
+**Decisão.**
 - **.NET: self-contained** no perfil `Packaged=true` (`SelfContained=true`, RID `win-x64` já fixo). O
   apphost carrega o `hostfxr` app-local e o host corre em modo self-contained. Nunca procura um runtime
   machine-wide. Prova: com `COREHOST_TRACE`, o host do pacote extraído resolve `hostfxr`, `hostpolicy` e
@@ -261,13 +265,40 @@ abre. O widget provider é ativado pelo COM sem janela e falha sem contexto.
   pelo Microsoft Update. Cada patch de segurança do .NET 10 relevante obriga a reconstruir e submeter uma
   atualização na Store. Também obriga a rever as entradas da allowlist que mudam por versão:
   `mscordaccore_amd64_amd64_<versão>.dll` e um token do `Microsoft.DiaSymReader.Native.amd64.dll`. O gate de
-  privacidade falha fechado até isso ser feito. O CI usa o SDK `10.0.x` mais recente, por isso essa falha
-  aparece no primeiro PR depois de um patch do .NET.
-- O SDK que constrói o pacote determina a versão do runtime embutido: `BundledNETCoreAppPackageVersion`, hoje
-  10.0.11 localmente (SDK 10.0.400) e 10.0.13 com o SDK 10.0.402. Fixar o SDK de release é uma decisão
-  separada, deixada à decisão humana.
+  privacidade falha fechado até isso ser feito. Com o SDK fixado (abaixo), essa falha aparece só no PR que
+  muda o `global.json`.
+- O SDK que constrói o pacote determina a versão do runtime embutido: `BundledNETCoreAppPackageVersion` é
+  10.0.11 com o SDK 10.0.400 e 10.0.13 com o SDK 10.0.402 (VERIFIED nos logs do CI do `main` 3eb4fc3: SDK
+  10.0.402 instalado, `Microsoft.NETCore.App 10.0.13` nos dois `runtimeconfig.json` do pacote).
 - Clean-machine continua **NOT_RUN** até haver uma VM descartável (REL.0D). O procedimento fica na
   documentação pública de preparação do REL.0D. Tem de cobrir: arranque da app, ativação a frio do widget,
   arranque `--background` e notificação a frio, numa máquina sem nenhum .NET instalado, mais a contraprova
   com um pacote framework-dependent.
+
+**Controlos de servicing (aceites com a decisão, 2026-10-14).** O Windows Update e o Microsoft Update
+**não** atualizam um runtime .NET self-contained: um pacote instalado fica com o runtime com que foi
+construído até publicarmos outro. Por isso:
+- **SDK fixado.** O `global.json` fixa um SDK exato (`10.0.402`, `rollForward: disable`,
+  `allowPrerelease: false`). Todos os passos `actions/setup-dotnet` do `ci.yml` e do `release-build.yml`
+  instalam a partir de `global-json-file`. `disable` e não `latestPatch`: a imagem do runner pode já trazer
+  um SDK mais recente da mesma banda, e o `latestPatch` escolhê-lo-ia, mudando o runtime embutido sem
+  revisão. Consequência local: construir o repositório exige exatamente o SDK fixado (na máquina de
+  desenvolvimento, o `dotnet` machine-wide; o SDK 10.0.400 user-scoped deixa de servir).
+- **Floor do runtime.** `release/min-dotnet-runtime.txt` (hoje `10.0.13`, release de 2026-10-13).
+  `Assert-PackageRuntime.ps1` falha fechado se o `Microsoft.NETCore.App` embutido (os `runtimeconfig.json`,
+  os `deps.json` e a versão reportada pelos próprios ficheiros do runtime) estiver abaixo. Corre no CI, no
+  `release-build.yml` e no `store-submit.yml` com o floor do checkout atual: um artefacto antigo ainda
+  descarregável deixa de ser submetível quando o floor o ultrapassa.
+- **Rastreabilidade.** Cada build empacotado regista commit, SDK, runtime embutido, floor, dependência do
+  Windows App Runtime e SHA-256 (`<pacote>.build.json`, junto do artefacto, e no resumo do job).
+- **Processo.** Avaliação **mensal** das releases de servicing do .NET. Objetivo: uma atualização segura
+  submetida **até 7 dias** depois da release regular, quando a QA e a distribuição o permitirem (a submissão
+  na Store continua a ser uma ação humana). Um **CVE crítico** no runtime implica avaliação **imediata**. O
+  scan de vulnerabilidades (`dotnet list package --vulnerable`) **não** cobre o runtime pack embutido. O
+  controlo do runtime é o floor mais a revisão mensal.
+- **Allowlist.** As entradas com nome por versão (`mscordaccore_amd64_amd64_<versão de ficheiro>.dll`) abaixo
+  do floor são removidas. `Test-RuntimeServicing.ps1` falha se alguma ficar, ou se o `reason` não nomear o
+  seu runtime. As entradas de 10.0.11 e 10.0.12 e o token exclusivo do 10.0.11 no `DiaSymReader` foram
+  removidos com o floor 10.0.13.
+- Procedimento completo: `docs/release-automation.md`, secção *.NET runtime servicing*.
 
