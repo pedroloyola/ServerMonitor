@@ -75,6 +75,55 @@ public sealed class SettingsLocalNetworkSearchTests
         Assert.Equal("NAS", Assert.Single(dashboard.DiscoveredServers).DisplayName);
     }
 
+    /// <summary>
+    /// Vigil PR #52 L-1: the window hides (close/minimize to tray) while the first Settings search still reads the
+    /// configured servers. The stop must win: no listener may be left open behind a hidden window.
+    /// </summary>
+    [Fact]
+    public async Task Hiding_while_the_configured_servers_are_read_leaves_no_listener()
+    {
+        var w = new World();
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource<IReadOnlyList<Server>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        w.Servers.GetAllOverride = _ => { entered.TrySetResult(); return release.Task; };
+        await using var _ = w.Service;
+        using var dashboard = w.Dashboard;
+
+        var press = w.StartAsync();
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(30));
+        await LocalNetworkSearchLifetime.StopForBackground(w.Service, NullLogger.Instance);
+        release.SetResult([]);
+        await press.WaitAsync(TimeSpan.FromSeconds(30));
+
+        Assert.False(w.Service.IsSearching);
+        Assert.Equal(DiscoverySearchEnd.Stopped, w.Service.LastSearchEnd);
+        Assert.Equal(w.Browser.StartCount, w.Browser.StopCount);
+        Assert.Equal(0, w.Browser.FoundSubscriberCount);
+        Assert.False(dashboard.IsLocalNetworkSearchRunning);
+    }
+
+    [Fact]
+    public async Task Suggestions_that_arrive_while_the_configured_servers_are_read_are_filtered_afterwards()
+    {
+        var w = new World();
+        var release = new TaskCompletionSource<IReadOnlyList<Server>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        w.Servers.GetAllOverride = _ => release.Task;
+        await using var _ = w.Service;
+        using var dashboard = w.Dashboard;
+
+        var press = w.StartAsync();
+        await DashboardEmptyStateTests.AdvanceUntilAsync(w.Time, () => w.Browser.StartCount == 1);
+        w.Browser.EmitFound(Observation("Mac Studio", "mac-studio.local", "192.168.1.20", w.Time));
+        w.Browser.EmitFound(Observation("NAS", "nas.local", "192.168.1.30", w.Time));
+        await DashboardEmptyStateTests.AdvanceUntilAsync(w.Time, () => dashboard.DiscoveredServers.Count == 2);
+
+        release.SetResult([DashboardDiscoveryViewModelTests.ServerForTest("mac-studio.local", 22)]);
+        await press.WaitAsync(TimeSpan.FromSeconds(30));
+
+        Assert.Equal("NAS", Assert.Single(dashboard.DiscoveredServers).DisplayName);
+        Assert.True(dashboard.IsLocalNetworkSearchRunning);
+    }
+
     [Fact]
     public async Task A_failed_server_read_does_not_block_the_search_the_user_asked_for()
     {

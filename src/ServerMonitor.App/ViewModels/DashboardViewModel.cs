@@ -1211,8 +1211,15 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
 
         try
         {
-            await EnsureConfiguredEndpointsAsync();
+            // Vigil PR #52 L-1: the start goes FIRST, straight into the service's lifecycle gate, so a hide while the
+            // configured servers are read below queues its stop behind this start and always wins. Awaiting the read
+            // first let a hide's stop run as a no-op and the start land after it, with the window hidden.
             await _discoveryActivity.StartSearchAsync();
+            if (!_configuredEndpointsKnown)
+            {
+                await EnsureConfiguredEndpointsAsync();
+                RebuildDiscovered(); // suggestions that arrived during the read are filtered now
+            }
         }
         catch (Exception exception)
         {
@@ -1221,7 +1228,7 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
     }
 
     // REL.0D: a search started from Settings before the overview loaded must still hide servers already added.
-    // A failed read only loses that de-duplication (advice, never trust); the search the user asked for still starts.
+    // A failed read only loses that de-duplication (advice, never trust); the search the user asked for still runs.
     private async Task EnsureConfiguredEndpointsAsync()
     {
         if (_configuredEndpointsKnown)
