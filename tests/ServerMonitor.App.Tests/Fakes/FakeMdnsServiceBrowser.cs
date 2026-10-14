@@ -61,8 +61,12 @@ internal sealed class FakeMdnsServiceBrowser : IMdnsServiceBrowser
         }
     }
 
+    /// <summary>Start/stop calls in order ("start", "stop", "stop-failed").</summary>
+    public List<string> Calls { get; } = [];
+
     public void Start()
     {
+        Calls.Add("start");
         StartCount++;
         if (StartException is { } exception)
         {
@@ -70,7 +74,25 @@ internal sealed class FakeMdnsServiceBrowser : IMdnsServiceBrowser
         }
     }
 
-    public void Stop() => StopCount++;
+    /// <summary>How many of the next Stop() calls throw (a failing native stop). StopCount counts successful stops only.</summary>
+    public int StopFailures { get; set; }
+
+    /// <summary>Every Stop() call, failed or not.</summary>
+    public int StopAttempts { get; private set; }
+
+    public void Stop()
+    {
+        StopAttempts++;
+        if (StopFailures > 0)
+        {
+            StopFailures--;
+            Calls.Add("stop-failed");
+            throw new InvalidOperationException("synthetic stop failure");
+        }
+
+        Calls.Add("stop");
+        StopCount++;
+    }
 
     public void EmitFound(DiscoveryObservation observation) => _found?.Invoke(this, observation);
 

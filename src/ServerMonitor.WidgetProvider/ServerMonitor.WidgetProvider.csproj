@@ -52,4 +52,16 @@
     <InternalsVisibleTo Include="ServerMonitor.WidgetProvider.Tests" />
   </ItemGroup>
 
+  <!-- REL.0C. Only for the packaged publish ServerMonitor.App.csproj runs (WindowsPackageType=MSIX,
+       self-contained .NET): drop the runtime pack's console-subsystem createdump.exe from the assets before
+       deps.json is written, exactly as the app does, so the provider's deps.json names no file the package
+       does not carry. See ExcludeCreateDumpFromPackage in ServerMonitor.App.csproj. -->
+  <Target Name="ExcludeCreateDumpFromPackage" AfterTargets="ResolveRuntimePackAssets"
+          Condition="'$(WindowsPackageType)' == 'MSIX' and '$(SelfContained)' == 'true'">
+    <ItemGroup>
+      <RuntimePackAsset Remove="@(RuntimePackAsset)" Condition="'%(Filename)%(Extension)' == 'createdump.exe'" />
+      <ReferenceCopyLocalPaths Remove="@(ReferenceCopyLocalPaths)" Condition="'%(Filename)%(Extension)' == 'createdump.exe'" />
+    </ItemGroup>
+  </Target>
+
 </Project>

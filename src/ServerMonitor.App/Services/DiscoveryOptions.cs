@@ -30,6 +30,20 @@ public sealed record DiscoveryOptions
     /// </summary>
     public TimeSpan ChangeNotificationDelay { get; init; } = TimeSpan.FromMilliseconds(100);
 
+    /// <summary>
+    /// REL.0B: a user-started search that shows nothing for this long ends by itself as
+    /// <see cref="DiscoverySearchEnd.NothingFound"/>. Sized to cover the browse's first query and one
+    /// re-query at the 30 s cadence (<c>MdnsServiceBrowserOptions.QueryInterval</c>), plus margin.
+    /// </summary>
+    public TimeSpan NothingFoundTimeout { get; init; } = TimeSpan.FromSeconds(40);
+
+    /// <summary>
+    /// REL.0B: hard upper bound on one user-started search, results or not. The UDP 5353 listener
+    /// processes untrusted LAN multicast, so it never stays open for a whole foreground session;
+    /// the user can search again.
+    /// </summary>
+    public TimeSpan MaxSearchDuration { get; init; } = TimeSpan.FromMinutes(10);
+
     /// <summary>Bounded drain timeout for the sweep loop during shutdown.</summary>
     public TimeSpan StopDrainTimeout { get; init; } = TimeSpan.FromSeconds(5);
 

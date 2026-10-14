@@ -85,6 +85,29 @@ public sealed class Ui5SettingsTests
         Assert.False(world.ViewModel.IsRestartNoticeOpen);
     }
 
+    /// <summary>
+    /// REL.0C: on first run the picker shows the language the app actually starts in. An exactly supported Windows
+    /// language needs no override ("system"); any other culture shows the language the startup resolution wrote;
+    /// a persisted choice (also the old pt-BR default) is shown as it is. The override comes from the REAL
+    /// LocalizationService startup over a fake platform (Atlas PR46-01), not from the table helper.
+    /// </summary>
+    [Theory]
+    [InlineData(null, "en-US", 0)]
+    [InlineData(null, "pt-PT", 0)]
+    [InlineData(null, "pt-BR", 0)]
+    [InlineData(null, "en-GB", 3)]
+    [InlineData(null, "fr-FR", 3)]
+    [InlineData(null, "", 3)]
+    [InlineData(null, "pt-AO", 2)]
+    [InlineData("pt-BR", "fr-FR", 1)]
+    public void OnFirstRun_TheLanguageIndex_ShowsTheStartupLanguage(string? persisted, string systemCulture, int index)
+    {
+        var startup = new LocalizationService(NullLogger<LocalizationService>.Instance, new FakeUiLanguagePlatform(systemCulture, persisted));
+        startup.InitializeFromSystem();
+
+        Assert.Equal(index, new World(language: startup.CurrentLanguageOverride).ViewModel.SelectedLanguageIndex);
+    }
+
     // ---- idempotent, concurrency-safe load ------------------------------------------------------------------------
 
     /// <summary>Both sub-pages load on Loaded: overlapping loads share ONE run and the list is never duplicated.</summary>

@@ -359,6 +359,12 @@
   <data name="HostKeySubjectJumpFormat" xml:space="preserve"><value>Jump host {0}</value></data>
   <data name="HostKeySubjectTargetFormat" xml:space="preserve"><value>Target {0} via {1}</value></data>
   <data name="DashboardEmptyDiscoverySearching.Text" xml:space="preserve"><value>Looking for SSH servers on your local network…</value></data>
+  <data name="DashboardEmptyDiscoveryStartButton.Content" xml:space="preserve"><value>Search local network</value></data>
+  <data name="DashboardEmptyDiscoveryPermissionNote.Text" xml:space="preserve"><value>Looks for SSH servers announced on your local network. Windows may ask for network access permission.</value></data>
+  <data name="DashboardEmptyDiscoveryStartButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.HelpText" xml:space="preserve"><value>Looks for SSH servers announced on your local network. Windows may ask for network access permission.</value></data>
+  <data name="DashboardEmptyDiscoveryNothingFound.Text" xml:space="preserve"><value>Nothing found on your local network.</value></data>
+  <data name="DashboardEmptyDiscoveryFailed.Text" xml:space="preserve"><value>Couldn't search your local network.</value></data>
+  <data name="DashboardEmptyDiscoveryTimeLimit.Text" xml:space="preserve"><value>The search ended after 10 minutes.</value></data>
   <data name="DashboardEmptyDiscoveryFoundFormat" xml:space="preserve"><value>Found on your local network: {0}</value></data>
   <data name="LocalKeyOptionRecommendedFormat" xml:space="preserve"><value>{0} · Recommended</value></data>
   <data name="LocalKeyOptionBrowse" xml:space="preserve"><value>Browse for another file…</value></data>
@@ -1109,4 +1115,6 @@ status, metrics and history.</value></data>
   <!-- UI.9 C2: widget picker strings, referenced from Package*.appxmanifest via ms-resource: (Prism to approve wording). -->
   <data name="WidgetDescription" xml:space="preserve"><value>Your servers' health and metrics at a glance.</value></data>
   <data name="WidgetScreenshotAltText" xml:space="preserve"><value>ServerAlyzer widget showing server health and CPU, RAM and disk use.</value></data>
+  <!-- REL.0C: app Description in Package*.appxmanifest (ms-resource:AppDescription). -->
+  <data name="AppDescription" xml:space="preserve"><value>Local dashboard for monitoring Linux and macOS servers over SSH.</value></data>
 </root>

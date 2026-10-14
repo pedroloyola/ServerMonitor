@@ -139,7 +139,9 @@ public sealed class QaStartupIsolationTests
     {
         var source = AppSourceWithoutComments();
         var refusal = Single(source, "Qa.QaStartupIsolation.RefuseUnisolatedLaunch();");
-        var build = Single(source, ".Build();");
+        // REL.0C: the host is built inside App.BuildServicesHost, called from the constructor.
+        Single(source, ".Build();");
+        var build = Single(source, "ServicesHost = BuildServicesHost(ConfigureApplicationServices);");
         var verify = Single(source, "Qa.QaStartupIsolation.VerifyOrThrow(ServicesHost.Services);");
         var initialize = source.IndexOf("InitializeComponent();", verify, StringComparison.Ordinal);
         var start = Single(source, "await ServicesHost.StartAsync();");

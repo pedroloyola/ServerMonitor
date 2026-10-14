@@ -2,7 +2,9 @@ name: Store submit
 
 # Submits an already-built, already-verified MSIX to the EXISTING ServerAlyzer product and
 # sends it to certification. It never builds anything: the package comes from a release-build
-# run, and its SHA-256 must match what that run reported.
+# run, and its SHA-256 must match what that run reported. Before the Store environment (and its
+# reviewer and secrets) is even reached, the provenance job proves from the GitHub API that the
+# run is the release-build run started by the push of the requested tag, on a commit in main (G4).
 #
 # What this workflow deliberately does NOT do:
 #   * publish the product to customers - the submission is committed with the publishing
@@ -18,12 +20,16 @@ name: Store submit
 on:
   workflow_dispatch:
     inputs:
+      release_tag:
+        description: 'Release tag the package was built from, e.g. v1.1.7 (its tag-push release-build run)'
+        required: true
+        type: string
       release_run_id:
         description: 'Run ID of the release-build workflow that produced the package'
         required: true
         type: string
       package_version:
-        description: 'Expected package version, e.g. 1.1.2.0'
+        description: 'Expected package version, Revision 0 and at least the tracked floor, e.g. 1.1.7.0'
         required: true
         type: string
       expected_sha256:
@@ -52,8 +58,77 @@ env:
   STORE_VISIBILITY: Public
 
 jobs:
-  submit:
+  # G4. Read-only, no environment, no Store secret: only the job's GITHUB_TOKEN with actions:read.
+  # A failure here stops the workflow before anyone is asked to approve the Store environment.
+  provenance:
     runs-on: windows-latest
+    permissions:
+      contents: read
+      actions: read
+    env:
+      RELEASE_TAG: ${{ inputs.release_tag }}
+      PACKAGE_VERSION: ${{ inputs.package_version }}
+      RELEASE_RUN_ID: ${{ inputs.release_run_id }}
+      REPOSITORY: ${{ github.repository }}
+      GH_TOKEN: ${{ github.token }}
+    outputs:
+      tagCommit: ${{ steps.check.outputs.tagCommit }}
+
+    steps:
+      - name: Validate the inputs
+        shell: pwsh
+        run: |
+          if ($env:RELEASE_TAG -cnotmatch '\Av[0-9]+\.[0-9]+\.[0-9]+\z') { throw 'release_tag must be vMAJOR.MINOR.PATCH.' }
+          if ($env:RELEASE_RUN_ID -cnotmatch '\A[1-9][0-9]*\z') { throw 'release_run_id must be a positive decimal run ID.' }
+          if ($env:PACKAGE_VERSION -cnotmatch '\A[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\z') { throw 'package_version is not a four-part version.' }
+          if ($env:REPOSITORY -cnotmatch '\A[A-Za-z0-9-]+/[A-Za-z0-9._-]+\z') { throw 'Unexpected repository name.' }
+
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Prove the run is the tag's release-build run on main
+        id: check
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path provenance | Out-Null
+          gh api "repos/$env:REPOSITORY/actions/runs/$env:RELEASE_RUN_ID" > provenance/run.json
+          if ($LASTEXITCODE -ne 0) { throw 'Could not read the release-build run.' }
+          gh api "repos/$env:REPOSITORY/git/ref/tags/$env:RELEASE_TAG" > provenance/tagref.json
+          if ($LASTEXITCODE -ne 0) { throw 'Could not read the tag ref.' }
+          $ref = Get-Content -Raw provenance/tagref.json | ConvertFrom-Json
+          if ($ref.object.type -ceq 'tag') {
+            if ($ref.object.sha -cnotmatch '\A[0-9a-f]{40}\z') { throw 'Malformed tag object sha.' }
+            gh api "repos/$env:REPOSITORY/git/tags/$($ref.object.sha)" > provenance/tagobject.json
+            if ($LASTEXITCODE -ne 0) { throw 'Could not read the annotated tag object.' }
+            $commit = (Get-Content -Raw provenance/tagobject.json | ConvertFrom-Json).object.sha
+          }
+          else { $commit = $ref.object.sha }
+          if ($commit -cnotmatch '\A[0-9a-f]{40}\z') { throw 'Malformed tag commit sha.' }
+          # Resolve the BRANCH main to a sha first: a bare "main" in a compare could also name a tag.
+          $mainSha = gh api "repos/$env:REPOSITORY/git/ref/heads/main" --jq '.object.sha'
+          if ($LASTEXITCODE -ne 0) { throw 'Could not read refs/heads/main.' }
+          $mainSha = "$mainSha".Trim()
+          if ($mainSha -cnotmatch '\A[0-9a-f]{40}\z') { throw 'Malformed main sha.' }
+          gh api "repos/$env:REPOSITORY/compare/$commit...$mainSha" --jq '{status: .status, ahead_by: .ahead_by, behind_by: .behind_by}' > provenance/compare.json
+          if ($LASTEXITCODE -ne 0) { throw 'Could not compare the tag commit with main.' }
+          ./tools/release/Assert-ReleaseRunProvenance.ps1 `
+            -RunPath provenance/run.json `
+            -TagRefPath provenance/tagref.json `
+            -TagObjectPath provenance/tagobject.json `
+            -ComparePath provenance/compare.json `
+            -Repository $env:REPOSITORY `
+            -Tag $env:RELEASE_TAG `
+            -PackageVersion $env:PACKAGE_VERSION
+
+  submit:
+    needs: provenance
+    runs-on: windows-latest
+    env:
+      SUBMIT_CONFIRM: ${{ inputs.confirm }}
+      PACKAGE_VERSION: ${{ inputs.package_version }}
+      EXPECTED_SHA256: ${{ inputs.expected_sha256 }}
+      RELEASE_RUN_ID: ${{ inputs.release_run_id }}
+      TAG_COMMIT: ${{ needs.provenance.outputs.tagCommit }}
 
     # Gate. The environment carries the Store secrets AND the required reviewer, so nothing
     # below runs until a human approves this specific run.
@@ -69,44 +144,48 @@ jobs:
       - name: Check the confirmation phrase
         shell: pwsh
         run: |
-          if ('${{ inputs.confirm }}' -cne 'SUBMIT') {
+          if ($env:RELEASE_RUN_ID -notmatch '\A[1-9][0-9]*\z') { throw 'release_run_id must be a positive decimal run ID.' }
+          if ($env:SUBMIT_CONFIRM -cne 'SUBMIT') {
             throw "Confirmation phrase was not SUBMIT. Nothing has been done."
           }
-          if ('${{ inputs.package_version }}' -notmatch '^\d+\.\d+\.\d+\.\d+$') {
-            throw "package_version '${{ inputs.package_version }}' is not a four-part version."
+          if ($env:PACKAGE_VERSION -notmatch '\A[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\z') {
+            throw "package_version is not a four-part version."
           }
-          if ('${{ inputs.expected_sha256 }}' -notmatch '^[0-9a-fA-F]{64}$') {
+          if ($env:EXPECTED_SHA256 -notmatch '\A[0-9a-fA-F]{64}\z') {
             throw 'expected_sha256 is not a 64-character hex digest.'
           }
+          if ($env:TAG_COMMIT -cnotmatch '\A[0-9a-f]{40}\z') { throw 'The provenance job did not hand over a tag commit.' }
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Download the package from the release-build run
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          run-id: ${{ inputs.release_run_id }}
+          run-id: ${{ env.RELEASE_RUN_ID }}
           github-token: ${{ github.token }}
-          name: serveralyzer-msix-${{ inputs.package_version }}
+          name: serveralyzer-msix-${{ env.PACKAGE_VERSION }}
           path: incoming
 
       - name: Re-verify the package before anything touches the Store
         id: verify
         shell: pwsh
         run: |
-          $packages = @(Get-ChildItem -Path incoming -Filter '*.msix' -Recurse)
-          if ($packages.Count -ne 1) {
-            throw "Expected exactly one MSIX in the artifact, found $($packages.Count)."
-          }
-          $package = $packages[0].FullName
+          ./tools/release/Assert-PackageVersionFloor.ps1 -PackageVersion $env:PACKAGE_VERSION
+          $package = ./tools/release/Get-ValidatedPackagePath.ps1 -DownloadDirectory 'incoming'
+
+          # G4: the file name release-build gives the package carries the commit it built. It must be
+          # the tag commit the provenance job proved, and the version the operator typed.
+          $expectedName = "ServerAlyzer_${env:PACKAGE_VERSION}_x64_$($env:TAG_COMMIT.Substring(0, 7)).msix"
+          if ((Split-Path -Leaf $package) -cne $expectedName) { throw "The package is not named $expectedName; refusing a package that is not bound to the tag commit." }
           "packagePath=$package" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
           # Independent of the checksum file that travelled with the artifact.
           ./tools/release/Assert-PackageIdentity.ps1 `
             -PackagePath $package `
-            -ExpectedVersion '${{ inputs.package_version }}' `
+            -ExpectedVersion $env:PACKAGE_VERSION `
             -ExpectedIdentityName '${{ env.STORE_IDENTITY_NAME }}' `
-            -ExpectedSha256 '${{ inputs.expected_sha256 }}'
+            -ExpectedSha256 $env:EXPECTED_SHA256
 
           # PRIV-PDBPATH, re-checked with THIS checkout's gate: a release-build run from before the
           # gate existed (artifacts are kept 90 days) must not be submittable just because it is
@@ -115,19 +194,34 @@ jobs:
             -Path $package `
             -AllowlistPath 'tools/release/distribution-privacy-allowlist.json'
 
+          # REL.0C runtime: the package must carry its own .NET runtime (Windows does not ship .NET 10
+          # and the Store has no .NET framework package). The check comes with the runtime change
+          # (PR #48). Until that is on the dispatching branch this step FAILS on purpose: no package
+          # may reach the Store unless this gate ran on it, and nothing is skipped silently.
+          $runtimeGate = './tools/release/Assert-PackageRuntime.ps1'
+          if (-not (Test-Path -LiteralPath $runtimeGate -PathType Leaf)) {
+            throw 'STOP: tools/release/Assert-PackageRuntime.ps1 is missing, so the .NET runtime of this package cannot be proven. Merge the runtime change first. Nothing has been sent to the Store.'
+          }
+          & $runtimeGate -PackagePath $package
+
       - name: Setup the Microsoft Store Developer CLI
-        # microsoft/microsoft-store-apppublisher@v1.4, pinned to its commit.
-        uses: microsoft/microsoft-store-apppublisher@cc9910a8d59f2eb55cbb83df0a3800cf3b5300e0
+        uses: microsoft/microsoft-store-apppublisher@cc9910a8d59f2eb55cbb83df0a3800cf3b5300e0 # v1.4
 
       # GitHub masks secret values in logs; none of them are echoed here either way.
       - name: Configure the CLI
         shell: pwsh
+        # Passed as environment values, not interpolated into the generated script (still masked).
+        env:
+          STORE_TENANT_ID: ${{ secrets.AZURE_AD_TENANT_ID }}
+          STORE_SELLER_ID: ${{ secrets.SELLER_ID }}
+          STORE_CLIENT_ID: ${{ secrets.AZURE_AD_APPLICATION_CLIENT_ID }}
+          STORE_CLIENT_SECRET: ${{ secrets.AZURE_AD_APPLICATION_SECRET }}
         run: |
           msstore reconfigure `
-            --tenantId ${{ secrets.AZURE_AD_TENANT_ID }} `
-            --sellerId ${{ secrets.SELLER_ID }} `
-            --clientId ${{ secrets.AZURE_AD_APPLICATION_CLIENT_ID }} `
-            --clientSecret ${{ secrets.AZURE_AD_APPLICATION_SECRET }}
+            --tenantId $env:STORE_TENANT_ID `
+            --sellerId $env:STORE_SELLER_ID `
+            --clientId $env:STORE_CLIENT_ID `
+            --clientSecret $env:STORE_CLIENT_SECRET
           if ($LASTEXITCODE -ne 0) { throw 'msstore reconfigure failed.' }
 
       - name: Confirm we are pointed at the existing ServerAlyzer product
@@ -152,9 +246,12 @@ jobs:
       # --noCommit uploads the package and leaves the submission in draft. Metadata edits
       # must come after this, because publish recreates the draft.
       - name: Upload the package, leaving the submission in draft
+        env:
+          PACKAGE_PATH: ${{ steps.verify.outputs.packagePath }}
         shell: pwsh
         run: |
-          msstore publish '${{ steps.verify.outputs.packagePath }}' -id ${{ env.STORE_PRODUCT_ID }} --noCommit
+          ./tools/release/Get-ValidatedPackagePath.ps1 -DownloadDirectory 'incoming' -PackagePath $env:PACKAGE_PATH | Out-Null
+          msstore publish "$env:PACKAGE_PATH" -id ${{ env.STORE_PRODUCT_ID }} --noCommit
           if ($LASTEXITCODE -ne 0) { throw 'msstore publish --noCommit failed.' }
 
       - name: Stage the release notes and prove the publishing hold survives
@@ -167,7 +264,7 @@ jobs:
           ./tools/release/Update-StoreSubmission.ps1 `
             -SubmissionPath draft.json `
             -OutputPath updated.json `
-            -ExpectedPackageVersion '${{ inputs.package_version }}' `
+            -ExpectedPackageVersion $env:PACKAGE_VERSION `
             -ExpectedVisibility '${{ env.STORE_VISIBILITY }}'
 
       - name: Apply the metadata
