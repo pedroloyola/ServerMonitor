@@ -124,12 +124,18 @@ Read-only. Reports one of:
 to its audience and to nobody else, and the report says so rather than claiming the product
 is live.
 
-**The run fails when `targetPublishMode` is not `Manual` (G6)**, after printing the report:
-`Assert-ManualPublishMode.ps1`. A submission that is not on the publishing hold would publish
-itself once certification passes; a mode changed in Partner Center while a submission sits in
-certification used to produce only a warning. If the last *published* submission was made by hand
-with another mode, the run stays red until the next pipeline submission (which is always `Manual`);
-read the message, it names the submission status.
+**The run fails when a submission in flight is not on the publishing hold (G6)**, after printing
+the report: `Assert-ManualPublishMode.ps1`.
+- **In flight** (`PendingCommit`, `CommitStarted`, `PreProcessing`, `Certification`, `Release`,
+  `PendingPublication`, `Publishing`), or any status it doesn't know, including an empty one:
+  `targetPublishMode` must be `Manual`, or the run fails. Such a submission would publish itself once
+  certification passes, and a mode changed in Partner Center during certification used to produce
+  only a warning.
+- **Idle** (`None`, `Published`, `Canceled` and the five `…Failed` states): a different mode on that
+  last submission is reported, not failed. Nothing is waiting to be published, and the next
+  submission's mode is set and verified by `store-submit` itself.
+
+So `store-status` stays usable as the "product is idle" check before a submission.
 
 Artifact paths are also validated: exactly one regular `.msix`, directly inside `incoming`,
 with a file name matching `\A[A-Za-z0-9._-]+\.msix\z`; reparse points and nested packages
@@ -149,8 +155,8 @@ the comment in step with the SHA. `ci.yml` (no secrets, read-only token) still u
 `Test-ReleaseWorkflowShape.ps1 -SelfTest` checks the wiring itself: the Release only from the
 dispatch-only job, the provenance job before the Store environment and without secrets, every gate
 (floor, name binding, identity, privacy, runtime) before the Store CLI is configured, and
-`store-status` failing on a publish mode other than `Manual`. Each rule is proven by breaking it in
-memory.
+`store-status` failing when a submission in flight is not on the publishing hold. Each rule is
+proven by breaking it in memory.
 
 ## Package version floor
 
@@ -357,9 +363,9 @@ Everything the workflows rely on runs offline:
 ./tools/release/Test-StoreSubmissionUpdate.ps1  # publishing hold, 12 cases
 ./tools/release/Get-SubmissionState.ps1 -SelfTest        # status mapping, 18 cases
 ./tools/release/Assert-NoPendingSubmission.ps1 -SelfTest # in-flight guard, 19 cases
-./tools/release/Test-ReleaseRunProvenance.ps1             # release run provenance (G4), 35 cases
-./tools/release/Test-ManualPublishMode.ps1                # publishing hold in store-status (G6), 9 cases
-./tools/release/Test-HardeningMutations.ps1               # remove each G4/G6 check; require its case to fail
+./tools/release/Test-ReleaseRunProvenance.ps1             # release run provenance (G4), 40 cases
+./tools/release/Test-ManualPublishMode.ps1                # publishing hold in store-status (G6), 20 cases
+./tools/release/Test-HardeningMutations.ps1               # weaken each G4/G6 check and the pin/wiring guards; require detection
 ./tools/release/Test-WorkflowRunInterpolation.ps1 -SelfTest # no inputs/steps/needs/event in run blocks
 ./tools/release/Test-WorkflowActionPins.ps1 -SelfTest     # actions pinned by full SHA (G8)
 ./tools/release/Test-ReleaseWorkflowShape.ps1 -SelfTest   # G2/G4/G6/runtime wiring of the workflows

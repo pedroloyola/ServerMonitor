@@ -93,7 +93,9 @@ if ((Get-Field $run 'status') -cne 'completed') { throw 'Provenance: the run has
 if ((Get-Field $run 'conclusion') -cne 'success') { throw 'Provenance: the run did not succeed.' }
 if ((Get-Field $run 'event') -cne 'push') { throw 'Provenance: only a run started by the tag push can be submitted (dispatch runs cannot be bound to the tag).' }
 if ((Get-Field $run 'head_branch') -cne $Tag) { throw "Provenance: the run was not started by the push of $Tag." }
-if ((Get-Field $run 'head_sha') -cne $tagCommit) { throw "Provenance: the run built a different commit than $Tag points at." }
+$headSha = [string] (Get-Field $run 'head_sha')
+if ($headSha -cnotmatch $sha) { throw 'Provenance: the run head_sha is not a full lowercase commit sha.' }
+if ($headSha -cne $tagCommit) { throw "Provenance: the run built a different commit than $Tag points at." }
 
 # --------------------------------------------------- the tag is on main
 $compare = Read-Json $ComparePath 'the tag...main comparison'

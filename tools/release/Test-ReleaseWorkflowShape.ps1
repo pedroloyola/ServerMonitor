@@ -35,7 +35,12 @@ function Assert-ReleaseBuild([string] $Text) {
     if ($releaseJobs.Count -ne 1) { throw 'Shape G2: exactly one job may create the GitHub Release.' }
     $release = Strip-Comments $jobs[$releaseJobs[0]]
     if ($release -notmatch '(?m)^    needs:\s*build\s*$') { throw 'Shape G2: the release job must need the build job.' }
-    if ($release -notmatch "(?m)^    if:.*github\.event_name == 'workflow_dispatch'.*&&.*inputs\.create_release == true") { throw 'Shape G2: the release job must run only on a dispatch with create_release == true.' }
+    # The whole condition, anchored: anything added around it ('|| true', another clause) is a different
+    # condition and must be reviewed, not accepted because the expected words still appear somewhere.
+    $conditions = @([regex]::Matches($release, '(?m)^    if:.*$'))
+    if ($conditions.Count -ne 1 -or $conditions[0].Value -cnotmatch "\A    if:\s*\$\{\{\s*github\.event_name == 'workflow_dispatch' && inputs\.create_release == true\s*\}\}\s*\z") {
+        throw 'Shape G2: the release job must run only on a dispatch with create_release == true (exact condition).'
+    }
     foreach ($name in $jobs.Keys) {
         $body = Strip-Comments $jobs[$name]
         if ($name -ne $releaseJobs[0] -and $body -match 'contents:\s*write') { throw "Shape G2: job '$name' must not have contents: write." }
@@ -64,7 +69,7 @@ function Assert-StoreSubmit([string] $Text) {
 function Assert-StoreStatus([string] $Text) {
     $body = Strip-Comments $Text
     if ($body -notmatch 'Assert-ManualPublishMode\.ps1 -PublishMode \$publishMode') { throw 'Shape G6: store-status must check the publish mode.' }
-    if ($body -notmatch 'if \(\$publishModeError\) \{ throw') { throw 'Shape G6: a publish mode other than Manual must fail the run.' }
+    if ($body -notmatch 'if \(\$publishModeError\) \{ throw') { throw 'Shape G6: a submission in flight off the publishing hold must fail the run.' }
 }
 
 $checks = [ordered]@{
@@ -76,6 +81,9 @@ $mutations = @{
     'release-build.yml' = @(
         @{ Old = "default: false`n        type: boolean`n      attach_package"; New = "default: true`n        type: boolean`n      attach_package"; Name = 'create_release defaults to true' }
         @{ Old = "if: `${{ github.event_name == 'workflow_dispatch' && inputs.create_release == true }}"; New = "if: `${{ inputs.create_release != false }}"; Name = 'release on tag push' }
+        @{ Old = "inputs.create_release == true }}"; New = "inputs.create_release == true || true }}"; Name = 'tautology appended (|| true)' }
+        @{ Old = "if: `${{ github.event_name"; New = "if: `${{ always() || github.event_name"; Name = 'tautology prepended (always() ||)' }
+        @{ Old = "if: `${{ github.event_name == 'workflow_dispatch' && inputs.create_release == true }}"; New = "if: `${{ github.event_name == 'workflow_dispatch' && inputs.create_release == true }}`n    if: `${{ true }}"; Name = 'second condition line' }
         @{ Old = "contents: read         # building"; New = "contents: write        # building"; Name = 'build job writable' }
         @{ Old = "    needs: build`n"; New = ''; Name = 'release without the build' }
     )

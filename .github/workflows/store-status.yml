@@ -116,6 +116,9 @@ jobs:
           ) | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
 
           # G6: decided here, enforced at the end of this step, after the report below is printed.
+          # A submission in flight (or with an unknown status) must be on the publishing hold; an
+          # idle product (None/Published/Canceled/*Failed) is reported, not failed, so this run
+          # still answers "is the product idle?" before a new submission.
           $publishModeError = $null
           try { ./tools/release/Assert-ManualPublishMode.ps1 -PublishMode $publishMode -Status $status }
           catch { $publishModeError = $_.Exception.Message; Write-Warning $publishModeError }

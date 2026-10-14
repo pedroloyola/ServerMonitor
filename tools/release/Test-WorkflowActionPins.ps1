@@ -30,10 +30,12 @@ foreach ($name in $names) {
     $count = Assert-ActionPins $text
     Write-Host "PASS action pins: $name ($count uses)"
     if ($SelfTest) {
-        # Reintroduce the defect in memory: re-point the first pinned action at a moving tag, a short SHA,
-        # and a SHA without its release comment.
+        # Reintroduce the defect in memory: re-point the first pinned action at a moving tag (without and
+        # WITH the release comment, so the tag itself is what must be rejected), a short SHA, a SHA without
+        # its release comment, and a branch.
         $mutants = @(
             [regex]::new('@[0-9a-f]{40}\s+#\s*(v[0-9.]+)').Replace($text, '@$1', 1),
+            [regex]::new('@[0-9a-f]{40}(\s+#\s*(v[0-9.]+))').Replace($text, '@$2$1', 1),
             [regex]::new('@([0-9a-f]{7})[0-9a-f]{33}').Replace($text, '@$1', 1),
             [regex]::new('(@[0-9a-f]{40})\s+#\s*v[0-9.]+').Replace($text, '$1', 1),
             [regex]::new('@[0-9a-f]{40}').Replace($text, '@main', 1)
@@ -47,15 +49,27 @@ foreach ($name in $names) {
             }
             if (-not $caught) { throw "Pin mutation survived in $name." }
         }
-        Write-Host "MUTATIONS DETECTED: $name (tag, short SHA, missing release comment, branch)"
+        Write-Host "MUTATIONS DETECTED: $name (tag, tag with release comment, short SHA, missing release comment, branch)"
         Assert-ActionPins $text | Out-Null
     }
 }
 if ($SelfTest) {
-    foreach ($text in @("steps:`n  - uses: actions/checkout@v4", "steps:`n  - { uses: actions/checkout@v4 }", "steps:`n  - run: echo")) {
+    # Each synthetic shape must be rejected for its own reason, not just "something threw".
+    $synthetic = @(
+        @{ Text = "steps:`n  - uses: actions/checkout@v4"; Reason = 'Action not pinned' }
+        @{ Text = "steps:`n  - uses: actions/checkout@v4 # v4"; Reason = 'Action not pinned' }
+        @{ Text = "steps:`n  - uses: actions/checkout@v4.4.0 # v4.4.0"; Reason = 'Action not pinned' }
+        @{ Text = "steps:`n  - uses: actions/checkout@11D5960A326750D5838078E36CF38B85AF677262 # v4.4.0"; Reason = 'Action not pinned' }
+        @{ Text = "steps:`n  - { uses: actions/checkout@v4 }"; Reason = 'Unsupported flow-style' }
+        @{ Text = "steps:`n  - run: echo"; Reason = 'No uses lines found' }
+    )
+    foreach ($case in $synthetic) {
         $caught = $false
-        try { Assert-ActionPins $text | Out-Null } catch { $caught = $true }
-        if (-not $caught) { throw 'Synthetic pin case survived.' }
+        try { Assert-ActionPins $case.Text | Out-Null } catch {
+            if (-not $_.Exception.Message.StartsWith($case.Reason)) { throw }
+            $caught = $true
+        }
+        if (-not $caught) { throw "Synthetic pin case survived: $($case.Text)" }
     }
-    Write-Host 'All 12 workflow pin mutations and 3 synthetic shapes rejected; original workflows passed again.'
+    Write-Host "All $(5 * $names.Count) workflow pin mutations and $($synthetic.Count) synthetic shapes rejected; original workflows passed again."
 }

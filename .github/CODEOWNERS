@@ -6,7 +6,11 @@
 # author of a pull request approve it, so with a single maintainer that requirement needs a second
 # identity; read that document before turning it on.
 #
-# Later patterns win. Keep the most specific entries last.
+# Later patterns win. The catch-all comes first; the entries below it name the paths that matter
+# most for releases, so they stay owned explicitly if the catch-all ever changes.
+
+# Everything
+*                                           @pedroloyola
 
 # Workflows, dependency automation and this file
 /.github/                                   @pedroloyola
@@ -21,3 +25,6 @@
 /src/Directory.Build.props                  @pedroloyola
 *.csproj                                    @pedroloyola
 /src/ServerMonitor.App/*.appxmanifest       @pedroloyola
+
+# Architecture guards: tests that encode security and boundary invariants
+/tests/**/Architecture/                     @pedroloyola

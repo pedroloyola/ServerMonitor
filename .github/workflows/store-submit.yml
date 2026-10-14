@@ -104,7 +104,12 @@ jobs:
           }
           else { $commit = $ref.object.sha }
           if ($commit -cnotmatch '\A[0-9a-f]{40}\z') { throw 'Malformed tag commit sha.' }
-          gh api "repos/$env:REPOSITORY/compare/$commit...main" --jq '{status: .status, ahead_by: .ahead_by, behind_by: .behind_by}' > provenance/compare.json
+          # Resolve the BRANCH main to a sha first: a bare "main" in a compare could also name a tag.
+          $mainSha = gh api "repos/$env:REPOSITORY/git/ref/heads/main" --jq '.object.sha'
+          if ($LASTEXITCODE -ne 0) { throw 'Could not read refs/heads/main.' }
+          $mainSha = "$mainSha".Trim()
+          if ($mainSha -cnotmatch '\A[0-9a-f]{40}\z') { throw 'Malformed main sha.' }
+          gh api "repos/$env:REPOSITORY/compare/$commit...$mainSha" --jq '{status: .status, ahead_by: .ahead_by, behind_by: .behind_by}' > provenance/compare.json
           if ($LASTEXITCODE -ne 0) { throw 'Could not compare the tag commit with main.' }
           ./tools/release/Assert-ReleaseRunProvenance.ps1 `
             -RunPath provenance/run.json `

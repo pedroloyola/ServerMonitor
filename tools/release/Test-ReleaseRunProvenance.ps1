@@ -43,6 +43,15 @@ $cases = @(
     @{ Name = 'other tag push'; Pass = $false; Edit = { param($f) $f.Run.head_branch = 'v1.1.8' } }
     @{ Name = 'head sha mismatch'; Pass = $false; Edit = { param($f) $f.Run.head_sha = 'c' * 40 } }
     @{ Name = 'head sha is the tag object'; Pass = $false; Edit = { param($f) $f.Run.head_sha = $tagSha } }
+    @{ Name = 'head sha empty'; Pass = $false; Edit = { param($f) $f.Run.head_sha = '' } }
+    @{ Name = 'head sha short prefix'; Pass = $false; Edit = { param($f) $f.Run.head_sha = 'aaaaaaa' } }
+    @{ Name = 'head sha uppercase'; Pass = $false; Edit = { param($f) $f.Run.head_sha = 'A' * 40 } }
+    @{ Name = 'completed status missing (success reported)'; Pass = $false; Edit = { param($f) $f.Run.status = 'in_progress' } }
+    @{ Name = 'tag with trailing newline (consistent everywhere)'; Pass = $false; Edit = {
+        param($f)
+        $t = "v1.1.7`n"
+        $f.Tag = $t; $f.Version = "1.1.7`n.0"; $f.Run.head_branch = $t; $f.TagRef.ref = "refs/tags/$t"; $f.TagObject.tag = $t
+    } }
     @{ Name = 'fork head repository'; Pass = $false; Edit = { param($f) $f.Run.head_repository = @{ full_name = 'evil/ServerMonitor' } } }
     @{ Name = 'other repository'; Pass = $false; Edit = { param($f) $f.Run.repository = @{ full_name = 'evil/ServerMonitor' } } }
     @{ Name = 'missing head repository'; Pass = $false; Edit = { param($f) $f.Run.Remove('head_repository') } }
@@ -89,7 +98,11 @@ try {
                 -ComparePath (Join-Path $dir 'compare.json') -Repository $fixture.Repository -Tag $fixture.Tag `
                 -PackageVersion $fixture.Version | Out-Null
         }
-        catch { $accepted = $false }
+        catch {
+            # Only the guard's own refusal counts; a parameter, parser or fixture error is a broken test.
+            if (-not $_.Exception.Message.StartsWith('Provenance:')) { throw "Case '$($case.Name)' failed for a reason that is not the guard's: $($_.Exception.Message)" }
+            $accepted = $false
+        }
         if ($accepted -ne $case.Pass) { $failed += $case.Name; Write-Host "FAIL $($case.Name)" }
         else { Write-Host "ok $($case.Name)" }
     }

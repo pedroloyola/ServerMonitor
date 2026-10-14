@@ -34,11 +34,17 @@ GitHub never lets the author of a pull request approve it (DOC). With one human 
 
 * **Variant 1, solo (recommended now).** Pull request required, **0** approvals, code-owner review
   **off**, required checks on, no force push, no deletion. Direct pushes to `main` stop, including
-  from tools and agents that use the owner's credential, and nothing red can merge. The owner can
-  still merge their own pull request. CODEOWNERS only routes notifications.
+  from tools and agents that use the owner's credential, and a pull request can merge only with the
+  three required checks green. **That does not make the checks trustworthy on their own:** the checks
+  are identified by job name, so a pull request that edits `ci.yml` or the guards it runs can turn
+  them green, and with 0 approvals the owner (or anything acting with the owner's credential) can
+  merge it. Variant 1 stops direct and force pushes and red merges. It does **not** stop a reviewed-by-
+  nobody change to the checks themselves. The owner can still merge their own pull request, and
+  CODEOWNERS only routes notifications.
 * **Variant 2, two identities.** A second GitHub account (or a GitHub App) does the merging or the
   approving, and code-owner review is **on** with 1 approval. Only this variant turns CODEOWNERS into
-  a control. It needs a second identity that agents cannot use.
+  a control, and only this variant stops a change to `ci.yml`, `tools/release/` or the workflows from
+  merging without a second pair of eyes. It needs a second identity that agents cannot use.
 
 **Automation shares the owner's credential (G7).** Local tooling that acts through the owner's `gh`
 login is, to GitHub, the owner. No rule can tell them apart. Variant 1 still forces such changes through
@@ -144,13 +150,18 @@ but its credential can write. Pick one:
   status run then waits for an approval, which is the cost. With one human, "prevent self-review"
   must stay off, or nobody can approve (G7).
 * **B2 (least privilege, not verified):** a second Entra application, added to Partner Center with
-  a role that cannot submit, used only by `microsoft-store-status`.
-  * Partner Center lets you assign Entra applications the roles Manager, Developer, Business
-    contributor, Finance contributor and Marketer (DOC, Partner Center "Add Microsoft Entra
-    applications").
-  * Microsoft's submission-API documentation asks for **Manager** (DOC).
-  * Whether a lesser role can read submission status through the API is **HYPOTHESIS**. Check it with
-    the second application in a `store-status` run, before relying on it.
+  less than Manager, used only by `microsoft-store-status`.
+  * When adding an Entra application, Partner Center asks for "the role(s) **or customized
+    permissions**" for it (DOC, *Manage Microsoft Entra applications in Partner Center*). A narrow set
+    of custom permissions is the least-privilege candidate, not just a smaller predefined role.
+  * Which roles and permissions exist is read in Partner Center itself, when the application is added.
+    The names aren't repeated here because the page above doesn't list them.
+  * Microsoft's submission-API documentation asks for **Manager** (DOC, *Create and manage
+    submissions using Microsoft Store services*: "assign this application the Manager role").
+  * Whether a role or custom permission set below Manager can read submission status through the API
+    is **HYPOTHESIS**. Check it with the second application in a `store-status` run before relying on it.
+    Confirm in Partner Center that the assigned role or permissions include nothing that submits,
+    commits or publishes. Never prove "read-only" by attempting a write.
   * Until that is proven, B1 is the control.
 
 Verify (read-only):
@@ -190,7 +201,7 @@ All of the following, verified with the commands above, recorded with the date:
 
 | ID | Risk | Why it is accepted | Revisit when |
 | --- | --- | --- | --- |
-| **G7** | One human identity. The reviewer of `microsoft-store` is also the one who dispatches (`prevent_self_review: false`). Agents act with the owner's credential, so rules cannot separate "owner" from "agent". Code-owner review can't be enforced without a second identity. | Solo maintainer. The controls that still hold: pull request + green checks on `main`, no force push, the provenance job, the Store reviewer prompt, `SUBMIT`, and the publishing hold (a person presses "Publish now" in Partner Center). | A second maintainer, or a separate restricted identity for agents. |
+| **G7** | One human identity. The reviewer of `microsoft-store` is also the one who dispatches (`prevent_self_review: false`). Agents act with the owner's credential, so rules cannot separate "owner" from "agent". Code-owner review can't be enforced without a second identity. With variant 1, a pull request that edits `ci.yml`, `tools/release/` or a workflow can make the required checks (matched by job name) green and be merged by the owner's credential without a second review. | Solo maintainer. The controls that still hold: pull request + green checks on `main`, no force push, the provenance job, the Store reviewer prompt, `SUBMIT`, and the publishing hold (a person presses "Publish now" in Partner Center). | A second maintainer, or a separate restricted identity for agents. |
 | **G9** | The Store credential is a long-lived Entra **client secret** (expires **2027-03-04**, see *Rotating the client secret*), not a federated/OIDC credential. | `msstore reconfigure` is documented with a client secret. Whether the Store CLI and the Partner Center flow accept a GitHub OIDC federated credential is **HYPOTHESIS** and needs an approved Entra identity change (R1). The secret lives only in the two environments, is passed to one step through the environment, and is never printed. | Before 2027-03-04 (rotation), or when a federated credential is approved. |
 
 | Accepted by | Date | Note |
@@ -202,4 +213,4 @@ All of the following, verified with the commands above, recorded with the date:
 * GitHub — [About rulesets](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/about-rulesets) · [Available rules for rulesets](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/available-rules-for-rulesets) · [REST: repository rulesets](https://docs.github.com/en/rest/repos/rules)
 * GitHub — [About code owners](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners) · [About pull request reviews (authors cannot approve their own)](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/reviewing-changes-in-pull-requests/about-pull-request-reviews)
 * GitHub — [Managing environments for deployment](https://docs.github.com/en/actions/managing-workflow-runs-and-deployments/managing-deployments/managing-environments-for-deployment) · [REST: GitHub Actions permissions](https://docs.github.com/en/rest/actions/permissions)
-* Microsoft — [Add Microsoft Entra applications to your Partner Center account](https://learn.microsoft.com/en-us/partner-center/account-settings/add-azure-ad-applications) · [Create and manage submissions using Microsoft Store services](https://learn.microsoft.com/en-us/windows/uwp/monetize/create-and-manage-submissions-using-windows-store-services)
+* Microsoft — [Manage Microsoft Entra applications in Partner Center](https://learn.microsoft.com/en-us/windows/apps/publish/partner-center/manage-azure-ad-applications-in-partner-center) · [Create and manage submissions using Microsoft Store services](https://learn.microsoft.com/en-us/windows/uwp/monetize/create-and-manage-submissions-using-windows-store-services)

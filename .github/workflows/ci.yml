@@ -149,6 +149,7 @@ jobs:
       - name: Release guards and their counterproofs
         shell: pwsh
         run: |
+          ./tools/release/Test-ValidatedPackagePath.ps1
           ./tools/release/Test-PackageVersionFloor.ps1
           ./tools/release/Test-TagVersion.ps1
           ./tools/release/Test-VersionGuardMutations.ps1
