@@ -102,8 +102,11 @@ Remove-Item -LiteralPath '<exact .pfx path>' -Confirm
 Remove-Item -LiteralPath '<exact password file path>' -Confirm
 ```
 
-Then empty the local Recycle Bin of those files (a `Remove-Item` from PowerShell does not use the bin;
-deletion from Explorer does), and the cloud bins / version history if I4 found a synced folder.
+`Remove-Item` deletes directly; it does not go through the Recycle Bin, so nothing is left there by these
+commands. If any copy was ever deleted via Explorer instead, empty the Recycle Bin. If I4 found a
+cloud-synced folder, also empty the cloud service's recycle bins and remove its version history. (A plain
+delete is not a secure wipe; that is accepted because after Phase 2 the certificate is no longer trusted,
+and it expires on 2026-11-30.)
 
 - In `Cert:`, `Remove-Item` honours only `-Path`, `-DeleteKey`, `-WhatIf` and `-Confirm`; any other
   parameter (including `-LiteralPath`) is ignored (DOC

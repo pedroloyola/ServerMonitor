@@ -67,9 +67,19 @@ Get-NetUDPEndpoint | Where-Object OwningProcess -in $pids | Select-Object LocalA
 Get-NetTCPConnection -State Listen | Where-Object OwningProcess -in $pids | Select-Object LocalAddress, LocalPort, OwningProcess
 ```
 
-PASS = no UDP endpoint on `0.0.0.0`/`::` (any port, including 5353), no TCP `Listen`, no Firewall
-dialog, and `(Get-NetFirewallRule).Count` equal before and after. Evidence: one CSV per sample series
-(timestamp, PID, address, port), plus the two rule counts.
+`Get-NetUDPEndpoint` also lists outbound UDP **client** sockets (e.g. DNS, SSH helpers), which are bound
+to a wildcard address on an ephemeral port; those are not listeners. Exact criteria:
+
+- **FAIL** if any of these holds: a UDP endpoint with `LocalPort` 5353 (any address); a TCP socket in
+  state `Listen` (any address, any port); a Firewall dialog; `(Get-NetFirewallRule).Count` differs
+  before vs after.
+- **INVESTIGATE** (record, not FAIL by itself): a UDP endpoint on `0.0.0.0`/`::` with a port outside the
+  dynamic range 49152–65535; any wildcard UDP endpoint that persists across all samples. It becomes FAIL
+  only if it coincides with a dialog or rule delta, or is shown to receive unsolicited inbound traffic.
+- **PASS**: no FAIL and every INVESTIGATE item explained.
+
+Evidence: one CSV per sample series (timestamp, PID, protocol, address, port, state), plus the two rule
+counts.
 
 Observation rule: the tester **records** any dialog (screenshot, time, exe path). In a disposable VM they
 may answer it; on the maintainer's machine agents never answer it.

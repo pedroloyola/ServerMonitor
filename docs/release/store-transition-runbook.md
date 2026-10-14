@@ -144,15 +144,26 @@ PRIVACY.md, or change storage); the M14.6 backup is the user-facing safety net e
    ignored devices):**
    1. Exit the app from the tray (**Exit**, not close). Close the Widgets board.
    2. Confirm nothing of the package is running: `Get-Process ServerMonitor.App, ServerAlyzer.WidgetProvider -ErrorAction SilentlyContinue` returns nothing. If the provider keeps reappearing, wait for its idle exit (do not kill it).
-   3. Copy the folder to a **new** folder outside any cloud-synced location, readable only by the user:
+   3. Create a **new** folder outside any cloud-synced location, restrict it to the current user, then copy
+      the folder into it. `robocopy /COPY:DAT` copies no ACLs: copied files inherit the destination's ACL,
+      so the restriction is set on `$Dst` **before** the copy.
       ```powershell
       $Src = Join-Path $env:LOCALAPPDATA 'ServerMonitor'
       $Dst = '<new folder outside cloud sync>\ServerMonitor-pre-transition-<yyyyMMdd>'
-      robocopy $Src $Dst /E /COPY:DAT /DCOPY:DAT /R:0 /W:0 /NP   # exit codes 0-7 = success
+      $Sid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+      New-Item -ItemType Directory -Path $Dst | Out-Null                  # fails if it already exists
+      icacls $Dst /inheritance:r /grant:r "*${Sid}:(OI)(CI)F"              # drop inherited entries, user only
+      robocopy $Src $Dst /E /COPY:DAT /DCOPY:DAT /R:0 /W:0 /NP            # exit codes 0-7 = success
       ```
       `history.db`, `history.db-wal` and `history.db-shm` must be copied together (all three or none).
-   4. Verify: the §6.1 hash list recomputed on `$Dst` equals the one on `$Src` (same relative names, sizes and
-      SHA-256). Any difference = STOP.
+   4. Verify, any failure = STOP:
+      - ACL: `$a = Get-Acl -LiteralPath $Dst` → `$a.AreAccessRulesProtected` is `True` and every entry of
+        `$a.Access` has `IdentityReference` translating to `$Sid`
+        (`$_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value -eq $Sid`);
+        the same check on every file under `$Dst` (inherited from `$Dst`, so only that user's entry).
+        Local administrators can still take ownership; the restriction is against other standard accounts.
+      - Content: the §6.1 hash list recomputed on `$Dst` equals the one on `$Src` (same relative names,
+        sizes and SHA-256).
    5. The copy contains server configuration and host-key trust but **no secrets** (those are in Credential
       Manager and in the encrypted backup). The human deletes it after the soak (§7) together with the
       M14.6 file they no longer need.
@@ -178,8 +189,10 @@ Get-ChildItem -LiteralPath $Root -Recurse -File | ForEach-Object {
 
 # STOP check: anything redirected on this machine?
 Test-Path "$env:LOCALAPPDATA\Packages\$Pfn\LocalCache\Local\ServerMonitor"
-# credential target NAMES only (no secrets)
-cmdkey /list | Select-String -SimpleMatch 'ServerMonitor:v1:ssh' | Measure-Object
+# credential target NAMES only, sorted (cmdkey never prints secrets; the names hold only prefix + GUIDs + kind)
+cmdkey /list | Select-String -Pattern 'ServerMonitor:v1:ssh:\S+' -AllMatches |
+  ForEach-Object { $_.Matches.Value } | Sort-Object -Unique |
+  ForEach-Object { [pscustomobject]@{ Target = $_ } } | Export-Csv "$Out\credential-targets-before.csv" -NoTypeInformation
 ```
 
 **If the `LocalCache` test is True: STOP** before any path R / fallback F-A. Copy and inventory that
@@ -222,7 +235,9 @@ a shorter soak, recorded as such. Key retirement (Phase 1) does not affect rollb
 2. **Before opening any server:** exit the app from the tray, recompute the §6.1 file list and compare with
    `files-before.csv`: equal except `history.db*`, `widget-state.json*`, `window-placement.json` (changed by
    the §6.3 launch). No `…\Packages\<PFN>\LocalCache\Local\ServerMonitor`.
-3. Credential target count equal to §6.1. Open one server → connects with **no** new host-key trust prompt
+3. Credential target **names**: the sorted list (same command as §6.1, written to
+   `credential-targets-after.csv`) is identical to `credential-targets-before.csv`, entry for entry (names
+   only, never secret values). Open one server → connects with **no** new host-key trust prompt
    and no password prompt.
 4. Original widget pin present and updating within one refresh cycle; no duplicate pin.
 5. Language shown = the one before.
