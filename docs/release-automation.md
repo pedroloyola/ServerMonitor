@@ -10,8 +10,8 @@ make the product public.** Publishing stays a human act.
 
 | workflow | trigger | talks to the Store | can publish |
 | --- | --- | --- | --- |
-| `release-build.yml` | tag `v*`, or manual dispatch | no | no |
-| `store-submit.yml` | manual dispatch only, `microsoft-store` environment | yes | no |
+| `release-build.yml` | tag `v*` builds and checks; a GitHub Release only by manual dispatch | no | no |
+| `store-submit.yml` | manual dispatch only; provenance job, then the `microsoft-store` environment | yes | no |
 | `store-status.yml` | manual dispatch only, `microsoft-store-status` environment | reads only | no |
 
 `release-build.yml` holds no Store secrets at all: it is not attached to the environment
@@ -26,6 +26,8 @@ Builds the shippable MSIX from an exact tag and proves it is what the tag says.
 3. `Assert-TagVersion.ps1` — the tag must resolve to the checked-out commit, and the
    csproj `Version` / `FileVersion` / `InformationalVersion` plus both appxmanifests must
    all agree with it. `AssemblyVersion` is deliberately excluded; it is pinned at `1.0.0.0`.
+   Then `Assert-PackageVersionFloor.ps1` on that version (see *Package version floor*), before
+   anything is built.
 4. Restore, non-incremental Release build, full test run, vulnerability scan.
 5. Runs the release checks' own counterproof suites, so a green package check means
    something.
@@ -49,6 +51,14 @@ Builds the shippable MSIX from an exact tag and proves it is what the tag says.
 11. Creates the GitHub Release **only if it does not already exist**, and by default
    **does not attach the MSIX**: the Microsoft Store is the distribution channel.
 
+**The GitHub Release is never a side effect of a tag push (G2).** A push of `vX.Y.Z` runs every
+step above up to the artifact upload, in a `build` job with **read-only** repository access. The
+Release is created by a separate `release` job, which runs only on a **manual dispatch** with
+`create_release: true` (default `false`), only after the `build` job succeeded, and is the only job
+with `contents: write`. `attach_package` stays `false` by default. The MSIX name carries the commit
+that was actually checked out (`git rev-parse HEAD`), not `github.sha`, which on a manual dispatch is
+the commit of the branch the dispatch ran on.
+
 ### 2. `store-submit.yml`
 
 Takes the artifact from a `release-build` run and submits it to the existing product.
@@ -57,13 +67,32 @@ It never builds. The package must arrive from a specific run id and its SHA-256 
 what the operator types in, so the thing that gets certified is provably the thing that was
 built and checked.
 
+Inputs: the release tag (`vX.Y.Z`), the run id of that tag's `release-build` run, the package
+version (`X.Y.Z.0`), the SHA-256 from that run, and `SUBMIT`.
+
 Order of operations, and why:
 
-1. Confirmation phrase `SUBMIT`, plus shape checks on the version and digest.
-2. Download the artifact from the named run; re-run the full package identity check and the
-   distribution privacy check on it, with this checkout's gate, so a run from before the
-   gate existed cannot be submitted.
-3. `msstore reconfigure` from environment secrets.
+0. **Provenance job (G4)**, with no environment, no reviewer prompt and no Store secret, only the
+   job's `GITHUB_TOKEN` with `actions: read`. It reads the run, the tag ref (and the annotated tag
+   object behind it) and a `tag...main` comparison from the GitHub API, and
+   `Assert-ReleaseRunProvenance.ps1` fails closed unless the run is
+   `.github/workflows/release-build.yml` of this repository (not a fork), `completed` with
+   `success`, started by the **push of that tag** (`event push`, `head_branch` = tag), on exactly the
+   commit the tag points at, that commit is contained in `main`, and the package version is the
+   tag's version with Revision 0. Runs started by a manual dispatch are refused: the API records the
+   dispatching branch's commit for them, not the tag they built, so they cannot be bound to the tag.
+   The submit job `needs` this job, so a failure here stops everything before anyone is asked to
+   approve the Store environment.
+1. Confirmation phrase `SUBMIT`, plus shape checks on the version, digest and the tag commit handed
+   over by the provenance job.
+2. Download the artifact from the named run. Before any secret is used, with this checkout's gates:
+   the version floor; the file name must be `ServerAlyzer_<version>_x64_<first 7 of the tag
+   commit>.msix`; the full package identity check against the typed SHA-256; distribution privacy;
+   and the **package runtime** check (`Assert-PackageRuntime.ps1`, REL.0C). The runtime check ships
+   with the self-contained runtime change; on a branch where the script does not exist yet the step
+   **fails** on purpose instead of skipping, so a framework-dependent package can never be submitted.
+3. `msstore reconfigure` from environment secrets, passed to the step as environment values rather
+   than written into the generated script.
 4. `msstore apps get 9N6ZBSBN1TD2` — the product must report identity
    `PedroLoy.ServerAlyzer`, or the run stops.
 5. **`Assert-NoPendingSubmission.ps1`.** This is the most important guard in the pipeline.
@@ -102,6 +131,64 @@ Read-only. Reports one of:
 `Published` is not the same as public. A product whose visibility is `Private` is published
 to its audience and to nobody else, and the report says so rather than claiming the product
 is live.
+
+**The run fails when a submission in flight is not on the publishing hold (G6)**, after printing
+the report: `Assert-ManualPublishMode.ps1`.
+- **In flight** (`PendingCommit`, `CommitStarted`, `PreProcessing`, `Certification`, `Release`,
+  `PendingPublication`, `Publishing`), or any status it doesn't know, including an empty one:
+  `targetPublishMode` must be `Manual`, or the run fails. Such a submission would publish itself once
+  certification passes, and a mode changed in Partner Center during certification used to produce
+  only a warning.
+- **Idle** (`None`, `Published`, `Canceled` and the five `…Failed` states): a different mode on that
+  last submission is reported, not failed. Nothing is waiting to be published, and the next
+  submission's mode is set and verified by `store-submit` itself.
+
+So `store-status` stays usable as the "product is idle" check before a submission.
+
+Artifact paths are also validated: exactly one regular `.msix`, directly inside `incoming`,
+with a file name matching `\A[A-Za-z0-9._-]+\.msix\z`; reparse points and nested packages
+are rejected. The upload step receives the path through `env`, revalidates it and passes
+it as a quoted argument. Inputs, step outputs, other jobs' outputs (`needs.*`) and the event
+payload (`github.event.*`) must not be interpolated into `run` scripts;
+`Test-WorkflowRunInterpolation.ps1 -SelfTest` checks all three release workflows and proves
+detection by reintroducing each kind of interpolation in memory.
+
+**Actions are pinned to full commit SHAs (G8)** in the three release workflows, with the release
+in a trailing comment (`uses: actions/checkout@<40 hex> # v4.4.0`). A tag or branch is a moving
+reference, and these jobs hold Store secrets or write Releases. `Test-WorkflowActionPins.ps1
+-SelfTest` fails on any other form. Dependabot keeps proposing updates for SHA-pinned actions;
+review each one as a supply-chain change (the release notes and the diff of the action), and keep
+the comment in step with the SHA. `ci.yml` (no secrets, read-only token) still uses major tags.
+
+`Test-ReleaseWorkflowShape.ps1 -SelfTest` checks the wiring itself: the Release only from the
+dispatch-only job, the provenance job before the Store environment and without secrets, every gate
+(floor, name binding, identity, privacy, runtime) before the Store CLI is configured, and
+`store-status` failing when a submission in flight is not on the publishing hold. Each rule is
+proven by breaking it in memory.
+
+## Package version floor
+
+`release/min-package-version.txt` tracks the minimum acceptable package version, currently
+**1.1.7.0**. It exceeds the installed Developer version 1.1.2.2 and the local QA versions
+1.1.3.0 through 1.1.6.0, preserving the upgrade path. This is the provisional REL.0
+candidate, not a reservation for a commercial release; a future release may use 1.2.0.0.
+
+`Assert-PackageVersionFloor.ps1` requires exactly four canonical decimal components,
+MSIX component bounds and **Revision = 0** (a nonzero revision was rejected by Partner
+Center). Missing, malformed or ambiguous floor files stop the run. Equality is allowed
+for a retry of the same candidate; this tracked floor is not a live Store history query.
+
+The release workflow checks the floor after tag/source coherence and before building or
+uploading. The submission workflow checks it again with the current checkout's floor,
+before any Store CLI or secret use, and verifies that the actual package identity matches
+that checked version. An older artifact cannot bypass the current submission gate.
+
+To raise the floor, review all previously used Developer, QA and Store versions, select a
+strictly higher four-part version ending in `.0`, update the single version line in the
+floor file and explain the reason in its comments. Never lower it to accept an old artifact.
+Run the floor, tag and mutation suites below. The RC preparation updates the project and
+both manifests together and creates the matching `vMAJOR.MINOR.PATCH` tag separately;
+changing the floor alone does not bump those files or authorize a release.
 
 ## Distribution privacy
 
@@ -212,6 +299,10 @@ Stored as GitHub **environment** secrets on `microsoft-store` and
 > A genuinely read-only credential would need a second Entra application with a Partner
 > Center role that cannot submit. Microsoft documents Manager as the role for this flow and
 > does not document a weaker one that works, so that option is not available today.
+>
+> The settings that make these restrictions hold (protecting `main`, a reviewer on
+> `microsoft-store-status`, CODEOWNERS enforcement) are human steps, described with read-only
+> verification commands in [`operations/release-security-setup.md`](operations/release-security-setup.md).
 
 | secret | what it is |
 | --- | --- |
@@ -264,12 +355,14 @@ repository, not in an issue, not in a run log.
 
 ## Running a release
 
-1. Land the version bump and tag the commit (`vX.Y.Z`).
-2. `release-build.yml` runs on the tag push. Record the package name and SHA-256 from the
-   run summary.
-3. Run `store-status.yml` and confirm the product is idle.
-4. Dispatch `store-submit.yml` with the run id, package version, the SHA-256, and `SUBMIT`.
-   Approve the `microsoft-store` environment when GitHub asks.
+1. Land the version bump on `main` and tag that commit (`vX.Y.Z`).
+2. `release-build.yml` runs on the tag push. Record the **run id**, the package name and the
+   SHA-256 from the run summary. No GitHub Release is created; if one is wanted, dispatch
+   `release-build.yml` for the tag with `create_release: true` (it rebuilds and re-checks first).
+3. Run `store-status.yml` and confirm the product is idle and on the publishing hold.
+4. Dispatch `store-submit.yml` with the tag, the run id **of the tag-push run**, the package
+   version, the SHA-256, and `SUBMIT`. The provenance job runs first; approve the
+   `microsoft-store` environment only after it is green.
 5. Watch with `store-status.yml`.
 6. When it reports `CERTIFIED (awaiting manual Publish now)`, a person decides whether to
    press **Publish now** in Partner Center. No workflow does this.
@@ -279,13 +372,25 @@ repository, not in an issue, not in a run log.
 Everything the workflows rely on runs offline:
 
 ```powershell
+./tools/release/Test-PackageVersionFloor.ps1   # synthetic floor and revision cases
+./tools/release/Test-TagVersion.ps1            # synthetic tag/source coherence cases
+./tools/release/Test-VersionGuardMutations.ps1 # remove checks; require suite failures; rerun originals
 ./tools/release/Test-ReleaseChecks.ps1          # package checks, 12 cases
 ./tools/release/Test-PackageRuntime.ps1         # .NET self-contained package runtime, 24 cases
 ./tools/release/Test-DistributionPrivacy.ps1    # distribution privacy, 52 cases
 ./tools/release/Test-StoreSubmissionUpdate.ps1  # publishing hold, 12 cases
 ./tools/release/Get-SubmissionState.ps1 -SelfTest        # status mapping, 18 cases
 ./tools/release/Assert-NoPendingSubmission.ps1 -SelfTest # in-flight guard, 19 cases
+./tools/release/Test-ReleaseRunProvenance.ps1             # release run provenance (G4), 40 cases
+./tools/release/Test-ManualPublishMode.ps1                # publishing hold in store-status (G6), 20 cases
+./tools/release/Test-HardeningMutations.ps1               # weaken each G4/G6 check and the pin/wiring guards; require detection
+./tools/release/Test-WorkflowRunInterpolation.ps1 -SelfTest # no inputs/steps/needs/event in run blocks
+./tools/release/Test-WorkflowActionPins.ps1 -SelfTest     # actions pinned by full SHA (G8)
+./tools/release/Test-ReleaseWorkflowShape.ps1 -SelfTest   # G2/G4/G6/runtime wiring of the workflows
 ```
+
+CI runs the version, provenance, publishing-hold, interpolation, pinning and wiring suites on every
+pull request (job *Release build + vulnerability scan*), not only on release day.
 
 ## Sources
 
@@ -295,6 +400,9 @@ Everything the workflows rely on runs offline:
 * [Manage app submissions (submission resource, `targetPublishMode`, status values)](https://learn.microsoft.com/en-us/windows/uwp/monetize/manage-app-submissions)
 * [Add and manage app credentials in Microsoft Entra ID](https://learn.microsoft.com/en-us/entra/identity-platform/how-to-add-credentials)
 * [microsoft/microsoft-store-apppublisher](https://github.com/microsoft/microsoft-store-apppublisher)
+* [GitHub REST — workflow runs (`path`, `event`, `head_branch`, `head_sha`, `conclusion`)](https://docs.github.com/en/rest/actions/workflow-runs#get-a-workflow-run)
+* [GitHub REST — git references and tag objects](https://docs.github.com/en/rest/git/refs) · [tags](https://docs.github.com/en/rest/git/tags)
+* [GitHub — security hardening for GitHub Actions (pinning to a full-length commit SHA, untrusted input)](https://docs.github.com/en/actions/security-for-github-actions/security-guides/security-hardening-for-github-actions)
 * [.NET SDK MSBuild properties — `ContinuousIntegrationBuild`](https://learn.microsoft.com/en-us/dotnet/core/project-sdk/msbuild-props#continuousintegrationbuild)
 * [C# compiler options — `Deterministic`, `PathMap`](https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/compiler-options/code-generation)
 * [dotnet/sourcelink — deterministic builds and `ContinuousIntegrationBuild`](https://github.com/dotnet/sourcelink/blob/main/docs/README.md)
