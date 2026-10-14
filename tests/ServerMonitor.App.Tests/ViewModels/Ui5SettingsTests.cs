@@ -86,27 +86,98 @@ public sealed class Ui5SettingsTests
     }
 
     /// <summary>
-    /// REL.0C: on first run the picker shows the language the app actually starts in. An exactly supported Windows
-    /// language needs no override ("system"); any other culture shows the language the startup resolution wrote;
-    /// a persisted choice (also the old pt-BR default) is shown as it is. The override comes from the REAL
-    /// LocalizationService startup over a fake platform (Atlas PR46-01), not from the table helper.
+    /// REL.0C/REL.0D: on first run the picker shows how the app starts. With no persisted choice that is "Use system
+    /// language" (0) on EVERY Windows culture - since REL.0D also where the startup wrote an override for it (Cortex N-1);
+    /// a persisted choice without a provenance record (also the old pt-BR default) is shown as it is. The REAL
+    /// LocalizationService startup over a fake platform and a fake provenance store (Atlas PR46-01).
     /// </summary>
     [Theory]
     [InlineData(null, "en-US", 0)]
     [InlineData(null, "pt-PT", 0)]
     [InlineData(null, "pt-BR", 0)]
-    [InlineData(null, "en-GB", 3)]
-    [InlineData(null, "fr-FR", 3)]
-    [InlineData(null, "", 3)]
-    [InlineData(null, "pt-AO", 2)]
+    [InlineData(null, "en-GB", 0)]
+    [InlineData(null, "fr-FR", 0)]
+    [InlineData(null, "", 0)]
+    [InlineData(null, "pt-AO", 0)]
     [InlineData("pt-BR", "fr-FR", 1)]
+    [InlineData("pt-PT", "en-GB", 2)]
+    [InlineData("en-US", "pt-AO", 3)]
     public void OnFirstRun_TheLanguageIndex_ShowsTheStartupLanguage(string? persisted, string systemCulture, int index)
     {
-        var startup = new LocalizationService(NullLogger<LocalizationService>.Instance, new FakeUiLanguagePlatform(systemCulture, persisted));
+        var startup = RealLocalization(new FakeUiLanguagePlatform(systemCulture, persisted), new FakeLanguageSettingsStore());
         startup.InitializeFromSystem();
 
-        Assert.Equal(index, new World(language: startup.CurrentLanguageOverride).ViewModel.SelectedLanguageIndex);
+        Assert.Equal(index, new World(localization: startup).ViewModel.SelectedLanguageIndex);
     }
+
+    /// <summary>REL.0D (Cortex N-1): "Use system language" sticks - the next Settings shows it again, not "English".</summary>
+    [Theory]
+    [InlineData("fr-FR")]
+    [InlineData("en-GB")]
+    [InlineData("pt-AO")]
+    public void ChoosingTheSystemLanguage_IsShownAgainNextTime(string systemCulture)
+    {
+        var platform = new FakeUiLanguagePlatform(systemCulture, "pt-PT");
+        var store = new FakeLanguageSettingsStore();
+        var world = new World(localization: RealLocalization(platform, store));
+        Assert.Equal(2, world.ViewModel.SelectedLanguageIndex);
+
+        world.ViewModel.SelectedLanguageIndex = 0;
+
+        Assert.True(world.ViewModel.IsRestartNoticeOpen);
+        var next = RealLocalization(platform, store);
+        next.InitializeFromSystem();
+        Assert.Equal(0, new World(localization: next).ViewModel.SelectedLanguageIndex);
+    }
+
+    /// <summary>REL.0D: a choice that could not be saved changes nothing - no restart notice, the picker goes back.</summary>
+    [Fact]
+    public void AChoiceThatCannotBeSaved_ShowsNoRestartNotice_AndThePickerGoesBack()
+    {
+        var platform = new FakeUiLanguagePlatform("fr-FR", "pt-BR");
+        var world = new World(localization: RealLocalization(platform, new FakeLanguageSettingsStore { FailWrites = true }));
+        var raised = new List<string?>();
+        world.ViewModel.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        world.ViewModel.SelectedLanguageIndex = 3;
+
+        Assert.Equal(1, world.ViewModel.SelectedLanguageIndex);
+        Assert.False(world.ViewModel.IsRestartNoticeOpen);
+        Assert.Empty(platform.Writes);
+        Assert.Equal(2, raised.Count(name => name == nameof(SettingsViewModel.SelectedLanguageIndex)));
+    }
+
+    /// <summary>
+    /// REL.0D (visual QA finding): Settings is a singleton, so a language decided on the Overview hint after Settings was
+    /// first opened must show on the next visit - display only, no write, no restart notice.
+    /// </summary>
+    [Fact]
+    public void ADecisionTakenElsewhere_IsShownOnTheNextVisit_WithoutWritingAgain()
+    {
+        var platform = new FakeUiLanguagePlatform("fr-FR", "pt-BR");
+        var store = new FakeLanguageSettingsStore();
+        var service = RealLocalization(platform, store);
+        var world = new World(localization: service);
+        Assert.Equal(1, world.ViewModel.SelectedLanguageIndex);
+        var raised = new List<string?>();
+        world.ViewModel.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        Assert.True(service.TrySetLanguage(null)); // the hint's "Use the system language"
+        world.ViewModel.NotifyNavigatedTo();
+
+        Assert.Equal(0, world.ViewModel.SelectedLanguageIndex);
+        Assert.Contains(nameof(SettingsViewModel.SelectedLanguageIndex), raised);
+        Assert.False(world.ViewModel.IsRestartNoticeOpen);
+        Assert.Equal(["en-US"], platform.Writes);
+        Assert.Single(store.Writes);
+
+        raised.Clear();
+        world.ViewModel.NotifyNavigatedTo(); // nothing changed since: no notification
+        Assert.DoesNotContain(nameof(SettingsViewModel.SelectedLanguageIndex), raised);
+    }
+
+    private static LocalizationService RealLocalization(FakeUiLanguagePlatform platform, FakeLanguageSettingsStore store) =>
+        new(NullLogger<LocalizationService>.Instance, platform, store);
 
     // ---- idempotent, concurrency-safe load ------------------------------------------------------------------------
 
@@ -450,13 +521,17 @@ public sealed class Ui5SettingsTests
 
     private sealed class World
     {
-        public World(AppThemePreference theme = AppThemePreference.System, string? language = null, IHistoryMaintenanceService? maintenance = null)
+        public World(
+            AppThemePreference theme = AppThemePreference.System,
+            string? language = null,
+            IHistoryMaintenanceService? maintenance = null,
+            ILocalizationService? localization = null)
         {
             Theme = new RecordingTheme(theme);
             Localization = new RecordingLocalization(language);
             ViewModel = new SettingsViewModel(
                 Theme,
-                Localization,
+                localization ?? Localization,
                 Navigation,
                 Servers,
                 Discovery,

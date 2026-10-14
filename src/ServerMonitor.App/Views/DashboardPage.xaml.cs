@@ -10,12 +10,17 @@ public sealed partial class DashboardPage : Page
 {
     private readonly ServerEditorReturnFocus? _editorReturnFocus;
 
-    public DashboardPage(DashboardViewModel viewModel, WindowModeViewModel windowMode, ServerEditorReturnFocus? editorReturnFocus = null)
+    public DashboardPage(
+        DashboardViewModel viewModel,
+        WindowModeViewModel windowMode,
+        LanguageRecoveryHintViewModel languageHint,
+        ServerEditorReturnFocus? editorReturnFocus = null)
     {
         InitializeComponent();
         _editorReturnFocus = editorReturnFocus;
         ViewModel = viewModel;
         WindowMode = windowMode;
+        LanguageHint = languageHint;
         DataContext = ViewModel;
 
         // The page and the view model are BOTH registered as singletons (App.xaml.cs), so they share one app-length
@@ -32,6 +37,9 @@ public sealed partial class DashboardPage : Page
     /// <summary>Backs the discreet "compact mode" entry in the header (D-UI4-NAV, until UI.6).</summary>
     public WindowModeViewModel WindowMode { get; }
 
+    /// <summary>REL.0D: the one-time legacy language hint (closed for everyone else).</summary>
+    public LanguageRecoveryHintViewModel LanguageHint { get; }
+
     internal static double EmptyStateMinimumHeight(double usableHeight) => usableHeight >= 700 ? 620 : 0;
 
     private void UpdateEmptyStateHeight()
@@ -43,6 +51,8 @@ public sealed partial class DashboardPage : Page
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
         UpdateEmptyStateHeight();
+        // PR #55 fix round 1: a language decided in Settings since the last visit retires the one-time hint.
+        LanguageHint.Refresh();
         await ViewModel.LoadAsync();
         DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, RestoreFocus);
     }
@@ -126,6 +136,24 @@ public sealed partial class DashboardPage : Page
     }
 
     private void FocusContent() => ShellPageFocus.FocusHeading(this);
+
+    // REL.0D: the language hint disappears once its decision is saved; focus returns to the page heading (top of the page,
+    // where the restart notice now shows) instead of jumping down the page. A failed save keeps the hint and the focus.
+    private void OnLanguageHintActionClick(object sender, RoutedEventArgs e)
+    {
+        var source = (Control)sender;
+        // Low: after the layout pass that collapses the hint (and moves the stray focus), not before it.
+        source.DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+        {
+            if (!LanguageHint.IsOpen)
+            {
+                // The collapsing button already handed focus further down (and the viewport followed it): bring the top
+                // back first - focusing the heading alone does not scroll it into view.
+                ShellPageFocus.FindHeading(this)?.StartBringIntoView();
+                ShellPageFocus.FocusHeading(this, force: true);
+            }
+        });
+    }
 
     // "Limpar pesquisa" disappears once it worked; focus returns to the search box (UI.3 pattern).
     private void OnClearSearchClick(object sender, RoutedEventArgs e) => FocusAfterAction.MoveTo((Control)sender, OverviewSearchBox);

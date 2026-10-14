@@ -1127,4 +1127,11 @@ as métricas e o histórico do servidor.</value></data>
   <data name="WidgetScreenshotAltText" xml:space="preserve"><value>Widget do ServerAlyzer com a saúde dos servidores e o uso de CPU, RAM e disco.</value></data>
   <!-- REL.0C: app Description in Package*.appxmanifest (ms-resource:AppDescription). -->
   <data name="AppDescription" xml:space="preserve"><value>Painel local de monitoramento de servidores Linux e macOS via SSH.</value></data>
+  <!-- REL.0D: one-time legacy language hint on Overview (LanguageRecoveryHintViewModel). -->
+  <data name="LanguageRecoveryHintTitle" xml:space="preserve"><value>Usar o idioma do sistema?</value></data>
+  <data name="LanguageRecoveryHintMessageFormat" xml:space="preserve"><value>O ServerAlyzer está em português (Brasil) porque uma versão anterior o escolheu automaticamente. O idioma do seu Windows não está disponível no ServerAlyzer, então, com o idioma do sistema, será usado {0}. A alteração é aplicada ao reiniciar e você pode mudar o idioma depois em Configurações › Idioma.</value></data>
+  <data name="LanguageRecoveryHintUseSystemButton.Content" xml:space="preserve"><value>Usar o idioma do sistema</value></data>
+  <data name="LanguageRecoveryHintKeepButton.Content" xml:space="preserve"><value>Manter português (Brasil)</value></data>
+  <data name="LanguageRecoveryHintSaveError.Title" xml:space="preserve"><value>Não foi possível salvar a escolha de idioma</value></data>
+  <data name="LanguageRecoveryHintSaveError.Message" xml:space="preserve"><value>Nada foi alterado. Tente novamente ou escolha o idioma em Configurações › Idioma.</value></data>
 </root>

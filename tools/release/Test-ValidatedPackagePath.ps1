@@ -29,3 +29,6 @@ foreach ($case in $cases) {
     Write-Host "PASS package path: $case"
 }
 Write-Host 'All 11 package path cases passed; fixtures retained in temporary storage.'
+# Explicit success. A native command or a stub inside the suite may have left $LASTEXITCODE non-zero,
+# and the GitHub Actions pwsh wrapper ends a step with `exit $LASTEXITCODE` (PR #53 B-1).
+exit 0

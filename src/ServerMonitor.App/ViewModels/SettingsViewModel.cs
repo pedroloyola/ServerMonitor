@@ -79,13 +79,7 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
         ResetHistoryCommand = new AsyncRelayCommand(ResetHistoryAsync);
         _selectedThemeIndex = (int)themeService.Current;
         _notificationsEnabled = notificationSettingsService.NotificationsEnabled;
-        _selectedLanguageIndex = localizationService.CurrentLanguageOverride switch
-        {
-            "pt-BR" => 1,
-            "pt-PT" => 2,
-            "en-US" => 3,
-            _ => 0
-        };
+        _selectedLanguageIndex = LanguageIndexOf(localizationService);
     }
 
     /// <summary>Real product version for the About section (packaged identity or assembly fallback).</summary>
@@ -191,10 +185,32 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
                 _ => null
             };
 
-            _localizationService.SetLanguage(languageTag);
-            IsRestartNoticeOpen = true;
+            if (_localizationService.TrySetLanguage(languageTag))
+            {
+                IsRestartNoticeOpen = true;
+                return;
+            }
+
+            // REL.0D: the choice could not be saved, so nothing changed: the picker goes back to what is in effect.
+            _selectedLanguageIndex = LanguageIndexOf(_localizationService);
+            OnPropertyChanged(nameof(SelectedLanguageIndex));
         }
     }
+
+    /// <summary>
+    /// The picker item for the persisted language. REL.0D (Cortex N-1): "Use system language" (0) whenever the UI
+    /// follows Windows - also when the app wrote an override for it - so that choice is shown back as it was made.
+    /// </summary>
+    private static int LanguageIndexOf(ILocalizationService localization) =>
+        localization.FollowsSystemLanguage
+            ? 0
+            : localization.CurrentLanguageOverride switch
+            {
+                "pt-BR" => 1,
+                "pt-PT" => 2,
+                "en-US" => 3,
+                _ => 0
+            };
 
     public bool IsRestartNoticeOpen
     {
@@ -269,8 +285,25 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
     /// can land on the right section, and a request nobody consumes is the same class of defect as a
     /// RefreshAll nobody calls.
     /// </summary>
-    public void NotifyNavigatedTo() =>
+    public void NotifyNavigatedTo()
+    {
         IsBackgroundSectionRequested = _navigationService.ConsumeBackgroundSettingsFocus();
+        RefreshLanguageIndex();
+    }
+
+    /// <summary>
+    /// REL.0D: the language can now also change outside this page (the Overview's one-time language hint), and this view
+    /// model is a singleton: each visit shows the choice in effect. Display only - nothing is written, no restart notice.
+    /// </summary>
+    private void RefreshLanguageIndex()
+    {
+        var current = LanguageIndexOf(_localizationService);
+        if (current != _selectedLanguageIndex)
+        {
+            _selectedLanguageIndex = current;
+            OnPropertyChanged(nameof(SelectedLanguageIndex));
+        }
+    }
 
     private bool _isAboutSectionRequested;
 
