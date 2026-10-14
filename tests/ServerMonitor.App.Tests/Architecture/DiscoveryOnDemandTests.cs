@@ -207,7 +207,8 @@ public sealed class DiscoveryOnDemandTests
         foreach (var (name, binding) in new[]
                  {
                      ("EmptyDiscoveryNothingFound", "{x:Bind ViewModel.ShowLocalNetworkNothingFound, Mode=OneWay}"),
-                     ("EmptyDiscoveryFailed", "{x:Bind ViewModel.ShowLocalNetworkSearchFailed, Mode=OneWay}")
+                     ("EmptyDiscoveryFailed", "{x:Bind ViewModel.ShowLocalNetworkSearchFailed, Mode=OneWay}"),
+                     ("EmptyDiscoveryTimeLimit", "{x:Bind ViewModel.ShowLocalNetworkSearchTimeLimit, Mode=OneWay}")
                  })
         {
             var caption = Assert.Single(block.Descendants().Where(e => (string?)e.Attribute(x + "Name") == name));
@@ -234,6 +235,7 @@ public sealed class DiscoveryOnDemandTests
         Assert.Equal(note, values["DashboardEmptyDiscoveryStartButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.HelpText"]);
         Assert.False(string.IsNullOrWhiteSpace(values["DashboardEmptyDiscoveryNothingFound.Text"]));
         Assert.False(string.IsNullOrWhiteSpace(values["DashboardEmptyDiscoveryFailed.Text"]));
+        Assert.False(string.IsNullOrWhiteSpace(values["DashboardEmptyDiscoveryTimeLimit.Text"]));
     }
 
     // ------------------------------------------------------------------ helpers

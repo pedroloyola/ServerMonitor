@@ -55,6 +55,25 @@ public sealed class DiscoverySearchBoundsTests
         Assert.Equal(1, browser.StopCount);
     }
 
+    /// <summary>N-r2-2: a result that appeared and expired before 40 s is not "nothing found"; the search runs to its limit.</summary>
+    [Fact]
+    public async Task A_result_that_appeared_and_expired_is_not_nothing_found()
+    {
+        var (service, browser, time) = Create(maxSearch: TimeSpan.FromMinutes(2), expiry: TimeSpan.FromSeconds(10));
+        await using var _ = service;
+        await service.StartSearchAsync();
+        browser.EmitFound(Observation("Mac Studio", time));
+        await AdvanceUntilAsync(time, () => service.GetDiscovered().Count == 1);
+
+        // Expired at ~10 s, nothing visible since; at 60 s it is still searching (not NothingFound at 40 s).
+        await AdvanceUntilAsync(time, () => time.GetUtcNow() - Start >= TimeSpan.FromSeconds(60));
+        Assert.Empty(service.GetDiscovered());
+        Assert.True(service.IsSearching);
+
+        await AdvanceUntilAsync(time, () => !service.IsSearching);
+        Assert.Equal(DiscoverySearchEnd.TimeLimit, service.LastSearchEnd);
+    }
+
     [Fact]
     public async Task A_manual_stop_wins_and_a_new_search_gets_a_fresh_bound()
     {
@@ -78,7 +97,8 @@ public sealed class DiscoverySearchBoundsTests
         Assert.Equal(2, browser.StopCount);
     }
 
-    private static (ServerDiscoveryService Service, FakeMdnsServiceBrowser Browser, FakeTimeProvider Time) Create(TimeSpan? maxSearch = null)
+    private static (ServerDiscoveryService Service, FakeMdnsServiceBrowser Browser, FakeTimeProvider Time) Create(
+        TimeSpan? maxSearch = null, TimeSpan? expiry = null)
     {
         var browser = new FakeMdnsServiceBrowser();
         var time = new FakeTimeProvider(Start);
@@ -86,7 +106,7 @@ public sealed class DiscoverySearchBoundsTests
             new DiscoveryOptions
             {
                 // Results must not expire under the hard-limit test; the bounds themselves are the defaults' shape.
-                ExpiryWindow = TimeSpan.FromDays(1),
+                ExpiryWindow = expiry ?? TimeSpan.FromDays(1),
                 NothingFoundTimeout = TimeSpan.FromSeconds(40),
                 MaxSearchDuration = maxSearch ?? DiscoveryOptions.Default.MaxSearchDuration
             });

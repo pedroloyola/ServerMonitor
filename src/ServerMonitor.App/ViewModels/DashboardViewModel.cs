@@ -296,6 +296,10 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
     public bool ShowLocalNetworkNothingFound =>
         CanStartLocalNetworkSearch && _discoveryActivity?.LastSearchEnd == DiscoverySearchEnd.NothingFound;
 
+    /// <summary>REL.0B (Cortex N-r2-1): the explicit search reached its time limit; its suggestions went with it.</summary>
+    public bool ShowLocalNetworkSearchTimeLimit =>
+        CanStartLocalNetworkSearch && _discoveryActivity?.LastSearchEnd == DiscoverySearchEnd.TimeLimit;
+
     /// <summary>REL.0B (Cortex N-3): the explicit search could not start; the action is offered again below.</summary>
     public bool ShowLocalNetworkSearchFailed =>
         CanStartLocalNetworkSearch && _discoveryActivity?.LastSearchEnd == DiscoverySearchEnd.Failed;
@@ -312,6 +316,7 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(CanStartLocalNetworkSearch));
         OnPropertyChanged(nameof(ShowLocalNetworkNothingFound));
         OnPropertyChanged(nameof(ShowLocalNetworkSearchFailed));
+        OnPropertyChanged(nameof(ShowLocalNetworkSearchTimeLimit));
         OnPropertyChanged(nameof(ShowEmptyStateDiscoveries));
         OnPropertyChanged(nameof(ShowDiscoverySection));
     }
@@ -1156,6 +1161,7 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(CanStartLocalNetworkSearch));
         OnPropertyChanged(nameof(ShowLocalNetworkNothingFound));
         OnPropertyChanged(nameof(ShowLocalNetworkSearchFailed));
+        OnPropertyChanged(nameof(ShowLocalNetworkSearchTimeLimit));
     }
 
     private async Task StartLocalNetworkSearchAsync()

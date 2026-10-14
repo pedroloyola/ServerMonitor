@@ -595,6 +595,9 @@
                                 <TextBlock x:Name="EmptyDiscoveryNothingFound" x:Uid="DashboardEmptyDiscoveryNothingFound" Style="{StaticResource SaCaptionTextStyle}"
                                            TextAlignment="Center" Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap"
                                            Visibility="{x:Bind ViewModel.ShowLocalNetworkNothingFound, Mode=OneWay}" />
+                                <TextBlock x:Name="EmptyDiscoveryTimeLimit" x:Uid="DashboardEmptyDiscoveryTimeLimit" Style="{StaticResource SaCaptionTextStyle}"
+                                           TextAlignment="Center" Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap"
+                                           Visibility="{x:Bind ViewModel.ShowLocalNetworkSearchTimeLimit, Mode=OneWay}" />
                                 <TextBlock x:Name="EmptyDiscoveryFailed" x:Uid="DashboardEmptyDiscoveryFailed" Style="{StaticResource SaCaptionTextStyle}"
                                            TextAlignment="Center" Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap"
                                            Visibility="{x:Bind ViewModel.ShowLocalNetworkSearchFailed, Mode=OneWay}" />

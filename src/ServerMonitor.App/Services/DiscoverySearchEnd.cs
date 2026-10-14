@@ -9,7 +9,10 @@ public enum DiscoverySearchEnd
     /// <summary>Stopped on purpose: window to background, exit.</summary>
     Stopped,
 
-    /// <summary>Ended by itself: nothing visible within <see cref="DiscoveryOptions.NothingFoundTimeout"/>.</summary>
+    /// <summary>
+    /// Ended by itself: nothing was EVER visible in this search within <see cref="DiscoveryOptions.NothingFoundTimeout"/>
+    /// (a result that appeared and expired keeps the search going to <see cref="TimeLimit"/>).
+    /// </summary>
     NothingFound,
 
     /// <summary>Ended by itself at <see cref="DiscoveryOptions.MaxSearchDuration"/>.</summary>

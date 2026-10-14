@@ -210,11 +210,20 @@ public sealed class DashboardEmptyStateTests
         Assert.True(dashboard.ShowLocalNetworkSearchFailed);
         Assert.False(dashboard.ShowLocalNetworkNothingFound);
 
+        // N-r2-1: the time limit has its own caption (its suggestions went with the stop).
+        live.LastSearchEnd = DiscoverySearchEnd.TimeLimit;
+        live.SetSearching(false);
+        Assert.True(dashboard.ShowLocalNetworkSearchTimeLimit);
+        Assert.False(dashboard.ShowLocalNetworkSearchFailed);
+        Assert.False(dashboard.ShowLocalNetworkNothingFound);
+        Assert.True(dashboard.CanStartLocalNetworkSearch);
+
         // While searching, neither caption nor the action.
         live.LastSearchEnd = DiscoverySearchEnd.None;
         live.SetSearching(true);
         Assert.False(dashboard.ShowLocalNetworkNothingFound);
         Assert.False(dashboard.ShowLocalNetworkSearchFailed);
+        Assert.False(dashboard.ShowLocalNetworkSearchTimeLimit);
         Assert.False(dashboard.CanStartLocalNetworkSearch);
     }
 
