@@ -61,6 +61,17 @@ function Get-Field($Object, [string] $Name) {
     return $property.Value
 }
 
+function Get-ScalarField($Object, [string] $Name) {
+    <# PR #56 Vigil N-3: a field that must be a single JSON value. Get-Field returns through the pipeline, which
+       unrolls a one-element array into its element, so ["Manual"] or ["<the right file name>"] would pass for
+       the right value. Here the value is inspected where it is read: arrays and objects are refused (null). #>
+    if ($null -eq $Object -or $Object -isnot [pscustomobject]) { return $null }
+    $property = $Object.PSObject.Properties | Where-Object { $_.Name -ieq $Name } | Select-Object -First 1
+    if ($null -eq $property) { return $null }
+    if ($property.Value -is [string] -or $property.Value -is [ValueType]) { return $property.Value }
+    return $null
+}
+
 function ConvertFrom-CliJson([string] $Raw) {
     if ([string]::IsNullOrWhiteSpace($Raw)) { throw 'the CLI returned nothing' }
     # Some CLI versions print status lines around the JSON; take the outermost object.
@@ -84,23 +95,23 @@ function Test-StagedSubmission {
     try { $submission = ConvertFrom-CliJson $Raw } catch { return & $fail $_.Exception.Message }
     if ($submission -isnot [pscustomobject]) { return & $fail 'the CLI output is not a JSON object' }
 
-    $status = [string] (Get-Field $submission 'status')
-    if (-not [string]::Equals($status, 'PendingCommit', [StringComparison]::Ordinal)) {
+    $status = Get-ScalarField $submission 'status'
+    if (-not ($status -is [string] -and [string]::Equals($status, 'PendingCommit', [StringComparison]::Ordinal))) {
         return & $fail "the product has no uncommitted draft (status '$status', expected 'PendingCommit')"
     }
 
-    $id = [string] (Get-Field $submission 'id')
+    $id = [string] (Get-ScalarField $submission 'id')
     if ($id -cnotmatch '\A[0-9]{1,30}\z') { return & $fail "the draft has no numeric submission id ('$id')" }
     if ($ExpectedSubmissionId -and -not [string]::Equals($id, $ExpectedSubmissionId, [StringComparison]::Ordinal)) {
         return & $fail "the pending draft is submission $id, not the staged submission $ExpectedSubmissionId"
     }
 
-    $mode = Get-Field $submission 'targetPublishMode'
+    $mode = Get-ScalarField $submission 'targetPublishMode'
     if (-not ($mode -is [string] -and [string]::Equals($mode, 'Manual', [StringComparison]::OrdinalIgnoreCase))) {
         return & $fail "targetPublishMode is '$mode', not 'Manual': the publishing hold is not in force"
     }
 
-    $visibility = Get-Field $submission 'visibility'
+    $visibility = Get-ScalarField $submission 'visibility'
     if (-not ($visibility -is [string] -and [string]::Equals($visibility, $ExpectedVisibility, [StringComparison]::OrdinalIgnoreCase))) {
         return & $fail "visibility is '$visibility', expected '$ExpectedVisibility'"
     }
@@ -111,13 +122,15 @@ function Test-StagedSubmission {
     $versions = @()
     $namedPackage = $false
     foreach ($package in @($packages)) {
-        if ([string]::Equals([string] (Get-Field $package 'fileStatus'), 'PendingDelete', [StringComparison]::OrdinalIgnoreCase)) { continue }
-        $text = [string] (Get-Field $package 'version')
+        if ([string]::Equals([string] (Get-ScalarField $package 'fileStatus'), 'PendingDelete', [StringComparison]::OrdinalIgnoreCase)) { continue }
+        $version = Get-ScalarField $package 'version'
+        $text = if ($version -is [string]) { $version } else { '' }
         if ($text -cnotmatch '\A[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\z') { return & $fail "a live package has an unreadable version ('$text')" }
         $versions += $text
         if ([string]::Equals($text, $ExpectedPackageVersion, [StringComparison]::Ordinal)) {
-            $fileName = [string] (Get-Field $package 'fileName')
-            if (-not [string]::Equals($fileName, $ExpectedPackageFileName, [StringComparison]::Ordinal)) {
+            # A JSON string only (PR #56 Vigil N-3): a one-element array holding the right name is refused.
+            $fileName = Get-ScalarField $package 'fileName'
+            if (-not ($fileName -is [string] -and [string]::Equals($fileName, $ExpectedPackageFileName, [StringComparison]::Ordinal))) {
                 return & $fail "the draft's package $text is '$fileName', not '$ExpectedPackageFileName' uploaded from the tag commit"
             }
             $namedPackage = $true
@@ -225,6 +238,13 @@ if ($SelfTest) {
         @{ Name = 'unreadable package version';           Raw = (New-Draft -Packages @([ordered] @{ version = '1.1.7.0'; fileName = 'ServerAlyzer_1.1.7.0_x64_300116d.msix'; fileStatus = 'Uploaded' }, [ordered] @{ version = 'v2'; fileStatus = 'Uploaded' })); Id = $id; Ok = $false }
         @{ Name = 'package of another commit (same version)'; Raw = (New-Draft -Packages @([ordered] @{ version = '1.1.7.0'; fileName = 'ServerAlyzer_1.1.7.0_x64_abcdef0.msix'; fileStatus = 'PendingUpload' })); Id = $id; Ok = $false }
         @{ Name = 'package file name missing';            Raw = (New-Draft -Packages @([ordered] @{ version = '1.1.7.0'; fileStatus = 'PendingUpload' })); Id = $id; Ok = $false }
+        @{ Name = 'hold as a one-element array';           Raw = (New-Draft @{ targetPublishMode = @('Manual') }); Id = $id; Ok = $false }
+        @{ Name = 'visibility as a one-element array';     Raw = (New-Draft @{ visibility = @('Public') }); Id = $id; Ok = $false }
+        @{ Name = 'status as a one-element array';         Raw = (New-Draft @{ status = @('PendingCommit') }); Id = $id; Ok = $false }
+        @{ Name = 'id as a one-element array';             Raw = (New-Draft @{ id = @('1152921505701819999') }); Id = $id; Ok = $false }
+        @{ Name = 'id as a JSON number';                   Raw = ((New-Draft) -replace '"id":\s*"1152921505701819999"', '"id": 1152921505701819999'); Id = $id; Ok = $true }
+        @{ Name = 'package version as a one-element array'; Raw = (New-Draft -Packages @([ordered] @{ version = @('1.1.7.0'); fileName = 'ServerAlyzer_1.1.7.0_x64_300116d.msix'; fileStatus = 'PendingUpload' })); Id = $id; Ok = $false }
+        @{ Name = 'package file name as a one-element array'; Raw = (New-Draft -Packages @([ordered] @{ version = '1.1.7.0'; fileName = @('ServerAlyzer_1.1.7.0_x64_300116d.msix'); fileStatus = 'PendingUpload' })); Id = $id; Ok = $false }
         @{ Name = 'package file name in other case';      Raw = (New-Draft -Packages @([ordered] @{ version = '1.1.7.0'; fileName = 'ServerAlyzer_1.1.7.0_X64_300116D.msix'; fileStatus = 'PendingUpload' })); Id = $id; Ok = $false }
         @{ Name = 'second live package, same version';    Raw = (New-Draft -Packages @([ordered] @{ version = '1.1.7.0'; fileName = 'ServerAlyzer_1.1.7.0_x64_300116d.msix'; fileStatus = 'PendingUpload' }, [ordered] @{ version = '1.1.7.0'; fileName = 'manual-upload.msix'; fileStatus = 'Uploaded' })); Id = $id; Ok = $false }
         @{ Name = 'expected file name malformed';         Raw = (New-Draft); Id = $id; File = '..\ServerAlyzer_1.1.7.0_x64_300116d.msix'; Ok = $false }

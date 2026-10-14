@@ -199,8 +199,10 @@ Inputs: the release tag, the run id of that tag's `release-build` run, the packa
    approve the environment.
 1. Confirmation phrase, version, submission id and tag commit checked again before any secret is used;
    the version floor is re-checked. `SUBMISSION_ID` comes **only** from the dispatch input: the shape
-   guard refuses a second declaration, an assignment, a `GITHUB_ENV` write or an environment API call
-   that could rebind it to the draft itself (PR #56 Relay W4).
+   guard refuses a second declaration, an assignment, a `GITHUB_ENV` write, an environment API call or
+   **any `Env:` provider path** other than the `$env:`/`${env:}` reads (so `Set-Item` and its alias `si`,
+   `ni`, `sc`, ... are all refused by one rule) that could rebind it to the draft itself (PR #56 Relay
+   W4, W11).
 2. `msstore reconfigure`, `msstore apps get` (identity), as in `store-submit`.
 3. **`Assert-StagedSubmission.ps1 -ExpectedSubmissionId`**, on a fresh `msstore submission get`,
    immediately before the commit: the pending draft must be exactly the staged submission id, still
@@ -608,14 +610,14 @@ Everything the workflows rely on runs offline:
 ./tools/release/Test-StoreSubmissionUpdate.ps1  # publishing hold, 12 cases
 ./tools/release/Get-SubmissionState.ps1 -SelfTest        # status mapping, 18 cases
 ./tools/release/Assert-NoPendingSubmission.ps1 -SelfTest # in-flight guard through its default allowed statuses (pinned), 20 cases
-./tools/release/Assert-StagedSubmission.ps1 -SelfTest    # staged draft (P-1): PendingCommit, id, hold, visibility, package + tag-bound file name, 36 cases
-./tools/release/Test-StoreStageCertify.ps1                # weaken each staged-draft / in-flight check in a copy; the named case must fail, 15 mutations
+./tools/release/Assert-StagedSubmission.ps1 -SelfTest    # staged draft (P-1): PendingCommit, id, hold, visibility, package + tag-bound file name, each a single JSON string (never a one-element array), 43 cases
+./tools/release/Test-StoreStageCertify.ps1                # weaken each staged-draft / in-flight check in a copy; the named case must fail, 18 mutations
 ./tools/release/Test-ReleaseRunProvenance.ps1             # release run provenance (G4), 40 cases
 ./tools/release/Test-ManualPublishMode.ps1                # publishing hold in store-status (G6), 20 cases
 ./tools/release/Test-HardeningMutations.ps1               # weaken each G4/G6 check and the pin/wiring guards; require detection
 ./tools/release/Test-WorkflowRunInterpolation.ps1 -SelfTest # no inputs/steps/needs/event in run blocks
 ./tools/release/Test-WorkflowActionPins.ps1 -SelfTest     # actions pinned by full SHA (G8)
-./tools/release/Test-ReleaseWorkflowShape.ps1 -SelfTest   # G2/G4/G6/runtime + P-1 stage/certify wiring, 41 mutations
+./tools/release/Test-ReleaseWorkflowShape.ps1 -SelfTest   # G2/G4/G6/runtime + P-1 stage/certify wiring, 45 mutations
 ```
 
 CI runs the version, provenance, publishing-hold, submission-update, in-flight, staged-draft, interpolation,

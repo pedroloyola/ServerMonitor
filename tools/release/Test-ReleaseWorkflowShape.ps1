@@ -152,11 +152,15 @@ function Assert-StoreCertify([string] $Text) {
 
     # Relay W4: the id binding comes only from the dispatch input. SUBMISSION_ID is declared once per job,
     # as the input, and nothing reassigns it (no assignment, no GITHUB_ENV, no environment API).
+    # PR #56 round 2 (Relay L-3, W11): no Env: provider path at all, other than the $env:NAME / ${env:NAME} reads.
+    # Every provider write (Set-Item and its alias si, New-Item/ni, Set-Content/sc, Copy-Item, Remove-Item, ...)
+    # has to name an Env: path, so the rule closes the class instead of listing cmdlets and aliases. A YAML
+    # "env:" key (end of line) is not a provider path.
     foreach ($name in @('provenance', 'certify')) {
         $declared = @([regex]::Matches((Strip-Comments $jobs[$name]), '(?m)^\s+SUBMISSION_ID:[^\n]*$'))
         if ($declared.Count -ne 1 -or $declared[0].Value -cnotmatch '\A\s+SUBMISSION_ID: \$\{\{ inputs\.submission_id \}\}\s*\z') { throw "Shape P-1: the $name job must take SUBMISSION_ID once, from inputs.submission_id." }
     }
-    if ($all -match '(?i)\$env:SUBMISSION_ID\s*[-+*/]?=(?!=)|\$\{env:SUBMISSION_ID\}\s*=(?!=)|GITHUB_ENV|SetEnvironmentVariable|(Set|New)-Item\b[^\n]*env:') {
+    if ($all -match '(?i)\$env:SUBMISSION_ID\s*[-+*/]?=(?!=)|\$\{env:SUBMISSION_ID\}\s*=(?!=)|GITHUB_ENV|SetEnvironmentVariable|(?m)(?<![$\{\w])env:(?![^\S\n]*$)') {
         throw 'Shape P-1: store-certify must never reassign SUBMISSION_ID or write the job environment.'
     }
 
@@ -226,6 +230,11 @@ $mutations = @{
         @{ Old = "          ./tools/release/Assert-StagedSubmission.ps1 ```n            -SubmissionPath draft.json"; New = "          `$env:SUBMISSION_ID = (Get-Content -Raw draft.json | ConvertFrom-Json).id`n          ./tools/release/Assert-StagedSubmission.ps1 ```n            -SubmissionPath draft.json"; Name = 'W4 id reassigned from the draft (Relay W4)' }
         @{ Old = "        run: ./tools/release/Assert-PackageVersionFloor.ps1 -PackageVersion `$env:PACKAGE_VERSION"; New = "        run: |`n          ./tools/release/Assert-PackageVersionFloor.ps1 -PackageVersion `$env:PACKAGE_VERSION`n          'SUBMISSION_ID=1' | Out-File -Append `$env:GITHUB_ENV"; Name = 'W4 id rewritten through GITHUB_ENV' }
         @{ Old = "      - name: Prove the draft is still the staged draft`n        shell: pwsh"; New = "      - name: Prove the draft is still the staged draft`n        env:`n          SUBMISSION_ID: `${{ steps.draft.outputs.id }}`n        shell: pwsh"; Name = 'W4 id redefined in a step env' }
+        # PR #56 round 2 (Relay L-3, W11): Env: provider writes, by alias and by cmdlet.
+        @{ Old = "          ./tools/release/Assert-StagedSubmission.ps1 ```n            -SubmissionPath draft.json"; New = "          si env:SUBMISSION_ID (Get-Content -Raw draft.json | ConvertFrom-Json).id`n          ./tools/release/Assert-StagedSubmission.ps1 ```n            -SubmissionPath draft.json"; Name = 'W11 id rewritten through the si alias' }
+        @{ Old = "          ./tools/release/Assert-StagedSubmission.ps1 ```n            -SubmissionPath draft.json"; New = "          ni Env:\SUBMISSION_ID -Value 1 -Force | Out-Null`n          ./tools/release/Assert-StagedSubmission.ps1 ```n            -SubmissionPath draft.json"; Name = 'W11 id rewritten through the ni alias' }
+        @{ Old = "          ./tools/release/Assert-StagedSubmission.ps1 ```n            -SubmissionPath draft.json"; New = "          sc env:SUBMISSION_ID 1`n          ./tools/release/Assert-StagedSubmission.ps1 ```n            -SubmissionPath draft.json"; Name = 'W11 id rewritten through Set-Content (sc)' }
+        @{ Old = "          ./tools/release/Assert-StagedSubmission.ps1 ```n            -SubmissionPath draft.json"; New = "          Set-Item -Path Env:SUBMISSION_ID -Value 1`n          ./tools/release/Assert-StagedSubmission.ps1 ```n            -SubmissionPath draft.json"; Name = 'W11 id rewritten through Set-Item -Path' }
     )
     'store-status.yml' = @(
         @{ Old = 'if ($publishModeError) { throw'; New = 'if ($publishModeError) { Write-Warning'; Name = 'publish mode only warns' }

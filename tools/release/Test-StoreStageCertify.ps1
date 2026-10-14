@@ -19,7 +19,7 @@ New-Item -ItemType Directory -Path $temp | Out-Null
 
 $mutations = @(
     @{ Name = 'any status accepted (a published submission would be committed)'
-       Old = "if (-not [string]::Equals(`$status, 'PendingCommit', [StringComparison]::Ordinal)) {"; New = 'if ($false) {'; Case = 'no draft: last published returned' }
+       Old = "if (-not (`$status -is [string] -and [string]::Equals(`$status, 'PendingCommit', [StringComparison]::Ordinal))) {"; New = 'if ($false) {'; Case = 'no draft: last published returned' }
     @{ Name = 'status compared case-insensitively'
        Old = "[string]::Equals(`$status, 'PendingCommit', [StringComparison]::Ordinal)"; New = "[string]::Equals(`$status, 'PendingCommit', [StringComparison]::OrdinalIgnoreCase)"; Case = 'status in other case' }
     @{ Name = 'staged submission id not bound'
@@ -35,14 +35,21 @@ $mutations = @(
     @{ Name = 'newer live package tolerated'
        Old = 'if (([version] $text) -gt $expected) {'; New = 'if ($false) {'; Case = 'newer live package in the draft' }
     @{ Name = 'PendingDelete package counted as live'
-       Old = "if ([string]::Equals([string] (Get-Field `$package 'fileStatus'), 'PendingDelete', [StringComparison]::OrdinalIgnoreCase)) { continue }"; New = ''; Case = 'expected package only PendingDelete' }
+       Old = "if ([string]::Equals([string] (Get-ScalarField `$package 'fileStatus'), 'PendingDelete', [StringComparison]::OrdinalIgnoreCase)) { continue }"; New = ''; Case = 'expected package only PendingDelete' }
     @{ Name = 'expected package not required'
        Old = 'if ($versions -cnotcontains $ExpectedPackageVersion -or -not $namedPackage) {'; New = 'if ($false) {'; Case = 'expected package absent' }
     @{ Name = 'empty CLI output parsed as nothing to refuse'
        Old = "if ([string]::IsNullOrWhiteSpace(`$Raw)) { throw 'the CLI returned nothing' }"; New = "if ([string]::IsNullOrWhiteSpace(`$Raw)) { return [pscustomobject] @{ status = 'PendingCommit'; id = '1152921505701819999'; targetPublishMode = 'Manual'; visibility = 'Public'; applicationPackages = @([pscustomobject] @{ version = '1.1.7.0'; fileName = 'ServerAlyzer_1.1.7.0_x64_300116d.msix' }) } }"; Case = 'empty output' }
     # PR #56 fix round 1 (Vigil L-1): the package must be the file uploaded from the tag commit.
     @{ Name = 'package file name not bound to the tag commit'
-       Old = "if (-not [string]::Equals(`$fileName, `$ExpectedPackageFileName, [StringComparison]::Ordinal)) {"; New = 'if ($false) {'; Case = 'package of another commit (same version)' }
+       Old = "if (-not (`$fileName -is [string] -and [string]::Equals(`$fileName, `$ExpectedPackageFileName, [StringComparison]::Ordinal))) {"; New = 'if ($false) {'; Case = 'package of another commit (same version)' }
+    # PR #56 round 2 (Vigil N-3): the fields that must be one JSON string are read without pipeline unrolling.
+    @{ Name = 'scalar fields read through the pipeline (one-element arrays unrolled)'
+       Old = 'if ($property.Value -is [string] -or $property.Value -is [ValueType]) { return $property.Value }'; New = 'return $property.Value'; Case = 'package file name as a one-element array' }
+    @{ Name = 'package file name read with Get-Field again'
+       Old = "`$fileName = Get-ScalarField `$package 'fileName'"; New = "`$fileName = Get-Field `$package 'fileName'"; Case = 'package file name as a one-element array' }
+    @{ Name = 'publishing hold read with Get-Field again'
+       Old = "`$mode = Get-ScalarField `$submission 'targetPublishMode'"; New = "`$mode = Get-Field `$submission 'targetPublishMode'"; Case = 'hold as a one-element array' }
     @{ Name = 'package file name compared case-insensitively'
        Old = "[string]::Equals(`$fileName, `$ExpectedPackageFileName, [StringComparison]::Ordinal)"; New = "[string]::Equals(`$fileName, `$ExpectedPackageFileName, [StringComparison]::OrdinalIgnoreCase)"; Case = 'package file name in other case' }
     # PR #56 fix round 1 (Relay M-1, W5): the in-flight guard's DEFAULT, which store-submit relies on.
