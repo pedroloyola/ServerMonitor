@@ -71,8 +71,11 @@ jobs:
           }
 
       - name: Report the submission state
+        env:
+          INCLUDE_METADATA: ${{ inputs.include_metadata }}
         shell: pwsh
         run: |
+          if ($env:INCLUDE_METADATA -cnotmatch '\A(true|false)\z') { throw 'Invalid include_metadata boolean.' }
           $raw = msstore submission get ${{ env.STORE_PRODUCT_ID }} 2>&1 | Out-String
           if ($LASTEXITCODE -ne 0) { throw 'msstore submission get failed.' }
 
@@ -126,7 +129,7 @@ jobs:
             Write-Host ("listings keys: " + (($listings.PSObject.Properties.Name | Sort-Object) -join ', '))
           }
 
-          if ('${{ inputs.include_metadata }}' -eq 'true') {
+          if ($env:INCLUDE_METADATA -eq 'true') {
             # The submission resource carries fileUploadUrl, a shared access signature that
             # grants package upload. Printing the raw object would put a live credential in
             # the run log, where anyone who can read Actions could take it. Redact by

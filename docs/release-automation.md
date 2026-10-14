@@ -95,6 +95,13 @@ Read-only. Reports one of:
 to its audience and to nobody else, and the report says so rather than claiming the product
 is live.
 
+Artifact paths are also validated: exactly one regular `.msix`, directly inside `incoming`,
+with a file name matching `\A[A-Za-z0-9._-]+\.msix\z`; reparse points and nested packages
+are rejected. The upload step receives the path through `env`, revalidates it and passes
+it as a quoted argument. Inputs and step outputs must not be interpolated into `run`
+scripts; `Test-WorkflowRunInterpolation.ps1 -SelfTest` checks all three release workflows
+and proves detection by reintroducing input/output interpolations in memory.
+
 ## Package version floor
 
 `release/min-package-version.txt` tracks the minimum acceptable package version, currently

@@ -55,7 +55,7 @@ jobs:
   submit:
     runs-on: windows-latest
     env:
-      INPUT_CONFIRM: ${{ inputs.confirm }}
+      SUBMIT_CONFIRM: ${{ inputs.confirm }}
       PACKAGE_VERSION: ${{ inputs.package_version }}
       EXPECTED_SHA256: ${{ inputs.expected_sha256 }}
       RELEASE_RUN_ID: ${{ inputs.release_run_id }}
@@ -75,7 +75,7 @@ jobs:
         shell: pwsh
         run: |
           if ($env:RELEASE_RUN_ID -notmatch '\A[1-9][0-9]*\z') { throw 'release_run_id must be a positive decimal run ID.' }
-          if ($env:INPUT_CONFIRM -cne 'SUBMIT') {
+          if ($env:SUBMIT_CONFIRM -cne 'SUBMIT') {
             throw "Confirmation phrase was not SUBMIT. Nothing has been done."
           }
           if ($env:PACKAGE_VERSION -notmatch '\A[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\z') {
@@ -101,11 +101,7 @@ jobs:
         shell: pwsh
         run: |
           ./tools/release/Assert-PackageVersionFloor.ps1 -PackageVersion $env:PACKAGE_VERSION
-          $packages = @(Get-ChildItem -Path incoming -Filter '*.msix' -Recurse)
-          if ($packages.Count -ne 1) {
-            throw "Expected exactly one MSIX in the artifact, found $($packages.Count)."
-          }
-          $package = $packages[0].FullName
+          $package = ./tools/release/Get-ValidatedPackagePath.ps1 -DownloadDirectory 'incoming'
           "packagePath=$package" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
           # Independent of the checksum file that travelled with the artifact.
@@ -159,9 +155,12 @@ jobs:
       # --noCommit uploads the package and leaves the submission in draft. Metadata edits
       # must come after this, because publish recreates the draft.
       - name: Upload the package, leaving the submission in draft
+        env:
+          PACKAGE_PATH: ${{ steps.verify.outputs.packagePath }}
         shell: pwsh
         run: |
-          msstore publish '${{ steps.verify.outputs.packagePath }}' -id ${{ env.STORE_PRODUCT_ID }} --noCommit
+          ./tools/release/Get-ValidatedPackagePath.ps1 -DownloadDirectory 'incoming' -PackagePath $env:PACKAGE_PATH | Out-Null
+          msstore publish "$env:PACKAGE_PATH" -id ${{ env.STORE_PRODUCT_ID }} --noCommit
           if ($LASTEXITCODE -ne 0) { throw 'msstore publish --noCommit failed.' }
 
       - name: Stage the release notes and prove the publishing hold survives
