@@ -346,12 +346,15 @@ public sealed class ServerDiscoveryServiceTests
         await h.Service.StartAsync();
 
         Assert.False(activity.IsSearching);
-        Assert.Equal(0, notifications);
+        // REL.0B (Cortex N-3): the failure itself is signalled, once, so the dashboard can say so.
+        Assert.Equal(DiscoverySearchEnd.Failed, activity.LastSearchEnd);
+        Assert.Equal(1, notifications);
 
         h.Browser.StartException = null;
         await h.Service.StartAsync();
         Assert.True(activity.IsSearching);
-        Assert.Equal(1, notifications);
+        Assert.Equal(DiscoverySearchEnd.None, activity.LastSearchEnd);
+        Assert.Equal(2, notifications);
         await h.DisposeAsync();
     }
 
@@ -560,7 +563,10 @@ public sealed class ServerDiscoveryServiceTests
                     RemovalGrace = TimeSpan.FromSeconds(5),
                     SweepInterval = TimeSpan.FromSeconds(1),
                     ChangeNotificationDelay = TimeSpan.FromMilliseconds(100),
-                    StopDrainTimeout = TimeSpan.FromSeconds(5)
+                    StopDrainTimeout = TimeSpan.FromSeconds(5),
+                    // REL.0B search bounds are covered by DiscoverySearchBoundsTests; out of the way here.
+                    NothingFoundTimeout = TimeSpan.FromDays(1),
+                    MaxSearchDuration = TimeSpan.FromDays(2)
                 });
             Service.DiscoveredChanged += (_, _) =>
             {

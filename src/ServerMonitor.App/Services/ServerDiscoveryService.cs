@@ -68,6 +68,8 @@ public sealed class ServerDiscoveryService : IServerDiscoveryService, IServerDis
     private Task _notificationTask = Task.CompletedTask;
     private long _materialChangeVersion;
     private volatile bool _isSearching;
+    private DateTimeOffset _searchStartedAt;
+    private volatile DiscoverySearchEnd _lastSearchEnd = DiscoverySearchEnd.None;
 
     public ServerDiscoveryService(
         IMdnsServiceBrowser browser,
@@ -90,6 +92,9 @@ public sealed class ServerDiscoveryService : IServerDiscoveryService, IServerDis
 
     /// <inheritdoc />
     public event EventHandler? IsSearchingChanged;
+
+    /// <inheritdoc />
+    public DiscoverySearchEnd LastSearchEnd => _lastSearchEnd;
 
     /// <summary>The host never starts discovery (REL.0B); see the type remarks.</summary>
     Task IHostedService.StartAsync(CancellationToken cancellationToken) => Task.CompletedTask;
@@ -122,6 +127,7 @@ public sealed class ServerDiscoveryService : IServerDiscoveryService, IServerDis
                 {
                     _ignored = new HashSet<string>(ignored, StringComparer.Ordinal);
                     generation = ++_lifecycleGeneration;
+                    _searchStartedAt = _timeProvider.GetUtcNow();
                     _acceptBrowserCallbacks = true;
                     _foundHandler = (_, observation) => OnFoundOrUpdated(generation, observation);
                     _updatedHandler = (_, observation) => OnFoundOrUpdated(generation, observation);
@@ -139,6 +145,7 @@ public sealed class ServerDiscoveryService : IServerDiscoveryService, IServerDis
                 _sweepLoop = Task.Run(() => SweepLoopAsync(generation, token), CancellationToken.None);
 
                 _state = LifecycleState.Started;
+                _lastSearchEnd = DiscoverySearchEnd.None;
                 SetSearching(true);
                 _logger.LogDebug("Discovery service started.");
             }
@@ -154,6 +161,10 @@ public sealed class ServerDiscoveryService : IServerDiscoveryService, IServerDis
                 _logger.LogError(
                     "Discovery service failed to start; discovery is disabled for now. Exception type: {Type}.",
                     exception.GetType().Name);
+
+                // REL.0B (Cortex N-3): a failed user-started search is reported, not silently reset.
+                _lastSearchEnd = DiscoverySearchEnd.Failed;
+                RaiseActivityChanged();
             }
         }
         finally
@@ -248,7 +259,7 @@ public sealed class ServerDiscoveryService : IServerDiscoveryService, IServerDis
         }
     }
 
-    private async Task StopWhileHeldAsync(CancellationToken cancellationToken)
+    private async Task StopWhileHeldAsync(CancellationToken cancellationToken, DiscoverySearchEnd end = DiscoverySearchEnd.Stopped)
     {
         if (_state != LifecycleState.Started)
         {
@@ -256,7 +267,6 @@ public sealed class ServerDiscoveryService : IServerDiscoveryService, IServerDis
         }
 
         _state = LifecycleState.Stopped;
-        SetSearching(false);
         EventHandler<DiscoveryObservation>? foundHandler;
         EventHandler<DiscoveryObservation>? updatedHandler;
         EventHandler<DiscoveryObservation>? removedHandler;
@@ -282,6 +292,13 @@ public sealed class ServerDiscoveryService : IServerDiscoveryService, IServerDis
             _published.Clear();
             _materialChangeVersion = 0;
         }
+
+        // REL.0B (Cortex C-1): signal only AFTER the store is empty. IsSearchingChanged is raised synchronously and a
+        // subscriber on the same thread (the hide path runs on the UI thread) rebuilds from GetDiscovered(); signalling
+        // first showed the stopped search's suggestions with no listener and hid the search action. No
+        // DiscoveredChanged follows a stop (the notification worker was just cancelled), so this is the one signal.
+        _lastSearchEnd = end;
+        SetSearching(false);
 
         if (foundHandler is not null)
         {
@@ -393,6 +410,11 @@ public sealed class ServerDiscoveryService : IServerDiscoveryService, IServerDis
         }
 
         _isSearching = value;
+        RaiseActivityChanged();
+    }
+
+    private void RaiseActivityChanged()
+    {
         try
         {
             IsSearchingChanged?.Invoke(this, EventArgs.Empty);
@@ -464,6 +486,12 @@ public sealed class ServerDiscoveryService : IServerDiscoveryService, IServerDis
             {
                 await Task.Delay(_options.SweepInterval, _timeProvider, token).ConfigureAwait(false);
                 Sweep(generation);
+                if (SearchLimitReached(generation) is { } end)
+                {
+                    // Not awaited here: the stop drains THIS loop, so it runs as its own task and the loop ends.
+                    _ = Task.Run(() => AutoStopAsync(generation, end), CancellationToken.None);
+                    return;
+                }
             }
         }
         catch (OperationCanceledException)
@@ -473,6 +501,63 @@ public sealed class ServerDiscoveryService : IServerDiscoveryService, IServerDis
         catch (Exception exception)
         {
             _logger.LogError("Discovery sweep loop ended unexpectedly. Exception type: {Type}.", exception.GetType().Name);
+        }
+    }
+
+    /// <summary>REL.0B (Vigil L-1, Prism N-5): a user-started search is bounded; see <see cref="DiscoveryOptions"/>.</summary>
+    private DiscoverySearchEnd? SearchLimitReached(long generation)
+    {
+        var now = _timeProvider.GetUtcNow();
+        lock (_sync)
+        {
+            if (!IsActiveGenerationLocked(generation))
+            {
+                return null;
+            }
+
+            var elapsed = now - _searchStartedAt;
+            if (elapsed >= _options.MaxSearchDuration)
+            {
+                return DiscoverySearchEnd.TimeLimit;
+            }
+
+            if (elapsed >= _options.NothingFoundTimeout && BuildVisibleSnapshotsLocked(now).Count == 0)
+            {
+                return DiscoverySearchEnd.NothingFound;
+            }
+
+            return null;
+        }
+    }
+
+    private async Task AutoStopAsync(long generation, DiscoverySearchEnd end)
+    {
+        try
+        {
+            await _lifecycleGate.WaitAsync().ConfigureAwait(false);
+            try
+            {
+                bool current;
+                lock (_sync)
+                {
+                    current = IsActiveGenerationLocked(generation);
+                }
+
+                // A manual stop, a newer start or dispose already won: never stop a search this loop did not own.
+                if (current && _state == LifecycleState.Started)
+                {
+                    await StopWhileHeldAsync(CancellationToken.None, end).ConfigureAwait(false);
+                    _logger.LogDebug("Discovery search ended by itself ({End}).", end);
+                }
+            }
+            finally
+            {
+                _lifecycleGate.Release();
+            }
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError("Discovery automatic stop failed. Exception type: {Type}.", exception.GetType().Name);
         }
     }
 

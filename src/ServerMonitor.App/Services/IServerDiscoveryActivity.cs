@@ -17,8 +17,14 @@ public interface IServerDiscoveryActivity
     /// <summary>True from a successful start of the mDNS browser until it is stopped.</summary>
     bool IsSearching { get; }
 
-    /// <summary>Raised on the thread that started or stopped discovery, after <see cref="IsSearching"/> changed.</summary>
+    /// <summary>
+    /// Raised on the thread that started or stopped discovery, after <see cref="IsSearching"/> or
+    /// <see cref="LastSearchEnd"/> changed. On a stop it is raised only after the suggestions are cleared.
+    /// </summary>
     event EventHandler? IsSearchingChanged;
+
+    /// <summary>How the last search ended; <see cref="DiscoverySearchEnd.None"/> while one runs or before the first.</summary>
+    DiscoverySearchEnd LastSearchEnd { get; }
 
     /// <summary>
     /// Starts searching the local network. Explicit user action ONLY. Idempotent while searching; a failed start

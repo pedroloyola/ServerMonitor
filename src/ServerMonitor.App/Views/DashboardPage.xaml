@@ -592,7 +592,14 @@
                             <!-- REL.0B UI9-FW-PROMPT: discovery starts only here, on request; the note sets the Windows permission expectation first. -->
                             <StackPanel x:Name="EmptyDiscoveryStartBlock" HorizontalAlignment="Center" MaxWidth="560" Spacing="{StaticResource SaSpace4}"
                                         Visibility="{x:Bind ViewModel.CanStartLocalNetworkSearch, Mode=OneWay}">
-                                <HyperlinkButton x:Name="EmptyDiscoveryStartButton" x:Uid="DashboardEmptyDiscoveryStartButton" HorizontalAlignment="Center"
+                                <TextBlock x:Name="EmptyDiscoveryNothingFound" x:Uid="DashboardEmptyDiscoveryNothingFound" Style="{StaticResource SaCaptionTextStyle}"
+                                           TextAlignment="Center" Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap"
+                                           Visibility="{x:Bind ViewModel.ShowLocalNetworkNothingFound, Mode=OneWay}" />
+                                <TextBlock x:Name="EmptyDiscoveryFailed" x:Uid="DashboardEmptyDiscoveryFailed" Style="{StaticResource SaCaptionTextStyle}"
+                                           TextAlignment="Center" Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap"
+                                           Visibility="{x:Bind ViewModel.ShowLocalNetworkSearchFailed, Mode=OneWay}" />
+                                <!-- Prism N-1: the permission note is the button's HelpText (resw); N-2: 24px target on this instance only. -->
+                                <HyperlinkButton x:Name="EmptyDiscoveryStartButton" x:Uid="DashboardEmptyDiscoveryStartButton" HorizontalAlignment="Center" MinHeight="24"
                                                  Style="{StaticResource SaTextLinkButtonStyle}" Command="{x:Bind ViewModel.StartLocalNetworkSearchCommand}" />
                                 <TextBlock x:Uid="DashboardEmptyDiscoveryPermissionNote" Style="{StaticResource SaCaptionTextStyle}" TextAlignment="Center"
                                            Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap" />

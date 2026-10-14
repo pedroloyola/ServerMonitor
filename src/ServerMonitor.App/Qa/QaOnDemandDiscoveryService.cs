@@ -11,13 +11,17 @@ namespace ServerMonitor.App.Qa;
 /// the search indicator is visible first), and a stop (window to background) hides everything again. In memory
 /// only - no mDNS browser, no socket, no persistence, no SSH. Excluded from Release.
 /// </summary>
-internal sealed class QaOnDemandDiscoveryService(IReadOnlyList<DiscoveredService> seed, TimeSpan? revealDelay = null)
+internal sealed class QaOnDemandDiscoveryService(
+    IReadOnlyList<DiscoveredService> seed,
+    TimeSpan? revealDelay = null,
+    TimeProvider? timeProvider = null)
     : IServerDiscoveryService, IServerDiscoveryActivity
 {
     /// <summary>How long the QA search "looks" before the seed appears (the launch default).</summary>
     internal static readonly TimeSpan DefaultRevealDelay = TimeSpan.FromSeconds(3);
 
     private readonly TimeSpan _revealDelay = revealDelay ?? DefaultRevealDelay;
+    private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
 
     private readonly QaDiscoveryService _inner = new(seed);
     private readonly object _sync = new();
@@ -33,6 +37,8 @@ internal sealed class QaOnDemandDiscoveryService(IReadOnlyList<DiscoveredService
     {
         get { lock (_sync) { return _searching; } }
     }
+
+    public DiscoverySearchEnd LastSearchEnd { get; private set; } = DiscoverySearchEnd.None;
 
     /// <summary>How many times a search was really started (test seam for "exactly once").</summary>
     internal int StartCount { get; private set; }
@@ -73,6 +79,7 @@ internal sealed class QaOnDemandDiscoveryService(IReadOnlyList<DiscoveredService
             }
 
             _searching = true;
+            LastSearchEnd = DiscoverySearchEnd.None;
             StartCount++;
             generation = ++_generation;
         }
@@ -94,6 +101,7 @@ internal sealed class QaOnDemandDiscoveryService(IReadOnlyList<DiscoveredService
             _searching = false;
             _revealed = false;
             _generation++;
+            LastSearchEnd = DiscoverySearchEnd.Stopped;
         }
 
         IsSearchingChanged?.Invoke(this, EventArgs.Empty);
@@ -103,7 +111,7 @@ internal sealed class QaOnDemandDiscoveryService(IReadOnlyList<DiscoveredService
 
     private async Task RevealAfterDelayAsync(long generation)
     {
-        await Task.Delay(_revealDelay).ConfigureAwait(false);
+        await Task.Delay(_revealDelay, _timeProvider).ConfigureAwait(false);
         lock (_sync)
         {
             if (generation != _generation || !_searching)

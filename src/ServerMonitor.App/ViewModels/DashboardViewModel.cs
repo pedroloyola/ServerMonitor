@@ -292,6 +292,14 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
     public bool CanStartLocalNetworkSearch =>
         !HasVisibleServers && !HasDiscoveredServers && _discoveryActivity is { IsSearching: false };
 
+    /// <summary>REL.0B: the explicit search ended by itself with nothing found; the action is offered again below.</summary>
+    public bool ShowLocalNetworkNothingFound =>
+        CanStartLocalNetworkSearch && _discoveryActivity?.LastSearchEnd == DiscoverySearchEnd.NothingFound;
+
+    /// <summary>REL.0B (Cortex N-3): the explicit search could not start; the action is offered again below.</summary>
+    public bool ShowLocalNetworkSearchFailed =>
+        CanStartLocalNetworkSearch && _discoveryActivity?.LastSearchEnd == DiscoverySearchEnd.Failed;
+
     /// <summary>Empty dashboard with suggestions: they are listed inside the empty state.</summary>
     public bool ShowEmptyStateDiscoveries => !HasVisibleServers && HasDiscoveredServers;
 
@@ -302,6 +310,8 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
     {
         OnPropertyChanged(nameof(IsSearchingLocalNetwork));
         OnPropertyChanged(nameof(CanStartLocalNetworkSearch));
+        OnPropertyChanged(nameof(ShowLocalNetworkNothingFound));
+        OnPropertyChanged(nameof(ShowLocalNetworkSearchFailed));
         OnPropertyChanged(nameof(ShowEmptyStateDiscoveries));
         OnPropertyChanged(nameof(ShowDiscoverySection));
     }
@@ -1144,6 +1154,8 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         RebuildDiscovered();
         OnPropertyChanged(nameof(IsSearchingLocalNetwork));
         OnPropertyChanged(nameof(CanStartLocalNetworkSearch));
+        OnPropertyChanged(nameof(ShowLocalNetworkNothingFound));
+        OnPropertyChanged(nameof(ShowLocalNetworkSearchFailed));
     }
 
     private async Task StartLocalNetworkSearchAsync()

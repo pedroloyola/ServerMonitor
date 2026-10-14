@@ -203,6 +203,17 @@ public sealed class DiscoveryOnDemandTests
         Assert.Equal("{x:Bind ViewModel.CanStartLocalNetworkSearch, Mode=OneWay}", (string?)block.Attribute("Visibility"));
         Assert.Contains(block.Descendants(), e => (string?)e.Attribute(x + "Uid") == "DashboardEmptyDiscoveryPermissionNote");
 
+        Assert.Equal("24", (string?)button.Attribute("MinHeight"));
+        foreach (var (name, binding) in new[]
+                 {
+                     ("EmptyDiscoveryNothingFound", "{x:Bind ViewModel.ShowLocalNetworkNothingFound, Mode=OneWay}"),
+                     ("EmptyDiscoveryFailed", "{x:Bind ViewModel.ShowLocalNetworkSearchFailed, Mode=OneWay}")
+                 })
+        {
+            var caption = Assert.Single(block.Descendants().Where(e => (string?)e.Attribute(x + "Name") == name));
+            Assert.Equal(binding, (string?)caption.Attribute("Visibility"));
+        }
+
         // Inside the first-server empty state, i.e. only reachable from a visible window.
         Assert.Contains(block.Ancestors(), e => (string?)e.Attribute(x + "Name") == "FirstServerStateBlock");
     }
@@ -219,6 +230,10 @@ public sealed class DiscoveryOnDemandTests
         Assert.False(string.IsNullOrWhiteSpace(values["DashboardEmptyDiscoveryStartButton.Content"]));
         var note = values["DashboardEmptyDiscoveryPermissionNote.Text"];
         Assert.Contains("Windows", note, StringComparison.Ordinal);
+        // Prism N-1: a screen reader that tabs straight to the action hears the same note.
+        Assert.Equal(note, values["DashboardEmptyDiscoveryStartButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.HelpText"]);
+        Assert.False(string.IsNullOrWhiteSpace(values["DashboardEmptyDiscoveryNothingFound.Text"]));
+        Assert.False(string.IsNullOrWhiteSpace(values["DashboardEmptyDiscoveryFailed.Text"]));
     }
 
     // ------------------------------------------------------------------ helpers
@@ -244,6 +259,8 @@ public sealed class DiscoveryOnDemandTests
         public event EventHandler? IsSearchingChanged { add { } remove { } }
 
         public bool IsSearching => true;
+
+        public DiscoverySearchEnd LastSearchEnd => DiscoverySearchEnd.None;
 
         public IReadOnlyList<DiscoveredService> GetDiscovered() => [];
 

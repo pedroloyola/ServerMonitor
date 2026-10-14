@@ -30,7 +30,8 @@ internal static class LocalNetworkSearchLifetime
     {
         try
         {
-            await activity.StopSearchAsync().ConfigureAwait(false);
+            // Off the UI thread (Cortex N-1): the browser's stop disposes sockets and unhooks NetworkChange synchronously.
+            await Task.Run(() => activity.StopSearchAsync()).ConfigureAwait(false);
         }
         catch (Exception exception)
         {
