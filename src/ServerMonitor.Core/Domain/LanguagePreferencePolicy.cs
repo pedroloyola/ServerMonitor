@@ -10,7 +10,14 @@ public enum LanguageRecordState
     Valid,
 
     /// <summary>Present but unusable (malformed, oversized, unknown schema, unreadable). Proves nothing.</summary>
-    Unreadable
+    Unreadable,
+
+    /// <summary>
+    /// PR #55 fix round 1 (Cortex N-1): a well-formed record written by ANOTHER app identity sharing the same folder
+    /// (the Store package, a Developer package, an unpackaged run). It proves nothing about this identity's override, so
+    /// for every decision it is the same as <see cref="Absent"/>: this identity has no record of its own.
+    /// </summary>
+    OtherWriter
 }
 
 /// <summary>
@@ -32,6 +39,8 @@ public sealed record LanguageRecordRead(LanguageRecordState State, LanguageProve
     public static LanguageRecordRead Absent { get; } = new(LanguageRecordState.Absent, null);
 
     public static LanguageRecordRead Unreadable { get; } = new(LanguageRecordState.Unreadable, null);
+
+    public static LanguageRecordRead OtherWriter { get; } = new(LanguageRecordState.OtherWriter, null);
 
     public static LanguageRecordRead Of(LanguageProvenance record) =>
         new(LanguageRecordState.Valid, record ?? throw new ArgumentNullException(nameof(record)));
@@ -57,9 +66,16 @@ public sealed record LanguageStartupPlan(LanguageProvenance? RecordToWrite, stri
 /// never reinterpreted or rewritten.</item>
 /// <item>The record is always written before the override: a record that is ahead of the override never matches it, so
 /// an interrupted sequence reads as "explicit" and the language never changes on its own.</item>
-/// <item>The legacy hint is offered only for the exact signature of the v1.x defect: pt-BR, no record at all, and a
-/// Windows culture that is not exactly en-US / pt-PT / pt-BR and whose own language is not Brazilian Portuguese.</item>
+/// <item>The legacy hint is offered only for the exact signature of the v1.x defect: pt-BR, no record of this app
+/// identity (absent, or written by another identity), and a Windows culture that is not exactly en-US / pt-PT / pt-BR
+/// and whose own language is not Brazilian Portuguese.</item>
 /// </list>
+/// <para>
+/// Known residual (Vigil L-1, PR #55): the record cannot see what an OLDER version does to the override. After a
+/// downgrade to v1.1.1 (same identity, which ignores the file) an explicit choice that happens to EQUAL the recorded
+/// automatic value is indistinguishable from it, so on the re-upgrade it follows a later Windows language change. It needs
+/// a sideloaded downgrade plus that exact coincidence; Settings › Language can always set it again.
+/// </para>
 /// </summary>
 public static class LanguagePreferencePolicy
 {
@@ -108,7 +124,7 @@ public static class LanguagePreferencePolicy
     public static string? LegacyHintTarget(string? persistedOverride, string? systemCulture, LanguageRecordRead record)
     {
         ArgumentNullException.ThrowIfNull(record);
-        if (record.State != LanguageRecordState.Absent
+        if (record.State is not (LanguageRecordState.Absent or LanguageRecordState.OtherWriter)
             || !Same(persistedOverride, SupportedCultures.BrazilianPortuguese)
             || SupportedCultures.IsSupported(systemCulture))
         {

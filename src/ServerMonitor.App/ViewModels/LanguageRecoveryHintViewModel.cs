@@ -106,9 +106,35 @@ public sealed class LanguageRecoveryHintViewModel : ObservableObject
             _ => "LanguageEnglishOption.Content"
         });
 
-    private void UseSystemLanguage()
+    /// <summary>
+    /// PR #55 fix round 1 (Relay L-1 / Cortex N-3): this view model is a singleton, and the language can be decided
+    /// elsewhere in the same session (Settings › Language). Each Overview visit re-checks the real state: when no hint is
+    /// due any more, the hint closes - without writing anything and without a restart notice. Never re-opens one.
+    /// </summary>
+    public void Refresh()
+    {
+        if (IsOpen && _localization.PendingLegacyLanguageHint is null)
+        {
+            IsSaveErrorOpen = false;
+            IsOpen = false;
+        }
+    }
+
+    /// <summary>An action on a hint that is no longer due only closes it (the user's later decision stands).</summary>
+    private bool StillDue()
     {
         if (!IsOpen)
+        {
+            return false;
+        }
+
+        Refresh();
+        return IsOpen;
+    }
+
+    private void UseSystemLanguage()
+    {
+        if (!StillDue())
         {
             return;
         }
@@ -126,7 +152,7 @@ public sealed class LanguageRecoveryHintViewModel : ObservableObject
 
     private void KeepCurrentLanguage()
     {
-        if (!IsOpen)
+        if (!StillDue())
         {
             return;
         }

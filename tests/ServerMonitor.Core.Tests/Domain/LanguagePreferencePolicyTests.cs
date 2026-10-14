@@ -12,6 +12,7 @@ public sealed class LanguagePreferencePolicyTests
     private static readonly LanguageRecordRead Absent = LanguageRecordRead.Absent;
     private static readonly LanguageRecordRead Unreadable = LanguageRecordRead.Unreadable;
     private static readonly LanguageRecordRead ExplicitRecord = LanguageRecordRead.Of(LanguageProvenance.Explicit);
+    private static readonly LanguageRecordRead OtherWriter = LanguageRecordRead.OtherWriter;
 
     private static LanguageRecordRead Following(string autoOverride) => LanguageRecordRead.Of(LanguageProvenance.System(autoOverride));
 
@@ -126,6 +127,36 @@ public sealed class LanguagePreferencePolicyTests
     [Fact]
     public void TheRecordComparison_IgnoresCase() =>
         Assert.True(LanguagePreferencePolicy.FollowsSystem("EN-us", Following("en-US")));
+
+    // ---- PR #55 fix round 1 (Cortex N-1): another identity's record proves nothing ----------------------------------
+
+    /// <summary>An override equal to what ANOTHER identity recorded is this identity's explicit choice: never re-resolved.</summary>
+    [Theory]
+    [InlineData("en-US", "pt-PT")]
+    [InlineData("pt-PT", "fr-FR")]
+    [InlineData("pt-BR", "en-GB")]
+    public void AnOverrideWithAnotherWritersRecord_IsExplicit_AndNeverFollowsWindows(string persisted, string systemCulture)
+    {
+        Assert.True(LanguagePreferencePolicy.AtStartup(persisted, systemCulture, OtherWriter).IsEmpty);
+        Assert.False(LanguagePreferencePolicy.FollowsSystem(persisted, OtherWriter));
+    }
+
+    /// <summary>Without an override, this identity records its own first run (replacing the other identity's record).</summary>
+    [Fact]
+    public void NoOverride_WithAnotherWritersRecord_RecordsItsOwn()
+    {
+        var plan = LanguagePreferencePolicy.AtStartup(null, "fr-FR", OtherWriter);
+
+        Assert.Equal(LanguageProvenance.System("en-US"), plan.RecordToWrite);
+        Assert.Equal("en-US", plan.OverrideToWrite);
+    }
+
+    /// <summary>The legacy hint is about THIS identity's v1.x pt-BR: another identity's record does not suppress it.</summary>
+    [Theory]
+    [InlineData("fr-FR", "en-US")]
+    [InlineData("pt-AO", "pt-PT")]
+    public void TheHint_IsOfferedWhenOnlyAnotherWriterHasARecord(string systemCulture, string expected) =>
+        Assert.Equal(expected, LanguagePreferencePolicy.LegacyHintTarget("pt-BR", systemCulture, OtherWriter));
 
     // ---- follows the system (the picker's first item) ---------------------------------------------------------------
 

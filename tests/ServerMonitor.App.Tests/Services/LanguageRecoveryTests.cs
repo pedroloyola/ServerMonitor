@@ -464,6 +464,121 @@ public sealed class LanguageRecoveryTests : IDisposable
         Assert.Single(store.Writes);
     }
 
+    // ---- B3 (PR #55 fix round 1, Relay L-1): a decision taken elsewhere retires the singleton hint ----------------
+
+    [Theory]
+    [InlineData("pt-PT")]
+    [InlineData("en-US")]
+    [InlineData("pt-BR")]
+    public void B3_AnExplicitChoiceInSettings_ClosesTheHintOnTheNextVisit_WithoutWritingAgain(string choice)
+    {
+        var platform = new FakeUiLanguagePlatform("fr-FR", "pt-BR");
+        var store = new FakeLanguageSettingsStore();
+        var hint = Hint(platform, store);
+        Assert.True(hint.IsOpen);
+
+        Assert.True(Service(platform, store).TrySetLanguage(choice)); // Settings › Language, same session
+        hint.Refresh();                                                 // back on Overview
+
+        Assert.False(hint.IsOpen);
+        Assert.False(hint.IsRestartNoticeOpen);
+        Assert.False(hint.HasVisibleNotice);
+        Assert.Equal([choice], platform.Writes);
+        Assert.Equal([LanguageProvenance.Explicit], store.Writes);
+    }
+
+    /// <summary>Even without a page visit, an action on a hint that is no longer due changes nothing and just closes it.</summary>
+    [Fact]
+    public void B3_TheHintsActions_RecheckFirst_AndNeverOverrideALaterChoice()
+    {
+        var platform = new FakeUiLanguagePlatform("fr-FR", "pt-BR");
+        var store = new FakeLanguageSettingsStore();
+        var useSystem = Hint(platform, store);
+        var keep = Hint(platform, store);
+        Assert.True(Service(platform, store).TrySetLanguage("pt-PT"));
+
+        useSystem.UseSystemLanguageCommand.Execute(null);
+        keep.KeepCurrentLanguageCommand.Execute(null);
+
+        Assert.False(useSystem.IsOpen);
+        Assert.False(useSystem.IsRestartNoticeOpen);
+        Assert.False(keep.IsOpen);
+        Assert.Equal(["pt-PT"], platform.Writes);
+        Assert.Single(store.Writes);
+    }
+
+    [Fact]
+    public void B3_RefreshKeepsADueHint_AndNeverReopensAClosedOne()
+    {
+        var platform = new FakeUiLanguagePlatform("fr-FR", "pt-BR");
+        var store = new FakeLanguageSettingsStore();
+        var hint = Hint(platform, store);
+
+        hint.Refresh();
+        Assert.True(hint.IsOpen);
+
+        hint.KeepCurrentLanguageCommand.Execute(null);
+        store.State = LanguageRecordRead.Absent; // even if the record vanished, the closed hint stays closed this session
+        hint.Refresh();
+        Assert.False(hint.IsOpen);
+    }
+
+    [Fact]
+    public void B3_TheOverviewRefreshesTheHint_OnEveryVisit()
+    {
+        var code = Architecture.AppSourceTree.CodeWithoutComments("Views/DashboardPage.xaml.cs");
+        var loaded = code[code.IndexOf("private async void OnLoaded(", StringComparison.Ordinal)..];
+        loaded = loaded[..loaded.IndexOf("RestoreFocus);", StringComparison.Ordinal)];
+
+        Assert.Contains("LanguageHint.Refresh();", loaded, StringComparison.Ordinal);
+    }
+
+    // ---- C (PR #55 fix round 1, Cortex N-1): identities sharing one real folder -----------------------------------------
+
+    /// <summary>
+    /// The dev-machine case: the Store package has an explicit en-US (no record of its own), an unpackaged run without an
+    /// override records "System(en-US)" in the same real folder. The Store package must NOT take that as its own
+    /// automatic value: when Windows changes, its explicit en-US stays.
+    /// </summary>
+    [Fact]
+    public void C1_AnotherIdentitysRecord_NeverMakesThisOverrideAutomatic()
+    {
+        var unpackaged = new FakeUiLanguagePlatform("fr-FR");
+        Service(unpackaged, FileStore("unpackaged")).InitializeFromSystem();
+        Assert.Equal(LanguageRecordRead.Of(LanguageProvenance.System("en-US")), FileStore("unpackaged").Read());
+
+        var store = new FakeUiLanguagePlatform("pt-PT", "en-US"); // Windows changed; the Store install chose English
+        var storeService = Service(store, FileStore("package:Store.Family_8wekyb3d8bbwe"));
+        storeService.InitializeFromSystem();
+
+        Assert.Empty(store.Writes);
+        Assert.False(storeService.FollowsSystemLanguage);
+    }
+
+    /// <summary>Same file, same identity: the app's own automatic value still follows Windows (no regression of A3).</summary>
+    [Fact]
+    public void C2_TheSameIdentitysRecord_StillFollowsWindows()
+    {
+        var platform = new FakeUiLanguagePlatform("fr-FR");
+        Service(platform, FileStore("package:Store.Family_8wekyb3d8bbwe")).InitializeFromSystem();
+
+        platform.SystemUiCultureName = "pt-AO";
+        Service(platform, FileStore("package:Store.Family_8wekyb3d8bbwe")).InitializeFromSystem();
+
+        Assert.Equal(["en-US", "pt-PT"], platform.Writes);
+    }
+
+    /// <summary>A legacy pt-BR of this identity still gets its one-time hint when only another identity has a record.</summary>
+    [Fact]
+    public void C3_TheLegacyHint_IsNotSuppressedByAnotherIdentitysRecord()
+    {
+        Service(new FakeUiLanguagePlatform("en-US"), FileStore("unpackaged")).InitializeFromSystem();
+
+        var store = Service(new FakeUiLanguagePlatform("fr-FR", "pt-BR"), FileStore("package:Store.Family_8wekyb3d8bbwe"));
+
+        Assert.Equal("en-US", store.PendingLegacyLanguageHint);
+    }
+
     // ---- B2: the copy, in the three languages ---------------------------------------------------------------------
 
     [Theory]
@@ -518,8 +633,8 @@ public sealed class LanguageRecoveryTests : IDisposable
     private static LanguageRecoveryHintViewModel Hint(FakeUiLanguagePlatform platform, ILanguageSettingsStore store) =>
         new(new ResWStrings(Service(platform, store), new ResWLocalizationService("en-US")));
 
-    private JsonLanguageSettingsStore FileStore() =>
-        new(new LanguageSettingsStorageOptions { FilePath = Path.Combine(_directory, "language-settings.json") },
+    private JsonLanguageSettingsStore FileStore(string writer = "unpackaged") =>
+        new(new LanguageSettingsStorageOptions { FilePath = Path.Combine(_directory, "language-settings.json"), Writer = writer },
             NullLogger<JsonLanguageSettingsStore>.Instance);
 
     /// <summary>The REAL service for every language decision; only <see cref="GetString"/> reads a resw file.</summary>

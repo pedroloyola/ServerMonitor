@@ -9,10 +9,14 @@ namespace ServerMonitor.App.Tests.Services;
 /// <summary>
 /// REL.0D: <c>language-settings.json</c> on a per-test temp folder (never the real <c>%LOCALAPPDATA%\ServerMonitor</c>).
 /// Strict reading - anything not exactly understood is Unreadable, which the policy treats as "no proof" - and an atomic
-/// write that reports failure instead of throwing.
+/// write that reports failure instead of throwing. PR #55 fix round 1: schema 2 with the writer identity (Cortex N-1) and
+/// a genuinely strict parser (Relay N-1).
 /// </summary>
 public sealed class JsonLanguageSettingsStoreTests : IDisposable
 {
+    private const string Me = "package:Test.Store_abc";
+    private const string Someone = "unpackaged";
+
     private readonly string _directory = Path.Combine(Path.GetTempPath(), "sm-language-settings-" + Guid.NewGuid().ToString("N"));
 
     private string FilePath => Path.Combine(_directory, "language-settings.json");
@@ -48,14 +52,48 @@ public sealed class JsonLanguageSettingsStoreTests : IDisposable
     }
 
     [Fact]
-    public void TheFile_CarriesTheSchemaVersion_AndNoLanguageOtherThanTheAppsOwnOverride()
+    public void TheFile_CarriesTheSchemaVersion_TheWriter_AndNoLanguageOtherThanTheAppsOwnOverride()
     {
         Store().TryWrite(LanguageProvenance.System("en-US"));
 
         using var document = JsonDocument.Parse(File.ReadAllBytes(FilePath));
         var names = document.RootElement.EnumerateObject().Select(property => property.Name).ToList();
-        Assert.Equal(["schemaVersion", "followSystem", "autoOverride"], names);
-        Assert.Equal(1, document.RootElement.GetProperty("schemaVersion").GetInt32());
+        Assert.Equal(["schemaVersion", "writer", "followSystem", "autoOverride"], names);
+        Assert.Equal(2, document.RootElement.GetProperty("schemaVersion").GetInt32());
+        Assert.Equal(Me, document.RootElement.GetProperty("writer").GetString());
+    }
+
+    /// <summary>Cortex N-1: a valid record of another identity sharing the folder proves nothing about this one.</summary>
+    [Theory]
+    [InlineData(true, "en-US")]
+    [InlineData(true, "")]
+    [InlineData(false, null)]
+    public void AValidRecordOfAnotherWriter_ReadsAsOtherWriter(bool followSystem, string? autoOverride)
+    {
+        var record = followSystem ? LanguageProvenance.System(autoOverride!) : LanguageProvenance.Explicit;
+        Assert.True(Store(Someone).TryWrite(record));
+
+        Assert.Equal(LanguageRecordRead.OtherWriter, Store(Me).Read());
+        Assert.Equal(LanguageRecordRead.Of(record), Store(Someone).Read());
+    }
+
+    /// <summary>Only a well-formed record says who wrote it: a broken one of another writer is still Unreadable.</summary>
+    [Fact]
+    public void AMalformedRecordOfAnotherWriter_IsUnreadable()
+    {
+        WriteRaw("""{"schemaVersion":2,"writer":"unpackaged","followSystem":true,"autoOverride":"fr-FR"}""");
+
+        Assert.Equal(LanguageRecordRead.Unreadable, Store(Me).Read());
+    }
+
+    [Theory]
+    [InlineData("Store.Family_8wekyb3d8bbwe", "package:Store.Family_8wekyb3d8bbwe")]
+    [InlineData("", "unpackaged")]
+    [InlineData(null, "unpackaged")]
+    public void TheWriter_IsThePackageFamily_OrUnpackaged(string? family, string expected)
+    {
+        Assert.Equal(expected, LanguageSettingsWriter.Resolve(() => family));
+        Assert.Equal("unpackaged", LanguageSettingsWriter.Resolve(() => throw new InvalidOperationException("not packaged")));
     }
 
     [Theory]
@@ -63,12 +101,21 @@ public sealed class JsonLanguageSettingsStoreTests : IDisposable
     [InlineData("{}")]
     [InlineData("null")]
     [InlineData("[]")]
-    [InlineData("""{"followSystem":true,"autoOverride":"en-US"}""")] // no schema version
-    [InlineData("""{"schemaVersion":2,"followSystem":true,"autoOverride":"en-US"}""")] // a newer schema
-    [InlineData("""{"schemaVersion":1,"autoOverride":"en-US"}""")] // no followSystem
-    [InlineData("""{"schemaVersion":1,"followSystem":true}""")] // follows, but which override?
-    [InlineData("""{"schemaVersion":1,"followSystem":true,"autoOverride":"fr-FR"}""")] // not a supported language
-    [InlineData("""{"schemaVersion":1,"followSystem":false,"autoOverride":"en-US"}""")] // explicit cannot carry one
+    [InlineData("""{"writer":"package:Test.Store_abc","followSystem":true,"autoOverride":"en-US"}""")] // no schema version
+    [InlineData("""{"schemaVersion":3,"writer":"package:Test.Store_abc","followSystem":true,"autoOverride":"en-US"}""")] // a newer schema
+    [InlineData("""{"schemaVersion":1,"followSystem":true,"autoOverride":"en-US"}""")] // schema 1 (unreleased builds, no writer)
+    [InlineData("""{"schemaVersion":2,"followSystem":true,"autoOverride":"en-US"}""")] // no writer
+    [InlineData("""{"schemaVersion":2,"writer":"","followSystem":true,"autoOverride":"en-US"}""")] // empty writer
+    [InlineData("""{"schemaVersion":2,"writer":"package:Test.Store_abc","autoOverride":"en-US"}""")] // no followSystem
+    [InlineData("""{"schemaVersion":2,"writer":"package:Test.Store_abc","followSystem":true}""")] // follows, but which override?
+    [InlineData("""{"schemaVersion":2,"writer":"package:Test.Store_abc","followSystem":true,"autoOverride":"fr-FR"}""")] // not a supported language
+    [InlineData("""{"schemaVersion":2,"writer":"package:Test.Store_abc","followSystem":false,"autoOverride":"en-US"}""")] // explicit cannot carry one
+    // Relay N-1: genuinely strict - exact names, numbers as numbers, no unknown members.
+    [InlineData("""{"SchemaVersion":2,"writer":"package:Test.Store_abc","followSystem":true,"autoOverride":"en-US"}""")]
+    [InlineData("""{"schemaVersion":2,"writer":"package:Test.Store_abc","FollowSystem":true,"autoOverride":"en-US"}""")]
+    [InlineData("""{"schemaVersion":"2","writer":"package:Test.Store_abc","followSystem":true,"autoOverride":"en-US"}""")]
+    [InlineData("""{"schemaVersion":2,"writer":"package:Test.Store_abc","followSystem":"true","autoOverride":"en-US"}""")]
+    [InlineData("""{"schemaVersion":2,"writer":"package:Test.Store_abc","followSystem":true,"autoOverride":"en-US","extra":1}""")]
     public void AnythingNotExactlyUnderstood_IsUnreadable(string content)
     {
         WriteRaw(content);
@@ -81,10 +128,10 @@ public sealed class JsonLanguageSettingsStoreTests : IDisposable
     /// valid, so each Unreadable case fails for its own reason - not because of how the test wrote the file.
     /// </summary>
     [Theory]
-    [InlineData("""{"schemaVersion":1,"followSystem":true,"autoOverride":"en-US"}""", true, "en-US")]
-    [InlineData("""{"schemaVersion":1,"followSystem":true,"autoOverride":""}""", true, "")]
-    [InlineData("""{"schemaVersion":1,"followSystem":false}""", false, null)]
-    [InlineData("""{"schemaVersion":1,"followSystem":false,"autoOverride":null}""", false, null)]
+    [InlineData("""{"schemaVersion":2,"writer":"package:Test.Store_abc","followSystem":true,"autoOverride":"en-US"}""", true, "en-US")]
+    [InlineData("""{"schemaVersion":2,"writer":"package:Test.Store_abc","followSystem":true,"autoOverride":""}""", true, "")]
+    [InlineData("""{"schemaVersion":2,"writer":"package:Test.Store_abc","followSystem":false}""", false, null)]
+    [InlineData("""{"schemaVersion":2,"writer":"package:Test.Store_abc","followSystem":false,"autoOverride":null}""", false, null)]
     public void AHandWrittenRecordOfTheCurrentSchema_IsRead(string content, bool followSystem, string? autoOverride)
     {
         WriteRaw(content);
@@ -98,7 +145,7 @@ public sealed class JsonLanguageSettingsStoreTests : IDisposable
     public void AFileWithAByteOrderMark_IsUnreadable()
     {
         Directory.CreateDirectory(_directory);
-        File.WriteAllText(FilePath, """{"schemaVersion":1,"followSystem":false}""", new UTF8Encoding(encoderShouldEmitUTF8Identifier: true));
+        File.WriteAllText(FilePath, """{"schemaVersion":2,"writer":"package:Test.Store_abc","followSystem":false}""", new UTF8Encoding(encoderShouldEmitUTF8Identifier: true));
 
         Assert.Equal(LanguageRecordRead.Unreadable, Store().Read());
     }
@@ -107,7 +154,7 @@ public sealed class JsonLanguageSettingsStoreTests : IDisposable
     public void AnOversizedFile_IsUnreadable()
     {
         Directory.CreateDirectory(_directory);
-        File.WriteAllText(FilePath, """{"schemaVersion":1,"followSystem":false}""" + new string(' ', JsonLanguageSettingsStore.MaxFileBytes));
+        File.WriteAllText(FilePath, """{"schemaVersion":2,"writer":"package:Test.Store_abc","followSystem":false}""" + new string(' ', JsonLanguageSettingsStore.MaxFileBytes));
 
         Assert.Equal(LanguageRecordRead.Unreadable, Store().Read());
     }
@@ -115,10 +162,11 @@ public sealed class JsonLanguageSettingsStoreTests : IDisposable
     [Fact]
     public void Parse_IsStrict_AndTheRenderRoundTrips()
     {
-        Assert.Equal(LanguageRecordRead.Absent, JsonLanguageSettingsStore.Parse(null));
+        Assert.Equal(LanguageRecordRead.Absent, JsonLanguageSettingsStore.Parse(null, Me));
         foreach (var record in new[] { LanguageProvenance.Explicit, LanguageProvenance.System(""), LanguageProvenance.System("pt-PT") })
         {
-            Assert.Equal(LanguageRecordRead.Of(record), JsonLanguageSettingsStore.Parse(JsonLanguageSettingsStore.Render(record)));
+            Assert.Equal(LanguageRecordRead.Of(record), JsonLanguageSettingsStore.Parse(JsonLanguageSettingsStore.Render(record, Me), Me));
+            Assert.Equal(LanguageRecordRead.OtherWriter, JsonLanguageSettingsStore.Parse(JsonLanguageSettingsStore.Render(record, Someone), Me));
         }
     }
 
@@ -152,6 +200,30 @@ public sealed class JsonLanguageSettingsStoreTests : IDisposable
         File.WriteAllBytes(FilePath, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false).GetBytes(content));
     }
 
-    private JsonLanguageSettingsStore Store() =>
-        new(new LanguageSettingsStorageOptions { FilePath = FilePath }, NullLogger<JsonLanguageSettingsStore>.Instance);
+    /// <summary>Relay N-2: the exception scope - environment failures only; programming errors still surface.</summary>
+    [Fact]
+    public void TheFailureScope_IsTheFileSystemOnes()
+    {
+        Assert.All(
+            new Exception[] { new IOException(), new UnauthorizedAccessException(), new NotSupportedException(), new ArgumentException(),
+                new System.Security.SecurityException(), new PathTooLongException(), new DirectoryNotFoundException() },
+            exception => Assert.True(JsonLanguageSettingsStore.IsFileSystemFailure(exception), exception.GetType().Name));
+        Assert.False(JsonLanguageSettingsStore.IsFileSystemFailure(new NullReferenceException()));
+        Assert.False(JsonLanguageSettingsStore.IsFileSystemFailure(new InvalidOperationException()));
+    }
+
+    /// <summary>A path the OS cannot use (an embedded NUL) is a false / not-valid read, never an exception.</summary>
+    [Fact]
+    public void AnUnusablePath_WritesFalse_AndNeverReadsValid_WithoutThrowing()
+    {
+        var store = new JsonLanguageSettingsStore(
+            new LanguageSettingsStorageOptions { FilePath = Path.Combine(_directory, "bad\0name.json"), Writer = Me },
+            NullLogger<JsonLanguageSettingsStore>.Instance);
+
+        Assert.False(store.TryWrite(LanguageProvenance.Explicit));
+        Assert.NotEqual(LanguageRecordState.Valid, store.Read().State);
+    }
+
+    private JsonLanguageSettingsStore Store(string writer = Me) =>
+        new(new LanguageSettingsStorageOptions { FilePath = FilePath, Writer = writer }, NullLogger<JsonLanguageSettingsStore>.Instance);
 }

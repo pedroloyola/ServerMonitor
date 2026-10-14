@@ -51,6 +51,8 @@ public sealed partial class DashboardPage : Page
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
         UpdateEmptyStateHeight();
+        // PR #55 fix round 1: a language decided in Settings since the last visit retires the one-time hint.
+        LanguageHint.Refresh();
         await ViewModel.LoadAsync();
         DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, RestoreFocus);
     }
