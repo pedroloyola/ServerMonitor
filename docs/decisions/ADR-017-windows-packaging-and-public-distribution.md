@@ -238,7 +238,9 @@ abre. O widget provider é ativado pelo COM sem janela e falha sem contexto.
 **Decisão proposta.**
 - **.NET: self-contained** no perfil `Packaged=true` (`SelfContained=true`, RID `win-x64` já fixo). O
   apphost carrega o `hostfxr` app-local e o host corre em modo self-contained. Nunca procura um runtime
-  machine-wide (prova por trace do host no relatório REL.0C).
+  machine-wide. Prova: com `COREHOST_TRACE`, o host do pacote extraído resolve `hostfxr`, `hostpolicy` e
+  todas as entradas TPA no diretório do pacote ("Executing as a self-contained app"). O pacote anterior
+  resolvia-os em `C:\Program Files\dotnet`.
 - **Windows App Runtime: continua framework package** (`WindowsAppSDKSelfContained=false`), como no §3.
 - **Widget provider** publicado também self-contained, com o mesmo RID e o mesmo host `dotnet`
   (`DOTNET_HOST_PATH`). Continua a acrescentar só os seus 4 ficheiros: partilha o runtime .NET da app na
@@ -264,6 +266,8 @@ abre. O widget provider é ativado pelo COM sem janela e falha sem contexto.
 - O SDK que constrói o pacote determina a versão do runtime embutido: `BundledNETCoreAppPackageVersion`, hoje
   10.0.11 localmente (SDK 10.0.400) e 10.0.13 com o SDK 10.0.402. Fixar o SDK de release é uma decisão
   separada, deixada à decisão humana.
-- Clean-machine continua **NOT_RUN** até haver uma VM descartável (REL.0D). O procedimento está no relatório
-  REL.0C.
+- Clean-machine continua **NOT_RUN** até haver uma VM descartável (REL.0D). O procedimento fica na
+  documentação pública de preparação do REL.0D. Tem de cobrir: arranque da app, ativação a frio do widget,
+  arranque `--background` e notificação a frio, numa máquina sem nenhum .NET instalado, mais a contraprova
+  com um pacote framework-dependent.
 
