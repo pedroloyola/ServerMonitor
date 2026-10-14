@@ -52,6 +52,13 @@ $mutations = @(
        Old = "`$mode = Get-ScalarField `$submission 'targetPublishMode'"; New = "`$mode = Get-Field `$submission 'targetPublishMode'"; Case = 'hold as a one-element array' }
     @{ Name = 'package file name compared case-insensitively'
        Old = "[string]::Equals(`$fileName, `$ExpectedPackageFileName, [StringComparison]::Ordinal)"; New = "[string]::Equals(`$fileName, `$ExpectedPackageFileName, [StringComparison]::OrdinalIgnoreCase)"; Case = 'package file name in other case' }
+    # PR #56 round 3 (Relay L-4, I-1, L-5): shapes that must make the draft or the product unreadable.
+    @{ Name = 'non-string fileStatus read as not PendingDelete (Relay L-4)'
+       Old = "if (`$null -ne `$fileStatusProperty -and `$null -ne `$fileStatusProperty.Value -and `$fileStatusProperty.Value -isnot [string]) {"; New = 'if ($false) {'; Case = 'package fileStatus as a one-element array' }
+    @{ Name = 'applicationPackages accepted as a single object (Relay I-1)'
+       Old = "if (`$packagesProperty.Value -isnot [array]) {"; New = 'if ($false) {'; Case = 'applicationPackages as a single object' }
+    @{ Name = 'in-flight status read through [string] again (Relay L-5)'; Guard = 'Assert-NoPendingSubmission.ps1'
+       Old = "if (`$null -ne `$statusProperty.Value -and `$statusProperty.Value -isnot [string]) {"; New = 'if ($false) {'; Case = 'status as a one-element array' }
     # PR #56 fix round 1 (Relay M-1, W5): the in-flight guard's DEFAULT, which store-submit relies on.
     @{ Name = 'W5 default allowed statuses widened to PendingCommit'; Guard = 'Assert-NoPendingSubmission.ps1'
        Old = "[string[]] `$AllowedStatuses = @('None', 'Published', 'Canceled')"; New = "[string[]] `$AllowedStatuses = @('None', 'Published', 'Canceled', 'PendingCommit')"; Case = 'draft a human is still editing' }

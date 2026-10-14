@@ -62,6 +62,11 @@ function Test-SubmissionIdle {
         return [pscustomobject] @{ Idle = $false; Status = ''; Reason = 'the submission JSON has no status field' }
     }
 
+    # PR #56 Relay L-5 (the N-3 rule): the status must be ONE JSON string. [string] of ["Published"] is "Published",
+    # which would read a malformed answer as idle and let the upload (which deletes a draft) run.
+    if ($null -ne $statusProperty.Value -and $statusProperty.Value -isnot [string]) {
+        return [pscustomobject] @{ Idle = $false; Status = ''; Reason = 'the submission status is not a single string' }
+    }
     $status = [string] $statusProperty.Value
     if ([string]::IsNullOrWhiteSpace($status)) {
         return [pscustomobject] @{ Idle = $false; Status = ''; Reason = 'the submission status is empty' }
@@ -99,6 +104,9 @@ if ($SelfTest) {
         @{ Name = 'JSON without a status field';       Raw = '{"id":"123"}';                   Idle = $false }
         @{ Name = 'empty status value';                Raw = '{"status":""}';                  Idle = $false }
         @{ Name = 'unknown future status';             Raw = '{"status":"SomethingNew"}';      Idle = $false }
+        @{ Name = 'status as a one-element array';     Raw = '{"status":["Published"]}';       Idle = $false }
+        @{ Name = 'status as an object';               Raw = '{"status":{"v":"None"}}';        Idle = $false }
+        @{ Name = 'status as a number';                Raw = '{"status":0}';                   Idle = $false }
     )
 
     $failedNames = @()

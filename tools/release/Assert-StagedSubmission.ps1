@@ -116,12 +116,21 @@ function Test-StagedSubmission {
         return & $fail "visibility is '$visibility', expected '$ExpectedVisibility'"
     }
 
-    $packages = Get-Field $submission 'applicationPackages'
-    if ($null -eq $packages) { return & $fail 'the draft has no applicationPackages' }
+    # Read where it is, not through Get-Field: the pipeline would hide whether it is an array (PR #56 Relay I-1).
+    $packagesProperty = $submission.PSObject.Properties | Where-Object { $_.Name -ieq 'applicationPackages' } | Select-Object -First 1
+    if ($null -eq $packagesProperty -or $null -eq $packagesProperty.Value) { return & $fail 'the draft has no applicationPackages' }
+    if ($packagesProperty.Value -isnot [array]) { return & $fail 'applicationPackages is not a JSON array' }
+    $packages = $packagesProperty.Value
     $expected = [version] $ExpectedPackageVersion
     $versions = @()
     $namedPackage = $false
-    foreach ($package in @($packages)) {
+    foreach ($package in $packages) {
+        # PR #56 Relay L-4: a fileStatus that is present but not one string ("[PendingDelete]") makes the package
+        # unreadable. Read as "not PendingDelete" it would count a package being removed as the live one.
+        $fileStatusProperty = if ($package -is [pscustomobject]) { $package.PSObject.Properties | Where-Object { $_.Name -ieq 'fileStatus' } | Select-Object -First 1 }
+        if ($null -ne $fileStatusProperty -and $null -ne $fileStatusProperty.Value -and $fileStatusProperty.Value -isnot [string]) {
+            return & $fail 'a package has an unreadable fileStatus (not a single string)'
+        }
         if ([string]::Equals([string] (Get-ScalarField $package 'fileStatus'), 'PendingDelete', [StringComparison]::OrdinalIgnoreCase)) { continue }
         $version = Get-ScalarField $package 'version'
         $text = if ($version -is [string]) { $version } else { '' }
@@ -244,6 +253,9 @@ if ($SelfTest) {
         @{ Name = 'id as a one-element array';             Raw = (New-Draft @{ id = @('1152921505701819999') }); Id = $id; Ok = $false }
         @{ Name = 'id as a JSON number';                   Raw = ((New-Draft) -replace '"id":\s*"1152921505701819999"', '"id": 1152921505701819999'); Id = $id; Ok = $true }
         @{ Name = 'package version as a one-element array'; Raw = (New-Draft -Packages @([ordered] @{ version = @('1.1.7.0'); fileName = 'ServerAlyzer_1.1.7.0_x64_300116d.msix'; fileStatus = 'PendingUpload' })); Id = $id; Ok = $false }
+        @{ Name = 'package fileStatus as a one-element array'; Raw = (New-Draft -Packages @([ordered] @{ version = '1.1.7.0'; fileName = 'ServerAlyzer_1.1.7.0_x64_300116d.msix'; fileStatus = @('PendingDelete') })); Id = $id; Ok = $false }
+        @{ Name = 'package without a fileStatus';          Raw = (New-Draft -Packages @([ordered] @{ version = '1.1.7.0'; fileName = 'ServerAlyzer_1.1.7.0_x64_300116d.msix' })); Id = $id; Ok = $true }
+        @{ Name = 'applicationPackages as a single object'; Raw = (New-Draft @{ applicationPackages = [ordered] @{ version = '1.1.7.0'; fileName = 'ServerAlyzer_1.1.7.0_x64_300116d.msix'; fileStatus = 'PendingUpload' } }); Id = $id; Ok = $false }
         @{ Name = 'package file name as a one-element array'; Raw = (New-Draft -Packages @([ordered] @{ version = '1.1.7.0'; fileName = @('ServerAlyzer_1.1.7.0_x64_300116d.msix'); fileStatus = 'PendingUpload' })); Id = $id; Ok = $false }
         @{ Name = 'package file name in other case';      Raw = (New-Draft -Packages @([ordered] @{ version = '1.1.7.0'; fileName = 'ServerAlyzer_1.1.7.0_X64_300116D.msix'; fileStatus = 'PendingUpload' })); Id = $id; Ok = $false }
         @{ Name = 'second live package, same version';    Raw = (New-Draft -Packages @([ordered] @{ version = '1.1.7.0'; fileName = 'ServerAlyzer_1.1.7.0_x64_300116d.msix'; fileStatus = 'PendingUpload' }, [ordered] @{ version = '1.1.7.0'; fileName = 'manual-upload.msix'; fileStatus = 'Uploaded' })); Id = $id; Ok = $false }

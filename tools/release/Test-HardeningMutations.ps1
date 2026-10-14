@@ -54,9 +54,12 @@ $selfTesting = @(
        Old = "'(?s)\./tools/release/Assert-StagedSubmission\.ps1 ``(?:\s*\n\s+-[A-Za-z]+[^\n]*``)*?\s*\n\s+' + [regex]::Escape(`$Argument)"; New = "'(?s)\./tools/release/Assert-StagedSubmission\.ps1 ``'"; Marker = 'SURVIVED: store-submit.yml / read-back file name not bound to the tag commit' }
     @{ Name = 'P-1 in-flight call matched by substring (extra -AllowedStatuses accepted)'; Guard = 'Test-ReleaseWorkflowShape.ps1'
        Old = "-cnotmatch '\A\s+\./tools/release/Assert-NoPendingSubmission\.ps1 -SubmissionPath before\.json\s*\z'"; New = "-cnotmatch 'Assert-NoPendingSubmission\.ps1 -SubmissionPath before\.json'"; Marker = 'SURVIVED: store-submit.yml / W3 call site lets PendingCommit through' }
+    # PR #56 round 3 (Vigil L-4): back to the round-2 exemption (any Env: at the end of a line); cd env: must survive.
+    @{ Name = 'P-1 Env: rule exempts every line ending in Env:'; Guard = 'Test-ReleaseWorkflowShape.ps1'
+       Old = '|(?m)^(?![^\S\n]*env:[^\S\n]*$)[^\n]*(?<![$\{\w])env:'')'; New = '|(?m)(?<![$\{\w])env:(?![^\S\n]*$)'')'; Marker = 'SURVIVED: store-certify.yml / W11 id rewritten after cd env:' }
     # PR #56 round 2 (Relay L-3): the Env: provider rule back to naming cmdlets; the si alias must then survive.
     @{ Name = 'P-1 Env: provider rule narrowed to Set-Item/New-Item by name'; Guard = 'Test-ReleaseWorkflowShape.ps1'
-       Old = '|(?m)(?<![$\{\w])env:(?![^\S\n]*$)'')'; New = '|(Set|New)-Item\b[^\n]*env:'')'; Marker = 'SURVIVED: store-certify.yml / W11 id rewritten through the si alias' }
+       Old = '|(?m)^(?![^\S\n]*env:[^\S\n]*$)[^\n]*(?<![$\{\w])env:'')'; New = '|(Set|New)-Item\b[^\n]*env:'')'; Marker = 'SURVIVED: store-certify.yml / W11 id rewritten through the si alias' }
     @{ Name = 'P-1 SUBMISSION_ID reassignment not refused'; Guard = 'Test-ReleaseWorkflowShape.ps1'
        Old = "if (`$all -match '(?i)\`$env:SUBMISSION_ID\s*[-+*/]?=(?!=)|"; New = "if (`$false -and `$all -match '(?i)\`$env:SUBMISSION_ID\s*[-+*/]?=(?!=)|"; Marker = 'SURVIVED: store-certify.yml / W4 id reassigned from the draft' }
     @{ Name = 'P-1 any step may be conditional'; Guard = 'Test-ReleaseWorkflowShape.ps1'

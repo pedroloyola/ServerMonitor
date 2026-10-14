@@ -154,13 +154,14 @@ function Assert-StoreCertify([string] $Text) {
     # as the input, and nothing reassigns it (no assignment, no GITHUB_ENV, no environment API).
     # PR #56 round 2 (Relay L-3, W11): no Env: provider path at all, other than the $env:NAME / ${env:NAME} reads.
     # Every provider write (Set-Item and its alias si, New-Item/ni, Set-Content/sc, Copy-Item, Remove-Item, ...)
-    # has to name an Env: path, so the rule closes the class instead of listing cmdlets and aliases. A YAML
-    # "env:" key (end of line) is not a provider path.
+    # has to name an Env: path, so the rule closes the class instead of listing cmdlets and aliases. Only a line
+    # that is exactly "<indent>env:" (a YAML key) is exempt: an Env: at the end of a command ("cd env:",
+    # "Push-Location Env:") followed by a relative "si SUBMISSION_ID" is refused (PR #56 Vigil L-4).
     foreach ($name in @('provenance', 'certify')) {
         $declared = @([regex]::Matches((Strip-Comments $jobs[$name]), '(?m)^\s+SUBMISSION_ID:[^\n]*$'))
         if ($declared.Count -ne 1 -or $declared[0].Value -cnotmatch '\A\s+SUBMISSION_ID: \$\{\{ inputs\.submission_id \}\}\s*\z') { throw "Shape P-1: the $name job must take SUBMISSION_ID once, from inputs.submission_id." }
     }
-    if ($all -match '(?i)\$env:SUBMISSION_ID\s*[-+*/]?=(?!=)|\$\{env:SUBMISSION_ID\}\s*=(?!=)|GITHUB_ENV|SetEnvironmentVariable|(?m)(?<![$\{\w])env:(?![^\S\n]*$)') {
+    if ($all -match '(?i)\$env:SUBMISSION_ID\s*[-+*/]?=(?!=)|\$\{env:SUBMISSION_ID\}\s*=(?!=)|GITHUB_ENV|SetEnvironmentVariable|(?m)^(?![^\S\n]*env:[^\S\n]*$)[^\n]*(?<![$\{\w])env:') {
         throw 'Shape P-1: store-certify must never reassign SUBMISSION_ID or write the job environment.'
     }
 
@@ -235,6 +236,9 @@ $mutations = @{
         @{ Old = "          ./tools/release/Assert-StagedSubmission.ps1 ```n            -SubmissionPath draft.json"; New = "          ni Env:\SUBMISSION_ID -Value 1 -Force | Out-Null`n          ./tools/release/Assert-StagedSubmission.ps1 ```n            -SubmissionPath draft.json"; Name = 'W11 id rewritten through the ni alias' }
         @{ Old = "          ./tools/release/Assert-StagedSubmission.ps1 ```n            -SubmissionPath draft.json"; New = "          sc env:SUBMISSION_ID 1`n          ./tools/release/Assert-StagedSubmission.ps1 ```n            -SubmissionPath draft.json"; Name = 'W11 id rewritten through Set-Content (sc)' }
         @{ Old = "          ./tools/release/Assert-StagedSubmission.ps1 ```n            -SubmissionPath draft.json"; New = "          Set-Item -Path Env:SUBMISSION_ID -Value 1`n          ./tools/release/Assert-StagedSubmission.ps1 ```n            -SubmissionPath draft.json"; Name = 'W11 id rewritten through Set-Item -Path' }
+        # PR #56 round 3 (Vigil L-4): Env: as the LAST token of a command, then a relative path.
+        @{ Old = "          ./tools/release/Assert-StagedSubmission.ps1 ```n            -SubmissionPath draft.json"; New = "          cd env:`n          si SUBMISSION_ID 1`n          ./tools/release/Assert-StagedSubmission.ps1 ```n            -SubmissionPath draft.json"; Name = 'W11 id rewritten after cd env:' }
+        @{ Old = "          ./tools/release/Assert-StagedSubmission.ps1 ```n            -SubmissionPath draft.json"; New = "          Push-Location Env:`n          Set-Item SUBMISSION_ID 1`n          Pop-Location`n          ./tools/release/Assert-StagedSubmission.ps1 ```n            -SubmissionPath draft.json"; Name = 'W11 id rewritten after Push-Location Env:' }
     )
     'store-status.yml' = @(
         @{ Old = 'if ($publishModeError) { throw'; New = 'if ($publishModeError) { Write-Warning'; Name = 'publish mode only warns' }
