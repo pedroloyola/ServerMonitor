@@ -26,7 +26,7 @@
       is ever enabled globally, CS8524 must be excluded via WarningsNotAsErrors or this design breaks.
     -->
     <WarningsAsErrors>$(WarningsAsErrors);CS8509</WarningsAsErrors>
-    <DefaultLanguage>pt-BR</DefaultLanguage>
+    <DefaultLanguage>en-US</DefaultLanguage>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <!-- M12/ADR-017 §6: use the custom Program.Main (Program.cs) so the single-instance

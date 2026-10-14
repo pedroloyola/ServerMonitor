@@ -43,4 +43,10 @@
     <ProjectReference Include="..\..\src\ServerMonitor.WidgetProvider\ServerMonitor.WidgetProvider.csproj" />
   </ItemGroup>
 
+  <!-- REL.0C: TEST-ONLY source link of the app's language table, so WidgetStringsCultureParityTests proves the
+       widget card resolves every culture exactly like the app, without the provider referencing Core. -->
+  <ItemGroup>
+    <Compile Include="..\..\src\ServerMonitor.Core\Domain\SupportedCultures.cs" Link="Linked\SupportedCultures.cs" />
+  </ItemGroup>
+
 </Project>

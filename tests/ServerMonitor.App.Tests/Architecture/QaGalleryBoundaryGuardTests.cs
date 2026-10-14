@@ -50,7 +50,9 @@ public sealed partial class QaGalleryBoundaryGuardTests
         var constructor = Body(code, "public App()");
         var router = IndexOf(constructor, "_activationRouter = new ActivationRouter(");
         var gallery = IndexOf(constructor, "QaGalleryComposition.IsRequested()");
-        var host = IndexOf(constructor, ".CreateDefaultBuilder(");
+        // REL.0C: the constructor builds the host through App.BuildServicesHost (host + startup language).
+        var host = IndexOf(constructor, "ServicesHost = BuildServicesHost(");
+        Assert.Contains(".CreateDefaultBuilder(", Body(code, "internal static IHost BuildServicesHost("), StringComparison.Ordinal);
         var branchEnd = constructor.IndexOf("#endif", gallery, StringComparison.Ordinal);
         Assert.True(branchEnd > gallery && branchEnd < host, "The gallery branch must be a closed #if DEBUG block before the host is built.");
         var galleryBranch = constructor[gallery..branchEnd];

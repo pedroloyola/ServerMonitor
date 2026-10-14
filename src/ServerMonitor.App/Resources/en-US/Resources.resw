@@ -1109,4 +1109,6 @@ status, metrics and history.</value></data>
   <!-- UI.9 C2: widget picker strings, referenced from Package*.appxmanifest via ms-resource: (Prism to approve wording). -->
   <data name="WidgetDescription" xml:space="preserve"><value>Your servers' health and metrics at a glance.</value></data>
   <data name="WidgetScreenshotAltText" xml:space="preserve"><value>ServerAlyzer widget showing server health and CPU, RAM and disk use.</value></data>
+  <!-- REL.0C: app Description in Package*.appxmanifest (ms-resource:AppDescription). -->
+  <data name="AppDescription" xml:space="preserve"><value>Local dashboard for monitoring Linux and macOS servers over SSH.</value></data>
 </root>
