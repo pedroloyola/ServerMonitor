@@ -1,0 +1,30 @@
+# Code owners for the release path and the package identity (REL.0C, Gate C G1).
+#
+# This file has NO effect on its own. It only routes review requests. It becomes a control when the
+# ruleset (or branch protection) on main requires a pull request AND "Require review from Code
+# Owners" - a human setting, see docs/operations/release-security-setup.md. GitHub never lets the
+# author of a pull request approve it, so with a single maintainer that requirement needs a second
+# identity; read that document before turning it on.
+#
+# Later patterns win. The catch-all comes first; the entries below it name the paths that matter
+# most for releases, so they stay owned explicitly if the catch-all ever changes.
+
+# Everything
+*                                           @pedroloyola
+
+# Workflows, dependency automation and this file
+/.github/                                   @pedroloyola
+
+# Release tooling, the version floor and the Store listing text
+/tools/release/                             @pedroloyola
+/release/                                   @pedroloyola
+
+# What the build and the package are: SDK pin, MSBuild imports, project files, manifests
+/global.json                                @pedroloyola
+/Directory.Build.targets                    @pedroloyola
+/src/Directory.Build.props                  @pedroloyola
+*.csproj                                    @pedroloyola
+/src/ServerMonitor.App/*.appxmanifest       @pedroloyola
+
+# Architecture guards: tests that encode security and boundary invariants
+/tests/**/Architecture/                     @pedroloyola

@@ -71,25 +71,7 @@ public partial class App : Application
         Qa.QaStartupIsolation.RefuseUnisolatedLaunch();
 #endif
 
-        ServicesHost = Microsoft.Extensions.Hosting.Host
-            .CreateDefaultBuilder()
-            .ConfigureLogging(logging =>
-            {
-                logging.ClearProviders();
-                logging.AddDebug();
-                logging.SetMinimumLevel(LogLevel.Information);
-            })
-            .ConfigureServices(services => ConfigureApplicationServices(services))
-            .Build();
-
-#if DEBUG
-        // Debug-only QA: --qa-ui-language <tag> forces the UI language before the first ResourceLoader
-        // (LocalizationService loads lazily) and before InitializeComponent resolves any x:Uid.
-        Qa.QaUiLanguageComposition.ApplyRequested();
-#endif
-        ServicesHost.Services
-            .GetRequiredService<ILocalizationService>()
-            .InitializeFromSystem();
+        ServicesHost = BuildServicesHost(ConfigureApplicationServices);
         // UI.12 C-L8: fire-and-forget UI failures are reported here (operation + exception type only, no message).
         var uiFailureLogger = ServicesHost.Services.GetRequiredService<ILogger<App>>();
         UiFireAndForget.Report = (operation, exceptionType) =>
@@ -432,6 +414,39 @@ public partial class App : Application
             (ExitSequence)services.GetRequiredService<IExitSequence>());
 
         services.GetRequiredService<TrayAffordanceLifecycle>().Evaluate();
+    }
+
+    /// <summary>
+    /// Builds the application host and applies the UI language BEFORE anything can load a resource: the host is
+    /// returned only after <see cref="ILocalizationService.InitializeFromSystem"/> ran, so the normal launch cannot
+    /// obtain its services without the startup language resolution (REL.0C). An invocable method for the same reason
+    /// as <see cref="ConfigureApplicationServices"/>: the App constructor needs a XAML runtime, this does not, so a
+    /// test runs it with its own composition.
+    /// </summary>
+    internal static IHost BuildServicesHost(Action<IServiceCollection> configureServices)
+    {
+        ArgumentNullException.ThrowIfNull(configureServices);
+
+        var host = Microsoft.Extensions.Hosting.Host
+            .CreateDefaultBuilder()
+            .ConfigureLogging(logging =>
+            {
+                logging.ClearProviders();
+                logging.AddDebug();
+                logging.SetMinimumLevel(LogLevel.Information);
+            })
+            .ConfigureServices(configureServices)
+            .Build();
+
+#if DEBUG
+        // Debug-only QA: --qa-ui-language <tag> forces the UI language before the first ResourceLoader
+        // (LocalizationService loads lazily) and before InitializeComponent resolves any x:Uid.
+        Qa.QaUiLanguageComposition.ApplyRequested();
+#endif
+        host.Services
+            .GetRequiredService<ILocalizationService>()
+            .InitializeFromSystem();
+        return host;
     }
 
     /// <summary>

@@ -1,0 +1,3 @@
+# Monotonic floor: above Developer 1.1.2.2 and local QA versions 1.1.3.0 through 1.1.6.0.
+# Provisional REL.0 candidate, not a reservation for a commercial edition.
+1.1.7.0

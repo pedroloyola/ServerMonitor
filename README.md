@@ -34,7 +34,7 @@ telemetria. A monitorização acontece diretamente entre o teu computador e os s
 | Tray & notificações | Um ícone, minimizar-para-tray, alertas locais com cooldown. |
 | Modo compacto | Apresentação reduzida sempre-no-topo, na mesma janela. |
 | Widget do Windows | Cartão no painel de Widgets do Windows 11 (pequeno/médio/grande), só-leitura, com frescura explícita. Requer Windows 11 22H2+. |
-| Idiomas | pt-BR (padrão), pt-PT, en-US. |
+| Idiomas | en-US (padrão), pt-PT, pt-BR. |
 | Temas | Claro, Escuro, Sistema. |
 
 ## Capturas de ecrã
@@ -115,7 +115,7 @@ dotnet test ServerMonitor.slnx
 # Correr a app (unpackaged, self-contained)
 dotnet run --project src/ServerMonitor.App
 
-# Construir o pacote MSIX de produção (framework-dependent)
+# Construir o pacote MSIX de produção (.NET self-contained; Windows App Runtime como framework package)
 dotnet build src/ServerMonitor.App/ServerMonitor.App.csproj -c Release -p:Packaged=true
 ```
 

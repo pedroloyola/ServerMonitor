@@ -1115,4 +1115,6 @@ as métricas e o histórico do servidor.</value></data>
   <!-- UI.9 C2: widget picker strings, referenced from Package*.appxmanifest via ms-resource: (Prism to approve wording). -->
   <data name="WidgetDescription" xml:space="preserve"><value>A saúde e as métricas dos teus servidores, num relance.</value></data>
   <data name="WidgetScreenshotAltText" xml:space="preserve"><value>Widget do ServerAlyzer com a saúde dos servidores e o uso de CPU, RAM e disco.</value></data>
+  <!-- REL.0C: app Description in Package*.appxmanifest (ms-resource:AppDescription). -->
+  <data name="AppDescription" xml:space="preserve"><value>Painel local de monitorização de servidores Linux e macOS por SSH.</value></data>
 </root>
