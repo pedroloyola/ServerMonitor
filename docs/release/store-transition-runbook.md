@@ -203,7 +203,8 @@ Plus: screenshot of the Widgets board (pin size/position), the language shown in
 ### 6.2 Rehearsal (disposable Windows 11 VM, `rel0d-preparation.md` §3)
 1. Install a **Developer-signed** 1.1.2.x of the production identity, signed with a **VM-local** test
    certificate (new human decision): created inside the VM with `-KeyExportPolicy NonExportable`, validity of
-   days, trusted only in the VM's `TrustedPeople` (never `Root`), deleted with the VM. Add synthetic data
+   days, trusted only in the VM's `TrustedPeople` (never `Root`), deleted with the VM — same signing and
+   package-source rules as `rel0d-preparation.md` §2.2 S1–S2 (never the retained QA package). Add synthetic data
    (no real hosts or credentials), pin a Medium widget, set language to pt-PT.
 2. Run §4 V1–V3.
 3. From the Store (private audience), install the RC. Record what the Store offers (F3).

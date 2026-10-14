@@ -31,8 +31,8 @@ Synthetic data only. Each cell = PASS / FAIL / NOT_RUN with evidence. **Gate** s
 
 | ID | Gate | Scenario | Checks | Depends on |
 |---|---|---|---|---|
-| CLEAN-1 | PRE + POST | Clean install, **no .NET 10 runtime** (`C:\Program Files\dotnet\shared\Microsoft.NETCore.App\10.*` absent) | App starts; widget provider activates from the picker; About shows the RC version; `Get-AppxPackage` Ok (POST: `SignatureKind Store`) | runtime change |
-| CLEAN-2 | PRE | Clean install, .NET 10 Desktop runtime present | as CLEAN-1 (no runtime conflict) | runtime change |
+| CLEAN-1 | PRE + POST | Clean install, **no .NET anywhere** (§2.2 step T2) | §2.2: cases R1–R5 PASS and counterproof X1 FAILS as expected; POST: the same R1–R5 on the Store install, `SignatureKind Store` | runtime change |
+| CLEAN-2 | PRE | Clean install, .NET 10 Desktop runtime present | §2.2 R1–R5 (no conflict with a global runtime) | runtime change |
 | CLEAN-3 | PRE + POST | AppData virtualization | runbook §4 V1–V3 | — |
 | OS-MIN | PRE | Windows 11 21H2 (10.0.22000, the manifest minimum), if an image is available | app works; the widget is **not** expected (Widgets providers need ≥ 22621.1413), and nothing errors | — |
 | ARCH | — | ARM64 device | **Out of scope**: the package is x64-only and the support matrix is Windows 11 x64 (ADR-017 §4b). Whether the Store offers the x64 package to ARM64 under emulation = HYPOTHESIS, not tested; record if a device is ever available | — |
@@ -84,6 +84,125 @@ counts.
 Observation rule: the tester **records** any dialog (screenshot, time, exe path). In a disposable VM they
 may answer it; on the maintainer's machine agents never answer it.
 
+### 2.2 Clean-machine runtime procedure (CLEAN-1, CLEAN-2)
+
+Goal: prove that the package starts — app, widget provider (COM, activated by the system), background
+start and notification activation — on Windows 11 with **no .NET installed**, and that the check is able to
+fail (counterproof X1). Two disposable VMs (§3): a **signing VM** (has the .NET SDK, Git and the Windows
+SDK signing tools; builds and signs) and a **test VM** (clean; only receives signed packages and a public
+certificate). Nothing from the maintainer's machine is copied into either VM except a Git checkout.
+
+**S1 — Package source (gate: the tester records which source was used; any other source = STOP).**
+
+| Package | Allowed source | Not a source |
+|---|---|---|
+| Candidate (`P-RC`) | (a) after a tag: the `release-build` workflow artifact `serveralyzer-msix-<version>`, downloaded by the human (`gh run download <run-id> -n serveralyzer-msix-<version>`), SHA-256 equal to the run summary; (b) before a tag: a local build in the signing VM of the candidate commit (below) | the CI `package-privacy` job (it builds the package but uploads no artifact); any package built on the maintainer's machine; Debug builds |
+| Counterproof (`P-X`) | a local build in the signing VM of commit **`e5ceb26`** (framework-dependent, before the runtime change; package version 1.1.1.0) | the retained 1.1.2.2 QA package (pre-privacy-gate, never leaves the maintainer's machine) |
+| Windows App Runtime (`P-WAR`) | the dependency produced by the same local build: `src/ServerMonitor.App/AppPackages/**/Dependencies/x64/Microsoft.WindowsAppRuntime*.msix`; or `tools/MSIX/win10-x64/Microsoft.WindowsAppRuntime.2.msix` from the `Microsoft.WindowsAppSDK.Runtime` NuGet package at the version in `ServerMonitor.App.csproj` (2.3.1) | an unrelated runtime version; the Store (only for the POST variant) |
+
+Local build in the signing VM, for each commit (`<commit>` = the candidate or `e5ceb26`):
+
+```powershell
+git clone https://github.com/pedroloyola/ServerMonitor.git sm; cd sm; git checkout <commit>
+dotnet build src/ServerMonitor.App/ServerMonitor.App.csproj -c Release -p:Packaged=true --no-incremental --disable-build-servers
+$Msix = Get-ChildItem -Recurse -Filter *.msix src/ServerMonitor.App/AppPackages | Where-Object FullName -notmatch '\\Dependencies\\'
+# gates of that commit, on that package - both must PASS
+./tools/release/Assert-PackageIdentity.ps1 -PackagePath $Msix.FullName -ExpectedVersion '<manifest version>'
+New-Item -ItemType Directory out | Out-Null; Copy-Item $Msix.FullName out/
+./tools/release/Assert-DistributionPrivacy.ps1 -Path out -AllowlistPath tools/release/distribution-privacy-allowlist.json
+```
+
+If the candidate commit has a packaged-runtime check (`tools/release/Assert-PackageRuntime.ps1`), run it too.
+Record the embedded runtime version: the `includedFrameworks` version in `ServerMonitor.App.runtimeconfig.json`
+inside the package. The release artifact must later carry the **same** runtime version as the package
+tested here; otherwise this procedure is repeated with the release artifact.
+
+**S2 — Signing (signing VM only; human authorization + security review).** The packages are unsigned by
+design (`AppxPackageSigningEnabled=false`). Sign them with a certificate created **inside the signing VM**:
+
+```powershell
+$cert = New-SelfSignedCertificate -Type Custom -Subject 'CN=32C0A056-FD57-422E-A59C-A8C26434951D' `
+  -KeyUsage DigitalSignature -KeyExportPolicy NonExportable -NotAfter (Get-Date).AddDays(7) `
+  -CertStoreLocation Cert:\CurrentUser\My `
+  -TextExtension @('2.5.29.37={text}1.3.6.1.5.5.7.3.3', '2.5.29.19={text}')
+Export-Certificate -Cert $cert -FilePath vm-test-signing.cer      # PUBLIC part only
+signtool sign /fd SHA256 /sha1 $cert.Thumbprint /s My <P-RC.msix>
+signtool sign /fd SHA256 /sha1 $cert.Thumbprint /s My <P-X.msix>
+```
+
+The subject must equal the package `Publisher` (production identity). `P-WAR` is Microsoft-signed and is
+not re-signed. Never import the DEV certificate, the QA-machine certificate or any `.pfx` into a VM.
+Transfer to the test VM: `P-RC`, `P-X`, `P-WAR`, `vm-test-signing.cer`, and their SHA-256 list.
+
+**T1 — Test VM snapshot `clean`** (Windows 11 x64 ≥ 22621.1413, updated, Firewall notifications on).
+
+**T2 — No-.NET check (gate; every line must hold, else this VM is not clean for CLEAN-1):**
+
+```powershell
+$hits = @()
+foreach ($p in "$env:ProgramFiles\dotnet", "${env:ProgramFiles(x86)}\dotnet",
+               "$env:USERPROFILE\.dotnet", "$env:LOCALAPPDATA\Microsoft\dotnet") { if (Test-Path $p) { $hits += $p } }
+foreach ($k in 'HKLM:\SOFTWARE\dotnet\Setup\InstalledVersions',
+               'HKLM:\SOFTWARE\WOW6432Node\dotnet\Setup\InstalledVersions',
+               'HKCU:\SOFTWARE\dotnet\Setup\InstalledVersions') { if (Test-Path $k) { $hits += $k } }
+foreach ($scope in 'Machine','User','Process') {
+  foreach ($v in 'DOTNET_ROOT','DOTNET_ROOT_X64','DOTNET_ROOT(x86)') {
+    if ([Environment]::GetEnvironmentVariable($v, $scope)) { $hits += "${scope}:$v" } } }
+if (Get-Command dotnet -ErrorAction SilentlyContinue) { $hits += 'dotnet on PATH' }
+$hits    # must be empty
+Get-AppxPackage Microsoft.WindowsAppRuntime* | Select-Object Name, Version   # record (inbox apps may bring some)
+```
+
+The registry `InstalledVersions\<arch>\InstallLocation` value and `DOTNET_ROOT` are how a
+framework-dependent app finds a global runtime outside the default folder, so all of them are checked.
+
+**T3 — Trust and install (test VM, elevated, after T2):**
+
+```powershell
+Import-Certificate -FilePath vm-test-signing.cer -CertStoreLocation Cert:\LocalMachine\TrustedPeople
+Add-AppxPackage -Path <P-RC.msix> -DependencyPath <P-WAR.msix>
+Get-AppxPackage PedroLoy.ServerAlyzer, Microsoft.WindowsAppRuntime* | Select-Object Name, Version, Status
+```
+
+**Cases, in this order** (each: PASS / FAIL / NOT_RUN; no case is skipped silently):
+
+| ID | Case | Steps | Expected |
+|---|---|---|---|
+| R1 | **Cold widget activation, app never launched** | right after T3, without opening the app: Win+W → Add widgets → ServerAlyzer → pin Medium | the provider process starts (`Get-Process ServerAlyzer.WidgetProvider`), the card renders its no-data state; no console window, no ".NET" dialog, no error card |
+| R2 | First app launch | Start → ServerAlyzer | main window opens; About shows the candidate version; exactly one `ServerMonitor.App` process; no ".NET" dialog |
+| R3 | `--background` start | tray → Exit; then `Invoke-CommandInDesktopPackage -PackageFamilyName PedroLoy.ServerAlyzer_htb92ajfwgw1e -AppId ServerMonitor -Command "$((Get-AppxPackage PedroLoy.ServerAlyzer).InstallLocation)\ServerMonitor.App.exe" -Args '--background'` | tray icon, no window, one process, no dialog. Equivalence of this launch to a system background launch = HYPOTHESIS |
+| R4 | Toast, warm | needs a disposable test SSH host on the VM network (human-provided; synthetic account). Add it, wait for Healthy, stop its SSH service → Offline toast (alerts fire only on transitions from a known state, `Core/Alerts/ServerAlertPolicy.cs`); click it while the app runs | the existing instance comes to the front with the server; no second process |
+| R5 | Toast, cold | restart then stop the host's SSH service to get a new toast; tray → Exit; click the toast in Notification Center | the app starts once and opens the server; one process |
+
+Without a test SSH host, R4/R5 are **NOT_RUN** (never PASS).
+
+**X1 — Counterproof** (restore snapshot `clean`, repeat T2, then T3 with `P-X` instead of `P-RC`):
+- launch from Start → expected: the .NET host's "install .NET" dialog and no window (exact dialog text =
+  HYPOTHESIS; screenshot it);
+- pin the widget → expected: the provider does not activate (no card / error card).
+
+If X1 starts normally, T2 missed a .NET install and **CLEAN-1 is invalid** (FAIL of the procedure, not of
+the product).
+
+**Evidence for every case** (redacted; no personal paths):
+```powershell
+$since = (Get-Date).AddMinutes(-10)
+Get-WinEvent -FilterHashtable @{ LogName = 'Application'; StartTime = $since } |
+  Where-Object ProviderName -in '.NET Runtime','Application Error','Windows Error Reporting' |
+  Select-Object TimeCreated, ProviderName, Id, Message
+Get-WinEvent -FilterHashtable @{ LogName = 'System'; ProviderName = 'Microsoft-Windows-DistributedCOM'; StartTime = $since } |
+  Select-Object TimeCreated, Id, Message
+Get-WinEvent -FilterHashtable @{ LogName = 'Microsoft-Windows-AppModel-Runtime/Admin'; StartTime = $since } -ErrorAction SilentlyContinue |
+  Select-Object TimeCreated, Id, Message
+```
+plus screenshots (card, window, any dialog), process lists, and the T2 output.
+
+**CLEAN-2:** restore `clean`, install the official .NET 10 Desktop Runtime x64, then T3 with `P-RC` and
+R1–R5. Expected: identical results (the package's own runtime is used; no conflict).
+
+**POST variant (Store, private audience):** restore `clean`, T2, install from the Store (the Store
+provisions the Windows App Runtime; no S2/T3), then R1–R5 and `SignatureKind Store`. X1 is not repeated.
+
 ## 3. Clean-machine plan
 
 The maintainer's development machine has no Windows Sandbox or Hyper-V, and installing a hypervisor there
@@ -104,9 +223,11 @@ The disposable machine must provide:
 5. Language packs en-US, pt-PT, pt-BR, fr-FR.
 6. Windows Firewall on, notifications on; no third-party firewall.
 7. For PRE rows and UPG-DEV: a **VM-local** test signing certificate with subject
-   `CN=32C0A056-FD57-422E-A59C-A8C26434951D`, created inside the VM with `-KeyExportPolicy NonExportable`,
-   validity of days, trusted only in the VM's `TrustedPeople` (never `Root`), deleted with the VM. Needs
-   human authorization and security review.
+   `CN=32C0A056-FD57-422E-A59C-A8C26434951D`, created inside the disposable **signing VM** with
+   `-KeyExportPolicy NonExportable`, validity of days; only its **public** `.cer` goes to the test VM,
+   trusted there in `LocalMachine\TrustedPeople` (never `Root`); both VMs are deleted afterwards. No copy of
+   the DEV or the QA-machine certificate or key, ever. Needs human authorization and security review
+   (§2.2 S2).
 8. No real servers, credentials or SSH keys; a test SSH host only if the human provides one.
 9. Evidence out: hashes, metadata, screenshots — redacted, no personal paths.
 
