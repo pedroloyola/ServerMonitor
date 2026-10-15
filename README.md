@@ -93,7 +93,7 @@ as métricas de cada servidor e há quanto tempo os dados foram lidos.
 
 ## Dados e privacidade
 
-Ver [`PRIVACY.md`](PRIVACY.md). Em resumo: local-first, sem conta, sem telemetria, sem nuvem. Todos os
+Ver [`PRIVACY.pt-PT.md`](PRIVACY.pt-PT.md) (também em [inglês](PRIVACY.md) e [pt-BR](PRIVACY.pt-BR.md)). Em resumo: local-first, sem conta, sem telemetria, sem nuvem. Todos os
 dados ficam na tua máquina:
 
 - `%LOCALAPPDATA%\ServerMonitor\servers.json` — configuração não sensível.

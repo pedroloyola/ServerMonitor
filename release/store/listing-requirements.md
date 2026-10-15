@@ -117,17 +117,18 @@ DRAFT-GATE block in `README.md`.
   - pt-BR: "Você pode procurar na sua rede local servidores SSH que se anunciam (mDNS/DNS-SD), a partir da Visão geral vazia ou em Configurações › Dados e servidores. A pesquisa só é feita quando você escolhe e nunca varre portas nem faixas de endereços."
   - Check the Settings labels against the merged resource strings before pasting.
 - **Privacy policy URL (submission gate)**: `support.txt` in all three files carries the URL with
-  a `GATED:` line. Do not enter it in Partner Center, and do not submit the listing, until
-  `PRIVACY.md` has been updated. Today it is pt-PT only and predates the current product. It does
-  not cover:
-  - the on-demand local network search;
-  - the encrypted backup file, which is saved where the user chooses;
-  - the widget snapshot file.
+  a `GATED:` line. Do not enter it in Partner Center, and do not submit the listing, until the
+  gate is cleared. REL.0E rewrote the policy: `PRIVACY.md` (English, the single URL the Store uses
+  for every market) plus `PRIVACY.pt-PT.md` and `PRIVACY.pt-BR.md`. It now covers the on-demand
+  local network search, the encrypted backup (which includes saved passwords), the widget
+  snapshot, notifications, logs (none) and the Store data location. The gate stays until:
+  - every `[NEEDS HUMAN: ...]` marker in the three files is resolved and removed (publisher
+    identity, legal review, privacy contact, Windows/runFullTrust wording, children);
+  - the uninstall behaviour is measured on a Store install and the Uninstalling paragraph is
+    written from that measurement;
+  - the policy is merged on main, so the URL resolves publicly.
 
-  Its uninstall and data-location statements are unmeasured for a Store install. The update is an
-  English policy (the Store uses one policy for every market) plus pt. It is written after the
-  clean-VM measurement, in its own docs pull request. Then point the URL at it and remove the
-  `GATED:` lines.
+  Then remove the `GATED:` lines.
 - **Widget screenshot (slot 08)**: it can only be captured from an installed package in the VM.
   If no VM capture exists at submission time, remove the `08-widget` line from all three caption
   files. Slot 09 keeps its name; only the order of the uploaded images matters.
