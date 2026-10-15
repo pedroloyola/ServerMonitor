@@ -103,12 +103,11 @@ public static class Program
             Qa.QaStartupIsolation.RefuseUnisolatedLaunch();
             _pendingActivation.Deliver(Qa.QaShellStartup.Activation(Environment.GetCommandLineArgs()));
 #endif
-            _pendingActivation.Deliver(ProtocolActivationReader.TryGetIntent(
-                AppInstance.GetCurrent().GetActivatedEventArgs()));
+            _pendingActivation.Deliver(ColdIntentOf(ReadOwnActivation()));
             return false;
         }
 
-        var activationArgs = AppInstance.GetCurrent().GetActivatedEventArgs();
+        var activationArgs = ReadOwnActivation();
         var keyInstance = AppInstance.FindOrRegisterForKey(key);
 
         if (keyInstance.IsCurrent)
@@ -116,14 +115,101 @@ public static class Program
             // We are the primary instance, and we keep the key for the whole life of the process (see the
             // ownership note above). Deliver THIS launch's own cold intent BEFORE subscribing to
             // redirects, so a later redirect (a newer user action) correctly supersedes it under the
-            // hand-off's latest-wins rule (§M-1).
-            _pendingActivation.Deliver(ProtocolActivationReader.TryGetIntent(activationArgs));
+            // hand-off's latest-wins rule (§M-1). A notification launch keeps its early registration: the
+            // hosted notification service adopts it (D-3).
+            _pendingActivation.Deliver(ColdIntentOf(activationArgs));
             keyInstance.Activated += OnActivated;
             return false;
         }
 
+        // D-3: a secondary that registered for a notification click hands the COM server back before forwarding,
+        // so later clicks go to the primary (or start a fresh process) instead of this one, which is exiting.
+        ReleaseEarlyNotificationRegistration();
+        if (activationArgs is null)
+        {
+            // Nothing readable to forward (the registration or the read failed): exit without redirecting. The
+            // primary is left as it is; at worst this one click is lost, never a second instance.
+            return true;
+        }
+
         RedirectActivationTo(activationArgs, keyInstance);
         return true;
+    }
+
+    // REL.0D D-3: set when THIS process registered for app notifications before reading its activation.
+    private static bool _notificationsRegisteredEarly;
+
+    /// <summary>
+    /// This launch's activation arguments, read in the Windows App SDK's documented order (D-3): a process COM
+    /// started for a notification click registers for notifications FIRST, because reading the arguments before
+    /// <c>Register()</c> fail-fasts the process natively (see <see cref="ColdNotificationLaunch"/>). The ONLY place
+    /// <c>GetActivatedEventArgs</c> is called (architecture-tested).
+    /// </summary>
+    private static AppActivationArguments? ReadOwnActivation() =>
+        ColdNotificationLaunch.ReadActivation(
+            Environment.CommandLine,
+            TryRegisterNotificationsEarly,
+            () => AppInstance.GetCurrent().GetActivatedEventArgs());
+
+    // Handler first, then Register() (inside the platform), on the process-scoped platform the hosted service
+    // adopts later. Fail-soft: any failure means "not registered", and the launch then never reads its arguments.
+    private static bool TryRegisterNotificationsEarly()
+    {
+        var platform = WindowsAppNotificationPlatform.Process;
+        try
+        {
+            if (!platform.IsSupported())
+            {
+                return false;
+            }
+
+            platform.Register();
+            _notificationsRegisteredEarly = true;
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static void ReleaseEarlyNotificationRegistration()
+    {
+        if (!_notificationsRegisteredEarly)
+        {
+            return;
+        }
+
+        try
+        {
+            WindowsAppNotificationPlatform.Process.Unregister();
+        }
+        catch
+        {
+            // Exiting anyway: the process end revokes the COM class object.
+        }
+    }
+
+    /// <summary>
+    /// The intent of this launch's own activation: a widget/protocol deep link exactly as before, or (D-3) a cold
+    /// notification click mapped through the closed notification contract.
+    /// </summary>
+    private static ActivationIntent? ColdIntentOf(AppActivationArguments? args) =>
+        ProtocolActivationReader.TryGetIntent(args) ?? ColdNotificationIntentOf(args);
+
+    private static ActivationIntent? ColdNotificationIntentOf(AppActivationArguments? args)
+    {
+        try
+        {
+            return args?.Kind == ExtendedActivationKind.AppNotification
+                && args.Data is Microsoft.Windows.AppNotifications.AppNotificationActivatedEventArgs notification
+                ? ColdNotificationLaunch.IntentFor(WindowsAppNotificationPlatform.ReadArguments(notification))
+                : null;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     // The single hand-off for activation intents across the App-construction boundary (§M-1/§M-2). The

@@ -57,7 +57,7 @@ public sealed class WindowsAppNotificationService : IUserNotificationService, IH
         INotificationRegistrationEvidence evidence,
         ILogger<WindowsAppNotificationService> logger)
         : this(
-            new WindowsAppNotificationPlatform(),
+            WindowsAppNotificationPlatform.Process,
             windowController,
             lifecycleController,
             logger,
@@ -507,9 +507,20 @@ internal interface IWindowsAppNotificationPlatform
 internal sealed class WindowsAppNotificationPlatform : IWindowsAppNotificationPlatform
 {
     private readonly Func<bool> _isSupported;
-    private readonly Func<AppNotificationManager> _managerFactory;
-    private AppNotificationManager? _manager;
+    private readonly Func<IAppNotificationManagerPort> _portFactory;
+    private readonly object _gate = new();
+    private IAppNotificationManagerPort? _port;
     private bool _handlerAttached;
+    private bool _registered;
+
+    /// <summary>
+    /// REL.0D D-3: the ONE platform of this process. A process COM started for a notification click registers it
+    /// in <c>Program.Main</c>, before it reads its activation (the documented order; see
+    /// <see cref="ColdNotificationLaunch"/>), and the hosted <see cref="WindowsAppNotificationService"/> adopts that
+    /// same registration when it starts. Two instances would mean two <c>Register()</c> calls, and the SDK refuses
+    /// the second with E_INVALIDARG ("Already Registered for App Notifications!").
+    /// </summary>
+    public static WindowsAppNotificationPlatform Process { get; } = new();
 
     public WindowsAppNotificationPlatform()
         : this(AppNotificationManager.IsSupported, () => AppNotificationManager.Default)
@@ -519,63 +530,103 @@ internal sealed class WindowsAppNotificationPlatform : IWindowsAppNotificationPl
     internal WindowsAppNotificationPlatform(
         Func<bool> isSupported,
         Func<AppNotificationManager> managerFactory)
+        : this(isSupported, WrapFactory(managerFactory), portSeam: true)
     {
+    }
+
+    /// <summary>Test seam: the platform over a fake <see cref="IAppNotificationManagerPort"/>.</summary>
+    internal static WindowsAppNotificationPlatform WithPort(Func<bool> isSupported, Func<IAppNotificationManagerPort> portFactory) =>
+        new(isSupported, portFactory, portSeam: true);
+
+    private WindowsAppNotificationPlatform(
+        Func<bool> isSupported,
+        Func<IAppNotificationManagerPort> portFactory,
+        bool portSeam)
+    {
+        _ = portSeam; // only disambiguates this constructor from the AppNotificationManager one
         _isSupported = isSupported ?? throw new ArgumentNullException(nameof(isSupported));
-        _managerFactory = managerFactory ?? throw new ArgumentNullException(nameof(managerFactory));
+        _portFactory = portFactory ?? throw new ArgumentNullException(nameof(portFactory));
     }
 
     public event EventHandler<NotificationActivationEventArgs>? Invoked;
 
-    public AppNotificationSetting Setting => GetRegisteredManager().Setting;
+    public AppNotificationSetting Setting => GetRegisteredPort().Setting;
+
+    /// <summary>True between a successful <see cref="Register"/> and <see cref="Unregister"/>.</summary>
+    public bool IsRegistered
+    {
+        get { lock (_gate) { return _registered; } }
+    }
 
     public bool IsSupported() => _isSupported();
 
+    /// <summary>
+    /// Registers this process once. A second call while registered is a no-op (D-3: the hosted service adopts the
+    /// registration <c>Program.Main</c> made for a notification launch), never a second SDK <c>Register()</c>.
+    /// </summary>
     public void Register()
     {
-        // AppNotificationManager.Default may require the Windows App SDK Singleton package
-        // for an unpackaged self-contained deployment. Do not resolve it before the caller
-        // has passed IsSupported(); registration failures remain inside the service's
-        // fail-soft boundary instead of escaping during dependency injection construction.
-        var manager = _manager ??= _managerFactory();
-        if (!_handlerAttached)
+        lock (_gate)
         {
-            manager.NotificationInvoked += OnNotificationInvoked;
-            _handlerAttached = true;
-        }
+            if (_registered)
+            {
+                return;
+            }
 
-        try
-        {
-            // The parameterless overload, and only this one: the packaged app's COM server and assets are
-            // declared in the manifest. The two-argument overload is for unpackaged registration and
-            // refuses a packaged process with E_ILLEGAL_METHOD_CALL.
-            manager.Register();
-        }
-        catch
-        {
-            manager.NotificationInvoked -= OnNotificationInvoked;
-            _handlerAttached = false;
-            throw;
+            // AppNotificationManager.Default may require the Windows App SDK Singleton package
+            // for an unpackaged self-contained deployment. Do not resolve it before the caller
+            // has passed IsSupported(); registration failures remain inside the service's
+            // fail-soft boundary instead of escaping during dependency injection construction.
+            var port = _port ??= _portFactory();
+            if (!_handlerAttached)
+            {
+                // Before Register: the handler makes the SDK use REGCLS_MULTIPLEUSE, so later clicks reach THIS process.
+                port.AddInvoked(OnNotificationInvoked);
+                _handlerAttached = true;
+            }
+
+            try
+            {
+                // The parameterless overload, and only this one: the packaged app's COM server and assets are
+                // declared in the manifest. The two-argument overload is for unpackaged registration and
+                // refuses a packaged process with E_ILLEGAL_METHOD_CALL.
+                port.Register();
+                _registered = true;
+            }
+            catch
+            {
+                port.RemoveInvoked(OnNotificationInvoked);
+                _handlerAttached = false;
+                throw;
+            }
         }
     }
 
     public void Unregister()
     {
-        var manager = _manager;
-        if (manager is null)
+        lock (_gate)
         {
-            return;
-        }
-
-        try
-        {
-            manager.Unregister();
-        }
-        finally
-        {
-            if (_handlerAttached)
+            var port = _port;
+            if (port is null)
             {
-                manager.NotificationInvoked -= OnNotificationInvoked;
-                _handlerAttached = false;
+                return;
+            }
+
+            try
+            {
+                if (_registered)
+                {
+                    port.Unregister();
+                }
+            }
+            finally
+            {
+                _registered = false;
+                if (_handlerAttached)
+                {
+                    port.RemoveInvoked(OnNotificationInvoked);
+                    _handlerAttached = false;
+                }
             }
         }
     }
@@ -607,27 +658,31 @@ internal sealed class WindowsAppNotificationPlatform : IWindowsAppNotificationPl
             notification.Expiration = DateTimeOffset.Now + lifetime;
         }
 
-        GetRegisteredManager().Show(notification);
+        GetRegisteredPort().Show(notification);
     }
 
-    private AppNotificationManager GetRegisteredManager() =>
-        _manager ?? throw new InvalidOperationException(
+    private IAppNotificationManagerPort GetRegisteredPort() =>
+        _port ?? throw new InvalidOperationException(
             "Windows app notifications have not been registered.");
 
-    private void OnNotificationInvoked(
-        AppNotificationManager sender,
-        AppNotificationActivatedEventArgs args) =>
-        Invoked?.Invoke(this, new NotificationActivationEventArgs(ReadArguments(args)));
+    private void OnNotificationInvoked(IReadOnlyDictionary<string, string>? arguments) =>
+        Invoked?.Invoke(this, new NotificationActivationEventArgs(arguments));
+
+    private static Func<IAppNotificationManagerPort> WrapFactory(Func<AppNotificationManager> managerFactory)
+    {
+        ArgumentNullException.ThrowIfNull(managerFactory);
+        return () => new AppNotificationManagerPort(managerFactory());
+    }
 
     /// <summary>
-    /// Copies the activation arguments out of the WinRT event. Nothing is interpreted here — the closed
-    /// contract does the interpreting, and fails closed on anything it does not recognize.
+    /// Copies the activation arguments out of a WinRT notification activation. Nothing is interpreted here — the
+    /// closed contract does the interpreting, and fails closed on anything it does not recognize.
     /// </summary>
-    private static IReadOnlyDictionary<string, string>? ReadArguments(AppNotificationActivatedEventArgs args)
+    internal static IReadOnlyDictionary<string, string>? ReadArguments(AppNotificationActivatedEventArgs? args)
     {
         try
         {
-            return args.Arguments is { } arguments
+            return args?.Arguments is { } arguments
                 ? new Dictionary<string, string>(arguments, StringComparer.Ordinal)
                 : null;
         }
@@ -636,4 +691,52 @@ internal sealed class WindowsAppNotificationPlatform : IWindowsAppNotificationPl
             return null;
         }
     }
+}
+
+/// <summary>
+/// The few <see cref="AppNotificationManager"/> operations the platform uses, so its registration rules (once,
+/// handler first, rollback on failure) are testable without the sealed WinRT type.
+/// </summary>
+internal interface IAppNotificationManagerPort
+{
+    AppNotificationSetting Setting { get; }
+
+    void AddInvoked(Action<IReadOnlyDictionary<string, string>?> handler);
+
+    void RemoveInvoked(Action<IReadOnlyDictionary<string, string>?> handler);
+
+    void Register();
+
+    void Unregister();
+
+    void Show(AppNotification notification);
+}
+
+internal sealed class AppNotificationManagerPort(AppNotificationManager manager) : IAppNotificationManagerPort
+{
+    private readonly Dictionary<Action<IReadOnlyDictionary<string, string>?>, global::Windows.Foundation.TypedEventHandler<AppNotificationManager, AppNotificationActivatedEventArgs>> _handlers = new();
+
+    public AppNotificationSetting Setting => manager.Setting;
+
+    public void AddInvoked(Action<IReadOnlyDictionary<string, string>?> handler)
+    {
+        global::Windows.Foundation.TypedEventHandler<AppNotificationManager, AppNotificationActivatedEventArgs> wrapper =
+            (_, args) => handler(WindowsAppNotificationPlatform.ReadArguments(args));
+        _handlers[handler] = wrapper;
+        manager.NotificationInvoked += wrapper;
+    }
+
+    public void RemoveInvoked(Action<IReadOnlyDictionary<string, string>?> handler)
+    {
+        if (_handlers.Remove(handler, out var wrapper))
+        {
+            manager.NotificationInvoked -= wrapper;
+        }
+    }
+
+    public void Register() => manager.Register();
+
+    public void Unregister() => manager.Unregister();
+
+    public void Show(AppNotification notification) => manager.Show(notification);
 }
