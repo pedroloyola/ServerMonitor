@@ -572,19 +572,57 @@ certify (`CERTIFY <version>` + a second environment approval), publish (Partner 
 
 ### Portal-only release (while the block above holds)
 
+Severity of the block (Vigil, independent check): **High, process/availability**. It fails closed:
+the API commit is refused or the draft ends in an error state and must be deleted. Nothing is
+published by mistake and no data is exposed, but a release cannot complete this way.
+
 Every Store change is made by a person in Partner Center; the API is never used on the draft.
-`release-build` still builds and proves the package, and `store-status` stays read-only.
+`release-build` still builds and proves the package, and `store-status` stays read-only. What the
+API path proved automatically (G4, the package bound to the tag-push run) is proven by hand in P2a.
 
 | step | who | action | evidence |
 | --- | --- | --- | --- |
 | P1. Package | `release-build` (tag push) | Tag `vX.Y.Z` on the `main` commit; record the run id, package name `ServerAlyzer_<version>_x64_<sha7>.msix` and SHA-256 from the summary | run id, SHA-256, build record |
-| P2. Verify the download | person, local | `gh run download <run id> -n serveralyzer-msix-<version>`; SHA-256 equals the summary and the `.sha256` file; `.build.json` commit equals the tag commit; rerun `Assert-PackageIdentity` (with `-ExpectedSha256`), `Assert-PackageRuntime`, `Assert-PackageResources`, `Assert-DistributionPrivacy` on it | gate logs |
+| P2a. Run provenance (manual G4) | person, local, read-only | See *P2a commands* below: the run is `.github/workflows/release-build.yml`, `event` **push**, `headBranch` **= the tag**, `headSha` **= the tag commit**, `status` completed, `conclusion` **success**, and the tag commit is reachable from `main`. Any mismatch: STOP, do not download | command output |
+| P2b. Verify the download | person, local | `gh run download <run id> -n serveralyzer-msix-<version> -D <new empty folder>`; SHA-256 equals the summary and the `.sha256` file; `.build.json` commit equals the tag commit; rerun `Assert-PackageIdentity` (with `-ExpectedSha256`), `Assert-PackageRuntime`, `Assert-PackageResources`, `Assert-DistributionPrivacy` on it | gate logs |
+| P2c. Freeze the file | person, local | Mark the verified `.msix` read-only (`Set-ItemProperty <file> -Name IsReadOnly -Value $true`) and record its SHA-256 in the evidence **before** the upload. Upload **that exact path** in P4, from a folder that holds no other package (never next to a local QA build) | SHA-256 + path |
 | P3. Backup | person, read-only | Product idle (no draft, publishing hold `Manual`); **Export listings** (CSV) to private evidence | CSV + date |
-| P4. Draft | person, Partner Center | *Update* the product (the draft is a copy of the last published submission); upload **the P2 file**, and only that file; check the version, architecture and identity Partner Center shows | screenshot |
+| P4. Draft | person, Partner Center | *Update* the product (the draft is a copy of the last published submission); upload **the P2c file**, and only that file; check the version, architecture and identity Partner Center shows. Partner Center does not show the hash | screenshot |
 | P5. Listing | person, in this draft | Steps 3a and 3b below (text, release notes from `whats-new.txt`, screenshots in order with captions). Touch nothing else | — |
-| P6. Verify | person, read-only | Step 4 below (the hold, three languages, package version, draft CSV diff against the repository) | draft CSV + diff |
+| P6. Verify | person, read-only | Step 4 below (the hold, three languages, package version, draft CSV diff against the repository); then dispatch **`store-status`** (read-only `GET`): the draft's live package must be `FileName` `ServerAlyzer_<version>_x64_<sha7>.msix` (sha7 = the tag commit) and, if already filled in, `Version` `<version>`. HYPOTHESIS until seen: `store-status` reads a portal-created draft without changing it (it only calls `apps get` and `submission get`) | draft CSV + diff, `store-status` run id |
 | P7. Certify | person (**certification GO**) | *Submit to the Store* in Partner Center, with *Publish manually* still selected | date, submission id |
 | P8. Publish | person (**publication GO**) | After certification: **Publish now** | — |
+
+**P2a commands** (read-only; the same checks and the same script as the `provenance` job of
+`store-submit.yml`; `R` is the repository, `TAG` the tag, `RUN` the run id):
+
+```powershell
+gh run view $RUN --json workflowName,event,headBranch,headSha,status,conclusion
+$tagCommit = (git rev-parse "$TAG^{commit}").Trim()      # after git fetch --tags origin
+git merge-base --is-ancestor $tagCommit origin/main; if ($LASTEXITCODE -ne 0) { throw 'tag commit not on main' }
+# The full G4, as store-submit runs it, writing the evidence files:
+gh api "repos/$R/actions/runs/$RUN" > run.json
+gh api "repos/$R/git/ref/tags/$TAG" > tagref.json
+# annotated tag: gh api "repos/$R/git/tags/<tagref object.sha>" > tagobject.json ; lightweight: '{}' > tagobject.json
+$main = (gh api "repos/$R/git/ref/heads/main" --jq '.object.sha').Trim()
+gh api "repos/$R/compare/$tagCommit...$main" --jq '{status: .status, ahead_by: .ahead_by, behind_by: .behind_by}' > compare.json
+./tools/release/Assert-ReleaseRunProvenance.ps1 -RunPath run.json -TagRefPath tagref.json -TagObjectPath tagobject.json `
+  -ComparePath compare.json -Repository $R -Tag $TAG -PackageVersion <version>
+```
+
+`gh run view` has no `path` field; the workflow file is proven by the script (`path` from the REST
+run object). Expected: `workflowName` `Release build`, `event` `push`, `headBranch` = `$TAG`,
+`headSha` = `$tagCommit`, `status` `completed`, `conclusion` `success`.
+
+**Credentials and accounts on this path:**
+
+* The `microsoft-store` / `microsoft-store-status` Entra application holds the **Manager** role (it
+  can write). On the portal-only path it is used **only** by `store-status`, whose commands read.
+  Prefer a credential with a read-only Partner Center role for `store-status` if Partner Center
+  offers one (**NEEDS HUMAN**); otherwise keep the CLI version pinned and the publishing hold
+  asserted.
+* **NEEDS HUMAN:** the Partner Center account that performs P4-P8 has MFA enabled, and no other user
+  or role can submit or publish for the product (review *Account settings → Users*).
 
 Rollback is R1, R2, R4-R6 below (R3 does not apply). A package that reached customers cannot be
 withdrawn by a lower version: the fix is a new release with a higher version.
