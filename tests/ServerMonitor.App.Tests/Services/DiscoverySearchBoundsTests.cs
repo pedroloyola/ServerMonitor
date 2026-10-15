@@ -74,6 +74,43 @@ public sealed class DiscoverySearchBoundsTests
         Assert.Equal(DiscoverySearchEnd.TimeLimit, service.LastSearchEnd);
     }
 
+    /// <summary>
+    /// REL.0D O-8: with the PRODUCTION options, a server found once (the real browser raises nothing for its unchanged
+    /// re-announcements) stays listed on every sweep until the 10 min limit ends the search, which then clears it and
+    /// closes the listener.
+    /// </summary>
+    [Fact]
+    public async Task With_the_default_options_a_result_found_once_stays_listed_until_the_time_limit()
+    {
+        var browser = new FakeMdnsServiceBrowser();
+        var time = new FakeTimeProvider(Start);
+        var service = new ServerDiscoveryService(browser, new GatedIgnoredDeviceStore(), NullLogger<ServerDiscoveryService>.Instance, time,
+            DiscoveryOptions.Default);
+        await using var _ = service;
+        DateTimeOffset? endedAt = null;
+        service.IsSearchingChanged += (_, _) => { if (!service.IsSearching) { endedAt ??= time.GetUtcNow(); } };
+        await service.StartSearchAsync();
+        browser.EmitFound(Observation("Mac Studio", time));
+
+        // Bounded by the clock, not IsSearching: the automatic stop clears the list before it flips IsSearching.
+        while (time.GetUtcNow() - Start < DiscoveryOptions.Default.MaxSearchDuration)
+        {
+            Assert.True(service.IsSearching);
+            Assert.Single(service.GetDiscovered());
+            time.Advance(TimeSpan.FromSeconds(1));
+            await Task.Delay(2);
+        }
+
+        await AdvanceUntilAsync(time, () => !service.IsSearching);
+        Assert.Equal(DiscoverySearchEnd.TimeLimit, service.LastSearchEnd);
+        Assert.InRange(endedAt!.Value - Start, TimeSpan.FromMinutes(10), TimeSpan.FromMinutes(10) + TimeSpan.FromSeconds(60));
+        Assert.Empty(service.GetDiscovered());
+        Assert.Equal(browser.StartCount, browser.StopCount);
+        Assert.Equal(0, browser.FoundSubscriberCount);
+        Assert.Equal(0, browser.UpdatedSubscriberCount);
+        Assert.Equal(0, browser.RemovedSubscriberCount);
+    }
+
     [Fact]
     public async Task A_manual_stop_wins_and_a_new_search_gets_a_fresh_bound()
     {

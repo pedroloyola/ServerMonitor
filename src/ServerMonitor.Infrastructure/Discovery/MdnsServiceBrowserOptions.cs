@@ -18,8 +18,9 @@ public sealed record MdnsServiceBrowserOptions
 
     /// <summary>
     /// Passive re-query cadence for the browser. Tmds.MDns defaults this to 10 s; we raise it to a
-    /// calmer 30 s so discovery stays non-aggressive while still refreshing steadily. The runtime
-    /// store's expiry window is sized around three of these intervals. Always applied through
+    /// calmer 30 s so discovery stays non-aggressive while still refreshing steadily. Unchanged
+    /// answers to these re-queries raise no event, so the runtime store does not expire on them
+    /// (REL.0D O-8, <c>DiscoveryOptions.ExpiryWindow</c>). Always applied through
     /// <see cref="ResolveQueryIntervalMilliseconds"/>, which keeps it positive and bounded.
     /// </summary>
     public TimeSpan QueryInterval { get; init; } = TimeSpan.FromSeconds(30);

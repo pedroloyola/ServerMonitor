@@ -11,7 +11,8 @@ namespace ServerMonitor.App.Services;
 /// Runtime discovery store and high-level <see cref="IServerDiscoveryService"/>. It subscribes to
 /// the fakeable browser seam (<see cref="IMdnsServiceBrowser"/>), merges per-interface
 /// observations of the same instance by <see cref="ServiceInstanceIdentity"/> (never by IP),
-/// tracks first/last seen, expires silent observations and applies a short grace to removals —
+/// tracks first/last seen, applies a short grace to removals (and an expiry backstop longer than a
+/// search, see <see cref="DiscoveryOptions.ExpiryWindow"/>) —
 /// all through an injected <see cref="TimeProvider"/>. It raises <see cref="DiscoveredChanged"/> only
 /// on material changes, and never touches SSH, credentials, trust or metrics.
 /// <para>
