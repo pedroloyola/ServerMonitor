@@ -19,7 +19,7 @@ Feito para o Windows 11
 O ServerAlyzer pode continuar na área de notificação quando fechas a janela e avisar-te com notificações do Windows quando o estado de um servidor muda. O modo compacto dá-te uma vista pequena de todos os servidores, que pode ficar sempre no topo. O widget do Windows 11 mostra os teus servidores no painel de Widgets, em três tamanhos, e indica sempre há quanto tempo os dados foram lidos. Tem temas claro, escuro e do sistema, e suporta navegação por teclado, leitores de ecrã e alto contraste. Disponível em português (Portugal), português (Brasil) e inglês.
 
 Pesquisa na rede local, só quando pedes
-Enquanto ainda não tens servidores, podes procurar na tua rede local servidores SSH que se anunciam (mDNS/DNS-SD). A pesquisa só corre quando a escolhes e nunca varre portas nem intervalos de endereços.
+Podes procurar na tua rede local servidores SSH que se anunciam (mDNS/DNS-SD), a partir da Visão geral vazia ou em Definições › Dados e servidores. A pesquisa só corre quando a escolhes e nunca varre portas nem intervalos de endereços. Termina sozinha ao fim de cerca de 40 segundos se não aparecer nenhum servidor novo, e ao fim de 10 minutos no máximo; também a podes parar quando quiseres.
 
 Cópia de segurança encriptada
 Guarda os teus servidores, chaves de host confiáveis e palavras-passe guardadas num ficheiro protegido por uma frase-passe à tua escolha, e restaura-os mais tarde. Os ficheiros de chave privada nunca são incluídos.

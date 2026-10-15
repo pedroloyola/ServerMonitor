@@ -50,6 +50,10 @@ sentence in all three files as described, then re-check the 1500-character limit
   on-demand discovery change (PR #47) is merged. Re-read it against the merged behaviour: an
   empty Overview, the button label, and that users who already have servers get no suggestions.
   Otherwise remove the paragraph.
+  **Re-read (REL.0E, 2026-10-16):** #47 and #52 are merged. The paragraph now names both entry
+  points (an empty Overview, Settings > Data and servers) and the bounded search (about 40 seconds
+  when no new server is found, 10 minutes at most). The old "no suggestions if you already have
+  servers" sentence was removed: a user with servers can now search from Settings.
 * **Language** (language paragraph): needs the language change (PR #46) merged. Otherwise remove
   the paragraph.
 * **Backup on another computer:** the text deliberately says only "restore them later". If
