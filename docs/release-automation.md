@@ -542,7 +542,9 @@ repository, not in an issue, not in a run log.
    `microsoft-store` environment only after it is green. Record the **submission id** from the run
    summary. Nothing has gone to certification.
 5. **Complete and review the draft** by hand: *Staged release: the human procedure* below (backup,
-   apply, verify).
+   apply, verify). **Blocked while that section says so:** editing an API-created draft in Partner
+   Center stops the API from committing it; a release whose listing changes follows the
+   *portal-only release* there instead of steps 4-6.
 6. **Certification GO:** dispatch `store-certify.yml` with the tag, the same run id, the package
    version, the submission id and `CERTIFY <version>`. Approve the environment after the
    provenance job is green.
@@ -554,6 +556,38 @@ Three separate human decisions, each with its own action: stage (`STAGE` + envir
 certify (`CERTIFY <version>` + a second environment approval), publish (Partner Center only).
 
 ## Staged release: the human procedure
+
+> **BLOCKED (REL.0E audit, 2026-10-16): do not run steps 2-5 below as written.** Steps 3a/3b edit,
+> in Partner Center, a draft that `store-submit` created through the submission API, and step 5 then
+> commits it through the API. Microsoft documents that this does not work: "If you use Partner Center
+> to change a submission that you originally created by using the API, you will no longer be able to
+> change or commit that submission by using the API. In some cases, the submission could be left in
+> an error state where it cannot proceed in the submission process. If this occurs, you must delete
+> the submission and create a new submission." (*Manage app submissions*, Microsoft Store submission
+> API, see Sources). Second, unproven risk: Partner Center may only fill in a package's `version`
+> when it processes the upload at commit, in which case `store-submit` stops after its upload (fail
+> closed, draft left behind). Until an all-API path (listing text **and** screenshots through the
+> API) exists and has been proven, a release whose listing changes uses the **portal-only release**
+> below; `store-submit` and `store-certify` are not dispatched.
+
+### Portal-only release (while the block above holds)
+
+Every Store change is made by a person in Partner Center; the API is never used on the draft.
+`release-build` still builds and proves the package, and `store-status` stays read-only.
+
+| step | who | action | evidence |
+| --- | --- | --- | --- |
+| P1. Package | `release-build` (tag push) | Tag `vX.Y.Z` on the `main` commit; record the run id, package name `ServerAlyzer_<version>_x64_<sha7>.msix` and SHA-256 from the summary | run id, SHA-256, build record |
+| P2. Verify the download | person, local | `gh run download <run id> -n serveralyzer-msix-<version>`; SHA-256 equals the summary and the `.sha256` file; `.build.json` commit equals the tag commit; rerun `Assert-PackageIdentity` (with `-ExpectedSha256`), `Assert-PackageRuntime`, `Assert-PackageResources`, `Assert-DistributionPrivacy` on it | gate logs |
+| P3. Backup | person, read-only | Product idle (no draft, publishing hold `Manual`); **Export listings** (CSV) to private evidence | CSV + date |
+| P4. Draft | person, Partner Center | *Update* the product (the draft is a copy of the last published submission); upload **the P2 file**, and only that file; check the version, architecture and identity Partner Center shows | screenshot |
+| P5. Listing | person, in this draft | Steps 3a and 3b below (text, release notes from `whats-new.txt`, screenshots in order with captions). Touch nothing else | — |
+| P6. Verify | person, read-only | Step 4 below (the hold, three languages, package version, draft CSV diff against the repository) | draft CSV + diff |
+| P7. Certify | person (**certification GO**) | *Submit to the Store* in Partner Center, with *Publish manually* still selected | date, submission id |
+| P8. Publish | person (**publication GO**) | After certification: **Publish now** | — |
+
+Rollback is R1, R2, R4-R6 below (R3 does not apply). A package that reached customers cannot be
+withdrawn by a lower version: the fix is a new release with a higher version.
 
 For a release whose listing (text and/or screenshots) changes, or whenever the draft should be
 reviewed before certification. The repository holds the content: text in
