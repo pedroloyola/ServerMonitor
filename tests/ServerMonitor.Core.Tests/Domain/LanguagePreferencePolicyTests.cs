@@ -272,4 +272,62 @@ public sealed class LanguagePreferencePolicyTests
         Assert.Null(LanguagePreferencePolicy.LegacyHintTarget("pt-BR", "fr-FR", Following("pt-BR")));
         Assert.Null(LanguagePreferencePolicy.LegacyHintTarget("pt-BR", "fr-FR", Following("en-US")));
     }
+
+    // ---- F-1 (Cortex A-lite): the profile language drives the decisions; the display only the hint condition ----------
+
+    /// <summary>The startup decision over the PROFILE language (A, B, C and controls): exactly supported → no override.</summary>
+    [Theory]
+    [InlineData("en-US", "")]      // A: display pt-BR, [en-US, …]
+    [InlineData("pt-BR", "")]      // B: display en-US, [pt-BR, …]
+    [InlineData("en-GB", "en-US")] // C: display pt-PT, [en-GB, …]
+    [InlineData("pt-PT", "")]
+    [InlineData("fr-FR", "en-US")]
+    public void AtStartup_OverTheProfileLanguage(string profile, string expectedOverride)
+    {
+        var plan = LanguagePreferencePolicy.AtStartup(null, profile, Absent);
+
+        Assert.Equal(LanguageProvenance.System(expectedOverride), plan.RecordToWrite);
+        Assert.Equal(expectedOverride.Length == 0 ? null : expectedOverride, plan.OverrideToWrite);
+    }
+
+    /// <summary>The applied culture: the #57 decision over the profile, else the profile when it is not the display.</summary>
+    [Theory]
+    [InlineData(null, "en-US", "pt-BR", "", "en-US")]       // A
+    [InlineData(null, "pt-BR", "en-US", "", "pt-BR")]       // B
+    [InlineData("en-US", "en-GB", "pt-PT", "en-US", "en-GB")] // C: the user's regional variant (MS model)
+    [InlineData("en-US", "en-GB", "en-GB", "en-US", null)]  // en-GB machine: .NET already formats en-GB
+    [InlineData(null, "pt-PT", "pt-PT", "", null)]          // the common machine: nothing
+    [InlineData("en-US", "fr-FR", "pt-PT", "en-US", "en-US")] // no app language in the list: the default it shows
+    public void AppliedFormattingCulture_FollowsTheProfileLanguage(
+        string? persisted, string profile, string display, string written, string? expected) =>
+        Assert.Equal(expected, LanguagePreferencePolicy.AppliedFormattingCulture(persisted, profile, display, Following(written)));
+
+    /// <summary>PR #58 round 1 (Cortex N-1): a neutral profile tag formats in the variant the app shows for it.</summary>
+    [Theory]
+    [InlineData("pt-PT", "pt", "en-US", "pt-PT", "pt-PT")]
+    [InlineData("en-US", "en", "pt-PT", "en-US", "en-US")]
+    [InlineData("pt-PT", "pt", "pt-PT", "pt-PT", null)]     // resolves to the display language: nothing to apply
+    [InlineData("pt-PT", "pt-AO", "en-US", "pt-PT", "pt-AO")] // a region is the user's own variant: kept
+    public void AppliedFormattingCulture_ResolvesANeutralProfileTag(
+        string persisted, string profile, string display, string written, string? expected) =>
+        Assert.Equal(expected, LanguagePreferencePolicy.AppliedFormattingCulture(persisted, profile, display, Following(written)));
+
+    [Fact]
+    public void AppliedFormattingCulture_KeepsAnExplicitChoice()
+    {
+        Assert.Equal("pt-PT", LanguagePreferencePolicy.AppliedFormattingCulture("pt-PT", "en-US", "pt-BR", ExplicitRecord));
+        Assert.Equal("pt-BR", LanguagePreferencePolicy.AppliedFormattingCulture("pt-BR", "en-GB", "pt-PT", Absent));
+    }
+
+    /// <summary>The hint: condition on the DISPLAY (v1.x decided by it), target from the PROFILE.</summary>
+    [Fact]
+    public void TheHint_ConditionIsTheDisplay_TargetIsTheProfile()
+    {
+        Assert.Equal("en-US", LanguagePreferencePolicy.LegacyHintTarget("pt-BR", "fr-FR", "fr-FR", Absent));
+        Assert.Equal("pt-PT", LanguagePreferencePolicy.LegacyHintTarget("pt-BR", "fr-FR", "pt-AO", Absent));
+        Assert.Null(LanguagePreferencePolicy.LegacyHintTarget("pt-BR", "fr-FR", "pt-BR", Absent)); // already what they have
+        // The trap: a pt-BR on a supported display is a genuine choice, whatever the profile says.
+        Assert.Null(LanguagePreferencePolicy.LegacyHintTarget("pt-BR", "pt-PT", "en-GB", Absent));
+        Assert.Null(LanguagePreferencePolicy.LegacyHintTarget("pt-BR", "en-US", "fr-FR", Absent));
+    }
 }

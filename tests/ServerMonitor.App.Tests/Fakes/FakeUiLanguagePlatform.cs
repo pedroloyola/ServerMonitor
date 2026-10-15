@@ -25,5 +25,18 @@ internal sealed class FakeUiLanguagePlatform(string systemCulture, string? persi
         }
     }
 
+    private string? _displayCulture;
+
+    /// <summary>F-1: the profile language - the app's "system language" (<paramref name="systemCulture"/>).</summary>
     public string SystemUiCultureName { get; set; } = systemCulture;
+
+    /// <summary>
+    /// F-1: the Windows display language. Unless a test sets it, it follows <see cref="SystemUiCultureName"/> - the
+    /// common machine, where the display language is the first preferred language (and every pre-F-1 test's machine).
+    /// </summary>
+    public string DisplayCultureName
+    {
+        get => _displayCulture ?? SystemUiCultureName;
+        set => _displayCulture = value;
+    }
 }

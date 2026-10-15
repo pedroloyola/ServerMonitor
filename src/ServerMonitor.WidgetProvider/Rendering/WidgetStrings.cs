@@ -76,17 +76,74 @@ public sealed class WidgetStrings
     public required string UnavailableBody { get; init; }
     public required string RingAltFormat { get; init; }
 
-    /// <summary>Resolves the strings for the current UI culture, defaulting to English.</summary>
-    public static WidgetStrings Current() => ForCulture(CultureInfo.CurrentUICulture);
+    /// <summary>
+    /// Resolves the strings for the user's language, defaulting to English. F-1 (REL.0D, Cortex A-lite): the PROFILE
+    /// language - the first Windows preferred language in English or Portuguese, the source the app's text, decisions and
+    /// number format follow - not the display language, which can differ (display pt-BR with [en-US, …] showed an English
+    /// app next to a Portuguese card). Read per render, like the culture was.
+    /// </summary>
+    public static WidgetStrings Current() => ForLanguageSource(PreferredLanguages, CultureInfo.CurrentUICulture.Name);
+
+    /// <summary>
+    /// PR #58 round 1 (Cortex L-1, Vigil N-1): the list is read on every render and is optional - the display language is
+    /// a complete answer, the one the card used before F-1 - so ANY failure to read it renders in the display language
+    /// instead of failing the render.
+    /// </summary>
+    public static WidgetStrings ForLanguageSource(Func<IReadOnlyList<string>?> preferredLanguages, string? displayCulture)
+    {
+        ArgumentNullException.ThrowIfNull(preferredLanguages);
+        IReadOnlyList<string>? languages;
+        try
+        {
+            languages = preferredLanguages();
+        }
+        catch (Exception)
+        {
+            languages = null;
+        }
+
+        return ForLanguages(languages, displayCulture);
+    }
+
+    /// <summary>The strings for a machine: its preferred-language list and display language (testable without Windows).</summary>
+    public static WidgetStrings ForLanguages(IReadOnlyList<string>? preferredLanguages, string? displayCulture) =>
+        ForCultureName(ProfileLanguage(preferredLanguages, displayCulture));
+
+    /// <summary>
+    /// The app's <c>SupportedCultures.ProfileLanguage</c> (a parity test keeps them equal): the first preferred language
+    /// whose base is en / pt (full tag), else the first entry, else <paramref name="displayCulture"/>.
+    /// </summary>
+    public static string ProfileLanguage(IReadOnlyList<string>? profileLanguages, string? displayCulture)
+    {
+        if (profileLanguages is null || profileLanguages.Count == 0)
+        {
+            return displayCulture ?? string.Empty;
+        }
+
+        foreach (var language in profileLanguages)
+        {
+            var subtags = (language ?? string.Empty).Split(['-', '_'], StringSplitOptions.RemoveEmptyEntries);
+            if (subtags.Length > 0
+                && (subtags[0].Equals("en", StringComparison.OrdinalIgnoreCase) || subtags[0].Equals("pt", StringComparison.OrdinalIgnoreCase)))
+            {
+                return language!;
+            }
+        }
+
+        return profileLanguages[0] ?? string.Empty;
+    }
 
     /// <summary>
     /// The app's table (REL.0C, <c>SupportedCultures.Resolve</c>; a parity test keeps them equal): pt-BR → PtBr,
-    /// any other Portuguese → PtPt, everything else → En. It follows the Windows culture, not the app's
+    /// any other Portuguese → PtPt, everything else → En. It follows the Windows language, not the app's
     /// in-app language choice (the provider is a separate process).
     /// </summary>
-    public static WidgetStrings ForCulture(CultureInfo? culture)
+    public static WidgetStrings ForCulture(CultureInfo? culture) => ForCultureName(culture?.Name);
+
+    /// <summary><see cref="ForCulture"/> by name (a profile tag needs no <see cref="CultureInfo"/> to be mapped).</summary>
+    public static WidgetStrings ForCultureName(string? cultureName)
     {
-        var subtags = (culture?.Name ?? string.Empty).Split(['-', '_'], StringSplitOptions.RemoveEmptyEntries);
+        var subtags = (cultureName ?? string.Empty).Split(['-', '_'], StringSplitOptions.RemoveEmptyEntries);
         if (subtags.Length == 0 || !subtags[0].Equals("pt", StringComparison.OrdinalIgnoreCase))
         {
             return En;
@@ -94,6 +151,10 @@ public sealed class WidgetStrings
 
         return subtags.Skip(1).Any(subtag => subtag.Equals("BR", StringComparison.OrdinalIgnoreCase)) ? PtBr : PtPt;
     }
+
+    /// <summary>The user's ordered preferred languages (a failure is contained by <see cref="ForLanguageSource"/>).</summary>
+    private static IReadOnlyList<string>? PreferredLanguages() =>
+        [.. Windows.System.UserProfile.GlobalizationPreferences.Languages];
 
     private static readonly WidgetStrings En = new()
     {

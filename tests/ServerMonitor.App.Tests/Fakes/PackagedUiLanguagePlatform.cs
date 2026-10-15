@@ -44,7 +44,11 @@ internal sealed class PackagedUiLanguagePlatform(string systemCulture, PackagedU
 
     public bool IsOverrideKnown => Read().IsKnown;
 
+    /// <summary>F-1 (PR #58): the profile language - the app's "system language".</summary>
     public string SystemUiCultureName => systemCulture;
+
+    /// <summary>F-1 (PR #58): the Windows display language; the same as the profile language unless a test sets it.</summary>
+    public string DisplayCultureName { get; init; } = systemCulture;
 
     private LanguageOverrideRead Read() => LanguageOverrideReader.Read(
         Identity,

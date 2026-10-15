@@ -401,6 +401,60 @@ public sealed class Ui5SettingsTests
     }
 
     /// <summary>
+    /// PR #58 × #59 merge: both fixes on the VM's machine at once - packaged semantics (the persisted override is read in
+    /// a new process; "" clears in Windows) AND F-1 (display pt-BR, preferred [en-US, …]: the profile language en-US is
+    /// the app's "system language"). An explicit pt-PT survives the relaunch with pt-PT text and numbers; "Use system
+    /// language" then follows the PROFILE (en-US text and numbers) after the next relaunch. The widget follows the
+    /// profile throughout - it never sees an in-app choice (ADR-018 §17, pre-existing).
+    /// Through the real handler, the real store (a temp folder) and the real launch path.
+    /// </summary>
+    [Fact]
+    public void Merge_PackagedApp_OnTheVmMachine_KeepsTheChoice_AndUseSystemFollowsTheProfile()
+    {
+        const string display = "pt-BR";
+        string[] preferred = ["en-US", "pt-BR"];
+        var profile = SupportedCultures.ProfileLanguage(preferred, display);
+        Assert.Equal("en-US", profile);
+        var directory = Path.Combine(Path.GetTempPath(), "sm-merge58-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var windows = new PackagedUiLanguagePlatform.PersistedOverride();
+            var store = FileStore(directory);
+            PackagedUiLanguagePlatform NewProcess() => new(profile, windows) { DisplayCultureName = display };
+            string Text(LocalizationService s) => TestSupport.MrtRuntimeLanguages.ResourceLanguage(s.CurrentLanguageOverride, preferred);
+
+            var first = Launch(NewProcess(), store);
+            Assert.Equal(("en-US", "en-US"), (Text(first), first.FormattingCultureName)); // F-1 A: one language
+
+            new World(localization: first).ViewModel.SelectedLanguageIndex = 2;           // Português (Portugal)
+            var chosen = Launch(NewProcess(), store);                                       // relaunch (new process)
+            Assert.Equal(LanguageRecordRead.Of(LanguageProvenance.Explicit), store.Read());
+            Assert.Equal(("pt-PT", "pt-PT"), (Text(chosen), chosen.FormattingCultureName));
+            Assert.Equal(2, new World(localization: chosen).ViewModel.SelectedLanguageIndex);
+            Assert.Equal("en-US", SupportedCultures.Resolve(profile));                     // the widget's language
+
+            new World(localization: chosen).ViewModel.SelectedLanguageIndex = 0;          // Use system language
+            Assert.Equal(string.Empty, windows.Value);
+            var system = Launch(NewProcess(), store);                                       // relaunch
+            Assert.Null(system.CurrentLanguageOverride);
+            Assert.True(system.FollowsSystemLanguage);
+            Assert.Equal(("en-US", "en-US"), (Text(system), system.FormattingCultureName));
+            Assert.Equal(0, new World(localization: system).ViewModel.SelectedLanguageIndex);
+            Assert.Null(system.PendingLegacyLanguageHint);
+        }
+        finally
+        {
+            try
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+            }
+        }
+    }
+
+    /// <summary>
     /// PR #59 round 2 (Cortex M-1, CONFIRMED on the VM): display pt-BR, Settings › Português (Portugal), then - same
     /// session - "Use system language". The SDK setter rejects "" (the fake throws like it), so before the hardening the
     /// record said System("") while Windows kept pt-PT and the next launch was still pt-PT. Now the persisted override is

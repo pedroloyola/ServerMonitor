@@ -71,4 +71,26 @@ public sealed class SupportedCulturesTests
     {
         Assert.Null(SupportedCultures.StartupOverride(persisted, systemCulture));
     }
+
+    // ---- F-1 (Cortex A-lite): the profile language --------------------------------------------------------------------
+
+    /// <summary>The first preferred language in en / pt (full tag), else the first entry, else the display language.</summary>
+    [Theory]
+    [InlineData("pt-BR", new[] { "en-US", "pt-BR" }, "en-US")]
+    [InlineData("pt-PT", new[] { "en-GB" }, "en-GB")]
+    [InlineData("pt-PT", new[] { "fr-FR", "en-GB" }, "en-GB")]
+    [InlineData("pt-PT", new[] { "fr-FR" }, "fr-FR")]
+    [InlineData("pt-BR", new string[0], "pt-BR")]
+    [InlineData("fr-FR", new[] { "pt-AO" }, "pt-AO")]
+    [InlineData("en-US", new[] { "de-DE", "pt", "en-US" }, "pt")]
+    [InlineData("en-US", new[] { "EN-au" }, "EN-au")]
+    public void ProfileLanguage_IsTheFirstPreferredLanguageTheAppHas(string display, string[] profile, string expected) =>
+        Assert.Equal(expected, SupportedCultures.ProfileLanguage(profile, display));
+
+    [Fact]
+    public void ProfileLanguage_WithoutAList_IsTheDisplayLanguage()
+    {
+        Assert.Equal("pt-PT", SupportedCultures.ProfileLanguage(null, "pt-PT"));
+        Assert.Equal(string.Empty, SupportedCultures.ProfileLanguage(null, null));
+    }
 }

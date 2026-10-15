@@ -30,8 +30,8 @@ public sealed class LocalizationService : ILocalizationService
         _logger = logger;
         _platform = platform;
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
-        _formattingCulture = new(() =>
-            LanguagePreferencePolicy.FormattingCulture(CurrentLanguageOverride, _platform.SystemUiCultureName, _settings.Read()));
+        _formattingCulture = new(() => LanguagePreferencePolicy.AppliedFormattingCulture(
+            CurrentLanguageOverride, _platform.SystemUiCultureName, _platform.DisplayCultureName, _settings.Read()));
     }
 
     public string? CurrentLanguageOverride =>
@@ -43,7 +43,8 @@ public sealed class LocalizationService : ILocalizationService
         LanguagePreferencePolicy.FollowsSystem(CurrentLanguageOverride, _settings.Read());
 
     public string? PendingLegacyLanguageHint =>
-        LanguagePreferencePolicy.LegacyHintTarget(CurrentLanguageOverride, _platform.SystemUiCultureName, _settings.Read());
+        LanguagePreferencePolicy.LegacyHintTarget(
+            CurrentLanguageOverride, _platform.DisplayCultureName, _platform.SystemUiCultureName, _settings.Read());
 
     /// <summary>
     /// REL.0E: decided once, on first read - after <see cref="InitializeFromSystem"/> in the launch - and kept for the
@@ -146,14 +147,30 @@ public sealed class LocalizationService : ILocalizationService
     }
 
     /// <summary>
-    /// The real platform: the Windows App SDK override and the Windows UI culture.
-    /// REL.0E: the culture is read ONCE, when the platform is built (with the service, before
+    /// The real platform: the Windows App SDK override and the Windows languages.
+    /// REL.0E: the languages are read ONCE, when the platform is built (with the service, before
     /// <see cref="AppFormattingCulture"/> points .NET's UI culture at the app language), so the recovery hint and
-    /// "Use system language" keep seeing Windows. .NET caches it per process anyway: nothing more recent was ever seen.
+    /// "Use system language" keep seeing Windows. .NET caches the display language per process anyway.
+    /// F-1 (Cortex A-lite): the "system language" is the profile language of the preferred-language list
+    /// (<c>GlobalizationPreferences.Languages</c>, the list MRT reads); the display language stays for the hint condition.
     /// </summary>
     internal sealed class WindowsUiLanguagePlatform : IUiLanguagePlatform
     {
-        private readonly string _systemUiCultureName = CultureInfo.CurrentUICulture.Name;
+        private readonly string _displayCultureName;
+        private readonly string _systemUiCultureName;
+
+        public WindowsUiLanguagePlatform()
+            : this(ReadPreferredLanguages)
+        {
+        }
+
+        /// <summary>Test seam: the preferred-language list from a fake (never the user's real list).</summary>
+        internal WindowsUiLanguagePlatform(Func<IReadOnlyList<string>?> preferredLanguages)
+        {
+            ArgumentNullException.ThrowIfNull(preferredLanguages);
+            _displayCultureName = CultureInfo.CurrentUICulture.Name;
+            _systemUiCultureName = SupportedCultures.ProfileLanguage(TryRead(preferredLanguages), _displayCultureName);
+        }
 
         /// <summary>
         /// REL.0D D-2: read through <see cref="LanguageOverrideReader"/> - the SDK getter alone is process-local and read
@@ -169,5 +186,29 @@ public sealed class LocalizationService : ILocalizationService
         public bool IsOverrideKnown => LanguageOverrideReader.ReadCurrent().IsKnown;
 
         public string SystemUiCultureName => _systemUiCultureName;
+
+        public string DisplayCultureName => _displayCultureName;
+
+        /// <summary>The user's ordered preferred languages (Settings › Language › Preferred languages).</summary>
+        private static IReadOnlyList<string>? ReadPreferredLanguages() =>
+            [.. Windows.System.UserProfile.GlobalizationPreferences.Languages];
+
+        /// <summary>
+        /// PR #58 round 1 (Cortex L-1, Vigil N-1): this runs in the service's constructor, so in the launch. The list is
+        /// optional - the display language is a complete answer, the one every version before F-1 used - so ANY failure
+        /// to read it (a WinRT HRESULT mapped to NotSupported/NotImplemented/Argument/…, a type initializer) falls back to
+        /// the display language instead of stopping the app.
+        /// </summary>
+        private static IReadOnlyList<string>? TryRead(Func<IReadOnlyList<string>?> preferredLanguages)
+        {
+            try
+            {
+                return preferredLanguages();
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
     }
 }
