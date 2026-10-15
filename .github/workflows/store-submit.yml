@@ -1,16 +1,24 @@
-name: Store submit
+name: Store submit (stage only)
 
-# Submits an already-built, already-verified MSIX to the EXISTING ServerAlyzer product and
-# sends it to certification. It never builds anything: the package comes from a release-build
-# run, and its SHA-256 must match what that run reported. Before the Store environment (and its
-# reviewer and secrets) is even reached, the provenance job proves from the GitHub API that the
-# run is the release-build run started by the push of the requested tag, on a commit in main (G4).
+# STAGES an already-built, already-verified MSIX in a Partner Center DRAFT of the EXISTING
+# ServerAlyzer product. It never builds anything: the package comes from a release-build run, and
+# its SHA-256 must match what that run reported. Before the Store environment (and its reviewer and
+# secrets) is even reached, the provenance job proves from the GitHub API that the run is the
+# release-build run started by the push of the requested tag, on a commit in main (G4).
+#
+# REL.0E P-1: this workflow NEVER commits. It uploads the package, writes the release notes, reads
+# the draft back (uncommitted, publishing hold, visibility, package) and stops, reporting the draft's
+# submission id. A person then applies the localized listing and screenshots to that draft and
+# reviews it in Partner Center. Certification is a SEPARATE dispatch (store-certify.yml) with its own
+# confirmation phrase and its own approval of the Store environment.
 #
 # What this workflow deliberately does NOT do:
-#   * publish the product to customers - the submission is committed with the publishing
-#     hold intact, so a person still has to press "Publish now" in Partner Center
+#   * commit the submission to certification (store-certify.yml does, on a second human GO)
+#   * publish the product to customers - even a certified submission waits on the publishing
+#     hold, so a person still has to press "Publish now" in Partner Center
 #   * create a product, an identity, or a listing
-#   * delete a submission, cancel one, or overwrite one that is in flight
+#   * delete a submission, cancel one, or overwrite one that is in flight: 'msstore publish'
+#     DELETES an existing draft, so the run refuses while any draft exists
 #   * change pricing, markets, age ratings, visibility, or any listing field other than
 #     the release notes tracked under release/store/
 #
@@ -37,13 +45,14 @@ on:
         required: true
         type: string
       confirm:
-        description: 'Type SUBMIT to confirm this sends the package to Microsoft for certification'
+        description: 'Type STAGE to upload the package into a Partner Center draft (nothing goes to certification)'
         required: true
         type: string
 
 permissions:
   contents: read
 
+# Shared with store-certify.yml: staging and certifying never run at the same time.
 concurrency:
   group: store-submit
   cancel-in-progress: false
@@ -52,7 +61,7 @@ env:
   STORE_PRODUCT_ID: 9N6ZBSBN1TD2
   STORE_IDENTITY_NAME: PedroLoy.ServerAlyzer
   # The product's real audience, read from the submission API on 2026-09-05, not assumed.
-  # This is asserted and never written: the workflow stops rather than committing if the
+  # This is asserted and never written: the workflow stops rather than staging if the
   # audience has changed underneath it, because that would mean something outside this
   # pipeline altered who can see the product.
   STORE_VISIBILITY: Public
@@ -69,6 +78,7 @@ jobs:
       RELEASE_TAG: ${{ inputs.release_tag }}
       PACKAGE_VERSION: ${{ inputs.package_version }}
       RELEASE_RUN_ID: ${{ inputs.release_run_id }}
+      STAGE_CONFIRM: ${{ inputs.confirm }}
       REPOSITORY: ${{ github.repository }}
       GH_TOKEN: ${{ github.token }}
     outputs:
@@ -82,6 +92,9 @@ jobs:
           if ($env:RELEASE_RUN_ID -cnotmatch '\A[1-9][0-9]*\z') { throw 'release_run_id must be a positive decimal run ID.' }
           if ($env:PACKAGE_VERSION -cnotmatch '\A[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\z') { throw 'package_version is not a four-part version.' }
           if ($env:REPOSITORY -cnotmatch '\A[A-Za-z0-9-]+/[A-Za-z0-9._-]+\z') { throw 'Unexpected repository name.' }
+          # Vigil P-1 N-1: a wrong phrase fails here, before anyone is asked to approve the Store environment.
+          # The submit job checks it again before any secret is used.
+          if ($env:STAGE_CONFIRM -cne 'STAGE') { throw 'Confirmation phrase was not STAGE. Nothing has been done.' }
 
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -145,8 +158,8 @@ jobs:
         shell: pwsh
         run: |
           if ($env:RELEASE_RUN_ID -notmatch '\A[1-9][0-9]*\z') { throw 'release_run_id must be a positive decimal run ID.' }
-          if ($env:SUBMIT_CONFIRM -cne 'SUBMIT') {
-            throw "Confirmation phrase was not SUBMIT. Nothing has been done."
+          if ($env:SUBMIT_CONFIRM -cne 'STAGE') {
+            throw "Confirmation phrase was not STAGE. Nothing has been done."
           }
           if ($env:PACKAGE_VERSION -notmatch '\A[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\z') {
             throw "package_version is not a four-part version."
@@ -235,16 +248,19 @@ jobs:
           }
           Write-Host 'Product identity confirmed.'
 
-      # The critical guard: msstore publish DELETES a pending draft and rebuilds it from the
-      # last published submission. Never run it while something is in flight.
+      # The critical guard: msstore publish DELETES a pending draft and rebuilds it from the last
+      # published submission (msstore-cli PublishAsync: a pending draft plus a published submission
+      # -> delete). Never run it while anything is in flight, including a draft this workflow staged
+      # earlier and a person is now editing: re-staging is a manual delete in Partner Center first.
       - name: Refuse to run if a submission is already in flight
         shell: pwsh
         run: |
           msstore submission get ${{ env.STORE_PRODUCT_ID }} 2>&1 | Out-String | Set-Content -LiteralPath before.json -Encoding UTF8
           ./tools/release/Assert-NoPendingSubmission.ps1 -SubmissionPath before.json
 
-      # --noCommit uploads the package and leaves the submission in draft. Metadata edits
-      # must come after this, because publish recreates the draft.
+      # --noCommit uploads the package and leaves the submission in draft. It is not a dry run: the
+      # draft is created and the package uploaded. Metadata edits must come after this, because
+      # publish recreates the draft. This workflow has no commit step.
       - name: Upload the package, leaving the submission in draft
         env:
           PACKAGE_PATH: ${{ steps.verify.outputs.packagePath }}
@@ -274,37 +290,44 @@ jobs:
           msstore submission update ${{ env.STORE_PRODUCT_ID }} $updated
           if ($LASTEXITCODE -ne 0) { throw 'msstore submission update failed.' }
 
-      # Read back what the Store actually stored, and check the hold on that, not on the
-      # file we sent. This is the last gate before the submission becomes irreversible.
-      - name: Re-read the submission and re-check the hold before committing
+      # Read back what the Store actually stored, and check that, not the file we sent: still an
+      # uncommitted draft, on the publishing hold, same audience, this package and none newer.
+      - name: Re-read the draft and prove it is staged, not committed
+        id: staged
         shell: pwsh
         run: |
           msstore submission get ${{ env.STORE_PRODUCT_ID }} | Out-File -FilePath readback.json -Encoding utf8
           if ($LASTEXITCODE -ne 0) { throw 'msstore submission get failed on read-back.' }
+          ./tools/release/Assert-StagedSubmission.ps1 `
+            -SubmissionPath readback.json `
+            -ExpectedPackageVersion $env:PACKAGE_VERSION `
+            -ExpectedPackageFileName "ServerAlyzer_${env:PACKAGE_VERSION}_x64_$($env:TAG_COMMIT.Substring(0, 7)).msix" `
+            -ExpectedVisibility '${{ env.STORE_VISIBILITY }}' `
+            -ListingReport
 
-          $raw = Get-Content -Raw readback.json
-          $start = $raw.IndexOf('{'); $end = $raw.LastIndexOf('}')
-          if ($start -lt 0 -or $end -le $start) { throw 'STOP: could not parse the read-back submission. Not committing.' }
-          $submission = $raw.Substring($start, $end - $start + 1) | ConvertFrom-Json
-
-          $mode = ($submission.PSObject.Properties | Where-Object { $_.Name -ieq 'targetPublishMode' } | Select-Object -First 1).Value
-          if ($mode -ne 'Manual') {
-            throw "STOP: the Store reports targetPublishMode '$mode', not 'Manual'. Committing now could publish the release without anyone deciding. The draft is left uncommitted; deal with it in Partner Center."
-          }
-          Write-Host "  ok    the Store reports targetPublishMode = Manual"
-
-          $visibility = ($submission.PSObject.Properties | Where-Object { $_.Name -ieq 'visibility' } | Select-Object -First 1).Value
-          if ($visibility -ne '${{ env.STORE_VISIBILITY }}') {
-            throw "STOP: visibility is '$visibility', expected '${{ env.STORE_VISIBILITY }}'. Not committing."
-          }
-          Write-Host "  ok    visibility is still $visibility"
-
-      - name: Commit the submission to certification
+      - name: Hand the draft over to a person
+        env:
+          SUBMISSION_ID: ${{ steps.staged.outputs.submissionId }}
         shell: pwsh
         run: |
-          msstore submission publish ${{ env.STORE_PRODUCT_ID }}
-          if ($LASTEXITCODE -ne 0) { throw 'msstore submission publish failed.' }
-          Write-Host 'Submitted for certification.'
+          if ($env:SUBMISSION_ID -cnotmatch '\A[0-9]{1,30}\z') { throw 'The read-back did not report a submission id.' }
+          @(
+            ''
+            '## ServerAlyzer - draft STAGED, not submitted'
+            ''
+            '| field | value |'
+            '| --- | --- |'
+            "| submission id | ``$env:SUBMISSION_ID`` |"
+            "| package | ``$env:PACKAGE_VERSION`` |"
+            "| release-build run | ``$env:RELEASE_RUN_ID`` |"
+            ''
+            'Nothing was sent to certification. Next, by hand (docs/release-automation.md, "Staged release"):'
+            ''
+            '1. Partner Center, this draft: export the listings (CSV backup), apply the localized listing and screenshots, review every language and "Publish manually".'
+            '2. Do not run store-submit again while this draft exists: its upload step would delete the draft (the run refuses).'
+            "3. Certification GO: dispatch store-certify.yml with submission_id $env:SUBMISSION_ID and the phrase CERTIFY $env:PACKAGE_VERSION."
+          ) | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          Write-Host "Draft $env:SUBMISSION_ID staged with package $env:PACKAGE_VERSION. Not committed."
 
       - name: Report the resulting state
         if: always()
@@ -320,7 +343,7 @@ jobs:
           }
           @(
             ''
-            'Certification is decided by Microsoft, not by this workflow. Nothing here means'
-            'the update passed certification, and nothing here makes the product public: the'
-            'submission was committed with the publishing hold in force.'
+            'This workflow only stages: it never commits a submission. A staged draft goes to'
+            'certification only through store-certify.yml, and even a certified submission waits'
+            'on the publishing hold until a person presses Publish now.'
           ) | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append

@@ -1,0 +1,235 @@
+name: Store certify (commit a staged draft)
+
+# REL.0E P-1, the SECOND human gate. Commits to certification the Partner Center draft that
+# store-submit.yml staged and a person then completed (localized listing, screenshots) and reviewed.
+# It uploads nothing and edits nothing: it re-proves the release run (G4), re-reads the draft, and
+# commits it only if it is still exactly the staged draft (same submission id, status PendingCommit),
+# on the publishing hold, with the audience unchanged and the verified package as its newest package.
+#
+# What this workflow deliberately does NOT do:
+#   * upload a package, change any listing field, or update the submission in any way
+#   * delete, cancel or recreate a submission
+#   * publish the product to customers - the commit keeps the publishing hold, so a certified
+#     submission waits until a person presses "Publish now" in Partner Center
+#
+# Manual dispatch only, behind the `microsoft-store` environment (required reviewer): approving this
+# run is a separate decision from approving the stage run. Its confirmation phrase names the version.
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Release tag the staged package was built from, e.g. v1.1.7'
+        required: true
+        type: string
+      release_run_id:
+        description: 'Run ID of the tag-push release-build run that produced the staged package'
+        required: true
+        type: string
+      package_version:
+        description: 'Package version in the staged draft, e.g. 1.1.7.0'
+        required: true
+        type: string
+      submission_id:
+        description: 'Submission id of the staged draft, from the store-submit run summary'
+        required: true
+        type: string
+      confirm:
+        description: 'Type CERTIFY followed by the package version (e.g. CERTIFY 1.1.7.0) to send this draft to Microsoft for certification'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# Shared with store-submit.yml: staging and certifying never run at the same time.
+concurrency:
+  group: store-submit
+  cancel-in-progress: false
+
+env:
+  STORE_PRODUCT_ID: 9N6ZBSBN1TD2
+  STORE_IDENTITY_NAME: PedroLoy.ServerAlyzer
+  # Asserted, never written (see store-submit.yml).
+  STORE_VISIBILITY: Public
+
+jobs:
+  # G4. Read-only, no environment, no Store secret: only the job's GITHUB_TOKEN with actions:read.
+  # A failure here stops the workflow before anyone is asked to approve the Store environment.
+  provenance:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+      actions: read
+    env:
+      RELEASE_TAG: ${{ inputs.release_tag }}
+      PACKAGE_VERSION: ${{ inputs.package_version }}
+      RELEASE_RUN_ID: ${{ inputs.release_run_id }}
+      SUBMISSION_ID: ${{ inputs.submission_id }}
+      CERTIFY_CONFIRM: ${{ inputs.confirm }}
+      REPOSITORY: ${{ github.repository }}
+      GH_TOKEN: ${{ github.token }}
+    outputs:
+      tagCommit: ${{ steps.check.outputs.tagCommit }}
+
+    steps:
+      - name: Validate the inputs
+        shell: pwsh
+        run: |
+          if ($env:RELEASE_TAG -cnotmatch '\Av[0-9]+\.[0-9]+\.[0-9]+\z') { throw 'release_tag must be vMAJOR.MINOR.PATCH.' }
+          if ($env:RELEASE_RUN_ID -cnotmatch '\A[1-9][0-9]*\z') { throw 'release_run_id must be a positive decimal run ID.' }
+          if ($env:PACKAGE_VERSION -cnotmatch '\A[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\z') { throw 'package_version is not a four-part version.' }
+          if ($env:REPOSITORY -cnotmatch '\A[A-Za-z0-9-]+/[A-Za-z0-9._-]+\z') { throw 'Unexpected repository name.' }
+          # Vigil P-1 N-1: a wrong phrase or id fails here, before anyone is asked to approve the Store
+          # environment. The certify job checks both again before any secret is used.
+          if ($env:SUBMISSION_ID -cnotmatch '\A[0-9]{1,30}\z') { throw 'submission_id must be the numeric id from the store-submit summary.' }
+          if ($env:CERTIFY_CONFIRM -cne "CERTIFY $env:PACKAGE_VERSION") { throw "Confirmation phrase was not 'CERTIFY $env:PACKAGE_VERSION'. Nothing has been done." }
+
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Prove the run is the tag's release-build run on main
+        id: check
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path provenance | Out-Null
+          gh api "repos/$env:REPOSITORY/actions/runs/$env:RELEASE_RUN_ID" > provenance/run.json
+          if ($LASTEXITCODE -ne 0) { throw 'Could not read the release-build run.' }
+          gh api "repos/$env:REPOSITORY/git/ref/tags/$env:RELEASE_TAG" > provenance/tagref.json
+          if ($LASTEXITCODE -ne 0) { throw 'Could not read the tag ref.' }
+          $ref = Get-Content -Raw provenance/tagref.json | ConvertFrom-Json
+          if ($ref.object.type -ceq 'tag') {
+            if ($ref.object.sha -cnotmatch '\A[0-9a-f]{40}\z') { throw 'Malformed tag object sha.' }
+            gh api "repos/$env:REPOSITORY/git/tags/$($ref.object.sha)" > provenance/tagobject.json
+            if ($LASTEXITCODE -ne 0) { throw 'Could not read the annotated tag object.' }
+            $commit = (Get-Content -Raw provenance/tagobject.json | ConvertFrom-Json).object.sha
+          }
+          else { $commit = $ref.object.sha }
+          if ($commit -cnotmatch '\A[0-9a-f]{40}\z') { throw 'Malformed tag commit sha.' }
+          # Resolve the BRANCH main to a sha first: a bare "main" in a compare could also name a tag.
+          $mainSha = gh api "repos/$env:REPOSITORY/git/ref/heads/main" --jq '.object.sha'
+          if ($LASTEXITCODE -ne 0) { throw 'Could not read refs/heads/main.' }
+          $mainSha = "$mainSha".Trim()
+          if ($mainSha -cnotmatch '\A[0-9a-f]{40}\z') { throw 'Malformed main sha.' }
+          gh api "repos/$env:REPOSITORY/compare/$commit...$mainSha" --jq '{status: .status, ahead_by: .ahead_by, behind_by: .behind_by}' > provenance/compare.json
+          if ($LASTEXITCODE -ne 0) { throw 'Could not compare the tag commit with main.' }
+          ./tools/release/Assert-ReleaseRunProvenance.ps1 `
+            -RunPath provenance/run.json `
+            -TagRefPath provenance/tagref.json `
+            -TagObjectPath provenance/tagobject.json `
+            -ComparePath provenance/compare.json `
+            -Repository $env:REPOSITORY `
+            -Tag $env:RELEASE_TAG `
+            -PackageVersion $env:PACKAGE_VERSION
+
+  certify:
+    needs: provenance
+    runs-on: windows-latest
+    env:
+      CERTIFY_CONFIRM: ${{ inputs.confirm }}
+      PACKAGE_VERSION: ${{ inputs.package_version }}
+      SUBMISSION_ID: ${{ inputs.submission_id }}
+      TAG_COMMIT: ${{ needs.provenance.outputs.tagCommit }}
+
+    # Gate. The environment carries the Store secrets AND the required reviewer, so nothing
+    # below runs until a human approves this specific run (a separate approval from the stage run).
+    environment:
+      name: microsoft-store
+      url: https://partner.microsoft.com/dashboard/products/9N6ZBSBN1TD2/overview
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check the confirmation phrase
+        shell: pwsh
+        run: |
+          if ($env:PACKAGE_VERSION -cnotmatch '\A[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\z') { throw 'package_version is not a four-part version.' }
+          if ($env:SUBMISSION_ID -cnotmatch '\A[0-9]{1,30}\z') { throw 'submission_id must be the numeric id from the store-submit summary.' }
+          if ($env:TAG_COMMIT -cnotmatch '\A[0-9a-f]{40}\z') { throw 'The provenance job did not hand over a tag commit.' }
+          # The phrase names the version, so a phrase typed for another release cannot certify this one.
+          if ($env:CERTIFY_CONFIRM -cne "CERTIFY $env:PACKAGE_VERSION") {
+            throw "Confirmation phrase was not 'CERTIFY $env:PACKAGE_VERSION'. Nothing has been done."
+          }
+
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Re-check the version floor
+        shell: pwsh
+        run: ./tools/release/Assert-PackageVersionFloor.ps1 -PackageVersion $env:PACKAGE_VERSION
+
+      - name: Setup the Microsoft Store Developer CLI
+        uses: microsoft/microsoft-store-apppublisher@cc9910a8d59f2eb55cbb83df0a3800cf3b5300e0 # v1.4
+
+      # GitHub masks secret values in logs; none of them are echoed here either way.
+      - name: Configure the CLI
+        shell: pwsh
+        # Passed as environment values, not interpolated into the generated script (still masked).
+        env:
+          STORE_TENANT_ID: ${{ secrets.AZURE_AD_TENANT_ID }}
+          STORE_SELLER_ID: ${{ secrets.SELLER_ID }}
+          STORE_CLIENT_ID: ${{ secrets.AZURE_AD_APPLICATION_CLIENT_ID }}
+          STORE_CLIENT_SECRET: ${{ secrets.AZURE_AD_APPLICATION_SECRET }}
+        run: |
+          msstore reconfigure `
+            --tenantId $env:STORE_TENANT_ID `
+            --sellerId $env:STORE_SELLER_ID `
+            --clientId $env:STORE_CLIENT_ID `
+            --clientSecret $env:STORE_CLIENT_SECRET
+          if ($LASTEXITCODE -ne 0) { throw 'msstore reconfigure failed.' }
+
+      - name: Confirm we are pointed at the existing ServerAlyzer product
+        shell: pwsh
+        run: |
+          $output = msstore apps get ${{ env.STORE_PRODUCT_ID }} 2>&1 | Out-String
+          Write-Host $output
+          if ($LASTEXITCODE -ne 0) { throw "msstore apps get failed for ${{ env.STORE_PRODUCT_ID }}." }
+          if ($output -notmatch '${{ env.STORE_IDENTITY_NAME }}') {
+            throw "The product ${{ env.STORE_PRODUCT_ID }} did not report the expected identity ${{ env.STORE_IDENTITY_NAME }}. Refusing to continue."
+          }
+          Write-Host 'Product identity confirmed.'
+
+      # 'msstore submission publish' commits whatever 'submission get' returns, which falls back to the
+      # LAST PUBLISHED submission when there is no draft. So the staged draft is proven here, as the
+      # last read before the commit: same id, PendingCommit, hold, visibility, package and none newer,
+      # and that package is the file store-submit uploaded from the tag commit G4 proved (TAG_COMMIT).
+      # SUBMISSION_ID comes only from the dispatch input; nothing in this job may reassign it.
+      - name: Prove the draft is still the staged draft
+        shell: pwsh
+        run: |
+          msstore submission get ${{ env.STORE_PRODUCT_ID }} | Out-File -FilePath draft.json -Encoding utf8
+          if ($LASTEXITCODE -ne 0) { throw 'msstore submission get failed.' }
+          ./tools/release/Assert-StagedSubmission.ps1 `
+            -SubmissionPath draft.json `
+            -ExpectedPackageVersion $env:PACKAGE_VERSION `
+            -ExpectedVisibility '${{ env.STORE_VISIBILITY }}' `
+            -ExpectedSubmissionId $env:SUBMISSION_ID `
+            -ExpectedPackageFileName "ServerAlyzer_${env:PACKAGE_VERSION}_x64_$($env:TAG_COMMIT.Substring(0, 7)).msix" `
+            -ListingReport
+
+      - name: Commit the staged draft to certification
+        shell: pwsh
+        run: |
+          msstore submission publish ${{ env.STORE_PRODUCT_ID }}
+          if ($LASTEXITCODE -ne 0) { throw 'msstore submission publish failed.' }
+          Write-Host "Submission $env:SUBMISSION_ID committed to certification with the publishing hold in force."
+
+      - name: Report the resulting state
+        if: always()
+        shell: pwsh
+        run: |
+          $raw = msstore submission status ${{ env.STORE_PRODUCT_ID }} 2>&1 | Out-String
+          Write-Host $raw
+          $start = $raw.IndexOf('{'); $end = $raw.LastIndexOf('}')
+          if ($start -ge 0 -and $end -gt $start) {
+            $status = ($raw.Substring($start, $end - $start + 1) | ConvertFrom-Json)
+            $value = ($status.PSObject.Properties | Where-Object { $_.Name -ieq 'status' } | Select-Object -First 1).Value
+            if ($value) { ./tools/release/Get-SubmissionState.ps1 -Status $value -Visibility '${{ env.STORE_VISIBILITY }}' }
+          }
+          @(
+            ''
+            'Certification is decided by Microsoft, not by this workflow. Nothing here means'
+            'the update passed certification, and nothing here makes the product public: the'
+            'submission was committed with the publishing hold in force.'
+          ) | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
