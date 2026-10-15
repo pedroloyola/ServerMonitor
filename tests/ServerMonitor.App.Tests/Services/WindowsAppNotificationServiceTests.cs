@@ -195,6 +195,75 @@ public sealed class WindowsAppNotificationServiceTests
         Assert.False(managerFactoryCalled);
     }
 
+    // ---- REL.0D D-3: the process-scoped platform registers once and the hosted service adopts it ----------------
+
+    [Fact]
+    public void D3_Platform_RegistersOnce_HandlerFirst_AndASecondRegisterIsANoOp()
+    {
+        var port = new FakePort();
+        var platform = WindowsAppNotificationPlatform.WithPort(() => true, () => port);
+
+        platform.Register();
+        platform.Register(); // the hosted service after Program.Main's early registration
+
+        Assert.Equal(1, port.RegisterCount); // the SDK would answer a second Register() with E_INVALIDARG
+        Assert.True(port.HandlerAttachedAtFirstRegister);
+        Assert.True(platform.IsRegistered);
+    }
+
+    [Fact]
+    public void D3_Platform_AFailedRegisterRollsBackTheHandler_AndCanBeRetried()
+    {
+        var port = new FakePort { FailNextRegister = true };
+        var platform = WindowsAppNotificationPlatform.WithPort(() => true, () => port);
+
+        Assert.ThrowsAny<Exception>(platform.Register);
+        Assert.False(platform.IsRegistered);
+        Assert.Equal(0, port.HandlerCount);
+
+        platform.Register();
+        Assert.True(platform.IsRegistered);
+        Assert.Equal(1, port.HandlerCount);
+    }
+
+    [Fact]
+    public void D3_Platform_UnregisterThenRegister_RegistersAgain_AndUnregisterIsNeverDoubled()
+    {
+        var port = new FakePort();
+        var platform = WindowsAppNotificationPlatform.WithPort(() => true, () => port);
+        platform.Register();
+
+        platform.Unregister();
+        platform.Unregister(); // the redirecting secondary, then nothing: the SDK would answer ERROR_NOT_FOUND
+        Assert.Equal(1, port.UnregisterCount);
+        Assert.Equal(0, port.HandlerCount);
+
+        platform.Register();
+        Assert.Equal(2, port.RegisterCount);
+    }
+
+    [Fact]
+    public async Task D3_TheServiceAdoptsAnEarlyRegistration_WithoutASecondRegister_AndWarmClicksStillRoute()
+    {
+        var port = new FakePort();
+        var platform = WindowsAppNotificationPlatform.WithPort(() => true, () => port);
+        platform.Register(); // Program.Main, for a cold notification launch
+        var window = new FakeWindowController();
+        var service = Create(platform, window);
+
+        await service.StartAsync(default);
+
+        Assert.Equal(NotificationRegistrationState.Registered, service.RegistrationState);
+        Assert.Equal(1, port.RegisterCount);
+
+        port.RaiseInvoked(NotificationActivationContract.ForServerHealth()); // a later (warm) click
+        Assert.Equal(1, window.RestoreCount);
+
+        await service.StopAsync(default);
+        Assert.Equal(1, port.UnregisterCount);
+        Assert.False(platform.IsRegistered);
+    }
+
     /// <summary>
     /// Once, with the handler already attached — the ordering Microsoft requires, and the one the
     /// activation depends on. The display name and icon assertions are gone with the overload that took
@@ -611,5 +680,71 @@ public sealed class WindowsAppNotificationServiceTests
         public void ToggleCompactMode() { }
         public void RequestClose() { }
         public void BeginShutdown() { }
+    }
+
+    /// <summary>A fake <see cref="IAppNotificationManagerPort"/> that refuses a second Register() as the SDK does.</summary>
+    private sealed class FakePort : IAppNotificationManagerPort
+    {
+        private readonly List<Action<IReadOnlyDictionary<string, string>?>> _handlers = new();
+        private bool _registered;
+
+        public bool FailNextRegister { get; set; }
+
+        public int RegisterCount { get; private set; }
+
+        public int UnregisterCount { get; private set; }
+
+        public int HandlerCount => _handlers.Count;
+
+        public bool HandlerAttachedAtFirstRegister { get; private set; }
+
+        public AppNotificationSetting Setting => AppNotificationSetting.Enabled;
+
+        public void AddInvoked(Action<IReadOnlyDictionary<string, string>?> handler) => _handlers.Add(handler);
+
+        public void RemoveInvoked(Action<IReadOnlyDictionary<string, string>?> handler) => _handlers.Remove(handler);
+
+        public void Register()
+        {
+            if (FailNextRegister)
+            {
+                FailNextRegister = false;
+                throw new System.Runtime.InteropServices.COMException("synthetic", unchecked((int)0x80004005));
+            }
+
+            if (_registered)
+            {
+                throw new ArgumentException("Already Registered for App Notifications!"); // E_INVALIDARG
+            }
+
+            if (RegisterCount == 0)
+            {
+                HandlerAttachedAtFirstRegister = _handlers.Count > 0;
+            }
+
+            RegisterCount++;
+            _registered = true;
+        }
+
+        public void Unregister()
+        {
+            if (!_registered)
+            {
+                throw new InvalidOperationException("Not Registered for App Notifications!"); // ERROR_NOT_FOUND
+            }
+
+            UnregisterCount++;
+            _registered = false;
+        }
+
+        public void Show(AppNotification notification) { }
+
+        public void RaiseInvoked(IReadOnlyDictionary<string, string>? arguments)
+        {
+            foreach (var handler in _handlers.ToArray())
+            {
+                handler(arguments);
+            }
+        }
     }
 }
