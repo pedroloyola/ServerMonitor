@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.UI.Xaml;
 using ServerMonitor.App.Services;
@@ -5,6 +6,7 @@ using ServerMonitor.App.Tests.Fakes;
 using ServerMonitor.App.ViewModels;
 using ServerMonitor.Core.Backup;
 using ServerMonitor.Core.Discovery;
+using ServerMonitor.Core.Domain;
 using ServerMonitor.Core.Enums;
 using ServerMonitor.Core.Interfaces;
 using ServerMonitor.Core.Models;
@@ -176,8 +178,118 @@ public sealed class Ui5SettingsTests
         Assert.DoesNotContain(nameof(SettingsViewModel.SelectedLanguageIndex), raised);
     }
 
+    // ---- REL.0D D-2 (VM QA): a picker with nothing selected is not "Use system language" --------------------------------
+
+    /// <summary>
+    /// The VM evidence, through the real Settings handler, the real store (a temp folder, never the user's) and the real
+    /// launch path: first run System(""), Settings › Português (Portugal), relaunch, then the ComboBox pushes -1 back
+    /// through its TwoWay binding. The explicit choice must survive - record, override and the next launch.
+    /// </summary>
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(4)]
+    [InlineData(int.MinValue)]
+    [InlineData(int.MaxValue)]
+    public void D2_AnIndexThatIsNoItem_NeverReplacesAnExplicitChoice(int noItem)
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "sm-d2-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var platform = new FakeUiLanguagePlatform("pt-BR");
+            var store = FileStore(directory);
+            Launch(platform, store);
+            Assert.Equal(LanguageRecordRead.Of(LanguageProvenance.System("")), store.Read()); // the VM's first run
+
+            new World(localization: Real(platform, store)).ViewModel.SelectedLanguageIndex = 2; // Português (Portugal)
+            Assert.Equal(LanguageRecordRead.Of(LanguageProvenance.Explicit), store.Read());
+
+            var relaunched = Launch(platform, store);
+            var settings = new World(localization: relaunched).ViewModel;
+            Assert.Equal(2, settings.SelectedLanguageIndex);
+            var raised = new List<string?>();
+            settings.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+            settings.SelectedLanguageIndex = noItem;
+
+            Assert.Equal(LanguageRecordRead.Of(LanguageProvenance.Explicit), store.Read());
+            Assert.Equal("pt-PT", platform.PrimaryLanguageOverride);
+            Assert.Equal(["pt-PT"], platform.Writes);
+            Assert.False(settings.IsRestartNoticeOpen);
+            Assert.Equal(2, settings.SelectedLanguageIndex);
+            Assert.Contains(nameof(SettingsViewModel.SelectedLanguageIndex), raised); // the picker is told again
+
+            var next = Launch(platform, store);
+            Assert.Equal("pt-PT", next.CurrentLanguageOverride);
+            Assert.False(next.FollowsSystemLanguage);
+            Assert.Equal(2, new World(localization: next).ViewModel.SelectedLanguageIndex);
+        }
+        finally
+        {
+            try
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+            }
+        }
+    }
+
+    /// <summary>D-2: index 0 is still exactly "Use system language" - persisted as System, shown again next time.</summary>
+    [Fact]
+    public void D2_IndexZero_IsStillUseSystemLanguage()
+    {
+        var platform = new FakeUiLanguagePlatform("fr-FR", "pt-PT");
+        var store = FakeLanguageSettingsStore.ExplicitChoice();
+        var settings = new World(localization: RealLocalization(platform, store)).ViewModel;
+
+        settings.SelectedLanguageIndex = 0;
+
+        Assert.Equal([LanguageProvenance.System("en-US")], store.Writes);
+        Assert.Equal(["en-US"], platform.Writes);
+        Assert.True(settings.IsRestartNoticeOpen);
+        Assert.True(RealLocalization(platform, store).FollowsSystemLanguage);
+    }
+
+    /// <summary>D-2: an index that is no item changes nothing on a page that follows the system either.</summary>
+    [Fact]
+    public void D2_AnIndexThatIsNoItem_WritesNothing_WhenFollowingTheSystem()
+    {
+        var platform = new FakeUiLanguagePlatform("fr-FR");
+        var store = new FakeLanguageSettingsStore();
+        RealLocalization(platform, store).InitializeFromSystem();
+        var settings = new World(localization: RealLocalization(platform, store)).ViewModel;
+        var writes = (platform.Writes.Count, store.Writes.Count);
+
+        settings.SelectedLanguageIndex = -1;
+
+        Assert.Equal(writes, (platform.Writes.Count, store.Writes.Count));
+        Assert.Equal(0, settings.SelectedLanguageIndex);
+        Assert.False(settings.IsRestartNoticeOpen);
+    }
+
     private static LocalizationService RealLocalization(FakeUiLanguagePlatform platform, FakeLanguageSettingsStore store) =>
         new(NullLogger<LocalizationService>.Instance, platform, store);
+
+    private static LocalizationService Real(FakeUiLanguagePlatform platform, ILanguageSettingsStore store) =>
+        new(NullLogger<LocalizationService>.Instance, platform, store);
+
+    private static JsonLanguageSettingsStore FileStore(string directory) =>
+        new(new LanguageSettingsStorageOptions { FilePath = Path.Combine(directory, "language-settings.json"), Writer = "unpackaged" },
+            NullLogger<JsonLanguageSettingsStore>.Instance);
+
+    /// <summary>One launch through the real startup path (the process UI culture recorded, never changed).</summary>
+    private static LocalizationService Launch(FakeUiLanguagePlatform platform, ILanguageSettingsStore store)
+    {
+        var service = Real(platform, store);
+        using (App.BuildServicesHost(
+                   services => services.AddSingleton<ILocalizationService>(service),
+                   static _ => { }))
+        {
+        }
+
+        return service;
+    }
 
     // ---- idempotent, concurrency-safe load ------------------------------------------------------------------------
 
