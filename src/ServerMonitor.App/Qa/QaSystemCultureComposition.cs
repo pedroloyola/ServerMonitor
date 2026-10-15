@@ -32,7 +32,7 @@ internal static class QaSystemCultureComposition
     {
         public string? PrimaryLanguageOverride
         {
-            get => ApplicationLanguages.PrimaryLanguageOverride;
+            get => LanguageOverrideReader.ReadCurrent(); // REL.0D D-2: the same read as the real platform
             set => ApplicationLanguages.PrimaryLanguageOverride = value;
         }
 

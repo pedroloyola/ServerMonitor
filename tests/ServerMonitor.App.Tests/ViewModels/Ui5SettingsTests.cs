@@ -268,10 +268,117 @@ public sealed class Ui5SettingsTests
         Assert.False(settings.IsRestartNoticeOpen);
     }
 
+    // ---- REL.0D D-2 root cause (VM reproduction, no keystrokes): the override read on a new launch ----------------------
+
+    /// <summary>
+    /// The VM reproduction through the real Settings handler, the real store (a temp folder) and the real launch path,
+    /// over a platform with the Windows App SDK's packaged semantics (the SDK getter is process-local; Windows persists the
+    /// value): Settings › Português (Portugal), then two relaunches. Before the fix the first relaunch read "" and recorded
+    /// System("") over the explicit choice - the file the VM showed - while the UI stayed pt-PT; on an UNSUPPORTED Windows
+    /// language it also wrote the system override over the choice.
+    /// </summary>
+    [Theory]
+    [InlineData("pt-BR", "")]      // the VM: display pt-BR, nothing to write for the system language
+    [InlineData("fr-FR", "en-US")] // unsupported display: the system override would replace the choice
+    [InlineData("en-GB", "en-US")]
+    public void D2_AnExplicitChoice_SurvivesEveryRelaunch_OfThePackagedApp(string display, string systemOverride)
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "sm-d2b-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var windows = new PackagedUiLanguagePlatform.PersistedOverride();
+            var store = FileStore(directory);
+            var first = new PackagedUiLanguagePlatform(display, windows);
+            Launch(first, store);
+            Assert.Equal(LanguageRecordRead.Of(LanguageProvenance.System(systemOverride)), store.Read());
+
+            new World(localization: Real(first, store)).ViewModel.SelectedLanguageIndex = 2; // Português (Portugal)
+            Assert.Equal(LanguageRecordRead.Of(LanguageProvenance.Explicit), store.Read());
+            Assert.Equal("pt-PT", windows.Value);
+
+            for (var relaunch = 0; relaunch < 2; relaunch++)
+            {
+                var process = new PackagedUiLanguagePlatform(display, windows); // a new process: the SDK value is empty
+                var service = Launch(process, store);
+
+                Assert.Equal(LanguageRecordRead.Of(LanguageProvenance.Explicit), store.Read());
+                Assert.Empty(process.Writes);
+                Assert.Equal("pt-PT", windows.Value);
+                Assert.Equal("pt-PT", service.CurrentLanguageOverride);
+                Assert.False(service.FollowsSystemLanguage);
+                Assert.Equal("pt-PT", service.FormattingCultureName); // #57: numbers and dates in the chosen language
+                Assert.Equal(2, new World(localization: service).ViewModel.SelectedLanguageIndex);
+            }
+        }
+        finally
+        {
+            try
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+            }
+        }
+    }
+
+    /// <summary>
+    /// D-2 / #55 D-B2 B (Cortex test 3): a v1.x pt-BR persisted by Windows, a new process (SDK value ""), an unsupported
+    /// display - before the fix the hint could never appear in the installed app (the getter never returned the pt-BR).
+    /// Now it does, and the launch leaves the legacy override and its absent record alone.
+    /// </summary>
+    [Fact]
+    public void D2_TheLegacyPtBrHint_IsVisible_InANewProcessOfThePackagedApp()
+    {
+        var windows = new PackagedUiLanguagePlatform.PersistedOverride { Value = "pt-BR" };
+        var store = new FakeLanguageSettingsStore();
+        var process = new PackagedUiLanguagePlatform("fr-FR", windows);
+
+        var service = Launch(process, store);
+
+        Assert.Empty(process.Writes);
+        Assert.Empty(store.Writes);
+        Assert.Equal("pt-BR", windows.Value);
+        Assert.Equal("pt-BR", service.CurrentLanguageOverride);
+        Assert.Equal("en-US", service.PendingLegacyLanguageHint);
+    }
+
+    /// <summary>Control (Cortex test 4): unpackaged nothing is persisted - a new process starts from the system language.</summary>
+    [Fact]
+    public void D2_Unpackaged_ANewProcessReadsOnlyItsOwnValue()
+    {
+        var windows = new PackagedUiLanguagePlatform.PersistedOverride { Value = "pt-PT" }; // never read when unpackaged
+        var store = new FakeLanguageSettingsStore();
+        var process = new PackagedUiLanguagePlatform("fr-FR", windows) { IsPackaged = false };
+
+        var service = Launch(process, store);
+
+        Assert.Equal(["en-US"], process.Writes);                 // REL.0C: the system language's override, as today
+        Assert.Equal("pt-PT", windows.Value);                    // and nothing reached Windows
+        Assert.Equal("en-US", service.CurrentLanguageOverride);
+    }
+
+    /// <summary>"Use system language" clears the persisted override too, so the next launch follows the system again.</summary>
+    [Fact]
+    public void D2_UseSystemLanguage_IsStillPersisted_AcrossRelaunches()
+    {
+        var windows = new PackagedUiLanguagePlatform.PersistedOverride { Value = "pt-PT" };
+        var store = FakeLanguageSettingsStore.ExplicitChoice();
+        var session = new PackagedUiLanguagePlatform("pt-BR", windows);
+
+        new World(localization: Real(session, store)).ViewModel.SelectedLanguageIndex = 0;
+
+        Assert.Equal(string.Empty, windows.Value);
+        var next = Launch(new PackagedUiLanguagePlatform("pt-BR", windows), store);
+        Assert.Null(next.CurrentLanguageOverride);
+        Assert.True(next.FollowsSystemLanguage);
+        Assert.Equal(0, new World(localization: next).ViewModel.SelectedLanguageIndex);
+    }
+
     private static LocalizationService RealLocalization(FakeUiLanguagePlatform platform, FakeLanguageSettingsStore store) =>
         new(NullLogger<LocalizationService>.Instance, platform, store);
 
-    private static LocalizationService Real(FakeUiLanguagePlatform platform, ILanguageSettingsStore store) =>
+    private static LocalizationService Real(IUiLanguagePlatform platform, ILanguageSettingsStore store) =>
         new(NullLogger<LocalizationService>.Instance, platform, store);
 
     private static JsonLanguageSettingsStore FileStore(string directory) =>
@@ -279,7 +386,7 @@ public sealed class Ui5SettingsTests
             NullLogger<JsonLanguageSettingsStore>.Instance);
 
     /// <summary>One launch through the real startup path (the process UI culture recorded, never changed).</summary>
-    private static LocalizationService Launch(FakeUiLanguagePlatform platform, ILanguageSettingsStore store)
+    private static LocalizationService Launch(IUiLanguagePlatform platform, ILanguageSettingsStore store)
     {
         var service = Real(platform, store);
         using (App.BuildServicesHost(

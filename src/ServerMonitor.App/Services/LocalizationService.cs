@@ -147,9 +147,13 @@ public sealed class LocalizationService : ILocalizationService
     {
         private readonly string _systemUiCultureName = CultureInfo.CurrentUICulture.Name;
 
+        /// <summary>
+        /// REL.0D D-2: read through <see cref="LanguageOverrideReader"/> - the SDK getter alone is process-local and read
+        /// "" on every launch of the installed app. The SDK setter persists it (forwarded to Windows when packaged).
+        /// </summary>
         public string? PrimaryLanguageOverride
         {
-            get => ApplicationLanguages.PrimaryLanguageOverride;
+            get => LanguageOverrideReader.ReadCurrent();
             set => ApplicationLanguages.PrimaryLanguageOverride = value;
         }
 
