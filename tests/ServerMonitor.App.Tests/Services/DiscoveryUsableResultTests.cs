@@ -17,7 +17,13 @@ namespace ServerMonitor.App.Tests.Services;
 public sealed class DiscoveryUsableResultTests
 {
     private static readonly DateTimeOffset Start = DateTimeOffset.Parse("2026-10-15T10:00:00Z");
-    private static readonly TimeSpan Tolerance = TimeSpan.FromSeconds(10); // CI-lag tolerance; the lower bound is the contract
+    // Cortex L-2 (CI-FLAKE-WALLCLOCK): the contract is "not before the bound" and "does end"; the upper bound only guards a
+    // hang, so it is wide enough for a loaded runner whose sweep/auto-stop lags the fake clock.
+    private static readonly TimeSpan NothingFoundTolerance = TimeSpan.FromSeconds(20);
+    private static readonly TimeSpan TimeLimitTolerance = TimeSpan.FromSeconds(60);
+
+    private static TimeSpan ToleranceFor(DiscoverySearchEnd end) =>
+        end == DiscoverySearchEnd.TimeLimit ? TimeLimitTolerance : NothingFoundTolerance;
 
     [Fact]
     public async Task No_announcement_at_all_ends_as_nothing_found_at_40_seconds()
@@ -139,18 +145,37 @@ public sealed class DiscoveryUsableResultTests
     }
 
     [Fact]
-    public async Task A_suggestion_still_visible_at_40_seconds_is_judged_again()
+    public async Task A_suggestion_still_visible_is_judged_again_up_to_the_40_second_bound()
     {
-        // The starter could not tell yet (its configured servers were still being read) and later can: still visible at
-        // 40 s, the new verdict decides. Unusable then usable keeps the search; the reverse is covered by the VM tests.
+        // The starter could not tell yet (its configured servers were still being read) and can just before the bound:
+        // the sweep re-judges what is still visible on every tick, so a verdict that turns usable at ~39 s keeps the search.
         var verdict = false;
+        var w = new World(options: Options(TimeSpan.FromMinutes(2)));
+        await using var _ = w.Service;
+        await w.Service.StartSearchAsync(_ => Volatile.Read(ref verdict));
+        w.Browser.EmitFound(Observation("NAS", "nas.local", "192.168.1.30", w.Time));
+        await AdvanceUntilAsync(w.Time, () => w.Time.GetUtcNow() - Start >= TimeSpan.FromSeconds(39));
+        Assert.True(w.Service.IsSearching);
+
+        Volatile.Write(ref verdict, true);
+        await AdvanceUntilAsync(w.Time, () => w.Time.GetUtcNow() - Start >= TimeSpan.FromSeconds(60));
+
+        Assert.True(w.Service.IsSearching);
+    }
+
+    [Fact]
+    public async Task A_result_once_usable_stays_counted_when_the_verdict_turns_unusable()
+    {
+        // The latch (N-r2-2): a suggestion seen as usable is never un-registered by a later "not usable" verdict - e.g. the
+        // user added it, so it is configured now. Only ignoring it takes it out (see the ignored-during-search case).
+        var verdict = true;
         var w = new World(options: Options(TimeSpan.FromMinutes(2)));
         await using var _ = w.Service;
         await w.Service.StartSearchAsync(_ => Volatile.Read(ref verdict));
         w.Browser.EmitFound(Observation("NAS", "nas.local", "192.168.1.30", w.Time));
         await AdvanceUntilAsync(w.Time, () => w.Service.GetDiscovered().Count == 1);
 
-        Volatile.Write(ref verdict, true);
+        Volatile.Write(ref verdict, false);
         await AdvanceUntilAsync(w.Time, () => w.Time.GetUtcNow() - Start >= TimeSpan.FromSeconds(60));
 
         Assert.True(w.Service.IsSearching);
@@ -185,7 +210,7 @@ public sealed class DiscoveryUsableResultTests
         await AdvanceUntilAsync(w.Time, () => !w.Service.IsSearching);
 
         Assert.Equal(DiscoverySearchEnd.NothingFound, w.Service.LastSearchEnd);
-        Assert.InRange(w.Time.GetUtcNow() - restartedAt, TimeSpan.FromSeconds(40), TimeSpan.FromSeconds(40) + Tolerance);
+        Assert.InRange(w.Time.GetUtcNow() - restartedAt, TimeSpan.FromSeconds(40), TimeSpan.FromSeconds(40) + NothingFoundTolerance);
     }
 
     [Fact]
@@ -257,7 +282,7 @@ public sealed class DiscoveryUsableResultTests
         {
             Assert.Equal(end, Service.LastSearchEnd);
             Assert.NotNull(_endedAt);
-            Assert.InRange(_endedAt.Value - Start, bound, bound + Tolerance);
+            Assert.InRange(_endedAt.Value - Start, bound, bound + ToleranceFor(end));
             Assert.Equal(Browser.StartCount, Browser.StopCount);
             Assert.Equal(0, Browser.FoundSubscriberCount);
             Assert.Equal(0, Browser.UpdatedSubscriberCount);

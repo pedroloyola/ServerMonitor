@@ -369,9 +369,9 @@
   <data name="DashboardEmptyDiscoveryStartButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.HelpText" xml:space="preserve"><value>Looks for SSH servers announced on your local network. Windows may ask for network access permission.</value></data>
   <data name="DashboardEmptyDiscoveryNothingFound.Text" xml:space="preserve"><value>No new SSH servers found on your local network.</value></data>
   <data name="DashboardEmptyDiscoveryStopButton.Content" xml:space="preserve"><value>Stop search</value></data>
-  <data name="DashboardEmptyDiscoveryStopButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Stop searching the local network</value></data>
+  <data name="DashboardEmptyDiscoveryStopButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Stop search on the local network</value></data>
   <data name="SettingsLocalNetworkStopButton.Content" xml:space="preserve"><value>Stop search</value></data>
-  <data name="SettingsLocalNetworkStopButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Stop searching the local network</value></data>
+  <data name="SettingsLocalNetworkStopButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Stop search on the local network</value></data>
   <data name="DashboardEmptyDiscoveryFailed.Text" xml:space="preserve"><value>Couldn't search your local network.</value></data>
   <data name="DashboardEmptyDiscoveryTimeLimit.Text" xml:space="preserve"><value>The search ended after 10 minutes.</value></data>
   <data name="DashboardEmptyDiscoveryFoundFormat" xml:space="preserve"><value>Found on your local network: {0}</value></data>

@@ -28,6 +28,8 @@ public sealed partial class DashboardPage : Page
         // Atlas review). A widget "open server" deep-link no longer scrolls a card here: UI.4 D-UI4-DETAIL opens the
         // interim server page through the view model.
         Loaded += OnLoaded;
+        // REL.0D O-7 R1 (Prism M-1): same app-length lifetime as above; only acted on while this page is shown.
+        ViewModel.LocalNetworkSearchStopFocusRequested += OnLocalNetworkStopFocusRequested;
         SizeChanged += (_, _) => UpdateEmptyStateHeight();
         HeaderGrid.SizeChanged += (_, _) => UpdateEmptyStateHeight();
     }
@@ -153,6 +155,21 @@ public sealed partial class DashboardPage : Page
                 ShellPageFocus.FocusHeading(this, force: true);
             }
         });
+    }
+
+    /// <summary>
+    /// REL.0D O-7 R1 (Prism M-1): "Parar pesquisa" collapses with the search; focus goes to "Procurar na rede local",
+    /// shown again by then (Low priority: after the state change and the layout pass). Settings › Data handles its own.
+    /// </summary>
+    private void OnLocalNetworkStopFocusRequested(object? sender, EventArgs e)
+    {
+        if (!IsLoaded)
+        {
+            return;
+        }
+
+        DispatcherQueue?.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+            EmptyDiscoveryStartButton.Focus(FocusState.Programmatic));
     }
 
     // "Limpar pesquisa" disappears once it worked; focus returns to the search box (UI.3 pattern).

@@ -38,7 +38,9 @@ public interface IServerDiscoveryActivity
     /// REL.0D O-7: as <see cref="StartSearchAsync(CancellationToken)"/>, but only a suggestion
     /// <paramref name="isUsable"/> accepts (one the user could still add, e.g. not a server already configured) keeps the
     /// search past <see cref="DiscoveryOptions.NothingFoundTimeout"/>. Called under the service's store lock on a
-    /// background thread: it must be cheap, lock-free and thread-safe. A stand-in without the bound ignores it.
+    /// background thread: it must be cheap, lock-free and thread-safe. A stand-in without the bound ignores it. Like the
+    /// plain start it is idempotent: while a search already runs, the call is a no-op and <paramref name="isUsable"/> is
+    /// ignored (the running search keeps the predicate it was started with).
     /// </summary>
     Task StartSearchAsync(Func<DiscoveredService, bool> isUsable, CancellationToken cancellationToken = default) =>
         StartSearchAsync(cancellationToken);

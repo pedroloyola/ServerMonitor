@@ -139,7 +139,7 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
             StartLocalNetworkSearchAsync, () => CanStartLocalNetworkSearchFromSettings);
         // REL.0D O-7: the explicit Stop next to the searching row on both surfaces.
         StopLocalNetworkSearchCommand = new AsyncRelayCommand(
-            () => LocalNetworkSearchLifetime.StopForUser(_discoveryService, _logger), () => IsLocalNetworkSearchRunning);
+            StopLocalNetworkSearchAsync, () => IsLocalNetworkSearchRunning);
         OpenServerDirectoryCommand = new RelayCommand(() =>
         {
             RememberReturnFocus(OverviewReturnTarget.DirectoryLink, Guid.Empty);
@@ -190,9 +190,10 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
 
     /// <summary>
     /// REL.0D O-7: a search lives only on the pages that show it - the overview's first-server state and Settings › Data -
-    /// and in the server editor, where "Add" on one of its suggestions leads (the search must not end mid-add; the editor
-    /// returns to its origin, and leaving that ends it). Not gated on IsSearching (like the hide path): a start still in
-    /// flight would otherwise outlive the page.
+    /// and in the server editor, where "Add" on one of its suggestions leads (the search must not end mid-add). Save goes
+    /// to the new server's Detail, which ends the search (product decision: the other suggestions go with it; search
+    /// again to add another); Cancel returns to the origin, where it goes on. Not gated on IsSearching (like the hide
+    /// path): a start still in flight would otherwise outlive the page.
     /// </summary>
     private void OnNavigatedForLocalNetworkSearch(object? sender, EventArgs e)
     {
@@ -287,6 +288,19 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
 
     /// <summary>REL.0D O-7: ends the running search on request (same stop as the hide path); offered only while one runs.</summary>
     public ICommand StopLocalNetworkSearchCommand { get; }
+
+    /// <summary>
+    /// REL.0D O-7 R1 (Prism M-1): raised on the command's (UI) thread once the explicit Stop has ended the search. The
+    /// Stop link collapses with the search, so the page that shows it hands focus to the start action offered again.
+    /// Only the explicit Stop raises it - never the automatic end, the hide path or navigating away.
+    /// </summary>
+    public event EventHandler? LocalNetworkSearchStopFocusRequested;
+
+    private async Task StopLocalNetworkSearchAsync()
+    {
+        await LocalNetworkSearchLifetime.StopForUser(_discoveryService, _logger);
+        LocalNetworkSearchStopFocusRequested?.Invoke(this, EventArgs.Empty);
+    }
 
 
     public bool HasVisibleServers
@@ -675,7 +689,7 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         {
             var servers = await _serverService.GetAllAsync();
             var all = servers.ToList();
-            _configuredEndpoints = BuildConfiguredEndpoints(all);
+            Volatile.Write(ref _configuredEndpoints, BuildConfiguredEndpoints(all));
             _configuredEndpointsKnown = true;
             HiddenServerCount = all.Count(server => server.IsHidden);
             SetServers(all.Where(server => !server.IsHidden));
@@ -1298,7 +1312,8 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
 
         try
         {
-            _configuredEndpoints = BuildConfiguredEndpoints(await _serverService.GetAllAsync());
+            var configured = BuildConfiguredEndpoints(await _serverService.GetAllAsync());
+            Volatile.Write(ref _configuredEndpoints, configured);
             _configuredEndpointsKnown = true;
         }
         catch (Exception exception)
@@ -1311,6 +1326,7 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
 
     private static bool IsAlreadyConfigured(HashSet<string>? configuredEndpoints, DiscoveredService discovered)
     {
+        // Null only in the runtime-free contract tests (GetUninitializedObject skips the field initializer).
         if (configuredEndpoints is null)
         {
             return false;

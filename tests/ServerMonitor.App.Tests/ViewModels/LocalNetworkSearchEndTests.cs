@@ -22,7 +22,9 @@ namespace ServerMonitor.App.Tests.ViewModels;
 public sealed class LocalNetworkSearchEndTests
 {
     private static readonly DateTimeOffset Start = DateTimeOffset.Parse("2026-10-15T12:00:00Z");
-    private static readonly TimeSpan Tolerance = TimeSpan.FromSeconds(10);
+    // Cortex L-2: "not before the bound" is the contract; the upper bound only guards a hang (+20 s / +60 s, CI headroom).
+    private static TimeSpan ToleranceFor(DiscoverySearchEnd end) =>
+        TimeSpan.FromSeconds(end == DiscoverySearchEnd.TimeLimit ? 60 : 20);
 
     [Fact]
     public async Task Settings_whose_only_announcer_is_already_configured_ends_at_40_seconds_with_no_new_servers()
@@ -167,6 +169,49 @@ public sealed class LocalNetworkSearchEndTests
         Assert.False(dashboard.LocalNetworkSearchEndedNothingFound);
     }
 
+    [Fact]
+    public async Task Stop_asks_the_view_to_move_focus_once_the_search_has_ended()
+    {
+        var w = new World();
+        await using var _ = w.Service;
+        using var dashboard = w.Dashboard;
+        await dashboard.LoadAsync();
+        w.Navigation.GoToDashboard();
+        var requests = new List<(bool Running, bool CanStart, bool CanStartFromSettings)>();
+        dashboard.LocalNetworkSearchStopFocusRequested += (_, _) => requests.Add(
+            (dashboard.IsLocalNetworkSearchRunning, dashboard.CanStartLocalNetworkSearch, dashboard.CanStartLocalNetworkSearchFromSettings));
+        await w.StartAsync();
+
+        await Assert.IsType<AsyncRelayCommand>(dashboard.StopLocalNetworkSearchCommand).ExecuteAsync(null);
+
+        // Raised once, AFTER the search ended: both focus targets (overview link, Settings button) are offered again.
+        Assert.Equal(new[] { (false, true, true) }, requests);
+    }
+
+    [Fact]
+    public async Task Only_the_explicit_stop_asks_for_focus()
+    {
+        var w = new World();
+        w.Servers.Servers.Add(DashboardDiscoveryViewModelTests.ServerForTest("10.0.0.5", 22));
+        await using var _ = w.Service;
+        using var dashboard = w.Dashboard;
+        await dashboard.LoadAsync();
+        var requests = 0;
+        dashboard.LocalNetworkSearchStopFocusRequested += (_, _) => requests++;
+
+        w.Navigation.GoToSettings(SettingsSection.Data);
+        await w.StartAsync();
+        await DiscoveryUsableResultTests.AdvanceUntilAsync(w.Time, () => !w.Service.IsSearching); // the automatic end
+        await w.StartAsync();
+        await LocalNetworkSearchLifetime.StopForBackground(w.Service, NullLogger.Instance); // the hide path
+        await w.StartAsync();
+        w.Navigation.GoToHistory(); // leaving the page
+        await DiscoveryUsableResultTests.AdvanceUntilAsync(w.Time, () => !w.Service.IsSearching);
+
+        Assert.Equal(3, w.Browser.StopCount);
+        Assert.Equal(0, requests);
+    }
+
     [Theory]
     [InlineData("History")]
     [InlineData("Servers")]
@@ -291,6 +336,49 @@ public sealed class LocalNetworkSearchEndTests
         Assert.Contains(settings.Ancestors(), e => (string?)e.Attribute(x + "Name") == "LocalNetworkSearchingRow");
     }
 
+    /// <summary>
+    /// Prism M-1: each page hands focus to ITS start control when Stop asks (Low priority, after the state change), and
+    /// only while it is shown. Code-behind cannot run without a XAML runtime, so the wiring is pinned at the source.
+    /// </summary>
+    [Fact]
+    public void Each_page_moves_focus_from_stop_to_its_start_control()
+    {
+        var settings = ReadView("SettingsDataPage.xaml.cs");
+        Assert.Contains("Discovery.LocalNetworkSearchStopFocusRequested += OnLocalNetworkStopFocusRequested;", settings, StringComparison.Ordinal);
+        Assert.Contains("Discovery.LocalNetworkSearchStopFocusRequested -= OnLocalNetworkStopFocusRequested;", settings, StringComparison.Ordinal);
+        var settingsHandler = Body(settings, "private void OnLocalNetworkStopFocusRequested(");
+        Assert.Contains("DispatcherQueuePriority.Low", settingsHandler, StringComparison.Ordinal);
+        Assert.Contains("LocalNetworkSearchButton.Focus(", settingsHandler, StringComparison.Ordinal);
+        // Subscribed while shown only: added in OnLoaded, removed in OnUnloaded.
+        Assert.Contains("LocalNetworkSearchStopFocusRequested +=", Body(settings, "private async void OnLoaded("), StringComparison.Ordinal);
+        Assert.Contains("LocalNetworkSearchStopFocusRequested -=", Body(settings, "private void OnUnloaded("), StringComparison.Ordinal);
+
+        var overview = ReadView("DashboardPage.xaml.cs");
+        Assert.Contains("ViewModel.LocalNetworkSearchStopFocusRequested += OnLocalNetworkStopFocusRequested;", overview, StringComparison.Ordinal);
+        var overviewHandler = Body(overview, "private void OnLocalNetworkStopFocusRequested(");
+        Assert.Contains("if (!IsLoaded)", overviewHandler, StringComparison.Ordinal);
+        Assert.Contains("DispatcherQueuePriority.Low", overviewHandler, StringComparison.Ordinal);
+        Assert.Contains("EmptyDiscoveryStartButton.Focus(", overviewHandler, StringComparison.Ordinal);
+    }
+
+    /// <summary>Prism L-2: Settings' searching row wraps its text; Stop keeps its own Auto column (never clipped first).</summary>
+    [Fact]
+    public void The_settings_searching_row_wraps_and_keeps_stop_in_its_own_column()
+    {
+        XNamespace x = "http://schemas.microsoft.com/winfx/2006/xaml";
+        var xaml = XDocument.Load(Path.Combine(RepositoryRoot(), "src", "ServerMonitor.App", "Views", "SettingsDataPage.xaml"));
+        XElement Named(string name) => Assert.Single(xaml.Descendants(), e => (string?)e.Attribute(x + "Name") == name);
+
+        var row = Named("LocalNetworkSearchingRow");
+        Assert.Equal("Grid", row.Name.LocalName);
+        Assert.Equal(
+            new string?[] { "Auto", "*", "Auto" },
+            row.Descendants().Where(e => e.Name.LocalName == "ColumnDefinition").Select(e => (string?)e.Attribute("Width")));
+        Assert.Equal("1", (string?)Named("LocalNetworkSearchingText").Attribute("Grid.Column"));
+        Assert.Equal("Wrap", (string?)Named("LocalNetworkSearchingText").Attribute("TextWrapping"));
+        Assert.Equal("2", (string?)Named("LocalNetworkStopButton").Attribute("Grid.Column"));
+    }
+
     [Theory]
     [InlineData("pt-PT")]
     [InlineData("pt-BR")]
@@ -306,7 +394,11 @@ public sealed class LocalNetworkSearchEndTests
         foreach (var key in new[] { "DashboardEmptyDiscoveryStopButton", "SettingsLocalNetworkStopButton" })
         {
             Assert.False(string.IsNullOrWhiteSpace(values[key + ".Content"]));
-            Assert.False(string.IsNullOrWhiteSpace(values[key + "." + automationName]));
+            // Prism L-1 (WCAG 2.5.3 Label in Name): the accessible name contains the visible label as whole words ("Stop
+            // searching" does not contain the label "Stop search": a voice command for the label would not match it).
+            Assert.Matches(
+                @"(?<!\w)" + System.Text.RegularExpressions.Regex.Escape(values[key + ".Content"]) + @"(?!\w)",
+                values[key + "." + automationName]);
         }
     }
 
@@ -315,6 +407,18 @@ public sealed class LocalNetworkSearchEndTests
     private static DiscoveryObservation Observation(string name, string host, string address, TimeProvider time) =>
         DiscoveryInputPolicy.TryCreateObservation(
             name, "_ssh._tcp", "local.", host, 22, [IPAddress.Parse(address)], "nic-a", time.GetUtcNow())!;
+
+    private static string ReadView(string file) =>
+        File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "ServerMonitor.App", "Views", file));
+
+    /// <summary>The text of the member that starts at <paramref name="signature"/>, up to the next member.</summary>
+    private static string Body(string code, string signature)
+    {
+        var start = code.IndexOf(signature, StringComparison.Ordinal);
+        Assert.True(start >= 0, signature + " not found");
+        var next = code.IndexOf("\n    private ", start + signature.Length, StringComparison.Ordinal);
+        return next < 0 ? code[start..] : code[start..next];
+    }
 
     private static string RepositoryRoot()
     {
@@ -377,7 +481,7 @@ public sealed class LocalNetworkSearchEndTests
         {
             Assert.Equal(end, Service.LastSearchEnd);
             Assert.NotNull(_endedAt);
-            Assert.InRange(_endedAt.Value - Start, bound, bound + Tolerance);
+            Assert.InRange(_endedAt.Value - Start, bound, bound + ToleranceFor(end));
             AssertNoListener();
         }
 
