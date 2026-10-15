@@ -1,7 +1,6 @@
 using System.Globalization;
 using Microsoft.Extensions.Logging;
 using Microsoft.Windows.ApplicationModel.Resources;
-using Microsoft.Windows.Globalization;
 using ServerMonitor.Core.Domain;
 
 namespace ServerMonitor.App.Services;
@@ -55,6 +54,15 @@ public sealed class LocalizationService : ILocalizationService
 
     public void InitializeFromSystem()
     {
+        // REL.0D D-2, PR #59 round 2 (Vigil L-1): an override that could not be read is NOT "no override" - deciding on it
+        // would record System(...) over an explicit choice again (and, on an unsupported Windows language, rewrite it).
+        // Like an unreadable record: nothing is written; the next launch decides.
+        if (!_platform.IsOverrideKnown)
+        {
+            _logger.LogWarning("The saved UI language could not be read; the startup language is left unchanged.");
+            return;
+        }
+
         var current = CurrentLanguageOverride;
         var systemCulture = _platform.SystemUiCultureName;
         var plan = LanguagePreferencePolicy.AtStartup(current, systemCulture, _settings.Read());
@@ -164,11 +172,18 @@ public sealed class LocalizationService : ILocalizationService
             _systemUiCultureName = SupportedCultures.ProfileLanguage(TryRead(preferredLanguages), _displayCultureName);
         }
 
+        /// <summary>
+        /// REL.0D D-2: read through <see cref="LanguageOverrideReader"/> - the SDK getter alone is process-local and read
+        /// "" on every launch of the installed app. The SDK setter persists it (forwarded to Windows when packaged).
+        /// </summary>
         public string? PrimaryLanguageOverride
         {
-            get => ApplicationLanguages.PrimaryLanguageOverride;
-            set => ApplicationLanguages.PrimaryLanguageOverride = value;
+            get => LanguageOverrideReader.ReadCurrent().Value;
+            set => LanguageOverrideReader.WriteCurrent(value); // PR #59 r2 (Cortex M-1): "" clears in Windows, never via the SDK
         }
+
+        /// <summary>PR #59 r2 (Vigil L-1): false when the persisted override or the package identity could not be read.</summary>
+        public bool IsOverrideKnown => LanguageOverrideReader.ReadCurrent().IsKnown;
 
         public string SystemUiCultureName => _systemUiCultureName;
 
