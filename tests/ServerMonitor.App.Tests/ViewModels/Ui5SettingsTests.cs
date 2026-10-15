@@ -349,13 +349,38 @@ public sealed class Ui5SettingsTests
     {
         var windows = new PackagedUiLanguagePlatform.PersistedOverride { Value = "pt-PT" }; // never read when unpackaged
         var store = new FakeLanguageSettingsStore();
-        var process = new PackagedUiLanguagePlatform("fr-FR", windows) { IsPackaged = false };
+        var process = new PackagedUiLanguagePlatform("fr-FR", windows) { Identity = PackageIdentity.Unpackaged };
 
         var service = Launch(process, store);
 
         Assert.Equal(["en-US"], process.Writes);                 // REL.0C: the system language's override, as today
         Assert.Equal("pt-PT", windows.Value);                    // and nothing reached Windows
         Assert.Equal("en-US", service.CurrentLanguageOverride);
+    }
+
+    /// <summary>
+    /// PR #59 round 2 (Vigil L-1): when the persisted override cannot be read - or the package identity cannot be
+    /// determined - the launch does not decide on "no override": an explicit choice keeps its record and its override,
+    /// also on an unsupported Windows language where the system override would replace it.
+    /// </summary>
+    [Theory]
+    [InlineData("pt-BR", "Packaged")]
+    [InlineData("fr-FR", "Packaged")]
+    [InlineData("en-GB", "Unknown")]
+    public void D2_AnUnreadableOverride_IsNotNoOverride_TheLaunchWritesNothing(string display, string identity)
+    {
+        var windows = new PackagedUiLanguagePlatform.PersistedOverride { Value = "pt-PT" };
+        var store = FakeLanguageSettingsStore.ExplicitChoice();
+        var process = new PackagedUiLanguagePlatform(display, windows) { Identity = Enum.Parse<PackageIdentity>(identity), FailPersistedRead = true };
+
+        var service = Launch(process, store);
+
+        Assert.False(process.IsOverrideKnown);
+        Assert.Empty(process.Writes);
+        Assert.Empty(store.Writes);
+        Assert.Equal("pt-PT", windows.Value);
+        Assert.Equal(LanguageRecordRead.Of(LanguageProvenance.Explicit), store.Read());
+        Assert.Null(service.CurrentLanguageOverride); // display fallback only: the process value of a new process
     }
 
     /// <summary>"Use system language" clears the persisted override too, so the next launch follows the system again.</summary>
@@ -373,6 +398,51 @@ public sealed class Ui5SettingsTests
         Assert.Null(next.CurrentLanguageOverride);
         Assert.True(next.FollowsSystemLanguage);
         Assert.Equal(0, new World(localization: next).ViewModel.SelectedLanguageIndex);
+    }
+
+    /// <summary>
+    /// PR #59 round 2 (Cortex M-1, CONFIRMED on the VM): display pt-BR, Settings › Português (Portugal), then - same
+    /// session - "Use system language". The SDK setter rejects "" (the fake throws like it), so before the hardening the
+    /// record said System("") while Windows kept pt-PT and the next launch was still pt-PT. Now the persisted override is
+    /// cleared in Windows: the next launch has no override, follows the system, and Settings shows "Use system language".
+    /// Through the real handler, the real store (a temp folder) and the real launch path.
+    /// </summary>
+    [Fact]
+    public void D2_UseSystemLanguage_AfterAnExplicitChoice_ClearsThePersistedOverride()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "sm-d2c-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var windows = new PackagedUiLanguagePlatform.PersistedOverride();
+            var store = FileStore(directory);
+            var session = new PackagedUiLanguagePlatform("pt-BR", windows);
+            var service = Launch(session, store);
+            var settings = new World(localization: service).ViewModel;
+
+            settings.SelectedLanguageIndex = 2;   // Português (Portugal)
+            Assert.Equal("pt-PT", windows.Value);
+            settings.SelectedLanguageIndex = 0;   // Use system language, same session
+
+            Assert.True(settings.IsRestartNoticeOpen);
+            Assert.Equal(0, settings.SelectedLanguageIndex);
+            Assert.Equal(string.Empty, windows.Value);                       // cleared in Windows, not left at pt-PT
+            Assert.Equal(LanguageRecordRead.Of(LanguageProvenance.System("")), store.Read());
+
+            var next = Launch(new PackagedUiLanguagePlatform("pt-BR", windows), store);
+            Assert.Null(next.CurrentLanguageOverride);
+            Assert.True(next.FollowsSystemLanguage);
+            Assert.Equal(0, new World(localization: next).ViewModel.SelectedLanguageIndex);
+        }
+        finally
+        {
+            try
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+            }
+        }
     }
 
     private static LocalizationService RealLocalization(FakeUiLanguagePlatform platform, FakeLanguageSettingsStore store) =>

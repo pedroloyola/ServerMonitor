@@ -110,8 +110,15 @@ public sealed partial class Rel0cLanguageGuardTests
             .Where(path => OverrideWrite().IsMatch(AppSourceTree.CodeWithoutComments(path)))
             .ToList();
 
-        // REL.0D: the --qa-system-culture platform forwards the REAL service's writes (Debug-only, excluded from Release).
-        Assert.Equal(["Qa/QaSystemCultureComposition.cs", "Qa/QaUiLanguageComposition.cs", "Services/LocalizationService.cs"], writers);
+        // REL.0D D-2 (PR #59): the SDK / Windows setters live in ONE place, LanguageOverrideReader ("" clears in Windows,
+        // never through the SDK setter that rejects it); the service writes its platform; the Debug --qa-ui-language flag.
+        Assert.Equal(["Qa/QaUiLanguageComposition.cs", "Services/LanguageOverrideReader.cs", "Services/LocalizationService.cs"], writers);
+
+        // ... and only the two platforms (the real one and the --qa-system-culture one, Debug-only) reach that writer.
+        var callers = AppSourceTree.Files(".cs")
+            .Where(path => AppSourceTree.CodeWithoutComments(path).Contains("LanguageOverrideReader.WriteCurrent(", StringComparison.Ordinal))
+            .ToList();
+        Assert.Equal(["Qa/QaSystemCultureComposition.cs", "Services/LocalizationService.cs"], callers);
     }
 
     private static XDocument Resources(string language) =>

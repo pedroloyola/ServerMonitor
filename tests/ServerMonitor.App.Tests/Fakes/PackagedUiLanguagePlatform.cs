@@ -3,11 +3,16 @@ using ServerMonitor.App.Services;
 namespace ServerMonitor.App.Tests.Fakes;
 
 /// <summary>
-/// REL.0D D-2: an <see cref="IUiLanguagePlatform"/> with the Windows App SDK's real semantics in a PACKAGED process -
-/// the SDK value lives in the process only, its setter also writes the value Windows persists for the package
-/// (<see cref="PersistedOverride"/>, shared by every "process" of one install) - read through the production
-/// <see cref="LanguageOverrideReader"/>. A new instance over the same <see cref="PersistedOverride"/> is a relaunch.
-/// Never the user's real preferences.
+/// REL.0D D-2: an <see cref="IUiLanguagePlatform"/> with the Windows App SDK's real semantics, read and written through
+/// the production <see cref="LanguageOverrideReader"/>:
+/// <list type="bullet">
+/// <item>the SDK value lives in the process only; in a packaged process the SDK setter also writes the value Windows
+/// persists for the package (<see cref="PersistedOverride"/>, shared by every "process" of one install);</item>
+/// <item>PR #59 round 2 (Cortex M-1, fidelity): the SDK setter REJECTS "" like the real one (IsWellFormedTag →
+/// E_INVALIDARG → <see cref="ArgumentException"/>);</item>
+/// <item>PR #59 round 2 (Vigil L-1): <see cref="FailPersistedRead"/> makes Windows' persisted read throw.</item>
+/// </list>
+/// A new instance over the same <see cref="PersistedOverride"/> is a relaunch. Never the user's real preferences.
 /// </summary>
 internal sealed class PackagedUiLanguagePlatform(string systemCulture, PackagedUiLanguagePlatform.PersistedOverride persisted)
     : IUiLanguagePlatform
@@ -20,24 +25,44 @@ internal sealed class PackagedUiLanguagePlatform(string systemCulture, PackagedU
         public string? Value { get; set; }
     }
 
-    /// <summary>False models the unpackaged Debug process: the setter does not persist, the read is the process value.</summary>
-    public bool IsPackaged { get; init; } = true;
+    /// <summary>Unpackaged models the Debug process: the SDK setter does not persist, the read is the process value.</summary>
+    public PackageIdentity Identity { get; init; } = PackageIdentity.Packaged;
+
+    public bool FailPersistedRead { get; init; }
 
     public List<string?> Writes { get; } = [];
 
     public string? PrimaryLanguageOverride
     {
-        get => LanguageOverrideReader.Read(IsPackaged, () => _processOverride, () => persisted.Value);
+        get => Read().Value;
         set
         {
             Writes.Add(value);
-            _processOverride = value;
-            if (IsPackaged)
-            {
-                persisted.Value = value; // the SDK setter forwards to Windows only in a packaged process
-            }
+            LanguageOverrideReader.Write(Identity, value, SdkSetter, language => persisted.Value = language);
         }
     }
 
+    public bool IsOverrideKnown => Read().IsKnown;
+
     public string SystemUiCultureName => systemCulture;
+
+    private LanguageOverrideRead Read() => LanguageOverrideReader.Read(
+        Identity,
+        () => _processOverride,
+        () => FailPersistedRead ? throw new InvalidOperationException("persisted read failed") : persisted.Value);
+
+    /// <summary>The SDK setter: validates the tag ("" is not one), stores it in the process, forwards it when packaged.</summary>
+    private void SdkSetter(string language)
+    {
+        if (string.IsNullOrEmpty(language))
+        {
+            throw new ArgumentException("The parameter is incorrect.", nameof(language));
+        }
+
+        _processOverride = language;
+        if (Identity == PackageIdentity.Packaged)
+        {
+            persisted.Value = language;
+        }
+    }
 }
