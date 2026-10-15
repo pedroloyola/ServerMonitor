@@ -172,6 +172,16 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
         get => _selectedLanguageIndex;
         set
         {
+            // REL.0D D-2 (VM QA): only one of the four items is a choice. -1 - the ComboBox with nothing selected, pushed
+            // back through the TwoWay binding - used to fall into "Use system language", which silently replaced an
+            // explicit choice (record and override). Like HistoryViewModel's range guard: no write, and the picker is told
+            // again what is in effect.
+            if (value is < 0 or > 3)
+            {
+                OnPropertyChanged(nameof(SelectedLanguageIndex));
+                return;
+            }
+
             if (!SetProperty(ref _selectedLanguageIndex, value))
             {
                 return;
@@ -179,10 +189,10 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
 
             var languageTag = value switch
             {
+                0 => null, // "Use system language"
                 1 => "pt-BR",
                 2 => "pt-PT",
-                3 => "en-US",
-                _ => null
+                _ => "en-US"
             };
 
             if (_localizationService.TrySetLanguage(languageTag))

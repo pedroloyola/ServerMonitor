@@ -1,6 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Windows.Globalization;
 using ServerMonitor.App.Services;
 
 namespace ServerMonitor.App.Qa;
@@ -32,9 +31,11 @@ internal static class QaSystemCultureComposition
     {
         public string? PrimaryLanguageOverride
         {
-            get => ApplicationLanguages.PrimaryLanguageOverride;
-            set => ApplicationLanguages.PrimaryLanguageOverride = value;
+            get => LanguageOverrideReader.ReadCurrent().Value; // REL.0D D-2: the same read and write as the real platform
+            set => LanguageOverrideReader.WriteCurrent(value);
         }
+
+        public bool IsOverrideKnown => LanguageOverrideReader.ReadCurrent().IsKnown;
 
         public string SystemUiCultureName => systemCulture;
     }
