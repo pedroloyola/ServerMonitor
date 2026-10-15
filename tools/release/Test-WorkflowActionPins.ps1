@@ -24,7 +24,7 @@ function Assert-ActionPins([string] $Text) {
     return $count
 }
 
-$names = @('release-build.yml', 'store-submit.yml', 'store-status.yml')
+$names = @('release-build.yml', 'store-submit.yml', 'store-certify.yml', 'store-status.yml')
 foreach ($name in $names) {
     $text = Get-Content -LiteralPath (Join-Path $RepositoryRoot ".github/workflows/$name") -Raw
     $count = Assert-ActionPins $text

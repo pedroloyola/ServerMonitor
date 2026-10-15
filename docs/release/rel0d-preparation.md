@@ -364,7 +364,9 @@ hold check; `Assert-NoPendingSubmission` fail-closed; privacy gate before any up
 | 1 Version bump + tag `v1.1.7` | human GO | commit; `git tag v1.1.7`; push tag | delete the tag before any Store step (human) |
 | 2 release-build | automatic on tag | record run id, package name, SHA-256 | nothing published |
 | 3 store-status | human dispatch | expect idle (`NO SUBMISSION` / `PUBLISHED`) | — |
-| 4 store-submit | human dispatch + `SUBMIT` + environment approval | run id, version, SHA-256 | before commit: delete the draft in Partner Center; after commit: cancel the submission in Partner Center (human) |
+| 4 store-submit (stage only, REL.0E P-1) | human dispatch + `STAGE` + environment approval | run id, version, SHA-256; record the submission id | delete the draft in Partner Center (human); nothing was committed |
+| 4b listing + review | human, Partner Center draft | `release-automation.md`, *Staged release: the human procedure* (CSV backup, apply, verify) | delete the draft, or re-import the backup CSV into it |
+| 4c store-certify | human dispatch + `CERTIFY <version>` + submission id + a second environment approval | the run re-proves the staged draft and commits it | cancel the submission in Partner Center (human) |
 | 5 certification | Store | watch with store-status | fix and resubmit with a **higher** version (the same version is refused) |
 | 6 Publish now (private audience) | human, Partner Center | then run the RC-POST rows | installed copies cannot be pulled back (HYPOTHESIS); ship a higher fixed version, or stop acquisition in Partner Center (human) |
 | 7 transition of the QA machine | human | `store-transition-runbook.md` | runbook §6.4 |

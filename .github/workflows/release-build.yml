@@ -142,6 +142,8 @@ jobs:
             'Test-DistributionPrivacy.ps1'
             'Test-StoreSubmissionUpdate.ps1'
             'Get-SubmissionState.ps1 -SelfTest'
+            'Assert-StagedSubmission.ps1 -SelfTest'
+            'Test-StoreStageCertify.ps1'
           )
 
       - name: Build the MSIX package

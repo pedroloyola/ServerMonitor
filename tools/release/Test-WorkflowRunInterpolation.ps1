@@ -29,7 +29,7 @@ function Assert-RunText([string] $Text) {
         if ($expression.Value -match '\b(inputs|steps|needs)\s*[.\[]|\bgithub\s*\.\s*event\s*[.\[]') { throw 'Unsafe workflow interpolation in run block.' }
     }
 }
-$names = @('store-submit.yml', 'store-status.yml', 'release-build.yml')
+$names = @('store-submit.yml', 'store-certify.yml', 'store-status.yml', 'release-build.yml')
 foreach ($name in $names) {
     $text = Get-Content -LiteralPath (Join-Path $RepositoryRoot ".github/workflows/$name") -Raw
     Assert-RunText $text
