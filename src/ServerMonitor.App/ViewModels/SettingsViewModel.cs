@@ -79,13 +79,7 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
         ResetHistoryCommand = new AsyncRelayCommand(ResetHistoryAsync);
         _selectedThemeIndex = (int)themeService.Current;
         _notificationsEnabled = notificationSettingsService.NotificationsEnabled;
-        _selectedLanguageIndex = localizationService.CurrentLanguageOverride switch
-        {
-            "pt-BR" => 1,
-            "pt-PT" => 2,
-            "en-US" => 3,
-            _ => 0
-        };
+        _selectedLanguageIndex = LanguageIndexOf(localizationService);
     }
 
     /// <summary>Real product version for the About section (packaged identity or assembly fallback).</summary>
@@ -178,6 +172,16 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
         get => _selectedLanguageIndex;
         set
         {
+            // REL.0D D-2 (VM QA): only one of the four items is a choice. -1 - the ComboBox with nothing selected, pushed
+            // back through the TwoWay binding - used to fall into "Use system language", which silently replaced an
+            // explicit choice (record and override). Like HistoryViewModel's range guard: no write, and the picker is told
+            // again what is in effect.
+            if (value is < 0 or > 3)
+            {
+                OnPropertyChanged(nameof(SelectedLanguageIndex));
+                return;
+            }
+
             if (!SetProperty(ref _selectedLanguageIndex, value))
             {
                 return;
@@ -185,16 +189,38 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
 
             var languageTag = value switch
             {
+                0 => null, // "Use system language"
                 1 => "pt-BR",
                 2 => "pt-PT",
-                3 => "en-US",
-                _ => null
+                _ => "en-US"
             };
 
-            _localizationService.SetLanguage(languageTag);
-            IsRestartNoticeOpen = true;
+            if (_localizationService.TrySetLanguage(languageTag))
+            {
+                IsRestartNoticeOpen = true;
+                return;
+            }
+
+            // REL.0D: the choice could not be saved, so nothing changed: the picker goes back to what is in effect.
+            _selectedLanguageIndex = LanguageIndexOf(_localizationService);
+            OnPropertyChanged(nameof(SelectedLanguageIndex));
         }
     }
+
+    /// <summary>
+    /// The picker item for the persisted language. REL.0D (Cortex N-1): "Use system language" (0) whenever the UI
+    /// follows Windows - also when the app wrote an override for it - so that choice is shown back as it was made.
+    /// </summary>
+    private static int LanguageIndexOf(ILocalizationService localization) =>
+        localization.FollowsSystemLanguage
+            ? 0
+            : localization.CurrentLanguageOverride switch
+            {
+                "pt-BR" => 1,
+                "pt-PT" => 2,
+                "en-US" => 3,
+                _ => 0
+            };
 
     public bool IsRestartNoticeOpen
     {
@@ -269,8 +295,25 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
     /// can land on the right section, and a request nobody consumes is the same class of defect as a
     /// RefreshAll nobody calls.
     /// </summary>
-    public void NotifyNavigatedTo() =>
+    public void NotifyNavigatedTo()
+    {
         IsBackgroundSectionRequested = _navigationService.ConsumeBackgroundSettingsFocus();
+        RefreshLanguageIndex();
+    }
+
+    /// <summary>
+    /// REL.0D: the language can now also change outside this page (the Overview's one-time language hint), and this view
+    /// model is a singleton: each visit shows the choice in effect. Display only - nothing is written, no restart notice.
+    /// </summary>
+    private void RefreshLanguageIndex()
+    {
+        var current = LanguageIndexOf(_localizationService);
+        if (current != _selectedLanguageIndex)
+        {
+            _selectedLanguageIndex = current;
+            OnPropertyChanged(nameof(SelectedLanguageIndex));
+        }
+    }
 
     private bool _isAboutSectionRequested;
 

@@ -209,12 +209,17 @@ public sealed class Ui7EditorSessionTests : IDisposable
     [Theory]
     [InlineData(NavigationDestination.Overview)]
     [InlineData(NavigationDestination.Servers)]
+    [InlineData(NavigationDestination.SettingsData)] // REL.0D: a suggestion added from Settings › "Procurar na rede local"
     public async Task Cancel_ReturnsToTheOrigin_AndRemembersTheOpenerForFocus(NavigationDestination origin)
     {
         await _world.StartAsync();
         if (origin == NavigationDestination.Servers)
         {
             _world.Navigation.GoToServers();
+        }
+        else if (origin == NavigationDestination.SettingsData)
+        {
+            _world.Navigation.GoToSettings(SettingsSection.Data);
         }
 
         _world.OpenerName = "AddButton";

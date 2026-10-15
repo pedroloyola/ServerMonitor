@@ -61,14 +61,15 @@ public sealed class LocalizationServiceStartupTests
         Assert.Equal(persisted, service.CurrentLanguageOverride);
     }
 
+    /// <summary>REL.0D: one write - the system language's own override - after its provenance record.</summary>
     [Fact]
-    public void ChoosingTheSystemLanguage_ClearsTheChoice_AndResolvesTheSystemCultureAgain()
+    public void ChoosingTheSystemLanguage_WritesTheSystemCulturesResolution()
     {
         var platform = new FakeUiLanguagePlatform("fr-FR", "pt-BR");
 
         Service(platform).SetLanguage(null);
 
-        Assert.Equal(["", "en-US"], platform.Writes);
+        Assert.Equal(["en-US"], platform.Writes);
     }
 
     [Fact]
@@ -76,8 +77,9 @@ public sealed class LocalizationServiceStartupTests
     {
         var platform = new FakeUiLanguagePlatform("fr-FR");
 
-        using var host = App.BuildServicesHost(services =>
-            services.AddSingleton<ILocalizationService>(Service(platform)));
+        using var host = App.BuildServicesHost(
+            services => services.AddSingleton<ILocalizationService>(Service(platform)),
+            static _ => { }); // REL.0E: the process UI culture is asserted in AppFormattingCultureTests
 
         Assert.Equal(["en-US"], platform.Writes);
         Assert.Equal("en-US", host.Services.GetRequiredService<ILocalizationService>().CurrentLanguageOverride);
@@ -88,7 +90,7 @@ public sealed class LocalizationServiceStartupTests
     {
         var recorder = new RecordingLocalization();
 
-        using var host = App.BuildServicesHost(services => services.AddSingleton<ILocalizationService>(recorder));
+        using var host = App.BuildServicesHost(services => services.AddSingleton<ILocalizationService>(recorder), static _ => { });
 
         Assert.Equal(1, recorder.Initializations);
         Assert.Same(recorder, host.Services.GetRequiredService<ILocalizationService>());
@@ -104,7 +106,7 @@ public sealed class LocalizationServiceStartupTests
     }
 
     private static LocalizationService Service(FakeUiLanguagePlatform platform) =>
-        new(NullLogger<LocalizationService>.Instance, platform);
+        new(NullLogger<LocalizationService>.Instance, platform, new FakeLanguageSettingsStore());
 
     private sealed class RecordingLocalization : ILocalizationService
     {

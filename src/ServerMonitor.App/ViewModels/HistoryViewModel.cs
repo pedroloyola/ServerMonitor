@@ -298,14 +298,16 @@ public sealed class HistoryViewModel : ObservableObject, IDisposable
 
     // Cortex L-4: ONE culture for every History text - numbers, peaks, summaries, axes and footer - the explicit UI
     // language when set (so it matches the resw copy), else the current UI culture. Cached per language.
+    // REL.0E fix round 1 (Cortex L-1): the language is the service's formatting decision - the same one the launch made
+    // the process UI culture - so History and every other screen format alike (a regional variant keeps its format).
     private CultureInfo FormatCulture =>
-        _formatCulture is { } cached && string.Equals(_formatCultureKey, _localizationService?.CurrentLanguageOverride, StringComparison.Ordinal)
+        _formatCulture is { } cached && string.Equals(_formatCultureKey, _localizationService?.FormattingCultureName, StringComparison.Ordinal)
             ? cached
             : CacheFormatCulture();
 
     private CultureInfo CacheFormatCulture()
     {
-        _formatCultureKey = _localizationService?.CurrentLanguageOverride;
+        _formatCultureKey = _localizationService?.FormattingCultureName;
         _formatCulture = HistoryPresentation.FormatCulture(_formatCultureKey);
         return _formatCulture;
     }
