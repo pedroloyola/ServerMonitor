@@ -21,6 +21,9 @@ por SSH. Ele foi projetado para que seus dados fiquem no seu PC e sob o seu cont
 - **Sem nuvem.** Não há sincronização na nuvem nem conta online.
 - **As únicas conexões de rede que o aplicativo faz por iniciativa própria** são conexões SSH com os servidores
   que você adiciona e, só quando você a inicia, uma pesquisa na sua rede local (veja "Pesquisa na rede local").
+- **Resolução de nomes.** Para se conectar a um servidor informado por nome, o Windows resolve esse nome pelo
+  serviço DNS da sua rede, ou por mDNS no caso de nomes `.local`. Em um servidor acessado por meio de um
+  servidor de salto, é o servidor de salto que resolve o nome. Nenhum serviço do ServerAlyzer participa.
 
 ## Quem é o responsável
 
@@ -56,10 +59,10 @@ um perfil móvel (roaming) nem os sincroniza com nenhum lugar.
 
 | Dados | Arquivo | Conteúdo |
 |---|---|---|
-| Servidores | `servers.json`, `routed-servers.json` | Nome, host, porta, usuário SSH, método de login, o **caminho** de uma chave privada que você escolher, servidor de salto. Sem senhas. |
+| Servidores | `servers.json`, `routed-servers.json` | Nome, host, porta, usuário SSH, método de login, o **caminho** de uma chave privada que você escolher, servidor de salto e preferências do servidor (sistema operacional, intervalo de atualização, oculto ou não, data em que foi adicionado, uma referência interna à senha salva). Sem senhas. |
 | Chaves de host confiáveis | `known-hosts.json`, `known-hosts.routes.json` | Host, porta, tipo de chave e impressão digital. |
 | Histórico de métricas | `history.db` (SQLite) | Por servidor: horário, estado de saúde, % de CPU, % de memória, % de disco. Mantido por **30 dias** e depois apagado automaticamente. Você pode limpá-lo nas Configurações. |
-| Resumo para o widget | `widget-state.json` | Para o widget do Windows: o nome de exibição do servidor (nunca o host nem o endereço IP), estado de saúde, uso de CPU, memória e disco, tempo ligado e horário da última atualização. |
+| Resumo para o widget | `widget-state.json` | Para o widget do Windows: um identificador interno do servidor, o nome de exibição do servidor (nunca o host nem o endereço IP), estado de saúde, uso de CPU, memória e disco (porcentagem, e GB usados e totais), tempo ligado e horário da última atualização. |
 | Dispositivos de rede ignorados | `ignored-devices.json` | Impressões digitais unidirecionais (hashes SHA-256) dos dispositivos que você escolheu ignorar. Sem nomes nem endereços. |
 | Preferências | `language-settings.json`, `notification-settings.json`, `background-settings.json`, `window-placement.json` | Idioma, escolhas de notificações e de monitoramento em segundo plano, posição da janela. |
 | Cópia de segurança da restauração | pasta `restore-journal` | Uma cópia temporária usada só enquanto um backup está sendo restaurado, para que uma restauração interrompida possa ser desfeita. |
@@ -74,7 +77,8 @@ O aplicativo **não grava arquivos de log**.
 
 ## Arquivos que o aplicativo lê no seu PC
 
-- `%USERPROFILE%\.ssh\config`, somente quando você escolhe **Importar de SSH**.
+- `%USERPROFILE%\.ssh\config`, e os arquivos que ele inclui a partir de `%USERPROFILE%\.ssh`, somente quando você
+  escolhe **Importar de SSH**. Arquivos incluídos fora dessa pasta, e arquivos que sejam links, não são lidos.
 - Para sugerir uma chave, o aplicativo verifica se os arquivos de chave padrão `id_ed25519`, `id_ecdsa` ou
   `id_rsa` existem em `%USERPROFILE%\.ssh`, usando apenas informações do arquivo (nome e tamanho). Ele não os
   abre. Um arquivo de chave só é lido para fazer login em um servidor que você configurou com essa chave.
@@ -92,7 +96,9 @@ O aplicativo **não grava arquivos de log**.
   descartados quando a pesquisa termina. Os dados adicionais dos anúncios (TXT) são ignorados.
 - Na primeira pesquisa, **o Firewall do Windows pode perguntar** se você permite o ServerAlyzer nas suas redes.
   O aplicativo precisa disso para receber as respostas. Se você não permitir, a pesquisa pode não encontrar
-  nada; o resto continua funcionando.
+  nada; o resto continua funcionando. O Windows salva sua resposta como regras do Firewall do Windows para o
+  aplicativo, que permanecem depois da pesquisa; você pode revisá-las ou removê-las nas configurações do Firewall
+  do Windows.
 - Adicionar um servidor encontrado passa pelo mesmo teste de conexão e pela mesma confirmação da chave do host
   que qualquer outro servidor.
 
@@ -101,9 +107,11 @@ O aplicativo **não grava arquivos de log**.
 - Se você criar um backup, o arquivo contém sua lista de servidores, as rotas, as chaves de host confiáveis,
   as configurações de notificações e de monitoramento em segundo plano **e suas senhas e frases secretas
   salvas**.
-- O arquivo inteiro é criptografado com **AES-256-GCM**, com uma chave derivada de uma senha de backup que você
+- O conteúdo do arquivo é criptografado com **AES-256-GCM**, com uma chave derivada de uma senha de backup que você
   escolhe (PBKDF2-HMAC-SHA256, 1.000.000 de iterações). O arquivo não pode ser lido sem essa senha e não pode
-  ser recuperado se você a esquecer.
+  ser recuperado se você a esquecer. Um cabeçalho curto com os parâmetros técnicos da criptografia (versão do
+  formato, algoritmo, número de iterações, salt) fica salvo sem criptografia, como esse método exige; ele não
+  contém nenhum dos seus dados.
 - O arquivo é salvo **somente onde você escolher**. O aplicativo nunca o envia para lugar nenhum. Se você o
   salvar em uma pasta sincronizada com a nuvem, os termos desse serviço valem para esse arquivo.
 - Os arquivos de chave privada e o histórico de métricas não são incluídos.
@@ -113,7 +121,10 @@ O aplicativo **não grava arquivos de log**.
 - Os alertas são notificações locais do Windows. Eles mostram o nome de exibição do servidor e o seu estado
   (por exemplo, "está em estado de atenção") e ficam na central de notificações do Windows até expirarem ou até
   você limpá-las. O aplicativo não usa nenhum serviço de notificações push.
-- O widget do ServerAlyzer mostra os dados de `widget-state.json`. O Windows os exibe no painel de Widgets.
+- O widget do ServerAlyzer mostra os dados de `widget-state.json`. Para exibi-los, o aplicativo entrega o
+  conteúdo do cartão (nome de exibição, estado de saúde, métricas, tempo ligado) ao painel de Widgets do
+  Windows, um componente da Microsoft. **[NEEDS HUMAN: confirmar se os dados entregues ao painel de Widgets
+  ficam sujeitos à Política de Privacidade da Microsoft, e dizer isso aqui.]**
 
 ## Componentes do Windows e da Microsoft
 

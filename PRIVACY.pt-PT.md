@@ -21,6 +21,9 @@ macOS por SSH. Foi desenhada para que os teus dados fiquem no teu PC e sob o teu
 - **Sem nuvem.** Não há sincronização na nuvem nem conta online.
 - **As únicas ligações de rede que a aplicação faz por iniciativa própria** são ligações SSH aos servidores que
   adicionas e, só quando a inicias, uma pesquisa na tua rede local (ver "Pesquisa na rede local").
+- **Resolução de nomes.** Para te ligares a um servidor indicado por nome, o Windows resolve esse nome através
+  do serviço DNS da tua rede, ou por mDNS no caso de nomes `.local`. Num servidor alcançado através de um
+  servidor de salto, é o servidor de salto que resolve o nome. Nenhum serviço da ServerAlyzer intervém.
 
 ## Quem é responsável
 
@@ -57,10 +60,10 @@ perfil itinerante (roaming) nem os sincroniza para lado nenhum.
 
 | Dados | Ficheiro | Conteúdo |
 |---|---|---|
-| Servidores | `servers.json`, `routed-servers.json` | Nome, host, porta, utilizador SSH, método de início de sessão, o **caminho** de uma chave privada que escolhas, servidor de salto. Sem passwords. |
+| Servidores | `servers.json`, `routed-servers.json` | Nome, host, porta, utilizador SSH, método de início de sessão, o **caminho** de uma chave privada que escolhas, servidor de salto e preferências do servidor (sistema operativo, intervalo de atualização, oculto ou não, data em que foi adicionado, uma referência interna à password guardada). Sem passwords. |
 | Chaves de host confiadas | `known-hosts.json`, `known-hosts.routes.json` | Host, porta, tipo de chave e impressão digital. |
 | Histórico de métricas | `history.db` (SQLite) | Por servidor: hora, estado de saúde, % de CPU, % de memória, % de disco. Guardado durante **30 dias** e depois apagado automaticamente. Podes limpá-lo nas Definições. |
-| Resumo para o widget | `widget-state.json` | Para o widget do Windows: o nome de apresentação do servidor (nunca o host nem o endereço IP), estado de saúde, utilização de CPU, memória e disco, tempo ligado e hora da última atualização. |
+| Resumo para o widget | `widget-state.json` | Para o widget do Windows: um identificador interno do servidor, o nome de apresentação do servidor (nunca o host nem o endereço IP), estado de saúde, utilização de CPU, memória e disco (percentagem, e GB usados e totais), tempo ligado e hora da última atualização. |
 | Dispositivos de rede ignorados | `ignored-devices.json` | Impressões digitais unidirecionais (hashes SHA-256) dos dispositivos que escolheste ignorar. Sem nomes nem endereços. |
 | Preferências | `language-settings.json`, `notification-settings.json`, `background-settings.json`, `window-placement.json` | Idioma, escolhas de notificações e de monitorização em segundo plano, posição da janela. |
 | Cópia de segurança do restauro | pasta `restore-journal` | Uma cópia temporária usada só enquanto um backup está a ser restaurado, para que um restauro interrompido possa ser desfeito. |
@@ -75,7 +78,8 @@ A aplicação **não escreve ficheiros de log**.
 
 ## Ficheiros que a aplicação lê no teu PC
 
-- `%USERPROFILE%\.ssh\config`, apenas quando escolhes **Importar de SSH**.
+- `%USERPROFILE%\.ssh\config`, e os ficheiros que ele inclui a partir de `%USERPROFILE%\.ssh`, apenas quando
+  escolhes **Importar de SSH**. Ficheiros incluídos fora dessa pasta, e ficheiros que sejam ligações, não são lidos.
 - Para sugerir uma chave, a aplicação verifica se os ficheiros de chave predefinidos `id_ed25519`, `id_ecdsa`
   ou `id_rsa` existem em `%USERPROFILE%\.ssh`, usando apenas informação do ficheiro (nome e tamanho). Não os
   abre. Um ficheiro de chave só é lido para iniciar sessão num servidor que configuraste com essa chave.
@@ -92,7 +96,8 @@ A aplicação **não escreve ficheiros de log**.
   descartados quando a pesquisa termina. Os dados adicionais dos anúncios (TXT) são ignorados.
 - Na primeira pesquisa, **a Firewall do Windows pode perguntar** se permites a ServerAlyzer nas tuas redes. A
   aplicação precisa disso para receber as respostas. Se não permitires, a pesquisa pode não encontrar nada; o
-  resto continua a funcionar.
+  resto continua a funcionar. O Windows guarda a tua resposta como regras da Firewall do Windows para a
+  aplicação, que ficam depois da pesquisa; podes revê-las ou removê-las nas definições da Firewall do Windows.
 - Adicionar um servidor encontrado passa pelo mesmo teste de ligação e pela mesma confirmação da chave do host
   que qualquer outro servidor.
 
@@ -101,9 +106,11 @@ A aplicação **não escreve ficheiros de log**.
 - Se criares um backup, o ficheiro contém a tua lista de servidores, as rotas, as chaves de host confiadas, as
   definições de notificações e de monitorização em segundo plano **e as tuas passwords e passphrases
   guardadas**.
-- O ficheiro inteiro é cifrado com **AES-256-GCM**, com uma chave derivada de uma password de backup que
+- O conteúdo do ficheiro é cifrado com **AES-256-GCM**, com uma chave derivada de uma password de backup que
   escolhes (PBKDF2-HMAC-SHA256, 1 000 000 iterações). O ficheiro não pode ser lido sem essa password e não pode
-  ser recuperado se a esqueceres.
+  ser recuperado se a esqueceres. Um cabeçalho curto com os parâmetros técnicos da cifra (versão do formato,
+  algoritmo, número de iterações, salt) fica guardado sem cifra, como este método exige; não contém nenhum dos
+  teus dados.
 - O ficheiro é guardado **apenas onde escolheres**. A aplicação nunca o envia para lado nenhum. Se o guardares
   numa pasta sincronizada com a nuvem, aplicam-se a esse ficheiro os termos desse serviço.
 - Os ficheiros de chave privada e o histórico de métricas não são incluídos.
@@ -113,7 +120,10 @@ A aplicação **não escreve ficheiros de log**.
 - Os alertas são notificações locais do Windows. Mostram o nome de apresentação do servidor e o seu estado
   (por exemplo, "está em estado de atenção") e ficam no centro de notificações do Windows até expirarem ou até as
   limpares. A aplicação não usa nenhum serviço de notificações push.
-- O widget da ServerAlyzer mostra os dados de `widget-state.json`. O Windows apresenta-os no painel de Widgets.
+- O widget da ServerAlyzer mostra os dados de `widget-state.json`. Para os apresentar, a aplicação entrega o
+  conteúdo do cartão (nome de apresentação, estado de saúde, métricas, tempo ligado) ao painel de Widgets do
+  Windows, um componente da Microsoft. **[NEEDS HUMAN: confirmar se os dados entregues ao painel de Widgets
+  ficam sujeitos à Declaração de Privacidade da Microsoft, e dizê-lo aqui.]**
 
 ## Componentes do Windows e da Microsoft
 

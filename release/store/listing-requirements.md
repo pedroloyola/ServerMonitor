@@ -123,7 +123,8 @@ DRAFT-GATE block in `README.md`.
   local network search, the encrypted backup (which includes saved passwords), the widget
   snapshot, notifications, logs (none) and the Store data location. The gate stays until:
   - every `[NEEDS HUMAN: ...]` marker in the three files is resolved and removed (publisher
-    identity, legal review, privacy contact, Windows/runFullTrust wording, children);
+    identity, legal review, privacy contact, Windows/runFullTrust wording, Widgets board,
+    children);
   - the uninstall behaviour is measured on a Store install and the Uninstalling paragraph is
     written from that measurement;
   - the policy is merged on main, so the URL resolves publicly.

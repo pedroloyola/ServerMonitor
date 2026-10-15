@@ -21,6 +21,9 @@ designed so that your data stays on your PC and under your control.
 - **No cloud.** There is no cloud sync and no online account.
 - **The only network connections the app makes on its own initiative** are SSH connections to the servers you
   add and, only when you start it, a search of your local network (see "Local network search").
+- **Name resolution.** To connect to a server you entered by name, Windows resolves that name through your
+  network's DNS service, or through mDNS for `.local` names. For a server reached through a jump host, the
+  jump host resolves the server's name. No ServerAlyzer service is involved.
 
 ## Who is responsible
 
@@ -54,10 +57,10 @@ in a roaming profile and does not sync it anywhere.
 
 | Data | File | Contents |
 |---|---|---|
-| Servers | `servers.json`, `routed-servers.json` | Name, host, port, SSH user, sign-in method, the **path** of a private key you choose, jump host. No passwords. |
+| Servers | `servers.json`, `routed-servers.json` | Name, host, port, SSH user, sign-in method, the **path** of a private key you choose, jump host, and server preferences (operating system, refresh interval, hidden or not, date added, an internal reference to the saved password). No passwords. |
 | Trusted host keys | `known-hosts.json`, `known-hosts.routes.json` | Host, port, key type and fingerprint. |
 | Metrics history | `history.db` (SQLite) | Per server: time, health state, CPU %, memory %, disk %. Kept for **30 days**, then deleted automatically. You can clear it in Settings. |
-| Widget snapshot | `widget-state.json` | For the Windows widget: the server's display name (never its host or IP address), health, CPU, memory and disk usage, uptime and last update time. |
+| Widget snapshot | `widget-state.json` | For the Windows widget: an internal server id, the server's display name (never its host or IP address), health, CPU, memory and disk usage (percent, and GB used and total), uptime and last update time. |
 | Ignored network devices | `ignored-devices.json` | One-way fingerprints (SHA-256 hashes) of devices you chose to ignore. No names or addresses. |
 | Preferences | `language-settings.json`, `notification-settings.json`, `background-settings.json`, `window-placement.json` | Language, notification and background monitoring choices, window position. |
 | Restore safety copy | `restore-journal` folder | A temporary copy used only while a backup is being restored, so that an interrupted restore can be undone. |
@@ -72,7 +75,8 @@ The app writes **no log files**.
 
 ## Files the app reads on your PC
 
-- `%USERPROFILE%\.ssh\config`, only when you choose **Import from SSH**.
+- `%USERPROFILE%\.ssh\config`, and the files it includes from inside `%USERPROFILE%\.ssh`, only when you choose
+  **Import from SSH**. Included files outside that folder, and linked files, are not read.
 - To suggest a key, the app checks whether the default key files `id_ed25519`, `id_ecdsa` or `id_rsa` exist in
   `%USERPROFILE%\.ssh`, using file information only (name and size). It does not open them. A key file is read
   only to sign in to a server you configured with that key.
@@ -90,16 +94,19 @@ The app writes **no log files**.
   search ends. Additional (TXT) announcement data is ignored.
 - The first time you search, **Windows Firewall may ask** whether to allow ServerAlyzer on your networks. The
   app needs this to receive the answers. If you do not allow it, the search may find nothing; everything else
-  keeps working.
+  keeps working. Windows saves your answer as Windows Firewall rules for the app, which stay after the search;
+  you can review or remove them in the Windows Firewall settings.
 - Adding a found server goes through the same connection test and host key confirmation as any other server.
 
 ## Encrypted backup
 
 - If you create a backup, the file contains your server list, routes, trusted host keys, notification and
   background monitoring settings, **and your saved passwords and passphrases**.
-- The whole file is encrypted with **AES-256-GCM**, with a key derived from a backup password you choose
+- The file's contents are encrypted with **AES-256-GCM**, with a key derived from a backup password you choose
   (PBKDF2-HMAC-SHA256, 1,000,000 iterations). The file cannot be read without that password, and it cannot be
-  recovered if you forget it.
+  recovered if you forget it. A short header with the technical encryption parameters (format version,
+  algorithm, number of iterations, salt) is stored unencrypted, as this method requires; it contains none of
+  your data.
 - The file is saved **only where you choose**. The app never uploads it. If you save it in a cloud-synced folder,
   that service's terms apply to the file.
 - Private key files and the metrics history are not included.
@@ -109,7 +116,10 @@ The app writes **no log files**.
 - Alerts are local Windows notifications. They show the server's display name and its state (for example "is
   in a warning state") and stay in the Windows notification center until they expire or you clear them. The
   app uses no push notification service.
-- The ServerAlyzer widget shows the data in `widget-state.json`. Windows displays it in the Widgets board.
+- The ServerAlyzer widget shows the data in `widget-state.json`. To display it, the app hands the card content
+  (display name, health, metrics, uptime) to the Windows Widgets board, a Microsoft component.
+  **[NEEDS HUMAN: confirm whether data handed to the Widgets board is subject to the Microsoft Privacy
+  Statement, and say so here.]**
 
 ## Windows and Microsoft components
 
