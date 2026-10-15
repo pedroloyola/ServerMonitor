@@ -48,6 +48,8 @@ public sealed class LanguageSourceMatrixTests
         new("C", FakeWindowsLanguages.Display("pt-PT", "en-GB", "pt-PT"), new("en-US", "en-GB", "en-US")),
         new("D (no app language first)", FakeWindowsLanguages.Display("pt-PT", "fr-FR", "pt-PT"), PtPt),
         new("E (no app language at all)", FakeWindowsLanguages.Display("pt-PT", "fr-FR"), EnUs),
+        // PR #58 round 1 (Cortex N-1): a neutral "pt" formats as the pt-PT the app shows, not ICU's neutral (Brazilian) data.
+        new("F (neutral pt)", FakeWindowsLanguages.Display("en-US", "de-DE", "pt", "en-US"), PtPt),
     ];
 
     public static TheoryData<string> CaseIds() => new(Cases.Select(c => c.Id));

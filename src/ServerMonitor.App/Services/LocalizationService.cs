@@ -161,7 +161,7 @@ public sealed class LocalizationService : ILocalizationService
         {
             ArgumentNullException.ThrowIfNull(preferredLanguages);
             _displayCultureName = CultureInfo.CurrentUICulture.Name;
-            _systemUiCultureName = SupportedCultures.ProfileLanguage(preferredLanguages(), _displayCultureName);
+            _systemUiCultureName = SupportedCultures.ProfileLanguage(TryRead(preferredLanguages), _displayCultureName);
         }
 
         public string? PrimaryLanguageOverride
@@ -174,15 +174,23 @@ public sealed class LocalizationService : ILocalizationService
 
         public string DisplayCultureName => _displayCultureName;
 
-        /// <summary>The user's ordered preferred languages; null when Windows cannot say (the display language then).</summary>
-        private static IReadOnlyList<string>? ReadPreferredLanguages()
+        /// <summary>The user's ordered preferred languages (Settings › Language › Preferred languages).</summary>
+        private static IReadOnlyList<string>? ReadPreferredLanguages() =>
+            [.. Windows.System.UserProfile.GlobalizationPreferences.Languages];
+
+        /// <summary>
+        /// PR #58 round 1 (Cortex L-1, Vigil N-1): this runs in the service's constructor, so in the launch. The list is
+        /// optional - the display language is a complete answer, the one every version before F-1 used - so ANY failure
+        /// to read it (a WinRT HRESULT mapped to NotSupported/NotImplemented/Argument/…, a type initializer) falls back to
+        /// the display language instead of stopping the app.
+        /// </summary>
+        private static IReadOnlyList<string>? TryRead(Func<IReadOnlyList<string>?> preferredLanguages)
         {
             try
             {
-                return [.. Windows.System.UserProfile.GlobalizationPreferences.Languages];
+                return preferredLanguages();
             }
-            catch (Exception exception) when (exception is System.Runtime.InteropServices.COMException
-                                                  or InvalidOperationException or UnauthorizedAccessException)
+            catch (Exception)
             {
                 return null;
             }

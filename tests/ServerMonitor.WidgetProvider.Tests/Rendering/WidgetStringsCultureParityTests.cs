@@ -85,9 +85,22 @@ public sealed class WidgetStringsCultureParityTests
             Architecture.ProviderBoundaryTests.RepositoryRoot(), "src", "ServerMonitor.WidgetProvider", "Rendering", "WidgetStrings.cs"));
 
         Assert.Contains(
-            "public static WidgetStrings Current() => ForLanguages(PreferredLanguages(), CultureInfo.CurrentUICulture.Name);",
+            "public static WidgetStrings Current() => ForLanguageSource(PreferredLanguages, CultureInfo.CurrentUICulture.Name);",
             source,
             StringComparison.Ordinal);
         Assert.Contains("GlobalizationPreferences.Languages", source, StringComparison.Ordinal);
+    }
+
+    /// <summary>PR #58 round 1 (Cortex L-1, Vigil N-1): a failed read renders in the display language, never fails the render.</summary>
+    [Fact]
+    public void A_failed_read_renders_in_the_display_language()
+    {
+        foreach (var failure in new Exception[] { new NotSupportedException(), new NotImplementedException(), new ArgumentException() })
+        {
+            Assert.Equal("pt-BR", WidgetStrings.ForLanguageSource(() => throw failure, "pt-BR").Culture.Name);
+            Assert.Equal("en-US", WidgetStrings.ForLanguageSource(() => throw failure, "en-GB").Culture.Name);
+        }
+
+        Assert.Equal("en-US", WidgetStrings.ForLanguageSource(() => ["en-US", "pt-BR"], "pt-BR").Culture.Name); // the list wins
     }
 }

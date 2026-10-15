@@ -181,8 +181,19 @@ public static class LanguagePreferencePolicy
             return culture;
         }
 
-        return string.IsNullOrWhiteSpace(profileLanguage) || Same(profileLanguage, displayCulture) ? null : profileLanguage;
+        var profile = FormattingTag(profileLanguage);
+        return string.IsNullOrWhiteSpace(profile) || Same(profile, displayCulture) ? null : profile;
     }
+
+    /// <summary>
+    /// PR #58 round 1 (Cortex N-1): a NEUTRAL preferred language (<c>pt</c>, <c>en</c> - no region) formats in the variant
+    /// the app shows for it (<see cref="SupportedCultures.Resolve"/>: pt → pt-PT, en → en-US), not in ICU's neutral data
+    /// (pt → Brazilian formats under European Portuguese text). A tag with a region is the user's own variant and is kept.
+    /// </summary>
+    private static string? FormattingTag(string? profileLanguage) =>
+        string.IsNullOrWhiteSpace(profileLanguage) || profileLanguage.IndexOfAny(['-', '_']) >= 0
+            ? profileLanguage
+            : SupportedCultures.Resolve(profileLanguage);
 
     private static bool SameLanguage(string left, string? right)
     {

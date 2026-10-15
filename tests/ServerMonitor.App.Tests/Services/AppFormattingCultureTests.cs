@@ -270,6 +270,23 @@ public sealed class AppFormattingCultureTests
         Assert.Equal(("pt-BR", "pt-BR"), (unknown.SystemUiCultureName, unknown.DisplayCultureName));
     }
 
+    /// <summary>
+    /// PR #58 round 1 (Cortex L-1, Vigil N-1): the list is read in the service's constructor, in the launch - ANY failure
+    /// to read it falls back to the display language, never stops the app.
+    /// </summary>
+    [Fact]
+    public void TheRealPlatform_FallsBackToTheDisplay_WhenThePreferredListCannotBeRead()
+    {
+        using var scope = new UiCultureScope("pt-BR");
+
+        foreach (var failure in new Exception[] { new NotSupportedException(), new NotImplementedException(), new ArgumentException() })
+        {
+            var platform = new LocalizationService.WindowsUiLanguagePlatform(() => throw failure);
+
+            Assert.Equal(("pt-BR", "pt-BR"), (platform.SystemUiCultureName, platform.DisplayCultureName));
+        }
+    }
+
     [Fact]
     public void SetProcessUiCulture_SetsTheCurrentAndTheDefaultUiCulture_ButNotTheRegionalFormat()
     {

@@ -82,7 +82,28 @@ public sealed class WidgetStrings
     /// number format follow - not the display language, which can differ (display pt-BR with [en-US, …] showed an English
     /// app next to a Portuguese card). Read per render, like the culture was.
     /// </summary>
-    public static WidgetStrings Current() => ForLanguages(PreferredLanguages(), CultureInfo.CurrentUICulture.Name);
+    public static WidgetStrings Current() => ForLanguageSource(PreferredLanguages, CultureInfo.CurrentUICulture.Name);
+
+    /// <summary>
+    /// PR #58 round 1 (Cortex L-1, Vigil N-1): the list is read on every render and is optional - the display language is
+    /// a complete answer, the one the card used before F-1 - so ANY failure to read it renders in the display language
+    /// instead of failing the render.
+    /// </summary>
+    public static WidgetStrings ForLanguageSource(Func<IReadOnlyList<string>?> preferredLanguages, string? displayCulture)
+    {
+        ArgumentNullException.ThrowIfNull(preferredLanguages);
+        IReadOnlyList<string>? languages;
+        try
+        {
+            languages = preferredLanguages();
+        }
+        catch (Exception)
+        {
+            languages = null;
+        }
+
+        return ForLanguages(languages, displayCulture);
+    }
 
     /// <summary>The strings for a machine: its preferred-language list and display language (testable without Windows).</summary>
     public static WidgetStrings ForLanguages(IReadOnlyList<string>? preferredLanguages, string? displayCulture) =>
@@ -131,19 +152,9 @@ public sealed class WidgetStrings
         return subtags.Skip(1).Any(subtag => subtag.Equals("BR", StringComparison.OrdinalIgnoreCase)) ? PtBr : PtPt;
     }
 
-    /// <summary>The user's ordered preferred languages; null when Windows cannot say (the display language then).</summary>
-    private static IReadOnlyList<string>? PreferredLanguages()
-    {
-        try
-        {
-            return [.. Windows.System.UserProfile.GlobalizationPreferences.Languages];
-        }
-        catch (Exception exception) when (exception is System.Runtime.InteropServices.COMException
-                                              or InvalidOperationException or UnauthorizedAccessException)
-        {
-            return null;
-        }
-    }
+    /// <summary>The user's ordered preferred languages (a failure is contained by <see cref="ForLanguageSource"/>).</summary>
+    private static IReadOnlyList<string>? PreferredLanguages() =>
+        [.. Windows.System.UserProfile.GlobalizationPreferences.Languages];
 
     private static readonly WidgetStrings En = new()
     {

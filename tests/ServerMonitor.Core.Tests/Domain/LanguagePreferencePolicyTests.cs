@@ -302,6 +302,16 @@ public sealed class LanguagePreferencePolicyTests
         string? persisted, string profile, string display, string written, string? expected) =>
         Assert.Equal(expected, LanguagePreferencePolicy.AppliedFormattingCulture(persisted, profile, display, Following(written)));
 
+    /// <summary>PR #58 round 1 (Cortex N-1): a neutral profile tag formats in the variant the app shows for it.</summary>
+    [Theory]
+    [InlineData("pt-PT", "pt", "en-US", "pt-PT", "pt-PT")]
+    [InlineData("en-US", "en", "pt-PT", "en-US", "en-US")]
+    [InlineData("pt-PT", "pt", "pt-PT", "pt-PT", null)]     // resolves to the display language: nothing to apply
+    [InlineData("pt-PT", "pt-AO", "en-US", "pt-PT", "pt-AO")] // a region is the user's own variant: kept
+    public void AppliedFormattingCulture_ResolvesANeutralProfileTag(
+        string persisted, string profile, string display, string written, string? expected) =>
+        Assert.Equal(expected, LanguagePreferencePolicy.AppliedFormattingCulture(persisted, profile, display, Following(written)));
+
     [Fact]
     public void AppliedFormattingCulture_KeepsAnExplicitChoice()
     {
