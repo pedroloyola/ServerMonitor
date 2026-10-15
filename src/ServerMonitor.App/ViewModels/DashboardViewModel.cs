@@ -52,6 +52,9 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
     // REL.0D: true once _configuredEndpoints reflects the stored servers. The Settings entry can start a search before
     // the overview ever loaded (a --background launch opened on Settings from the tray).
     private bool _configuredEndpointsKnown;
+    // REL.0D O-7: true while a search started before the overview loaded still reads the configured servers. Until that
+    // read settles nothing counts as usable for the 40 s bound (the service re-judges what is still visible at 40 s).
+    private volatile bool _configuredEndpointsLoading;
     private bool _hasVisibleServers;
     private bool _hasDiscoveredServers;
     private int _discoveredCount;
@@ -134,6 +137,9 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         // REL.0D: not offered while a search runs (the Settings button stays visible, so it is disabled instead).
         StartLocalNetworkSearchCommand = new AsyncRelayCommand(
             StartLocalNetworkSearchAsync, () => CanStartLocalNetworkSearchFromSettings);
+        // REL.0D O-7: the explicit Stop next to the searching row on both surfaces.
+        StopLocalNetworkSearchCommand = new AsyncRelayCommand(
+            StopLocalNetworkSearchAsync, () => IsLocalNetworkSearchRunning);
         OpenServerDirectoryCommand = new RelayCommand(() =>
         {
             RememberReturnFocus(OverviewReturnTarget.DirectoryLink, Guid.Empty);
@@ -141,6 +147,8 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         });
         // Cortex r1 SHOULD-1: the user moving to another page cancels a deep-link still waiting for its server.
         navigationService.NavigatedAwayFromOverview += OnNavigatedAwayFromOverview;
+        // REL.0D O-7: leaving the pages that host the search ends it (no listener behind a page the user left).
+        navigationService.Navigated += OnNavigatedForLocalNetworkSearch;
         ClearOverviewSearchCommand = new RelayCommand(() => OverviewSearchText = string.Empty);
         OpenPriorityProblemCommand = new RelayCommand(OpenPriorityProblem);
     }
@@ -179,6 +187,31 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
     public bool HasVisibleServer(Guid serverId) => VisibleServers?.Any(card => card.Server.Id == serverId) == true;
 
     private void OnNavigatedAwayFromOverview(object? sender, EventArgs e) => ClearServerFocus();
+
+    /// <summary>
+    /// REL.0D O-7: a search lives only on the pages that show it - the overview's first-server state and Settings › Data -
+    /// and in the server editor, where "Add" on one of its suggestions leads (the search must not end mid-add). Save goes
+    /// to the new server's Detail, which ends the search (product decision: the other suggestions go with it; search
+    /// again to add another); Cancel returns to the origin, where it goes on. Not gated on IsSearching (like the hide
+    /// path): a start still in flight would otherwise outlive the page.
+    /// </summary>
+    private void OnNavigatedForLocalNetworkSearch(object? sender, EventArgs e)
+    {
+        if (_discoveryActivity is null || LocalNetworkSearchHostedAt(_navigationService.CurrentDestination))
+        {
+            return;
+        }
+
+        _ = LocalNetworkSearchLifetime.StopForUser(_discoveryService, _logger);
+    }
+
+    private bool LocalNetworkSearchHostedAt(NavigationDestination? destination) => destination switch
+    {
+        NavigationDestination.SettingsData => true,
+        NavigationDestination.Overview => ShowFirstServerState,
+        NavigationDestination.ServerEditor => true,
+        _ => false
+    };
 
     private void TryApplyPendingFocus()
     {
@@ -253,6 +286,22 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
     /// </summary>
     public ICommand StartLocalNetworkSearchCommand { get; }
 
+    /// <summary>REL.0D O-7: ends the running search on request (same stop as the hide path); offered only while one runs.</summary>
+    public ICommand StopLocalNetworkSearchCommand { get; }
+
+    /// <summary>
+    /// REL.0D O-7 R1 (Prism M-1): raised on the command's (UI) thread once the explicit Stop has ended the search. The
+    /// Stop link collapses with the search, so the page that shows it hands focus to the start action offered again.
+    /// Only the explicit Stop raises it - never the automatic end, the hide path or navigating away.
+    /// </summary>
+    public event EventHandler? LocalNetworkSearchStopFocusRequested;
+
+    private async Task StopLocalNetworkSearchAsync()
+    {
+        await LocalNetworkSearchLifetime.StopForUser(_discoveryService, _logger);
+        LocalNetworkSearchStopFocusRequested?.Invoke(this, EventArgs.Empty);
+    }
+
 
     public bool HasVisibleServers
     {
@@ -324,6 +373,9 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
     /// <summary>A search is running (wherever it was started).</summary>
     public bool IsLocalNetworkSearchRunning => _discoveryActivity?.IsSearching == true;
 
+    /// <summary>REL.0D O-7: the overview's first-server state offers Stop while a search runs, results listed or not.</summary>
+    public bool ShowOverviewStopLocalNetworkSearch => !HasVisibleServers && IsLocalNetworkSearchRunning;
+
     /// <summary>The entry's action is offered: live discovery, not already searching.</summary>
     public bool CanStartLocalNetworkSearchFromSettings => _discoveryActivity is { IsSearching: false };
 
@@ -343,7 +395,9 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(LocalNetworkSearchEndedNothingFound));
         OnPropertyChanged(nameof(LocalNetworkSearchEndedTimeLimit));
         OnPropertyChanged(nameof(LocalNetworkSearchEndedFailed));
+        OnPropertyChanged(nameof(ShowOverviewStopLocalNetworkSearch));
         (StartLocalNetworkSearchCommand as AsyncRelayCommand)?.NotifyCanExecuteChanged();
+        (StopLocalNetworkSearchCommand as AsyncRelayCommand)?.NotifyCanExecuteChanged();
     }
 
     private void OnEmptyStateDiscoveryChanged()
@@ -355,6 +409,7 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(ShowLocalNetworkSearchTimeLimit));
         OnPropertyChanged(nameof(ShowEmptyStateDiscoveries));
         OnPropertyChanged(nameof(ShowDiscoverySection));
+        OnPropertyChanged(nameof(ShowOverviewStopLocalNetworkSearch));
     }
 
     /// <summary>
@@ -634,7 +689,7 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         {
             var servers = await _serverService.GetAllAsync();
             var all = servers.ToList();
-            _configuredEndpoints = BuildConfiguredEndpoints(all);
+            Volatile.Write(ref _configuredEndpoints, BuildConfiguredEndpoints(all));
             _configuredEndpointsKnown = true;
             HiddenServerCount = all.Count(server => server.IsHidden);
             SetServers(all.Where(server => !server.IsHidden));
@@ -941,6 +996,7 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         if (_navigationService is not null)
         {
             _navigationService.NavigatedAwayFromOverview -= OnNavigatedAwayFromOverview;
+            _navigationService.Navigated -= OnNavigatedForLocalNetworkSearch;
         }
         _connectionStateStore.StateChanged -= OnConnectionStateChanged;
         _monitoringStateStore.StateChanged -= OnMonitoringStateChanged;
@@ -1214,10 +1270,14 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
             // Vigil PR #52 L-1: the start goes FIRST, straight into the service's lifecycle gate, so a hide while the
             // configured servers are read below queues its stop behind this start and always wins. Awaiting the read
             // first let a hide's stop run as a no-op and the start land after it, with the window hidden.
-            await _discoveryActivity.StartSearchAsync();
-            if (!_configuredEndpointsKnown)
+            // REL.0D O-7: only what this page would list keeps the search past 40 s (see IsUsableDiscovery).
+            var mustReadConfigured = !_configuredEndpointsKnown;
+            _configuredEndpointsLoading = mustReadConfigured;
+            await _discoveryActivity.StartSearchAsync(IsUsableDiscovery);
+            if (mustReadConfigured)
             {
                 await EnsureConfiguredEndpointsAsync();
+                _configuredEndpointsLoading = false;
                 RebuildDiscovered(); // suggestions that arrived during the read are filtered now
             }
         }
@@ -1225,7 +1285,21 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         {
             HandleError(exception, "search the local network");
         }
+        finally
+        {
+            _configuredEndpointsLoading = false;
+        }
     }
+
+    /// <summary>
+    /// REL.0D O-7: a suggestion is usable when the user could still add it - exactly what <see cref="RebuildDiscovered"/>
+    /// lists (the service already drops ignored devices; a server already configured is never suggested again). Called by
+    /// the discovery service under its store lock on a background thread, so it reads only an immutable snapshot of the
+    /// configured endpoints and takes no lock. While those are still being read nothing is usable yet; a failed read
+    /// leaves the set empty, so everything is usable (the same list the page then shows).
+    /// </summary>
+    private bool IsUsableDiscovery(DiscoveredService discovered) =>
+        !_configuredEndpointsLoading && !IsAlreadyConfigured(Volatile.Read(ref _configuredEndpoints), discovered);
 
     // REL.0D: a search started from Settings before the overview loaded must still hide servers already added.
     // A failed read only loses that de-duplication (advice, never trust); the search the user asked for still runs.
@@ -1238,7 +1312,8 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
 
         try
         {
-            _configuredEndpoints = BuildConfiguredEndpoints(await _serverService.GetAllAsync());
+            var configured = BuildConfiguredEndpoints(await _serverService.GetAllAsync());
+            Volatile.Write(ref _configuredEndpoints, configured);
             _configuredEndpointsKnown = true;
         }
         catch (Exception exception)
@@ -1247,16 +1322,24 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         }
     }
 
-    private bool IsAlreadyConfigured(DiscoveredService discovered)
+    private bool IsAlreadyConfigured(DiscoveredService discovered) => IsAlreadyConfigured(_configuredEndpoints, discovered);
+
+    private static bool IsAlreadyConfigured(HashSet<string>? configuredEndpoints, DiscoveredService discovered)
     {
-        if (_configuredEndpoints.Contains(EndpointKey(discovered.HostName, discovered.Port)))
+        // Null only in the runtime-free contract tests (GetUninitializedObject skips the field initializer).
+        if (configuredEndpoints is null)
+        {
+            return false;
+        }
+
+        if (configuredEndpoints.Contains(EndpointKey(discovered.HostName, discovered.Port)))
         {
             return true;
         }
 
         foreach (var address in discovered.Addresses)
         {
-            if (_configuredEndpoints.Contains(EndpointKey(address.ToString(), discovered.Port)))
+            if (configuredEndpoints.Contains(EndpointKey(address.ToString(), discovered.Port)))
             {
                 return true;
             }

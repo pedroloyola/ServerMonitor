@@ -26,6 +26,13 @@ internal static class LocalNetworkSearchLifetime
         return StopAsync(activity, logger);
     }
 
+    /// <summary>
+    /// REL.0D O-7: the same fire-and-forget stop for the user's own ending of a search - the explicit Stop action, and
+    /// leaving the pages that host the search (the overview's first-server state and Settings › Data). Never throws.
+    /// </summary>
+    public static Task StopForUser(IServerDiscoveryService discoveryService, ILogger logger) =>
+        StopForBackground(discoveryService, logger);
+
     private static async Task StopAsync(IServerDiscoveryActivity activity, ILogger logger)
     {
         try

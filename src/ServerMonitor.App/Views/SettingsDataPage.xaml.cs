@@ -35,6 +35,14 @@ public sealed partial class SettingsDataPage : Page, ISettingsNavigationTarget
         DispatcherQueue?.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
             FocusTargetFor(action, ResetHistoryButton, ClearHistoryButton).Focus(Microsoft.UI.Xaml.FocusState.Programmatic));
 
+    /// <summary>
+    /// REL.0D O-7 R1 (Prism M-1): "Parar" collapses with the searching row; focus goes to "Procurar", which the ended
+    /// search has re-enabled by then (Low priority: after the state change and the layout pass).
+    /// </summary>
+    private void OnLocalNetworkStopFocusRequested(object? sender, EventArgs e) =>
+        DispatcherQueue?.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+            LocalNetworkSearchButton.Focus(Microsoft.UI.Xaml.FocusState.Programmatic));
+
     public SettingsViewModel ViewModel { get; }
 
     /// <summary>Backs the Backup and restore section (M14.6).</summary>
@@ -59,6 +67,8 @@ public sealed partial class SettingsDataPage : Page, ISettingsNavigationTarget
         Backup.PropertyChanged += OnBackupPropertyChanged;
         ViewModel.HistoryFocusRequested -= OnHistoryFocusRequested;
         ViewModel.HistoryFocusRequested += OnHistoryFocusRequested;
+        Discovery.LocalNetworkSearchStopFocusRequested -= OnLocalNetworkStopFocusRequested;
+        Discovery.LocalNetworkSearchStopFocusRequested += OnLocalNetworkStopFocusRequested;
         await ViewModel.LoadAsync();
     }
 
@@ -66,6 +76,7 @@ public sealed partial class SettingsDataPage : Page, ISettingsNavigationTarget
     {
         Backup.PropertyChanged -= OnBackupPropertyChanged;
         ViewModel.HistoryFocusRequested -= OnHistoryFocusRequested;
+        Discovery.LocalNetworkSearchStopFocusRequested -= OnLocalNetworkStopFocusRequested;
         ViewModel.NotifyDataNavigatedFrom(); // Boss fix round 2 decision 2: the toast never outlives the visit
     }
 

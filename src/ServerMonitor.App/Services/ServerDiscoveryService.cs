@@ -69,9 +69,14 @@ public sealed class ServerDiscoveryService : IServerDiscoveryService, IServerDis
     private long _materialChangeVersion;
     private volatile bool _isSearching;
     private DateTimeOffset _searchStartedAt;
-    // N-r2-2: something was visible at some point in THIS search (reset on start), so "nothing found" is never claimed
-    // for a search that showed a result which later expired.
-    private bool _sawResults;
+    // N-r2-2: the identities that were USABLE at some point in THIS search (reset on start), so "nothing found" is never
+    // claimed for a search that showed a result which later expired.
+    // REL.0D O-7: "usable" is what the search's starter says the user could still add (_isUsable). A search whose only
+    // announcers are servers already configured, ignored devices (also ignored during the search) or duplicates of
+    // those ends at the 40 s bound as NothingFound instead of listening, with nothing to show, until the 10 min limit.
+    // Bounded like the store itself; once full, more identities add nothing to the decision.
+    private readonly HashSet<ServiceInstanceIdentity> _usableSeen = [];
+    private Func<DiscoveredService, bool>? _isUsable;
     // Vigil NIT-A / Cortex addendum: one automatic stop at a time; cleared when it fails so the next sweep retries.
     private int _autoStopInFlight;
     // Cortex addendum: the browser's own stop threw. Guarded by the lifecycle gate; every later stop/start/dispose and a
@@ -115,9 +120,19 @@ public sealed class ServerDiscoveryService : IServerDiscoveryService, IServerDis
     public Task StartSearchAsync(CancellationToken cancellationToken = default) => StartAsync(cancellationToken);
 
     /// <inheritdoc />
+    public Task StartSearchAsync(Func<DiscoveredService, bool> isUsable, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(isUsable);
+        return StartCoreAsync(isUsable, cancellationToken);
+    }
+
+    /// <inheritdoc />
     public Task StopSearchAsync(CancellationToken cancellationToken = default) => StopAsync(cancellationToken);
 
-    public async Task StartAsync(CancellationToken cancellationToken = default)
+    /// <summary>Starts a search in which every visible suggestion counts as usable (the pre-O-7 behaviour).</summary>
+    public Task StartAsync(CancellationToken cancellationToken = default) => StartCoreAsync(null, cancellationToken);
+
+    private async Task StartCoreAsync(Func<DiscoveredService, bool>? isUsable, CancellationToken cancellationToken)
     {
         await _lifecycleGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
@@ -138,7 +153,8 @@ public sealed class ServerDiscoveryService : IServerDiscoveryService, IServerDis
                     _ignored = new HashSet<string>(ignored, StringComparer.Ordinal);
                     generation = ++_lifecycleGeneration;
                     _searchStartedAt = _timeProvider.GetUtcNow();
-                    _sawResults = false;
+                    _usableSeen.Clear();
+                    _isUsable = isUsable;
                     Volatile.Write(ref _autoStopInFlight, 0);
                     _acceptBrowserCallbacks = true;
                     _foundHandler = (_, observation) => OnFoundOrUpdated(generation, observation);
@@ -315,6 +331,8 @@ public sealed class ServerDiscoveryService : IServerDiscoveryService, IServerDis
             _tracked.Clear();
             _published.Clear();
             _materialChangeVersion = 0;
+            _isUsable = null;
+            _usableSeen.Clear();
         }
 
         // REL.0B (Cortex C-1): signal only AFTER the store is empty. IsSearchingChanged is raised synchronously and a
@@ -390,6 +408,8 @@ public sealed class ServerDiscoveryService : IServerDiscoveryService, IServerDis
             _published.Clear();
             _ignored = new HashSet<string>(StringComparer.Ordinal);
             _materialChangeVersion = 0;
+            _isUsable = null;
+            _usableSeen.Clear();
         }
 
         if (foundHandler is not null)
@@ -598,7 +618,9 @@ public sealed class ServerDiscoveryService : IServerDiscoveryService, IServerDis
                 return DiscoverySearchEnd.TimeLimit;
             }
 
-            if (elapsed >= _options.NothingFoundTimeout && !_sawResults && BuildVisibleSnapshotsLocked(now).Count == 0)
+            // No re-judging here: the sweep that precedes this check on every tick recomputes the visible set, so a
+            // suggestion the starter could not judge yet (its configured servers were still being read) is judged again.
+            if (elapsed >= _options.NothingFoundTimeout && !HasUsableResultLocked())
             {
                 return DiscoverySearchEnd.NothingFound;
             }
@@ -688,15 +710,13 @@ public sealed class ServerDiscoveryService : IServerDiscoveryService, IServerDis
     private bool RecomputeChangeLocked(DateTimeOffset now)
     {
         var current = new Dictionary<ServiceInstanceIdentity, string>();
-        foreach (var snapshot in BuildVisibleSnapshotsLocked(now))
+        var visible = BuildVisibleSnapshotsLocked(now);
+        foreach (var snapshot in visible)
         {
             current[snapshot.Identity] = Signature(snapshot);
         }
 
-        if (current.Count > 0)
-        {
-            _sawResults = true;
-        }
+        RecordUsableLocked(visible);
 
         if (current.Count == _published.Count)
         {
@@ -723,6 +743,59 @@ public sealed class ServerDiscoveryService : IServerDiscoveryService, IServerDis
         }
 
         return true;
+    }
+
+    /// <summary>Records which of <paramref name="visible"/> are usable (once usable, an identity stays recorded).</summary>
+    private void RecordUsableLocked(List<DiscoveredService> visible)
+    {
+        foreach (var snapshot in visible)
+        {
+            if (_usableSeen.Count >= MaxTrackedServices)
+            {
+                break;
+            }
+
+            if (!_usableSeen.Contains(snapshot.Identity) && IsUsableLocked(snapshot))
+            {
+                _usableSeen.Add(snapshot.Identity);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Whether this search had a usable result the user has not ignored since (one that later expired still counts,
+    /// N-r2-2).
+    /// </summary>
+    private bool HasUsableResultLocked()
+    {
+        foreach (var identity in _usableSeen)
+        {
+            if (!_ignored.Contains(identity.StableHash))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private bool IsUsableLocked(DiscoveredService snapshot)
+    {
+        if (_isUsable is not { } isUsable)
+        {
+            return true;
+        }
+
+        try
+        {
+            return isUsable(snapshot);
+        }
+        catch (Exception exception)
+        {
+            // Fail toward the pre-O-7 behaviour: a suggestion that cannot be judged keeps the search to its 10 min bound.
+            _logger.LogDebug("Discovery usable check raised {Type}; counted as usable.", exception.GetType().Name);
+            return true;
+        }
     }
 
     private List<DiscoveredService> BuildVisibleSnapshotsLocked(DateTimeOffset now)
