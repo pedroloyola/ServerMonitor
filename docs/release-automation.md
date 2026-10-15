@@ -184,15 +184,29 @@ only the release named in `tools/release/msstore-cli-pin.json` and fails closed,
 | Check | Pinned value (v0.4.3) |
 | --- | --- |
 | Exact asset URL (the tag, never `latest`) | `releases/download/v0.4.3/MSStoreCLI-win-x64.zip` |
-| Archive SHA-256 and size, **before** extraction | `c5fb008b616f96b1b55f1d52e4e0a5dd8f6c156129b5f52f9b97ec0eed11bd57`, 57 635 931 bytes |
-| Authenticode `Valid`, signer subject, on `msstore.exe`, `msalruntime.dll`, `libSkiaSharp.dll` | `CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US` |
+| Archive SHA-256 and size, **before** extraction, on one private copy held open exclusively through the extraction | `c5fb008b616f96b1b55f1d52e4e0a5dd8f6c156129b5f52f9b97ec0eed11bd57`, 57 635 931 bytes |
+| Authenticode `Valid`, signer subject and issuing CA, on `msstore.exe`, `msalruntime.dll`, `libSkiaSharp.dll` | `CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US`, issued by `CN=Microsoft Code Signing PCA 2024, O=Microsoft Corporation, C=US` |
 | `msstore.exe` product version (read, not executed) | `0.4.3.2+193cb57f2a` (source commit `193cb57f2a58a50c9fd4d000fa12c6078852bb7a`) |
 
 Provenance of the pin (VERIFIED 2026-10-16, without running the CLI): the hash is the same in the
 downloaded file, GitHub's asset digest and the release's own `MSStoreCLI-win-x64.zip.sha256.txt`; the
 archive's SPDX build manifest names Microsoft's official build of `microsoft/msstore-cli` at
 `193cb57`. The release has no GitHub artifact attestation and the tag commit is unsigned, so the
-Authenticode signer and the pinned hash are the trust anchors. `Test-ReleaseWorkflowShape.ps1` (M-1)
+Authenticode signer and the pinned hash are the trust anchors. The issuing CA is pinned exactly: the
+hash fixes the bytes, so the signature (and its issuer) of this release cannot change; a new release
+signed under another Microsoft CA is a pin update anyway. The thumbprint is not pinned (the signing
+certificate is renewed yearly; it adds nothing the hash does not already fix).
+
+The archive is copied into a new folder with a random name and opened once with `FileShare.None`;
+the hash and the extraction read that same handle, so the file cannot be swapped or rewritten between
+the check and the extraction (Vigil #66 L-1).
+
+**Known gap (documented, not enforced):** M-1 does not forbid another step from writing `GITHUB_PATH`
+and putting a different `msstore` ahead of the verified one. In the three Store workflows today the
+only other steps are the repository's own `run:` steps and two pinned actions, `actions/checkout` and
+(store-submit) `actions/download-artifact`; none of the `run:` steps writes `GITHUB_PATH` (VERIFIED by
+search), and neither action is expected to (HYPOTHESIS). A change adding one is a workflow change under
+review (Vigil #66 Nit-2). `Test-ReleaseWorkflowShape.ps1` (M-1)
 refuses the action, any other download of `msstore-cli`, an installer call with arguments, a condition
 or `continue-on-error` on it, and any `msstore` use before it.
 
@@ -640,7 +654,7 @@ Everything the workflows rely on runs offline:
 ./tools/release/Test-WorkflowRunInterpolation.ps1 -SelfTest # no inputs/steps/needs/event in run blocks
 ./tools/release/Test-WorkflowActionPins.ps1 -SelfTest     # actions pinned by full SHA (G8)
 ./tools/release/Test-ReleaseWorkflowShape.ps1 -SelfTest   # G2/G4/G6/runtime + P-1 stage/certify + M-1 pinned CLI wiring, 68 mutations
-./tools/release/Install-MsStoreCli.ps1 -SelfTest          # pinned Store CLI: pin shape, hash/size before extraction, signer, product version, PATH, 31 cases
+./tools/release/Install-MsStoreCli.ps1 -SelfTest          # pinned Store CLI: pin shape, hash/size before extraction on one held private copy (swap cases), signer + issuer, product version, PATH, 35 cases
 ```
 
 CI runs the version, provenance, publishing-hold, submission-update, in-flight, staged-draft, interpolation,

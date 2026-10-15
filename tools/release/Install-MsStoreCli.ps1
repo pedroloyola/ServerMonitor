@@ -13,9 +13,13 @@
     In order, any failure stops the run before the CLI is on PATH:
       1. the pin itself is well formed (exact GitHub release URL for the pinned tag, lowercase 64-hex
          hash, product version bound to the source commit, msstore.exe among the signed files);
-      2. the downloaded archive has the pinned size and SHA-256 (checked BEFORE anything is extracted);
+      2. the archive is copied into a freshly created folder with a random name and that copy is opened
+         ONCE, exclusively (FileShare.None); its size and SHA-256 are checked on that handle BEFORE
+         anything is extracted, and the extraction reads the same handle, so nothing can swap or rewrite
+         the bytes between the check and the extraction (Vigil #66 L-1);
       3. it is extracted into a fresh folder (an existing one is refused, so nothing stale can mix in);
-      4. every pinned file is there and carries a Valid Authenticode signature from the pinned signer;
+      4. every pinned file is there and carries a Valid Authenticode signature from the pinned signer
+         (certificate subject) and the pinned issuing CA (Vigil #66 Nit-1);
       5. msstore.exe reports exactly the pinned product version (version + source commit), read from its
          version resource, without running it.
     Only then is the folder appended to GITHUB_PATH, so the next steps run this msstore.exe.
@@ -34,9 +38,10 @@ param(
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.ZipFile
 
 $assetName = 'MSStoreCLI-win-x64.zip'
-$pinFields = @('comment', 'version', 'url', 'sha256', 'size', 'productVersion', 'sourceCommit', 'signerSubject', 'signedFiles')
+$pinFields = @('comment', 'version', 'url', 'sha256', 'size', 'productVersion', 'sourceCommit', 'signerSubject', 'signerIssuer', 'signedFiles')
 
 function Read-Pin([string] $Json) {
     $pin = $Json | ConvertFrom-Json
@@ -53,16 +58,18 @@ function Read-Pin([string] $Json) {
     $product = '\A' + [regex]::Escape($numeric) + '\.[0-9]+\+' + [regex]::Escape($pin.sourceCommit.Substring(0, 10)) + '\z'
     if ($pin.productVersion -cnotmatch $product) { throw "Pin: productVersion '$($pin.productVersion)' must be $numeric.<build>+<first 10 of sourceCommit>." }
     if ([string]::IsNullOrWhiteSpace($pin.signerSubject) -or $pin.signerSubject -cnotmatch '\ACN=[^,]+, O=') { throw 'Pin: signerSubject must be a certificate subject (CN=..., O=...).' }
+    if ([string]::IsNullOrWhiteSpace($pin.signerIssuer) -or $pin.signerIssuer -cnotmatch '\ACN=[^,]+, O=') { throw 'Pin: signerIssuer must be a certificate subject (CN=..., O=...).' }
     $files = @($pin.signedFiles)
     if ($files -cnotcontains 'msstore.exe') { throw 'Pin: signedFiles must include msstore.exe.' }
     foreach ($file in $files) { if ($file -cnotmatch '\A[A-Za-z0-9_.-]+\.(exe|dll)\z') { throw "Pin: signed file '$file' must be a plain .exe/.dll name." } }
     return $pin
 }
 
-function Assert-Archive([string] $Path, $Pin) {
-    $item = Get-Item -LiteralPath $Path
-    if ($item.Length -ne [long] $Pin.size) { throw "Archive size mismatch: $($item.Length) bytes, pinned $($Pin.size). Nothing was extracted." }
-    $hash = (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
+# Size and SHA-256 of the archive, read through the one handle the extraction will also read.
+function Assert-Archive([IO.FileStream] $Stream, $Pin) {
+    if ($Stream.Length -ne [long] $Pin.size) { throw "Archive size mismatch: $($Stream.Length) bytes, pinned $($Pin.size). Nothing was extracted." }
+    $Stream.Position = 0
+    $hash = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($Stream)).ToLowerInvariant()
     if ($hash -cne $Pin.sha256) { throw "Archive SHA-256 mismatch: $hash, pinned $($Pin.sha256). Nothing was extracted." }
 }
 
@@ -73,16 +80,33 @@ function Assert-Binaries([string] $Folder, $Pin) {
         $signature = Get-AuthenticodeSignature -LiteralPath $path
         if ($signature.Status -ne 'Valid' -or $signature.SignatureType -ne 'Authenticode') { throw "$file is not validly Authenticode-signed ($($signature.Status), $($signature.SignatureType))." }
         if ($signature.SignerCertificate.Subject -cne $Pin.signerSubject) { throw "$file signer '$($signature.SignerCertificate.Subject)' is not the pinned signer." }
+        if ($signature.SignerCertificate.Issuer -cne $Pin.signerIssuer) { throw "$file issuer '$($signature.SignerCertificate.Issuer)' is not the pinned issuer." }
     }
     $version = (Get-Item -LiteralPath (Join-Path $Folder 'msstore.exe')).VersionInfo.ProductVersion
     if ($version -cne $Pin.productVersion) { throw "msstore.exe product version '$version' is not the pinned '$($Pin.productVersion)'." }
 }
 
 # Verifies, extracts and verifies again. Returns the folder holding the verified msstore.exe.
-function Install-Verified($Pin, [string] $Archive, [string] $Target, [string] $PathFile) {
-    Assert-Archive $Archive $Pin
+# $BetweenCheckAndExtract is a self-test seam only (the script parameters cannot reach it): it runs after
+# the hash is accepted and before the extraction, to prove a swap at that moment changes nothing.
+function Install-Verified($Pin, [string] $Archive, [string] $Target, [string] $PathFile, [scriptblock] $BetweenCheckAndExtract) {
     if (Test-Path -LiteralPath $Target) { throw "Destination already exists: $Target. Refusing to mix a verified CLI with older files." }
-    Expand-Archive -LiteralPath $Archive -DestinationPath $Target
+    # L-1: a private copy in a folder created now with a random name (New-Item fails if it exists), opened
+    # once with FileShare.None and held until the extraction ends: the hash and the extraction read the same
+    # open file, which no other process can write, delete or rename meanwhile.
+    $private = Join-Path ([IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($Target))) ('msstore-cli-verify-' + [guid]::NewGuid().ToString('n'))
+    New-Item -ItemType Directory -Path $private | Out-Null
+    $held = Join-Path $private $assetName
+    Copy-Item -LiteralPath $Archive -Destination $held
+    $stream = [IO.File]::Open($held, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::None)
+    try {
+        Assert-Archive $stream $Pin
+        if ($BetweenCheckAndExtract) { & $BetweenCheckAndExtract $held }
+        $stream.Position = 0
+        $zip = [IO.Compression.ZipArchive]::new($stream, [IO.Compression.ZipArchiveMode]::Read, $true)
+        try { [IO.Compression.ZipFileExtensions]::ExtractToDirectory($zip, $Target) } finally { $zip.Dispose() }
+    }
+    finally { $stream.Dispose() }
     Assert-Binaries $Target $Pin
     if ($PathFile) { Add-Content -LiteralPath $PathFile -Value $Target -Encoding utf8 }
     return $Target
@@ -105,7 +129,7 @@ if (-not $SelfTest) {
         Invoke-WebRequest -Uri $pin.url -OutFile $ArchivePath -MaximumRetryCount 3 -RetryIntervalSec 5
     }
     $folder = Install-Verified $pin $ArchivePath $Destination $pathFile
-    Write-Host "msstore-cli $($pin.version) verified: SHA-256 $($pin.sha256), $($pin.size) bytes, Authenticode '$($pin.signerSubject)', product version $($pin.productVersion)."
+    Write-Host "msstore-cli $($pin.version) verified: SHA-256 $($pin.sha256), $($pin.size) bytes, Authenticode '$($pin.signerSubject)' issued by '$($pin.signerIssuer)', product version $($pin.productVersion)."
     if ($pathFile) { Write-Host "On PATH for the next steps: $folder" } else { Write-Host "Verified only (no PATH change): $folder" }
     exit 0
 }
@@ -143,6 +167,7 @@ try {
         @{ Name = 'msstore.exe not signature-checked'; Old = '"msstore.exe", '; New = ''; Reason = 'Pin: signedFiles must include msstore.exe' }
         @{ Name = 'signed file with a path'; Old = '"msalruntime.dll"'; New = '"..\\msalruntime.dll"'; Reason = 'Pin: signed file' }
         @{ Name = 'signer emptied'; Old = '"signerSubject": "CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US"'; New = '"signerSubject": ""'; Reason = 'Pin: signerSubject' }
+        @{ Name = 'issuer emptied'; Old = '"signerIssuer": "CN=Microsoft Code Signing PCA 2024, O=Microsoft Corporation, C=US"'; New = '"signerIssuer": ""'; Reason = 'Pin: signerIssuer' }
         @{ Name = 'unknown field (e.g. a skip switch)'; Old = '"version": "v0.4.3",'; New = '"version": "v0.4.3", "skipVerification": true,'; Reason = 'Pin: unknown field' }
         @{ Name = 'field removed'; Old = '"size": 57635931,'; New = ''; Reason = 'Pin: missing field' }
     )
@@ -156,6 +181,7 @@ try {
     #    and on the runner (this pwsh) stands in for msstore.exe; nothing is ever executed from an archive.
     $pwsh = (Get-Process -Id $PID).Path
     $signer = (Get-AuthenticodeSignature -LiteralPath $pwsh).SignerCertificate.Subject
+    $issuer = (Get-AuthenticodeSignature -LiteralPath $pwsh).SignerCertificate.Issuer
     $signedVersion = (Get-Item -LiteralPath $pwsh).VersionInfo.ProductVersion
     function New-Archive([string] $Name, [hashtable] $Files) {
         $stage = Join-Path $root "stage-$Name"
@@ -174,6 +200,7 @@ try {
             size = (Get-Item -LiteralPath $Zip).Length
             productVersion = $signedVersion
             signerSubject = $signer
+            signerIssuer = $issuer
             signedFiles = @('msstore.exe', 'helper.dll')
         }
         foreach ($key in $Override.Keys) { $pin[$key] = $Override[$key] }
@@ -183,6 +210,8 @@ try {
     $unsigned = New-Archive 'unsigned' @{ 'msstore.exe' = 'MZ not really a program'; 'helper.dll' = '<signed>' }
     $unsignedDll = New-Archive 'unsigned-dll' @{ 'msstore.exe' = '<signed>'; 'helper.dll' = 'not signed' }
     $missing = New-Archive 'missing' @{ 'msstore.exe' = '<signed>' }
+    # Same signed files as $good, plus a file no signature check looks at: only the hash protects it.
+    $swap = New-Archive 'swap' @{ 'msstore.exe' = '<signed>'; 'helper.dll' = '<signed>'; 'readme.txt' = 'x'; 'evil.dll' = 'planted' }
     $n = 0
     function Next-Target { $script:n++; return (Join-Path $root "install-$script:n") }
 
@@ -206,6 +235,28 @@ try {
     Test-Case 'signed by someone else refused' { Install-Verified (New-TestPin $good @{ signerSubject = 'CN=Contoso, O=Contoso' }) $good $t $null } 'msstore.exe signer'
     $t = Next-Target
     Test-Case 'other product version refused' { Install-Verified (New-TestPin $good @{ productVersion = '0.4.3.2+193cb57f2a' }) $good $t $null } "msstore.exe product version"
+    $t = Next-Target
+    Test-Case 'issued by another CA refused' { Install-Verified (New-TestPin $good @{ signerIssuer = 'CN=Contoso Code Signing CA, O=Contoso' }) $good $t $null } 'msstore.exe issuer'
+
+    # L-1: the source swapped right after the check changes nothing (the held private copy is extracted),
+    # and the held copy itself cannot be rewritten or deleted while it is checked and extracted.
+    $t = Next-Target
+    $source = Join-Path $root 'source.zip'; Copy-Item -LiteralPath $good -Destination $source
+    $swapPin = New-TestPin $good
+    Test-Case 'source swapped after the check: the verified bytes are extracted' {
+        Install-Verified $swapPin $source $t $null { param($held) Copy-Item -LiteralPath $swap -Destination $source -Force }
+    } $null { (Test-Path -LiteralPath (Join-Path $t 'readme.txt')) -and -not (Test-Path -LiteralPath (Join-Path $t 'evil.dll')) -and ((Get-FileHash -LiteralPath $source).Hash -eq (Get-FileHash -LiteralPath $swap).Hash) }
+    $t = Next-Target
+    $script:heldAttempts = @()
+    Test-Case 'held copy cannot be rewritten or deleted between check and extraction' {
+        Install-Verified $swapPin $good $t $null {
+            param($held)
+            try { [IO.File]::WriteAllBytes($held, [IO.File]::ReadAllBytes($swap)); $script:heldAttempts += 'write succeeded' } catch { $script:heldAttempts += 'write refused' }
+            try { [IO.File]::Delete($held); $script:heldAttempts += 'delete succeeded' } catch { $script:heldAttempts += 'delete refused' }
+            try { [IO.File]::Move($held, "$held.moved"); $script:heldAttempts += 'rename succeeded' } catch { $script:heldAttempts += 'rename refused' }
+        }
+    } $null { ($script:heldAttempts -join ',') -ceq 'write refused,delete refused,rename refused' -and -not (Test-Path -LiteralPath (Join-Path $t 'evil.dll')) }
+
     $t = Next-Target
     New-Item -ItemType Directory -Path $t | Out-Null
     Test-Case 'existing destination refused' { Install-Verified (New-TestPin $good) $good $t $null } 'Destination already exists'
@@ -231,9 +282,9 @@ try {
         Write-Host ("  {0}  install without GITHUB_PATH or -NoPath refused" -f $(if ($ok) { 'ok  ' } else { 'FAIL' }))
     } finally { $env:GITHUB_PATH = $saved; $global:LASTEXITCODE = 0 }
 
-    $total = 1 + $pinMutations.Count + 13
+    $total = 1 + $pinMutations.Count + 16
     if ($failed -gt 0) { throw "$failed of $total msstore pin cases are wrong." }
-    Write-Host "All $total msstore pin cases behaved as required (pin shape, hash and size before extraction, signer, product version, PATH)."
+    Write-Host "All $total msstore pin cases behaved as required (pin shape, hash and size before extraction on one held private copy, signer and issuer, product version, PATH)."
 }
 finally {
     $resolved = [IO.Path]::GetFullPath($root)

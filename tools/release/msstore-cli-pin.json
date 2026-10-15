@@ -7,5 +7,6 @@
   "productVersion": "0.4.3.2+193cb57f2a",
   "sourceCommit": "193cb57f2a58a50c9fd4d000fa12c6078852bb7a",
   "signerSubject": "CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US",
+  "signerIssuer": "CN=Microsoft Code Signing PCA 2024, O=Microsoft Corporation, C=US",
   "signedFiles": [ "msstore.exe", "msalruntime.dll", "libSkiaSharp.dll" ]
 }
