@@ -42,4 +42,52 @@ public sealed class WidgetStringsCultureParityTests
     {
         Assert.Equal(expected, WidgetStrings.ForCulture(CultureInfo.GetCultureInfo(culture)).Culture.Name);
     }
+
+    // ---- F-1 (REL.0D, Cortex A-lite): the card follows the PROFILE language, like the app -------------------------------
+
+    public static TheoryData<string[], string> Machines() => new()
+    {
+        { ["en-US", "pt-BR"], "pt-BR" },          // A (the VM): English app → English card
+        { ["pt-BR", "en-US"], "en-US" },          // B
+        { ["en-GB", "pt-PT"], "pt-PT" },          // C
+        { ["fr-FR", "pt-PT"], "pt-PT" },
+        { ["fr-FR"], "pt-PT" },
+        { [], "pt-BR" },
+        { ["de-DE", "pt", "en-US"], "en-US" },
+        { ["pt-AO"], "fr-FR" },
+        { ["EN-au", "pt-BR"], "pt-BR" },
+    };
+
+    [Theory]
+    [MemberData(nameof(Machines))]
+    public void The_profile_language_matches_the_app(string[] preferred, string display)
+    {
+        Assert.Equal(SupportedCultures.ProfileLanguage(preferred, display), WidgetStrings.ProfileLanguage(preferred, display));
+        Assert.Equal(
+            SupportedCultures.Resolve(SupportedCultures.ProfileLanguage(preferred, display)),
+            WidgetStrings.ForLanguages(preferred, display).Culture.Name);
+    }
+
+    [Theory]
+    [InlineData(new[] { "en-US", "pt-BR" }, "pt-BR", "en-US")] // A: not the display's PtBr
+    [InlineData(new[] { "pt-BR", "en-US" }, "en-US", "pt-BR")] // B
+    [InlineData(new[] { "en-GB", "pt-PT" }, "pt-PT", "en-US")] // C
+    public void The_card_follows_the_profile_not_the_display(string[] preferred, string display, string expected)
+    {
+        Assert.Equal(expected, WidgetStrings.ForLanguages(preferred, display).Culture.Name);
+    }
+
+    /// <summary>The provider's live entry point reads the preferred list (not CultureInfo.CurrentUICulture alone).</summary>
+    [Fact]
+    public void Current_reads_the_preferred_languages()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            Architecture.ProviderBoundaryTests.RepositoryRoot(), "src", "ServerMonitor.WidgetProvider", "Rendering", "WidgetStrings.cs"));
+
+        Assert.Contains(
+            "public static WidgetStrings Current() => ForLanguages(PreferredLanguages(), CultureInfo.CurrentUICulture.Name);",
+            source,
+            StringComparison.Ordinal);
+        Assert.Contains("GlobalizationPreferences.Languages", source, StringComparison.Ordinal);
+    }
 }

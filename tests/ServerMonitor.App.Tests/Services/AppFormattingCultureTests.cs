@@ -196,14 +196,12 @@ public sealed class AppFormattingCultureTests
         var apply = body.IndexOf("AppFormattingCulture.Apply(localization.FormattingCultureName, applyUiCulture);", StringComparison.Ordinal);
         Assert.True(resolve >= 0 && apply > resolve, "the service (and its Windows snapshot) must be resolved before Apply");
 
-        using var scope = new UiCultureScope("pt-BR");
-        var service = new LocalizationService(NullLogger<LocalizationService>.Instance, new FakeLanguageSettingsStore());
-        AppFormattingCulture.SetProcessUiCulture(CultureInfo.GetCultureInfo("en-US"));
-
-        var platform = typeof(LocalizationService)
-            .GetField("_platform", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
-            .GetValue(service);
-        Assert.Equal("pt-BR", Assert.IsType<LocalizationService.WindowsUiLanguagePlatform>(platform).SystemUiCultureName);
+        // F-1: the production constructor would now read the user's REAL preferred-language list, so its eagerness is
+        // pinned in the source (the platform is built in the constructor chain, never lazily) and the snapshot itself is
+        // proved over a fake list (TheRealPlatform_KeepsTheWindowsLanguages_AfterTheAppLanguageIsApplied).
+        var service = Architecture.AppSourceTree.CodeWithoutComments("Services/LocalizationService.cs");
+        Assert.Contains(": this(logger, new WindowsUiLanguagePlatform(), settings)", service, StringComparison.Ordinal);
+        Assert.DoesNotContain("Lazy<IUiLanguagePlatform>", service, StringComparison.Ordinal);
     }
 
     /// <summary>The defect as the human saw it: English chosen on a Portuguese (Brazil) Windows read "6,6 GB".</summary>
@@ -257,15 +255,19 @@ public sealed class AppFormattingCultureTests
     /// built, so the recovery hint and "Use system language" never read the app language back as "the system".
     /// </summary>
     [Fact]
-    public void TheRealPlatform_KeepsTheWindowsCulture_AfterTheAppLanguageIsApplied()
+    public void TheRealPlatform_KeepsTheWindowsLanguages_AfterTheAppLanguageIsApplied()
     {
         using var scope = new UiCultureScope("pt-BR");
-        var platform = new LocalizationService.WindowsUiLanguagePlatform();
+        var sameAsDisplay = new LocalizationService.WindowsUiLanguagePlatform(() => ["pt-BR", "en-US"]);
+        var profileFirst = new LocalizationService.WindowsUiLanguagePlatform(() => ["fr-FR", "en-GB", "pt-BR"]);
+        var unknown = new LocalizationService.WindowsUiLanguagePlatform(() => null);
 
         AppFormattingCulture.SetProcessUiCulture(CultureInfo.GetCultureInfo("en-US"));
 
         Assert.Equal("en-US", CultureInfo.CurrentUICulture.Name);
-        Assert.Equal("pt-BR", platform.SystemUiCultureName);
+        Assert.Equal(("pt-BR", "pt-BR"), (sameAsDisplay.SystemUiCultureName, sameAsDisplay.DisplayCultureName));
+        Assert.Equal(("en-GB", "pt-BR"), (profileFirst.SystemUiCultureName, profileFirst.DisplayCultureName)); // F-1: the profile
+        Assert.Equal(("pt-BR", "pt-BR"), (unknown.SystemUiCultureName, unknown.DisplayCultureName));
     }
 
     [Fact]

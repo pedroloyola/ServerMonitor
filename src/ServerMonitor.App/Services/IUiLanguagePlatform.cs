@@ -12,6 +12,18 @@ internal interface IUiLanguagePlatform
     /// <summary>The app's language override; empty or null when none is set.</summary>
     string? PrimaryLanguageOverride { get; set; }
 
-    /// <summary>The Windows UI culture name (empty for the invariant culture).</summary>
+    /// <summary>
+    /// The user's "system language" for this app (F-1, Cortex A-lite): the profile language
+    /// (<see cref="Core.Domain.SupportedCultures.ProfileLanguage"/> of the preferred-language list) - the source MRT loads
+    /// the text from without an override. Every language decision, the number format and "Use system language" read it.
+    /// Empty for the invariant culture.
+    /// </summary>
     string SystemUiCultureName { get; }
+
+    /// <summary>
+    /// F-1: the Windows DISPLAY language (<c>CultureInfo.CurrentUICulture</c> at startup). Only the legacy-hint CONDITION
+    /// reads it (v1.x decided by it), and the number format compares against it (.NET formats in it unless told
+    /// otherwise). By default the same as <see cref="SystemUiCultureName"/>: the common machine, display = first preferred.
+    /// </summary>
+    string DisplayCultureName => SystemUiCultureName;
 }

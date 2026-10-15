@@ -49,4 +49,33 @@ public static class SupportedCultures
 
         return Resolve(systemCulture);
     }
+
+    /// <summary>
+    /// F-1 (REL.0D, Cortex A-lite): the user's "system language" for this app - the first Windows preferred language
+    /// (Settings › Language › Preferred languages, <c>GlobalizationPreferences.Languages</c>) whose base language the app
+    /// has (en / pt), kept as the full tag (en-GB, pt-AO, …). That is the language MRT loads the text in when there is no
+    /// override (the profile list filtered by the manifest), so the decisions, the number format and the widget follow
+    /// the same source as the text. None of them in the list → the first entry (the app then shows its default); an
+    /// empty list → <paramref name="displayCulture"/>. Never <c>ApplicationLanguages.Languages</c>: after the app's own
+    /// override that list starts with the override itself.
+    /// </summary>
+    public static string ProfileLanguage(IReadOnlyList<string>? profileLanguages, string? displayCulture)
+    {
+        if (profileLanguages is null || profileLanguages.Count == 0)
+        {
+            return displayCulture ?? string.Empty;
+        }
+
+        foreach (var language in profileLanguages)
+        {
+            var subtags = (language ?? string.Empty).Split(['-', '_'], StringSplitOptions.RemoveEmptyEntries);
+            if (subtags.Length > 0
+                && (subtags[0].Equals("en", StringComparison.OrdinalIgnoreCase) || subtags[0].Equals("pt", StringComparison.OrdinalIgnoreCase)))
+            {
+                return language!;
+            }
+        }
+
+        return profileLanguages[0] ?? string.Empty;
+    }
 }

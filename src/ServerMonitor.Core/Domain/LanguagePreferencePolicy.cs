@@ -121,17 +121,26 @@ public static class LanguagePreferencePolicy
     /// <summary>
     /// The language the one-time legacy hint offers (the effective system language), or null when no hint is due.
     /// </summary>
-    public static string? LegacyHintTarget(string? persistedOverride, string? systemCulture, LanguageRecordRead record)
+    public static string? LegacyHintTarget(string? persistedOverride, string? systemCulture, LanguageRecordRead record) =>
+        LegacyHintTarget(persistedOverride, systemCulture, systemCulture, record);
+
+    /// <summary>
+    /// F-1 (Cortex A-lite §5): the CONDITION rebuilds what v1.x did, and v1.x decided by the Windows DISPLAY language
+    /// (<paramref name="displayCulture"/>): a pt-BR on a supported display was never written by v1.x, so it is a choice and
+    /// gets no hint. The TARGET offered is what the user has now, the profile language (<paramref name="profileLanguage"/>).
+    /// </summary>
+    public static string? LegacyHintTarget(
+        string? persistedOverride, string? displayCulture, string? profileLanguage, LanguageRecordRead record)
     {
         ArgumentNullException.ThrowIfNull(record);
         if (record.State is not (LanguageRecordState.Absent or LanguageRecordState.OtherWriter)
             || !Same(persistedOverride, SupportedCultures.BrazilianPortuguese)
-            || SupportedCultures.IsSupported(systemCulture))
+            || SupportedCultures.IsSupported(displayCulture))
         {
             return null;
         }
 
-        var effective = EffectiveSystemLanguage(systemCulture);
+        var effective = EffectiveSystemLanguage(profileLanguage);
         return Same(effective, SupportedCultures.BrazilianPortuguese) ? null : effective;
     }
 
@@ -156,6 +165,23 @@ public static class LanguagePreferencePolicy
         }
 
         return persistedOverride;
+    }
+
+    /// <summary>
+    /// F-1 (Cortex A-lite §3): the culture the launch makes the process format in, or null to leave .NET on the display
+    /// language. <see cref="FormattingCulture"/> over the PROFILE language, else the profile language itself when it is
+    /// not the display language (the text then comes from the profile list, so the numbers must too: display pt-BR with
+    /// [en-US, …] formats en-US; display pt-PT with [en-GB, …] formats en-GB, the user's own variant).
+    /// </summary>
+    public static string? AppliedFormattingCulture(
+        string? persistedOverride, string? profileLanguage, string? displayCulture, LanguageRecordRead record)
+    {
+        if (FormattingCulture(persistedOverride, profileLanguage, record) is { } culture)
+        {
+            return culture;
+        }
+
+        return string.IsNullOrWhiteSpace(profileLanguage) || Same(profileLanguage, displayCulture) ? null : profileLanguage;
     }
 
     private static bool SameLanguage(string left, string? right)
