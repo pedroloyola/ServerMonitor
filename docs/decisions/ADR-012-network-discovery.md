@@ -109,7 +109,10 @@ com todo o tempo via **`TimeProvider` injetável** (seams prontos para `FakeTime
 
 - **Cadência de query**: `QueryParameters.QueryInterval` é configurada a partir das opções para
   **30 s** (default da biblioteca é 10 s), validada positiva e limitada a [5 s, 5 min].
-- **Expiry** por observação/interface: dimensionado em ~3× a cadência de 30 s (default 95 s).
+- **Expiry** por observação/interface: rede de segurança **mais longa do que uma pesquisa**
+  (default 11 min = `MaxSearchDuration` 10 min + 1 min de margem). Ver a emenda REL.0D O-8 abaixo;
+  o valor original (95 s, ~3× a cadência de 30 s) assumia um evento por re-anúncio que a
+  biblioteca não emite.
 - **Grace de remoção**: um goodbye/`ServiceRemoved` só remove após ~5 s, evitando piscar em
   flaps ou re-anúncios imediatos; o sweep finaliza.
 - **Notificações apenas em mudança material**: `DiscoveredChanged` dispara só quando o conjunto
@@ -119,6 +122,21 @@ com todo o tempo via **`TimeProvider` injetável** (seams prontos para `FakeTime
 - **Defesa contra flood**: o conjunto rastreado é limitado a 512 records e reserva pelo menos
   256 lugares para sugestões visíveis, impedindo identidades ignoradas de esgotarem a store;
   excedentes são descartados (log Debug).
+- **Emenda 2026-10-15 (REL.0D O-8) — expiry:**
+  - **Razão:** o Tmds.MDns 0.9.1 levanta `ServiceAdded` uma vez e depois **nada** enquanto o
+    host responde às re-queries com registos iguais (não guarda TTL; `ServiceChanged` só com uma
+    diferença real). O `LastSeenAt` nunca era renovado, e cada sugestão viva desaparecia ~95 s
+    depois de aparecer, com o host ainda a anunciar.
+  - **Decisão:** `ExpiryWindow` passa a 11 min, mais do que `MaxSearchDuration` (10 min), e
+    nunca dispara dentro de uma pesquisa. A vivacidade vem da biblioteca: goodbye/TTL 0 e a
+    remoção por robustez (queries sem resposta) levantam `Removed`, a que se seguem os 5 s de
+    grace. O fim da pesquisa (limite, NothingFound, Parar, esconder a janela, navegar)
+    continua a fechar o listener e a limpar o estado transitório. Sem cache persistente, sem
+    descoberta no arranque, sem mudanças em SSH ou host-key trust.
+  - **Limitação residual:** um dispositivo que desaparece em silêncio (sem goodbye) pode
+    continuar listado até ao fim da pesquisa, no máximo 10 min. Selecioná-lo continua a passar
+    pelo teste de ligação normal e pela confiança de host-key (TOFU); nada é confiado
+    automaticamente.
 - **Lifecycle**: `IHostedService` ligado ao host. `Start/Stop` idempotentes; gerações vedam
   callbacks antigos após Stop/restart e tarefas de sweep/notificação são canceladas e drenadas.
   O shutdown da janela é bounded e só dispõe o host depois de `StopAsync` realmente terminar,
@@ -142,7 +160,9 @@ com todo o tempo via **`TimeProvider` injetável** (seams prontos para `FakeTime
   sem Avahi não surge — daí o scan de subnet/manual como camadas futuras.
 - Descoberta é apenas na rede local elegível; VPNs (Tailscale/WireGuard) como redes confiáveis
   ficam para o futuro (§61).
-- Sem TTL da biblioteca, o expiry é heurístico (95 s) e não igual ao TTL real do anúncio.
+- Sem TTL da biblioteca nem evento para re-anúncios iguais, o expiry não deteta um host que
+  desaparece em silêncio dentro de uma pesquisa; fica listado até ao fim dela, no máximo 10 min
+  (REL.0D O-8).
 
 ## Dependência distribuída
 

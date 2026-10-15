@@ -130,27 +130,64 @@ public sealed class ServerDiscoveryServiceTests
         Assert.Equal(2, h.ChangeCount);
     }
 
+    // REL.0D O-8: Tmds.MDns 0.9.1 raises ServiceAdded once and then nothing while a host keeps answering the 30 s
+    // re-queries with unchanged records (no TTL is stored, ServiceChanged needs a real difference). These tests model
+    // that: Found once, no Updated, ever. The suggestion used to drop at 95 s although the host was still announcing.
     [Fact]
-    public async Task RenewalRestartsNinetyFiveSecondExpiryWindow()
+    public async Task FoundOnceWithoutAnyUpdate_StaysListedPast95SecondsAndForMinutes()
+    {
+        await using var h = await Harness.StartAsync();
+        h.Browser.EmitFound(h.Observation("Server", "server"));
+        var discoveryId = Assert.Single(h.Service.GetDiscovered()).DiscoveryId;
+
+        foreach (var at in new[] { 94, 95, 96, 120, 300, 540 })
+        {
+            h.Time.Advance(TimeSpan.FromSeconds(at) - (h.Time.GetUtcNow() - StartTime));
+            Assert.Equal(discoveryId, Assert.Single(h.Service.GetDiscovered()).DiscoveryId);
+        }
+
+        await h.FlushNotificationsAsync(1);
+        Assert.Equal(1, h.ChangeCount); // the appearance only; nothing dropped and came back
+    }
+
+    [Fact]
+    public async Task FoundOnceWithoutAnyUpdate_StaysListedForTheWholeDefaultSearch()
     {
         await using var h = await Harness.StartAsync();
         h.Browser.EmitFound(h.Observation("Server", "server"));
 
-        h.Time.Advance(TimeSpan.FromSeconds(90));
-        h.Browser.EmitUpdated(h.Observation("Server", "server"));
-        h.Time.Advance(TimeSpan.FromSeconds(94));
+        for (var elapsed = TimeSpan.Zero; elapsed < DiscoveryOptions.Default.MaxSearchDuration; elapsed += TimeSpan.FromSeconds(1))
+        {
+            h.Time.Advance(TimeSpan.FromSeconds(1));
+        }
+
+        Assert.Equal(DiscoveryOptions.Default.MaxSearchDuration, h.Time.GetUtcNow() - StartTime);
         Assert.Single(h.Service.GetDiscovered());
     }
 
     [Fact]
-    public async Task ObservationExpiresAtNinetyFiveSecondsWithoutRealWaiting()
+    public void DefaultExpiry_NeverFiresInsideASearch()
+    {
+        // The search's own end clears the store; the expiry is only a backstop and must outlast the longest search,
+        // with a margin for the sweep and the automatic stop.
+        Assert.True(DiscoveryOptions.Default.ExpiryWindow >= DiscoveryOptions.Default.MaxSearchDuration + TimeSpan.FromMinutes(1),
+            $"ExpiryWindow {DiscoveryOptions.Default.ExpiryWindow} must outlast MaxSearchDuration {DiscoveryOptions.Default.MaxSearchDuration} by 1 min");
+        Assert.Equal(TimeSpan.FromMinutes(10), DiscoveryOptions.Default.MaxSearchDuration);
+    }
+
+    [Fact]
+    public async Task GoodbyeLateInTheSearch_StillRemovesAfterGrace()
     {
         await using var h = await Harness.StartAsync();
-        h.Browser.EmitFound(h.Observation("Server", "server"));
-
-        h.Time.Advance(TimeSpan.FromSeconds(94));
+        var observation = h.Observation("Server", "server");
+        h.Browser.EmitFound(observation);
+        h.Time.Advance(TimeSpan.FromMinutes(5));
         Assert.Single(h.Service.GetDiscovered());
-        h.Time.Advance(TimeSpan.FromSeconds(1));
+
+        h.Browser.EmitRemoved(observation with { ObservedAt = h.Time.GetUtcNow() });
+        h.Time.Advance(TimeSpan.FromMilliseconds(4_999));
+        Assert.Single(h.Service.GetDiscovered());
+        h.Time.Advance(TimeSpan.FromMilliseconds(1));
         Assert.Empty(h.Service.GetDiscovered());
     }
 
@@ -559,7 +596,8 @@ public sealed class ServerDiscoveryServiceTests
             Service = new ServerDiscoveryService(Browser, Store,
                 NullLogger<ServerDiscoveryService>.Instance, Time, new DiscoveryOptions
                 {
-                    ExpiryWindow = TimeSpan.FromSeconds(95),
+                    // REL.0D O-8: the production expiry, so no test here leans on a renewal the real browser never sends.
+                    ExpiryWindow = DiscoveryOptions.Default.ExpiryWindow,
                     RemovalGrace = TimeSpan.FromSeconds(5),
                     SweepInterval = TimeSpan.FromSeconds(1),
                     ChangeNotificationDelay = TimeSpan.FromMilliseconds(100),
