@@ -1,3 +1,5 @@
+using ServerMonitor.Core.Discovery;
+
 namespace ServerMonitor.App.Services;
 
 /// <summary>
@@ -31,6 +33,15 @@ public interface IServerDiscoveryActivity
     /// leaves <see cref="IsSearching"/> false and does not throw (cancellation excepted).
     /// </summary>
     Task StartSearchAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// REL.0D O-7: as <see cref="StartSearchAsync(CancellationToken)"/>, but only a suggestion
+    /// <paramref name="isUsable"/> accepts (one the user could still add, e.g. not a server already configured) keeps the
+    /// search past <see cref="DiscoveryOptions.NothingFoundTimeout"/>. Called under the service's store lock on a
+    /// background thread: it must be cheap, lock-free and thread-safe. A stand-in without the bound ignores it.
+    /// </summary>
+    Task StartSearchAsync(Func<DiscoveredService, bool> isUsable, CancellationToken cancellationToken = default) =>
+        StartSearchAsync(cancellationToken);
 
     /// <summary>Stops searching. Idempotent; a later explicit action may start it again.</summary>
     Task StopSearchAsync(CancellationToken cancellationToken = default);

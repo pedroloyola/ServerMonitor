@@ -372,7 +372,11 @@
   <data name="DashboardEmptyDiscoveryStartButton.Content" xml:space="preserve"><value>Procurar na rede local</value></data>
   <data name="DashboardEmptyDiscoveryPermissionNote.Text" xml:space="preserve"><value>Encontra servidores SSH que se anunciam na sua rede local. O Windows pode pedir permissão de rede.</value></data>
   <data name="DashboardEmptyDiscoveryStartButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.HelpText" xml:space="preserve"><value>Encontra servidores SSH que se anunciam na sua rede local. O Windows pode pedir permissão de rede.</value></data>
-  <data name="DashboardEmptyDiscoveryNothingFound.Text" xml:space="preserve"><value>Nada encontrado na rede local.</value></data>
+  <data name="DashboardEmptyDiscoveryNothingFound.Text" xml:space="preserve"><value>Nenhum servidor SSH novo encontrado na rede local.</value></data>
+  <data name="DashboardEmptyDiscoveryStopButton.Content" xml:space="preserve"><value>Parar pesquisa</value></data>
+  <data name="DashboardEmptyDiscoveryStopButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Parar a pesquisa na rede local</value></data>
+  <data name="SettingsLocalNetworkStopButton.Content" xml:space="preserve"><value>Parar pesquisa</value></data>
+  <data name="SettingsLocalNetworkStopButton.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Parar a pesquisa na rede local</value></data>
   <data name="DashboardEmptyDiscoveryFailed.Text" xml:space="preserve"><value>Não foi possível procurar na rede local.</value></data>
   <data name="DashboardEmptyDiscoveryTimeLimit.Text" xml:space="preserve"><value>A pesquisa terminou após 10 minutos.</value></data>
   <data name="DashboardEmptyDiscoveryFoundFormat" xml:space="preserve"><value>Encontrado na rede local: {0}</value></data>

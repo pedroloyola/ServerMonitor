@@ -201,8 +201,11 @@
                         <StackPanel x:Name="LocalNetworkSearchingRow" Orientation="Horizontal" Spacing="{StaticResource SaSpace8}"
                                     Visibility="{x:Bind Discovery.IsLocalNetworkSearchRunning, Mode=OneWay}">
                             <ProgressRing Width="14" Height="14" IsActive="{x:Bind Discovery.IsLocalNetworkSearchRunning, Mode=OneWay}" />
-                            <TextBlock x:Uid="DashboardEmptyDiscoverySearching" Style="{StaticResource SaCaptionTextStyle}"
+                            <TextBlock x:Uid="DashboardEmptyDiscoverySearching" Style="{StaticResource SaCaptionTextStyle}" VerticalAlignment="Center"
                                        Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap" />
+                            <!-- REL.0D O-7: the explicit Stop (same stop as the hide path); shown only while a search runs. -->
+                            <HyperlinkButton x:Name="LocalNetworkStopButton" x:Uid="SettingsLocalNetworkStopButton" MinHeight="24" VerticalAlignment="Center"
+                                             Style="{StaticResource SaTextLinkButtonStyle}" Command="{x:Bind Discovery.StopLocalNetworkSearchCommand}" />
                         </StackPanel>
                         <TextBlock x:Name="LocalNetworkNothingFound" x:Uid="DashboardEmptyDiscoveryNothingFound" Style="{StaticResource SaCaptionTextStyle}"
                                    Foreground="{ThemeResource SaTextSecondaryBrush}" TextWrapping="Wrap"

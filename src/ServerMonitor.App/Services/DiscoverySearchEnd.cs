@@ -10,8 +10,9 @@ public enum DiscoverySearchEnd
     Stopped,
 
     /// <summary>
-    /// Ended by itself: nothing was EVER visible in this search within <see cref="DiscoveryOptions.NothingFoundTimeout"/>
-    /// (a result that appeared and expired keeps the search going to <see cref="TimeLimit"/>).
+    /// Ended by itself: nothing USABLE was ever visible in this search within <see cref="DiscoveryOptions.NothingFoundTimeout"/>
+    /// (a usable result that appeared and expired keeps the search going to <see cref="TimeLimit"/>). REL.0D O-7: servers
+    /// already configured, ignored devices and duplicates of those are not usable, so they do not keep a search alive.
     /// </summary>
     NothingFound,
 

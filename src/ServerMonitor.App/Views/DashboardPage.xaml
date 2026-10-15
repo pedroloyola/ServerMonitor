@@ -645,6 +645,10 @@
                                 <ItemsRepeater x:Name="EmptyDiscoveredRepeater"
                                                ItemsSource="{x:Bind ViewModel.DiscoveredServers}" ItemTemplate="{StaticResource DiscoveredRowTemplate}" />
                             </primitives:SaListHost>
+                            <!-- REL.0D O-7: the explicit Stop while a search runs, with or without suggestions listed above. -->
+                            <HyperlinkButton x:Name="EmptyDiscoveryStopButton" x:Uid="DashboardEmptyDiscoveryStopButton" HorizontalAlignment="Center" MinHeight="24"
+                                             Style="{StaticResource SaTextLinkButtonStyle}" Command="{x:Bind ViewModel.StopLocalNetworkSearchCommand}"
+                                             Visibility="{x:Bind ViewModel.ShowOverviewStopLocalNetworkSearch, Mode=OneWay}" />
 
                 </StackPanel></Grid>
                 <!-- G-15 derived: live hidden list, never first-server copy. -->
