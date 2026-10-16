@@ -129,10 +129,9 @@ DRAFT-GATE block in `README.md`.
   - the policy must be on `main` (merge of the privacy PR), because the URL shows `main`;
   - Partner Center work stays outside REL.0E (portal-only, no Store operations).
 
-  Open follow-up, not a gate on the URL: the name, storage location and data-processing terms
-  of the mailbox provider behind Cloudflare Email Routing are not publicly verifiable; the
-  policy names it only as a recipient category and makes no transfer claim for it. When the
-  owner records those facts, add them to the three policy files.
+  E-mail recipients are named from owner-confirmed facts: Cloudflare Email Routing (forwarding)
+  and Microsoft Outlook (the publisher's mailbox). No processing agreement with Microsoft is
+  claimed, because the Outlook account type was not verified.
 - **Widget screenshot (slot 08)**: it can only be captured from an installed package in the VM.
   If no VM capture exists at submission time, remove the `08-widget` line from all three caption
   files. Slot 09 keeps its name; only the order of the uploaded images matters.
