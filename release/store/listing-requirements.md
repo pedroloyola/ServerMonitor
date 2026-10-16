@@ -128,9 +128,9 @@ DRAFT-GATE block in `README.md`.
   snapshot, notifications, logs (none) and the Store data location. The gate stays until:
   - every `[NEEDS HUMAN: ...]` marker in the three files is resolved and removed. R2
     (2026-10-16) resolved publisher identity, privacy contact, Widgets board, children and
-    Uninstalling (measured in the QA VM). Still open: the legal review of the publisher's
-    obligations, the read-only Partner Center check of the reports Microsoft gives the
-    publisher, and the `runFullTrust` wording;
+    Uninstalling (measured in the QA VM); R3 resolved the `runFullTrust` wording. Still open:
+    the legal review of the publisher's obligations and the read-only Partner Center check of
+    the reports Microsoft gives the publisher;
   - the policy is merged on main, so the URL resolves publicly.
 
   Then remove the `GATED:` lines.

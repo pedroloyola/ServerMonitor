@@ -157,9 +157,12 @@ The app writes **no log files**.
   it. Windows may send diagnostic data to Microsoft, including reports of app crashes and hangs, according to
   your Windows diagnostic data settings and under the Microsoft Privacy Statement. ServerAlyzer adds nothing to
   it.
-- The package declares the `runFullTrust` capability, which desktop apps of this kind need in order to run as
-  a regular Windows desktop app. ServerAlyzer uses it only for what this policy describes. **[NEEDS HUMAN:
-  confirm this wording.]**
+- ServerAlyzer is a Windows desktop app and declares the Microsoft Store `runFullTrust` capability, so it runs
+  as a regular desktop program rather than inside the Store app sandbox. It needs this to connect over SSH to
+  the servers you add, to look for servers on your local network only when you start a search, to keep your
+  server passwords and passphrases in Windows Credential Manager on your device, and to provide notifications,
+  the notification-area (tray) icon and the Windows widget. This capability does not give the app administrator
+  rights.
 
 ## Links that open your browser
 
@@ -179,10 +182,14 @@ Hugeicons icons. Licences are listed in `THIRD-PARTY-NOTICES.md` in the reposito
 - You can also view and remove saved passwords in Windows **Credential Manager**.
 - **Uninstalling:** Windows removes the app's package data folder with the files listed above. Two things stay
   until you remove them yourself:
-  - passwords and passphrases in Windows Credential Manager: open **Credential Manager** → **Windows
-    Credentials** and remove the entries that start with `ServerMonitor:v1:ssh`;
-  - the Windows Firewall rules that Windows created if you allowed the local network search: open **Windows
-    Defender Firewall with Advanced Security** → **Inbound Rules** and remove the rules named `ServerMonitor.App`.
+  - **The SSH passwords and passphrases you saved**, in Windows Credential Manager. The entry names contain no
+    server name, address or user name. To remove them, open **Control Panel** → **Credential Manager** →
+    **Windows Credentials** → **Generic Credentials** and remove each entry that starts with
+    `ServerMonitor:v1:ssh` (or, if you used an early version, `pedroloyola.ServerMonitor:v1:ssh`).
+  - **The Windows Firewall rules named `ServerMonitor.App`**, if you chose **Allow** when Windows Firewall asked
+    during a local network search. Windows creates these rules; the app neither creates nor removes them. To
+    remove them, open **Windows Security** → **Firewall & network protection** → **Advanced settings** →
+    **Inbound Rules** and delete the rules named `ServerMonitor.App`.
 
   The app never changes your `.ssh` folder. Backup files you saved elsewhere are never touched.
 

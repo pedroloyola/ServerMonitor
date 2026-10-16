@@ -167,9 +167,13 @@ O aplicativo **não grava arquivos de log**.
   instalado com ele. O Windows pode enviar dados de diagnóstico à Microsoft, inclusive relatórios de falhas e
   travamentos de aplicativos, de acordo com suas configurações de dados de diagnóstico do Windows e nos termos
   da Política de Privacidade da Microsoft. O ServerAlyzer não acrescenta nada a eles.
-- O pacote declara a capacidade `runFullTrust`, de que aplicativos desse tipo precisam para funcionar como um
-  aplicativo de área de trabalho comum do Windows. O ServerAlyzer a usa somente para o que esta política
-  descreve. **[NEEDS HUMAN: confirmar esta redação.]**
+- O ServerAlyzer é um aplicativo de área de trabalho do Windows e declara a capacidade `runFullTrust` da
+  Microsoft Store, por isso é executado como um programa de área de trabalho comum, e não dentro da sandbox dos
+  aplicativos da Store. Ele precisa dela para se conectar por SSH aos servidores que você adicionar, para
+  procurar servidores na sua rede local somente quando você inicia uma pesquisa, para guardar as senhas e frases
+  secretas dos servidores no Gerenciador de Credenciais do Windows, no seu dispositivo, e para oferecer as
+  notificações, o ícone na área de notificação e o widget do Windows. Essa capacidade não dá ao aplicativo
+  direitos de administrador.
 
 ## Links que abrem o seu navegador
 
@@ -189,10 +193,15 @@ e os ícones Hugeicons. As licenças estão listadas em `THIRD-PARTY-NOTICES.md`
 - Você também pode ver e remover as senhas salvas no **Gerenciador de Credenciais** do Windows.
 - **Desinstalação:** o Windows remove a pasta de dados do pacote com os arquivos acima. Duas coisas permanecem
   até você removê-las:
-  - as senhas e frases secretas no Gerenciador de Credenciais do Windows: abra o **Gerenciador de
-    Credenciais** → **Credenciais do Windows** e remova as entradas que começam com `ServerMonitor:v1:ssh`;
-  - as regras do Firewall do Windows que o Windows criou se você permitiu a pesquisa na rede local: abra o
-    **Windows Defender Firewall com Segurança Avançada** → **Regras de Entrada** e remova as regras com o nome
+  - **As senhas e frases secretas SSH que você salvou**, no Gerenciador de Credenciais do Windows. Os nomes das
+    entradas não contêm o nome do servidor, o endereço nem o usuário. Para removê-las, abra o **Painel de
+    Controle** → **Gerenciador de Credenciais** → **Credenciais do Windows** → **Credenciais Genéricas** e remova
+    cada entrada que comece com `ServerMonitor:v1:ssh` (ou, se você usou uma versão antiga,
+    `pedroloyola.ServerMonitor:v1:ssh`).
+  - **As regras do Firewall do Windows com o nome `ServerMonitor.App`**, se você escolheu **Permitir** quando o
+    Firewall do Windows perguntou durante uma pesquisa na rede local. É o Windows que cria essas regras; o
+    aplicativo não as cria nem as remove. Para removê-las, abra a **Segurança do Windows** → **Firewall e
+    proteção de rede** → **Configurações avançadas** → **Regras de Entrada** e exclua as regras com o nome
     `ServerMonitor.App`.
 
   O aplicativo nunca altera sua pasta `.ssh`. Os arquivos de backup que você salvou em outro lugar nunca são
