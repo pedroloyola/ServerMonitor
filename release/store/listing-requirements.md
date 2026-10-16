@@ -116,6 +116,10 @@ DRAFT-GATE block in `README.md`.
   - pt-PT: "Podes procurar na tua rede local servidores SSH que se anunciam (mDNS/DNS-SD), a partir da Visão geral vazia ou em Definições › Dados e servidores. A pesquisa só corre quando a escolhes e nunca varre portas nem intervalos de endereços."
   - pt-BR: "Você pode procurar na sua rede local servidores SSH que se anunciam (mDNS/DNS-SD), a partir da Visão geral vazia ou em Configurações › Dados e servidores. A pesquisa só é feita quando você escolhe e nunca varre portas nem faixas de endereços."
   - Check the Settings labels against the merged resource strings before pasting.
+  - **Applied (REL.0E, 2026-10-16):** #52 is merged, so the sentence pair above is in all three
+    files, with the labels checked against the resource strings. One sentence was added for the
+    bounded search (O-7/O-8): it ends after about 40 seconds if no new server is found, and after
+    10 minutes at most. `whats-new.txt` was reconciled the same way.
 - **Privacy policy URL (submission gate)**: `support.txt` in all three files carries the URL with
   a `GATED:` line. Do not enter it in Partner Center, and do not submit the listing, until the
   gate is cleared. REL.0E rewrote the policy: `PRIVACY.md` (English, the single URL the Store uses
@@ -133,6 +137,8 @@ DRAFT-GATE block in `README.md`.
 - **Widget screenshot (slot 08)**: it can only be captured from an installed package in the VM.
   If no VM capture exists at submission time, remove the `08-widget` line from all three caption
   files. Slot 09 keeps its name; only the order of the uploaded images matters.
+  - **Applied (REL.0E, 2026-10-16):** there is no 08 capture, so the `08-widget` line was removed
+    from all three caption files. Add it back only together with a VM widget capture.
 
 ## Sources
 

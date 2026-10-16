@@ -2,14 +2,14 @@ Interface redesenhada e novos recursos desde o ServerAlyzer 1.1.
 
 Um novo visual. Uma barra lateral leva você à Visão geral, Servidores, Histórico e Configurações, cada servidor tem sua página de detalhes e o modo compacto e o widget do Windows 11 foram refeitos. O suporte a teclado, leitores de tela e alto contraste foi melhorado.
 
-Configuração mais simples. Um guia inicial ajuda você a adicionar o primeiro servidor. Você pode preencher um servidor com um host do seu arquivo de configuração SSH, o aplicativo sugere suas chaves privadas padrão da pasta .ssh e o teste de conexão mostra cada etapa, para você ver o que falhou.
+Configuração mais simples. Um guia inicial ajuda você a adicionar o primeiro servidor. Você pode preencher um servidor com um host do seu arquivo de configuração SSH, o aplicativo sugere suas chaves privadas padrão da pasta .ssh e o teste de conexão mostra cada etapa, para ver o que falhou.
 
 Jump hosts. Agora você pode usar servidores acessados por um único jump host (ProxyJump); a chave do jump host é verificada à parte.
 
-Backup criptografado. Em Configurações você pode salvar servidores, chaves de host confiáveis e senhas em um arquivo protegido por uma frase secreta escolhida por você, e restaurá-los depois. Os arquivos de chave privada nunca são incluídos.
+Backup criptografado. Em Configurações você pode salvar servidores, chaves de host confiáveis e senhas em um arquivo protegido por uma frase secreta de sua escolha, e restaurá-los depois. Os arquivos de chave privada nunca são incluídos.
 
 Idioma. Em uma instalação nova, se o Windows não estiver em português, o aplicativo abre em inglês. Um idioma já definido é mantido. Para mudar, use Configurações > Idioma e reinicie o aplicativo.
 
-A pesquisa na rede local só é feita quando você pede: na Visão geral vazia, escolha "Procurar na rede local"; o Windows pode pedir permissão de rede. Se você já tem servidores, os dispositivos da rede deixam de ser sugeridos.
+A pesquisa na rede local só é feita quando você pede, na Visão geral vazia ou em Configurações > Dados e servidores; o Windows pode pedir permissão de rede. Termina após cerca de 40 segundos sem servidores novos, ou após 10 minutos.
 
 O .NET agora vem incluído: você não precisa mais instalá-lo.

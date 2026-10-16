@@ -1,11 +1,11 @@
 # Dependabot keeps the pinned GitHub Actions visible, so an update is a decision someone
 # makes rather than something that drifts in unnoticed.
 #
-# microsoft/microsoft-store-apppublisher is pinned to a commit SHA on purpose: it is a
-# third-party action that installs the tool which can submit and publish to the Microsoft
-# Store. Dependabot will open a PR proposing a newer SHA and name the release it belongs to.
-# Merging that PR is the deliberate update; moving the reference to a floating tag such as
-# @v1.4 is not, and must not be done for convenience.
+# The Microsoft Store CLI is not an action any more: tools/release/msstore-cli-pin.json pins
+# one msstore-cli release by URL, SHA-256, signer and product version, and
+# tools/release/Install-MsStoreCli.ps1 refuses anything else. Dependabot cannot see that pin;
+# updating it is a reviewed pull request (docs/release-automation.md). Never re-introduce
+# microsoft-store-apppublisher: it installs whatever msstore-cli release is latest.
 version: 2
 updates:
   - package-ecosystem: github-actions
