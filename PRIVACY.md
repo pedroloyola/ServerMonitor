@@ -35,59 +35,79 @@ privately through GitHub Security Advisories on the same repository (Security ta
 
 ## What the publisher can and cannot receive
 
-ServerAlyzer involves three kinds of data, and this policy keeps them apart.
+ServerAlyzer involves four kinds of data, and this policy keeps them apart.
 
-- **Data that stays only on your device.** Everything described in "What is stored on your PC", "Files the app
-  reads on your PC", "Local network search", "Encrypted backup" and "Notifications and widget" is processed by
-  the app on your PC. The app never sends it to the publisher, so the publisher never receives, holds or sees
-  it.
-- **Messages you choose to send to the publisher.** An e-mail to **serveralyzer@pedroloyola.com**, or an issue, comment or security
-  report on GitHub. They contain what you write and your e-mail address or GitHub user name.
-- **Reports Microsoft shows the publisher in Partner Center.** Reports about the Store app that Microsoft
-  compiles and shows to the publisher, and the ratings and reviews published in the Store (see "Windows and
-  Microsoft components"). They are not ServerAlyzer telemetry.
-
-The Microsoft Store, Windows diagnostic data and the Widgets board are run by Microsoft under the
-[Microsoft Privacy Statement](https://privacy.microsoft.com/privacystatement), not under this policy.
+1. **Data that stays only on your device.** Everything described in "What is stored on your PC", "Files the app
+   reads on your PC", "Local network search", "Encrypted backup" and "Notifications and widget" is processed by
+   the app on your PC. The app never sends it to the publisher, so the publisher never receives, holds or sees
+   it.
+2. **Messages you choose to send to the publisher.** An e-mail to **serveralyzer@pedroloyola.com**, or an issue, comment or
+   private security report on GitHub.
+3. **Information Microsoft shows the publisher in Partner Center.** Reports about the Store app that Microsoft
+   compiles itself, and the ratings and reviews published in the Store (see "Windows and Microsoft
+   components"). They are not ServerAlyzer telemetry.
+4. **Data processed by Microsoft and other independent services.** The Microsoft Store, Windows (including its
+   diagnostic data and the Widgets board), GitHub and the e-mail service you use process data under their own
+   terms and privacy statements, for example the
+   [Microsoft Privacy Statement](https://privacy.microsoft.com/privacystatement), not under this policy.
 
 ## How the publisher handles the data it receives
 
-For the messages you send, and for its own use of the Partner Center reports, ratings and reviews, the publisher
-is the controller under the EU General Data Protection Regulation (GDPR). Microsoft's collection and
-compilation of those reports is governed by the Microsoft Privacy Statement.
+**Controller.** For the messages in point 2, and for its own use of the information in point 3, the controller
+under the EU General Data Protection Regulation (GDPR) is the publisher: Pedro Loyola (publisher name Pedro
+Loy), a natural person resident in Portugal, contact **serveralyzer@pedroloyola.com**. Microsoft's collection and
+compilation of the Partner Center information is governed by the Microsoft Privacy Statement.
 
-| | Messages you send | Partner Center reports, ratings and reviews |
+| | Messages you send (point 2) | Partner Center information (point 3) |
 |---|---|---|
-| **Purpose** | To read and answer your message, and to fix or improve what you report. | To understand installs, use and reliability of the app, fix crashes and hangs, and read and answer reviews. |
-| **Proposed legal basis** | Legitimate interests (GDPR Art. 6(1)(f)): answering messages that people send voluntarily and supporting the app they use. | Legitimate interests (GDPR Art. 6(1)(f)): maintaining the quality of the app, using the reports Microsoft provides to every Store publisher. |
-| **How long** | E-mails: as long as needed to handle your message and any follow-up, then deleted [OWNER: maximum period, or the criterion for deleting]. GitHub issues and comments: public, and they stay on GitHub until they are deleted; you can edit or delete your own comments, or ask the publisher to delete an issue or comment. Private security reports (GitHub Security Advisories): kept private while the problem is investigated and fixed; a resulting advisory may be published without your personal details, unless you ask to be credited [OWNER: confirm, and state how long a private report is kept after the fix]. | The publisher keeps no copies outside Partner Center [OWNER: confirm, or state the criterion]. Inside Partner Center, Microsoft's own terms apply. |
-| **Recipients** | The e-mail service that hosts the address above [OWNER: name of the e-mail provider]. For GitHub, GitHub, Inc., which publishes the content under its own [privacy statement](https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement). | Microsoft, which operates the Store and Partner Center. Reviews are public in the Store; Microsoft states that the name and picture of your Microsoft account may be shown with them. |
+| **Data** | What you write; your name and e-mail address as your e-mail program sends them, or your GitHub user name; and any technical details you choose to include. | Statistics about the Store app, such as page views, installs, sessions, crashes and hangs and the devices affected; and the ratings and reviews published in the Store, with the name Microsoft shows for each review. |
+| **Purpose** | To read and answer your message, and to investigate, fix or improve what you report. | To understand how the app is installed and used, find and fix crashes and hangs, and read and answer reviews. |
+| **Legal basis** | Legitimate interests (GDPR Art. 6(1)(f)): answering people who contact the publisher voluntarily and supporting the app. You start the contact, you expect a reply, and only what you choose to send is used. | Legitimate interests (GDPR Art. 6(1)(f)): keeping the app reliable and answering feedback. Microsoft provides this information to every Store publisher, it is mostly statistical, and reviews are already public. |
+| **How long** | E-mails: kept while needed to handle your message and any follow-up, and deleted at the latest 12 months after the last message in the conversation, unless they are needed for a legal claim. GitHub issues and comments: public, and kept on GitHub until they are deleted; you can edit or delete your own comments, or ask the publisher to delete an issue or comment. Private security reports: kept private on GitHub while the problem is investigated and fixed; the resulting advisory names you only if you ask to be credited; e-mails about a report follow the e-mail rule. | The publisher views this information in Partner Center only and does not export or download it. Inside Partner Center, Microsoft's terms apply. |
+| **Recipients** | The e-mail service provider that hosts the publisher's address, which processes the messages for the publisher. For content on GitHub, GitHub, Inc., which states that it acts as a controller under its own [privacy statement](https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement). No one else. | Microsoft, which operates the Store and Partner Center. Reviews are public in the Store; Microsoft states that the name and picture of your Microsoft account may be shown with them. No one else. |
 
-**Your rights.** You can ask the publisher, at **serveralyzer@pedroloyola.com**, for access to, correction or deletion of your data,
-or for the restriction of its processing; where it applies, you can also ask for data portability. The publisher
-answers without undue delay and within one month. The GDPR allows that period to be extended in complex cases;
-if so, the publisher tells you within the first month, with the reasons. Data that Microsoft holds is handled by
-Microsoft (see the Microsoft Privacy Statement). You can also lodge a complaint with a data protection
-supervisory authority; in Portugal, the Comissão Nacional de Proteção de Dados (CNPD, <https://www.cnpd.pt>).
+**No automated decisions.** No automated decision-making or profiling is carried out.
+
+**Your rights.** Under the GDPR you can ask the publisher for access to your data, its rectification or
+erasure, the restriction of its processing and, where the GDPR provides for it, its portability.
 
 **Your right to object.** Because the publisher relies on legitimate interests, you can object at any time, on
-grounds relating to your particular situation, to the processing of your data described above, by writing to
-**serveralyzer@pedroloyola.com**. The publisher then stops that processing, unless it demonstrates compelling legitimate
-grounds or needs the data for legal claims, as Article 21 of the GDPR provides.
+grounds relating to your particular situation, to the processing of your data described above. The publisher
+will then no longer process it, unless it demonstrates compelling legitimate grounds for the processing which
+override your interests, rights and freedoms, or the processing is for the establishment, exercise or defence of
+legal claims (GDPR Art. 21(1)).
+
+**How to make a request.** Send your request by e-mail to **serveralyzer@pedroloyola.com** and say what you are asking
+for. Requests are free of charge. If the publisher has reasonable doubts about who you are, it may ask only for
+the information needed to confirm your identity. The publisher replies without undue delay and within one
+month. That period may be extended by up to two further months where necessary, taking into account the
+complexity and number of requests; if so, the publisher tells you within the first month, with the reasons. For
+data that Microsoft or GitHub hold, such as your Microsoft account, your Store reviews or your GitHub account,
+contact them directly.
+
+**Complaints.** You can lodge a complaint with a data protection supervisory authority; in Portugal, the
+Comissão Nacional de Proteção de Dados (CNPD, <https://www.cnpd.pt>).
 
 **International transfers.** The publisher is in Portugal. GitHub states that it stores and processes personal
 data in several locations, including the United States, and relies on the European Commission's standard
 contractual clauses and on its certification under the EU-U.S. Data Privacy Framework
 ([GitHub privacy statement](https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement)). Microsoft states that it may store and process personal data in your region,
 the United States and other countries, and relies on the standard contractual clauses and on the EU-U.S. Data
-Privacy Framework (Microsoft Privacy Statement). [OWNER: where the e-mail provider stores mail, if outside the
-EU.]
+Privacy Framework (Microsoft Privacy Statement). If the publisher's e-mail service provider stores messages
+outside the European Economic Area, the transfer relies on a safeguard recognised by the GDPR, such as an
+adequacy decision or the European Commission's standard contractual clauses.
 
-**Brazil (LGPD).** This policy is also published in Brazilian Portuguese, and the app may be offered in the
-Brazilian Store [OWNER: confirm the markets]. **[NEEDS HUMAN: legal decision pending. A legal reviewer approves
-the purposes, legal bases, retention criteria, recipients and transfer wording above, decides whether the
-Brazilian LGPD applies (and, if so, adds its rights and the ANPD), and the owner fills in the [OWNER: …]
-items.]**
+**Brazil (LGPD).** Under its Article 3, Brazil's General Data Protection Law (LGPD) applies when the processing
+is carried out in Brazil, when it aims to offer or supply goods or services to, or process the data of,
+individuals located in Brazil, or when the personal data was collected in Brazil. Whether that is the case
+depends on these facts, for example whether ServerAlyzer is offered in the Brazilian Microsoft Store; the
+existence of a Brazilian Portuguese version of this policy does not, on its own, make the LGPD apply. Where the
+LGPD applies, you also have the rights in its Article 18, which you can exercise at **serveralyzer@pedroloyola.com**, and
+you can complain to the Autoridade Nacional de Proteção de Dados (ANPD).
+
+**[NEEDS HUMAN: owner final approval pending. The owner approves this section, including the proposals listed
+as owner approval items in the R8 report: e-mail retention, no exports of Partner Center information, the e-mail
+provider wording and the LGPD wording.]**
 
 ## How monitoring works
 
@@ -191,7 +211,7 @@ nowhere, and it can only be read on your PC with Windows diagnostic tools (event
   These reports are not ServerAlyzer telemetry: the app sends nothing for them, does not use the Microsoft
   Store Services SDK and logs no custom events.
 - **Diagnostic data.** The app is built on Windows and the Windows App SDK, a Microsoft runtime installed with
-  it. Windows may send diagnostic data to Microsoft, including reports of app crashes and hangs, according to
+  it. Windows may send diagnostic data to Microsoft, including reports of app crashes and hangs through Windows Error Reporting, according to
   your Windows diagnostic data settings and under the Microsoft Privacy Statement. ServerAlyzer adds nothing to
   it.
 - ServerAlyzer is a Windows desktop app and declares the Microsoft Store `runFullTrust` capability, so it runs

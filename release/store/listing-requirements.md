@@ -129,8 +129,9 @@ DRAFT-GATE block in `README.md`.
   - every `[NEEDS HUMAN: ...]` marker in the three files is resolved and removed. R2
     (2026-10-16) resolved publisher identity, privacy contact, Widgets board, children and
     Uninstalling (measured in the QA VM); R3 resolved the `runFullTrust` wording; R6 resolved
-    the Partner Center reports (owner's read-only check). Still open: the legal review of the
-    publisher's GDPR Art. 13 wording and the LGPD question, and the `[OWNER: …]` items;
+    the Partner Center reports (owner's read-only check); R8 wrote the final internal GDPR
+    Art. 12-14 and LGPD wording with recommended proposals. Still open: the owner's final
+    approval of that section (one NEEDS HUMAN line per file);
   - the policy is merged on main, so the URL resolves publicly.
 
   Then remove the `GATED:` lines.

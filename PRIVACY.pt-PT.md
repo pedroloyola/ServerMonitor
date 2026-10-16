@@ -36,63 +36,82 @@ dos GitHub Security Advisories do mesmo repositório (separador Security), e nã
 
 ## O que o editor pode e não pode receber
 
-O ServerAlyzer envolve três tipos de dados, e esta política mantém-nos separados.
+O ServerAlyzer envolve quatro tipos de dados, e esta política mantém-nos separados.
 
-- **Dados que ficam só no teu dispositivo.** Tudo o que está descrito em "O que fica guardado no teu PC",
-  "Ficheiros que a aplicação lê no teu PC", "Pesquisa na rede local", "Cópia de segurança encriptada" e
-  "Notificações e widget" é tratado pela aplicação no teu PC. A aplicação nunca o envia ao editor, por isso o
-  editor nunca o recebe, guarda ou vê.
-- **Mensagens que decides enviar ao editor.** Um e-mail para **serveralyzer@pedroloyola.com**, ou um issue, comentário ou relatório
-  de segurança no GitHub. Contêm o que escreves e o teu endereço de e-mail ou nome de utilizador do GitHub.
-- **Relatórios que a Microsoft mostra ao editor no Partner Center.** Relatórios sobre a aplicação na Store que
-  a Microsoft compila e mostra ao editor, e as classificações e críticas publicadas na Store (ver "Componentes
-  do Windows e da Microsoft"). Não são telemetria do ServerAlyzer.
-
-A Microsoft Store, os dados de diagnóstico do Windows e o painel de Widgets são geridos pela Microsoft ao
-abrigo da [Declaração de Privacidade da Microsoft](https://privacy.microsoft.com/pt-pt/privacystatement), e não
-desta política.
+1. **Dados que ficam só no teu dispositivo.** Tudo o que está descrito em "O que fica guardado no teu PC",
+   "Ficheiros que a aplicação lê no teu PC", "Pesquisa na rede local", "Cópia de segurança encriptada" e
+   "Notificações e widget" é tratado pela aplicação no teu PC. A aplicação nunca o envia ao editor, por isso o
+   editor nunca o recebe, guarda ou vê.
+2. **Mensagens que decides enviar ao editor.** Um e-mail para **serveralyzer@pedroloyola.com**, ou um issue, comentário ou
+   relatório de segurança privado no GitHub.
+3. **Informação que a Microsoft mostra ao editor no Partner Center.** Relatórios sobre a aplicação na Store que
+   a própria Microsoft compila, e as classificações e críticas publicadas na Store (ver "Componentes do Windows
+   e da Microsoft"). Não são telemetria do ServerAlyzer.
+4. **Dados tratados pela Microsoft e por outros serviços independentes.** A Microsoft Store, o Windows
+   (incluindo os seus dados de diagnóstico e o painel de Widgets), o GitHub e o serviço de e-mail que usas tratam
+   dados ao abrigo dos seus próprios termos e declarações de privacidade, por exemplo a
+   [Declaração de Privacidade da Microsoft](https://privacy.microsoft.com/pt-pt/privacystatement), e não desta
+   política.
 
 ## Como o editor trata os dados que recebe
 
-Quanto às mensagens que envias, e quanto ao uso que o próprio editor faz dos relatórios, classificações e
-críticas do Partner Center, o editor é o responsável pelo tratamento nos termos do Regulamento Geral sobre a
-Proteção de Dados (RGPD). A recolha e a compilação desses relatórios pela Microsoft regem-se pela Declaração de
-Privacidade da Microsoft.
+**Responsável pelo tratamento.** Quanto às mensagens do ponto 2, e quanto ao uso que o próprio editor faz da
+informação do ponto 3, o responsável pelo tratamento nos termos do Regulamento Geral sobre a Proteção de Dados
+(RGPD) é o editor: Pedro Loyola (nome de editor Pedro Loy), pessoa singular residente em Portugal, contacto
+**serveralyzer@pedroloyola.com**. A recolha e a compilação da informação do Partner Center pela Microsoft regem-se pela
+Declaração de Privacidade da Microsoft.
 
-| | Mensagens que envias | Relatórios do Partner Center, classificações e críticas |
+| | Mensagens que envias (ponto 2) | Informação do Partner Center (ponto 3) |
 |---|---|---|
-| **Finalidade** | Ler e responder à tua mensagem, e corrigir ou melhorar o que comunicas. | Perceber as instalações, a utilização e a fiabilidade da aplicação, corrigir falhas e bloqueios, e ler e responder às críticas. |
-| **Fundamento jurídico proposto** | Interesses legítimos (artigo 6.º, n.º 1, alínea f), do RGPD): responder a mensagens enviadas voluntariamente e dar apoio à aplicação que usas. | Interesses legítimos (artigo 6.º, n.º 1, alínea f), do RGPD): manter a qualidade da aplicação, usando os relatórios que a Microsoft disponibiliza a todos os editores da Store. |
-| **Durante quanto tempo** | E-mails: o tempo necessário para tratar a tua mensagem e o seguimento, sendo depois apagados [OWNER: prazo máximo, ou o critério para apagar]. Issues e comentários no GitHub: são públicos e ficam no GitHub até serem apagados; podes editar ou apagar os teus comentários, ou pedir ao editor que apague um issue ou comentário. Relatórios de segurança privados (GitHub Security Advisories): ficam privados enquanto o problema é investigado e corrigido; um aviso de segurança resultante pode ser publicado sem os teus dados pessoais, a não ser que peças para ser creditado [OWNER: confirmar, e indicar durante quanto tempo um relatório privado é guardado depois da correção]. | O editor não guarda cópias fora do Partner Center [OWNER: confirmar, ou indicar o critério]. Dentro do Partner Center aplicam-se os termos da própria Microsoft. |
-| **Destinatários** | O serviço de e-mail que aloja o endereço acima [OWNER: nome do fornecedor de e-mail]. No GitHub, a GitHub, Inc., que publica o conteúdo ao abrigo da sua própria [declaração de privacidade](https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement). | A Microsoft, que gere a Store e o Partner Center. As críticas são públicas na Store; a Microsoft indica que o nome e a imagem da tua conta Microsoft podem ser mostrados com elas. |
+| **Dados** | O que escreves; o teu nome e endereço de e-mail tal como o teu programa de e-mail os envia, ou o teu nome de utilizador do GitHub; e os detalhes técnicos que decidas incluir. | Estatísticas sobre a aplicação na Store, como visualizações da página, instalações, sessões, falhas e bloqueios e os dispositivos afetados; e as classificações e críticas publicadas na Store, com o nome que a Microsoft mostra em cada crítica. |
+| **Finalidade** | Ler e responder à tua mensagem, e investigar, corrigir ou melhorar o que comunicas. | Perceber como a aplicação é instalada e usada, encontrar e corrigir falhas e bloqueios, e ler e responder às críticas. |
+| **Fundamento jurídico** | Interesses legítimos (artigo 6.º, n.º 1, alínea f), do RGPD): responder a quem contacta o editor voluntariamente e dar apoio à aplicação. És tu que inicias o contacto, esperas uma resposta, e só é usado o que decides enviar. | Interesses legítimos (artigo 6.º, n.º 1, alínea f), do RGPD): manter a aplicação fiável e responder ao feedback. A Microsoft disponibiliza esta informação a todos os editores da Store, é sobretudo estatística, e as críticas já são públicas. |
+| **Durante quanto tempo** | E-mails: guardados enquanto forem necessários para tratar a tua mensagem e o seguimento, e apagados o mais tardar 12 meses depois da última mensagem da conversa, salvo se forem necessários para um processo judicial. Issues e comentários no GitHub: são públicos e ficam no GitHub até serem apagados; podes editar ou apagar os teus comentários, ou pedir ao editor que apague um issue ou comentário. Relatórios de segurança privados: ficam privados no GitHub enquanto o problema é investigado e corrigido; o aviso de segurança resultante só te identifica se pedires para ser creditado; os e-mails sobre um relatório seguem a regra dos e-mails. | O editor consulta esta informação apenas no Partner Center e não a exporta nem descarrega. Dentro do Partner Center aplicam-se os termos da Microsoft. |
+| **Destinatários** | O fornecedor do serviço de e-mail que aloja o endereço do editor, que trata as mensagens por conta do editor. Quanto ao conteúdo no GitHub, a GitHub, Inc., que indica agir como responsável pelo tratamento ao abrigo da sua própria [declaração de privacidade](https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement). Mais ninguém. | A Microsoft, que gere a Store e o Partner Center. As críticas são públicas na Store; a Microsoft indica que o nome e a imagem da tua conta Microsoft podem ser mostrados com elas. Mais ninguém. |
 
-**Os teus direitos.** Podes pedir ao editor, através de **serveralyzer@pedroloyola.com**, o acesso aos teus dados, a sua
-retificação ou o seu apagamento, ou a limitação do tratamento; quando se aplique, podes também pedir a
-portabilidade dos dados. O editor responde sem demora injustificada e no prazo de um mês. O RGPD permite
-prorrogar esse prazo em casos complexos; nesse caso, o editor informa-te no primeiro mês, com os motivos. Os
-dados que a Microsoft detém são tratados pela Microsoft (ver a Declaração de Privacidade da Microsoft). Podes
-também apresentar reclamação a uma autoridade de controlo; em Portugal, a Comissão Nacional de Proteção de
-Dados (CNPD, <https://www.cnpd.pt>).
+**Sem decisões automatizadas.** Não há decisões automatizadas nem definição de perfis.
+
+**Os teus direitos.** Nos termos do RGPD, podes pedir ao editor o acesso aos teus dados, a sua retificação ou
+apagamento, a limitação do seu tratamento e, quando o RGPD o preveja, a sua portabilidade.
 
 **O teu direito de oposição.** Como o editor se baseia em interesses legítimos, podes opor-te a qualquer
-momento, por motivos relacionados com a tua situação particular, ao tratamento dos teus dados descrito acima,
-escrevendo para **serveralyzer@pedroloyola.com**. O editor deixa então de fazer esse tratamento, a não ser que apresente
-razões imperiosas e legítimas ou precise dos dados para efeitos de um processo judicial, como prevê o artigo
-21.º do RGPD.
+momento, por motivos relacionados com a tua situação particular, ao tratamento dos teus dados descrito acima. O
+editor deixa então de os tratar, a não ser que apresente razões imperiosas e legítimas para esse tratamento que
+prevaleçam sobre os teus interesses, direitos e liberdades, ou para efeitos de declaração, exercício ou defesa
+de um direito num processo judicial (artigo 21.º, n.º 1, do RGPD).
+
+**Como fazer um pedido.** Envia o teu pedido por e-mail para **serveralyzer@pedroloyola.com** e diz o que pedes. Os
+pedidos são gratuitos. Se o editor tiver dúvidas razoáveis quanto à tua identidade, pode pedir-te apenas a
+informação necessária para a confirmar. O editor responde sem demora injustificada e no prazo de um mês. Esse
+prazo pode ser prorrogado até dois meses, quando necessário, tendo em conta a complexidade e o número de
+pedidos; nesse caso, o editor informa-te no primeiro mês, com os motivos. Quanto aos dados que a Microsoft ou o
+GitHub detêm, como a tua conta Microsoft, as tuas críticas na Store ou a tua conta do GitHub, contacta-os
+diretamente.
+
+**Reclamações.** Podes apresentar reclamação a uma autoridade de controlo; em Portugal, a Comissão Nacional de
+Proteção de Dados (CNPD, <https://www.cnpd.pt>).
 
 **Transferências internacionais.** O editor está em Portugal. O GitHub indica que guarda e trata dados pessoais
 em vários locais, incluindo os Estados Unidos, e que recorre às cláusulas contratuais-tipo da Comissão Europeia
 e à sua certificação ao abrigo do Quadro de Privacidade de Dados UE-EUA
 ([declaração de privacidade do GitHub](https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement)). A Microsoft indica que pode guardar e tratar dados pessoais na tua
 região, nos Estados Unidos e noutros países, e que recorre às cláusulas contratuais-tipo e ao Quadro de
-Privacidade de Dados UE-EUA (Declaração de Privacidade da Microsoft). [OWNER: onde o fornecedor de e-mail guarda
-o correio, se for fora da UE.]
+Privacidade de Dados UE-EUA (Declaração de Privacidade da Microsoft). Se o fornecedor do serviço de e-mail do
+editor guardar mensagens fora do Espaço Económico Europeu, a transferência assenta numa garantia reconhecida pelo
+RGPD, como uma decisão de adequação ou as cláusulas contratuais-tipo da Comissão Europeia.
 
-**Brasil (LGPD).** Esta política é também publicada em português do Brasil, e a aplicação pode ser
-disponibilizada na Store brasileira [OWNER: confirmar os mercados]. **[NEEDS HUMAN: decisão jurídica pendente.
-Um revisor jurídico aprova as finalidades, os fundamentos jurídicos, os critérios de conservação, os
-destinatários e a redação sobre transferências acima, decide se a LGPD brasileira se aplica (e, se sim,
-acrescenta os seus direitos e a ANPD), e o editor preenche os itens [OWNER: …].]**
+**Brasil (LGPD).** Nos termos do seu artigo 3.º, a Lei Geral de Proteção de Dados brasileira (LGPD) aplica-se
+quando o tratamento é realizado no Brasil, quando tem por objetivo a oferta ou o fornecimento de bens ou
+serviços, ou o tratamento de dados, de pessoas localizadas no Brasil, ou quando os dados pessoais foram
+recolhidos no Brasil. Se é esse o caso depende destes factos, por exemplo se o ServerAlyzer é disponibilizado na
+Microsoft Store brasileira; a existência de uma versão desta política em português do Brasil não faz, por si só,
+com que a LGPD se aplique. Quando a LGPD se aplica, tens também os direitos do seu artigo 18.º, que podes exercer
+através de **serveralyzer@pedroloyola.com**, e podes apresentar reclamação à Autoridade Nacional de Proteção de Dados
+(ANPD).
+
+**[NEEDS HUMAN: aprovação final do editor pendente. O editor aprova esta secção, incluindo as propostas listadas
+como itens de aprovação do editor no relatório R8: conservação dos e-mails, não exportação da informação do
+Partner Center, redação sobre o fornecedor de e-mail e redação sobre a LGPD.]**
 
 ## Como funciona a monitorização
 
@@ -204,7 +223,7 @@ PC com ferramentas de diagnóstico do Windows (rastreio de eventos ou um depurad
   regista eventos personalizados.
 - **Dados de diagnóstico.** A aplicação assenta no Windows e no Windows App SDK, um runtime da Microsoft
   instalado com ela. O Windows pode enviar dados de diagnóstico à Microsoft, incluindo relatórios de falhas e
-  bloqueios de aplicações, de acordo com as tuas definições de dados de diagnóstico do Windows e ao abrigo da
+  bloqueios de aplicações através do Relatório de Erros do Windows (Windows Error Reporting), de acordo com as tuas definições de dados de diagnóstico do Windows e ao abrigo da
   Declaração de Privacidade da Microsoft. O ServerAlyzer não lhes acrescenta nada.
 - O ServerAlyzer é uma aplicação de ambiente de trabalho do Windows e declara a capacidade `runFullTrust` da
   Microsoft Store, pelo que funciona como um programa de ambiente de trabalho normal e não dentro da sandbox das
