@@ -148,7 +148,9 @@ Order of operations, and why:
 
 Sources: the CLI documentation (DOC) and the CLI source, `microsoft/msstore-cli` `main` at
 `5f15f06` (2026-10-06), `IStorePackagedAPIExtensions.PublishAsync` and the `submission` commands
-(VERIFIED by reading the source; no Store call was made).
+(VERIFIED by reading the source; no Store call was made). The pinned release, **v0.4.3**
+(`193cb57`), differs from `5f15f06` only in `version.json` (v0.4.3 side) and two unit-test fixtures
+(`5f15f06` side), so this behaviour is the pinned CLI's (VERIFIED with the GitHub compare API, REL.0E).
 
 - `--noCommit` is **not a dry run**: it creates or reuses a draft, uploads the package and updates the
   draft; it only skips the final commit (DOC: "`--noCommit` uploads the package and updates the
@@ -173,14 +175,46 @@ workflow ever calls `msstore publish` except that one upload with `--noCommit`. 
 Partner Center *between* the in-flight check and the upload (seconds) would still be deleted; the
 procedure below says not to edit the product in Partner Center while a stage run is in progress.
 
-**Gate on the first real dispatch (open, pre-existing Medium):** the Store CLI version is not pinned.
-`microsoft-store-apppublisher` installs the **latest** `msstore`, and that CLI receives the Store
-client secret in `reconfigure` and decides what is deleted or committed. Before the first real
-`store-submit` run, a person chooses a reviewed `msstore-cli` release and either pins the action's
-`version` input to it or adds a step between *Setup* and *Configure* that compares `msstore --version`
-with an allowlist in the repository and fails closed (Vigil, PR #56). The behaviour described above is
-the one documented today and read from `5f15f06`; re-read it whenever the pinned version changes.
-This is a gate on the dispatch, not on merging the workflows.
+**The Store CLI is pinned and verified (REL.0E; addresses the Vigil PR #56 Medium, whose closure is Vigil's call).** The
+CLI receives the Store client secret in `reconfigure` and decides what is deleted or committed, so the
+three Store workflows no longer use `microsoft-store-apppublisher` (which installed whatever release was
+**latest**, unchecked). Their *Setup* step runs `tools/release/Install-MsStoreCli.ps1`, which installs
+only the release named in `tools/release/msstore-cli-pin.json` and fails closed, before *Configure*:
+
+| Check | Pinned value (v0.4.3) |
+| --- | --- |
+| Exact asset URL (the tag, never `latest`) | `releases/download/v0.4.3/MSStoreCLI-win-x64.zip` |
+| Archive SHA-256 and size, **before** extraction, on one private copy held open exclusively through the extraction | `c5fb008b616f96b1b55f1d52e4e0a5dd8f6c156129b5f52f9b97ec0eed11bd57`, 57 635 931 bytes |
+| Authenticode `Valid`, signer subject and issuing CA, on `msstore.exe`, `msalruntime.dll`, `libSkiaSharp.dll` | `CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US`, issued by `CN=Microsoft Code Signing PCA 2024, O=Microsoft Corporation, C=US` |
+| `msstore.exe` product version (read, not executed) | `0.4.3.2+193cb57f2a` (source commit `193cb57f2a58a50c9fd4d000fa12c6078852bb7a`) |
+
+Provenance of the pin (VERIFIED 2026-10-16, without running the CLI): the hash is the same in the
+downloaded file, GitHub's asset digest and the release's own `MSStoreCLI-win-x64.zip.sha256.txt`; the
+archive's SPDX build manifest names Microsoft's official build of `microsoft/msstore-cli` at
+`193cb57`. The release has no GitHub artifact attestation and the tag commit is unsigned, so the
+Authenticode signer and the pinned hash are the trust anchors. The issuing CA is pinned exactly: the
+hash fixes the bytes, so the signature (and its issuer) of this release cannot change; a new release
+signed under another Microsoft CA is a pin update anyway. The thumbprint is not pinned (the signing
+certificate is renewed yearly; it adds nothing the hash does not already fix).
+
+The archive is copied into a new folder with a random name and opened once with `FileShare.None`;
+the hash and the extraction read that same handle, so the file cannot be swapped or rewritten between
+the check and the extraction (Vigil #66 L-1).
+
+**Known gap (documented, not enforced):** M-1 does not forbid another step from writing `GITHUB_PATH`
+and putting a different `msstore` ahead of the verified one. In the three Store workflows today the
+only other steps are the repository's own `run:` steps and two pinned actions, `actions/checkout` and
+(store-submit) `actions/download-artifact`; none of the `run:` steps writes `GITHUB_PATH` (VERIFIED by
+search), and neither action is expected to (HYPOTHESIS). A change adding one is a workflow change under
+review (Vigil #66 Nit-2). `Test-ReleaseWorkflowShape.ps1` (M-1)
+refuses the action, any other download of `msstore-cli`, an installer call with arguments, a condition
+or `continue-on-error` on it, and any `msstore` use before it.
+
+**Updating the CLI is a reviewed pull request:** take every value of the pin from the new release
+(digest, `.sha256.txt`, signature and product version of the extracted `msstore.exe`), re-read
+`PublishAsync` and the `submission` commands at the new tag, and run
+`./tools/release/Install-MsStoreCli.ps1 -ArchivePath <zip> -Destination <empty folder> -NoPath` on the
+downloaded archive. Dependabot cannot track a release-asset hash.
 
 ### 2b. `store-certify.yml` (the certification gate)
 
@@ -619,7 +653,8 @@ Everything the workflows rely on runs offline:
 ./tools/release/Test-HardeningMutations.ps1               # weaken each G4/G6 check and the pin/wiring guards; require detection
 ./tools/release/Test-WorkflowRunInterpolation.ps1 -SelfTest # no inputs/steps/needs/event in run blocks
 ./tools/release/Test-WorkflowActionPins.ps1 -SelfTest     # actions pinned by full SHA (G8)
-./tools/release/Test-ReleaseWorkflowShape.ps1 -SelfTest   # G2/G4/G6/runtime + P-1 stage/certify wiring, 47 mutations
+./tools/release/Test-ReleaseWorkflowShape.ps1 -SelfTest   # G2/G4/G6/runtime + P-1 stage/certify + M-1 pinned CLI wiring, 68 mutations
+./tools/release/Install-MsStoreCli.ps1 -SelfTest          # pinned Store CLI: pin shape, hash/size before extraction on one held private copy (swap cases), signer + issuer, product version, PATH, 35 cases
 ```
 
 CI runs the version, provenance, publishing-hold, submission-update, in-flight, staged-draft, interpolation,
@@ -640,7 +675,8 @@ enforces both.
 * [Publish app updates to Microsoft Store with GitHub Actions](https://learn.microsoft.com/en-us/windows/apps/publish/msstore-dev-cli/github-actions)
 * [Manage app submissions (submission resource, `targetPublishMode`, status values)](https://learn.microsoft.com/en-us/windows/uwp/monetize/manage-app-submissions)
 * [Add and manage app credentials in Microsoft Entra ID](https://learn.microsoft.com/en-us/entra/identity-platform/how-to-add-credentials)
-* [microsoft/microsoft-store-apppublisher](https://github.com/microsoft/microsoft-store-apppublisher)
+* [microsoft/microsoft-store-apppublisher](https://github.com/microsoft/microsoft-store-apppublisher) (no longer used; read at `cc9910a`: `version` defaults to `latest`, no checksum)
+* [microsoft/msstore-cli releases](https://github.com/microsoft/msstore-cli/releases) · [v0.4.3](https://github.com/microsoft/msstore-cli/releases/tag/v0.4.3)
 * [GitHub REST — workflow runs (`path`, `event`, `head_branch`, `head_sha`, `conclusion`)](https://docs.github.com/en/rest/actions/workflow-runs#get-a-workflow-run)
 * [GitHub REST — git references and tag objects](https://docs.github.com/en/rest/git/refs) · [tags](https://docs.github.com/en/rest/git/tags)
 * [GitHub — security hardening for GitHub Actions (pinning to a full-length commit SHA, untrusted input)](https://docs.github.com/en/actions/security-for-github-actions/security-guides/security-hardening-for-github-actions)
