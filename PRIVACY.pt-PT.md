@@ -1,8 +1,3 @@
-<!--
-RASCUNHO (REL.0E). Cada marca "[NEEDS HUMAN: ...]" tem de ser resolvida pelo editor e removida antes de este
-URL ser introduzido no Partner Center (release/store/*/support.txt mantém a linha GATED até lá).
--->
-
 # Política de Privacidade do ServerAlyzer
 
 [English](PRIVACY.md) · **Português (Portugal)** · [Português (Brasil)](PRIVACY.pt-BR.md)
@@ -64,10 +59,10 @@ Declaração de Privacidade da Microsoft.
 | | Mensagens que envias (ponto 2) | Informação do Partner Center (ponto 3) |
 |---|---|---|
 | **Dados** | O que escreves; o teu nome e endereço de e-mail tal como o teu programa de e-mail os envia, ou o teu nome de utilizador do GitHub; e os detalhes técnicos que decidas incluir. | Estatísticas sobre a aplicação na Store, como visualizações da página, instalações, sessões, falhas e bloqueios e os dispositivos afetados; e as classificações e críticas publicadas na Store, com o nome que a Microsoft mostra em cada crítica. |
-| **Finalidade** | Ler e responder à tua mensagem, e investigar, corrigir ou melhorar o que comunicas. | Perceber como a aplicação é instalada e usada, encontrar e corrigir falhas e bloqueios, e ler e responder às críticas. |
+| **Finalidade** | Ler e responder à tua mensagem, e investigar, corrigir ou melhorar o que comunicas. | Perceber como a aplicação é instalada e usada, encontrar e corrigir falhas e bloqueios, e ler e responder às críticas. As exportações ocasionais de relatórios servem apenas para auditoria e diagnóstico. |
 | **Fundamento jurídico** | Interesses legítimos (artigo 6.º, n.º 1, alínea f), do RGPD): responder a quem contacta o editor voluntariamente e dar apoio à aplicação. És tu que inicias o contacto, esperas uma resposta, e só é usado o que decides enviar. | Interesses legítimos (artigo 6.º, n.º 1, alínea f), do RGPD): manter a aplicação fiável e responder ao feedback. A Microsoft disponibiliza esta informação a todos os editores da Store, é sobretudo estatística, e as críticas já são públicas. |
-| **Durante quanto tempo** | E-mails: guardados enquanto forem necessários para tratar a tua mensagem e o seguimento, e apagados o mais tardar 12 meses depois da última mensagem da conversa, salvo se forem necessários para um processo judicial. Issues e comentários no GitHub: são públicos e ficam no GitHub até serem apagados; podes editar ou apagar os teus comentários, ou pedir ao editor que apague um issue ou comentário. Relatórios de segurança privados: ficam privados no GitHub enquanto o problema é investigado e corrigido; o GitHub propõe que sejas mencionado no aviso de segurança resultante, e só és identificado se aceitares; podes pedir ao editor que retire a menção; os e-mails sobre um relatório seguem a regra dos e-mails. | O editor consulta esta informação sobretudo no Partner Center e não a exporta nem descarrega. A Microsoft pode também enviar ao editor notificações por e-mail sobre a aplicação, como alertas sobre o estado de funcionamento; esses e-mails seguem a regra dos e-mails. Dentro do Partner Center aplicam-se os termos da Microsoft. |
-| **Destinatários** | O fornecedor do serviço de e-mail que aloja o endereço do editor, que trata as mensagens por conta do editor. Quanto ao conteúdo no GitHub, a GitHub, Inc., que indica agir como responsável pelo tratamento ao abrigo da sua própria [declaração de privacidade](https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement). O editor não partilha as tuas mensagens com mais ninguém. Os issues e comentários que publicas no GitHub ficam visíveis para qualquer pessoa. Se um relatório disser respeito a uma componente de terceiros, o editor pode transmitir os detalhes técnicos, sem os teus dados pessoais, a quem mantém essa componente. | A Microsoft, que gere a Store e o Partner Center. As críticas são públicas na Store; a Microsoft indica que o nome e a imagem da tua conta Microsoft podem ser mostrados com elas. Mais ninguém. |
+| **Durante quanto tempo** | E-mails: guardados enquanto forem necessários para tratar a tua mensagem e o seguimento, e apagados o mais tardar 12 meses depois da última mensagem da conversa, salvo se forem necessários para efeitos de declaração, exercício ou defesa de um direito num processo judicial. Issues e comentários no GitHub: são públicos e ficam no GitHub até serem apagados; podes editar ou apagar os teus comentários, ou pedir ao editor que apague um issue ou comentário. Relatórios de segurança privados: ficam confidenciais no GitHub até o problema estar resolvido; o GitHub propõe que sejas mencionado no aviso de segurança resultante, e só és identificado se aceitares; podes pedir ao editor que retire a menção; os e-mails sobre um relatório seguem a regra dos e-mails. | O editor consulta esta informação no Partner Center e pode ocasionalmente exportar relatórios, apenas para auditoria e diagnóstico. Os relatórios exportados ficam apenas nos dispositivos do próprio editor e são apagados quando deixarem de ser necessários para essa finalidade, e o mais tardar 12 meses depois da exportação. A Microsoft pode também enviar ao editor notificações por e-mail sobre a aplicação, como alertas sobre o estado de funcionamento; esses e-mails seguem a regra dos e-mails. Dentro do Partner Center aplicam-se os termos da Microsoft. |
+| **Destinatários** | No e-mail: a Cloudflare, Inc., cujo serviço Email Routing recebe as mensagens enviadas para o endereço do editor e as reencaminha para a caixa de correio do editor, e o fornecedor de e-mail que aloja essa caixa de correio. A Cloudflare indica que o Email Routing não examina, não põe em fila nem guarda e-mails, que as mensagens são entregues em tempo real, e que trata o envelope da mensagem para a entregar, mantendo intactos os cabeçalhos e o corpo ([Cloudflare](https://blog.cloudflare.com/introducing-email-routing/)). Quanto ao conteúdo no GitHub, a GitHub, Inc., que indica agir como responsável pelo tratamento ao abrigo da sua própria [declaração de privacidade](https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement). O editor não partilha as tuas mensagens com mais ninguém. Os issues e comentários que publicas no GitHub ficam visíveis para qualquer pessoa. Se um relatório disser respeito a uma componente de terceiros, o editor pode transmitir os detalhes técnicos, sem os teus dados pessoais, a quem mantém essa componente. | A Microsoft, que gere a Store e o Partner Center. As críticas são públicas na Store; a Microsoft indica que o nome e a imagem da tua conta Microsoft podem ser mostrados com elas. Mais ninguém; os relatórios exportados ficam nos dispositivos do próprio editor. |
 
 **Sem decisões automatizadas.** Não há decisões automatizadas nem definição de perfis.
 
@@ -96,9 +91,10 @@ em vários locais, incluindo os Estados Unidos, e que recorre às cláusulas con
 e à sua certificação ao abrigo do Quadro de Privacidade de Dados UE-EUA
 ([declaração de privacidade do GitHub](https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement)). A Microsoft indica que pode guardar e tratar dados pessoais na tua
 região, nos Estados Unidos e noutros países, e que recorre às cláusulas contratuais-tipo e ao Quadro de
-Privacidade de Dados UE-EUA (Declaração de Privacidade da Microsoft). Se o fornecedor do serviço de e-mail do
-editor guardar mensagens fora do Espaço Económico Europeu, a transferência assenta numa garantia reconhecida pelo
-RGPD, como uma decisão de adequação ou as cláusulas contratuais-tipo da Comissão Europeia.
+Privacidade de Dados UE-EUA (Declaração de Privacidade da Microsoft). A Cloudflare indica que, nas transferências a partir do Espaço Económico Europeu, recorre às
+cláusulas contratuais-tipo da UE e à sua certificação ao abrigo do Quadro de Privacidade de Dados UE-EUA, e que o
+seu Data Processing Addendum normalizado está incorporado por referência no seu Self-Serve Subscription Agreement
+([perguntas frequentes da Cloudflare sobre o RGPD](https://www.cloudflare.com/trust-hub/gdpr/)).
 
 **Brasil (LGPD).** Nos termos do seu artigo 3.º, a Lei Geral de Proteção de Dados Pessoais (LGPD) brasileira aplica-se
 quando o tratamento é realizado no Brasil, quando tem por objetivo a oferta ou o fornecimento de bens ou
@@ -109,9 +105,6 @@ com que a LGPD se aplique. Quando a LGPD se aplica, tens também os direitos do 
 através de **serveralyzer@pedroloyola.com**, e podes apresentar reclamação à Autoridade Nacional de Proteção de Dados
 (ANPD).
 
-**[NEEDS HUMAN: aprovação final do editor pendente. O editor aprova esta secção, incluindo as propostas listadas
-como itens de aprovação do editor no relatório R8: conservação dos e-mails, não exportação da informação do
-Partner Center, redação sobre o fornecedor de e-mail e redação sobre a LGPD.]**
 
 ## Como funciona a monitorização
 

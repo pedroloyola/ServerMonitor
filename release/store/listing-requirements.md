@@ -120,21 +120,19 @@ DRAFT-GATE block in `README.md`.
     files, with the labels checked against the resource strings. One sentence was added for the
     bounded search (O-7/O-8): it ends after about 40 seconds if no new server is found, and after
     10 minutes at most. `whats-new.txt` was reconciled the same way.
-- **Privacy policy URL (submission gate)**: `support.txt` in all three files carries the URL with
-  a `GATED:` line. Do not enter it in Partner Center, and do not submit the listing, until the
-  gate is cleared. REL.0E rewrote the policy: `PRIVACY.md` (English, the single URL the Store uses
-  for every market) plus `PRIVACY.pt-PT.md` and `PRIVACY.pt-BR.md`. It now covers the on-demand
-  local network search, the encrypted backup (which includes saved passwords), the widget
-  snapshot, notifications, logs (none) and the Store data location. The gate stays until:
-  - every `[NEEDS HUMAN: ...]` marker in the three files is resolved and removed. R2
-    (2026-10-16) resolved publisher identity, privacy contact, Widgets board, children and
-    Uninstalling (measured in the QA VM); R3 resolved the `runFullTrust` wording; R6 resolved
-    the Partner Center reports (owner's read-only check); R8 wrote the final internal GDPR
-    Art. 12-14 and LGPD wording with recommended proposals. Still open: the owner's final
-    approval of that section (one NEEDS HUMAN line per file);
-  - the policy is merged on main, so the URL resolves publicly.
+- **Privacy policy URL (gate cleared, REL.0E R10, 2026-10-16)**: `support.txt` in all three
+  files carries the URL `https://github.com/pedroloyola/ServerMonitor/blob/main/PRIVACY.md`,
+  and the `GATED:` lines were removed. REL.0E rewrote the policy: `PRIVACY.md` (English, the
+  single URL the Store uses for every market) plus `PRIVACY.pt-PT.md` and `PRIVACY.pt-BR.md`.
+  All `[NEEDS HUMAN: ...]` markers and the DRAFT header are resolved and removed (R2-R10;
+  owner final approval recorded 2026-10-16). Two conditions remain before the URL is entered:
+  - the policy must be on `main` (merge of the privacy PR), because the URL shows `main`;
+  - Partner Center work stays outside REL.0E (portal-only, no Store operations).
 
-  Then remove the `GATED:` lines.
+  Open follow-up, not a gate on the URL: the name, storage location and data-processing terms
+  of the mailbox provider behind Cloudflare Email Routing are not publicly verifiable; the
+  policy names it only as a recipient category and makes no transfer claim for it. When the
+  owner records those facts, add them to the three policy files.
 - **Widget screenshot (slot 08)**: it can only be captured from an installed package in the VM.
   If no VM capture exists at submission time, remove the `08-widget` line from all three caption
   files. Slot 09 keeps its name; only the order of the uploaded images matters.

@@ -1,8 +1,3 @@
-<!--
-DRAFT (REL.0E). Every "[NEEDS HUMAN: ...]" marker must be resolved by the publisher and removed before
-this URL is entered in Partner Center (release/store/*/support.txt keeps its GATED line until then).
--->
-
 # ServerAlyzer Privacy Policy
 
 **English** · [Português (Portugal)](PRIVACY.pt-PT.md) · [Português (Brasil)](PRIVACY.pt-BR.md)
@@ -61,10 +56,10 @@ compilation of the Partner Center information is governed by the Microsoft Priva
 | | Messages you send (point 2) | Partner Center information (point 3) |
 |---|---|---|
 | **Data** | What you write; your name and e-mail address as your e-mail program sends them, or your GitHub user name; and any technical details you choose to include. | Statistics about the Store app, such as page views, installs, sessions, crashes and hangs and the devices affected; and the ratings and reviews published in the Store, with the name Microsoft shows for each review. |
-| **Purpose** | To read and answer your message, and to investigate, fix or improve what you report. | To understand how the app is installed and used, find and fix crashes and hangs, and read and answer reviews. |
+| **Purpose** | To read and answer your message, and to investigate, fix or improve what you report. | To understand how the app is installed and used, find and fix crashes and hangs, and read and answer reviews. Occasional exports of reports are used only for audit and diagnostics. |
 | **Legal basis** | Legitimate interests (GDPR Art. 6(1)(f)): answering people who contact the publisher voluntarily and supporting the app. You start the contact, you expect a reply, and only what you choose to send is used. | Legitimate interests (GDPR Art. 6(1)(f)): keeping the app reliable and answering feedback. Microsoft provides this information to every Store publisher, it is mostly statistical, and reviews are already public. |
-| **How long** | E-mails: kept while needed to handle your message and any follow-up, and deleted at the latest 12 months after the last message in the conversation, unless they are needed for a legal claim. GitHub issues and comments: public, and kept on GitHub until they are deleted; you can edit or delete your own comments, or ask the publisher to delete an issue or comment. Private security reports: kept private on GitHub while the problem is investigated and fixed; GitHub offers you a credit on the resulting advisory, and you are named only if you accept it; you can ask the publisher to remove it; e-mails about a report follow the e-mail rule. | The publisher mainly views this information in Partner Center and does not export or download it. Microsoft may also e-mail the publisher notifications about the app, such as health alerts; those e-mails follow the e-mail rule. Inside Partner Center, Microsoft's terms apply. |
-| **Recipients** | The e-mail service provider that hosts the publisher's address, which processes the messages for the publisher. For content on GitHub, GitHub, Inc., which states that it acts as a controller under its own [privacy statement](https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement). The publisher shares your messages with no one else. Issues and comments you post publicly on GitHub are visible to everyone. If a report concerns a third-party component, the publisher may pass on the technical details, without your personal data, to that component's maintainers. | Microsoft, which operates the Store and Partner Center. Reviews are public in the Store; Microsoft states that the name and picture of your Microsoft account may be shown with them. No one else. |
+| **How long** | E-mails: kept while needed to handle your message and any follow-up, and deleted at the latest 12 months after the last message in the conversation, unless they are needed for the establishment, exercise or defence of legal claims. GitHub issues and comments: public, and kept on GitHub until they are deleted; you can edit or delete your own comments, or ask the publisher to delete an issue or comment. Private security reports: kept confidential on GitHub until the problem is resolved; GitHub offers you a credit on the resulting advisory, and you are named only if you accept it; you can ask the publisher to remove it; e-mails about a report follow the e-mail rule. | The publisher views this information in Partner Center and may occasionally export reports, only for audit and diagnostics. Exported reports are kept only on the publisher's own devices and deleted when they are no longer needed for that purpose, and at the latest 12 months after the export. Microsoft may also e-mail the publisher notifications about the app, such as health alerts; those e-mails follow the e-mail rule. Inside Partner Center, Microsoft's terms apply. |
+| **Recipients** | For e-mail: Cloudflare, Inc., whose Email Routing service receives the messages sent to the publisher's address and forwards them to the publisher's mailbox, and the e-mail provider that hosts that mailbox. Cloudflare states that Email Routing does not look into, queue or store e-mails, that messages are delivered in real time, and that it handles the message envelope to deliver them while keeping the headers and body intact ([Cloudflare](https://blog.cloudflare.com/introducing-email-routing/)). For content on GitHub, GitHub, Inc., which states that it acts as a controller under its own [privacy statement](https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement). The publisher shares your messages with no one else. Issues and comments you post publicly on GitHub are visible to everyone. If a report concerns a third-party component, the publisher may pass on the technical details, without your personal data, to that component's maintainers. | Microsoft, which operates the Store and Partner Center. Reviews are public in the Store; Microsoft states that the name and picture of your Microsoft account may be shown with them. No one else; exported reports stay on the publisher's own devices. |
 
 **No automated decisions.** No automated decision-making or profiling is carried out.
 
@@ -93,9 +88,10 @@ data in several locations, including the United States, and relies on the Europe
 contractual clauses and on its certification under the EU-U.S. Data Privacy Framework
 ([GitHub privacy statement](https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement)). Microsoft states that it may store and process personal data in your region,
 the United States and other countries, and relies on the standard contractual clauses and on the EU-U.S. Data
-Privacy Framework (Microsoft Privacy Statement). If the publisher's e-mail service provider stores messages
-outside the European Economic Area, the transfer relies on a safeguard recognised by the GDPR, such as an
-adequacy decision or the European Commission's standard contractual clauses.
+Privacy Framework (Microsoft Privacy Statement). Cloudflare states that, for transfers from the European Economic Area, it relies on the EU standard
+contractual clauses and on its certification under the EU-U.S. Data Privacy Framework, and that its standard
+Data Processing Addendum is incorporated by reference into its Self-Serve Subscription Agreement
+([Cloudflare GDPR FAQ](https://www.cloudflare.com/trust-hub/gdpr/)).
 
 **Brazil (LGPD).** Under its Article 3, Brazil's General Data Protection Law (LGPD) applies when the processing
 is carried out in Brazil, when it aims to offer or supply goods or services to, or process the data of,
@@ -105,9 +101,6 @@ existence of a Brazilian Portuguese version of this policy does not, on its own,
 LGPD applies, you also have the rights in its Article 18, which you can exercise at **serveralyzer@pedroloyola.com**, and
 you can complain to the Autoridade Nacional de Proteção de Dados (ANPD).
 
-**[NEEDS HUMAN: owner final approval pending. The owner approves this section, including the proposals listed
-as owner approval items in the R8 report: e-mail retention, no exports of Partner Center information, the e-mail
-provider wording and the LGPD wording.]**
 
 ## How monitoring works
 
