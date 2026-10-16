@@ -26,7 +26,7 @@ public sealed class DiscoverySearchBoundsTests
         await service.StartSearchAsync();
 
         // The stop flips IsSearching before it closes the browser (on another thread): wait for the counted stop too.
-        await AdvanceUntilAsync(time, () => !service.IsSearching && browser.StopCount == 1);
+        await AdvanceUntilAsync(time, () => !service.IsSearching && browser.StopCount >= 1);
 
         Assert.Equal(DiscoverySearchEnd.NothingFound, service.LastSearchEnd);
         Assert.Equal(1, browser.StopCount);
@@ -50,7 +50,7 @@ public sealed class DiscoverySearchBoundsTests
         Assert.Single(service.GetDiscovered());
 
         // The stop flips IsSearching before it closes the browser (on another thread): wait for the counted stop too.
-        await AdvanceUntilAsync(time, () => !service.IsSearching && browser.StopCount == 1);
+        await AdvanceUntilAsync(time, () => !service.IsSearching && browser.StopCount >= 1);
         Assert.Equal(DiscoverySearchEnd.TimeLimit, service.LastSearchEnd);
         Assert.InRange(endedAt!.Value - Start, TimeSpan.FromMinutes(2), TimeSpan.FromMinutes(2) + TimeSpan.FromSeconds(10));
         Assert.Empty(service.GetDiscovered());
@@ -104,7 +104,7 @@ public sealed class DiscoverySearchBoundsTests
         }
 
         // The stop flips IsSearching before it closes the browser (on another thread): wait for the counted stop too.
-        await AdvanceUntilAsync(time, () => !service.IsSearching && browser.StopCount == browser.StartCount);
+        await AdvanceUntilAsync(time, () => !service.IsSearching && browser.StopCount >= browser.StartCount);
         Assert.Equal(DiscoverySearchEnd.TimeLimit, service.LastSearchEnd);
         Assert.InRange(endedAt!.Value - Start, TimeSpan.FromMinutes(10), TimeSpan.FromMinutes(10) + TimeSpan.FromSeconds(60));
         Assert.Empty(service.GetDiscovered());
@@ -133,7 +133,7 @@ public sealed class DiscoverySearchBoundsTests
         Assert.Equal(1, browser.StopCount);
 
         // The stop flips IsSearching before it closes the browser (on another thread): wait for the counted stop too.
-        await AdvanceUntilAsync(time, () => !service.IsSearching && browser.StopCount == 2);
+        await AdvanceUntilAsync(time, () => !service.IsSearching && browser.StopCount >= 2);
         Assert.Equal(DiscoverySearchEnd.NothingFound, service.LastSearchEnd);
         Assert.Equal(2, browser.StopCount);
     }

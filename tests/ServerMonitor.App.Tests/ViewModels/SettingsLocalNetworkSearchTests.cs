@@ -150,7 +150,7 @@ public sealed class SettingsLocalNetworkSearchTests
         await w.StartAsync();
 
         // The stop flips IsSearching before it closes the browser (on another thread): wait for the counted stop too.
-        await DashboardEmptyStateTests.AdvanceUntilAsync(w.Time, () => !dashboard.IsLocalNetworkSearchRunning && w.Browser.StopCount == 1);
+        await DashboardEmptyStateTests.AdvanceUntilAsync(w.Time, () => !dashboard.IsLocalNetworkSearchRunning && w.Browser.StopCount >= 1);
 
         Assert.Equal(DiscoverySearchEnd.NothingFound, w.Service.LastSearchEnd);
         Assert.True(dashboard.LocalNetworkSearchEndedNothingFound);

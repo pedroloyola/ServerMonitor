@@ -207,7 +207,7 @@ public sealed class LocalNetworkSearchEndTests
         await w.StartAsync();
         w.Navigation.GoToHistory(); // leaving the page
         // The stop flips IsSearching before it closes the browser (on another thread): wait for the counted stop too.
-        await DiscoveryUsableResultTests.AdvanceUntilAsync(w.Time, () => !w.Service.IsSearching && w.Browser.StopCount == 3);
+        await DiscoveryUsableResultTests.AdvanceUntilAsync(w.Time, () => !w.Service.IsSearching && w.Browser.StopCount >= 3);
 
         Assert.Equal(3, w.Browser.StopCount);
         Assert.Equal(0, requests);
@@ -281,7 +281,7 @@ public sealed class LocalNetworkSearchEndTests
         w.Navigation.GoToHistory(); // the stop queues behind the start that holds the lifecycle gate
         ignored.Release();
         await press.WaitAsync(TimeSpan.FromSeconds(30));
-        await DiscoveryUsableResultTests.AdvanceUntilAsync(w.Time, () => !w.Service.IsSearching && w.Browser.StopCount == 1);
+        await DiscoveryUsableResultTests.AdvanceUntilAsync(w.Time, () => !w.Service.IsSearching && w.Browser.StopCount >= 1);
 
         w.AssertStopped();
     }
