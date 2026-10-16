@@ -47,11 +47,12 @@ privately through GitHub Security Advisories on the same repository (Security ta
   are run by Microsoft under the [Microsoft Privacy Statement](https://privacy.microsoft.com/privacystatement),
   not under this policy.
 - **The publisher's obligations.** For the data in the second point, the publisher is the controller under the
-  EU General Data Protection Regulation (GDPR). You can ask him, at the e-mail address above, for access to that
-  data, its correction or its deletion, and you can lodge a complaint with a data protection supervisory
-  authority (in Portugal, the Comissão Nacional de Proteção de Dados, CNPD). **[NEEDS HUMAN: a legal reviewer
-  confirms whether the purpose, legal basis and retention period for this correspondence and these reports must
-  be stated here, and their wording; and whether the Brazilian LGPD also applies.]**
+  EU General Data Protection Regulation (GDPR). You can ask the publisher, at the e-mail address above, to
+  exercise your rights over that data, such as access, correction or deletion, and you can lodge a complaint
+  with a data protection supervisory authority (in Portugal, the Comissão Nacional de Proteção de Dados, CNPD).
+  **[NEEDS HUMAN: a legal reviewer confirms whether the purpose, legal basis and retention period for this
+  correspondence and these reports, and the full list of rights (including restriction, objection and
+  portability), must be stated here, and their wording; and whether the Brazilian LGPD also applies.]**
 
 ## How monitoring works
 
@@ -76,8 +77,8 @@ in a roaming profile and does not sync it anywhere.
 |---|---|---|
 | Servers | `servers.json`, `routed-servers.json` | Name, host, port, SSH user, sign-in method, the **path** of a private key you choose, jump host, and server preferences (operating system, refresh interval, hidden or not, date added, an internal reference to the saved password). No passwords. |
 | Trusted host keys | `known-hosts.json`, `known-hosts.routes.json` | Host, port, key type and fingerprint. |
-| Metrics history | `history.db` (SQLite) | Per server: time, health state, CPU %, memory %, disk %. Kept for **30 days**, then deleted automatically. You can clear it in Settings. |
-| Widget snapshot | `widget-state.json` | For the Windows widget: an internal server id, the server's display name (never its host or IP address), health, CPU, memory and disk usage (percent, and GB used and total), uptime and last update time. |
+| Metrics history | `history.db` (SQLite) | Per server: time, health state, CPU %, memory %, disk %. Kept for **30 days**: older entries are deleted automatically while the app runs (when it starts, then once a day). You can clear it in **Settings › Data and servers**. |
+| Widget snapshot | `widget-state.json` | For the Windows widget: an internal server id, the name you gave the server (the app never replaces it with the host or IP address), health, CPU, memory and disk usage (percent, and GB used and total), uptime and last update time. |
 | Ignored network devices | `ignored-devices.json` | One-way fingerprints (SHA-256 hashes) of devices you chose to ignore. No names or addresses. |
 | Preferences | `language-settings.json`, `notification-settings.json`, `background-settings.json`, `window-placement.json` | Language, notification and background monitoring choices, window position. |
 | Restore safety copy | `restore-journal` folder | A temporary copy used only while a backup is being restored, so that an interrupted restore can be undone. |
@@ -88,7 +89,9 @@ app keeps only the path you chose.
 
 Docker container and service lists are shown in the app and are not saved.
 
-The app writes **no log files**.
+The app writes **no log files**. The widget component can emit technical Windows event tracing (operation names
+and error types only, never server names, server data or file paths); the app writes it to no file and sends it
+nowhere, and it can only be read with Windows event-tracing tools on your PC.
 
 ## Files the app reads on your PC
 
@@ -119,10 +122,10 @@ The app writes **no log files**.
 
 - If you create a backup, the file contains your server list, routes, trusted host keys, notification and
   background monitoring settings, **and your saved passwords and passphrases**.
-- The file's contents are encrypted with **AES-256-GCM**, with a key derived from a backup password you choose
-  (PBKDF2-HMAC-SHA256, 1,000,000 iterations). The file cannot be read without that password, and it cannot be
+- The file's contents are encrypted with **AES-256-GCM**, with a key derived from a backup passphrase you choose
+  (PBKDF2-HMAC-SHA256, 1,000,000 iterations). The file cannot be read without that passphrase, and it cannot be
   recovered if you forget it. A short header with the technical encryption parameters (format version,
-  algorithm, number of iterations, salt) is stored unencrypted, as this method requires; it contains none of
+  algorithms, number of iterations, salt, nonce and length) is stored unencrypted, as this method requires; it contains none of
   your data.
 - The file is saved **only where you choose**. The app never uploads it. If you save it in a cloud-synced folder,
   that service's terms apply to the file.
@@ -130,11 +133,11 @@ The app writes **no log files**.
 
 ## Notifications and widget
 
-- Alerts are local Windows notifications. They show the server's display name and its state (for example "is
+- Alerts are local Windows notifications. They show the name you gave the server and its state (for example "is
   in a warning state") and stay in the Windows notification center until they expire or you clear them. The
   app uses no push notification service.
 - The ServerAlyzer widget shows the data in `widget-state.json`. To display it, the app hands the card content
-  (an internal server id, display name, health, metrics, uptime) to Windows on your PC, which shows it in the
+  (an internal server id, the name you gave the server, health, metrics, uptime) to Windows on your PC, which shows it in the
   Widgets board, a Windows feature provided by Microsoft. ServerAlyzer sends it to no online service. Microsoft
   states that Windows diagnostic data is collected from the Widgets board according to your Windows diagnostic
   data settings, and that each widget is controlled by the settings of the app that powers it, here ServerAlyzer
@@ -158,7 +161,7 @@ The app writes **no log files**.
   your Windows diagnostic data settings and under the Microsoft Privacy Statement. ServerAlyzer adds nothing to
   it.
 - ServerAlyzer is a Windows desktop app and declares the Microsoft Store `runFullTrust` capability, so it runs
-  as a regular desktop program rather than inside the Store app sandbox. It needs this to connect over SSH to
+  as a regular desktop program rather than inside the Store app sandbox. It uses this to connect over SSH to
   the servers you add, to look for servers on your local network only when you start a search, to keep your
   server passwords and passphrases in Windows Credential Manager on your device, and to provide notifications,
   the notification-area (tray) icon and the Windows widget. This capability does not give the app administrator
@@ -166,27 +169,28 @@ The app writes **no log files**.
 
 ## Links that open your browser
 
-Links in the app, such as the GitHub project page in Settings, open in your web browser only when you click
+Links in the app, such as the GitHub project page in **Settings › Data and servers**, open in your web browser only when you click
 them. The privacy terms of that website apply there.
 
 ## Open-source components
 
 ServerAlyzer includes open-source components that run on your PC and send nothing to their authors: SSH.NET,
 Tmds.MDns, Microsoft.Data.Sqlite and SQLitePCLRaw (SQLite), WinUIEx, the Windows App SDK, .NET libraries and
-Hugeicons icons. Licences are listed in `THIRD-PARTY-NOTICES.md` in the repository.
+Hugeicons icons. Licenses are listed in `THIRD-PARTY-NOTICES.md` in the repository.
 
 ## Your control over your data
 
-- In the app you can remove a server, clear the metrics history (**Clear history**) and show ignored devices
-  again (**Show ignored devices again**).
-- You can also view and remove saved passwords in Windows **Credential Manager**.
+- In the app you can remove a server and, in **Settings › Data and servers**, clear the metrics history
+  (**Clear history**) and show ignored devices again (**Show ignored devices again**).
+- You can also see the entries for your saved passwords and passphrases in Windows **Credential Manager** and
+  remove them.
 - **Uninstalling:** Windows removes the app's package data folder with the files listed above. Two things stay
   until you remove them yourself:
   - **The SSH passwords and passphrases you saved**, in Windows Credential Manager. The entry names contain no
     server name, address or user name. To remove them, open **Control Panel** → **Credential Manager** →
     **Windows Credentials** → **Generic Credentials** and remove each entry that starts with
     `ServerMonitor:v1:ssh` (or, if you used an early version, `pedroloyola.ServerMonitor:v1:ssh`).
-  - **The Windows Firewall rules named `ServerMonitor.App`**, if you chose **Allow** when Windows Firewall asked
+  - **The Windows Firewall rules named `ServerMonitor.App`**, if you allowed access when Windows Firewall asked
     during a local network search. Windows creates these rules; the app neither creates nor removes them. To
     remove them, open **Windows Security** → **Firewall & network protection** → **Advanced settings** →
     **Inbound Rules** and delete the rules named `ServerMonitor.App`.
@@ -195,8 +199,8 @@ Hugeicons icons. Licences are listed in `THIRD-PARTY-NOTICES.md` in the reposito
 
 ## Children
 
-ServerAlyzer is a technical tool for the general public and is not directed at children. It has no features
-aimed at children and collects no personal data from anyone, including children.
+ServerAlyzer is a technical tool for the general public and is not directed at children; it has no features
+aimed at children. The app collects no personal data from anyone, including children.
 
 ## Changes to this policy
 

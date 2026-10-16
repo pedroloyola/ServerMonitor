@@ -94,7 +94,9 @@ as métricas de cada servidor e há quanto tempo os dados foram lidos.
 ## Dados e privacidade
 
 Ver [`PRIVACY.pt-PT.md`](PRIVACY.pt-PT.md) (também em [inglês](PRIVACY.md) e [pt-BR](PRIVACY.pt-BR.md)). Em resumo: local-first, sem conta, sem telemetria, sem nuvem. Todos os
-dados ficam na tua máquina:
+dados ficam na tua máquina. Os caminhos abaixo são os de uma execução a partir do código; numa instalação da
+Microsoft Store, o Windows guarda a pasta `ServerMonitor` dentro da pasta de dados do pacote
+(`%LOCALAPPDATA%\Packages\<nome do pacote>\LocalCache\Local\ServerMonitor`), e remove-a ao desinstalar:
 
 - `%LOCALAPPDATA%\ServerMonitor\servers.json` — configuração não sensível.
 - `%LOCALAPPDATA%\ServerMonitor\history.db` — histórico de métricas (SQLite).
