@@ -42,7 +42,7 @@ O ServerAlyzer envolve três tipos de dados, e esta política os mantém separad
   "Arquivos que o aplicativo lê no seu PC", "Pesquisa na rede local", "Backup criptografado" e "Notificações e
   widget" é tratado pelo aplicativo no seu PC. O aplicativo nunca envia isso ao editor, por isso o editor nunca
   recebe, guarda ou vê esses dados.
-- **Mensagens que você decide enviar ao editor.** Um e-mail para serveralyzer@pedroloyola.com, ou uma issue, comentário ou
+- **Mensagens que você decide enviar ao editor.** Um e-mail para **serveralyzer@pedroloyola.com**, ou uma issue, comentário ou
   relatório de segurança no GitHub. Elas contêm o que você escreve e o seu endereço de e-mail ou nome de usuário
   do GitHub.
 - **Relatórios que a Microsoft mostra ao editor no Partner Center.** Relatórios sobre o aplicativo na Store que
@@ -55,22 +55,31 @@ desta política.
 
 ## Como o editor trata os dados que recebe
 
-Quanto às mensagens e aos relatórios do Partner Center acima, o editor é o controlador nos termos do
-Regulamento Geral sobre a Proteção de Dados da União Europeia (GDPR).
+Quanto às mensagens que você envia, e quanto ao uso que o próprio editor faz dos relatórios, avaliações e
+comentários do Partner Center, o editor é o controlador nos termos do Regulamento Geral sobre a Proteção de
+Dados da União Europeia (GDPR). A coleta e a compilação desses relatórios pela Microsoft são regidas pela
+Política de Privacidade da Microsoft.
 
 | | Mensagens que você envia | Relatórios do Partner Center, avaliações e comentários |
 |---|---|---|
 | **Finalidade** | Ler e responder à sua mensagem, e corrigir ou melhorar o que você relata. | Entender as instalações, o uso e a confiabilidade do aplicativo, corrigir falhas e travamentos, e ler e responder aos comentários. |
 | **Base legal proposta** | Legítimo interesse (art. 6(1)(f) do GDPR): responder a mensagens enviadas voluntariamente e dar suporte ao aplicativo que você usa. | Legítimo interesse (art. 6(1)(f) do GDPR): manter a qualidade do aplicativo, usando os relatórios que a Microsoft disponibiliza a todos os editores da Store. |
-| **Por quanto tempo** | E-mails: pelo tempo necessário para tratar a sua mensagem e o acompanhamento, e depois são apagados [OWNER: prazo máximo, ou o critério para apagar]. GitHub: as issues e comentários são públicos e ficam no GitHub até serem excluídos; você pode editar ou excluir os seus comentários, ou pedir ao editor que exclua uma issue ou comentário. | O editor não guarda cópias fora do Partner Center [OWNER: confirmar, ou informar o critério]. Dentro do Partner Center valem os termos da própria Microsoft. |
+| **Por quanto tempo** | E-mails: pelo tempo necessário para tratar a sua mensagem e o acompanhamento, e depois são apagados [OWNER: prazo máximo, ou o critério para apagar]. Issues e comentários no GitHub: são públicos e ficam no GitHub até serem excluídos; você pode editar ou excluir os seus comentários, ou pedir ao editor que exclua uma issue ou comentário. Relatórios de segurança privados (GitHub Security Advisories): ficam privados enquanto o problema é investigado e corrigido; um aviso de segurança resultante pode ser publicado sem os seus dados pessoais, a menos que você peça para ser creditado [OWNER: confirmar, e informar por quanto tempo um relatório privado é guardado depois da correção]. | O editor não guarda cópias fora do Partner Center [OWNER: confirmar, ou informar o critério]. Dentro do Partner Center valem os termos da própria Microsoft. |
 | **Destinatários** | O serviço de e-mail que hospeda o endereço acima [OWNER: nome do provedor de e-mail]. No GitHub, a GitHub, Inc., que publica o conteúdo nos termos da sua própria [declaração de privacidade](https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement). | A Microsoft, que opera a Store e o Partner Center. Os comentários são públicos na Store; a Microsoft informa que o nome e a imagem da sua conta Microsoft podem ser exibidos com eles. |
 
-**Seus direitos.** Você pode pedir ao editor, pelo serveralyzer@pedroloyola.com, o acesso aos seus dados, a correção ou a exclusão
-deles, a limitação do tratamento, ou se opor a ele; quando for o caso, você também pode pedir a portabilidade
-dos dados. O editor responde em até um mês, como o GDPR exige. Os dados que a Microsoft mantém são tratados pela
-Microsoft (veja a Política de Privacidade da Microsoft). Você também pode apresentar uma reclamação a uma
-autoridade de proteção de dados; em Portugal, a Comissão Nacional de Proteção de Dados (CNPD,
-<https://www.cnpd.pt>).
+**Seus direitos.** Você pode pedir ao editor, pelo e-mail **serveralyzer@pedroloyola.com**, o acesso aos seus dados, a
+correção ou a exclusão deles, ou a limitação do tratamento; quando for o caso, você também pode pedir a
+portabilidade dos dados. O editor responde sem demora injustificada e em até um mês. O GDPR permite prorrogar
+esse prazo em casos complexos; nesse caso, o editor avisa você dentro do primeiro mês, com os motivos. Os dados
+que a Microsoft mantém são tratados pela Microsoft (veja a Política de Privacidade da Microsoft). Você também
+pode apresentar uma reclamação a uma autoridade de proteção de dados; em Portugal, a Comissão Nacional de
+Proteção de Dados (CNPD, <https://www.cnpd.pt>).
+
+**Seu direito de oposição.** Como o editor se baseia em legítimo interesse, você pode se opor a qualquer
+momento, por motivos relacionados à sua situação particular, ao tratamento dos seus dados descrito acima,
+escrevendo para o e-mail **serveralyzer@pedroloyola.com**. O editor então deixa de fazer esse tratamento, a menos que
+demonstre motivos legítimos imperiosos ou precise dos dados para a defesa em processos judiciais, como prevê o
+artigo 21 do GDPR.
 
 **Transferências internacionais.** O editor está em Portugal. O GitHub informa que armazena e trata dados
 pessoais em vários locais, inclusive nos Estados Unidos, e que recorre às cláusulas contratuais padrão da
