@@ -120,18 +120,18 @@ DRAFT-GATE block in `README.md`.
     files, with the labels checked against the resource strings. One sentence was added for the
     bounded search (O-7/O-8): it ends after about 40 seconds if no new server is found, and after
     10 minutes at most. `whats-new.txt` was reconciled the same way.
-- **Privacy policy URL (submission gate)**: `support.txt` in all three files carries the URL with
-  a `GATED:` line. Do not enter it in Partner Center, and do not submit the listing, until
-  `PRIVACY.md` has been updated. Today it is pt-PT only and predates the current product. It does
-  not cover:
-  - the on-demand local network search;
-  - the encrypted backup file, which is saved where the user chooses;
-  - the widget snapshot file.
+- **Privacy policy URL (gate cleared, REL.0E R10, 2026-10-16)**: `support.txt` in all three
+  files carries the URL `https://github.com/pedroloyola/ServerMonitor/blob/main/PRIVACY.md`,
+  and the `GATED:` lines were removed. REL.0E rewrote the policy: `PRIVACY.md` (English, the
+  single URL the Store uses for every market) plus `PRIVACY.pt-PT.md` and `PRIVACY.pt-BR.md`.
+  All `[NEEDS HUMAN: ...]` markers and the DRAFT header are resolved and removed (R2-R10;
+  owner final approval recorded 2026-10-16). Two conditions remain before the URL is entered:
+  - the policy must be on `main` (merge of the privacy PR), because the URL shows `main`;
+  - Partner Center work stays outside REL.0E (portal-only, no Store operations).
 
-  Its uninstall and data-location statements are unmeasured for a Store install. The update is an
-  English policy (the Store uses one policy for every market) plus pt. It is written after the
-  clean-VM measurement, in its own docs pull request. Then point the URL at it and remove the
-  `GATED:` lines.
+  E-mail recipients are named from owner-confirmed facts: Cloudflare Email Routing (forwarding)
+  and Microsoft Outlook (the publisher's mailbox). No processing agreement with Microsoft is
+  claimed, because the Outlook account type was not verified.
 - **Widget screenshot (slot 08)**: it can only be captured from an installed package in the VM.
   If no VM capture exists at submission time, remove the `08-widget` line from all three caption
   files. Slot 09 keeps its name; only the order of the uploaded images matters.
