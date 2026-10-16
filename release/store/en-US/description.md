@@ -19,7 +19,7 @@ At home in Windows 11
 ServerAlyzer can keep running in the notification area when you close the window, and can tell you with Windows notifications when a server's health changes. Compact mode gives you a small view of all your servers that can stay always on top. The Windows 11 widget shows your servers on the Widgets board in three sizes and always shows how old its data is. Light, dark and system themes, keyboard navigation, screen readers and high contrast are supported. Available in English, Portuguese (Portugal) and Portuguese (Brazil).
 
 Local network search, only when you ask
-With no servers added yet, you can search your local network for SSH servers that announce themselves (mDNS/DNS-SD). The search runs only when you choose it and never scans ports or address ranges.
+You can search your local network for SSH servers that announce themselves (mDNS/DNS-SD), from the empty Overview or from Settings › Data and servers. The search runs only when you choose it and never scans ports or address ranges. It ends on its own after about 40 seconds if no new server is found, and after 10 minutes at most; you can also stop it at any time.
 
 Encrypted backup
 Save your servers, trusted host keys and saved passwords to a file protected by a passphrase you choose, and restore them later. Private key files are never included.

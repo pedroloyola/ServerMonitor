@@ -10,6 +10,6 @@ Cópia de segurança encriptada. Nas Definições podes guardar servidores, chav
 
 Idioma. Numa instalação nova, se o Windows não estiver em português, a aplicação abre em inglês. Um idioma já definido mantém-se. Para mudar, vai a Definições > Idioma e reinicia a aplicação.
 
-A pesquisa na rede local só corre quando pedes: na Visão geral vazia, escolhe "Procurar na rede local"; o Windows pode pedir permissão de rede. Se já tens servidores, os dispositivos da rede deixam de ser sugeridos.
+A pesquisa na rede local só corre quando pedes, na Visão geral vazia ou em Definições > Dados e servidores; o Windows pode pedir permissão de rede. Termina após cerca de 40 segundos sem servidores novos, ou após 10 minutos.
 
 O .NET passa a vir incluído: já não precisas de o instalar.
