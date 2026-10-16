@@ -35,24 +35,52 @@ privately through GitHub Security Advisories on the same repository (Security ta
 
 ## What the publisher can and cannot receive
 
-- **Data processed only on your PC.** Everything described in "What is stored on your PC", "Files the app reads
-  on your PC", "Local network search", "Encrypted backup" and "Notifications and widget" is processed by the app
-  on your PC. The app never sends it to the publisher, so the publisher never receives, holds or sees it.
-- **Data the publisher may receive.** Only:
-  - what you choose to send: an e-mail to the address above, or an issue, comment or security report on GitHub
-    (on GitHub, GitHub's own terms and privacy statement also apply);
-  - the reports, ratings and reviews that Microsoft makes available to Store publishers (see "Windows and
-    Microsoft components").
-- **Data under Microsoft's responsibility.** The Microsoft Store, Windows diagnostic data and the Widgets board
-  are run by Microsoft under the [Microsoft Privacy Statement](https://privacy.microsoft.com/privacystatement),
-  not under this policy.
-- **The publisher's obligations.** For the data in the second point, the publisher is the controller under the
-  EU General Data Protection Regulation (GDPR). You can ask the publisher, at the e-mail address above, to
-  exercise your rights over that data, such as access, correction or deletion, and you can lodge a complaint
-  with a data protection supervisory authority (in Portugal, the Comissão Nacional de Proteção de Dados, CNPD).
-  **[NEEDS HUMAN: a legal reviewer confirms whether the purpose, legal basis and retention period for this
-  correspondence and these reports, and the full list of rights (including restriction, objection and
-  portability), must be stated here, and their wording; and whether the Brazilian LGPD also applies.]**
+ServerAlyzer involves three kinds of data, and this policy keeps them apart.
+
+- **Data that stays only on your device.** Everything described in "What is stored on your PC", "Files the app
+  reads on your PC", "Local network search", "Encrypted backup" and "Notifications and widget" is processed by
+  the app on your PC. The app never sends it to the publisher, so the publisher never receives, holds or sees
+  it.
+- **Messages you choose to send to the publisher.** An e-mail to serveralyzer@pedroloyola.com, or an issue, comment or security
+  report on GitHub. They contain what you write and your e-mail address or GitHub user name.
+- **Reports Microsoft shows the publisher in Partner Center.** Reports about the Store app that Microsoft
+  compiles and shows to the publisher, and the ratings and reviews published in the Store (see "Windows and
+  Microsoft components"). They are not ServerAlyzer telemetry.
+
+The Microsoft Store, Windows diagnostic data and the Widgets board are run by Microsoft under the
+[Microsoft Privacy Statement](https://privacy.microsoft.com/privacystatement), not under this policy.
+
+## How the publisher handles the data it receives
+
+For the messages and the Partner Center reports above, the publisher is the controller under the EU General
+Data Protection Regulation (GDPR).
+
+| | Messages you send | Partner Center reports, ratings and reviews |
+|---|---|---|
+| **Purpose** | To read and answer your message, and to fix or improve what you report. | To understand installs, use and reliability of the app, fix crashes and hangs, and read and answer reviews. |
+| **Proposed legal basis** | Legitimate interests (GDPR Art. 6(1)(f)): answering messages that people send voluntarily and supporting the app they use. | Legitimate interests (GDPR Art. 6(1)(f)): maintaining the quality of the app, using the reports Microsoft provides to every Store publisher. |
+| **How long** | E-mails: as long as needed to handle your message and any follow-up, then deleted [OWNER: maximum period, or the criterion for deleting]. GitHub: issues and comments are public and stay on GitHub until they are deleted; you can edit or delete your own comments, or ask the publisher to delete an issue or comment. | The publisher keeps no copies outside Partner Center [OWNER: confirm, or state the criterion]. Inside Partner Center, Microsoft's own terms apply. |
+| **Recipients** | The e-mail service that hosts the address above [OWNER: name of the e-mail provider]. For GitHub, GitHub, Inc., which publishes the content under its own [privacy statement](https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement). | Microsoft, which operates the Store and Partner Center. Reviews are public in the Store; Microsoft states that the name and picture of your Microsoft account may be shown with them. |
+
+**Your rights.** You can ask the publisher, at serveralyzer@pedroloyola.com, for access to, correction or deletion of your data, for
+the restriction of its processing, or object to it; where it applies, you can also ask for data portability. The
+publisher answers within one month, as the GDPR requires. Data that Microsoft holds is handled by Microsoft
+(see the Microsoft Privacy Statement). You can also lodge a complaint with a data protection supervisory
+authority; in Portugal, the Comissão Nacional de Proteção de Dados (CNPD, <https://www.cnpd.pt>).
+
+**International transfers.** The publisher is in Portugal. GitHub states that it stores and processes personal
+data in several locations, including the United States, and relies on the European Commission's standard
+contractual clauses and on its certification under the EU-U.S. Data Privacy Framework
+([GitHub privacy statement](https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement)). Microsoft states that it may store and process personal data in your region,
+the United States and other countries, and relies on the standard contractual clauses and on the EU-U.S. Data
+Privacy Framework (Microsoft Privacy Statement). [OWNER: where the e-mail provider stores mail, if outside the
+EU.]
+
+**Brazil (LGPD).** This policy is also published in Brazilian Portuguese, and the app may be offered in the
+Brazilian Store [OWNER: confirm the markets]. **[NEEDS HUMAN: legal decision pending. A legal reviewer approves
+the purposes, legal bases, retention criteria, recipients and transfer wording above, decides whether the
+Brazilian LGPD applies (and, if so, adds its rights and the ANPD), and the owner fills in the [OWNER: …]
+items.]**
 
 ## How monitoring works
 
@@ -147,15 +175,14 @@ nowhere, and it can only be read on your PC with Windows diagnostic tools (event
 
 - The app is distributed and updated through the Microsoft Store. Installs, updates, ratings and reviews are
   handled by Microsoft under the Microsoft Privacy Statement.
-- **Reports Microsoft gives the publisher.** Through Partner Center, Microsoft gives Store publishers reports it
-  compiles from Store and Windows data, for example: Store page views, installs and uninstalls, active devices,
-  sessions and their duration, broken down by market, device type, Windows version and app version; crash and
-  hang counts and rates, with technical failure details such as stack traces (the crash and hang rates use
-  devices that share optional diagnostic data); and the ratings and reviews published in the Store
-  ([Partner Center analytics](https://learn.microsoft.com/windows/apps/publish/analyze-app-performance/msix), [Health report](https://learn.microsoft.com/windows/apps/publish/analyze-app-performance/health-report)). ServerAlyzer adds nothing to these
-  reports: it does not use the Microsoft Store Services SDK and logs no custom events. **[NEEDS HUMAN: once the
-  app is live, the publisher checks read-only in Partner Center → Insights that these are the reports shown for
-  ServerAlyzer, and updates this paragraph if they are not.]**
+- **Reports Microsoft shows the publisher.** In Partner Center, Microsoft shows the publisher reports about the
+  ServerAlyzer Store app that Microsoft compiles itself: acquisitions (such as Store page views and installs),
+  usage (such as sessions), health (such as crashes and hangs, the devices affected and technical failure
+  details) and the ratings and reviews published in the Store
+  ([Partner Center analytics](https://learn.microsoft.com/windows/apps/publish/analyze-app-performance/msix), [Health report](https://learn.microsoft.com/windows/apps/publish/analyze-app-performance/health-report)). Microsoft collects this data under the
+  Microsoft Privacy Statement and, for crashes and hangs, according to your Windows diagnostic data settings.
+  These reports are not ServerAlyzer telemetry: the app sends nothing for them, does not use the Microsoft
+  Store Services SDK and logs no custom events.
 - **Diagnostic data.** The app is built on Windows and the Windows App SDK, a Microsoft runtime installed with
   it. Windows may send diagnostic data to Microsoft, including reports of app crashes and hangs, according to
   your Windows diagnostic data settings and under the Microsoft Privacy Statement. ServerAlyzer adds nothing to

@@ -36,27 +36,54 @@ dos GitHub Security Advisories do mesmo repositório (separador Security), e nã
 
 ## O que o editor pode e não pode receber
 
-- **Dados tratados apenas no teu PC.** Tudo o que está descrito em "O que fica guardado no teu PC", "Ficheiros
-  que a aplicação lê no teu PC", "Pesquisa na rede local", "Cópia de segurança encriptada" e "Notificações e
-  widget" é tratado pela aplicação no teu PC. A aplicação nunca o envia ao editor, por isso o editor nunca o
-  recebe, guarda ou vê.
-- **Dados que o editor pode receber.** Apenas:
-  - o que decidires enviar: um e-mail para o endereço acima, ou um issue, comentário ou relatório de segurança
-    no GitHub (no GitHub aplicam-se também os termos e a declaração de privacidade do próprio GitHub);
-  - os relatórios, classificações e críticas que a Microsoft disponibiliza aos editores da Store (ver
-    "Componentes do Windows e da Microsoft").
-- **Dados sob responsabilidade da Microsoft.** A Microsoft Store, os dados de diagnóstico do Windows e o painel
-  de Widgets são geridos pela Microsoft ao abrigo da
-  [Declaração de Privacidade da Microsoft](https://privacy.microsoft.com/pt-pt/privacystatement), e não desta
-  política.
-- **Obrigações do editor.** Quanto aos dados do segundo ponto, o editor é o responsável pelo tratamento nos
-  termos do Regulamento Geral sobre a Proteção de Dados (RGPD). Podes exercer os teus direitos sobre esses
-  dados, como o acesso, a retificação ou o apagamento, pedindo-o ao editor através do endereço de e-mail acima, e
-  podes apresentar reclamação a uma autoridade de controlo (em Portugal, a Comissão Nacional de Proteção de Dados,
-  CNPD). **[NEEDS HUMAN: um revisor jurídico confirma se a finalidade, o fundamento jurídico e o prazo de
-  conservação desta correspondência e destes relatórios, e a lista completa de direitos (incluindo a limitação,
-  a oposição e a portabilidade), têm de ser indicados aqui, e com que redação; e se a LGPD brasileira também se
-  aplica.]**
+O ServerAlyzer envolve três tipos de dados, e esta política mantém-nos separados.
+
+- **Dados que ficam só no teu dispositivo.** Tudo o que está descrito em "O que fica guardado no teu PC",
+  "Ficheiros que a aplicação lê no teu PC", "Pesquisa na rede local", "Cópia de segurança encriptada" e
+  "Notificações e widget" é tratado pela aplicação no teu PC. A aplicação nunca o envia ao editor, por isso o
+  editor nunca o recebe, guarda ou vê.
+- **Mensagens que decides enviar ao editor.** Um e-mail para serveralyzer@pedroloyola.com, ou um issue, comentário ou relatório
+  de segurança no GitHub. Contêm o que escreves e o teu endereço de e-mail ou nome de utilizador do GitHub.
+- **Relatórios que a Microsoft mostra ao editor no Partner Center.** Relatórios sobre a aplicação na Store que
+  a Microsoft compila e mostra ao editor, e as classificações e críticas publicadas na Store (ver "Componentes
+  do Windows e da Microsoft"). Não são telemetria do ServerAlyzer.
+
+A Microsoft Store, os dados de diagnóstico do Windows e o painel de Widgets são geridos pela Microsoft ao
+abrigo da [Declaração de Privacidade da Microsoft](https://privacy.microsoft.com/pt-pt/privacystatement), e não
+desta política.
+
+## Como o editor trata os dados que recebe
+
+Quanto às mensagens e aos relatórios do Partner Center acima, o editor é o responsável pelo tratamento nos
+termos do Regulamento Geral sobre a Proteção de Dados (RGPD).
+
+| | Mensagens que envias | Relatórios do Partner Center, classificações e críticas |
+|---|---|---|
+| **Finalidade** | Ler e responder à tua mensagem, e corrigir ou melhorar o que comunicas. | Perceber as instalações, a utilização e a fiabilidade da aplicação, corrigir falhas e bloqueios, e ler e responder às críticas. |
+| **Fundamento jurídico proposto** | Interesses legítimos (artigo 6.º, n.º 1, alínea f), do RGPD): responder a mensagens enviadas voluntariamente e dar apoio à aplicação que usas. | Interesses legítimos (artigo 6.º, n.º 1, alínea f), do RGPD): manter a qualidade da aplicação, usando os relatórios que a Microsoft disponibiliza a todos os editores da Store. |
+| **Durante quanto tempo** | E-mails: o tempo necessário para tratar a tua mensagem e o seguimento, sendo depois apagados [OWNER: prazo máximo, ou o critério para apagar]. GitHub: os issues e comentários são públicos e ficam no GitHub até serem apagados; podes editar ou apagar os teus comentários, ou pedir ao editor que apague um issue ou comentário. | O editor não guarda cópias fora do Partner Center [OWNER: confirmar, ou indicar o critério]. Dentro do Partner Center aplicam-se os termos da própria Microsoft. |
+| **Destinatários** | O serviço de e-mail que aloja o endereço acima [OWNER: nome do fornecedor de e-mail]. No GitHub, a GitHub, Inc., que publica o conteúdo ao abrigo da sua própria [declaração de privacidade](https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement). | A Microsoft, que gere a Store e o Partner Center. As críticas são públicas na Store; a Microsoft indica que o nome e a imagem da tua conta Microsoft podem ser mostrados com elas. |
+
+**Os teus direitos.** Podes pedir ao editor, através de serveralyzer@pedroloyola.com, o acesso aos teus dados, a sua retificação
+ou o seu apagamento, a limitação do tratamento, ou opor-te a ele; quando se aplique, podes também pedir a
+portabilidade dos dados. O editor responde no prazo de um mês, como o RGPD exige. Os dados que a Microsoft
+detém são tratados pela Microsoft (ver a Declaração de Privacidade da Microsoft). Podes também apresentar
+reclamação a uma autoridade de controlo; em Portugal, a Comissão Nacional de Proteção de Dados (CNPD,
+<https://www.cnpd.pt>).
+
+**Transferências internacionais.** O editor está em Portugal. O GitHub indica que guarda e trata dados pessoais
+em vários locais, incluindo os Estados Unidos, e que recorre às cláusulas contratuais-tipo da Comissão Europeia
+e à sua certificação ao abrigo do Quadro de Privacidade de Dados UE-EUA
+([declaração de privacidade do GitHub](https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement)). A Microsoft indica que pode guardar e tratar dados pessoais na tua
+região, nos Estados Unidos e noutros países, e que recorre às cláusulas contratuais-tipo e ao Quadro de
+Privacidade de Dados UE-EUA (Declaração de Privacidade da Microsoft). [OWNER: onde o fornecedor de e-mail guarda
+o correio, se for fora da UE.]
+
+**Brasil (LGPD).** Esta política é também publicada em português do Brasil, e a aplicação pode ser
+disponibilizada na Store brasileira [OWNER: confirmar os mercados]. **[NEEDS HUMAN: decisão jurídica pendente.
+Um revisor jurídico aprova as finalidades, os fundamentos jurídicos, os critérios de conservação, os
+destinatários e a redação sobre transferências acima, decide se a LGPD brasileira se aplica (e, se sim,
+acrescenta os seus direitos e a ANPD), e o editor preenche os itens [OWNER: …].]**
 
 ## Como funciona a monitorização
 
@@ -156,18 +183,16 @@ PC com ferramentas de diagnóstico do Windows (rastreio de eventos ou um depurad
 
 - A aplicação é distribuída e atualizada através da Microsoft Store. As instalações, atualizações,
   classificações e críticas são tratadas pela Microsoft, ao abrigo da Declaração de Privacidade da Microsoft.
-- **Relatórios que a Microsoft dá ao editor.** Através do Partner Center, a Microsoft dá aos editores da Store
-  relatórios que compila a partir de dados da Store e do Windows, por exemplo: visualizações da página da Store,
-  instalações e desinstalações, dispositivos ativos, sessões e a sua duração, por mercado, tipo de dispositivo,
-  versão do Windows e versão da aplicação; números e taxas de falhas e bloqueios, com detalhes técnicos das
-  falhas, como stack traces (as taxas de falhas e bloqueios usam os dispositivos que partilham dados de
-  diagnóstico opcionais); e as classificações e críticas publicadas na Store
+- **Relatórios que a Microsoft mostra ao editor.** No Partner Center, a Microsoft mostra ao editor relatórios
+  sobre a aplicação ServerAlyzer na Store que a própria Microsoft compila: aquisições (como visualizações da
+  página da Store e instalações), utilização (como sessões), estado de funcionamento (como falhas e bloqueios,
+  os dispositivos afetados e detalhes técnicos das falhas) e as classificações e críticas publicadas na Store
   ([análise do Partner Center](https://learn.microsoft.com/windows/apps/publish/analyze-app-performance/msix),
   [relatório de estado de funcionamento](https://learn.microsoft.com/windows/apps/publish/analyze-app-performance/health-report)).
-  O ServerAlyzer não acrescenta nada a estes relatórios: não usa o Microsoft Store Services SDK nem regista
-  eventos personalizados. **[NEEDS HUMAN: quando a aplicação estiver publicada, o editor confirma, só em
-  leitura, em Partner Center → Insights, que são estes os relatórios mostrados para o ServerAlyzer, e atualiza
-  este parágrafo se não forem.]**
+  A Microsoft recolhe estes dados ao abrigo da Declaração de Privacidade da Microsoft e, no caso das falhas e
+  bloqueios, de acordo com as tuas definições de dados de diagnóstico do Windows. Estes relatórios não são
+  telemetria do ServerAlyzer: a aplicação não envia nada para eles, não usa o Microsoft Store Services SDK nem
+  regista eventos personalizados.
 - **Dados de diagnóstico.** A aplicação assenta no Windows e no Windows App SDK, um runtime da Microsoft
   instalado com ela. O Windows pode enviar dados de diagnóstico à Microsoft, incluindo relatórios de falhas e
   bloqueios de aplicações, de acordo com as tuas definições de dados de diagnóstico do Windows e ao abrigo da
