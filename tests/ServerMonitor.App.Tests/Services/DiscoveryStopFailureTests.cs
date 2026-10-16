@@ -96,7 +96,9 @@ public sealed class DiscoveryStopFailureTests
         await service.StartSearchAsync();
         browser.StopFailures = 3;
 
-        await AdvanceUntilAsync(time, () => !service.IsSearching);
+        // The automatic end flips IsSearching before it unsubscribes and tries the browser (on another thread): wait for
+        // that first (failing) attempt, which comes after the unsubscription.
+        await AdvanceUntilAsync(time, () => !service.IsSearching && browser.StopAttempts >= 1);
         Assert.Equal(DiscoverySearchEnd.NothingFound, service.LastSearchEnd);
         Assert.Equal(0, browser.FoundSubscriberCount);
 

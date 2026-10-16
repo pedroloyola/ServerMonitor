@@ -206,7 +206,8 @@ public sealed class LocalNetworkSearchEndTests
         await LocalNetworkSearchLifetime.StopForBackground(w.Service, NullLogger.Instance); // the hide path
         await w.StartAsync();
         w.Navigation.GoToHistory(); // leaving the page
-        await DiscoveryUsableResultTests.AdvanceUntilAsync(w.Time, () => !w.Service.IsSearching);
+        // The stop flips IsSearching before it closes the browser (on another thread): wait for the counted stop too.
+        await DiscoveryUsableResultTests.AdvanceUntilAsync(w.Time, () => !w.Service.IsSearching && w.Browser.StopCount == 3);
 
         Assert.Equal(3, w.Browser.StopCount);
         Assert.Equal(0, requests);
@@ -493,6 +494,9 @@ public sealed class LocalNetworkSearchEndTests
 
         private void AssertNoListener()
         {
+            // A stop that ends on another thread (the automatic end, leaving a page) flips IsSearching before it
+            // unsubscribes and closes the browser. Bounded wait for that close; the asserts below still decide.
+            SpinWait.SpinUntil(() => Browser.StopCount >= Browser.StartCount, TimeSpan.FromSeconds(30));
             Assert.False(Service.IsSearching);
             Assert.Equal(1, Browser.StartCount);
             Assert.Equal(Browser.StartCount, Browser.StopCount);
