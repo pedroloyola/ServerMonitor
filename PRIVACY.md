@@ -91,7 +91,7 @@ Docker container and service lists are shown in the app and are not saved.
 
 The app writes **no log files**. The widget component can emit technical Windows event tracing (operation names
 and error types only, never server names, server data or file paths); the app writes it to no file and sends it
-nowhere, and it can only be read with Windows event-tracing tools on your PC.
+nowhere, and it can only be read on your PC with Windows diagnostic tools (event tracing or a debugger).
 
 ## Files the app reads on your PC
 

@@ -98,7 +98,7 @@ As listas de containers Docker e de serviços são mostradas no aplicativo e nã
 O aplicativo **não grava arquivos de log**. O componente do widget pode emitir rastreamento técnico de eventos
 do Windows (só nomes de operações e tipos de erro, nunca nomes de servidores, dados dos servidores nem caminhos
 de arquivos); o aplicativo não o grava em nenhum arquivo nem o envia para lugar nenhum, e ele só pode ser lido
-com ferramentas de rastreamento de eventos do Windows no seu PC.
+no seu PC com ferramentas de diagnóstico do Windows (rastreamento de eventos ou um depurador).
 
 ## Arquivos que o aplicativo lê no seu PC
 

@@ -96,8 +96,8 @@ As listas de containers Docker e de serviços são mostradas na aplicação e n�
 
 A aplicação **não escreve ficheiros de log**. O componente do widget pode emitir rastreio técnico de eventos do
 Windows (só nomes de operações e tipos de erro, nunca nomes de servidores, dados dos servidores nem caminhos de
-ficheiros); a aplicação não o escreve em nenhum ficheiro nem o envia para lado nenhum, e só pode ser lido com
-ferramentas de rastreio de eventos do Windows no teu PC.
+ficheiros); a aplicação não o escreve em nenhum ficheiro nem o envia para lado nenhum, e só pode ser lido no teu
+PC com ferramentas de diagnóstico do Windows (rastreio de eventos ou um depurador).
 
 ## Ficheiros que a aplicação lê no teu PC
 
