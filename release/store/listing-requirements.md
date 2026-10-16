@@ -126,11 +126,11 @@ DRAFT-GATE block in `README.md`.
   for every market) plus `PRIVACY.pt-PT.md` and `PRIVACY.pt-BR.md`. It now covers the on-demand
   local network search, the encrypted backup (which includes saved passwords), the widget
   snapshot, notifications, logs (none) and the Store data location. The gate stays until:
-  - every `[NEEDS HUMAN: ...]` marker in the three files is resolved and removed (publisher
-    identity, legal review, privacy contact, Windows/runFullTrust wording, Widgets board,
-    children);
-  - the uninstall behaviour is measured on a Store install and the Uninstalling paragraph is
-    written from that measurement;
+  - every `[NEEDS HUMAN: ...]` marker in the three files is resolved and removed. R2
+    (2026-10-16) resolved publisher identity, privacy contact, Widgets board, children and
+    Uninstalling (measured in the QA VM). Still open: the legal review of the publisher's
+    obligations, the read-only Partner Center check of the reports Microsoft gives the
+    publisher, and the `runFullTrust` wording;
   - the policy is merged on main, so the URL resolves publicly.
 
   Then remove the `GATED:` lines.

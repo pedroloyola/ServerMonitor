@@ -27,14 +27,31 @@ designed so that your data stays on your PC and under your control.
 
 ## Who is responsible
 
-ServerAlyzer is published on the Microsoft Store by **[NEEDS HUMAN: publisher legal name and country]**.
-The app keeps all data on your device and transmits nothing to the publisher, so the publisher does not
-receive or hold your data. **[NEEDS HUMAN: confirm this position with a legal reviewer, including whether a
-data controller and contact details under the GDPR or the LGPD must be named here.]**
+ServerAlyzer is developed and published on the Microsoft Store by **Pedro Loyola**, a natural person resident in
+Portugal, under the publisher name **Pedro Loy** (the "publisher").
 
-Contact: open an issue at <https://github.com/pedroloyola/ServerMonitor/issues>. Report security issues
+Contact for privacy questions: **serveralyzer@pedroloyola.com**. You can also open an issue at <https://github.com/pedroloyola/ServerMonitor/issues>. Report security issues
 privately through GitHub Security Advisories on the same repository (Security tab), not in a public issue.
-**[NEEDS HUMAN: add a privacy contact e-mail address if one is required.]**
+
+## What the publisher can and cannot receive
+
+- **Data processed only on your PC.** Everything described in "What is stored on your PC", "Files the app reads
+  on your PC", "Local network search", "Encrypted backup" and "Notifications and widget" is processed by the app
+  on your PC. The app never sends it to the publisher, so the publisher never receives, holds or sees it.
+- **Data the publisher may receive.** Only:
+  - what you choose to send: an e-mail to the address above, or an issue, comment or security report on GitHub
+    (on GitHub, GitHub's own terms and privacy statement also apply);
+  - the reports, ratings and reviews that Microsoft makes available to Store publishers (see "Windows and
+    Microsoft components").
+- **Data under Microsoft's responsibility.** The Microsoft Store, Windows diagnostic data and the Widgets board
+  are run by Microsoft under the [Microsoft Privacy Statement](https://privacy.microsoft.com/privacystatement),
+  not under this policy.
+- **The publisher's obligations.** For the data in the second point, the publisher is the controller under the
+  EU General Data Protection Regulation (GDPR). You can ask him, at the e-mail address above, for access to that
+  data, its correction or its deletion, and you can lodge a complaint with a data protection supervisory
+  authority (in Portugal, the Comissão Nacional de Proteção de Dados, CNPD). **[NEEDS HUMAN: a legal reviewer
+  confirms whether the purpose, legal basis and retention period for this correspondence and these reports must
+  be stated here, and their wording; and whether the Brazilian LGPD also applies.]**
 
 ## How monitoring works
 
@@ -117,17 +134,29 @@ The app writes **no log files**.
   in a warning state") and stay in the Windows notification center until they expire or you clear them. The
   app uses no push notification service.
 - The ServerAlyzer widget shows the data in `widget-state.json`. To display it, the app hands the card content
-  (display name, health, metrics, uptime) to the Windows Widgets board, a Microsoft component.
-  **[NEEDS HUMAN: confirm whether data handed to the Widgets board is subject to the Microsoft Privacy
-  Statement, and say so here.]**
+  (an internal server id, display name, health, metrics, uptime) to Windows on your PC, which shows it in the
+  Widgets board, a Windows feature provided by Microsoft. ServerAlyzer sends it to no online service. Microsoft
+  states that Windows diagnostic data is collected from the Widgets board according to your Windows diagnostic
+  data settings, and that each widget is controlled by the settings of the app that powers it, here ServerAlyzer
+  ([Microsoft Support: Widgets](https://support.microsoft.com/windows/stay-up-to-date-with-widgets-in-windows-7ba79aaa-dac6-4687-b460-ad16a06be6e4)).
 
 ## Windows and Microsoft components
 
 - The app is distributed and updated through the Microsoft Store. Installs, updates, ratings and reviews are
   handled by Microsoft under the Microsoft Privacy Statement.
-- The app is built on Windows and the Windows App SDK. Diagnostic data that Windows itself collects is governed
-  by your Windows privacy settings and the Microsoft Privacy Statement, not by this policy. **[NEEDS HUMAN:
-  confirm this wording about Windows and Windows App SDK diagnostic data.]**
+- **Reports Microsoft gives the publisher.** Through Partner Center, Microsoft gives Store publishers reports it
+  compiles from Store and Windows data, for example: Store page views, installs and uninstalls, active devices,
+  sessions and their duration, broken down by market, device type, Windows version and app version; crash and
+  hang counts and rates, with technical failure details such as stack traces (the crash and hang rates use
+  devices that share optional diagnostic data); and the ratings and reviews published in the Store
+  ([Partner Center analytics](https://learn.microsoft.com/windows/apps/publish/analyze-app-performance/msix), [Health report](https://learn.microsoft.com/windows/apps/publish/analyze-app-performance/health-report)). ServerAlyzer adds nothing to these
+  reports: it does not use the Microsoft Store Services SDK and logs no custom events. **[NEEDS HUMAN: once the
+  app is live, the publisher checks read-only in Partner Center → Insights that these are the reports shown for
+  ServerAlyzer, and updates this paragraph if they are not.]**
+- **Diagnostic data.** The app is built on Windows and the Windows App SDK, a Microsoft runtime installed with
+  it. Windows may send diagnostic data to Microsoft, including reports of app crashes and hangs, according to
+  your Windows diagnostic data settings and under the Microsoft Privacy Statement. ServerAlyzer adds nothing to
+  it.
 - The package declares the `runFullTrust` capability, which desktop apps of this kind need in order to run as
   a regular Windows desktop app. ServerAlyzer uses it only for what this policy describes. **[NEEDS HUMAN:
   confirm this wording.]**
@@ -148,14 +177,19 @@ Hugeicons icons. Licences are listed in `THIRD-PARTY-NOTICES.md` in the reposito
 - In the app you can remove a server, clear the metrics history (**Clear history**) and show ignored devices
   again (**Show ignored devices again**).
 - You can also view and remove saved passwords in Windows **Credential Manager**.
-- **Uninstalling:** **[NEEDS HUMAN: confirm by measuring an uninstall of the Store package. Expected: Windows
-  removes the app's package data folder with the files listed above, while passwords and passphrases in
-  Credential Manager remain until you remove them.]** Backup files you saved elsewhere are never touched.
+- **Uninstalling:** Windows removes the app's package data folder with the files listed above. Two things stay
+  until you remove them yourself:
+  - passwords and passphrases in Windows Credential Manager: open **Credential Manager** → **Windows
+    Credentials** and remove the entries that start with `ServerMonitor:v1:ssh`;
+  - the Windows Firewall rules that Windows created if you allowed the local network search: open **Windows
+    Defender Firewall with Advanced Security** → **Inbound Rules** and remove the rules named `ServerMonitor.App`.
+
+  The app never changes your `.ssh` folder. Backup files you saved elsewhere are never touched.
 
 ## Children
 
-**[NEEDS HUMAN: decide whether a statement about children is needed. The app is a technical tool and collects
-no data from anyone.]**
+ServerAlyzer is a technical tool for the general public and is not directed at children. It has no features
+aimed at children and collects no personal data from anyone, including children.
 
 ## Changes to this policy
 

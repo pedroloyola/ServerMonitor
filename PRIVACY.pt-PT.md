@@ -27,15 +27,34 @@ macOS por SSH. Foi desenhada para que os teus dados fiquem no teu PC e sob o teu
 
 ## Quem é responsável
 
-A ServerAlyzer é publicada na Microsoft Store por **[NEEDS HUMAN: nome legal e país do editor]**.
-A aplicação guarda todos os dados no teu dispositivo e não transmite nada ao editor, por isso o editor não
-recebe nem guarda os teus dados. **[NEEDS HUMAN: confirmar esta posição com um revisor jurídico, incluindo se é
-preciso indicar aqui um responsável pelo tratamento e respetivos contactos ao abrigo do RGPD ou da LGPD.]**
+A ServerAlyzer é desenvolvida e publicada na Microsoft Store por **Pedro Loyola**, pessoa singular residente em
+Portugal, com o nome de editor **Pedro Loy** (o "editor").
 
-Contacto: abre um issue em <https://github.com/pedroloyola/ServerMonitor/issues>. Comunica problemas de
-segurança de forma privada através dos GitHub Security Advisories do mesmo repositório (separador Security), e
-não num issue público. **[NEEDS HUMAN: acrescentar um endereço de e-mail de contacto para privacidade, se for
-exigido.]**
+Contacto para questões de privacidade: **serveralyzer@pedroloyola.com**. Também podes abrir um issue em <https://github.com/pedroloyola/ServerMonitor/issues>. Comunica
+problemas de segurança de forma privada através dos GitHub Security Advisories do mesmo repositório (separador
+Security), e não num issue público.
+
+## O que o editor pode e não pode receber
+
+- **Dados tratados apenas no teu PC.** Tudo o que está descrito em "O que fica guardado no teu PC", "Ficheiros
+  que a aplicação lê no teu PC", "Pesquisa na rede local", "Backup cifrado" e "Notificações e widget" é tratado
+  pela aplicação no teu PC. A aplicação nunca o envia ao editor, por isso o editor nunca o recebe, guarda ou vê.
+- **Dados que o editor pode receber.** Apenas:
+  - o que decidires enviar: um e-mail para o endereço acima, ou um issue, comentário ou relatório de segurança
+    no GitHub (no GitHub aplicam-se também os termos e a declaração de privacidade do próprio GitHub);
+  - os relatórios, classificações e críticas que a Microsoft disponibiliza aos editores da Store (ver
+    "Componentes do Windows e da Microsoft").
+- **Dados sob responsabilidade da Microsoft.** A Microsoft Store, os dados de diagnóstico do Windows e o painel
+  de Widgets são geridos pela Microsoft ao abrigo da
+  [Declaração de Privacidade da Microsoft](https://privacy.microsoft.com/pt-pt/privacystatement), e não desta
+  política.
+- **Obrigações do editor.** Quanto aos dados do segundo ponto, o editor é o responsável pelo tratamento nos
+  termos do Regulamento Geral sobre a Proteção de Dados (RGPD). Podes pedir-lhe, através do endereço de e-mail
+  acima, o acesso a esses dados, a sua retificação ou o seu apagamento, e podes apresentar reclamação a uma
+  autoridade de controlo (em Portugal, a Comissão Nacional de Proteção de Dados, CNPD). **[NEEDS HUMAN: um
+  revisor jurídico confirma se a finalidade, o fundamento jurídico e o prazo de conservação desta
+  correspondência e destes relatórios têm de ser indicados aqui, e com que redação; e se a LGPD brasileira
+  também se aplica.]**
 
 ## Como funciona a monitorização
 
@@ -121,18 +140,32 @@ A aplicação **não escreve ficheiros de log**.
   (por exemplo, "está em estado de atenção") e ficam no centro de notificações do Windows até expirarem ou até as
   limpares. A aplicação não usa nenhum serviço de notificações push.
 - O widget da ServerAlyzer mostra os dados de `widget-state.json`. Para os apresentar, a aplicação entrega o
-  conteúdo do cartão (nome de apresentação, estado de saúde, métricas, tempo ligado) ao painel de Widgets do
-  Windows, um componente da Microsoft. **[NEEDS HUMAN: confirmar se os dados entregues ao painel de Widgets
-  ficam sujeitos à Declaração de Privacidade da Microsoft, e dizê-lo aqui.]**
+  conteúdo do cartão (um identificador interno do servidor, nome de apresentação, estado de saúde, métricas,
+  tempo ligado) ao Windows no teu PC, que o mostra no painel de Widgets, uma funcionalidade do Windows fornecida
+  pela Microsoft. A ServerAlyzer não o envia para nenhum serviço online. A Microsoft indica que recolhe dados de
+  diagnóstico do Windows a partir do painel de Widgets de acordo com as tuas definições de dados de diagnóstico,
+  e que cada widget é controlado pelas definições da aplicação que o fornece, aqui a ServerAlyzer
+  ([Suporte da Microsoft: Widgets](https://support.microsoft.com/windows/stay-up-to-date-with-widgets-in-windows-7ba79aaa-dac6-4687-b460-ad16a06be6e4)).
 
 ## Componentes do Windows e da Microsoft
 
 - A aplicação é distribuída e atualizada através da Microsoft Store. As instalações, atualizações,
   classificações e críticas são tratadas pela Microsoft, ao abrigo da Declaração de Privacidade da Microsoft.
-- A aplicação assenta no Windows e no Windows App SDK. Os dados de diagnóstico que o próprio Windows recolhe
-  regem-se pelas tuas definições de privacidade do Windows e pela Declaração de Privacidade da Microsoft, e não
-  por esta política. **[NEEDS HUMAN: confirmar esta redação sobre os dados de diagnóstico do Windows e do
-  Windows App SDK.]**
+- **Relatórios que a Microsoft dá ao editor.** Através do Partner Center, a Microsoft dá aos editores da Store
+  relatórios que compila a partir de dados da Store e do Windows, por exemplo: visualizações da página da Store,
+  instalações e desinstalações, dispositivos ativos, sessões e a sua duração, por mercado, tipo de dispositivo,
+  versão do Windows e versão da aplicação; números e taxas de falhas e bloqueios, com detalhes técnicos das
+  falhas, como stack traces (as taxas de falhas e bloqueios usam os dispositivos que partilham dados de
+  diagnóstico opcionais); e as classificações e críticas publicadas na Store
+  ([análise do Partner Center](https://learn.microsoft.com/windows/apps/publish/analyze-app-performance/msix), [relatório de estado de funcionamento](https://learn.microsoft.com/windows/apps/publish/analyze-app-performance/health-report)). A ServerAlyzer não
+  acrescenta nada a estes relatórios: não usa o Microsoft Store Services SDK nem regista eventos
+  personalizados. **[NEEDS HUMAN: quando a aplicação estiver publicada, o editor confirma, só em leitura, em
+  Partner Center → Insights, que são estes os relatórios mostrados para a ServerAlyzer, e atualiza este
+  parágrafo se não forem.]**
+- **Dados de diagnóstico.** A aplicação assenta no Windows e no Windows App SDK, um runtime da Microsoft
+  instalado com ela. O Windows pode enviar dados de diagnóstico à Microsoft, incluindo relatórios de falhas e
+  bloqueios de aplicações, de acordo com as tuas definições de dados de diagnóstico do Windows e ao abrigo da
+  Declaração de Privacidade da Microsoft. A ServerAlyzer não lhes acrescenta nada.
 - O pacote declara a capacidade `runFullTrust`, de que as aplicações deste tipo precisam para funcionar como
   uma aplicação de ambiente de trabalho normal do Windows. A ServerAlyzer usa-a apenas para o que esta política
   descreve. **[NEEDS HUMAN: confirmar esta redação.]**
@@ -153,14 +186,21 @@ e os ícones Hugeicons. As licenças estão listadas em `THIRD-PARTY-NOTICES.md`
 - Na aplicação podes remover um servidor, limpar o histórico de métricas (**Limpar histórico**) e voltar a
   mostrar os dispositivos ignorados (**Voltar a mostrar dispositivos ignorados**).
 - Também podes ver e remover as passwords guardadas no **Gestor de Credenciais** do Windows.
-- **Desinstalação:** **[NEEDS HUMAN: confirmar medindo a desinstalação do pacote da Store. Esperado: o Windows
-  remove a pasta de dados do pacote com os ficheiros acima, e as passwords e passphrases no Gestor de
-  Credenciais ficam até as removeres.]** Os ficheiros de backup que guardaste noutro sítio nunca são tocados.
+- **Desinstalação:** o Windows remove a pasta de dados do pacote com os ficheiros acima. Duas coisas ficam até
+  as removeres tu:
+  - as passwords e passphrases no Gestor de Credenciais do Windows: abre o **Gestor de Credenciais** →
+    **Credenciais do Windows** e remove as entradas que começam por `ServerMonitor:v1:ssh`;
+  - as regras da Firewall do Windows que o Windows criou se permitiste a pesquisa na rede local: abre a
+    **Firewall do Windows Defender com Segurança Avançada** → **Regras de Entrada** e remove as regras com o nome
+    `ServerMonitor.App`.
+
+  A aplicação nunca altera a tua pasta `.ssh`. Os ficheiros de backup que guardaste noutro sítio nunca são
+  tocados.
 
 ## Crianças
 
-**[NEEDS HUMAN: decidir se é precisa uma declaração sobre crianças. A aplicação é uma ferramenta técnica e não
-recolhe dados de ninguém.]**
+A ServerAlyzer é uma ferramenta técnica para o público em geral e não se destina a crianças. Não tem
+funcionalidades dirigidas a crianças e não recolhe dados pessoais de ninguém, incluindo crianças.
 
 ## Alterações a esta política
 
