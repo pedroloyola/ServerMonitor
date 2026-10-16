@@ -500,7 +500,7 @@ public sealed class ServerDiscoveryServiceTests
     {
         await using var h = await Harness.StartAsync();
         var injectedSecondService = false;
-        h.Service.DiscoveredChanged += (_, _) =>
+        h.OnDiscoveredChanged((_, _) =>
         {
             if (injectedSecondService)
             {
@@ -510,7 +510,7 @@ public sealed class ServerDiscoveryServiceTests
             injectedSecondService = true;
             Assert.Equal("First", Assert.Single(h.Service.GetDiscovered()).DisplayName);
             h.Browser.EmitFound(h.Observation("Second", "second"));
-        };
+        });
 
         h.Browser.EmitFound(h.Observation("First", "first"));
         await h.FlushNotificationsAsync(1);
@@ -606,13 +606,9 @@ public sealed class ServerDiscoveryServiceTests
                     NothingFoundTimeout = TimeSpan.FromDays(1),
                     MaxSearchDuration = TimeSpan.FromDays(2)
                 });
-            Service.DiscoveredChanged += (_, _) =>
-            {
-                lock (_notificationGate)
-                {
-                    _changeCount++;
-                }
-            };
+            // The harness's ONLY subscription, made before the service can raise anything. Subscribing per flush
+            // raced a raise already in flight: the service invokes the delegate it read before that subscription.
+            Service.DiscoveredChanged += CountChange;
         }
 
         /// <summary>The notification delay configured on the service under test.</summary>
@@ -626,6 +622,8 @@ public sealed class ServerDiscoveryServiceTests
         private static readonly TimeSpan FlushDeadline = TimeSpan.FromSeconds(30);
 
         private readonly object _notificationGate = new();
+        private readonly List<EventHandler> _testHandlers = [];
+        private readonly List<(int Expected, TaskCompletionSource Delivered)> _waiters = [];
         private int _changeCount;
 
         public FakeMdnsServiceBrowser Browser { get; }
@@ -636,6 +634,50 @@ public sealed class ServerDiscoveryServiceTests
         public int ChangeCount
         {
             get { lock (_notificationGate) { return _changeCount; } }
+        }
+
+        /// <summary>
+        /// A test's own reaction to <c>DiscoveredChanged</c>. It runs inside the harness's subscription, BEFORE the
+        /// change is counted, so a flush never returns while it is still running (one test discovers a second service
+        /// from inside it).
+        /// </summary>
+        public void OnDiscoveredChanged(EventHandler handler)
+        {
+            lock (_notificationGate)
+            {
+                _testHandlers.Add(handler);
+            }
+        }
+
+        private void CountChange(object? sender, EventArgs args)
+        {
+            EventHandler[] handlers;
+            lock (_notificationGate)
+            {
+                handlers = [.. _testHandlers];
+            }
+
+            try
+            {
+                foreach (var handler in handlers)
+                {
+                    handler(sender, args);
+                }
+            }
+            finally
+            {
+                // Counted and signalled under one lock, after the test's handlers: a waiter registered before this
+                // point is completed here, one registered after it sees the count.
+                lock (_notificationGate)
+                {
+                    _changeCount++;
+                    foreach (var waiter in _waiters.Where(w => _changeCount >= w.Expected).ToList())
+                    {
+                        waiter.Delivered.TrySetResult();
+                        _waiters.Remove(waiter);
+                    }
+                }
+            }
         }
 
         /// <summary>
@@ -650,60 +692,49 @@ public sealed class ServerDiscoveryServiceTests
         /// first and read a stale count, which is a test that fails for reasons the product does not
         /// control.
         ///
-        /// The count is registered BEFORE the clock is advanced, so a notification that lands
-        /// immediately cannot be missed, and an expectation that is already satisfied returns without
-        /// waiting at all — some tests advance time enough for the notification to have fired before
-        /// they flush.
+        /// The waiter is registered BEFORE the clock is advanced, under the lock the count moves under,
+        /// so a notification that lands immediately (or is already in flight) cannot be missed, and an
+        /// expectation that is already satisfied returns without waiting at all — some tests advance time
+        /// enough for the notification to have fired before they flush.
+        ///
+        /// REL.0E: the waiter used to be a handler subscribed here. A raise already in flight had read the
+        /// delegate before that subscription, so it never called it, yet its count could move after the
+        /// pre-check: "raised 1 time(s); waiting for 1", then the deadline. Counting and signalling now
+        /// happen in the one handler subscribed in the constructor (see <see cref="CountChange"/>).
         /// </remarks>
         public async Task FlushNotificationsAsync(int expectedChangeCount)
         {
-            var delivered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-
-            void Signal(object? sender, EventArgs args)
+            TaskCompletionSource? delivered = null;
+            lock (_notificationGate)
             {
-                lock (_notificationGate)
+                if (_changeCount < expectedChangeCount)
                 {
-                    if (_changeCount < expectedChangeCount)
-                    {
-                        return;
-                    }
+                    delivered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                    _waiters.Add((expectedChangeCount, delivered));
                 }
-
-                delivered.TrySetResult();
             }
 
-            // Subscribed HERE and not in the constructor, so it is the last handler in the multicast
-            // and runs after any handler the test itself added. A subscriber that reacts to the
-            // notification — one of these tests discovers a second service from inside it — must have
-            // finished before the flush returns, or the test resumes against a half-applied world and
-            // sees one service where two exist.
-            Service.DiscoveredChanged += Signal;
+            Time.Advance(NotificationDelay);
+
+            if (delivered is null)
+            {
+                return;
+            }
+
             try
             {
+                await delivered.Task.WaitAsync(FlushDeadline);
+            }
+            catch (TimeoutException)
+            {
                 lock (_notificationGate)
                 {
-                    if (_changeCount >= expectedChangeCount)
-                    {
-                        delivered.TrySetResult();
-                    }
+                    _waiters.RemoveAll(waiter => ReferenceEquals(waiter.Delivered, delivered));
                 }
 
-                Time.Advance(NotificationDelay);
-
-                try
-                {
-                    await delivered.Task.WaitAsync(FlushDeadline);
-                }
-                catch (TimeoutException)
-                {
-                    throw new InvalidOperationException(
-                        $"DiscoveredChanged was raised {ChangeCount} time(s); the flush was waiting for "
-                            + $"{expectedChangeCount}. The notification never arrived, so this is not slowness.");
-                }
-            }
-            finally
-            {
-                Service.DiscoveredChanged -= Signal;
+                throw new InvalidOperationException(
+                    $"DiscoveredChanged was raised {ChangeCount} time(s); the flush was waiting for "
+                        + $"{expectedChangeCount}. The notification never arrived, so this is not slowness.");
             }
         }
 

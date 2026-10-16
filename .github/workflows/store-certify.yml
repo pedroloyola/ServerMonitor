@@ -159,8 +159,12 @@ jobs:
         shell: pwsh
         run: ./tools/release/Assert-PackageVersionFloor.ps1 -PackageVersion $env:PACKAGE_VERSION
 
-      - name: Setup the Microsoft Store Developer CLI
-        uses: microsoft/microsoft-store-apppublisher@cc9910a8d59f2eb55cbb83df0a3800cf3b5300e0 # v1.4
+      # The one msstore-cli release in tools/release/msstore-cli-pin.json, verified before it can see a
+      # secret: archive SHA-256 and size before extraction, Microsoft Authenticode signer, product
+      # version. Replaces microsoft-store-apppublisher, which installed whatever release was latest.
+      - name: Setup the Microsoft Store Developer CLI (pinned, verified)
+        shell: pwsh
+        run: ./tools/release/Install-MsStoreCli.ps1
 
       # GitHub masks secret values in logs; none of them are echoed here either way.
       - name: Configure the CLI

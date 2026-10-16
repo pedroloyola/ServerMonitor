@@ -148,7 +148,9 @@ Order of operations, and why:
 
 Sources: the CLI documentation (DOC) and the CLI source, `microsoft/msstore-cli` `main` at
 `5f15f06` (2026-10-06), `IStorePackagedAPIExtensions.PublishAsync` and the `submission` commands
-(VERIFIED by reading the source; no Store call was made).
+(VERIFIED by reading the source; no Store call was made). The pinned release, **v0.4.3**
+(`193cb57`), differs from `5f15f06` only in `version.json` (v0.4.3 side) and two unit-test fixtures
+(`5f15f06` side), so this behaviour is the pinned CLI's (VERIFIED with the GitHub compare API, REL.0E).
 
 - `--noCommit` is **not a dry run**: it creates or reuses a draft, uploads the package and updates the
   draft; it only skips the final commit (DOC: "`--noCommit` uploads the package and updates the
@@ -173,14 +175,46 @@ workflow ever calls `msstore publish` except that one upload with `--noCommit`. 
 Partner Center *between* the in-flight check and the upload (seconds) would still be deleted; the
 procedure below says not to edit the product in Partner Center while a stage run is in progress.
 
-**Gate on the first real dispatch (open, pre-existing Medium):** the Store CLI version is not pinned.
-`microsoft-store-apppublisher` installs the **latest** `msstore`, and that CLI receives the Store
-client secret in `reconfigure` and decides what is deleted or committed. Before the first real
-`store-submit` run, a person chooses a reviewed `msstore-cli` release and either pins the action's
-`version` input to it or adds a step between *Setup* and *Configure* that compares `msstore --version`
-with an allowlist in the repository and fails closed (Vigil, PR #56). The behaviour described above is
-the one documented today and read from `5f15f06`; re-read it whenever the pinned version changes.
-This is a gate on the dispatch, not on merging the workflows.
+**The Store CLI is pinned and verified (REL.0E; addresses the Vigil PR #56 Medium, whose closure is Vigil's call).** The
+CLI receives the Store client secret in `reconfigure` and decides what is deleted or committed, so the
+three Store workflows no longer use `microsoft-store-apppublisher` (which installed whatever release was
+**latest**, unchecked). Their *Setup* step runs `tools/release/Install-MsStoreCli.ps1`, which installs
+only the release named in `tools/release/msstore-cli-pin.json` and fails closed, before *Configure*:
+
+| Check | Pinned value (v0.4.3) |
+| --- | --- |
+| Exact asset URL (the tag, never `latest`) | `releases/download/v0.4.3/MSStoreCLI-win-x64.zip` |
+| Archive SHA-256 and size, **before** extraction, on one private copy held open exclusively through the extraction | `c5fb008b616f96b1b55f1d52e4e0a5dd8f6c156129b5f52f9b97ec0eed11bd57`, 57 635 931 bytes |
+| Authenticode `Valid`, signer subject and issuing CA, on `msstore.exe`, `msalruntime.dll`, `libSkiaSharp.dll` | `CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US`, issued by `CN=Microsoft Code Signing PCA 2024, O=Microsoft Corporation, C=US` |
+| `msstore.exe` product version (read, not executed) | `0.4.3.2+193cb57f2a` (source commit `193cb57f2a58a50c9fd4d000fa12c6078852bb7a`) |
+
+Provenance of the pin (VERIFIED 2026-10-16, without running the CLI): the hash is the same in the
+downloaded file, GitHub's asset digest and the release's own `MSStoreCLI-win-x64.zip.sha256.txt`; the
+archive's SPDX build manifest names Microsoft's official build of `microsoft/msstore-cli` at
+`193cb57`. The release has no GitHub artifact attestation and the tag commit is unsigned, so the
+Authenticode signer and the pinned hash are the trust anchors. The issuing CA is pinned exactly: the
+hash fixes the bytes, so the signature (and its issuer) of this release cannot change; a new release
+signed under another Microsoft CA is a pin update anyway. The thumbprint is not pinned (the signing
+certificate is renewed yearly; it adds nothing the hash does not already fix).
+
+The archive is copied into a new folder with a random name and opened once with `FileShare.None`;
+the hash and the extraction read that same handle, so the file cannot be swapped or rewritten between
+the check and the extraction (Vigil #66 L-1).
+
+**Known gap (documented, not enforced):** M-1 does not forbid another step from writing `GITHUB_PATH`
+and putting a different `msstore` ahead of the verified one. In the three Store workflows today the
+only other steps are the repository's own `run:` steps and two pinned actions, `actions/checkout` and
+(store-submit) `actions/download-artifact`; none of the `run:` steps writes `GITHUB_PATH` (VERIFIED by
+search), and neither action is expected to (HYPOTHESIS). A change adding one is a workflow change under
+review (Vigil #66 Nit-2). `Test-ReleaseWorkflowShape.ps1` (M-1)
+refuses the action, any other download of `msstore-cli`, an installer call with arguments, a condition
+or `continue-on-error` on it, and any `msstore` use before it.
+
+**Updating the CLI is a reviewed pull request:** take every value of the pin from the new release
+(digest, `.sha256.txt`, signature and product version of the extracted `msstore.exe`), re-read
+`PublishAsync` and the `submission` commands at the new tag, and run
+`./tools/release/Install-MsStoreCli.ps1 -ArchivePath <zip> -Destination <empty folder> -NoPath` on the
+downloaded archive. Dependabot cannot track a release-asset hash.
 
 ### 2b. `store-certify.yml` (the certification gate)
 
@@ -542,7 +576,9 @@ repository, not in an issue, not in a run log.
    `microsoft-store` environment only after it is green. Record the **submission id** from the run
    summary. Nothing has gone to certification.
 5. **Complete and review the draft** by hand: *Staged release: the human procedure* below (backup,
-   apply, verify).
+   apply, verify). **Blocked while that section says so:** editing an API-created draft in Partner
+   Center stops the API from committing it; a release whose listing changes follows the
+   *portal-only release* there instead of steps 4-6.
 6. **Certification GO:** dispatch `store-certify.yml` with the tag, the same run id, the package
    version, the submission id and `CERTIFY <version>`. Approve the environment after the
    provenance job is green.
@@ -554,6 +590,76 @@ Three separate human decisions, each with its own action: stage (`STAGE` + envir
 certify (`CERTIFY <version>` + a second environment approval), publish (Partner Center only).
 
 ## Staged release: the human procedure
+
+> **BLOCKED (REL.0E audit, 2026-10-16): do not run steps 2-5 below as written.** Steps 3a/3b edit,
+> in Partner Center, a draft that `store-submit` created through the submission API, and step 5 then
+> commits it through the API. Microsoft documents that this does not work: "If you use Partner Center
+> to change a submission that you originally created by using the API, you will no longer be able to
+> change or commit that submission by using the API. In some cases, the submission could be left in
+> an error state where it cannot proceed in the submission process. If this occurs, you must delete
+> the submission and create a new submission." (*Manage app submissions*, Microsoft Store submission
+> API, see Sources). Second, unproven risk: Partner Center may only fill in a package's `version`
+> when it processes the upload at commit, in which case `store-submit` stops after its upload (fail
+> closed, draft left behind). Until an all-API path (listing text **and** screenshots through the
+> API) exists and has been proven, a release whose listing changes uses the **portal-only release**
+> below; `store-submit` and `store-certify` are not dispatched.
+
+### Portal-only release (while the block above holds)
+
+Severity of the block (Vigil, independent check): **High, process/availability**. It fails closed:
+the API commit is refused or the draft ends in an error state and must be deleted. Nothing is
+published by mistake and no data is exposed, but a release cannot complete this way.
+
+Every Store change is made by a person in Partner Center; the API is never used on the draft.
+`release-build` still builds and proves the package, and `store-status` stays read-only. What the
+API path proved automatically (G4, the package bound to the tag-push run) is proven by hand in P2a.
+
+| step | who | action | evidence |
+| --- | --- | --- | --- |
+| P1. Package | `release-build` (tag push) | Tag `vX.Y.Z` on the `main` commit; record the run id, package name `ServerAlyzer_<version>_x64_<sha7>.msix` and SHA-256 from the summary | run id, SHA-256, build record |
+| P2a. Run provenance (manual G4) | person, local, read-only | See *P2a commands* below: the run is `.github/workflows/release-build.yml`, `event` **push**, `headBranch` **= the tag**, `headSha` **= the tag commit**, `status` completed, `conclusion` **success**, and the tag commit is reachable from `main`. Any mismatch: STOP, do not download | command output |
+| P2b. Verify the download | person, local | `gh run download <run id> -n serveralyzer-msix-<version> -D <new empty folder>`; SHA-256 equals the summary and the `.sha256` file; `.build.json` commit equals the tag commit; rerun `Assert-PackageIdentity` (with `-ExpectedSha256`), `Assert-PackageRuntime`, `Assert-PackageResources`, `Assert-DistributionPrivacy` on it | gate logs |
+| P2c. Freeze the file | person, local | Mark the verified `.msix` read-only (`Set-ItemProperty <file> -Name IsReadOnly -Value $true`) and record its SHA-256 in the evidence **before** the upload. Upload **that exact path** in P4, from a folder that holds no other package (never next to a local QA build) | SHA-256 + path |
+| P3. Backup | person, read-only | Product idle (no draft, publishing hold `Manual`); **Export listings** (CSV) to private evidence | CSV + date |
+| P4. Draft | person, Partner Center | *Update* the product (the draft is a copy of the last published submission); upload **the P2c file**, and only that file; check the version, architecture and identity Partner Center shows. Partner Center does not show the hash | screenshot |
+| P5. Listing | person, in this draft | Steps 3a and 3b below (text, release notes from `whats-new.txt`, screenshots in order with captions). Touch nothing else | — |
+| P6. Verify | person, read-only | Step 4 below (the hold, three languages, package version, draft CSV diff against the repository); then read the package file name back: either dispatch **`store-status`** with **`include_metadata: true`** (`gh workflow run store-status.yml -f include_metadata=true`; read-only `GET`) and read `ApplicationPackages[].FileName` in the redacted submission JSON of its log, or read it on the draft's *Packages* page in Partner Center. Without `include_metadata` the run prints only the package versions, not the file name. The live package must be `ServerAlyzer_<version>_x64_<sha7>.msix` (sha7 = the tag commit) and, if already filled in, `Version` `<version>`. The JSON dump redacts the upload SAS URL and other credential-like values, but the log is readable by anyone who can read this public repository's Actions logs: check it shows nothing else sensitive before relying on it. HYPOTHESIS until seen: `store-status` reads a portal-created draft without changing it (it only calls `apps get` and `submission get`) | draft CSV + diff, `store-status` run id |
+| P7. Certify | person (**certification GO**) | *Submit to the Store* in Partner Center, with *Publish manually* still selected | date, submission id |
+| P8. Publish | person (**publication GO**) | After certification: **Publish now** | — |
+
+**P2a commands** (read-only; the same checks and the same script as the `provenance` job of
+`store-submit.yml`; `R` is the repository, `TAG` the tag, `RUN` the run id):
+
+```powershell
+gh run view $RUN --json workflowName,event,headBranch,headSha,status,conclusion
+$tagCommit = (git rev-parse "$TAG^{commit}").Trim()      # after git fetch --tags origin
+git merge-base --is-ancestor $tagCommit origin/main; if ($LASTEXITCODE -ne 0) { throw 'tag commit not on main' }
+# The full G4, as store-submit runs it, writing the evidence files:
+gh api "repos/$R/actions/runs/$RUN" > run.json
+gh api "repos/$R/git/ref/tags/$TAG" > tagref.json
+# annotated tag: gh api "repos/$R/git/tags/<tagref object.sha>" > tagobject.json ; lightweight: '{}' > tagobject.json
+$main = (gh api "repos/$R/git/ref/heads/main" --jq '.object.sha').Trim()
+gh api "repos/$R/compare/$tagCommit...$main" --jq '{status: .status, ahead_by: .ahead_by, behind_by: .behind_by}' > compare.json
+./tools/release/Assert-ReleaseRunProvenance.ps1 -RunPath run.json -TagRefPath tagref.json -TagObjectPath tagobject.json `
+  -ComparePath compare.json -Repository $R -Tag $TAG -PackageVersion <version>
+```
+
+`gh run view` has no `path` field; the workflow file is proven by the script (`path` from the REST
+run object). Expected: `workflowName` `Release build`, `event` `push`, `headBranch` = `$TAG`,
+`headSha` = `$tagCommit`, `status` `completed`, `conclusion` `success`.
+
+**Credentials and accounts on this path:**
+
+* The `microsoft-store` / `microsoft-store-status` Entra application holds the **Manager** role (it
+  can write). On the portal-only path it is used **only** by `store-status`, whose commands read.
+  Prefer a credential with a read-only Partner Center role for `store-status` if Partner Center
+  offers one (**NEEDS HUMAN**); otherwise keep the CLI version pinned and the publishing hold
+  asserted.
+* **NEEDS HUMAN:** the Partner Center account that performs P4-P8 has MFA enabled, and no other user
+  or role can submit or publish for the product (review *Account settings → Users*).
+
+Rollback is R1, R2, R4-R6 below (R3 does not apply). A package that reached customers cannot be
+withdrawn by a lower version: the fix is a new release with a higher version.
 
 For a release whose listing (text and/or screenshots) changes, or whenever the draft should be
 reviewed before certification. The repository holds the content: text in
@@ -619,7 +725,8 @@ Everything the workflows rely on runs offline:
 ./tools/release/Test-HardeningMutations.ps1               # weaken each G4/G6 check and the pin/wiring guards; require detection
 ./tools/release/Test-WorkflowRunInterpolation.ps1 -SelfTest # no inputs/steps/needs/event in run blocks
 ./tools/release/Test-WorkflowActionPins.ps1 -SelfTest     # actions pinned by full SHA (G8)
-./tools/release/Test-ReleaseWorkflowShape.ps1 -SelfTest   # G2/G4/G6/runtime + P-1 stage/certify wiring, 47 mutations
+./tools/release/Test-ReleaseWorkflowShape.ps1 -SelfTest   # G2/G4/G6/runtime + P-1 stage/certify + M-1 pinned CLI wiring, 68 mutations
+./tools/release/Install-MsStoreCli.ps1 -SelfTest          # pinned Store CLI: pin shape, hash/size before extraction on one held private copy (swap cases), signer + issuer, product version, PATH, 35 cases
 ```
 
 CI runs the version, provenance, publishing-hold, submission-update, in-flight, staged-draft, interpolation,
@@ -640,7 +747,8 @@ enforces both.
 * [Publish app updates to Microsoft Store with GitHub Actions](https://learn.microsoft.com/en-us/windows/apps/publish/msstore-dev-cli/github-actions)
 * [Manage app submissions (submission resource, `targetPublishMode`, status values)](https://learn.microsoft.com/en-us/windows/uwp/monetize/manage-app-submissions)
 * [Add and manage app credentials in Microsoft Entra ID](https://learn.microsoft.com/en-us/entra/identity-platform/how-to-add-credentials)
-* [microsoft/microsoft-store-apppublisher](https://github.com/microsoft/microsoft-store-apppublisher)
+* [microsoft/microsoft-store-apppublisher](https://github.com/microsoft/microsoft-store-apppublisher) (no longer used; read at `cc9910a`: `version` defaults to `latest`, no checksum)
+* [microsoft/msstore-cli releases](https://github.com/microsoft/msstore-cli/releases) · [v0.4.3](https://github.com/microsoft/msstore-cli/releases/tag/v0.4.3)
 * [GitHub REST — workflow runs (`path`, `event`, `head_branch`, `head_sha`, `conclusion`)](https://docs.github.com/en/rest/actions/workflow-runs#get-a-workflow-run)
 * [GitHub REST — git references and tag objects](https://docs.github.com/en/rest/git/refs) · [tags](https://docs.github.com/en/rest/git/tags)
 * [GitHub — security hardening for GitHub Actions (pinning to a full-length commit SHA, untrusted input)](https://docs.github.com/en/actions/security-for-github-actions/security-guides/security-hardening-for-github-actions)

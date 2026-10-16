@@ -11,6 +11,9 @@
        confirmation phrase bound to the version, the staged draft proven by id right before the single
        commit, and no upload/update/delete. No step of either job is conditional or allowed to fail
        open, and both share the store-submit concurrency group.
+   M-1 (REL.0E) every Store workflow gets its CLI only from Install-MsStoreCli.ps1, called exactly, with no
+       condition and no continue-on-error, before the CLI is first used: no floating
+       microsoft-store-apppublisher action, no other download of msstore-cli.
    Unsupported shapes fail closed. -SelfTest reintroduces each defect in memory and requires a failure. #>
 [CmdletBinding()]
 param([string] $RepositoryRoot = (Join-Path $PSScriptRoot '../..'), [switch] $SelfTest)
@@ -93,10 +96,24 @@ function Get-Index([string] $Text, [string] $Pattern) {
     return $match.Index
 }
 
+# M-1: the pinned, verified Store CLI (tools/release/msstore-cli-pin.json), and nothing else.
+$pinnedCliStep = "      - name: Setup the Microsoft Store Developer CLI (pinned, verified)`n        shell: pwsh`n        run: ./tools/release/Install-MsStoreCli.ps1`n"
+function Assert-PinnedStoreCli([string] $Text) {
+    $all = Strip-Comments $Text
+    if ($all -match '(?i)microsoft-store-apppublisher|(?m)^\s*(?:-\s+)?uses:[^\n]*msstore') { throw 'Shape M-1: the Store CLI must come only from Install-MsStoreCli.ps1, never from the floating microsoft-store-apppublisher action.' }
+    if ($all -match '(?i)msstore-cli/releases|MSStoreCLI-') { throw 'Shape M-1: no other download of msstore-cli; the pinned installer is the only source.' }
+    $calls = @([regex]::Matches($all, '(?m)^.*Install-MsStoreCli\.ps1.*$'))
+    if ($calls.Count -ne 1 -or -not $all.Contains($pinnedCliStep)) { throw 'Shape M-1: exactly one step must run "./tools/release/Install-MsStoreCli.ps1" with no argument, no condition and no continue-on-error.' }
+    $install = $all.IndexOf($pinnedCliStep)
+    $firstUse = Get-Index $all "$command\bmsstore\s+[a-z]"
+    if ($firstUse -lt 0 -or $firstUse -lt $install) { throw 'Shape M-1: the pinned CLI must be installed and verified before msstore is first used.' }
+}
+
 function Assert-StoreSubmit([string] $Text) {
     $jobs = Get-Jobs $Text
     $submit = Assert-Provenance $jobs 'submit'
     Assert-SharedConcurrency $Text
+    Assert-PinnedStoreCli $Text
     $configure = $submit.IndexOf('msstore reconfigure')
     if ($configure -lt 0) { throw 'Shape: the submit job no longer configures the Store CLI; review this guard.' }
 
@@ -136,6 +153,7 @@ function Assert-StoreCertify([string] $Text) {
     $jobs = Get-Jobs $Text
     $certify = Assert-Provenance $jobs 'certify'
     Assert-SharedConcurrency $Text
+    Assert-PinnedStoreCli $Text
     $all = Strip-Comments $Text
     if ($all -match '\bmsstore\s+(publish|submission\s+(update|updateMetadata|delete|rollout))\b') { throw 'Shape P-1: store-certify must not upload, update, delete or roll out; it only commits the staged draft.' }
     $configure = $certify.IndexOf('msstore reconfigure')
@@ -172,6 +190,7 @@ function Assert-StoreCertify([string] $Text) {
 }
 
 function Assert-StoreStatus([string] $Text) {
+    Assert-PinnedStoreCli $Text
     $body = Strip-Comments $Text
     if ($body -notmatch 'Assert-ManualPublishMode\.ps1 -PublishMode \$publishMode') { throw 'Shape G6: store-status must check the publish mode.' }
     if ($body -notmatch 'if \(\$publishModeError\) \{ throw') { throw 'Shape G6: a submission in flight off the publishing hold must fail the run.' }
@@ -244,6 +263,19 @@ $mutations = @{
         @{ Old = 'if ($publishModeError) { throw'; New = 'if ($publishModeError) { Write-Warning'; Name = 'publish mode only warns' }
     )
 }
+
+# M-1 (REL.0E): the floating action back, the installer weakened, skipped or bypassed.
+$step = "      - name: Setup the Microsoft Store Developer CLI (pinned, verified)`n        shell: pwsh`n        run: ./tools/release/Install-MsStoreCli.ps1`n"
+$pinMutations = @(
+    @{ Old = $step; New = "      - name: Setup the Microsoft Store Developer CLI`n        uses: microsoft/microsoft-store-apppublisher@cc9910a8d59f2eb55cbb83df0a3800cf3b5300e0 # v1.4`n"; Name = 'M-1 floating action back' }
+    @{ Old = $step; New = $step.Replace('Install-MsStoreCli.ps1', 'Install-MsStoreCli.ps1 -NoPath'); Name = 'M-1 installer verifies but leaves PATH alone' }
+    @{ Old = $step; New = $step.Replace("        shell: pwsh`n", "        continue-on-error: true`n        shell: pwsh`n"); Name = 'M-1 installer allowed to fail' }
+    @{ Old = $step; New = $step.Replace("        shell: pwsh`n", "        if: false`n        shell: pwsh`n"); Name = 'M-1 installer skipped by a condition' }
+    @{ Old = $step; New = "      - name: Setup the Microsoft Store Developer CLI`n        shell: pwsh`n        run: Write-Host 'skipped'`n"; Name = 'M-1 installer removed' }
+    @{ Old = $step; New = $step + "`n      - name: Refresh the CLI`n        shell: pwsh`n        run: Invoke-WebRequest https://github.com/microsoft/msstore-cli/releases/latest/download/MSStoreCLI-win-x64.zip -OutFile c.zip`n"; Name = 'M-1 second, unverified download' }
+    @{ Old = $step; New = "      - name: Use the runner's CLI first`n        shell: pwsh`n        run: msstore reconfigure --clientSecret x`n`n" + $step; Name = 'M-1 CLI used before it is verified' }
+)
+foreach ($name in @('store-submit.yml', 'store-certify.yml', 'store-status.yml')) { $mutations[$name] = @($mutations[$name]) + $pinMutations }
 
 $total = 0
 foreach ($name in $checks.Keys) {

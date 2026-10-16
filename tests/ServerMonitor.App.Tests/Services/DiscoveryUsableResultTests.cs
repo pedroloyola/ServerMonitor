@@ -283,6 +283,9 @@ public sealed class DiscoveryUsableResultTests
             Assert.Equal(end, Service.LastSearchEnd);
             Assert.NotNull(_endedAt);
             Assert.InRange(_endedAt.Value - Start, bound, bound + ToleranceFor(end));
+            // The automatic end runs on another thread and flips IsSearching before it unsubscribes and closes the
+            // browser. Bounded wait for that close; the asserts below still decide.
+            SpinWait.SpinUntil(() => Browser.StopCount >= Browser.StartCount, TimeSpan.FromSeconds(30));
             Assert.Equal(Browser.StartCount, Browser.StopCount);
             Assert.Equal(0, Browser.FoundSubscriberCount);
             Assert.Equal(0, Browser.UpdatedSubscriberCount);

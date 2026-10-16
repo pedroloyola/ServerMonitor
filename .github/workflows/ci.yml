@@ -171,6 +171,7 @@ jobs:
             'Get-SubmissionState.ps1 -SelfTest'
             'Assert-StagedSubmission.ps1 -SelfTest'
             'Test-StoreStageCertify.ps1'
+            'Install-MsStoreCli.ps1 -SelfTest'
           )
 
       - name: Vulnerability scan (fail on any vulnerable package)
