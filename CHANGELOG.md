@@ -13,9 +13,9 @@ pacote **1.1.7.0** (x64), construído a partir da tag [`v1.1.7`](https://github.
 
 - **Novo visual.** Barra lateral com Visão geral, Servidores, Histórico e Definições; página de detalhe por
   servidor; modo compacto e widget do Windows 11 refeitos; melhor suporte a teclado, leitores de ecrã e alto
-  contraste (#13, #14, #16, #18, #23, #25, #27, #29, #32, #36, #38, #42).
-- **Configuração mais simples.** Guia de primeira utilização, servidores a partir do ficheiro de configuração SSH,
-  sugestão das chaves privadas habituais da pasta `.ssh` e teste de ligação passo a passo (#10).
+  contraste (#13, #14, #16, #18, #23, #25, #27, #29, #32, #36, #38, #40, #42).
+- **Configuração mais simples.** Guia de início, servidores a partir do ficheiro de configuração SSH,
+  sugestão das chaves privadas habituais da pasta `.ssh` e teste de ligação passo a passo (#6, #10).
 - **Jump hosts.** Servidores alcançados através de um único jump host (ProxyJump), com a chave do jump host
   verificada à parte (#7, #8, #9).
 - **Cópia de segurança encriptada.** Servidores, chaves de host confiáveis e palavras-passe guardados num ficheiro
@@ -27,12 +27,14 @@ pacote **1.1.7.0** (x64), construído a partir da tag [`v1.1.7`](https://github.
 - **.NET incluído no pacote.** O MSIX é self-contained para a app e para o WidgetProvider: deixa de ser preciso
   instalar o .NET 10. O Windows App Runtime continua a ser uma dependência de framework instalada pela Store
   (#48, #53).
-- **Idioma.** Numa instalação nova: Windows em pt-BR → pt-BR, outro `pt*` → pt-PT, qualquer outro idioma → en-US.
-  Uma escolha de idioma já guardada nunca é substituída e mantém-se entre arranques, incluindo "Usar o idioma do
+- **Idioma.** Numa instalação nova, a app usa o primeiro idioma inglês ou português das preferências de idioma do
+  Windows: pt-BR → pt-BR, outro `pt*` → pt-PT, inglês ou nenhum dos dois → en-US.
+  Uma escolha de idioma já guardada nunca é substituída e mantém-se entre arranques, incluindo "Utilizar idioma do
   sistema" (#46, #55, #58, #59).
 - **Números no idioma da app.** Valores e tamanhos formatados segundo o idioma da interface, por exemplo
-  "6.6 GB" em inglês (#57).
-- **Correção:** clicar numa notificação com a app fechada já não a faz falhar ao arrancar (#60).
+  "6,6 GB" em português e "6.6 GB" em inglês (#57).
+- **Correções:** clicar numa notificação com a app fechada já não faz a app falhar ao arrancar (#60); o resumo do
+  widget já não perde uma atualização por uma corrida no limitador de escrita (#35).
 - **Política de privacidade** reescrita em en-US, pt-PT e pt-BR: o que fica no PC, o que o editor pode receber e
   os teus direitos (#65).
 
@@ -55,6 +57,19 @@ pacote **1.1.7.0** (x64), construído a partir da tag [`v1.1.7`](https://github.
 
 > **Nota de versão.** Produto **1.1.7**, pacote **1.1.7.0** (revisão 0). `AssemblyVersion` mantém-se em
 > 1.0.0.0. As versões de pacote 1.1.2.x–1.1.6.0 foram usadas apenas em QA local e nunca foram distribuídas.
+
+## [1.1.1] — 2026-09-05
+
+Correções do **widget do Windows 11** e da **área de notificação**; sem funcionalidades novas.
+
+- O widget continua a receber leituras novas com a janela fechada.
+- Ícone na área de notificação com o menu nativo do Windows, que abre completo em qualquer estado da janela.
+- O aviso de primeiro fecho volta a aparecer quando deve.
+- Encerramento previsível: **Sair do ServerAlyzer** termina o processo; com o segundo plano desativado, fechar a
+  janela volta a ser uma saída completa.
+- Sem janelas de consola.
+
+Notas completas: [ServerAlyzer 1.1.1](https://github.com/pedroloyola/ServerMonitor/releases/tag/v1.1.1).
 
 ## [1.1.0] — 2026-08-31
 

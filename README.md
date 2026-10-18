@@ -4,11 +4,11 @@
 [![Licença: MIT](https://img.shields.io/github/license/pedroloyola/ServerMonitor?label=licen%C3%A7a)](LICENSE)
 
 **ServerAlyzer** é um painel calmo e compacto para Windows 11 que mostra o estado dos servidores Linux e macOS que
-geres — CPU, memória, disco, uptime, histórico, containers Docker e serviços do sistema — através de ligações
+geres — CPU, memória, disco, tempo de atividade, histórico, containers Docker e serviços do sistema — através de ligações
 **SSH diretas** a partir do teu PC.
 
-É **local-first** e **open-source (MIT)**: não precisa de conta, não instala agentes nos servidores e não faz
-telemetria. A monitorização acontece diretamente entre o teu computador e os servidores que configuras.
+É **local-first** e **open-source (MIT)**: não precisa de conta, não instala agentes nos servidores e não
+recolhe telemetria. A monitorização acontece diretamente entre o teu computador e os servidores que configuras.
 
 **Versão atual: 1.1.7** · [**Instalar a partir da Microsoft Store**](https://apps.microsoft.com/detail/9n6zbsbn1td2)
 (gratuita, Windows 11 x64) · [Notas de versão](https://github.com/pedroloyola/ServerMonitor/releases/latest) ·
@@ -25,17 +25,18 @@ telemetria. A monitorização acontece diretamente entre o teu computador e os s
 ## Funcionalidades
 
 - **Monitorização por SSH** de servidores **Linux** e **macOS**, sem agente e sem conta.
-- **CPU, memória, disco e uptime**, com estado de saúde por servidor. Quando um valor não pode ser lido, a app diz
+- **CPU, memória, disco e tempo de atividade**, com estado de saúde por servidor. Quando um valor não pode ser lido, a app diz
   isso em vez de mostrar zero.
 - **Histórico local** de CPU, memória e disco durante 30 dias, com gráficos da última hora aos últimos 30 dias.
 - **Containers Docker e serviços** (systemd no Linux, launchd no macOS) em modo **só de leitura**: a app nunca
   inicia, para ou altera nada nos servidores.
-- **Widget do Windows 11** no painel de Widgets (Win + W), em três tamanhos, sempre com a idade dos dados.
-- **Área de notificação e notificações** do Windows quando a saúde de um servidor muda; a monitorização pode
-  continuar com a janela fechada.
+- **Widget do Windows 11** no painel de Widgets (Win + W), em três tamanhos, e indica sempre há quanto
+  tempo os dados foram lidos.
+- **Área de notificação e notificações do Windows**: avisos quando o estado de um servidor muda; a
+  monitorização pode continuar com a janela fechada.
 - **Modo compacto**: uma vista pequena de todos os servidores que pode ficar sempre no topo.
 - **Pesquisa na rede local só quando pedes** (mDNS/DNS-SD), sem varrer portas nem intervalos de endereços.
-- **Configuração simples**: guia de primeira utilização, servidores a partir do teu ficheiro de configuração SSH,
+- **Configuração simples**: guia de início, servidores a partir do teu ficheiro de configuração SSH,
   teste de ligação passo a passo e suporte para um jump host (ProxyJump).
 - **Cópia de segurança encriptada** dos servidores, chaves de host confiáveis e palavras-passe guardadas, protegida
   por uma frase-passe à tua escolha.
@@ -52,7 +53,7 @@ de instalar o .NET.
 Requisitos:
 
 - **Windows 11 x64**.
-- Para o widget: **Windows 11 22H2 (build 22621) ou mais recente**. Em versões anteriores a aplicação funciona
+- Para o widget: **Windows 11 22H2 (build 22621.1413) ou mais recente**, com as atualizações em dia. Em versões anteriores a aplicação funciona
   normalmente; apenas o widget não é oferecido pelo sistema.
 - Servidores **Linux** ou **macOS** acessíveis por SSH a partir do teu PC. As listas de serviços precisam de
   `systemd` (Linux) ou `launchd` (macOS).
@@ -63,15 +64,15 @@ Para compilar a partir do código, vê [Compilar a partir do código](#compilar-
 
 ## Primeiros passos
 
-1. **Adicionar um servidor.** Abre a aplicação e segue o guia de primeira utilização, ou escolhe **Adicionar**.
+1. **Adicionar um servidor.** Abre a aplicação e segue o guia de início, ou escolhe **Adicionar**.
    Podes preencher os dados a partir de um host do teu ficheiro de configuração SSH.
-2. **Autenticação SSH.** Escolhe **palavra-passe** ou **chave privada** (com frase-passe opcional). A app sugere
-   as chaves habituais da tua pasta `.ssh`. Só o **caminho** da chave é guardado, nunca o seu conteúdo.
-3. **Confirmar a chave do host.** No primeiro teste de ligação, a app mostra o **fingerprint SHA-256** do servidor
-   e pede a tua confirmação antes de confiar nele. Se a chave mudar mais tarde, a ligação é **bloqueada**.
+2. **Autenticação SSH.** Escolhe **Palavra-passe** ou **Chave SSH** (chave privada, com frase-passe opcional).
+   A aplicação sugere as chaves habituais da tua pasta `.ssh`. Só o **caminho** da chave é guardado, nunca o seu conteúdo.
+3. **Confirmar a chave do host.** No primeiro teste de ligação, a aplicação mostra a **impressão digital SHA-256**
+   da chave do servidor e pede a tua confirmação antes de confiar nele. Se a chave mudar mais tarde, a ligação é **bloqueada**.
 4. **Consultar as métricas.** A **Visão geral** mostra o estado de todos os servidores; cada servidor tem uma
    página de detalhe com métricas, histórico, serviços e containers.
-5. **Adicionar o widget.** No Windows 11 22H2 ou mais recente, abre o painel de Widgets com **Win + W**, escolhe
+5. **Adicionar o widget.** No Windows 11 22H2 (build 22621.1413) ou mais recente, abre o painel de Widgets com **Win + W**, escolhe
    **Adicionar widgets** e seleciona o **ServerAlyzer**.
 
 ## Privacidade e segurança
@@ -83,26 +84,28 @@ A política de privacidade completa está em [`PRIVACY.pt-PT.md`](PRIVACY.pt-PT.
   preferências ficam numa pasta `ServerMonitor` nos dados locais de aplicações da tua conta. Numa instalação da
   Microsoft Store, o Windows pode guardá-la dentro da pasta de dados do pacote; se a pasta
   `%LOCALAPPDATA%\ServerMonitor` já existia antes da instalação (por exemplo, de uma versão de desenvolvimento),
-  a app continua a usá-la. Nada é sincronizado nem enviado ao editor.
-- **Credenciais.** Palavras-passe e frases-passe SSH ficam no **Gestor de Credenciais do Windows**, nunca em
-  ficheiros da app.
+  a aplicação continua a usá-la. Nada é sincronizado nem enviado ao editor.
+- **Credenciais.** Palavras-passe e frases-passe SSH ficam no **Gestor de Credenciais do Windows**, nunca nos
+  ficheiros de dados da aplicação; só entram, encriptadas, numa cópia de segurança se a criares.
 - **Widget do Windows.** O conteúdo do cartão é entregue ao painel de Widgets, uma funcionalidade do Windows; o
   processo do widget não faz SSH nem acede a credenciais.
-- **Contactos voluntários.** O editor só recebe o que decidires enviar (e-mail, issues ou relatórios de segurança
-  no GitHub).
-- **Serviços independentes.** A Microsoft (Store, Windows) e o GitHub tratam dados segundo as suas próprias
-  políticas.
+- **O que o editor pode receber.** Apenas o que decidires enviar (e-mail, issues ou relatórios de segurança no
+  GitHub) e os relatórios e críticas que a Microsoft lhe mostra no Partner Center (não são telemetria da
+  aplicação).
+- **Serviços independentes.** A Microsoft (Store, Windows), o GitHub e os serviços de e-mail tratam dados segundo
+  as suas próprias políticas.
 - **Segurança SSH.** Sem confiança automática em hosts desconhecidos, conjunto fechado de comandos só de leitura,
   sem sudo, e texto remoto tratado como não confiável.
 - **Desinstalação.** As credenciais no Gestor de Credenciais e eventuais regras da Firewall do Windows ficam até
-  as removeres; a política de privacidade explica como.
+  as removeres; se a aplicação usava uma pasta `%LOCALAPPDATA%\ServerMonitor` que já existia antes da
+  instalação, essa pasta também fica. A política de privacidade explica como remover as credenciais e as regras.
 
-Para reportar uma vulnerabilidade, usa os [GitHub Security Advisories](SECURITY.md) deste repositório, não uma
-issue pública.
+Para reportar uma vulnerabilidade, usa os [GitHub Security Advisories](SECURITY.md) deste repositório, não num
+issue público.
 
 ## Compilar a partir do código
 
-Requisitos: **.NET 10 SDK**, Windows 11 x64.
+Requisitos: **SDK .NET 10.0.402** (fixado em `global.json`, sem roll-forward), Windows 11 x64.
 
 ```powershell
 # Build + testes
