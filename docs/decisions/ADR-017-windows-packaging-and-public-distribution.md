@@ -168,7 +168,7 @@ sandboxed) → **upgrade preserva todos os dados** sem re-onboarding (§33/§34)
 por tipo de dado (§35). Segredos continuam no Credential Manager (§84).
 
 > **Nota posterior (2026-10-18):** esta decisão mantém-se, mas a premissa "continua a aceder ao
-> `%LOCALAPPDATA%\ServerMonitor\` real" só foi verificada quando a pasta já existe. Numa instalação limpa da
+> `%LOCALAPPDATA%\ServerMonitor\` real" só foi verificada quando a pasta já existia. Numa instalação limpa da
 > Store, o Windows redireciona a pasta para o `LocalCache` do pacote. Ver a *Emenda REL.0F/REL.0G* no fim deste
 > ADR.
 
@@ -318,7 +318,7 @@ construído até publicarmos outro. Por isso:
 **Origem.** As secções §8 e §12 foram escritas no M12 (2026-08) antes de existir um pacote da Store medido.
 Assumiam que a app, por ser full-trust, usaria sempre a pasta real `%LOCALAPPDATA%\ServerMonitor\` e que o
 uninstall a deixaria intacta. O runbook de transição (`docs/release/store-transition-runbook.md` §4) marcou
-o caso de uma máquina limpa como HIPÓTESE.
+o caso de uma máquina limpa como HYPOTHESIS (V1).
 
 **Medição.** Pacote da Store **1.1.7.0** (tag `v1.1.7`).
 - REL.0F (2026-10-17): ensaio R0–R6 numa VM Windows 11 descartável e transição real na máquina de QA.
@@ -327,18 +327,22 @@ o caso de uma máquina limpa como HIPÓTESE.
 | Cenário | Onde ficam os ficheiros da app | Depois do uninstall | Credenciais |
 |---|---|---|---|
 | Instalação limpa da Store (a pasta não existe) | `%LOCALAPPDATA%\Packages\PedroLoy.ServerAlyzer_htb92ajfwgw1e\LocalCache\Local\ServerMonitor\` (redirecionada pelo Windows) | **removidos** com o pacote; uma reinstalação começa do zero | ficam no Credential Manager (órfãs) |
-| `%LOCALAPPDATA%\ServerMonitor\` já existia (versões de desenvolvimento ou de teste) | a pasta real, incluindo os ficheiros criados depois | **ficam**, sem alterações; uma reinstalação reutiliza-os | ficam |
+| `%LOCALAPPDATA%\ServerMonitor\` já existia (versões de desenvolvimento ou de teste) | a pasta real, incluindo os ficheiros criados depois | **ficam**, sem alterações; uma reinstalação reutiliza-os (medido em R5) | ficam |
 
-**Consequências:**
-- §8 mantém-se: os caminhos não mudaram, e um upgrade da Store preserva os dados.
-- A frase "acede sempre à pasta real" passa a ser válida **só** com pasta pré-existente.
+**Consequências.**
+- §8 mantém-se: os caminhos não mudaram, e a transição para a Store preservou os dados quando a pasta
+  real já existia (medido no REL.0F). Um upgrade Store → Store não foi medido.
+- A premissa "continua a aceder ao `%LOCALAPPDATA%\ServerMonitor\` real" passa a ser válida **só** com pasta
+  pré-existente.
 - §12 mantém a política de não haver *cleanup* destrutivo automático. A afirmação "o uninstall não os remove"
   passa a ser válida **só** com pasta pré-existente: numa instalação limpa, o Windows remove os dados com o
   pacote.
 - Em ambos os casos ficam as entradas do Credential Manager e as regras da Firewall que o utilizador tenha
-  autorizado.
+  autorizado (Firewall: medido a 2026-10-16 com o RC em sideload numa instalação limpa e no REL.0F R5 com a
+  build da Store).
 - A política de privacidade (PR #72) e o README já descrevem os dois cenários e como remover o que fica.
 
-**Não testado:** pasta pré-existente **vazia**, Windows 10, vários utilizadores, `%LOCALAPPDATA%` redirecionado ou
-itinerante, e upgrade Store → Store para além de 1.1.7.0. Para este último, a documentação da Microsoft diz que
-os dados se mantêm no upgrade.
+**Não testado:** pasta pré-existente **vazia**; pasta real criada **depois** de uma instalação limpa (por exemplo,
+por uma build a partir do código; não se sabe que cópia prevalece); Windows 10; vários utilizadores;
+`%LOCALAPPDATA%` redirecionado ou itinerante; e upgrade Store → Store para além de 1.1.7.0 (HYPOTHESIS: os dados
+mantêm-se no upgrade; não medido).

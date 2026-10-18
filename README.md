@@ -85,8 +85,8 @@ A política de privacidade completa está em [`PRIVACY.pt-PT.md`](PRIVACY.pt-PT.
   limpa a partir da Microsoft Store, o Windows guarda-a dentro da pasta de dados do pacote
   (`%LOCALAPPDATA%\Packages\<nome do pacote>\LocalCache\Local\ServerMonitor`) e remove-a ao desinstalar. Se a
   pasta `%LOCALAPPDATA%\ServerMonitor` já existir (por exemplo, de uma versão de desenvolvimento), a aplicação
-  usa-a em vez da pasta do pacote; essa pasta fica depois de desinstalar e é reutilizada se voltares a
-  instalar. Nada é sincronizado nem enviado ao editor.
+  usa-a em vez da pasta do pacote; os ficheiros dessa pasta ficam depois de desinstalar e são reutilizados se
+  voltares a instalar. Nada é sincronizado nem enviado ao editor.
 - **Credenciais.** Palavras-passe e frases-passe SSH ficam no **Gestor de Credenciais do Windows**, nunca nos
   ficheiros de dados da aplicação; só entram, encriptadas, numa cópia de segurança se a criares.
 - **Widget do Windows.** O conteúdo do cartão é entregue ao painel de Widgets, uma funcionalidade do Windows; o

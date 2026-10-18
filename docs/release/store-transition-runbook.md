@@ -90,28 +90,33 @@ All measurements are **EMPIRICAL**.
 - **Environment:** disposable Windows 11 VM (pt-BR, clean snapshot `GA-BASE-OFF`) with synthetic servers and
   credentials, plus the maintainer's QA machine for the real transition.
 - **Methods:** `Remove-AppxPackage` for the current user; Store installs through `winget --source msstore`
-  (VM) and the Microsoft Store app (QA machine).
+  (VM); on the QA machine, an install by the owner from the Microsoft Store (`SignatureKind Store`).
 - **Evidence:** internal REL.0F/REL.0G reports.
 
 | Case | Where the app's files live | After uninstall | Credential Manager | After reinstall |
 |---|---|---|---|---|
-| **Clean Store install**: folder absent (REL.0G C1–C6) | `%LOCALAPPDATA%\Packages\PedroLoy.ServerAlyzer_htb92ajfwgw1e\LocalCache\Local\ServerMonitor\`; the real `%LOCALAPPDATA%\ServerMonitor` is never created | **removed** with the whole package folder | entries **stay** (orphans) | fresh start (first-run screen) |
-| **Pre-existing real folder**, Store build (REL.0G C7: folder created by an unpackaged process before install) | the real `%LOCALAPPDATA%\ServerMonitor\`, **including files the app creates later** (history, widget state, language settings); no `LocalCache` copy | **stays**, byte-identical | entries stay | data reused |
+| **Clean Store install**: folder absent (REL.0G C1–C6) | `%LOCALAPPDATA%\Packages\PedroLoy.ServerAlyzer_htb92ajfwgw1e\LocalCache\Local\ServerMonitor\`; the real `%LOCALAPPDATA%\ServerMonitor` is not created (C1–C6) | **removed** with the whole package folder | entries **stay** (orphans) | fresh start (first-run screen) |
+| **Pre-existing real folder**, Store build (REL.0G C7: folder created by an unpackaged process before install) | the real `%LOCALAPPDATA%\ServerMonitor\`, **including files the app creates later** (history, widget state, language settings); no `LocalCache` copy | **stays**, byte-identical | entries stay | not measured in C7 (it ended at uninstall); reuse was measured in R5, next row |
 | **Pre-existing real folder**, Developer → uninstall → Store (REL.0F R0–R6, VM) | the real folder | stays, byte-identical (Developer uninstall) | entries stay | the Store 1.1.7.0 install reused it; rollback Store → Developer restored with 0 hash differences |
-| **QA machine, real transition** (REL.0F, 2026-10-17) | the real folder (created by earlier unpackaged builds) | Developer 1.1.2.2 uninstall: 12/12 files intact; only the package `Settings` folder was removed | 1 entry stayed | the Store 1.1.7.0 install used the existing data |
+| **QA machine, real transition** (REL.0F, 2026-10-17) | the real folder (created by earlier unpackaged builds) | Developer 1.1.2.2 uninstall: 12/12 files intact; the package folder (`Settings` + `SystemAppData`) was removed | 1 entry stayed | the Store 1.1.7.0 install used the existing data |
 
 **Answers to the questions below:**
 - (V1) Confirmed: on a clean machine the folder is redirected and uninstall deletes it.
 - (V3) Confirmed: with an existing folder, both existing files and new ones are read and written in the real folder.
 - Credentials are never removed by uninstall.
-- Package `Settings` (`settings.dat`, which holds the language override) is always removed with the package.
+- Package `Settings` (`settings.dat`) is always removed with the package. The language override set through
+  `ApplicationLanguages.PrimaryLanguageOverride` is package-level state (HYPOTHESIS: kept there, not inspected),
+  so a reinstall that reuses the data files is still expected to start with the default language setting.
 
 **Not tested:**
 - (V2) an **empty** pre-existing folder;
 - Windows 10;
 - several users on one PC;
 - a redirected or roaming `%LOCALAPPDATA%`;
-- an in-place Store → Store upgrade, 1.1.7.0 to a later version (DOC: app data is kept on upgrade).
+- a real `%LOCALAPPDATA%\ServerMonitor` created **after** a clean Store install, for example by running a build
+  from source (which copy wins is untested; §4.2 DOC says the package copy is opened first);
+- an in-place Store → Store upgrade, 1.1.7.0 to a later version (HYPOTHESIS: app data is kept on upgrade;
+  not measured).
 
 **Consequences, already applied:**
 - `PRIVACY*.md` was corrected in PR #72;
@@ -246,7 +251,7 @@ Plus: screenshot of the Widgets board (pin size/position), the language shown in
    days, trusted only in the VM's `TrustedPeople` (never `Root`), deleted with the VM — same signing and
    package-source rules as `rel0d-preparation.md` §2.2 S1–S2 (never the retained QA package). Add synthetic data
    (no real hosts or credentials), pin a Medium widget, set language to pt-PT.
-2. Run §4 V1–V3.
+2. Run §4 V1–V3 (V1 and V3 answered in §4.1 on 2026-10-18; V2 still open).
 3. From the Store (private audience), install the RC. Record what the Store offers (F3).
 4. Run §7. Then uninstall + install from the Store; record what survived (§3 column R).
 
