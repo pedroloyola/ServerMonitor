@@ -106,7 +106,7 @@ All measurements are **EMPIRICAL**.
 - Credentials are never removed by uninstall.
 - Package `Settings` (`settings.dat`) is always removed with the package. The language override set through
   `ApplicationLanguages.PrimaryLanguageOverride` is package-level state (HYPOTHESIS: kept there, not inspected),
-  so a reinstall that reuses the data files is still expected to start with the default language setting.
+  so a reinstall that reuses the data files is still expected to start with the default language setting (not measured).
 
 **Not tested:**
 - (V2) an **empty** pre-existing folder;

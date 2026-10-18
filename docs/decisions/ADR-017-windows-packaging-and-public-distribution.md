@@ -338,8 +338,8 @@ o caso de uma máquina limpa como HYPOTHESIS (V1).
   passa a ser válida **só** com pasta pré-existente: numa instalação limpa, o Windows remove os dados com o
   pacote.
 - Em ambos os casos ficam as entradas do Credential Manager e as regras da Firewall que o utilizador tenha
-  autorizado (Firewall: medido a 2026-10-16 com o RC em sideload numa instalação limpa e no REL.0F R5 com a
-  build da Store).
+  autorizado (Firewall: medido a 2026-10-16 com o RC em sideload numa instalação limpa e no REL.0F R3 com o
+  Developer 1.1.2.2; com a build da Store não foi medido, mas o mecanismo é o mesmo).
 - A política de privacidade (PR #72) e o README já descrevem os dois cenários e como remover o que fica.
 
 **Não testado:** pasta pré-existente **vazia**; pasta real criada **depois** de uma instalação limpa (por exemplo,
