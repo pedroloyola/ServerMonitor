@@ -2,7 +2,7 @@
 
 [English](PRIVACY.md) · **Português (Portugal)** · [Português (Brasil)](PRIVACY.pt-BR.md)
 
-_Última atualização: 2026-10-16 · aplica-se ao ServerAlyzer 1.1.7 e posteriores para Windows_
+_Última atualização: 2026-10-18 · aplica-se ao ServerAlyzer 1.1.7 e posteriores para Windows_
 
 O ServerAlyzer é uma aplicação Windows **local-first** para monitorizar os teus próprios servidores Linux e
 macOS por SSH. Foi desenhado para que os teus dados fiquem no teu PC e sob o teu controlo.
@@ -121,10 +121,12 @@ através de **serveralyzer@pedroloyola.com**, e podes apresentar reclamação à
 ## O que fica guardado no teu PC
 
 Todos os dados ficam guardados localmente, numa pasta chamada `ServerMonitor` nos dados locais de aplicações
-da tua conta de utilizador. Quando a aplicação é instalada a partir da Microsoft Store, o Windows mantém essa
-pasta dentro da pasta de dados do próprio pacote da aplicação
-(`%LOCALAPPDATA%\Packages\<nome do pacote>\LocalCache\Local\ServerMonitor`). A aplicação não guarda dados num
-perfil itinerante (roaming) nem os sincroniza para lado nenhum.
+da tua conta de utilizador. Quando a aplicação é instalada a partir da Microsoft Store num PC onde essa pasta
+ainda não existe, o Windows mantém-na dentro da pasta de dados do próprio pacote da aplicação
+(`%LOCALAPPDATA%\Packages\<nome do pacote>\LocalCache\Local\ServerMonitor`). Se já existir uma pasta
+`%LOCALAPPDATA%\ServerMonitor` quando a aplicação é instalada (por exemplo, de uma versão anterior de
+desenvolvimento ou de teste), a aplicação continua a usar essa pasta. A aplicação não guarda dados num perfil
+itinerante (roaming) nem os sincroniza para lado nenhum.
 
 | Dados | Ficheiro | Conteúdo |
 |---|---|---|
@@ -243,8 +245,9 @@ e os ícones Hugeicons. As licenças estão listadas em `THIRD-PARTY-NOTICES.md`
   ignorados**).
 - Também podes ver as entradas das palavras-passe e frases-passe guardadas no **Gestor de Credenciais** do
   Windows e removê-las.
-- **Desinstalação:** o Windows remove a pasta de dados do pacote com os ficheiros acima. Duas coisas ficam até
-  as removeres tu:
+- **Desinstalação:** o Windows remove a pasta de dados do pacote com os ficheiros acima. Se a aplicação usava uma
+  pasta `%LOCALAPPDATA%\ServerMonitor` que já existia (ver "O que fica guardado no teu PC"), o Windows não remove
+  essa pasta: fica com os seus ficheiros até a apagares tu. Há mais duas coisas que ficam até as removeres tu:
   - **As palavras-passe e frases-passe SSH que guardaste**, no Gestor de Credenciais do Windows. Os nomes das
     entradas não contêm o nome do servidor, o endereço nem o utilizador. Para as remover, abre o **Painel de
     Controlo** → **Gestor de Credenciais** → **Credenciais do Windows** → **Credenciais Genéricas** e remove cada

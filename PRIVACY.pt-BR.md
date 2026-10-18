@@ -2,7 +2,7 @@
 
 [English](PRIVACY.md) · [Português (Portugal)](PRIVACY.pt-PT.md) · **Português (Brasil)**
 
-_Última atualização: 2026-10-16 · vale para o ServerAlyzer 1.1.7 e posteriores para Windows_
+_Última atualização: 2026-10-18 · vale para o ServerAlyzer 1.1.7 e posteriores para Windows_
 
 O ServerAlyzer é um aplicativo Windows **local-first** para monitorar seus próprios servidores Linux e macOS
 por SSH. Ele foi projetado para que seus dados fiquem no seu PC e sob o seu controle.
@@ -122,10 +122,12 @@ reclamação à Autoridade Nacional de Proteção de Dados (ANPD).
 ## O que fica salvo no seu PC
 
 Todos os dados ficam salvos localmente, em uma pasta chamada `ServerMonitor` nos dados locais de aplicativos da
-sua conta de usuário. Quando o aplicativo é instalado pela Microsoft Store, o Windows mantém essa pasta dentro
-da pasta de dados do próprio pacote do aplicativo
-(`%LOCALAPPDATA%\Packages\<nome do pacote>\LocalCache\Local\ServerMonitor`). O aplicativo não salva dados em
-um perfil móvel (roaming) nem os sincroniza com nenhum lugar.
+sua conta de usuário. Quando o aplicativo é instalado pela Microsoft Store em um PC onde essa pasta ainda não
+existe, o Windows a mantém dentro da pasta de dados do próprio pacote do aplicativo
+(`%LOCALAPPDATA%\Packages\<nome do pacote>\LocalCache\Local\ServerMonitor`). Se já existir uma pasta
+`%LOCALAPPDATA%\ServerMonitor` quando o aplicativo é instalado (por exemplo, de uma versão anterior de
+desenvolvimento ou de teste), o aplicativo continua usando essa pasta. O aplicativo não salva dados em um perfil
+móvel (roaming) nem os sincroniza com nenhum lugar.
 
 | Dados | Arquivo | Conteúdo |
 |---|---|---|
@@ -246,8 +248,9 @@ e os ícones Hugeicons. As licenças estão listadas em `THIRD-PARTY-NOTICES.md`
   dispositivos ignorados**).
 - Você também pode ver as entradas das senhas e frases secretas salvas no **Gerenciador de Credenciais** do
   Windows e removê-las.
-- **Desinstalação:** o Windows remove a pasta de dados do pacote com os arquivos acima. Duas coisas permanecem
-  até você removê-las:
+- **Desinstalação:** o Windows remove a pasta de dados do pacote com os arquivos acima. Se o aplicativo usava uma
+  pasta `%LOCALAPPDATA%\ServerMonitor` que já existia (veja "O que fica salvo no seu PC"), o Windows não remove
+  essa pasta: ela permanece com os arquivos até você apagá-la. Outras duas coisas permanecem até você removê-las:
   - **As senhas e frases secretas SSH que você salvou**, no Gerenciador de Credenciais do Windows. Os nomes das
     entradas não contêm o nome do servidor, o endereço nem o usuário. Para removê-las, abra o **Painel de
     Controle** → **Gerenciador de Credenciais** → **Credenciais do Windows** → **Credenciais Genéricas** e remova
