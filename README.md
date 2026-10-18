@@ -30,7 +30,7 @@ recolhe telemetria. A monitorização acontece diretamente entre o teu computado
 - **Histórico local** de CPU, memória e disco durante 30 dias, com gráficos da última hora aos últimos 30 dias.
 - **Containers Docker e serviços** (systemd no Linux, launchd no macOS) em modo **só de leitura**: a app nunca
   inicia, para ou altera nada nos servidores.
-- **Widget do Windows 11** no painel de Widgets (Win + W), em três tamanhos, e indica sempre há quanto
+- **Widget do Windows 11** no painel de Widgets (Win + W), em três tamanhos, que indica sempre há quanto
   tempo os dados foram lidos.
 - **Área de notificação e notificações do Windows**: avisos quando o estado de um servidor muda; a
   monitorização pode continuar com a janela fechada.
@@ -100,7 +100,7 @@ A política de privacidade completa está em [`PRIVACY.pt-PT.md`](PRIVACY.pt-PT.
   as removeres; se a aplicação usava uma pasta `%LOCALAPPDATA%\ServerMonitor` que já existia antes da
   instalação, essa pasta também fica. A política de privacidade explica como remover as credenciais e as regras.
 
-Para reportar uma vulnerabilidade, usa os [GitHub Security Advisories](SECURITY.md) deste repositório, não num
+Para reportar uma vulnerabilidade, usa os [GitHub Security Advisories](SECURITY.md) deste repositório; não abras um
 issue público.
 
 ## Compilar a partir do código

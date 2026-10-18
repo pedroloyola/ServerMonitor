@@ -33,8 +33,7 @@ pacote **1.1.7.0** (x64), construído a partir da tag [`v1.1.7`](https://github.
   sistema" (#46, #55, #58, #59).
 - **Números no idioma da app.** Valores e tamanhos formatados segundo o idioma da interface, por exemplo
   "6,6 GB" em português e "6.6 GB" em inglês (#57).
-- **Correções:** clicar numa notificação com a app fechada já não faz a app falhar ao arrancar (#60); o resumo do
-  widget já não perde uma atualização por uma corrida no limitador de escrita (#35).
+- **Correção:** clicar numa notificação com a app fechada já não faz a app falhar ao arrancar (#60).
 - **Política de privacidade** reescrita em en-US, pt-PT e pt-BR: o que fica no PC, o que o editor pode receber e
   os teus direitos (#65).
 
