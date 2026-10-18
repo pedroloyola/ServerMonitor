@@ -1,113 +1,111 @@
 # ServerAlyzer
 
-**ServerAlyzer** é uma aplicação de desktop para Windows 11 que reúne, num painel calmo e compacto,
-o estado dos teus servidores Linux e macOS — CPU, memória, disco, uptime, histórico, containers Docker
-e serviços do sistema — através de ligações **SSH diretas** a partir do teu PC.
+[![Release](https://img.shields.io/github/v/release/pedroloyola/ServerMonitor?label=vers%C3%A3o)](https://github.com/pedroloyola/ServerMonitor/releases/latest)
+[![Licença: MIT](https://img.shields.io/github/license/pedroloyola/ServerMonitor?label=licen%C3%A7a)](LICENSE)
 
-É **local-first**: não requer conta, não envia dados para nenhum servidor da ServerAlyzer e não faz
-telemetria. A monitorização acontece diretamente entre o teu computador e os servidores que configuras.
+**ServerAlyzer** é um painel calmo e compacto para Windows 11 que mostra o estado dos servidores Linux e macOS que
+geres — CPU, memória, disco, tempo de atividade, histórico, containers Docker e serviços do sistema — através de ligações
+**SSH diretas** a partir do teu PC.
 
-> Estado: versão **1.1.0**, que acrescenta o widget oficial do Windows 11. Ver
-> [Instalação](#instalação) e o [changelog](CHANGELOG.md).
+É **local-first** e **open-source (MIT)**: não precisa de conta, não instala agentes nos servidores e não
+recolhe telemetria. A monitorização acontece diretamente entre o teu computador e os servidores que configuras.
 
-## O que faz
-
-- Mostra métricas reais de host (CPU, RAM, disco, uptime) de servidores **Linux** e **macOS** via SSH.
-- Monitoriza automaticamente em segundo plano, com estado de saúde por servidor e refresh manual.
-- Guarda **histórico local** e desenha gráficos temporais (CPU/RAM/disco).
-- Observa, em modo **só-leitura**, containers **Docker** e serviços **systemd** (Linux) / **launchd** (macOS).
-- Descobre servidores SSH na rede local (mDNS/DNS-SD), sem varrer portas ou subnets.
-- Vive na **área de notificação** (tray) e emite notificações locais em transições reais de saúde.
-- Tem um **modo compacto** sempre-visível, além da apresentação normal.
-- Integra-se com o painel de **Widgets do Windows 11** (Win + W), em três tamanhos.
-
-## Funcionalidades
-
-| Área | Detalhe |
-|---|---|
-| SSH seguro | Confiança de host key por fingerprint SHA-256, sem aceitação automática; mismatch bloqueia. |
-| Credenciais | Passwords e passphrases ficam no **Windows Credential Manager**, nunca em ficheiros. |
-| Métricas | Linux e macOS, via comandos de leitura fechados; `desconhecido ≠ zero`. |
-| Histórico | SQLite local, retenção de 30 dias, gráficos nativos. |
-| Workloads | Docker + serviços em modo **só-leitura** (sem start/stop/restart/exec). |
-| Descoberta | Passiva, `_ssh._tcp.local.`, com ignorar/repor. |
-| Tray & notificações | Um ícone, minimizar-para-tray, alertas locais com cooldown. |
-| Modo compacto | Apresentação reduzida sempre-no-topo, na mesma janela. |
-| Widget do Windows | Cartão no painel de Widgets do Windows 11 (pequeno/médio/grande), só-leitura, com frescura explícita. Requer Windows 11 22H2+. |
-| Idiomas | en-US (padrão), pt-PT, pt-BR. |
-| Temas | Claro, Escuro, Sistema. |
+**Versão atual: 1.1.7** · [**Instalar a partir da Microsoft Store**](https://apps.microsoft.com/detail/9n6zbsbn1td2)
+(gratuita, Windows 11 x64) · [Notas de versão](https://github.com/pedroloyola/ServerMonitor/releases/latest) ·
+[Changelog](CHANGELOG.md)
 
 ## Capturas de ecrã
 
-_As capturas serão adicionadas junto com a listagem pública._ (Ver checklist em
-`docs/store-submission-checklist.md`.)
+| Visão geral | Detalhe do servidor |
+|---|---|
+| ![Visão geral com o estado de todos os servidores](release/store-screenshots/pt-PT/01-overview.png) | ![Página de um servidor com informação do sistema e leituras recentes](release/store-screenshots/pt-PT/02-server-detail.png) |
+| **Serviços e containers (só leitura)** | **Modo compacto** |
+| ![Serviços do sistema e containers Docker, só de leitura](release/store-screenshots/pt-PT/04-services-containers.png) | ![Modo compacto com todos os servidores](release/store-screenshots/pt-PT/05-compact-mode.png) |
+
+## Funcionalidades
+
+- **Monitorização por SSH** de servidores **Linux** e **macOS**, sem agente e sem conta.
+- **CPU, memória, disco e tempo de atividade**, com estado de saúde por servidor. Quando um valor não pode ser lido, a app diz
+  isso em vez de mostrar zero.
+- **Histórico local** de CPU, memória e disco durante 30 dias, com gráficos da última hora aos últimos 30 dias.
+- **Containers Docker e serviços** (systemd no Linux, launchd no macOS) em modo **só de leitura**: a app nunca
+  inicia, para ou altera nada nos servidores.
+- **Widget do Windows 11** no painel de Widgets (Win + W), em três tamanhos, que indica sempre há quanto
+  tempo os dados foram lidos.
+- **Área de notificação e notificações do Windows**: avisos quando o estado de um servidor muda; a
+  monitorização pode continuar com a janela fechada.
+- **Modo compacto**: uma vista pequena de todos os servidores que pode ficar sempre no topo.
+- **Pesquisa na rede local só quando pedes** (mDNS/DNS-SD), sem varrer portas nem intervalos de endereços.
+- **Configuração simples**: guia de início, servidores a partir do teu ficheiro de configuração SSH,
+  teste de ligação passo a passo e suporte para um jump host (ProxyJump).
+- **Cópia de segurança encriptada** dos servidores, chaves de host confiáveis e palavras-passe guardadas, protegida
+  por uma frase-passe à tua escolha.
+- **Idiomas**: inglês (en-US), português de Portugal (pt-PT) e português do Brasil (pt-BR).
+- **Temas** Claro, Escuro e Sistema; navegação por teclado, leitores de ecrã e alto contraste.
 
 ## Instalação
 
-**Versão estável (Microsoft Store):** _pendente de submissão._ A ServerAlyzer será distribuída
-principalmente pela **Microsoft Store**, que trata da instalação, assinatura e atualizações
-automaticamente. O link será publicado aqui quando a app estiver disponível.
+O ServerAlyzer está disponível **gratuitamente na Microsoft Store**:
+[apps.microsoft.com/detail/9n6zbsbn1td2](https://apps.microsoft.com/detail/9n6zbsbn1td2).
+A Store trata da instalação e das **atualizações**. O runtime .NET vem incluído no pacote, por isso não precisas
+de instalar o .NET.
 
-**A partir do código-fonte (developers):** ver [Compilar a partir do código](#compilar-a-partir-do-código).
+Requisitos:
 
-> Este repositório ainda **não** publica um instalador assinado para download direto. Instalar um
-> pacote MSIX de teste exige um certificado de desenvolvimento e o Modo de Programador do Windows —
-> destina-se apenas a QA local, não a utilizadores finais.
+- **Windows 11 x64**.
+- Para o widget: **Windows 11 22H2 (build 22621.1413) ou mais recente**, com as atualizações em dia. Em versões anteriores a aplicação funciona
+  normalmente; apenas o widget não é oferecido pelo sistema.
+- Servidores **Linux** ou **macOS** acessíveis por SSH a partir do teu PC. As listas de serviços precisam de
+  `systemd` (Linux) ou `launchd` (macOS).
 
-## Sistemas suportados
+Este repositório **não** publica instaladores para download direto: as
+[GitHub Releases](https://github.com/pedroloyola/ServerMonitor/releases) contêm as notas de versão e o código-fonte.
+Para compilar a partir do código, vê [Compilar a partir do código](#compilar-a-partir-do-código).
 
-- **Windows 11 x64** (aplicação).
-- **Windows 11 22H2 (build 22621) ou mais recente** para o widget no painel de Widgets. Em 21H2 a
-  aplicação instala e funciona normalmente — apenas o widget não é oferecido pelo sistema.
-- Servidores monitorizados: **Linux** (com `systemd` para serviços) e **macOS** (com `launchd`),
-  acessíveis por SSH a partir do teu PC.
+## Primeiros passos
 
-## Adicionar um servidor
+1. **Adicionar um servidor.** Abre a aplicação e segue o guia de início, ou escolhe **Adicionar**.
+   Podes preencher os dados a partir de um host do teu ficheiro de configuração SSH.
+2. **Autenticação SSH.** Escolhe **Palavra-passe** ou **Chave SSH** (chave privada, com frase-passe opcional).
+   A aplicação sugere as chaves habituais da tua pasta `.ssh`. Só o **caminho** da chave é guardado, nunca o seu conteúdo.
+3. **Confirmar a chave do host.** No primeiro teste de ligação, a aplicação mostra a **impressão digital SHA-256**
+   da chave do servidor e pede a tua confirmação antes de confiar nele. Se a chave mudar mais tarde, a ligação é **bloqueada**.
+4. **Consultar as métricas.** A **Visão geral** mostra o estado de todos os servidores; cada servidor tem uma
+   página de detalhe com métricas, histórico, serviços e containers.
+5. **Adicionar o widget.** No Windows 11 22H2 (build 22621.1413) ou mais recente, abre o painel de Widgets com **Win + W**, escolhe
+   **Adicionar widgets** e seleciona o **ServerAlyzer**.
 
-1. Abre a app e escolhe **Adicionar servidor** (ou aceita uma sugestão da descoberta local).
-2. Indica endereço, utilizador e método de autenticação (password ou chave privada + passphrase opcional).
-3. Ao testar a ligação pela primeira vez, a app mostra o **fingerprint SHA-256** do host e pede
-   confirmação explícita antes de confiar. Um fingerprint diferente no futuro **bloqueia** a ligação.
-4. A chave privada nunca é copiada — apenas o **caminho** que escolheres é guardado; o ficheiro
-   permanece protegido pelas ACLs do sistema.
+## Privacidade e segurança
 
-## Widget do Windows
+A política de privacidade completa está em [`PRIVACY.pt-PT.md`](PRIVACY.pt-PT.md) (também em
+[inglês](PRIVACY.md) e [pt-BR](PRIVACY.pt-BR.md)). Em resumo:
 
-No Windows 11 22H2 ou mais recente, abre o painel de Widgets com **Win + W**, escolhe **Adicionar
-widgets** e seleciona o **ServerAlyzer**. O cartão existe em três tamanhos e mostra o estado da frota,
-as métricas de cada servidor e há quanto tempo os dados foram lidos.
+- **Dados da aplicação, no teu PC.** Servidores, chaves de host confiáveis, histórico, resumo do widget e
+  preferências ficam numa pasta `ServerMonitor` nos dados locais de aplicações da tua conta. Numa instalação da
+  Microsoft Store, o Windows pode guardá-la dentro da pasta de dados do pacote; se a pasta
+  `%LOCALAPPDATA%\ServerMonitor` já existia antes da instalação (por exemplo, de uma versão de desenvolvimento),
+  a aplicação continua a usá-la. Nada é sincronizado nem enviado ao editor.
+- **Credenciais.** Palavras-passe e frases-passe SSH ficam no **Gestor de Credenciais do Windows**, nunca nos
+  ficheiros de dados da aplicação; só entram, encriptadas, numa cópia de segurança se a criares.
+- **Widget do Windows.** O conteúdo do cartão é entregue ao painel de Widgets, uma funcionalidade do Windows; o
+  processo do widget não faz SSH nem acede a credenciais.
+- **O que o editor pode receber.** Apenas o que decidires enviar (e-mail, issues ou relatórios de segurança no
+  GitHub) e os relatórios e críticas que a Microsoft lhe mostra no Partner Center (não são telemetria da
+  aplicação).
+- **Serviços independentes.** A Microsoft (Store, Windows), o GitHub e os serviços de e-mail tratam dados segundo
+  as suas próprias políticas.
+- **Segurança SSH.** Sem confiança automática em hosts desconhecidos, conjunto fechado de comandos só de leitura,
+  sem sudo, e texto remoto tratado como não confiável.
+- **Desinstalação.** As credenciais no Gestor de Credenciais e eventuais regras da Firewall do Windows ficam até
+  as removeres; se a aplicação usava uma pasta `%LOCALAPPDATA%\ServerMonitor` que já existia antes da
+  instalação, essa pasta também fica. A política de privacidade explica como remover as credenciais e as regras.
 
-- Clicar no cartão abre o painel; clicar numa linha abre o painel com esse servidor em destaque.
-- Com a aplicação fechada o widget mostra a última leitura conhecida, sempre datada.
-- O widget corre num processo próprio que **não** faz SSH nem acede a credenciais: lê apenas um resumo
-  local já sanitizado (identificador opaco, nome, saúde e métricas), sem endereços, utilizadores ou
-  chaves de host.
-
-## Modelo de segurança
-
-- Sem auto-trust e sem prompts implícitos: host desconhecido exige aprovação; mismatch bloqueia.
-- Segredos apenas no Windows Credential Manager; `servers.json` guarda só configuração não sensível
-  e uma referência opaca.
-- Catálogo SSH **fechado** e só-leitura para métricas e workloads (sem execução arbitrária, sem sudo).
-- Texto remoto é tratado como não confiável (sanitização, limites de tamanho, UTF-8 estrito).
-
-## Dados e privacidade
-
-Ver [`PRIVACY.pt-PT.md`](PRIVACY.pt-PT.md) (também em [inglês](PRIVACY.md) e [pt-BR](PRIVACY.pt-BR.md)). Em resumo: local-first, sem conta, sem telemetria, sem nuvem. Todos os
-dados ficam na tua máquina. Os caminhos abaixo são os de uma execução a partir do código; numa instalação da
-Microsoft Store, o Windows guarda a pasta `ServerMonitor` dentro da pasta de dados do pacote
-(`%LOCALAPPDATA%\Packages\<nome do pacote>\LocalCache\Local\ServerMonitor`), e remove-a ao desinstalar:
-
-- `%LOCALAPPDATA%\ServerMonitor\servers.json` — configuração não sensível.
-- `%LOCALAPPDATA%\ServerMonitor\history.db` — histórico de métricas (SQLite).
-- Windows Credential Manager — segredos SSH.
-- Ficheiros locais separados — dispositivos ignorados, confiança de host keys, preferências de janela.
-- `%LOCALAPPDATA%\ServerMonitor\widget-state.json` — resumo sanitizado que alimenta o widget do
-  Windows (sem endereços, utilizadores nem segredos).
+Para reportar uma vulnerabilidade, usa os [GitHub Security Advisories](SECURITY.md) deste repositório; não abras um
+issue público.
 
 ## Compilar a partir do código
 
-Requisitos: **.NET 10 SDK**, Windows 11 x64.
+Requisitos: **SDK .NET 10.0.402** (fixado em `global.json`, sem roll-forward), Windows 11 x64.
 
 ```powershell
 # Build + testes
@@ -121,16 +119,26 @@ dotnet run --project src/ServerMonitor.App
 dotnet build src/ServerMonitor.App/ServerMonitor.App.csproj -c Release -p:Packaged=true
 ```
 
-Detalhes de arquitetura em [`docs/architecture.md`](docs/architecture.md) e das decisões em
-[`docs/decisions/`](docs/decisions/). Resolução de problemas em
-[`docs/troubleshooting.md`](docs/troubleshooting.md).
+Um pacote MSIX construído localmente não é assinado pela Store: instalá-lo exige um certificado de teste e
+destina-se apenas a desenvolvimento e QA, não a utilizadores finais.
+
+Documentação técnica: arquitetura em [`docs/architecture.md`](docs/architecture.md), decisões em
+[`docs/decisions/`](docs/decisions/) e resolução de problemas em [`docs/troubleshooting.md`](docs/troubleshooting.md).
 
 ## Contribuir
 
-Contribuições são bem-vindas via issues e pull requests. Reporta vulnerabilidades de forma responsável
-— ver [`SECURITY.md`](SECURITY.md).
+Contribuições são bem-vindas através de issues e pull requests. Reporta vulnerabilidades de forma responsável —
+ver [`SECURITY.md`](SECURITY.md).
+
+## Suporte e ligações
+
+- [Microsoft Store](https://apps.microsoft.com/detail/9n6zbsbn1td2)
+- [GitHub Releases](https://github.com/pedroloyola/ServerMonitor/releases)
+- [Issues](https://github.com/pedroloyola/ServerMonitor/issues)
+- [Segurança (`SECURITY.md`)](SECURITY.md)
+- [Política de privacidade](PRIVACY.pt-PT.md)
+- [Changelog](CHANGELOG.md)
 
 ## Licença
 
-[MIT](LICENSE). Software de terceiros e respetivas licenças em
-[`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md).
+[MIT](LICENSE). Software de terceiros e respetivas licenças em [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md).
