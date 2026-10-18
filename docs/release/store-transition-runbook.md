@@ -78,7 +78,47 @@ PFN — and **(R) uninstall + install**.
 | Toast COM / `serveralyzer:` / widget COM server | Re-registered from the new manifest; CLSIDs unchanged (HYPOTHESIS: existing toasts keep routing) | Unregistered, then registered; old toasts may stop activating (HYPOTHESIS, harmless) |
 | Windows Firewall | New version = new install path → **new prompt** on first listen, unless discovery is on demand (REL.0B) — EMPIRICAL (one rule pair per installed version path) | Same; uninstall does not remove old rules (EMPIRICAL) |
 
-## 4. AppData write virtualization — the open question
+> **Update 2026-10-18.** The `%LOCALAPPDATA%\ServerMonitor` and Credential Manager rows were measured in
+> REL.0F and REL.0G with 1.1.7.0. The results are in §4.1. The table above keeps the expectations as they were
+> written before the transition.
+
+## 4. AppData write virtualization (answered 2026-10-18; original analysis kept below)
+
+### 4.1 Measured results (REL.0F 2026-10-17, REL.0G 2026-10-18; Store package 1.1.7.0)
+
+All measurements are **EMPIRICAL**.
+- **Environment:** disposable Windows 11 VM (pt-BR, clean snapshot `GA-BASE-OFF`) with synthetic servers and
+  credentials, plus the maintainer's QA machine for the real transition.
+- **Methods:** `Remove-AppxPackage` for the current user; Store installs through `winget --source msstore`
+  (VM) and the Microsoft Store app (QA machine).
+- **Evidence:** internal REL.0F/REL.0G reports.
+
+| Case | Where the app's files live | After uninstall | Credential Manager | After reinstall |
+|---|---|---|---|---|
+| **Clean Store install**: folder absent (REL.0G C1–C6) | `%LOCALAPPDATA%\Packages\PedroLoy.ServerAlyzer_htb92ajfwgw1e\LocalCache\Local\ServerMonitor\`; the real `%LOCALAPPDATA%\ServerMonitor` is never created | **removed** with the whole package folder | entries **stay** (orphans) | fresh start (first-run screen) |
+| **Pre-existing real folder**, Store build (REL.0G C7: folder created by an unpackaged process before install) | the real `%LOCALAPPDATA%\ServerMonitor\`, **including files the app creates later** (history, widget state, language settings); no `LocalCache` copy | **stays**, byte-identical | entries stay | data reused |
+| **Pre-existing real folder**, Developer → uninstall → Store (REL.0F R0–R6, VM) | the real folder | stays, byte-identical (Developer uninstall) | entries stay | the Store 1.1.7.0 install reused it; rollback Store → Developer restored with 0 hash differences |
+| **QA machine, real transition** (REL.0F, 2026-10-17) | the real folder (created by earlier unpackaged builds) | Developer 1.1.2.2 uninstall: 12/12 files intact; only the package `Settings` folder was removed | 1 entry stayed | the Store 1.1.7.0 install used the existing data |
+
+**Answers to the questions below:**
+- (V1) Confirmed: on a clean machine the folder is redirected and uninstall deletes it.
+- (V3) Confirmed: with an existing folder, both existing files and new ones are read and written in the real folder.
+- Credentials are never removed by uninstall.
+- Package `Settings` (`settings.dat`, which holds the language override) is always removed with the package.
+
+**Not tested:**
+- (V2) an **empty** pre-existing folder;
+- Windows 10;
+- several users on one PC;
+- a redirected or roaming `%LOCALAPPDATA%`;
+- an in-place Store → Store upgrade, 1.1.7.0 to a later version (DOC: app data is kept on upgrade).
+
+**Consequences, already applied:**
+- `PRIVACY*.md` was corrected in PR #72;
+- ADR-017 §8/§12 carry an amendment;
+- the README summary was updated.
+
+### 4.2 Original analysis (written before measurement; kept for the record)
 
 **DOC** ([Understanding how packaged desktop apps run on Windows](https://learn.microsoft.com/windows/msix/desktop/desktop-to-uwp-behind-the-scenes), ms.date 2026-09-30), for virtualized packaged desktop apps on Windows 10 1903+:
 - "All newly created files and folders in the user's `AppData` folder … are written to a private per-user,

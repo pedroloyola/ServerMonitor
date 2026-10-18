@@ -81,10 +81,12 @@ A política de privacidade completa está em [`PRIVACY.pt-PT.md`](PRIVACY.pt-PT.
 [inglês](PRIVACY.md) e [pt-BR](PRIVACY.pt-BR.md)). Em resumo:
 
 - **Dados da aplicação, no teu PC.** Servidores, chaves de host confiáveis, histórico, resumo do widget e
-  preferências ficam numa pasta `ServerMonitor` nos dados locais de aplicações da tua conta. Numa instalação da
-  Microsoft Store, o Windows pode guardá-la dentro da pasta de dados do pacote; se a pasta
-  `%LOCALAPPDATA%\ServerMonitor` já existia antes da instalação (por exemplo, de uma versão de desenvolvimento),
-  a aplicação continua a usá-la. Nada é sincronizado nem enviado ao editor.
+  preferências ficam numa pasta `ServerMonitor` nos dados locais de aplicações da tua conta. Numa instalação
+  limpa a partir da Microsoft Store, o Windows guarda-a dentro da pasta de dados do pacote
+  (`%LOCALAPPDATA%\Packages\<nome do pacote>\LocalCache\Local\ServerMonitor`) e remove-a ao desinstalar. Se a
+  pasta `%LOCALAPPDATA%\ServerMonitor` já existir (por exemplo, de uma versão de desenvolvimento), a aplicação
+  usa-a em vez da pasta do pacote; essa pasta fica depois de desinstalar e é reutilizada se voltares a
+  instalar. Nada é sincronizado nem enviado ao editor.
 - **Credenciais.** Palavras-passe e frases-passe SSH ficam no **Gestor de Credenciais do Windows**, nunca nos
   ficheiros de dados da aplicação; só entram, encriptadas, numa cópia de segurança se a criares.
 - **Widget do Windows.** O conteúdo do cartão é entregue ao painel de Widgets, uma funcionalidade do Windows; o
@@ -96,9 +98,10 @@ A política de privacidade completa está em [`PRIVACY.pt-PT.md`](PRIVACY.pt-PT.
   as suas próprias políticas.
 - **Segurança SSH.** Sem confiança automática em hosts desconhecidos, conjunto fechado de comandos só de leitura,
   sem sudo, e texto remoto tratado como não confiável.
-- **Desinstalação.** As credenciais no Gestor de Credenciais e eventuais regras da Firewall do Windows ficam até
-  as removeres; se a aplicação usava uma pasta `%LOCALAPPDATA%\ServerMonitor` que já existia antes da
-  instalação, essa pasta também fica. A política de privacidade explica como remover as credenciais e as regras.
+- **Desinstalação.** Numa instalação limpa, os ficheiros de dados da aplicação são removidos com o pacote. As
+  credenciais no Gestor de Credenciais e eventuais regras da Firewall do Windows ficam até as removeres; se a
+  aplicação usava uma pasta `%LOCALAPPDATA%\ServerMonitor` que já existia, essa pasta também fica. A política de
+  privacidade explica como remover a pasta, as credenciais e as regras.
 
 Para reportar uma vulnerabilidade, usa os [GitHub Security Advisories](SECURITY.md) deste repositório; não abras um
 issue público.
