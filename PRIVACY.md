@@ -116,11 +116,11 @@ you can complain to the Autoridade Nacional de Proteção de Dados (ANPD).
 
 ## What is stored on your PC
 
-All data is stored locally, in a folder named `ServerMonitor` in your user account's local application data.
-When the app is installed from the Microsoft Store on a PC where that folder does not exist yet, Windows keeps it
+All the app's data files are stored locally, in a folder named `ServerMonitor` in your user account's local
+application data. On a clean install from the Microsoft Store (no such folder yet), Windows keeps that folder
 inside the app's own package data folder (`%LOCALAPPDATA%\Packages\<package name>\LocalCache\Local\ServerMonitor`).
-If a `%LOCALAPPDATA%\ServerMonitor` folder already exists when the app is installed (for example, from an earlier
-development or test version), the app keeps using that folder instead. The app does not store data in a roaming
+If a `%LOCALAPPDATA%\ServerMonitor` folder already exists (for example, from an earlier development or test
+version), the app uses that folder instead of the package folder. The app does not store data in a roaming
 profile and does not sync it anywhere.
 
 | Data | File | Contents |
@@ -233,10 +233,11 @@ Hugeicons icons. Licenses are listed in `THIRD-PARTY-NOTICES.md` in the reposito
   (**Clear history**) and show ignored devices again (**Show ignored devices again**).
 - You can also see the entries for your saved passwords and passphrases in Windows **Credential Manager** and
   remove them.
-- **Uninstalling:** Windows removes the app's package data folder with the files listed above. If the app used an
-  existing `%LOCALAPPDATA%\ServerMonitor` folder instead (see "What is stored on your PC"), Windows does not remove
-  that folder: it stays with its files until you delete it yourself. Two other things stay until you remove them
-  yourself:
+- **Uninstalling:** on a clean install, Windows removes the app's package data folder and, with it, the files
+  listed above. If the app used an existing `%LOCALAPPDATA%\ServerMonitor` folder instead (see "What is stored on
+  your PC"), Windows does not remove that folder: it stays with its files until you delete it yourself. To remove
+  it, type `%LOCALAPPDATA%\ServerMonitor` in the File Explorer address bar and delete that folder; this removes your
+  server list, trusted host keys, history and settings. Two other things stay until you remove them yourself:
   - **The SSH passwords and passphrases you saved**, in Windows Credential Manager. The entry names contain no
     server name, address or user name. To remove them, open **Control Panel** → **Credential Manager** →
     **Windows Credentials** → **Generic Credentials** and remove each entry that starts with

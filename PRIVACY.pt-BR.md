@@ -121,13 +121,13 @@ reclamação à Autoridade Nacional de Proteção de Dados (ANPD).
 
 ## O que fica salvo no seu PC
 
-Todos os dados ficam salvos localmente, em uma pasta chamada `ServerMonitor` nos dados locais de aplicativos da
-sua conta de usuário. Quando o aplicativo é instalado pela Microsoft Store em um PC onde essa pasta ainda não
-existe, o Windows a mantém dentro da pasta de dados do próprio pacote do aplicativo
+Todos os arquivos de dados do aplicativo ficam salvos localmente, em uma pasta chamada `ServerMonitor` nos dados
+locais de aplicativos da sua conta de usuário. Em uma instalação limpa pela Microsoft Store (sem essa pasta), o
+Windows a mantém dentro da pasta de dados do próprio pacote do aplicativo
 (`%LOCALAPPDATA%\Packages\<nome do pacote>\LocalCache\Local\ServerMonitor`). Se já existir uma pasta
-`%LOCALAPPDATA%\ServerMonitor` quando o aplicativo é instalado (por exemplo, de uma versão anterior de
-desenvolvimento ou de teste), o aplicativo continua usando essa pasta. O aplicativo não salva dados em um perfil
-móvel (roaming) nem os sincroniza com nenhum lugar.
+`%LOCALAPPDATA%\ServerMonitor` (por exemplo, de uma versão anterior de desenvolvimento ou de teste), o aplicativo
+usa essa pasta em vez da pasta do pacote. O aplicativo não salva dados em um perfil móvel (roaming) nem os
+sincroniza com nenhum lugar.
 
 | Dados | Arquivo | Conteúdo |
 |---|---|---|
@@ -248,9 +248,12 @@ e os ícones Hugeicons. As licenças estão listadas em `THIRD-PARTY-NOTICES.md`
   dispositivos ignorados**).
 - Você também pode ver as entradas das senhas e frases secretas salvas no **Gerenciador de Credenciais** do
   Windows e removê-las.
-- **Desinstalação:** o Windows remove a pasta de dados do pacote com os arquivos acima. Se o aplicativo usava uma
-  pasta `%LOCALAPPDATA%\ServerMonitor` que já existia (veja "O que fica salvo no seu PC"), o Windows não remove
-  essa pasta: ela permanece com os arquivos até você apagá-la. Outras duas coisas permanecem até você removê-las:
+- **Desinstalação:** em uma instalação limpa, o Windows remove a pasta de dados do pacote e, junto com ela, os
+  arquivos acima. Se o aplicativo usava uma pasta `%LOCALAPPDATA%\ServerMonitor` que já existia (veja "O que fica
+  salvo no seu PC"), o Windows não remove essa pasta: ela permanece com os arquivos até você apagá-la. Para
+  removê-la, digite `%LOCALAPPDATA%\ServerMonitor` na barra de endereços do Explorador de Arquivos e apague essa
+  pasta; isso remove a lista de servidores, as chaves de host confiáveis, o histórico e as configurações. Outras
+  duas coisas permanecem até você removê-las:
   - **As senhas e frases secretas SSH que você salvou**, no Gerenciador de Credenciais do Windows. Os nomes das
     entradas não contêm o nome do servidor, o endereço nem o usuário. Para removê-las, abra o **Painel de
     Controle** → **Gerenciador de Credenciais** → **Credenciais do Windows** → **Credenciais Genéricas** e remova
