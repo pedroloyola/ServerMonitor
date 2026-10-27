@@ -1,3 +1,4 @@
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using ServerMonitor.App.Services;
@@ -16,6 +17,12 @@ namespace ServerMonitor.App.Tests.Lifecycle;
 /// </summary>
 public sealed class TerminationWatchdogTests
 {
+    /// <summary>
+    /// How long a handshake may take before the test FAILS. It never decides an ordering: every wait below
+    /// is on an event the other side sets, and running out of patience is reported as a failure.
+    /// </summary>
+    private static readonly TimeSpan Failsafe = TimeSpan.FromSeconds(30);
+
     private static TerminationWatchdog Create(ManualWatchdogScheduler scheduler) =>
         new(scheduler, NullLogger<TerminationWatchdog>.Instance);
 
@@ -229,21 +236,266 @@ public sealed class TerminationWatchdogTests
     /// <summary>
     /// Fail CLOSED, not fail DEAD. A failed attempt must not consume the one-shot: the process would then
     /// be permanently unable to arm the last resort because of a transient scheduler failure.
+    /// <para>
+    /// The failure and the retry hit the SAME instance. Two separate instances (the previous shape) prove
+    /// nothing about this one-shot, so a watchdog that burned its flag on the failed attempt passed.
+    /// </para>
     /// </summary>
     [Fact]
     public void A_failed_arming_does_not_consume_the_one_shot()
     {
-        var scheduler = new ManualWatchdogScheduler();
-        var watchdog = new TerminationWatchdog(new ThrowingWatchdogScheduler(), NullLogger<TerminationWatchdog>.Instance);
-        Assert.Throws<TerminationWatchdogArmingException>(
-            () => watchdog.Arm(TimeSpan.FromSeconds(10), () => { }));
-
-        var armed = Create(scheduler);
+        var scheduler = new ManualWatchdogScheduler { FailNextAttempts = 1 };
+        var watchdog = Create(scheduler);
         var terminations = 0;
-        armed.Arm(TimeSpan.FromSeconds(10), () => terminations++);
-        scheduler.ElapseAll();
 
-        Assert.True(armed.IsArmed);
+        Assert.Throws<TerminationWatchdogArmingException>(
+            () => watchdog.Arm(TimeSpan.FromSeconds(10), () => terminations++));
+        Assert.False(watchdog.IsArmed);
+        Assert.Equal(0, scheduler.ScheduleCount);
+
+        watchdog.Arm(TimeSpan.FromSeconds(10), () => terminations++);
+
+        Assert.True(watchdog.IsArmed);
+        Assert.Equal(2, scheduler.Attempts); // the retry reached the scheduler: nothing was consumed
+        Assert.Equal([TimeSpan.FromSeconds(10)], scheduler.ScheduledDelays);
+
+        scheduler.ElapseAll();
+        Assert.Equal(1, terminations);
+    }
+
+    /// <summary>
+    /// <b>The ORDER itself, not just the rollback.</b> Every other test here observes the state only after
+    /// <c>Arm</c> returned, so publishing armed BEFORE the scheduling while KEEPING the rollback in the
+    /// catch passed all of them: the rollback hid the early write from anyone who looked afterwards. This
+    /// holds the scheduling open mid-flight and has a concurrent reader look INSIDE that interval, which
+    /// is the only place the ordering is visible.
+    /// <para>
+    /// The reader takes the same lock-free path a real consumer takes, so an early write is observable
+    /// exactly as it would be in production. Both waits are handshakes; <see cref="Failsafe"/> only fails.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void IsArmed_is_false_while_the_scheduling_is_still_in_flight()
+    {
+        var scheduler = new ManualWatchdogScheduler();
+        var watchdog = Create(scheduler);
+        using var schedulingStarted = new ManualResetEventSlim(false);
+        using var observationTaken = new ManualResetEventSlim(false);
+        var armedMidFlight = true;
+        var observerRan = false;
+        var released = false;
+
+        var observer = new Thread(() =>
+        {
+            observerRan = schedulingStarted.Wait(Failsafe);
+            armedMidFlight = watchdog.IsArmed; // no gate: exactly what a concurrent consumer would see
+            observationTaken.Set();
+        }) { IsBackground = true };
+        observer.Start();
+
+        // Held open in the middle of the scheduling, so the observation happens after the scheduler was
+        // entered and before Arm could possibly have finished.
+        scheduler.OnScheduleAttempt = () =>
+        {
+            schedulingStarted.Set();
+            released = observationTaken.Wait(Failsafe);
+        };
+
+        watchdog.Arm(TimeSpan.FromSeconds(10), () => { });
+
+        Assert.True(observer.Join(Failsafe), "the observer never finished");
+        Assert.True(observerRan, "the observer never saw the scheduling start");
+        Assert.True(released, "the arming was never released");
+        Assert.False(
+            armedMidFlight,
+            "the watchdog published Armed while its scheduling was still in flight: the flag must be "
+            + "written AFTER the escalation exists, and a rollback in the catch does not make an early "
+            + "write acceptable");
+        Assert.True(watchdog.IsArmed); // and it IS armed once the scheduling has actually happened
+    }
+
+    /// <summary>
+    /// The other half of the one-shot: once a deadline IS established the watchdog is closed for good, so
+    /// a later call never even reaches the scheduler - it cannot extend the deadline, add a second
+    /// escalation, or fail.
+    /// </summary>
+    [Fact]
+    public void An_established_deadline_stops_every_later_call_before_the_scheduler()
+    {
+        var scheduler = new ManualWatchdogScheduler();
+        var watchdog = Create(scheduler);
+        watchdog.Arm(TimeSpan.FromSeconds(10), () => { });
+
+        scheduler.FailNextAttempts = 1; // would throw if the call got through
+        watchdog.Arm(TimeSpan.FromSeconds(60), () => { });
+
+        Assert.True(watchdog.IsArmed);
+        Assert.Equal(1, scheduler.Attempts);
+        Assert.Equal([TimeSpan.FromSeconds(10)], scheduler.ScheduledDelays);
+    }
+
+    /// <summary>
+    /// Two callers arriving together - the window close and the tray "Sair", the real race - while the
+    /// FIRST attempt fails. Check, establish and publish must be one indivisible step under the arming
+    /// gate, and the failed attempt must leave the deadline for the second caller to establish.
+    /// <para>
+    /// <b>White-box, deliberately.</b> Exclusion is proved on the REAL monitor: the private
+    /// <c>_armGate</c> is read by reflection (a rename fails the lookup loudly, never silently), and a
+    /// probe thread must be refused that monitor while the first attempt is inside the scheduler. A
+    /// thread-state poll or a spin budget would only infer that the second caller is parked; a refused
+    /// <see cref="Monitor.TryEnter(object, int)"/> with a zero timeout is a direct answer and waits on
+    /// nothing. Declared residual: the second caller signals on the statement before its <c>Arm</c> call,
+    /// so it is either parked on the gate or about to be - both are serialized behind the first attempt.
+    /// </para>
+    /// <para>
+    /// Nothing asserts inside the scheduler hook: production's catch would turn a failed assertion into a
+    /// <see cref="TerminationWatchdogArmingException"/>, which the outer <c>Assert.Throws</c> accepts. Every
+    /// observation is captured and asserted after <c>Arm</c> returned.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void Two_concurrent_callers_after_a_failed_attempt_establish_exactly_one_deadline()
+    {
+        var gateField = typeof(TerminationWatchdog).GetField("_armGate", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(gateField); // the probe below is meaningless without the real gate
+
+        var scheduler = new ManualWatchdogScheduler { FailNextAttempts = 1 };
+        var watchdog = Create(scheduler);
+        var gate = gateField.GetValue(watchdog);
+        Assert.NotNull(gate);
+
+        var terminations = 0;
+        var hookCalls = 0;
+        using var firstIsInsideTheScheduler = new ManualResetEventSlim(false);
+        using var secondIsAboutToArm = new ManualResetEventSlim(false);
+        var secondSawTheFirst = false;
+        var secondFailed = 0;
+
+        // Captured inside the hook, asserted after Arm returned.
+        Exception? hookFailure = null;
+        var secondSignalled = false;
+        var probeFinished = false;
+        var probeEnteredTheGate = true;
+        var armedDuringTheFailedAttempt = true;
+
+        var second = new Thread(() =>
+        {
+            secondSawTheFirst = firstIsInsideTheScheduler.Wait(Failsafe);
+            secondIsAboutToArm.Set(); // the very next statement is the arming call
+            try
+            {
+                watchdog.Arm(TimeSpan.FromSeconds(10), () => Interlocked.Increment(ref terminations));
+            }
+            catch (TerminationWatchdogArmingException)
+            {
+                Interlocked.Increment(ref secondFailed);
+            }
+        }) { IsBackground = true };
+        second.Start();
+
+        scheduler.OnScheduleAttempt = () =>
+        {
+            if (Interlocked.Increment(ref hookCalls) != 1)
+            {
+                return; // the second caller's own attempt must not block
+            }
+
+            try
+            {
+                firstIsInsideTheScheduler.Set();
+                secondSignalled = secondIsAboutToArm.Wait(Failsafe);
+
+                var probe = new Thread(() =>
+                {
+                    probeEnteredTheGate = Monitor.TryEnter(gate, 0);
+                    if (probeEnteredTheGate)
+                    {
+                        Monitor.Exit(gate);
+                    }
+                }) { IsBackground = true };
+                probe.Start();
+                probeFinished = probe.Join(Failsafe);
+
+                armedDuringTheFailedAttempt = watchdog.IsArmed;
+            }
+            catch (Exception exception)
+            {
+                hookFailure = exception;
+            }
+        };
+
+        Assert.Throws<TerminationWatchdogArmingException>(
+            () => watchdog.Arm(TimeSpan.FromSeconds(10), () => Interlocked.Increment(ref terminations)));
+        Assert.True(second.Join(Failsafe), "the second caller never returned");
+
+        Assert.Null(hookFailure);
+        Assert.True(secondSawTheFirst, "the second caller never saw the first attempt start");
+        Assert.True(secondSignalled, "the second caller never reached its arming call");
+        Assert.True(probeFinished, "the gate probe never finished");
+        Assert.False(
+            probeEnteredTheGate,
+            "the arming gate was free while the first attempt was inside the scheduler: check, establish "
+            + "and publish must be one indivisible step, or a concurrent caller can interleave");
+        Assert.False(armedDuringTheFailedAttempt, "an attempt that has not succeeded must never read as armed");
+
+        Assert.Equal(0, secondFailed);
+        Assert.True(watchdog.IsArmed);
+        Assert.Equal(2, scheduler.Attempts);
+        Assert.Equal(1, scheduler.ScheduleCount);
+        Assert.Equal(2, hookCalls);
+
+        scheduler.ElapseAll();
+        Assert.Equal(1, terminations);
+    }
+
+    /// <summary>
+    /// The same race with a SUCCESSFUL first attempt: the losers must find an established deadline and
+    /// return without scheduling a second escalation.
+    /// <para>
+    /// <b>Stress/regression smoke, not a deterministic proof.</b> Correct code passes under every
+    /// interleaving, so this cannot be flaky; but whether a gate-less mutant actually interleaves here is
+    /// up to the scheduler. The deterministic exclusion proof is the gate probe above.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void Concurrent_callers_never_establish_two_deadlines()
+    {
+        var scheduler = new ManualWatchdogScheduler();
+        var watchdog = Create(scheduler);
+        var terminations = 0;
+        const int callers = 16;
+        using var start = new Barrier(callers);
+        var failures = 0;
+
+        var threads = Enumerable.Range(0, callers).Select(_ => new Thread(() =>
+        {
+            start.SignalAndWait();
+            try
+            {
+                watchdog.Arm(TimeSpan.FromSeconds(10), () => Interlocked.Increment(ref terminations));
+            }
+            catch (TerminationWatchdogArmingException)
+            {
+                Interlocked.Increment(ref failures);
+            }
+        }) { IsBackground = true }).ToArray();
+
+        foreach (var thread in threads)
+        {
+            thread.Start();
+        }
+
+        foreach (var thread in threads)
+        {
+            Assert.True(thread.Join(Failsafe), "an arming caller never returned");
+        }
+
+        Assert.Equal(0, failures);
+        Assert.True(watchdog.IsArmed);
+        Assert.Equal(1, scheduler.ScheduleCount);
+        Assert.Equal(1, scheduler.Attempts);
+
+        scheduler.ElapseAll();
         Assert.Equal(1, terminations);
     }
 

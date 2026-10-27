@@ -18,9 +18,37 @@ internal sealed class ManualWatchdogScheduler : IWatchdogScheduler
     /// <summary>Every deadline the watchdog asked for, in order. A second entry means it was restarted.</summary>
     public IReadOnlyList<TimeSpan> ScheduledDelays => _scheduled.Select(entry => entry.Delay).ToArray();
 
+    /// <summary>How many deadlines were actually ESTABLISHED. A failed attempt establishes nothing.</summary>
     public int ScheduleCount => _scheduled.Count;
 
-    public void ScheduleOnce(TimeSpan delay, Action callback) => _scheduled.Add((delay, callback));
+    /// <summary>Every attempt, successful or not. The gap between the two is the CV-21 A case.</summary>
+    public int Attempts { get; private set; }
+
+    /// <summary>
+    /// When above zero, that many further attempts throw instead of scheduling - a watchdog thread that
+    /// cannot be started, which is what made the old code claim to be armed with nothing behind it.
+    /// </summary>
+    public int FailNextAttempts { get; set; }
+
+    /// <summary>
+    /// Runs INSIDE the attempt, before it succeeds or fails, so a test can interleave a second caller at
+    /// the exact moment the first is mid-arming.
+    /// </summary>
+    public Action? OnScheduleAttempt { get; set; }
+
+    public void ScheduleOnce(TimeSpan delay, Action callback)
+    {
+        Attempts++;
+        OnScheduleAttempt?.Invoke();
+
+        if (FailNextAttempts > 0)
+        {
+            FailNextAttempts--;
+            throw new InvalidOperationException("the watchdog thread could not be started");
+        }
+
+        _scheduled.Add((delay, callback));
+    }
 
     /// <summary>
     /// Fires everything scheduled, exactly as elapsed time would. Callbacks are taken by copy so a
