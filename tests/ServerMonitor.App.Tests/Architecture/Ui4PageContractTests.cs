@@ -148,7 +148,7 @@ public sealed partial class Ui4PageContractTests
         Assert.Equal(3, rowButtons.Count);
         Assert.All(rowButtons, b =>
         {
-            Assert.Equal("{x:Bind DetailAutomationName}", Attr(b, "AutomationProperties.Name"));
+            Assert.Equal("{x:Bind DetailAutomationName, Mode=OneWay}", Attr(b, "AutomationProperties.Name")); // SVA-5
             Assert.Equal("{x:Bind RowAutomationName, Mode=OneWay}", Attr(b, "AutomationProperties.HelpText"));
         });
     }
