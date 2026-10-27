@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using ServerMonitor.App.Services;
 using ServerMonitor.App.Tests.Fakes;
@@ -111,6 +112,81 @@ public sealed class AppLifecycleControllerTests
         Assert.Equal(new[] { ProcessTerminator.WatchdogExitCode }, harness.Terminator.Terminations);
     }
 
+    /// <summary>
+    /// The whole exit, not just its last step, when the watchdog cannot be armed. An escaping
+    /// <see cref="TerminationWatchdogArmingException"/> would surface as a crash from a window handler AND
+    /// skip every cleanup step, trading a missing escalation for a certainly broken shutdown.
+    /// <para>
+    /// CV-17 is kept: the exit-committed callback runs exactly once, before the arming and before
+    /// <see cref="IExitSequence.StopAcceptingForegroundWork"/>, even though the arming then fails. The
+    /// failure is reported as the <c>ArmTerminationWatchdog</c> step, carrying the arming exception.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void An_arming_failure_never_aborts_the_ordered_exit()
+    {
+        var timeline = new List<string>();
+        var committed = new List<ExitReason>();
+        var log = new RecordingLogger();
+        var h = new Harness(
+            logger: log,
+            onExitCommitted: reason =>
+            {
+                committed.Add(reason);
+                timeline.Add("ExitCommitted");
+            });
+        h.Scheduler.FailNextAttempts = 1;
+        h.Scheduler.OnScheduleAttempt = () => timeline.Add("ArmAttempt");
+        h.Sequence.OnStopAcceptingForegroundWork = () => timeline.Add(nameof(IExitSequence.StopAcceptingForegroundWork));
+
+        var escaped = Record.Exception(() => h.Controller.RequestExit(ExitReason.TrayExit));
+
+        Assert.Null(escaped);
+        Assert.Equal(
+            [
+                nameof(IExitSequence.StopAcceptingForegroundWork),
+                nameof(IExitSequence.RemoveTrayIcon),
+                nameof(IExitSequence.HideUserInterface),
+                nameof(IExitSequence.DrainHost)
+            ],
+            h.Sequence.Steps);
+        Assert.Equal(1, h.ApplicationExits);
+
+        Assert.False(h.Watchdog.IsArmed);
+        Assert.Equal(1, h.Scheduler.Attempts);
+        Assert.Equal(0, h.Scheduler.ScheduleCount);
+
+        Assert.Equal([ExitReason.TrayExit], committed);
+        Assert.Equal(
+            ["ExitCommitted", "ArmAttempt", nameof(IExitSequence.StopAcceptingForegroundWork)],
+            timeline);
+
+        var error = Assert.Single(log.Entries, entry => entry.Level == LogLevel.Error);
+        Assert.IsType<TerminationWatchdogArmingException>(error.Exception);
+        Assert.Equal("ArmTerminationWatchdog", error.Step);
+    }
+
+    /// <summary>
+    /// Records what the controller reported, with the structured <c>{Step}</c> value, so a test can name
+    /// the failed step without matching message text.
+    /// </summary>
+    private sealed class RecordingLogger : ILogger<AppLifecycleController>
+    {
+        public List<(LogLevel Level, string Message, Exception? Exception, string? Step)> Entries { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+        {
+            var step = state is IEnumerable<KeyValuePair<string, object?>> values
+                ? values.FirstOrDefault(pair => pair.Key == "Step").Value as string
+                : null;
+            Entries.Add((logLevel, formatter(state, exception), exception, step));
+        }
+    }
+
     /// <summary>A scheduler that refuses to establish anything (CV-21 A).</summary>
     private sealed class ThrowingWatchdogScheduler : IWatchdogScheduler
     {
@@ -136,7 +212,11 @@ public sealed class AppLifecycleControllerTests
 
         public AppLifecycleController Controller { get; }
 
-        public Harness(LaunchMode launchMode = LaunchMode.Foreground, TimeSpan? deadline = null)
+        public Harness(
+            LaunchMode launchMode = LaunchMode.Foreground,
+            TimeSpan? deadline = null,
+            ILogger<AppLifecycleController>? logger = null,
+            Action<ExitReason>? onExitCommitted = null)
         {
             Watchdog = new TerminationWatchdog(Scheduler, NullLogger<TerminationWatchdog>.Instance);
             Controller = new AppLifecycleController(
@@ -144,9 +224,10 @@ public sealed class AppLifecycleControllerTests
                 () => ApplicationExits++,
                 Watchdog,
                 Terminator,
-                NullLogger<AppLifecycleController>.Instance,
+                logger ?? NullLogger<AppLifecycleController>.Instance,
                 launchMode,
-                deadline);
+                deadline,
+                onExitCommitted);
         }
 
         /// <summary>What elapsed time does, through the real watchdog.</summary>
