@@ -948,11 +948,11 @@ as métricas e o histórico do servidor.</value></data>
   <data name="ServerEditorAuthSubtitlePasswordKeepEdit" xml:space="preserve"><value>Deixe em branco para manter a senha atual.</value></data>
   <data name="ServerEditorAuthMethodGroup.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Método de autenticação</value></data>
   <data name="ServerEditorNameField.Header" xml:space="preserve"><value>Nome</value></data>
-  <data name="ServerEditorNameInput.PlaceholderText" xml:space="preserve"><value>Ex.: Servidor principal</value></data>
+  <data name="ServerEditorNameInput.PlaceholderText" xml:space="preserve"><value>Por exemplo: Servidor principal</value></data>
   <data name="ServerEditorHostField.Header" xml:space="preserve"><value>Host ou endereço IP</value></data>
-  <data name="ServerEditorHostInput.PlaceholderText" xml:space="preserve"><value>Ex.: server.example.com</value></data>
+  <data name="ServerEditorHostInput.PlaceholderText" xml:space="preserve"><value>Por exemplo: server.example.com</value></data>
   <data name="ServerEditorUsernameField.Header" xml:space="preserve"><value>Usuário SSH</value></data>
-  <data name="ServerEditorUsernameInput.PlaceholderText" xml:space="preserve"><value>Ex.: monitor</value></data>
+  <data name="ServerEditorUsernameInput.PlaceholderText" xml:space="preserve"><value>Por exemplo: monitor</value></data>
   <data name="ServerEditorPrivateKeyField.Header" xml:space="preserve"><value>Arquivo da chave privada</value></data>
   <data name="ServerEditorPassphraseField.Header" xml:space="preserve"><value>Frase secreta da chave · opcional</value></data>
   <data name="ServerEditorPassphraseInput.PlaceholderText" xml:space="preserve"><value>Apenas se sua chave estiver protegida</value></data>
@@ -969,9 +969,9 @@ as métricas e o histórico do servidor.</value></data>
   <data name="ServerEditorJumpHostTitle.Text" xml:space="preserve"><value>Jump host</value></data>
   <data name="ServerEditorJumpHostSubtitle.Text" xml:space="preserve"><value>Credenciais próprias do jump host.</value></data>
   <data name="ServerEditorJumpHostField.Header" xml:space="preserve"><value>Jump host</value></data>
-  <data name="ServerEditorJumpHostInput.PlaceholderText" xml:space="preserve"><value>Ex.: bastion.example.com</value></data>
+  <data name="ServerEditorJumpHostInput.PlaceholderText" xml:space="preserve"><value>Por exemplo: bastion.example.com</value></data>
   <data name="ServerEditorJumpUsernameField.Header" xml:space="preserve"><value>Usuário SSH</value></data>
-  <data name="ServerEditorJumpUsernameInput.PlaceholderText" xml:space="preserve"><value>Ex.: admin</value></data>
+  <data name="ServerEditorJumpUsernameInput.PlaceholderText" xml:space="preserve"><value>Por exemplo: admin</value></data>
   <data name="ServerEditorJumpPortField.Header" xml:space="preserve"><value>Porta</value></data>
   <data name="ServerEditorJumpPortInput.PlaceholderText" xml:space="preserve"><value>22</value></data>
   <data name="ServerEditorJumpAuthTitle.Text" xml:space="preserve"><value>Autenticação</value></data>
