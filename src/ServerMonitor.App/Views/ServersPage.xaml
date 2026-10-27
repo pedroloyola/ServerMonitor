@@ -68,7 +68,7 @@
         <!-- Wide 112:1443: SERVIDOR * (min 230) · SISTEMA 110 · ESTADO 150 · CPU/RAM/DISCO 85 · ação 127, gap 10, h78. -->
         <DataTemplate x:Key="ServerRowWideTemplate" x:DataType="vm:ServerDirectoryRowViewModel">
             <controls:ServerTableRowButton Style="{StaticResource ServerRowButtonStyle}" Command="{x:Bind OpenDetailCommand}"
-                    AutomationProperties.Name="{x:Bind DetailAutomationName}"
+                    AutomationProperties.Name="{x:Bind DetailAutomationName, Mode=OneWay}"
                     AutomationProperties.HelpText="{x:Bind RowAutomationName, Mode=OneWay}">
                 <Border Style="{StaticResource SaDataTableRowStyle}">
                     <Grid ColumnSpacing="10">
@@ -125,9 +125,9 @@
         <!-- Mid (900–1039): no SISTEMA column (the system joins the address line); the action is the chevron alone (44). -->
         <DataTemplate x:Key="ServerRowMidTemplate" x:DataType="vm:ServerDirectoryRowViewModel">
             <controls:ServerTableRowButton Style="{StaticResource ServerRowButtonStyle}" Command="{x:Bind OpenDetailCommand}"
-                    AutomationProperties.Name="{x:Bind DetailAutomationName}"
+                    AutomationProperties.Name="{x:Bind DetailAutomationName, Mode=OneWay}"
                     AutomationProperties.HelpText="{x:Bind RowAutomationName, Mode=OneWay}"
-                    ToolTipService.ToolTip="{x:Bind DetailAutomationName}">
+                    ToolTipService.ToolTip="{x:Bind DetailToolTip}">
                 <Border Style="{StaticResource SaDataTableRowStyle}">
                     <Grid ColumnSpacing="10">
                         <Grid.ColumnDefinitions>
@@ -178,7 +178,7 @@
              there is no header), chevron at the right, no dividers. -->
         <DataTemplate x:Key="ServerRowStackedTemplate" x:DataType="vm:ServerDirectoryRowViewModel">
             <controls:ServerTableRowButton Style="{StaticResource ServerRowButtonStyle}" Command="{x:Bind OpenDetailCommand}"
-                    AutomationProperties.Name="{x:Bind DetailAutomationName}"
+                    AutomationProperties.Name="{x:Bind DetailAutomationName, Mode=OneWay}"
                     AutomationProperties.HelpText="{x:Bind RowAutomationName, Mode=OneWay}">
                 <Grid MinHeight="88" ColumnSpacing="{StaticResource SaSpace12}">
                     <Grid.ColumnDefinitions>

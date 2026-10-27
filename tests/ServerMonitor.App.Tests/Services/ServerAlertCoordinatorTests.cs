@@ -264,6 +264,243 @@ public sealed class ServerAlertCoordinatorTests
             harness.Notifications.Items.Count(item => item.Category == ServerAlertCategory.Warning));
     }
 
+    /// <summary>
+    /// SVA-12 regression guard. The server is removed while its warning is inside the platform boundary; removal clears
+    /// the cooldown and retires the server's baseline epoch, so the completed delivery must not write the cooldown back.
+    /// Before the epoch fence it did, and the same Id re-added inside the window had its first warning suppressed.
+    /// </summary>
+    [Fact]
+    public async Task RemovedWhileDelivering_SameIdReadded_FirstWarningIsNotSuppressed()
+    {
+        await using var harness = await Harness.CreateAsync(ServerHealth.Healthy);
+        var gate = new GatedDelivery();
+        harness.Notifications.HoldNext(gate);
+
+        harness.SetHealth(ServerHealth.Warning);
+        await gate.Entered.Task.WaitAsync(DeadlockGuard);
+        harness.States.Remove(harness.Server.Id);  // production removal path; clears the cooldown synchronously
+        gate.Release.TrySetResult(true);           // the in-flight warning is delivered after the removal
+        await harness.SettleAsync();
+
+        harness.States.Set(ServerMonitoringState.Initial(harness.Server.Id) with
+        {
+            Health = ServerHealth.Healthy
+        });
+        harness.SetHealth(ServerHealth.Warning);   // same instant on the fake clock: inside the cooldown window
+        await harness.SettleAsync();
+
+        Assert.Equal(
+            2,
+            harness.Notifications.Items.Count(item => item.Category == ServerAlertCategory.Warning));
+    }
+
+    /// <summary>SVA-12: the stale completion must not leak into a different server, nor leave a cooldown behind for
+    /// the removed Id.</summary>
+    [Fact]
+    public async Task RemovedWhileDelivering_DifferentIdAdded_FirstWarningIsDelivered()
+    {
+        await using var harness = await Harness.CreateAsync(ServerHealth.Healthy);
+        var gate = new GatedDelivery();
+        harness.Notifications.HoldNext(gate);
+
+        harness.SetHealth(ServerHealth.Warning);
+        await gate.Entered.Task.WaitAsync(DeadlockGuard);
+        harness.States.Remove(harness.Server.Id);
+        gate.Release.TrySetResult(true);
+        await harness.SettleAsync();
+        Assert.Equal((0, 0, 0), harness.Coordinator.GetTrackedStateCounts());
+
+        var other = harness.AddServer(ServerHealth.Healthy);
+        harness.SetHealth(other.Id, ServerHealth.Warning);  // same instant on the fake clock
+        await harness.WaitForNotificationsAsync(2);
+
+        Assert.Equal(other.Id, harness.Notifications.Items[1].ServerId);
+        Assert.Equal(ServerAlertCategory.Warning, harness.Notifications.Items[1].Category);
+        Assert.Equal((1, 1, 1), harness.Coordinator.GetTrackedStateCounts());  // only the new server's cooldown
+    }
+
+    /// <summary>SVA-12: after the in-flight delivery completes post-removal, no per-server state remains.</summary>
+    [Fact]
+    public async Task RemovedWhileDelivering_CompletionLeavesNoOrphanState()
+    {
+        await using var harness = await Harness.CreateAsync(ServerHealth.Healthy);
+        var gate = new GatedDelivery();
+        harness.Notifications.HoldNext(gate);
+
+        harness.SetHealth(ServerHealth.Warning);
+        await gate.Entered.Task.WaitAsync(DeadlockGuard);
+        Assert.Equal((1, 1, 0), harness.Coordinator.GetTrackedStateCounts());  // cooldown not reserved yet
+
+        harness.States.Remove(harness.Server.Id);
+        Assert.Equal((0, 0, 0), harness.Coordinator.GetTrackedStateCounts());
+
+        gate.Release.TrySetResult(true);
+        await harness.SettleAsync();
+
+        Assert.Equal((0, 0, 0), harness.Coordinator.GetTrackedStateCounts());
+        Assert.Single(harness.Notifications.Items);  // the in-flight one was still shown; only its cooldown is fenced
+    }
+
+    /// <summary>SVA-12: the fence does not weaken normal cooldowns. A held delivery that completes without a removal
+    /// still reserves the cooldown, and the next warning inside the window is suppressed.</summary>
+    [Fact]
+    public async Task NotRemovedWhileDelivering_CooldownIsStillReserved()
+    {
+        await using var harness = await Harness.CreateAsync(ServerHealth.Healthy);
+        var gate = new GatedDelivery();
+        harness.Notifications.HoldNext(gate);
+
+        harness.SetHealth(ServerHealth.Warning);
+        await gate.Entered.Task.WaitAsync(DeadlockGuard);
+        gate.Release.TrySetResult(true);
+        await harness.SettleAsync();
+        Assert.Equal((1, 1, 1), harness.Coordinator.GetTrackedStateCounts());
+
+        harness.SetHealth(ServerHealth.Healthy);
+        await harness.WaitForNotificationsAsync(2);
+        harness.SetHealth(ServerHealth.Warning);  // inside the cooldown window
+        await harness.SettleAsync();
+
+        Assert.Single(harness.Notifications.Items, item => item.Category == ServerAlertCategory.Warning);
+    }
+
+    /// <summary>SVA-12: priority escalations keep bypassing cooldowns on the race path too.</summary>
+    [Fact]
+    public async Task RemovedWhileDeliveringOffline_SameIdReadded_OfflineStillNotifies()
+    {
+        await using var harness = await Harness.CreateAsync(ServerHealth.Healthy);
+        var gate = new GatedDelivery();
+        harness.Notifications.HoldNext(gate);
+
+        harness.SetHealth(ServerHealth.Offline);
+        await gate.Entered.Task.WaitAsync(DeadlockGuard);
+        harness.States.Remove(harness.Server.Id);
+        gate.Release.TrySetResult(true);
+        await harness.SettleAsync();
+        Assert.Equal((0, 0, 0), harness.Coordinator.GetTrackedStateCounts());
+
+        harness.States.Set(ServerMonitoringState.Initial(harness.Server.Id) with { Health = ServerHealth.Healthy });
+        harness.SetHealth(ServerHealth.Offline);
+        await harness.WaitForNotificationsAsync(2);
+        harness.SetHealth(ServerHealth.Healthy);
+        await harness.WaitForNotificationsAsync(3);
+        harness.SetHealth(ServerHealth.Offline);  // a new outage inside the window still notifies (priority)
+        await harness.WaitForNotificationsAsync(4);
+
+        Assert.Equal(3, harness.Notifications.Items.Count(item => item.Category == ServerAlertCategory.Offline));
+    }
+
+    /// <summary>
+    /// SVA-12 bound: 1,000 add/remove cycles - alternating the same Id and fresh Ids, every 5th with the warning held
+    /// inside ShowAsync across the removal - leave no per-server state, and every re-added server's first warning
+    /// is delivered (none is suppressed by a stale cooldown).
+    /// </summary>
+    [Fact]
+    public async Task ThousandAddRemoveCycles_IncludingInFlightDeliveries_LeaveStateBounded()
+    {
+        await using var harness = await Harness.CreateAsync();
+
+        for (var cycle = 0; cycle < 1_000; cycle++)
+        {
+            var server = cycle % 2 == 0 ? harness.Server : harness.AddServer(initial: null);
+            harness.States.Set(ServerMonitoringState.Initial(server.Id) with { Health = ServerHealth.Healthy });
+            var gate = cycle % 5 == 0 ? new GatedDelivery() : null;  // alternates same Id / fresh Id
+            if (gate is not null)
+            {
+                harness.Notifications.HoldNext(gate);
+            }
+
+            harness.SetHealth(server.Id, ServerHealth.Warning);
+            if (gate is not null)
+            {
+                await gate.Entered.Task.WaitAsync(DeadlockGuard);
+                harness.States.Remove(server.Id);
+                gate.Release.TrySetResult(true);
+                await harness.SettleAsync();
+            }
+            else
+            {
+                await harness.WaitForNotificationsAsync(cycle + 1);
+                Assert.Equal((1, 1, 1), harness.Coordinator.GetTrackedStateCounts());
+                harness.States.Remove(server.Id);
+            }
+
+            Assert.Equal((0, 0, 0), harness.Coordinator.GetTrackedStateCounts());
+            if (server.Id != harness.Server.Id)
+            {
+                harness.Servers.Servers.Remove(server);
+            }
+        }
+
+        await harness.SettleAsync();
+        Assert.Equal(1_000, harness.Notifications.Items.Count(item => item.Category == ServerAlertCategory.Warning));
+        Assert.Equal((0, 0, 0), harness.Coordinator.GetTrackedStateCounts());
+    }
+
+    /// <summary>
+    /// SVA-12 ordering: removal landing before the post-ShowAsync reservation (held while resolving the server, or
+    /// inside ShowAsync) fences it; removal landing after it (flush barrier = the reservation ran) clears it. In every
+    /// order the same Id re-added inside the window notifies and no state is left. Gates only, no timing.
+    /// </summary>
+    [Theory]
+    [InlineData(RemovalPoint.WhileResolvingServer)]
+    [InlineData(RemovalPoint.InsideShowAsync)]
+    [InlineData(RemovalPoint.AfterCooldownReserved)]
+    public async Task RemovalRacingCompletion_InEveryOrder_LeavesNoCooldown(RemovalPoint point)
+    {
+        await using var harness = await Harness.CreateAsync(ServerHealth.Healthy);
+        switch (point)
+        {
+            case RemovalPoint.WhileResolvingServer:
+                var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                harness.Servers.GetAllOverride = async cancellationToken =>
+                {
+                    entered.TrySetResult();
+                    await release.Task.WaitAsync(cancellationToken);
+                    return harness.Servers.Servers.ToList();
+                };
+                harness.SetHealth(ServerHealth.Warning);
+                await entered.Task.WaitAsync(DeadlockGuard);
+                harness.States.Remove(harness.Server.Id);
+                release.TrySetResult();
+                await harness.SettleAsync();
+                harness.Servers.GetAllOverride = null;
+                break;
+
+            case RemovalPoint.InsideShowAsync:
+                var gate = new GatedDelivery();
+                harness.Notifications.HoldNext(gate);
+                harness.SetHealth(ServerHealth.Warning);
+                await gate.Entered.Task.WaitAsync(DeadlockGuard);
+                harness.States.Remove(harness.Server.Id);
+                gate.Release.TrySetResult(true);
+                await harness.SettleAsync();
+                break;
+
+            case RemovalPoint.AfterCooldownReserved:
+                harness.SetHealth(ServerHealth.Warning);
+                await harness.WaitForNotificationsAsync(1);
+                Assert.Equal((1, 1, 1), harness.Coordinator.GetTrackedStateCounts());
+                harness.States.Remove(harness.Server.Id);
+                break;
+        }
+
+        Assert.Equal((0, 0, 0), harness.Coordinator.GetTrackedStateCounts());
+        harness.States.Set(ServerMonitoringState.Initial(harness.Server.Id) with { Health = ServerHealth.Healthy });
+        harness.SetHealth(ServerHealth.Warning);
+        await harness.SettleAsync();
+
+        Assert.Equal(2, harness.Notifications.Items.Count(item => item.Category == ServerAlertCategory.Warning));
+    }
+
+    public enum RemovalPoint
+    {
+        WhileResolvingServer,
+        InsideShowAsync,
+        AfterCooldownReserved
+    }
+
     [Fact]
     public async Task HiddenConfiguredServer_StillNotifies()
     {
@@ -435,6 +672,22 @@ public sealed class ServerAlertCoordinatorTests
         public void SetHealth(ServerHealth health, bool isRefreshing = false) =>
             States.Set(States.Get(Server.Id) with { Health = health, IsRefreshing = isRefreshing });
 
+        public void SetHealth(Guid serverId, ServerHealth health) =>
+            States.Set(States.Get(serverId) with { Health = health });
+
+        /// <summary>Adds another configured server; with <paramref name="initial"/> its baseline is observed too.</summary>
+        public Server AddServer(ServerHealth? initial)
+        {
+            var server = TestData.LinuxServer();
+            Servers.Servers.Add(server);
+            if (initial is not null)
+            {
+                States.Set(ServerMonitoringState.Initial(server.Id) with { Health = initial.Value });
+            }
+
+            return server;
+        }
+
         /// <summary>
         /// Barrier: completes once the coordinator has processed every intent queued so far (its FIFO flush seam). An
         /// assertion that something was NOT delivered, or that exactly N were, is only meaningful after it — otherwise
@@ -475,8 +728,12 @@ public sealed class ServerAlertCoordinatorTests
     {
         private readonly ConcurrentQueue<UserNotification> _items = new();
         private readonly SemaphoreSlim _calls = new(0);
+        private GatedDelivery? _held;
 
         public IReadOnlyList<UserNotification> Items => _items.ToArray();
+
+        /// <summary>SVA-12: the next call is recorded, then held inside the platform boundary until the test releases it.</summary>
+        public void HoldNext(GatedDelivery gate) => _held = gate;
 
         public int BeginShutdownCount { get; private set; }
 
@@ -490,7 +747,8 @@ public sealed class ServerAlertCoordinatorTests
         {
             _items.Enqueue(notification);
             _calls.Release();
-            return Task.FromResult(Delivers);
+            var held = Interlocked.Exchange(ref _held, null);
+            return held is null ? Task.FromResult(Delivers) : held.HoldAsync(cancellationToken);
         }
 
         /// <summary>Waits for the coordinator's worker to deliver <paramref name="expected"/> notifications; each
@@ -501,6 +759,22 @@ public sealed class ServerAlertCoordinatorTests
             {
                 Assert.True(await _calls.WaitAsync(DeadlockGuard));
             }
+        }
+    }
+
+    private sealed class GatedDelivery
+    {
+        public TaskCompletionSource Entered { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        /// <summary>Completed by the test with the platform result (true = delivered).</summary>
+        public TaskCompletionSource<bool> Release { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task<bool> HoldAsync(CancellationToken cancellationToken)
+        {
+            Entered.TrySetResult();
+            return Release.Task.WaitAsync(cancellationToken);
         }
     }
 
