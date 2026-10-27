@@ -10,6 +10,10 @@ namespace ServerMonitor.App.Tests.Fakes;
 /// the production watchdog expire immediately still passed 542/542. The state machine under test is
 /// therefore always the production class, and only its waiting is made controllable here (BOSS.md §10).
 /// </para>
+/// <para>
+/// Not thread-safe: <see cref="Attempts"/> and the schedule list are only valid while callers are
+/// serialized, which production does under <c>TerminationWatchdog._armGate</c>.
+/// </para>
 /// </summary>
 internal sealed class ManualWatchdogScheduler : IWatchdogScheduler
 {

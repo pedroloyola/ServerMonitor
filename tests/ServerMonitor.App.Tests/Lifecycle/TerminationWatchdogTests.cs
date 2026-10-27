@@ -284,12 +284,20 @@ public sealed class TerminationWatchdogTests
         var armedMidFlight = true;
         var observerRan = false;
         var released = false;
+        Exception? observerFailure = null;
 
         var observer = new Thread(() =>
         {
-            observerRan = schedulingStarted.Wait(Failsafe);
-            armedMidFlight = watchdog.IsArmed; // no gate: exactly what a concurrent consumer would see
-            observationTaken.Set();
+            try
+            {
+                observerRan = schedulingStarted.Wait(Failsafe);
+                armedMidFlight = watchdog.IsArmed; // no gate: exactly what a concurrent consumer would see
+                observationTaken.Set();
+            }
+            catch (ObjectDisposedException exception)
+            {
+                observerFailure = exception; // the test already failed and disposed the events; never crash the host
+            }
         }) { IsBackground = true };
         observer.Start();
 
@@ -304,6 +312,7 @@ public sealed class TerminationWatchdogTests
         watchdog.Arm(TimeSpan.FromSeconds(10), () => { });
 
         Assert.True(observer.Join(Failsafe), "the observer never finished");
+        Assert.Null(observerFailure);
         Assert.True(observerRan, "the observer never saw the scheduling start");
         Assert.True(released, "the arming was never released");
         Assert.False(
@@ -349,8 +358,9 @@ public sealed class TerminationWatchdogTests
     /// </para>
     /// <para>
     /// Nothing asserts inside the scheduler hook: production's catch would turn a failed assertion into a
-    /// <see cref="TerminationWatchdogArmingException"/>, which the outer <c>Assert.Throws</c> accepts. Every
-    /// observation is captured and asserted after <c>Arm</c> returned.
+    /// <see cref="TerminationWatchdogArmingException"/>. Every observation is captured, and the first
+    /// <c>Arm</c> is recorded rather than asserted, so the probe is checked BEFORE anything else: with the
+    /// gate removed, the first failing assertion is "gate was free", not some later symptom.
     /// </para>
     /// </summary>
     [Fact]
@@ -358,6 +368,11 @@ public sealed class TerminationWatchdogTests
     {
         var gateField = typeof(TerminationWatchdog).GetField("_armGate", BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.NotNull(gateField); // the probe below is meaningless without the real gate
+        Assert.True(
+            gateField.FieldType == typeof(object),
+            "the gate probe requires a Monitor-based gate (an object locked with lock/Monitor), but _armGate is "
+            + $"{gateField.FieldType}: a System.Threading.Lock is not probed by Monitor.TryEnter, so this test "
+            + "must be rewritten for it rather than read as 'gate was free'");
 
         var scheduler = new ManualWatchdogScheduler { FailNextAttempts = 1 };
         var watchdog = Create(scheduler);
@@ -370,6 +385,7 @@ public sealed class TerminationWatchdogTests
         using var secondIsAboutToArm = new ManualResetEventSlim(false);
         var secondSawTheFirst = false;
         var secondFailed = 0;
+        Exception? secondThreadFailure = null;
 
         // Captured inside the hook, asserted after Arm returned.
         Exception? hookFailure = null;
@@ -380,15 +396,19 @@ public sealed class TerminationWatchdogTests
 
         var second = new Thread(() =>
         {
-            secondSawTheFirst = firstIsInsideTheScheduler.Wait(Failsafe);
-            secondIsAboutToArm.Set(); // the very next statement is the arming call
             try
             {
+                secondSawTheFirst = firstIsInsideTheScheduler.Wait(Failsafe);
+                secondIsAboutToArm.Set(); // the very next statement is the arming call
                 watchdog.Arm(TimeSpan.FromSeconds(10), () => Interlocked.Increment(ref terminations));
             }
             catch (TerminationWatchdogArmingException)
             {
                 Interlocked.Increment(ref secondFailed);
+            }
+            catch (ObjectDisposedException exception)
+            {
+                secondThreadFailure = exception; // the test already failed and disposed the events; never crash the host
             }
         }) { IsBackground = true };
         second.Start();
@@ -424,18 +444,22 @@ public sealed class TerminationWatchdogTests
             }
         };
 
-        Assert.Throws<TerminationWatchdogArmingException>(
+        var firstAttempt = Record.Exception(
             () => watchdog.Arm(TimeSpan.FromSeconds(10), () => Interlocked.Increment(ref terminations)));
-        Assert.True(second.Join(Failsafe), "the second caller never returned");
 
+        // The probe first: everything it needs was written on this thread before Arm returned.
         Assert.Null(hookFailure);
-        Assert.True(secondSawTheFirst, "the second caller never saw the first attempt start");
-        Assert.True(secondSignalled, "the second caller never reached its arming call");
         Assert.True(probeFinished, "the gate probe never finished");
         Assert.False(
             probeEnteredTheGate,
             "the arming gate was free while the first attempt was inside the scheduler: check, establish "
             + "and publish must be one indivisible step, or a concurrent caller can interleave");
+
+        Assert.IsType<TerminationWatchdogArmingException>(firstAttempt);
+        Assert.True(second.Join(Failsafe), "the second caller never returned");
+        Assert.Null(secondThreadFailure);
+        Assert.True(secondSawTheFirst, "the second caller never saw the first attempt start");
+        Assert.True(secondSignalled, "the second caller never reached its arming call");
         Assert.False(armedDuringTheFailedAttempt, "an attempt that has not succeeded must never read as armed");
 
         Assert.Equal(0, secondFailed);
@@ -466,17 +490,28 @@ public sealed class TerminationWatchdogTests
         const int callers = 16;
         using var start = new Barrier(callers);
         var failures = 0;
+        var barrierTimeouts = 0;
+        var disposedFailures = 0;
 
         var threads = Enumerable.Range(0, callers).Select(_ => new Thread(() =>
         {
-            start.SignalAndWait();
             try
             {
+                if (!start.SignalAndWait(Failsafe))
+                {
+                    Interlocked.Increment(ref barrierTimeouts);
+                    return;
+                }
+
                 watchdog.Arm(TimeSpan.FromSeconds(10), () => Interlocked.Increment(ref terminations));
             }
             catch (TerminationWatchdogArmingException)
             {
                 Interlocked.Increment(ref failures);
+            }
+            catch (ObjectDisposedException)
+            {
+                Interlocked.Increment(ref disposedFailures); // the test already failed; never crash the host
             }
         }) { IsBackground = true }).ToArray();
 
@@ -490,6 +525,8 @@ public sealed class TerminationWatchdogTests
             Assert.True(thread.Join(Failsafe), "an arming caller never returned");
         }
 
+        Assert.Equal(0, barrierTimeouts);
+        Assert.Equal(0, disposedFailures);
         Assert.Equal(0, failures);
         Assert.True(watchdog.IsArmed);
         Assert.Equal(1, scheduler.ScheduleCount);
