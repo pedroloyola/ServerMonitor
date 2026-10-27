@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.Net;
@@ -133,7 +134,7 @@ public sealed class LoopbackOriginatorGateTests
         {
             return await listener.AcceptTcpClientAsync(budget);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (budget.IsCancellationRequested)
         {
             Assert.Fail(child.DescribeAcceptFailure());
             throw new UnreachableException();
@@ -149,12 +150,14 @@ public sealed class LoopbackOriginatorGateTests
 
     /// <summary>
     /// A child Windows PowerShell that connects to <c>127.0.0.1:port</c> and holds the socket. Identity (PID,
-    /// image, start time) is recorded at start and revalidated before the exact PID is stopped (BOSS §17).
-    /// stdout/stderr are drained asynchronously from start so the child can never block on a full pipe; only the
-    /// last <see cref="BoundedTail.MaxChars"/> chars of each stream are kept, for the accept-failure message.
+    /// image, start time) is recorded at start and revalidated before that exact PID - and only that PID - is
+    /// killed (BOSS §17). stdout/stderr are drained asynchronously from start so the child can never block on a
+    /// full pipe; each line is sanitized as it arrives and only the last whole lines (up to
+    /// <see cref="BoundedTail.MaxChars"/> chars) of each stream are kept, for the failure messages.
     /// </summary>
     private sealed class ChildProcess : IDisposable
     {
+        private const int KillWaitMilliseconds = 5000;
         private readonly Process _process;
         private readonly BoundedTail _stdout;
         private readonly BoundedTail _stderr;
@@ -207,64 +210,57 @@ public sealed class LoopbackOriginatorGateTests
                 throw new InvalidOperationException("child did not start");
             }
 
+            var pid = process.Id;
             process.BeginOutputReadLine();
             process.BeginErrorReadLine();
             try
             {
                 return new ChildProcess(process, stdout, stderr);
             }
-            catch
+            catch (Exception ex)
             {
-                // Identity capture failed (e.g. the child already exited): never leak the process or its tree.
+                // Identity capture failed (e.g. the child already exited): never leak the process, and keep the
+                // diagnosis. The exit state is read before our own kill so it reflects what the child did.
+                var exited = DescribeExit(process);
+                var exitedAfterKill = true;
                 try
                 {
-                    TryKillTree(process);
+                    exitedAfterKill = TryKill(process);
                 }
                 finally
                 {
                     StopReadsAndDispose(process);
                 }
 
-                throw;
+                throw new InvalidOperationException(
+                    Describe(pid, "could not be identified right after start", exited, !exitedAfterKill, stdout, stderr),
+                    ex);
             }
         }
 
-        public string DescribeAcceptFailure()
-        {
-            string exited;
-            try
-            {
-                exited = _process.HasExited
-                    ? $"yes, exit code {_process.ExitCode.ToString(CultureInfo.InvariantCulture)}"
-                    : "no";
-            }
-            catch (InvalidOperationException)
-            {
-                exited = "unknown";
-            }
-
-            return $"The child (pid {Pid}) did not connect within the accept budget. Child exited: {exited}. "
-                   + $"stdout tail: [{Sanitize(_stdout.Snapshot())}] stderr tail: [{Sanitize(_stderr.Snapshot())}]";
-        }
+        public string DescribeAcceptFailure() =>
+            Describe(Pid, "did not connect within the accept budget", DescribeExit(_process), false, _stdout, _stderr);
 
         public void Dispose()
         {
-            // Order: kill the tree -> bounded wait -> stop the async reads -> dispose. Nothing here can block
-            // indefinitely: the drain handlers only append under a short lock, and CancelXxxRead stops delivery even
-            // if a surviving handle kept a pipe open.
+            // Order: revalidate identity -> kill the exact PID -> bounded wait -> stop the async reads -> dispose.
+            // Nothing here can block indefinitely: the drain handlers only append under a short lock, and
+            // CancelXxxRead stops delivery even if a surviving handle kept a pipe open. A child that vanishes between
+            // the checks is "already gone", so no exception from this `using` can replace the real test failure.
             try
             {
                 if (!_process.HasExited)
                 {
                     using var current = Process.GetProcessById(Pid);
                     if (current.StartTime == _startTime
-                        && string.Equals(current.MainModule?.FileName, _image, StringComparison.OrdinalIgnoreCase))
+                        && string.Equals(current.MainModule?.FileName, _image, StringComparison.OrdinalIgnoreCase)
+                        && !TryKill(_process))
                     {
-                        TryKillTree(_process);
+                        Trace.WriteLine($"SVA-7: child pid {Pid} did not exit within 5 s after kill.");
                     }
                 }
             }
-            catch (ArgumentException)
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or Win32Exception)
             {
                 // Already gone.
             }
@@ -274,16 +270,42 @@ public sealed class LoopbackOriginatorGateTests
             }
         }
 
-        private static void TryKillTree(Process process)
+        private static string Describe(
+            int pid,
+            string what,
+            string exited,
+            bool killTimedOut,
+            BoundedTail stdout,
+            BoundedTail stderr) =>
+            $"The child (pid {pid}) {what}. Child exited: {exited}."
+            + (killTimedOut ? " It did not exit within 5 s after kill." : string.Empty)
+            + $" stdout tail: [{stdout.Snapshot()}] stderr tail: [{stderr.Snapshot()}]";
+
+        private static string DescribeExit(Process process)
         {
             try
             {
-                process.Kill(entireProcessTree: true);
-                process.WaitForExit(5000);
+                return process.HasExited
+                    ? $"yes, exit code {process.ExitCode.ToString(CultureInfo.InvariantCulture)}"
+                    : "no";
             }
-            catch (InvalidOperationException)
+            catch (Exception ex) when (ex is InvalidOperationException or Win32Exception)
             {
-                // Exited between the check and the kill.
+                return "unknown";
+            }
+        }
+
+        /// <summary>Kills the exact process (never its tree); false when it is still running after the bounded wait.</summary>
+        private static bool TryKill(Process process)
+        {
+            try
+            {
+                process.Kill(entireProcessTree: false);
+                return process.WaitForExit(KillWaitMilliseconds);
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or Win32Exception)
+            {
+                return true; // exited between the check and the kill
             }
         }
 
@@ -303,13 +325,94 @@ public sealed class LoopbackOriginatorGateTests
                 process.Dispose();
             }
         }
+    }
+
+    /// <summary>
+    /// Thread-safe tail of a redirected stream. Each line is sanitized BEFORE it is stored, and only whole lines are
+    /// kept (the most recent ones, up to <see cref="MaxChars"/> chars), so the tail never starts mid-value; a single
+    /// line longer than the cap keeps its last <see cref="MaxChars"/> chars and is marked with a leading '…'.
+    /// </summary>
+    private sealed class BoundedTail
+    {
+        public const int MaxChars = 2048;
+        private static readonly Lazy<IReadOnlyList<(string Value, string Placeholder)>> Replacements =
+            new(BuildReplacements);
+
+        private readonly object _gate = new();
+        private readonly Queue<string> _lines = new();
+        private int _chars;
+        private bool _dropped;
+
+        public void Append(string? line)
+        {
+            if (line is null)
+            {
+                return; // end of stream
+            }
+
+            var stored = Sanitize(line);
+            if (stored.Length > MaxChars)
+            {
+                stored = "…" + stored[^MaxChars..];
+            }
+
+            lock (_gate)
+            {
+                _lines.Enqueue(stored);
+                _chars += stored.Length + 1;
+                while (_chars > MaxChars && _lines.Count > 1)
+                {
+                    _chars -= _lines.Dequeue().Length + 1;
+                    _dropped = true;
+                }
+            }
+        }
+
+        public string Snapshot()
+        {
+            lock (_gate)
+            {
+                return (_dropped ? "…¶" : string.Empty) + string.Join('¶', _lines);
+            }
+        }
 
         /// <summary>No runner usernames, hostnames, profile/temp/workspace paths or token-shaped strings reach the CI log.</summary>
         private static string Sanitize(string text)
         {
+            // Control chars and Unicode format chars (bidi overrides, zero-width) cannot reorder or hide log text.
+            var neutral = new StringBuilder(text.Length);
+            foreach (var rune in text.EnumerateRunes())
+            {
+                if (Rune.IsControl(rune) || Rune.GetUnicodeCategory(rune) == UnicodeCategory.Format)
+                {
+                    neutral.Append(' ');
+                }
+                else
+                {
+                    neutral.Append(rune.ToString());
+                }
+            }
+
+            var result = neutral.ToString();
+            foreach (var (value, placeholder) in Replacements.Value)
+            {
+                result = result.Replace(value, placeholder, StringComparison.OrdinalIgnoreCase);
+            }
+
+            result = Regex.Replace(result, @"(?i)[a-z]:[\\/]Users[\\/][^\\/\s'""]+", @"<drive>:\Users\<user>");
+            return Regex.Replace(
+                result,
+                @"\b(gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|eyJ[A-Za-z0-9_\-]{20,}\.[A-Za-z0-9_\-\.]+)",
+                "<redacted>");
+        }
+
+        private static IReadOnlyList<(string Value, string Placeholder)> BuildReplacements()
+        {
             var replacements = new List<(string Value, string Placeholder)>();
             void Add(string? value, string placeholder)
             {
+                // Values shorter than 3 chars are intentionally NOT redacted (they would shred unrelated text);
+                // 3+ char values are replaced as substrings anywhere and may over-redact - the safe side.
                 if (!string.IsNullOrWhiteSpace(value) && value.Length >= 3)
                 {
                     replacements.Add((value.TrimEnd('\\', '/'), placeholder));
@@ -332,54 +435,7 @@ public sealed class LoopbackOriginatorGateTests
             Add(Environment.UserName, "<user>");
             Add(Environment.UserDomainName, "<domain>");
             Add(Environment.MachineName, "<host>");
-
-            var result = new string(text.Select(ch => char.IsControl(ch) && ch != '\n' ? ' ' : ch).ToArray());
-            foreach (var (value, placeholder) in replacements.OrderByDescending(r => r.Value.Length))
-            {
-                result = result.Replace(value, placeholder, StringComparison.OrdinalIgnoreCase);
-            }
-
-            result = Regex.Replace(result, @"(?i)[a-z]:\\Users\\[^\\\s'""]+", @"<drive>:\Users\<user>");
-            result = Regex.Replace(
-                result,
-                @"\b(gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|eyJ[A-Za-z0-9_\-]{20,}\.[A-Za-z0-9_\-\.]+)",
-                "<redacted>");
-            return result.Replace('\n', '¶');
-        }
-    }
-
-    /// <summary>Thread-safe tail of a redirected stream: keeps only the last <see cref="MaxChars"/> chars.</summary>
-    private sealed class BoundedTail
-    {
-        public const int MaxChars = 2048;
-        private readonly object _gate = new();
-        private readonly StringBuilder _text = new();
-        private bool _truncated;
-
-        public void Append(string? line)
-        {
-            if (line is null)
-            {
-                return; // end of stream
-            }
-
-            lock (_gate)
-            {
-                _text.Append(line).Append('\n');
-                if (_text.Length > MaxChars)
-                {
-                    _text.Remove(0, _text.Length - MaxChars);
-                    _truncated = true;
-                }
-            }
-        }
-
-        public string Snapshot()
-        {
-            lock (_gate)
-            {
-                return _truncated ? "…" + _text : _text.ToString();
-            }
+            return replacements.OrderByDescending(r => r.Value.Length).ToList();
         }
     }
 }
