@@ -28,6 +28,12 @@ public sealed class ServerAlertCoordinator : IServerAlertCoordinator, IAsyncDisp
     private readonly Dictionary<Guid, ServerMonitoringState> _baselines = [];
     private readonly Dictionary<(Guid ServerId, ServerAlertCategory Category), DateTimeOffset> _lastAlerts = [];
 
+    // SVA-12: each baseline is stamped from one coordinator-wide, never-reused epoch. Removal drops the stamp and a
+    // re-added server (same Id) gets a fresh one, so an intent queued before the removal can never match again (no
+    // ABA), and the map holds exactly one entry per baselined server (bounded).
+    private readonly Dictionary<Guid, long> _baselineEpochs = [];
+    private long _epoch;
+
     private Channel<CoordinatorWork>? _intents;
     private CancellationTokenSource? _lifetime;
     private Task? _worker;
@@ -72,9 +78,11 @@ public sealed class ServerAlertCoordinator : IServerAlertCoordinator, IAsyncDisp
 
             cancellationToken.ThrowIfCancellationRequested();
             _baselines.Clear();
+            _baselineEpochs.Clear();
             foreach (var state in _stateStore.GetAll())
             {
                 _baselines[state.ServerId] = state;
+                _baselineEpochs[state.ServerId] = ++_epoch;
             }
 
             _intents = Channel.CreateUnbounded<CoordinatorWork>(new UnboundedChannelOptions
@@ -185,6 +193,15 @@ public sealed class ServerAlertCoordinator : IServerAlertCoordinator, IAsyncDisp
         await StopAsync(CancellationToken.None).ConfigureAwait(false);
     }
 
+    /// <summary>Test seam (SVA-12): sizes of the per-server state maps, to prove removal leaves nothing behind.</summary>
+    internal (int Baselines, int BaselineEpochs, int Cooldowns) GetTrackedStateCounts()
+    {
+        lock (_gate)
+        {
+            return (_baselines.Count, _baselineEpochs.Count, _lastAlerts.Count);
+        }
+    }
+
     /// <summary>Deterministic test seam that completes after all earlier queued intents.</summary>
     internal Task FlushAsync()
     {
@@ -212,6 +229,7 @@ public sealed class ServerAlertCoordinator : IServerAlertCoordinator, IAsyncDisp
             lock (_gate)
             {
                 _baselines.Remove(serverId);
+                _baselineEpochs.Remove(serverId);  // retires the epoch: in-flight intents for this Id can't reserve
                 foreach (var key in _lastAlerts.Keys
                              .Where(candidate => candidate.ServerId == serverId)
                              .ToArray())
@@ -234,6 +252,7 @@ public sealed class ServerAlertCoordinator : IServerAlertCoordinator, IAsyncDisp
             if (!_baselines.TryGetValue(serverId, out var previous))
             {
                 _baselines[serverId] = snapshot;
+                _baselineEpochs[serverId] = ++_epoch;
                 return;
             }
 
@@ -244,7 +263,7 @@ public sealed class ServerAlertCoordinator : IServerAlertCoordinator, IAsyncDisp
                 return;
             }
 
-            intent = new AlertIntent(serverId, decision, _settingsGeneration);
+            intent = new AlertIntent(serverId, decision, _settingsGeneration, _baselineEpochs[serverId]);
             _intents.Writer.TryWrite(intent);
         }
     }
@@ -347,8 +366,13 @@ public sealed class ServerAlertCoordinator : IServerAlertCoordinator, IAsyncDisp
             {
                 // Reserve cooldown only after the notification boundary completed. An intent
                 // fenced by a settings change, a removed server, cancellation or a failed
-                // delivery must not suppress the next real transition.
-                _lastAlerts[alertKey] = _timeProvider.GetUtcNow();
+                // delivery must not suppress the next real transition. SVA-12: a server removed while
+                // ShowAsync was in flight (even if its Id was re-added since) retired the epoch this intent
+                // carries; writing here would re-create an orphan cooldown for the removed/re-added Id.
+                if (_baselineEpochs.TryGetValue(intent.ServerId, out var epoch) && epoch == intent.BaselineEpoch)
+                {
+                    _lastAlerts[alertKey] = _timeProvider.GetUtcNow();
+                }
             }
             _logger.LogDebug(
                 "Sent {Category} notification for server {ServerId}.",
@@ -413,7 +437,8 @@ public sealed class ServerAlertCoordinator : IServerAlertCoordinator, IAsyncDisp
     private sealed record AlertIntent(
         Guid ServerId,
         ServerAlertDecision Decision,
-        int SettingsGeneration) : CoordinatorWork;
+        int SettingsGeneration,
+        long BaselineEpoch) : CoordinatorWork;
 
     private sealed record FlushWork(TaskCompletionSource Completion) : CoordinatorWork;
 }
