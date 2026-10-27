@@ -100,8 +100,16 @@ public sealed class ServerDirectoryRowViewModel : ObservableObject, IDisposable
         ? string.Join(", ", Name, StatusDisplay, age)
         : string.Join(", ", Name, StatusDisplay);
 
-    /// <summary>"Ver detalhe de &lt;servidor&gt;" — the action's accessible name carries the server.</summary>
-    public string DetailAutomationName => Format("ServerDetailOpenFor", Name);
+    /// <summary>
+    /// "Ver detalhe de &lt;servidor&gt;" — the action's accessible name carries the server (+ ", Última atualização há N min"
+    /// when stale, SVA-5: the row's Name is what Narrator reads first, so the age cue cannot live only in the help text).
+    /// </summary>
+    public string DetailAutomationName => StaleAgeDisplay is { } age
+        ? string.Join(", ", DetailToolTip, age)
+        : DetailToolTip;
+
+    /// <summary>The Mid row's visible tooltip: "Ver detalhe de &lt;servidor&gt;" only, never the age (SVA-5 keeps it as it was).</summary>
+    public string DetailToolTip => Format("ServerDetailOpenFor", Name);
 
     /// <summary>
     /// The whole row read as one sentence ("prod-web-01, Atenção, CPU 92% em atenção, RAM 41%, disco 52%"). UI.10 F24: the
@@ -152,6 +160,7 @@ public sealed class ServerDirectoryRowViewModel : ObservableObject, IDisposable
                 OnPropertyChanged(nameof(StaleAgeDisplay));
                 OnPropertyChanged(nameof(ShowsStaleCue));
                 OnPropertyChanged(nameof(ListAutomationName));
+                OnPropertyChanged(nameof(DetailAutomationName));
                 OnPropertyChanged(nameof(RowAutomationName));
                 break;
             case nameof(ServerCardViewModel.HasCpuPercent):
