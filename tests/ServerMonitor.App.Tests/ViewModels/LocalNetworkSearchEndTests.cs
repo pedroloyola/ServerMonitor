@@ -315,6 +315,204 @@ public sealed class LocalNetworkSearchEndTests
         Assert.Equal(before - 1, w.Navigation.NavigatedSubscribers);
     }
 
+    // ------------------------------------------------------------------ SVA-14 (L-4): the end is announced once
+
+    [Theory]
+    [InlineData(DiscoverySearchEnd.NothingFound)]
+    [InlineData(DiscoverySearchEnd.TimeLimit)]
+    public async Task A_search_that_ends_by_itself_raises_its_end_once(DiscoverySearchEnd expected)
+    {
+        var w = new World(new DiscoveryOptions { MaxSearchDuration = TimeSpan.FromMinutes(2) });
+        w.Servers.Servers.Add(DashboardDiscoveryViewModelTests.ServerForTest("10.0.0.5", 22));
+        await using var _ = w.Service;
+        using var dashboard = w.Dashboard;
+        await dashboard.LoadAsync();
+        w.Navigation.GoToSettings(SettingsSection.Data);
+        await w.StartAsync();
+        if (expected == DiscoverySearchEnd.TimeLimit)
+        {
+            w.Browser.EmitFound(Observation("NAS", "nas.local", "192.168.1.30", w.Time)); // usable: kept to the limit
+        }
+
+        // The browser is closed only after the end was signalled (and the view model raised, synchronously).
+        await DiscoveryUsableResultTests.AdvanceUntilAsync(w.Time, () => w.Browser.StopCount >= 1, TimeSpan.FromSeconds(1), 600);
+        w.AssertEndedAt(expected, expected == DiscoverySearchEnd.TimeLimit ? TimeSpan.FromMinutes(2) : TimeSpan.FromSeconds(40));
+        Assert.Equal(new[] { expected }, w.Ended());
+
+        // Later time, re-entry and leaving again say nothing more.
+        await DiscoveryUsableResultTests.AdvanceUntilAsync(w.Time, () => w.Time.GetUtcNow() - Start >= TimeSpan.FromMinutes(4), TimeSpan.FromSeconds(1), 600);
+        w.Navigation.GoToHistory();
+        w.Navigation.GoToSettings(SettingsSection.Data);
+        Assert.Equal(new[] { expected }, w.Ended());
+    }
+
+    [Fact]
+    public async Task Every_user_started_search_that_fails_raises_failed_again()
+    {
+        var w = new World();
+        w.Browser.StartException = new InvalidOperationException("synthetic");
+        await using var _ = w.Service;
+        using var dashboard = w.Dashboard;
+        await dashboard.LoadAsync();
+        w.Navigation.GoToDashboard();
+
+        await w.StartAsync();
+        Assert.Equal(new[] { DiscoverySearchEnd.Failed }, w.Ended());
+        Assert.True(dashboard.ShowLocalNetworkSearchFailed);
+
+        // LastSearchEnd stays Failed (no value change): the new search is still a new end.
+        await w.StartAsync();
+        Assert.Equal(new[] { DiscoverySearchEnd.Failed, DiscoverySearchEnd.Failed }, w.Ended());
+        Assert.Equal(2, w.Browser.StartCount);
+    }
+
+    [Fact]
+    public async Task No_stop_raises_an_end()
+    {
+        var w = new World();
+        w.Servers.Servers.Add(DashboardDiscoveryViewModelTests.ServerForTest("10.0.0.5", 22));
+        await using var _ = w.Service;
+        using var dashboard = w.Dashboard;
+        await dashboard.LoadAsync();
+        w.Navigation.GoToSettings(SettingsSection.Data);
+
+        await w.StartAsync();
+        await Assert.IsType<AsyncRelayCommand>(dashboard.StopLocalNetworkSearchCommand).ExecuteAsync(null); // explicit Stop
+        await w.StartAsync();
+        await LocalNetworkSearchLifetime.StopForBackground(w.Service, NullLogger.Instance); // hide / tray
+        await w.StartAsync();
+        w.Navigation.GoToHistory(); // leaving the page
+        await DiscoveryUsableResultTests.AdvanceUntilAsync(w.Time, () => w.Browser.StopCount >= 3);
+        w.Navigation.GoToSettings(SettingsSection.Data);
+        await w.StartAsync();
+        await w.Service.StopAsync(); // host stop / exit
+        await DiscoveryUsableResultTests.AdvanceUntilAsync(w.Time, () => w.Browser.StopCount >= 4);
+        Assert.Equal(DiscoverySearchEnd.Stopped, w.Service.LastSearchEnd);
+        Assert.Equal(4, w.Browser.StopCount);
+        Assert.Empty(w.Ended());
+
+        // Each stop also disarmed its search: an end the user did not start here is not announced either.
+        w.Browser.StartException = new InvalidOperationException("synthetic");
+        await w.Service.StartSearchAsync();
+        Assert.Equal(DiscoverySearchEnd.Failed, w.Service.LastSearchEnd);
+        Assert.Empty(w.Ended());
+    }
+
+    [Fact]
+    public async Task Re_entry_re_hydration_and_start_availability_flips_do_not_raise_the_end_again()
+    {
+        var w = new World();
+        w.Servers.Servers.Add(DashboardDiscoveryViewModelTests.ServerForTest("10.0.0.5", 22));
+        await using var _ = w.Service;
+        using var dashboard = w.Dashboard;
+        await dashboard.LoadAsync();
+        w.Navigation.GoToSettings(SettingsSection.Data);
+        await w.StartAsync();
+        await DiscoveryUsableResultTests.AdvanceUntilAsync(w.Time, () => w.Browser.StopCount >= 1);
+        Assert.Equal(new[] { DiscoverySearchEnd.NothingFound }, w.Ended());
+        Assert.False(dashboard.ShowLocalNetworkNothingFound); // a user with servers: the overview hides its caption
+
+        // The last server goes: the overview's caption (and its start) appear; it is a re-read, not a new end.
+        w.Servers.Servers.Clear();
+        await dashboard.LoadAsync();
+        Assert.True(dashboard.ShowLocalNetworkNothingFound);
+        w.Navigation.GoToDashboard();
+        w.Navigation.GoToSettings(SettingsSection.Data);
+        w.Navigation.GoToDashboard();
+        await dashboard.LoadAsync();
+
+        // A search that did not come from the user's command (no arming) is not announced as this one's end.
+        w.Browser.StartException = new InvalidOperationException("synthetic");
+        await w.Service.StartSearchAsync();
+        Assert.Equal(DiscoverySearchEnd.Failed, w.Service.LastSearchEnd);
+        Assert.True(dashboard.ShowLocalNetworkSearchFailed);
+
+        Assert.Equal(new[] { DiscoverySearchEnd.NothingFound }, w.Ended());
+    }
+
+    [Fact]
+    public async Task Both_pages_on_the_one_view_model_get_one_end()
+    {
+        // Overview and Settings › Data share the view model: it raises once; each page says only ITS shown caption
+        // (runtime-only, pinned below and in Narrator N-8).
+        var w = new World();
+        w.Browser.StartException = new InvalidOperationException("synthetic");
+        await using var _ = w.Service;
+        using var dashboard = w.Dashboard;
+        await dashboard.LoadAsync();
+        var overview = 0;
+        var settings = 0;
+        dashboard.LocalNetworkSearchEnded += (_, _) => overview++;
+        dashboard.LocalNetworkSearchEnded += (_, _) => settings++;
+
+        await w.StartAsync();
+
+        Assert.Equal((1, 1), (overview, settings));
+        Assert.Single(w.Ended());
+    }
+
+    [Theory]
+    [InlineData(DiscoverySearchEnd.NothingFound, "nothing")]
+    [InlineData(DiscoverySearchEnd.TimeLimit, "limit")]
+    [InlineData(DiscoverySearchEnd.Failed, "failed")]
+    [InlineData(DiscoverySearchEnd.Stopped, null)]
+    [InlineData(DiscoverySearchEnd.None, null)]
+    public void Each_end_is_said_by_its_own_caption(DiscoverySearchEnd end, string? caption) =>
+        Assert.Equal(caption, ServerMonitor.App.Views.LocalNetworkSearchEndAnnouncement.CaptionFor(end, "nothing", "limit", "failed"));
+
+    /// <summary>
+    /// SVA-14: code-behind cannot run without a XAML runtime, so the wiring is pinned at the source: each page listens
+    /// only while loaded, says its own captions, after the layout pass, as a fixed-id notification of the shown text.
+    /// </summary>
+    [Fact]
+    public void Each_page_announces_its_own_end_caption_while_shown()
+    {
+        var settings = ReadView("SettingsDataPage.xaml.cs");
+        Assert.Contains("Discovery.LocalNetworkSearchEnded += OnLocalNetworkSearchEnded;", Body(settings, "private async void OnLoaded("), StringComparison.Ordinal);
+        Assert.Contains("Discovery.LocalNetworkSearchEnded -= OnLocalNetworkSearchEnded;", Body(settings, "private void OnUnloaded("), StringComparison.Ordinal);
+        Assert.Contains(
+            "CaptionFor(end, LocalNetworkNothingFound, LocalNetworkTimeLimit, LocalNetworkFailed)",
+            Body(settings, "private void OnLocalNetworkSearchEnded("), StringComparison.Ordinal);
+
+        var overview = ReadView("DashboardPage.xaml.cs");
+        Assert.Contains("ViewModel.LocalNetworkSearchEnded += OnLocalNetworkSearchEnded;", Body(overview, "private async void OnLoaded("), StringComparison.Ordinal);
+        Assert.Contains("ViewModel.LocalNetworkSearchEnded -= OnLocalNetworkSearchEnded;", Body(overview, "private void OnUnloaded("), StringComparison.Ordinal);
+        Assert.Contains(
+            "CaptionFor(end, EmptyDiscoveryNothingFound, EmptyDiscoveryTimeLimit, EmptyDiscoveryFailed)",
+            Body(overview, "private void OnLocalNetworkSearchEnded("), StringComparison.Ordinal);
+
+        var helper = ReadView("LocalNetworkSearchEndAnnouncement.cs");
+        foreach (var expected in new[]
+        {
+            "DispatcherQueuePriority.Low",
+            "SaAnnounce.ShouldAnnounce(caption.Visibility == Visibility.Visible, SaLiveTree.IsLive(caption), caption.Text)",
+            "AutomationNotificationKind.ActionCompleted, AutomationNotificationProcessing.CurrentThenMostRecent",
+            "caption.Text, ActivityId",
+        })
+        {
+            Assert.Contains(expected, helper, StringComparison.Ordinal);
+        }
+
+        Assert.Equal("LocalNetworkSearchEnded", ServerMonitor.App.Views.LocalNetworkSearchEndAnnouncement.ActivityId);
+
+        // Not live regions: those would speak again on every re-entry or visibility flip.
+        XNamespace x = "http://schemas.microsoft.com/winfx/2006/xaml";
+        foreach (var (page, names) in new[]
+        {
+            ("DashboardPage.xaml", new[] { "EmptyDiscoveryNothingFound", "EmptyDiscoveryTimeLimit", "EmptyDiscoveryFailed" }),
+            ("SettingsDataPage.xaml", new[] { "LocalNetworkNothingFound", "LocalNetworkTimeLimit", "LocalNetworkFailed" }),
+        })
+        {
+            var xaml = XDocument.Load(Path.Combine(RepositoryRoot(), "src", "ServerMonitor.App", "Views", page));
+            foreach (var name in names)
+            {
+                var caption = Assert.Single(xaml.Descendants(), e => (string?)e.Attribute(x + "Name") == name);
+                Assert.DoesNotContain(caption.Attributes(), a => a.Name.LocalName.Contains("Announce", StringComparison.Ordinal)
+                    || a.Name.LocalName.Contains("LiveSetting", StringComparison.Ordinal));
+            }
+        }
+    }
+
     // ------------------------------------------------------------------ view wiring + copy
 
     [Fact]
@@ -462,6 +660,24 @@ public sealed class LocalNetworkSearchEndTests
                 Navigation,
                 new FakeLocalizationService(),
                 NullLogger<DashboardViewModel>.Instance);
+            // Raised on the thread that ended the search (no dispatcher here).
+            Dashboard.LocalNetworkSearchEnded += (_, end) =>
+            {
+                lock (_ended)
+                {
+                    _ended.Add(end);
+                }
+            };
+        }
+
+        private readonly List<DiscoverySearchEnd> _ended = [];
+
+        public DiscoverySearchEnd[] Ended()
+        {
+            lock (_ended)
+            {
+                return [.. _ended];
+            }
         }
 
         public FakeServerService Servers { get; } = new();

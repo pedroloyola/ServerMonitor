@@ -296,6 +296,17 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
     /// </summary>
     public event EventHandler? LocalNetworkSearchStopFocusRequested;
 
+    /// <summary>
+    /// SVA-14 (L-4): raised on the UI thread once per user-started search that ended by itself or could not start
+    /// (NothingFound, TimeLimit, Failed), after the end captions' properties changed, so the page shown announces the
+    /// caption it now shows. Never for a stop (explicit, hide, navigating away, exit), page re-entry or other re-reads.
+    /// </summary>
+    public event EventHandler<DiscoverySearchEnd>? LocalNetworkSearchEnded;
+
+    // SVA-14: armed by the user's start, consumed by the first end of that search (a plain bool: runtime-free tests
+    // build this view model without field initializers). A Failed after a Failed is a new end, so this is not a value change.
+    private bool _localNetworkSearchEndPending;
+
     private async Task StopLocalNetworkSearchAsync()
     {
         await LocalNetworkSearchLifetime.StopForUser(_discoveryService, _logger);
@@ -1256,6 +1267,22 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(ShowLocalNetworkSearchFailed));
         OnPropertyChanged(nameof(ShowLocalNetworkSearchTimeLimit));
         NotifyLocalNetworkSearchEntry();
+        RaiseLocalNetworkSearchEndedOnce();
+    }
+
+    private void RaiseLocalNetworkSearchEndedOnce()
+    {
+        if (!_localNetworkSearchEndPending || _discoveryActivity is not { IsSearching: false, LastSearchEnd: var end }
+            || end == DiscoverySearchEnd.None)
+        {
+            return;
+        }
+
+        _localNetworkSearchEndPending = false;
+        if (end != DiscoverySearchEnd.Stopped)
+        {
+            LocalNetworkSearchEnded?.Invoke(this, end);
+        }
     }
 
     private async Task StartLocalNetworkSearchAsync()
@@ -1273,6 +1300,7 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
             // REL.0D O-7: only what this page would list keeps the search past 40 s (see IsUsableDiscovery).
             var mustReadConfigured = !_configuredEndpointsKnown;
             _configuredEndpointsLoading = mustReadConfigured;
+            _localNetworkSearchEndPending = true;
             await _discoveryActivity.StartSearchAsync(IsUsableDiscovery);
             if (mustReadConfigured)
             {

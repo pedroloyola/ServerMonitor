@@ -43,6 +43,11 @@ public sealed partial class SettingsDataPage : Page, ISettingsNavigationTarget
         DispatcherQueue?.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
             LocalNetworkSearchButton.Focus(Microsoft.UI.Xaml.FocusState.Programmatic));
 
+    /// <summary>SVA-14 (L-4): the search ended by itself or could not start - say the end caption shown below "Procurar".</summary>
+    private void OnLocalNetworkSearchEnded(object? sender, DiscoverySearchEnd end) =>
+        LocalNetworkSearchEndAnnouncement.AnnounceAfterLayout(
+            LocalNetworkSearchEndAnnouncement.CaptionFor(end, LocalNetworkNothingFound, LocalNetworkTimeLimit, LocalNetworkFailed));
+
     public SettingsViewModel ViewModel { get; }
 
     /// <summary>Backs the Backup and restore section (M14.6).</summary>
@@ -69,6 +74,8 @@ public sealed partial class SettingsDataPage : Page, ISettingsNavigationTarget
         ViewModel.HistoryFocusRequested += OnHistoryFocusRequested;
         Discovery.LocalNetworkSearchStopFocusRequested -= OnLocalNetworkStopFocusRequested;
         Discovery.LocalNetworkSearchStopFocusRequested += OnLocalNetworkStopFocusRequested;
+        Discovery.LocalNetworkSearchEnded -= OnLocalNetworkSearchEnded;
+        Discovery.LocalNetworkSearchEnded += OnLocalNetworkSearchEnded;
         await ViewModel.LoadAsync();
     }
 
@@ -77,6 +84,7 @@ public sealed partial class SettingsDataPage : Page, ISettingsNavigationTarget
         Backup.PropertyChanged -= OnBackupPropertyChanged;
         ViewModel.HistoryFocusRequested -= OnHistoryFocusRequested;
         Discovery.LocalNetworkSearchStopFocusRequested -= OnLocalNetworkStopFocusRequested;
+        Discovery.LocalNetworkSearchEnded -= OnLocalNetworkSearchEnded;
         ViewModel.NotifyDataNavigatedFrom(); // Boss fix round 2 decision 2: the toast never outlives the visit
     }
 
