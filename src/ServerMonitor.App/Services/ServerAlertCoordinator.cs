@@ -263,6 +263,7 @@ public sealed class ServerAlertCoordinator : IServerAlertCoordinator, IAsyncDisp
                 return;
             }
 
+            // Safe indexer: keys(_baselines) == keys(_baselineEpochs), always written as a pair under _gate.
             intent = new AlertIntent(serverId, decision, _settingsGeneration, _baselineEpochs[serverId]);
             _intents.Writer.TryWrite(intent);
         }
@@ -366,8 +367,8 @@ public sealed class ServerAlertCoordinator : IServerAlertCoordinator, IAsyncDisp
             {
                 // Reserve cooldown only after the notification boundary completed. An intent
                 // fenced by a settings change, a removed server, cancellation or a failed
-                // delivery must not suppress the next real transition. SVA-12: a server removed while
-                // ShowAsync was in flight (even if its Id was re-added since) retired the epoch this intent
+                // delivery must not suppress the next real transition. SVA-12: a server removed after this
+                // intent was queued (even if its Id was re-added since) retired the epoch this intent
                 // carries; writing here would re-create an orphan cooldown for the removed/re-added Id.
                 if (_baselineEpochs.TryGetValue(intent.ServerId, out var epoch) && epoch == intent.BaselineEpoch)
                 {
