@@ -1,7 +1,11 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
+using System.Text;
+using System.Text.RegularExpressions;
 using ServerMonitor.Infrastructure.SSH;
+using Xunit.Abstractions;
 
 namespace ServerMonitor.Infrastructure.Tests.SSH;
 
@@ -41,8 +45,24 @@ public sealed class LoopbackOriginatorGateTests
         Assert.False(sealedAgain.Admitted);
     }
 
+    // SVA-7 DIAGNOSTIC — temporary, never merge. Constructor + output helper exist only for the diagnostic.
+    private readonly ITestOutputHelper _output;
+
+    public LoopbackOriginatorGateTests(ITestOutputHelper output) => _output = output;
+
     [Fact]
-    public async Task A_connection_from_a_child_process_is_rejected_even_while_armed_and_does_not_consume_the_arm()
+    public Task A_connection_from_a_child_process_is_rejected_even_while_armed_and_does_not_consume_the_arm()
+        => RunChildScenarioAsync("fact");
+
+    // SVA-7 DIAGNOSTIC — temporary, never merge. 40 repeats of the child scenario to raise the CI hit rate.
+    public static IEnumerable<object[]> Sva7DiagnosticIterations => Enumerable.Range(1, 40).Select(i => new object[] { i });
+
+    // SVA-7 DIAGNOSTIC — temporary, never merge.
+    [Theory]
+    [MemberData(nameof(Sva7DiagnosticIterations))]
+    public Task SVA7_DIAGNOSTIC_child_scenario_repeat(int iteration) => RunChildScenarioAsync($"iter{iteration:D2}");
+
+    private async Task RunChildScenarioAsync(string label)
     {
         using var listener = new TcpListener(IPAddress.Loopback, 0);
         listener.Start();
@@ -50,7 +70,7 @@ public sealed class LoopbackOriginatorGateTests
 
         using var child = ChildProcess.ConnectAndHold(boundPort);
         using var acceptTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        using var accepted = await listener.AcceptTcpClientAsync(acceptTimeout.Token);
+        using var accepted = await Sva7Diagnostic.AcceptChildOrFailAsync(listener, child, acceptTimeout.Token, label, _output);
         var originatorPort = (uint)((IPEndPoint)accepted.Client.RemoteEndPoint!).Port;
         var gate = new LoopbackOriginatorGate();
 
@@ -127,22 +147,41 @@ public sealed class LoopbackOriginatorGateTests
     /// <summary>
     /// A child Windows PowerShell that connects to <c>127.0.0.1:port</c> and holds the socket. Identity (PID,
     /// image, start time) is recorded at start and revalidated before the exact PID is stopped (BOSS §17).
+    /// SVA-7 DIAGNOSTIC — temporary, never merge: stdout/stderr are drained asynchronously and every line is
+    /// stamped with ms since the Process.Start call. CAVEAT: draining alone can change behaviour (a child that
+    /// previously blocked on a full, unread pipe no longer blocks), so a run with zero timeouts does not by
+    /// itself prove hypothesis A or B wrong.
     /// </summary>
     private sealed class ChildProcess : IDisposable
     {
+        private const string ExitedMarker = "\u0000EXITED";
         private readonly Process _process;
         private readonly DateTime _startTime;
         private readonly string _image;
+        private readonly Stopwatch _clock;
+        private readonly object _gate = new();
+        private readonly List<(long Ms, string Line)> _stdout = new();
+        private readonly List<(long Ms, string Line)> _stderr = new();
+        private long? _exitedMs;
 
-        private ChildProcess(Process process)
+        private ChildProcess(Process process, Stopwatch clock, long startReturnedMs)
         {
             _process = process;
+            _clock = clock;
+            StartReturnedMs = startReturnedMs;
             Pid = process.Id;
             _startTime = process.StartTime;
             _image = process.MainModule?.FileName ?? string.Empty;
+            IdentityCapturedMs = clock.ElapsedMilliseconds;
         }
 
         public int Pid { get; }
+
+        public long StartReturnedMs { get; }
+
+        public long IdentityCapturedMs { get; }
+
+        public long ElapsedMs => _clock.ElapsedMilliseconds;
 
         public static ChildProcess ConnectAndHold(uint port)
         {
@@ -161,13 +200,104 @@ public sealed class LoopbackOriginatorGateTests
             foreach (var argument in new[]
                      {
                          "-NoProfile", "-NonInteractive", "-Command",
-                         $"$c = New-Object System.Net.Sockets.TcpClient; $c.Connect('127.0.0.1', {port}); Start-Sleep -Seconds 60"
+                         "[Console]::Out.WriteLine('SVA7 PS_READY'); "
+                         + $"$c = New-Object System.Net.Sockets.TcpClient; $c.Connect('127.0.0.1', {port}); "
+                         + "[Console]::Out.WriteLine('SVA7 CONNECTED'); Start-Sleep -Seconds 60"
                      })
             {
                 info.ArgumentList.Add(argument);
             }
 
-            return new ChildProcess(Process.Start(info) ?? throw new InvalidOperationException("child did not start"));
+            var process = new Process { StartInfo = info, EnableRaisingEvents = true };
+            var clock = new Stopwatch();
+            ChildProcess? child = null;
+            var early = new List<(bool IsError, long Ms, string Line)>();
+            process.OutputDataReceived += (_, e) => Record(isError: false, e.Data);
+            process.ErrorDataReceived += (_, e) => Record(isError: true, e.Data);
+            process.Exited += (_, _) => Record(isError: false, ExitedMarker);
+
+            clock.Start();
+            if (!process.Start())
+            {
+                throw new InvalidOperationException("child did not start");
+            }
+
+            var startReturnedMs = clock.ElapsedMilliseconds;
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
+            var created = new ChildProcess(process, clock, startReturnedMs);
+            lock (early)
+            {
+                foreach (var (isError, ms, line) in early)
+                {
+                    created.Append(isError, ms, line);
+                }
+
+                early.Clear();
+                child = created;
+            }
+
+            return created;
+
+            void Record(bool isError, string? data)
+            {
+                if (data is null)
+                {
+                    return;
+                }
+
+                var ms = clock.ElapsedMilliseconds;
+                ChildProcess? current;
+                lock (early)
+                {
+                    current = child;
+                    if (current is null)
+                    {
+                        early.Add((isError, ms, data));
+                        return;
+                    }
+                }
+
+                current.Append(isError, ms, data);
+            }
+        }
+
+        private void Append(bool isError, long ms, string line)
+        {
+            lock (_gate)
+            {
+                if (line == ExitedMarker)
+                {
+                    _exitedMs ??= ms;
+                }
+                else
+                {
+                    (isError ? _stderr : _stdout).Add((ms, line));
+                }
+            }
+        }
+
+        public ChildSnapshot Snapshot()
+        {
+            bool hasExited;
+            int? exitCode = null;
+            try
+            {
+                hasExited = _process.HasExited;
+                if (hasExited)
+                {
+                    exitCode = _process.ExitCode;
+                }
+            }
+            catch (InvalidOperationException)
+            {
+                hasExited = false;
+            }
+
+            lock (_gate)
+            {
+                return new ChildSnapshot(hasExited, exitCode, _exitedMs, _stdout.ToArray(), _stderr.ToArray());
+            }
         }
 
         public void Dispose()
@@ -194,5 +324,224 @@ public sealed class LoopbackOriginatorGateTests
                 _process.Dispose();
             }
         }
+    }
+
+    private sealed record ChildSnapshot(
+        bool HasExited,
+        int? ExitCode,
+        long? ExitedMs,
+        IReadOnlyList<(long Ms, string Line)> Stdout,
+        IReadOnlyList<(long Ms, string Line)> Stderr)
+    {
+        public long? MarkerMs(string marker)
+        {
+            foreach (var (ms, line) in Stdout)
+            {
+                if (line.Contains(marker, StringComparison.Ordinal))
+                {
+                    return ms;
+                }
+            }
+
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// SVA-7 DIAGNOSTIC — temporary, never merge. Discriminates (A) slow PowerShell 5.1 cold start from (B) a child
+    /// that failed silently, plus (C) stalls on either side of an already-started child. Grep CI logs for
+    /// <c>SVA7-DIAG</c>. All times are ms since the child's Process.Start call.
+    /// </summary>
+    private static class Sva7Diagnostic
+    {
+        private const int MaxStreamChars = 2048;
+        private static readonly TimeSpan LateAcceptWindow = TimeSpan.FromSeconds(60);
+        private static readonly object SamplesGate = new();
+        private static readonly List<long> AcceptSamplesMs = new();
+
+        public static async Task<TcpClient> AcceptChildOrFailAsync(
+            TcpListener listener,
+            ChildProcess child,
+            CancellationToken budget,
+            string label,
+            ITestOutputHelper output)
+        {
+            var budgetStartMs = child.ElapsedMs;
+            var acceptTask = listener.AcceptTcpClientAsync(CancellationToken.None).AsTask();
+            _ = acceptTask.ContinueWith(t => _ = t.Exception, TaskContinuationOptions.OnlyOnFaulted);
+            var budgetTask = Task.Delay(Timeout.Infinite, budget);
+            _ = budgetTask.ContinueWith(t => _ = t.Exception, TaskContinuationOptions.OnlyOnFaulted);
+            if (await Task.WhenAny(acceptTask, budgetTask) == acceptTask)
+            {
+                var acceptMs = child.ElapsedMs;
+                lock (SamplesGate)
+                {
+                    AcceptSamplesMs.Add(acceptMs);
+                }
+
+                var ok = child.Snapshot();
+                var line = $"SVA7-DIAG OK {label} startReturned={child.StartReturnedMs}ms "
+                           + $"identity={child.IdentityCapturedMs}ms budgetStart={budgetStartMs}ms "
+                           + $"psReady={Fmt(ok.MarkerMs("SVA7 PS_READY"))} "
+                           + $"childConnected={Fmt(ok.MarkerMs("SVA7 CONNECTED"))} "
+                           + $"accept={acceptMs}ms stderrLines={ok.Stderr.Count}";
+                output.WriteLine(line);
+                AppendStepSummary(line);
+                return await acceptTask;
+            }
+
+            // Budget expired: freeze the state at the moment of the timeout, then keep listening to see whether a
+            // late connection ever arrives (A) or never does (B/C).
+            var timerFiredMs = child.ElapsedMs;
+            var atTimeout = child.Snapshot();
+            ThreadPool.GetAvailableThreads(out var availableWorkers, out _);
+            ThreadPool.GetMaxThreads(out var maxWorkers, out _);
+            var threadPool = $"tp.threads={ThreadPool.ThreadCount} tp.pending={ThreadPool.PendingWorkItemCount} "
+                             + $"tp.busyWorkers={maxWorkers - availableWorkers}";
+
+            string lateAccept;
+            if (await Task.WhenAny(acceptTask, Task.Delay(LateAcceptWindow)) == acceptTask
+                && acceptTask.Status == TaskStatus.RanToCompletion)
+            {
+                lateAccept = $"{child.ElapsedMs}ms";
+                acceptTask.Result.Dispose();
+            }
+            else
+            {
+                lateAccept = $"none-within+{(int)LateAcceptWindow.TotalMilliseconds}ms";
+            }
+
+            var final = child.Snapshot();
+            var hint = Classify(atTimeout, final, timerFiredMs);
+            var message = $"SVA7-DIAG TIMEOUT {label} hint={hint} budget=30000ms budgetStart={budgetStartMs}ms "
+                          + $"timerFired={timerFiredMs}ms startReturned={child.StartReturnedMs}ms "
+                          + $"identity={child.IdentityCapturedMs}ms "
+                          + $"hasExitedAtTimeout={atTimeout.HasExited} exitCodeAtTimeout={Fmt(atTimeout.ExitCode)} "
+                          + $"exitedAt={Fmt(final.ExitedMs)} psReady={Fmt(final.MarkerMs("SVA7 PS_READY"))} "
+                          + $"childConnected={Fmt(final.MarkerMs("SVA7 CONNECTED"))} lateAccept={lateAccept} "
+                          + $"{threadPool} prior={PriorSummary()} "
+                          + $"| stdout=[{Render(final.Stdout)}] | stderr=[{Render(final.Stderr)}]";
+            output.WriteLine(message);
+            AppendStepSummary(message);
+            Assert.Fail(message);
+            throw new UnreachableException();
+        }
+
+        private static string Classify(ChildSnapshot atTimeout, ChildSnapshot final, long timerFiredMs)
+        {
+            if (atTimeout.HasExited)
+            {
+                return "B_CHILD_EXITED";
+            }
+
+            // PowerShell 5.1 may emit benign CLIXML progress ("Preparing modules for first use") on a redirected stderr.
+            if (final.Stderr.Any(e => e.Line.Trim().Length > 0
+                                      && !e.Line.StartsWith("#< CLIXML", StringComparison.Ordinal)
+                                      && !e.Line.Contains("Preparing modules", StringComparison.OrdinalIgnoreCase)))
+            {
+                return "B_CHILD_STDERR";
+            }
+
+            if (final.MarkerMs("SVA7 CONNECTED") is { } connected && connected <= timerFiredMs)
+            {
+                return "C_PARENT_ACCEPT_STALL";
+            }
+
+            var psReady = final.MarkerMs("SVA7 PS_READY");
+            if (psReady is { } ready && ready <= timerFiredMs)
+            {
+                return "C_CHILD_CONNECT_STALL";
+            }
+
+            return psReady is null ? "A_SLOW_START_NEVER_READY" : "A_SLOW_START_READY_AFTER_BUDGET";
+        }
+
+        private static string PriorSummary()
+        {
+            long[] samples;
+            lock (SamplesGate)
+            {
+                samples = AcceptSamplesMs.Order().ToArray();
+            }
+
+            if (samples.Length == 0)
+            {
+                return "n=0";
+            }
+
+            long At(double q) => samples[Math.Clamp((int)Math.Ceiling(q * samples.Length) - 1, 0, samples.Length - 1)];
+            return $"n={samples.Length},p50={At(0.5)}ms,p95={At(0.95)}ms,max={samples[^1]}ms";
+        }
+
+        private static string Render(IReadOnlyList<(long Ms, string Line)> lines)
+        {
+            var builder = new StringBuilder();
+            foreach (var (ms, line) in lines)
+            {
+                builder.Append('+').Append(ms).Append("ms ").Append(Sanitize(line)).Append(" ¶ ");
+                if (builder.Length > MaxStreamChars)
+                {
+                    break;
+                }
+            }
+
+            return builder.Length > MaxStreamChars
+                ? builder.ToString(0, MaxStreamChars) + "…[truncated]"
+                : builder.ToString();
+        }
+
+        /// <summary>No runner usernames, hostnames, profile/temp paths or token-shaped strings reach the CI log.</summary>
+        private static string Sanitize(string text)
+        {
+            var result = new string(text.Select(ch => char.IsControl(ch) ? ' ' : ch).ToArray());
+            foreach (var (secret, placeholder) in new[]
+                     {
+                         (Environment.GetEnvironmentVariable("USERPROFILE"), "<profile>"),
+                         (Environment.GetEnvironmentVariable("TEMP"), "<temp>"),
+                         (Environment.GetEnvironmentVariable("TMP"), "<temp>"),
+                         (Environment.GetEnvironmentVariable("GITHUB_WORKSPACE"), "<workspace>"),
+                         (Environment.UserName, "<user>"),
+                         (Environment.UserDomainName, "<domain>"),
+                         (Environment.MachineName, "<host>")
+                     })
+            {
+                if (!string.IsNullOrWhiteSpace(secret) && secret.Length >= 3)
+                {
+                    result = result.Replace(secret, placeholder, StringComparison.OrdinalIgnoreCase);
+                }
+            }
+
+            result = Regex.Replace(result, @"(?i)[a-z]:\\Users\\[^\\\s'""]+", @"<drive>:\Users\<user>");
+            return Regex.Replace(
+                result,
+                @"\b(gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|eyJ[A-Za-z0-9_\-]{20,}\.[A-Za-z0-9_\-\.]+)",
+                "<redacted>");
+        }
+
+        private static void AppendStepSummary(string line)
+        {
+            // `dotnet test` does not print passed-test output at its default verbosity, so on CI the latency
+            // distribution also goes to the job summary. Only sanitized markers and numbers are written.
+            var path = Environment.GetEnvironmentVariable("GITHUB_STEP_SUMMARY");
+            if (string.IsNullOrEmpty(path))
+            {
+                return;
+            }
+
+            try
+            {
+                File.AppendAllText(path, $"`{line.Replace('`', '\'')}`  {Environment.NewLine}");
+            }
+            catch (IOException)
+            {
+            }
+            catch (UnauthorizedAccessException)
+            {
+            }
+        }
+
+        private static string Fmt(long? ms) => ms is { } value ? $"{value}ms" : "none";
+
+        private static string Fmt(int? code) => code?.ToString(CultureInfo.InvariantCulture) ?? "n/a";
     }
 }
