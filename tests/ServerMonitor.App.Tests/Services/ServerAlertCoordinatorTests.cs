@@ -264,6 +264,36 @@ public sealed class ServerAlertCoordinatorTests
             harness.Notifications.Items.Count(item => item.Category == ServerAlertCategory.Warning));
     }
 
+    /// <summary>
+    /// SVA-12 reproduction: fails until the cooldown write is fenced against removal. The server is removed while its
+    /// warning is inside the platform boundary; removal clears the cooldown, then the completed delivery writes it back,
+    /// so the same Id re-added inside the window has its first warning suppressed.
+    /// </summary>
+    [Fact]
+    public async Task RemovedWhileDelivering_SameIdReadded_FirstWarningIsNotSuppressed()
+    {
+        await using var harness = await Harness.CreateAsync(ServerHealth.Healthy);
+        var gate = new GatedDelivery();
+        harness.Notifications.HoldNext(gate);
+
+        harness.SetHealth(ServerHealth.Warning);
+        await gate.Entered.Task.WaitAsync(DeadlockGuard);
+        harness.States.Remove(harness.Server.Id);  // production removal path; clears the cooldown synchronously
+        gate.Release.TrySetResult(true);           // the in-flight warning is delivered after the removal
+        await harness.SettleAsync();
+
+        harness.States.Set(ServerMonitoringState.Initial(harness.Server.Id) with
+        {
+            Health = ServerHealth.Healthy
+        });
+        harness.SetHealth(ServerHealth.Warning);   // same instant on the fake clock: inside the cooldown window
+        await harness.SettleAsync();
+
+        Assert.Equal(
+            2,
+            harness.Notifications.Items.Count(item => item.Category == ServerAlertCategory.Warning));
+    }
+
     [Fact]
     public async Task HiddenConfiguredServer_StillNotifies()
     {
@@ -475,8 +505,12 @@ public sealed class ServerAlertCoordinatorTests
     {
         private readonly ConcurrentQueue<UserNotification> _items = new();
         private readonly SemaphoreSlim _calls = new(0);
+        private GatedDelivery? _held;
 
         public IReadOnlyList<UserNotification> Items => _items.ToArray();
+
+        /// <summary>SVA-12: the next call is recorded, then held inside the platform boundary until the test releases it.</summary>
+        public void HoldNext(GatedDelivery gate) => _held = gate;
 
         public int BeginShutdownCount { get; private set; }
 
@@ -490,7 +524,8 @@ public sealed class ServerAlertCoordinatorTests
         {
             _items.Enqueue(notification);
             _calls.Release();
-            return Task.FromResult(Delivers);
+            var held = Interlocked.Exchange(ref _held, null);
+            return held is null ? Task.FromResult(Delivers) : held.HoldAsync(cancellationToken);
         }
 
         /// <summary>Waits for the coordinator's worker to deliver <paramref name="expected"/> notifications; each
@@ -501,6 +536,22 @@ public sealed class ServerAlertCoordinatorTests
             {
                 Assert.True(await _calls.WaitAsync(DeadlockGuard));
             }
+        }
+    }
+
+    private sealed class GatedDelivery
+    {
+        public TaskCompletionSource Entered { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        /// <summary>Completed by the test with the platform result (true = delivered).</summary>
+        public TaskCompletionSource<bool> Release { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task<bool> HoldAsync(CancellationToken cancellationToken)
+        {
+            Entered.TrySetResult();
+            return Release.Task.WaitAsync(cancellationToken);
         }
     }
 
