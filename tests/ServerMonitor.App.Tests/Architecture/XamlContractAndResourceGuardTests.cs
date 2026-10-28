@@ -46,7 +46,9 @@ public sealed partial class XamlContractAndResourceGuardTests
             "PriorityHost", "ServersToolbar", "OverviewSearchBox", "StateOverlay",
             "HealthCard", "PriorityButton", "DirectoryLinkButton", "OverviewRepeater", "EmptyAddButton", "EmptyDiscoveryStartButton",
             // UI.7C (Cortex m-3): the editor's return focus finds a suggestion's "Adicionar" in these lists.
-            "DiscoveredRepeater", "EmptyDiscoveredRepeater"],
+            "DiscoveredRepeater", "EmptyDiscoveredRepeater",
+            // SVA-14: the end of a search is announced on its caption.
+            "EmptyDiscoveryNothingFound", "EmptyDiscoveryTimeLimit", "EmptyDiscoveryFailed"],
         // UI.5: BackgroundSection is brought into view from code-behind; the rest are reflowed by the WidthStates setters.
         ["Views/SettingsPage.xaml"] = ["PageViewport", "BackgroundSection", "PageRoot", "AutosaveText", "ThemeControl", "LanguageControl", "BackgroundControl",
             "NotificationsControl", "CompactControl", "TopmostControl", "DisclosureColumn2", "DisclosureGrid", "AboutDisclosure",
@@ -65,6 +67,8 @@ public sealed partial class XamlContractAndResourceGuardTests
             "GitHubButton", "SuccessToast",
             // REL.0D: "Procurar na rede local" moves under its title when narrow, like every card action.
             "LocalNetworkSearchButton",
+            // SVA-14: the end of a search is announced on its caption.
+            "LocalNetworkNothingFound", "LocalNetworkTimeLimit", "LocalNetworkFailed",
             // UI.5 fix round 3 (Beacon C2 R2-M1): focus returns to the history button that opened its dialog.
             "ClearHistoryButton", "ResetHistoryButton"],
         // UI.3: adaptive VisualState setters reflow these (no code-behind dependency).

@@ -30,6 +30,9 @@ public sealed partial class DashboardPage : Page
         Loaded += OnLoaded;
         // REL.0D O-7 R1 (Prism M-1): same app-length lifetime as above; only acted on while this page is shown.
         ViewModel.LocalNetworkSearchStopFocusRequested += OnLocalNetworkStopFocusRequested;
+        // SVA-14 (L-4): same app-length lifetime; only said while the caption is on the live tree (no Unloaded: a stale
+        // Unloaded after Loaded would silently drop it, see SaLiveTree).
+        ViewModel.LocalNetworkSearchEnded += OnLocalNetworkSearchEnded;
         SizeChanged += (_, _) => UpdateEmptyStateHeight();
         HeaderGrid.SizeChanged += (_, _) => UpdateEmptyStateHeight();
     }
@@ -171,6 +174,11 @@ public sealed partial class DashboardPage : Page
         DispatcherQueue?.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
             EmptyDiscoveryStartButton.Focus(FocusState.Programmatic));
     }
+
+    /// <summary>SVA-14 (L-4): the search ended by itself or could not start - say the end caption of the first-server state.</summary>
+    private void OnLocalNetworkSearchEnded(object? sender, DiscoverySearchEnd end) =>
+        LocalNetworkSearchEndAnnouncement.AnnounceAfterLayout(
+            LocalNetworkSearchEndAnnouncement.CaptionFor(end, EmptyDiscoveryNothingFound, EmptyDiscoveryTimeLimit, EmptyDiscoveryFailed));
 
     // "Limpar pesquisa" disappears once it worked; focus returns to the search box (UI.3 pattern).
     private void OnClearSearchClick(object sender, RoutedEventArgs e) => FocusAfterAction.MoveTo((Control)sender, OverviewSearchBox);
