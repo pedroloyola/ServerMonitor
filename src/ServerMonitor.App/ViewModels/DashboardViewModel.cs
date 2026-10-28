@@ -297,9 +297,10 @@ public sealed class DashboardViewModel : ObservableObject, IDisposable
     public event EventHandler? LocalNetworkSearchStopFocusRequested;
 
     /// <summary>
-    /// SVA-14 (L-4): raised on the UI thread once per user-started search that ended by itself or could not start
-    /// (NothingFound, TimeLimit, Failed), after the end captions' properties changed, so the page shown announces the
-    /// caption it now shows. Never for a stop (explicit, hide, navigating away, exit), page re-entry or other re-reads.
+    /// SVA-14 (L-4): raised once per user-started search that ended by itself or could not start (NothingFound,
+    /// TimeLimit, Failed), after the end captions' properties changed, so the page shown announces the caption it now
+    /// shows. Raised on the thread that applies the discovery activity change: in the app the UI thread (the change is
+    /// marshalled through the dispatcher in OnDiscoverySearchingChanged). Never for a stop (explicit, hide, navigating away, exit), page re-entry or other re-reads.
     /// </summary>
     public event EventHandler<DiscoverySearchEnd>? LocalNetworkSearchEnded;
 

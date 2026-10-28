@@ -28,9 +28,11 @@ public sealed partial class DashboardPage : Page
         // Atlas review). A widget "open server" deep-link no longer scrolls a card here: UI.4 D-UI4-DETAIL opens the
         // interim server page through the view model.
         Loaded += OnLoaded;
-        Unloaded += OnUnloaded;
         // REL.0D O-7 R1 (Prism M-1): same app-length lifetime as above; only acted on while this page is shown.
         ViewModel.LocalNetworkSearchStopFocusRequested += OnLocalNetworkStopFocusRequested;
+        // SVA-14 (L-4): same app-length lifetime; only said while the caption is on the live tree (no Unloaded: a stale
+        // Unloaded after Loaded would silently drop it, see SaLiveTree).
+        ViewModel.LocalNetworkSearchEnded += OnLocalNetworkSearchEnded;
         SizeChanged += (_, _) => UpdateEmptyStateHeight();
         HeaderGrid.SizeChanged += (_, _) => UpdateEmptyStateHeight();
     }
@@ -53,8 +55,6 @@ public sealed partial class DashboardPage : Page
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
-        ViewModel.LocalNetworkSearchEnded -= OnLocalNetworkSearchEnded;
-        ViewModel.LocalNetworkSearchEnded += OnLocalNetworkSearchEnded;
         UpdateEmptyStateHeight();
         // PR #55 fix round 1: a language decided in Settings since the last visit retires the one-time hint.
         LanguageHint.Refresh();
@@ -174,9 +174,6 @@ public sealed partial class DashboardPage : Page
         DispatcherQueue?.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
             EmptyDiscoveryStartButton.Focus(FocusState.Programmatic));
     }
-
-    // SVA-14 (L-4): announced only while shown (Settings › Data says its own caption when the search ended there).
-    private void OnUnloaded(object sender, RoutedEventArgs e) => ViewModel.LocalNetworkSearchEnded -= OnLocalNetworkSearchEnded;
 
     /// <summary>SVA-14 (L-4): the search ended by itself or could not start - say the end caption of the first-server state.</summary>
     private void OnLocalNetworkSearchEnded(object? sender, DiscoverySearchEnd end) =>

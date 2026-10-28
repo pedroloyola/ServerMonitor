@@ -431,10 +431,10 @@ public sealed class LocalNetworkSearchEndTests
     }
 
     [Fact]
-    public async Task Both_pages_on_the_one_view_model_get_one_end()
+    public async Task The_view_model_raises_once_per_end()
     {
-        // Overview and Settings › Data share the view model: it raises once; each page says only ITS shown caption
-        // (runtime-only, pinned below and in Narrator N-8).
+        // Overview and Settings › Data share the view model, and it raises once per end. Whether the pages together say
+        // it once (each only ITS shown caption) is runtime-only: covered by Narrator N-8 alone, not by this test.
         var w = new World();
         w.Browser.StartException = new InvalidOperationException("synthetic");
         await using var _ = w.Service;
@@ -461,8 +461,10 @@ public sealed class LocalNetworkSearchEndTests
         Assert.Equal(caption, ServerMonitor.App.Views.LocalNetworkSearchEndAnnouncement.CaptionFor(end, "nothing", "limit", "failed"));
 
     /// <summary>
-    /// SVA-14: code-behind cannot run without a XAML runtime, so the wiring is pinned at the source: each page listens
-    /// only while loaded, says its own captions, after the layout pass, as a fixed-id notification of the shown text.
+    /// SVA-14: code-behind cannot run without a XAML runtime, so the wiring is pinned at the source: Settings › Data
+    /// listens while loaded; the overview (an app-length singleton with its view model) listens for the page lifetime,
+    /// subscribed once in its constructor, never on Loaded/Unloaded (a stale Unloaded after Loaded would drop it). Each
+    /// says its own captions, after the layout pass, as a fixed-id notification of the shown text, only while live.
     /// </summary>
     [Fact]
     public void Each_page_announces_its_own_end_caption_while_shown()
@@ -475,8 +477,9 @@ public sealed class LocalNetworkSearchEndTests
             Body(settings, "private void OnLocalNetworkSearchEnded("), StringComparison.Ordinal);
 
         var overview = ReadView("DashboardPage.xaml.cs");
-        Assert.Contains("ViewModel.LocalNetworkSearchEnded += OnLocalNetworkSearchEnded;", Body(overview, "private async void OnLoaded("), StringComparison.Ordinal);
-        Assert.Contains("ViewModel.LocalNetworkSearchEnded -= OnLocalNetworkSearchEnded;", Body(overview, "private void OnUnloaded("), StringComparison.Ordinal);
+        Assert.Contains("ViewModel.LocalNetworkSearchEnded += OnLocalNetworkSearchEnded;", Body(overview, "public DashboardPage("), StringComparison.Ordinal);
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(overview, @"LocalNetworkSearchEnded\s*[+-]="));
+        Assert.DoesNotContain("OnUnloaded", overview, StringComparison.Ordinal);
         Assert.Contains(
             "CaptionFor(end, EmptyDiscoveryNothingFound, EmptyDiscoveryTimeLimit, EmptyDiscoveryFailed)",
             Body(overview, "private void OnLocalNetworkSearchEnded("), StringComparison.Ordinal);
