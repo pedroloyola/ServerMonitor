@@ -38,12 +38,14 @@ Store listing.
 
 Notes for **1.1.8** (package 1.1.8.0, tag `v1.1.8`). They replace the 1.1.7 text and describe only
 the user-visible changes in that release: the stale data age on the Servers page, the announced
-end of a local network search, the alert that could be held back after a server was removed and
-re-added, and the clearer Portuguese example text in the server editor.
+end of a local network search, a rare case in which an alert could be held back after a server
+stopped being monitored and was monitored again, and the clearer Portuguese example text in the server editor.
 
-**DRAFT-GATE — check before submission.** The screen reader sentences (paragraph two in all three
-files) are true in the code but must also be confirmed by the human Narrator session. If a check
-fails, remove or narrow the matching sentence in all three files.
+**DRAFT-GATE — check before submission.** The screen reader sentences (paragraph two, and the last clause
+of the "Por exemplo:" paragraph, in all three files) are true in the code but must also be confirmed
+by the human Narrator session (stale data age, end of search, example text). If a check fails,
+remove or narrow the matching sentence in all three files, and if paragraph two goes, also edit
+the first sentence.
 
 Known issues that are **not** fixed in 1.1.8 (large text size, switching between two high contrast
 themes, theme choice not remembered) are listed in `docs/release/1.1.8-known-issues.md`. Do not
