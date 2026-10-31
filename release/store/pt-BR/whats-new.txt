@@ -1,15 +1,7 @@
-Interface redesenhada e novos recursos desde o ServerAlyzer 1.1.
+O ServerAlyzer 1.1.8 melhora o suporte a leitores de tela e a confiabilidade dos alertas.
 
-Um novo visual. Uma barra lateral leva você à Visão geral, Servidores, Histórico e Configurações, cada servidor tem sua página de detalhes e o modo compacto e o widget do Windows 11 foram refeitos. O suporte a teclado, leitores de tela e alto contraste foi melhorado.
+Leitores de tela. Na página Servidores, um servidor com dados desatualizados agora inclui a idade desses dados no que os leitores de tela leem primeiro. Quando uma pesquisa na rede local termina sozinha, os leitores de tela agora anunciam como ela terminou.
 
-Configuração mais simples. Um guia inicial ajuda você a adicionar o primeiro servidor. Você pode preencher um servidor com um host do seu arquivo de configuração SSH, o aplicativo sugere suas chaves privadas padrão da pasta .ssh e o teste de conexão mostra cada etapa, para ver o que falhou.
+Alertas. Foi corrigido um caso raro em que um alerta podia ficar retido por até 5 minutos depois que um servidor deixava de ser monitorado e voltava a ser.
 
-Jump hosts. Agora você pode usar servidores acessados por um único jump host (ProxyJump); a chave do jump host é verificada à parte.
-
-Backup criptografado. Em Configurações você pode salvar servidores, chaves de host confiáveis e senhas em um arquivo protegido por uma frase secreta de sua escolha, e restaurá-los depois. Os arquivos de chave privada nunca são incluídos.
-
-Idioma. Em uma instalação nova, se o Windows não estiver em português, o aplicativo abre em inglês. Um idioma já definido é mantido. Para mudar, use Configurações > Idioma e reinicie o aplicativo.
-
-A pesquisa na rede local só é feita quando você pede, na Visão geral vazia ou em Configurações > Dados e servidores; o Windows pode pedir permissão de rede. Termina após cerca de 40 segundos sem servidores novos, ou após 10 minutos.
-
-O .NET agora vem incluído: você não precisa mais instalá-lo.
+Exemplos mais claros. No editor de servidores, o texto de exemplo dos campos agora diz "Por exemplo:" em vez de "Ex.:", o que os leitores de tela leem com mais clareza.

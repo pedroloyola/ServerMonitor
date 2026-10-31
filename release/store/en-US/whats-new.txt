@@ -1,15 +1,7 @@
-A redesigned interface and new features since ServerAlyzer 1.1.
+ServerAlyzer 1.1.8 improves screen reader support and alert reliability.
 
-A new look. A sidebar takes you to Overview, Servers, History and Settings, each server has its own detail page, and compact mode and the Windows 11 widget were redesigned. Keyboard, screen reader and high contrast support was improved.
+Screen readers. On the Servers page, a server whose data is out of date now includes how old that data is in what screen readers read first. When a local network search ends on its own, screen readers now announce how it ended.
 
-Easier setup. A first-run guide helps you add your first server. You can fill in a server from a host in your SSH config file, the app suggests your standard private keys from your .ssh folder, and the connection test shows each step so you can see what failed.
+Alerts. Fixed a rare case in which an alert could be held back for up to 5 minutes after a server stopped being monitored and was then monitored again.
 
-Jump hosts. Servers reached through one ProxyJump host are now supported, and the jump host's key is checked separately.
-
-Encrypted backup. In Settings you can save your servers, trusted host keys and saved passwords to a file protected by a passphrase you choose, and restore them later. Private key files are never included.
-
-Language. On a new install, if Windows is not in Portuguese, the app opens in English. A language already set is kept, including Brazilian Portuguese chosen automatically by earlier versions: to change it, pick English or "Use system language" in Settings > Language and restart the app.
-
-Local network search now runs only when you ask, from an empty Overview or from Settings > Data and servers; Windows may ask for network permission. It ends after about 40 seconds if no new server is found, or after 10 minutes.
-
-The .NET runtime is now included, so you no longer need to install .NET.
+Portuguese. In the server editor, the example text in the fields now says "Por exemplo:" instead of "Ex.:", so screen readers read it more clearly.

@@ -36,26 +36,17 @@ Store listing.
 
 ## Current contents
 
-Draft notes for the next release candidate, covering what changed since 1.1.x. Not submitted yet;
-review them again before the version bump.
+Notes for **1.1.8** (package 1.1.8.0, tag `v1.1.8`). They replace the 1.1.7 text and describe only
+the user-visible changes in that release: the stale data age on the Servers page, the announced
+end of a local network search, a rare case in which an alert could be held back after a server
+stopped being monitored and was monitored again, and the clearer Portuguese example text in the server editor.
 
-**DRAFT-GATE — check each line before submission.** Some sentences are only true once a gate
-passes. Rows refer to `docs/release/rel0d-preparation.md` §2. If a gate has not passed, edit the
-sentence in all three files as described, then re-check the 1500-character limit.
+**DRAFT-GATE — check before submission.** The screen reader sentences (paragraph two, and the last clause
+of the "Por exemplo:" paragraph, in all three files) are true in the code but must also be confirmed
+by the human Narrator session (stale data age, end of search, example text). If a check fails,
+remove or narrow the matching sentence in all three files, and if paragraph two goes, also edit
+the first sentence.
 
-* **.NET included** (last paragraph, all three files): keep it only if the self-contained .NET
-  change (PR #48) is merged **and** CLEAN-1 passes, with counterproof X1 failing as expected.
-  Otherwise remove the paragraph.
-* **Local network search on request** (search paragraph, all three files): keep it only if the
-  on-demand discovery change (PR #47) is merged. Re-read it against the merged behaviour: an
-  empty Overview, the button label, and that users who already have servers get no suggestions.
-  Otherwise remove the paragraph.
-  **Re-read (REL.0E, 2026-10-16):** #47 and #52 are merged. The paragraph now names both entry
-  points (an empty Overview, Settings > Data and servers) and the bounded search (about 40 seconds
-  when no new server is found, 10 minutes at most). The old "no suggestions if you already have
-  servers" sentence was removed: a user with servers can now search from Settings.
-* **Language** (language paragraph): needs the language change (PR #46) merged. Otherwise remove
-  the paragraph.
-* **Backup on another computer:** the text deliberately says only "restore them later". If
-  BACKUP-XM passes, you may mention restoring on another computer, but then also say that servers
-  using a key file need that file on the other computer, if the length allows.
+Known issues that are **not** fixed in 1.1.8 (large text size, switching between two high contrast
+themes, theme choice not remembered) are listed in `docs/release/1.1.8-known-issues.md`. Do not
+describe them as fixed here.
