@@ -41,11 +41,10 @@ the user-visible changes in that release: the stale data age on the Servers page
 end of a local network search, a rare case in which an alert could be held back after a server
 stopped being monitored and was monitored again, and the clearer Portuguese example text in the server editor.
 
-**DRAFT-GATE — check before submission.** The screen reader sentences (paragraph two, and the last clause
-of the "Por exemplo:" paragraph, in all three files) are true in the code but must also be confirmed
-by the human Narrator session (stale data age, end of search, example text). If a check fails,
-remove or narrow the matching sentence in all three files, and if paragraph two goes, also edit
-the first sentence.
+**Screen reader wording.** No human screen reader session was run for 1.1.8. The screen reader
+sentences (paragraph two in all three files) therefore describe only what the app gives to screen
+readers (the accessible name, the notification), not what a screen reader says. Keep that wording
+until a human screen reader check confirms more.
 
 Known issues that are **not** fixed in 1.1.8 (large text size, switching between two high contrast
 themes, theme choice not remembered) are listed in `docs/release/1.1.8-known-issues.md`. Do not

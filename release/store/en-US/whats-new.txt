@@ -1,7 +1,7 @@
 ServerAlyzer 1.1.8 improves screen reader support and alert reliability.
 
-Screen readers. On the Servers page, a server whose data is out of date now includes how old that data is in what screen readers read first. When a local network search ends on its own, screen readers now announce how it ended.
+Screen readers. On the Servers page, a server whose data is out of date now includes how old that data is in the name it gives to screen readers. When a local network search ends on its own, the app now notifies screen readers of how it ended.
 
 Alerts. Fixed a rare case in which an alert could be held back for up to 5 minutes after a server stopped being monitored and was then monitored again.
 
-Portuguese. In the server editor, the example text in the fields now says "Por exemplo:" instead of "Ex.:", so screen readers read it more clearly.
+Portuguese. In the server editor, the example text in the fields now says "Por exemplo:" instead of "Ex.:".
