@@ -296,11 +296,14 @@ jobs:
             -ExpectedPackageFileName "ServerAlyzer_${env:PACKAGE_VERSION}_x64_$($env:TAG_COMMIT.Substring(0, 7)).msix" `
             -ExpectedVisibility '${{ env.STORE_VISIBILITY }}'
 
+      # STORE-PIPE-1 round 2 (Vigil L-2): the JSON goes in by file (--payload, read with File.ReadAllTextAsync in
+      # the pinned CLI's PayloadResolver), so fileUploadUrl, a SAS URI with write access, is not on the command
+      # line. It stays in the JSON: the CLI PUTs the object as given and the pinned source does not show whether
+      # Partner Center accepts the update without it, which no offline check can settle.
       - name: Apply the metadata
         shell: pwsh
         run: |
-          $updated = Get-Content -Raw updated.json
-          msstore submission update ${{ env.STORE_PRODUCT_ID }} $updated
+          msstore submission update ${{ env.STORE_PRODUCT_ID }} --payload updated.json
           if ($LASTEXITCODE -ne 0) { throw 'msstore submission update failed.' }
 
       # Read back what the Store actually stored, and check that, not the file we sent: still an
@@ -338,8 +341,8 @@ jobs:
             ''
             '1. Partner Center, this draft: review every language and "Publish manually". Until the commit the UI shows the draft as unchanged, with the previous package: the staged file is the PendingUpload line of the read-back step in this run.'
             '2. Do not run store-submit again while this draft exists: its upload step would delete the draft (the run refuses).'
-            "3a. Nothing edited in Partner Center: certification GO = dispatch store-certify.yml with submission_id $env:SUBMISSION_ID and the phrase CERTIFY $env:PACKAGE_VERSION."
-            '3b. Listing text or screenshots edited in Partner Center: certify in the Partner Center UI (Submit for certification). Do NOT run store-certify: an API-created submission changed in Partner Center can no longer be committed through the API.'
+            "3. Certification GO, runbook step 5a or 5b (docs/release-automation.md). 5a, nothing edited in Partner Center: dispatch store-certify.yml with submission_id $env:SUBMISSION_ID and the phrase CERTIFY $env:PACKAGE_VERSION."
+            '   5b, listing text or screenshots edited in Partner Center (runbook steps 3a/3b): certify in the Partner Center UI (Submit for certification; UNVERIFIED for an API-staged draft until first seen live). Do NOT run store-certify: an API-created submission changed in Partner Center can no longer be committed through the API. Never upload an MSIX by hand on this path.'
           ) | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           Write-Host "Draft $env:SUBMISSION_ID staged with package $env:PACKAGE_VERSION. Not committed."
 
@@ -358,6 +361,14 @@ jobs:
           @(
             ''
             'This workflow only stages: it never commits a submission. A staged draft goes to'
-            'certification only through store-certify.yml, and even a certified submission waits'
-            'on the publishing hold until a person presses Publish now.'
+            'certification through store-certify.yml (nothing edited in Partner Center) or, after a'
+            'manual edit, through Submit for certification in Partner Center; even a certified'
+            'submission waits on the publishing hold until a person presses Publish now.'
           ) | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+
+      # STORE-PIPE-1 round 2 (Vigil L-2): these files hold the submission JSON, including fileUploadUrl (a SAS URI
+      # with write access). Removed by name, whatever happened before. Nothing else may run here.
+      - name: Remove the submission JSON files
+        if: always()
+        shell: pwsh
+        run: Remove-Item -LiteralPath 'before.json', 'draft.json', 'updated.json', 'readback.json' -Force -ErrorAction SilentlyContinue

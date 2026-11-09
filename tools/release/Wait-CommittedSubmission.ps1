@@ -54,6 +54,18 @@ $ErrorActionPreference = 'Stop'
 $STATUS_IN_PROGRESS = @('CommitStarted', 'PreProcessing')
 $STATUS_PROCESSED = @('Certification', 'PendingPublication')
 
+function ConvertTo-LogSafe($Value) {
+    <# STORE-PIPE-1 round 2 (Vigil L-1): a value read from Partner Center is printed only if it is plainly
+       printable. A file name holding a newline followed by "::warning::..." would otherwise start a line
+       that GitHub Actions runs as a workflow command. \A and \z, not ^ and $: $ also matches before a
+       trailing newline. #>
+    if ($null -eq $Value) { return '' }
+    $text = [string] $Value
+    if ($text -eq '') { return '' }
+    if ($text -cmatch '\A[A-Za-z0-9._ -]{1,200}\z') { return $text }
+    return '<unprintable>'
+}
+
 function Get-ScalarField($Object, [string] $Name) {
     <# A field that must be one JSON value: arrays and objects are refused (null), PR #56 Vigil N-3. #>
     if ($null -eq $Object -or $Object -isnot [pscustomobject]) { return $null }
@@ -77,7 +89,7 @@ function Read-Committed([scriptblock] $Reader, [string] $ExpectedSubmissionId) {
     try { $submission = ConvertFrom-CliJson $raw } catch { return @{ Error = $_.Exception.Message } }
     if ($submission -isnot [pscustomobject]) { return @{ Error = 'the CLI output is not a JSON object' } }
     $id = [string] (Get-ScalarField $submission 'id')
-    if ($id -cnotmatch '\A[0-9]{1,30}\z') { return @{ Error = "the submission has no numeric id ('$id')" } }
+    if ($id -cnotmatch '\A[0-9]{1,30}\z') { return @{ Error = "the submission has no numeric id ('$(ConvertTo-LogSafe $id)')" } }
     if (-not [string]::Equals($id, $ExpectedSubmissionId, [StringComparison]::Ordinal)) {
         return @{ Error = "the product's current submission is $id, not the committed submission $ExpectedSubmissionId" }
     }
@@ -104,13 +116,13 @@ function Test-ProcessedPackages($Submission, [string] $ExpectedPackageVersion, [
         $version = [string] (Get-ScalarField $package 'version')
         if ([string]::Equals($fileName, $ExpectedPackageFileName, [StringComparison]::Ordinal)) {
             $found++
-            if (-not [string]::Equals($fileStatus, 'Uploaded', [StringComparison]::OrdinalIgnoreCase)) { return "the package $fileName is '$fileStatus', not Uploaded, after processing" }
-            if (-not [string]::Equals($version, $ExpectedPackageVersion, [StringComparison]::Ordinal)) { return "Partner Center read the package $fileName as version '$version', not $ExpectedPackageVersion" }
+            if (-not [string]::Equals($fileStatus, 'Uploaded', [StringComparison]::OrdinalIgnoreCase)) { return "the package $fileName is '$(ConvertTo-LogSafe $fileStatus)', not Uploaded, after processing" }
+            if (-not [string]::Equals($version, $ExpectedPackageVersion, [StringComparison]::Ordinal)) { return "Partner Center read the package $fileName as version '$(ConvertTo-LogSafe $version)', not $ExpectedPackageVersion" }
             continue
         }
         if ([string]::Equals($fileStatus, 'PendingDelete', [StringComparison]::OrdinalIgnoreCase)) { continue }
-        if ($version -cnotmatch '\A[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\z') { return "a live package ('$fileName') has an unreadable version ('$version')" }
-        if (([version] $version) -ge $expected) { return "the submission carries a live package $version ('$fileName') that is not older than $ExpectedPackageVersion; customers would get a package this run did not verify" }
+        if ($version -cnotmatch '\A[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\z') { return "a live package ('$(ConvertTo-LogSafe $fileName)') has an unreadable version ('$(ConvertTo-LogSafe $version)')" }
+        if (([version] $version) -ge $expected) { return "the submission carries a live package $version ('$(ConvertTo-LogSafe $fileName)') that is not older than $ExpectedPackageVersion; customers would get a package this run did not verify" }
     }
     if ($found -eq 0) { return "the submission has no package named $ExpectedPackageFileName after processing" }
     if ($found -gt 1) { return "the submission has more than one package named $ExpectedPackageFileName" }
@@ -133,28 +145,33 @@ function Wait-CommittedSubmission {
         $read = Read-Committed $Reader $ExpectedSubmissionId
         if ($read.ContainsKey('Error')) { return & $fail $read.Error $reads }
         $status = $read.Status
-        Write-Host "  read $reads/$MaxReads  submission $ExpectedSubmissionId status $status"
+        Write-Host "  read $reads/$MaxReads  submission $ExpectedSubmissionId status $(ConvertTo-LogSafe $status)"
         if ($STATUS_IN_PROGRESS -ccontains $status) {
-            if ($reads -ge $MaxReads) { return & $fail "Partner Center was still processing the commit (status $status) after $reads reads, $IntervalSeconds s apart" $reads }
+            if ($reads -ge $MaxReads) { return & $fail "Partner Center was still processing the commit (status $(ConvertTo-LogSafe $status)) after $reads reads, $IntervalSeconds s apart" $reads }
             & $Sleeper $IntervalSeconds
             continue
         }
         break
     }
     if ($STATUS_PROCESSED -cnotcontains $status) {
-        return & $fail "the committed submission ended in status '$status', not Certification or PendingPublication" $reads
+        return & $fail "the committed submission ended in status '$(ConvertTo-LogSafe $status)', not Certification or PendingPublication" $reads
     }
 
     # The re-read: the state the package proof is made on.
     $reads++
     $read = Read-Committed $Reader $ExpectedSubmissionId
     if ($read.ContainsKey('Error')) { return & $fail $read.Error $reads }
-    if ($STATUS_PROCESSED -cnotcontains $read.Status) { return & $fail "on the re-read the submission is in status '$($read.Status)', not Certification or PendingPublication" $reads }
+    if ($STATUS_PROCESSED -cnotcontains $read.Status) { return & $fail "on the re-read the submission is in status '$(ConvertTo-LogSafe $read.Status)', not Certification or PendingPublication" $reads }
+    # STORE-PIPE-1 round 2 (Vigil, optional): the commit must have kept the publishing hold.
+    $mode = Get-ScalarField $read.Submission 'targetPublishMode'
+    if (-not ($mode -is [string] -and [string]::Equals($mode, 'Manual', [StringComparison]::OrdinalIgnoreCase))) {
+        return & $fail "after the commit targetPublishMode is '$(ConvertTo-LogSafe $mode)', not 'Manual': the publishing hold is not in force; cancel the submission in Partner Center (R4)" $reads
+    }
     $reason = Test-ProcessedPackages $read.Submission $ExpectedPackageVersion $ExpectedPackageFileName
     if ($reason) { return & $fail $reason $reads }
     $packages = @(($read.Submission.PSObject.Properties | Where-Object { $_.Name -ieq 'applicationPackages' } | Select-Object -First 1).Value)
     foreach ($package in $packages) {
-        $shown = foreach ($field in @('fileName', 'fileStatus', 'version')) { $value = Get-ScalarField $package $field; if ($null -eq $value -or "$value" -eq '') { '-' } else { "$value" } }
+        $shown = foreach ($field in @('fileName', 'fileStatus', 'version')) { $value = Get-ScalarField $package $field; if ($null -eq $value -or "$value" -eq '') { '-' } else { ConvertTo-LogSafe $value } }
         Write-Host "    package: $($shown -join ' / ')"
     }
     return [pscustomobject] @{ Ok = $true; Reason = "submission $ExpectedSubmissionId is in $($read.Status) with $ExpectedPackageFileName Uploaded as $ExpectedPackageVersion"; Reads = $reads; Status = $read.Status }
@@ -163,14 +180,14 @@ function Wait-CommittedSubmission {
 if ($SelfTest) {
     $id = '1152921505701819999'
     $file = 'ServerAlyzer_1.1.8.0_x64_744297c.msix'
-    function New-Read([string] $Status, [object[]] $Packages = $null, [string] $Id = $id) {
+    function New-Read([string] $Status, [object[]] $Packages = $null, [string] $Id = $id, [object] $Mode = 'Manual') {
         if ($null -eq $Packages) {
             $Packages = @(
                 [ordered] @{ fileName = 'ServerAlyzer_1.1.7.0_x64_1ff0fe3.msix'; fileStatus = 'PendingDelete'; version = '1.1.7.0' }
                 [ordered] @{ fileName = $file; fileStatus = 'PendingUpload' }
             )
         }
-        $json = [ordered] @{ id = $Id; status = $Status; targetPublishMode = 'Manual'; fileUploadUrl = 'https://example.invalid/upload?sig=REDACTED'; applicationPackages = $Packages } | ConvertTo-Json -Depth 10
+        $json = [ordered] @{ id = $Id; status = $Status; targetPublishMode = $Mode; fileUploadUrl = 'https://example.invalid/upload?sig=REDACTED'; applicationPackages = $Packages } | ConvertTo-Json -Depth 10
         return "Found Pending Submission.`n$json"
     }
     $processed = @(
@@ -204,6 +221,14 @@ if ($SelfTest) {
         @{ Name = 'empty output'; Reads = @(''); Ok = $false; ExpectReads = 1 }
         @{ Name = 'not JSON'; Reads = @('error: could not reach the service'); Ok = $false; ExpectReads = 1 }
         @{ Name = 'the read throws'; Reads = @('THROW'); Ok = $false; ExpectReads = 1 }
+        # STORE-PIPE-1 round 2: the publishing hold after the commit (Vigil, optional), and no injected workflow command (Vigil L-1).
+        @{ Name = 'hold lost after the commit (Immediate)'; Reads = @((New-Read 'Certification' $processed), (New-Read 'Certification' $processed -Mode 'Immediate')); Ok = $false; ExpectReads = 2 }
+        @{ Name = 'hold missing after the commit'; Reads = @((New-Read 'Certification' $processed), (New-Read 'Certification' $processed -Mode $null)); Ok = $false; ExpectReads = 2 }
+        @{ Name = 'hold as a one-element array'; Reads = @((New-Read 'Certification' $processed), (New-Read 'Certification' $processed -Mode @('Manual'))); Ok = $false; ExpectReads = 2 }
+        @{ Name = 'injection: old package name (passes)'; Reads = @((New-Read 'Certification' @($processed[0], [ordered] @{ fileName = "old.msix`n::warning::injected"; fileStatus = 'PendingDelete'; version = '1.1.7.0' })), (New-Read 'Certification' @($processed[0], [ordered] @{ fileName = "old.msix`n::warning::injected"; fileStatus = 'PendingDelete'; version = '1.1.7.0' }))); Ok = $true; ExpectReads = 2 }
+        @{ Name = 'injection: status (refused)'; Reads = @((New-Read "Certification`n::warning::injected" $processed)); Ok = $false; ExpectReads = 1 }
+        @{ Name = 'injection: processed fileStatus (refused)'; Reads = @((New-Read 'Certification' @([ordered] @{ fileName = $file; fileStatus = "Uploaded`n::warning::injected"; version = '1.1.8.0' })), (New-Read 'Certification' @([ordered] @{ fileName = $file; fileStatus = "Uploaded`n::warning::injected"; version = '1.1.8.0' }))); Ok = $false; ExpectReads = 2 }
+        @{ Name = 'injection: live package name (refused)'; Reads = @((New-Read 'Certification' @($processed[0], [ordered] @{ fileName = "x.msix`n::warning::injected"; fileStatus = 'Uploaded'; version = '1.1.9.0' })), (New-Read 'Certification' @($processed[0], [ordered] @{ fileName = "x.msix`n::warning::injected"; fileStatus = 'Uploaded'; version = '1.1.9.0' }))); Ok = $false; ExpectReads = 2 }
     )
     $failedNames = @()
     foreach ($case in $cases) {
@@ -217,7 +242,7 @@ if ($SelfTest) {
         # Everything the wait printed (Write-Host is the information stream): the SAS upload URL must never be in it.
         $text = (@($printed | Where-Object { $_ -is [System.Management.Automation.InformationRecord] } | ForEach-Object { [string] $_.MessageData }) -join "`n")
         $hostLines = @($text -split "`n" | Where-Object { $_ }).Count
-        $ok = ($result.Ok -eq $case.Ok) -and ($result.Reads -eq $case.ExpectReads) -and ($slept.Count -le 4) -and (-not $result.Ok -or $hostLines -ge 2) -and -not $text.Contains('example.invalid')
+        $ok = ($result.Ok -eq $case.Ok) -and ($result.Reads -eq $case.ExpectReads) -and ($slept.Count -le 4) -and (-not $result.Ok -or $hostLines -ge 2) -and -not $text.Contains('example.invalid') -and -not @(($text + "`n" + $result.Reason) -split "`r?`n" | Where-Object { $_.TrimStart().StartsWith('::') }).Count
         if (-not $ok) { $failedNames += $case.Name }
         Write-Host ("  {0}  {1,-64} ok={2,-5} reads={3}  {4}" -f $(if ($ok) { 'ok  ' } else { 'FAIL' }), $case.Name, $result.Ok, $result.Reads, $result.Reason)
     }

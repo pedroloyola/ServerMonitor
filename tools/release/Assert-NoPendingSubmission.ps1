@@ -137,10 +137,12 @@ if (-not $result.Idle) {
     $draftAdvice = if ($result.Status -ceq 'PendingCommit') {
         @"
 
-A draft already exists. If store-submit staged it, do NOT stage again: send it to certification
-with store-certify.yml (its submission id is in the store-submit run summary) once the listing is
-reviewed. To start the staging over, a person deletes that draft in Partner Center first, after
-exporting its listings if they hold work worth keeping.
+A draft already exists. If store-submit staged it, do NOT stage again. Once the listing is
+reviewed, send it to certification with store-certify.yml (its submission id is in the
+store-submit run summary) only if nothing was edited in Partner Center; if anyone edited it
+there, certify it in the Partner Center UI instead (Submit for certification) and do not run
+store-certify (docs/release-automation.md, step 5b). To start the staging over, a person deletes
+that draft in Partner Center first, after exporting its listings if they hold work worth keeping.
 "@
     } else { '' }
     throw @"

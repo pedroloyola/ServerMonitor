@@ -263,3 +263,10 @@ jobs:
             'Center UI (Submit for certification), not here: an API-created submission changed in Partner'
             'Center can no longer be committed through the API.'
           ) | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+
+      # STORE-PIPE-1 round 2 (Vigil L-2): draft.json holds the submission JSON, including fileUploadUrl (a SAS URI
+      # with write access). Removed by name, whatever happened before. Nothing else may run here.
+      - name: Remove the submission JSON files
+        if: always()
+        shell: pwsh
+        run: Remove-Item -LiteralPath 'draft.json' -Force -ErrorAction SilentlyContinue

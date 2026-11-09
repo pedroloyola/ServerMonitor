@@ -68,9 +68,21 @@ function Assert-Provenance($Jobs, [string] $StoreJob) {
     # A conditional step or one allowed to fail would let a later Store call run past a failed guard.
     if ($store -match '(?m)^\s+continue-on-error:') { throw "Shape P-1: no step of the $StoreJob job may continue on error." }
     foreach ($step in ($store -split '(?m)^      - ')) {
-        if ($step -match '(?m)^        if:' -and $step -notmatch '\Aname: Report the resulting state\s*\n') { throw "Shape P-1: only the report step of the $StoreJob job may carry a condition." }
+        # STORE-PIPE-1 round 2 (Vigil L-2): besides the report, only the JSON cleanup, exactly as below: if: always(),
+        # one Remove-Item of named .json files in the work directory, nothing else on the step.
+        if ($step -match '(?m)^        if:' -and $step -notmatch '\Aname: Report the resulting state\s*\n' -and $step -cnotmatch $cleanupStepPattern) { throw "Shape P-1: only the report step and the JSON cleanup of the $StoreJob job may carry a condition." }
     }
     return $store
+}
+
+$cleanupStepPattern = "\Aname: Remove the submission JSON files\n        if: always\(\)\n        shell: pwsh\n        run: Remove-Item -LiteralPath '[a-z]+\.json'(?:, '[a-z]+\.json')* -Force -ErrorAction SilentlyContinue\n\s*\z"
+
+# STORE-PIPE-1 round 2 (Vigil L-2): the job ends by removing, by name, every file that held the submission JSON.
+function Assert-JsonCleanup([string] $Store, [string] $StoreJob, [string[]] $Files) {
+    $steps = @($Store -split '(?m)^      - ' | Where-Object { $_ -cmatch $cleanupStepPattern })
+    if ($steps.Count -ne 1) { throw "Shape STORE-PIPE-1: the $StoreJob job must end with exactly one 'Remove the submission JSON files' step (if: always())." }
+    foreach ($file in $Files) { if (-not $steps[0].Contains("'$file'")) { throw "Shape STORE-PIPE-1: the $StoreJob job's cleanup must remove $file (it holds the SAS upload URL)." } }
+    if (-not ($Store -split '(?m)^      - ')[-1].StartsWith('name: Remove the submission JSON files')) { throw "Shape STORE-PIPE-1: the JSON cleanup must be the last step of the $StoreJob job." }
 }
 
 function Assert-SharedConcurrency([string] $Text) {
@@ -147,6 +159,9 @@ function Assert-StoreSubmit([string] $Text) {
     if ((Get-StagedCall $submit $tagBoundFileName) -lt 0) { throw 'Shape P-1: the read-back must bind the package file name to the tag commit.' }
     # STORE-PIPE-1: before the commit the upload has no version, so the metadata step identifies it by file name.
     if ((Get-ScriptCall $submit 'Update-StoreSubmission' $tagBoundFileName) -lt 0) { throw 'Shape STORE-PIPE-1: Update-StoreSubmission must bind the pending upload to the tag-commit file name.' }
+    # Vigil L-2: the submission JSON (with the SAS upload URL) goes to the update by file, never on the command line.
+    if ($submit -notmatch '(?m)^\s+msstore submission update \$\{\{ env\.STORE_PRODUCT_ID \}\} --payload updated\.json\s*$') { throw 'Shape STORE-PIPE-1: msstore submission update must read the JSON from updated.json (--payload), not from the command line.' }
+    Assert-JsonCleanup $submit 'submit' @('before.json', 'draft.json', 'updated.json', 'readback.json')
 
     foreach ($marker in @('Assert-PackageVersionFloor.ps1', 'Assert-PackageIdentity.ps1', 'Assert-DistributionPrivacy.ps1', 'Assert-PackageRuntime.ps1', '$expectedName')) {
         $at = $submit.IndexOf($marker)
@@ -178,6 +193,7 @@ function Assert-StoreCertify([string] $Text) {
     # submission id and the same tag-commit file name. Before the commit it could only time out.
     $wait = Get-ScriptCall $certify 'Wait-CommittedSubmission' '-ExpectedSubmissionId $env:SUBMISSION_ID `'
     $waitNamed = Get-ScriptCall $certify 'Wait-CommittedSubmission' $tagBoundFileName
+    Assert-JsonCleanup $certify 'certify' @('draft.json')
     if ($wait -lt 0 -or $wait -lt $commit -or $waitNamed -ne $wait) { throw 'Shape STORE-PIPE-1: after the commit, store-certify must wait for Partner Center and prove the package (Wait-CommittedSubmission, bound to the submission id and the tag-commit file name).' }
 
     # Relay W4: the id binding comes only from the dispatch input. SUBMISSION_ID is declared once per job,
@@ -244,6 +260,11 @@ $mutations = @{
         @{ Old = "`$(`$env:TAG_COMMIT.Substring(0, 7)).msix`" ```n            -ExpectedVisibility '`${{ env.STORE_VISIBILITY }}' ``"; New = "0000000.msix`" ```n            -ExpectedVisibility '`${{ env.STORE_VISIBILITY }}' ``"; Name = 'read-back file name not bound to the tag commit (Vigil L-1)' }
         # STORE-PIPE-1.
         @{ Old = "            -ExpectedPackageFileName `"ServerAlyzer_`${env:PACKAGE_VERSION}_x64_`$(`$env:TAG_COMMIT.Substring(0, 7)).msix`" ```n            -ExpectedVisibility '`${{ env.STORE_VISIBILITY }}'`n"; New = "            -ExpectedVisibility '`${{ env.STORE_VISIBILITY }}'`n"; Name = 'metadata step identifies the upload by version only (STORE-PIPE-1)' }
+        # STORE-PIPE-1 round 2 (Vigil L-2).
+        @{ Old = "msstore submission update `${{ env.STORE_PRODUCT_ID }} --payload updated.json"; New = "msstore submission update `${{ env.STORE_PRODUCT_ID }} (Get-Content -Raw updated.json)"; Name = 'submission JSON back on the command line (Vigil L-2)' }
+        @{ Old = "'before.json', 'draft.json', 'updated.json', 'readback.json'"; New = "'before.json', 'draft.json', 'readback.json'"; Name = 'cleanup misses updated.json (Vigil L-2)' }
+        @{ Old = "        run: Remove-Item -LiteralPath 'before.json', 'draft.json', 'updated.json', 'readback.json' -Force -ErrorAction SilentlyContinue`n"; New = "        run: |`n          Remove-Item -LiteralPath 'before.json', 'draft.json', 'updated.json', 'readback.json' -Force -ErrorAction SilentlyContinue`n          msstore submission get x`n"; Name = 'cleanup step runs something else under if: always() (Vigil L-2)' }
+        @{ Old = "      - name: Remove the submission JSON files`n        if: always()`n"; New = "      - name: Remove the submission JSON files`n"; Name = 'cleanup only on success (Vigil L-2)' }
     )
     'store-certify.yml' = @(
         @{ Old = "  certify:`n    needs: provenance`n"; New = "  certify:`n"; Name = 'certify without provenance' }
@@ -265,6 +286,8 @@ $mutations = @{
         @{ Old = "        run: ./tools/release/Assert-PackageVersionFloor.ps1 -PackageVersion `$env:PACKAGE_VERSION"; New = "        run: |`n          ./tools/release/Assert-PackageVersionFloor.ps1 -PackageVersion `$env:PACKAGE_VERSION`n          'SUBMISSION_ID=1' | Out-File -Append `$env:GITHUB_ENV"; Name = 'W4 id rewritten through GITHUB_ENV' }
         # STORE-PIPE-1: the wait for Partner Center after the commit, and the proof of the ingested package.
         @{ Old = './tools/release/Wait-CommittedSubmission.ps1 `'; New = 'Write-Host `'; Name = 'no wait or package proof after the commit (STORE-PIPE-1)' }
+        @{ Old = "        run: Remove-Item -LiteralPath 'draft.json' -Force -ErrorAction SilentlyContinue`n"; New = "        run: Remove-Item -LiteralPath 'other.json' -Force -ErrorAction SilentlyContinue`n"; Name = 'cleanup misses draft.json (Vigil L-2)' }
+        @{ Old = "        run: Remove-Item -LiteralPath 'draft.json' -Force -ErrorAction SilentlyContinue`n"; New = "        run: Remove-Item -LiteralPath 'draft.json' -Force -ErrorAction SilentlyContinue; msstore submission publish x`n"; Name = 'cleanup step commits under if: always() (Vigil L-2)' }
         @{ Old = "      - name: Wait for Partner Center to process the commit and prove the package`n        shell: pwsh"; New = "      - name: Wait for Partner Center to process the commit and prove the package`n        continue-on-error: true`n        shell: pwsh"; Name = 'post-commit proof allowed to fail (STORE-PIPE-1)' }
         @{ Old = "            -ProductId '`${{ env.STORE_PRODUCT_ID }}' ```n            -ExpectedSubmissionId `$env:SUBMISSION_ID ```n"; New = "            -ProductId '`${{ env.STORE_PRODUCT_ID }}' ```n            -ExpectedSubmissionId 1 ```n"; Name = 'post-commit proof not bound to the submission id (STORE-PIPE-1)' }
         @{ Old = "_x64_`$(`$env:TAG_COMMIT.Substring(0, 7)).msix`" ```n            -ExpectedPackageVersion `$env:PACKAGE_VERSION`n"; New = "_x64_0000000.msix`" ```n            -ExpectedPackageVersion `$env:PACKAGE_VERSION`n"; Name = 'post-commit proof file name not bound to the tag commit (STORE-PIPE-1)' }

@@ -125,6 +125,8 @@ function Invoke-Case {
         SubmissionPath   = $inputPath
         OutputPath       = $outputPath
         StoreListingRoot = $ListingRoot
+        ExpectedPackageVersion  = $expectedVersion
+        ExpectedPackageFileName = $expectedFile
     }
     foreach ($key in $ExtraArgs.Keys) { $arguments[$key] = $ExtraArgs[$key] }
 
@@ -217,10 +219,16 @@ try {
         -Expected 'fail' -ExpectedMessagePattern 'unreadable fileStatus' -ExtraArgs $packageArgs
     Invoke-Case -Name 'applicationPackages as a single object' -Json ((New-Submission) -replace '(?s)"applicationPackages":\s*\[.*?\]\s*,', ('"applicationPackages": ' + ((New-Upload) | ConvertTo-Json -Compress) + ',')) `
         -Expected 'fail' -ExpectedMessagePattern 'not a JSON array' -ExtraArgs $packageArgs
+    # Vigil L-3: both package parameters are mandatory. An empty value is refused by the binder (an omitted one
+    # would prompt in an interactive host and fail in a non-interactive one), so the package check cannot be skipped.
     Invoke-Case -Name 'version given without a file name' -Json (New-Submission) `
-        -Expected 'fail' -ExpectedMessagePattern 'ExpectedPackageFileName is missing' -ExtraArgs @{ ExpectedPackageVersion = $expectedVersion }
+        -Expected 'fail' -ExpectedMessagePattern "argument to parameter 'ExpectedPackageFileName' because it is an empty string" -ExtraArgs @{ ExpectedPackageFileName = '' }
     Invoke-Case -Name 'file name given without a version' -Json (New-Submission) `
-        -Expected 'fail' -ExpectedMessagePattern 'ExpectedPackageVersion is missing' -ExtraArgs @{ ExpectedPackageFileName = $expectedFile }
+        -Expected 'fail' -ExpectedMessagePattern "argument to parameter 'ExpectedPackageVersion' because it is an empty string" -ExtraArgs @{ ExpectedPackageVersion = '' }
+    Invoke-Case -Name 'neither package parameter (check not skipped, Vigil L-3)' -Json (New-Submission) `
+        -Expected 'fail' -ExpectedMessagePattern 'because it is an empty string' -ExtraArgs @{ ExpectedPackageVersion = ''; ExpectedPackageFileName = '' }
+    Invoke-Case -Name 'malformed expected file name' -Json (New-Submission) `
+        -Expected 'fail' -ExpectedMessagePattern 'ExpectedPackageFileName is missing or not' -ExtraArgs @{ ExpectedPackageFileName = "..\$expectedFile" }
     Invoke-Case -Name 'real shape: SAS upload URL passes through untouched' -Json (New-Submission) -Expected 'pass' -ExtraArgs $packageArgs `
         -Then {
             param($path)
@@ -272,6 +280,28 @@ try {
     }
     catch { $leakDetail = "the real draft shape was refused: $($_.Exception.Message)" }
     $results.Add([pscustomobject] @{ Case = 'fileUploadUrl never printed'; Expected = 'pass'; Actual = $(if ($leakDetail) { 'fail' } else { 'pass' }); Verdict = $(if ($leakDetail) { 'TEST ERROR' } else { 'OK' }); Detail = $leakDetail }) | Out-Null
+
+    # ------------------- STORE-PIPE-1 round 2 (Vigil L-1): no workflow command injected from Partner Center values
+    # A value that holds a newline followed by "::warning::..." would start a log line GitHub Actions runs as a
+    # workflow command. Values read from the submission are printed only when plainly printable.
+    $injected = "`n::warning::injected"
+    $injection = @(
+        @{ Name = 'injection: pending upload file name (refused)'; Json = (New-Submission -Packages @($oldPackage, (New-Upload @{ fileName = "$expectedFile$injected" }))) }
+        @{ Name = 'injection: untouched listing key (passes)'; Json = (New-Submission -Languages @('en-us', 'pt-br', 'pt-pt', "zz$injected")) }
+        @{ Name = 'injection: publish mode (refused)'; Json = (New-Submission -PublishMode "Immediate$injected") }
+        @{ Name = 'injection: visibility (refused)'; Json = (New-Submission -Visibility "Public$injected") }
+        @{ Name = 'injection: live package file name (refused)'; Json = (New-Submission -Packages @((New-Upload), [ordered] @{ fileName = "new.msix$injected"; fileStatus = 'Uploaded'; version = '1.1.9.0' })) }
+    )
+    foreach ($case in $injection) {
+        $inPath = Join-Path $workDir ("inj-$([guid]::NewGuid().ToString('n')).json")
+        $outPath = Join-Path $workDir ("inj-out-$([guid]::NewGuid().ToString('n')).json")
+        Set-Content -LiteralPath $inPath -Value $case.Json -Encoding UTF8
+        $text = ''
+        try { $text = & $updateScript -SubmissionPath $inPath -OutputPath $outPath -StoreListingRoot $realListingRoot @packageArgs -ExpectedVisibility 'Private' *>&1 | Out-String }
+        catch { $text += "`n" + $_.Exception.Message }
+        $bad = @($text -split "`r?`n" | Where-Object { $_.TrimStart().StartsWith('::') })
+        $results.Add([pscustomobject] @{ Case = $case.Name; Expected = 'pass'; Actual = $(if ($bad.Count) { 'fail' } else { 'pass' }); Verdict = $(if ($bad.Count) { 'TEST ERROR' } else { 'OK' }); Detail = $(if ($bad.Count) { "an output line starts with '::': $($bad[0])" } else { '' }) }) | Out-Null
+    }
 
     # ------------------- regression of the SVA-9 incident (STAGE run 42478961083)
     # The rule before STORE-PIPE-1, verbatim in substance: the versions of every package that is not PendingDelete.

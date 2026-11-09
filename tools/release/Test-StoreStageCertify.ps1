@@ -94,6 +94,15 @@ $mutations = @(
        Old = "if (-not [string]::Equals(`$fileStatus, 'Uploaded', [StringComparison]::OrdinalIgnoreCase)) {"; New = 'if ($false) {'; Case = 'package not Uploaded' }
     @{ Name = 'newer live package tolerated after processing'; Guard = 'Wait-CommittedSubmission.ps1'
        Old = 'if (([version] $version) -ge $expected) {'; New = 'if ($false) {'; Case = 'newer live package' }
+    # STORE-PIPE-1 round 2 (Vigil L-1, L-4 and the optional hold re-assert).
+    @{ Name = 'Partner Center values printed raw (workflow command injection)'
+       Old = "if (`$text -cmatch '\A[A-Za-z0-9._ -]{1,200}\z') { return `$text }"; New = 'return $text'; Case = 'main path: passing draft, SAS and injected names' }
+    @{ Name = 'main path prints the submission JSON (SAS upload URL)'
+       Old = "Write-Host '  packages in the draft (fileName / fileStatus / version):'"; New = "Write-Host `"  packages in the draft: `$raw`""; Case = 'main path: passing draft, SAS and injected names' }
+    @{ Name = 'post-commit values printed raw (workflow command injection)'; Guard = 'Wait-CommittedSubmission.ps1'
+       Old = "if (`$text -cmatch '\A[A-Za-z0-9._ -]{1,200}\z') { return `$text }"; New = 'return $text'; Case = 'injection: status (refused)' }
+    @{ Name = 'publishing hold not re-asserted after the commit'; Guard = 'Wait-CommittedSubmission.ps1'
+       Old = "if (-not (`$mode -is [string] -and [string]::Equals(`$mode, 'Manual', [StringComparison]::OrdinalIgnoreCase))) {"; New = 'if ($false) {'; Case = 'hold lost after the commit (Immediate)' }
     @{ Name = 'SAS upload URL printed (STORE-PIPE-1 hardening)'; Guard = 'Wait-CommittedSubmission.ps1'
        Old = 'Write-Host "    package: $($shown -join '' / '')"'; New = 'Write-Host "    package: $($shown -join '' / '') $($read.Submission.fileUploadUrl)"'; Case = 'CommitStarted -> PreProcessing -> Certification, version filled in' }
 )

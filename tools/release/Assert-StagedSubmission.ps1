@@ -58,6 +58,18 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+function ConvertTo-LogSafe($Value) {
+    <# STORE-PIPE-1 round 2 (Vigil L-1): a value read from Partner Center is printed only if it is plainly
+       printable. A file name holding a newline followed by "::warning::..." would otherwise start a line
+       that GitHub Actions runs as a workflow command. \A and \z, not ^ and $: $ also matches before a
+       trailing newline. #>
+    if ($null -eq $Value) { return '' }
+    $text = [string] $Value
+    if ($text -eq '') { return '' }
+    if ($text -cmatch '\A[A-Za-z0-9._ -]{1,200}\z') { return $text }
+    return '<unprintable>'
+}
+
 function Get-Field($Object, [string] $Name) {
     if ($null -eq $Object -or $Object -isnot [pscustomobject]) { return $null }
     $property = $Object.PSObject.Properties | Where-Object { $_.Name -ieq $Name } | Select-Object -First 1
@@ -101,23 +113,23 @@ function Test-StagedSubmission {
 
     $status = Get-ScalarField $submission 'status'
     if (-not ($status -is [string] -and [string]::Equals($status, 'PendingCommit', [StringComparison]::Ordinal))) {
-        return & $fail "the product has no uncommitted draft (status '$status', expected 'PendingCommit')"
+        return & $fail "the product has no uncommitted draft (status '$(ConvertTo-LogSafe $status)', expected 'PendingCommit')"
     }
 
     $id = [string] (Get-ScalarField $submission 'id')
-    if ($id -cnotmatch '\A[0-9]{1,30}\z') { return & $fail "the draft has no numeric submission id ('$id')" }
+    if ($id -cnotmatch '\A[0-9]{1,30}\z') { return & $fail "the draft has no numeric submission id ('$(ConvertTo-LogSafe $id)')" }
     if ($ExpectedSubmissionId -and -not [string]::Equals($id, $ExpectedSubmissionId, [StringComparison]::Ordinal)) {
         return & $fail "the pending draft is submission $id, not the staged submission $ExpectedSubmissionId"
     }
 
     $mode = Get-ScalarField $submission 'targetPublishMode'
     if (-not ($mode -is [string] -and [string]::Equals($mode, 'Manual', [StringComparison]::OrdinalIgnoreCase))) {
-        return & $fail "targetPublishMode is '$mode', not 'Manual': the publishing hold is not in force"
+        return & $fail "targetPublishMode is '$(ConvertTo-LogSafe $mode)', not 'Manual': the publishing hold is not in force"
     }
 
     $visibility = Get-ScalarField $submission 'visibility'
     if (-not ($visibility -is [string] -and [string]::Equals($visibility, $ExpectedVisibility, [StringComparison]::OrdinalIgnoreCase))) {
-        return & $fail "visibility is '$visibility', expected '$ExpectedVisibility'"
+        return & $fail "visibility is '$(ConvertTo-LogSafe $visibility)', expected '$ExpectedVisibility'"
     }
 
     # Read where it is, not through Get-Field: the pipeline would hide whether it is an array (PR #56 Relay I-1).
@@ -151,22 +163,22 @@ function Test-StagedSubmission {
             $pendingUploads++
             if ($pendingUploads -gt 1) { return & $fail 'the draft has more than one package waiting for upload (PendingUpload)' }
             if (-not ($fileName -is [string] -and [string]::Equals($fileName, $ExpectedPackageFileName, [StringComparison]::Ordinal))) {
-                return & $fail "the draft's pending upload is '$fileName', not '$ExpectedPackageFileName' uploaded from the tag commit"
+                return & $fail "the draft's pending upload is '$(ConvertTo-LogSafe $fileName)', not '$ExpectedPackageFileName' uploaded from the tag commit"
             }
             if ($text -ne '' -and -not [string]::Equals($text, $ExpectedPackageVersion, [StringComparison]::Ordinal)) {
-                return & $fail "the draft's pending upload carries version '$text', not $ExpectedPackageVersion"
+                return & $fail "the draft's pending upload carries version '$(ConvertTo-LogSafe $text)', not $ExpectedPackageVersion"
             }
             continue
         }
 
         # Any other live package (Uploaded, None, or no fileStatus): readable, and older than the expected one.
-        if ($text -cnotmatch '\A[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\z') { return & $fail "a live package has an unreadable version ('$text')" }
+        if ($text -cnotmatch '\A[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\z') { return & $fail "a live package has an unreadable version ('$(ConvertTo-LogSafe $text)')" }
         $versions += $text
         if (([version] $text) -gt $expected) {
             return & $fail "the draft carries package $text, newer than $ExpectedPackageVersion; customers would get a package this run did not verify"
         }
         if (([version] $text) -eq $expected) {
-            return & $fail "the draft carries a second live package of version $text ('$fileName') besides the pending upload; it is not the file this run vouches for"
+            return & $fail "the draft carries a second live package of version $text ('$(ConvertTo-LogSafe $fileName)') besides the pending upload; it is not the file this run vouches for"
         }
     }
     if ($pendingUploads -eq 0) {
@@ -193,7 +205,7 @@ function Write-ListingReport($Submission, [string] $ListingRoot) {
             }
         }
         [pscustomobject] @{
-            Language        = $property.Name
+            Language        = ConvertTo-LogSafe $property.Name
             Description     = ([string] (Get-Field $base 'description')).Length
             ShortDescription = ([string] (Get-Field $base 'shortDescription')).Length
             Features        = @(Get-Field $base 'features' | Where-Object { $_ }).Count
@@ -338,8 +350,48 @@ if ($SelfTest) {
     if (-not $legacyRefused) { $failedNames += 'regression: the old rule no longer refuses the real draft shape (fixture drifted)' }
     else { Write-Host "  ok    regression: the old rule refuses the real draft shape (version '' on the upload), as in SVA-9" }
 
+    # STORE-PIPE-1 round 2 (Vigil L-1, L-4): the MAIN path, as the workflows call it, with -ListingReport, the step
+    # summary and the step output. The SAS upload URL never reaches any of them, and a Partner Center value holding
+    # a newline and "::warning::" never starts a line (a workflow command).
+    $injected = "`n::warning::injected"
+    $mainCases = @(
+        @{ Name = 'main path: passing draft, SAS and injected names'; Ok = $true; Raw = (New-Draft -Packages @(
+            [ordered] @{ fileName = "old.msix$injected"; fileStatus = 'PendingDelete'; version = '1.1.7.0' }, (New-Upload)) `
+            -Change @{ listings = [ordered] @{ 'en-us' = [ordered] @{ baseListing = [ordered] @{ description = 'd'; releaseNotes = 'n' } }; "zz$injected" = [ordered] @{ baseListing = [ordered] @{ releaseNotes = 'x' } } } }) }
+        @{ Name = 'main path: refused draft, injected upload name'; Ok = $false; Raw = (New-Draft -Packages @($old, (New-Upload @{ fileName = "$file$injected" }))) }
+        @{ Name = 'main path: refused draft, injected status'; Ok = $false; Raw = (New-Draft @{ status = "PendingCommit$injected" }) }
+    )
+    $mainDir = Join-Path ([IO.Path]::GetTempPath()) ('staged-main-' + [guid]::NewGuid().ToString('n'))
+    New-Item -ItemType Directory -Path $mainDir | Out-Null
+    $savedSummary = $env:GITHUB_STEP_SUMMARY; $savedOutput = $env:GITHUB_OUTPUT
+    try {
+        foreach ($case in $mainCases) {
+            $draftPath = Join-Path $mainDir 'draft.json'
+            Set-Content -LiteralPath $draftPath -Value $case.Raw -Encoding utf8
+            $env:GITHUB_STEP_SUMMARY = Join-Path $mainDir 'summary.md'; $env:GITHUB_OUTPUT = Join-Path $mainDir 'output.txt'
+            Set-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Value ''; Set-Content -LiteralPath $env:GITHUB_OUTPUT -Value ''
+            $passed = $true; $text = ''
+            try { $text = & $PSCommandPath -SubmissionPath $draftPath -ExpectedPackageVersion '1.1.8.0' -ExpectedVisibility 'Public' -ExpectedPackageFileName $file -ListingReport -StoreListingRoot $mainDir *>&1 | Out-String }
+            catch { $passed = $false; $text += "`n" + $_.Exception.Message }
+            $all = $text + "`n" + (Get-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Raw) + "`n" + (Get-Content -LiteralPath $env:GITHUB_OUTPUT -Raw)
+            $command = @($all -split "`r?`n" | Where-Object { $_.TrimStart().StartsWith('::') })
+            $problems = @()
+            if ($passed -ne $case.Ok) { $problems += "ok=$passed" }
+            if ($all.Contains('example.invalid') -or $all.Contains('sig=')) { $problems += 'the SAS upload URL was printed' }
+            if ($command.Count) { $problems += "a line starts with '::' ($($command[0].Trim()))" }
+            if ($case.Ok -and -not $text.Contains("$file / PendingUpload / -")) { $problems += 'the package report was not captured' }
+            if ($case.Ok -and -not $text.Contains('<unprintable> / PendingDelete / 1.1.7.0')) { $problems += 'the injected old package name was not shown as <unprintable>' }
+            if ($problems.Count) { $failedNames += "$($case.Name) ($($problems -join '; '))" }
+            Write-Host ("  {0}  {1,-44} {2}" -f $(if ($problems.Count) { 'FAIL' } else { 'ok  ' }), $case.Name, $(if ($problems.Count) { $problems -join '; ' } else { 'no SAS, no workflow command' }))
+        }
+    }
+    finally {
+        $env:GITHUB_STEP_SUMMARY = $savedSummary; $env:GITHUB_OUTPUT = $savedOutput
+        Remove-Item -LiteralPath $mainDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
     if ($failedNames.Count -gt 0) { throw "Staged submission cases failed: $($failedNames -join '; ')" }
-    Write-Host "All $($cases.Count) staged-submission cases and the SVA-9 regression behaved as required."
+    Write-Host "All $($cases.Count) staged-submission cases, $($mainCases.Count) main-path cases and the SVA-9 regression behaved as required."
     exit 0  # explicit success for the Actions wrapper (PR #53 B-1)
 }
 
@@ -362,7 +414,7 @@ Write-Host "  ok    $($result.Reason) (other live packages: $($result.Versions -
 # never reach a log.
 Write-Host '  packages in the draft (fileName / fileStatus / version):'
 foreach ($package in @((ConvertFrom-CliJson $raw).PSObject.Properties | Where-Object { $_.Name -ieq 'applicationPackages' } | Select-Object -First 1).Value) {
-    $shown = foreach ($field in @('fileName', 'fileStatus', 'version')) { $value = Get-ScalarField $package $field; if ($null -eq $value -or "$value" -eq '') { '-' } else { "$value" } }
+    $shown = foreach ($field in @('fileName', 'fileStatus', 'version')) { $value = Get-ScalarField $package $field; if ($null -eq $value -or "$value" -eq '') { '-' } else { ConvertTo-LogSafe $value } }
     Write-Host "    $($shown -join ' / ')"
 }
 if ($ListingReport) { Write-ListingReport (ConvertFrom-CliJson $raw) $StoreListingRoot }
