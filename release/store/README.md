@@ -36,16 +36,9 @@ Store listing.
 
 ## Current contents
 
-Notes for **1.1.8** (package 1.1.8.0, tag `v1.1.8`). They replace the 1.1.7 text and describe only
-the user-visible changes in that release: the stale data age on the Servers page, the announced
-end of a local network search, a rare case in which an alert could be held back after a server
-stopped being monitored and was monitored again, and the clearer Portuguese example text in the server editor.
+Notes for **1.1.9** (package 1.1.9.0, tag `v1.1.9`). They replace the 1.1.8 text and describe only
+the user-visible change in that release: the Light or Dark theme choice is now remembered across
+restarts, System still follows Windows, and a Windows high contrast theme still takes priority.
 
-**Screen reader wording.** No human screen reader session was run for 1.1.8. The screen reader
-sentences (paragraph two in all three files) therefore describe only what the app gives to screen
-readers (the accessible name, the notification), not what a screen reader says. Keep that wording
-until a human screen reader check confirms more.
-
-Known issues that are **not** fixed in 1.1.8 (large text size, switching between two high contrast
-themes, theme choice not remembered) are listed in `docs/release/1.1.8-known-issues.md`. Do not
-describe them as fixed here.
+Known issues that are **not** fixed in 1.1.9 (large text size, switching between two high contrast
+themes) are listed in `docs/release/1.1.9-known-issues.md`. Do not describe them as fixed here.
