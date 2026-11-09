@@ -170,24 +170,39 @@ public sealed class JsonThemePreferenceStoreTests : IDisposable
         // Read and TryWrite share one lock. The writer is held at the replace point by a gate: a Read started
         // meanwhile must not complete until the save does, and then sees the new record. The short wait below can
         // only make a broken lock harder to catch, never fail a correct one.
+        // r3 (Atlas): the gate only opens when the test opens it. If the writer's wait ever times out (a runner
+        // stalled for minutes) that is recorded and reported as such, never mistaken for a lock failure.
         Store().TryWrite(AppThemePreference.Light);
+        var gateTimeout = TimeSpan.FromMinutes(5);
         using var atReplace = new ManualResetEventSlim();
         using var release = new ManualResetEventSlim();
+        var gateExpired = false;
         var store = Store(beforeReplace: _ =>
         {
             atReplace.Set();
-            release.Wait(TimeSpan.FromSeconds(30));
+            gateExpired = !release.Wait(gateTimeout);
         });
 
-        var write = Task.Run(() => store.TryWrite(AppThemePreference.Dark));
-        Assert.True(atReplace.Wait(TimeSpan.FromSeconds(30)));
-        var read = Task.Run(store.Read);
-        var completedWhileHeld = read.Wait(TimeSpan.FromMilliseconds(200));
-        release.Set();
+        Task<bool> write;
+        Task<AppThemePreference> read;
+        bool completedWhileHeld;
+        try
+        {
+            write = Task.Run(() => store.TryWrite(AppThemePreference.Dark));
+            Assert.True(atReplace.Wait(gateTimeout), "The writer never reached the replace point.");
+            read = Task.Run(store.Read);
+            completedWhileHeld = read.Wait(TimeSpan.FromMilliseconds(200));
+        }
+        finally
+        {
+            release.Set(); // whatever happened above, the writer is never left blocked
+        }
 
-        Assert.True(write.Wait(TimeSpan.FromSeconds(30)) && write.Result);
-        Assert.True(read.Wait(TimeSpan.FromSeconds(30)));
-        Assert.False(completedWhileHeld);
+        Assert.True(write.Wait(gateTimeout), "The save did not finish after the gate was released.");
+        Assert.True(read.Wait(gateTimeout), "The read did not finish after the save.");
+        Assert.False(gateExpired, "The gate expired before the test released it (runner stall); the result says nothing about the lock.");
+        Assert.True(write.Result, "The save reported failure.");
+        Assert.False(completedWhileHeld, "A Read completed while a save held the lock.");
         Assert.Equal(AppThemePreference.Dark, read.Result);
     }
 

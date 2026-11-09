@@ -16,6 +16,8 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
     private readonly IThemePreferenceStore _themePreferenceStore;
     // THEME-1 r2 (Prism LOW-3): the last value the store holds for sure - a failed save leaves it unchanged, so choosing
     // the same option again retries instead of being taken for "nothing changed".
+    // Known limitation (Atlas r3): re-clicking the radio that is already checked sends no new index, so a retry needs
+    // another choice first (or a re-bind of the same value, e.g. a page reload).
     private AppThemePreference _lastPersistedTheme;
     private readonly IServerService _serverService;
     private readonly IServerDiscoveryService _discoveryService;
