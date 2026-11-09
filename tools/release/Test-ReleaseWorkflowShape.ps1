@@ -68,9 +68,21 @@ function Assert-Provenance($Jobs, [string] $StoreJob) {
     # A conditional step or one allowed to fail would let a later Store call run past a failed guard.
     if ($store -match '(?m)^\s+continue-on-error:') { throw "Shape P-1: no step of the $StoreJob job may continue on error." }
     foreach ($step in ($store -split '(?m)^      - ')) {
-        if ($step -match '(?m)^        if:' -and $step -notmatch '\Aname: Report the resulting state\s*\n') { throw "Shape P-1: only the report step of the $StoreJob job may carry a condition." }
+        # STORE-PIPE-1 round 2 (Vigil L-2): besides the report, only the JSON cleanup, exactly as below: if: always(),
+        # one Remove-Item of named .json files in the work directory, nothing else on the step.
+        if ($step -match '(?m)^        if:' -and $step -notmatch '\Aname: Report the resulting state\s*\n' -and $step -cnotmatch $cleanupStepPattern) { throw "Shape P-1: only the report step and the JSON cleanup of the $StoreJob job may carry a condition." }
     }
     return $store
+}
+
+$cleanupStepPattern = "\Aname: Remove the submission JSON files\n        if: always\(\)\n        shell: pwsh\n        run: Remove-Item -LiteralPath '[a-z]+\.json'(?:, '[a-z]+\.json')* -Force -ErrorAction SilentlyContinue\n\s*\z"
+
+# STORE-PIPE-1 round 2 (Vigil L-2): the job ends by removing, by name, every file that held the submission JSON.
+function Assert-JsonCleanup([string] $Store, [string] $StoreJob, [string[]] $Files) {
+    $steps = @($Store -split '(?m)^      - ' | Where-Object { $_ -cmatch $cleanupStepPattern })
+    if ($steps.Count -ne 1) { throw "Shape STORE-PIPE-1: the $StoreJob job must end with exactly one 'Remove the submission JSON files' step (if: always())." }
+    foreach ($file in $Files) { if (-not $steps[0].Contains("'$file'")) { throw "Shape STORE-PIPE-1: the $StoreJob job's cleanup must remove $file (it holds the SAS upload URL)." } }
+    if (-not ($Store -split '(?m)^      - ')[-1].StartsWith('name: Remove the submission JSON files')) { throw "Shape STORE-PIPE-1: the JSON cleanup must be the last step of the $StoreJob job." }
 }
 
 function Assert-SharedConcurrency([string] $Text) {
@@ -84,6 +96,11 @@ $command = '(?m)^[^''"\n]*?'
 # Vigil P-1 L-1: the staged draft's package must be the file store-submit uploaded from the tag commit
 # G4 proved, in BOTH reads of the draft (stage read-back, certify proof).
 $tagBoundFileName = '-ExpectedPackageFileName "ServerAlyzer_${env:PACKAGE_VERSION}_x64_$($env:TAG_COMMIT.Substring(0, 7)).msix" `'
+
+# Index of the call of tools/release/<Script>.ps1 whose continuation lines include $Argument, or -1.
+function Get-ScriptCall([string] $Text, [string] $Script, [string] $Argument) {
+    return Get-Index $Text ('(?s)\./tools/release/' + [regex]::Escape($Script) + '\.ps1 `(?:\s*\n\s+-[A-Za-z]+[^\n]*`)*?\s*\n\s+' + [regex]::Escape($Argument))
+}
 
 # Index of the Assert-StagedSubmission call whose continuation lines include $Argument, or -1.
 function Get-StagedCall([string] $Text, [string] $Argument) {
@@ -109,11 +126,28 @@ function Assert-PinnedStoreCli([string] $Text) {
     if ($firstUse -lt 0 -or $firstUse -lt $install) { throw 'Shape M-1: the pinned CLI must be installed and verified before msstore is first used.' }
 }
 
+# STORE-PIPE-1 round 3. V-1: every print of raw CLI output ($raw / $output) is exactly the wrapped block below, a
+# fresh random token (never printed before its stop line) around one Write-Host, so the output cannot run workflow
+# commands. V-3: no msstore call runs verbose (the pinned CLI logs the SAS upload URL at Information level).
+$wrappedPrintPattern = "(?m)^([ ]+)\`$stopToken = \[guid\]::NewGuid\(\)\.ToString\('n'\)\n\1Write-Host `"::stop-commands::\`$stopToken`"\n\1Write-Host \`$(?:raw|output)\n\1Write-Host `"::\`$stopToken::`"[ ]*$"
+function Assert-StoreLogHygiene([string] $Text) {
+    $body = Strip-Comments $Text
+    $prints = @([regex]::Matches($body, '(?m)^[^\n]*\bWrite-(?:Host|Output|Information|Warning|Verbose|Error)\b[^\n]*\$(?:raw|output)\b[^\n]*$'))
+    $wrapped = @([regex]::Matches($body, $wrappedPrintPattern))
+    if ($prints.Count -ne $wrapped.Count) { throw 'Shape V-1: raw CLI output ($raw / $output) may be printed only between "::stop-commands::<fresh token>" and "::<token>::".' }
+    if (([regex]::Matches($body, [regex]::Escape('$stopToken'))).Count -ne 3 * $wrapped.Count) { throw 'Shape V-1: the stop-commands token is used only by its wrapped print (never printed or reused elsewhere).' }
+    $commands = (($body -replace '`\n[ \t]*', ' ') -split "`n") | Where-Object { $_ -match '\bmsstore\b' }
+    foreach ($line in $commands) {
+        if ($line -cmatch '(?<!\S)(?:--verbose|-v)(?![\w-])') { throw 'Shape V-3: no msstore call may run with --verbose / -v (the pinned CLI logs the SAS upload URL).' }
+    }
+}
+
 function Assert-StoreSubmit([string] $Text) {
     $jobs = Get-Jobs $Text
     $submit = Assert-Provenance $jobs 'submit'
     Assert-SharedConcurrency $Text
     Assert-PinnedStoreCli $Text
+    Assert-StoreLogHygiene $Text
     $configure = $submit.IndexOf('msstore reconfigure')
     if ($configure -lt 0) { throw 'Shape: the submit job no longer configures the Store CLI; review this guard.' }
 
@@ -140,6 +174,11 @@ function Assert-StoreSubmit([string] $Text) {
     $staged = $submit.IndexOf('./tools/release/Assert-StagedSubmission.ps1 `')
     if ($update -lt 0 -or $staged -lt $update) { throw 'Shape P-1: the read-back must prove an uncommitted draft after the metadata update.' }
     if ((Get-StagedCall $submit $tagBoundFileName) -lt 0) { throw 'Shape P-1: the read-back must bind the package file name to the tag commit.' }
+    # STORE-PIPE-1: before the commit the upload has no version, so the metadata step identifies it by file name.
+    if ((Get-ScriptCall $submit 'Update-StoreSubmission' $tagBoundFileName) -lt 0) { throw 'Shape STORE-PIPE-1: Update-StoreSubmission must bind the pending upload to the tag-commit file name.' }
+    # Vigil L-2: the submission JSON (with the SAS upload URL) goes to the update by file, never on the command line.
+    if ($submit -notmatch '(?m)^\s+msstore submission update \$\{\{ env\.STORE_PRODUCT_ID \}\} --payload updated\.json\s*$') { throw 'Shape STORE-PIPE-1: msstore submission update must read the JSON from updated.json (--payload), not from the command line.' }
+    Assert-JsonCleanup $submit 'submit' @('before.json', 'draft.json', 'updated.json', 'readback.json')
 
     foreach ($marker in @('Assert-PackageVersionFloor.ps1', 'Assert-PackageIdentity.ps1', 'Assert-DistributionPrivacy.ps1', 'Assert-PackageRuntime.ps1', '$expectedName')) {
         $at = $submit.IndexOf($marker)
@@ -154,6 +193,7 @@ function Assert-StoreCertify([string] $Text) {
     $certify = Assert-Provenance $jobs 'certify'
     Assert-SharedConcurrency $Text
     Assert-PinnedStoreCli $Text
+    Assert-StoreLogHygiene $Text
     $all = Strip-Comments $Text
     if ($all -match '\bmsstore\s+(publish|submission\s+(update|updateMetadata|delete|rollout))\b') { throw 'Shape P-1: store-certify must not upload, update, delete or roll out; it only commits the staged draft.' }
     $configure = $certify.IndexOf('msstore reconfigure')
@@ -167,6 +207,12 @@ function Assert-StoreCertify([string] $Text) {
     if ($staged -lt 0 -or $staged -lt $configure -or $staged -gt $commit) { throw 'Shape P-1: the staged draft must be proven by its submission id right before the commit.' }
     $named = Get-StagedCall $certify $tagBoundFileName
     if ($named -ne $staged) { throw 'Shape P-1: the certify proof must bind the package file name to the tag commit (L-1).' }
+    # STORE-PIPE-1: after the commit, the bounded wait and the proof of the ingested package, bound to the same
+    # submission id and the same tag-commit file name. Before the commit it could only time out.
+    $wait = Get-ScriptCall $certify 'Wait-CommittedSubmission' '-ExpectedSubmissionId $env:SUBMISSION_ID `'
+    $waitNamed = Get-ScriptCall $certify 'Wait-CommittedSubmission' $tagBoundFileName
+    Assert-JsonCleanup $certify 'certify' @('draft.json')
+    if ($wait -lt 0 -or $wait -lt $commit -or $waitNamed -ne $wait) { throw 'Shape STORE-PIPE-1: after the commit, store-certify must wait for Partner Center and prove the package (Wait-CommittedSubmission, bound to the submission id and the tag-commit file name).' }
 
     # Relay W4: the id binding comes only from the dispatch input. SUBMISSION_ID is declared once per job,
     # as the input, and nothing reassigns it (no assignment, no GITHUB_ENV, no environment API).
@@ -191,6 +237,7 @@ function Assert-StoreCertify([string] $Text) {
 
 function Assert-StoreStatus([string] $Text) {
     Assert-PinnedStoreCli $Text
+    Assert-StoreLogHygiene $Text
     $body = Strip-Comments $Text
     if ($body -notmatch 'Assert-ManualPublishMode\.ps1 -PublishMode \$publishMode') { throw 'Shape G6: store-status must check the publish mode.' }
     if ($body -notmatch 'if \(\$publishModeError\) \{ throw') { throw 'Shape G6: a submission in flight off the publishing hold must fail the run.' }
@@ -229,14 +276,28 @@ $mutations = @{
         # PR #56 fix round 1.
         @{ Old = './tools/release/Assert-NoPendingSubmission.ps1 -SubmissionPath before.json'; New = './tools/release/Assert-NoPendingSubmission.ps1 -SubmissionPath before.json -AllowedStatuses None,Published,Canceled,PendingCommit'; Name = 'W3 call site lets PendingCommit through (Relay M-1)' }
         @{ Old = "          if (`$env:STAGE_CONFIRM -cne 'STAGE') { throw"; New = "          if (`$false) { throw"; Name = 'phrase not checked before the approval (Vigil N-1)' }
-        @{ Old = '$($env:TAG_COMMIT.Substring(0, 7)).msix" `'; New = '0000000.msix" `'; Name = 'read-back file name not bound to the tag commit (Vigil L-1)' }
+        @{ Old = "`$(`$env:TAG_COMMIT.Substring(0, 7)).msix`" ```n            -ExpectedVisibility '`${{ env.STORE_VISIBILITY }}' ``"; New = "0000000.msix`" ```n            -ExpectedVisibility '`${{ env.STORE_VISIBILITY }}' ``"; Name = 'read-back file name not bound to the tag commit (Vigil L-1)' }
+        # STORE-PIPE-1.
+        @{ Old = "            -ExpectedPackageFileName `"ServerAlyzer_`${env:PACKAGE_VERSION}_x64_`$(`$env:TAG_COMMIT.Substring(0, 7)).msix`" ```n            -ExpectedVisibility '`${{ env.STORE_VISIBILITY }}'`n"; New = "            -ExpectedVisibility '`${{ env.STORE_VISIBILITY }}'`n"; Name = 'metadata step identifies the upload by version only (STORE-PIPE-1)' }
+        # STORE-PIPE-1 round 2 (Vigil L-2).
+        @{ Old = "msstore submission update `${{ env.STORE_PRODUCT_ID }} --payload updated.json"; New = "msstore submission update `${{ env.STORE_PRODUCT_ID }} (Get-Content -Raw updated.json)"; Name = 'submission JSON back on the command line (Vigil L-2)' }
+        @{ Old = "'before.json', 'draft.json', 'updated.json', 'readback.json'"; New = "'before.json', 'draft.json', 'readback.json'"; Name = 'cleanup misses updated.json (Vigil L-2)' }
+        @{ Old = "        run: Remove-Item -LiteralPath 'before.json', 'draft.json', 'updated.json', 'readback.json' -Force -ErrorAction SilentlyContinue`n"; New = "        run: |`n          Remove-Item -LiteralPath 'before.json', 'draft.json', 'updated.json', 'readback.json' -Force -ErrorAction SilentlyContinue`n          msstore submission get x`n"; Name = 'cleanup step runs something else under if: always() (Vigil L-2)' }
+        @{ Old = "      - name: Remove the submission JSON files`n        if: always()`n"; New = "      - name: Remove the submission JSON files`n"; Name = 'cleanup only on success (Vigil L-2)' }
+        # STORE-PIPE-1 round 3 (Vigil V-1, V-3).
+        @{ Old = "          Write-Host `"::stop-commands::`$stopToken`"`n          Write-Host `$raw`n"; New = "          Write-Host `$raw`n"; Name = 'status output printed without stop-commands (Vigil V-1)' }
+        @{ Old = "          Write-Host `"::stop-commands::`$stopToken`"`n          Write-Host `$output`n"; New = "          Write-Host `$output`n"; Name = 'apps get output printed without stop-commands (Vigil V-1)' }
+        @{ Old = "          Write-Host `$raw`n"; New = "          Write-Host `$raw`n          Write-Host `$raw.Trim()`n"; Name = 'a second, unwrapped print of the status output (Vigil V-1)' }
+        @{ Old = "          `$stopToken = [guid]::NewGuid().ToString('n')`n          Write-Host `"::stop-commands::`$stopToken`"`n          Write-Host `$raw`n"; New = "          `$stopToken = 'fixed'`n          Write-Host `"::stop-commands::`$stopToken`"`n          Write-Host `$raw`n"; Name = 'predictable stop-commands token (Vigil V-1)' }
+        @{ Old = "msstore publish `"`$env:PACKAGE_PATH`" -id"; New = "msstore publish `"`$env:PACKAGE_PATH`" --verbose -id"; Name = 'upload runs verbose (Vigil V-3)' }
+        @{ Old = "          msstore reconfigure ```n"; New = "          msstore reconfigure ```n            -v ```n"; Name = 'reconfigure runs verbose on a continuation line (Vigil V-3)' }
     )
     'store-certify.yml' = @(
         @{ Old = "  certify:`n    needs: provenance`n"; New = "  certify:`n"; Name = 'certify without provenance' }
         @{ Old = 'Assert-ReleaseRunProvenance.ps1 `'; New = 'Write-Host `'; Name = 'provenance check removed' }
         @{ Old = "    environment:`n      name: microsoft-store`n"; New = ''; Name = 'certify outside the Store environment' }
         @{ Old = 'if ($env:CERTIFY_CONFIRM -cne "CERTIFY $env:PACKAGE_VERSION") {'; New = 'if ($env:CERTIFY_CONFIRM -cnotlike "CERTIFY*") {'; Name = 'phrase not bound to the version' }
-        @{ Old = "            -ExpectedSubmissionId `$env:SUBMISSION_ID ```n"; New = ''; Name = 'staged draft not bound by id' }
+        @{ Old = "-ExpectedVisibility '`${{ env.STORE_VISIBILITY }}' ```n            -ExpectedSubmissionId `$env:SUBMISSION_ID ```n"; New = "-ExpectedVisibility '`${{ env.STORE_VISIBILITY }}' ```n"; Name = 'staged draft not bound by id' }
         @{ Old = './tools/release/Assert-StagedSubmission.ps1 `'; New = 'Write-Host `'; Name = 'staged draft proof removed' }
         @{ Old = "      - name: Commit the staged draft to certification`n"; New = "      - name: Commit the staged draft to certification`n        if: always()`n"; Name = 'commit runs after a failed proof' }
         @{ Old = "      - name: Prove the draft is still the staged draft`n        shell: pwsh"; New = "      - name: Prove the draft is still the staged draft`n        continue-on-error: true`n        shell: pwsh"; Name = 'staged proof allowed to fail' }
@@ -249,6 +310,16 @@ $mutations = @{
         @{ Old = '          if ($env:CERTIFY_CONFIRM -cne "CERTIFY $env:PACKAGE_VERSION") { throw "Confirmation'; New = '          if ($false) { throw "Confirmation'; Name = 'phrase not checked before the approval (Vigil N-1)' }
         @{ Old = "          ./tools/release/Assert-StagedSubmission.ps1 ```n            -SubmissionPath draft.json"; New = "          `$env:SUBMISSION_ID = (Get-Content -Raw draft.json | ConvertFrom-Json).id`n          ./tools/release/Assert-StagedSubmission.ps1 ```n            -SubmissionPath draft.json"; Name = 'W4 id reassigned from the draft (Relay W4)' }
         @{ Old = "        run: ./tools/release/Assert-PackageVersionFloor.ps1 -PackageVersion `$env:PACKAGE_VERSION"; New = "        run: |`n          ./tools/release/Assert-PackageVersionFloor.ps1 -PackageVersion `$env:PACKAGE_VERSION`n          'SUBMISSION_ID=1' | Out-File -Append `$env:GITHUB_ENV"; Name = 'W4 id rewritten through GITHUB_ENV' }
+        # STORE-PIPE-1: the wait for Partner Center after the commit, and the proof of the ingested package.
+        @{ Old = './tools/release/Wait-CommittedSubmission.ps1 `'; New = 'Write-Host `'; Name = 'no wait or package proof after the commit (STORE-PIPE-1)' }
+        @{ Old = "        run: Remove-Item -LiteralPath 'draft.json' -Force -ErrorAction SilentlyContinue`n"; New = "        run: Remove-Item -LiteralPath 'other.json' -Force -ErrorAction SilentlyContinue`n"; Name = 'cleanup misses draft.json (Vigil L-2)' }
+        @{ Old = "        run: Remove-Item -LiteralPath 'draft.json' -Force -ErrorAction SilentlyContinue`n"; New = "        run: Remove-Item -LiteralPath 'draft.json' -Force -ErrorAction SilentlyContinue; msstore submission publish x`n"; Name = 'cleanup step commits under if: always() (Vigil L-2)' }
+        @{ Old = "          Write-Host `"::stop-commands::`$stopToken`"`n          Write-Host `$raw`n"; New = "          Write-Host `$raw`n"; Name = 'status output printed without stop-commands (Vigil V-1)' }
+        @{ Old = "msstore submission get `${{ env.STORE_PRODUCT_ID }} | Out-File -FilePath draft.json"; New = "msstore submission get `${{ env.STORE_PRODUCT_ID }} --verbose | Out-File -FilePath draft.json"; Name = 'draft read runs verbose (Vigil V-3)' }
+        @{ Old = "      - name: Wait for Partner Center to process the commit and prove the package`n        shell: pwsh"; New = "      - name: Wait for Partner Center to process the commit and prove the package`n        continue-on-error: true`n        shell: pwsh"; Name = 'post-commit proof allowed to fail (STORE-PIPE-1)' }
+        @{ Old = "            -ProductId '`${{ env.STORE_PRODUCT_ID }}' ```n            -ExpectedSubmissionId `$env:SUBMISSION_ID ```n"; New = "            -ProductId '`${{ env.STORE_PRODUCT_ID }}' ```n            -ExpectedSubmissionId 1 ```n"; Name = 'post-commit proof not bound to the submission id (STORE-PIPE-1)' }
+        @{ Old = "_x64_`$(`$env:TAG_COMMIT.Substring(0, 7)).msix`" ```n            -ExpectedPackageVersion `$env:PACKAGE_VERSION`n"; New = "_x64_0000000.msix`" ```n            -ExpectedPackageVersion `$env:PACKAGE_VERSION`n"; Name = 'post-commit proof file name not bound to the tag commit (STORE-PIPE-1)' }
+        @{ Old = "      - name: Commit the staged draft to certification`n"; New = "      - name: Early wait`n        shell: pwsh`n        run: |`n          ./tools/release/Wait-CommittedSubmission.ps1 ```n            -ProductId x ```n            -ExpectedSubmissionId `$env:SUBMISSION_ID ```n            -ExpectedPackageFileName `"ServerAlyzer_`${env:PACKAGE_VERSION}_x64_`$(`$env:TAG_COMMIT.Substring(0, 7)).msix`" ```n            -ExpectedPackageVersion `$env:PACKAGE_VERSION`n`n      - name: Commit the staged draft to certification`n"; Name = 'wait placed before the commit (STORE-PIPE-1)' }
         @{ Old = "      - name: Prove the draft is still the staged draft`n        shell: pwsh"; New = "      - name: Prove the draft is still the staged draft`n        env:`n          SUBMISSION_ID: `${{ steps.draft.outputs.id }}`n        shell: pwsh"; Name = 'W4 id redefined in a step env' }
         # PR #56 round 2 (Relay L-3, W11): Env: provider writes, by alias and by cmdlet.
         @{ Old = "          ./tools/release/Assert-StagedSubmission.ps1 ```n            -SubmissionPath draft.json"; New = "          si env:SUBMISSION_ID (Get-Content -Raw draft.json | ConvertFrom-Json).id`n          ./tools/release/Assert-StagedSubmission.ps1 ```n            -SubmissionPath draft.json"; Name = 'W11 id rewritten through the si alias' }
@@ -260,6 +331,11 @@ $mutations = @{
         @{ Old = "          ./tools/release/Assert-StagedSubmission.ps1 ```n            -SubmissionPath draft.json"; New = "          Push-Location Env:`n          Set-Item SUBMISSION_ID 1`n          Pop-Location`n          ./tools/release/Assert-StagedSubmission.ps1 ```n            -SubmissionPath draft.json"; Name = 'W11 id rewritten after Push-Location Env:' }
     )
     'store-status.yml' = @(
+        # STORE-PIPE-1 round 3 (Vigil V-1, V-3).
+        @{ Old = "            Write-Host `"::stop-commands::`$stopToken`"`n            Write-Host `$raw`n"; New = "            Write-Host `$raw`n"; Name = 'no-JSON output printed without stop-commands (Vigil V-1)' }
+        @{ Old = "          Write-Host `"::stop-commands::`$stopToken`"`n          Write-Host `$output`n"; New = "          Write-Host `$output`n"; Name = 'apps get output printed without stop-commands (Vigil V-1)' }
+        @{ Old = "            Write-Host `"::`$stopToken::`"`n"; New = "            Write-Host `"::`$stopToken::`"`n            Write-Host `"token `$stopToken`"`n"; Name = 'stop-commands token printed (Vigil V-1)' }
+        @{ Old = "msstore apps get `${{ env.STORE_PRODUCT_ID }} 2>&1"; New = "msstore apps get `${{ env.STORE_PRODUCT_ID }} -v 2>&1"; Name = 'apps get runs verbose (Vigil V-3)' }
         @{ Old = 'if ($publishModeError) { throw'; New = 'if ($publishModeError) { Write-Warning'; Name = 'publish mode only warns' }
     )
 }

@@ -30,8 +30,18 @@
     a whats-new.txt.
 
 .PARAMETER ExpectedPackageVersion
-    The package version that must already be present in the submission, e.g. 1.1.2.0.
-    Guards against updating metadata onto a draft that carries the wrong package.
+    Mandatory. The package version msstore publish staged in the draft, e.g. 1.1.8.0. Guards
+    against updating metadata onto a draft that carries the wrong package.
+
+.PARAMETER ExpectedPackageFileName
+    Mandatory (STORE-PIPE-1 round 2, Vigil L-3: with both optional, leaving both out skipped the
+    package check). The file name msstore publish uploaded: ServerAlyzer_<version>_x64_<first 7 of the tag commit>.msix.
+    STORE-PIPE-1: before the commit Partner Center has not filled in the version of the new package
+    (msstore publish adds it as { fileStatus = PendingUpload, fileName } and marks the published
+    package PendingDelete), so the file name is what identifies it. The rule is the one
+    Assert-StagedSubmission.ps1 applies on the read-back: exactly one PendingUpload entry with this
+    name, byte for byte; a version on it is optional but, if present, the expected one; every other
+    package PendingDelete, or live with a readable version older than the expected one.
 
 .PARAMETER ExpectedVisibility
     Asserted, not written. Leave empty to skip the assertion.
@@ -44,7 +54,8 @@ param(
     [Parameter(Mandatory)] [string] $SubmissionPath,
     [Parameter(Mandatory)] [string] $OutputPath,
     [string] $StoreListingRoot = (Join-Path (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path 'release/store'),
-    [string] $ExpectedPackageVersion,
+    [Parameter(Mandatory)] [string] $ExpectedPackageVersion,
+    [Parameter(Mandatory)] [string] $ExpectedPackageFileName,
     [string] $ExpectedVisibility,
     [int] $MaxReleaseNotesLength = 1500
 )
@@ -63,6 +74,18 @@ function Get-Member-CaseInsensitive {
         if ($property.Name -ieq $Name) { return $property }
     }
     return $null
+}
+
+function ConvertTo-LogSafe($Value) {
+    <# STORE-PIPE-1 round 2 (Vigil L-1): a value read from Partner Center is printed only if it is plainly
+       printable. A file name holding a newline followed by "::warning::..." would otherwise start a line
+       that GitHub Actions runs as a workflow command. \A and \z, not ^ and $: $ also matches before a
+       trailing newline. #>
+    if ($null -eq $Value) { return '' }
+    $text = [string] $Value
+    if ($text -eq '') { return '' }
+    if ($text -cmatch '\A[A-Za-z0-9._ -]{1,200}\z') { return $text }
+    return '<unprintable>'
 }
 
 function Get-Value { param($Object, [string] $Name)
@@ -96,49 +119,91 @@ Inspect the submission in Partner Center and re-run once the field is present.
 
 $publishMode = $publishModeMember.Value
 if ($publishMode -ne $MANUAL_PUBLISH_MODE) {
+    $shownMode = ConvertTo-LogSafe $publishMode
     throw @"
-STOP: targetPublishMode is '$publishMode', not '$MANUAL_PUBLISH_MODE'.
+STOP: targetPublishMode is '$shownMode', not '$MANUAL_PUBLISH_MODE'.
 
 '$MANUAL_PUBLISH_MODE' is the API spelling of "Don't publish this submission until I select
-Publish now". With '$publishMode' the release would go live on its own once certification
+Publish now". With '$shownMode' the release would go live on its own once certification
 passes, which no one has authorised.
 
 This is deliberately not overridable from the workflow. If automatic publishing is really
 wanted, a person must change it in Partner Center and say so.
 "@
 }
-Write-Host "  ok    targetPublishMode = $publishMode (publishing hold intact)"
+Write-Host "  ok    targetPublishMode = $(ConvertTo-LogSafe $publishMode) (publishing hold intact)"
 
 # ------------------------------------------------------------- 2. visibility
 $visibility = Get-Value -Object $submission -Name 'visibility'
 if ($ExpectedVisibility) {
     if ($visibility -ne $ExpectedVisibility) {
-        throw "STOP: visibility is '$visibility' but '$ExpectedVisibility' was expected. This pipeline never changes the audience; a mismatch means something else did."
+        throw "STOP: visibility is '$(ConvertTo-LogSafe $visibility)' but '$ExpectedVisibility' was expected. This pipeline never changes the audience; a mismatch means something else did."
     }
-    Write-Host "  ok    visibility = $visibility (unchanged, asserted only)"
+    Write-Host "  ok    visibility = $(ConvertTo-LogSafe $visibility) (unchanged, asserted only)"
 }
 else {
-    Write-Host "  info  visibility = $visibility (not asserted)"
+    Write-Host "  info  visibility = $(ConvertTo-LogSafe $visibility) (not asserted)"
 }
 
 # --------------------------------------------------------- 3. package version
-if ($ExpectedPackageVersion) {
-    $packages = Get-Value -Object $submission -Name 'applicationPackages'
-    if ($null -eq $packages) { throw 'STOP: the submission JSON has no applicationPackages array.' }
-
-    $versions = @()
-    foreach ($package in @($packages)) {
-        $status = Get-Value -Object $package -Name 'fileStatus'
-        if ($status -ieq 'PendingDelete') { continue }
-        $version = Get-Value -Object $package -Name 'version'
-        if ($version) { $versions += $version }
-    }
-
-    if ($versions -notcontains $ExpectedPackageVersion) {
-        throw "STOP: the submission carries package version(s) [$($versions -join ', ')] but $ExpectedPackageVersion was expected. The wrong package would be certified."
-    }
-    Write-Host "  ok    submission carries package version $ExpectedPackageVersion (all: $($versions -join ', '))"
+function Get-ScalarValue { param($Object, [string] $Name)
+    <# A field that must be one JSON value: an array or object is refused (null). Get-Value returns through the
+       pipeline, which unrolls a one-element array, so ["PendingUpload"] would pass for the right value. #>
+    $member = Get-Member-CaseInsensitive -Object $Object -Name $Name
+    if ($null -eq $member) { return $null }
+    if ($member.Value -is [string] -or $member.Value -is [ValueType]) { return $member.Value }
+    return $null
 }
+
+# STORE-PIPE-1: both are mandatory (round 2, Vigil L-3) and checked here, so a malformed value fails closed too.
+if ($ExpectedPackageVersion -cnotmatch '\A[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\z') { throw 'STOP: -ExpectedPackageVersion is missing or not a four-part version.' }
+if ($ExpectedPackageFileName -cnotmatch '\AServerAlyzer_[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+_x64_[0-9a-f]{7}\.msix\z') { throw 'STOP: -ExpectedPackageFileName is missing or not ServerAlyzer_<version>_x64_<sha7>.msix.' }
+
+$packagesMember = Get-Member-CaseInsensitive -Object $submission -Name 'applicationPackages'
+if ($null -eq $packagesMember -or $null -eq $packagesMember.Value) { throw 'STOP: the submission JSON has no applicationPackages array.' }
+if ($packagesMember.Value -isnot [array]) { throw 'STOP: applicationPackages is not a JSON array.' }
+
+$expected = [version] $ExpectedPackageVersion
+$versions = @()
+$pendingUploads = 0
+foreach ($package in $packagesMember.Value) {
+    if ($package -isnot [pscustomobject]) { throw 'STOP: a package entry in applicationPackages is not a JSON object.' }
+    # PR #56 Relay L-4: a fileStatus that is present but not one string makes the package unreadable.
+    $statusMember = Get-Member-CaseInsensitive -Object $package -Name 'fileStatus'
+    if ($null -ne $statusMember -and $null -ne $statusMember.Value -and $statusMember.Value -isnot [string]) {
+        throw 'STOP: a package has an unreadable fileStatus (not a single string).'
+    }
+    $status = [string] (Get-ScalarValue -Object $package -Name 'fileStatus')
+    if ([string]::Equals($status, 'PendingDelete', [StringComparison]::OrdinalIgnoreCase)) { continue }
+    $fileName = Get-ScalarValue -Object $package -Name 'fileName'
+    $versionMember = Get-Member-CaseInsensitive -Object $package -Name 'version'
+    $version = Get-ScalarValue -Object $package -Name 'version'
+    if ($null -ne $versionMember -and $null -ne $versionMember.Value -and $version -isnot [string]) { throw 'STOP: a package has an unreadable version (not a single string).' }
+    $text = if ($version -is [string]) { $version } else { '' }
+
+    if ([string]::Equals($status, 'PendingUpload', [StringComparison]::OrdinalIgnoreCase)) {
+        $pendingUploads++
+        if ($pendingUploads -gt 1) { throw 'STOP: the submission has more than one package waiting for upload (PendingUpload). The wrong package could be certified.' }
+        if (-not ($fileName -is [string] -and [string]::Equals($fileName, $ExpectedPackageFileName, [StringComparison]::Ordinal))) {
+            throw "STOP: the submission's pending upload is '$(ConvertTo-LogSafe $fileName)' but $ExpectedPackageFileName was expected. The wrong package would be certified."
+        }
+        if ($text -ne '' -and -not [string]::Equals($text, $ExpectedPackageVersion, [StringComparison]::Ordinal)) {
+            throw "STOP: the submission's pending upload carries version '$(ConvertTo-LogSafe $text)' but $ExpectedPackageVersion was expected. The wrong package would be certified."
+        }
+        continue
+    }
+
+    if ($text -cnotmatch '\A[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\z') { throw "STOP: the submission has a live package with an unreadable version ('$(ConvertTo-LogSafe $text)')." }
+    $versions += $text
+    if (([version] $text) -ge $expected) {
+        throw "STOP: the submission carries a live package $text ('$(ConvertTo-LogSafe $fileName)') that is not older than $ExpectedPackageVersion besides the pending upload. The wrong package would be certified."
+    }
+}
+
+if ($pendingUploads -eq 0) {
+    throw "STOP: the submission has no package waiting for upload (no PendingUpload entry; live package version(s) [$($versions -join ', ')]) but $ExpectedPackageFileName was expected. It is not the draft msstore publish staged."
+}
+Write-Host "  ok    pending upload $ExpectedPackageFileName for $ExpectedPackageVersion (other live packages: $($versions -join ', '))"
 
 # ------------------------------------------------------------ 4. release notes
 if (-not (Test-Path -LiteralPath $StoreListingRoot)) { throw "Store listing root not found: $StoreListingRoot" }
@@ -166,12 +231,12 @@ foreach ($dir in $languageDirs) {
 
     $matchedKey = $listingKeys | Where-Object { $_ -ieq $dir.Name } | Select-Object -First 1
     if (-not $matchedKey) {
-        throw "STOP: the submission has no listing for '$($dir.Name)'. Listings present: $($listingKeys -join ', '). Adding a new language is a product decision, not something this workflow does."
+        throw "STOP: the submission has no listing for '$($dir.Name)'. Listings present: $(@($listingKeys | ForEach-Object { ConvertTo-LogSafe $_ }) -join ', '). Adding a new language is a product decision, not something this workflow does."
     }
 
     $listing = $listings.$matchedKey
     $baseListingMember = Get-Member-CaseInsensitive -Object $listing -Name 'baseListing'
-    if ($null -eq $baseListingMember) { throw "STOP: listing '$matchedKey' has no baseListing object." }
+    if ($null -eq $baseListingMember) { throw "STOP: listing '$(ConvertTo-LogSafe $matchedKey)' has no baseListing object." }
     $baseListing = $baseListingMember.Value
 
     $releaseNotesMember = Get-Member-CaseInsensitive -Object $baseListing -Name 'releaseNotes'
@@ -186,7 +251,7 @@ foreach ($dir in $languageDirs) {
 
     $touchedKeys.Add($matchedKey) | Out-Null
     $changes.Add([pscustomobject] @{
-        Language    = $matchedKey
+        Language    = ConvertTo-LogSafe $matchedKey
         Source      = $notesPath
         OldLength   = $previous.Length
         NewLength   = $notes.Length
@@ -199,7 +264,7 @@ $untouched = @($listingKeys | Where-Object { $touchedKeys -notcontains $_ })
 Write-Host ''
 Write-Host 'Release notes written:'
 $changes | Format-Table -AutoSize Language, OldLength, NewLength, Changed | Out-String -Width 200 | Write-Host
-if ($untouched.Count -gt 0) { Write-Host "Listings left untouched: $($untouched -join ', ')" }
+if ($untouched.Count -gt 0) { Write-Host "Listings left untouched: $(@($untouched | ForEach-Object { ConvertTo-LogSafe $_ }) -join ', ')" }
 
 # ----------------------------------------------------------------- 5. write out
 $json = $submission | ConvertTo-Json -Depth 100
@@ -212,7 +277,7 @@ Write-Host "Updated submission written to $OutputPath ($((Get-Item -LiteralPath 
 $roundTrip = Get-Content -LiteralPath $OutputPath -Raw | ConvertFrom-Json
 $roundTripMode = Get-Value -Object $roundTrip -Name 'targetPublishMode'
 if ($roundTripMode -ne $MANUAL_PUBLISH_MODE) {
-    throw "STOP: after serialisation targetPublishMode is '$roundTripMode'. The file that would be sent does not preserve the publishing hold."
+    throw "STOP: after serialisation targetPublishMode is '$(ConvertTo-LogSafe $roundTripMode)'. The file that would be sent does not preserve the publishing hold."
 }
 Write-Host "  ok    re-read $OutputPath and targetPublishMode is still $roundTripMode"
 

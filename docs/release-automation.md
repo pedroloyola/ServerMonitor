@@ -5,8 +5,10 @@ workflow is allowed to do, and what still needs a person.
 
 The design principle throughout: **the pipeline can prepare and submit, but it can never
 make the product public.** Publishing stays a human act. Since REL.0E (P-1) preparing and
-submitting are also separate human decisions: `store-submit` only **stages** a draft, and
-only `store-certify`, dispatched and approved separately, sends it to certification.
+submitting are also separate human decisions: `store-submit` only **stages** a draft, and only a
+second, separate human act sends it to certification: `store-certify`, dispatched and approved
+separately, for a draft nobody edited in Partner Center, or *Submit for certification* in the Partner
+Center UI after a manual edit there (owner decision (ii), step 5b of the human procedure).
 
 ## The four workflows
 
@@ -14,7 +16,7 @@ only `store-certify`, dispatched and approved separately, sends it to certificat
 | --- | --- | --- | --- | --- |
 | `release-build.yml` | tag `v*` builds and checks; a GitHub Release only by manual dispatch | no | no | no |
 | `store-submit.yml` | manual dispatch only (`STAGE`); provenance job, then the `microsoft-store` environment | yes: uploads into a draft | **no** | no |
-| `store-certify.yml` | manual dispatch only (`CERTIFY <version>`); provenance job, then the `microsoft-store` environment | yes: commits the staged draft | yes | no |
+| `store-certify.yml` | manual dispatch only (`CERTIFY <version>`); provenance job, then the `microsoft-store` environment | yes: commits the staged draft, only if nobody edited it in Partner Center (otherwise step 5b, in the Partner Center UI) | yes | no |
 | `store-status.yml` | manual dispatch only, `microsoft-store-status` environment | reads only | no | no |
 
 `release-build.yml` holds no Store secrets at all: it is not attached to the environment
@@ -120,7 +122,8 @@ Order of operations, and why:
    refuses to run at all while anything is in flight (anything but `None`, `Published`,
    `Canceled`), and fails closed on unparseable output. A `PendingCommit` draft (typically one
    this workflow staged and a person is completing) gets an explicit refusal that says what to do
-   instead: certify it with `store-certify`, or delete it by hand in Partner Center to stage again.
+   instead: certify it with `store-certify` (or, if it was edited in Partner Center, in the Partner
+   Center UI, step 5b), or delete it by hand in Partner Center to stage again.
    The workflow calls the guard **exactly** as `Assert-NoPendingSubmission.ps1 -SubmissionPath
    before.json`, with its default allowed statuses; the shape guard refuses any other call (an extra
    `-AllowedStatuses`), and the guard's self-test runs through that default and pins it, so neither
@@ -129,20 +132,69 @@ Order of operations, and why:
    submission in draft. This must come **before** metadata edits, because `publish`
    recreates the draft.
 7. `msstore submission get`, then `Update-StoreSubmission.ps1`, which asserts
-   `targetPublishMode == Manual`, asserts visibility, asserts the draft carries the
-   expected package version, and writes the release notes from `release/store/`.
-8. `msstore submission update` applies the metadata.
+   `targetPublishMode == Manual`, asserts visibility, asserts that the draft's one pending upload is
+   the file this run uploaded (`-ExpectedPackageFileName`, see *Before the commit* below), and writes
+   the release notes from `release/store/`. The release notes are the only listing field this
+   workflow writes through the API.
+8. `msstore submission update <productId> --payload updated.json` applies the metadata. The JSON is
+   read from the file, so the SAS upload URL it holds is not on the command line (Vigil L-2).
 9. **Read back from the Store and prove the draft is staged, not committed**
    (`Assert-StagedSubmission.ps1`, on what the Store actually stored, not on the file that was
-   sent): status exactly `PendingCommit`, `targetPublishMode` `Manual`, visibility unchanged, the
-   expected package present **under the file name this run uploaded**
+   sent): status exactly `PendingCommit`, `targetPublishMode` `Manual`, visibility unchanged, exactly
+   one pending upload **under the file name this run uploaded**
    (`ServerAlyzer_<version>_x64_<first 7 of the tag commit>.msix`, which `msstore publish` writes into
-   `applicationPackages[].fileName`) and **no newer live package**. It also prints, per language, the
-   lengths and counts of the listing fields and whether the release notes equal the repository's.
+   `applicationPackages[].fileName`) and **no newer live package**. It prints the draft's packages
+   (`fileName / fileStatus / version` only) and, per language, the lengths and counts of the listing
+   fields and whether the release notes equal the repository's.
 10. **Hand over.** The run summary reports the draft's **submission id**, the package and the next
-    steps. Nothing has been sent to certification. The localized listing and screenshots are applied
-    by a person, to this draft, only now (after the upload phase), and reviewed in Partner Center:
-    see *Staged release: the human procedure*.
+    steps. Nothing has been sent to certification. A person reviews the draft in Partner Center; how
+    it is then certified depends on whether they edit it there (owner decision (ii), see
+    *Staged release: the human procedure*).
+
+#### Before the commit: the draft has no package version yet (STORE-PIPE-1)
+
+What a staged draft looks like, from the pinned CLI's source (`PrepareBundleAsync`, v0.4.3) and the
+submission API documentation, and seen in the first live STAGE run (SVA-9, run 42478961083, which
+failed on it):
+
+- `msstore publish --noCommit` marks the published package `PendingDelete` and adds the upload as
+  `{ fileStatus: PendingUpload, fileName: <the uploaded file> }`, **without a `version`**. The API
+  says that apart from `fileName`, `fileStatus` and two system-requirement fields "the other values
+  are populated by Partner Center". It fills in `version` only when it processes the upload, which
+  happens **after the commit** (`CommitStarted`, then `PreProcessing`). What SVA-9 **observed** is
+  only the first half: no version before the commit. That the version is filled in after the commit
+  is documented and inferred, **not yet observed**; its first live proof is `store-certify` at 1.1.9.
+- So before the commit no script can read the new version from the draft. The rule both
+  `Update-StoreSubmission.ps1` and `Assert-StagedSubmission.ps1` apply is: exactly one `PendingUpload`
+  entry, whose `fileName` is byte for byte `ServerAlyzer_<version>_x64_<sha7>.msix`; a `version` on it
+  is optional but, if present, must be the expected one; every other package is `PendingDelete`, or
+  live with a readable version older than the expected one; anything else (two pending uploads, none,
+  another name, a `fileStatus` or `version` that is not one string) fails. The name binds the draft to
+  the bytes that were proven before the upload (version floor, package identity, SHA-256 against the
+  release run, tag-commit file name). The rule before STORE-PIPE-1 required the version and read the
+  real draft as `[]`; the self-tests keep that as a regression case.
+- The **Partner Center UI** shows such a draft as unchanged ("Sem alterações" / "No changes"), with
+  the **previous** package (for example `ServerAlyzer_1.1.7.0_x64_1ff0fe3.msix`, *Validated*) and no
+  row for the new one. Our reading (an **inference**, not documented): the UI shows the processed
+  package set, and the upload is a pending operation until the commit. That is expected and does
+  **not** mean the upload was lost. Check the
+  staged file in the read-back log of the `store-submit` run (the `PendingUpload` line), not on the
+  *Packages* page.
+- The version is proven after the commit, by `store-certify` (see 2b step 5), on the expectation
+  above that Partner Center fills it in then (documented, not yet observed: first live proof at
+  1.1.9). If it does not, the wait fails closed (R3b).
+- The submission JSON also holds `fileUploadUrl`, a SAS URI with **write** access to the upload. No
+  script prints it, and the workflows keep the JSON only in the job's working directory, never as an
+  artifact. Each Store job ends with an `if: always()` step that removes those files by name
+  (`store-submit`: `before.json`, `draft.json`, `updated.json`, `readback.json`; `store-certify`:
+  `draft.json`), and `msstore submission update` reads `updated.json` by `--payload`, so the URL is
+  not on its command line (Vigil L-2; the shape guard enforces both). The URL stays **in**
+  `updated.json`: the pinned CLI deserializes the file and PUTs the whole object, and neither its
+  source nor the API documentation says whether Partner Center accepts the update without it, which
+  only a live call could settle. Outside our control: the pinned CLI itself logs the URL at
+  Information level when it uploads (`IStorePackagedAPIExtensions.cs`, v0.4.3); the public log of
+  the SVA-9 run shows no `sig=`. Any future capture of a real draft (for a fixture) must remove it
+  before the file is written anywhere.
 
 #### What `msstore publish --noCommit` does to an existing draft
 
@@ -218,10 +270,18 @@ downloaded archive. Dependabot cannot track a release-asset hash.
 
 ### 2b. `store-certify.yml` (the certification gate)
 
-Commits to certification the draft that `store-submit` staged, after a person completed and
-reviewed it. A **second dispatch**, with its own inputs, its own confirmation phrase and its own
-approval of the `microsoft-store` environment (each run is approved separately). It uploads
-nothing, edits nothing and deletes nothing (`Test-ReleaseWorkflowShape.ps1` enforces this).
+Commits to certification the draft that `store-submit` staged, after a person reviewed it. A
+**second dispatch**, with its own inputs, its own confirmation phrase and its own approval of the
+`microsoft-store` environment (each run is approved separately). It uploads nothing, edits nothing
+and deletes nothing (`Test-ReleaseWorkflowShape.ps1` enforces this).
+
+**Only for a draft nobody edited in Partner Center (owner decision (ii), STORE-PIPE-1).** Microsoft
+documents that a submission created through the API and then changed in Partner Center can no
+longer be changed or committed through the API, and may be left in an error state that only a
+delete clears. So when the listing text or screenshots were edited in the draft in Partner Center,
+certification is done **in the Partner Center UI** (*Submit for certification*, with *Publish
+manually* still selected) and `store-certify` is **not** dispatched. The input description of
+`confirm` and the run summary say the same.
 
 Inputs: the release tag, the run id of that tag's `release-build` run, the package version, the
 **submission id** from the stage run's summary, and the phrase **`CERTIFY <version>`** (for example
@@ -249,10 +309,35 @@ Inputs: the release tag, the run id of that tag's `release-build` run, the packa
    (what is about to be certified).
 4. `msstore submission publish` — the only commit in the pipeline. The publishing hold stays in
    force, so certification never means publication.
-5. Report the resulting state.
+5. **`Wait-CommittedSubmission.ps1`** (STORE-PIPE-1): Partner Center fills in the package version
+   only while it processes the commit (documented and inferred, not yet observed: first live proof
+   at 1.1.9). The step reads the submission (`msstore submission get`) at
+   most 30 times, 20 s apart, while it is `CommitStarted` or `PreProcessing`, and stops at the first
+   other status. It then requires `Certification` or `PendingPublication` and, on a re-read of the
+   same submission id, `targetPublishMode` still `Manual` (the hold survived the commit), the package
+   named `ServerAlyzer_<version>_x64_<sha7>.msix` as `Uploaded` with `version` equal to the expected
+   one and no other live package of that or a newer version.
+   `CommitFailed`, `PreProcessingFailed` or any other status, a version mismatch, another submission
+   id and a timeout fail the run. The submission is then left as it is: nothing can go live, because
+   of the publishing hold; to stop it, cancel it in Partner Center (R4). It prints only status, id
+   and the packages' `fileName / fileStatus / version`, never the submission JSON; like the other
+   Store scripts it prints a value read from Partner Center only if it is plain
+   (`[A-Za-z0-9._ -]`, at most 200 characters), else `<unprintable>`, so a value cannot inject a
+   workflow command (Vigil L-1). Its reads go through
+   an injectable function, so `-SelfTest` runs every case offline.
+6. Report the resulting state.
+7. Remove the submission JSON files (`if: always()`, see §2 *Before the commit*).
 
-No step of either Store job may be conditional (other than the final report) or `continue-on-error`,
-so a later Store call can never run past a failed guard.
+No step of either Store job may be conditional (other than the final report and the JSON cleanup,
+whose exact form, one `Remove-Item` of named `.json` files, the shape guard pins) or
+`continue-on-error`, so a later Store call can never run past a failed guard.
+
+**Logs (STORE-PIPE-1 round 3).** Every print of raw CLI output in the three Store workflows (`apps get`,
+`submission status`, and `store-status`'s output when it holds no JSON) goes out between
+`::stop-commands::<token>` and `::<token>::`, with a fresh random token per step that is never printed
+before its stop line, so a value in the output cannot run as a workflow command (a forged `::error::`
+or `::notice::` at the gate, Vigil V-1). No `msstore` call may run with `--verbose` / `-v`, since the
+pinned CLI logs the SAS upload URL at Information level (Vigil V-3). The shape guard enforces both.
 
 **Limits of the shape guard.** `Test-ReleaseWorkflowShape.ps1` reads the workflow **text**. It catches
 regressions written the ordinary way: a commit step put back, `--noCommit` dropped, a guard removed,
@@ -575,40 +660,55 @@ repository, not in an issue, not in a run log.
    package version, the SHA-256, and `STAGE`. The provenance job runs first; approve the
    `microsoft-store` environment only after it is green. Record the **submission id** from the run
    summary. Nothing has gone to certification.
-5. **Complete and review the draft** by hand: *Staged release: the human procedure* below (backup,
-   apply, verify). **Blocked while that section says so:** editing an API-created draft in Partner
-   Center stops the API from committing it; a release whose listing changes follows the
-   *portal-only release* there instead of steps 4-6.
-6. **Certification GO:** dispatch `store-certify.yml` with the tag, the same run id, the package
-   version, the submission id and `CERTIFY <version>`. Approve the environment after the
-   provenance job is green.
+5. **Review the draft** by hand: *Staged release: the human procedure* below. Before the commit the
+   Partner Center UI shows the draft as unchanged, with the previous package; check the staged file
+   name in the read-back log of the stage run.
+6. **Certification GO**, one of two ways (owner decision (ii)):
+   - nothing was edited in the draft in Partner Center: dispatch `store-certify.yml` with the tag, the
+     same run id, the package version, the submission id and `CERTIFY <version>`, and approve the
+     environment after the provenance job is green;
+   - the listing text or screenshots were edited in the draft in Partner Center: certify in the
+     Partner Center UI (*Submit for certification*), and do **not** dispatch `store-certify` (an
+     API-created submission changed in Partner Center can no longer be committed through the API).
+     This route is a **HYPOTHESIS** until first seen live; never upload an MSIX by hand on it, and
+     prove the package with `store-status` afterwards (step 5b, failure: R3c).
 7. Watch with `store-status.yml`.
 8. When it reports `CERTIFIED (awaiting manual Publish now)`, a person decides whether to
    press **Publish now** in Partner Center (**publication GO**). No workflow does this.
 
 Three separate human decisions, each with its own action: stage (`STAGE` + environment approval),
-certify (`CERTIFY <version>` + a second environment approval), publish (Partner Center only).
+certify (`CERTIFY <version>` + a second environment approval, or *Submit for certification* in Partner
+Center after a manual edit), publish (Partner Center only).
 
 ## Staged release: the human procedure
 
-> **BLOCKED (REL.0E audit, 2026-10-16): do not run steps 2-5 below as written.** Steps 3a/3b edit,
-> in Partner Center, a draft that `store-submit` created through the submission API, and step 5 then
-> commits it through the API. Microsoft documents that this does not work: "If you use Partner Center
-> to change a submission that you originally created by using the API, you will no longer be able to
-> change or commit that submission by using the API. In some cases, the submission could be left in
-> an error state where it cannot proceed in the submission process. If this occurs, you must delete
-> the submission and create a new submission." (*Manage app submissions*, Microsoft Store submission
-> API, see Sources). Second, unproven risk: Partner Center may only fill in a package's `version`
-> when it processes the upload at commit, in which case `store-submit` stops after its upload (fail
-> closed, draft left behind). Until an all-API path (listing text **and** screenshots through the
-> API) exists and has been proven, a release whose listing changes uses the **portal-only release**
-> below; `store-submit` and `store-certify` are not dispatched.
+> **Changed by STORE-PIPE-1 (2026-11-09), owner decision (ii).** The REL.0E audit (2026-10-16)
+> blocked steps 2-5 as written for two reasons. Both are now handled, but the API path has **not yet
+> run end to end live** after the change; 1.1.9 is its first run.
+>
+> 1. Steps 3a/3b edit, in Partner Center, a draft that `store-submit` created through the submission
+>    API. Microsoft documents: "If you use Partner Center to change a submission that you originally
+>    created by using the API, you will no longer be able to change or commit that submission by
+>    using the API. In some cases, the submission could be left in an error state where it cannot
+>    proceed in the submission process. If this occurs, you must delete the submission and create a
+>    new submission." (*Manage app submissions*, see Sources). **Decision (ii):** after any manual
+>    edit in Partner Center, step 5 is *Submit for certification* in the Partner Center UI;
+>    `store-certify` is used only when nobody edited the draft there.
+> 2. Partner Center fills in the new package's `version` only when it processes the upload after the
+>    commit. The SVA-9 STAGE run (42478961083), which stopped after its upload, confirmed only the
+>    first half: the version is missing **before** the commit. That it is filled in after the commit
+>    is documented and inferred, not yet observed (first live proof at 1.1.9). `store-submit` now
+>    identifies the upload by file name, and `store-certify` proves the version after the commit
+>    (see §2 *Before the commit* and §2b step 5).
+>
+> The **portal-only release** below stays available. It is the path when no API stage is wanted.
 
-### Portal-only release (while the block above holds)
+### Portal-only release (no API stage)
 
-Severity of the block (Vigil, independent check): **High, process/availability**. It fails closed:
-the API commit is refused or the draft ends in an error state and must be deleted. Nothing is
-published by mistake and no data is exposed, but a release cannot complete this way.
+The fallback when no API stage is wanted, or when the API path fails (R3c). Before STORE-PIPE-1 it
+was the only way a release could complete: the API path then failed closed (Vigil, independent check:
+**High, process/availability**), with nothing published by mistake and no data exposed. That block is
+handled above, but the API path is not yet proven live, so this path stays documented and ready.
 
 Every Store change is made by a person in Partner Center; the API is never used on the draft.
 `release-build` still builds and proves the package, and `store-status` stays read-only. What the
@@ -622,8 +722,8 @@ API path proved automatically (G4, the package bound to the tag-push run) is pro
 | P2c. Freeze the file | person, local | Mark the verified `.msix` read-only (`Set-ItemProperty <file> -Name IsReadOnly -Value $true`) and record its SHA-256 in the evidence **before** the upload. Upload **that exact path** in P4, from a folder that holds no other package (never next to a local QA build) | SHA-256 + path |
 | P3. Backup | person, read-only | Product idle (no draft, publishing hold `Manual`); **Export listings** (CSV) to private evidence | CSV + date |
 | P4. Draft | person, Partner Center | *Update* the product (the draft is a copy of the last published submission); upload **the P2c file**, and only that file; check the version, architecture and identity Partner Center shows. Partner Center does not show the hash | screenshot |
-| P5. Listing | person, in this draft | Steps 3a and 3b below (text, release notes from `whats-new.txt`, screenshots in order with captions). Touch nothing else | — |
-| P6. Verify | person, read-only | Step 4 below (the hold, three languages, package version, draft CSV diff against the repository); then read the package file name back: either dispatch **`store-status`** with **`include_metadata: true`** (`gh workflow run store-status.yml -f include_metadata=true`; read-only `GET`) and read `ApplicationPackages[].FileName` in the redacted submission JSON of its log, or read it on the draft's *Packages* page in Partner Center. Without `include_metadata` the run prints only the package versions, not the file name. The live package must be `ServerAlyzer_<version>_x64_<sha7>.msix` (sha7 = the tag commit) and, if already filled in, `Version` `<version>`. The JSON dump redacts the upload SAS URL and other credential-like values, but the log is readable by anyone who can read this public repository's Actions logs: check it shows nothing else sensitive before relying on it. HYPOTHESIS until seen: `store-status` reads a portal-created draft without changing it (it only calls `apps get` and `submission get`) | draft CSV + diff, `store-status` run id |
+| P5. Listing | person, in this draft | Steps 3a and 3b below (text, release notes from `whats-new.txt`, screenshots in order with captions); their note about step 5b concerns only the API path. Touch nothing else | — |
+| P6. Verify | person, read-only | *Submission options*: **Publish manually** (the hold) still selected; all three languages present; **Export listings** of the draft and diff it against the repository text; then read the package back: either dispatch **`store-status`** with **`include_metadata: true`** (`gh workflow run store-status.yml -f include_metadata=true`; read-only `GET`) and read `ApplicationPackages[].FileName` in the redacted submission JSON of its log, or read it on the draft's *Packages* page in Partner Center. Without `include_metadata` the run prints only the package versions, not the file name. The live package must be `ServerAlyzer_<version>_x64_<sha7>.msix` (sha7 = the tag commit) and, if already filled in, `Version` `<version>`. The JSON dump redacts the upload SAS URL and other credential-like values, but the log is readable by anyone who can read this public repository's Actions logs: check it shows nothing else sensitive before relying on it. HYPOTHESIS until seen: `store-status` reads a portal-created draft without changing it (it only calls `apps get` and `submission get`) | draft CSV + diff, `store-status` run id |
 | P7. Certify | person (**certification GO**) | *Submit to the Store* in Partner Center, with *Publish manually* still selected | date, submission id |
 | P8. Publish | person (**publication GO**) | After certification: **Publish now** | — |
 
@@ -658,7 +758,7 @@ run object). Expected: `workflowName` `Release build`, `event` `push`, `headBran
 * **NEEDS HUMAN:** the Partner Center account that performs P4-P8 has MFA enabled, and no other user
   or role can submit or publish for the product (review *Account settings → Users*).
 
-Rollback is R1, R2, R4-R6 below (R3 does not apply). A package that reached customers cannot be
+Rollback is R1, R2, R4-R6 below (R3, R3b, R3c and R3d do not apply: they concern the API path). A package that reached customers cannot be
 withdrawn by a lower version: the fix is a new release with a higher version.
 
 For a release whose listing (text and/or screenshots) changes, or whenever the draft should be
@@ -676,10 +776,11 @@ progress.
 | --- | --- | --- | --- | --- |
 | 1. Backup | person, read-only | **Before staging**, with the product idle: Partner Center → app → *Store listings* → **Export listings** (CSV of the published listing). Keep it in private evidence (`.boss/evidence/<release>/`), never in the public repository | yes (export only reads) | CSV + date |
 | 2. Stage | workflow `store-submit` | Upload, release notes, read-back proof (see §2). The draft is `PendingCommit` | no: a second run **refuses** while the draft exists. To stage again: delete the draft (step R1), then rerun | run id, submission id |
-| 3a. Text | person, in **this draft** | Per language, paste each field from `release/store/<lang>/` into the listing form (one feature per line, one keyword per line). Touch nothing else: not pricing/availability, properties, age ratings, packages or submission options | yes (setting the same value twice changes nothing) | — |
-| 3b. Screenshots | person, in this draft | Per language: remove the old screenshots not on the list, upload `01…NN` **in order** with the caption of the matching `NN-slug` line. Count and compare names before uploading: Partner Center does not de-duplicate | only if you compare first | — |
-| 4. Verify | person, read-only | *Submission options*: **Publish manually** (the hold) still selected; all three languages present; the package version on *Packages*; **Export listings** of the draft and diff it against the repository text; `store-status` reports `DRAFT (not submitted)` | yes | draft CSV + diff |
-| 5. Certify | workflow `store-certify` (**certification GO**) | `CERTIFY <version>` + submission id; the run re-proves the draft (id, `PendingCommit`, hold, visibility, package) and commits it. Check that the listing report in its log matches what you reviewed | yes: once committed, the draft is no longer `PendingCommit`, so a second run refuses | run id, state `SUBMITTED` |
+| 3a. Text (only if the listing text changes) | person, in **this draft** | Per language, paste each field from `release/store/<lang>/` into the listing form (one feature per line, one keyword per line). Touch nothing else: not pricing/availability, properties, age ratings, packages or submission options. **Any edit here means step 5 is done in the Partner Center UI (5b), never by `store-certify`** | yes (setting the same value twice changes nothing) | — |
+| 3b. Screenshots (only if they change) | person, in this draft | Per language: remove the old screenshots not on the list, upload `01…NN` **in order** with the caption of the matching `NN-slug` line. Count and compare names before uploading: Partner Center does not de-duplicate. **Any edit here means step 5 is 5b** | only if you compare first | — |
+| 4. Verify | person, read-only | *Submission options*: **Publish manually** (the hold) still selected; all three languages present; **the draft's package file name in the read-back log of the `store-submit` run**: the `PendingUpload` line must be `ServerAlyzer_<version>_x64_<sha7>.msix` (sha7 = the tag commit); **Export listings** of the draft and diff it against the repository text; `store-status` reports `DRAFT (not submitted)`. Do **not** look for the new version on *Packages*: before the commit Partner Center has not processed the upload, so that page shows the draft as unchanged, with the previous package (see §2 *Before the commit*) | yes | read-back log, draft CSV + diff |
+| 5a. Certify, draft not edited in Partner Center | workflow `store-certify` (**certification GO**) | Only if steps 3a and 3b were not done. `CERTIFY <version>` + submission id; the run re-proves the draft (id, `PendingCommit`, hold, visibility, pending upload by file name), commits it, waits for Partner Center to process it and proves the package version (§2b step 5). Check that the listing report in its log matches what you reviewed | yes: once committed, the draft is no longer `PendingCommit`, so a second run refuses | run id, state `CERTIFICATION IN PROGRESS` or `CERTIFIED` |
+| 5b. Certify, draft edited in Partner Center | person (**certification GO**), Partner Center | **HYPOTHESIS until first seen live**: that Partner Center certifies, from its UI, a draft staged through the API, with the staged upload. After step 3a or 3b: *Submit for certification* in the Partner Center UI, with *Publish manually* still selected. Do **not** dispatch `store-certify`: an API-created submission changed in Partner Center can no longer be committed through the API. **Never upload an MSIX by hand on this path** (the staged upload is the file the stage run proved). Once processing is done, dispatch `store-status` (`include_metadata: true` (`include_metadata` writes the redacted submission JSON to this public repository's Actions log: check it shows nothing sensitive, see P6)) and check that the submission has the new package `ServerAlyzer_<version>_x64_<sha7>.msix` with version `<version>`. No new package, a package that is not `<version>`, or an error state: **R3c** (certified with the old package: **R3d**), and **never Publish now** | no (one submission) | date, submission id, `store-status` run id |
 | 6. Publish | person (**publication GO**) | After certification: **Publish now** in Partner Center | — | — |
 
 Alternative to 3a, **Import listings (CSV) into the draft**: start from the CSV exported for **this
@@ -694,7 +795,10 @@ in the CSV replace the language's set (H-2). Never import a CSV built from scrat
 | --- | --- | --- |
 | R1. Before certification (steps 2–4) | Partner Center → the draft → **Delete** | Customers see no change. The next `store-submit` starts a new draft from the last published submission (old listing) |
 | R2. The draft content is wrong, the package is fine | Fix it in the draft (or import the step-1 CSV into the draft), then repeat step 4 | Draft only |
-| R3. `store-certify` refused | Nothing was committed. Read the reason (another draft id, status, hold, visibility, package); fix it in Partner Center or restage (R1 + step 2), then certify again | — |
+| R3. `store-certify` refused before the commit | Nothing was committed. Read the reason (another draft id, status, hold, visibility, package); fix it in Partner Center or restage (R1 + step 2), then certify again. If the draft was edited in Partner Center, certify it in the UI (step 5b) | — |
+| R3b. `store-certify` failed after the commit (wait timed out, `CommitFailed` / `PreProcessingFailed`, wrong package version) | The submission was committed and left as it is; the publishing hold still holds. `store-certify` cannot be rerun on it (it is no longer `PendingCommit`). **After a timeout**, first dispatch `store-status` (`include_metadata: true` (`include_metadata` writes the redacted submission JSON to this public repository's Actions log: check it shows nothing sensitive, see P6)): the submission may still progress; if it reaches certification with the package `ServerAlyzer_<version>_x64_<sha7>.msix` at version `<version>`, carry on from step 6. Otherwise (a failure status, another package or version, or no progress) **Cancel submission** (R4); after the cancel the product is idle again and a new `store-submit` (step 2) is allowed | Customers see no change |
+| R3c. Step 5b did not take (`store-status` shows no new package, a package that is not `<version>`, or an error state) | **Never Publish now.** In certification: **Cancel submission** (R4); still a draft or in an error state: **Delete** it (R1). Then release through the *portal-only release* (P1-P8). Do not upload an MSIX into that submission by hand | Customers see no change; the hold still holds |
+| R3d. Step 5b certified, waiting for Publish now, but `store-status` shows the old package (or no package at `<version>`): the new listing would ship with the previous package | **Never Publish now.** Cancel it (R5), then release through the *portal-only release* (P1-P8) | Customers see no change; the hold still holds |
 | R4. Committed, in certification | **Cancel submission** in Partner Center | The published listing does not change |
 | R5. Certified, waiting for Publish now | Do not publish; cancel it | Same, thanks to the publishing hold |
 | R6. Already published | A listing-only submission that **imports the step-1 CSV** (plus the old screenshots if needed) | Restores the previous listing |
@@ -715,17 +819,18 @@ Everything the workflows rely on runs offline:
 ./tools/release/Test-RepositoryPackageVersion.ps1 # csproj + both manifests declare one package version, 9 cases
 ./tools/release/Test-PackageResources.ps1       # en-US default + manifest strings in 3 languages (makepri stubbed), 23 cases
 ./tools/release/Test-DistributionPrivacy.ps1    # distribution privacy, 52 cases
-./tools/release/Test-StoreSubmissionUpdate.ps1  # publishing hold, 12 cases
+./tools/release/Test-StoreSubmissionUpdate.ps1  # publishing hold + the real draft shape (pending upload by file name, STORE-PIPE-1), SAS URL never printed, SVA-9 regression, a Partner Center value never printed raw (no workflow command), 40 cases
 ./tools/release/Get-SubmissionState.ps1 -SelfTest        # status mapping, 18 cases
-./tools/release/Assert-NoPendingSubmission.ps1 -SelfTest # in-flight guard through its default allowed statuses (pinned); status must be one string, 23 cases
-./tools/release/Assert-StagedSubmission.ps1 -SelfTest    # staged draft (P-1): PendingCommit, id, hold, visibility, package + tag-bound file name, each a single JSON string (never a one-element array); applicationPackages a JSON array; a non-string fileStatus refused, 46 cases
-./tools/release/Test-StoreStageCertify.ps1                # weaken each staged-draft / in-flight check in a copy; the named case must fail, 21 mutations
+./tools/release/Assert-NoPendingSubmission.ps1 -SelfTest # in-flight guard through its default allowed statuses (pinned); status must be one string, a Partner Center status never printed raw (no workflow command), 25 cases
+./tools/release/Assert-StagedSubmission.ps1 -SelfTest    # staged draft (P-1): PendingCommit, id, hold, visibility, one pending upload under the tag-bound file name, version optional before the commit (STORE-PIPE-1), each a single JSON string (never a one-element array); applicationPackages a JSON array; a non-string fileStatus refused; SVA-9 regression, 56 cases + 3 main-path cases (-ListingReport, step summary and output: no SAS, no workflow command)
+./tools/release/Wait-CommittedSubmission.ps1 -SelfTest   # store-certify after the commit (STORE-PIPE-1): bounded wait through CommitStarted/PreProcessing, end state, re-read, package Uploaded as the expected version, the hold re-asserted, SAS URL never printed, no workflow command, 34 cases
+./tools/release/Test-StoreStageCertify.ps1                # weaken each staged-draft / in-flight / post-commit check in a copy; the named case must fail, 39 mutations
 ./tools/release/Test-ReleaseRunProvenance.ps1             # release run provenance (G4), 40 cases
 ./tools/release/Test-ManualPublishMode.ps1                # publishing hold in store-status (G6), 20 cases
 ./tools/release/Test-HardeningMutations.ps1               # weaken each G4/G6 check and the pin/wiring guards; require detection
 ./tools/release/Test-WorkflowRunInterpolation.ps1 -SelfTest # no inputs/steps/needs/event in run blocks
 ./tools/release/Test-WorkflowActionPins.ps1 -SelfTest     # actions pinned by full SHA (G8)
-./tools/release/Test-ReleaseWorkflowShape.ps1 -SelfTest   # G2/G4/G6/runtime + P-1 stage/certify + M-1 pinned CLI wiring, 68 mutations
+./tools/release/Test-ReleaseWorkflowShape.ps1 -SelfTest   # G2/G4/G6/runtime + P-1 stage/certify + STORE-PIPE-1 file-name binding, post-commit wait, update by --payload and JSON cleanup + raw CLI output only inside stop-commands, no verbose msstore + M-1 pinned CLI wiring, 92 mutations
 ./tools/release/Install-MsStoreCli.ps1 -SelfTest          # pinned Store CLI: pin shape, hash/size before extraction on one held private copy (swap cases), signer + issuer, product version, PATH, 35 cases
 ```
 
