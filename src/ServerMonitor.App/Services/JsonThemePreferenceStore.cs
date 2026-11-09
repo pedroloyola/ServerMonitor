@@ -37,13 +37,27 @@ public sealed class JsonThemePreferenceStore : IThemePreferenceStore
     private readonly ThemeSettingsStorageOptions _storageOptions;
     private readonly ILogger<JsonThemePreferenceStore> _logger;
     private readonly object _sync = new();
+    private readonly Action<string>? _beforeReplace;
 
     public JsonThemePreferenceStore(
         ThemeSettingsStorageOptions storageOptions,
         ILogger<JsonThemePreferenceStore> logger)
+        : this(storageOptions, logger, beforeReplace: null)
+    {
+    }
+
+    /// <summary>
+    /// THEME-1 r2 (Atlas P2-B) test seam: <paramref name="beforeReplace"/> runs inside the lock, with the complete
+    /// temporary file on disk and the old record not yet replaced - the exact point an interrupted save stops at.
+    /// </summary>
+    internal JsonThemePreferenceStore(
+        ThemeSettingsStorageOptions storageOptions,
+        ILogger<JsonThemePreferenceStore> logger,
+        Action<string>? beforeReplace)
     {
         _storageOptions = storageOptions ?? throw new ArgumentNullException(nameof(storageOptions));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _beforeReplace = beforeReplace;
     }
 
     public AppThemePreference Read()
@@ -176,6 +190,7 @@ public sealed class JsonThemePreferenceStore : IThemePreferenceStore
                 stream.Flush(flushToDisk: true);
             }
 
+            _beforeReplace?.Invoke(temporaryFile);
             File.Move(temporaryFile, _storageOptions.FilePath, overwrite: true);
         }
         finally

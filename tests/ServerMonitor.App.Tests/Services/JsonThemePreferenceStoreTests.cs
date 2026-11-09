@@ -138,6 +138,59 @@ public sealed class JsonThemePreferenceStoreTests : IDisposable
         Assert.False(File.Exists(FilePath + ".tmp"));
     }
 
+    // ---- Atomic replace (Atlas P2-B) -------------------------------------------------------------------------------
+
+    [Fact]
+    public void ASaveInterruptedBeforeTheReplace_KeepsTheOldRecordWhole_AndLeavesNoPartialFile()
+    {
+        Store().TryWrite(AppThemePreference.Light);
+        var before = File.ReadAllBytes(FilePath);
+        string? temporary = null;
+        var store = Store(beforeReplace: path =>
+        {
+            temporary = path;
+            // The new record is complete in the temporary file, and the old one is still in place.
+            Assert.Equal(JsonThemePreferenceStore.Render(AppThemePreference.Dark), File.ReadAllBytes(path));
+            Assert.Equal(before, File.ReadAllBytes(FilePath));
+            throw new IOException("simulated interruption before the replace");
+        });
+
+        Assert.False(store.TryWrite(AppThemePreference.Dark));
+
+        Assert.NotNull(temporary); // the save really reached the replace point
+        Assert.Equal(before, File.ReadAllBytes(FilePath));
+        Assert.Equal(AppThemePreference.Light, Store().Read());
+        Assert.False(File.Exists(temporary));
+        Assert.Equal(["theme-settings.json"], Directory.GetFiles(_directory).Select(Path.GetFileName));
+    }
+
+    [Fact]
+    public void AReadDuringASave_WaitsForIt_AndSeesTheNewRecord()
+    {
+        // Read and TryWrite share one lock. The writer is held at the replace point by a gate: a Read started
+        // meanwhile must not complete until the save does, and then sees the new record. The short wait below can
+        // only make a broken lock harder to catch, never fail a correct one.
+        Store().TryWrite(AppThemePreference.Light);
+        using var atReplace = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        var store = Store(beforeReplace: _ =>
+        {
+            atReplace.Set();
+            release.Wait(TimeSpan.FromSeconds(30));
+        });
+
+        var write = Task.Run(() => store.TryWrite(AppThemePreference.Dark));
+        Assert.True(atReplace.Wait(TimeSpan.FromSeconds(30)));
+        var read = Task.Run(store.Read);
+        var completedWhileHeld = read.Wait(TimeSpan.FromMilliseconds(200));
+        release.Set();
+
+        Assert.True(write.Wait(TimeSpan.FromSeconds(30)) && write.Result);
+        Assert.True(read.Wait(TimeSpan.FromSeconds(30)));
+        Assert.False(completedWhileHeld);
+        Assert.Equal(AppThemePreference.Dark, read.Result);
+    }
+
     [Fact]
     public void AnUndefinedValue_IsNeverWritten()
     {
@@ -157,6 +210,6 @@ public sealed class JsonThemePreferenceStoreTests : IDisposable
         Assert.Equal(AppThemePreference.System, new InMemoryThemePreferenceStore((AppThemePreference)7).Read());
     }
 
-    private JsonThemePreferenceStore Store() =>
-        new(new ThemeSettingsStorageOptions { FilePath = FilePath }, NullLogger<JsonThemePreferenceStore>.Instance);
+    private JsonThemePreferenceStore Store(Action<string>? beforeReplace = null) =>
+        new(new ThemeSettingsStorageOptions { FilePath = FilePath }, NullLogger<JsonThemePreferenceStore>.Instance, beforeReplace);
 }

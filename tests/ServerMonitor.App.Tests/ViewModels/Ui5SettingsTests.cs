@@ -95,6 +95,37 @@ public sealed class Ui5SettingsTests
     }
 
     [Fact]
+    public void THEME1_AfterAFailedSave_ChoosingTheSameOptionAgain_Retries()
+    {
+        // Prism LOW-3: the comparison is with what the store holds, not with Current.
+        var store = new FakeThemePreferenceStore(AppThemePreference.Light) { FailWrites = true };
+        var world = new World(theme: AppThemePreference.Light, themeStore: store);
+        world.ViewModel.SelectedThemeIndex = 2; // Dark - the save fails
+        store.FailWrites = false;
+
+        world.ViewModel.SelectedThemeIndex = -1; // the radio group re-pushes the same choice
+        world.ViewModel.SelectedThemeIndex = 2;
+
+        Assert.Equal([AppThemePreference.Dark, AppThemePreference.Dark], store.Writes);
+        Assert.Equal(AppThemePreference.Dark, store.Saved);
+    }
+
+    [Fact]
+    public void THEME1_AfterAFailedSave_GoingBackToTheSavedValue_WritesNothing()
+    {
+        var store = new FakeThemePreferenceStore(AppThemePreference.Light) { FailWrites = true };
+        var world = new World(theme: AppThemePreference.Light, themeStore: store);
+        world.ViewModel.SelectedThemeIndex = 2; // Dark - the save fails, the file still says Light
+        store.FailWrites = false;
+
+        world.ViewModel.SelectedThemeIndex = 1; // back to Light: already what the store holds
+
+        Assert.Equal([AppThemePreference.Dark], store.Writes);
+        Assert.Equal(AppThemePreference.Light, store.Saved);
+        Assert.Equal(AppThemePreference.Light, world.Theme.Current);
+    }
+
+    [Fact]
     public void THEME1_AStoreThatThrows_IsNotFatal_TheChoiceStillApplies()
     {
         var store = new FakeThemePreferenceStore { ThrowOnWrite = new InvalidOperationException("broken store") };

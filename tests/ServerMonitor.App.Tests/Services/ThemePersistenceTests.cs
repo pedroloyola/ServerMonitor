@@ -49,6 +49,60 @@ public sealed class ThemePersistenceTests
         Assert.Equal(1, store.Reads);
     }
 
+    // ---- Restore: what a root REALLY receives at Attach (Atlas P2-A) ----------------------------------------------
+
+    [Theory]
+    [InlineData(AppThemePreference.System, ElementTheme.Default)]
+    [InlineData(AppThemePreference.Light, ElementTheme.Light)]
+    [InlineData(AppThemePreference.Dark, ElementTheme.Dark)]
+    public void TheFirstRoot_ReceivesTheSavedTheme_AtAttach_BeforeAnyApply(AppThemePreference saved, ElementTheme expected)
+    {
+        var assigned = new List<(object Root, ElementTheme Theme)>();
+        var service = new ThemeService(
+            NullLogger<ThemeService>.Instance, new FakeThemePreferenceStore(saved), (root, theme) => assigned.Add((root, theme)));
+        var dashboard = new object();
+
+        service.AttachRoot(dashboard);
+
+        // Through the same setter the production line sits behind: the theme the root is given, not a property that
+        // could disagree with it. Exactly one assignment, for this root, before anything else ran.
+        Assert.Equal([(dashboard, expected)], assigned);
+    }
+
+    [Fact]
+    public void ASecondRoot_ReceivesTheSameSavedTheme_AndALaterApplyReachesBothRoots()
+    {
+        var assigned = new List<(object Root, ElementTheme Theme)>();
+        var service = new ThemeService(
+            NullLogger<ThemeService>.Instance,
+            new FakeThemePreferenceStore(AppThemePreference.Dark),
+            (root, theme) => assigned.Add((root, theme)));
+        var dashboard = new object();
+        var flyout = new object();
+
+        service.AttachRoot(dashboard);
+        service.AttachRoot(flyout);
+        service.Apply(AppThemePreference.Light);
+
+        Assert.Equal(
+            [(dashboard, ElementTheme.Dark), (flyout, ElementTheme.Dark), (dashboard, ElementTheme.Light), (flyout, ElementTheme.Light)],
+            assigned);
+    }
+
+    [Fact]
+    public void TheProductionConstructor_UsesTheXamlSetter()
+    {
+        // The public constructor (the one DI uses) must route through XamlRootThemeSetter, whose body is the single
+        // RequestedTheme assignment; the internal constructor exists only for the recording setter above.
+        var constructor = Assert.Single(typeof(ThemeService).GetConstructors());
+        Assert.Equal(
+            [typeof(Microsoft.Extensions.Logging.ILogger<ThemeService>), typeof(IThemePreferenceStore)],
+            constructor.GetParameters().Select(parameter => parameter.ParameterType));
+        var service = new ThemeService(NullLogger<ThemeService>.Instance, new FakeThemePreferenceStore());
+        var field = typeof(ThemeService).GetField("_setRootTheme", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        Assert.Same(ThemeService.XamlRootThemeSetter, field!.GetValue(service));
+    }
+
     [Fact]
     public void AStoreThatThrows_OrReturnsAnUndefinedValue_RestoresSystem_AndNeverCrashesStartup()
     {

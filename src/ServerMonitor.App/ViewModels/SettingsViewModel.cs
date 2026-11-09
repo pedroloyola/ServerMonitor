@@ -14,6 +14,9 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
     private readonly ILocalizationService _localizationService;
     private readonly IThemeService _themeService;
     private readonly IThemePreferenceStore _themePreferenceStore;
+    // THEME-1 r2 (Prism LOW-3): the last value the store holds for sure - a failed save leaves it unchanged, so choosing
+    // the same option again retries instead of being taken for "nothing changed".
+    private AppThemePreference _lastPersistedTheme;
     private readonly IServerService _serverService;
     private readonly IServerDiscoveryService _discoveryService;
     private readonly INotificationSettingsService _notificationSettingsService;
@@ -81,6 +84,7 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
         ClearHistoryCommand = new AsyncRelayCommand(ClearHistoryAsync);
         ResetHistoryCommand = new AsyncRelayCommand(ResetHistoryAsync);
         _selectedThemeIndex = (int)themeService.Current;
+        _lastPersistedTheme = themeService.Current; // the value ThemeService restored from the store
         _notificationsEnabled = notificationSettingsService.NotificationsEnabled;
         _selectedLanguageIndex = LanguageIndexOf(localizationService);
     }
@@ -166,12 +170,11 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
             if (SetProperty(ref _selectedThemeIndex, value) && Enum.IsDefined((AppThemePreference)value))
             {
                 var preference = (AppThemePreference)value;
-                var changed = preference != _themeService.Current;
                 _themeService.Apply(preference);
-                if (changed)
+                if (preference != _lastPersistedTheme)
                 {
-                    // Only a real change is a choice: a radio re-binding the current value (a theme remount, a page
-                    // reload) must not rewrite the file.
+                    // Compared with what the store holds, not with Current: a re-bind of the saved value (a theme
+                    // remount, a page reload) never rewrites the file, and a choice whose save failed is retried.
                     SaveThemeChoice(preference);
                 }
             }
@@ -195,7 +198,11 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
             return;
         }
 
-        if (!saved)
+        if (saved)
+        {
+            _lastPersistedTheme = preference;
+        }
+        else
         {
             _logger.LogWarning("The theme choice {Theme} was not saved; it applies to this session only.", preference);
         }

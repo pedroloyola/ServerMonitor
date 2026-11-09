@@ -24,12 +24,47 @@ namespace ServerMonitor.App.Services;
 /// <c>RequestedTheme</c>, nothing on that path calls <see cref="Apply"/>, and when it ends the saved choice is
 /// what the roots still carry.
 /// </para>
+/// <para>
+/// <b>Known limitation (THEME-1 r2, Prism LOW-1).</b> Popups that WinUI hosts outside the root's tree (flyouts,
+/// menu flyouts, tooltips, possibly ComboBox drop-downs) may resolve the app-level theme, which follows Windows,
+/// instead of the root's <c>RequestedTheme</c>. ContentDialogs and the server-prep flyout are themed explicitly. No
+/// central fix is applied: <c>Application.RequestedTheme</c> can only be set before the first window and never
+/// changes afterwards, so setting it to the saved Light/Dark would make a later "System" choice resolve to that
+/// value instead of Windows until restart. The alternative is patching popups one by one, which the brief rules out.
+/// </para>
 /// </summary>
-public sealed class ThemeService(ILogger<ThemeService> logger, IThemePreferenceStore preferenceStore) : IThemeService
+public sealed class ThemeService : IThemeService
 {
+    /// <summary>
+    /// THEME-1 r2 (Atlas P2-A): the ONE line that touches a XAML root. Every theme a root receives - at
+    /// <see cref="Attach"/> and on every <see cref="Apply"/> - goes through the setter, so the tests observe the theme
+    /// a root really gets through the same path, with a recording setter in place of this one.
+    /// </summary>
+    internal static readonly Action<object, ElementTheme> XamlRootThemeSetter =
+        static (root, theme) => ((FrameworkElement)root).RequestedTheme = theme;
+
+    private readonly ILogger<ThemeService> _logger;
+    private readonly Action<object, ElementTheme> _setRootTheme;
     private readonly ThemeRootSet _roots = new();
 
-    public AppThemePreference Current { get; private set; } = Restore(preferenceStore, logger);
+    public ThemeService(ILogger<ThemeService> logger, IThemePreferenceStore preferenceStore)
+        : this(logger, preferenceStore, XamlRootThemeSetter)
+    {
+    }
+
+    /// <summary>The test seam: <paramref name="setRootTheme"/> stands in for <see cref="XamlRootThemeSetter"/>.</summary>
+    internal ThemeService(
+        ILogger<ThemeService> logger,
+        IThemePreferenceStore preferenceStore,
+        Action<object, ElementTheme> setRootTheme)
+    {
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _setRootTheme = setRootTheme ?? throw new ArgumentNullException(nameof(setRootTheme));
+        // Restored HERE, before any root can attach: the first root's first frame is already in the saved theme.
+        Current = Restore(preferenceStore, logger);
+    }
+
+    public AppThemePreference Current { get; private set; }
 
     /// <summary>
     /// Registers a XAML root and brings it to the current preference immediately, so a root created
@@ -39,8 +74,14 @@ public sealed class ThemeService(ILogger<ThemeService> logger, IThemePreferenceS
     {
         ArgumentNullException.ThrowIfNull(rootElement);
 
-        _roots.Add(rootElement);
-        ApplyTo(rootElement);
+        AttachRoot(rootElement);
+    }
+
+    /// <summary><see cref="Attach"/> without the XAML type, so the tests can attach plain objects.</summary>
+    internal void AttachRoot(object root)
+    {
+        _roots.Add(root);
+        ApplyTo(root);
     }
 
     /// <summary>
@@ -59,9 +100,9 @@ public sealed class ThemeService(ILogger<ThemeService> logger, IThemePreferenceS
         Current = preference;
 
         // EVERY root, not the most recent one. ThemeRootSet owns the iteration so that claim is testable.
-        _roots.ForEach(root => ApplyTo((FrameworkElement)root));
+        _roots.ForEach(ApplyTo);
 
-        logger.LogInformation("Application theme changed to {Theme}.", preference);
+        _logger.LogInformation("Application theme changed to {Theme}.", preference);
     }
 
     /// <summary>How many roots currently follow the preference. Diagnostic, and the seam the tests pin.</summary>
@@ -108,5 +149,5 @@ public sealed class ThemeService(ILogger<ThemeService> logger, IThemePreferenceS
     /// </summary>
     internal ElementTheme ThemeForNewRoot => ResolveElementTheme(Current);
 
-    private void ApplyTo(FrameworkElement root) => root.RequestedTheme = ThemeForNewRoot;
+    private void ApplyTo(object root) => _setRootTheme(root, ThemeForNewRoot);
 }
