@@ -15,15 +15,21 @@ namespace ServerMonitor.App.Services;
 /// Dashboard silently stops following the preference from then on.
 /// </para>
 /// <para>
-/// Scope note: this is the preference <b>within the current process</b>. Persisting it across launches is
-/// THEME-1 and deliberately not implemented here.
+/// <b>THEME-1 (persistence).</b> The saved choice is read from <see cref="IThemePreferenceStore"/> in the
+/// constructor, so <see cref="Current"/> is already the restored value before ANY root can be attached: every
+/// root (MainWindow, and the native tray menu that reads <see cref="Current"/>) gets it from its first frame, on
+/// a normal and on a headless <c>--background</c> start alike. A missing or unusable record restores System.
+/// This service never writes the record - only an explicit choice in Settings does
+/// (<c>SettingsViewModel.SelectedThemeIndex</c>). High Contrast is not a preference: Windows applies it over
+/// <c>RequestedTheme</c>, nothing on that path calls <see cref="Apply"/>, and when it ends the saved choice is
+/// what the roots still carry.
 /// </para>
 /// </summary>
-public sealed class ThemeService(ILogger<ThemeService> logger) : IThemeService
+public sealed class ThemeService(ILogger<ThemeService> logger, IThemePreferenceStore preferenceStore) : IThemeService
 {
     private readonly ThemeRootSet _roots = new();
 
-    public AppThemePreference Current { get; private set; } = AppThemePreference.System;
+    public AppThemePreference Current { get; private set; } = Restore(preferenceStore, logger);
 
     /// <summary>
     /// Registers a XAML root and brings it to the current preference immediately, so a root created
@@ -73,5 +79,34 @@ public sealed class ThemeService(ILogger<ThemeService> logger) : IThemeService
         // what it renders as.
     };
 
-    private void ApplyTo(FrameworkElement root) => root.RequestedTheme = ResolveElementTheme(Current);
+    /// <summary>
+    /// The startup value: the saved choice, or System. Fail-safe by contract of the store, and again here so that a
+    /// store that breaks it (an undefined value, an unexpected exception) cannot crash startup or render garbage.
+    /// </summary>
+    internal static AppThemePreference Restore(IThemePreferenceStore store, ILogger logger)
+    {
+        ArgumentNullException.ThrowIfNull(store);
+
+        AppThemePreference saved;
+        try
+        {
+            saved = store.Read();
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning("The saved theme could not be read ({Type}); the theme follows Windows.", exception.GetType().Name);
+            return AppThemePreference.System;
+        }
+
+        return Enum.IsDefined(saved) ? saved : AppThemePreference.System;
+    }
+
+    /// <summary>
+    /// THEME-1: what <see cref="Attach"/> gives a root right now - the restored preference from the moment the service
+    /// exists, before any root or any <see cref="Apply"/>. The seam the restore-before-attach tests pin without a XAML
+    /// runtime: <see cref="ApplyTo"/> uses nothing else.
+    /// </summary>
+    internal ElementTheme ThemeForNewRoot => ResolveElementTheme(Current);
+
+    private void ApplyTo(FrameworkElement root) => root.RequestedTheme = ThemeForNewRoot;
 }

@@ -226,6 +226,7 @@ public sealed class Ui5R3Tests
 
     private static SettingsViewModel Settings(IHistoryMaintenanceService maintenance) => new(
         new Ui5SettingsTests.RecordingTheme(AppThemePreference.System),
+        new InMemoryThemePreferenceStore(),
         new FakeLocalizationService(),
         new FakeNavigationService(),
         new FakeServerService(),

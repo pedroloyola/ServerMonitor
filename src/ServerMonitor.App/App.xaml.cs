@@ -486,6 +486,9 @@ public partial class App : Application
         services.AddSingleton<ILanguageSettingsStore, JsonLanguageSettingsStore>();
         services.AddSingleton<ILocalizationService, LocalizationService>();
         services.AddSingleton<LanguageRecoveryHintViewModel>();
+        // THEME-1: the saved theme choice (theme-settings.json), restored by ThemeService before any root attaches.
+        services.AddSingleton(ThemeSettingsStorageOptions.ForCurrentUser());
+        services.AddSingleton<IThemePreferenceStore, JsonThemePreferenceStore>();
         services.AddSingleton<IThemeService, ThemeService>();
         services.AddSingleton<IAppVersionProvider, AppVersionProvider>();
         services.AddSingleton<INavigationService, NavigationService>();

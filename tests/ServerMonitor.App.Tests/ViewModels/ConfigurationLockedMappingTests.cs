@@ -104,6 +104,7 @@ public sealed class ConfigurationLockedMappingTests
         IBackgroundMonitoringSettingsService background,
         IServerService? servers = null) => new(
         new InertThemeService(),
+        new InMemoryThemePreferenceStore(),
         new FakeLocalizationService(),
         new FakeNavigationService(),
         servers ?? new FakeServerService(),

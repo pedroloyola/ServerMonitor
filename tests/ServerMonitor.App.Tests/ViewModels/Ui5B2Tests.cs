@@ -377,6 +377,7 @@ public sealed class Ui5B2Tests
         var servers = new FakeServerService();
         var viewModel = new SettingsViewModel(
             new Ui5SettingsTests.RecordingTheme(AppThemePreference.System),
+                new InMemoryThemePreferenceStore(),
             new FakeLocalizationService(),
             new FakeNavigationService(),
             servers,
@@ -653,6 +654,7 @@ public sealed class Ui5B2Tests
             var clock = new TimerRecordingTimeProvider();
             var viewModel = new SettingsViewModel(
                 new Ui5SettingsTests.RecordingTheme(AppThemePreference.System),
+                new InMemoryThemePreferenceStore(),
                 localization,
                 new FakeNavigationService(),
                 servers,

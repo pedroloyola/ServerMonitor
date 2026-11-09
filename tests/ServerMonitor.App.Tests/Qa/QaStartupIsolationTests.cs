@@ -41,6 +41,7 @@ public sealed class QaStartupIsolationTests
         "NotificationSettingsStorageOptions.FilePath",
         "WindowPlacementStorageOptions.FilePath",
         "LanguageSettingsStorageOptions.FilePath",
+        "ThemeSettingsStorageOptions.FilePath",
         "SshConfigFileImportSource.ConfigPath",
         "LocalSshKeyDiscovery.SshDirectory",
         "PrivateKeyFilePicker.UserProfile"
@@ -287,6 +288,7 @@ public sealed class QaStartupIsolationTests
         services.AddSingleton(new NotificationSettingsStorageOptions { FilePath = Path.Combine(Sentinel, "notification-settings.json") });
         services.AddSingleton(new WindowPlacementStorageOptions { FilePath = Path.Combine(Sentinel, "window-placement.json") });
         services.AddSingleton(new LanguageSettingsStorageOptions { FilePath = Path.Combine(Sentinel, "language-settings.json") });
+        services.AddSingleton(new ThemeSettingsStorageOptions { FilePath = Path.Combine(Sentinel, "theme-settings.json") });
         services.AddSingleton(new UngatedCredentialStore(UninitializedCredentialManager()));
         services.AddSingleton<ISshConfigImportSource>(new SshConfigFileImportSource(Sentinel));
         services.AddSingleton<ILocalSshKeyDiscovery>(new LocalSshKeyDiscovery(Sentinel));
