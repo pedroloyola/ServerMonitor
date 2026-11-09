@@ -198,6 +198,7 @@ internal static partial class QaStartupIsolation
         services.AddSingleton(new NotificationSettingsStorageOptions { FilePath = Path.Combine(root, "notification-settings.json") });
         services.AddSingleton(new WindowPlacementStorageOptions { FilePath = Path.Combine(root, "window-placement.json") });
         services.AddSingleton(new LanguageSettingsStorageOptions { FilePath = Path.Combine(root, "language-settings.json") });
+        services.AddSingleton(new ThemeSettingsStorageOptions { FilePath = Path.Combine(root, "theme-settings.json") });
 
         // The raw store is swapped; ordinary callers still get it through the gated decorator (M14.6 §5.5).
         services.AddSingleton(new UngatedCredentialStore(new QaInMemoryCredentialStore()));
@@ -274,7 +275,8 @@ internal static partial class QaStartupIsolation
         typeof(BackgroundSettingsStorageOptions),
         typeof(NotificationSettingsStorageOptions),
         typeof(WindowPlacementStorageOptions),
-        typeof(LanguageSettingsStorageOptions)
+        typeof(LanguageSettingsStorageOptions),
+        typeof(ThemeSettingsStorageOptions)
     ];
 
     /// <summary>
@@ -405,6 +407,7 @@ internal static partial class QaStartupIsolation
         DirectoryOf(NotificationSettingsStorageOptions.ForCurrentUser().FilePath),
         DirectoryOf(WindowPlacementStorageOptions.ForCurrentUser().FilePath),
         DirectoryOf(LanguageSettingsStorageOptions.ForCurrentUser().FilePath),
+        DirectoryOf(ThemeSettingsStorageOptions.ForCurrentUser().FilePath),
         DirectoryOf(HistoryStorageOptions.ForCurrentUser().DatabasePath),
         DirectoryOf(IgnoredDeviceStorageOptions.ForCurrentUser().FilePath),
         DirectoryOf(WidgetStateOptions.ForCurrentUser().SnapshotPath),

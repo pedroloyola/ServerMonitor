@@ -406,6 +406,7 @@ public sealed class Ui5R2Tests
         var logger = new RecordingLogger();
         var viewModel = new SettingsViewModel(
             new Ui5SettingsTests.RecordingTheme(AppThemePreference.System),
+            new InMemoryThemePreferenceStore(),
             new FakeLocalizationService(),
             new FakeNavigationService(),
             new FakeServerService(),
@@ -600,6 +601,7 @@ public sealed class Ui5R2Tests
         servers.RestoreOverride = _ => Task.FromResult(true);
         var viewModel = new SettingsViewModel(
             new Ui5SettingsTests.RecordingTheme(AppThemePreference.System),
+            new InMemoryThemePreferenceStore(),
             new ResWLocalizationService("pt-PT"),
             new FakeNavigationService(),
             servers,

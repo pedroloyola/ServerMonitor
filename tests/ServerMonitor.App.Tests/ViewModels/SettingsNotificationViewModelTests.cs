@@ -180,6 +180,7 @@ public sealed class SettingsNotificationViewModelTests
         var background = new FakeBackgroundMonitoringSettingsService(enabled: true);
         var viewModel = new SettingsViewModel(
             new FakeThemeService(),
+            new InMemoryThemePreferenceStore(),
             new FakeLocalizationService(),
             new FakeNavigationService(),
             new FakeServerService(),
@@ -200,6 +201,7 @@ public sealed class SettingsNotificationViewModelTests
 
     private static SettingsViewModel CreateWithNavigation(FakeNavigationService navigation) => new(
         new FakeThemeService(),
+        new InMemoryThemePreferenceStore(),
         new FakeLocalizationService(),
         navigation,
         new FakeServerService(),
@@ -214,6 +216,7 @@ public sealed class SettingsNotificationViewModelTests
 
     private static SettingsViewModel CreateWithDegradation(IBackgroundDegradationNotice degradation) => new(
         new FakeThemeService(),
+        new InMemoryThemePreferenceStore(),
         new FakeLocalizationService(),
         new FakeNavigationService(),
         new FakeServerService(),
@@ -230,6 +233,7 @@ public sealed class SettingsNotificationViewModelTests
         INotificationSettingsService settings,
         IBackgroundMonitoringSettingsService? background = null) => new(
         new FakeThemeService(),
+        new InMemoryThemePreferenceStore(),
         new FakeLocalizationService(),
         new FakeNavigationService(),
         new FakeServerService(),

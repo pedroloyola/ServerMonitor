@@ -49,6 +49,94 @@ public sealed class Ui5SettingsTests
         Assert.Empty(world.Theme.Applied);
     }
 
+    [Theory]
+    [InlineData(1, AppThemePreference.Light)]
+    [InlineData(2, AppThemePreference.Dark)]
+    [InlineData(0, AppThemePreference.System)]
+    public void THEME1_ChoosingATheme_PersistsIt(int index, AppThemePreference expected)
+    {
+        var store = new FakeThemePreferenceStore();
+        var world = new World(
+            theme: AppThemePreference.Light == expected ? AppThemePreference.Dark : AppThemePreference.Light,
+            themeStore: store);
+
+        world.ViewModel.SelectedThemeIndex = index;
+
+        Assert.Equal([expected], store.Writes);
+        Assert.Equal(expected, store.Saved);
+    }
+
+    [Fact]
+    public void THEME1_NoChoice_NoWrite_NotAtConstruction_NotForTheSameValue_NotForAnUndefinedIndex()
+    {
+        var store = new FakeThemePreferenceStore(AppThemePreference.Dark);
+        var world = new World(theme: AppThemePreference.Dark, themeStore: store);
+
+        world.ViewModel.SelectedThemeIndex = 2; // already Dark
+        world.ViewModel.SelectedThemeIndex = -1; // nothing selected
+        world.ViewModel.SelectedThemeIndex = 7;
+        world.ViewModel.SelectedThemeIndex = 2; // a re-bind of the current value (e.g. a theme remount) is not a choice
+
+        Assert.Empty(store.Writes);
+    }
+
+    [Fact]
+    public void THEME1_AFailedSave_IsNotFatal_TheChoiceStillApplies()
+    {
+        var store = new FakeThemePreferenceStore { FailWrites = true };
+        var world = new World(theme: AppThemePreference.System, themeStore: store);
+
+        world.ViewModel.SelectedThemeIndex = 2;
+
+        Assert.Equal([AppThemePreference.Dark], world.Theme.Applied);
+        Assert.Equal(AppThemePreference.Dark, world.Theme.Current);
+        Assert.Equal(2, world.ViewModel.SelectedThemeIndex);
+        Assert.Equal(AppThemePreference.System, store.Saved);
+    }
+
+    [Fact]
+    public void THEME1_AfterAFailedSave_ChoosingTheSameOptionAgain_Retries()
+    {
+        // Prism LOW-3: the comparison is with what the store holds, not with Current.
+        var store = new FakeThemePreferenceStore(AppThemePreference.Light) { FailWrites = true };
+        var world = new World(theme: AppThemePreference.Light, themeStore: store);
+        world.ViewModel.SelectedThemeIndex = 2; // Dark - the save fails
+        store.FailWrites = false;
+
+        world.ViewModel.SelectedThemeIndex = -1; // the radio group re-pushes the same choice
+        world.ViewModel.SelectedThemeIndex = 2;
+
+        Assert.Equal([AppThemePreference.Dark, AppThemePreference.Dark], store.Writes);
+        Assert.Equal(AppThemePreference.Dark, store.Saved);
+    }
+
+    [Fact]
+    public void THEME1_AfterAFailedSave_GoingBackToTheSavedValue_WritesNothing()
+    {
+        var store = new FakeThemePreferenceStore(AppThemePreference.Light) { FailWrites = true };
+        var world = new World(theme: AppThemePreference.Light, themeStore: store);
+        world.ViewModel.SelectedThemeIndex = 2; // Dark - the save fails, the file still says Light
+        store.FailWrites = false;
+
+        world.ViewModel.SelectedThemeIndex = 1; // back to Light: already what the store holds
+
+        Assert.Equal([AppThemePreference.Dark], store.Writes);
+        Assert.Equal(AppThemePreference.Light, store.Saved);
+        Assert.Equal(AppThemePreference.Light, world.Theme.Current);
+    }
+
+    [Fact]
+    public void THEME1_AStoreThatThrows_IsNotFatal_TheChoiceStillApplies()
+    {
+        var store = new FakeThemePreferenceStore { ThrowOnWrite = new InvalidOperationException("broken store") };
+        var world = new World(theme: AppThemePreference.System, themeStore: store);
+
+        world.ViewModel.SelectedThemeIndex = 1;
+
+        Assert.Equal([AppThemePreference.Light], world.Theme.Applied);
+        Assert.Equal(1, world.ViewModel.SelectedThemeIndex);
+    }
+
     [Fact]
     public void TheThemeIndex_StartsFromTheCurrentTheme()
     {
@@ -868,12 +956,15 @@ public sealed class Ui5SettingsTests
             AppThemePreference theme = AppThemePreference.System,
             string? language = null,
             IHistoryMaintenanceService? maintenance = null,
-            ILocalizationService? localization = null)
+            ILocalizationService? localization = null,
+            IThemePreferenceStore? themeStore = null)
         {
             Theme = new RecordingTheme(theme);
+            ThemeStore = themeStore ?? new FakeThemePreferenceStore();
             Localization = new RecordingLocalization(language);
             ViewModel = new SettingsViewModel(
                 Theme,
+                ThemeStore,
                 localization ?? Localization,
                 Navigation,
                 Servers,
@@ -892,6 +983,8 @@ public sealed class Ui5SettingsTests
         public SettingsViewModel ViewModel { get; }
 
         public RecordingTheme Theme { get; }
+
+        public IThemePreferenceStore ThemeStore { get; }
 
         public RecordingLocalization Localization { get; }
 

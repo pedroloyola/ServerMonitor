@@ -13,6 +13,12 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
 {
     private readonly ILocalizationService _localizationService;
     private readonly IThemeService _themeService;
+    private readonly IThemePreferenceStore _themePreferenceStore;
+    // THEME-1 r2 (Prism LOW-3): the last value the store holds for sure - a failed save leaves it unchanged, so choosing
+    // the same option again retries instead of being taken for "nothing changed".
+    // Known limitation (Atlas r3): re-clicking the radio that is already checked sends no new index, so a retry needs
+    // another choice first (or a re-bind of the same value, e.g. a page reload).
+    private AppThemePreference _lastPersistedTheme;
     private readonly IServerService _serverService;
     private readonly IServerDiscoveryService _discoveryService;
     private readonly INotificationSettingsService _notificationSettingsService;
@@ -40,6 +46,7 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
 
     public SettingsViewModel(
         IThemeService themeService,
+        IThemePreferenceStore themePreferenceStore,
         ILocalizationService localizationService,
         INavigationService navigationService,
         IServerService serverService,
@@ -55,6 +62,7 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
         ArgumentNullException.ThrowIfNull(clock); // UI.5 fix round 4: required - the toast countdown never defaults to the system clock
         _toastTimer = new TransientNoticeTimer(clock.TimeProvider);
         _themeService = themeService;
+        _themePreferenceStore = themePreferenceStore ?? throw new ArgumentNullException(nameof(themePreferenceStore));
         AppVersion = appVersionProvider.DisplayVersion;
         _localizationService = localizationService;
         _serverService = serverService;
@@ -78,6 +86,7 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
         ClearHistoryCommand = new AsyncRelayCommand(ClearHistoryAsync);
         ResetHistoryCommand = new AsyncRelayCommand(ResetHistoryAsync);
         _selectedThemeIndex = (int)themeService.Current;
+        _lastPersistedTheme = themeService.Current; // the value ThemeService restored from the store
         _notificationsEnabled = notificationSettingsService.NotificationsEnabled;
         _selectedLanguageIndex = LanguageIndexOf(localizationService);
     }
@@ -162,8 +171,42 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
         {
             if (SetProperty(ref _selectedThemeIndex, value) && Enum.IsDefined((AppThemePreference)value))
             {
-                _themeService.Apply((AppThemePreference)value);
+                var preference = (AppThemePreference)value;
+                _themeService.Apply(preference);
+                if (preference != _lastPersistedTheme)
+                {
+                    // Compared with what the store holds, not with Current: a re-bind of the saved value (a theme
+                    // remount, a page reload) never rewrites the file, and a choice whose save failed is retried.
+                    SaveThemeChoice(preference);
+                }
             }
+        }
+    }
+
+    /// <summary>
+    /// THEME-1: an explicit choice here is the ONLY writer of the saved theme (High Contrast and startup never write).
+    /// A failed save is not fatal: the choice still applies for this session and is logged; the UI shows no error.
+    /// </summary>
+    private void SaveThemeChoice(AppThemePreference preference)
+    {
+        bool saved;
+        try
+        {
+            saved = _themePreferenceStore.TryWrite(preference);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogWarning("The theme choice could not be saved ({Type}); it applies to this session only.", exception.GetType().Name);
+            return;
+        }
+
+        if (saved)
+        {
+            _lastPersistedTheme = preference;
+        }
+        else
+        {
+            _logger.LogWarning("The theme choice {Theme} was not saved; it applies to this session only.", preference);
         }
     }
 
