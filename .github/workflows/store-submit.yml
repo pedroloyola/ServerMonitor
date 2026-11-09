@@ -16,7 +16,8 @@ name: Store submit (stage only)
 #     own confirmation phrase and its own approval of the Store environment).
 #   * The listing text or screenshots are edited in Partner Center: certify in the Partner Center UI
 #     (Submit for certification) and do NOT run store-certify. Microsoft documents that an API-created
-#     submission changed in Partner Center can no longer be committed through the API.
+#     submission changed in Partner Center can no longer be committed through the API. This UI route
+#     is UNVERIFIED for an API-staged draft until it is first seen live (runbook step 5b, failure R3c).
 # Before the commit the Partner Center UI shows this draft as unchanged, with the previous package: the
 # upload is a pending operation until the commit. Check the staged file name in this run's read-back log.
 #
@@ -253,7 +254,12 @@ jobs:
         shell: pwsh
         run: |
           $output = msstore apps get ${{ env.STORE_PRODUCT_ID }} 2>&1 | Out-String
+          # Vigil V-1: the raw CLI output goes out between stop-commands under a fresh random token, so nothing in
+          # it can run as a workflow command (a forged ::error:: or ::notice:: at the gate).
+          $stopToken = [guid]::NewGuid().ToString('n')
+          Write-Host "::stop-commands::$stopToken"
           Write-Host $output
+          Write-Host "::$stopToken::"
           if ($LASTEXITCODE -ne 0) { throw "msstore apps get failed for ${{ env.STORE_PRODUCT_ID }}." }
           if ($output -notmatch '${{ env.STORE_IDENTITY_NAME }}') {
             throw "The product ${{ env.STORE_PRODUCT_ID }} did not report the expected identity ${{ env.STORE_IDENTITY_NAME }}. Refusing to continue."
@@ -351,7 +357,12 @@ jobs:
         shell: pwsh
         run: |
           $raw = msstore submission status ${{ env.STORE_PRODUCT_ID }} 2>&1 | Out-String
+          # Vigil V-1: the raw CLI output goes out between stop-commands under a fresh random token, so nothing in
+          # it can run as a workflow command (a forged ::error:: or ::notice:: at the gate).
+          $stopToken = [guid]::NewGuid().ToString('n')
+          Write-Host "::stop-commands::$stopToken"
           Write-Host $raw
+          Write-Host "::$stopToken::"
           $start = $raw.IndexOf('{'); $end = $raw.LastIndexOf('}')
           if ($start -ge 0 -and $end -gt $start) {
             $status = ($raw.Substring($start, $end - $start + 1) | ConvertFrom-Json)

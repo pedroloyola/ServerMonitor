@@ -35,6 +35,17 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+function ConvertTo-LogSafe($Value) {
+    <# STORE-PIPE-1 round 3 (Vigil V-2): a value read from Partner Center goes into a message only if it is plainly
+       printable. A status holding a newline followed by "::warning::..." would otherwise start a line that
+       GitHub Actions runs as a workflow command. \A and \z, not ^ and $: $ also matches before a trailing newline. #>
+    if ($null -eq $Value) { return '' }
+    $text = [string] $Value
+    if ($text -eq '') { return '' }
+    if ($text -cmatch '\A[A-Za-z0-9._ -]{1,200}\z') { return $text }
+    return '<unprintable>'
+}
+
 function Test-SubmissionIdle {
     <#
         Returns a result object rather than throwing, so the self-test can exercise the
@@ -55,7 +66,8 @@ function Test-SubmissionIdle {
 
     $json = $Raw.Substring($start, $end - $start + 1)
     try { $submission = $json | ConvertFrom-Json }
-    catch { return [pscustomobject] @{ Idle = $false; Status = ''; Reason = "the CLI output could not be parsed as JSON: $($_.Exception.Message)" } }
+    # Vigil V-2: the parser's message can quote the CLI output, so it is not repeated here.
+    catch { return [pscustomobject] @{ Idle = $false; Status = ''; Reason = 'the CLI output could not be parsed as JSON' } }
 
     $statusProperty = $submission.PSObject.Properties | Where-Object { $_.Name -ieq 'status' } | Select-Object -First 1
     if ($null -eq $statusProperty) {
@@ -73,10 +85,10 @@ function Test-SubmissionIdle {
     }
 
     if ($AllowedStatuses -contains $status) {
-        return [pscustomobject] @{ Idle = $true; Status = $status; Reason = "status '$status' means nothing is in flight" }
+        return [pscustomobject] @{ Idle = $true; Status = $status; Reason = "status '$(ConvertTo-LogSafe $status)' means nothing is in flight" }
     }
 
-    return [pscustomobject] @{ Idle = $false; Status = $status; Reason = "a submission is in flight with status '$status'" }
+    return [pscustomobject] @{ Idle = $false; Status = $status; Reason = "a submission is in flight with status '$(ConvertTo-LogSafe $status)'" }
 }
 
 if ($SelfTest) {
@@ -107,6 +119,9 @@ if ($SelfTest) {
         @{ Name = 'status as a one-element array';     Raw = '{"status":["Published"]}';       Idle = $false }
         @{ Name = 'status as an object';               Raw = '{"status":{"v":"None"}}';        Idle = $false }
         @{ Name = 'status as a number';                Raw = '{"status":0}';                   Idle = $false }
+        # Vigil V-2: an injected workflow command in the status never starts a line of the reason (the throw message).
+        @{ Name = 'injection: status';                 Raw = '{"status":"PendingCommit\n::warning::injected"}'; Idle = $false }
+        @{ Name = 'injection: malformed JSON';         Raw = "{`"status`": `n::warning::injected }"; Idle = $false }
     )
 
     $failedNames = @()
@@ -116,7 +131,7 @@ if ($SelfTest) {
     Write-Host ("  {0}  {1,-32} [{2}]" -f $(if ($defaultOk) { 'ok  ' } else { 'FAIL' }), 'default allowed statuses', ($allowed -join ', '))
     foreach ($case in $cases) {
         $result = Test-SubmissionIdle -Raw $case.Raw -AllowedStatuses $allowed
-        $ok = ($result.Idle -eq $case.Idle)
+        $ok = ($result.Idle -eq $case.Idle) -and -not @($result.Reason -split "`r?`n" | Where-Object { $_.TrimStart().StartsWith('::') }).Count
         if (-not $ok) { $failedNames += $case.Name }
         $mark = if ($ok) { 'ok  ' } else { 'FAIL' }
         Write-Host ("  {0}  {1,-32} idle={2,-5}  {3}" -f $mark, $case.Name, $result.Idle, $result.Reason)

@@ -126,11 +126,28 @@ function Assert-PinnedStoreCli([string] $Text) {
     if ($firstUse -lt 0 -or $firstUse -lt $install) { throw 'Shape M-1: the pinned CLI must be installed and verified before msstore is first used.' }
 }
 
+# STORE-PIPE-1 round 3. V-1: every print of raw CLI output ($raw / $output) is exactly the wrapped block below, a
+# fresh random token (never printed before its stop line) around one Write-Host, so the output cannot run workflow
+# commands. V-3: no msstore call runs verbose (the pinned CLI logs the SAS upload URL at Information level).
+$wrappedPrintPattern = "(?m)^([ ]+)\`$stopToken = \[guid\]::NewGuid\(\)\.ToString\('n'\)\n\1Write-Host `"::stop-commands::\`$stopToken`"\n\1Write-Host \`$(?:raw|output)\n\1Write-Host `"::\`$stopToken::`"[ ]*$"
+function Assert-StoreLogHygiene([string] $Text) {
+    $body = Strip-Comments $Text
+    $prints = @([regex]::Matches($body, '(?m)^[^\n]*\bWrite-(?:Host|Output|Information|Warning|Verbose|Error)\b[^\n]*\$(?:raw|output)\b[^\n]*$'))
+    $wrapped = @([regex]::Matches($body, $wrappedPrintPattern))
+    if ($prints.Count -ne $wrapped.Count) { throw 'Shape V-1: raw CLI output ($raw / $output) may be printed only between "::stop-commands::<fresh token>" and "::<token>::".' }
+    if (([regex]::Matches($body, [regex]::Escape('$stopToken'))).Count -ne 3 * $wrapped.Count) { throw 'Shape V-1: the stop-commands token is used only by its wrapped print (never printed or reused elsewhere).' }
+    $commands = (($body -replace '`\n[ \t]*', ' ') -split "`n") | Where-Object { $_ -match '\bmsstore\b' }
+    foreach ($line in $commands) {
+        if ($line -cmatch '(?<!\S)(?:--verbose|-v)(?![\w-])') { throw 'Shape V-3: no msstore call may run with --verbose / -v (the pinned CLI logs the SAS upload URL).' }
+    }
+}
+
 function Assert-StoreSubmit([string] $Text) {
     $jobs = Get-Jobs $Text
     $submit = Assert-Provenance $jobs 'submit'
     Assert-SharedConcurrency $Text
     Assert-PinnedStoreCli $Text
+    Assert-StoreLogHygiene $Text
     $configure = $submit.IndexOf('msstore reconfigure')
     if ($configure -lt 0) { throw 'Shape: the submit job no longer configures the Store CLI; review this guard.' }
 
@@ -176,6 +193,7 @@ function Assert-StoreCertify([string] $Text) {
     $certify = Assert-Provenance $jobs 'certify'
     Assert-SharedConcurrency $Text
     Assert-PinnedStoreCli $Text
+    Assert-StoreLogHygiene $Text
     $all = Strip-Comments $Text
     if ($all -match '\bmsstore\s+(publish|submission\s+(update|updateMetadata|delete|rollout))\b') { throw 'Shape P-1: store-certify must not upload, update, delete or roll out; it only commits the staged draft.' }
     $configure = $certify.IndexOf('msstore reconfigure')
@@ -219,6 +237,7 @@ function Assert-StoreCertify([string] $Text) {
 
 function Assert-StoreStatus([string] $Text) {
     Assert-PinnedStoreCli $Text
+    Assert-StoreLogHygiene $Text
     $body = Strip-Comments $Text
     if ($body -notmatch 'Assert-ManualPublishMode\.ps1 -PublishMode \$publishMode') { throw 'Shape G6: store-status must check the publish mode.' }
     if ($body -notmatch 'if \(\$publishModeError\) \{ throw') { throw 'Shape G6: a submission in flight off the publishing hold must fail the run.' }
@@ -265,6 +284,13 @@ $mutations = @{
         @{ Old = "'before.json', 'draft.json', 'updated.json', 'readback.json'"; New = "'before.json', 'draft.json', 'readback.json'"; Name = 'cleanup misses updated.json (Vigil L-2)' }
         @{ Old = "        run: Remove-Item -LiteralPath 'before.json', 'draft.json', 'updated.json', 'readback.json' -Force -ErrorAction SilentlyContinue`n"; New = "        run: |`n          Remove-Item -LiteralPath 'before.json', 'draft.json', 'updated.json', 'readback.json' -Force -ErrorAction SilentlyContinue`n          msstore submission get x`n"; Name = 'cleanup step runs something else under if: always() (Vigil L-2)' }
         @{ Old = "      - name: Remove the submission JSON files`n        if: always()`n"; New = "      - name: Remove the submission JSON files`n"; Name = 'cleanup only on success (Vigil L-2)' }
+        # STORE-PIPE-1 round 3 (Vigil V-1, V-3).
+        @{ Old = "          Write-Host `"::stop-commands::`$stopToken`"`n          Write-Host `$raw`n"; New = "          Write-Host `$raw`n"; Name = 'status output printed without stop-commands (Vigil V-1)' }
+        @{ Old = "          Write-Host `"::stop-commands::`$stopToken`"`n          Write-Host `$output`n"; New = "          Write-Host `$output`n"; Name = 'apps get output printed without stop-commands (Vigil V-1)' }
+        @{ Old = "          Write-Host `$raw`n"; New = "          Write-Host `$raw`n          Write-Host `$raw.Trim()`n"; Name = 'a second, unwrapped print of the status output (Vigil V-1)' }
+        @{ Old = "          `$stopToken = [guid]::NewGuid().ToString('n')`n          Write-Host `"::stop-commands::`$stopToken`"`n          Write-Host `$raw`n"; New = "          `$stopToken = 'fixed'`n          Write-Host `"::stop-commands::`$stopToken`"`n          Write-Host `$raw`n"; Name = 'predictable stop-commands token (Vigil V-1)' }
+        @{ Old = "msstore publish `"`$env:PACKAGE_PATH`" -id"; New = "msstore publish `"`$env:PACKAGE_PATH`" --verbose -id"; Name = 'upload runs verbose (Vigil V-3)' }
+        @{ Old = "          msstore reconfigure ```n"; New = "          msstore reconfigure ```n            -v ```n"; Name = 'reconfigure runs verbose on a continuation line (Vigil V-3)' }
     )
     'store-certify.yml' = @(
         @{ Old = "  certify:`n    needs: provenance`n"; New = "  certify:`n"; Name = 'certify without provenance' }
@@ -288,6 +314,8 @@ $mutations = @{
         @{ Old = './tools/release/Wait-CommittedSubmission.ps1 `'; New = 'Write-Host `'; Name = 'no wait or package proof after the commit (STORE-PIPE-1)' }
         @{ Old = "        run: Remove-Item -LiteralPath 'draft.json' -Force -ErrorAction SilentlyContinue`n"; New = "        run: Remove-Item -LiteralPath 'other.json' -Force -ErrorAction SilentlyContinue`n"; Name = 'cleanup misses draft.json (Vigil L-2)' }
         @{ Old = "        run: Remove-Item -LiteralPath 'draft.json' -Force -ErrorAction SilentlyContinue`n"; New = "        run: Remove-Item -LiteralPath 'draft.json' -Force -ErrorAction SilentlyContinue; msstore submission publish x`n"; Name = 'cleanup step commits under if: always() (Vigil L-2)' }
+        @{ Old = "          Write-Host `"::stop-commands::`$stopToken`"`n          Write-Host `$raw`n"; New = "          Write-Host `$raw`n"; Name = 'status output printed without stop-commands (Vigil V-1)' }
+        @{ Old = "msstore submission get `${{ env.STORE_PRODUCT_ID }} | Out-File -FilePath draft.json"; New = "msstore submission get `${{ env.STORE_PRODUCT_ID }} --verbose | Out-File -FilePath draft.json"; Name = 'draft read runs verbose (Vigil V-3)' }
         @{ Old = "      - name: Wait for Partner Center to process the commit and prove the package`n        shell: pwsh"; New = "      - name: Wait for Partner Center to process the commit and prove the package`n        continue-on-error: true`n        shell: pwsh"; Name = 'post-commit proof allowed to fail (STORE-PIPE-1)' }
         @{ Old = "            -ProductId '`${{ env.STORE_PRODUCT_ID }}' ```n            -ExpectedSubmissionId `$env:SUBMISSION_ID ```n"; New = "            -ProductId '`${{ env.STORE_PRODUCT_ID }}' ```n            -ExpectedSubmissionId 1 ```n"; Name = 'post-commit proof not bound to the submission id (STORE-PIPE-1)' }
         @{ Old = "_x64_`$(`$env:TAG_COMMIT.Substring(0, 7)).msix`" ```n            -ExpectedPackageVersion `$env:PACKAGE_VERSION`n"; New = "_x64_0000000.msix`" ```n            -ExpectedPackageVersion `$env:PACKAGE_VERSION`n"; Name = 'post-commit proof file name not bound to the tag commit (STORE-PIPE-1)' }
@@ -303,6 +331,11 @@ $mutations = @{
         @{ Old = "          ./tools/release/Assert-StagedSubmission.ps1 ```n            -SubmissionPath draft.json"; New = "          Push-Location Env:`n          Set-Item SUBMISSION_ID 1`n          Pop-Location`n          ./tools/release/Assert-StagedSubmission.ps1 ```n            -SubmissionPath draft.json"; Name = 'W11 id rewritten after Push-Location Env:' }
     )
     'store-status.yml' = @(
+        # STORE-PIPE-1 round 3 (Vigil V-1, V-3).
+        @{ Old = "            Write-Host `"::stop-commands::`$stopToken`"`n            Write-Host `$raw`n"; New = "            Write-Host `$raw`n"; Name = 'no-JSON output printed without stop-commands (Vigil V-1)' }
+        @{ Old = "          Write-Host `"::stop-commands::`$stopToken`"`n          Write-Host `$output`n"; New = "          Write-Host `$output`n"; Name = 'apps get output printed without stop-commands (Vigil V-1)' }
+        @{ Old = "            Write-Host `"::`$stopToken::`"`n"; New = "            Write-Host `"::`$stopToken::`"`n            Write-Host `"token `$stopToken`"`n"; Name = 'stop-commands token printed (Vigil V-1)' }
+        @{ Old = "msstore apps get `${{ env.STORE_PRODUCT_ID }} 2>&1"; New = "msstore apps get `${{ env.STORE_PRODUCT_ID }} -v 2>&1"; Name = 'apps get runs verbose (Vigil V-3)' }
         @{ Old = 'if ($publishModeError) { throw'; New = 'if ($publishModeError) { Write-Warning'; Name = 'publish mode only warns' }
     )
 }

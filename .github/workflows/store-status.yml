@@ -73,7 +73,12 @@ jobs:
         shell: pwsh
         run: |
           $output = msstore apps get ${{ env.STORE_PRODUCT_ID }} 2>&1 | Out-String
+          # Vigil V-1: the raw CLI output goes out between stop-commands under a fresh random token, so nothing in
+          # it can run as a workflow command (a forged ::error:: or ::notice:: at the gate).
+          $stopToken = [guid]::NewGuid().ToString('n')
+          Write-Host "::stop-commands::$stopToken"
           Write-Host $output
+          Write-Host "::$stopToken::"
           if ($LASTEXITCODE -ne 0) { throw "msstore apps get failed for ${{ env.STORE_PRODUCT_ID }}." }
           if ($output -notmatch '${{ env.STORE_IDENTITY_NAME }}') {
             throw "Product ${{ env.STORE_PRODUCT_ID }} did not report identity ${{ env.STORE_IDENTITY_NAME }}."
@@ -90,7 +95,12 @@ jobs:
 
           $start = $raw.IndexOf('{'); $end = $raw.LastIndexOf('}')
           if ($start -lt 0 -or $end -le $start) {
+            # Vigil V-1: the raw CLI output goes out between stop-commands under a fresh random token, so nothing in
+            # it can run as a workflow command (a forged ::error:: or ::notice:: at the gate).
+            $stopToken = [guid]::NewGuid().ToString('n')
+            Write-Host "::stop-commands::$stopToken"
             Write-Host $raw
+            Write-Host "::$stopToken::"
             throw 'Could not find a JSON submission object in the CLI output. Reporting nothing rather than guessing.'
           }
 
