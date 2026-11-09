@@ -1,7 +1,5 @@
-ServerAlyzer 1.1.8 improves screen reader support and alert reliability.
+ServerAlyzer 1.1.9 remembers your theme.
 
-Screen readers. On the Servers page, a server whose data is out of date now includes how old that data is in the name it gives to screen readers. When a local network search ends on its own, the app now notifies screen readers of how it ended.
+Theme. The Light or Dark choice in Settings is now kept when you close and reopen ServerAlyzer. If you choose System, ServerAlyzer follows the Windows theme as before.
 
-Alerts. Fixed a rare case in which an alert could be held back for up to 5 minutes after a server stopped being monitored and was then monitored again.
-
-Portuguese. In the server editor, the example text in the fields now says "Por exemplo:" instead of "Ex.:".
+High contrast. When a Windows high contrast theme is on, it still takes priority over your choice. When you turn high contrast off, ServerAlyzer goes back to the theme you chose.
