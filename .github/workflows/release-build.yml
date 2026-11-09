@@ -143,6 +143,7 @@ jobs:
             'Test-StoreSubmissionUpdate.ps1'
             'Get-SubmissionState.ps1 -SelfTest'
             'Assert-StagedSubmission.ps1 -SelfTest'
+            'Wait-CommittedSubmission.ps1 -SelfTest'
             'Test-StoreStageCertify.ps1'
             'Install-MsStoreCli.ps1 -SelfTest'
           )

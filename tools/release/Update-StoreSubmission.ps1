@@ -30,8 +30,18 @@
     a whats-new.txt.
 
 .PARAMETER ExpectedPackageVersion
-    The package version that must already be present in the submission, e.g. 1.1.2.0.
-    Guards against updating metadata onto a draft that carries the wrong package.
+    The package version msstore publish staged in the draft, e.g. 1.1.8.0. Guards against
+    updating metadata onto a draft that carries the wrong package. Give it together with
+    -ExpectedPackageFileName.
+
+.PARAMETER ExpectedPackageFileName
+    The file name msstore publish uploaded: ServerAlyzer_<version>_x64_<first 7 of the tag commit>.msix.
+    STORE-PIPE-1: before the commit Partner Center has not filled in the version of the new package
+    (msstore publish adds it as { fileStatus = PendingUpload, fileName } and marks the published
+    package PendingDelete), so the file name is what identifies it. The rule is the one
+    Assert-StagedSubmission.ps1 applies on the read-back: exactly one PendingUpload entry with this
+    name, byte for byte; a version on it is optional but, if present, the expected one; every other
+    package PendingDelete, or live with a readable version older than the expected one.
 
 .PARAMETER ExpectedVisibility
     Asserted, not written. Leave empty to skip the assertion.
@@ -45,6 +55,7 @@ param(
     [Parameter(Mandatory)] [string] $OutputPath,
     [string] $StoreListingRoot = (Join-Path (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path 'release/store'),
     [string] $ExpectedPackageVersion,
+    [string] $ExpectedPackageFileName,
     [string] $ExpectedVisibility,
     [int] $MaxReleaseNotesLength = 1500
 )
@@ -122,22 +133,65 @@ else {
 }
 
 # --------------------------------------------------------- 3. package version
-if ($ExpectedPackageVersion) {
-    $packages = Get-Value -Object $submission -Name 'applicationPackages'
-    if ($null -eq $packages) { throw 'STOP: the submission JSON has no applicationPackages array.' }
+function Get-ScalarValue { param($Object, [string] $Name)
+    <# A field that must be one JSON value: an array or object is refused (null). Get-Value returns through the
+       pipeline, which unrolls a one-element array, so ["PendingUpload"] would pass for the right value. #>
+    $member = Get-Member-CaseInsensitive -Object $Object -Name $Name
+    if ($null -eq $member) { return $null }
+    if ($member.Value -is [string] -or $member.Value -is [ValueType]) { return $member.Value }
+    return $null
+}
 
+if ($ExpectedPackageVersion -or $ExpectedPackageFileName) {
+    # STORE-PIPE-1: both or neither. A version alone cannot identify the upload before the commit.
+    if ($ExpectedPackageVersion -cnotmatch '\A[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\z') { throw 'STOP: -ExpectedPackageVersion is missing or not a four-part version; it is required with -ExpectedPackageFileName.' }
+    if ($ExpectedPackageFileName -cnotmatch '\AServerAlyzer_[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+_x64_[0-9a-f]{7}\.msix\z') { throw 'STOP: -ExpectedPackageFileName is missing or not ServerAlyzer_<version>_x64_<sha7>.msix; it is required with -ExpectedPackageVersion.' }
+
+    $packagesMember = Get-Member-CaseInsensitive -Object $submission -Name 'applicationPackages'
+    if ($null -eq $packagesMember -or $null -eq $packagesMember.Value) { throw 'STOP: the submission JSON has no applicationPackages array.' }
+    if ($packagesMember.Value -isnot [array]) { throw 'STOP: applicationPackages is not a JSON array.' }
+
+    $expected = [version] $ExpectedPackageVersion
     $versions = @()
-    foreach ($package in @($packages)) {
-        $status = Get-Value -Object $package -Name 'fileStatus'
-        if ($status -ieq 'PendingDelete') { continue }
-        $version = Get-Value -Object $package -Name 'version'
-        if ($version) { $versions += $version }
+    $pendingUploads = 0
+    foreach ($package in $packagesMember.Value) {
+        if ($package -isnot [pscustomobject]) { throw 'STOP: a package entry in applicationPackages is not a JSON object.' }
+        # PR #56 Relay L-4: a fileStatus that is present but not one string makes the package unreadable.
+        $statusMember = Get-Member-CaseInsensitive -Object $package -Name 'fileStatus'
+        if ($null -ne $statusMember -and $null -ne $statusMember.Value -and $statusMember.Value -isnot [string]) {
+            throw 'STOP: a package has an unreadable fileStatus (not a single string).'
+        }
+        $status = [string] (Get-ScalarValue -Object $package -Name 'fileStatus')
+        if ([string]::Equals($status, 'PendingDelete', [StringComparison]::OrdinalIgnoreCase)) { continue }
+        $fileName = Get-ScalarValue -Object $package -Name 'fileName'
+        $versionMember = Get-Member-CaseInsensitive -Object $package -Name 'version'
+        $version = Get-ScalarValue -Object $package -Name 'version'
+        if ($null -ne $versionMember -and $null -ne $versionMember.Value -and $version -isnot [string]) { throw 'STOP: a package has an unreadable version (not a single string).' }
+        $text = if ($version -is [string]) { $version } else { '' }
+
+        if ([string]::Equals($status, 'PendingUpload', [StringComparison]::OrdinalIgnoreCase)) {
+            $pendingUploads++
+            if ($pendingUploads -gt 1) { throw 'STOP: the submission has more than one package waiting for upload (PendingUpload). The wrong package could be certified.' }
+            if (-not ($fileName -is [string] -and [string]::Equals($fileName, $ExpectedPackageFileName, [StringComparison]::Ordinal))) {
+                throw "STOP: the submission's pending upload is '$fileName' but $ExpectedPackageFileName was expected. The wrong package would be certified."
+            }
+            if ($text -ne '' -and -not [string]::Equals($text, $ExpectedPackageVersion, [StringComparison]::Ordinal)) {
+                throw "STOP: the submission's pending upload carries version '$text' but $ExpectedPackageVersion was expected. The wrong package would be certified."
+            }
+            continue
+        }
+
+        if ($text -cnotmatch '\A[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\z') { throw "STOP: the submission has a live package with an unreadable version ('$text')." }
+        $versions += $text
+        if (([version] $text) -ge $expected) {
+            throw "STOP: the submission carries a live package $text ('$fileName') that is not older than $ExpectedPackageVersion besides the pending upload. The wrong package would be certified."
+        }
     }
 
-    if ($versions -notcontains $ExpectedPackageVersion) {
-        throw "STOP: the submission carries package version(s) [$($versions -join ', ')] but $ExpectedPackageVersion was expected. The wrong package would be certified."
+    if ($pendingUploads -eq 0) {
+        throw "STOP: the submission has no package waiting for upload (no PendingUpload entry; live package version(s) [$($versions -join ', ')]) but $ExpectedPackageFileName was expected. It is not the draft msstore publish staged."
     }
-    Write-Host "  ok    submission carries package version $ExpectedPackageVersion (all: $($versions -join ', '))"
+    Write-Host "  ok    pending upload $ExpectedPackageFileName for $ExpectedPackageVersion (other live packages: $($versions -join ', '))"
 }
 
 # ------------------------------------------------------------ 4. release notes

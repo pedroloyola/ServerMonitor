@@ -1,10 +1,17 @@
 name: Store certify (commit a staged draft)
 
 # REL.0E P-1, the SECOND human gate. Commits to certification the Partner Center draft that
-# store-submit.yml staged and a person then completed (localized listing, screenshots) and reviewed.
-# It uploads nothing and edits nothing: it re-proves the release run (G4), re-reads the draft, and
-# commits it only if it is still exactly the staged draft (same submission id, status PendingCommit),
-# on the publishing hold, with the audience unchanged and the verified package as its newest package.
+# store-submit.yml staged and a person then reviewed. It uploads nothing and edits nothing: it re-proves
+# the release run (G4), re-reads the draft, and commits it only if it is still exactly the staged draft
+# (same submission id, status PendingCommit), on the publishing hold, with the audience unchanged and the
+# verified package as its one pending upload. After the commit it waits (bounded) while Partner Center
+# processes it, and proves the ingested package is that file, as that version (STORE-PIPE-1).
+#
+# STORE-PIPE-1, owner decision (ii): use this workflow ONLY when nobody changed the draft in Partner Center.
+# If the listing text or screenshots were edited there, certify in the Partner Center UI (Submit for
+# certification) and do NOT run this: Microsoft documents that a submission created through the API and
+# then changed in Partner Center can no longer be changed or committed through the API, and may be left in
+# an error state.
 #
 # What this workflow deliberately does NOT do:
 #   * upload a package, change any listing field, or update the submission in any way
@@ -35,7 +42,7 @@ on:
         required: true
         type: string
       confirm:
-        description: 'Type CERTIFY followed by the package version (e.g. CERTIFY 1.1.7.0) to send this draft to Microsoft for certification'
+        description: 'Type CERTIFY and the package version (e.g. CERTIFY 1.1.8.0). ONLY if nobody edited the draft in Partner Center; after a manual edit (text, screenshots) certify in the Partner Center UI (Submit for certification), not here'
         required: true
         type: string
 
@@ -219,6 +226,20 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'msstore submission publish failed.' }
           Write-Host "Submission $env:SUBMISSION_ID committed to certification with the publishing hold in force."
 
+      # STORE-PIPE-1: Partner Center fills in the package version only while it processes the commit
+      # (CommitStarted, PreProcessing). Wait for that, bounded (30 reads, 20 s apart), stopping at the first
+      # end state; then require Certification or PendingPublication and, on a re-read, the uploaded file
+      # Uploaded as the expected version with nothing newer. A failure or a timeout fails the run and leaves
+      # the submission as it is (the publishing hold still holds; to stop it, cancel it in Partner Center, R4).
+      - name: Wait for Partner Center to process the commit and prove the package
+        shell: pwsh
+        run: |
+          ./tools/release/Wait-CommittedSubmission.ps1 `
+            -ProductId '${{ env.STORE_PRODUCT_ID }}' `
+            -ExpectedSubmissionId $env:SUBMISSION_ID `
+            -ExpectedPackageFileName "ServerAlyzer_${env:PACKAGE_VERSION}_x64_$($env:TAG_COMMIT.Substring(0, 7)).msix" `
+            -ExpectedPackageVersion $env:PACKAGE_VERSION
+
       - name: Report the resulting state
         if: always()
         shell: pwsh
@@ -236,4 +257,9 @@ jobs:
             'Certification is decided by Microsoft, not by this workflow. Nothing here means'
             'the update passed certification, and nothing here makes the product public: the'
             'submission was committed with the publishing hold in force.'
+            ''
+            'This workflow is only for a draft nobody edited in Partner Center (STORE-PIPE-1, decision (ii)).'
+            'After a manual edit of the listing text or screenshots, certification is done in the Partner'
+            'Center UI (Submit for certification), not here: an API-created submission changed in Partner'
+            'Center can no longer be committed through the API.'
           ) | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append

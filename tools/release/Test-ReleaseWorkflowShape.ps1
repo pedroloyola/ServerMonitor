@@ -85,6 +85,11 @@ $command = '(?m)^[^''"\n]*?'
 # G4 proved, in BOTH reads of the draft (stage read-back, certify proof).
 $tagBoundFileName = '-ExpectedPackageFileName "ServerAlyzer_${env:PACKAGE_VERSION}_x64_$($env:TAG_COMMIT.Substring(0, 7)).msix" `'
 
+# Index of the call of tools/release/<Script>.ps1 whose continuation lines include $Argument, or -1.
+function Get-ScriptCall([string] $Text, [string] $Script, [string] $Argument) {
+    return Get-Index $Text ('(?s)\./tools/release/' + [regex]::Escape($Script) + '\.ps1 `(?:\s*\n\s+-[A-Za-z]+[^\n]*`)*?\s*\n\s+' + [regex]::Escape($Argument))
+}
+
 # Index of the Assert-StagedSubmission call whose continuation lines include $Argument, or -1.
 function Get-StagedCall([string] $Text, [string] $Argument) {
     return Get-Index $Text ('(?s)\./tools/release/Assert-StagedSubmission\.ps1 `(?:\s*\n\s+-[A-Za-z]+[^\n]*`)*?\s*\n\s+' + [regex]::Escape($Argument))
@@ -140,6 +145,8 @@ function Assert-StoreSubmit([string] $Text) {
     $staged = $submit.IndexOf('./tools/release/Assert-StagedSubmission.ps1 `')
     if ($update -lt 0 -or $staged -lt $update) { throw 'Shape P-1: the read-back must prove an uncommitted draft after the metadata update.' }
     if ((Get-StagedCall $submit $tagBoundFileName) -lt 0) { throw 'Shape P-1: the read-back must bind the package file name to the tag commit.' }
+    # STORE-PIPE-1: before the commit the upload has no version, so the metadata step identifies it by file name.
+    if ((Get-ScriptCall $submit 'Update-StoreSubmission' $tagBoundFileName) -lt 0) { throw 'Shape STORE-PIPE-1: Update-StoreSubmission must bind the pending upload to the tag-commit file name.' }
 
     foreach ($marker in @('Assert-PackageVersionFloor.ps1', 'Assert-PackageIdentity.ps1', 'Assert-DistributionPrivacy.ps1', 'Assert-PackageRuntime.ps1', '$expectedName')) {
         $at = $submit.IndexOf($marker)
@@ -167,6 +174,11 @@ function Assert-StoreCertify([string] $Text) {
     if ($staged -lt 0 -or $staged -lt $configure -or $staged -gt $commit) { throw 'Shape P-1: the staged draft must be proven by its submission id right before the commit.' }
     $named = Get-StagedCall $certify $tagBoundFileName
     if ($named -ne $staged) { throw 'Shape P-1: the certify proof must bind the package file name to the tag commit (L-1).' }
+    # STORE-PIPE-1: after the commit, the bounded wait and the proof of the ingested package, bound to the same
+    # submission id and the same tag-commit file name. Before the commit it could only time out.
+    $wait = Get-ScriptCall $certify 'Wait-CommittedSubmission' '-ExpectedSubmissionId $env:SUBMISSION_ID `'
+    $waitNamed = Get-ScriptCall $certify 'Wait-CommittedSubmission' $tagBoundFileName
+    if ($wait -lt 0 -or $wait -lt $commit -or $waitNamed -ne $wait) { throw 'Shape STORE-PIPE-1: after the commit, store-certify must wait for Partner Center and prove the package (Wait-CommittedSubmission, bound to the submission id and the tag-commit file name).' }
 
     # Relay W4: the id binding comes only from the dispatch input. SUBMISSION_ID is declared once per job,
     # as the input, and nothing reassigns it (no assignment, no GITHUB_ENV, no environment API).
@@ -229,14 +241,16 @@ $mutations = @{
         # PR #56 fix round 1.
         @{ Old = './tools/release/Assert-NoPendingSubmission.ps1 -SubmissionPath before.json'; New = './tools/release/Assert-NoPendingSubmission.ps1 -SubmissionPath before.json -AllowedStatuses None,Published,Canceled,PendingCommit'; Name = 'W3 call site lets PendingCommit through (Relay M-1)' }
         @{ Old = "          if (`$env:STAGE_CONFIRM -cne 'STAGE') { throw"; New = "          if (`$false) { throw"; Name = 'phrase not checked before the approval (Vigil N-1)' }
-        @{ Old = '$($env:TAG_COMMIT.Substring(0, 7)).msix" `'; New = '0000000.msix" `'; Name = 'read-back file name not bound to the tag commit (Vigil L-1)' }
+        @{ Old = "`$(`$env:TAG_COMMIT.Substring(0, 7)).msix`" ```n            -ExpectedVisibility '`${{ env.STORE_VISIBILITY }}' ``"; New = "0000000.msix`" ```n            -ExpectedVisibility '`${{ env.STORE_VISIBILITY }}' ``"; Name = 'read-back file name not bound to the tag commit (Vigil L-1)' }
+        # STORE-PIPE-1.
+        @{ Old = "            -ExpectedPackageFileName `"ServerAlyzer_`${env:PACKAGE_VERSION}_x64_`$(`$env:TAG_COMMIT.Substring(0, 7)).msix`" ```n            -ExpectedVisibility '`${{ env.STORE_VISIBILITY }}'`n"; New = "            -ExpectedVisibility '`${{ env.STORE_VISIBILITY }}'`n"; Name = 'metadata step identifies the upload by version only (STORE-PIPE-1)' }
     )
     'store-certify.yml' = @(
         @{ Old = "  certify:`n    needs: provenance`n"; New = "  certify:`n"; Name = 'certify without provenance' }
         @{ Old = 'Assert-ReleaseRunProvenance.ps1 `'; New = 'Write-Host `'; Name = 'provenance check removed' }
         @{ Old = "    environment:`n      name: microsoft-store`n"; New = ''; Name = 'certify outside the Store environment' }
         @{ Old = 'if ($env:CERTIFY_CONFIRM -cne "CERTIFY $env:PACKAGE_VERSION") {'; New = 'if ($env:CERTIFY_CONFIRM -cnotlike "CERTIFY*") {'; Name = 'phrase not bound to the version' }
-        @{ Old = "            -ExpectedSubmissionId `$env:SUBMISSION_ID ```n"; New = ''; Name = 'staged draft not bound by id' }
+        @{ Old = "-ExpectedVisibility '`${{ env.STORE_VISIBILITY }}' ```n            -ExpectedSubmissionId `$env:SUBMISSION_ID ```n"; New = "-ExpectedVisibility '`${{ env.STORE_VISIBILITY }}' ```n"; Name = 'staged draft not bound by id' }
         @{ Old = './tools/release/Assert-StagedSubmission.ps1 `'; New = 'Write-Host `'; Name = 'staged draft proof removed' }
         @{ Old = "      - name: Commit the staged draft to certification`n"; New = "      - name: Commit the staged draft to certification`n        if: always()`n"; Name = 'commit runs after a failed proof' }
         @{ Old = "      - name: Prove the draft is still the staged draft`n        shell: pwsh"; New = "      - name: Prove the draft is still the staged draft`n        continue-on-error: true`n        shell: pwsh"; Name = 'staged proof allowed to fail' }
@@ -249,6 +263,12 @@ $mutations = @{
         @{ Old = '          if ($env:CERTIFY_CONFIRM -cne "CERTIFY $env:PACKAGE_VERSION") { throw "Confirmation'; New = '          if ($false) { throw "Confirmation'; Name = 'phrase not checked before the approval (Vigil N-1)' }
         @{ Old = "          ./tools/release/Assert-StagedSubmission.ps1 ```n            -SubmissionPath draft.json"; New = "          `$env:SUBMISSION_ID = (Get-Content -Raw draft.json | ConvertFrom-Json).id`n          ./tools/release/Assert-StagedSubmission.ps1 ```n            -SubmissionPath draft.json"; Name = 'W4 id reassigned from the draft (Relay W4)' }
         @{ Old = "        run: ./tools/release/Assert-PackageVersionFloor.ps1 -PackageVersion `$env:PACKAGE_VERSION"; New = "        run: |`n          ./tools/release/Assert-PackageVersionFloor.ps1 -PackageVersion `$env:PACKAGE_VERSION`n          'SUBMISSION_ID=1' | Out-File -Append `$env:GITHUB_ENV"; Name = 'W4 id rewritten through GITHUB_ENV' }
+        # STORE-PIPE-1: the wait for Partner Center after the commit, and the proof of the ingested package.
+        @{ Old = './tools/release/Wait-CommittedSubmission.ps1 `'; New = 'Write-Host `'; Name = 'no wait or package proof after the commit (STORE-PIPE-1)' }
+        @{ Old = "      - name: Wait for Partner Center to process the commit and prove the package`n        shell: pwsh"; New = "      - name: Wait for Partner Center to process the commit and prove the package`n        continue-on-error: true`n        shell: pwsh"; Name = 'post-commit proof allowed to fail (STORE-PIPE-1)' }
+        @{ Old = "            -ProductId '`${{ env.STORE_PRODUCT_ID }}' ```n            -ExpectedSubmissionId `$env:SUBMISSION_ID ```n"; New = "            -ProductId '`${{ env.STORE_PRODUCT_ID }}' ```n            -ExpectedSubmissionId 1 ```n"; Name = 'post-commit proof not bound to the submission id (STORE-PIPE-1)' }
+        @{ Old = "_x64_`$(`$env:TAG_COMMIT.Substring(0, 7)).msix`" ```n            -ExpectedPackageVersion `$env:PACKAGE_VERSION`n"; New = "_x64_0000000.msix`" ```n            -ExpectedPackageVersion `$env:PACKAGE_VERSION`n"; Name = 'post-commit proof file name not bound to the tag commit (STORE-PIPE-1)' }
+        @{ Old = "      - name: Commit the staged draft to certification`n"; New = "      - name: Early wait`n        shell: pwsh`n        run: |`n          ./tools/release/Wait-CommittedSubmission.ps1 ```n            -ProductId x ```n            -ExpectedSubmissionId `$env:SUBMISSION_ID ```n            -ExpectedPackageFileName `"ServerAlyzer_`${env:PACKAGE_VERSION}_x64_`$(`$env:TAG_COMMIT.Substring(0, 7)).msix`" ```n            -ExpectedPackageVersion `$env:PACKAGE_VERSION`n`n      - name: Commit the staged draft to certification`n"; Name = 'wait placed before the commit (STORE-PIPE-1)' }
         @{ Old = "      - name: Prove the draft is still the staged draft`n        shell: pwsh"; New = "      - name: Prove the draft is still the staged draft`n        env:`n          SUBMISSION_ID: `${{ steps.draft.outputs.id }}`n        shell: pwsh"; Name = 'W4 id redefined in a step env' }
         # PR #56 round 2 (Relay L-3, W11): Env: provider writes, by alias and by cmdlet.
         @{ Old = "          ./tools/release/Assert-StagedSubmission.ps1 ```n            -SubmissionPath draft.json"; New = "          si env:SUBMISSION_ID (Get-Content -Raw draft.json | ConvertFrom-Json).id`n          ./tools/release/Assert-StagedSubmission.ps1 ```n            -SubmissionPath draft.json"; Name = 'W11 id rewritten through the si alias' }
