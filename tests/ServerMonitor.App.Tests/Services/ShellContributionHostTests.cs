@@ -356,7 +356,7 @@ public sealed class ShellContributionHostTests
         var host = AppSourceTree.CodeWithoutComments("Services/ShellContributionHost.cs");
         Assert.Contains("NavigationViewType.IsInstanceOfType(view) && ((FrameworkElement)view).Parent is null", host, StringComparison.Ordinal);
         Assert.Contains("SectionViewType.IsInstanceOfType(view) && ((FrameworkElement)view).Parent is null", host, StringComparison.Ordinal);
-        Assert.Contains(": this(contributions, logger, localization.GetString, IsDisplayableNavigationView, IsDisplayableSectionView)", host, StringComparison.Ordinal);
+        Assert.Contains(": this(contributions, logger, localization.GetString, IsDisplayableNavigationView, IsDisplayableSectionView, ValidateIconPathData)", host, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -650,5 +650,77 @@ public sealed class ShellContributionHostTests
         var host = Host(registered);
         Assert.Equal(BaselineNavigationIds, host.NavigationIds);
         Assert.Equal(BaselineSettingsSectionIds, host.SettingsSectionIds);
+    }
+
+    // ---------------------------------------------------------------- r3: icon data is parsed inside the isolation (N-1 / L-3)
+
+    private static ShellContributionHost IconHost(ShellContributions contributions, ILogger logger, List<string> validated) =>
+        new(contributions, logger, key => "Title of " + key, view => view is View, view => view is View, data =>
+        {
+            validated.Add(data);
+            if (!data.StartsWith('M') || data.EndsWith('L'))
+            {
+                throw new FormatException("bad path markup near the end of " + data);
+            }
+        });
+
+    [Theory]
+    [InlineData("M0,0 L")]
+    [InlineData("not a path")]
+    public void MalformedIconData_FallsBackToTheGenericIcon_LoggedByIdAndType_AndTheEntryStays(string data)
+    {
+        var logger = new RecordingLogger();
+        var validated = new List<string>();
+        var host = IconHost(new ShellContributions([], [new ShellContribution("bad.icon", 0, "Key", () => new View("bad.icon"), data)]), logger, validated);
+
+        var entry = Assert.Single(host.NavigationEntries);
+
+        Assert.Equal("bad.icon", entry.Id);
+        Assert.Null(entry.IconPathData);
+        Assert.Equal([data], validated);
+        var warning = Assert.Single(logger.Entries, e => e.Level == LogLevel.Warning);
+        Assert.Contains("bad.icon", warning.Message, StringComparison.Ordinal);
+        Assert.Contains(nameof(FormatException), warning.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("bad path markup", warning.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Error);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void NoIconData_IsNeverParsed_AndShowsTheGenericIcon(string? data)
+    {
+        var logger = new RecordingLogger();
+        var validated = new List<string>();
+        var host = IconHost(new ShellContributions([], [new ShellContribution("no.icon", 0, "Key", () => new View("no.icon"), data)]), logger, validated);
+
+        Assert.Null(Assert.Single(host.NavigationEntries).IconPathData);
+        Assert.Empty(validated);
+        Assert.Empty(logger.Entries);
+    }
+
+    [Fact]
+    public void ValidIconData_IsParsedOnce_AndKept()
+    {
+        var logger = new RecordingLogger();
+        var validated = new List<string>();
+        var host = IconHost(new ShellContributions([], [new ShellContribution("good.icon", 0, "Key", () => new View("good.icon"), "M0,0 L20,20 Z")]), logger, validated);
+
+        Assert.Equal("M0,0 L20,20 Z", Assert.Single(host.NavigationEntries).IconPathData);
+        _ = host.NavigationEntries;
+        Assert.Equal(["M0,0 L20,20 Z"], validated);
+        Assert.Empty(logger.Entries);
+    }
+
+    [Fact]
+    public void InProduction_IconDataIsParsedExactlyAsTheSidebarsIconParsesIt()
+    {
+        var host = AppSourceTree.CodeWithoutComments("Services/ShellContributionHost.cs");
+        var icon = AppSourceTree.CodeWithoutComments("Controls/Primitives/SaIcon.cs");
+
+        Assert.Contains("XamlBindingHelper.ConvertValue(typeof(Geometry), Data)", icon, StringComparison.Ordinal);
+        Assert.Contains("ValidateIconPathData(string data) => _ = (Geometry)XamlBindingHelper.ConvertValue(typeof(Geometry), data);", host, StringComparison.Ordinal);
+        Assert.Contains("IsDisplayableNavigationView, IsDisplayableSectionView, ValidateIconPathData)", host, StringComparison.Ordinal);
     }
 }

@@ -1,6 +1,8 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Markup;
+using Microsoft.UI.Xaml.Media;
 using ServerMonitor.Features;
 
 namespace ServerMonitor.App.Services;
@@ -27,6 +29,10 @@ public sealed record RealizedShellContribution(string Id, string Title, object V
 /// in its frame when the theme changes; a Settings section's view may be any <see cref="FrameworkElement"/>, because it
 /// lives inside the Settings page. Either must be new, with no parent: an element can be in one place only. A view is
 /// placed through <see cref="TryAttach"/>, so a view that still fails when it is added is left out too.
+/// </para>
+/// <para>
+/// A navigation entry's icon is parsed here too, inside the same isolation: icon data that is not valid path markup is
+/// logged and replaced by the generic icon, so it never reaches the sidebar's icon, which converts it during layout.
 /// </para>
 /// <para>
 /// Views are created once and kept for the life of the process, shown again on every visit and never disposed (see
@@ -59,6 +65,7 @@ public sealed class ShellContributionHost
     private readonly Func<string, string> _title;
     private readonly Func<object, bool> _canShowNavigationView;
     private readonly Func<object, bool> _canShowSectionView;
+    private readonly Action<string> _validateIcon;
     private IReadOnlyList<RealizedShellContribution>? _navigationEntries;
     private IReadOnlyList<RealizedShellContribution>? _settingsSections;
     private bool _realizing;
@@ -67,7 +74,7 @@ public sealed class ShellContributionHost
         ShellContributions contributions,
         ILocalizationService localization,
         ILogger<ShellContributionHost> logger)
-        : this(contributions, logger, localization.GetString, IsDisplayableNavigationView, IsDisplayableSectionView)
+        : this(contributions, logger, localization.GetString, IsDisplayableNavigationView, IsDisplayableSectionView, ValidateIconPathData)
     {
     }
 
@@ -81,24 +88,41 @@ public sealed class ShellContributionHost
     {
     }
 
-    /// <summary>TEST SEAM: the real arranging and realizing over a title lookup and per-kind view checks.</summary>
+    /// <summary>TEST SEAM: per-kind view checks; icons are taken as valid.</summary>
     internal ShellContributionHost(
         ShellContributions contributions,
         ILogger logger,
         Func<string, string> title,
         Func<object, bool> canShowNavigationView,
         Func<object, bool> canShowSectionView)
+        : this(contributions, logger, title, canShowNavigationView, canShowSectionView, static _ => { })
+    {
+    }
+
+    /// <summary>
+    /// TEST SEAM: the real arranging and realizing over a title lookup, per-kind view checks and an icon check that
+    /// throws on icon data it cannot parse.
+    /// </summary>
+    internal ShellContributionHost(
+        ShellContributions contributions,
+        ILogger logger,
+        Func<string, string> title,
+        Func<object, bool> canShowNavigationView,
+        Func<object, bool> canShowSectionView,
+        Action<string> validateIcon)
     {
         ArgumentNullException.ThrowIfNull(contributions);
         ArgumentNullException.ThrowIfNull(logger);
         ArgumentNullException.ThrowIfNull(title);
         ArgumentNullException.ThrowIfNull(canShowNavigationView);
         ArgumentNullException.ThrowIfNull(canShowSectionView);
+        ArgumentNullException.ThrowIfNull(validateIcon);
         _contributions = contributions;
         _logger = logger;
         _title = title;
         _canShowNavigationView = canShowNavigationView;
         _canShowSectionView = canShowSectionView;
+        _validateIcon = validateIcon;
     }
 
     /// <summary>The type a navigation entry's view must be: what the shell re-mounts in its frame on a theme change.</summary>
@@ -114,6 +138,12 @@ public sealed class ShellContributionHost
     /// <summary>A Settings section's view: an element that is not placed anywhere yet.</summary>
     internal static bool IsDisplayableSectionView(object view) =>
         SectionViewType.IsInstanceOfType(view) && ((FrameworkElement)view).Parent is null;
+
+    /// <summary>
+    /// Parses icon data exactly as the sidebar's icon does (<c>SaIcon</c>), so data that would fail there throws here,
+    /// inside the host's isolation. UI thread only.
+    /// </summary>
+    internal static void ValidateIconPathData(string data) => _ = (Geometry)XamlBindingHelper.ConvertValue(typeof(Geometry), data);
 
     /// <summary>The contributed navigation entries, realized on first use (UI thread).</summary>
     public IReadOnlyList<RealizedShellContribution> NavigationEntries =>
@@ -223,7 +253,7 @@ public sealed class ShellContributionHost
                 }
 
                 realized.Add(new RealizedShellContribution(
-                    contribution.Id, TitleOf(contribution, kind), view, contribution.IconPathData));
+                    contribution.Id, TitleOf(contribution, kind), view, IconOf(contribution, kind)));
             }
             catch (Exception exception)
             {
@@ -252,6 +282,31 @@ public sealed class ShellContributionHost
             "A contributed {Kind} has no title resource; a neutral label is shown. Id: {Id}. Key: {Key}.",
             kind, contribution.Id, contribution.TitleResourceKey);
         return Lookup(UntitledResourceKey) ?? UntitledFallback;
+    }
+
+    /// <summary>
+    /// The contribution's icon data, parsed here: data that cannot be parsed is logged (id and exception type only) and
+    /// replaced by the generic icon (null). The contribution itself stays.
+    /// </summary>
+    private string? IconOf(ShellContribution contribution, string kind)
+    {
+        if (contribution.IconPathData is not { } data)
+        {
+            return null;
+        }
+
+        try
+        {
+            _validateIcon(data);
+            return data;
+        }
+        catch (Exception exception)
+        {
+            _logger.LogWarning(
+                "A contributed {Kind} has icon data that cannot be parsed; the generic icon is shown. Id: {Id}. Exception type: {ExceptionType}.",
+                kind, contribution.Id, exception.GetType().Name);
+            return null;
+        }
     }
 
     private string? Lookup(string key)
