@@ -53,7 +53,9 @@ public sealed partial class XamlContractAndResourceGuardTests
         ["Views/SettingsPage.xaml"] = ["PageViewport", "BackgroundSection", "PageRoot", "AutosaveText", "ThemeControl", "LanguageControl", "BackgroundControl",
             "NotificationsControl", "CompactControl", "TopmostControl", "DisclosureColumn2", "DisclosureGrid", "AboutDisclosure",
             // UI.5 fix round 2 (Prism C1 M-8): the Narrow state spaces these rows.
-            "ThemeRow", "CompactRow"],
+            "ThemeRow", "CompactRow",
+            // M15.4a: the host of contributed Settings sections (filled from code-behind, collapsed when empty).
+            "ContributedSections"],
         // UI.5 Server Detail: WidthStates setters + code-behind focus (HistoryRow / WorkloadsRow / RefreshButton).
         ["Views/ServerDetailPage.xaml"] = ["PageViewport", "PageScroll", "PageRoot", "IdentityGrid", "IdentityActions", "ServerNameHeading", "RefreshButton",
             "CollectingColumns", "MetricsGrid", "MetricsColumn2", "MetricsColumn3", "MemoryCard", "DiskCard", "DeeperGrid", "DeeperColumn2",

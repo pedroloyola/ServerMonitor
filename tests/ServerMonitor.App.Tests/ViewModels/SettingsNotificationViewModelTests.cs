@@ -298,6 +298,8 @@ public sealed class SettingsNotificationViewModelTests
     private sealed class FakeNavigationService : INavigationService
     {
         public NavigationDestination? CurrentDestination => null;
+        public string? CurrentContributionId => null;
+        public void GoToContribution(string id) => throw new NotSupportedException();
         public event EventHandler? Navigated { add { } remove { } }
         public void EnsureInitialNavigation() => throw new NotSupportedException();
         public void GoToHistory() => throw new NotSupportedException();

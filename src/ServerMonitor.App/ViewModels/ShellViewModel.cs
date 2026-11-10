@@ -6,10 +6,40 @@ namespace ServerMonitor.App.ViewModels;
 public sealed class ShellViewModel : ObservableObject, IDisposable
 {
     private readonly INavigationService _navigation;
+    private readonly ShellContributionHost? _contributions;
     public ShellViewModel(INavigationService navigation)
+        : this(navigation, null)
+    {
+    }
+
+    /// <summary>M15.4a: with the contributed navigation entries (the container uses this constructor).</summary>
+    public ShellViewModel(INavigationService navigation, ShellContributionHost? contributions)
     {
         _navigation = navigation;
+        _contributions = contributions;
         _navigation.Navigated += OnNavigated;
+    }
+
+    /// <summary>
+    /// M15.4a: the contributed navigation entries, in display order (realized on first use, on the UI thread). Empty
+    /// when nothing was contributed, which leaves the sidebar exactly as it is.
+    /// </summary>
+    public IReadOnlyList<RealizedShellContribution> ContributedEntries =>
+        _contributions?.NavigationEntries ?? [];
+
+    /// <summary>M15.4a: the contributed entry shown, or null (a built-in destination is selected instead).</summary>
+    public string? SelectedContributionId =>
+        _navigation.CurrentDestination == NavigationDestination.Contribution ? _navigation.CurrentContributionId : null;
+
+    /// <summary>M15.4a: opens a contributed entry by id, as a sidebar navigation.</summary>
+    public void NavigateToContribution(string id)
+    {
+        IsSidebarNavigation = true;
+        try
+        {
+            _navigation.GoToContribution(id);
+        }
+        finally { IsSidebarNavigation = false; }
     }
 
     public ShellDestination? SelectedDestination => _navigation.CurrentDestination switch
@@ -50,6 +80,7 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(SelectedDestination));
         OnPropertyChanged(nameof(IsOverviewSelected)); OnPropertyChanged(nameof(IsServersSelected));
         OnPropertyChanged(nameof(IsHistorySelected)); OnPropertyChanged(nameof(IsSettingsSelected));
+        OnPropertyChanged(nameof(SelectedContributionId));
     }
     public void Dispose() => _navigation.Navigated -= OnNavigated;
 }

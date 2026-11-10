@@ -7,6 +7,8 @@ namespace ServerMonitor.App.Tests.Fakes;
 internal sealed class FakeNavigationService : INavigationService
 {
     public NavigationDestination? CurrentDestination { get; set; }
+    public string? CurrentContributionId => null;
+    public void GoToContribution(string id) { }
     public event EventHandler? Navigated;
     public int NavigatedSubscribers => Navigated?.GetInvocationList().Length ?? 0;
     public void EnsureInitialNavigation() { if (CurrentDestination is null) GoToDashboard(); }

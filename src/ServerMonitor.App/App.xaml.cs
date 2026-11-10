@@ -742,6 +742,12 @@ public partial class App : Application
         // that records what was ACTUALLY registered.
         services.AddSingleton<IFeatureCatalog>(FeatureCatalog.Empty);
 
+        // M15.4a shell contributions. Default: none, in the same idiom, so the sidebar and the Settings page resolve
+        // the host in every composition and show exactly their built-in items. The non-QA branch replaces the list
+        // with what the COMPOSED modules contribute; the host turns it into views on the UI thread.
+        services.AddSingleton(ShellContributions.Empty);
+        services.AddSingleton<ShellContributionHost>();
+
         // UI.4 D-UI4-PRIORITY: ONE MonitoringOptions for the engine and the overview, so the priority problem uses
         // exactly the engine's thresholds (no second copy of the rule). Same values as the previous options: null, but a
         // distinct instance from MonitoringOptions.Default, so a consumer that silently falls back to the default is
@@ -1041,6 +1047,9 @@ public partial class App : Application
             modules,
             commercialEntitlements ?? CommunityEntitlementProvider.Instance);
         services.AddSingleton<IFeatureCatalog>(composition.Catalog);
+
+        // Only composed modules contributed (same gate as their services); the provider itself is still not registered.
+        services.AddSingleton(composition.Contributions);
         return composition;
     }
 

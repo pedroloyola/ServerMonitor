@@ -312,6 +312,10 @@
                 </Border>
             </StackPanel>
 
+            <!-- M15.4a: sections contributed by feature modules, after the built-in ones. Collapsed (no spacing, nothing
+                 shown) while there are none, so the page is unchanged without contributions. -->
+            <StackPanel x:Name="ContributedSections" Spacing="{StaticResource SaSpace20}" Visibility="Collapsed" />
+
             <!-- Additional settings 112:7984: two disclosures 56 high r20 (Cortex 2: in-page links until UI.6; H-UI5-4:
                  "Sobre" lands on Dados e servidores with its About card in view). -->
             <Grid x:Name="DisclosureGrid" ColumnSpacing="{StaticResource SaSpace24}">

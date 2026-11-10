@@ -88,4 +88,14 @@ public interface INavigationService
     /// navigation that asked; "Continuar a editar" drops it. Clicks are never queued (the question is modal).
     /// </summary>
     void LeaveCurrentPageForActivation(Action continuation);
+
+    /// <summary>
+    /// M15.4a: the contributed navigation entry <paramref name="id"/> (<see cref="ShellContributionHost"/>), routed by id
+    /// alone - no page type, no reflection. An unknown id changes nothing. Leaves the current page through its exit guard
+    /// like every navigation.
+    /// </summary>
+    void GoToContribution(string id);
+
+    /// <summary>The id of the contributed entry shown, while <see cref="CurrentDestination"/> is a contribution; else null.</summary>
+    string? CurrentContributionId { get; }
 }

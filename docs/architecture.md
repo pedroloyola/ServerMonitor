@@ -238,3 +238,40 @@ Os workloads têm secção própria no detalhe do servidor (apenas Standard Mode
 **não** aparecem no modo compacto. Ações remotas (restart de serviços/containers, gestão Docker) ficam
 explicitamente fora do M11 — são V3 do roadmap. Decisões, catálogo completo, tabelas de mapeamento e
 limites constam da ADR-016.
+
+## Ponto de extensão da interface (contribuições do shell)
+
+Um `IFeatureModule` estático pode acrescentar interface ao shell através de `Contributions`
+(`ShellContributions`, em `ServerMonitor.Features`). Cada contribuição é um descritor neutro
+`ShellContribution { Id, Order, TitleResourceKey, CreateView }`, de dois tipos: **secções de Definições**
+(mostradas na página Definições, depois das secções próprias) e **entradas de navegação** (mostradas na barra
+lateral, depois de Histórico e antes de Definições). O membro tem implementação por omissão vazia, por isso os
+módulos existentes não mudam; nenhum módulo deste repositório contribui interface hoje.
+
+- **Mesmo gate dos serviços.** `FeatureComposition.Compose` só lê `Contributions` de um módulo que compôs.
+  Um módulo incondicional contribui sempre, diga o fornecedor o que disser (mesmo que lance); um módulo
+  condicional recusado não contribui nada e nem chega a ser consultado. O fornecedor continua fora do
+  contentor.
+- **Encaminhamento por `Id`.** O shell cria a vista chamando `CreateView` e navega por id
+  (`INavigationService.GoToContribution`), sem tipo genérico nem reflexão; as páginas próprias continuam a usar
+  `NavigateTo<TPage>()`.
+- **Ordem determinística.** `ShellContributionOrdering.Arrange`: um id repetido ou igual a um id próprio do
+  shell é descartado (ganha o primeiro, pela ordem de composição) e registado em log; os restantes ordenam-se
+  por `Order` e depois por `Id` (ordinal).
+- **Falhas nunca fatais.** `ShellContributionHost` cria as vistas uma vez, no thread de UI, dentro de
+  try/catch: uma fábrica que lança, ou que devolve algo que não é um elemento de UI, remove só essa
+  contribuição e fica no log (tipo da exceção, nunca a mensagem).
+- **Sem contribuições, sem mudança.** As sequências de ids da navegação (`overview`, `servers`, `history`,
+  `settings`) e das secções de Definições (`appearance`, `monitoring`, `window`) ficam iguais à baseline
+  guardada nos testes, que também a confrontam com o XAML.
+
+Só se aceitam módulos estáticos, listados no composition root; não há carregamento dinâmico.
+
+## Fronteira de rede
+
+`NetworkBoundaryAllowlistTests` lê os metadados compilados de Core, Infrastructure, Collectors e App e falha
+se aparecer qualquer tipo de `System.Net.Http` ou `System.Net.Sockets` fora de uma allowlist exata, por
+assembly e tipo. Hoje a allowlist tem só `AddressFamily` (Core e App, forma de endereços IPv6) e
+`SocketError`/`SocketException` (Infrastructure, mapeamento de falhas SSH); as ligações em si ficam dentro
+dos pacotes SSH.NET e Tmds.MDns. Nenhuma camada referencia `System.Net.Http`. Um novo caminho de rede é uma
+decisão de produto que altera esta lista em revisão.

@@ -12,13 +12,37 @@ public sealed partial class SettingsPage : Page, ISettingsNavigationTarget
 {
     public SettingsPage(
         SettingsViewModel viewModel,
-        WindowModeViewModel windowMode)
+        WindowModeViewModel windowMode,
+        ShellContributionHost contributions)
     {
         InitializeComponent();
         ViewModel = viewModel;
         WindowMode = windowMode;
         DataContext = ViewModel;
+        AddContributedSections(contributions);
         Loaded += OnLoaded;
+    }
+
+    /// <summary>
+    /// M15.4a: each contributed section as a titled block like the built-in ones (heading level 2, then the view). The
+    /// views are created here, on the UI thread, once (the page is a singleton); a factory that failed was already left
+    /// out by the host. With none the host stays collapsed.
+    /// </summary>
+    private void AddContributedSections(ShellContributionHost contributions)
+    {
+        foreach (var section in contributions.SettingsSections)
+        {
+            var title = new TextBlock { Text = section.Title, Style = (Microsoft.UI.Xaml.Style)Microsoft.UI.Xaml.Application.Current.Resources["SaCardTitleTextStyle"] };
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetHeadingLevel(title, Microsoft.UI.Xaml.Automation.Peers.AutomationHeadingLevel.Level2);
+            var block = new StackPanel { Spacing = 10 };
+            block.Children.Add(title);
+            block.Children.Add((Microsoft.UI.Xaml.UIElement)section.View);
+            ContributedSections.Children.Add(block);
+        }
+
+        ContributedSections.Visibility = ContributedSections.Children.Count > 0
+            ? Microsoft.UI.Xaml.Visibility.Visible
+            : Microsoft.UI.Xaml.Visibility.Collapsed;
     }
 
     public SettingsViewModel ViewModel { get; }
