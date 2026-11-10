@@ -17,6 +17,7 @@ public sealed partial class SaSidebar : UserControl
     private bool _rail;
     private Button? _footerLink;
     private TextBlock? _footerLabel;
+    private SaIcon? _footerIcon;
     public SaSidebar()
     {
         InitializeComponent();
@@ -42,13 +43,18 @@ public sealed partial class SaSidebar : UserControl
             ToolTipService.SetToolTip(item, rail ? Microsoft.UI.Xaml.Automation.AutomationProperties.GetName(item) : null);
             if (item.Content is Grid grid) grid.ColumnSpacing = rail ? 0 : 10;
         }
-        if (_footerLink is not null && _footerLabel is not null)
+        if (_footerLink is not null && _footerLabel is not null && _footerIcon is not null)
         {
-            // M15.4a: the footer link has the items' geometry (176 expanded, the 46 circle in the rail).
+            // M15.4a r4 (Figma): expanded, a 176x36 pill (radius 12) with its text only; in the rail, the items' 46 circle
+            // with the icon and a tooltip.
             _footerLink.Width = rail ? ShellLayout.RailItemWidth : ShellLayout.ItemWidth;
+            _footerLink.Height = rail ? SidebarContributionLayout.RailFooterLinkHeight : SidebarContributionLayout.FooterLinkHeight;
+            _footerLink.CornerRadius = new CornerRadius(rail ? SidebarContributionLayout.RailFooterLinkCornerRadius : SidebarContributionLayout.FooterLinkCornerRadius);
             _footerLink.Padding = new Thickness(rail ? 13 : 12, 0, rail ? 13 : 12, 0);
-            if (_footerLink.Content is Grid footerGrid) footerGrid.ColumnSpacing = rail ? 0 : 10;
+            _footerLink.HorizontalContentAlignment = rail ? HorizontalAlignment.Center : HorizontalAlignment.Stretch;
+            NavGrid.RowDefinitions[Grid.GetRow(_footerLink)].Height = new GridLength(_footerLink.Height);
             _footerLabel.Visibility = rail ? Visibility.Collapsed : Visibility.Visible;
+            _footerIcon.Visibility = rail ? Visibility.Visible : Visibility.Collapsed;
             ApplyFooterText();
         }
         foreach (var label in new[] { OverviewLabel, ServersLabel, HistoryLabel, SettingsLabel, BrandText }.Concat(_contributed.Select(entry => entry.Label))) label.Visibility = rail ? Visibility.Collapsed : Visibility.Visible;
@@ -98,7 +104,7 @@ public sealed partial class SaSidebar : UserControl
         for (var i = 0; i < count; i++)
             NavGrid.RowDefinitions.Insert(SidebarContributionLayout.RowOfContributed(i), new RowDefinition { Height = new GridLength(SidebarContributionLayout.ContributedRowHeight) });
 
-        var settingsIndex = NavGrid.Children.IndexOf(SettingsItem);
+        var settingsIndex = NavGrid.Children.IndexOf((UIElement?)_footerLink ?? SettingsItem); // above the footer link: the arrow order is the visual one
         for (var i = 0; i < count; i++)
         {
             var entry = entries[i];
@@ -134,9 +140,10 @@ public sealed partial class SaSidebar : UserControl
 
     /// <summary>
     /// M15.4a: the composition-supplied link at the foot of the navigation, just above Settings: a host-drawn button (a
-    /// link, not one of the destinations), with the items' geometry, keyboard and focus visuals, its label as the
-    /// Narrator's name and its hint as the help text; in the rail, the icon and a tooltip. Built once; without a footer
-    /// link nothing here changes the tree.
+    /// link, not one of the destinations). Expanded, the Figma pill (176x36, radius 12, solid fill, one 12 px line
+    /// "label · hint"); in the rail, the items' 46 circle with the icon and a tooltip. It is in the sidebar's arrow order
+    /// (between the last destination above it and Settings) with the system focus ring; its label is the Narrator's name
+    /// and its hint the help text. Built once; without a footer link nothing here changes the tree.
     /// </summary>
     private void AddFooterLink(ShellViewModel shell)
     {
@@ -147,21 +154,30 @@ public sealed partial class SaSidebar : UserControl
             Grid.SetRowSpan(child, SidebarContributionLayout.RowSpanAfterFooter(row, Grid.GetRowSpan(child)));
             Grid.SetRow(child, SidebarContributionLayout.RowAfterFooter(row));
         }
-        NavGrid.RowDefinitions.Insert(SidebarContributionLayout.FooterRow, new RowDefinition { Height = new GridLength(SidebarContributionLayout.ContributedRowHeight) });
+        NavGrid.RowDefinitions.Insert(SidebarContributionLayout.FooterRow, new RowDefinition { Height = new GridLength(SidebarContributionLayout.FooterLinkHeight) });
 
-        _footerLabel = new TextBlock { MaxWidth = ShellLayout.ItemLabelMaxWidth, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center };
-        Grid.SetColumn(_footerLabel, 1);
-        var content = new Grid { ColumnSpacing = 10 };
-        content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(20) });
-        content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        content.Children.Add(new SaIcon { Data = link.IconPathData ?? (string)Application.Current.Resources["SaIconPackageData"], Size = 20 });
+        _footerLabel = new TextBlock
+        {
+            Style = (Style)Application.Current.Resources["SaCaptionTextStyle"],
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            TextWrapping = TextWrapping.NoWrap,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        _footerIcon = new SaIcon
+        {
+            Data = link.IconPathData ?? (string)Application.Current.Resources["SaIconPackageData"],
+            Size = 20,
+            Visibility = Visibility.Collapsed,
+        };
+        var content = new Grid();
+        content.Children.Add(_footerIcon);
         content.Children.Add(_footerLabel);
         _footerLink = new Button
         {
             Style = (Style)Application.Current.Resources["SaNavFooterLinkStyle"],
-            Height = SidebarContributionLayout.ContributedRowHeight,
             Content = content,
         };
+        SaGroupNavigation.SetIsGroupMember(_footerLink, true);
         Grid.SetRow(_footerLink, SidebarContributionLayout.FooterRow);
         _footerLink.Click += OnFooterLinkClick;
         NavGrid.Children.Insert(NavGrid.Children.IndexOf(SettingsItem), _footerLink);
@@ -184,10 +200,11 @@ public sealed partial class SaSidebar : UserControl
         if (_footerLink is null || _footerLabel is null || DataContext is not ShellViewModel shell) return;
         var label = shell.FooterLinkLabel ?? string.Empty;
         var hint = shell.FooterLinkHint;
-        _footerLabel.Text = label;
+        var text = SidebarContributionLayout.FooterLinkText(label, hint);
+        _footerLabel.Text = text;
         AutomationProperties.SetName(_footerLink, label);
         AutomationProperties.SetHelpText(_footerLink, hint ?? string.Empty);
-        ToolTipService.SetToolTip(_footerLink, _rail ? label : hint);
+        ToolTipService.SetToolTip(_footerLink, _rail ? text : null);
     }
 
     private void BindContributions(ShellViewModel? shell)

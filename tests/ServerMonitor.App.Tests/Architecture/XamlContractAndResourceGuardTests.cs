@@ -12,7 +12,8 @@ namespace ServerMonitor.App.Tests.Architecture;
 /// <item>Resource keys: every <c>{StaticResource}</c>/<c>{ThemeResource}</c>/<c>ResourceKey</c> used by app XAML and
 /// every <c>Application.Current.Resources[...]</c> key used by app C# resolves to a key the app defines
 /// (App.xaml, any dictionary under Styles/**, or the file's own local resources) or to the documented WinUI
-/// platform allowlist below.</item>
+/// platform allowlist below. A code-behind's read of its own <c>Resources["..."]</c> (not through another object)
+/// may also resolve to a key its own XAML file defines (M15.4a r4: a page-local template).</item>
 /// </list>
 /// Styles/** is enumerated generically, so new token dictionaries (e.g. Styles/Tokens/*.xaml) are picked up
 /// without editing this test.
@@ -350,8 +351,18 @@ public sealed partial class XamlContractAndResourceGuardTests
 
         foreach (var file in AppSourceTree.Files(".cs"))
         {
-            foreach (var key in CodeResourceReferences(AppSourceTree.CodeWithoutComments(file)))
+            var code = AppSourceTree.CodeWithoutComments(file);
+            var ownXaml = file.EndsWith(".xaml.cs", StringComparison.Ordinal) && documents.TryGetValue(file[..^3], out var own)
+                ? DefinedKeys(own)
+                : [];
+            var ownReads = OwnResourceRead().Matches(code).Select(m => m.Groups[1].Value).ToHashSet(StringComparer.Ordinal);
+            foreach (var key in CodeResourceReferences(code))
             {
+                if (ownReads.Contains(key) && ownXaml.Contains(key))
+                {
+                    continue;
+                }
+
                 if (!appWide.Contains(key) && !PlatformResourceKeys.Contains(key))
                 {
                     unresolved.Add($"{file}: {key}");
@@ -516,6 +527,10 @@ public sealed partial class XamlContractAndResourceGuardTests
 
     [GeneratedRegex(@"Resources\[""([^""]+)""\](?!\s*=[^=])")]
     private static partial Regex LiteralResourceRead();
+
+    /// <summary>A read of the object's own <c>Resources["..."]</c>, not of another object's (no <c>.</c> before it).</summary>
+    [GeneratedRegex(@"(?<![\w.])Resources\[""([^""]+)""\](?!\s*=[^=])")]
+    private static partial Regex OwnResourceRead();
 
     [GeneratedRegex(@"Resources\[[A-Za-z_][A-Za-z0-9_]*\]")]
     private static partial Regex VariableResourceRead();

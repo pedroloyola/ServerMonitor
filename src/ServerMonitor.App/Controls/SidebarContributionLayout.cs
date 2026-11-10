@@ -13,6 +13,20 @@ internal static class SidebarContributionLayout
     /// <summary>Settings' row in the XAML. The footer link takes a new row here, so it sits just above Settings.</summary>
     internal const int SettingsRow = 5;
 
+    /// <summary>M15.4a r4 (Figma, owner decision): the expanded footer link is a 176x36 pill with radius 12.</summary>
+    internal const double FooterLinkHeight = 36;
+
+    internal const double FooterLinkCornerRadius = 12;
+
+    /// <summary>In the rail the footer link keeps the items' 46 circle (the Figma has no rail design).</summary>
+    internal const double RailFooterLinkHeight = 46;
+
+    internal const double RailFooterLinkCornerRadius = 23;
+
+    /// <summary>The footer link's text: the label, then the hint after a middle dot when there is one.</summary>
+    internal static string FooterLinkText(string label, string? hint) =>
+        string.IsNullOrWhiteSpace(hint) ? label : label + " · " + hint;
+
     /// <summary>The footer link's row, before the contributed entries are inserted (they move it down with Settings).</summary>
     internal const int FooterRow = SettingsRow;
 

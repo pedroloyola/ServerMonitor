@@ -389,6 +389,7 @@ public sealed partial class MainWindow : Window
         Microsoft.UI.Xaml.Controls.Grid.SetColumn(_returnHeader, 1);
         ShellSurface.Children.Add(_returnHeader);
         Shell.PropertyChanged += OnShellReturnChanged;
+        ContentFrame.SizeChanged += OnContentFrameSizeChanged;
         UpdateReturnHeader();
     }
 
@@ -397,9 +398,15 @@ public sealed partial class MainWindow : Window
         if (args.PropertyName == nameof(ShellViewModel.IsUnlistedPageShown)) UpdateReturnHeader();
     }
 
+    private void OnContentFrameSizeChanged(object sender, SizeChangedEventArgs args)
+    {
+        if (_returnHeader is not null) _returnHeader.Margin = Controls.ShellReturnHeader.MarginFor(args.NewSize.Width);
+    }
+
     private void UpdateReturnHeader()
     {
         if (_returnHeader is null) return;
+        _returnHeader.Margin = Controls.ShellReturnHeader.MarginFor(ContentFrame.ActualWidth);
         var shown = Shell.IsUnlistedPageShown;
         _returnHeader.Visibility = shown ? Visibility.Visible : Visibility.Collapsed;
         ContentFrame.Margin = shown ? new Thickness(0, Controls.ShellReturnHeader.FrameOffset, 0, 0) : default;
@@ -680,7 +687,11 @@ public sealed partial class MainWindow : Window
         RootLayout.ActualThemeChanged -= OnActualThemeChanged;
         Services.Motion.MotionPolicy.Source.Changed -= OnReducedMotionChanged;
         Activated -= OnWindowActivated;
-        if (_returnHeader is not null) Shell.PropertyChanged -= OnShellReturnChanged;
+        if (_returnHeader is not null)
+        {
+            Shell.PropertyChanged -= OnShellReturnChanged;
+            ContentFrame.SizeChanged -= OnContentFrameSizeChanged;
+        }
         Closed -= OnWindowClosed;
     }
 }

@@ -87,24 +87,27 @@
             </Setter.Value>
         </Setter>
     </Style>
-    <!-- M15.4a: the composition-supplied link at the foot of the sidebar (a host control, a link rather than a destination):
-         the nav item's geometry (h46 w176 r23, pad 12, icon 20 + gap 10), its hover/pressed veils and keyboard ring, and a
-         hairline outline so it reads as a pill. Never selected: it opens a page, the destinations keep the indicator. -->
+    <!-- M15.4a r4 (Figma, owner decision): the composition-supplied link at the foot of the sidebar, a
+         host control (a link, not a destination). 176x36, radius 12, solid Interior fill (#313131 D / #E8E8E8 L, the
+         tokens nearest the Figma's #303030 / #E6E6E6), no outline (SaSecondaryBorderBrush: transparent, ButtonText in HC),
+         one 12 px Regular line in the primary text colour. Hover/pressed veils and the system focus ring as the nav items.
+         The rail keeps the 46 circle (set from code). Never selected. -->
     <Style x:Key="SaNavFooterLinkStyle" TargetType="Button">
-        <Setter Property="Height" Value="46" />
+        <Setter Property="Height" Value="36" />
         <Setter Property="MinWidth" Value="0" />
         <Setter Property="Padding" Value="12,0" />
         <Setter Property="Width" Value="176" />
-        <Setter Property="CornerRadius" Value="23" />
+        <Setter Property="CornerRadius" Value="12" />
         <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="BorderBrush" Value="{ThemeResource SaDialogButtonBorderBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource SaSecondaryBorderBrush}" />
         <Setter Property="FontFamily" Value="{StaticResource SaFontText}" />
-        <Setter Property="FontSize" Value="{StaticResource SaFontSizeControl}" />
+        <Setter Property="FontSize" Value="{StaticResource SaFontSizeCaption}" />
         <Setter Property="FontWeight" Value="Normal" />
-        <Setter Property="Foreground" Value="{ThemeResource SaTextSecondaryBrush}" />
-        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{ThemeResource SaTextBrush}" />
+        <Setter Property="Background" Value="{ThemeResource SaInteriorBrush}" />
         <Setter Property="HorizontalAlignment" Value="Left" />
-        <Setter Property="HorizontalContentAlignment" Value="Left" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
         <Setter Property="VerticalContentAlignment" Value="Center" />
         <Setter Property="UseSystemFocusVisuals" Value="True" />
         <Setter Property="FocusVisualPrimaryBrush" Value="{ThemeResource SaFocusRingBrush}" />

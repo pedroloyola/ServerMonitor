@@ -107,6 +107,8 @@ public sealed class CompositionSuppliedContributionsTests
         Assert.Equal(["supplied.one"], HostOver(supplied).SettingsSections.Select(s => s.Id)); // the broken one is left out
         Assert.Equal(["supplied.page"], LastContributions(supplied).UnlistedPages.Select(c => c.Id));
         Assert.Equal(["supplied.link"], LastContributions(supplied).Links.Select(l => l.Id));
+        // Vigil L-6: an unlisted page never becomes a navigation entry.
+        Assert.Empty(LastContributions(supplied).NavigationEntries);
     }
 
     /// <summary>A composed module that declares unlisted pages and links: only the composition root may supply those.</summary>

@@ -36,13 +36,24 @@ namespace ServerMonitor.App.Tests.Architecture;
 /// </description></item>
 /// <item><description>
 /// <b>What the UI frameworks fetch by themselves.</b> The WinUI and Windows API assemblies are allowed as a whole, so the
-/// types and members in them that load a URI on their own are watched by name: <c>WebView2</c> and the
-/// <c>Microsoft.Web.WebView2</c> namespace, <c>BitmapImage</c> and <c>SvgImageSource</c>, the
-/// <c>Windows.Media.Streaming</c> and <c>Windows.Services.Store</c> namespaces, and the members
-/// <c>StorageFile.CreateStreamedFileFromUriAsync</c>/<c>ReplaceWithStreamedFileFromUriAsync</c> and
-/// <c>RandomAccessStreamReference.CreateFromUri</c>. <c>Windows.System.Launcher</c> is watched too and allowed where it is
-/// used: it hands a URI to the user's default browser or to our own protocol handler, and the app itself makes no
-/// connection.
+/// types and members in them that load a URI on their own are watched: <c>WebView2</c> and the
+/// <c>Microsoft.Web.WebView2</c> namespace; every image source (<c>ImageSource</c> and the
+/// <c>Microsoft.UI.Xaml.Media.Imaging</c> namespace, which holds <c>BitmapImage</c> and <c>SvgImageSource</c>), so a
+/// string converted to an image (<c>XamlBindingHelper.ConvertValue(typeof(ImageSource), …)</c>, or an <c>x:Bind</c> of
+/// a string to an image <c>Source</c>, whose generated code names the type) is seen too; the
+/// <c>Windows.Media.Streaming</c> and <c>Windows.Services.Store</c> namespaces; and, by name pattern, every member of a
+/// <c>Windows.*</c> or <c>Microsoft.*</c> type whose name contains <c>FromUri</c> (<c>CreateFromUri</c>,
+/// <c>MediaSource.CreateFromUri</c>, <c>XmlDocument.LoadFromUriAsync</c>,
+/// <c>StorageFile.CreateStreamedFileFromUriAsync</c>, <c>RandomAccessStreamReference.CreateFromUri</c>, …).
+/// <c>Windows.System.Launcher</c> is watched too and allowed where it is used: it hands a URI to the user's default
+/// browser or to our own protocol handler, and the app itself makes no connection.
+/// </description></item>
+/// <item><description>
+/// <b>Image and media sources in the App's XAML.</b> Markup is compiled to a binary file, not to IL, so an element that
+/// loads a URI (<c>Image</c>, <c>ImageBrush</c>, <c>BitmapIcon</c>, <c>ImageIcon</c>, <c>PersonPicture</c>,
+/// <c>MediaPlayerElement</c>, <c>WebView2</c>, <c>BitmapImage</c>, <c>SvgImageSource</c>) whose source is bound
+/// (<c>{x:Bind}</c>, <c>{Binding}</c>, <c>{TemplateBinding}</c>) is listed, and so is any declared
+/// <c>BitmapImage</c>, <c>SvgImageSource</c> or <c>WebView2</c> element. Both lists are measured: none today.
 /// </description></item>
 /// <item><description>
 /// <b>Web addresses written in the product.</b> Every <c>http://</c>/<c>https://</c> literal in the compiled code of the
@@ -52,11 +63,14 @@ namespace ServerMonitor.App.Tests.Architecture;
 /// </description></item>
 /// </list>
 /// <para>
-/// Not covered here: a type resolved from a string at run time, which the source guard against dynamic loading (R6c)
-/// forbids; and an address that is not written in the product but built or read at run time (concatenated, taken from
-/// the resource files, which are text, or from the user's own input such as the servers they add). Those reach the
-/// network only through the types and members above, which are watched. A new network path is a product decision that
-/// changes these lists in review, never a side effect.
+/// Not covered here, as documented limits: a type resolved from a string at run time, which the source guard against
+/// dynamic loading (R6c) forbids; an address that is not written in the product but built or read at run time
+/// (concatenated, taken from the resource files, which are text, or from the user's own input such as the servers they
+/// add); a URI-loading member of a framework type whose name does not contain <c>FromUri</c> and that is not listed
+/// above; and a URI given to a framework element through a generic setter (<c>SetValue</c> with a property found at run
+/// time) or a style, which names no watched type. A run-time address reaches the network only through what is watched
+/// here or through those limits. A new network path is a product decision that changes these lists in review, never a
+/// side effect.
 /// </para>
 /// </summary>
 public sealed class NetworkBoundaryAllowlistTests
@@ -65,6 +79,7 @@ public sealed class NetworkBoundaryAllowlistTests
     [
         "System.Net", "Windows.Web", "Windows.Networking",
         "Microsoft.Web.WebView2", "Windows.Media.Streaming", "Windows.Services.Store",
+        "Microsoft.UI.Xaml.Media.Imaging",
     ];
 
     /// <summary>Single framework types that load a URI on their own (their namespaces are otherwise not watched).</summary>
@@ -73,8 +88,29 @@ public sealed class NetworkBoundaryAllowlistTests
         "Microsoft.UI.Xaml.Controls.WebView2",
         "Microsoft.UI.Xaml.Media.Imaging.BitmapImage",
         "Microsoft.UI.Xaml.Media.Imaging.SvgImageSource",
+        "Microsoft.UI.Xaml.Media.ImageSource",
         "Windows.System.Launcher",
     ];
+
+    /// <summary>The name pattern of framework members that load a URI: on a Windows.* or Microsoft.* type, containing this.</summary>
+    private const string FetchingMemberPattern = "FromUri";
+
+    /// <summary>XAML elements that load a URI, and the attributes that carry it.</summary>
+    private static readonly Dictionary<string, string[]> FetchingElements = new(StringComparer.Ordinal)
+    {
+        ["Image"] = ["Source"],
+        ["ImageBrush"] = ["ImageSource"],
+        ["BitmapIcon"] = ["UriSource"],
+        ["ImageIcon"] = ["Source"],
+        ["PersonPicture"] = ["ProfilePicture"],
+        ["MediaPlayerElement"] = ["Source", "PosterSource"],
+        ["WebView2"] = ["Source"],
+        ["BitmapImage"] = ["UriSource"],
+        ["SvgImageSource"] = ["UriSource"],
+    };
+
+    /// <summary>XAML elements that fetch by themselves wherever they are declared.</summary>
+    private static readonly string[] FetchingDeclarations = ["BitmapImage", "SvgImageSource", "WebView2"];
 
     /// <summary>Framework members that fetch a URI, "type::member".</summary>
     private static readonly string[] WatchedMembers =
@@ -111,6 +147,10 @@ public sealed class NetworkBoundaryAllowlistTests
         "ServerMonitor.App: System.Net.IPAddress",                               // mDNS result / SSH command: address shape
         "ServerMonitor.App: System.Net.Sockets.AddressFamily",                   // mDNS result / SSH command: IPv6 address shape
         "ServerMonitor.App: Windows.System.Launcher",                            // opens the project page in the user's browser
+#if DEBUG
+        // The QA gallery (Debug only, removed from Release by the project) renders a local element to check tokens; no URI.
+        "ServerMonitor.App: Microsoft.UI.Xaml.Media.Imaging.RenderTargetBitmap",
+#endif
         "ServerAlyzer.WidgetProvider: Windows.System.Launcher",                  // opens the app through its own protocol
     ];
 
@@ -127,6 +167,16 @@ public sealed class NetworkBoundaryAllowlistTests
 
     /// <summary>Measured web addresses in the App's XAML, "file: address". None.</summary>
     private static readonly string[] XamlAddressAllowlist =
+    [
+    ];
+
+    /// <summary>Measured bound sources of fetching elements in the App's XAML, "file: Element.Attribute". None.</summary>
+    private static readonly string[] XamlBoundSourceAllowlist =
+    [
+    ];
+
+    /// <summary>Measured declarations of self-fetching elements in the App's XAML, "file: Element". None.</summary>
+    private static readonly string[] XamlFetchingDeclarationAllowlist =
     [
     ];
 
@@ -245,10 +295,55 @@ public sealed class NetworkBoundaryAllowlistTests
     public void Every_layer_calls_only_the_measured_framework_members_that_fetch_a_uri()
     {
         var found = Layers().SelectMany(layer => layer.MemberReferences
-            .Where(member => WatchedMembers.Contains(member, StringComparer.Ordinal))
+            .Where(IsFetchingMember)
             .Select(member => $"{layer.Name}: {member}"));
 
         AssertExactly(MemberAllowlist, found);
+    }
+
+    [Fact]
+    public void Every_bound_source_of_a_fetching_element_in_the_apps_xaml_is_on_the_list()
+    {
+        var found = AppSourceTree.Files(".xaml").SelectMany(file =>
+            XDocument.Load(AppSourceTree.Full(file)).Descendants()
+                .Where(element => FetchingElements.ContainsKey(element.Name.LocalName))
+                .SelectMany(element => FetchingElements[element.Name.LocalName]
+                    .Where(attribute => IsBound(element.Attribute(attribute)?.Value)
+                        || element.Elements().Any(child => child.Name.LocalName == $"{element.Name.LocalName}.{attribute}"
+                            && child.DescendantsAndSelf().Any(d => d.Attributes().Any(a => IsBound(a.Value)))))
+                    .Select(attribute => $"{file}: {element.Name.LocalName}.{attribute}")));
+
+        AssertExactly(XamlBoundSourceAllowlist, found);
+    }
+
+    [Fact]
+    public void Every_self_fetching_element_declared_in_the_apps_xaml_is_on_the_list()
+    {
+        var found = AppSourceTree.Files(".xaml").SelectMany(file =>
+            XDocument.Load(AppSourceTree.Full(file)).Descendants()
+                .Where(element => FetchingDeclarations.Contains(element.Name.LocalName, StringComparer.Ordinal))
+                .Select(element => $"{file}: {element.Name.LocalName}"));
+
+        AssertExactly(XamlFetchingDeclarationAllowlist, found);
+    }
+
+    [Fact]
+    public void The_fetching_rules_recognise_what_they_are_meant_to()
+    {
+        // Guards the guards: the member pattern and the binding rule on known shapes.
+        Assert.True(IsFetchingMember("Windows.Media.Core.MediaSource::CreateFromUri"));
+        Assert.True(IsFetchingMember("Windows.Data.Xml.Dom.XmlDocument::LoadFromUriAsync"));
+        Assert.True(IsFetchingMember("Windows.Storage.StorageFile::CreateStreamedFileFromUriAsync"));
+        Assert.All(WatchedMembers, member => Assert.True(IsFetchingMember(member)));
+        Assert.False(IsFetchingMember("Windows.System.Launcher::LaunchUriAsync"));
+        Assert.False(IsFetchingMember("ServerMonitor.App.Helpers::LoadFromUri")); // product code is scanned as a layer
+        Assert.True(IsBound("{x:Bind RemoteLogo}"));
+        Assert.True(IsBound(" {Binding Logo}"));
+        Assert.True(IsBound("{TemplateBinding Source}"));
+        Assert.False(IsBound("ms-appx:///Assets/Logo.png"));
+        Assert.False(IsBound(null));
+        Assert.True(IsWatched("Microsoft.UI.Xaml.Media.ImageSource"));
+        Assert.True(IsWatched("Microsoft.UI.Xaml.Media.Imaging.WriteableBitmap"));
     }
 
     [Fact]
@@ -415,6 +510,25 @@ public sealed class NetworkBoundaryAllowlistTests
         WebAddress.Matches(text).Select(match => match.Value)
             .Where(address => !(Uri.TryCreate(address, UriKind.Absolute, out var uri)
                 && XmlNamespaceHosts.Any(host => uri.Host.Equals(host, StringComparison.OrdinalIgnoreCase))));
+
+    /// <summary>A member of a Windows.* or Microsoft.* type that loads a URI: a listed one, or one matching the name pattern.</summary>
+    private static bool IsFetchingMember(string member)
+    {
+        if (WatchedMembers.Contains(member, StringComparer.Ordinal))
+        {
+            return true;
+        }
+
+        var separator = member.IndexOf("::", StringComparison.Ordinal);
+        var type = member[..separator];
+        var name = member[(separator + 2)..];
+        return (type.StartsWith("Windows.", StringComparison.Ordinal) || type.StartsWith("Microsoft.", StringComparison.Ordinal))
+            && name.Contains(FetchingMemberPattern, StringComparison.Ordinal);
+    }
+
+    /// <summary>A XAML attribute value that is a binding, not a literal.</summary>
+    private static bool IsBound(string? value) =>
+        value is not null && Regex.IsMatch(value, @"^\s*\{\s*(x:Bind|Binding|TemplateBinding)\b");
 
     private static bool IsWatched(string typeName)
     {

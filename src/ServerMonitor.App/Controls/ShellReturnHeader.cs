@@ -21,8 +21,23 @@ internal static class ShellReturnHeader
     /// <summary>The Narrator's name.</summary>
     internal const string NameResourceKey = "ShellReturnToSettingsName";
 
-    /// <summary>Below the window's drag strip (32), aligned with the pages' padding (40).</summary>
-    internal static readonly Thickness Margin = new(40, 36, 40, 0);
+    /// <summary>Below the window's drag strip (32).</summary>
+    internal const double Top = 36;
+
+    /// <summary>The pages' side padding: <c>SaPagePadding</c> (40) wide, <c>SaPagePaddingCompact</c> (24) below 700.</summary>
+    internal const double Side = 40;
+
+    internal const double CompactSide = 24;
+
+    /// <summary>The content width below which the pages use their compact padding (their Narrow state).</summary>
+    internal const double NarrowBelow = 700;
+
+    /// <summary>M15.4a r4 (Prism P-5): aligned with the shown page's content, whose padding follows its width.</summary>
+    internal static Thickness MarginFor(double contentWidth)
+    {
+        var side = contentWidth < NarrowBelow ? CompactSide : Side;
+        return new Thickness(side, Top, side, 0);
+    }
 
     internal const double Height = 22;
 
@@ -45,7 +60,7 @@ internal static class ShellReturnHeader
         {
             Style = (Style)Application.Current.Resources["SaBreadcrumbParentButtonStyle"],
             Height = Height,
-            Margin = Margin,
+            Margin = MarginFor(double.PositiveInfinity),
             HorizontalAlignment = HorizontalAlignment.Left,
             VerticalAlignment = VerticalAlignment.Top,
             Visibility = Visibility.Collapsed,

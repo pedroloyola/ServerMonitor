@@ -3,8 +3,11 @@ using System.Xml.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using ServerMonitor.App.Controls;
+using ServerMonitor.App.Controls.Primitives;
 using ServerMonitor.App.Services;
 using ServerMonitor.App.Tests.Architecture;
+using Windows.System;
 using ServerMonitor.App.ViewModels;
 using ServerMonitor.Features;
 using CardLayout = ServerMonitor.App.Views.SettingsLinkCardLayout;
@@ -116,8 +119,8 @@ public sealed class ShellLinksAndUnlistedPagesTests
 
         // Each control returns before touching the tree when there is nothing to draw.
         AssertBefore(sidebar, "if (shell.FooterLink is not { } link) return;", "NavGrid.RowDefinitions.Insert(SidebarContributionLayout.FooterRow");
-        AssertBefore(settings, "if (_linkCards.Count == 0) return;", "DisclosureGrid.RowSpacing =");
-        AssertBefore(settings, "if (_linkCards.Count == 0) return;", "PlaceLinkCards(narrow: false);");
+        AssertBefore(settings, "if (_linkCards.Count == 0) return;", "DisclosureGrid.ColumnDefinitions.Add(_cardColumn);");
+        AssertBefore(Body(settings, "private void PlaceLinkCards(bool narrow)"), "if (count == 0) return;", "DisclosureGrid.RowDefinitions");
         AssertBefore(window, "if (!Shell.HasUnlistedPages) return;", "ShellSurface.Children.Add(_returnHeader);");
         // and the built-in XAML holds none of them
         Assert.DoesNotContain("SaNavFooterLinkStyle", File.ReadAllText(AppSourceTree.Full("Controls/SaSidebar.xaml")), StringComparison.Ordinal);
@@ -404,46 +407,108 @@ public sealed class ShellLinksAndUnlistedPagesTests
         var cards = grid.Elements().Where(e => e.Name.LocalName == "Button").ToList();
 
         Assert.Equal(CardLayout.BuiltInCards, cards.Count);
-        Assert.Equal(CardLayout.DeclaredRows, grid.Descendants().Count(e => e.Name.LocalName == "RowDefinition"));
+        int Declared(string definitions) => grid.Elements().Single(e => e.Name.LocalName == definitions).Elements().Count();
+        Assert.Equal(CardLayout.DeclaredRows, Declared("Grid.RowDefinitions"));
+        Assert.Equal(CardLayout.DeclaredColumns, Declared("Grid.ColumnDefinitions"));
         Assert.Equal(["SettingsOpenDataButton", "SettingsOpenAboutButton"], cards.Select(c => (string?)c.Attribute(AppSourceTree.Xaml + "Uid")));
-        for (var i = 0; i < cards.Count; i++)
-        {
-            Assert.Equal(CardLayout.Place(i, narrow: false), (Int(cards[i], "Grid.Row"), Int(cards[i], "Grid.Column")));
-        }
+        Assert.Equal(CardLayout.Place(CardLayout.DataSequence, 0, narrow: false), (Int(cards[0], "Grid.Row"), Int(cards[0], "Grid.Column")));
+        Assert.Equal(CardLayout.Place(CardLayout.AboutSequence(0), 0, narrow: false), (Int(cards[1], "Grid.Row"), Int(cards[1], "Grid.Column")));
+        Assert.Equal("AboutDisclosure", (string?)cards[1].Attribute(AppSourceTree.Xaml + "Name"));
 
-        // The Narrow state stacks "Sobre" under "Dados e servidores": the same cell the layout gives it.
-        var setters = page.Descendants().Where(e => e.Name.LocalName == "Setter").Where(e => e.Attribute("Target") is not null).GroupBy(e => (string)e.Attribute("Target")!).ToDictionary(g => g.Key, g => (string)g.First().Attribute("Value")!);
-        Assert.Equal(CardLayout.Place(1, narrow: true),
-            (int.Parse(setters["AboutDisclosure.(Grid.Row)"], CultureInfo.InvariantCulture), int.Parse(setters["AboutDisclosure.(Grid.Column)"], CultureInfo.InvariantCulture)));
+        // The Narrow state no longer moves "Sobre" (the page places it, see below) and still zeroes the second column.
+        var setters = page.Descendants().Where(e => e.Name.LocalName == "Setter" && e.Attribute("Target") is not null)
+            .Select(e => ((string)e.Attribute("Target")!, (string?)e.Attribute("Value"))).ToList();
+        Assert.DoesNotContain(setters, s => s.Item1.StartsWith("AboutDisclosure.", StringComparison.Ordinal));
+        Assert.Contains(("DisclosureColumn2.Width", "0"), setters);
+        // ... and the page puts "Sobre" where those setters did, under "Dados e servidores".
+        Assert.Equal((1, 0), CardLayout.Place(CardLayout.AboutSequence(0), 0, narrow: true));
     }
 
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void WithNoCard_TheRowOfCardsIsTheXamls(bool narrow) =>
-        Assert.Equal(CardLayout.DeclaredRows, CardLayout.Rows(0, narrow));
-
-    [Fact]
-    public void WithOneCard_ItFollowsSobre_AndReflows()
+    public void WithNoCard_TheRowOfCardsIsTheXamls(bool narrow)
     {
-        // Wide: two per row, so the card starts the second row; narrow: one per row, the third.
-        Assert.Equal((1, 0), CardLayout.Place(2, narrow: false));
-        Assert.Equal(2, CardLayout.Rows(1, narrow: false));
-        Assert.Equal((2, 0), CardLayout.Place(2, narrow: true));
-        Assert.Equal(3, CardLayout.Rows(1, narrow: true));
-        // and two cards share the second row in the wide layout
-        Assert.Equal((1, 1), CardLayout.Place(3, narrow: false));
-        Assert.Equal(2, CardLayout.Rows(2, narrow: false));
+        Assert.Equal(CardLayout.DeclaredRows, CardLayout.Rows(0, narrow));
+        Assert.Equal(narrow ? 1 : CardLayout.DeclaredColumns, CardLayout.Columns(0, narrow));
+        Assert.Equal((0, 0), CardLayout.Place(CardLayout.DataSequence, 0, narrow));
+        Assert.Equal(narrow ? (1, 0) : (0, 1), CardLayout.Place(CardLayout.AboutSequence(0), 0, narrow));
     }
 
     [Fact]
-    public void TheSettingsPage_PlacesTheCardsAfterTheBuiltInOnes_InTheShellsOrder_ForTheCurrentWidthState()
+    public void WithOneCard_ItSitsInTheMiddle_ThreePerRow_AndOnePerRowWhenNarrow()
+    {
+        // Wide (Figma 303:486): Dados | the card | Sobre, on one row.
+        Assert.Equal(3, CardLayout.Columns(1, narrow: false));
+        Assert.Equal((0, 0), CardLayout.Place(CardLayout.DataSequence, 1, narrow: false));
+        Assert.Equal((0, 1), CardLayout.Place(CardLayout.ContributedSequence(0), 1, narrow: false));
+        Assert.Equal((0, 2), CardLayout.Place(CardLayout.AboutSequence(1), 1, narrow: false));
+        Assert.Equal(1, CardLayout.UsedRows(1, narrow: false));
+        Assert.Equal(CardLayout.DeclaredRows, CardLayout.Rows(1, narrow: false));
+        // Narrow: one per row, same order.
+        Assert.Equal((0, 0), CardLayout.Place(CardLayout.DataSequence, 1, narrow: true));
+        Assert.Equal((1, 0), CardLayout.Place(CardLayout.ContributedSequence(0), 1, narrow: true));
+        Assert.Equal((2, 0), CardLayout.Place(CardLayout.AboutSequence(1), 1, narrow: true));
+        Assert.Equal(3, CardLayout.Rows(1, narrow: true));
+        // Two cards: the row fills, "Sobre" starts the next one.
+        Assert.Equal((0, 2), CardLayout.Place(CardLayout.ContributedSequence(1), 2, narrow: false));
+        Assert.Equal((1, 0), CardLayout.Place(CardLayout.AboutSequence(2), 2, narrow: false));
+        Assert.Equal(2, CardLayout.UsedRows(2, narrow: false));
+    }
+
+    [Fact]
+    public void TheSettingsPage_PlacesSobreAlways_AndTheCardsBetween_ForTheCurrentWidthState()
     {
         var settings = AppSourceTree.CodeWithoutComments("Views/SettingsPage.xaml.cs");
+        var place = Body(settings, "private void PlaceLinkCards(bool narrow)");
 
         Assert.Contains("foreach (var link in contributions.SettingsCards)", settings, StringComparison.Ordinal);
-        Assert.Contains("SettingsLinkCardLayout.Place(SettingsLinkCardLayout.BuiltInCards + i, narrow);", settings, StringComparison.Ordinal);
         Assert.Contains("WidthStates.CurrentStateChanged += (_, args) => PlaceLinkCards(args.NewState?.Name == \"Narrow\");", settings, StringComparison.Ordinal);
+        Assert.Contains("Loaded += (_, _) => PlaceLinkCards(WidthStates.CurrentState?.Name == \"Narrow\");", settings, StringComparison.Ordinal);
+        // "Sobre" is placed with or without cards (the XAML's Narrow state no longer does it), then the cards' own work.
+        AssertBefore(place, "SettingsLinkCardLayout.Place(SettingsLinkCardLayout.AboutSequence(count), count, narrow);", "Grid.SetColumn(AboutDisclosure, aboutColumn);");
+        AssertBefore(place, "Grid.SetColumn(AboutDisclosure, aboutColumn);", "if (count == 0) return;");
+        AssertBefore(place, "if (count == 0) return;", "_cardColumn!.Width = narrow ? new GridLength(0) : new GridLength(1, GridUnitType.Star);");
+        AssertBefore(place, "if (count == 0) return;", "DisclosureGrid.RowSpacing =");
+        Assert.Contains("SettingsLinkCardLayout.Place(SettingsLinkCardLayout.ContributedSequence(i), count, narrow);", place, StringComparison.Ordinal);
+        Assert.Contains("DisclosureGrid.ClearValue(Grid.RowSpacingProperty);", place, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TheSettingsCard_IsTheFigmasCard_DrawnFromATemplate_ThatFollowsTheTheme()
+    {
+        var page = AppSourceTree.LoadXaml("Views/SettingsPage.xaml");
+        var template = page.Descendants().Single(e => e.Name.LocalName == "DataTemplate"
+            && (string?)e.Attribute(AppSourceTree.Xaml + "Key") == "SettingsLinkCardTemplate");
+        Assert.Equal("views:SettingsLinkCardContent", (string?)template.Attribute(AppSourceTree.Xaml + "DataType"));
+
+        // P-4: both icons take the theme resource, re-evaluated on theme and high-contrast changes, like the built-in cards.
+        var icons = template.Descendants().Where(e => e.Name.LocalName == "SaIcon").ToList();
+        Assert.Equal(2, icons.Count);
+        Assert.All(icons, icon => Assert.Equal("{ThemeResource SaIconSecondaryStyle}", (string?)icon.Attribute("Style")));
+        Assert.Equal("{x:Bind IconPathData}", (string?)icons[0].Attribute("Data"));
+        Assert.Equal("18", (string?)icons[0].Attribute("Size"));
+        // P-3: the label, then the hint visible after it (12 Medium, secondary), trimmed together.
+        var text = template.Descendants().Single(e => e.Name.LocalName == "TextBlock");
+        Assert.Equal("CharacterEllipsis", (string?)text.Attribute("TextTrimming"));
+        var runs = text.Elements().Where(e => e.Name.LocalName == "Run").ToList();
+        Assert.Equal("{x:Bind Label, Mode=OneWay}", (string?)runs[0].Attribute("Text"));
+        Assert.Equal("{x:Bind HintText, Mode=OneWay}", (string?)runs[1].Attribute("Text"));
+        Assert.Equal("{StaticResource SaFontSizeCaption}", (string?)runs[1].Attribute("FontSize"));
+        Assert.Equal("Medium", (string?)runs[1].Attribute("FontWeight"));
+        Assert.Equal("{ThemeResource SaTextSecondaryBrush}", (string?)runs[1].Attribute("Foreground"));
+        Assert.Equal(string.Empty, ServerMonitor.App.Views.SettingsLinkCardContent.HintTextOf(null));
+        Assert.Equal(string.Empty, ServerMonitor.App.Views.SettingsLinkCardContent.HintTextOf("  "));
+        Assert.Equal("\u2002Hint", ServerMonitor.App.Views.SettingsLinkCardContent.HintTextOf("Hint"));
+
+        // The page builds the card from that template and never resolves a theme style once in code.
+        var settings = AppSourceTree.CodeWithoutComments("Views/SettingsPage.xaml.cs");
+        Assert.Contains("var template = (DataTemplate)Resources[\"SettingsLinkCardTemplate\"];", settings, StringComparison.Ordinal);
+        Assert.Contains("ContentTemplate = template,", settings, StringComparison.Ordinal);
+        Assert.Contains("content.SetText(text, hint);", settings, StringComparison.Ordinal);
+        Assert.Contains("AutomationProperties.SetName(card, text);", settings, StringComparison.Ordinal);
+        Assert.Contains("AutomationProperties.SetHelpText(card, hint ?? string.Empty);", settings, StringComparison.Ordinal);
+        Assert.DoesNotContain("SaIconSecondaryStyle", settings, StringComparison.Ordinal);
     }
 
     // ---------------------------------------------------------------- the footer row in the sidebar
@@ -499,6 +564,115 @@ public sealed class ShellLinksAndUnlistedPagesTests
         // The footer link uses the common width, never a width of its own.
         var sidebar = AppSourceTree.CodeWithoutComments("Controls/SaSidebar.xaml.cs");
         Assert.Contains("_footerLink.Width = rail ? ShellLayout.RailItemWidth : ShellLayout.ItemWidth;", sidebar, StringComparison.Ordinal);
+    }
+
+    // ---------------------------------------------------------------- r4: the pill follows the Figma (owner decision)
+
+    [Fact]
+    public void TheFooterLink_IsTheFigmaPill_FromTheThemesTokens()
+    {
+        var navigation = AppSourceTree.LoadXaml("Styles/Components/Sa.Navigation.xaml");
+        var setters = navigation.Root!.Elements().Single(e => (string?)e.Attribute(AppSourceTree.Xaml + "Key") == "SaNavFooterLinkStyle")
+            .Elements().Where(e => e.Name.LocalName == "Setter")
+            .ToDictionary(e => (string)e.Attribute("Property")!, e => (string?)e.Attribute("Value"));
+
+        Assert.Equal(SidebarLayout.FooterLinkHeight.ToString(CultureInfo.InvariantCulture), setters["Height"]);
+        Assert.Equal(36, SidebarLayout.FooterLinkHeight);
+        Assert.Equal(SidebarLayout.FooterLinkCornerRadius.ToString(CultureInfo.InvariantCulture), setters["CornerRadius"]);
+        Assert.Equal(12, SidebarLayout.FooterLinkCornerRadius);
+        Assert.Equal("176", setters["Width"]);
+        // Solid fill, no outline (transparent, ButtonText in high contrast), primary text, 12 Regular; tokens, no literal colour.
+        Assert.Equal("{ThemeResource SaInteriorBrush}", setters["Background"]);
+        Assert.Equal("{ThemeResource SaSecondaryBorderBrush}", setters["BorderBrush"]);
+        Assert.Equal("{ThemeResource SaTextBrush}", setters["Foreground"]);
+        Assert.Equal("{StaticResource SaFontSizeCaption}", setters["FontSize"]);
+        Assert.Equal("Normal", setters["FontWeight"]);
+        Assert.Equal("True", setters["UseSystemFocusVisuals"]);
+        Assert.DoesNotContain(setters.Values, value => value is not null && value.StartsWith('#'));
+        var colors = File.ReadAllText(AppSourceTree.Full("Styles/Tokens/Color.Semantic.xaml"));
+        Assert.Contains("<SolidColorBrush x:Key=\"SaInteriorBrush\" Color=\"{ThemeResource SystemColorWindowColor}\" />", colors, StringComparison.Ordinal);
+        Assert.Contains("<SolidColorBrush x:Key=\"SaSecondaryBorderBrush\" Color=\"{ThemeResource SystemColorButtonTextColor}\" />", colors, StringComparison.Ordinal);
+        Assert.Equal(2, colors.Split("<SolidColorBrush x:Key=\"SaSecondaryBorderBrush\" Color=\"Transparent\" />").Length - 1);
+    }
+
+    [Fact]
+    public void TheFooterLink_ShowsOneLine_LabelDotHint_Expanded_AndTheIconCircle_InTheRail()
+    {
+        Assert.Equal("Label · Hint", SidebarLayout.FooterLinkText("Label", "Hint"));
+        Assert.Equal("Label", SidebarLayout.FooterLinkText("Label", null));
+        Assert.Equal("Label", SidebarLayout.FooterLinkText("Label", " "));
+        Assert.Equal(ShellLayout.RailItemWidth, SidebarLayout.RailFooterLinkHeight);
+        Assert.Equal(ShellLayout.RailItemWidth / 2, SidebarLayout.RailFooterLinkCornerRadius);
+
+        var sidebar = AppSourceTree.CodeWithoutComments("Controls/SaSidebar.xaml.cs");
+        var build = Body(sidebar, "private void AddFooterLink(ShellViewModel shell)");
+        Assert.Contains("Style = (Style)Application.Current.Resources[\"SaCaptionTextStyle\"],", build, StringComparison.Ordinal);
+        Assert.Contains("TextTrimming = TextTrimming.CharacterEllipsis,", build, StringComparison.Ordinal);
+        Assert.Contains("new GridLength(SidebarContributionLayout.FooterLinkHeight)", build, StringComparison.Ordinal);
+        Assert.Contains("_footerLabel.Visibility = rail ? Visibility.Collapsed : Visibility.Visible;", sidebar, StringComparison.Ordinal);
+        Assert.Contains("_footerIcon.Visibility = rail ? Visibility.Visible : Visibility.Collapsed;", sidebar, StringComparison.Ordinal);
+        Assert.Contains("_footerLink.Height = rail ? SidebarContributionLayout.RailFooterLinkHeight : SidebarContributionLayout.FooterLinkHeight;", sidebar, StringComparison.Ordinal);
+        Assert.Contains("NavGrid.RowDefinitions[Grid.GetRow(_footerLink)].Height = new GridLength(_footerLink.Height);", sidebar, StringComparison.Ordinal);
+        var text = Body(sidebar, "private void ApplyFooterText()");
+        Assert.Contains("_footerLabel.Text = text;", text, StringComparison.Ordinal);
+        Assert.Contains("AutomationProperties.SetName(_footerLink, label);", text, StringComparison.Ordinal);
+        Assert.Contains("AutomationProperties.SetHelpText(_footerLink, hint ?? string.Empty);", text, StringComparison.Ordinal);
+        Assert.Contains("ToolTipService.SetToolTip(_footerLink, _rail ? text : null);", text, StringComparison.Ordinal);
+    }
+
+    // ---------------------------------------------------------------- r4 (Prism P-1): the pill is reached by keyboard
+
+    [Fact]
+    public void TheFooterLink_IsInTheSidebarsArrowOrder_BetweenTheLastEntryAndSettings_ForFocusOnly()
+    {
+        // The rule: radio items, and buttons marked as members; nothing else.
+        Assert.True(SaGroupNavigation.IsMember(isRadioItem: true, isButton: true, markedMember: false));
+        Assert.True(SaGroupNavigation.IsMember(isRadioItem: false, isButton: true, markedMember: true));
+        Assert.False(SaGroupNavigation.IsMember(isRadioItem: false, isButton: true, markedMember: false));
+        Assert.False(SaGroupNavigation.IsMember(isRadioItem: false, isButton: false, markedMember: true));
+
+        // Overview, Servers, History, the footer link, Settings: down from History reaches the link, then Settings.
+        Assert.Equal(3, SaGroupNavigation.ArrowTarget(VirtualKey.Down, 2, 5));
+        Assert.Equal(4, SaGroupNavigation.ArrowTarget(VirtualKey.Down, 3, 5));
+        Assert.Equal(3, SaGroupNavigation.ArrowTarget(VirtualKey.Up, 4, 5));
+        Assert.Equal(2, SaGroupNavigation.ArrowTarget(VirtualKey.Up, 3, 5));
+
+        // The sidebar marks the link and puts it in the children just before Settings, with the contributed items
+        // before it (the visual order); the group walks every member and selects radio items only.
+        var sidebar = AppSourceTree.CodeWithoutComments("Controls/SaSidebar.xaml.cs");
+        var build = Body(sidebar, "private void AddFooterLink(ShellViewModel shell)");
+        Assert.Contains("SaGroupNavigation.SetIsGroupMember(_footerLink, true);", build, StringComparison.Ordinal);
+        Assert.Contains("NavGrid.Children.Insert(NavGrid.Children.IndexOf(SettingsItem), _footerLink);", build, StringComparison.Ordinal);
+        Assert.Contains("var settingsIndex = NavGrid.Children.IndexOf((UIElement?)_footerLink ?? SettingsItem);", sidebar, StringComparison.Ordinal);
+        AssertBefore(sidebar, "AddFooterLink(shell);", "var settingsIndex =");
+        var group = AppSourceTree.CodeWithoutComments("Controls/Primitives/SaGroupNavigation.cs");
+        Assert.Contains("if (e.OriginalSource is not Control item || !IsMemberOf(item))", group, StringComparison.Ordinal);
+        Assert.Contains(".Where(i => IsMemberOf(i) && i.IsEnabled && i.Visibility == Visibility.Visible)", group, StringComparison.Ordinal);
+        Assert.Contains("if (items[target] is RadioButton radio && SelectsOnFocusMove(", group, StringComparison.Ordinal);
+        Assert.Contains("IsMember(control is RadioButton, control is Microsoft.UI.Xaml.Controls.Primitives.ButtonBase, GetIsGroupMember(control))", group, StringComparison.Ordinal);
+        // the group is one Tab stop entered at the selected item, like Definições
+        Assert.Contains("p:SaGroupNavigation.Mode=\"FocusOnly\"", File.ReadAllText(AppSourceTree.Full("Controls/SaSidebar.xaml")), StringComparison.Ordinal);
+    }
+
+    // ---------------------------------------------------------------- r4 (Prism P-5): the way back follows the padding
+
+    [Fact]
+    public void TheWayBack_IsAlignedWithThePagesPadding_WideAndNarrow()
+    {
+        var spacing = File.ReadAllText(AppSourceTree.Full("Styles/Tokens/Spacing.xaml"));
+        Assert.Contains($"<Thickness x:Key=\"SaPagePadding\">{ShellReturnHeader.Side}</Thickness>", spacing, StringComparison.Ordinal);
+        Assert.Contains($"<Thickness x:Key=\"SaPagePaddingCompact\">{ShellReturnHeader.CompactSide},40,{ShellReturnHeader.CompactSide},24</Thickness>", spacing, StringComparison.Ordinal);
+        Assert.Contains($"MaxWidth=\"{ShellReturnHeader.NarrowBelow}\"", File.ReadAllText(AppSourceTree.Full("Views/SettingsPage.xaml")), StringComparison.Ordinal);
+
+        Assert.Equal(new Microsoft.UI.Xaml.Thickness(24, 36, 24, 0), ShellReturnHeader.MarginFor(699));
+        Assert.Equal(new Microsoft.UI.Xaml.Thickness(40, 36, 40, 0), ShellReturnHeader.MarginFor(700));
+        Assert.Equal(new Microsoft.UI.Xaml.Thickness(40, 36, 40, 0), ShellReturnHeader.MarginFor(double.PositiveInfinity));
+
+        var window = AppSourceTree.CodeWithoutComments("MainWindow.xaml.cs");
+        Assert.Contains("ContentFrame.SizeChanged += OnContentFrameSizeChanged;", window, StringComparison.Ordinal);
+        Assert.Contains("ContentFrame.SizeChanged -= OnContentFrameSizeChanged;", window, StringComparison.Ordinal);
+        Assert.Contains("_returnHeader.Margin = Controls.ShellReturnHeader.MarginFor(args.NewSize.Width);", window, StringComparison.Ordinal);
+        Assert.Contains("_returnHeader.Margin = Controls.ShellReturnHeader.MarginFor(ContentFrame.ActualWidth);", window, StringComparison.Ordinal);
     }
 
     // ---------------------------------------------------------------- helpers
