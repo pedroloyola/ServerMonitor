@@ -243,9 +243,9 @@ limites constam da ADR-016.
 
 Um `IFeatureModule` estático pode acrescentar interface ao shell através de `Contributions`
 (`ShellContributions`, em `ServerMonitor.Features`). Cada contribuição é um descritor neutro
-`ShellContribution { Id, Order, TitleResourceKey, CreateView }`, de dois tipos: **secções de Definições**
-(mostradas na página Definições, depois das secções próprias) e **entradas de navegação** (mostradas na barra
-lateral, depois de Histórico e antes de Definições). O membro tem implementação por omissão vazia, por isso os
+`ShellContribution { Id, Order, TitleResourceKey, CreateView, IconPathData? }`, de dois tipos: **secções de
+Definições** (mostradas na página Definições, depois das secções próprias) e **entradas de navegação** (mostradas na
+barra lateral, depois de Histórico e antes de Definições). O membro tem implementação por omissão vazia, por isso os
 módulos existentes não mudam; nenhum módulo deste repositório contribui interface hoje.
 
 - **Mesmo gate dos serviços.** `FeatureComposition.Compose` só lê `Contributions` de um módulo que compôs.
@@ -253,25 +253,49 @@ módulos existentes não mudam; nenhum módulo deste repositório contribui inte
   condicional recusado não contribui nada e nem chega a ser consultado. O fornecedor continua fora do
   contentor.
 - **Encaminhamento por `Id`.** O shell cria a vista chamando `CreateView` e navega por id
-  (`INavigationService.GoToContribution`), sem tipo genérico nem reflexão; as páginas próprias continuam a usar
-  `NavigateTo<TPage>()`.
+  (`INavigationService.GoToContribution`, que passa pelo mesmo exit guard das outras navegações), sem tipo genérico
+  nem reflexão; as páginas próprias continuam a usar `NavigateTo<TPage>()`.
 - **Ordem determinística.** `ShellContributionOrdering.Arrange`: um id repetido ou igual a um id próprio do
   shell é descartado (ganha o primeiro, pela ordem de composição) e registado em log; os restantes ordenam-se
   por `Order` e depois por `Id` (ordinal).
-- **Falhas nunca fatais.** `ShellContributionHost` cria as vistas uma vez, no thread de UI, dentro de
-  try/catch: uma fábrica que lança, ou que devolve algo que não é um elemento de UI, remove só essa
-  contribuição e fica no log (tipo da exceção, nunca a mensagem).
+- **O que o shell aceita.** Uma entrada de navegação tem de ser uma `Page` (o shell remonta-a no frame quando o tema
+  muda); uma secção de Definições pode ser qualquer `FrameworkElement`. Em ambos os casos, um elemento novo, sem pai.
+  Um título sem recurso fica registado em log e mostra um rótulo neutro ("Sem título"), nunca o id. Sem ícone, a
+  entrada usa o ícone genérico.
+- **Falhas nunca fatais.** `ShellContributionHost` cria as vistas uma vez, no thread de UI, dentro de try/catch: uma
+  fábrica que lança, ou que devolve algo que o shell não aceita, remove só essa contribuição e fica no log (tipo da
+  exceção, nunca a mensagem). Colocar a vista na árvore também passa por try/catch (`TryAttach`), secção a secção, por
+  isso uma secção que falhe ao entrar deixa a página Definições construída.
+- **Vida das vistas.** Cada vista é criada uma vez e dura o processo inteiro: volta a ser mostrada em cada visita e
+  nunca é descartada. Tem de aguentar vários `Loaded`/`Unloaded` (navegação e mudança de tema), libertar o que segura
+  em `Unloaded` e não depender de `Dispose`.
 - **Sem contribuições, sem mudança.** As sequências de ids da navegação (`overview`, `servers`, `history`,
   `settings`) e das secções de Definições (`appearance`, `monitoring`, `window`) ficam iguais à baseline
   guardada nos testes, que também a confrontam com o XAML.
 
 Só se aceitam módulos estáticos, listados no composition root; não há carregamento dinâmico.
 
+**Contribuições fornecidas pela composição.** Ao lado do gancho de módulos, `App.xaml.cs` declara um segundo gancho
+parcial vazio, que recebe uma `IList<ShellContribution>`, na mesma forma clássica: sem implementação, o
+compilador remove a chamada. Recebe uma lista nova e vazia, e só isso (nem contentor, nem catálogo, nem fornecedor), por
+isso não pode acrescentar capacidades, funcionalidades nem serviços. Só corre fora dos arranques de QA. O que acrescentar
+aparece como secções de Definições, depois das contribuições dos módulos compostos e pela mesma ordenação: em caso de id
+igual ganha a contribuição composta, e os ids próprios do shell são rejeitados.
+
 ## Fronteira de rede
 
-`NetworkBoundaryAllowlistTests` lê os metadados compilados de Core, Infrastructure, Collectors e App e falha
-se aparecer qualquer tipo de `System.Net.Http` ou `System.Net.Sockets` fora de uma allowlist exata, por
-assembly e tipo. Hoje a allowlist tem só `AddressFamily` (Core e App, forma de endereços IPv6) e
-`SocketError`/`SocketException` (Infrastructure, mapeamento de falhas SSH); as ligações em si ficam dentro
-dos pacotes SSH.NET e Tmds.MDns. Nenhuma camada referencia `System.Net.Http`. Um novo caminho de rede é uma
-decisão de produto que altera esta lista em revisão.
+`NetworkBoundaryAllowlistTests` lê os metadados compilados de Core, Infrastructure, Collectors, Features, App, o
+fornecedor do widget e os dois assemblies de contrato, e compara-os com listas exatas medidas no código:
+
+- **Tipos:** qualquer tipo de `System.Net`, `Windows.Web` ou `Windows.Networking` (e subnamespaces). Hoje só há tipos
+  de endereço, de interface e de erro (`IPAddress`, `AddressFamily`, `NetworkInterface`, `SocketError`,
+  `SocketException`), nenhum dos quais abre ligações.
+- **Assemblies:** nenhuma camada pode referenciar um assembly que faz ligações (`System.Net.Http`, `Sockets`,
+  `Requests`, `WebClient`, `WebSockets`, `NameResolution`, `Ping`, `Quic`, `Security`, `Mail`, `HttpListener`,
+  `Microsoft.Extensions.Http`, entre outros). Todas as outras referências fora da família `System` estão numa lista por
+  camada, por isso um pacote novo passa por revisão. Os pacotes da lista que fazem ligações são os dois caminhos
+  existentes: SSH.NET (os servidores do utilizador) e Tmds.MDns (descoberta na rede local). Um assembly do produto
+  referenciado por uma camada tem de ser ele próprio uma camada lida.
+- **Módulos nativos:** cada biblioteca importada com `DllImport`/`LibraryImport`.
+
+Um novo caminho de rede é uma decisão de produto que altera estas listas em revisão.

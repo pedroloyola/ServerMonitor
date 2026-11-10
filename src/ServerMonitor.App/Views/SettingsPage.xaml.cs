@@ -26,18 +26,23 @@ public sealed partial class SettingsPage : Page, ISettingsNavigationTarget
     /// <summary>
     /// M15.4a: each contributed section as a titled block like the built-in ones (heading level 2, then the view). The
     /// views are created here, on the UI thread, once (the page is a singleton); a factory that failed was already left
-    /// out by the host. With none the host stays collapsed.
+    /// out by the host. Each section is placed through the host's <see cref="ShellContributionHost.TryAttach"/>, so a
+    /// view that still fails when it is added leaves out that section only and this page still builds. With none the
+    /// host stays collapsed.
     /// </summary>
     private void AddContributedSections(ShellContributionHost contributions)
     {
         foreach (var section in contributions.SettingsSections)
         {
-            var title = new TextBlock { Text = section.Title, Style = (Microsoft.UI.Xaml.Style)Microsoft.UI.Xaml.Application.Current.Resources["SaCardTitleTextStyle"] };
-            Microsoft.UI.Xaml.Automation.AutomationProperties.SetHeadingLevel(title, Microsoft.UI.Xaml.Automation.Peers.AutomationHeadingLevel.Level2);
-            var block = new StackPanel { Spacing = 10 };
-            block.Children.Add(title);
-            block.Children.Add((Microsoft.UI.Xaml.UIElement)section.View);
-            ContributedSections.Children.Add(block);
+            contributions.TryAttach(section, view =>
+            {
+                var title = new TextBlock { Text = section.Title, Style = (Microsoft.UI.Xaml.Style)Microsoft.UI.Xaml.Application.Current.Resources["SaCardTitleTextStyle"] };
+                Microsoft.UI.Xaml.Automation.AutomationProperties.SetHeadingLevel(title, Microsoft.UI.Xaml.Automation.Peers.AutomationHeadingLevel.Level2);
+                var block = new StackPanel { Spacing = 10 };
+                block.Children.Add(title);
+                block.Children.Add((Microsoft.UI.Xaml.UIElement)view);
+                ContributedSections.Children.Add(block); // last: a block that failed above never reaches the page
+            });
         }
 
         ContributedSections.Visibility = ContributedSections.Children.Count > 0

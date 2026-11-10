@@ -18,9 +18,9 @@ namespace ServerMonitor.App.Tests.Services;
 public sealed class ShellContributionHostTests
 {
     /// <summary>The baseline: what the shell shows today with no contributions.</summary>
-    private static readonly string[] BaselineNavigationIds = ["overview", "servers", "history", "settings"];
+    internal static readonly string[] BaselineNavigationIds = ["overview", "servers", "history", "settings"];
 
-    private static readonly string[] BaselineSettingsSectionIds = ["appearance", "monitoring", "window"];
+    internal static readonly string[] BaselineSettingsSectionIds = ["appearance", "monitoring", "window"];
 
     private sealed class View(string name)
     {
@@ -314,5 +314,341 @@ public sealed class ShellContributionHostTests
 
         Assert.Empty(names.Where(name => forbidden.IsMatch(name)));
         Assert.All(sources, source => Assert.DoesNotMatch(forbidden, source));
+    }
+
+    // ---------------------------------------------------------------- r2: what the shell can show (L-1, S-1)
+
+    private sealed class PageView(string name)
+    {
+        public string Name { get; } = name;
+    }
+
+    [Fact]
+    public void ANavigationEntry_MustBeAPage_ASettingsSectionAnyElement()
+    {
+        var logger = new RecordingLogger();
+        var host = new ShellContributionHost(
+            new ShellContributions(
+                [Contribution("plain.section"), Contribution("page.section", factory: () => new PageView("page.section"))],
+                [Contribution("plain.entry"), Contribution("page.entry", factory: () => new PageView("page.entry"))]),
+            logger, key => "Title of " + key,
+            canShowNavigationView: view => view is PageView,
+            canShowSectionView: view => view is View or PageView);
+
+        Assert.Equal(["page.entry"], host.NavigationEntries.Select(entry => entry.Id));
+        Assert.Equal(["page.section", "plain.section"], host.SettingsSections.Select(section => section.Id));
+        Assert.Contains(logger.Entries, entry => entry.Level == LogLevel.Error && entry.Message.Contains("plain.entry", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void TheShell_AcceptsOnlyAPageForANavigationEntry_TheTypeItRemountsOnAThemeChange()
+    {
+        Assert.Equal(typeof(Microsoft.UI.Xaml.Controls.Page), ShellContributionHost.NavigationViewType);
+        Assert.Equal(typeof(Microsoft.UI.Xaml.FrameworkElement), ShellContributionHost.SectionViewType);
+        Assert.False(ShellContributionHost.IsDisplayableNavigationView(new object()));
+        Assert.False(ShellContributionHost.IsDisplayableSectionView("not an element"));
+
+        // The theme re-mount re-creates what the frame shows only when it is a Page (MainWindow).
+        var mainWindow = AppSourceTree.CodeWithoutComments("MainWindow.xaml.cs");
+        Assert.Contains("ContentFrame.Content is Microsoft.UI.Xaml.Controls.Page page && SaThemeRefresh.Remount(page", mainWindow, StringComparison.Ordinal);
+
+        // Both checks also require no parent: an element can be placed in one place only.
+        var host = AppSourceTree.CodeWithoutComments("Services/ShellContributionHost.cs");
+        Assert.Contains("NavigationViewType.IsInstanceOfType(view) && ((FrameworkElement)view).Parent is null", host, StringComparison.Ordinal);
+        Assert.Contains("SectionViewType.IsInstanceOfType(view) && ((FrameworkElement)view).Parent is null", host, StringComparison.Ordinal);
+        Assert.Contains(": this(contributions, logger, localization.GetString, IsDisplayableNavigationView, IsDisplayableSectionView)", host, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AViewThatCannotBePlaced_IsLeftOut_LoggedByType_AndTheNextOneIsStillPlaced()
+    {
+        var logger = new RecordingLogger();
+        var host = Host(new ShellContributions([Contribution("a.section"), Contribution("b.section")], []), logger);
+        var placed = new List<string>();
+
+        var results = host.SettingsSections
+            .Select(section => host.TryAttach(section, view =>
+            {
+                if (section.Id == "a.section")
+                {
+                    throw new InvalidOperationException("Element is already the child of another element.");
+                }
+
+                placed.Add(((View)view).Name);
+            }))
+            .ToList();
+
+        Assert.Equal([false, true], results);
+        Assert.Equal(["b.section"], placed);
+        var error = Assert.Single(logger.Entries, entry => entry.Level == LogLevel.Error);
+        Assert.Contains("a.section", error.Message, StringComparison.Ordinal);
+        Assert.Contains(nameof(InvalidOperationException), error.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("already the child", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TheSettingsPage_PlacesEachSectionThroughTheHost_SoOneFailingSectionLeavesThePageBuilt()
+    {
+        var code = AppSourceTree.CodeWithoutComments("Views/SettingsPage.xaml.cs").Replace("\r\n", "\n", StringComparison.Ordinal);
+        var start = code.IndexOf("private void AddContributedSections(", StringComparison.Ordinal);
+        var body = code[start..code.IndexOf("\n    }", start, StringComparison.Ordinal)];
+
+        Assert.Contains("contributions.TryAttach(section, view =>", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("section.View", body, StringComparison.Ordinal); // only the view TryAttach hands over
+        Assert.True(
+            body.IndexOf("block.Children.Add((Microsoft.UI.Xaml.UIElement)view)", StringComparison.Ordinal)
+                < body.IndexOf("ContributedSections.Children.Add(block)", StringComparison.Ordinal),
+            "a block reaches the page only once it is complete");
+    }
+
+    // ---------------------------------------------------------------- r2: title and icon (U-1, U-2)
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("TitleKey.no.title")]
+    [InlineData(null)]
+    public void AMissingTitle_IsLogged_AndShowsANeutralLabel_NeverTheId(string? lookupResult)
+    {
+        var logger = new RecordingLogger();
+        var host = new ShellContributionHost(
+            new ShellContributions([], [Contribution("no.title")]),
+            logger,
+            key => key == ShellContributionHost.UntitledResourceKey ? "Neutral label"
+                : lookupResult ?? throw new InvalidOperationException("missing resource"),
+            view => view is View);
+
+        var entry = Assert.Single(host.NavigationEntries);
+        Assert.Equal("Neutral label", entry.Title);
+        var warning = Assert.Single(logger.Entries, e => e.Level == LogLevel.Warning);
+        Assert.Contains("no.title", warning.Message, StringComparison.Ordinal);
+        Assert.Contains("TitleKey.no.title", warning.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void WithoutEvenTheNeutralResource_TheLabelIsStillNotTheId()
+    {
+        var host = new ShellContributionHost(new ShellContributions([], [Contribution("no.title")]), NullLogger.Instance, _ => "", view => view is View);
+
+        Assert.Equal(ShellContributionHost.UntitledFallback, Assert.Single(host.NavigationEntries).Title);
+    }
+
+    [Theory]
+    [InlineData("en-US", "Untitled")]
+    [InlineData("pt-PT", "Sem título")]
+    [InlineData("pt-BR", "Sem título")]
+    public void TheNeutralLabel_IsInEveryLanguage(string language, string expected)
+    {
+        var resw = XDocument.Load(AppSourceTree.Full($"Resources/{language}/Resources.resw"));
+        var value = resw.Root!.Elements("data")
+            .Single(data => (string?)data.Attribute("name") == ShellContributionHost.UntitledResourceKey)
+            .Element("value")!.Value;
+
+        Assert.Equal(expected, value);
+    }
+
+    [Fact]
+    public void AnEntrysIcon_IsCarriedToTheShell_AndBlankMeansTheGenericOne()
+    {
+        var host = Host(new ShellContributions([], [
+            new ShellContribution("with.icon", 0, "Key", () => new View("with.icon"), "M0,0 L20,20"),
+            new ShellContribution("blank.icon", 1, "Key", () => new View("blank.icon"), "  "),
+            Contribution("no.icon", order: 2),
+        ]));
+
+        Assert.Equal(["M0,0 L20,20", null, null], host.NavigationEntries.Select(entry => entry.IconPathData));
+        var sidebar = AppSourceTree.CodeWithoutComments("Controls/SaSidebar.xaml.cs");
+        Assert.Contains("entry.IconPathData ?? (string)Application.Current.Resources[\"SaIconPackageData\"]", sidebar, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AFactoryThatReadsTheContributionsWhileTheyAreCreated_SeesNone_AndDoesNotRecurse()
+    {
+        ShellContributionHost? host = null;
+        var seen = -1;
+        host = Host(new ShellContributions([], [Contribution("curious.entry", factory: () =>
+        {
+            seen = host!.NavigationEntries.Count + host.SettingsSections.Count;
+            return new View("curious.entry");
+        })]));
+
+        Assert.Equal(["curious.entry"], host.NavigationEntries.Select(entry => entry.Id));
+        Assert.Equal(0, seen);
+    }
+
+    // ---------------------------------------------------------------- r2: the sidebar's insertion (T-1)
+
+    [Fact]
+    public void TheSidebarLayout_MatchesTheSidebarsXaml()
+    {
+        var grid = SidebarGrid();
+        var rows = grid.Element(Presentation + "Grid.RowDefinitions")!.Elements().Select(r => (string)r.Attribute("Height")!).ToList();
+        var items = grid.Elements().Where(e => e.Name.LocalName == "RadioButton").ToList();
+
+        Assert.Equal(rows.IndexOf("*"), ServerMonitor.App.Controls.SidebarContributionLayout.FirstContributedRow);
+        Assert.Single(rows, height => height == "*");
+        Assert.Equal(items.Count, ServerMonitor.App.Controls.SidebarContributionLayout.BuiltInDestinations);
+        Assert.Equal(ServerMonitor.App.Controls.SidebarContributionLayout.ContributedRowHeight.ToString(System.Globalization.CultureInfo.InvariantCulture), rows[1]);
+        Assert.Equal(
+            Enumerable.Range(1, items.Count).Select(i => i.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+            items.Select(item => (string)item.Attribute("AutomationProperties.PositionInSet")!));
+        Assert.All(items, item => Assert.Equal(
+            ServerMonitor.App.Controls.SidebarContributionLayout.SizeOfSet(0).ToString(System.Globalization.CultureInfo.InvariantCulture),
+            (string)item.Attribute("AutomationProperties.SizeOfSet")!));
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(5)]
+    public void InsertingEntries_KeepsSettingsLast_TheIndicatorSpanningAllRows_AndAGaplessSet(int count)
+    {
+        var grid = SidebarGrid();
+        var rowCount = grid.Element(Presentation + "Grid.RowDefinitions")!.Elements().Count() + count;
+        var children = grid.Elements().Where(e => !e.Name.LocalName.Contains('.', StringComparison.Ordinal)).Select(e => (
+            Name: (string?)e.Attribute(AppSourceTree.Xaml + "Name") ?? e.Name.LocalName,
+            Row: ServerMonitor.App.Controls.SidebarContributionLayout.RowAfterInsert(IntAttribute(e, "Grid.Row", 0), count),
+            Span: ServerMonitor.App.Controls.SidebarContributionLayout.RowSpanAfterInsert(IntAttribute(e, "Grid.Row", 0), IntAttribute(e, "Grid.RowSpan", 1), count),
+            Position: IntAttribute(e, "AutomationProperties.PositionInSet", 0))).ToList();
+        var contributedRows = Enumerable.Range(0, count).Select(ServerMonitor.App.Controls.SidebarContributionLayout.RowOfContributed).ToList();
+
+        Assert.Equal(rowCount - 1, children.Single(c => c.Name == "SettingsItem").Row);
+        Assert.Equal(rowCount, children.Single(c => c.Name == "Border").Span);
+        Assert.DoesNotContain(children, c => c.Span == 1 && contributedRows.Contains(c.Row)); // the new rows are free
+        Assert.Equal(Enumerable.Range(ServerMonitor.App.Controls.SidebarContributionLayout.FirstContributedRow, count), contributedRows);
+
+        var positions = children.Where(c => c.Position > 0 && c.Name != "SettingsItem").Select(c => c.Position)
+            .Concat(Enumerable.Range(0, count).Select(ServerMonitor.App.Controls.SidebarContributionLayout.PositionOfContributed))
+            .Append(ServerMonitor.App.Controls.SidebarContributionLayout.SizeOfSet(count)); // Settings is the last position
+        Assert.Equal(Enumerable.Range(1, ServerMonitor.App.Controls.SidebarContributionLayout.SizeOfSet(count)), positions);
+    }
+
+    [Fact]
+    public void TheSidebar_UsesTheLayoutForEveryRowAndPosition()
+    {
+        var code = AppSourceTree.CodeWithoutComments("Controls/SaSidebar.xaml.cs");
+
+        Assert.Contains("SidebarContributionLayout.RowAfterInsert(row, count)", code, StringComparison.Ordinal);
+        Assert.Contains("SidebarContributionLayout.RowSpanAfterInsert(row, Grid.GetRowSpan(child), count)", code, StringComparison.Ordinal);
+        Assert.Contains("NavGrid.RowDefinitions.Insert(SidebarContributionLayout.RowOfContributed(i)", code, StringComparison.Ordinal);
+        Assert.Contains("AutomationProperties.SetPositionInSet(item, SidebarContributionLayout.PositionOfContributed(i))", code, StringComparison.Ordinal);
+        Assert.Contains("var size = SidebarContributionLayout.SizeOfSet(count);", code, StringComparison.Ordinal);
+        Assert.Contains("AutomationProperties.SetPositionInSet(SettingsItem, size);", code, StringComparison.Ordinal);
+        Assert.Contains("NavGrid.Children.Insert(settingsIndex + i, item);", code, StringComparison.Ordinal);
+    }
+
+    private static readonly XNamespace Presentation = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
+
+    private static System.Xml.Linq.XElement SidebarGrid() =>
+        AppSourceTree.LoadXaml("Controls/SaSidebar.xaml").Descendants()
+            .Single(e => (string?)e.Attribute(AppSourceTree.Xaml + "Name") == "NavGrid");
+
+    private static int IntAttribute(System.Xml.Linq.XElement element, string name, int fallback) =>
+        element.Attribute(name) is { } attribute ? int.Parse(attribute.Value, System.Globalization.CultureInfo.InvariantCulture) : fallback;
+
+    // ---------------------------------------------------------------- r2: routing through the exit guard (T-2)
+
+    private sealed class GuardedPage(Task<bool> answer) : INavigationExitGuard
+    {
+        public int Asked { get; private set; }
+
+        public Task<bool> ConfirmLeaveAsync()
+        {
+            Asked++;
+            return answer;
+        }
+    }
+
+    [Fact]
+    public void GoingToAContribution_StaysWhenTheShownPageRefusesToBeLeft()
+    {
+        var (navigation, frame, _) = Router(new ShellContributions([], [Contribution("tools.entry")]));
+        var guard = new GuardedPage(Task.FromResult(false));
+        frame.Content = guard;
+
+        navigation.GoToContribution("tools.entry");
+
+        Assert.Equal(1, guard.Asked);
+        Assert.Same(guard, frame.Content);
+        Assert.Null(navigation.CurrentContributionId);
+    }
+
+    [Fact]
+    public void GoingToAContribution_WaitsForTheAnswer_AndGoesWhenThePageAgrees()
+    {
+        var (navigation, frame, _) = Router(new ShellContributions([], [Contribution("tools.entry")]));
+        var answer = new TaskCompletionSource<bool>();
+        var guard = new GuardedPage(answer.Task);
+        frame.Content = guard;
+
+        navigation.GoToContribution("tools.entry");
+        Assert.Same(guard, frame.Content); // still asking
+        navigation.GoToContribution("tools.entry"); // a second click while the question is open is dropped
+        answer.SetResult(true);
+
+        Assert.Equal(1, guard.Asked);
+        Assert.Equal("tools.entry", Assert.IsType<View>(frame.Content).Name);
+        Assert.Equal("tools.entry", navigation.CurrentContributionId);
+        Assert.Equal(NavigationDestination.Contribution, navigation.CurrentDestination);
+    }
+
+    [Fact]
+    public void SelectingTheContributionAlreadyShown_DoesNothing()
+    {
+        var (navigation, frame, _) = Router(new ShellContributions([], [Contribution("tools.entry")]));
+        navigation.GoToContribution("tools.entry");
+        var shown = frame.Content;
+        var navigated = 0;
+        navigation.Navigated += (_, _) => navigated++;
+
+        navigation.GoToContribution("tools.entry");
+
+        Assert.Same(shown, frame.Content);
+        Assert.Equal(0, navigated);
+        Assert.Equal("tools.entry", navigation.CurrentContributionId);
+    }
+
+    // ---------------------------------------------------------------- r2: the real root with a denied module (L-2)
+
+    private sealed class DenyAll : IEntitlementProvider
+    {
+        public bool IsEntitled(FeatureId id) => false;
+    }
+
+    private sealed class GatedContributingModule : IFeatureModule
+    {
+        public FeatureDescriptor Descriptor { get; } = new(new FeatureId("test.gated"), RequiresEntitlement: true);
+
+        public int ContributionReads { get; private set; }
+
+        public ShellContributions Contributions
+        {
+            get
+            {
+                ContributionReads++;
+                return new ShellContributions([Contribution("gated.section")], [Contribution("gated.entry")]);
+            }
+        }
+
+        public void Register(IServiceCollection services)
+        {
+        }
+    }
+
+    [Fact]
+    public void ThroughTheRealRoot_ADeniedConditionalModuleThatDeclaresContributions_ContributesNothing()
+    {
+        var services = new ServiceCollection();
+        var module = new GatedContributingModule();
+
+        var result = App.ComposeFeatures(services, [module], new DenyAll());
+
+        Assert.Single(result.Skipped);
+        Assert.Equal(0, module.ContributionReads);
+        var registered = Assert.IsType<ShellContributions>(services.Last(d => d.ServiceType == typeof(ShellContributions)).ImplementationInstance);
+        Assert.Empty(registered.SettingsSections);
+        Assert.Empty(registered.NavigationEntries);
+        var host = Host(registered);
+        Assert.Equal(BaselineNavigationIds, host.NavigationIds);
+        Assert.Equal(BaselineSettingsSectionIds, host.SettingsSectionIds);
     }
 }

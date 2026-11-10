@@ -13,6 +13,14 @@ namespace ServerMonitor.Features;
 /// display; anything else, and any exception thrown by <see cref="CreateView"/>, removes the contribution instead of
 /// failing the application.
 /// </para>
+/// <para>
+/// <b>Lifetime of the view.</b> The shell creates the view once and keeps it for the life of the process: it is shown
+/// again on every visit and is never disposed. The view must therefore tolerate being loaded and unloaded many times
+/// (every navigation away and back, and a theme change, which re-mounts the page it is on), release anything it holds
+/// on <c>Unloaded</c> and take it again on <c>Loaded</c>, and never rely on <see cref="IDisposable"/>. It must be a new
+/// element with no parent. A navigation entry's view must be a page, so the shell can re-mount it when the theme
+/// changes; a Settings section's view may be any element.
+/// </para>
 /// </summary>
 public sealed class ShellContribution
 {
@@ -23,7 +31,11 @@ public sealed class ShellContribution
     /// <param name="order">Position among contributions of the same kind: lower first, ties broken by <paramref name="id"/>.</param>
     /// <param name="titleResourceKey">The resource key of the title the shell shows for it.</param>
     /// <param name="createView">Creates the view. Called by the shell on the UI thread, at most once per contribution.</param>
-    public ShellContribution(string id, int order, string titleResourceKey, Func<object> createView)
+    /// <param name="iconPathData">
+    /// Optional icon for a navigation entry, as path markup data (the same mini-language as the shell's own icons).
+    /// Null or blank means the shell's generic icon. Settings sections show no icon.
+    /// </param>
+    public ShellContribution(string id, int order, string titleResourceKey, Func<object> createView, string? iconPathData = null)
     {
         if (!FeatureId.IsWellFormed(id))
         {
@@ -39,6 +51,7 @@ public sealed class ShellContribution
         Order = order;
         TitleResourceKey = titleResourceKey;
         CreateView = createView;
+        IconPathData = string.IsNullOrWhiteSpace(iconPathData) ? null : iconPathData;
     }
 
     public string Id { get; }
@@ -48,6 +61,9 @@ public sealed class ShellContribution
     public string TitleResourceKey { get; }
 
     public Func<object> CreateView { get; }
+
+    /// <summary>The navigation entry's icon as path markup data, or null for the shell's generic icon.</summary>
+    public string? IconPathData { get; }
 
     public override string ToString() => $"{Id} (order {Order})";
 }

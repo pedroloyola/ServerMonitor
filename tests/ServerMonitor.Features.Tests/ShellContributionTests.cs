@@ -230,6 +230,17 @@ public sealed class ShellContributionTests
         Assert.Throws<ArgumentException>(() => new ShellContributions([null!], []));
     }
 
+    [Theory]
+    [InlineData(null, null)]
+    [InlineData("", null)]
+    [InlineData("   ", null)]
+    [InlineData("M0,0 L1,1", "M0,0 L1,1")]
+    public void TheIcon_IsOptional_AndBlankMeansTheShellsGenericOne(string? given, string? expected)
+    {
+        Assert.Equal(expected, new ShellContribution("ok.id", 0, "TitleKey", () => new object(), given).IconPathData);
+        Assert.Null(new ShellContribution("ok.id", 0, "TitleKey", () => new object()).IconPathData);
+    }
+
     private static IEnumerable<ShellContribution[]> Permutations(ShellContribution[] items)
     {
         if (items.Length <= 1)

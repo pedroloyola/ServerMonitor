@@ -856,6 +856,7 @@
   <data name="ShellSettings.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Settings</value></data>
   <data name="ShellSettings.[using:Microsoft.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve"><value>Settings</value></data>
   <data name="ShellSettingsLabel.Text" xml:space="preserve"><value>Settings</value></data>
+  <data name="ShellContributionUntitled" xml:space="preserve"><value>Untitled</value></data>
   <data name="ShellNavigation.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Main navigation</value></data>
   <data name="ShellNavigationList.[using:Microsoft.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve"><value>Pages</value></data>
   <data name="OnboardingWelcomeTitle.Text" xml:space="preserve"><value>Your servers.

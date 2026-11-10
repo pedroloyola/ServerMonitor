@@ -10,10 +10,6 @@ using Windows.System;
 namespace ServerMonitor.App.Controls;
 public sealed partial class SaSidebar : UserControl
 {
-    // M15.4a: the built-in rows are brand, three destinations, the flexible spacer and Settings; contributed entries
-    // take new rows between the last destination and the spacer, so Settings stays at the bottom.
-    private const int FirstContributedRow = 4;
-    private const int BuiltInDestinations = 4;
     private readonly SidebarSelectionSync _selection;
     private readonly List<(string Id, RadioButton Item, TextBlock Label)> _contributed = [];
     private ShellViewModel? _contributionShell;
@@ -77,15 +73,18 @@ public sealed partial class SaSidebar : UserControl
         var entries = shell.ContributedEntries;
         if (entries.Count == 0) return;
 
+        // Rows and positions: SidebarContributionLayout (brand, destinations, then the contributed rows before the
+        // flexible spacer, so Settings stays at the bottom; the sliding indicator keeps spanning every row).
         var count = entries.Count;
-        var size = BuiltInDestinations + count;
+        var size = SidebarContributionLayout.SizeOfSet(count);
         foreach (var child in NavGrid.Children.OfType<FrameworkElement>())
         {
             var row = Grid.GetRow(child);
-            if (row >= FirstContributedRow) Grid.SetRow(child, row + count);
-            else if (Grid.GetRowSpan(child) > 1) Grid.SetRowSpan(child, Grid.GetRowSpan(child) + count); // the indicator spans every row
+            Grid.SetRowSpan(child, SidebarContributionLayout.RowSpanAfterInsert(row, Grid.GetRowSpan(child), count));
+            Grid.SetRow(child, SidebarContributionLayout.RowAfterInsert(row, count));
         }
-        for (var i = 0; i < count; i++) NavGrid.RowDefinitions.Insert(FirstContributedRow + i, new RowDefinition { Height = new GridLength(46) });
+        for (var i = 0; i < count; i++)
+            NavGrid.RowDefinitions.Insert(SidebarContributionLayout.RowOfContributed(i), new RowDefinition { Height = new GridLength(SidebarContributionLayout.ContributedRowHeight) });
 
         var settingsIndex = NavGrid.Children.IndexOf(SettingsItem);
         for (var i = 0; i < count; i++)
@@ -96,7 +95,7 @@ public sealed partial class SaSidebar : UserControl
             var content = new Grid { ColumnSpacing = 10 };
             content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(20) });
             content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            content.Children.Add(new SaIcon { Data = (string)Application.Current.Resources["SaIconPackageData"], Size = 20 });
+            content.Children.Add(new SaIcon { Data = entry.IconPathData ?? (string)Application.Current.Resources["SaIconPackageData"], Size = 20 });
             content.Children.Add(label);
             var item = new RadioButton
             {
@@ -107,9 +106,9 @@ public sealed partial class SaSidebar : UserControl
                 Content = content,
             };
             AutomationProperties.SetName(item, entry.Title);
-            AutomationProperties.SetPositionInSet(item, BuiltInDestinations + i);
+            AutomationProperties.SetPositionInSet(item, SidebarContributionLayout.PositionOfContributed(i));
             AutomationProperties.SetSizeOfSet(item, size);
-            Grid.SetRow(item, FirstContributedRow + i);
+            Grid.SetRow(item, SidebarContributionLayout.RowOfContributed(i));
             item.Click += OnContributedItemClick;
             item.KeyDown += OnContributedItemKeyDown;
             NavGrid.Children.Insert(settingsIndex + i, item);
