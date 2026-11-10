@@ -1,6 +1,8 @@
 using System.Reflection.Metadata;
 using System.Reflection.Metadata.Ecma335;
 using System.Reflection.PortableExecutable;
+using System.Text.RegularExpressions;
+using System.Xml.Linq;
 using ServerMonitor.ActivationContract;
 using ServerMonitor.Collectors;
 using ServerMonitor.Core.Models;
@@ -32,15 +34,60 @@ namespace ServerMonitor.App.Tests.Architecture;
 /// <item><description>
 /// <b>Native modules.</b> Every native library a layer imports (<c>DllImport</c>/<c>LibraryImport</c>).
 /// </description></item>
+/// <item><description>
+/// <b>What the UI frameworks fetch by themselves.</b> The WinUI and Windows API assemblies are allowed as a whole, so the
+/// types and members in them that load a URI on their own are watched by name: <c>WebView2</c> and the
+/// <c>Microsoft.Web.WebView2</c> namespace, <c>BitmapImage</c> and <c>SvgImageSource</c>, the
+/// <c>Windows.Media.Streaming</c> and <c>Windows.Services.Store</c> namespaces, and the members
+/// <c>StorageFile.CreateStreamedFileFromUriAsync</c>/<c>ReplaceWithStreamedFileFromUriAsync</c> and
+/// <c>RandomAccessStreamReference.CreateFromUri</c>. <c>Windows.System.Launcher</c> is watched too and allowed where it is
+/// used: it hands a URI to the user's default browser or to our own protocol handler, and the app itself makes no
+/// connection.
+/// </description></item>
+/// <item><description>
+/// <b>Web addresses written in the product.</b> Every <c>http://</c>/<c>https://</c> literal in the compiled code of the
+/// layers (the string heap of each assembly) and in the App's XAML sources (attribute values and text), each one on an
+/// exact list with what it is for. XML namespace identifiers (<c>schemas.microsoft.com</c>, <c>www.w3.org</c>,
+/// <c>schemas.openxmlformats.org</c>) are names, never fetched, and are not listed.
+/// </description></item>
 /// </list>
 /// <para>
 /// Not covered here: a type resolved from a string at run time, which the source guard against dynamic loading (R6c)
-/// forbids. A new network path is a product decision that changes these lists in review, never a side effect.
+/// forbids; and an address that is not written in the product but built or read at run time (concatenated, taken from
+/// the resource files, which are text, or from the user's own input such as the servers they add). Those reach the
+/// network only through the types and members above, which are watched. A new network path is a product decision that
+/// changes these lists in review, never a side effect.
 /// </para>
 /// </summary>
 public sealed class NetworkBoundaryAllowlistTests
 {
-    private static readonly string[] WatchedNamespaces = ["System.Net", "Windows.Web", "Windows.Networking"];
+    private static readonly string[] WatchedNamespaces =
+    [
+        "System.Net", "Windows.Web", "Windows.Networking",
+        "Microsoft.Web.WebView2", "Windows.Media.Streaming", "Windows.Services.Store",
+    ];
+
+    /// <summary>Single framework types that load a URI on their own (their namespaces are otherwise not watched).</summary>
+    private static readonly string[] WatchedTypes =
+    [
+        "Microsoft.UI.Xaml.Controls.WebView2",
+        "Microsoft.UI.Xaml.Media.Imaging.BitmapImage",
+        "Microsoft.UI.Xaml.Media.Imaging.SvgImageSource",
+        "Windows.System.Launcher",
+    ];
+
+    /// <summary>Framework members that fetch a URI, "type::member".</summary>
+    private static readonly string[] WatchedMembers =
+    [
+        "Windows.Storage.StorageFile::CreateStreamedFileFromUriAsync",
+        "Windows.Storage.StorageFile::ReplaceWithStreamedFileFromUriAsync",
+        "Windows.Storage.Streams.RandomAccessStreamReference::CreateFromUri",
+    ];
+
+    /// <summary>XML namespace identifiers: names, never fetched.</summary>
+    private static readonly string[] XmlNamespaceHosts = ["schemas.microsoft.com", "www.w3.org", "schemas.openxmlformats.org"];
+
+    private static readonly Regex WebAddress = new(@"https?://[^\s""'<>]+", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
     /// <summary>Assemblies whose purpose is to make or accept connections. Matched on the name or as a dotted prefix.</summary>
     private static readonly string[] DeniedAssemblies =
@@ -63,6 +110,24 @@ public sealed class NetworkBoundaryAllowlistTests
         "ServerMonitor.Infrastructure: System.Net.Sockets.SocketException",      // SSH: the same mapping
         "ServerMonitor.App: System.Net.IPAddress",                               // mDNS result / SSH command: address shape
         "ServerMonitor.App: System.Net.Sockets.AddressFamily",                   // mDNS result / SSH command: IPv6 address shape
+        "ServerMonitor.App: Windows.System.Launcher",                            // opens the project page in the user's browser
+        "ServerAlyzer.WidgetProvider: Windows.System.Launcher",                  // opens the app through its own protocol
+    ];
+
+    /// <summary>Measured framework members that fetch a URI, "layer: type::member". None.</summary>
+    private static readonly string[] MemberAllowlist =
+    [
+    ];
+
+    /// <summary>Measured web addresses in compiled code, "layer: address", with where each one goes.</summary>
+    private static readonly string[] CompiledAddressAllowlist =
+    [
+        "ServerMonitor.App: https://github.com/pedroloyola/ServerMonitor", // About: opened with Launcher in the browser
+    ];
+
+    /// <summary>Measured web addresses in the App's XAML, "file: address". None.</summary>
+    private static readonly string[] XamlAddressAllowlist =
+    [
     ];
 
     /// <summary>Measured assembly references outside the System family, "layer -> assembly".</summary>
@@ -177,6 +242,54 @@ public sealed class NetworkBoundaryAllowlistTests
     }
 
     [Fact]
+    public void Every_layer_calls_only_the_measured_framework_members_that_fetch_a_uri()
+    {
+        var found = Layers().SelectMany(layer => layer.MemberReferences
+            .Where(member => WatchedMembers.Contains(member, StringComparer.Ordinal))
+            .Select(member => $"{layer.Name}: {member}"));
+
+        AssertExactly(MemberAllowlist, found);
+    }
+
+    [Fact]
+    public void Every_web_address_in_compiled_code_is_on_the_list()
+    {
+        var found = Layers().SelectMany(layer => layer.UserStrings
+            .SelectMany(WebAddresses)
+            .Select(address => $"{layer.Name}: {address}"));
+
+        AssertExactly(CompiledAddressAllowlist, found);
+    }
+
+    [Fact]
+    public void Every_web_address_in_the_apps_xaml_is_on_the_list()
+    {
+        var found = AppSourceTree.Files(".xaml").SelectMany(file =>
+        {
+            var document = XDocument.Load(AppSourceTree.Full(file));
+            var values = document.Descendants().SelectMany(element => element.Attributes()
+                    .Where(attribute => !attribute.IsNamespaceDeclaration)
+                    .Select(attribute => attribute.Value)
+                    .Concat(element.Nodes().OfType<XText>().Select(text => text.Value)));
+            return values.SelectMany(WebAddresses).Select(address => $"{file}: {address}");
+        });
+
+        AssertExactly(XamlAddressAllowlist, found);
+    }
+
+    [Fact]
+    public void The_scan_sees_member_references_strings_and_xaml()
+    {
+        // Guards the guards above: each source they read must actually be read.
+        var app = Layers().Single(layer => layer.Name == "ServerMonitor.App");
+
+        Assert.Contains(app.MemberReferences, member => member.StartsWith("Windows.System.Launcher::", StringComparison.Ordinal));
+        Assert.NotEmpty(app.UserStrings);
+        Assert.Contains("Controls/SaSidebar.xaml", AppSourceTree.Files(".xaml"));
+        Assert.Equal(["https://example.org/x"], WebAddresses("see https://example.org/x and http://schemas.microsoft.com/winfx/2006/xaml"));
+    }
+
+    [Fact]
     public void The_scan_reads_every_layer()
     {
         // Guards the guards: a layer whose scan came back empty would pass every test above vacuously.
@@ -201,7 +314,9 @@ public sealed class NetworkBoundaryAllowlistTests
         string Name,
         IReadOnlySet<string> TypeReferences,
         IReadOnlySet<string> AssemblyReferences,
-        IReadOnlySet<string> NativeModules);
+        IReadOnlySet<string> NativeModules,
+        IReadOnlySet<string> MemberReferences,
+        IReadOnlySet<string> UserStrings);
 
     internal static IReadOnlyList<Layer> Layers() =>
     [
@@ -238,7 +353,26 @@ public sealed class NetworkBoundaryAllowlistTests
             modules.Add(metadata.GetString(metadata.GetModuleReference(MetadataTokens.ModuleReferenceHandle(row)).Name));
         }
 
-        return new Layer(metadata.GetString(metadata.GetAssemblyDefinition().Name), types, assemblies, modules);
+        var members = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var handle in metadata.MemberReferences)
+        {
+            var member = metadata.GetMemberReference(handle);
+            if (member.Parent.Kind == HandleKind.TypeReference)
+            {
+                members.Add(FullName(metadata, (TypeReferenceHandle)member.Parent) + "::" + metadata.GetString(member.Name));
+            }
+        }
+
+        var strings = new HashSet<string>(StringComparer.Ordinal);
+        if (metadata.GetHeapSize(HeapIndex.UserString) > 1)
+        {
+            for (var handle = MetadataTokens.UserStringHandle(1); !handle.IsNil; handle = metadata.GetNextHandle(handle))
+            {
+                strings.Add(metadata.GetUserString(handle));
+            }
+        }
+
+        return new Layer(metadata.GetString(metadata.GetAssemblyDefinition().Name), types, assemblies, modules, members, strings);
     }
 
     /// <summary>
@@ -276,8 +410,19 @@ public sealed class NetworkBoundaryAllowlistTests
         return ns.Length == 0 ? name : ns + "." + name;
     }
 
+    /// <summary>The web addresses in <paramref name="text"/>, without XML namespace identifiers.</summary>
+    private static IEnumerable<string> WebAddresses(string text) =>
+        WebAddress.Matches(text).Select(match => match.Value)
+            .Where(address => !(Uri.TryCreate(address, UriKind.Absolute, out var uri)
+                && XmlNamespaceHosts.Any(host => uri.Host.Equals(host, StringComparison.OrdinalIgnoreCase))));
+
     private static bool IsWatched(string typeName)
     {
+        if (WatchedTypes.Contains(typeName.Split('+')[0], StringComparer.Ordinal))
+        {
+            return true;
+        }
+
         var outer = typeName.Split('+')[0];
         var lastDot = outer.LastIndexOf('.');
         var ns = lastDot < 0 ? string.Empty : outer[..lastDot];

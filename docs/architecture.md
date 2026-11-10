@@ -261,7 +261,8 @@ módulos existentes não mudam; nenhum módulo deste repositório contribui inte
 - **O que o shell aceita.** Uma entrada de navegação tem de ser uma `Page` (o shell remonta-a no frame quando o tema
   muda); uma secção de Definições pode ser qualquer `FrameworkElement`. Em ambos os casos, um elemento novo, sem pai.
   Um título sem recurso fica registado em log e mostra um rótulo neutro ("Sem título"), nunca o id. Sem ícone, a
-  entrada usa o ícone genérico.
+  entrada usa o ícone genérico; um ícone que não seja path markup válido é verificado no host, dentro do isolamento,
+  fica no log e é trocado pelo genérico, por isso nunca chega à barra lateral.
 - **Falhas nunca fatais.** `ShellContributionHost` cria as vistas uma vez, no thread de UI, dentro de try/catch: uma
   fábrica que lança, ou que devolve algo que o shell não aceita, remove só essa contribuição e fica no log (tipo da
   exceção, nunca a mensagem). Colocar a vista na árvore também passa por try/catch (`TryAttach`), secção a secção, por
@@ -297,5 +298,14 @@ fornecedor do widget e os dois assemblies de contrato, e compara-os com listas e
   existentes: SSH.NET (os servidores do utilizador) e Tmds.MDns (descoberta na rede local). Um assembly do produto
   referenciado por uma camada tem de ser ele próprio uma camada lida.
 - **Módulos nativos:** cada biblioteca importada com `DllImport`/`LibraryImport`.
+- **O que as frameworks de UI vão buscar sozinhas:** `WebView2`, `BitmapImage`, `SvgImageSource`, os namespaces
+  `Microsoft.Web.WebView2`, `Windows.Media.Streaming` e `Windows.Services.Store`, e os membros que abrem um URI
+  (`StorageFile.CreateStreamedFileFromUriAsync`, `RandomAccessStreamReference.CreateFromUri`). Hoje nenhum é usado.
+  `Windows.System.Launcher` está na lista onde é usado: entrega o endereço ao browser do utilizador (ou ao protocolo da
+  própria app) e a app não faz ligação nenhuma.
+- **Endereços escritos no produto:** cada literal `http://`/`https://` no código compilado das camadas e na XAML da
+  App, numa lista exata com o seu destino. Hoje há um: a página do projeto, aberta no browser a partir de Acerca de.
+  Identificadores de namespace XML não são endereços e ficam de fora. Não são vistos os endereços construídos em
+  runtime (ficheiros de recursos, dados do utilizador); esses só chegam à rede pelos tipos e membros acima.
 
 Um novo caminho de rede é uma decisão de produto que altera estas listas em revisão.
