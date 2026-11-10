@@ -52,24 +52,29 @@ public sealed class CompositionSuppliedContributionsTests
     // ---------------------------------------------------------------- 1. it cannot add capabilities, features or services
 
     [Fact]
-    public void TheHook_IsClassicOptionalPartial_AndReceivesOnlyAListOfContributions()
+    public void TheHook_IsClassicOptionalPartial_AndReceivesOnlyListsOfDescriptions()
     {
         var declaration = Assert.Single(Regex.Matches(AppSource(),
             $@"^[ \t]*(?<prefix>[\w \t]*?)\bpartial\s+void\s+{HookName}\s*\((?<parameters>[^)]*)\)\s*;",
             RegexOptions.Multiline));
 
         Assert.Equal("static", declaration.Groups["prefix"].Value.Trim());
-        Assert.Equal("IList<ShellContribution> contributions", Regex.Replace(declaration.Groups["parameters"].Value.Trim(), @"\s+", " "));
+        Assert.Equal(
+            "IList<ShellContribution> settingsSections, IList<ShellContribution> unlistedPages, IList<ShellLink> links",
+            Regex.Replace(declaration.Groups["parameters"].Value.Trim(), @"\s+", " "));
     }
 
     [Theory]
     [InlineData(typeof(ShellContribution))]
     [InlineData(typeof(ShellContributions))]
+    [InlineData(typeof(ShellLink))]
+    [InlineData(typeof(RealizedShellLink))]
     public void AContribution_CarriesNoServiceCollectionCatalogProviderOrModule(Type type)
     {
         Type[] forbidden =
         [
             typeof(IServiceProvider), typeof(IServiceCollection), typeof(IEntitlementProvider), typeof(IFeatureCatalog), typeof(IFeatureModule),
+            typeof(INavigationService), typeof(ShellContributionHost),
         ];
         var memberTypes = type.GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static).Select(p => p.PropertyType)
             .Concat(type.GetFields(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static).Select(f => f.FieldType))
@@ -90,7 +95,9 @@ public sealed class CompositionSuppliedContributionsTests
         var baselineResult = App.ComposeFeatures(baseline, [], null);
         var supplied = new ServiceCollection();
         var suppliedResult = App.ComposeFeatures(supplied, [], null,
-            [Section("supplied.one"), Section("supplied.broken", factory: () => throw new InvalidOperationException("view failed"))]);
+            [Section("supplied.one"), Section("supplied.broken", factory: () => throw new InvalidOperationException("view failed"))],
+            [Section("supplied.page")],
+            [new ShellLink("supplied.link", 0, "Key", "supplied.page", ShellLinkPlacement.SidebarFooter)]);
 
         Assert.Equal(Shapes(baseline), Shapes(supplied));
         Assert.Equal(
@@ -98,6 +105,32 @@ public sealed class CompositionSuppliedContributionsTests
             suppliedResult.Catalog.Composed.Select(d => d.Id));
         Assert.Equal(["supplied.one", "supplied.broken"], LastContributions(supplied).SettingsSections.Select(c => c.Id));
         Assert.Equal(["supplied.one"], HostOver(supplied).SettingsSections.Select(s => s.Id)); // the broken one is left out
+        Assert.Equal(["supplied.page"], LastContributions(supplied).UnlistedPages.Select(c => c.Id));
+        Assert.Equal(["supplied.link"], LastContributions(supplied).Links.Select(l => l.Id));
+    }
+
+    /// <summary>A composed module that declares unlisted pages and links: only the composition root may supply those.</summary>
+    private sealed class OverreachingModule : IFeatureModule
+    {
+        public FeatureDescriptor Descriptor { get; } = new(new FeatureId("test.overreach"), RequiresEntitlement: true);
+
+        public ShellContributions Contributions { get; } = new(
+            [], [], [Section("module.page")], [new ShellLink("module.link", 0, "Key", "module.page", ShellLinkPlacement.SidebarFooter)]);
+
+        public void Register(IServiceCollection services)
+        {
+        }
+    }
+
+    [Fact]
+    public void AModule_CannotSupplyUnlistedPagesOrLinks_EvenWhenComposed()
+    {
+        var services = new ServiceCollection();
+        App.ComposeFeatures(services, [new OverreachingModule()], new GrantAll());
+
+        var contributions = LastContributions(services);
+        Assert.Empty(contributions.UnlistedPages);
+        Assert.Empty(contributions.Links);
     }
 
     // ---------------------------------------------------------------- 2. it runs only outside QA launches
@@ -106,15 +139,22 @@ public sealed class CompositionSuppliedContributionsTests
     public void TheHook_IsCalledOnce_OnlyOutsideQaLaunches_WithAFreshList_ThatTheRootNeverFills()
     {
         var source = AppSource();
-        var call = Assert.Single(Regex.Matches(source, $@"\b{HookName}\s*\(\s*(?<list>\w+)\s*\)\s*;"));
-        var list = call.Groups["list"].Value;
+        var call = Assert.Single(Regex.Matches(source, $@"\b{HookName}\s*\(\s*(?<a>\w+)\s*,\s*(?<b>\w+)\s*,\s*(?<c>\w+)\s*\)\s*;"));
+        var lists = new[] { (call.Groups["a"].Value, "ShellContribution"), (call.Groups["b"].Value, "ShellContribution"), (call.Groups["c"].Value, "ShellLink") };
+        Assert.Equal(3, lists.Select(l => l.Item1).Distinct().Count());
 
         var (blockStart, blockEnd) = Block(source, source.IndexOf("if (!qaMode)", StringComparison.Ordinal));
         Assert.InRange(call.Index, blockStart, blockEnd);
         Assert.Single(Regex.Matches(source, @"if \(!qaMode\)\s*\{[^{}]*" + "AddCommercialComposition"));
-        Assert.Matches($@"\bvar\s+{Regex.Escape(list)}\s*=\s*new\s+List<ShellContribution>\s*\(\s*\)\s*;", source);
-        Assert.DoesNotMatch($@"\b{Regex.Escape(list)}\s*\.\s*(Add|AddRange|Insert|InsertRange|Clear|Remove)\w*\s*\(", source);
-        Assert.Matches($@"\bComposeFeatures\s*\(\s*services\s*,\s*\w+\s*,\s*\w+\s*,\s*{Regex.Escape(list)}\s*\)", source);
+        foreach (var (list, type) in lists)
+        {
+            Assert.Matches($@"\bvar\s+{Regex.Escape(list)}\s*=\s*new\s+List<{type}>\s*\(\s*\)\s*;", source);
+            Assert.DoesNotMatch($@"\b{Regex.Escape(list)}\s*\.\s*(Add|AddRange|Insert|InsertRange|Clear|Remove)\w*\s*\(", source);
+        }
+
+        Assert.Matches(
+            $@"\bComposeFeatures\s*\(\s*services\s*,\s*\w+\s*,\s*\w+\s*,\s*{lists[0].Item1}\s*,\s*{lists[1].Item1}\s*,\s*{lists[2].Item1}\s*\)",
+            source);
         Assert.True(source.IndexOf("AddCommercialComposition(", StringComparison.Ordinal) < call.Index, "it runs after the module hook");
     }
 
@@ -146,8 +186,14 @@ public sealed class CompositionSuppliedContributionsTests
     {
         var composed = new ShellContributions([Section("a.section")], [Section("a.entry")]);
 
-        Assert.Same(composed, App.WithSuppliedSettingsSections(composed, null));
-        Assert.Same(composed, App.WithSuppliedSettingsSections(composed, []));
+        Assert.Same(composed, App.WithSupplied(composed, null));
+        Assert.Same(composed, App.WithSupplied(composed, []));
+        Assert.Same(composed, App.WithSupplied(composed, [], [], []));
+
+        var withLink = App.WithSupplied(composed, null, null, [new ShellLink("only.link", 0, "Key", "a.entry", ShellLinkPlacement.SettingsCard)]);
+        Assert.Equal(["a.section"], withLink.SettingsSections.Select(c => c.Id));
+        Assert.Equal(["a.entry"], withLink.NavigationEntries.Select(c => c.Id));
+        Assert.Equal(["only.link"], withLink.Links.Select(l => l.Id));
     }
 
     // ---------------------------------------------------------------- 4. with no implementation, the baseline
@@ -162,6 +208,10 @@ public sealed class CompositionSuppliedContributionsTests
 
         Assert.Equal(ShellContributionHostTests.BaselineNavigationIds, host.NavigationIds);
         Assert.Equal(ShellContributionHostTests.BaselineSettingsSectionIds, host.SettingsSectionIds);
+        Assert.Empty(host.UnlistedPages);
+        Assert.Empty(host.Links);
+        Assert.Null(host.FooterLink);
+        Assert.Empty(host.SettingsCards);
     }
 
     // ---------------------------------------------------------------- helpers

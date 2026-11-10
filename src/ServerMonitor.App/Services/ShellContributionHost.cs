@@ -15,6 +15,40 @@ namespace ServerMonitor.App.Services;
 public sealed record RealizedShellContribution(string Id, string Title, object View, string? IconPathData = null);
 
 /// <summary>
+/// A link the shell kept (<see cref="ShellLink"/>): its target is a page the shell shows. The current label and hint
+/// are read through <see cref="ShellContributionHost.LabelOf"/> and <see cref="ShellContributionHost.HintOf"/>.
+/// </summary>
+public sealed class RealizedShellLink
+{
+    internal RealizedShellLink(ShellLink link, string title, string? iconPathData)
+    {
+        Id = link.Id;
+        Placement = link.Placement;
+        TargetId = link.TargetId;
+        Title = title;
+        IconPathData = iconPathData;
+        Label = link.Label;
+        Hint = link.Hint;
+    }
+
+    public string Id { get; }
+
+    public ShellLinkPlacement Placement { get; }
+
+    /// <summary>The page it opens (a navigation entry or an unlisted page the shell shows).</summary>
+    public string TargetId { get; }
+
+    /// <summary>The title from the resource key, or the neutral label: what is shown when the label provider gives nothing.</summary>
+    public string Title { get; }
+
+    public string? IconPathData { get; }
+
+    internal Func<string>? Label { get; }
+
+    internal Func<string>? Hint { get; }
+}
+
+/// <summary>
 /// The user interface feature modules add to the shell (<see cref="ShellContribution"/>), turned into views.
 /// <para>
 /// Each kind is arranged once with <see cref="ShellContributionOrdering.Arrange"/> (the first of two equal ids wins,
@@ -33,6 +67,15 @@ public sealed record RealizedShellContribution(string Id, string Title, object V
 /// <para>
 /// A navigation entry's icon is parsed here too, inside the same isolation: icon data that is not valid path markup is
 /// logged and replaced by the generic icon, so it never reaches the sidebar's icon, which converts it during layout.
+/// </para>
+/// <para>
+/// Composition-supplied pages and links (filled by the composition root only, never by a module): an unlisted page is
+/// realized like a navigation entry (a page with no parent), routed by id through <see cref="TryGetNavigationView"/> and
+/// never listed; an id already taken by a navigation entry or a built-in destination is left out. A link is arranged with
+/// the same rule, kept only when its target is a page realized here, and at most one link goes at the foot of the
+/// navigation (the first; the rest are logged and left out). A link's label and hint are read through
+/// <see cref="LabelOf"/> and <see cref="HintOf"/>, inside a try/catch, each time the shell shows it again
+/// (<see cref="RefreshLinkText"/>).
 /// </para>
 /// <para>
 /// Views are created once and kept for the life of the process, shown again on every visit and never disposed (see
@@ -68,6 +111,9 @@ public sealed class ShellContributionHost
     private readonly Action<string> _validateIcon;
     private IReadOnlyList<RealizedShellContribution>? _navigationEntries;
     private IReadOnlyList<RealizedShellContribution>? _settingsSections;
+    private IReadOnlyList<RealizedShellContribution>? _unlistedPages;
+    private IReadOnlyList<RealizedShellLink>? _links;
+    private readonly HashSet<string> _failedLinkText = new(StringComparer.Ordinal);
     private bool _realizing;
 
     public ShellContributionHost(
@@ -155,6 +201,70 @@ public sealed class ShellContributionHost
         _settingsSections ?? RealizeOnce(
             ref _settingsSections, _contributions.SettingsSections, BuiltInSettingsSectionIds, "Settings section", _canShowSectionView);
 
+    /// <summary>
+    /// The composition-supplied unlisted pages, realized on first use (UI thread): reached by id, never in the sidebar.
+    /// An id that a navigation entry (realized or not) or a built-in destination has is left out.
+    /// </summary>
+    public IReadOnlyList<RealizedShellContribution> UnlistedPages =>
+        _unlistedPages ?? RealizeOnce(
+            ref _unlistedPages,
+            _contributions.UnlistedPages,
+            [.. BuiltInNavigationIds, .. _contributions.NavigationEntries.Select(entry => entry.Id)],
+            "unlisted page",
+            _canShowNavigationView);
+
+    /// <summary>
+    /// The composition-supplied links the shell draws, realized on first use (UI thread), in display order: arranged
+    /// like contributions (built-in ids reserved), kept only when the target is a page realized here, and at most one
+    /// at the foot of the navigation.
+    /// </summary>
+    public IReadOnlyList<RealizedShellLink> Links => _links ??= RealizeLinks();
+
+    /// <summary>The one link at the foot of the navigation, or null.</summary>
+    public RealizedShellLink? FooterLink => Links.FirstOrDefault(link => link.Placement == ShellLinkPlacement.SidebarFooter);
+
+    /// <summary>The links shown as cards on the Settings page, in display order.</summary>
+    public IReadOnlyList<RealizedShellLink> SettingsCards => [.. Links.Where(link => link.Placement == ShellLinkPlacement.SettingsCard)];
+
+    /// <summary>True when <paramref name="id"/> is an unlisted page the shell shows.</summary>
+    public bool IsUnlistedPage(string? id) =>
+        id is not null && UnlistedPages.Any(page => string.Equals(page.Id, id, StringComparison.Ordinal));
+
+    /// <summary>
+    /// Raised by <see cref="RefreshLinkText"/>: the controls that draw links read <see cref="LabelOf"/> and
+    /// <see cref="HintOf"/> again. UI thread.
+    /// </summary>
+    public event EventHandler? LinkTextChanged;
+
+    /// <summary>
+    /// Asks the controls that draw links to read their label and hint again (after a navigation, when the window
+    /// becomes active, after a theme change). Nothing happens while no link is shown; it never realizes anything.
+    /// </summary>
+    public void RefreshLinkText()
+    {
+        if (_links is { Count: > 0 })
+        {
+            LinkTextChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    /// <summary>
+    /// The link's current label: the provider's, or when it has none, returns nothing or throws (logged once, id and
+    /// exception type only), the title from the resource key, else the neutral label. Never the raw id.
+    /// </summary>
+    public string LabelOf(RealizedShellLink link)
+    {
+        ArgumentNullException.ThrowIfNull(link);
+        return ReadLinkText(link, link.Label, "label") ?? link.Title;
+    }
+
+    /// <summary>The link's current secondary text, or null (none, nothing returned, or a provider that throws).</summary>
+    public string? HintOf(RealizedShellLink link)
+    {
+        ArgumentNullException.ThrowIfNull(link);
+        return ReadLinkText(link, link.Hint, "hint");
+    }
+
     /// <summary>Every navigation id in display order: the built-in ones, the contributed ones before the last built-in.</summary>
     public IReadOnlyList<string> NavigationIds =>
     [
@@ -190,12 +300,84 @@ public sealed class ShellContributionHost
         }
     }
 
-    /// <summary>The view of the contributed navigation entry <paramref name="id"/>; false for any other id.</summary>
+    /// <summary>
+    /// The view of the contributed navigation entry or unlisted page <paramref name="id"/>; false for any other id.
+    /// </summary>
     public bool TryGetNavigationView(string id, out object view)
     {
-        var entry = NavigationEntries.FirstOrDefault(candidate => string.Equals(candidate.Id, id, StringComparison.Ordinal));
+        var entry = NavigationEntries.FirstOrDefault(candidate => string.Equals(candidate.Id, id, StringComparison.Ordinal))
+            ?? UnlistedPages.FirstOrDefault(candidate => string.Equals(candidate.Id, id, StringComparison.Ordinal));
         view = entry?.View!;
         return entry is not null;
+    }
+
+    private IReadOnlyList<RealizedShellLink> RealizeLinks()
+    {
+        if (_contributions.Links.Count == 0)
+        {
+            return [];
+        }
+
+        var arranged = ShellContributionOrdering.Arrange(
+            _contributions.Links, [.. BuiltInNavigationIds, .. BuiltInSettingsSectionIds], out var rejected);
+        foreach (var rejection in rejected)
+        {
+            _logger.LogWarning("A link was left out: {Reason}. Id: {Id}.", rejection.Reason, rejection.Link.Id);
+        }
+
+        var kept = new List<RealizedShellLink>(arranged.Count);
+        var footer = false;
+        foreach (var link in arranged)
+        {
+            if (!TryGetNavigationView(link.TargetId, out _))
+            {
+                _logger.LogWarning("A link was left out: its target is not a page the shell shows. Id: {Id}. Target: {Target}.", link.Id, link.TargetId);
+                continue;
+            }
+
+            if (link.Placement == ShellLinkPlacement.SidebarFooter)
+            {
+                if (footer)
+                {
+                    _logger.LogWarning("A link was left out: the foot of the navigation holds one link and an earlier one has it. Id: {Id}.", link.Id);
+                    continue;
+                }
+
+                footer = true;
+            }
+
+            kept.Add(new RealizedShellLink(
+                link,
+                TitleOf(link.Id, link.TitleResourceKey, "link"),
+                IconOf(link.Id, link.IconPathData, "link")));
+        }
+
+        return kept;
+    }
+
+    private string? ReadLinkText(RealizedShellLink link, Func<string>? provider, string what)
+    {
+        if (provider is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            var text = provider();
+            return string.IsNullOrWhiteSpace(text) ? null : text;
+        }
+        catch (Exception exception)
+        {
+            if (_failedLinkText.Add(link.Id + "|" + what))
+            {
+                _logger.LogWarning(
+                    "A link's {What} provider failed; the fallback is shown. Id: {Id}. Exception type: {ExceptionType}.",
+                    what, link.Id, exception.GetType().Name);
+            }
+
+            return null;
+        }
     }
 
     private IReadOnlyList<RealizedShellContribution> RealizeOnce(
@@ -253,7 +435,10 @@ public sealed class ShellContributionHost
                 }
 
                 realized.Add(new RealizedShellContribution(
-                    contribution.Id, TitleOf(contribution, kind), view, IconOf(contribution, kind)));
+                    contribution.Id,
+                    TitleOf(contribution.Id, contribution.TitleResourceKey, kind),
+                    view,
+                    IconOf(contribution.Id, contribution.IconPathData, kind)));
             }
             catch (Exception exception)
             {
@@ -271,16 +456,16 @@ public sealed class ShellContributionHost
     /// The contribution's title. A missing resource (blank, the key itself, or a lookup that throws) is logged with the
     /// id and the key and shows a neutral label, never the raw id, so the Narrator does not read an identifier.
     /// </summary>
-    private string TitleOf(ShellContribution contribution, string kind)
+    private string TitleOf(string id, string titleResourceKey, string kind)
     {
-        if (Lookup(contribution.TitleResourceKey) is { } title)
+        if (Lookup(titleResourceKey) is { } title)
         {
             return title;
         }
 
         _logger.LogWarning(
             "A contributed {Kind} has no title resource; a neutral label is shown. Id: {Id}. Key: {Key}.",
-            kind, contribution.Id, contribution.TitleResourceKey);
+            kind, id, titleResourceKey);
         return Lookup(UntitledResourceKey) ?? UntitledFallback;
     }
 
@@ -288,9 +473,9 @@ public sealed class ShellContributionHost
     /// The contribution's icon data, parsed here: data that cannot be parsed is logged (id and exception type only) and
     /// replaced by the generic icon (null). The contribution itself stays.
     /// </summary>
-    private string? IconOf(ShellContribution contribution, string kind)
+    private string? IconOf(string id, string? iconPathData, string kind)
     {
-        if (contribution.IconPathData is not { } data)
+        if (iconPathData is not { } data)
         {
             return null;
         }
@@ -304,7 +489,7 @@ public sealed class ShellContributionHost
         {
             _logger.LogWarning(
                 "A contributed {Kind} has icon data that cannot be parsed; the generic icon is shown. Id: {Id}. Exception type: {ExceptionType}.",
-                kind, contribution.Id, exception.GetType().Name);
+                kind, id, exception.GetType().Name);
             return null;
         }
     }

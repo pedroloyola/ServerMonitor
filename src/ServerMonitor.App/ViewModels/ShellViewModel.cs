@@ -18,7 +18,41 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         _navigation = navigation;
         _contributions = contributions;
         _navigation.Navigated += OnNavigated;
+        if (_contributions is not null) _contributions.LinkTextChanged += OnLinkTextChanged;
     }
+
+    /// <summary>M15.4a: the one link at the foot of the navigation (host-drawn), or null: then nothing is drawn.</summary>
+    public RealizedShellLink? FooterLink => _contributions?.FooterLink;
+
+    /// <summary>M15.4a: the footer link's current label (never the raw id); null without a footer link.</summary>
+    public string? FooterLinkLabel => FooterLink is { } link ? _contributions!.LabelOf(link) : null;
+
+    /// <summary>M15.4a: the footer link's current secondary text, or null.</summary>
+    public string? FooterLinkHint => FooterLink is { } link ? _contributions!.HintOf(link) : null;
+
+    /// <summary>M15.4a: opens the footer link's page, as a sidebar navigation (through the exit guard).</summary>
+    public void OpenFooterLink()
+    {
+        if (FooterLink is { } link) NavigateToContribution(link.TargetId);
+    }
+
+    /// <summary>M15.4a: true when there is an unlisted page at all (only then does the window draw a way back).</summary>
+    public bool HasUnlistedPages => _contributions is { UnlistedPages.Count: > 0 };
+
+    /// <summary>M15.4a: an unlisted page is shown: the window draws "‹ Definições" above it.</summary>
+    public bool IsUnlistedPageShown => HasUnlistedPages && _contributions!.IsUnlistedPage(SelectedContributionId);
+
+    /// <summary>
+    /// M15.4a: the way back from an unlisted page, drawn by the window: Settings, through the exit guard like every
+    /// navigation (an unlisted page cannot navigate by itself).
+    /// </summary>
+    public void ReturnToSettings() => _navigation.GoToSettings();
+
+    /// <summary>
+    /// M15.4a: the links read their label and hint again (the window calls this when it becomes active and after a theme
+    /// change; every navigation does too). Nothing happens without links.
+    /// </summary>
+    public void RefreshLinkText() => _contributions?.RefreshLinkText();
 
     /// <summary>
     /// M15.4a: the contributed navigation entries, in display order (realized on first use, on the UI thread). Empty
@@ -81,6 +115,19 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(IsOverviewSelected)); OnPropertyChanged(nameof(IsServersSelected));
         OnPropertyChanged(nameof(IsHistorySelected)); OnPropertyChanged(nameof(IsSettingsSelected));
         OnPropertyChanged(nameof(SelectedContributionId));
+        OnPropertyChanged(nameof(IsUnlistedPageShown));
+        RefreshLinkText();
     }
-    public void Dispose() => _navigation.Navigated -= OnNavigated;
+
+    private void OnLinkTextChanged(object? sender, EventArgs args)
+    {
+        OnPropertyChanged(nameof(FooterLinkLabel));
+        OnPropertyChanged(nameof(FooterLinkHint));
+    }
+
+    public void Dispose()
+    {
+        _navigation.Navigated -= OnNavigated;
+        if (_contributions is not null) _contributions.LinkTextChanged -= OnLinkTextChanged;
+    }
 }

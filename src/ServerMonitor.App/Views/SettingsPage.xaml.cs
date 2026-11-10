@@ -1,4 +1,7 @@
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
+using ServerMonitor.App.Controls.Primitives;
 using ServerMonitor.App.Services;
 using ServerMonitor.App.ViewModels;
 
@@ -10,17 +13,110 @@ namespace ServerMonitor.App.Views;
 /// </summary>
 public sealed partial class SettingsPage : Page, ISettingsNavigationTarget
 {
+    private readonly List<(RealizedShellLink Link, Button Card, TextBlock Label)> _linkCards = [];
+    private readonly ShellContributionHost _contributions;
+    private readonly INavigationService _navigation;
+
     public SettingsPage(
         SettingsViewModel viewModel,
         WindowModeViewModel windowMode,
-        ShellContributionHost contributions)
+        ShellContributionHost contributions,
+        INavigationService navigation)
     {
         InitializeComponent();
         ViewModel = viewModel;
         WindowMode = windowMode;
         DataContext = ViewModel;
+        _contributions = contributions;
+        _navigation = navigation;
         AddContributedSections(contributions);
+        AddLinkCards(contributions);
         Loaded += OnLoaded;
+    }
+
+    /// <summary>
+    /// M15.4a: the composition-supplied Settings cards, in the row of link cards after "Sobre o ServerAlyzer", drawn like
+    /// the built-in ones (glass disclosure, icon, label, arrow); the label is the Narrator's name and the hint the help
+    /// text. A click opens the card's page through the navigation (its exit guard included). With none, the grid is the
+    /// XAML's.
+    /// </summary>
+    private void AddLinkCards(ShellContributionHost contributions)
+    {
+        foreach (var link in contributions.SettingsCards)
+        {
+            var label = new TextBlock { VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
+            Grid.SetColumn(label, 1);
+            var arrow = new SaIcon
+            {
+                Data = (string)Application.Current.Resources["SaIconArrowRight01Data"],
+                Size = 17,
+                VerticalAlignment = VerticalAlignment.Center,
+                Style = (Style)Application.Current.Resources["SaIconSecondaryStyle"],
+            };
+            Grid.SetColumn(arrow, 2);
+            var content = new Grid { ColumnSpacing = 12 };
+            content.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            content.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            content.Children.Add(new SaIcon
+            {
+                Data = link.IconPathData ?? (string)Application.Current.Resources["SaIconPackageData"],
+                Size = 18,
+                VerticalAlignment = VerticalAlignment.Center,
+                Style = (Style)Application.Current.Resources["SaIconSecondaryStyle"],
+            });
+            content.Children.Add(label);
+            content.Children.Add(arrow);
+            var card = new Button { Style = (Style)Application.Current.Resources["SaDisclosureButtonStyle"], Content = content };
+            var target = link.TargetId;
+            card.Click += (_, _) => _navigation.GoToContribution(target);
+            DisclosureGrid.Children.Add(card);
+            _linkCards.Add((link, card, label));
+        }
+
+        if (_linkCards.Count == 0) return;
+        // A second row is now in use in the wide layout too: the same row gap as the narrow one.
+        DisclosureGrid.RowSpacing = (double)Application.Current.Resources["SaSpace12"];
+        PlaceLinkCards(narrow: false);
+        ApplyLinkCardText();
+        WidthStates.CurrentStateChanged += (_, args) => PlaceLinkCards(args.NewState?.Name == "Narrow");
+        Loaded += (_, _) =>
+        {
+            PlaceLinkCards(WidthStates.CurrentState?.Name == "Narrow");
+            ApplyLinkCardText();
+            _contributions.LinkTextChanged += OnLinkTextChanged;
+        };
+        Unloaded += (_, _) => _contributions.LinkTextChanged -= OnLinkTextChanged;
+    }
+
+    /// <summary>M15.4a: the cards' cells (after the built-in two) and the grid's rows, for the current width state.</summary>
+    private void PlaceLinkCards(bool narrow)
+    {
+        var rows = SettingsLinkCardLayout.Rows(_linkCards.Count, narrow);
+        while (DisclosureGrid.RowDefinitions.Count < rows) DisclosureGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        while (DisclosureGrid.RowDefinitions.Count > rows) DisclosureGrid.RowDefinitions.RemoveAt(DisclosureGrid.RowDefinitions.Count - 1);
+        for (var i = 0; i < _linkCards.Count; i++)
+        {
+            var (row, column) = SettingsLinkCardLayout.Place(SettingsLinkCardLayout.BuiltInCards + i, narrow);
+            Grid.SetRow(_linkCards[i].Card, row);
+            Grid.SetColumn(_linkCards[i].Card, column);
+        }
+    }
+
+    private void OnLinkTextChanged(object? sender, EventArgs args) => ApplyLinkCardText();
+
+    /// <summary>M15.4a: each card's label and hint, read again through the shell (its try/catch, its fallbacks).</summary>
+    private void ApplyLinkCardText()
+    {
+        foreach (var (link, card, label) in _linkCards)
+        {
+            var text = _contributions.LabelOf(link);
+            var hint = _contributions.HintOf(link);
+            label.Text = text;
+            AutomationProperties.SetName(card, text);
+            AutomationProperties.SetHelpText(card, hint ?? string.Empty);
+            ToolTipService.SetToolTip(card, hint);
+        }
     }
 
     /// <summary>

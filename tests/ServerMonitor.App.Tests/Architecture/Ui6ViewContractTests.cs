@@ -11,7 +11,7 @@ public sealed class Ui6ViewContractTests
     private static string? A(XElement e, XName name) => (string?)e.Attribute(name);
 
     [Theory]
-    [InlineData(1440, 208)] [InlineData(1120, 208)] [InlineData(1040, 208)]
+    [InlineData(1440, 224)] [InlineData(1120, 224)] [InlineData(1040, 224)]
     [InlineData(1039, 80)] [InlineData(900, 80)] [InlineData(700, 80)] [InlineData(640, 80)] [InlineData(560, 80)]
     public void Rail_ReservesOnlyItsWidth(double window, double sidebar) => Assert.Equal(sidebar, ShellLayout.SidebarWidth(window));
 
@@ -22,7 +22,7 @@ public sealed class Ui6ViewContractTests
         var frame = Named(doc, "ContentFrame");
         Assert.Equal("1", A(frame,"Grid.Column"));
         Assert.Null(frame.Attribute("Padding")); Assert.Null(frame.Attribute("Margin"));
-        Assert.Equal("208", A(Named(doc,"SidebarColumn"),"Width"));
+        Assert.Equal("224", A(Named(doc,"SidebarColumn"),"Width")); // M15.4a owner decision (was 208)
         Assert.Null(A(Named(doc,"Sidebar"),"Background"));
         Assert.Contains(doc.Descendants(), e => e.Name.LocalName == "Border" && A(e,"Background") == "{ThemeResource SaSidebarMaterialBrush}");
         Assert.Equal("{StaticResource SaShellWindowBackgroundStyle}", A(Named(doc,"WindowBackground"),"Style"));
@@ -55,7 +55,7 @@ public sealed class Ui6ViewContractTests
         }
         Assert.Equal("FocusOnly",A(Named(doc,"NavGrid"),XName.Get("SaGroupNavigation.Mode","using:ServerMonitor.App.Controls.Primitives")));
         Assert.All(items.SelectMany(e=>e.Descendants()).Where(e=>e.Name.LocalName=="TextBlock"),e=>
-        { Assert.Equal("106",A(e,"MaxWidth")); Assert.Equal("CharacterEllipsis",A(e,"TextTrimming")); });
+        { Assert.Equal("122",A(e,"MaxWidth")); Assert.Equal("CharacterEllipsis",A(e,"TextTrimming")); });
         Assert.DoesNotContain(doc.Descendants(),e=>A(e,"Tag")=="Pro");
     }
 

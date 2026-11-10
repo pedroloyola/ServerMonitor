@@ -277,11 +277,38 @@ módulos existentes não mudam; nenhum módulo deste repositório contribui inte
 Só se aceitam módulos estáticos, listados no composition root; não há carregamento dinâmico.
 
 **Contribuições fornecidas pela composição.** Ao lado do gancho de módulos, `App.xaml.cs` declara um segundo gancho
-parcial vazio, que recebe uma `IList<ShellContribution>`, na mesma forma clássica: sem implementação, o
-compilador remove a chamada. Recebe uma lista nova e vazia, e só isso (nem contentor, nem catálogo, nem fornecedor), por
-isso não pode acrescentar capacidades, funcionalidades nem serviços. Só corre fora dos arranques de QA. O que acrescentar
-aparece como secções de Definições, depois das contribuições dos módulos compostos e pela mesma ordenação: em caso de id
-igual ganha a contribuição composta, e os ids próprios do shell são rejeitados.
+parcial vazio, na mesma forma clássica: sem implementação, o compilador remove a chamada. Recebe três listas novas e
+vazias, e só isso (nem contentor, nem catálogo, nem fornecedor, nem navegação), por isso não pode acrescentar
+capacidades, funcionalidades nem serviços. Só corre fora dos arranques de QA. As três listas:
+
+- **Secções de Definições** (`ShellContribution`): depois das contribuições dos módulos compostos e pela mesma
+  ordenação; em caso de id igual ganha a contribuição composta, e os ids próprios do shell são rejeitados.
+- **Páginas não listadas** (`ShellContribution`, vista `Page` sem pai): alcançadas só por id (`GoToContribution`),
+  nunca aparecem na barra lateral. Um id já usado por uma entrada de navegação ou por um destino próprio é rejeitado.
+- **Ligações** (`ShellLink { Id, Order, TitleResourceKey, TargetId, Placement, Label?, Hint?, IconPathData? }`, sem
+  vista): o shell desenha-as com os seus próprios controlos. `SettingsCard` é um cartão na linha de cartões-ligação
+  das Definições, depois de "Sobre o ServerAlyzer" (dois por linha; um por linha abaixo de 700). `SidebarFooter` é uma
+  entrada no rodapé da barra lateral, logo acima de Definições, com a geometria dos itens; há no máximo uma (ganha a
+  primeira pela ordenação, as outras ficam no log). Abrir uma ligação navega por id, pelo exit guard. Uma ligação cujo
+  `TargetId` não é uma página que o shell mostra é descartada, com log. O rótulo e a dica dinâmicos são lidos pelo
+  shell, dentro de try/catch, quando a ligação é construída, depois de cada navegação, quando a janela volta a ficar
+  ativa e depois de mudar o tema. Se o fornecedor lançar ou não devolver nada, aparece o título do recurso e depois
+  "Sem título", nunca o id.
+
+Os módulos não podem fornecer páginas não listadas nem ligações: `FeatureComposition` só recolhe as secções e as
+entradas de navegação de um módulo composto.
+
+**Contrato das páginas não listadas.** Uma página não listada não navega sozinha. Por cima dela, a janela desenha um
+cabeçalho de retorno, "‹ Definições": é um controlo do shell, com teclado, anel de foco e nome para o Narrador, que vai
+para Definições pela navegação e pelo exit guard da página. A navegação entre sub-páginas fica dentro da própria
+`Page`. A página é criada uma vez e nunca é descartada, como qualquer vista contribuída.
+
+**Sem nada fornecido, sem mudança.** Sem ligações nem páginas não listadas, não há pílula no rodapé, cartão,
+cabeçalho de retorno nem rotas novas. Nenhum destes controlos é criado e a árvore é a do XAML.
+
+**Larguras da barra lateral.** A coluna expandida tem 224 (padding 24 + 24) e todos os itens expandidos têm 176: os
+destinos próprios, as entradas contribuídas, a pílula do rodapé e Definições. No rail, os itens são o círculo de 46,
+numa coluna de 80; o breakpoint continua nos 1040. O padding do conteúdo das páginas continua a 40.
 
 ## Fronteira de rede
 

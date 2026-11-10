@@ -10,6 +10,18 @@ internal static class SidebarContributionLayout
     /// <summary>The flexible spacer's row: contributed entries take new rows here, so Settings stays at the bottom.</summary>
     internal const int FirstContributedRow = 4;
 
+    /// <summary>Settings' row in the XAML. The footer link takes a new row here, so it sits just above Settings.</summary>
+    internal const int SettingsRow = 5;
+
+    /// <summary>The footer link's row, before the contributed entries are inserted (they move it down with Settings).</summary>
+    internal const int FooterRow = SettingsRow;
+
+    /// <summary>The row of an existing child once the footer row is inserted: Settings moves one down.</summary>
+    internal static int RowAfterFooter(int row) => row >= FooterRow ? row + 1 : row;
+
+    /// <summary>The row span of an existing child once the footer row is inserted (the indicator keeps spanning all).</summary>
+    internal static int RowSpanAfterFooter(int row, int rowSpan) => row < FooterRow && row + rowSpan > FooterRow ? rowSpan + 1 : rowSpan;
+
     /// <summary>The built-in destinations (radio buttons), Settings included.</summary>
     internal const int BuiltInDestinations = 4;
 

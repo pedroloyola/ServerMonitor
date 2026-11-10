@@ -241,6 +241,59 @@ public sealed class ShellContributionTests
         Assert.Null(new ShellContribution("ok.id", 0, "TitleKey", () => new object()).IconPathData);
     }
 
+    // ---------------------------------------------------------------- r3 addendum: unlisted pages and links
+
+    [Fact]
+    public void ModulesDeclareTwoLists_TheOtherTwoAreEmptyByDefault()
+    {
+        var contributions = new ShellContributions([Contribution("a.section")], [Contribution("a.entry")]);
+
+        Assert.Empty(contributions.UnlistedPages);
+        Assert.Empty(contributions.Links);
+        Assert.Empty(ShellContributions.Empty.UnlistedPages);
+        Assert.Empty(ShellContributions.Empty.Links);
+    }
+
+    [Fact]
+    public void NoListMayBeNullOrHoldNull()
+    {
+        var link = new ShellLink("a.link", 0, "Key", "a.page", ShellLinkPlacement.SettingsCard);
+
+        Assert.Throws<ArgumentNullException>(() => new ShellContributions([], [], null!, []));
+        Assert.Throws<ArgumentNullException>(() => new ShellContributions([], [], [], null!));
+        Assert.Throws<ArgumentException>(() => new ShellContributions([], [], [null!], []));
+        Assert.Throws<ArgumentException>(() => new ShellContributions([], [], [], [null!]));
+        Assert.Equal([link], new ShellContributions([], [], [], [link]).Links);
+    }
+
+    [Theory]
+    [InlineData("Bad Id", "a.page", "Key")]
+    [InlineData("a.link", "Bad Target", "Key")]
+    [InlineData("a.link", "a.page", " ")]
+    public void ALink_NeedsWellFormedIds_AndATitleKey(string id, string target, string key) =>
+        Assert.ThrowsAny<ArgumentException>(() => new ShellLink(id, 0, key, target, ShellLinkPlacement.SidebarFooter));
+
+    [Fact]
+    public void ALink_HasAKnownPlacement_AndBlankIconMeansTheGenericOne()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new ShellLink("a.link", 0, "Key", "a.page", (ShellLinkPlacement)42));
+        Assert.Null(new ShellLink("a.link", 0, "Key", "a.page", ShellLinkPlacement.SettingsCard, iconPathData: "  ").IconPathData);
+    }
+
+    [Fact]
+    public void Links_AreArrangedByTheSameRule()
+    {
+        ShellLink Link(string id, int order) => new(id, order, "Key", "a.page", ShellLinkPlacement.SettingsCard);
+        var first = Link("dup.link", 3);
+
+        var arranged = ShellContributionOrdering.Arrange([first, Link("b.link", 1), Link("dup.link", -9), Link("settings", 0), Link("a.link", 1)],
+            ["settings"], out IReadOnlyList<ShellLinkRejection> rejected);
+
+        Assert.Equal(["a.link", "b.link", "dup.link"], arranged.Select(link => link.Id));
+        Assert.Same(first, arranged[2]);
+        Assert.Equal(["dup.link", "settings"], rejected.Select(r => r.Link.Id));
+    }
+
     private static IEnumerable<ShellContribution[]> Permutations(ShellContribution[] items)
     {
         if (items.Length <= 1)

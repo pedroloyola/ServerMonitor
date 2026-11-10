@@ -8,12 +8,12 @@
         <ResourceDictionary Source="ms-appx:///Styles/Tokens/Radius.xaml" />
         <ResourceDictionary Source="ms-appx:///Styles/Tokens/Borders.xaml" />
     </ResourceDictionary.MergedDictionaries>
-    <!-- SidebarNavItem 112:969 (selected) / 112:976 (unselected): h46 w160 radius h/2 pad-L 12, icon 20 + gap 10 + 13 text (content); selected = Secondary fill + highlight, Medium, selected text; unselected Regular muted, no fill. Hover/pressed/focus DERIVED. Host (NavigationView vs list) is a UI.6 decision. -->
+    <!-- SidebarNavItem 112:969 (selected) / 112:976 (unselected): h46 w176 (M15.4a owner decision, was 160) radius h/2 pad-L 12, icon 20 + gap 10 + 13 text (content); selected = Secondary fill + highlight, Medium, selected text; unselected Regular muted, no fill. Hover/pressed/focus DERIVED. Host (NavigationView vs list) is a UI.6 decision. -->
     <Style x:Key="SaNavItemStyle" TargetType="RadioButton">
         <Setter Property="Height" Value="46" />
         <Setter Property="MinWidth" Value="0" />
         <Setter Property="Padding" Value="12,0" />
-        <Setter Property="Width" Value="160" />
+        <Setter Property="Width" Value="176" />
         <Setter Property="CornerRadius" Value="23" />
         <Setter Property="FontFamily" Value="{StaticResource SaFontText}" />
         <Setter Property="FontSize" Value="{StaticResource SaFontSizeControl}" />
@@ -70,6 +70,74 @@
                             </VisualStateGroup>
                         </VisualStateManager.VisualStateGroups>
                         <Border x:Name="Shell" Background="{TemplateBinding Background}" CornerRadius="{TemplateBinding CornerRadius}" />
+                        <Border x:Name="StateOverlay" CornerRadius="{TemplateBinding CornerRadius}" IsHitTestVisible="False" Background="Transparent" primitives:SaMotion.HoverFade="True" />
+                        <ContentPresenter x:Name="ContentPresenter"
+                                          Padding="{TemplateBinding Padding}"
+                                          HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                                          Content="{TemplateBinding Content}"
+                                          ContentTemplate="{TemplateBinding ContentTemplate}"
+                                          FontFamily="{TemplateBinding FontFamily}"
+                                          FontSize="{TemplateBinding FontSize}"
+                                          FontWeight="{TemplateBinding FontWeight}"
+                                          Foreground="{TemplateBinding Foreground}"
+                                          AutomationProperties.AccessibilityView="Raw" />
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+    <!-- M15.4a: the composition-supplied link at the foot of the sidebar (a host control, a link rather than a destination):
+         the nav item's geometry (h46 w176 r23, pad 12, icon 20 + gap 10), its hover/pressed veils and keyboard ring, and a
+         hairline outline so it reads as a pill. Never selected: it opens a page, the destinations keep the indicator. -->
+    <Style x:Key="SaNavFooterLinkStyle" TargetType="Button">
+        <Setter Property="Height" Value="46" />
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="Padding" Value="12,0" />
+        <Setter Property="Width" Value="176" />
+        <Setter Property="CornerRadius" Value="23" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="BorderBrush" Value="{ThemeResource SaDialogButtonBorderBrush}" />
+        <Setter Property="FontFamily" Value="{StaticResource SaFontText}" />
+        <Setter Property="FontSize" Value="{StaticResource SaFontSizeControl}" />
+        <Setter Property="FontWeight" Value="Normal" />
+        <Setter Property="Foreground" Value="{ThemeResource SaTextSecondaryBrush}" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="HorizontalAlignment" Value="Left" />
+        <Setter Property="HorizontalContentAlignment" Value="Left" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="UseSystemFocusVisuals" Value="True" />
+        <Setter Property="FocusVisualPrimaryBrush" Value="{ThemeResource SaFocusRingBrush}" />
+        <Setter Property="FocusVisualPrimaryThickness" Value="{StaticResource SaFocusRingThickness}" />
+        <Setter Property="FocusVisualSecondaryThickness" Value="{ThemeResource SaFocusVisualSecondaryThickness}" />
+        <Setter Property="FocusVisualSecondaryBrush" Value="{ThemeResource SaFocusRingSecondaryBrush}" />
+        <Setter Property="FocusVisualMargin" Value="0" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Grid x:Name="RootGrid" Background="Transparent">
+                        <VisualStateManager.VisualStateGroups>
+                            <VisualStateGroup x:Name="CommonStates">
+                                <VisualState x:Name="Normal" />
+                                <VisualState x:Name="PointerOver">
+                                    <VisualState.Setters>
+                                        <Setter Target="StateOverlay.Background" Value="{ThemeResource SaHoverVeilBrush}" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Pressed">
+                                    <VisualState.Setters>
+                                        <Setter Target="StateOverlay.Background" Value="{ThemeResource SaSelectedVeilBrush}" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Disabled">
+                                    <VisualState.Setters>
+                                        <Setter Target="RootGrid.Opacity" Value="0.58" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                            </VisualStateGroup>
+                        </VisualStateManager.VisualStateGroups>
+                        <Border x:Name="Shell" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="{TemplateBinding CornerRadius}" />
                         <Border x:Name="StateOverlay" CornerRadius="{TemplateBinding CornerRadius}" IsHitTestVisible="False" Background="Transparent" primitives:SaMotion.HoverFade="True" />
                         <ContentPresenter x:Name="ContentPresenter"
                                           Padding="{TemplateBinding Padding}"

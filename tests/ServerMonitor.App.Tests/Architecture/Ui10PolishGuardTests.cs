@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
+using ServerMonitor.App.Services;
 
 namespace ServerMonitor.App.Tests.Architecture;
 
@@ -123,7 +124,9 @@ public sealed partial class Ui10PolishGuardTests
             Assert.Equal("46", rows[int.Parse((string)item.Attribute("Grid.Row")!, CultureInfo.InvariantCulture)]);
 
         var code = AppSourceTree.CodeWithoutComments("Controls/SaSidebar.xaml.cs");
-        Assert.Contains("item.Width = rail ? 46 : 160;", code, StringComparison.Ordinal);
+        Assert.Contains("item.Width = rail ? ShellLayout.RailItemWidth : ShellLayout.ItemWidth;", code, StringComparison.Ordinal);
+        Assert.Equal(46, ShellLayout.RailItemWidth);
+        Assert.Equal(176, ShellLayout.ItemWidth); // M15.4a owner decision (was 160)
     }
 
     /// <summary>
