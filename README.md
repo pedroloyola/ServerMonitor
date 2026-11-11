@@ -10,9 +10,9 @@ geres — CPU, memória, disco, tempo de atividade, histórico, containers Docke
 É **local-first** e **open-source (MIT)**: não precisa de conta, não instala agentes nos servidores e não
 recolhe telemetria. A monitorização acontece diretamente entre o teu computador e os servidores que configuras.
 
-**Versão atual: 1.1.7** · [**Instalar a partir da Microsoft Store**](https://apps.microsoft.com/detail/9n6zbsbn1td2)
+**Versão atual: 1.1.10** · [**Instalar a partir da Microsoft Store**](https://apps.microsoft.com/detail/9n6zbsbn1td2)
 (gratuita, Windows 11 x64) · [Notas de versão](https://github.com/pedroloyola/ServerMonitor/releases/latest) ·
-[Changelog](CHANGELOG.md)
+[Changelog](CHANGELOG.md) · Site e documentação: [serveralyzer.com](https://serveralyzer.com)
 
 ## Capturas de ecrã
 
@@ -135,6 +135,7 @@ ver [`SECURITY.md`](SECURITY.md).
 
 ## Suporte e ligações
 
+- [Site e documentação (serveralyzer.com)](https://serveralyzer.com): guias de instalação, SSH, Docker, serviços e resolução de problemas
 - [Microsoft Store](https://apps.microsoft.com/detail/9n6zbsbn1td2)
 - [GitHub Releases](https://github.com/pedroloyola/ServerMonitor/releases)
 - [Issues](https://github.com/pedroloyola/ServerMonitor/issues)
