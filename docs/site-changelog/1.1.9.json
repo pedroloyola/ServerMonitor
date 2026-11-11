@@ -1,0 +1,68 @@
+{
+  "version": "1.1.9",
+  "date": "2026-11-09",
+  "en": {
+    "title": "Your theme choice is remembered",
+    "blocks": [
+      {
+        "kind": "ul",
+        "items": [
+          "The Light or Dark choice in Settings is now kept when you close and reopen ServerAlyzer. If you choose System, ServerAlyzer follows the Windows theme as before.",
+          "A Windows high contrast theme still takes priority over your choice. When you turn high contrast off, ServerAlyzer goes back to the theme you chose."
+        ]
+      },
+      {
+        "kind": "note",
+        "text": "Known issue: at a Windows text size of about 175% or larger, some text in Settings can be cut off and wrapped descriptions can overlap. A fix is planned for a later version."
+      }
+    ]
+  },
+  "pt-pt": {
+    "title": "A sua escolha de tema é memorizada",
+    "blocks": [
+      {
+        "kind": "ul",
+        "items": [
+          "A escolha de Claro ou Escuro nas Definições passa a ser mantida quando fecha e volta a abrir o ServerAlyzer. Se escolher Sistema, o ServerAlyzer segue o tema do Windows como antes.",
+          "Um tema de alto contraste do Windows continua a ter prioridade sobre a sua escolha. Quando desativa o alto contraste, o ServerAlyzer volta ao tema que escolheu."
+        ]
+      },
+      {
+        "kind": "note",
+        "text": "Problema conhecido: com o tamanho do texto do Windows a cerca de 175% ou mais, algum texto nas Definições pode ficar cortado e descrições em várias linhas podem sobrepor-se. Está prevista uma correção numa versão futura."
+      }
+    ]
+  },
+  "pt-br": {
+    "title": "Sua escolha de tema é lembrada",
+    "blocks": [
+      {
+        "kind": "ul",
+        "items": [
+          "A escolha de Claro ou Escuro nas Configurações agora é mantida quando você fecha e reabre o ServerAlyzer. Se você escolher Sistema, o ServerAlyzer segue o tema do Windows como antes.",
+          "Um tema de alto contraste do Windows continua tendo prioridade sobre a sua escolha. Quando você desativa o alto contraste, o ServerAlyzer volta ao tema que você escolheu."
+        ]
+      },
+      {
+        "kind": "note",
+        "text": "Problema conhecido: com o tamanho de texto do Windows em cerca de 175% ou mais, alguns textos nas Configurações podem ficar cortados e descrições em várias linhas podem se sobrepor. Uma correção está prevista para uma versão futura."
+      }
+    ]
+  },
+  "es": {
+    "title": "Tu elección de tema se recuerda",
+    "blocks": [
+      {
+        "kind": "ul",
+        "items": [
+          "La opción Light o Dark de Settings ahora se mantiene al cerrar y volver a abrir ServerAlyzer. Si eliges System, ServerAlyzer sigue el tema de Windows como antes.",
+          "Un tema de alto contraste de Windows sigue teniendo prioridad sobre tu elección. Al desactivar el alto contraste, ServerAlyzer vuelve al tema que elegiste."
+        ]
+      },
+      {
+        "kind": "note",
+        "text": "Problema conocido: con un tamaño de texto de Windows de aproximadamente el 175 % o más, parte del texto de Settings puede cortarse y las descripciones en varias líneas pueden solaparse. Hay una corrección prevista para una versión posterior."
+      }
+    ]
+  }
+}

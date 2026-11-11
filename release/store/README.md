@@ -24,6 +24,12 @@ JSON (`en-us`, `pt-br`, `pt-pt`).
 * Update these files as part of the version bump, in the same commit, so the notes are
   reviewable in the pull request rather than typed into a web form at release time.
 
+## Website changelog
+
+The version PR also adds `docs/site-changelog/<version>.json`: the same change for the changelog on
+serveralyzer.com, in en, pt-PT, pt-BR and es (format in `docs/site-changelog/README.md`). The website
+publishes it, and moves to the new version, once the Store offers that version.
+
 ## What must never go in here
 
 * Credentials of any kind. Certification test credentials belong in Partner Center under
