@@ -323,6 +323,10 @@ public static class QaTokenManifest
         new("SaSpace40", QaTokenKind.Double),
         new("SaPagePadding", QaTokenKind.Thickness),
         new("SaPagePaddingCompact", QaTokenKind.Thickness),
+        new("SaCaptionBandHeight", QaTokenKind.Double),
+        new("SaPageScrollInset", QaTokenKind.Thickness),
+        new("SaScrollPagePadding", QaTokenKind.Thickness),
+        new("SaScrollPagePaddingCompact", QaTokenKind.Thickness),
         // Styles/Tokens/Radius.xaml
         new("SaRadiusPanel", QaTokenKind.CornerRadius),
         new("SaRadiusCard", QaTokenKind.CornerRadius),

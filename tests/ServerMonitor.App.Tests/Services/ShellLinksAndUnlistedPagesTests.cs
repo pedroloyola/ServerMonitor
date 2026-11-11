@@ -120,7 +120,7 @@ public sealed class ShellLinksAndUnlistedPagesTests
         // Each control returns before touching the tree when there is nothing to draw.
         AssertBefore(sidebar, "if (shell.FooterLink is not { } link) return;", "NavGrid.RowDefinitions.Insert(SidebarContributionLayout.FooterRow");
         AssertBefore(settings, "if (_linkCards.Count == 0) return;", "DisclosureGrid.ColumnDefinitions.Add(_cardColumn);");
-        AssertBefore(Body(settings, "private void PlaceLinkCards(bool narrow)"), "if (count == 0) return;", "DisclosureGrid.RowDefinitions");
+        AssertBefore(Body(settings, "private void PlaceLinkCards()"), "if (count == 0) return;", "DisclosureGrid.RowDefinitions");
         AssertBefore(window, "if (!Shell.HasUnlistedPages) return;", "ShellSurface.Children.Add(_returnHeader);");
         // and the built-in XAML holds none of them
         Assert.DoesNotContain("SaNavFooterLinkStyle", File.ReadAllText(AppSourceTree.Full("Controls/SaSidebar.xaml")), StringComparison.Ordinal);
@@ -411,8 +411,8 @@ public sealed class ShellLinksAndUnlistedPagesTests
         Assert.Equal(CardLayout.DeclaredRows, Declared("Grid.RowDefinitions"));
         Assert.Equal(CardLayout.DeclaredColumns, Declared("Grid.ColumnDefinitions"));
         Assert.Equal(["SettingsOpenDataButton", "SettingsOpenAboutButton"], cards.Select(c => (string?)c.Attribute(AppSourceTree.Xaml + "Uid")));
-        Assert.Equal(CardLayout.Place(CardLayout.DataSequence, 0, narrow: false), (Int(cards[0], "Grid.Row"), Int(cards[0], "Grid.Column")));
-        Assert.Equal(CardLayout.Place(CardLayout.AboutSequence(0), 0, narrow: false), (Int(cards[1], "Grid.Row"), Int(cards[1], "Grid.Column")));
+        Assert.Equal(CardLayout.Place(CardLayout.DataSequence, CardLayout.DeclaredColumns), (Int(cards[0], "Grid.Row"), Int(cards[0], "Grid.Column")));
+        Assert.Equal(CardLayout.Place(CardLayout.AboutSequence(0), CardLayout.DeclaredColumns), (Int(cards[1], "Grid.Row"), Int(cards[1], "Grid.Column")));
         Assert.Equal("AboutDisclosure", (string?)cards[1].Attribute(AppSourceTree.Xaml + "Name"));
 
         // The Narrow state no longer moves "Sobre" (the page places it, see below) and still zeroes the second column.
@@ -421,7 +421,7 @@ public sealed class ShellLinksAndUnlistedPagesTests
         Assert.DoesNotContain(setters, s => s.Item1.StartsWith("AboutDisclosure.", StringComparison.Ordinal));
         Assert.Contains(("DisclosureColumn2.Width", "0"), setters);
         // ... and the page puts "Sobre" where those setters did, under "Dados e servidores".
-        Assert.Equal((1, 0), CardLayout.Place(CardLayout.AboutSequence(0), 0, narrow: true));
+        Assert.Equal((1, 0), CardLayout.Place(CardLayout.AboutSequence(0), 1));
     }
 
     [Theory]
@@ -429,49 +429,56 @@ public sealed class ShellLinksAndUnlistedPagesTests
     [InlineData(true)]
     public void WithNoCard_TheRowOfCardsIsTheXamls(bool narrow)
     {
-        Assert.Equal(CardLayout.DeclaredRows, CardLayout.Rows(0, narrow));
-        Assert.Equal(narrow ? 1 : CardLayout.DeclaredColumns, CardLayout.Columns(0, narrow));
-        Assert.Equal((0, 0), CardLayout.Place(CardLayout.DataSequence, 0, narrow));
-        Assert.Equal(narrow ? (1, 0) : (0, 1), CardLayout.Place(CardLayout.AboutSequence(0), 0, narrow));
+        // Today's built-in texts (about 121 at most) fit two columns from the Narrow trigger up.
+        var columns = CardLayout.Columns(0, narrow ? 699 : 700, 121);
+        Assert.Equal(narrow ? 1 : CardLayout.DeclaredColumns, columns);
+        Assert.Equal(CardLayout.DeclaredRows, CardLayout.Rows(0, columns));
+        Assert.Equal((0, 0), CardLayout.Place(CardLayout.DataSequence, columns));
+        Assert.Equal(narrow ? (1, 0) : (0, 1), CardLayout.Place(CardLayout.AboutSequence(0), columns));
     }
 
     [Fact]
     public void WithOneCard_ItSitsInTheMiddle_ThreePerRow_AndOnePerRowWhenNarrow()
     {
         // Wide (Figma 303:486): Dados | the card | Sobre, on one row.
-        Assert.Equal(3, CardLayout.Columns(1, narrow: false));
-        Assert.Equal((0, 0), CardLayout.Place(CardLayout.DataSequence, 1, narrow: false));
-        Assert.Equal((0, 1), CardLayout.Place(CardLayout.ContributedSequence(0), 1, narrow: false));
-        Assert.Equal((0, 2), CardLayout.Place(CardLayout.AboutSequence(1), 1, narrow: false));
-        Assert.Equal(1, CardLayout.UsedRows(1, narrow: false));
-        Assert.Equal(CardLayout.DeclaredRows, CardLayout.Rows(1, narrow: false));
-        // Narrow: one per row, same order.
-        Assert.Equal((0, 0), CardLayout.Place(CardLayout.DataSequence, 1, narrow: true));
-        Assert.Equal((1, 0), CardLayout.Place(CardLayout.ContributedSequence(0), 1, narrow: true));
-        Assert.Equal((2, 0), CardLayout.Place(CardLayout.AboutSequence(1), 1, narrow: true));
-        Assert.Equal(3, CardLayout.Rows(1, narrow: true));
+        var wide = CardLayout.Columns(1, 1000, 121);
+        Assert.Equal(3, wide);
+        Assert.Equal((0, 0), CardLayout.Place(CardLayout.DataSequence, wide));
+        Assert.Equal((0, 1), CardLayout.Place(CardLayout.ContributedSequence(0), wide));
+        Assert.Equal((0, 2), CardLayout.Place(CardLayout.AboutSequence(1), wide));
+        Assert.Equal(1, CardLayout.UsedRows(1, wide));
+        Assert.Equal(CardLayout.DeclaredRows, CardLayout.Rows(1, wide));
+        // Narrow (or a text that does not fit, FIX-OVERVIEW-FIT D-3): one per row, same order.
+        var stacked = CardLayout.Columns(1, 699, 121);
+        Assert.Equal(1, stacked);
+        Assert.Equal((0, 0), CardLayout.Place(CardLayout.DataSequence, stacked));
+        Assert.Equal((1, 0), CardLayout.Place(CardLayout.ContributedSequence(0), stacked));
+        Assert.Equal((2, 0), CardLayout.Place(CardLayout.AboutSequence(1), stacked));
+        Assert.Equal(3, CardLayout.Rows(1, stacked));
         // Two cards: the row fills, "Sobre" starts the next one.
-        Assert.Equal((0, 2), CardLayout.Place(CardLayout.ContributedSequence(1), 2, narrow: false));
-        Assert.Equal((1, 0), CardLayout.Place(CardLayout.AboutSequence(2), 2, narrow: false));
-        Assert.Equal(2, CardLayout.UsedRows(2, narrow: false));
+        Assert.Equal(3, CardLayout.Columns(2, 1000, 121));
+        Assert.Equal((0, 2), CardLayout.Place(CardLayout.ContributedSequence(1), wide));
+        Assert.Equal((1, 0), CardLayout.Place(CardLayout.AboutSequence(2), wide));
+        Assert.Equal(2, CardLayout.UsedRows(2, wide));
     }
 
     [Fact]
     public void TheSettingsPage_PlacesSobreAlways_AndTheCardsBetween_ForTheCurrentWidthState()
     {
         var settings = AppSourceTree.CodeWithoutComments("Views/SettingsPage.xaml.cs");
-        var place = Body(settings, "private void PlaceLinkCards(bool narrow)");
+        var place = Body(settings, "private void PlaceLinkCards()");
 
         Assert.Contains("foreach (var link in contributions.SettingsCards)", settings, StringComparison.Ordinal);
-        Assert.Contains("WidthStates.CurrentStateChanged += (_, args) => PlaceLinkCards(args.NewState?.Name == \"Narrow\");", settings, StringComparison.Ordinal);
-        Assert.Contains("Loaded += (_, _) => PlaceLinkCards(WidthStates.CurrentState?.Name == \"Narrow\");", settings, StringComparison.Ordinal);
-        // "Sobre" is placed with or without cards (the XAML's Narrow state no longer does it), then the cards' own work.
-        AssertBefore(place, "SettingsLinkCardLayout.Place(SettingsLinkCardLayout.AboutSequence(count), count, narrow);", "Grid.SetColumn(AboutDisclosure, aboutColumn);");
+        Assert.Contains("WidthStates.CurrentStateChanged += (_, _) => PlaceLinkCards();", settings, StringComparison.Ordinal);
+        Assert.Contains("Loaded += (_, _) => PlaceLinkCards();", settings, StringComparison.Ordinal);
+        // FIX-OVERVIEW-FIT D-3: the columns come from the viewport and the widest card text, first of all.
+        AssertBefore(place, "var columns = SettingsLinkCardLayout.Columns(count, ActualWidth, WidestCardText());", "SettingsLinkCardLayout.Place(");
+        // "Sobre" is placed with or without cards (the XAML's Narrow state no longer does it), then the gaps, then the cards' own work.
+        AssertBefore(place, "SettingsLinkCardLayout.Place(SettingsLinkCardLayout.AboutSequence(count), columns);", "Grid.SetColumn(AboutDisclosure, aboutColumn);");
         AssertBefore(place, "Grid.SetColumn(AboutDisclosure, aboutColumn);", "if (count == 0) return;");
-        AssertBefore(place, "if (count == 0) return;", "_cardColumn!.Width = narrow ? new GridLength(0) : new GridLength(1, GridUnitType.Star);");
-        AssertBefore(place, "if (count == 0) return;", "DisclosureGrid.RowSpacing =");
-        Assert.Contains("SettingsLinkCardLayout.Place(SettingsLinkCardLayout.ContributedSequence(i), count, narrow);", place, StringComparison.Ordinal);
-        Assert.Contains("DisclosureGrid.ClearValue(Grid.RowSpacingProperty);", place, StringComparison.Ordinal);
+        AssertBefore(place, "DisclosureGrid.RowSpacing =", "if (count == 0) return;");
+        AssertBefore(place, "if (count == 0) return;", "_cardColumn!.Width = stacked ? new GridLength(0) : new GridLength(1, GridUnitType.Star);");
+        Assert.Contains("SettingsLinkCardLayout.Place(SettingsLinkCardLayout.ContributedSequence(i), columns);", place, StringComparison.Ordinal);
     }
 
     [Fact]

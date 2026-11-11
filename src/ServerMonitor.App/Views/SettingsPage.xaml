@@ -30,7 +30,7 @@
         </DataTemplate>
     </Page.Resources>
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+    <ScrollViewer Margin="{StaticResource SaPageScrollInset}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
         <VisualStateManager.VisualStateGroups>
             <VisualStateGroup x:Name="WidthStates">
                 <VisualState x:Name="Wide">
@@ -44,7 +44,7 @@
                         <primitives:SaContentWidthTrigger Source="{Binding ElementName=PageViewport}" MinWidth="0" MaxWidth="700" />
                     </VisualState.StateTriggers>
                     <VisualState.Setters>
-                        <Setter Target="PageRoot.Padding" Value="{StaticResource SaPagePaddingCompact}" />
+                        <Setter Target="PageRoot.Padding" Value="{StaticResource SaScrollPagePaddingCompact}" />
                         <Setter Target="AutosaveText.(Grid.Row)" Value="1" />
                         <Setter Target="AutosaveText.(Grid.Column)" Value="0" />
                         <Setter Target="AutosaveText.HorizontalAlignment" Value="Left" />
@@ -80,7 +80,7 @@
                 </VisualState>
             </VisualStateGroup>
         </VisualStateManager.VisualStateGroups>
-        <StackPanel x:Name="PageRoot" Padding="{StaticResource SaPagePadding}" Spacing="{StaticResource SaSpace20}">
+        <StackPanel x:Name="PageRoot" Padding="{StaticResource SaScrollPagePadding}" Spacing="{StaticResource SaSpace20}">
 
             <!-- Header = the shared page header, status-text variant (UI.10 F09/F10, Figma Page header Ação=Texto 247:418):
                  title 32/40 + "À tua medida." 13/18 muted | autosave 11, centred on the title line. -->
@@ -335,7 +335,9 @@
             <StackPanel x:Name="ContributedSections" Spacing="{StaticResource SaSpace20}" Visibility="Collapsed" />
 
             <!-- Additional settings 112:7984: two disclosures 56 high r20 (Cortex 2: in-page links until UI.6; H-UI5-4:
-                 "Sobre" lands on Dados e servidores with its About card in view). -->
+                 "Sobre" lands on Dados e servidores with its About card in view). FIX-OVERVIEW-FIT D-3: the page places the
+                 cards (SettingsLinkCardLayout.Columns): one per row below 700 and whenever the widest card text would not
+                 fit its column on one line; the Narrow state's setters below keep the same arrangement. -->
             <Grid x:Name="DisclosureGrid" ColumnSpacing="{StaticResource SaSpace24}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
@@ -353,7 +355,7 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <primitives:SaIcon Data="{StaticResource SaIconHardDriveData}" Size="18" VerticalAlignment="Center" Style="{ThemeResource SaIconSecondaryStyle}" />
-                        <TextBlock x:Uid="SettingsOpenDataText" Grid.Column="1" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                        <TextBlock x:Name="DataDisclosureText" x:Uid="SettingsOpenDataText" Grid.Column="1" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                         <primitives:SaIcon Grid.Column="2" Data="{StaticResource SaIconArrowRight01Data}" Size="17" VerticalAlignment="Center" Style="{ThemeResource SaIconSecondaryStyle}" />
                     </Grid>
                 </Button>
@@ -365,7 +367,7 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <primitives:SaIcon Data="{StaticResource SaIconInformationCircleData}" Size="18" VerticalAlignment="Center" Style="{ThemeResource SaIconSecondaryStyle}" />
-                        <TextBlock x:Uid="SettingsOpenAboutText" Grid.Column="1" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                        <TextBlock x:Name="AboutDisclosureText" x:Uid="SettingsOpenAboutText" Grid.Column="1" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                         <primitives:SaIcon Grid.Column="2" Data="{StaticResource SaIconArrowRight01Data}" Size="17" VerticalAlignment="Center" Style="{ThemeResource SaIconSecondaryStyle}" />
                     </Grid>
                 </Button>

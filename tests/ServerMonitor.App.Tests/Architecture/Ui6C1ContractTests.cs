@@ -13,6 +13,10 @@ public sealed class Ui6C1ContractTests
             var parts = Key(doc,key).Value.Split(',');
             Assert.True(double.Parse(parts.Length == 1 ? parts[0] : parts[1]) >= 40, key);
         }
+        // FIX-OVERVIEW-FIT D-2: a scrolling page's viewport starts below the 32 band, so its own top padding plus the band clears it.
+        var band = double.Parse(Key(doc, "SaCaptionBandHeight").Value);
+        foreach (var key in new[] { "SaScrollPagePadding", "SaScrollPagePaddingCompact" })
+            Assert.True(double.Parse(Key(doc, key).Value.Split(',')[1]) + band >= 40, key);
     }
     [Fact]
     public void EmptyBlocks_CentreWithinFiniteContainer_AndIconsUseLiveThemeResources()
@@ -49,7 +53,9 @@ public sealed class Ui6C1ContractTests
     {
         var doc=AppSourceTree.LoadXaml("Views/"+page+"Page.xaml");
         var heading=doc.Descendants().Single(e=>A(e,"AutomationProperties.HeadingLevel")=="Level1");
-        Assert.Contains(heading.Ancestors(),e=>A(e,"Padding")=="{StaticResource SaPagePadding}");
+        // FIX-OVERVIEW-FIT D-2: pages that scroll as a whole use the scroll padding (top 8 below the 32 band = the same y40).
+        var padding = page is "History" or "Workloads" ? "{StaticResource SaPagePadding}" : "{StaticResource SaScrollPagePadding}";
+        Assert.Contains(heading.Ancestors(),e=>A(e,"Padding")==padding);
         if(page=="Settings") Assert.Equal("0",A(heading.Parent!,"Grid.Column"));
         if(page=="History")
         {

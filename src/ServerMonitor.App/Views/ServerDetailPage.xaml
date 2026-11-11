@@ -70,7 +70,7 @@
                         <primitives:SaContentWidthTrigger Source="{Binding ElementName=PageViewport}" MinWidth="0" MaxWidth="700" />
                     </VisualState.StateTriggers>
                     <VisualState.Setters>
-                        <Setter Target="PageRoot.Padding" Value="{StaticResource SaPagePaddingCompact}" />
+                        <Setter Target="PageRoot.Padding" Value="{StaticResource SaScrollPagePaddingCompact}" />
                         <Setter Target="MetricsColumn2.Width" Value="0" />
                         <Setter Target="MetricsColumn3.Width" Value="0" />
                         <Setter Target="MetricsGrid.ColumnSpacing" Value="0" />
@@ -94,8 +94,8 @@
                 </VisualState>
             </VisualStateGroup>
         </VisualStateManager.VisualStateGroups>
-    <ScrollViewer x:Name="PageScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-        <StackPanel x:Name="PageRoot" Padding="{StaticResource SaPagePadding}" Spacing="{StaticResource SaSpace24}">
+    <ScrollViewer x:Name="PageScroll" Margin="{StaticResource SaPageScrollInset}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel x:Name="PageRoot" Padding="{StaticResource SaScrollPagePadding}" Spacing="{StaticResource SaSpace24}">
 
             <!-- Breadcrumb 112:1786: the origin (A-2), then the server. -->
             <primitives:SaBreadcrumb
