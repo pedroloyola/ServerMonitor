@@ -499,7 +499,12 @@ public sealed class ShellLinksAndUnlistedPagesTests
         Assert.Equal("{ThemeResource SaTextSecondaryBrush}", (string?)runs[1].Attribute("Foreground"));
         Assert.Equal(string.Empty, ServerMonitor.App.Views.SettingsLinkCardContent.HintTextOf(null));
         Assert.Equal(string.Empty, ServerMonitor.App.Views.SettingsLinkCardContent.HintTextOf("  "));
-        Assert.Equal("\u2002Hint", ServerMonitor.App.Views.SettingsLinkCardContent.HintTextOf("Hint"));
+        // r5 (Prism INFO-2): 12 px between label and hint: an em space in the 12 px hint run.
+        Assert.Equal("\u2003Hint", ServerMonitor.App.Views.SettingsLinkCardContent.HintTextOf("Hint"));
+        Assert.Equal("\u2003", ServerMonitor.App.Views.SettingsLinkCardContent.EmSpace);
+        Assert.Contains("<x:Double x:Key=\"SaFontSizeCaption\">12</x:Double>",
+            File.ReadAllText(AppSourceTree.Full("Styles/Tokens/Typography.xaml")), StringComparison.Ordinal);
+        Assert.Single(text.Elements(), e => e.Name.LocalName == "Run" && (string?)e.Attribute("Text") == "{x:Bind HintText, Mode=OneWay}");
 
         // The page builds the card from that template and never resolves a theme style once in code.
         var settings = AppSourceTree.CodeWithoutComments("Views/SettingsPage.xaml.cs");
@@ -617,7 +622,21 @@ public sealed class ShellLinksAndUnlistedPagesTests
         Assert.Contains("_footerLabel.Text = text;", text, StringComparison.Ordinal);
         Assert.Contains("AutomationProperties.SetName(_footerLink, label);", text, StringComparison.Ordinal);
         Assert.Contains("AutomationProperties.SetHelpText(_footerLink, hint ?? string.Empty);", text, StringComparison.Ordinal);
-        Assert.Contains("ToolTipService.SetToolTip(_footerLink, _rail ? text : null);", text, StringComparison.Ordinal);
+        Assert.Contains("ToolTipService.SetToolTip(_footerLink, SidebarContributionLayout.FooterLinkToolTip(_rail, _footerLabel.IsTextTrimmed, text));", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TheFooterLinksTooltip_IsTheWholeLine_InTheRail_AndExpandedOnlyWhenTrimmed()
+    {
+        // r5 (Prism INFO-1)
+        Assert.Equal("Label · Hint", SidebarLayout.FooterLinkToolTip(rail: true, trimmed: false, "Label · Hint"));
+        Assert.Equal("Label · Hint", SidebarLayout.FooterLinkToolTip(rail: true, trimmed: true, "Label · Hint"));
+        Assert.Equal("Label · Hint", SidebarLayout.FooterLinkToolTip(rail: false, trimmed: true, "Label · Hint"));
+        Assert.Null(SidebarLayout.FooterLinkToolTip(rail: false, trimmed: false, "Label · Hint"));
+
+        // The tooltip is set again whenever the trimming changes (a resize, another language, a new label).
+        var sidebar = AppSourceTree.CodeWithoutComments("Controls/SaSidebar.xaml.cs");
+        Assert.Contains("_footerLabel.IsTextTrimmedChanged += (_, _) => ApplyFooterText();", Body(sidebar, "private void AddFooterLink(ShellViewModel shell)"), StringComparison.Ordinal);
     }
 
     // ---------------------------------------------------------------- r4 (Prism P-1): the pill is reached by keyboard

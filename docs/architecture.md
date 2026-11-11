@@ -292,7 +292,8 @@ capacidades, funcionalidades nem serviços. Só corre fora dos arranques de QA. 
   visível a seguir (12 Medium, cor secundária), e é desenhado por um template, por isso segue o tema e o alto
   contraste. `SidebarFooter` é uma entrada no rodapé da barra lateral, logo acima de Definições: em expandido, uma
   pílula de 176×36 (raio 12, preenchimento sólido dos tokens, sem contorno) com uma linha de 12 px "rótulo · dica";
-  no rail, o círculo de 46 com o ícone e uma tooltip. Está na ordem das setas da barra lateral, entre o último destino
+  no rail, o círculo de 46 com o ícone e uma tooltip. Em expandido, a linha completa aparece em tooltip só quando
+  está cortada. Está na ordem das setas da barra lateral, entre o último destino
   e Definições, só para foco (Enter/Espaço ativam, nunca fica selecionada). Há no máximo uma (ganha a primeira pela
   ordenação, as outras ficam no log). O nome para o Narrador é o rótulo e o texto de ajuda é a dica. Abrir uma ligação navega por id, pelo exit guard. Uma ligação cujo
   `TargetId` não é uma página que o shell mostra é descartada, com log. O rótulo e a dica dinâmicos são lidos pelo

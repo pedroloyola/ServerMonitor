@@ -27,6 +27,12 @@ internal static class SidebarContributionLayout
     internal static string FooterLinkText(string label, string? hint) =>
         string.IsNullOrWhiteSpace(hint) ? label : label + " · " + hint;
 
+    /// <summary>
+    /// M15.4a r5 (Prism INFO-1): the footer link's tooltip, the whole line: always in the rail (the text is hidden), and
+    /// expanded only when the line is trimmed; none when it fits.
+    /// </summary>
+    internal static string? FooterLinkToolTip(bool rail, bool trimmed, string text) => rail || trimmed ? text : null;
+
     /// <summary>The footer link's row, before the contributed entries are inserted (they move it down with Settings).</summary>
     internal const int FooterRow = SettingsRow;
 

@@ -163,6 +163,7 @@ public sealed partial class SaSidebar : UserControl
             TextWrapping = TextWrapping.NoWrap,
             VerticalAlignment = VerticalAlignment.Center,
         };
+        _footerLabel.IsTextTrimmedChanged += (_, _) => ApplyFooterText();
         _footerIcon = new SaIcon
         {
             Data = link.IconPathData ?? (string)Application.Current.Resources["SaIconPackageData"],
@@ -204,7 +205,7 @@ public sealed partial class SaSidebar : UserControl
         _footerLabel.Text = text;
         AutomationProperties.SetName(_footerLink, label);
         AutomationProperties.SetHelpText(_footerLink, hint ?? string.Empty);
-        ToolTipService.SetToolTip(_footerLink, _rail ? text : null);
+        ToolTipService.SetToolTip(_footerLink, SidebarContributionLayout.FooterLinkToolTip(_rail, _footerLabel.IsTextTrimmed, text));
     }
 
     private void BindContributions(ShellViewModel? shell)
