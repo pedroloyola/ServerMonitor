@@ -2,7 +2,7 @@
 
 **English** · [Português (Portugal)](PRIVACY.pt-PT.md) · [Português (Brasil)](PRIVACY.pt-BR.md)
 
-_Last updated: 2026-10-18 · applies to ServerAlyzer 1.1.7 and later for Windows_
+_Last updated: 2026-11-11 · applies to ServerAlyzer 1.1.7 and later for Windows_
 
 ServerAlyzer is a **local-first** Windows app for monitoring your own Linux and macOS servers over SSH. It is
 designed so that your data stays on your PC and under your control.
@@ -248,6 +248,39 @@ Hugeicons icons. Licenses are listed in `THIRD-PARTY-NOTICES.md` in the reposito
     **Inbound Rules** and delete the rules named `ServerMonitor.App`.
 
   The app never changes your `.ssh` folder. Backup files you saved elsewhere are never touched.
+
+## This website
+
+This section covers the website **serveralyzer.com**. The rest of this policy covers the app.
+
+- **Hosting.** The site is a set of static pages served by Cloudflare, Inc. To deliver each page and protect
+  the site from attacks, Cloudflare processes the technical data that every browser sends with a request, such
+  as your IP address, your browser and operating system, the page you ask for and the page that linked to it.
+- **Statistics.** The publisher uses Cloudflare Web Analytics and Cloudflare's traffic statistics to see how
+  the site is used: page views, visits, the pages visited, referring sites, countries, device types, browsers
+  and how fast pages load. The publisher sees these figures only in aggregate. Cloudflare states that Web
+  Analytics uses no cookies or `localStorage` and does not fingerprint visitors
+  ([Cloudflare](https://developers.cloudflare.com/web-analytics/data-metrics/core-web-vitals/)). Its
+  measurement script is loaded from `static.cloudflareinsights.com` and reports to serveralyzer.com.
+- **No cookies from the site and no advertising.** The site itself sets no cookies and has no advertising,
+  social media buttons or third-party trackers. Cloudflare may set a strictly necessary security cookie to
+  tell people apart from malicious bots.
+- **Your preferences stay in your browser.** If you choose a theme or a language on the site, the choice is
+  kept in your browser's `localStorage` (`sa-theme`, `sa-lang`) so the next page opens the same way. It is
+  never sent anywhere, and you can remove it by clearing this site's data in your browser.
+- **Download links.** Links to the Microsoft Store carry a campaign label (`cid`) that only says which button
+  and language were used, so Partner Center can count installs per button. It contains nothing about you.
+
+**Purpose and legal basis.** To deliver the site securely and to understand, in aggregate, how it is used:
+legitimate interests (GDPR Art. 6(1)(f)). Your theme or language choice is stored in your browser only because
+you made it.
+
+**How long.** The publisher downloads no request logs and keeps no copy of this data. Cloudflare keeps the
+statistics for the limited period its service provides.
+
+**Recipients.** Cloudflare, Inc., which acts for the publisher under its standard Data Processing Addendum. The
+information on international transfers above also applies to Cloudflare. No one else. Your rights described
+above apply to this data too.
 
 ## Children
 
