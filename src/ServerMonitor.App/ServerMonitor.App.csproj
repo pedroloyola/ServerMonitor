@@ -83,11 +83,20 @@
            AssemblyVersion          : 1.0.0.0  (unchanged)
            Product SemVer / Informational : 1.1.9
          DisplayVersion = 1.1.9. A release candidate, not a release: NÃO criar tag v1.1.9 sem
+         aprovação humana.
+
+         Release candidate 1.1.10 (human-approved 2026-11-11). The Store has 1.1.9.0 published,
+         so the floor moves to 1.1.10.0. Concept map now:
+           Package/Identity Version : 1.1.10.0  (Store-valid; Revision 0; = floor)
+           FileVersion              : 1.1.10.0  (tracks the package build)
+           AssemblyVersion          : 1.0.0.0  (unchanged)
+           Product SemVer / Informational : 1.1.10
+         DisplayVersion = 1.1.10. A release candidate, not a release: NÃO criar tag v1.1.10 sem
          aprovação humana. -->
-    <Version>1.1.9</Version>
+    <Version>1.1.10</Version>
     <AssemblyVersion>1.0.0.0</AssemblyVersion>
-    <FileVersion>1.1.9.0</FileVersion>
-    <InformationalVersion>1.1.9</InformationalVersion>
+    <FileVersion>1.1.10.0</FileVersion>
+    <InformationalVersion>1.1.10</InformationalVersion>
     <!-- M12/ADR-017: one app, two deployment profiles. Default is the existing UNPACKAGED,
          self-contained build (dev Debug + existing Release + every test/gate). Pass
          -p:Packaged=true for the production single-project MSIX profile below. Domain logic

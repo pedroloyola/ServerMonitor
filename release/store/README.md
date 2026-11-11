@@ -36,9 +36,9 @@ Store listing.
 
 ## Current contents
 
-Notes for **1.1.9** (package 1.1.9.0, tag `v1.1.9`). They replace the 1.1.8 text and describe only
-the user-visible change in that release: the Light or Dark theme choice is now remembered across
-restarts, System still follows Windows, and a Windows high contrast theme still takes priority.
+Notes for **1.1.10** (package 1.1.10.0, tag `v1.1.10`). They replace the 1.1.9 text and describe only
+the user-visible change in that release: the sidebar is slightly wider (224 px, was 208 px), so page
+names have more room before they are shortened.
 
-Known issues that are **not** fixed in 1.1.9 (large text size, switching between two high contrast
-themes) are listed in `docs/release/1.1.9-known-issues.md`. Do not describe them as fixed here.
+Known issues that are **not** fixed in 1.1.10 (large text size, switching between two high contrast
+themes) are listed in `docs/release/1.1.10-known-issues.md`. Do not describe them as fixed here.
