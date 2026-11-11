@@ -18,7 +18,6 @@ public sealed partial class SaSidebar : UserControl
     private Button? _footerLink;
     private TextBlock? _footerLabel;
     private SaIcon? _footerIcon;
-    private ToolTip? _footerToolTip;
     public SaSidebar()
     {
         InitializeComponent();
@@ -180,11 +179,6 @@ public sealed partial class SaSidebar : UserControl
             Content = content,
         };
         SaGroupNavigation.SetIsGroupMember(_footerLink, true);
-        // r5 (Prism R5-1): one tooltip, attached once and never replaced; ApplyFooterText only changes its text and
-        // whether it may open (IsEnabled). Swapping the attached value between null and a new string on each refresh,
-        // mid-layout when the trimming changes, was seen not to open when expanded; this form is measured to.
-        _footerToolTip = new ToolTip();
-        ToolTipService.SetToolTip(_footerLink, _footerToolTip);
         Grid.SetRow(_footerLink, SidebarContributionLayout.FooterRow);
         _footerLink.Click += OnFooterLinkClick;
         NavGrid.Children.Insert(NavGrid.Children.IndexOf(SettingsItem), _footerLink);
@@ -204,17 +198,14 @@ public sealed partial class SaSidebar : UserControl
     /// </summary>
     private void ApplyFooterText()
     {
-        if (_footerLink is null || _footerLabel is null || _footerToolTip is null || DataContext is not ShellViewModel shell) return;
+        if (_footerLink is null || _footerLabel is null || DataContext is not ShellViewModel shell) return;
         var label = shell.FooterLinkLabel ?? string.Empty;
         var hint = shell.FooterLinkHint;
         var text = SidebarContributionLayout.FooterLinkText(label, hint);
         _footerLabel.Text = text;
         AutomationProperties.SetName(_footerLink, label);
         AutomationProperties.SetHelpText(_footerLink, hint ?? string.Empty);
-        var toolTip = SidebarContributionLayout.FooterLinkToolTip(_rail, _footerLabel.IsTextTrimmed, text);
-        _footerToolTip.Content = text;
-        _footerToolTip.IsEnabled = toolTip is not null;
-        if (toolTip is null) _footerToolTip.IsOpen = false;
+        ToolTipService.SetToolTip(_footerLink, SidebarContributionLayout.FooterLinkToolTip(_rail, _footerLabel.IsTextTrimmed, text));
     }
 
     private void BindContributions(ShellViewModel? shell)

@@ -622,25 +622,7 @@ public sealed class ShellLinksAndUnlistedPagesTests
         Assert.Contains("_footerLabel.Text = text;", text, StringComparison.Ordinal);
         Assert.Contains("AutomationProperties.SetName(_footerLink, label);", text, StringComparison.Ordinal);
         Assert.Contains("AutomationProperties.SetHelpText(_footerLink, hint ?? string.Empty);", text, StringComparison.Ordinal);
-        Assert.Contains("var toolTip = SidebarContributionLayout.FooterLinkToolTip(_rail, _footerLabel.IsTextTrimmed, text);", text, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void TheFooterLinksTooltip_IsOneToolTip_AttachedOnce_ThenOnlyItsTextAndWhetherItMayOpenChange()
-    {
-        // r5 (Prism R5-1): swapping the attached tooltip between null and a new string, mid-layout, left it unopened
-        // live; one ToolTip is attached when the link is built, and the refresh never replaces it (measured live).
-        var sidebar = AppSourceTree.CodeWithoutComments("Controls/SaSidebar.xaml.cs");
-        var build = Body(sidebar, "private void AddFooterLink(ShellViewModel shell)");
-        var apply = Body(sidebar, "private void ApplyFooterText()");
-
-        Assert.Contains("_footerToolTip = new ToolTip();", build, StringComparison.Ordinal);
-        Assert.Contains("ToolTipService.SetToolTip(_footerLink, _footerToolTip);", build, StringComparison.Ordinal);
-        Assert.Equal(1, sidebar.Split("ToolTipService.SetToolTip(_footerLink,").Length - 1);
-        Assert.DoesNotContain("ToolTipService.SetToolTip", apply, StringComparison.Ordinal);
-        Assert.Contains("_footerToolTip.Content = text;", apply, StringComparison.Ordinal);
-        Assert.Contains("_footerToolTip.IsEnabled = toolTip is not null;", apply, StringComparison.Ordinal);
-        Assert.Contains("if (toolTip is null) _footerToolTip.IsOpen = false;", apply, StringComparison.Ordinal);
+        Assert.Contains("ToolTipService.SetToolTip(_footerLink, SidebarContributionLayout.FooterLinkToolTip(_rail, _footerLabel.IsTextTrimmed, text));", text, StringComparison.Ordinal);
     }
 
     [Fact]
