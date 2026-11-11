@@ -120,24 +120,67 @@ public static class OverviewPresentation
             return [];
         }
 
-        var available = HealthBarWidth - (HealthBarGap * (segments.Count - 1));
-        if (summary.Total <= MaxDiscreteHealthSegments)
+        var widths = SegmentWidths(segments.Select(segment => segment.Weight).ToList(), summary.Total <= MaxDiscreteHealthSegments);
+        return segments.Select((segment, index) => new HealthBarSegment(segment.Health, widths[index], segment.Weight)).ToList();
+    }
+
+    /// <summary>
+    /// FIX-OVERVIEW-FIT D-5: whole-pixel segment widths. Layout rounding snaps every segment to whole pixels, so fractional
+    /// widths that sum to exactly 213 could render up to 2 px wider and lose the last segment's right end. Widths are
+    /// whole numbers that never exceed the bar: discrete (one per server) segments are equal and at most 30 (6 servers =
+    /// the Figma's 6 × 30); below the cap they fill the bar exactly, the leftover pixels going to the leftmost segments.
+    /// Aggregated (one per present state, Prism r1 (a)): every present state first gets the minimum of 12, the rest is
+    /// shared by count, and the leftover pixels go to the largest remainders (ties: bar order) — exactly 213.
+    /// </summary>
+    internal static int[] SegmentWidths(IReadOnlyList<int> weights, bool discrete)
+    {
+        ArgumentNullException.ThrowIfNull(weights);
+        var count = weights.Count;
+        if (count == 0)
         {
-            // Discrete (one per server): equal widths, at most 30 (6 servers = the Figma's 6 × 30; 12 ≈ 13 each).
-            var width = Math.Round(Math.Min(HealthSegmentMaxWidth, available / segments.Count), 2);
-            return segments.Select(segment => new HealthBarSegment(segment.Health, width, segment.Weight)).ToList();
+            return [];
         }
 
-        // Aggregated (one per present state), Prism r1 (a): reserve the minimum for EVERY present state first, then share
-        // the rest by count — so the bar always sums to exactly 213 and no present state can vanish.
-        var total = segments.Sum(segment => segment.Weight);
-        var spare = available - (HealthSegmentMinWidth * segments.Count);
-        return segments
-            .Select(segment => new HealthBarSegment(
-                segment.Health,
-                Math.Round(HealthSegmentMinWidth + (spare * segment.Weight / total), 2),
-                segment.Weight))
-            .ToList();
+        var available = (int)(HealthBarWidth - (HealthBarGap * (count - 1)));
+        var widths = new int[count];
+        if (discrete)
+        {
+            var max = (int)HealthSegmentMaxWidth;
+            if (available >= max * count)
+            {
+                Array.Fill(widths, max);
+                return widths;
+            }
+
+            Array.Fill(widths, available / count);
+            for (var i = 0; i < available % count; i++)
+            {
+                widths[i]++;
+            }
+
+            return widths;
+        }
+
+        var min = (int)HealthSegmentMinWidth;
+        long total = weights.Sum(weight => (long)weight);
+        var spare = available - (min * count);
+        var remainders = new long[count];
+        var used = 0;
+        for (var i = 0; i < count; i++)
+        {
+            // Exact integer arithmetic: share = floor(spare * weight / total), remainder kept for the largest-remainder pass.
+            var product = (long)spare * weights[i];
+            widths[i] = min + (int)(product / total);
+            remainders[i] = product % total;
+            used += widths[i];
+        }
+
+        foreach (var index in Enumerable.Range(0, count).OrderByDescending(i => remainders[i]).ThenBy(i => i).Take(available - used))
+        {
+            widths[index]++;
+        }
+
+        return widths;
     }
 
     /// <summary>The severity of one metric under the engine's limits (inclusive); Healthy when below or unknown.</summary>

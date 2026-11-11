@@ -93,15 +93,16 @@ public sealed class FixOverviewFitContractTests
     }
 
     [Fact]
-    public void TheHealthRow_HasASpacerOf24_AndOnlyTheBarHasAFixedWidth()
+    public void TheHealthRow_HasASpacerOf24_AndNothingInItHasAFixedWidth()
     {
         var elements = AppSourceTree.LoadXaml(Overview).Descendants().ToList();
         var row = elements.Single(e => Name(e) == "HealthCountRow");
         Assert.Equal("{StaticResource SaSpace24}", A(row.Descendants().Single(c => Name(c) == "HealthSpacerColumn"), "MinWidth"));
 
         var bar = elements.Single(e => Name(e) == "HealthSegments");
-        Assert.Equal(OverviewPresentation.HealthBarWidth.ToString(CultureInfo.InvariantCulture), A(bar, "Width"));
-        Assert.All(row.Elements().Where(e => !e.Name.LocalName.Contains('.') && e != bar), child => Assert.Null(A(child, "Width")));
+        // D-5: the bar's 213 is a minimum, never a fixed width (a fixed one clips what layout rounding adds above 100 %).
+        Assert.Equal(OverviewPresentation.HealthBarWidth.ToString(CultureInfo.InvariantCulture), A(bar, "MinWidth"));
+        Assert.All(row.Elements().Where(e => !e.Name.LocalName.Contains('.')), child => Assert.Null(A(child, "Width")));
     }
 
     [Fact]

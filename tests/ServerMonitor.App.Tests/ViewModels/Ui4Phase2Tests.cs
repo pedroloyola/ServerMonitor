@@ -60,8 +60,9 @@ public sealed class Ui4Phase2Tests
 
         var twelve = OverviewPresentation.BarSegments(Summary(12));
         Assert.Equal(12, twelve.Count);
-        Assert.Single(twelve.Select(segment => segment.Width).Distinct());
-        Assert.True(BarLength(twelve) <= 213.5);
+        // D-5: whole pixels, equal to within 1 px (the leftover pixels go to the leftmost), filling the bar exactly.
+        Assert.True(twelve.Max(segment => segment.Width) - twelve.Min(segment => segment.Width) <= 1);
+        Assert.Equal(213, BarLength(twelve));
         Assert.True(twelve[0].Width >= OverviewPresentation.HealthSegmentMinWidth);
     }
 

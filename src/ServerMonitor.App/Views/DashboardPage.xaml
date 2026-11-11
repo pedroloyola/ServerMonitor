@@ -435,8 +435,11 @@
                                     <TextBlock x:Name="HealthTotalText" Grid.Column="1" VerticalAlignment="Center" Style="{StaticResource SaHealthTotalTextStyle}"
                                                Foreground="{ThemeResource SaTextBrush}"
                                                Text="{x:Bind ViewModel.HealthOfTotalDisplay, Mode=OneWay}" />
+                                    <!-- D-5: MinWidth, not Width: the segments are whole DIPs summing to at most 213, but at 125/150/175 %
+                                         layout rounding works in physical pixels and may add a pixel; a fixed Width would clip the last
+                                         segment's rounded end, MinWidth lets the bar take that pixel and keeps its place. -->
                                     <ItemsRepeater x:Name="HealthSegments" Grid.Column="3" HorizontalAlignment="Left" VerticalAlignment="Center"
-                                                   Width="213" ItemsSource="{x:Bind ViewModel.HealthBarSegments, Mode=OneWay}"
+                                                   MinWidth="213" ItemsSource="{x:Bind ViewModel.HealthBarSegments, Mode=OneWay}"
                                                    ItemTemplate="{StaticResource HealthSegmentTemplate}">
                                         <ItemsRepeater.Layout>
                                             <StackLayout Orientation="Horizontal" Spacing="5" />
