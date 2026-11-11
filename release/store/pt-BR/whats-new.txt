@@ -1,5 +1,3 @@
-O ServerAlyzer 1.1.9 agora lembra o tema que você escolheu.
+O ServerAlyzer 1.1.10 dá um pouco mais de espaço à barra lateral.
 
-Tema. A escolha Claro ou Escuro nas Configurações agora é mantida quando você fecha e abre o ServerAlyzer de novo. Se você escolher Sistema, o ServerAlyzer continua seguindo o tema do Windows.
-
-Alto contraste. Quando um tema de alto contraste do Windows está ativado, ele continua tendo prioridade sobre a sua escolha. Quando você desativa o alto contraste, o ServerAlyzer volta ao tema que você escolheu.
+Barra lateral. A barra lateral ficou um pouco mais larga, então os nomes das páginas têm mais espaço antes de serem abreviados. Todo o resto funciona como na versão 1.1.9.

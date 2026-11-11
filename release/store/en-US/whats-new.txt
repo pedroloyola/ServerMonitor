@@ -1,5 +1,3 @@
-ServerAlyzer 1.1.9 remembers your theme.
+ServerAlyzer 1.1.10 gives the sidebar a little more room.
 
-Theme. The Light or Dark choice in Settings is now kept when you close and reopen ServerAlyzer. If you choose System, ServerAlyzer follows the Windows theme as before.
-
-High contrast. When a Windows high contrast theme is on, it still takes priority over your choice. When you turn high contrast off, ServerAlyzer goes back to the theme you chose.
+Sidebar. The sidebar is slightly wider, so the names of the pages have more space before they are shortened. Everything else works as in 1.1.9.
