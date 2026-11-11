@@ -2,7 +2,7 @@
 
 [English](PRIVACY.md) · **Português (Portugal)** · [Português (Brasil)](PRIVACY.pt-BR.md)
 
-_Última atualização: 2026-10-18 · aplica-se ao ServerAlyzer 1.1.7 e posteriores para Windows_
+_Última atualização: 2026-11-11 · aplica-se ao ServerAlyzer 1.1.7 e posteriores para Windows_
 
 O ServerAlyzer é uma aplicação Windows **local-first** para monitorizar os teus próprios servidores Linux e
 macOS por SSH. Foi desenhado para que os teus dados fiquem no teu PC e sob o teu controlo.
@@ -264,6 +264,42 @@ e os ícones Hugeicons. As licenças estão listadas em `THIRD-PARTY-NOTICES.md`
 
   A aplicação nunca altera a tua pasta `.ssh`. Os ficheiros de cópia de segurança que guardaste noutro sítio
   nunca são tocados.
+
+## Este site
+
+Esta secção trata do site **serveralyzer.com**. O resto desta política trata da aplicação.
+
+- **Alojamento.** O site é um conjunto de páginas estáticas servidas pela Cloudflare, Inc. Para entregar cada
+  página e proteger o site contra ataques, a Cloudflare trata os dados técnicos que qualquer navegador envia
+  com um pedido, como o teu endereço IP, o teu navegador e sistema operativo, a página que pedes e a página
+  que te trouxe até ela.
+- **Estatísticas.** O editor usa o Cloudflare Web Analytics e as estatísticas de tráfego da Cloudflare para
+  perceber como o site é usado: visualizações de páginas, visitas, páginas visitadas, sites de origem, países,
+  tipos de dispositivo, navegadores e a rapidez com que as páginas carregam. O editor só vê estes números de
+  forma agregada. A Cloudflare afirma que o Web Analytics não usa cookies nem `localStorage` e não cria
+  impressões digitais dos visitantes
+  ([Cloudflare](https://developers.cloudflare.com/web-analytics/data-metrics/core-web-vitals/)). O script de
+  medição é carregado a partir de `static.cloudflareinsights.com` e envia os dados para serveralyzer.com.
+- **O site não usa cookies nem publicidade.** O próprio site não define cookies e não tem publicidade, botões
+  de redes sociais nem rastreadores de terceiros. A Cloudflare pode definir um cookie de segurança
+  estritamente necessário para distinguir pessoas de bots maliciosos.
+- **As tuas preferências ficam no teu navegador.** Se escolheres um tema ou uma língua no site, a escolha fica
+  guardada no `localStorage` do teu navegador (`sa-theme`, `sa-lang`) para que a página seguinte abra da mesma
+  forma. Nunca é enviada para lado nenhum, e podes apagá-la limpando os dados deste site no teu navegador.
+- **Ligações de transferência.** As ligações para a Microsoft Store levam uma etiqueta de campanha (`cid`) que
+  indica apenas o botão e a língua usados, para que o Partner Center possa contar as instalações por botão.
+  Não contém nada sobre ti.
+
+**Finalidade e fundamento jurídico.** Entregar o site de forma segura e perceber, de forma agregada, como é
+usado: interesses legítimos (artigo 6.º, n.º 1, alínea f), do RGPD). A tua escolha de tema ou de língua só
+fica guardada no teu navegador porque a fizeste.
+
+**Durante quanto tempo.** O editor não descarrega registos de pedidos e não guarda cópias destes dados. A
+Cloudflare guarda as estatísticas durante o período limitado que o seu serviço oferece.
+
+**Destinatários.** A Cloudflare, Inc., que atua por conta do editor ao abrigo do seu Data Processing Addendum
+padrão. A informação sobre transferências internacionais acima aplica-se também à Cloudflare. Mais ninguém. Os
+teus direitos descritos acima aplicam-se também a estes dados.
 
 ## Crianças
 
