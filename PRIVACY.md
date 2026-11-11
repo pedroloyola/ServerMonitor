@@ -25,7 +25,7 @@ designed so that your data stays on your PC and under your control.
 ServerAlyzer is developed and published on the Microsoft Store by **Pedro Loyola**, a natural person resident in
 Portugal, under the publisher name **Pedro Loy** (the "publisher").
 
-Contact for privacy questions: **serveralyzer@pedroloyola.com**. You can also open an issue at <https://github.com/pedroloyola/ServerMonitor/issues>. Report security issues
+Contact for privacy questions: **hello@serveralyzer.com**. You can also open an issue at <https://github.com/pedroloyola/ServerMonitor/issues>. Report security issues
 privately through GitHub Security Advisories on the same repository (Security tab), not in a public issue.
 
 ## What the publisher can and cannot receive
@@ -36,7 +36,7 @@ ServerAlyzer involves four kinds of data, and this policy keeps them apart.
    reads on your PC", "Local network search", "Encrypted backup" and "Notifications and widget" is processed by
    the app on your PC. The app never sends it to the publisher, so the publisher never receives, holds or sees
    it.
-2. **Messages you choose to send to the publisher.** An e-mail to **serveralyzer@pedroloyola.com**, or an issue, comment or
+2. **Messages you choose to send to the publisher.** An e-mail to **hello@serveralyzer.com**, or an issue, comment or
    private security report on GitHub.
 3. **Information Microsoft shows the publisher in Partner Center.** Reports about the Store app that Microsoft
    compiles itself, and the ratings and reviews published in the Store (see "Windows and Microsoft
@@ -50,7 +50,7 @@ ServerAlyzer involves four kinds of data, and this policy keeps them apart.
 
 **Controller.** For the messages in point 2, and for its own use of the information in point 3, the controller
 under the EU General Data Protection Regulation (GDPR) is the publisher: Pedro Loyola (publisher name Pedro
-Loy), a natural person resident in Portugal, contact **serveralyzer@pedroloyola.com**. Microsoft's collection and
+Loy), a natural person resident in Portugal, contact **hello@serveralyzer.com**. Microsoft's collection and
 compilation of the Partner Center information is governed by the Microsoft Privacy Statement.
 
 | | Messages you send (point 2) | Partner Center information (point 3) |
@@ -72,7 +72,7 @@ will then no longer process it, unless it demonstrates compelling legitimate gro
 override your interests, rights and freedoms, or the processing is for the establishment, exercise or defence of
 legal claims (GDPR Art. 21(1)).
 
-**How to make a request.** Send your request by e-mail to **serveralyzer@pedroloyola.com** and say what you are asking
+**How to make a request.** Send your request by e-mail to **hello@serveralyzer.com** and say what you are asking
 for. Requests are free of charge. If the publisher has reasonable doubts about who you are, it may ask only for
 the information needed to confirm your identity. The publisher replies without undue delay and within one
 month. That period may be extended by up to two further months where necessary, taking into account the
@@ -98,7 +98,7 @@ is carried out in Brazil, when it aims to offer or supply goods or services to, 
 individuals located in Brazil, or when the personal data was collected in Brazil. Whether that is the case
 depends on these facts, for example whether ServerAlyzer is offered in the Brazilian Microsoft Store; the
 existence of a Brazilian Portuguese version of this policy does not, on its own, make the LGPD apply. Where the
-LGPD applies, you also have the rights in its Article 18, which you can exercise at **serveralyzer@pedroloyola.com**, and
+LGPD applies, you also have the rights in its Article 18, which you can exercise at **hello@serveralyzer.com**, and
 you can complain to the Autoridade Nacional de Proteção de Dados (ANPD).
 
 

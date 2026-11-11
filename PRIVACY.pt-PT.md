@@ -25,7 +25,7 @@ macOS por SSH. Foi desenhado para que os teus dados fiquem no teu PC e sob o teu
 O ServerAlyzer é desenvolvido e publicado na Microsoft Store por **Pedro Loyola**, pessoa singular residente em
 Portugal, com o nome de editor **Pedro Loy** (o "editor").
 
-Contacto para questões de privacidade: **serveralyzer@pedroloyola.com**. Também podes abrir um issue em
+Contacto para questões de privacidade: **hello@serveralyzer.com**. Também podes abrir um issue em
 <https://github.com/pedroloyola/ServerMonitor/issues>. Comunica problemas de segurança de forma privada através
 dos GitHub Security Advisories do mesmo repositório (separador Security), e não num issue público.
 
@@ -37,7 +37,7 @@ O ServerAlyzer envolve quatro tipos de dados, e esta política mantém-nos separ
    "Ficheiros que a aplicação lê no teu PC", "Pesquisa na rede local", "Cópia de segurança encriptada" e
    "Notificações e widget" é tratado pela aplicação no teu PC. A aplicação nunca o envia ao editor, por isso o
    editor nunca o recebe, guarda ou vê.
-2. **Mensagens que decides enviar ao editor.** Um e-mail para **serveralyzer@pedroloyola.com**, ou um issue, comentário ou
+2. **Mensagens que decides enviar ao editor.** Um e-mail para **hello@serveralyzer.com**, ou um issue, comentário ou
    relatório de segurança privado no GitHub.
 3. **Informação que a Microsoft mostra ao editor no Partner Center.** Relatórios sobre a aplicação na Store que
    a própria Microsoft compila, e as classificações e críticas publicadas na Store (ver "Componentes do Windows
@@ -53,7 +53,7 @@ O ServerAlyzer envolve quatro tipos de dados, e esta política mantém-nos separ
 **Responsável pelo tratamento.** Quanto às mensagens do ponto 2, e quanto ao uso que o próprio editor faz da
 informação do ponto 3, o responsável pelo tratamento nos termos do Regulamento Geral sobre a Proteção de Dados
 (RGPD) é o editor: Pedro Loyola (nome de editor Pedro Loy), pessoa singular residente em Portugal, contacto
-**serveralyzer@pedroloyola.com**. A recolha e a compilação da informação do Partner Center pela Microsoft regem-se pela
+**hello@serveralyzer.com**. A recolha e a compilação da informação do Partner Center pela Microsoft regem-se pela
 Declaração de Privacidade da Microsoft.
 
 | | Mensagens que envias (ponto 2) | Informação do Partner Center (ponto 3) |
@@ -75,7 +75,7 @@ editor deixa então de os tratar, a não ser que apresente razões imperiosas e 
 prevaleçam sobre os teus interesses, direitos e liberdades, ou para efeitos de declaração, exercício ou defesa
 de um direito num processo judicial (artigo 21.º, n.º 1, do RGPD).
 
-**Como fazer um pedido.** Envia o teu pedido por e-mail para **serveralyzer@pedroloyola.com** e diz o que pedes. Os
+**Como fazer um pedido.** Envia o teu pedido por e-mail para **hello@serveralyzer.com** e diz o que pedes. Os
 pedidos são gratuitos. Se o editor tiver dúvidas razoáveis quanto à tua identidade, pode pedir-te apenas a
 informação necessária para a confirmar. O editor responde sem demora injustificada e no prazo de um mês. Esse
 prazo pode ser prorrogado por mais dois meses, no máximo, quando necessário, tendo em conta a complexidade e o número de
@@ -102,7 +102,7 @@ serviços, ou o tratamento de dados, de pessoas localizadas no Brasil, ou quando
 recolhidos no Brasil. Se é esse o caso depende destes factos, por exemplo se o ServerAlyzer é disponibilizado na
 Microsoft Store brasileira; a existência de uma versão desta política em português do Brasil não faz, por si só,
 com que a LGPD se aplique. Quando a LGPD se aplica, tens também os direitos do seu artigo 18.º, que podes exercer
-através de **serveralyzer@pedroloyola.com**, e podes apresentar reclamação à Autoridade Nacional de Proteção de Dados
+através de **hello@serveralyzer.com**, e podes apresentar reclamação à Autoridade Nacional de Proteção de Dados
 (ANPD).
 
 
