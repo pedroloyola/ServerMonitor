@@ -742,6 +742,12 @@ public partial class App : Application
         // that records what was ACTUALLY registered.
         services.AddSingleton<IFeatureCatalog>(FeatureCatalog.Empty);
 
+        // M15.4a shell contributions. Default: none, in the same idiom, so the sidebar and the Settings page resolve
+        // the host in every composition and show exactly their built-in items. The non-QA branch replaces the list
+        // with what the COMPOSED modules contribute; the host turns it into views on the UI thread.
+        services.AddSingleton(ShellContributions.Empty);
+        services.AddSingleton<ShellContributionHost>();
+
         // UI.4 D-UI4-PRIORITY: ONE MonitoringOptions for the engine and the overview, so the priority problem uses
         // exactly the engine's thresholds (no second copy of the rule). Same values as the previous options: null, but a
         // distinct instance from MonitoringOptions.Default, so a consumer that silently falls back to the default is
@@ -790,10 +796,20 @@ public partial class App : Application
             IEntitlementProvider? commercialEntitlements = null;
             AddCommercialComposition(commercialModules, ref commercialEntitlements);
 
+            // M15.4a: the second empty extension point, for composition-supplied contributions. Same classic partial
+            // form, so with no implementation the compiler removes the call. It is handed FRESH lists (Settings
+            // sections, unlisted pages, links) and nothing else: no service collection, catalog or provider, so it
+            // cannot add a capability, a feature or a service. ComposeFeatures appends them after the composed modules'.
+            var suppliedSettingsSections = new List<ShellContribution>();
+            var suppliedUnlistedPages = new List<ShellContribution>();
+            var suppliedLinks = new List<ShellLink>();
+            AddCommercialContributions(suppliedSettingsSections, suppliedUnlistedPages, suppliedLinks);
+
             // The result's Skipped list is provably empty in this repository: it can only receive a module
             // that declares RequiresEntitlement, and none does. A build that supplies such modules owns
             // reporting what it skipped - the result carries the reason rather than swallowing it.
-            _ = ComposeFeatures(services, commercialModules, commercialEntitlements);
+            _ = ComposeFeatures(
+                services, commercialModules, commercialEntitlements, suppliedSettingsSections, suppliedUnlistedPages, suppliedLinks);
 
             // HAZARD, deliberate: the composite below resolves one recorder from EACH of three modules, so
             // those three are all-or-nothing by construction. It is safe today because all four modules are
@@ -1010,7 +1026,10 @@ public partial class App : Application
     internal static FeatureCompositionResult ComposeFeatures(
         IServiceCollection services,
         IReadOnlyList<IFeatureModule> commercialModules,
-        IEntitlementProvider? commercialEntitlements)
+        IEntitlementProvider? commercialEntitlements,
+        IReadOnlyList<ShellContribution>? suppliedSettingsSections = null,
+        IReadOnlyList<ShellContribution>? suppliedUnlistedPages = null,
+        IReadOnlyList<ShellLink>? suppliedLinks = null)
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(commercialModules);
@@ -1041,7 +1060,37 @@ public partial class App : Application
             modules,
             commercialEntitlements ?? CommunityEntitlementProvider.Instance);
         services.AddSingleton<IFeatureCatalog>(composition.Catalog);
+
+        // Only composed modules contributed (same gate as their services); the provider itself is still not registered.
+        // Composition-supplied Settings sections come AFTER the composed ones, so the shell's single arrangement (first
+        // id wins, built-in ids rejected, then Order and Id) lets every composed contribution win a collision; unlisted
+        // pages and links come only from here (modules cannot supply them). They add user interface only: nothing else
+        // is registered.
+        services.AddSingleton(WithSupplied(composition.Contributions, suppliedSettingsSections, suppliedUnlistedPages, suppliedLinks));
         return composition;
+    }
+
+    /// <summary>
+    /// The composed contributions with the composition-supplied ones: Settings sections after the composed ones, then
+    /// the unlisted pages and links (which only the composition supplies). With nothing supplied, the composed ones.
+    /// </summary>
+    internal static ShellContributions WithSupplied(
+        ShellContributions composed,
+        IReadOnlyList<ShellContribution>? settingsSections,
+        IReadOnlyList<ShellContribution>? unlistedPages = null,
+        IReadOnlyList<ShellLink>? links = null)
+    {
+        ArgumentNullException.ThrowIfNull(composed);
+        settingsSections ??= [];
+        unlistedPages ??= [];
+        links ??= [];
+        return settingsSections.Count == 0 && unlistedPages.Count == 0 && links.Count == 0
+            ? composed
+            : new ShellContributions(
+                [.. composed.SettingsSections, .. settingsSections],
+                composed.NavigationEntries,
+                [.. unlistedPages],
+                [.. links]);
     }
 
     /// <summary>
@@ -1067,4 +1116,30 @@ public partial class App : Application
     /// </para>
     /// </summary>
     static partial void AddCommercialComposition(IList<IFeatureModule> modules, ref IEntitlementProvider? entitlements);
+
+    /// <summary>
+    /// The extension point for composition-supplied contributions: user interface that a build adds to the shell
+    /// without a feature module, and deliberately empty here.
+    /// <para>
+    /// Same CLASSIC partial form as <see cref="AddCommercialComposition"/>, for the same reason: with no implementation
+    /// the compiler removes the body and the call site, and a public clone still compiles. It runs only outside QA
+    /// launches, after <see cref="AddCommercialComposition"/>.
+    /// </para>
+    /// <para>
+    /// Every list starts empty. <paramref name="settingsSections"/> are shown as Settings sections, AFTER the composed
+    /// modules' sections and through the same arrangement: the first of two equal ids wins (so a composed contribution
+    /// always beats a supplied one), a built-in id is rejected, then by order and id. <paramref name="unlistedPages"/> are
+    /// pages reached by id only, never listed in the navigation; the shell draws a way back to Settings above them.
+    /// <paramref name="links"/> are drawn by the shell's own controls (a Settings card, or at most one entry at the foot
+    /// of the navigation) and open a page by id. Each view is created once on the UI thread inside the shell's
+    /// try/catch, like any contribution.
+    /// </para>
+    /// <para>
+    /// It receives lists of descriptions and nothing else - no service collection, feature catalog, provider, service
+    /// provider or navigation - so it cannot add a capability, a feature or a service; <see cref="ShellContribution.CreateView"/>
+    /// takes no arguments either. This declaration names no type, assembly or path outside this repository.
+    /// </para>
+    /// </summary>
+    static partial void AddCommercialContributions(
+        IList<ShellContribution> settingsSections, IList<ShellContribution> unlistedPages, IList<ShellLink> links);
 }

@@ -63,6 +63,7 @@ public sealed partial class MainWindow : Window
         Shell = shell;
         Onboarding = onboarding;
         Sidebar.DataContext = shell;
+        AddReturnHeader(localizationService);
         FirstRunView.Localization = localizationService;
         FirstRunView.DataContext = onboarding;
         Onboarding.PropertyChanged += OnOnboardingChanged;
@@ -367,6 +368,48 @@ public sealed partial class MainWindow : Window
         _isWindowActive = args.WindowActivationState != WindowActivationState.Deactivated;
         // UI.11.1 H02 (Cortex S0 D1): a deactivation raises no CaptureLost - a segmented drag in THIS window cancels from here.
         Services.Motion.WindowActivationHub.Default.Publish(AppWindow.Id, _isWindowActive);
+        // M15.4a: back in the window, the composition-supplied links read their label and hint again (a change made on a
+        // page, or elsewhere, shows without waiting for a navigation). Nothing happens without links.
+        if (_isWindowActive) Shell.RefreshLinkText();
+    }
+
+    private Microsoft.UI.Xaml.Controls.Button? _returnHeader;
+
+    /// <summary>
+    /// M15.4a: the host-drawn way back above an unlisted page (<see cref="Controls.ShellReturnHeader"/>), created only
+    /// when there is an unlisted page; without one the window's tree is unchanged.
+    /// </summary>
+    private void AddReturnHeader(ILocalizationService localization)
+    {
+        if (!Shell.HasUnlistedPages) return;
+        _returnHeader = Controls.ShellReturnHeader.Create(
+            localization.GetString(Controls.ShellReturnHeader.TextResourceKey),
+            localization.GetString(Controls.ShellReturnHeader.NameResourceKey),
+            Shell.ReturnToSettings);
+        Microsoft.UI.Xaml.Controls.Grid.SetColumn(_returnHeader, 1);
+        ShellSurface.Children.Add(_returnHeader);
+        Shell.PropertyChanged += OnShellReturnChanged;
+        ContentFrame.SizeChanged += OnContentFrameSizeChanged;
+        UpdateReturnHeader();
+    }
+
+    private void OnShellReturnChanged(object? sender, PropertyChangedEventArgs args)
+    {
+        if (args.PropertyName == nameof(ShellViewModel.IsUnlistedPageShown)) UpdateReturnHeader();
+    }
+
+    private void OnContentFrameSizeChanged(object sender, SizeChangedEventArgs args)
+    {
+        if (_returnHeader is not null) _returnHeader.Margin = Controls.ShellReturnHeader.MarginFor(args.NewSize.Width);
+    }
+
+    private void UpdateReturnHeader()
+    {
+        if (_returnHeader is null) return;
+        _returnHeader.Margin = Controls.ShellReturnHeader.MarginFor(ContentFrame.ActualWidth);
+        var shown = Shell.IsUnlistedPageShown;
+        _returnHeader.Visibility = shown ? Visibility.Visible : Visibility.Collapsed;
+        ContentFrame.Margin = shown ? new Thickness(0, Controls.ShellReturnHeader.FrameOffset, 0, 0) : default;
     }
 
     /// <summary>
@@ -460,6 +503,8 @@ public sealed partial class MainWindow : Window
                 () => SaThemeRefresh.Remount(FirstRunView, FirstRunView.Content, content => FirstRunView.Content = content, restoreFocus: false),
                 () => SaThemeRefresh.Remount(CompactShellView, CompactShellView.Content, content => CompactShellView.Content = content, restoreFocus: false)
             ]);
+            // M15.4a: after the remount, the composition-supplied links read their label and hint again.
+            Shell.RefreshLinkText();
         });
     }
 
@@ -642,6 +687,11 @@ public sealed partial class MainWindow : Window
         RootLayout.ActualThemeChanged -= OnActualThemeChanged;
         Services.Motion.MotionPolicy.Source.Changed -= OnReducedMotionChanged;
         Activated -= OnWindowActivated;
+        if (_returnHeader is not null)
+        {
+            Shell.PropertyChanged -= OnShellReturnChanged;
+            ContentFrame.SizeChanged -= OnContentFrameSizeChanged;
+        }
         Closed -= OnWindowClosed;
     }
 }

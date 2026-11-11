@@ -22,6 +22,9 @@ public sealed class NavigationService : INavigationService
     // m-2: the latest external activation that arrived while the discard question was open (latest-wins).
     private Action? _pendingActivation;
     public NavigationDestination? CurrentDestination { get; private set; }
+
+    /// <inheritdoc />
+    public string? CurrentContributionId { get; private set; }
     public event EventHandler? Navigated;
 
     public void EnsureInitialNavigation()
@@ -244,6 +247,35 @@ public sealed class NavigationService : INavigationService
     }
 
     /// <inheritdoc />
+    public void GoToContribution(string id)
+    {
+        ArgumentNullException.ThrowIfNull(id);
+        _ = Host;
+        if (CurrentDestination == NavigationDestination.Contribution && string.Equals(CurrentContributionId, id, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        // By id through the host's realized views: never a type, never reflection. A view whose factory failed was
+        // never realized, so it cannot be reached here either.
+        if (_serviceProvider.GetService<ShellContributionHost>() is not { } contributions
+            || !contributions.TryGetNavigationView(id, out var view))
+        {
+            _logger.LogWarning("No contributed navigation entry has the id {Id}; nothing changed.", id);
+            return;
+        }
+
+        if (DeferToExitGuard(() => GoToContribution(id)))
+        {
+            return;
+        }
+
+        CurrentContributionId = id;
+        Show(view, NavigationDestination.Contribution);
+        _logger.LogInformation("Navigated to the contributed entry {Id}.", id);
+    }
+
+    /// <inheritdoc />
     public void LeaveCurrentPageThen(Action continuation)
     {
         ArgumentNullException.ThrowIfNull(continuation);
@@ -409,9 +441,16 @@ public sealed class NavigationService : INavigationService
     private void Show(object page, NavigationDestination destination)
     {
         var previous = Host.Content;
+        // A contributed view is created once and shown again on every visit: it is never released here.
+        var previousIsContribution = CurrentDestination == NavigationDestination.Contribution;
         Host.Content = page;
         CurrentDestination = destination;
-        if (!ReferenceEquals(previous, page) && previous is IDisposable disposable)
+        if (destination != NavigationDestination.Contribution)
+        {
+            CurrentContributionId = null;
+        }
+
+        if (!ReferenceEquals(previous, page) && !previousIsContribution && previous is IDisposable disposable)
         {
             disposable.Dispose();
         }

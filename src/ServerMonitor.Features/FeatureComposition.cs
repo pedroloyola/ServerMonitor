@@ -14,7 +14,20 @@ public readonly record struct FeatureCompositionFailure(FeatureId Id, Exception?
 /// <summary>What composition produced: the catalog, and everything that did not make it.</summary>
 public readonly record struct FeatureCompositionResult(
     IFeatureCatalog Catalog,
-    IReadOnlyList<FeatureCompositionFailure> Skipped);
+    IReadOnlyList<FeatureCompositionFailure> Skipped)
+{
+    private readonly ShellContributions? _contributions;
+
+    /// <summary>
+    /// The user interface the COMPOSED modules add, each list in composition order (not yet arranged: see
+    /// <see cref="ShellContributionOrdering"/>). A module that was skipped contributes nothing. Never null.
+    /// </summary>
+    public ShellContributions Contributions
+    {
+        get => _contributions ?? ShellContributions.Empty;
+        init => _contributions = value;
+    }
+}
 
 /// <summary>
 /// Turns a static list of modules into registrations plus a catalog. This is the ONLY place in the product
@@ -76,6 +89,8 @@ public static class FeatureComposition
         var composed = new List<FeatureDescriptor>(modules.Count);
         var skipped = new List<FeatureCompositionFailure>();
         var seen = new HashSet<FeatureId>();
+        var settingsSections = new List<ShellContribution>();
+        var navigationEntries = new List<ShellContribution>();
 
         foreach (var module in modules)
         {
@@ -113,9 +128,19 @@ public static class FeatureComposition
             }
 
             composed.Add(descriptor);
+
+            // User interface follows the module through the SAME gate: only a module composed above is asked for
+            // its contributions, so a skipped module adds no section and no entry. Like Register, a module whose
+            // Contributions throws is a defect in our own module and is not caught.
+            var contributions = module.Contributions ?? ShellContributions.Empty;
+            settingsSections.AddRange(contributions.SettingsSections);
+            navigationEntries.AddRange(contributions.NavigationEntries);
         }
 
-        return new FeatureCompositionResult(new FeatureCatalog(composed), skipped);
+        return new FeatureCompositionResult(new FeatureCatalog(composed), skipped)
+        {
+            Contributions = new ShellContributions(settingsSections, navigationEntries),
+        };
     }
 
     /// <summary>

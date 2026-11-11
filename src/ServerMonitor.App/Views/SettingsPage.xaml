@@ -4,12 +4,30 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:converters="using:ServerMonitor.App.Converters"
     xmlns:primitives="using:ServerMonitor.App.Controls.Primitives"
+    xmlns:views="using:ServerMonitor.App.Views"
 >
     <!-- UI.5 "Definições", Figma 112:7909 (D) / 112:8003 (L): header, three sections (title 17 + glass card of setting
          rows: label 14 Medium + description 12 | control at the right), two disclosures, local-preferences footer.
          Below 700 the control of each row moves under its text (SPEC §5). -->
     <Page.Resources>
         <converters:IndexToBooleanConverter x:Key="IndexToBooleanConverter" />
+        <!-- M15.4a r4 (Figma 303:486 / 303:498): a composition-supplied link card, drawn like the built-in disclosures
+             (icon 18, label, arrow) with its hint visible after the label (12 Medium, secondary). A template, so the icon
+             style follows theme and high-contrast changes. -->
+        <DataTemplate x:Key="SettingsLinkCardTemplate" x:DataType="views:SettingsLinkCardContent">
+            <Grid ColumnSpacing="{StaticResource SaSpace12}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <primitives:SaIcon Data="{x:Bind IconPathData}" Size="18" VerticalAlignment="Center" Style="{ThemeResource SaIconSecondaryStyle}" />
+                <TextBlock Grid.Column="1" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap">
+                    <Run Text="{x:Bind Label, Mode=OneWay}" /><Run Text="{x:Bind HintText, Mode=OneWay}" FontSize="{StaticResource SaFontSizeCaption}" FontWeight="Medium" Foreground="{ThemeResource SaTextSecondaryBrush}" />
+                </TextBlock>
+                <primitives:SaIcon Grid.Column="2" Data="{StaticResource SaIconArrowRight01Data}" Size="17" VerticalAlignment="Center" Style="{ThemeResource SaIconSecondaryStyle}" />
+            </Grid>
+        </DataTemplate>
     </Page.Resources>
 
     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
@@ -56,8 +74,8 @@
                         <Setter Target="DisclosureColumn2.Width" Value="0" />
                         <Setter Target="DisclosureGrid.ColumnSpacing" Value="0" />
                         <Setter Target="DisclosureGrid.RowSpacing" Value="{StaticResource SaSpace12}" />
-                        <Setter Target="AboutDisclosure.(Grid.Column)" Value="0" />
-                        <Setter Target="AboutDisclosure.(Grid.Row)" Value="1" />
+                        <!-- M15.4a r4: "Sobre" is placed from code (SettingsLinkCardLayout: (1,0) here, (0,1) wide without a
+                             contributed card, as before), so a contributed card can sit between the two. -->
                     </VisualState.Setters>
                 </VisualState>
             </VisualStateGroup>
@@ -311,6 +329,10 @@
                     </StackPanel>
                 </Border>
             </StackPanel>
+
+            <!-- M15.4a: sections contributed by feature modules, after the built-in ones. Collapsed (no spacing, nothing
+                 shown) while there are none, so the page is unchanged without contributions. -->
+            <StackPanel x:Name="ContributedSections" Spacing="{StaticResource SaSpace20}" Visibility="Collapsed" />
 
             <!-- Additional settings 112:7984: two disclosures 56 high r20 (Cortex 2: in-page links until UI.6; H-UI5-4:
                  "Sobre" lands on Dados e servidores with its About card in view). -->

@@ -28,4 +28,15 @@ public interface IFeatureModule
     /// </para>
     /// </summary>
     void Register(IServiceCollection services);
+
+    /// <summary>
+    /// The Settings sections and navigation entries this capability adds to the shell (see
+    /// <see cref="ShellContribution"/>). Defaults to none, so a module that adds no user interface implements nothing
+    /// new.
+    /// <para>
+    /// Read by <see cref="FeatureComposition.Compose"/> only for a module it actually composed, right after
+    /// <see cref="Register"/>: a module that is not composed adds no user interface either, and is not even asked.
+    /// </para>
+    /// </summary>
+    ShellContributions Contributions => ShellContributions.Empty;
 }

@@ -23,6 +23,24 @@ public static class SaGroupNavigation
     public static void SetMode(Panel panel, SaGroupNavigationMode value) => panel.SetValue(ModeProperty, value);
 
     /// <summary>
+    /// M15.4a r4 (Prism P-1): a button (not a radio item) that takes part in the group's arrow order, for focus only: the
+    /// arrows reach it like the items around it, Enter/Space activate it (the button's own behaviour), it is never
+    /// selected and a focus entry never lands on it. Set on a child of the panel.
+    /// </summary>
+    public static readonly DependencyProperty IsGroupMemberProperty = DependencyProperty.RegisterAttached(
+        "IsGroupMember", typeof(bool), typeof(SaGroupNavigation), new PropertyMetadata(false));
+
+    public static bool GetIsGroupMember(Control control) => (bool)control.GetValue(IsGroupMemberProperty);
+
+    public static void SetIsGroupMember(Control control, bool value) => control.SetValue(IsGroupMemberProperty, value);
+
+    /// <summary>
+    /// Pure rule (unit-tested): a child belongs to the arrow order when it is a radio item, or a button marked as a member
+    /// (<see cref="IsGroupMemberProperty"/>).
+    /// </summary>
+    internal static bool IsMember(bool isRadioItem, bool isButton, bool markedMember) => isRadioItem || (isButton && markedMember);
+
+    /// <summary>
     /// Pure rule (unit-tested). UI.3 (Beacon F1, WCAG 3.2.1): the selection follows ONLY an arrow move between items of
     /// the group. No focus ENTRY ever selects - Tab, Shift+Tab, the Shift+Tab wrap from the first tab stop of the window,
     /// an XY arrow from a neighbour, a programmatic or UI Automation focus - so moving focus never changes the data shown.
@@ -100,23 +118,27 @@ public static class SaGroupNavigation
 
     private static void OnKeyDown(object sender, KeyRoutedEventArgs e)
     {
-        if (e.OriginalSource is not RadioButton item)
+        if (e.OriginalSource is not Control item || !IsMemberOf(item))
         {
             return;
         }
 
-        var items = ((Panel)sender).Children.OfType<RadioButton>().Where(i => i.IsEnabled && i.Visibility == Visibility.Visible).ToList();
+        var items = ((Panel)sender).Children.OfType<Control>()
+            .Where(i => IsMemberOf(i) && i.IsEnabled && i.Visibility == Visibility.Visible).ToList();
         if (ArrowTarget(e.Key, items.IndexOf(item), items.Count) is { } target)
         {
             items[target].Focus(FocusState.Keyboard);
-            if (SelectsOnFocusMove(GetMode((Panel)sender), arrowInsideGroup: true))
+            if (items[target] is RadioButton radio && SelectsOnFocusMove(GetMode((Panel)sender), arrowInsideGroup: true))
             {
-                items[target].IsChecked = true;
+                radio.IsChecked = true;
             }
 
             e.Handled = true;
         }
     }
+
+    private static bool IsMemberOf(Control control) =>
+        IsMember(control is RadioButton, control is Microsoft.UI.Xaml.Controls.Primitives.ButtonBase, GetIsGroupMember(control));
 
     private static bool IsInside(Panel panel, DependencyObject? element)
     {

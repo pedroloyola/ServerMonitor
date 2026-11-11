@@ -61,6 +61,7 @@ public sealed class Ui7NavigationGuardTests
     [InlineData("public void GoToHistory()")]
     [InlineData("public void GoToServerEditor(ServerEditorRequest request, Action? refused = null)")]
     [InlineData("public void LeaveCurrentPageThen(Action continuation)")]
+    [InlineData("public void GoToContribution(string id)")] // M15.4a: a contributed entry passes the same guard
     public void EveryNavigationMethod_PassesTheGuard_BeforeShowingAnything(string signature)
     {
         var code = AppSourceTree.CodeWithoutComments("Services/NavigationService.cs").Replace("\r\n", "\n", StringComparison.Ordinal);

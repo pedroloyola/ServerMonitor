@@ -238,3 +238,119 @@ Os workloads têm secção própria no detalhe do servidor (apenas Standard Mode
 **não** aparecem no modo compacto. Ações remotas (restart de serviços/containers, gestão Docker) ficam
 explicitamente fora do M11 — são V3 do roadmap. Decisões, catálogo completo, tabelas de mapeamento e
 limites constam da ADR-016.
+
+## Ponto de extensão da interface (contribuições do shell)
+
+Um `IFeatureModule` estático pode acrescentar interface ao shell através de `Contributions`
+(`ShellContributions`, em `ServerMonitor.Features`). Cada contribuição é um descritor neutro
+`ShellContribution { Id, Order, TitleResourceKey, CreateView, IconPathData? }`, de dois tipos: **secções de
+Definições** (mostradas na página Definições, depois das secções próprias) e **entradas de navegação** (mostradas na
+barra lateral, depois de Histórico e antes de Definições). O membro tem implementação por omissão vazia, por isso os
+módulos existentes não mudam; nenhum módulo deste repositório contribui interface hoje.
+
+- **Mesmo gate dos serviços.** `FeatureComposition.Compose` só lê `Contributions` de um módulo que compôs.
+  Um módulo incondicional contribui sempre, diga o fornecedor o que disser (mesmo que lance); um módulo
+  condicional recusado não contribui nada e nem chega a ser consultado. O fornecedor continua fora do
+  contentor.
+- **Encaminhamento por `Id`.** O shell cria a vista chamando `CreateView` e navega por id
+  (`INavigationService.GoToContribution`, que passa pelo mesmo exit guard das outras navegações), sem tipo genérico
+  nem reflexão; as páginas próprias continuam a usar `NavigateTo<TPage>()`.
+- **Ordem determinística.** `ShellContributionOrdering.Arrange`: um id repetido ou igual a um id próprio do
+  shell é descartado (ganha o primeiro, pela ordem de composição) e registado em log; os restantes ordenam-se
+  por `Order` e depois por `Id` (ordinal).
+- **O que o shell aceita.** Uma entrada de navegação tem de ser uma `Page` (o shell remonta-a no frame quando o tema
+  muda); uma secção de Definições pode ser qualquer `FrameworkElement`. Em ambos os casos, um elemento novo, sem pai.
+  Um título sem recurso fica registado em log e mostra um rótulo neutro ("Sem título"), nunca o id. Sem ícone, a
+  entrada usa o ícone genérico; um ícone que não seja path markup válido é verificado no host, dentro do isolamento,
+  fica no log e é trocado pelo genérico, por isso nunca chega à barra lateral.
+- **Falhas nunca fatais.** `ShellContributionHost` cria as vistas uma vez, no thread de UI, dentro de try/catch: uma
+  fábrica que lança, ou que devolve algo que o shell não aceita, remove só essa contribuição e fica no log (tipo da
+  exceção, nunca a mensagem). Colocar a vista na árvore também passa por try/catch (`TryAttach`), secção a secção, por
+  isso uma secção que falhe ao entrar deixa a página Definições construída.
+- **Vida das vistas.** Cada vista é criada uma vez e dura o processo inteiro: volta a ser mostrada em cada visita e
+  nunca é descartada. Tem de aguentar vários `Loaded`/`Unloaded` (navegação e mudança de tema), libertar o que segura
+  em `Unloaded` e não depender de `Dispose`.
+- **Sem contribuições, sem mudança.** As sequências de ids da navegação (`overview`, `servers`, `history`,
+  `settings`) e das secções de Definições (`appearance`, `monitoring`, `window`) ficam iguais à baseline
+  guardada nos testes, que também a confrontam com o XAML.
+
+Só se aceitam módulos estáticos, listados no composition root; não há carregamento dinâmico.
+
+**Contribuições fornecidas pela composição.** Ao lado do gancho de módulos, `App.xaml.cs` declara um segundo gancho
+parcial vazio, na mesma forma clássica: sem implementação, o compilador remove a chamada. Recebe três listas novas e
+vazias, e só isso (nem contentor, nem catálogo, nem fornecedor, nem navegação), por isso não pode acrescentar
+capacidades, funcionalidades nem serviços. Só corre fora dos arranques de QA. As três listas:
+
+- **Secções de Definições** (`ShellContribution`): depois das contribuições dos módulos compostos e pela mesma
+  ordenação; em caso de id igual ganha a contribuição composta, e os ids próprios do shell são rejeitados.
+- **Páginas não listadas** (`ShellContribution`, vista `Page` sem pai): alcançadas só por id (`GoToContribution`),
+  nunca aparecem na barra lateral. Um id já usado por uma entrada de navegação ou por um destino próprio é rejeitado.
+- **Ligações** (`ShellLink { Id, Order, TitleResourceKey, TargetId, Placement, Label?, Hint?, IconPathData? }`, sem
+  vista): o shell desenha-as com os seus próprios controlos. `SettingsCard` é um cartão na linha de cartões-ligação
+  das Definições, entre "Dados e servidores" e "Sobre o ServerAlyzer": três por linha em largo, um por linha abaixo de
+  700, pela mesma ordem; sem cartões contribuídos, a linha é a de sempre (dois). O cartão tem ícone 18, rótulo e a dica
+  visível a seguir (12 Medium, cor secundária), e é desenhado por um template, por isso segue o tema e o alto
+  contraste. `SidebarFooter` é uma entrada no rodapé da barra lateral, logo acima de Definições: em expandido, uma
+  pílula de 176×36 (raio 12, preenchimento sólido dos tokens, sem contorno) com uma linha de 12 px "rótulo · dica";
+  no rail, o círculo de 46 com o ícone e uma tooltip. Em expandido, a linha completa aparece em tooltip só quando
+  está cortada. Está na ordem das setas da barra lateral, entre o último destino
+  e Definições, só para foco (Enter/Espaço ativam, nunca fica selecionada). Há no máximo uma (ganha a primeira pela
+  ordenação, as outras ficam no log). O nome para o Narrador é o rótulo e o texto de ajuda é a dica. Abrir uma ligação navega por id, pelo exit guard. Uma ligação cujo
+  `TargetId` não é uma página que o shell mostra é descartada, com log. O rótulo e a dica dinâmicos são lidos pelo
+  shell, dentro de try/catch, quando a ligação é construída, depois de cada navegação, quando a janela volta a ficar
+  ativa e depois de mudar o tema. Se o fornecedor lançar ou não devolver nada, aparece o título do recurso e depois
+  "Sem título", nunca o id.
+
+Os módulos não podem fornecer páginas não listadas nem ligações: `FeatureComposition` só recolhe as secções e as
+entradas de navegação de um módulo composto.
+
+**Contrato das páginas não listadas.** Uma página não listada não navega sozinha. Por cima dela, a janela desenha um
+cabeçalho de retorno, "‹ Definições": é um controlo do shell, com teclado, anel de foco e nome para o Narrador, que vai
+para Definições pela navegação e pelo exit guard da página. Fica alinhado com o padding da página: 40 em largo, 24
+quando o conteúdo tem menos de 700. A navegação entre sub-páginas fica dentro da própria
+`Page`. A página é criada uma vez e nunca é descartada, como qualquer vista contribuída.
+
+**Sem nada fornecido, sem mudança.** Sem ligações nem páginas não listadas, não há pílula no rodapé, cartão,
+cabeçalho de retorno nem rotas novas. Nenhum destes controlos é criado e a árvore é a do XAML.
+
+**Larguras da barra lateral.** A coluna expandida tem 224 (padding 24 + 24) e todos os itens expandidos têm 176: os
+destinos próprios, as entradas contribuídas, a pílula do rodapé e Definições. No rail, os itens são o círculo de 46,
+numa coluna de 80; o breakpoint continua nos 1040. O padding do conteúdo das páginas continua a 40.
+
+## Fronteira de rede
+
+`NetworkBoundaryAllowlistTests` lê os metadados compilados de Core, Infrastructure, Collectors, Features, App, o
+fornecedor do widget e os dois assemblies de contrato, e compara-os com listas exatas medidas no código:
+
+- **Tipos:** qualquer tipo de `System.Net`, `Windows.Web` ou `Windows.Networking` (e subnamespaces). Hoje só há tipos
+  de endereço, de interface e de erro (`IPAddress`, `AddressFamily`, `NetworkInterface`, `SocketError`,
+  `SocketException`), nenhum dos quais abre ligações.
+- **Assemblies:** nenhuma camada pode referenciar um assembly que faz ligações (`System.Net.Http`, `Sockets`,
+  `Requests`, `WebClient`, `WebSockets`, `NameResolution`, `Ping`, `Quic`, `Security`, `Mail`, `HttpListener`,
+  `Microsoft.Extensions.Http`, entre outros). Todas as outras referências fora da família `System` estão numa lista por
+  camada, por isso um pacote novo passa por revisão. Os pacotes da lista que fazem ligações são os dois caminhos
+  existentes: SSH.NET (os servidores do utilizador) e Tmds.MDns (descoberta na rede local). Um assembly do produto
+  referenciado por uma camada tem de ser ele próprio uma camada lida.
+- **Módulos nativos:** cada biblioteca importada com `DllImport`/`LibraryImport`.
+- **O que as frameworks de UI vão buscar sozinhas:** `WebView2` e o namespace `Microsoft.Web.WebView2`; todas as
+  fontes de imagem (`ImageSource` e o namespace `Microsoft.UI.Xaml.Media.Imaging`, por isso uma string convertida em
+  imagem, por `XamlBindingHelper.ConvertValue` ou por um `x:Bind` de uma string a um `Source`, também é vista); os
+  namespaces `Windows.Media.Streaming` e `Windows.Services.Store`; e, por padrão de nome, qualquer membro de um tipo
+  `Windows.*`/`Microsoft.*` com `FromUri` no nome (`MediaSource.CreateFromUri`, `XmlDocument.LoadFromUriAsync`,
+  `StorageFile.CreateStreamedFileFromUriAsync`, `RandomAccessStreamReference.CreateFromUri`, …). Hoje só aparece
+  `RenderTargetBitmap`, na autoverificação de QA, que desenha um elemento local e não abre URI.
+  `Windows.System.Launcher` está na lista onde é usado: entrega o endereço ao browser do utilizador (ou ao protocolo da
+  própria app) e a app não faz ligação nenhuma.
+- **Fontes de imagem e media na XAML da App:** a XAML compila para binário e não para IL, por isso os elementos que
+  carregam um URI (`Image`, `ImageBrush`, `BitmapIcon`, `ImageIcon`, `PersonPicture`, `MediaPlayerElement`, `WebView2`,
+  `BitmapImage`, `SvgImageSource`) com a fonte ligada (`x:Bind`, `Binding`, `TemplateBinding`) estão numa lista, tal
+  como qualquer `BitmapImage`, `SvgImageSource` ou `WebView2` declarado. Hoje as duas listas estão vazias.
+- **Endereços escritos no produto:** cada literal `http://`/`https://` no código compilado das camadas e na XAML da
+  App, numa lista exata com o seu destino. Hoje há um: a página do projeto, aberta no browser a partir de Acerca de.
+  Identificadores de namespace XML não são endereços e ficam de fora. Não são vistos os endereços construídos em
+  runtime (ficheiros de recursos, dados do utilizador); esses só chegam à rede pelos tipos e membros acima.
+- **Limites documentados:** um tipo resolvido por nome em runtime (proibido pela guarda R6c); um membro de framework
+  que carrega um URI sem `FromUri` no nome e fora da lista; e um URI dado a um elemento por um setter genérico
+  (`SetValue` com uma propriedade encontrada em runtime) ou por um estilo, que não nomeia nenhum tipo vigiado.
+
+Um novo caminho de rede é uma decisão de produto que altera estas listas em revisão.
