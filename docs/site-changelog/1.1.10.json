@@ -1,0 +1,64 @@
+{
+  "version": "1.1.10",
+  "date": "2026-11-11",
+  "en": {
+    "title": "A little more room in the sidebar",
+    "blocks": [
+      {
+        "kind": "ul",
+        "items": [
+          "The sidebar is slightly wider, so page names have more space before they are shortened. Everything else works as in 1.1.9."
+        ]
+      },
+      {
+        "kind": "note",
+        "text": "Known issues: at a Windows text size of about 175% or larger, some text in Settings can be cut off and wrapped descriptions can overlap. Switching straight from one high contrast theme to another while the app is open can leave the selected sidebar item with the previous theme's highlight; choose Exit ServerAlyzer in the notification area menu and open the app again. Fixes are planned for a later version."
+      }
+    ]
+  },
+  "pt-pt": {
+    "title": "Um pouco mais de espaço na barra lateral",
+    "blocks": [
+      {
+        "kind": "ul",
+        "items": [
+          "A barra lateral está ligeiramente mais larga, por isso os nomes das páginas têm mais espaço antes de serem encurtados. Tudo o resto funciona como na 1.1.9."
+        ]
+      },
+      {
+        "kind": "note",
+        "text": "Problemas conhecidos: com o tamanho do texto do Windows a cerca de 175% ou mais, algum texto nas Definições pode ficar cortado e descrições em várias linhas podem sobrepor-se. Mudar diretamente de um tema de alto contraste para outro com a aplicação aberta pode deixar o item selecionado da barra lateral com o destaque do tema anterior; escolha Sair do ServerAlyzer no menu da área de notificação e volte a abrir a aplicação. Estão previstas correções numa versão futura."
+      }
+    ]
+  },
+  "pt-br": {
+    "title": "Um pouco mais de espaço na barra lateral",
+    "blocks": [
+      {
+        "kind": "ul",
+        "items": [
+          "A barra lateral ficou um pouco mais larga, então os nomes das páginas têm mais espaço antes de serem encurtados. Todo o resto funciona como na 1.1.9."
+        ]
+      },
+      {
+        "kind": "note",
+        "text": "Problemas conhecidos: com o tamanho de texto do Windows em cerca de 175% ou mais, alguns textos nas Configurações podem ficar cortados e descrições em várias linhas podem se sobrepor. Trocar diretamente de um tema de alto contraste para outro com o aplicativo aberto pode deixar o item selecionado da barra lateral com o destaque do tema anterior; escolha Sair do ServerAlyzer no menu da área de notificação e abra o aplicativo de novo. Correções estão previstas para uma versão futura."
+      }
+    ]
+  },
+  "es": {
+    "title": "Un poco más de espacio en la barra lateral",
+    "blocks": [
+      {
+        "kind": "ul",
+        "items": [
+          "La barra lateral es un poco más ancha, así que los nombres de las páginas tienen más espacio antes de acortarse. Todo lo demás funciona como en la 1.1.9."
+        ]
+      },
+      {
+        "kind": "note",
+        "text": "Problemas conocidos: con un tamaño de texto de Windows de aproximadamente el 175 % o más, parte del texto de Settings puede cortarse y las descripciones en varias líneas pueden solaparse. Cambiar directamente de un tema de alto contraste a otro con la aplicación abierta puede dejar el elemento seleccionado de la barra lateral con el resaltado del tema anterior; elige Exit ServerAlyzer en el menú del área de notificación y vuelve a abrir la aplicación. Hay correcciones previstas para una versión posterior."
+      }
+    ]
+  }
+}

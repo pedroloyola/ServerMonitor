@@ -1,0 +1,60 @@
+{
+  "version": "1.1.8",
+  "date": "2026-11-08",
+  "en": {
+    "title": "Screen reader support and alert reliability",
+    "blocks": [
+      {
+        "kind": "ul",
+        "items": [
+          "On the Servers page, a server whose data is out of date now tells screen readers how old that data is.",
+          "When a local network search ends on its own, the app now tells screen readers how it ended.",
+          "Clearer Portuguese examples in the server editor: the field hints now say “Por exemplo:” instead of “Ex.:”.",
+          "Fixed a rare case in which an alert could be held back for up to 5 minutes after a server stopped being monitored and was then monitored again."
+        ]
+      }
+    ]
+  },
+  "pt-pt": {
+    "title": "Leitores de ecrã e alertas mais fiáveis",
+    "blocks": [
+      {
+        "kind": "ul",
+        "items": [
+          "Na página Servidores, um servidor com dados desatualizados passa a indicar aos leitores de ecrã a idade desses dados.",
+          "Quando uma pesquisa na rede local termina por si, a app passa a indicar aos leitores de ecrã como terminou.",
+          "Exemplos mais claros em português no editor de servidores: as sugestões dos campos passam a dizer “Por exemplo:” em vez de “Ex.:”.",
+          "Corrigido um caso raro em que um alerta podia ficar retido até 5 minutos depois de um servidor deixar de ser monitorizado e voltar a sê-lo."
+        ]
+      }
+    ]
+  },
+  "pt-br": {
+    "title": "Leitores de tela e alertas mais confiáveis",
+    "blocks": [
+      {
+        "kind": "ul",
+        "items": [
+          "Na página Servidores, um servidor com dados desatualizados agora informa aos leitores de tela a idade desses dados.",
+          "Quando uma busca na rede local termina sozinha, o app agora informa aos leitores de tela como ela terminou.",
+          "Exemplos mais claros em português no editor de servidor: as dicas dos campos agora dizem “Por exemplo:” em vez de “Ex.:”.",
+          "Corrigido um caso raro em que um alerta podia ficar retido por até 5 minutos depois que um servidor deixava de ser monitorado e voltava a ser monitorado."
+        ]
+      }
+    ]
+  },
+  "es": {
+    "title": "Lectores de pantalla y alertas más fiables",
+    "blocks": [
+      {
+        "kind": "ul",
+        "items": [
+          "En la página Servers, un servidor con datos desactualizados ahora indica a los lectores de pantalla la antigüedad de esos datos.",
+          "Cuando una búsqueda en la red local termina por sí sola, la app ahora indica a los lectores de pantalla cómo terminó.",
+          "Ejemplos más claros en portugués en el editor de servidores: las indicaciones de los campos ahora dicen “Por exemplo:” en lugar de “Ex.:”.",
+          "Corregido un caso poco frecuente en el que una alerta podía retenerse hasta 5 minutos después de que un servidor dejara de monitorizarse y volviera a monitorizarse."
+        ]
+      }
+    ]
+  }
+}
