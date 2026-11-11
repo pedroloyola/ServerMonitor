@@ -36,6 +36,8 @@ public sealed partial class SettingsPage : Page, ISettingsNavigationTarget
         // change resizes a text block).
         WidthStates.CurrentStateChanged += (_, _) => PlaceLinkCards();
         Loaded += (_, _) => PlaceLinkCards();
+        // LOW-1: the columns come from the page's own ActualWidth, so its resize is the direct trigger; the text hooks
+        // below add text, language and text-scale changes.
         SizeChanged += (_, _) => PlaceLinkCards();
         DataDisclosureText.SizeChanged += (_, _) => PlaceLinkCards();
         AboutDisclosureText.SizeChanged += (_, _) => PlaceLinkCards();
@@ -64,7 +66,8 @@ public sealed partial class SettingsPage : Page, ISettingsNavigationTarget
             card.Click += (_, _) => _navigation.GoToContribution(target);
             // D-3: its template text is realised with the card; a resize re-checks the widest text.
             card.SizeChanged += (_, _) => PlaceLinkCards();
-            DisclosureGrid.Children.Add(card);
+            // D-4: before "Sobre", so the tree order is the visual order (Tab and Narrator alike).
+            SettingsLinkCardLayout.AddBefore(DisclosureGrid.Children, AboutDisclosure, card);
             _linkCards.Add((link, card, content));
         }
 

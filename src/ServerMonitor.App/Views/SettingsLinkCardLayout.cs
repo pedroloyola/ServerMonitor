@@ -71,4 +71,21 @@ internal static class SettingsLinkCardLayout
 
     /// <summary>The rows the grid needs, never fewer than the XAML declares (an unused Auto row takes no space).</summary>
     internal static int Rows(int contributed, int columns) => Math.Max(DeclaredRows, UsedRows(contributed, columns));
+
+    /// <summary>
+    /// FIX-OVERVIEW-FIT D-4: a contributed card joins the grid's children just before "Sobre o ServerAlyzer", so the
+    /// tree order (Tab, Shift+Tab, Narrator, UI Automation) is the visual order: "Dados e servidores", the contributed
+    /// cards in the shell's order, then "Sobre". Without "Sobre" among the children it is added last.
+    /// </summary>
+    internal static void AddBefore<T>(IList<T> children, T about, T card)
+    {
+        var index = children.IndexOf(about);
+        if (index < 0)
+        {
+            children.Add(card);
+            return;
+        }
+
+        children.Insert(index, card);
+    }
 }

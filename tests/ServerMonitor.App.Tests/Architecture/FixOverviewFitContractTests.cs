@@ -291,10 +291,15 @@ public sealed class FixOverviewFitContractTests
         Assert.Contains("foreach (var (_, card, _) in _linkCards)", widestBody, StringComparison.Ordinal);
         Assert.Contains("widest = Math.Max(widest, UnconstrainedWidth(text));", widestBody, StringComparison.Ordinal);
         Assert.Contains("text.Measure(new Windows.Foundation.Size(double.PositiveInfinity, double.PositiveInfinity));", code, StringComparison.Ordinal);
-        foreach (var source in new[] { "SizeChanged", "DataDisclosureText.SizeChanged", "AboutDisclosureText.SizeChanged", "card.SizeChanged" })
+        foreach (var source in new[] { "DataDisclosureText.SizeChanged", "AboutDisclosureText.SizeChanged", "card.SizeChanged" })
         {
             Assert.Contains(source + " += (_, _) => PlaceLinkCards();", code, StringComparison.Ordinal);
         }
+
+        // LOW-1: the page's own resize, matched on its own (a bare "SizeChanged" is also the end of the text hooks above).
+        // The columns are computed from the page's ActualWidth, so this is the direct trigger.
+        Assert.Matches(@"(?<![\w.])SizeChanged \+= \(_, _\) => PlaceLinkCards\(\);", code);
+        Assert.Contains("SettingsLinkCardLayout.Columns(count, ActualWidth, WidestCardText())", code, StringComparison.Ordinal);
 
         // A label or hint change re-places the cards.
         var apply = code[code.IndexOf("private void ApplyLinkCardText()", StringComparison.Ordinal)..];

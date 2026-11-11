@@ -302,7 +302,10 @@ public sealed class ShellLinksAndUnlistedPagesTests
         var settings = AppSourceTree.CodeWithoutComments("Views/SettingsPage.xaml.cs");
 
         Assert.Contains("card.Click += (_, _) => _navigation.GoToContribution(target);", settings, StringComparison.Ordinal);
-        Assert.Contains("DisclosureGrid.Children.Add(card);", settings, StringComparison.Ordinal);
+        // FIX-OVERVIEW-FIT D-4: each card goes in before "Sobre", never appended after it.
+        Assert.Contains("SettingsLinkCardLayout.AddBefore(DisclosureGrid.Children, AboutDisclosure, card);", settings, StringComparison.Ordinal);
+        Assert.DoesNotContain("DisclosureGrid.Children.Add(", settings, StringComparison.Ordinal);
+        Assert.DoesNotContain("TabIndex", settings, StringComparison.Ordinal);
         Assert.DoesNotContain("ContributedSections.Children.Add(card)", settings, StringComparison.Ordinal);
         Assert.Contains("SaDisclosureButtonStyle", settings, StringComparison.Ordinal);
     }
@@ -460,6 +463,52 @@ public sealed class ShellLinksAndUnlistedPagesTests
         Assert.Equal((0, 2), CardLayout.Place(CardLayout.ContributedSequence(1), wide));
         Assert.Equal((1, 0), CardLayout.Place(CardLayout.AboutSequence(2), wide));
         Assert.Equal(2, CardLayout.UsedRows(2, wide));
+    }
+
+    /// <summary>
+    /// FIX-OVERVIEW-FIT D-4: the grid's children (the tree order that Tab, Shift+Tab, Narrator and UI Automation follow)
+    /// are the visual order: "Dados e servidores", the contributed cards in the shell's order, then "Sobre". Without a
+    /// contributed card the children are the XAML's, unchanged. The cards come from a host over test contributions.
+    /// </summary>
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(4)]
+    public void TheTreeOrder_IsTheVisualOrder_WithAndWithoutContributedCards(int contributed)
+    {
+        var host = Host(With(unlisted: [Page("extra.page")], links:
+            [.. Enumerable.Range(0, contributed).Select(i => Link($"card.{i}", "extra.page", ShellLinkPlacement.SettingsCard, order: i))]));
+        var page = AppSourceTree.LoadXaml("Views/SettingsPage.xaml");
+        var grid = page.Descendants().Single(e => (string?)e.Attribute(AppSourceTree.Xaml + "Name") == "DisclosureGrid");
+        var children = grid.Elements().Where(e => e.Name.LocalName == "Button").Select(e => (string)e.Attribute(AppSourceTree.Xaml + "Uid")!).ToList();
+        const string Data = "SettingsOpenDataButton";
+        const string About = "SettingsOpenAboutButton";
+        Assert.Equal([Data, About], children);
+
+        foreach (var card in host.SettingsCards)
+        {
+            CardLayout.AddBefore(children, About, card.Id);
+        }
+
+        Assert.Equal(contributed, host.SettingsCards.Count);
+        Assert.Equal([Data, .. Enumerable.Range(0, contributed).Select(i => $"card.{i}"), About], children);
+        // The tree index of every card is its place in the layout, so focus moves cell by cell in reading order.
+        Assert.Equal(CardLayout.DataSequence, children.IndexOf(Data));
+        for (var i = 0; i < contributed; i++)
+        {
+            Assert.Equal(CardLayout.ContributedSequence(i), children.IndexOf($"card.{i}"));
+        }
+
+        Assert.Equal(CardLayout.AboutSequence(contributed), children.IndexOf(About));
+    }
+
+    [Fact]
+    public void WithoutSobreAmongTheChildren_ACardIsAddedLast()
+    {
+        List<string> children = ["data"];
+        CardLayout.AddBefore(children, "about", "card");
+        Assert.Equal(["data", "card"], children);
     }
 
     [Fact]
