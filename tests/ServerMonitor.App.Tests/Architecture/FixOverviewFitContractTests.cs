@@ -284,6 +284,11 @@ public sealed class FixOverviewFitContractTests
         var code = AppSourceTree.CodeWithoutComments("Views/SettingsPage.xaml.cs");
         Assert.Contains("var widest = Math.Max(UnconstrainedWidth(DataDisclosureText), UnconstrainedWidth(AboutDisclosureText));", code, StringComparison.Ordinal);
         Assert.Contains("card.ContentTemplateRoot is Panel root && root.Children.OfType<TextBlock>().FirstOrDefault() is { } text", code, StringComparison.Ordinal);
+        // Each contributed card's text counts towards the widest, not only the two built-in cards.
+        var widestBody = code[code.IndexOf("private double WidestCardText()", StringComparison.Ordinal)..];
+        widestBody = widestBody[..widestBody.IndexOf("return widest;", StringComparison.Ordinal)];
+        Assert.Contains("foreach (var (_, card, _) in _linkCards)", widestBody, StringComparison.Ordinal);
+        Assert.Contains("widest = Math.Max(widest, UnconstrainedWidth(text));", widestBody, StringComparison.Ordinal);
         Assert.Contains("text.Measure(new Windows.Foundation.Size(double.PositiveInfinity, double.PositiveInfinity));", code, StringComparison.Ordinal);
         foreach (var source in new[] { "SizeChanged", "DataDisclosureText.SizeChanged", "AboutDisclosureText.SizeChanged", "card.SizeChanged" })
         {
