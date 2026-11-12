@@ -1,3 +1,9 @@
-O ServerAlyzer 1.1.10 dá um pouco mais de espaço à barra lateral.
+O ServerAlyzer 1.1.11 faz com que a Visão geral e as Definições caibam melhor em janelas mais pequenas.
 
-Barra lateral. A barra lateral está ligeiramente mais larga, por isso os nomes das páginas têm mais espaço antes de serem encurtados. Tudo o resto funciona como na 1.1.9.
+Visão geral. A barra de saúde nunca fica cortada: numa janela estreita passa para baixo das contagens de servidores, e o último segmento mantém a ponta arredondada.
+
+Páginas. Quando percorre uma página, o conteúdo já não passa por baixo da zona da barra de título.
+
+Definições. Os cartões ficam empilhados em vez de cortados quando a janela é estreita, e a tecla Tab e os leitores de ecrã percorrem-nos pela ordem em que os vê.
+
+Barra lateral. A barra lateral está ligeiramente mais larga, por isso os nomes das páginas têm mais espaço antes de serem encurtados.

@@ -42,9 +42,11 @@ Store listing.
 
 ## Current contents
 
-Notes for **1.1.10** (package 1.1.10.0, tag `v1.1.10`). They replace the 1.1.9 text and describe only
-the user-visible change in that release: the sidebar is slightly wider (224 px, was 208 px), so page
-names have more room before they are shortened.
+Notes for **1.1.11** (package 1.1.11.0, tag `v1.1.11`). The Store still offers 1.1.9, and 1.1.10 was released
+on GitHub only, so these notes describe the user-visible changes since 1.1.9: the Overview health bar is
+never cut off (it moves below the server counts in a narrow window, and its last segment keeps its rounded
+end), scrolled page content clears the title bar area, the Settings cards stack instead of being cut off
+and are reached by Tab and screen readers in visual order, and the sidebar is slightly wider (from 1.1.10).
 
-Known issues that are **not** fixed in 1.1.10 (large text size, switching between two high contrast
-themes) are listed in `docs/release/1.1.10-known-issues.md`. Do not describe them as fixed here.
+Known issues that are **not** fixed in 1.1.11 (large text size, switching between two high contrast
+themes) are listed in `docs/release/1.1.11-known-issues.md`. Do not describe them as fixed here.
