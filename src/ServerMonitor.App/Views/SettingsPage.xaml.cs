@@ -32,8 +32,15 @@ public sealed partial class SettingsPage : Page, ISettingsNavigationTarget
         _navigation = navigation;
         AddContributedSections(contributions);
         AddLinkCards(contributions);
-        WidthStates.CurrentStateChanged += (_, args) => PlaceLinkCards(args.NewState?.Name == "Narrow");
-        Loaded += (_, _) => PlaceLinkCards(WidthStates.CurrentState?.Name == "Narrow");
+        // FIX-OVERVIEW-FIT D-3: the cards follow the viewport and the widest card text (a text, language or text-scale
+        // change resizes a text block).
+        WidthStates.CurrentStateChanged += (_, _) => PlaceLinkCards();
+        Loaded += (_, _) => PlaceLinkCards();
+        // LOW-1: the columns come from the page's own ActualWidth, so its resize is the direct trigger; the text hooks
+        // below add text, language and text-scale changes.
+        SizeChanged += (_, _) => PlaceLinkCards();
+        DataDisclosureText.SizeChanged += (_, _) => PlaceLinkCards();
+        AboutDisclosureText.SizeChanged += (_, _) => PlaceLinkCards();
         Loaded += OnLoaded;
     }
 
@@ -57,7 +64,10 @@ public sealed partial class SettingsPage : Page, ISettingsNavigationTarget
             };
             var target = link.TargetId;
             card.Click += (_, _) => _navigation.GoToContribution(target);
-            DisclosureGrid.Children.Add(card);
+            // D-3: its template text is realised with the card; a resize re-checks the widest text.
+            card.SizeChanged += (_, _) => PlaceLinkCards();
+            // D-4: before "Sobre", so the tree order is the visual order (Tab and Narrator alike).
+            SettingsLinkCardLayout.AddBefore(DisclosureGrid.Children, AboutDisclosure, card);
             _linkCards.Add((link, card, content));
         }
 
@@ -75,33 +85,64 @@ public sealed partial class SettingsPage : Page, ISettingsNavigationTarget
     }
 
     /// <summary>
-    /// M15.4a r4: every card's cell for the current width state (SettingsLinkCardLayout): "Sobre" always (the XAML's
-    /// Narrow state no longer moves it), the contributed cards, the third column and the rows when there are any.
-    /// Without a contributed card this is the XAML's row exactly: "Sobre" at (0,1) wide and (1,0) narrow.
+    /// M15.4a r4 + FIX-OVERVIEW-FIT D-3: every card's cell (SettingsLinkCardLayout) for the viewport and the widest card
+    /// text: "Sobre" always, the columns and gaps (one per row: the Narrow state's arrangement, also at 700 and above when
+    /// a text would not fit), then the contributed cards, the third column and the rows when there are any. Without a
+    /// contributed card and with the texts fitting, this is the XAML's row exactly: "Sobre" at (0,1) wide, (1,0) narrow.
     /// </summary>
-    private void PlaceLinkCards(bool narrow)
+    private void PlaceLinkCards()
     {
         var count = _linkCards.Count;
-        var (aboutRow, aboutColumn) = SettingsLinkCardLayout.Place(SettingsLinkCardLayout.AboutSequence(count), count, narrow);
+        var columns = SettingsLinkCardLayout.Columns(count, ActualWidth, WidestCardText());
+        var stacked = columns == 1;
+        var (aboutRow, aboutColumn) = SettingsLinkCardLayout.Place(SettingsLinkCardLayout.AboutSequence(count), columns);
         Grid.SetRow(AboutDisclosure, aboutRow);
         Grid.SetColumn(AboutDisclosure, aboutColumn);
+        DisclosureColumn2.Width = stacked ? new GridLength(0) : new GridLength(1, GridUnitType.Star);
+        DisclosureGrid.ColumnSpacing = stacked ? 0 : (double)Application.Current.Resources["SaSpace24"];
+        // One per row, or a wide second row of cards: the narrow row gap; a single wide row: none (the XAML's).
+        DisclosureGrid.RowSpacing = stacked || SettingsLinkCardLayout.UsedRows(count, columns) > 1
+            ? (double)Application.Current.Resources["SaSpace12"]
+            : 0;
         if (count == 0) return;
 
-        _cardColumn!.Width = narrow ? new GridLength(0) : new GridLength(1, GridUnitType.Star);
-        var rows = SettingsLinkCardLayout.Rows(count, narrow);
+        _cardColumn!.Width = stacked ? new GridLength(0) : new GridLength(1, GridUnitType.Star);
+        var rows = SettingsLinkCardLayout.Rows(count, columns);
         while (DisclosureGrid.RowDefinitions.Count < rows) DisclosureGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         while (DisclosureGrid.RowDefinitions.Count > rows) DisclosureGrid.RowDefinitions.RemoveAt(DisclosureGrid.RowDefinitions.Count - 1);
-        // Wide, a second row of cards takes the narrow row gap; a single row keeps the XAML's (none). Narrow, the XAML sets it.
-        if (!narrow && SettingsLinkCardLayout.UsedRows(count, narrow) > 1)
-            DisclosureGrid.RowSpacing = (double)Application.Current.Resources["SaSpace12"];
-        else
-            DisclosureGrid.ClearValue(Grid.RowSpacingProperty);
         for (var i = 0; i < count; i++)
         {
-            var (row, column) = SettingsLinkCardLayout.Place(SettingsLinkCardLayout.ContributedSequence(i), count, narrow);
+            var (row, column) = SettingsLinkCardLayout.Place(SettingsLinkCardLayout.ContributedSequence(i), columns);
             Grid.SetRow(_linkCards[i].Card, row);
             Grid.SetColumn(_linkCards[i].Card, column);
         }
+    }
+
+    /// <summary>
+    /// D-3: the widest one-line width any card's text needs: the two built-in cards and each contributed card's
+    /// template text (label + hint), each measured unconstrained.
+    /// </summary>
+    private double WidestCardText()
+    {
+        var widest = Math.Max(UnconstrainedWidth(DataDisclosureText), UnconstrainedWidth(AboutDisclosureText));
+        foreach (var (_, card, _) in _linkCards)
+        {
+            if (card.ContentTemplateRoot is Panel root && root.Children.OfType<TextBlock>().FirstOrDefault() is { } text)
+            {
+                widest = Math.Max(widest, UnconstrainedWidth(text));
+            }
+        }
+
+        return widest;
+    }
+
+    /// <summary>The width <paramref name="text"/> needs on one line; its layout is then measured again in its column.</summary>
+    private static double UnconstrainedWidth(TextBlock text)
+    {
+        text.Measure(new Windows.Foundation.Size(double.PositiveInfinity, double.PositiveInfinity));
+        var width = text.DesiredSize.Width;
+        text.InvalidateMeasure();
+        return width;
     }
 
     private void OnLinkTextChanged(object? sender, EventArgs args) => ApplyLinkCardText();
@@ -117,6 +158,9 @@ public sealed partial class SettingsPage : Page, ISettingsNavigationTarget
             AutomationProperties.SetName(card, text);
             AutomationProperties.SetHelpText(card, hint ?? string.Empty);
         }
+
+        // D-3: a new label or hint can change the widest text, and so the columns.
+        PlaceLinkCards();
     }
 
     /// <summary>

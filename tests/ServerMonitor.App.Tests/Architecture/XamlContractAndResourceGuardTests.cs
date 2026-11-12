@@ -46,6 +46,8 @@ public sealed partial class XamlContractAndResourceGuardTests
         // UI.4: adaptive VisualState setters reflow these; OverviewSearchBox also takes focus after "Limpar pesquisa";
         // Beacon r1: the code-behind focuses the content / the return target (HealthCard … EmptyAddButton).
         ["Views/DashboardPage.xaml"] = ["FirstServerStateBlock", "HiddenStateBlock", "PageViewport", "PageRoot", "HeaderGrid", "HeaderActions", "HealthRow", "HealthColumn2", "HealthCountRow", "HealthSegments",
+            // FIX-OVERVIEW-FIT: the bar placement rule measures these; the empty-state height reads the scroll viewport.
+            "HealthCountText", "HealthTotalText", "WidthStates", "NarrowWide", "Narrow", "PageScroll",
             "PriorityHost", "ServersToolbar", "OverviewSearchBox", "StateOverlay",
             "HealthCard", "PriorityButton", "DirectoryLinkButton", "OverviewRepeater", "EmptyAddButton", "EmptyDiscoveryStartButton",
             // UI.7C (Cortex m-3): the editor's return focus finds a suggestion's "Adicionar" in these lists.
@@ -53,7 +55,9 @@ public sealed partial class XamlContractAndResourceGuardTests
             // SVA-14: the end of a search is announced on its caption.
             "EmptyDiscoveryNothingFound", "EmptyDiscoveryTimeLimit", "EmptyDiscoveryFailed"],
         // UI.5: BackgroundSection is brought into view from code-behind; the rest are reflowed by the WidthStates setters.
-        ["Views/SettingsPage.xaml"] = ["PageViewport", "BackgroundSection", "PageRoot", "AutosaveText", "ThemeControl", "LanguageControl", "BackgroundControl",
+        ["Views/SettingsPage.xaml"] = ["PageViewport", "BackgroundSection", "PageRoot",
+            // FIX-OVERVIEW-FIT D-3: the widest card text is measured on these.
+            "DataDisclosureText", "AboutDisclosureText", "AutosaveText", "ThemeControl", "LanguageControl", "BackgroundControl",
             "NotificationsControl", "CompactControl", "TopmostControl", "DisclosureColumn2", "DisclosureGrid", "AboutDisclosure",
             // UI.5 fix round 2 (Prism C1 M-8): the Narrow state spaces these rows.
             "ThemeRow", "CompactRow",

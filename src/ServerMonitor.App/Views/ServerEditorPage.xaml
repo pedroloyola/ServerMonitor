@@ -45,7 +45,7 @@
                         <primitives:SaContentWidthTrigger Source="{Binding ElementName=PageViewport}" MinWidth="0" MaxWidth="700" />
                     </VisualState.StateTriggers>
                     <VisualState.Setters>
-                        <Setter Target="PageRoot.Padding" Value="{StaticResource SaPagePaddingCompact}" />
+                        <Setter Target="PageRoot.Padding" Value="{StaticResource SaScrollPagePaddingCompact}" />
                         <Setter Target="ActionEnd.(Grid.Row)" Value="1" />
                         <Setter Target="ActionEnd.(Grid.Column)" Value="0" />
                         <Setter Target="ActionEnd.(Grid.ColumnSpan)" Value="2" />
@@ -60,8 +60,8 @@
     <!-- UI.12 B12F-01: while the modal layer is open this host is inert - the whole page under it leaves the UIA tree
          (AccessibilityView Raw on PageScroll hid only that node; its descendants re-parented and stayed reachable). -->
     <primitives:SaInertHost x:Name="PageHost">
-    <ScrollViewer x:Name="PageScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-        <Grid x:Name="PageRoot" Padding="{StaticResource SaPagePadding}" RowSpacing="{StaticResource SaSpace16}">
+    <ScrollViewer x:Name="PageScroll" Margin="{StaticResource SaPageScrollInset}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <Grid x:Name="PageRoot" Padding="{StaticResource SaScrollPagePadding}" RowSpacing="{StaticResource SaSpace16}">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />

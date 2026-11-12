@@ -22,6 +22,13 @@
     <!-- UI.3 page padding: 40 (Figma 112:2258 / 112:2613, >= 640 wide) and 24 horizontally on narrow windows; top 40 clears native captions (UI.6 c1, DERIVED). -->
     <Thickness x:Key="SaPagePadding">40</Thickness>
     <Thickness x:Key="SaPagePaddingCompact">24,40,24,24</Thickness>
+    <!-- FIX-OVERVIEW-FIT D-2: the native caption band (= ShellDragRegion height, G-1). Page scroll viewports start below
+         it, so scrolled content never draws under the caption buttons or the drag strip. -->
+    <x:Double x:Key="SaCaptionBandHeight">32</x:Double>
+    <Thickness x:Key="SaPageScrollInset">0,32,0,0</Thickness>
+    <!-- Scrolling pages: 32 band + 8 = the header still at y40 (UI.6 c1); sides and bottom as SaPagePadding(Compact). -->
+    <Thickness x:Key="SaScrollPagePadding">40,8,40,40</Thickness>
+    <Thickness x:Key="SaScrollPagePaddingCompact">24,8,24,24</Thickness>
     <!-- UI.6 112:1359 p24, Settings bottom 40. Rail and narrow onboarding are DERIVED. -->
     <Thickness x:Key="SaSidebarPadding">24,24,24,40</Thickness>
     <Thickness x:Key="SaRailPadding">16,24,16,40</Thickness>

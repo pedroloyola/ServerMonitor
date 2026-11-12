@@ -205,13 +205,14 @@
             <VisualStateGroup x:Name="WidthStates">
                 <VisualState x:Name="Wide">
                     <VisualState.StateTriggers>
-                        <primitives:SaContentWidthTrigger Source="{Binding ElementName=PageViewport}" MinWidth="900" />
+                        <primitives:SaContentWidthTrigger Source="{Binding ElementName=PageViewport}" MinWidth="1000" />
                     </VisualState.StateTriggers>
                 </VisualState>
-                <!-- < 900 (Prism r1): Prioritário under Saúde, both full width. -->
+                <!-- < 1000 (Prism r1; FIX-OVERVIEW-FIT D-1: 900 -> 1000, OverviewLayout.MinTwoColumnViewport): Prioritário
+                     under Saúde, both full width. -->
                 <VisualState x:Name="Medium">
                     <VisualState.StateTriggers>
-                        <primitives:SaContentWidthTrigger Source="{Binding ElementName=PageViewport}" MinWidth="640" MaxWidth="900" />
+                        <primitives:SaContentWidthTrigger Source="{Binding ElementName=PageViewport}" MinWidth="640" MaxWidth="1000" />
                     </VisualState.StateTriggers>
                     <VisualState.Setters>
                         <Setter Target="PriorityHost.(Grid.Row)" Value="1" />
@@ -227,7 +228,7 @@
                         <primitives:SaContentWidthTrigger Source="{Binding ElementName=PageViewport}" MinWidth="600" MaxWidth="640" />
                     </VisualState.StateTriggers>
                     <VisualState.Setters>
-                        <Setter Target="PageRoot.Padding" Value="{StaticResource SaPagePaddingCompact}" />
+                        <Setter Target="PageRoot.Padding" Value="{StaticResource SaScrollPagePaddingCompact}" />
                         <Setter Target="PriorityHost.(Grid.Row)" Value="1" />
                         <Setter Target="PriorityHost.(Grid.Column)" Value="0" />
                         <Setter Target="HealthColumn2.Width" Value="0" />
@@ -252,7 +253,7 @@
                         <primitives:SaContentWidthTrigger Source="{Binding ElementName=PageViewport}" MinWidth="0" MaxWidth="600" />
                     </VisualState.StateTriggers>
                     <VisualState.Setters>
-                        <Setter Target="PageRoot.Padding" Value="{StaticResource SaPagePaddingCompact}" />
+                        <Setter Target="PageRoot.Padding" Value="{StaticResource SaScrollPagePaddingCompact}" />
                         <Setter Target="PriorityHost.(Grid.Row)" Value="1" />
                         <Setter Target="PriorityHost.(Grid.Column)" Value="0" />
                         <Setter Target="HealthColumn2.Width" Value="0" />
@@ -279,9 +280,9 @@
         </VisualStateManager.VisualStateGroups>
 
         <!-- One page ScrollViewer (Cortex M-3 pattern), vertical only: no horizontal scroll at any width. -->
-        <ScrollViewer x:Name="PageScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled">
+        <ScrollViewer x:Name="PageScroll" Margin="{StaticResource SaPageScrollInset}" VerticalScrollBarVisibility="Auto" HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled">
             <!-- UI.10 F09: 24 between the sections, as on Servidores (Figma 112:996 28 -> 24). -->
-            <StackPanel x:Name="PageRoot" Padding="{StaticResource SaPagePadding}" Spacing="{StaticResource SaSpace24}">
+            <StackPanel x:Name="PageRoot" Padding="{StaticResource SaScrollPagePadding}" Spacing="{StaticResource SaSpace24}">
 
                 <!-- Header = the shared page header (UI.10 F09/F10, Figma Page header 240:614): title 32/40 + line 2 13/18 muted
                      (the first-server line or "Atualizado há…", 18 reserved even when empty); Modo compacto, Atualizar 44 round
@@ -388,7 +389,7 @@
                     </Border>
                 </StackPanel>
 
-                <!-- Health and priority 112:1009: 624 : 392 with gap 24 (stacked under 900). -->
+                <!-- Health and priority 112:1009: 624 : 392 with gap 24 (stacked under 1000). -->
                 <Grid x:Name="HealthRow" ColumnSpacing="{StaticResource SaSpace24}" primitives:SaMotion.Enter="ContentFade" Visibility="{x:Bind ViewModel.ShowOverviewContent, Mode=OneWay}">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="624*" />
@@ -412,12 +413,14 @@
                                 </StackPanel>
                                 <!-- 112:1014: "4" + 8 + "de 6 saudáveis" + 8 + spacer + 8 + the 213 bar (B5). UI.10 F05 (H02, Figma 112:1017
                                      Fill): the spacer takes the free width, so the bar ends at the card's right padding instead of
-                                     leaving a band there; the bar keeps its data-computed 213 (segment widths are the VM's). -->
+                                     leaving a band there; the bar keeps its data-computed 213 (segment widths are the VM's).
+                                     FIX-OVERVIEW-FIT D-1: spacer minimum 24; when the measured row still cannot hold count, total and
+                                     bar, the code-behind moves the bar under the count (OverviewLayout.HealthBarBelowCount). -->
                                 <Grid x:Name="HealthCountRow" MinHeight="47" ColumnSpacing="{StaticResource SaSpace8}">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition x:Name="HealthSpacerColumn" Width="*" MinWidth="75" />
+                                        <ColumnDefinition x:Name="HealthSpacerColumn" Width="*" MinWidth="{StaticResource SaSpace24}" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <Grid.RowDefinitions>
@@ -429,11 +432,14 @@
                                     <TextBlock x:Name="HealthCountText" VerticalAlignment="Center" Margin="0,-1.5,0,-1.5"
                                                Style="{StaticResource SaHealthCountTextStyle}" Foreground="{ThemeResource SaTextBrush}"
                                                Text="{x:Bind ViewModel.HealthyCountDisplay, Mode=OneWay}" />
-                                    <TextBlock Grid.Column="1" VerticalAlignment="Center" Style="{StaticResource SaHealthTotalTextStyle}"
+                                    <TextBlock x:Name="HealthTotalText" Grid.Column="1" VerticalAlignment="Center" Style="{StaticResource SaHealthTotalTextStyle}"
                                                Foreground="{ThemeResource SaTextBrush}"
                                                Text="{x:Bind ViewModel.HealthOfTotalDisplay, Mode=OneWay}" />
+                                    <!-- D-5: MinWidth, not Width: the segments are whole DIPs summing to at most 213, but at 125/150/175 %
+                                         layout rounding works in physical pixels and may add a pixel; a fixed Width would clip the last
+                                         segment's rounded end, MinWidth lets the bar take that pixel and keeps its place. -->
                                     <ItemsRepeater x:Name="HealthSegments" Grid.Column="3" HorizontalAlignment="Left" VerticalAlignment="Center"
-                                                   Width="213" ItemsSource="{x:Bind ViewModel.HealthBarSegments, Mode=OneWay}"
+                                                   MinWidth="213" ItemsSource="{x:Bind ViewModel.HealthBarSegments, Mode=OneWay}"
                                                    ItemTemplate="{StaticResource HealthSegmentTemplate}">
                                         <ItemsRepeater.Layout>
                                             <StackLayout Orientation="Horizontal" Spacing="5" />

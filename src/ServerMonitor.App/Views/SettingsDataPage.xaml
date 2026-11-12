@@ -59,7 +59,7 @@
                             <primitives:SaContentWidthTrigger Source="{Binding ElementName=PageViewport}" MinWidth="0" MaxWidth="700" />
                         </VisualState.StateTriggers>
                         <VisualState.Setters>
-                            <Setter Target="PageRoot.Padding" Value="{StaticResource SaPagePaddingCompact}" />
+                            <Setter Target="PageRoot.Padding" Value="{StaticResource SaScrollPagePaddingCompact}" />
                             <Setter Target="LocalNetworkSearchButton.(Grid.Row)" Value="1" />
                             <Setter Target="LocalNetworkSearchButton.(Grid.Column)" Value="0" />
                             <Setter Target="LocalNetworkSearchButton.HorizontalAlignment" Value="Left" />
@@ -79,8 +79,8 @@
                     </VisualState>
                 </VisualStateGroup>
             </VisualStateManager.VisualStateGroups>
-        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-            <StackPanel x:Name="PageRoot" Padding="{StaticResource SaPagePadding}" Spacing="{StaticResource SaSpace20}">
+        <ScrollViewer Margin="{StaticResource SaPageScrollInset}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel x:Name="PageRoot" Padding="{StaticResource SaScrollPagePadding}" Spacing="{StaticResource SaSpace20}">
 
                 <!-- Data settings header 112:8231: back 36 ("‹" = ArrowRight01 turned 180°, as the Figma) + title 30 + parent. -->
                 <Grid ColumnSpacing="{StaticResource SaSpace16}">

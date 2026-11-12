@@ -1,6 +1,7 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using ServerMonitor.App.Controls.Primitives;
+using ServerMonitor.App.Converters;
 using ServerMonitor.App.Services;
 using ServerMonitor.App.ViewModels;
 
@@ -35,6 +36,11 @@ public sealed partial class DashboardPage : Page
         ViewModel.LocalNetworkSearchEnded += OnLocalNetworkSearchEnded;
         SizeChanged += (_, _) => UpdateEmptyStateHeight();
         HeaderGrid.SizeChanged += (_, _) => UpdateEmptyStateHeight();
+        // FIX-OVERVIEW-FIT D-1 rule B: re-checked whenever the row or either text changes size, and on a width state change.
+        HealthCountRow.SizeChanged += (_, _) => UpdateHealthBarPlacement();
+        HealthCountText.SizeChanged += (_, _) => UpdateHealthBarPlacement();
+        HealthTotalText.SizeChanged += (_, _) => UpdateHealthBarPlacement();
+        WidthStates.CurrentStateChanged += (_, _) => UpdateHealthBarPlacement();
     }
 
     public DashboardViewModel ViewModel { get; }
@@ -49,8 +55,47 @@ public sealed partial class DashboardPage : Page
 
     private void UpdateEmptyStateHeight()
     {
-        var usable = ActualHeight - PageRoot.Padding.Top - PageRoot.Padding.Bottom - HeaderGrid.ActualHeight - PageRoot.Spacing;
+        // FIX-OVERVIEW-FIT D-2: the scroll viewport starts below the caption band, so its height (not the page's) is usable.
+        var usable = PageScroll.ActualHeight - PageRoot.Padding.Top - PageRoot.Padding.Bottom - HeaderGrid.ActualHeight - PageRoot.Spacing;
         FirstServerStateBlock.MinHeight = HiddenStateBlock.MinHeight = EmptyStateMinimumHeight(usable);
+    }
+
+    private bool _healthBarBelow;
+
+    /// <summary>
+    /// FIX-OVERVIEW-FIT D-1 rule B: in Wide and Medium, when the measured row cannot hold count, total and the 213 bar,
+    /// the bar moves under the count exactly as NarrowWide places it; otherwise it goes back. NarrowWide and Narrow
+    /// already place it there through their own setters, so they are left alone.
+    /// </summary>
+    private void UpdateHealthBarPlacement()
+    {
+        if (WidthStates.CurrentState?.Name is "NarrowWide" or "Narrow")
+        {
+            return;
+        }
+
+        var below = HealthCountRow.ActualWidth > 0 && OverviewLayout.HealthBarBelowCount(
+            HealthCountRow.ActualWidth, HealthCountText.DesiredSize.Width, HealthTotalText.DesiredSize.Width);
+        if (below == _healthBarBelow)
+        {
+            return;
+        }
+
+        _healthBarBelow = below;
+        if (below)
+        {
+            Grid.SetRow(HealthSegments, 1);
+            Grid.SetColumn(HealthSegments, 0);
+            Grid.SetColumnSpan(HealthSegments, 4);
+            HealthCountRow.RowSpacing = (double)Application.Current.Resources["SaSpace12"];
+        }
+        else
+        {
+            Grid.SetRow(HealthSegments, 0);
+            Grid.SetColumn(HealthSegments, 3);
+            Grid.SetColumnSpan(HealthSegments, 1);
+            HealthCountRow.RowSpacing = 0;
+        }
     }
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
