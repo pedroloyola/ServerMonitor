@@ -1,3 +1,9 @@
-ServerAlyzer 1.1.10 gives the sidebar a little more room.
+ServerAlyzer 1.1.11 makes the Overview and Settings fit better in smaller windows.
 
-Sidebar. The sidebar is slightly wider, so the names of the pages have more space before they are shortened. Everything else works as in 1.1.9.
+Overview. The health bar is never cut off: in a narrow window it moves below the server counts, and its last segment keeps its rounded end.
+
+Pages. When you scroll a page, its content no longer runs under the title bar area.
+
+Settings. The cards stack instead of being cut off when the window is narrow, and Tab and screen readers move through them in the order you see them.
+
+Sidebar. The sidebar is slightly wider, so the names of the pages have more space before they are shortened.

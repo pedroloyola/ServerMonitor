@@ -1,0 +1,72 @@
+{
+  "version": "1.1.11",
+  "date": "2026-11-12",
+  "en": {
+    "title": "Overview and Settings fit smaller windows",
+    "blocks": [
+      {
+        "kind": "ul",
+        "items": [
+          "The Overview health bar is never cut off: in a narrow window it moves below the server counts, and its last segment keeps its rounded end.",
+          "When you scroll a page, its content no longer runs under the title bar area.",
+          "The Settings cards stack instead of being cut off when the window is narrow, and Tab and screen readers move through them in the order you see them."
+        ]
+      },
+      {
+        "kind": "note",
+        "text": "Known issues: at a Windows text size of about 175% or larger, some text in Settings can be cut off and wrapped descriptions can overlap. Switching straight from one high contrast theme to another while the app is open can leave the selected sidebar item with the previous theme's highlight; choose Exit ServerAlyzer in the notification area menu and open the app again. Fixes are planned for a later version."
+      }
+    ]
+  },
+  "pt-pt": {
+    "title": "A Visão geral e as Definições cabem em janelas mais pequenas",
+    "blocks": [
+      {
+        "kind": "ul",
+        "items": [
+          "A barra de saúde da Visão geral nunca fica cortada: numa janela estreita passa para baixo das contagens de servidores, e o último segmento mantém a ponta arredondada.",
+          "Quando percorre uma página, o conteúdo já não passa por baixo da zona da barra de título.",
+          "Os cartões das Definições ficam empilhados em vez de cortados quando a janela é estreita, e a tecla Tab e os leitores de ecrã percorrem-nos pela ordem em que os vê."
+        ]
+      },
+      {
+        "kind": "note",
+        "text": "Problemas conhecidos: com o tamanho do texto do Windows a cerca de 175% ou mais, algum texto nas Definições pode ficar cortado e descrições em várias linhas podem sobrepor-se. Mudar diretamente de um tema de alto contraste para outro com a aplicação aberta pode deixar o item selecionado da barra lateral com o destaque do tema anterior; escolha Sair do ServerAlyzer no menu da área de notificação e volte a abrir a aplicação. Estão previstas correções numa versão futura."
+      }
+    ]
+  },
+  "pt-br": {
+    "title": "A Visão geral e as Configurações cabem em janelas menores",
+    "blocks": [
+      {
+        "kind": "ul",
+        "items": [
+          "A barra de saúde da Visão geral nunca fica cortada: em uma janela estreita ela passa para baixo das contagens de servidores, e o último segmento mantém a ponta arredondada.",
+          "Quando você rola uma página, o conteúdo não passa mais por baixo da área da barra de título.",
+          "Os cartões das Configurações ficam empilhados em vez de cortados quando a janela é estreita, e a tecla Tab e os leitores de tela passam por eles na ordem em que você os vê."
+        ]
+      },
+      {
+        "kind": "note",
+        "text": "Problemas conhecidos: com o tamanho de texto do Windows em cerca de 175% ou mais, alguns textos nas Configurações podem ficar cortados e descrições em várias linhas podem se sobrepor. Trocar diretamente de um tema de alto contraste para outro com o aplicativo aberto pode deixar o item selecionado da barra lateral com o destaque do tema anterior; escolha Sair do ServerAlyzer no menu da área de notificação e abra o aplicativo de novo. Correções estão previstas para uma versão futura."
+      }
+    ]
+  },
+  "es": {
+    "title": "Overview y Settings caben en ventanas más pequeñas",
+    "blocks": [
+      {
+        "kind": "ul",
+        "items": [
+          "La barra de salud de Overview nunca se corta: en una ventana estrecha pasa debajo de los recuentos de servidores, y el último segmento conserva su extremo redondeado.",
+          "Al desplazarte por una página, el contenido ya no pasa por debajo de la zona de la barra de título.",
+          "Las tarjetas de Settings se apilan en lugar de cortarse cuando la ventana es estrecha, y la tecla Tab y los lectores de pantalla las recorren en el orden en que las ves."
+        ]
+      },
+      {
+        "kind": "note",
+        "text": "Problemas conocidos: con un tamaño de texto de Windows de aproximadamente el 175 % o más, parte del texto de Settings puede cortarse y las descripciones en varias líneas pueden solaparse. Cambiar directamente de un tema de alto contraste a otro con la aplicación abierta puede dejar el elemento seleccionado de la barra lateral con el resaltado del tema anterior; elige Exit ServerAlyzer en el menú del área de notificación y vuelve a abrir la aplicación. Hay correcciones previstas para una versión posterior."
+      }
+    ]
+  }
+}
