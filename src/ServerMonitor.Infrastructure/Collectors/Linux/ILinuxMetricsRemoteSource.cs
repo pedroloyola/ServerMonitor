@@ -42,6 +42,9 @@ public sealed record LinuxMetricsRemoteResult
     } or
     {
         OsRelease: not null
+    } or
+    {
+        LoadAverage: not null
     };
 }
 
@@ -60,4 +63,6 @@ public sealed record LinuxMetricsRawData
     public string? Hostname { get; init; }
 
     public string? OsRelease { get; init; }
+
+    public string? LoadAverage { get; init; }
 }

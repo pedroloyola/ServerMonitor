@@ -250,7 +250,125 @@ public sealed class SqliteServerHistoryStoreTests : IDisposable
         await verify.OpenAsync();
         await using var version = verify.CreateCommand();
         version.CommandText = "PRAGMA user_version;";
-        Assert.Equal(2L, await version.ExecuteScalarAsync());
+        Assert.Equal(3L, await version.ExecuteScalarAsync());
+        Assert.Null(row.Load1);
+    }
+
+    /// <summary>The v2 table exactly as v2 created it (the DDL shipped before schema v3), with a v2 row in it.</summary>
+    private async Task CreateVersion2DatabaseAsync(Guid serverId, DateTimeOffset at)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(_dbPath)!);
+        await using var connection = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = _dbPath }.ToString());
+        await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText =
+            "CREATE TABLE history_samples (" +
+            "  server_id       TEXT    NOT NULL," +
+            "  captured_at_utc INTEGER NOT NULL CHECK(typeof(captured_at_utc)='integer')," +
+            "  health          INTEGER NOT NULL CHECK(typeof(health)='integer' AND health BETWEEN 0 AND 4)," +
+            "  cpu_percent     REAL    NULL CHECK(cpu_percent IS NULL OR (typeof(cpu_percent) IN ('real','integer') AND cpu_percent BETWEEN 0 AND 100))," +
+            "  memory_percent  REAL    NULL CHECK(memory_percent IS NULL OR (typeof(memory_percent) IN ('real','integer') AND memory_percent BETWEEN 0 AND 100))," +
+            "  disk_percent    REAL    NULL CHECK(disk_percent IS NULL OR (typeof(disk_percent) IN ('real','integer') AND disk_percent BETWEEN 0 AND 100))," +
+            "  PRIMARY KEY (server_id, captured_at_utc)" +
+            ");" +
+            "PRAGMA user_version=2;" +
+            "INSERT INTO history_samples VALUES ($id, $at, 1, 12.5, 34.5, 56.5);";
+        command.Parameters.AddWithValue("$id", serverId.ToString());
+        command.Parameters.AddWithValue("$at", at.ToUnixTimeMilliseconds());
+        await command.ExecuteNonQueryAsync();
+    }
+
+    [Fact]
+    public async Task Version2Migration_PreservesRows_AddsNullLoad1_AndBumpsToVersion3()
+    {
+        var serverId = Guid.NewGuid();
+        var at = new DateTimeOffset(2026, 11, 17, 10, 0, 0, TimeSpan.Zero);
+        await CreateVersion2DatabaseAsync(serverId, at);
+
+        var store = NewStore();
+        await store.InitializeAsync();
+
+        Assert.True(store.IsAvailable);
+        var row = Assert.Single(await store.QueryAsync(serverId, at - TimeSpan.FromMinutes(1), at + TimeSpan.FromMinutes(1)));
+        Assert.Equal(ServerHealth.Healthy, row.Health);
+        Assert.Equal(12.5, row.CpuPercent);
+        Assert.Equal(34.5, row.MemoryPercent);
+        Assert.Equal(56.5, row.DiskPercent);
+        Assert.Null(row.Load1); // unknown for every pre-v3 row, never 0
+
+        await using var verify = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = _dbPath }.ToString());
+        await verify.OpenAsync();
+        await using var version = verify.CreateCommand();
+        version.CommandText = "PRAGMA user_version;";
+        Assert.Equal(3L, await version.ExecuteScalarAsync());
+
+        // The migrated file is writable with a load, and still rejects a negative one.
+        var later = at + TimeSpan.FromMinutes(1);
+        await store.WriteAsync([Sample(serverId, later) with { Load1 = 3.25 }]);
+        var written = Assert.Single(await store.QueryAsync(serverId, later, later + TimeSpan.FromSeconds(1)));
+        Assert.Equal(3.25, written.Load1);
+
+        await using var negative = verify.CreateCommand();
+        negative.CommandText = "INSERT INTO history_samples VALUES ($id, $at, 1, NULL, NULL, NULL, -0.5);";
+        negative.Parameters.AddWithValue("$id", serverId.ToString());
+        negative.Parameters.AddWithValue("$at", (later + TimeSpan.FromMinutes(1)).ToUnixTimeMilliseconds());
+        var exception = await Assert.ThrowsAsync<SqliteException>(() => negative.ExecuteNonQueryAsync());
+        Assert.Equal(19, exception.SqliteErrorCode); // SQLITE_CONSTRAINT
+    }
+
+    [Fact]
+    public async Task Version2Migration_ReopenedFile_IsANoOp()
+    {
+        var serverId = Guid.NewGuid();
+        var at = new DateTimeOffset(2026, 11, 17, 10, 0, 0, TimeSpan.Zero);
+        await CreateVersion2DatabaseAsync(serverId, at);
+
+        var first = NewStore();
+        await first.InitializeAsync();
+        first.Dispose();
+        SqliteConnection.ClearAllPools();
+
+        var second = NewStore();
+        await second.InitializeAsync();
+
+        Assert.True(second.IsAvailable);
+        Assert.Single(await second.QueryAsync(serverId, at - TimeSpan.FromMinutes(1), at + TimeSpan.FromMinutes(1)));
+    }
+
+    [Fact]
+    public async Task Load1_RoundTrips_AboveOneHundred_AndNullStaysNull()
+    {
+        var store = NewStore();
+        await store.InitializeAsync();
+        var serverId = Guid.NewGuid();
+        var at = new DateTimeOffset(2026, 11, 17, 10, 0, 0, TimeSpan.Zero);
+        await store.WriteAsync(
+        [
+            Sample(serverId, at) with { Load1 = 0 },
+            Sample(serverId, at + TimeSpan.FromSeconds(30)) with { Load1 = 128.5 }, // not a percentage: no upper bound
+            Sample(serverId, at + TimeSpan.FromSeconds(60)) with { Load1 = null },
+            Sample(serverId, at + TimeSpan.FromSeconds(90)) with { Load1 = -1 } // sanitized to unknown on write
+        ]);
+
+        var rows = await store.QueryAsync(serverId, at, at + TimeSpan.FromMinutes(2));
+
+        Assert.Equal([0, 128.5, null, null], rows.Select(r => r.Load1).ToArray());
+    }
+
+    [Fact]
+    public async Task SchemaChecks_RejectNegativeLoad1DirectWrite()
+    {
+        var store = NewStore();
+        await store.InitializeAsync();
+        await using var connection = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = _dbPath }.ToString());
+        await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText = "INSERT INTO history_samples VALUES ($id, $at, 1, NULL, NULL, NULL, -1);";
+        command.Parameters.AddWithValue("$id", Guid.NewGuid().ToString());
+        command.Parameters.AddWithValue("$at", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+
+        var exception = await Assert.ThrowsAsync<SqliteException>(() => command.ExecuteNonQueryAsync());
+        Assert.Equal(19, exception.SqliteErrorCode); // SQLITE_CONSTRAINT
     }
 
     [Fact]
@@ -267,7 +385,7 @@ public sealed class SqliteServerHistoryStoreTests : IDisposable
             await using var command = connection.CreateCommand();
             command.CommandText =
                 "PRAGMA ignore_check_constraints=ON;" +
-                "INSERT INTO history_samples VALUES ($id, $at, 999, -10, 101, 'NaN');";
+                "INSERT INTO history_samples VALUES ($id, $at, 999, -10, 101, 'NaN', -1);";
             command.Parameters.AddWithValue("$id", serverId.ToString());
             command.Parameters.AddWithValue("$at", at.ToUnixTimeMilliseconds());
             await command.ExecuteNonQueryAsync();
@@ -278,6 +396,7 @@ public sealed class SqliteServerHistoryStoreTests : IDisposable
         Assert.Null(row.CpuPercent);
         Assert.Null(row.MemoryPercent);
         Assert.Null(row.DiskPercent);
+        Assert.Null(row.Load1);
     }
 
     [Fact]
@@ -289,7 +408,7 @@ public sealed class SqliteServerHistoryStoreTests : IDisposable
         await connection.OpenAsync();
         await using var command = connection.CreateCommand();
         command.CommandText =
-            "INSERT INTO history_samples VALUES ($id, $at, 1, 101, NULL, NULL);";
+            "INSERT INTO history_samples VALUES ($id, $at, 1, 101, NULL, NULL, NULL);";
         command.Parameters.AddWithValue("$id", Guid.NewGuid().ToString());
         command.Parameters.AddWithValue("$at", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
 
@@ -305,7 +424,7 @@ public sealed class SqliteServerHistoryStoreTests : IDisposable
         {
             await connection.OpenAsync();
             await using var command = connection.CreateCommand();
-            command.CommandText = "CREATE TABLE wrong_table(value TEXT); PRAGMA user_version=2;";
+            command.CommandText = "CREATE TABLE wrong_table(value TEXT); PRAGMA user_version=3;";
             await command.ExecuteNonQueryAsync();
         }
 

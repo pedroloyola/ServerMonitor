@@ -387,6 +387,29 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
 
     public string CpuAccessibleValue => AccessiblePercent(HasCpuPercent, _card?.CpuUsageValue ?? 0);
 
+    /// <summary>
+    /// M16.1 (ADR-026): "Load 0.52 · 0.40 · 0.31 · 4 CPUs" under the CPU card, from the last snapshot. Null (the line is
+    /// hidden) when the host reported no load average: unknown is never shown as 0. The CPU count is added only when known.
+    /// </summary>
+    public string? LoadAverageText
+    {
+        get
+        {
+            if (_card?.MetricsSnapshot is not { LoadAverage1: { } one, LoadAverage5: { } five, LoadAverage15: { } fifteen } snapshot)
+            {
+                return null;
+            }
+
+            var load = Format("ServerDetailLoadAverageFormat", LoadValue(one), LoadValue(five), LoadValue(fifteen));
+            return snapshot.LogicalCpuCount is { } cpus and > 0
+                ? string.Join(_localization.GetString("ServerDetailLoadAverageSeparator"), load,
+                    Format(WorkloadPresentation.PluralKey("ServerDetailLogicalCpuCount", cpus), cpus))
+                : load;
+        }
+    }
+
+    public bool HasLoadAverage => LoadAverageText is not null;
+
     /// <summary>UI.10 F25: the CPU number's severity, exactly the Servidores row's (Healthy when unknown / offline).</summary>
     public ServerHealth CpuSeverity => Severity(ServerMetricKind.Cpu);
 
@@ -879,6 +902,8 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
             Raise(Args.UptimeDisplayOrDash);
             Raise(Args.LastUpdatedValue);
             Raise(Args.LastUpdatedOrDash);
+            Raise(Args.LoadAverageText);
+            Raise(Args.HasLoadAverage);
             RequestCpuPulse(force: false);
         }
 
@@ -1014,6 +1039,8 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
         ? string.Format(CultureInfo.CurrentUICulture, "{0:0}", value)
         : Unavailable;
 
+    private static string LoadValue(double value) => value.ToString("0.00", CultureInfo.CurrentUICulture);
+
     private string? BytesOf(long? used, long? total) =>
         used is { } usedBytes && total is { } totalBytes && totalBytes > 0 && usedBytes >= 0
             ? Format("ServerDetailBytesOfFormat", MetricVisualPresentation.FormatBytes(usedBytes), MetricVisualPresentation.FormatBytes(totalBytes))
@@ -1136,5 +1163,7 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
         public static readonly PropertyChangedEventArgs LastUpdatedOrDash = new(nameof(ServerDetailViewModel.LastUpdatedOrDash));
         public static readonly PropertyChangedEventArgs MemoryLitCount = new(nameof(ServerDetailViewModel.MemoryLitCount));
         public static readonly PropertyChangedEventArgs DiskLitCount = new(nameof(ServerDetailViewModel.DiskLitCount));
+        public static readonly PropertyChangedEventArgs LoadAverageText = new(nameof(ServerDetailViewModel.LoadAverageText));
+        public static readonly PropertyChangedEventArgs HasLoadAverage = new(nameof(ServerDetailViewModel.HasLoadAverage));
     }
 }

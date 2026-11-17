@@ -90,6 +90,7 @@ public sealed class LinuxMetricsCollector : IServerMetricsCollector
         var memory = MemInfoParser.Parse(data.MemInfo);
         var disk = DiskUsageParser.Parse(data.RootFileSystem);
         var os = OsReleaseParser.Parse(data.OsRelease);
+        var load = ProcLoadAvgParser.Parse(data.LoadAverage);
 
         return new ServerMetricsSnapshot
         {
@@ -105,7 +106,11 @@ public sealed class LinuxMetricsCollector : IServerMetricsCollector
             Uptime = ProcUptimeParser.Parse(data.Uptime),
             Hostname = HostnameParser.Parse(data.Hostname),
             OperatingSystemName = os.Name,
-            OperatingSystemVersion = os.Version
+            OperatingSystemVersion = os.Version,
+            LoadAverage1 = load?.OneMinute,
+            LoadAverage5 = load?.FiveMinutes,
+            LoadAverage15 = load?.FifteenMinutes,
+            LogicalCpuCount = ProcStatCpuParser.CountLogicalCpus(data.SecondCpuStat ?? data.FirstCpuStat)
         };
     }
 

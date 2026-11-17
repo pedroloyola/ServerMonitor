@@ -93,6 +93,7 @@ public sealed class MacOsMetricsCollector : IServerMetricsCollector
         var memory = MacMemoryParser.Parse(data.VmStat, data.PhysicalMemory);
         var disk = MacDiskUsageParser.Parse(data.RootFileSystem);
         var os = SwVersParser.Parse(data.SwVers);
+        var load = MacLoadAverageParser.Parse(data.LoadAverage);
 
         return new ServerMetricsSnapshot
         {
@@ -108,7 +109,11 @@ public sealed class MacOsMetricsCollector : IServerMetricsCollector
             Uptime = ComputeUptime(data.BootTime),
             Hostname = HostnameParser.Parse(data.Hostname),
             OperatingSystemName = os.ProductName,
-            OperatingSystemVersion = os.ProductVersion
+            OperatingSystemVersion = os.ProductVersion,
+            LoadAverage1 = load.Load?.OneMinute,
+            LoadAverage5 = load.Load?.FiveMinutes,
+            LoadAverage15 = load.Load?.FifteenMinutes,
+            LogicalCpuCount = load.LogicalCpuCount
         };
     }
 

@@ -191,4 +191,27 @@ public sealed class ProcStatCpuParserTests
 
         Assert.Null(ProcStatCpuParser.CalculateUsagePercent(first, second));
     }
+
+    [Fact]
+    public void CountLogicalCpus_CountsThePerCpuLines_NotTheAggregate()
+    {
+        var sample = "cpu  100 0 0 800 0 0 0 0 0 0\n" +
+                     "cpu0 25 0 0 200 0 0 0 0 0 0\n" +
+                     "cpu1 25 0 0 200 0 0 0 0 0 0\n" +
+                     "cpu2 25 0 0 200 0 0 0 0 0 0\n" +
+                     "cpu3 25 0 0 200 0 0 0 0 0 0\n" +
+                     "intr 12345\nctxt 6789\nprocs_running 1\n";
+
+        Assert.Equal(4, ProcStatCpuParser.CountLogicalCpus(sample));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("cpu  100 0 0 800 0 0 0 0 0 0\n")]   // aggregate only: unknown, never 0
+    [InlineData("cpux 1 2 3\ncpu- 1 2 3\n")]
+    public void CountLogicalCpus_NoPerCpuLines_ReturnsNull(string? sample)
+    {
+        Assert.Null(ProcStatCpuParser.CountLogicalCpus(sample));
+    }
 }

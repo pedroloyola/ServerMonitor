@@ -146,7 +146,9 @@ public sealed class CommercialVocabularyBoundaryTests
         var store = File.ReadAllText(Path.Combine(
             root, "src", "ServerMonitor.Infrastructure", "Persistence", "SqliteServerHistoryStore.cs"));
 
-        Assert.Contains("private const int CurrentSchemaVersion = 2;", store, StringComparison.Ordinal);
+        // v3 (M16.1, ADR-026 §9) is a Community change: the nullable load1 column the Community detail page and
+        // history record. It prepares no commercial capability; any further bump must be pinned here again.
+        Assert.Contains("private const int CurrentSchemaVersion = 3;", store, StringComparison.Ordinal);
     }
 
     // ------------------------------------------------------------------------------------- helpers

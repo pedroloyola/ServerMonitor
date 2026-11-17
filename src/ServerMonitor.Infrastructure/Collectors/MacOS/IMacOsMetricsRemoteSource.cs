@@ -43,6 +43,9 @@ public sealed record MacOsMetricsRemoteResult
     } or
     {
         SwVers: not null
+    } or
+    {
+        LoadAverage: not null
     };
 }
 
@@ -61,4 +64,6 @@ public sealed record MacOsMetricsRawData
     public string? Hostname { get; init; }
 
     public string? SwVers { get; init; }
+
+    public string? LoadAverage { get; init; }
 }

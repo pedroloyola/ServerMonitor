@@ -28,8 +28,19 @@ public sealed record ServerMetricsSnapshot
 
     public string? OperatingSystemVersion { get; init; }
 
+    /// <summary>The 1 minute load average; null when unknown, never 0 for a missing reading.</summary>
+    public double? LoadAverage1 { get; init; }
+
+    public double? LoadAverage5 { get; init; }
+
+    public double? LoadAverage15 { get; init; }
+
+    /// <summary>The CPUs the load is measured against (online CPUs on Linux, hw.logicalcpu on macOS).</summary>
+    public int? LogicalCpuCount { get; init; }
+
     public bool HasAnyData =>
         CpuUsagePercent is not null ||
+        LoadAverage1 is not null ||
         MemoryTotalBytes is not null ||
         DiskTotalBytes is not null ||
         Uptime is not null ||

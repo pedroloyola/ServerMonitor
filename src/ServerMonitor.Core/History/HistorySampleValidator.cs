@@ -35,6 +35,14 @@ public static class HistorySampleValidator
         return Math.Clamp(v, 0, 100);
     }
 
+    /// <summary>
+    /// Returns a load average as it is (any finite value ≥ 0, with no upper bound: a busy many-core host
+    /// can sit far above 100), or <c>null</c> when absent, NaN, infinite or negative. Never clamps into
+    /// the percentage range and never returns <c>0</c> for a missing value.
+    /// </summary>
+    public static double? SanitizeLoad(double? value) =>
+        value is { } v && double.IsFinite(v) && v >= 0 ? v : null;
+
     /// <summary>True when the timestamp is a usable, non-default UTC instant.</summary>
     public static bool IsValidTimestamp(DateTimeOffset capturedAtUtc) =>
         capturedAtUtc != default && capturedAtUtc.Year > 2000;
