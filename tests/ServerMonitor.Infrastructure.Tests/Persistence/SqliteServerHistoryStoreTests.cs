@@ -296,6 +296,8 @@ public sealed class SqliteServerHistoryStoreTests : IDisposable
         Assert.Equal(56.5, row.DiskPercent);
         Assert.Null(row.Load1); // unknown for every pre-v3 row, never 0
 
+        // The v2 helper's pooled connection predates the ALTER TABLE; never reuse it to check the new column.
+        SqliteConnection.ClearAllPools();
         await using var verify = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = _dbPath }.ToString());
         await verify.OpenAsync();
         await using var version = verify.CreateCommand();
@@ -309,7 +311,8 @@ public sealed class SqliteServerHistoryStoreTests : IDisposable
         Assert.Equal(3.25, written.Load1);
 
         await using var negative = verify.CreateCommand();
-        negative.CommandText = "INSERT INTO history_samples VALUES ($id, $at, 1, NULL, NULL, NULL, -0.5);";
+        negative.CommandText =
+            "INSERT INTO history_samples (server_id, captured_at_utc, health, load1) VALUES ($id, $at, 1, -0.5);";
         negative.Parameters.AddWithValue("$id", serverId.ToString());
         negative.Parameters.AddWithValue("$at", (later + TimeSpan.FromMinutes(1)).ToUnixTimeMilliseconds());
         var exception = await Assert.ThrowsAsync<SqliteException>(() => negative.ExecuteNonQueryAsync());
