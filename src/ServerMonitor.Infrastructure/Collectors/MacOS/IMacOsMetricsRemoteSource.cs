@@ -1,4 +1,5 @@
 using ServerMonitor.Core.Models;
+using ServerMonitor.Core.Probes;
 
 namespace ServerMonitor.Infrastructure.Collectors.MacOS;
 
@@ -14,6 +15,29 @@ public interface IMacOsMetricsRemoteSource
         Server server,
         TimeSpan timeout,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Two-phase collection in ONE session, as in <c>ILinuxMetricsRemoteSource</c>: <paramref name="onBaseResult"/>
+    /// receives the built-in result as soon as it is ready, only when it succeeded; then the due probes run before
+    /// the session closes. When <paramref name="onBaseResult"/> was called, the returned result must not be published
+    /// again. This default runs no probes and calls back after the session closed.
+    /// </summary>
+    async Task<MacOsMetricsRemoteResult> CollectAsync(
+        Server server,
+        TimeSpan timeout,
+        Action<MacOsMetricsRemoteResult> onBaseResult,
+        RemoteProbeReservation? probes,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(onBaseResult);
+        var result = await CollectAsync(server, timeout, cancellationToken).ConfigureAwait(false);
+        if (result.IsSuccess)
+        {
+            RemoteResultCallback.Invoke(onBaseResult, result);
+        }
+
+        return result;
+    }
 }
 
 public sealed record MacOsMetricsRemoteResult
@@ -22,32 +46,21 @@ public sealed record MacOsMetricsRemoteResult
 
     public MacOsMetricsRawData? Data { get; init; }
 
-    public bool IsSuccess => ConnectionResult.IsSuccess && Data is
-    {
-        CpuTop: not null
-    } or
-    {
-        VmStat: not null
-    } or
-    {
-        PhysicalMemory: not null
-    } or
-    {
-        RootFileSystem: not null
-    } or
-    {
-        BootTime: not null
-    } or
-    {
-        Hostname: not null
-    } or
-    {
-        SwVers: not null
-    };
+    public bool IsSuccess => ConnectionResult.IsSuccess && Data is { HasAnySource: true };
 }
 
 public sealed record MacOsMetricsRawData
 {
+    /// <summary>At least one source answered. Without any, the collection counts as failed.</summary>
+    public bool HasAnySource =>
+        CpuTop is not null
+        || VmStat is not null
+        || PhysicalMemory is not null
+        || RootFileSystem is not null
+        || BootTime is not null
+        || Hostname is not null
+        || SwVers is not null;
+
     public string? CpuTop { get; init; }
 
     public string? VmStat { get; init; }

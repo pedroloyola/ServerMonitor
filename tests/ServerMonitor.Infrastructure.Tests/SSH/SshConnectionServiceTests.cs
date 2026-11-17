@@ -3,6 +3,7 @@ using ServerMonitor.Core.Enums;
 using ServerMonitor.Core.Interfaces;
 using ServerMonitor.Core.Models;
 using ServerMonitor.Core.Security;
+using ServerMonitor.Infrastructure.Collectors;
 using ServerMonitor.Infrastructure.Collectors.Linux;
 using ServerMonitor.Infrastructure.Collectors.MacOS;
 using ServerMonitor.Infrastructure.Collectors.Workloads;
@@ -488,6 +489,109 @@ public sealed class SshConnectionServiceTests
     }
 
     [Fact]
+    public async Task Linux_metrics_two_phases_publish_once_and_a_failed_phase_two_is_never_published()
+    {
+        // M16.1: the session calls back after the built-in commands, then its second phase "fails". The operation
+        // returns what it published; the session's own return only closed phase 2.
+        var raw = new LinuxMetricsRawData { Hostname = "ubuntu" };
+        var fixture = new Fixture
+        {
+            TrustedHostKey = Trusted(Identity(1))
+        };
+        fixture.Credentials.Secret = "password";
+        fixture.Factory.Enqueue(new FakeSession(Identity(1), SshConnectionErrorCode.AuthenticationFailed));
+        fixture.Factory.Enqueue(new FakeSession(Identity(1), SshConnectionErrorCode.None, linuxMetrics: raw)
+        {
+            AfterPhaseTwo = result => result with { ErrorCode = SshConnectionErrorCode.Unexpected }
+        });
+        var published = new List<LinuxMetricsRemoteResult>();
+
+        var result = await fixture.Service.CollectAsync(
+            Request().Server with { OperatingSystem = ServerOperatingSystem.Linux },
+            TimeSpan.FromMilliseconds(500),
+            TimeSpan.FromSeconds(2),
+            published.Add,
+            probes: null);
+
+        var only = Assert.Single(published);
+        Assert.True(only.IsSuccess);
+        Assert.Same(raw, only.Data);
+        Assert.True(result.IsSuccess);
+        Assert.Same(only.ConnectionResult, result.ConnectionResult);
+        Assert.Equal(1, fixture.Factory.LastSession!.PhasedCalls);
+    }
+
+    [Fact]
+    public async Task Linux_metrics_two_phases_failure_never_calls_back()
+    {
+        var fixture = new Fixture
+        {
+            TrustedHostKey = Trusted(Identity(1))
+        };
+        fixture.Credentials.Secret = "password";
+        fixture.Factory.Enqueue(new FakeSession(Identity(1), SshConnectionErrorCode.AuthenticationFailed));
+        fixture.Factory.Enqueue(new FakeSession(Identity(1), SshConnectionErrorCode.AuthenticationFailed));
+        var calls = 0;
+
+        var result = await fixture.Service.CollectAsync(
+            Request().Server with { OperatingSystem = ServerOperatingSystem.Linux },
+            TimeSpan.FromMilliseconds(500),
+            TimeSpan.FromSeconds(2),
+            _ => calls++,
+            probes: null);
+
+        Assert.Equal(0, calls);
+        Assert.False(result.IsSuccess);
+        Assert.False(result.ConnectionResult.IsSuccess);
+    }
+
+    [Fact]
+    public async Task Linux_metrics_two_phases_with_no_remote_source_never_calls_back()
+    {
+        var fixture = new Fixture
+        {
+            TrustedHostKey = Trusted(Identity(1))
+        };
+        fixture.Credentials.Secret = "password";
+        fixture.Factory.Enqueue(new FakeSession(Identity(1), SshConnectionErrorCode.AuthenticationFailed));
+        fixture.Factory.Enqueue(new FakeSession(Identity(1), SshConnectionErrorCode.None, linuxMetrics: new LinuxMetricsRawData()));
+        var calls = 0;
+
+        var result = await fixture.Service.CollectAsync(
+            Request().Server with { OperatingSystem = ServerOperatingSystem.Linux },
+            TimeSpan.FromMilliseconds(500),
+            TimeSpan.FromSeconds(2),
+            _ => calls++,
+            probes: null);
+
+        Assert.Equal(0, calls);
+        Assert.False(result.IsSuccess);
+    }
+
+    [Fact]
+    public async Task Linux_metrics_a_callback_that_throws_still_returns_the_published_result()
+    {
+        var raw = new LinuxMetricsRawData { Hostname = "ubuntu" };
+        var fixture = new Fixture
+        {
+            TrustedHostKey = Trusted(Identity(1))
+        };
+        fixture.Credentials.Secret = "password";
+        fixture.Factory.Enqueue(new FakeSession(Identity(1), SshConnectionErrorCode.AuthenticationFailed));
+        fixture.Factory.Enqueue(new FakeSession(Identity(1), SshConnectionErrorCode.None, linuxMetrics: raw));
+
+        var result = await fixture.Service.CollectAsync(
+            Request().Server with { OperatingSystem = ServerOperatingSystem.Linux },
+            TimeSpan.FromMilliseconds(500),
+            TimeSpan.FromSeconds(2),
+            _ => throw new InvalidOperationException(),
+            probes: null);
+
+        Assert.True(result.IsSuccess);
+        Assert.Same(raw, result.Data);
+    }
+
+    [Fact]
     public async Task Linux_metrics_unknown_host_never_loads_credentials_or_collects()
     {
         var fixture = new Fixture();
@@ -877,6 +981,28 @@ public sealed class SshConnectionServiceTests
         {
             CollectWasCalled = true;
             return RunAsync(hostKeyVerifier, cancellationToken);
+        }
+
+        /// <summary>M16.1: what the session returns once its second phase is over (the base result when null).</summary>
+        public Func<SshSessionResult, SshSessionResult>? AfterPhaseTwo { get; init; }
+
+        public int PhasedCalls { get; private set; }
+
+        public async Task<SshSessionResult> CollectLinuxMetricsAsync(
+            Func<HostKeyIdentity, bool> hostKeyVerifier,
+            TimeSpan cpuSampleInterval,
+            SshSessionPhases phases,
+            CancellationToken cancellationToken)
+        {
+            CollectWasCalled = true;
+            PhasedCalls++;
+            var result = await RunAsync(hostKeyVerifier, cancellationToken);
+            if (SshSessionPhases.IsPublishable(result))
+            {
+                RemoteResultCallback.Invoke(phases.OnBaseResult, result);
+            }
+
+            return AfterPhaseTwo?.Invoke(result) ?? result;
         }
 
         public Task<SshSessionResult> CollectMacOsMetricsAsync(

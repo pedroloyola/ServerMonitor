@@ -91,6 +91,7 @@ public static class FeatureComposition
         var seen = new HashSet<FeatureId>();
         var settingsSections = new List<ShellContribution>();
         var navigationEntries = new List<ShellContribution>();
+        var serverDetailSections = new List<ServerDetailSection>();
 
         foreach (var module in modules)
         {
@@ -135,11 +136,12 @@ public static class FeatureComposition
             var contributions = module.Contributions ?? ShellContributions.Empty;
             settingsSections.AddRange(contributions.SettingsSections);
             navigationEntries.AddRange(contributions.NavigationEntries);
+            serverDetailSections.AddRange(contributions.ServerDetailSections);
         }
 
         return new FeatureCompositionResult(new FeatureCatalog(composed), skipped)
         {
-            Contributions = new ShellContributions(settingsSections, navigationEntries),
+            Contributions = new ShellContributions(settingsSections, navigationEntries, [], [], serverDetailSections),
         };
     }
 

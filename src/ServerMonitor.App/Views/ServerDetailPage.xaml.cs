@@ -16,11 +16,16 @@ namespace ServerMonitor.App.Views;
 public sealed partial class ServerDetailPage : Page, IServerDetailView, IDisposable
 {
     private readonly ServerEditorReturnFocus? _editorReturnFocus;
+    private readonly ShellContributionHost? _contributions;
 
-    public ServerDetailPage(ServerDetailViewModel viewModel, ServerEditorReturnFocus? editorReturnFocus = null)
+    public ServerDetailPage(
+        ServerDetailViewModel viewModel,
+        ServerEditorReturnFocus? editorReturnFocus = null,
+        ShellContributionHost? contributions = null)
     {
         InitializeComponent();
         _editorReturnFocus = editorReturnFocus;
+        _contributions = contributions;
         ViewModel = viewModel;
         DataContext = viewModel;
         Loaded += OnLoaded;
@@ -32,7 +37,40 @@ public sealed partial class ServerDetailPage : Page, IServerDetailView, IDisposa
 
     public ServerDetailViewModel ViewModel { get; }
 
-    public void Load(Guid serverId, ServerDetailOrigin origin) => ViewModel.Load(serverId, origin);
+    public void Load(Guid serverId, ServerDetailOrigin origin)
+    {
+        ViewModel.Load(serverId, origin);
+        AddContributedSections(serverId);
+    }
+
+    /// <summary>
+    /// M16.1: the sections feature modules contribute to this server's page, each a titled glass card like the built-in
+    /// ones. The host creates their views for this server now (a factory that failed was already left out) and each is
+    /// placed through <see cref="ShellContributionHost.TryAttach"/>, so a view that fails when it is added leaves out
+    /// that section only. With none the panel stays collapsed.
+    /// </summary>
+    private void AddContributedSections(Guid serverId)
+    {
+        ContributedSections.Children.Clear();
+        if (_contributions is not null)
+        {
+            foreach (var section in _contributions.CreateServerDetailSections(serverId))
+            {
+                _contributions.TryAttach(section, view =>
+                {
+                    var title = new TextBlock { Text = section.Title, Style = (Style)Application.Current.Resources["SaCardTitleTextStyle"] };
+                    Microsoft.UI.Xaml.Automation.AutomationProperties.SetHeadingLevel(title, AutomationHeadingLevel.Level2);
+                    var block = new StackPanel { Spacing = 16 };
+                    block.Children.Add(title);
+                    block.Children.Add((UIElement)view);
+                    var card = new Border { Style = (Style)Application.Current.Resources["SaGlassSurfaceStyle"], Child = block };
+                    ContributedSections.Children.Add(card); // last: a card that failed above never reaches the page
+                });
+            }
+        }
+
+        ContributedSections.Visibility = ContributedSections.Children.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
 
     /// <summary>Idempotent: the view model unsubscribes once.</summary>
     public void Dispose()

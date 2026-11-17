@@ -1,5 +1,7 @@
 using ServerMonitor.Core.Enums;
 using ServerMonitor.Core.Models;
+using ServerMonitor.Core.Probes;
+using ServerMonitor.Infrastructure.Collectors;
 using ServerMonitor.Infrastructure.Collectors.Linux;
 using ServerMonitor.Infrastructure.Collectors.MacOS;
 using ServerMonitor.Infrastructure.Collectors.Workloads;
@@ -101,6 +103,54 @@ internal interface ISshSession : IDisposable
         Func<HostKeyIdentity, bool> hostKeyVerifier,
         WorkloadCollectionPlan plan,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Two-phase Linux collection in this one session (see <see cref="SshSessionPhases"/>). This default has no
+    /// second phase: it calls back after the session closed.
+    /// </summary>
+    async Task<SshSessionResult> CollectLinuxMetricsAsync(
+        Func<HostKeyIdentity, bool> hostKeyVerifier,
+        TimeSpan cpuSampleInterval,
+        SshSessionPhases phases,
+        CancellationToken cancellationToken)
+    {
+        var result = await CollectLinuxMetricsAsync(hostKeyVerifier, cpuSampleInterval, cancellationToken)
+            .ConfigureAwait(false);
+        if (SshSessionPhases.IsPublishable(result))
+        {
+            RemoteResultCallback.Invoke(phases.OnBaseResult, result);
+        }
+
+        return result;
+    }
+
+    /// <summary>Two-phase macOS collection in this one session (see <see cref="SshSessionPhases"/>).</summary>
+    async Task<SshSessionResult> CollectMacOsMetricsAsync(
+        Func<HostKeyIdentity, bool> hostKeyVerifier,
+        SshSessionPhases phases,
+        CancellationToken cancellationToken)
+    {
+        var result = await CollectMacOsMetricsAsync(hostKeyVerifier, cancellationToken).ConfigureAwait(false);
+        if (SshSessionPhases.IsPublishable(result))
+        {
+            RemoteResultCallback.Invoke(phases.OnBaseResult, result);
+        }
+
+        return result;
+    }
+}
+
+/// <summary>
+/// The two phases of one metrics session. Phase 1 runs the built-in commands; when the session succeeded and at least
+/// one source answered, <see cref="OnBaseResult"/> receives that result once (anything it throws is ignored). Phase 2
+/// then runs the due probes of <see cref="Probes"/>, on the reservation's own token, before the session disconnects
+/// exactly as a one-phase session does. A failed connect or phase 1 never calls back and runs no probes.
+/// </summary>
+internal sealed record SshSessionPhases(Action<SshSessionResult>? OnBaseResult, RemoteProbeReservation? Probes)
+{
+    public static bool IsPublishable(SshSessionResult result) =>
+        result.IsSuccess
+        && (result.LinuxMetrics is { HasAnySource: true } || result.MacOsMetrics is { HasAnySource: true });
 }
 
 /// <summary>

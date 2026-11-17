@@ -1,4 +1,5 @@
 using ServerMonitor.Core.Models;
+using ServerMonitor.Core.Probes;
 
 namespace ServerMonitor.App.Services;
 
@@ -14,6 +15,27 @@ public interface IServerMetricsStore
     Task<ServerMetricsCollectionResult> RefreshAsync(
         Server server,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Refreshes like <see cref="RefreshAsync(Server, CancellationToken)"/>, then runs the reserved remote probes in
+    /// the same session. The returned task completes with the built-in result as soon as it is ready; the probes go
+    /// on afterwards and the store always completes <paramref name="probes"/> when the session is over (or at once
+    /// when it is not used). This default runs no probes.
+    /// </summary>
+    async Task<ServerMetricsCollectionResult> RefreshAsync(
+        Server server,
+        RemoteProbeReservation? probes,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await RefreshAsync(server, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            probes?.Complete();
+        }
+    }
 
     void Remove(Guid serverId);
 }

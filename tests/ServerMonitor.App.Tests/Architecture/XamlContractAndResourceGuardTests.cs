@@ -70,7 +70,9 @@ public sealed partial class XamlContractAndResourceGuardTests
             // UI.5 fix round 2 (Beacon C1 N2): the live "A atualizar…" text announced from code-behind.
             "RefreshingText",
             // UI.5 fix round 2: focus returns to "…" after a cancelled / failed Ocultar or Remover.
-            "MoreActionsButton"],
+            "MoreActionsButton",
+            // M16.1: the host of contributed server detail sections (filled from code-behind, collapsed when empty).
+            "ContributedSections"],
         // UI.5 §4: the Data sub-page brings the backup status and (H-UI5-4) the About card into view from code-behind.
         ["Views/SettingsDataPage.xaml"] = ["PageViewport", "BackupStatusBar", "AboutSection", "PageRoot", "ResetIgnoredButton", "HistoryActions", "BackupActions",
             "GitHubButton", "SuccessToast",

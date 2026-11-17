@@ -723,4 +723,72 @@ public sealed class ShellContributionHostTests
         Assert.Contains("ValidateIconPathData(string data) => _ = (Geometry)XamlBindingHelper.ConvertValue(typeof(Geometry), data);", host, StringComparison.Ordinal);
         Assert.Contains("IsDisplayableNavigationView, IsDisplayableSectionView, ValidateIconPathData)", host, StringComparison.Ordinal);
     }
+
+    // ---------------------------------------------------------------- M16.1: server detail sections
+
+    private static ServerDetailSection DetailSection(string id, int order = 0, Func<Guid, object>? factory = null) =>
+        new(id, order, "TitleKey." + id, factory ?? (_ => new View(id)));
+
+    [Fact]
+    public void WithNoServerDetailSections_TheDetailPageGetsNone()
+    {
+        Assert.Empty(Host(ShellContributions.Empty).CreateServerDetailSections(Guid.NewGuid()));
+    }
+
+    [Fact]
+    public void ServerDetailSections_AreCreatedForTheServer_EachTime_InOrder()
+    {
+        var seen = new List<Guid>();
+        var host = Host(ShellContributions.Empty.WithServerDetailSections([
+            DetailSection("b.detail", 1, id =>
+            {
+                seen.Add(id);
+                return new View("b.detail");
+            }),
+            DetailSection("a.detail", 1),
+        ]));
+        var first = Guid.NewGuid();
+        var second = Guid.NewGuid();
+
+        var forFirst = host.CreateServerDetailSections(first);
+        var forSecond = host.CreateServerDetailSections(second);
+
+        Assert.Equal(["a.detail", "b.detail"], forFirst.Select(section => section.Id));
+        Assert.Equal("Title of TitleKey.b.detail", forFirst[1].Title);
+        Assert.Equal([first, second], seen);
+        Assert.NotSame(forFirst[1].View, forSecond[1].View); // a new view for each page, never cached
+    }
+
+    [Fact]
+    public void AServerDetailSectionThatThrows_OrGivesNoShowableView_IsLeftOut_LoggedByIdAndType()
+    {
+        var logger = new RecordingLogger();
+        var host = Host(ShellContributions.Empty.WithServerDetailSections([
+            DetailSection("a.detail", factory: _ => throw new InvalidOperationException("secret detail")),
+            DetailSection("b.detail", factory: _ => "not a view"),
+            DetailSection("connection"),
+            DetailSection("c.detail"),
+        ]), logger);
+
+        var sections = host.CreateServerDetailSections(Guid.NewGuid());
+
+        Assert.Equal(["c.detail"], sections.Select(section => section.Id));
+        Assert.Contains(logger.Entries, entry => entry.Level == LogLevel.Error
+            && entry.Message.Contains("a.detail", StringComparison.Ordinal)
+            && entry.Message.Contains(nameof(InvalidOperationException), StringComparison.Ordinal));
+        Assert.Contains(logger.Entries, entry => entry.Level == LogLevel.Error && entry.Message.Contains("b.detail", StringComparison.Ordinal));
+        Assert.Contains(logger.Entries, entry => entry.Level == LogLevel.Warning && entry.Message.Contains("connection", StringComparison.Ordinal));
+        Assert.DoesNotContain(logger.Entries, entry => entry.Message.Contains("secret detail", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void TheServerDetailPage_PlacesEachSectionThroughTheHost()
+    {
+        var code = AppSourceTree.CodeWithoutComments("Views/ServerDetailPage.xaml.cs").Replace("\r\n", "\n", StringComparison.Ordinal);
+        var start = code.IndexOf("private void AddContributedSections(", StringComparison.Ordinal);
+        var body = code[start..code.IndexOf("\n    }", start, StringComparison.Ordinal)];
+
+        Assert.Contains("CreateServerDetailSections(serverId)", body, StringComparison.Ordinal);
+        Assert.Contains("TryAttach(section, view =>", body, StringComparison.Ordinal);
+    }
 }

@@ -30,9 +30,24 @@ public sealed class MacOsMetricsCollector : IServerMetricsCollector
         _options = options ?? MacOsMetricsCollectorOptions.Default;
     }
 
-    public async Task<ServerMetricsCollectionResult> CollectAsync(
+    public Task<ServerMetricsCollectionResult> CollectAsync(
         Server server,
+        CancellationToken cancellationToken = default) =>
+        CollectCoreAsync(server, null, cancellationToken);
+
+    public Task<ServerMetricsCollectionResult> CollectAsync(
+        Server server,
+        MetricsCollectionPhases phases,
         CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(phases);
+        return CollectCoreAsync(server, phases, cancellationToken);
+    }
+
+    private async Task<ServerMetricsCollectionResult> CollectCoreAsync(
+        Server server,
+        MetricsCollectionPhases? phases,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(server);
 
@@ -48,33 +63,30 @@ public sealed class MacOsMetricsCollector : IServerMetricsCollector
 
         try
         {
-            var remoteResult = await _remoteSource
-                .CollectAsync(server, _options.Timeout, cancellationToken)
+            if (phases is null)
+            {
+                var remoteResult = await _remoteSource
+                    .CollectAsync(server, _options.Timeout, cancellationToken)
+                    .ConfigureAwait(false);
+                return Map(server, remoteResult);
+            }
+
+            // Phase 1 is mapped and handed on from the session's callback; the returned result then only means the
+            // session (and its probes) is over, so it is returned without being mapped or published again.
+            ServerMetricsCollectionResult? published = null;
+            var finalResult = await _remoteSource
+                .CollectAsync(
+                    server,
+                    _options.Timeout,
+                    baseResult =>
+                    {
+                        published = Map(server, baseResult);
+                        phases.OnBaseResult(published);
+                    },
+                    phases.Probes,
+                    cancellationToken)
                 .ConfigureAwait(false);
-
-            if (!remoteResult.ConnectionResult.IsSuccess)
-            {
-                return ServerMetricsCollectionResult.Failure(
-                    MapConnectionError(remoteResult.ConnectionResult.ErrorCode),
-                    remoteResult.ConnectionResult);
-            }
-
-            if (remoteResult.Data is not { } data)
-            {
-                return ServerMetricsCollectionResult.Failure(
-                    MetricsCollectionErrorCode.NoMetricsAvailable,
-                    remoteResult.ConnectionResult);
-            }
-
-            var snapshot = BuildSnapshot(server.Id, data);
-            if (!snapshot.HasAnyData)
-            {
-                return ServerMetricsCollectionResult.Failure(
-                    MetricsCollectionErrorCode.NoMetricsAvailable,
-                    remoteResult.ConnectionResult);
-            }
-
-            return ServerMetricsCollectionResult.Success(snapshot, remoteResult.ConnectionResult);
+            return published ?? Map(server, finalResult);
         }
         catch (OperationCanceledException)
         {
@@ -86,6 +98,33 @@ public sealed class MacOsMetricsCollector : IServerMetricsCollector
             // collector must never crash its caller over a single server.
             return ServerMetricsCollectionResult.Failure(MetricsCollectionErrorCode.Unexpected);
         }
+    }
+
+    private ServerMetricsCollectionResult Map(Server server, MacOsMetricsRemoteResult remoteResult)
+    {
+        if (!remoteResult.ConnectionResult.IsSuccess)
+        {
+            return ServerMetricsCollectionResult.Failure(
+                MapConnectionError(remoteResult.ConnectionResult.ErrorCode),
+                remoteResult.ConnectionResult);
+        }
+
+        if (remoteResult.Data is not { } data)
+        {
+            return ServerMetricsCollectionResult.Failure(
+                MetricsCollectionErrorCode.NoMetricsAvailable,
+                remoteResult.ConnectionResult);
+        }
+
+        var snapshot = BuildSnapshot(server.Id, data);
+        if (!snapshot.HasAnyData)
+        {
+            return ServerMetricsCollectionResult.Failure(
+                MetricsCollectionErrorCode.NoMetricsAvailable,
+                remoteResult.ConnectionResult);
+        }
+
+        return ServerMetricsCollectionResult.Success(snapshot, remoteResult.ConnectionResult);
     }
 
     private ServerMetricsSnapshot BuildSnapshot(Guid serverId, MacOsMetricsRawData data)

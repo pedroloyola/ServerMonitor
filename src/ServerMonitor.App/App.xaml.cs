@@ -18,6 +18,7 @@ using ServerMonitor.Core.Domain;
 using ServerMonitor.Core.History;
 using ServerMonitor.Core.Interfaces;
 using ServerMonitor.Core.Monitoring;
+using ServerMonitor.Core.Probes;
 using ServerMonitor.Core.Workloads;
 using ServerMonitor.Features;
 using ServerMonitor.Infrastructure.Backup;
@@ -715,6 +716,11 @@ public partial class App : Application
         services.AddSingleton<IServerMetricsCollector, MetricsCollectorRouter>();
         services.AddSingleton<IServerMetricsStore, ServerMetricsStore>();
 
+        // M16.1 generic seams. One history generation for every composition: clear/reset advances it, and late
+        // remote-probe results of an older generation are dropped. The scheduler holds the composed remote probes
+        // (none in this repository, so a poll runs exactly the built-in commands).
+        services.AddSingleton<HistoryGeneration>();
+
         // M10 local history. Default: unavailable. The real stack (in the non-QA branch
         // below) or a QA harness overrides this registration; every composition can resolve
         // these so the History UI degrades to "unavailable" gracefully.
@@ -828,6 +834,9 @@ public partial class App : Application
                 sp.GetRequiredService<ILogger<CompositeMonitoringCycleObserver>>()));
 
             services.AddSingleton<IServerMonitoringStateStore, ServerMonitoringStateStore>();
+            services.AddSingleton(sp => new RemoteProbeScheduler(
+                sp.GetServices<IRemoteProbe>(),
+                sp.GetRequiredService<HistoryGeneration>()));
             services.AddSingleton(sp => new MonitoringEngine(
                 sp.GetRequiredService<IServerService>(),
                 sp.GetRequiredService<IServerMetricsStore>(),
@@ -837,7 +846,8 @@ public partial class App : Application
                 // The one MonitoringOptions instance (registered above): the overview's priority rule reads the very
                 // thresholds the engine derives health from (D-UI4-PRIORITY).
                 options: sp.GetRequiredService<MonitoringOptions>(),
-                cycleObserver: sp.GetRequiredService<IMonitoringCycleObserver>()));
+                cycleObserver: sp.GetRequiredService<IMonitoringCycleObserver>(),
+                probeScheduler: sp.GetRequiredService<RemoteProbeScheduler>()));
             services.AddSingleton<IMonitoringEngine>(sp => sp.GetRequiredService<MonitoringEngine>());
         }
 #if DEBUG
@@ -1090,7 +1100,8 @@ public partial class App : Application
                 [.. composed.SettingsSections, .. settingsSections],
                 composed.NavigationEntries,
                 [.. unlistedPages],
-                [.. links]);
+                [.. links],
+                composed.ServerDetailSections);
     }
 
     /// <summary>
