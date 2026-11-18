@@ -114,5 +114,33 @@ public static class ProcStatCpuParser
         return false;
     }
 
+    /// <summary>
+    /// Counts the per-CPU lines ("cpu0", "cpu1", …) of one "cat /proc/stat" sample: the CPUs online, which
+    /// is what the load average is measured against. Null when the sample has none (unknown, never 0).
+    /// </summary>
+    public static int? CountLogicalCpus(string? sample)
+    {
+        if (string.IsNullOrWhiteSpace(sample))
+        {
+            return null;
+        }
+
+        var count = 0;
+        foreach (var rawLine in sample.Split('\n'))
+        {
+            var line = rawLine.TrimEnd('\r');
+            var end = line.IndexOf(' ');
+            var name = end < 0 ? line : line[..end];
+            if (name.Length > 3 &&
+                name.StartsWith("cpu", StringComparison.Ordinal) &&
+                name.AsSpan(3).IndexOfAnyExceptInRange('0', '9') < 0)
+            {
+                count++;
+            }
+        }
+
+        return count > 0 ? count : null;
+    }
+
     private readonly record struct CpuTimes(ulong Total, ulong Idle);
 }

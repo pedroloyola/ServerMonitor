@@ -16,7 +16,7 @@ namespace ServerMonitor.Infrastructure.Persistence;
 /// </summary>
 public sealed class SqliteServerHistoryStore : IServerHistoryStore, IDisposable
 {
-    private const int CurrentSchemaVersion = 2;
+    private const int CurrentSchemaVersion = 3;
 
     private readonly HistoryStorageOptions _options;
     private readonly ILogger<SqliteServerHistoryStore> _logger;
@@ -97,8 +97,8 @@ public sealed class SqliteServerHistoryStore : IServerHistoryStore, IDisposable
             command.Transaction = transaction;
             command.CommandText =
                 "INSERT OR IGNORE INTO history_samples " +
-                "(server_id, captured_at_utc, health, cpu_percent, memory_percent, disk_percent) " +
-                "VALUES ($server_id, $captured_at_utc, $health, $cpu, $memory, $disk);";
+                "(server_id, captured_at_utc, health, cpu_percent, memory_percent, disk_percent, load1) " +
+                "VALUES ($server_id, $captured_at_utc, $health, $cpu, $memory, $disk, $load1);";
 
             var serverId = command.Parameters.Add("$server_id", SqliteType.Text);
             var capturedAt = command.Parameters.Add("$captured_at_utc", SqliteType.Integer);
@@ -106,6 +106,7 @@ public sealed class SqliteServerHistoryStore : IServerHistoryStore, IDisposable
             var cpu = command.Parameters.Add("$cpu", SqliteType.Real);
             var memory = command.Parameters.Add("$memory", SqliteType.Real);
             var disk = command.Parameters.Add("$disk", SqliteType.Real);
+            var load1 = command.Parameters.Add("$load1", SqliteType.Real);
 
             foreach (var sample in batch)
             {
@@ -120,6 +121,7 @@ public sealed class SqliteServerHistoryStore : IServerHistoryStore, IDisposable
                 cpu.Value = (object?)HistorySampleValidator.SanitizePercent(sample.CpuPercent) ?? DBNull.Value;
                 memory.Value = (object?)HistorySampleValidator.SanitizePercent(sample.MemoryPercent) ?? DBNull.Value;
                 disk.Value = (object?)HistorySampleValidator.SanitizePercent(sample.DiskPercent) ?? DBNull.Value;
+                load1.Value = (object?)HistorySampleValidator.SanitizeLoad(sample.Load1) ?? DBNull.Value;
                 await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             }
 
@@ -161,7 +163,7 @@ public sealed class SqliteServerHistoryStore : IServerHistoryStore, IDisposable
                 await using var connection = await OpenConfiguredAsync(cancellationToken).ConfigureAwait(false);
                 await using var command = connection.CreateCommand();
                 command.CommandText =
-                    "SELECT captured_at_utc, health, cpu_percent, memory_percent, disk_percent " +
+                    "SELECT captured_at_utc, health, cpu_percent, memory_percent, disk_percent, load1 " +
                     "FROM history_samples " +
                     "WHERE server_id = $server_id AND captured_at_utc >= $start AND captured_at_utc <= $end " +
                     "ORDER BY captured_at_utc ASC " +
@@ -193,7 +195,8 @@ public sealed class SqliteServerHistoryStore : IServerHistoryStore, IDisposable
                         Health = ReadHealth(reader, 1),
                         CpuPercent = ReadPercent(reader, 2),
                         MemoryPercent = ReadPercent(reader, 3),
-                        DiskPercent = ReadPercent(reader, 4)
+                        DiskPercent = ReadPercent(reader, 4),
+                        Load1 = ReadLoad(reader, 5)
                     });
                 }
 
@@ -381,6 +384,12 @@ public sealed class SqliteServerHistoryStore : IServerHistoryStore, IDisposable
             version = 2;
         }
 
+        if (version == 2)
+        {
+            await MigrateVersion2To3Async(connection, cancellationToken).ConfigureAwait(false);
+            version = 3;
+        }
+
         if (version != CurrentSchemaVersion ||
             !await HasExpectedSchemaAsync(connection, cancellationToken).ConfigureAwait(false))
         {
@@ -398,7 +407,7 @@ public sealed class SqliteServerHistoryStore : IServerHistoryStore, IDisposable
             .BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
         await using var create = connection.CreateCommand();
         create.Transaction = transaction;
-        create.CommandText = CreateTableSql("history_samples") +
+        create.CommandText = CreateTableSql("history_samples", includeLoad1: true) +
                              $"PRAGMA user_version={CurrentSchemaVersion};";
         await create.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
@@ -418,7 +427,7 @@ public sealed class SqliteServerHistoryStore : IServerHistoryStore, IDisposable
         await using var command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText =
-            CreateTableSql("history_samples_v2") +
+            CreateTableSql("history_samples_v2", includeLoad1: false) +
             "INSERT OR IGNORE INTO history_samples_v2 " +
             "(server_id, captured_at_utc, health, cpu_percent, memory_percent, disk_percent) " +
             "SELECT server_id, captured_at_utc, " +
@@ -435,7 +444,32 @@ public sealed class SqliteServerHistoryStore : IServerHistoryStore, IDisposable
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    private static string CreateTableSql(string tableName) =>
+    /// <summary>
+    /// Schema v3 (M16.1, load average): adds the nullable 1 minute load average. A plain ADD COLUMN keeps
+    /// every v2 row and leaves its <c>load1</c> NULL (unknown, never 0). The CHECK is not the percentage
+    /// one: a load has no upper bound, only ≥ 0. All-or-nothing in one transaction.
+    /// </summary>
+    private static async Task MigrateVersion2To3Async(
+        SqliteConnection connection,
+        CancellationToken cancellationToken)
+    {
+        await using var transaction = (SqliteTransaction)await connection
+            .BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            $"ALTER TABLE history_samples ADD COLUMN {Load1ColumnSql};" +
+            "PRAGMA user_version=3;";
+        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    private const string Load1ColumnSql =
+        "load1 REAL NULL CHECK(load1 IS NULL OR (typeof(load1) IN ('real','integer') AND load1 >= 0))";
+
+    /// <summary>The v2 table (the 1→2 rebuild) or the current v3 one, which adds <c>load1</c> last, as the
+    /// 2→3 ADD COLUMN does, so a migrated and a fresh database have the same column list.</summary>
+    private static string CreateTableSql(string tableName, bool includeLoad1) =>
         $"CREATE TABLE {tableName} (" +
         "  server_id       TEXT    NOT NULL," +
         "  captured_at_utc INTEGER NOT NULL CHECK(typeof(captured_at_utc)='integer')," +
@@ -443,6 +477,7 @@ public sealed class SqliteServerHistoryStore : IServerHistoryStore, IDisposable
         "  cpu_percent     REAL    NULL CHECK(cpu_percent IS NULL OR (typeof(cpu_percent) IN ('real','integer') AND cpu_percent BETWEEN 0 AND 100))," +
         "  memory_percent  REAL    NULL CHECK(memory_percent IS NULL OR (typeof(memory_percent) IN ('real','integer') AND memory_percent BETWEEN 0 AND 100))," +
         "  disk_percent    REAL    NULL CHECK(disk_percent IS NULL OR (typeof(disk_percent) IN ('real','integer') AND disk_percent BETWEEN 0 AND 100))," +
+        (includeLoad1 ? $"  {Load1ColumnSql}," : string.Empty) +
         "  PRIMARY KEY (server_id, captured_at_utc)" +
         ");";
 
@@ -462,7 +497,8 @@ public sealed class SqliteServerHistoryStore : IServerHistoryStore, IDisposable
             ("health", "INTEGER", true, 0),
             ("cpu_percent", "REAL", false, 0),
             ("memory_percent", "REAL", false, 0),
-            ("disk_percent", "REAL", false, 0)
+            ("disk_percent", "REAL", false, 0),
+            ("load1", "REAL", false, 0)
         };
 
         var actual = new List<(string Name, string Type, bool NotNull, int PrimaryKeyOrder)>();
@@ -488,7 +524,8 @@ public sealed class SqliteServerHistoryStore : IServerHistoryStore, IDisposable
                sql.Contains("CHECK", StringComparison.OrdinalIgnoreCase) &&
                sql.Contains("cpu_percent BETWEEN 0 AND 100", StringComparison.OrdinalIgnoreCase) &&
                sql.Contains("memory_percent BETWEEN 0 AND 100", StringComparison.OrdinalIgnoreCase) &&
-               sql.Contains("disk_percent BETWEEN 0 AND 100", StringComparison.OrdinalIgnoreCase);
+               sql.Contains("disk_percent BETWEEN 0 AND 100", StringComparison.OrdinalIgnoreCase) &&
+               sql.Contains("load1 >= 0", StringComparison.OrdinalIgnoreCase);
     }
 
     private static async Task<long> ReadUserVersionAsync(SqliteConnection connection, CancellationToken cancellationToken)
@@ -546,6 +583,22 @@ public sealed class SqliteServerHistoryStore : IServerHistoryStore, IDisposable
             _ => (double?)null
         };
         return HistorySampleValidator.SanitizePercent(value);
+    }
+
+    private static double? ReadLoad(SqliteDataReader reader, int ordinal)
+    {
+        if (reader.IsDBNull(ordinal))
+        {
+            return null;
+        }
+
+        var value = reader.GetValue(ordinal) switch
+        {
+            double real => real,
+            long integer => integer,
+            _ => (double?)null
+        };
+        return HistorySampleValidator.SanitizeLoad(value);
     }
 
     private void EnsureDirectory()

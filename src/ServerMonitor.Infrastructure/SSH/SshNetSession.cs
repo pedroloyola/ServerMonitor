@@ -246,6 +246,11 @@ internal sealed class SshNetSession(
                 DefaultOutputLimit,
                 cancellationToken)
             .ConfigureAwait(false);
+        var loadAverage = await TryExecuteCommandAsync(
+                LinuxMetricsCommandCatalog.LoadAverage,
+                SmallOutputLimit,
+                cancellationToken)
+            .ConfigureAwait(false);
 
         return new LinuxMetricsRawData
         {
@@ -255,7 +260,8 @@ internal sealed class SshNetSession(
             RootFileSystem = rootFileSystem,
             Uptime = uptime,
             Hostname = hostname,
-            OsRelease = osRelease
+            OsRelease = osRelease,
+            LoadAverage = loadAverage
         };
     }
 
@@ -298,6 +304,11 @@ internal sealed class SshNetSession(
                 SmallOutputLimit,
                 cancellationToken)
             .ConfigureAwait(false);
+        var loadAverage = await TryExecuteCommandAsync(
+                MacOsMetricsCommandCatalog.LoadAverage,
+                SmallOutputLimit,
+                cancellationToken)
+            .ConfigureAwait(false);
 
         return new MacOsMetricsRawData
         {
@@ -307,7 +318,8 @@ internal sealed class SshNetSession(
             RootFileSystem = rootFileSystem,
             BootTime = bootTime,
             Hostname = hostname,
-            SwVers = swVers
+            SwVers = swVers,
+            LoadAverage = loadAverage
         };
     }
 

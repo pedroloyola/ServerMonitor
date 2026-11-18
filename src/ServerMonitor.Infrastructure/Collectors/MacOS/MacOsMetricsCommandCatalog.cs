@@ -18,6 +18,9 @@ internal static class MacOsMetricsCommandCatalog
     internal const string Hostname = "hostname";
     internal const string SwVers = "sw_vers";
 
+    // One exec, two lines: "{ 1.23 1.45 1.67 }", then the logical CPU count the load is read against.
+    internal const string LoadAverage = "sysctl -n vm.loadavg hw.logicalcpu";
+
     internal static IReadOnlyList<string> All { get; } = Array.AsReadOnly(
     [
         CpuTop,
@@ -26,6 +29,7 @@ internal static class MacOsMetricsCommandCatalog
         RootFileSystem,
         BootTime,
         Hostname,
-        SwVers
+        SwVers,
+        LoadAverage
     ]);
 }

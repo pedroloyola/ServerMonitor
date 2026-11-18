@@ -22,4 +22,7 @@ public sealed record ServerHistorySample
     public double? MemoryPercent { get; init; }
 
     public double? DiskPercent { get; init; }
+
+    /// <summary>The 1 minute load average (not a percentage: any finite value ≥ 0). Schema v3.</summary>
+    public double? Load1 { get; init; }
 }

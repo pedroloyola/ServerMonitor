@@ -767,6 +767,10 @@
   <data name="ServerDetailCpuCaption.Text" xml:space="preserve"><value>CPU usage</value></data>
   <data name="ServerDetailMetricAccessibleFormat" xml:space="preserve"><value>{0}: {1}</value></data>
   <data name="ServerDetailBytesOfFormat" xml:space="preserve"><value>{0} of {1}</value></data>
+  <data name="ServerDetailLoadAverageFormat" xml:space="preserve"><value>Load {0} · {1} · {2}</value></data>
+  <data name="ServerDetailLoadAverageSeparator" xml:space="preserve"><value> · </value></data>
+  <data name="ServerDetailLogicalCpuCountOne" xml:space="preserve"><value>{0} CPU</value></data>
+  <data name="ServerDetailLogicalCpuCountOther" xml:space="preserve"><value>{0} CPUs</value></data>
   <data name="ServerDetailUptimeLabel.Text" xml:space="preserve"><value>Uptime</value></data>
   <data name="ServerDetailIntervalLabel.Text" xml:space="preserve"><value>Interval</value></data>
   <data name="ServerDetailDurationSecondsOne" xml:space="preserve"><value>{0} second</value></data>

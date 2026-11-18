@@ -57,6 +57,45 @@ public sealed class MacOsMetricsCollectorTests
     };
 
     [Fact]
+    public async Task CollectAsync_LoadAverage_MapsAllThreeAndTheLogicalCpuCount()
+    {
+        var remote = new FakeMacOsMetricsRemoteSource
+        {
+            Result = SuccessResult(FullRawData with { LoadAverage = "{ 1.25 1.50 1.75 }\n10\n" })
+        };
+        var collector = new MacOsMetricsCollector(remote);
+
+        var result = await collector.CollectAsync(MacServer());
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(1.25, result.Snapshot!.LoadAverage1);
+        Assert.Equal(1.50, result.Snapshot.LoadAverage5);
+        Assert.Equal(1.75, result.Snapshot.LoadAverage15);
+        Assert.Equal(10, result.Snapshot.LogicalCpuCount);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("sysctl: unknown oid 'vm.loadavg'\n")]
+    public async Task CollectAsync_LoadAverageMissingOrMalformed_IsNullNeverZero(string? loadAverage)
+    {
+        var remote = new FakeMacOsMetricsRemoteSource
+        {
+            Result = SuccessResult(FullRawData with { LoadAverage = loadAverage })
+        };
+        var collector = new MacOsMetricsCollector(remote);
+
+        var result = await collector.CollectAsync(MacServer());
+
+        Assert.True(result.IsSuccess);
+        Assert.Null(result.Snapshot!.LoadAverage1);
+        Assert.Null(result.Snapshot.LoadAverage5);
+        Assert.Null(result.Snapshot.LoadAverage15);
+        Assert.Null(result.Snapshot.LogicalCpuCount);
+    }
+
+    [Fact]
     public async Task CollectAsync_NonMacOsServer_FailsWithoutCallingRemoteSource()
     {
         var remote = new FakeMacOsMetricsRemoteSource();

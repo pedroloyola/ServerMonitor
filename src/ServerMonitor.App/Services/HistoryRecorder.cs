@@ -67,7 +67,8 @@ public sealed class HistoryRecorder : IMonitoringCycleObserver
             Health = completion.Health,
             CpuPercent = HistorySampleValidator.SanitizePercent(snapshot?.CpuUsagePercent),
             MemoryPercent = HistorySampleValidator.SanitizePercent(snapshot?.MemoryUsagePercent),
-            DiskPercent = HistorySampleValidator.SanitizePercent(snapshot?.DiskUsagePercent)
+            DiskPercent = HistorySampleValidator.SanitizePercent(snapshot?.DiskUsagePercent),
+            Load1 = HistorySampleValidator.SanitizeLoad(snapshot?.LoadAverage1)
         };
 
         if (!_channel.TryWrite(sample))
