@@ -26,6 +26,12 @@ catálogo. Do mesmo modo, a página de detalhe e a limpeza do histórico só con
   (stream de entrada do `SshCommand` do SSH.NET). A shell de login do utilizador (bash, zsh, fish, csh…) só vê
   `sh -s`, por isso o script é sempre lido por um `sh` POSIX, e nenhum carácter do script (aspas, `$`) chega à linha de
   comando. Não foi preciso o recurso `sh -c '<script>'`, e por isso `'` não é recusado.
+- **Stdin dentro do script.** Como o próprio script é o stdin do `sh`, um comando do script que leia o stdin (`cat`
+  sem ficheiro, `read`, `ssh`, `docker exec -i`, `docker run -i`…) consome o resto do script, e a sonda termina mais
+  cedo sem erro visível. Esses comandos têm de redirecionar com `</dev/null`. A regra está no `IRemoteProbe.Command`.
+- **Escrita no stdin que falha.** Se a escrita do script falhar (o canal fechou porque o `sh` já saiu, ou
+  cancelamento), a sessão cancela o comando e espera pelas suas tarefas antes de deixar a falha subir. A sonda fica
+  `Failed`, e a falha não leva o script nem o output.
 - Limites fixos (`RemoteProbeLimits`): até 4 sondas por recolha, orçamento total de output de 1 MiB, até 256 KiB por
   sonda, timeout máximo de 30 s e script com até 8 KiB (8192 caracteres).
 - **Duas fases na mesma sessão.** A sessão corre os comandos de origem, constrói o resultado e entrega-o uma vez a um
@@ -72,6 +78,8 @@ apareça depois dela.
 - O limitador global de recolhas concorrentes do motor é libertado no fim da fase 1, não da fase 2 (ver "Sessões e
   tetos").
 - QA manual: um servidor cuja shell de login é fish (e, se possível, csh/tcsh), com uma sonda multi-linha com `if` e
-  `for`. Esperado: o resultado chega à sonda igual ao de um servidor com bash.
+  `for`. Esperado: o resultado chega à sonda igual ao de um servidor com bash. Fazer o mesmo também com um servidor
+  com bash, antes de ligar a primeira sonda real, porque o caminho do stdin do SSH.NET não tem teste contra um servidor
+  SSH.
 - A regra da composição que rejeita um módulo condicional que registe um tipo de serviço já registado continua em
   vigor; um segundo módulo condicional que registe `IRemoteProbe` ou `IHistoryParticipant` exige uma decisão própria.

@@ -28,6 +28,11 @@ public interface IRemoteProbe
     /// The constant POSIX sh script: lines separated by LF, no other control character, at most
     /// <see cref="RemoteProbeLimits.MaxCommandLength"/> characters. It runs as ONE exec of <c>sh -s</c> with the script on
     /// standard input, so the server's login shell (bash, zsh, fish, csh...) never interprets it.
+    /// <para>
+    /// Because the script itself is <c>sh</c>'s standard input, any command in it that can read standard input
+    /// (<c>cat</c> with no file, <c>read</c>, <c>ssh</c>, <c>docker exec -i</c>, <c>docker run -i</c>...) must redirect it
+    /// with <c>&lt;/dev/null</c>. Otherwise it consumes the rest of the script, and the probe ends early without an error.
+    /// </para>
     /// </summary>
     string Command { get; }
 

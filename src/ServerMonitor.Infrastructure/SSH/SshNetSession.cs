@@ -502,9 +502,14 @@ internal sealed class SshNetSession(
         {
             if (standardInput is not null)
             {
-                // Disposing the stream sends EOF, so `sh -s` ends after the script's last line.
-                await using var input = command.CreateInputStream();
-                await input.WriteAsync(standardInput, commandCancellation.Token).ConfigureAwait(false);
+                await WriteStandardInputAsync(
+                        command,
+                        standardInput,
+                        commandCancellation,
+                        executeTask,
+                        outputTask,
+                        errorTask)
+                    .ConfigureAwait(false);
             }
 
             await Task.WhenAll(executeTask, outputTask, errorTask).ConfigureAwait(false);
@@ -537,6 +542,41 @@ internal sealed class SshNetSession(
                 StandardError = null,
                 OutputExceededLimit = true
             };
+        }
+    }
+
+    /// <summary>
+    /// Writes the probe script and closes standard input. A failed write (the channel closed because <c>sh</c> already
+    /// exited, or the caller cancelled) stops the command and drains its three tasks before the failure goes up, so
+    /// none is left unobserved until the command is disposed. The failure carries neither the script nor any output.
+    /// </summary>
+    private static async Task WriteStandardInputAsync(
+        SshCommand command,
+        byte[] standardInput,
+        CancellationTokenSource commandCancellation,
+        Task executeTask,
+        Task outputTask,
+        Task errorTask)
+    {
+        try
+        {
+            // Disposing the stream sends EOF, so `sh -s` ends after the script's last line.
+            await using var input = command.CreateInputStream();
+            await input.WriteAsync(standardInput, commandCancellation.Token).ConfigureAwait(false);
+        }
+        catch
+        {
+            commandCancellation.Cancel();
+            try
+            {
+                await Task.WhenAll(executeTask, outputTask, errorTask).ConfigureAwait(false);
+            }
+            catch
+            {
+                // Draining after a failed write must not replace the write's own failure.
+            }
+
+            throw;
         }
     }
 

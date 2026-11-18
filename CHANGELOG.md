@@ -3,6 +3,17 @@
 Todas as alterações relevantes deste projeto são documentadas aqui. O formato inspira-se em
 [Keep a Changelog](https://keepachangelog.com/) e o versionamento segue [SemVer](https://semver.org/).
 
+## [Por publicar]
+
+### Produto
+
+- **Carga média no detalhe do servidor.** O cartão de CPU mostra a carga de 1, 5 e 15 minutos e o número de CPUs,
+  quando o servidor a reporta (#95).
+- **Histórico na versão 3 do esquema.** O histórico local ganha uma coluna para a carga de 1 minuto. A migração
+  mantém todas as amostras antigas. Atenção: depois de a nova versão abrir o histórico, uma versão anterior da app
+  deixa de o conseguir usar. Desliga o histórico, mas não apaga nem altera os dados, e volta a funcionar ao reinstalar
+  a versão nova (#95).
+
 ## [1.1.7] — 2026-10-17
 
 Interface redesenhada e novas funcionalidades desde o ServerAlyzer 1.1. Publicada na **Microsoft Store** como
