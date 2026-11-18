@@ -805,6 +805,26 @@ public sealed class ShellContributionHostTests
     }
 
     [Fact]
+    public void AServerDetailSectionWithoutATitle_IsLoggedOnce_NotOnEveryVisit()
+    {
+        var logger = new RecordingLogger();
+        var host = new ShellContributionHost(
+            ShellContributions.Empty.WithServerDetailSections([DetailSection("a.detail"), DetailSection("b.detail")]),
+            logger,
+            key => key == ShellContributionHost.UntitledResourceKey ? "Neutral label"
+                : key == "TitleKey.b.detail" ? "B" : "",
+            view => view is View);
+
+        var first = host.CreateServerDetailSections(Guid.NewGuid());
+        var second = host.CreateServerDetailSections(Guid.NewGuid());
+
+        Assert.Equal(["Neutral label", "B"], first.Select(section => section.Title));
+        Assert.Equal(["Neutral label", "B"], second.Select(section => section.Title));
+        var warning = Assert.Single(logger.Entries, entry => entry.Level == LogLevel.Warning);
+        Assert.Contains("a.detail", warning.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void TheServerDetailBaseline_IsThePagesBuiltInCards_AndContributionsFollowThem()
     {
         // Like the Settings baseline: the reserved ids are the cards of the "deeper" grid, in order (connection, then
