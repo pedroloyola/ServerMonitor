@@ -116,6 +116,7 @@ public sealed class ShellContributionHost
     private IReadOnlyList<RealizedShellContribution>? _settingsSections;
     private IReadOnlyList<RealizedShellContribution>? _unlistedPages;
     private IReadOnlyList<RealizedShellLink>? _links;
+    private IReadOnlyList<ServerDetailSection>? _arrangedServerDetailSections;
     private readonly HashSet<string> _failedLinkText = new(StringComparer.Ordinal);
     private bool _realizing;
 
@@ -307,7 +308,9 @@ public sealed class ShellContributionHost
     /// M16.1: the contributed sections of the detail page of <paramref name="serverId"/>, in display order, with views
     /// created now (UI thread) for this page only; nothing is cached, so every visit asks the factories again. A factory
     /// that throws or returns no view the shell can show (like a Settings section's) leaves out that section and is
-    /// logged with the id and exception type only. With no contributions the list is empty and no factory runs.
+    /// logged with the id and exception type only. With no contributions the list is empty and no factory runs. The
+    /// order is arranged once, on the first visit, so a rejected section (a reserved or repeated id) is logged once, not
+    /// on every visit; the contributions are fixed at composition, so the arrangement cannot change afterwards.
     /// </summary>
     public IReadOnlyList<RealizedShellContribution> CreateServerDetailSections(Guid serverId)
     {
@@ -316,14 +319,7 @@ public sealed class ShellContributionHost
             return [];
         }
 
-        var arranged = ShellContributionOrdering.Arrange(
-            _contributions.ServerDetailSections, BuiltInServerDetailSectionIds, out var rejected);
-        foreach (var rejection in rejected)
-        {
-            _logger.LogWarning(
-                "A contributed server detail section was left out: {Reason}. Id: {Id}.", rejection.Reason, rejection.Section.Id);
-        }
-
+        var arranged = _arrangedServerDetailSections ??= ArrangeServerDetailSections();
         var realized = new List<RealizedShellContribution>(arranged.Count);
         foreach (var section in arranged)
         {
@@ -351,6 +347,19 @@ public sealed class ShellContributionHost
         }
 
         return realized;
+    }
+
+    private IReadOnlyList<ServerDetailSection> ArrangeServerDetailSections()
+    {
+        var arranged = ShellContributionOrdering.Arrange(
+            _contributions.ServerDetailSections, BuiltInServerDetailSectionIds, out var rejected);
+        foreach (var rejection in rejected)
+        {
+            _logger.LogWarning(
+                "A contributed server detail section was left out: {Reason}. Id: {Id}.", rejection.Reason, rejection.Section.Id);
+        }
+
+        return arranged;
     }
 
     /// <summary>

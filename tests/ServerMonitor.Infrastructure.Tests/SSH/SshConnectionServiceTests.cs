@@ -546,7 +546,7 @@ public sealed class SshConnectionServiceTests
     }
 
     [Fact]
-    public async Task Linux_metrics_two_phases_with_no_remote_source_never_calls_back()
+    public async Task Linux_metrics_two_phases_with_no_source_answering_never_calls_back()
     {
         var fixture = new Fixture
         {
@@ -673,6 +673,173 @@ public sealed class SshConnectionServiceTests
         Assert.False(result.IsSuccess);
         Assert.True(result.ConnectionResult.IsSuccess);
         Assert.NotNull(result.Data);
+    }
+
+    // ---------------------------------------------------------------- M16.1: a load-only answer counts
+
+    [Fact]
+    public void A_load_average_alone_counts_as_a_source_on_each_platform()
+    {
+        // Pins the LoadAverage line of both HasAnySource: removing it makes every assertion here fail.
+        var linux = new LinuxMetricsRawData { LoadAverage = "0.10 0.20 0.30 1/100 4242" };
+        var macOs = new MacOsMetricsRawData { LoadAverage = "{ 0.10 0.20 0.30 }" };
+        var connected = new SshConnectionResult { State = ServerConnectionState.Connected };
+
+        Assert.True(linux.HasAnySource);
+        Assert.True(macOs.HasAnySource);
+        Assert.True(new LinuxMetricsRemoteResult { ConnectionResult = connected, Data = linux }.IsSuccess);
+        Assert.True(new MacOsMetricsRemoteResult { ConnectionResult = connected, Data = macOs }.IsSuccess);
+        Assert.True(SshSessionPhases.IsPublishable(new SshSessionResult { ErrorCode = SshConnectionErrorCode.None, LinuxMetrics = linux }));
+        Assert.True(SshSessionPhases.IsPublishable(new SshSessionResult { ErrorCode = SshConnectionErrorCode.None, MacOsMetrics = macOs }));
+        Assert.False(SshSessionPhases.IsPublishable(new SshSessionResult { ErrorCode = SshConnectionErrorCode.None, LinuxMetrics = new LinuxMetricsRawData() }));
+        Assert.False(SshSessionPhases.IsPublishable(new SshSessionResult { ErrorCode = SshConnectionErrorCode.None, MacOsMetrics = new MacOsMetricsRawData() }));
+    }
+
+    [Fact]
+    public async Task Linux_metrics_a_load_only_answer_is_published_in_phase_one()
+    {
+        var raw = new LinuxMetricsRawData { LoadAverage = "0.10 0.20 0.30 1/100 4242" };
+        var fixture = new Fixture
+        {
+            TrustedHostKey = Trusted(Identity(1))
+        };
+        fixture.Credentials.Secret = "password";
+        fixture.Factory.Enqueue(new FakeSession(Identity(1), SshConnectionErrorCode.AuthenticationFailed));
+        fixture.Factory.Enqueue(new FakeSession(Identity(1), SshConnectionErrorCode.None, linuxMetrics: raw));
+        var published = new List<LinuxMetricsRemoteResult>();
+
+        var result = await fixture.Service.CollectAsync(
+            Request().Server with { OperatingSystem = ServerOperatingSystem.Linux },
+            TimeSpan.FromMilliseconds(500),
+            TimeSpan.FromSeconds(2),
+            published.Add,
+            probes: null);
+
+        Assert.Same(raw, Assert.Single(published).Data);
+        Assert.True(result.IsSuccess);
+    }
+
+    [Fact]
+    public async Task MacOs_metrics_a_load_only_answer_is_published_in_phase_one()
+    {
+        var raw = new MacOsMetricsRawData { LoadAverage = "{ 0.10 0.20 0.30 }" };
+        var fixture = new Fixture
+        {
+            TrustedHostKey = Trusted(Identity(1))
+        };
+        fixture.Credentials.Secret = "password";
+        fixture.Factory.Enqueue(new FakeSession(Identity(1), SshConnectionErrorCode.AuthenticationFailed));
+        fixture.Factory.Enqueue(new FakeSession(Identity(1), SshConnectionErrorCode.None, macOsMetrics: raw));
+        var published = new List<MacOsMetricsRemoteResult>();
+
+        var result = await fixture.Service.CollectAsync(
+            Request().Server with { OperatingSystem = ServerOperatingSystem.MacOS },
+            TimeSpan.FromSeconds(2),
+            published.Add,
+            probes: null);
+
+        Assert.Same(raw, Assert.Single(published).Data);
+        Assert.True(result.IsSuccess);
+    }
+
+    // ---------------------------------------------------------------- M16.1: macOS two phases, as Linux
+
+    [Fact]
+    public async Task MacOs_metrics_two_phases_publish_once_and_a_failed_phase_two_is_never_published()
+    {
+        var raw = new MacOsMetricsRawData { Hostname = "mac-mini" };
+        var fixture = new Fixture
+        {
+            TrustedHostKey = Trusted(Identity(1))
+        };
+        fixture.Credentials.Secret = "password";
+        fixture.Factory.Enqueue(new FakeSession(Identity(1), SshConnectionErrorCode.AuthenticationFailed));
+        fixture.Factory.Enqueue(new FakeSession(Identity(1), SshConnectionErrorCode.None, macOsMetrics: raw)
+        {
+            AfterPhaseTwo = result => result with { ErrorCode = SshConnectionErrorCode.Unexpected }
+        });
+        var published = new List<MacOsMetricsRemoteResult>();
+
+        var result = await fixture.Service.CollectAsync(
+            Request().Server with { OperatingSystem = ServerOperatingSystem.MacOS },
+            TimeSpan.FromSeconds(2),
+            published.Add,
+            probes: null);
+
+        var only = Assert.Single(published);
+        Assert.True(only.IsSuccess);
+        Assert.Same(raw, only.Data);
+        Assert.True(result.IsSuccess);
+        Assert.Same(only.ConnectionResult, result.ConnectionResult);
+        Assert.Equal(1, fixture.Factory.LastSession!.PhasedMacOsCalls);
+        Assert.Equal(0, fixture.Factory.LastSession.PhasedCalls);
+    }
+
+    [Fact]
+    public async Task MacOs_metrics_two_phases_failure_never_calls_back()
+    {
+        var fixture = new Fixture
+        {
+            TrustedHostKey = Trusted(Identity(1))
+        };
+        fixture.Credentials.Secret = "password";
+        fixture.Factory.Enqueue(new FakeSession(Identity(1), SshConnectionErrorCode.AuthenticationFailed));
+        fixture.Factory.Enqueue(new FakeSession(Identity(1), SshConnectionErrorCode.AuthenticationFailed));
+        var calls = 0;
+
+        var result = await fixture.Service.CollectAsync(
+            Request().Server with { OperatingSystem = ServerOperatingSystem.MacOS },
+            TimeSpan.FromSeconds(2),
+            _ => calls++,
+            probes: null);
+
+        Assert.Equal(0, calls);
+        Assert.False(result.IsSuccess);
+        Assert.False(result.ConnectionResult.IsSuccess);
+    }
+
+    [Fact]
+    public async Task MacOs_metrics_two_phases_with_no_source_answering_never_calls_back()
+    {
+        var fixture = new Fixture
+        {
+            TrustedHostKey = Trusted(Identity(1))
+        };
+        fixture.Credentials.Secret = "password";
+        fixture.Factory.Enqueue(new FakeSession(Identity(1), SshConnectionErrorCode.AuthenticationFailed));
+        fixture.Factory.Enqueue(new FakeSession(Identity(1), SshConnectionErrorCode.None, macOsMetrics: new MacOsMetricsRawData()));
+        var calls = 0;
+
+        var result = await fixture.Service.CollectAsync(
+            Request().Server with { OperatingSystem = ServerOperatingSystem.MacOS },
+            TimeSpan.FromSeconds(2),
+            _ => calls++,
+            probes: null);
+
+        Assert.Equal(0, calls);
+        Assert.False(result.IsSuccess);
+    }
+
+    [Fact]
+    public async Task MacOs_metrics_a_callback_that_throws_still_returns_the_published_result()
+    {
+        var raw = new MacOsMetricsRawData { Hostname = "mac-mini" };
+        var fixture = new Fixture
+        {
+            TrustedHostKey = Trusted(Identity(1))
+        };
+        fixture.Credentials.Secret = "password";
+        fixture.Factory.Enqueue(new FakeSession(Identity(1), SshConnectionErrorCode.AuthenticationFailed));
+        fixture.Factory.Enqueue(new FakeSession(Identity(1), SshConnectionErrorCode.None, macOsMetrics: raw));
+
+        var result = await fixture.Service.CollectAsync(
+            Request().Server with { OperatingSystem = ServerOperatingSystem.MacOS },
+            TimeSpan.FromSeconds(2),
+            _ => throw new InvalidOperationException(),
+            probes: null);
+
+        Assert.True(result.IsSuccess);
+        Assert.Same(raw, result.Data);
     }
 
     [Fact]
@@ -1011,6 +1178,24 @@ public sealed class SshConnectionServiceTests
         {
             CollectMacOsWasCalled = true;
             return RunAsync(hostKeyVerifier, cancellationToken);
+        }
+
+        public int PhasedMacOsCalls { get; private set; }
+
+        public async Task<SshSessionResult> CollectMacOsMetricsAsync(
+            Func<HostKeyIdentity, bool> hostKeyVerifier,
+            SshSessionPhases phases,
+            CancellationToken cancellationToken)
+        {
+            CollectMacOsWasCalled = true;
+            PhasedMacOsCalls++;
+            var result = await RunAsync(hostKeyVerifier, cancellationToken);
+            if (SshSessionPhases.IsPublishable(result))
+            {
+                RemoteResultCallback.Invoke(phases.OnBaseResult, result);
+            }
+
+            return AfterPhaseTwo?.Invoke(result) ?? result;
         }
 
         public Task<SshSessionResult> CollectWorkloadsAsync(

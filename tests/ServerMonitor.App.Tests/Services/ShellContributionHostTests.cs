@@ -782,6 +782,53 @@ public sealed class ShellContributionHostTests
     }
 
     [Fact]
+    public void ARejectedServerDetailSection_IsLoggedOnce_NotOnEveryVisit()
+    {
+        var logger = new RecordingLogger();
+        var host = Host(ShellContributions.Empty.WithServerDetailSections([
+            DetailSection("explore"),
+            DetailSection("a.detail"),
+            DetailSection("a.detail"),
+        ]), logger);
+
+        var first = host.CreateServerDetailSections(Guid.NewGuid());
+        var second = host.CreateServerDetailSections(Guid.NewGuid());
+        var third = host.CreateServerDetailSections(Guid.NewGuid());
+
+        Assert.Equal(["a.detail"], first.Select(section => section.Id));
+        Assert.Equal(["a.detail"], second.Select(section => section.Id));
+        Assert.Equal(["a.detail"], third.Select(section => section.Id));
+        var warnings = logger.Entries.Where(entry => entry.Level == LogLevel.Warning).ToList();
+        Assert.Single(warnings, entry => entry.Message.Contains("explore", StringComparison.Ordinal));
+        Assert.Single(warnings, entry => entry.Message.Contains("a.detail", StringComparison.Ordinal));
+        Assert.Equal(2, warnings.Count);
+    }
+
+    [Fact]
+    public void TheServerDetailBaseline_IsThePagesBuiltInCards_AndContributionsFollowThem()
+    {
+        // Like the Settings baseline: the reserved ids are the cards of the "deeper" grid, in order (connection, then
+        // explore), and the contributed sections' host comes right after that grid, collapsed while there are none.
+        var page = AppSourceTree.LoadXaml("Views/ServerDetailPage.xaml");
+        var grid = page.Descendants().Single(e => (string?)e.Attribute(AppSourceTree.Xaml + "Name") == "DeeperGrid");
+        var cards = grid.Elements().Where(e => e.Name.LocalName == "Border")
+            .OrderBy(e => int.Parse((string?)e.Attribute("Grid.Row") ?? "0", System.Globalization.CultureInfo.InvariantCulture))
+            .ThenBy(e => int.Parse((string?)e.Attribute("Grid.Column") ?? "0", System.Globalization.CultureInfo.InvariantCulture))
+            .ToList();
+        var titles = cards.Select(card => card.Descendants()
+            .First(e => (string?)e.Attribute("AutomationProperties.HeadingLevel") == "Level2")
+            .Attribute(AppSourceTree.Xaml + "Uid")?.Value);
+
+        Assert.Equal(["ServerDetailConnectionTitle", "ServerDetailExploreTitle"], titles);
+        Assert.Equal(["connection", "explore"], ShellContributionHost.BuiltInServerDetailSectionIds);
+        Assert.Equal(ShellContributionHost.BuiltInServerDetailSectionIds.Count, cards.Count);
+        var siblings = grid.Parent!.Elements().ToList();
+        var contributed = siblings[siblings.IndexOf(grid) + 1];
+        Assert.Equal("ContributedSections", (string?)contributed.Attribute(AppSourceTree.Xaml + "Name"));
+        Assert.Equal("Collapsed", (string?)contributed.Attribute("Visibility")); // no visual change while there are none
+    }
+
+    [Fact]
     public void TheServerDetailPage_PlacesEachSectionThroughTheHost()
     {
         var code = AppSourceTree.CodeWithoutComments("Views/ServerDetailPage.xaml.cs").Replace("\r\n", "\n", StringComparison.Ordinal);
