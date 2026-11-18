@@ -53,6 +53,33 @@ public sealed class HistorySampleValidatorTests
         Assert.Null(HistorySampleValidator.SanitizePercent(null));
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(0.52)]
+    [InlineData(100.5)] // not a percentage: never clamped or dropped above 100
+    [InlineData(4096)]
+    public void SanitizeLoad_FiniteNonNegative_ReturnsTheValueUnchanged(double value)
+    {
+        Assert.Equal(value, HistorySampleValidator.SanitizeLoad(value));
+    }
+
+    [Theory]
+    [InlineData(-0.01)]
+    [InlineData(double.NaN)]
+    [InlineData(double.PositiveInfinity)]
+    [InlineData(double.NegativeInfinity)]
+    public void SanitizeLoad_NegativeOrNotFinite_ReturnsNull(double value)
+    {
+        Assert.Null(HistorySampleValidator.SanitizeLoad(value));
+    }
+
+    [Fact]
+    public void SanitizeLoad_Null_StaysNull_AndZeroStaysZero()
+    {
+        Assert.Null(HistorySampleValidator.SanitizeLoad(null));
+        Assert.Equal(0d, HistorySampleValidator.SanitizeLoad(0));
+    }
+
     [Fact]
     public void IsValidTimestamp_DefaultOrPreEpoch_False()
     {

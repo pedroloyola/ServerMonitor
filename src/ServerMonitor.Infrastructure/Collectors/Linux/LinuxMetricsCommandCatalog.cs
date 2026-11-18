@@ -9,6 +9,9 @@ internal static class LinuxMetricsCommandCatalog
     internal const string Hostname = "cat /proc/sys/kernel/hostname";
     internal const string OsRelease = "cat /etc/os-release";
 
+    // The 1, 5 and 15 minute load averages are the first three fields.
+    internal const string LoadAverage = "cat /proc/loadavg";
+
     internal static IReadOnlyList<string> All { get; } = Array.AsReadOnly(
     [
         CpuStat,
@@ -16,6 +19,7 @@ internal static class LinuxMetricsCommandCatalog
         RootFileSystem,
         Uptime,
         Hostname,
-        OsRelease
+        OsRelease,
+        LoadAverage
     ]);
 }

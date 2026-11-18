@@ -42,6 +42,63 @@ public sealed class LinuxMetricsCollectorTests
     };
 
     [Fact]
+    public async Task CollectAsync_LoadAverage_MapsAllThreeAndTheLogicalCpuCount()
+    {
+        var remote = new FakeLinuxMetricsRemoteSource
+        {
+            Result = SuccessResult(FullRawData with
+            {
+                SecondCpuStat = "cpu  150 0 0 850 0 0 0 0 0 0\ncpu0 75 0 0 425 0 0 0 0 0 0\ncpu1 75 0 0 425 0 0 0 0 0 0\n",
+                LoadAverage = "0.52 0.40 0.31 1/123 4567\n"
+            })
+        };
+        var collector = new LinuxMetricsCollector(remote);
+
+        var result = await collector.CollectAsync(LinuxServer());
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(0.52, result.Snapshot!.LoadAverage1);
+        Assert.Equal(0.40, result.Snapshot.LoadAverage5);
+        Assert.Equal(0.31, result.Snapshot.LoadAverage15);
+        Assert.Equal(2, result.Snapshot.LogicalCpuCount);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("garbage\n")]
+    public async Task CollectAsync_LoadAverageMissingOrMalformed_IsNullNeverZero(string? loadAverage)
+    {
+        var remote = new FakeLinuxMetricsRemoteSource
+        {
+            Result = SuccessResult(FullRawData with { LoadAverage = loadAverage })
+        };
+        var collector = new LinuxMetricsCollector(remote);
+
+        var result = await collector.CollectAsync(LinuxServer());
+
+        Assert.True(result.IsSuccess); // the other metrics still arrive
+        Assert.Null(result.Snapshot!.LoadAverage1);
+        Assert.Null(result.Snapshot.LoadAverage5);
+        Assert.Null(result.Snapshot.LoadAverage15);
+    }
+
+    [Fact]
+    public async Task CollectAsync_OnlyALoadAverage_StillCountsAsData()
+    {
+        var remote = new FakeLinuxMetricsRemoteSource
+        {
+            Result = SuccessResult(new LinuxMetricsRawData { LoadAverage = "0.00 0.00 0.00 1/50 99\n" })
+        };
+        var collector = new LinuxMetricsCollector(remote);
+
+        var result = await collector.CollectAsync(LinuxServer());
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(0d, result.Snapshot!.LoadAverage1); // a real 0 survives as 0
+    }
+
+    [Fact]
     public async Task CollectAsync_NonLinuxServer_FailsWithoutCallingRemoteSource()
     {
         var remote = new FakeLinuxMetricsRemoteSource();

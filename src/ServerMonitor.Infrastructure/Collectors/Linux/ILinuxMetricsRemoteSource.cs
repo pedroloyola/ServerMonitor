@@ -60,7 +60,8 @@ public sealed record LinuxMetricsRawData
         || RootFileSystem is not null
         || Uptime is not null
         || Hostname is not null
-        || OsRelease is not null;
+        || OsRelease is not null
+        || LoadAverage is not null;
 
     public string? FirstCpuStat { get; init; }
 
@@ -75,4 +76,6 @@ public sealed record LinuxMetricsRawData
     public string? Hostname { get; init; }
 
     public string? OsRelease { get; init; }
+
+    public string? LoadAverage { get; init; }
 }

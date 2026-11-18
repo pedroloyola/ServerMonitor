@@ -59,7 +59,8 @@ public sealed record MacOsMetricsRawData
         || RootFileSystem is not null
         || BootTime is not null
         || Hostname is not null
-        || SwVers is not null;
+        || SwVers is not null
+        || LoadAverage is not null;
 
     public string? CpuTop { get; init; }
 
@@ -74,4 +75,6 @@ public sealed record MacOsMetricsRawData
     public string? Hostname { get; init; }
 
     public string? SwVers { get; init; }
+
+    public string? LoadAverage { get; init; }
 }

@@ -5,7 +5,7 @@ namespace ServerMonitor.Infrastructure.Tests.SSH;
 public sealed class MacOsMetricsCommandCatalogTests
 {
     [Fact]
-    public void Catalog_contains_only_the_seven_reviewed_literal_commands()
+    public void Catalog_contains_only_the_eight_reviewed_literal_commands()
     {
         Assert.Equal(
             [
@@ -15,7 +15,8 @@ public sealed class MacOsMetricsCommandCatalogTests
                 "df -P -k /",
                 "sysctl -n kern.boottime",
                 "hostname",
-                "sw_vers"
+                "sw_vers",
+                "sysctl -n vm.loadavg hw.logicalcpu"
             ],
             MacOsMetricsCommandCatalog.All);
     }
