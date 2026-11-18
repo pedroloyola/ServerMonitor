@@ -1,4 +1,5 @@
 using ServerMonitor.Collectors.MacOS;
+using ServerMonitor.Collectors.Tests.MacOS.Fakes;
 using ServerMonitor.Core.Enums;
 using ServerMonitor.Core.History;
 using ServerMonitor.Core.Interfaces;
@@ -128,17 +129,30 @@ public sealed class MacOsMetricsCollectorPhasesTests
     [Fact]
     public async Task ACallbackThatThrows_DoesNotFailTheCollection()
     {
-        var remote = new PhasedMacOsSource { Result = Success() };
+        // The isolation is the production one (the interface's phased path), not the fake's: the fake source here only
+        // implements the one-phase call, so a callback exception that got through would make the collector return
+        // Unexpected.
+        var remote = new FakeMacOsMetricsRemoteSource { Result = Success() };
         var collector = new MacOsMetricsCollector(remote);
+        var attempts = 0;
 
         var returned = await collector.CollectAsync(
-            MacServer(), new MetricsCollectionPhases(_ => throw new InvalidOperationException(), Probes: null));
+            MacServer(),
+            new MetricsCollectionPhases(_ =>
+            {
+                attempts++;
+                throw new InvalidOperationException();
+            }, Probes: null));
 
+        Assert.Equal(1, attempts);
         Assert.True(returned.IsSuccess);
-        Assert.True(remote.PhaseTwoFinished);
+        Assert.Equal(1, remote.CallCount);
     }
 
-    /// <summary>A source with a real second phase: calls back on success, then "runs probes", then returns.</summary>
+    /// <summary>
+    /// A source with a real second phase: calls back on success, then "runs probes", then returns. It does not catch
+    /// what the callback throws, so no test here can pass on the fake's own isolation.
+    /// </summary>
     private sealed class PhasedMacOsSource : IMacOsMetricsRemoteSource
     {
         public required MacOsMetricsRemoteResult Result { get; init; }
@@ -163,14 +177,7 @@ public sealed class MacOsMetricsCollectorPhasesTests
             LastProbes = probes;
             if (Result.IsSuccess)
             {
-                try
-                {
-                    onBaseResult(Result);
-                }
-                catch (Exception)
-                {
-                    // As the session does: a callback that throws is ignored.
-                }
+                onBaseResult(Result);
             }
 
             await Task.Yield();

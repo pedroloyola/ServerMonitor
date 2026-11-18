@@ -118,6 +118,7 @@ public sealed class ShellContributionHost
     private IReadOnlyList<RealizedShellLink>? _links;
     private IReadOnlyList<ServerDetailSection>? _arrangedServerDetailSections;
     private readonly HashSet<string> _failedLinkText = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _untitled = new(StringComparer.Ordinal);
     private bool _realizing;
 
     public ShellContributionHost(
@@ -306,7 +307,7 @@ public sealed class ShellContributionHost
 
     /// <summary>
     /// M16.1: the contributed sections of the detail page of <paramref name="serverId"/>, in display order, with views
-    /// created now (UI thread) for this page only; nothing is cached, so every visit asks the factories again. A factory
+    /// created now (UI thread) for this page only; no view is cached, so every visit asks the factories again. A factory
     /// that throws or returns no view the shell can show (like a Settings section's) leaves out that section and is
     /// logged with the id and exception type only. With no contributions the list is empty and no factory runs. The
     /// order is arranged once, on the first visit, so a rejected section (a reserved or repeated id) is logged once, not
@@ -516,7 +517,8 @@ public sealed class ShellContributionHost
 
     /// <summary>
     /// The contribution's title. A missing resource (blank, the key itself, or a lookup that throws) is logged with the
-    /// id and the key and shows a neutral label, never the raw id, so the Narrator does not read an identifier.
+    /// id and the key and shows a neutral label, never the raw id, so the Narrator does not read an identifier. It is
+    /// logged once per kind and id: a server detail section asks for its title on every visit.
     /// </summary>
     private string TitleOf(string id, string titleResourceKey, string kind)
     {
@@ -525,9 +527,13 @@ public sealed class ShellContributionHost
             return title;
         }
 
-        _logger.LogWarning(
-            "A contributed {Kind} has no title resource; a neutral label is shown. Id: {Id}. Key: {Key}.",
-            kind, id, titleResourceKey);
+        if (_untitled.Add(kind + "|" + id))
+        {
+            _logger.LogWarning(
+                "A contributed {Kind} has no title resource; a neutral label is shown. Id: {Id}. Key: {Key}.",
+                kind, id, titleResourceKey);
+        }
+
         return Lookup(UntitledResourceKey) ?? UntitledFallback;
     }
 
