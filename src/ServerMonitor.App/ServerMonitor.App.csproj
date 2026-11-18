@@ -101,11 +101,20 @@
            AssemblyVersion          : 1.0.0.0  (unchanged)
            Product SemVer / Informational : 1.1.11
          DisplayVersion = 1.1.11. A release candidate, not a release: NÃO criar tag v1.1.11 sem
+         aprovação humana.
+
+         Release candidate 1.1.12 (human-approved 2026-11-18). GitHub release only for now; the Store
+         submission of 1.1.11 is still pending. The floor moves to 1.1.12.0. Concept map now:
+           Package/Identity Version : 1.1.12.0  (Store-valid; Revision 0; = floor)
+           FileVersion              : 1.1.12.0  (tracks the package build)
+           AssemblyVersion          : 1.0.0.0  (unchanged)
+           Product SemVer / Informational : 1.1.12
+         DisplayVersion = 1.1.12. A release candidate, not a release: NÃO criar tag v1.1.12 sem
          aprovação humana. -->
-    <Version>1.1.11</Version>
+    <Version>1.1.12</Version>
     <AssemblyVersion>1.0.0.0</AssemblyVersion>
-    <FileVersion>1.1.11.0</FileVersion>
-    <InformationalVersion>1.1.11</InformationalVersion>
+    <FileVersion>1.1.12.0</FileVersion>
+    <InformationalVersion>1.1.12</InformationalVersion>
     <!-- M12/ADR-017: one app, two deployment profiles. Default is the existing UNPACKAGED,
          self-contained build (dev Debug + existing Release + every test/gate). Pass
          -p:Packaged=true for the production single-project MSIX profile below. Domain logic

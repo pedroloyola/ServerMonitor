@@ -1,9 +1,5 @@
-O ServerAlyzer 1.1.11 faz com que a Visão geral e as Definições caibam melhor em janelas mais pequenas.
+O ServerAlyzer 1.1.12 mostra a carga média dos seus servidores Linux e macOS.
 
-Visão geral. A barra de saúde nunca fica cortada: numa janela estreita passa para baixo das contagens de servidores, e o último segmento mantém a ponta arredondada.
+Detalhes do servidor. O cartão do CPU mostra a carga média do último minuto, dos últimos 5 e dos últimos 15 minutos, junto ao número de CPUs. Quando um servidor não a indica, não aparece nada: um valor em falta nunca é mostrado como 0.
 
-Páginas. Quando percorre uma página, o conteúdo já não passa por baixo da zona da barra de título.
-
-Definições. Os cartões ficam empilhados em vez de cortados quando a janela é estreita, e a tecla Tab e os leitores de ecrã percorrem-nos pela ordem em que os vê.
-
-Barra lateral. A barra lateral está ligeiramente mais larga, por isso os nomes das páginas têm mais espaço antes de serem encurtados.
+Histórico. O ServerAlyzer passa também a guardar a carga média de 1 minuto no histórico local do seu PC.

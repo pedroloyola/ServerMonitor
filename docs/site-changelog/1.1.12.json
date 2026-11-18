@@ -1,0 +1,72 @@
+{
+  "version": "1.1.12",
+  "date": "2026-11-18",
+  "en": {
+    "title": "Load average for Linux and macOS servers",
+    "blocks": [
+      {
+        "kind": "ul",
+        "items": [
+          "The server details CPU card shows the load average over the last 1, 5 and 15 minutes, next to the number of CPUs.",
+          "When a server does not report its load average, nothing is shown: a missing value is never shown as 0.",
+          "The 1-minute load average is also recorded in the local history on your PC."
+        ]
+      },
+      {
+        "kind": "note",
+        "text": "Known issues: at a Windows text size of about 175% or larger, some text in Settings can be cut off and wrapped descriptions can overlap. Switching straight from one high contrast theme to another while the app is open can leave the selected sidebar item with the previous theme's highlight; choose Exit ServerAlyzer in the notification area menu and open the app again. Fixes are planned for a later version."
+      }
+    ]
+  },
+  "pt-pt": {
+    "title": "Carga média dos servidores Linux e macOS",
+    "blocks": [
+      {
+        "kind": "ul",
+        "items": [
+          "O cartão do CPU nos detalhes do servidor mostra a carga média do último minuto, dos últimos 5 e dos últimos 15 minutos, junto ao número de CPUs.",
+          "Quando um servidor não indica a carga média, não aparece nada: um valor em falta nunca é mostrado como 0.",
+          "A carga média de 1 minuto passa também a ser guardada no histórico local do seu PC."
+        ]
+      },
+      {
+        "kind": "note",
+        "text": "Problemas conhecidos: com o tamanho do texto do Windows a cerca de 175% ou mais, algum texto nas Definições pode ficar cortado e descrições em várias linhas podem sobrepor-se. Mudar diretamente de um tema de alto contraste para outro com a aplicação aberta pode deixar o item selecionado da barra lateral com o destaque do tema anterior; escolha Sair do ServerAlyzer no menu da área de notificação e volte a abrir a aplicação. Estão previstas correções numa versão futura."
+      }
+    ]
+  },
+  "pt-br": {
+    "title": "Carga média dos servidores Linux e macOS",
+    "blocks": [
+      {
+        "kind": "ul",
+        "items": [
+          "O cartão da CPU nos detalhes do servidor mostra a carga média do último minuto, dos últimos 5 e dos últimos 15 minutos, ao lado do número de CPUs.",
+          "Quando um servidor não informa a carga média, nada aparece: um valor ausente nunca é mostrado como 0.",
+          "A carga média de 1 minuto passa a ser salva também no histórico local do seu PC."
+        ]
+      },
+      {
+        "kind": "note",
+        "text": "Problemas conhecidos: com o tamanho de texto do Windows em cerca de 175% ou mais, alguns textos nas Configurações podem ficar cortados e descrições em várias linhas podem se sobrepor. Trocar diretamente de um tema de alto contraste para outro com o aplicativo aberto pode deixar o item selecionado da barra lateral com o destaque do tema anterior; escolha Sair do ServerAlyzer no menu da área de notificação e abra o aplicativo de novo. Correções estão previstas para uma versão futura."
+      }
+    ]
+  },
+  "es": {
+    "title": "Carga media de los servidores Linux y macOS",
+    "blocks": [
+      {
+        "kind": "ul",
+        "items": [
+          "La tarjeta de CPU en los detalles del servidor muestra la carga media del último minuto, de los últimos 5 y de los últimos 15 minutos, junto al número de CPU.",
+          "Cuando un servidor no informa de su carga media, no se muestra nada: un valor que falta nunca se muestra como 0.",
+          "La carga media de 1 minuto también se guarda en el historial local de tu PC."
+        ]
+      },
+      {
+        "kind": "note",
+        "text": "Problemas conocidos: con un tamaño de texto de Windows de aproximadamente el 175 % o más, parte del texto de Settings puede cortarse y las descripciones en varias líneas pueden solaparse. Cambiar directamente de un tema de alto contraste a otro con la aplicación abierta puede dejar el elemento seleccionado de la barra lateral con el resaltado del tema anterior; elige Exit ServerAlyzer en el menú del área de notificación y vuelve a abrir la aplicación. Hay correcciones previstas para una versión posterior."
+      }
+    ]
+  }
+}
