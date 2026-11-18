@@ -136,7 +136,7 @@ public sealed class CommercialVocabularyBoundaryTests
     // --------------------------------------------------------------- C15: persisted schemas untouched
 
     [Fact]
-    public void Persisted_schema_versions_are_unchanged_by_M14()
+    public void Persisted_schema_versions_are_pinned_and_never_bumped_for_commercial_work()
     {
         // ADR-021 E8: a shared schema version is never bumped to prepare for a commercial capability.
         // Pinning the literals here makes an accidental bump a named failure rather than a field report.
@@ -146,7 +146,7 @@ public sealed class CommercialVocabularyBoundaryTests
         var store = File.ReadAllText(Path.Combine(
             root, "src", "ServerMonitor.Infrastructure", "Persistence", "SqliteServerHistoryStore.cs"));
 
-        // v3 (M16.1, ADR-026 §9) is a Community change: the nullable load1 column the Community detail page and
+        // v3 (M16.1, load average) is a Community change: the nullable load1 column the Community detail page and
         // history record. It prepares no commercial capability; any further bump must be pinned here again.
         Assert.Contains("private const int CurrentSchemaVersion = 3;", store, StringComparison.Ordinal);
     }

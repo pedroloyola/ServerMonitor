@@ -283,7 +283,7 @@
                                        Visibility="{Binding HasCpuPercent, Converter={StaticResource BooleanToVisibilityConverter}}" />
                         </StackPanel>
                         <primitives:SaPulseBars Samples="{Binding CpuPulseSamples}" Ceiling="{Binding CpuPulseCeiling}" HorizontalAlignment="Stretch" />
-                        <!-- M16.1 (ADR-026): the caption slot shows the load average and CPU count when the host reports them
+                        <!-- M16.1, load average: the caption slot shows the load average and CPU count when the host reports them
                              (the card keeps its fixed height); the plain caption otherwise. Unknown load is never shown as 0. -->
                         <TextBlock x:Uid="ServerDetailCpuCaption" Style="{StaticResource SaCaptionTextStyle}" Foreground="{ThemeResource SaTextSecondaryBrush}"
                                    Visibility="{Binding HasLoadAverage, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Invert}" />

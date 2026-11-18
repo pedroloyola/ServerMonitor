@@ -27,7 +27,7 @@ ServerDetailPage (UI.5)
 | Uptime | `cat /proc/uptime` | primeiro valor, parsing invariant |
 | Hostname | `cat /proc/sys/kernel/hostname` | texto simples, limitado e sem decoração de shell |
 | Sistema | `cat /etc/os-release` | allowlist de `NAME`, `VERSION`, `VERSION_ID` e `PRETTY_NAME`; nunca `source`/`eval` |
-| Load average | `cat /proc/loadavg` | os três primeiros campos (1, 5 e 15 min), parsing invariant, ≥ 0 e finitos; qualquer campo inválido torna a leitura `null`. O número de CPUs lógicas vem das linhas `cpuN` do `/proc/stat` já lido (M16.1, ADR-026) |
+| Load average | `cat /proc/loadavg` | os três primeiros campos (1, 5 e 15 min), parsing invariant, ≥ 0 e finitos; qualquer campo inválido torna a leitura `null`. O número de CPUs lógicas vem das linhas `cpuN` do `/proc/stat` já lido (M16.1, load average) |
 
 Nenhuma string de configuração, host, username ou UI é concatenada nestes comandos. A aplicação não publica uma API genérica `ExecuteCommandAsync(string)`.
 
@@ -63,7 +63,7 @@ O macOS usa a userland BSD (sem GNU coreutils) e não expõe um contador cumulat
 | Uptime | `sysctl -n kern.boottime` | apenas o campo `sec` (epoch UTC); uptime derivado pelo `TimeProvider`, descartado se negativo |
 | Hostname | `hostname` | parser partilhado e agnóstico de OS |
 | Sistema | `sw_vers` | allowlist de `ProductName`, `ProductVersion`, `BuildVersion` |
-| Load average | `sysctl -n vm.loadavg hw.logicalcpu` | duas linhas no mesmo exec: `{ a b c }` e o número de CPUs lógicas; cada parte é lida sozinha e uma inválida fica `null` (M16.1, ADR-026) |
+| Load average | `sysctl -n vm.loadavg hw.logicalcpu` | duas linhas no mesmo exec: `{ a b c }` e o número de CPUs lógicas; cada linha é lida sozinha, uma inválida ou em falta fica `null` e não esconde a outra; se o próprio `sysctl` falhar (saída ≠ 0) as duas ficam `null` (M16.1, load average) |
 
 O tamanho da página é lido do cabeçalho do `vm_stat` e nunca assumido como 4096 (Apple Silicon usa 16384). As regras de falha parcial, segurança, limites e não-persistência são as mesmas do Linux. O catálogo e as decisões constam da ADR-010.
 

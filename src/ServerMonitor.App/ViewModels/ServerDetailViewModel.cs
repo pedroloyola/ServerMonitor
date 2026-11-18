@@ -388,7 +388,7 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
     public string CpuAccessibleValue => AccessiblePercent(HasCpuPercent, _card?.CpuUsageValue ?? 0);
 
     /// <summary>
-    /// M16.1 (ADR-026): "Load 0.52 · 0.40 · 0.31 · 4 CPUs" under the CPU card, from the last snapshot. Null (the line is
+    /// M16.1, load average: "Load 0.52 · 0.40 · 0.31 · 4 CPUs" under the CPU card, from the last snapshot. Null (the line is
     /// hidden) when the host reported no load average: unknown is never shown as 0. The CPU count is added only when known.
     /// </summary>
     public string? LoadAverageText

@@ -68,6 +68,15 @@ public sealed class ProcLoadAvgParserTests
         Assert.Null(ProcLoadAvgParser.Parse(new string('9', 64) + " 0.40 0.31 1/123 4567"));
     }
 
+    [Theory]
+    [InlineData("1234567.8901 0.40 0.31 1/123 4567", true)]    // 12 characters: the longest accepted
+    [InlineData("12345678.9012 0.40 0.31 1/123 4567", false)]  // 13 characters
+    [InlineData("0000000000000000000000000000001 0.40 0.31 1/123 4567", false)] // a 31-digit run
+    public void Parse_TokenLength_IsCappedAtTwelveCharacters(string output, bool accepted)
+    {
+        Assert.Equal(accepted, ProcLoadAvgParser.Parse(output) is not null);
+    }
+
     [Fact]
     public void Parse_OnlyTheFirstLineIsRead()
     {

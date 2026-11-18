@@ -4,8 +4,10 @@ namespace ServerMonitor.Collectors.MacOS.Parsing;
 
 /// <summary>
 /// Parses "sysctl -n vm.loadavg hw.logicalcpu" output: two lines, "{ 1.23 1.45 1.67 }" and the logical
-/// CPU count ("8"). Each part is read on its own, so a malformed count never hides a valid load and the
-/// reverse. Anything that does not match exactly is null (unknown), never 0.
+/// CPU count ("8"). Each line is read on its own, so a malformed count line never hides a valid load and
+/// the reverse; a lone load line (the count missing) keeps the load. Both values come from ONE exec, so
+/// when sysctl itself fails (non-zero exit, for example an unknown name) the session gets no output at all
+/// and both are unknown. Anything that does not match exactly is null (unknown), never 0.
 /// </summary>
 public static class MacLoadAverageParser
 {
@@ -24,12 +26,12 @@ public static class MacLoadAverageParser
             .Where(line => line.Length > 0)
             .ToArray();
 
-        if (lines.Length != 2)
+        return lines.Length switch
         {
-            return default;
-        }
-
-        return new MacLoadAverageResult(ParseLoad(lines[0]), ParseCount(lines[1]));
+            1 => new MacLoadAverageResult(ParseLoad(lines[0]), null),
+            2 => new MacLoadAverageResult(ParseLoad(lines[0]), ParseCount(lines[1])),
+            _ => default
+        };
     }
 
     private static LoadAverage? ParseLoad(string line)

@@ -8,8 +8,11 @@ namespace ServerMonitor.Collectors;
 /// </summary>
 public readonly record struct LoadAverage(double OneMinute, double FiveMinutes, double FifteenMinutes)
 {
-    /// <summary>Longest token accepted for one load value; anything longer is malformed.</summary>
-    private const int MaxTokenLength = 32;
+    /// <summary>
+    /// Longest token accepted for one load value; anything longer is malformed. Real loads print as
+    /// "0.52" or "1234.56" (at most a handful of digits); 12 leaves room without accepting digit runs.
+    /// </summary>
+    private const int MaxTokenLength = 12;
 
     /// <summary>
     /// Reads three load tokens. All three must be plain, finite, non-negative decimals in the invariant

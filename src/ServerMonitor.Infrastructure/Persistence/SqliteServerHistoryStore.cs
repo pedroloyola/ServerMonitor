@@ -445,7 +445,7 @@ public sealed class SqliteServerHistoryStore : IServerHistoryStore, IDisposable
     }
 
     /// <summary>
-    /// Schema v3 (M16.1, ADR-026 §9): adds the nullable 1 minute load average. A plain ADD COLUMN keeps
+    /// Schema v3 (M16.1, load average): adds the nullable 1 minute load average. A plain ADD COLUMN keeps
     /// every v2 row and leaves its <c>load1</c> NULL (unknown, never 0). The CHECK is not the percentage
     /// one: a load has no upper bound, only ≥ 0. All-or-nothing in one transaction.
     /// </summary>

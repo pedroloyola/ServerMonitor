@@ -35,7 +35,38 @@ public sealed class MacLoadAverageParserTests
     }
 
     [Theory]
-    [InlineData("{ 1.83 2.01 2.12 }")]                 // the count line is missing
+    [InlineData("{ 1.83 2.01 2.12 }")]
+    [InlineData("{ 1.83 2.01 2.12 }\n")]
+    [InlineData("{ 1.83 2.01 2.12 }\n\n")]
+    public void Parse_CountLineMissing_KeepsTheLoad(string output)
+    {
+        var result = MacLoadAverageParser.Parse(output);
+
+        Assert.Equal(new LoadAverage(1.83, 2.01, 2.12), result.Load);
+        Assert.Null(result.LogicalCpuCount);
+    }
+
+    [Fact]
+    public void Parse_LoneCountLine_IsNotTakenForALoad()
+    {
+        var result = MacLoadAverageParser.Parse("10\n");
+
+        Assert.Null(result.Load);
+        Assert.Null(result.LogicalCpuCount);
+    }
+
+    [Theory]
+    [InlineData("{ 12345678.9012 2.01 2.12 }\n10\n")]               // a 13-character load token
+    [InlineData("{ 00000000000000000000000000000001 2.01 2.12 }\n10\n")] // a 32-digit run
+    public void Parse_OverlongLoadToken_KeepsTheCountButNoLoad(string output)
+    {
+        var result = MacLoadAverageParser.Parse(output);
+
+        Assert.Null(result.Load);
+        Assert.Equal(10, result.LogicalCpuCount);
+    }
+
+    [Theory]
     [InlineData("{ 1.83 2.01 2.12 }\n10\n12\n")]        // an extra line
     [InlineData("sysctl: unknown oid 'vm.loadavg'\n")]
     public void Parse_UnexpectedShape_ReturnsNothing(string output)
