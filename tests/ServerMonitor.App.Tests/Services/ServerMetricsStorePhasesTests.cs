@@ -117,7 +117,8 @@ public sealed class ServerMetricsStorePhasesTests
         var reservation = scheduler.TryReserve(serverId, CancellationToken.None)!;
         var store = new ServerMetricsStore(new FakeMetricsCollector());
 
-        Assert.Throws<ArgumentNullException>(() => store.RefreshAsync(null!, reservation));
+        // RefreshAsync is not async: the null check throws synchronously, before any Task exists.
+        Assert.Throws<ArgumentNullException>(() => { _ = store.RefreshAsync(null!, reservation); });
         Assert.False(scheduler.IsInFlight(serverId));
     }
 
