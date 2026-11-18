@@ -1,9 +1,5 @@
-ServerAlyzer 1.1.11 makes the Overview and Settings fit better in smaller windows.
+ServerAlyzer 1.1.12 shows the load average of your Linux and macOS servers.
 
-Overview. The health bar is never cut off: in a narrow window it moves below the server counts, and its last segment keeps its rounded end.
+Server details. The CPU card shows the load average over the last 1, 5 and 15 minutes, next to the number of CPUs. When a server does not report it, nothing is shown: a missing value is never shown as 0.
 
-Pages. When you scroll a page, its content no longer runs under the title bar area.
-
-Settings. The cards stack instead of being cut off when the window is narrow, and Tab and screen readers move through them in the order you see them.
-
-Sidebar. The sidebar is slightly wider, so the names of the pages have more space before they are shortened.
+History. ServerAlyzer now also records the 1-minute load average in the local history on your PC.
