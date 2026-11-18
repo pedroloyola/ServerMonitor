@@ -442,18 +442,20 @@ internal sealed class SshNetSession(
         ExecuteDetailedAsync(commandText, outputLimit, connectionInfo.Timeout, cancellationToken);
 
     /// <summary>
-    /// Phase 2: one probe's constant command, with the probe's own output cap and timeout. Its output goes only to
-    /// the probe's sink; nothing here logs it.
+    /// Phase 2: one probe's constant script, as ONE exec of <c>sh -s</c> with the script on standard input
+    /// (<see cref="ProbeShellInvocation"/>), with the probe's own output cap and timeout. Its output goes only to the
+    /// probe's sink; nothing here logs it, nor the script.
     /// </summary>
     private async Task<RemoteProbeExecution> ExecuteProbeAsync(
         RemoteProbeRequest request,
         CancellationToken cancellationToken)
     {
         var outcome = await ExecuteDetailedAsync(
-                request.Command,
+                ProbeShellInvocation.CommandText,
                 request.OutputLimitBytes,
                 request.Timeout,
-                cancellationToken)
+                cancellationToken,
+                ProbeShellInvocation.StandardInput(request.Command))
             .ConfigureAwait(false);
         return new RemoteProbeExecution(
             outcome.WasExecuted,
@@ -467,7 +469,8 @@ internal sealed class SshNetSession(
         string commandText,
         int outputLimit,
         TimeSpan commandTimeout,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        byte[]? standardInput = null)
     {
         using var command = _client.CreateCommand(commandText);
         command.CommandTimeout = commandTimeout;
@@ -485,6 +488,13 @@ internal sealed class SshNetSession(
 
         try
         {
+            if (standardInput is not null)
+            {
+                // Disposing the stream sends EOF, so `sh -s` ends after the script's last line.
+                await using var input = command.CreateInputStream();
+                await input.WriteAsync(standardInput, commandCancellation.Token).ConfigureAwait(false);
+            }
+
             await Task.WhenAll(executeTask, outputTask, errorTask).ConfigureAwait(false);
             return new RemoteCommandOutcome
             {

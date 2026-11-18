@@ -110,6 +110,18 @@ public sealed class ServerMetricsStorePhasesTests
     }
 
     [Fact]
+    public void ANullServer_StillCompletesTheReservation()
+    {
+        var scheduler = Scheduler();
+        var serverId = TestData.LinuxServer().Id;
+        var reservation = scheduler.TryReserve(serverId, CancellationToken.None)!;
+        var store = new ServerMetricsStore(new FakeMetricsCollector());
+
+        Assert.Throws<ArgumentNullException>(() => store.RefreshAsync(null!, reservation));
+        Assert.False(scheduler.IsInFlight(serverId));
+    }
+
+    [Fact]
     public async Task AOnePhaseCollector_CompletesTheReservation()
     {
         // The interface default runs the one-phase collection and calls back once with its result.

@@ -140,7 +140,11 @@ public sealed class RemoteProbeScheduler
         RemoteProbeReservation? open;
         lock (_gate)
         {
+            // Marked under the same lock that clears _lastRun: a Begin that runs after this refuses the reservation, so
+            // it cannot record a run for the removed server between this lock and the Cancel below. The reservation
+            // stays in _inFlight until it completes, so the one-second-phase-per-server cap still holds.
             open = _inFlight.GetValueOrDefault(serverId);
+            open?.MarkForgotten();
             foreach (var key in _lastRun.Keys.Where(key => key.ServerId == serverId).ToList())
             {
                 _lastRun.Remove(key);
@@ -158,6 +162,7 @@ public sealed class RemoteProbeScheduler
         {
             if (!_inFlight.TryGetValue(reservation.ServerId, out var current)
                 || !ReferenceEquals(current, reservation)
+                || reservation.IsForgotten
                 || reservation.CancellationToken.IsCancellationRequested)
             {
                 return null;
@@ -283,11 +288,16 @@ public sealed class RemoteProbeScheduler
             return "its operating system is not Linux or macOS";
         }
 
-        if (string.IsNullOrWhiteSpace(command)
-            || command.Length > RemoteProbeLimits.MaxCommandLength
-            || command.Any(character => char.IsControl(character)))
+        if (string.IsNullOrWhiteSpace(command) || command.Length > RemoteProbeLimits.MaxCommandLength)
         {
-            return "its command is empty, too long or not a single line";
+            return "its script is empty or too long";
+        }
+
+        // A constant script, lines separated by LF only. CR, NUL, TAB, ESC and every other control character
+        // (including the Unicode line and paragraph separators) are refused, so what is reviewed is what runs.
+        if (command.Any(character => character != '\n' && (char.IsControl(character) || IsLineOrParagraphSeparator(character))))
+        {
+            return "its script has a control character other than LF";
         }
 
         if (limit < 1 || limit > RemoteProbeLimits.MaxOutputLimitBytes)
@@ -302,6 +312,10 @@ public sealed class RemoteProbeScheduler
 
         return interval < TimeSpan.Zero ? "its minimum interval is negative" : null;
     }
+
+    // U+2028 and U+2029 are not control characters to char.IsControl, yet some tools treat them as line breaks.
+    private static bool IsLineOrParagraphSeparator(char character) =>
+        character == (char)0x2028 || character == (char)0x2029;
 
     private static bool IsWellFormedId(string? id)
     {
@@ -383,6 +397,11 @@ public sealed class RemoteProbeReservation
         _scheduler.Release(this);
         _cancellation.Dispose();
     }
+
+    /// <summary>Set, under the scheduler's lock, when the server was removed. Read only under that lock.</summary>
+    internal bool IsForgotten { get; private set; }
+
+    internal void MarkForgotten() => IsForgotten = true;
 
     internal void Cancel()
     {

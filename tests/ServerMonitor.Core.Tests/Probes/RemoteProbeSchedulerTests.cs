@@ -34,7 +34,13 @@ public sealed class RemoteProbeSchedulerTests
             new FakeProbe(".lead"),
             new FakeProbe(new string('a', RemoteProbeLimits.MaxIdLength + 1)),
             new FakeProbe("os") { OperatingSystem = ServerOperatingSystem.Unknown },
-            new FakeProbe("multi") { Command = "uptime\nsecret-two" },
+            new FakeProbe("crlf") { Command = "uptime\r\nsecret-two" },
+            new FakeProbe("cr") { Command = "uptime\rsecret-two" },
+            new FakeProbe("tab") { Command = "uptime\n\tsecret-two" },
+            new FakeProbe("nul") { Command = "uptime\n\0secret-two" },
+            new FakeProbe("esc") { Command = "uptime\n\u001b[2Jsecret-two" },
+            new FakeProbe("del") { Command = "uptime\n\u007fsecret-two" },
+            new FakeProbe("ls") { Command = "uptime" + (char)0x2028 + "secret-two" },
             new FakeProbe("long") { Command = new string('x', RemoteProbeLimits.MaxCommandLength + 1) },
             new FakeProbe("empty") { Command = "  " },
             new FakeProbe("cap0") { OutputLimitBytes = 0 },
@@ -52,6 +58,38 @@ public sealed class RemoteProbeSchedulerTests
         Assert.Equal(probes.Length - 1, scheduler.Rejected.Count);
         Assert.DoesNotContain(scheduler.Rejected, reason => reason.Contains("secret-two", StringComparison.Ordinal));
         Assert.Contains(scheduler.Rejected, reason => reason.Contains("already has its id", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void MultiLineScript_SeparatedByLf_IsAccepted_UpToTheLengthLimit()
+    {
+        const string script = "if [ -r /proc/mdstat ]; then\n  cat /proc/mdstat\nfi\necho \"@@rc=$?\"";
+        var atLimit = "echo a\n" + new string('#', RemoteProbeLimits.MaxCommandLength - 7);
+        var scheduler = new RemoteProbeScheduler(
+            [new FakeProbe("multi") { Command = script }, new FakeProbe("limit") { Command = atLimit }],
+            new HistoryGeneration());
+
+        Assert.Equal(2, scheduler.Count);
+        Assert.Empty(scheduler.Rejected);
+        Assert.Equal(8 * 1024, RemoteProbeLimits.MaxCommandLength);
+        Assert.Equal(RemoteProbeLimits.MaxCommandLength, atLimit.Length);
+    }
+
+    [Fact]
+    public async Task MultiLineProbe_RunsAsExactlyOneExec_WithTheWholeScript()
+    {
+        const string script = "for f in /etc/os-release /etc/hostname; do\n  cat \"$f\"\ndone";
+        var scheduler = new RemoteProbeScheduler([new FakeProbe("multi") { Command = script }], new HistoryGeneration());
+        var batch = scheduler.TryReserve(ServerA, CancellationToken.None)!.Begin(ServerOperatingSystem.Linux)!;
+        var executed = new List<string>();
+
+        await batch.RunAsync((request, _) =>
+        {
+            executed.Add(request.Command);
+            return Task.FromResult(Ok);
+        });
+
+        Assert.Equal(script, Assert.Single(executed));
     }
 
     [Fact]
@@ -108,6 +146,27 @@ public sealed class RemoteProbeSchedulerTests
         scheduler.Forget(ServerA);
 
         Assert.NotNull(BeginAndComplete(scheduler, ServerA));
+    }
+
+    [Fact]
+    public void Forget_BeforeAPendingBegin_LeavesNoLastRunBehind()
+    {
+        // The window: Forget clears _lastRun, and a Begin for the same reservation arrives before Forget's Cancel.
+        // That Begin must refuse, so the removed server keeps no record of a run.
+        var clock = new ManualClock();
+        var scheduler = new RemoteProbeScheduler(
+            [new FakeProbe("slow") { MinimumInterval = TimeSpan.FromHours(1) }],
+            new HistoryGeneration(),
+            clock);
+        var reservation = scheduler.TryReserve(ServerA, CancellationToken.None)!;
+
+        scheduler.Forget(ServerA);
+
+        Assert.Null(reservation.Begin(ServerOperatingSystem.Linux));
+        Assert.True(scheduler.IsInFlight(ServerA)); // the cap still holds until the session ends
+        reservation.Complete();
+        Assert.False(scheduler.IsInFlight(ServerA));
+        Assert.NotNull(BeginAndComplete(scheduler, ServerA)); // not "ran a moment ago": nothing was recorded
     }
 
     [Fact]

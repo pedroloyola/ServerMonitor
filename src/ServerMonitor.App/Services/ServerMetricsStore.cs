@@ -22,7 +22,12 @@ public sealed class ServerMetricsStore(IServerMetricsCollector collector) : ISer
         RemoteProbeReservation? probes,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(server);
+        if (server is null)
+        {
+            // The reservation is ours from here on: close it, or the server's second phase would stay reserved forever.
+            probes?.Complete();
+            throw new ArgumentNullException(nameof(server));
+        }
 
         // Single-flight per ServerId. The in-flight Task is registered (TryAdd)
         // before the collection starts running, so—unlike a GetOrAdd factory that

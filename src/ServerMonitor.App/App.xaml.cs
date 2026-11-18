@@ -834,9 +834,10 @@ public partial class App : Application
                 sp.GetRequiredService<ILogger<CompositeMonitoringCycleObserver>>()));
 
             services.AddSingleton<IServerMonitoringStateStore, ServerMonitoringStateStore>();
-            services.AddSingleton(sp => new RemoteProbeScheduler(
+            services.AddSingleton(sp => RemoteProbeComposition.CreateScheduler(
                 sp.GetServices<IRemoteProbe>(),
-                sp.GetRequiredService<HistoryGeneration>()));
+                sp.GetRequiredService<HistoryGeneration>(),
+                sp.GetRequiredService<ILogger<RemoteProbeScheduler>>()));
             services.AddSingleton(sp => new MonitoringEngine(
                 sp.GetRequiredService<IServerService>(),
                 sp.GetRequiredService<IServerMetricsStore>(),

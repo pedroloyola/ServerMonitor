@@ -17,8 +17,8 @@ public static class RemoteProbeLimits
     /// <summary>The longest timeout one probe may declare.</summary>
     public static readonly TimeSpan MaxTimeout = TimeSpan.FromSeconds(30);
 
-    /// <summary>The longest command line, in characters.</summary>
-    public const int MaxCommandLength = 1024;
+    /// <summary>The longest probe script, in characters (8 KiB), all its lines and LFs included.</summary>
+    public const int MaxCommandLength = 8 * 1024;
 
     /// <summary>The longest probe id, in characters.</summary>
     public const int MaxIdLength = 64;

@@ -16,12 +16,18 @@ catálogo. Do mesmo modo, a página de detalhe e a limpeza do histórico só con
 
 ### 1. Sondas remotas (`IRemoteProbe`)
 
-- Uma sonda é código compilado e registado na composição: id, sistema operativo, um comando de uma linha, limite de
-  output, timeout e intervalo mínimo. Tudo é lido e validado uma vez no arranque; uma sonda inválida fica de fora e é
-  registada no log só pela posição e pelo motivo, nunca pelo comando. Nenhum texto de utilizador, configuração, host
-  ou UI entra num comando.
-- Limites fixos (`RemoteProbeLimits`): número máximo de sondas por recolha, orçamento total de output, limite por sonda
-  e timeout máximo.
+- Uma sonda é código compilado e registado na composição: id, sistema operativo, um script constante, linhas separadas
+  por LF, um exec; limite de output, timeout e intervalo mínimo. Tudo é lido e validado uma vez no arranque. O script
+  aceita só LF como quebra de linha: CR, NUL, TAB, ESC, qualquer outro carácter de controlo e os separadores Unicode
+  U+2028/U+2029 são recusados. Uma sonda inválida fica de fora e o arranque regista um aviso por cada uma ("A remote
+  probe was left out: …"), só com a posição e o motivo, nunca com o comando. Nenhum texto de utilizador, configuração,
+  host ou UI entra num comando.
+- **Dialeto fixo.** Cada sonda corre como um único exec do comando constante `sh -s`, com o script enviado pelo stdin
+  (stream de entrada do `SshCommand` do SSH.NET). A shell de login do utilizador (bash, zsh, fish, csh…) só vê
+  `sh -s`, por isso o script é sempre lido por um `sh` POSIX, e nenhum carácter do script (aspas, `$`) chega à linha de
+  comando. Não foi preciso o recurso `sh -c '<script>'`, e por isso `'` não é recusado.
+- Limites fixos (`RemoteProbeLimits`): até 4 sondas por recolha, orçamento total de output de 1 MiB, até 256 KiB por
+  sonda, timeout máximo de 30 s e script com até 8 KiB (8192 caracteres).
 - **Duas fases na mesma sessão.** A sessão corre os comandos de origem, constrói o resultado e entrega-o uma vez a um
   callback (o que o callback lançar é ignorado). Só depois corre as sondas devidas e entrega cada resultado à sua sonda.
   Por fim desliga, como antes. A posse da sessão, o túnel por jump host, a eliminação das credenciais e o `Disconnect`
@@ -33,6 +39,17 @@ catálogo. Do mesmo modo, a página de detalhe e a limpeza do histórico só con
   callback já foi chamado, o resultado devolvido só fecha a fase 2 e nunca é publicado segunda vez.
 - **Cancelamento.** Cada fase 2 tem o seu próprio token, ligado ao token de monitorização do servidor. Remover o
   servidor, parar a monitorização ou limpar/repor o histórico cancela-a.
+- **Gravar depois de uma limpeza.** Os resultados de uma geração anterior são descartados antes de chegarem à sonda,
+  mas uma limpeza pode cair entre essa verificação e a escrita da própria sonda. Uma sonda que guarde dados tem de
+  voltar a comparar `RemoteProbeOutcome.HistoryGeneration` com `HistoryGeneration.Current` no momento em que escreve,
+  e descartar o resultado se já não for igual.
+- **Sessões e tetos.** A fase 2 fica fora do limitador global de recolhas: este é libertado no fim da fase 1.
+  - Por servidor há no máximo uma fase 2 (uma reserva por servidor). Por isso há no máximo 2 sessões ao mesmo
+    servidor: a fase 2 em curso e a fase 1 da recolha seguinte.
+  - Entre servidores, a fase 2 não é limitada. Com N servidores, o pior caso é 2×N sessões abertas ao mesmo tempo.
+  - Uma fase 2 dura no máximo 4 × 30 s = 120 s. Uma sonda que ignore o token é abandonada quando o seu timeout passa.
+  - A credencial da sessão (chave ou palavra-passe em memória) vive até ao fim da fase 2, ou seja até 120 s a mais do
+    que antes, e é libertada no mesmo `finally` de sempre.
 - O output bruto de uma sonda nunca vai para o log e nunca sai do computador.
 
 ### 2. Secções do detalhe do servidor (`ServerDetailSection`)
@@ -52,6 +69,9 @@ apareça depois dela.
 ## Consequências
 
 - Sem módulos registados: zero comandos extra, nenhuma secção nova, limpeza do histórico igual.
-- O limitador global de recolhas concorrentes do motor é libertado no fim da fase 1, não da fase 2.
+- O limitador global de recolhas concorrentes do motor é libertado no fim da fase 1, não da fase 2 (ver "Sessões e
+  tetos").
+- QA manual: um servidor cuja shell de login é fish (e, se possível, csh/tcsh), com uma sonda multi-linha com `if` e
+  `for`. Esperado: o resultado chega à sonda igual ao de um servidor com bash.
 - A regra da composição que rejeita um módulo condicional que registe um tipo de serviço já registado continua em
   vigor; um segundo módulo condicional que registe `IRemoteProbe` ou `IHistoryParticipant` exige uma decisão própria.

@@ -24,7 +24,11 @@ public interface IRemoteProbe
     /// <summary>The one operating system it runs on: <see cref="ServerOperatingSystem.Linux"/> or <see cref="ServerOperatingSystem.MacOS"/>.</summary>
     ServerOperatingSystem OperatingSystem { get; }
 
-    /// <summary>The constant command line. Single line, at most <see cref="RemoteProbeLimits.MaxCommandLength"/> characters.</summary>
+    /// <summary>
+    /// The constant POSIX sh script: lines separated by LF, no other control character, at most
+    /// <see cref="RemoteProbeLimits.MaxCommandLength"/> characters. It runs as ONE exec of <c>sh -s</c> with the script on
+    /// standard input, so the server's login shell (bash, zsh, fish, csh...) never interprets it.
+    /// </summary>
     string Command { get; }
 
     /// <summary>The most standard output kept, in bytes. More than that is reported as <see cref="RemoteProbeOutcomeKind.OutputExceededLimit"/>.</summary>
@@ -39,6 +43,12 @@ public interface IRemoteProbe
     /// <summary>
     /// Receives one outcome. Called from a background thread, never concurrently for the same server. Must be quick;
     /// an exception thrown here is caught and ignored.
+    /// <para>
+    /// Outcomes from before a history clear or reset are dropped before this is called, but a clear can still land
+    /// between that check and the sink's own write. A sink that stores anything must recheck, at the moment it writes,
+    /// that <see cref="RemoteProbeOutcome.HistoryGeneration"/> is still <see cref="History.HistoryGeneration.Current"/>,
+    /// and drop the outcome otherwise.
+    /// </para>
     /// </summary>
     void Accept(RemoteProbeOutcome outcome);
 }

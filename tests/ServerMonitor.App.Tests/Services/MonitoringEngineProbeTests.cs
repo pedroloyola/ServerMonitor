@@ -55,6 +55,28 @@ public sealed class MonitoringEngineProbeTests
     }
 
     [Fact]
+    public async Task ManyPollsWhileThePhaseTwoRuns_NeverOpenASecondPhaseTwo()
+    {
+        // The per-server cap (ADR-027): one second phase per server, so at most two sessions to it at once (that one
+        // and the next poll's built-in session), however many polls come while it runs.
+        var server = TestData.LinuxServer();
+        var scheduler = new RemoteProbeScheduler([new OneProbe()], new HistoryGeneration());
+        var store = new ReservationKeepingStore();
+        await using var engine = await StartAsync(store, scheduler, server);
+
+        for (var poll = 0; poll < 5; poll++)
+        {
+            await engine.RefreshNowAsync(server.Id, TestTimeout);
+        }
+
+        Assert.Equal(5, store.Reservations.Count);
+        Assert.NotNull(store.Reservations[0]);
+        Assert.All(store.Reservations.Skip(1), Assert.Null);
+        Assert.True(scheduler.IsInFlight(server.Id));
+        store.Reservations[0]!.Complete();
+    }
+
+    [Fact]
     public async Task RemovingTheServer_CancelsItsPhaseTwo()
     {
         var server = TestData.LinuxServer();
