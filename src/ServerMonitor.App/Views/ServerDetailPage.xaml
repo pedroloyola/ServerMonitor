@@ -420,6 +420,10 @@
                     </StackPanel>
                 </Border>
             </Grid>
+
+            <!-- M16.1: sections contributed by feature modules, each a titled glass card after the built-in ones. Built in
+                 code-behind from the shell's contribution host; collapsed when there are none. -->
+            <StackPanel x:Name="ContributedSections" Spacing="{StaticResource SaSpace24}" Visibility="Collapsed" />
         </StackPanel>
     </ScrollViewer>
 

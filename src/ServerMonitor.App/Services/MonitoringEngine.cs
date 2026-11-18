@@ -4,6 +4,7 @@ using ServerMonitor.Core.Enums;
 using ServerMonitor.Core.Interfaces;
 using ServerMonitor.Core.Models;
 using ServerMonitor.Core.Monitoring;
+using ServerMonitor.Core.Probes;
 
 namespace ServerMonitor.App.Services;
 
@@ -27,6 +28,7 @@ public sealed class MonitoringEngine : IMonitoringEngine, IHostedService, IAsync
     private readonly TimeProvider _timeProvider;
     private readonly MonitoringOptions _options;
     private readonly ILogger<MonitoringEngine> _logger;
+    private readonly RemoteProbeScheduler? _probeScheduler;
 
     private readonly Dictionary<Guid, ServerMonitor> _monitors = [];
     private readonly SemaphoreSlim _reconcileGate = new(1, 1);
@@ -42,8 +44,10 @@ public sealed class MonitoringEngine : IMonitoringEngine, IHostedService, IAsync
         ILogger<MonitoringEngine> logger,
         TimeProvider? timeProvider = null,
         MonitoringOptions? options = null,
-        IMonitoringCycleObserver? cycleObserver = null)
+        IMonitoringCycleObserver? cycleObserver = null,
+        RemoteProbeScheduler? probeScheduler = null)
     {
+        _probeScheduler = probeScheduler;
         _serverService = serverService ?? throw new ArgumentNullException(nameof(serverService));
         _metricsStore = metricsStore ?? throw new ArgumentNullException(nameof(metricsStore));
         _stateStore = stateStore ?? throw new ArgumentNullException(nameof(stateStore));
@@ -214,6 +218,7 @@ public sealed class MonitoringEngine : IMonitoringEngine, IHostedService, IAsync
         foreach (var (id, monitor) in _monitors.Where(pair => !monitored.ContainsKey(pair.Key)).ToList())
         {
             monitor.Cts.Cancel();
+            _probeScheduler?.Forget(id);
             _monitors.Remove(id);
             _stateStore.Remove(id);
         }
@@ -311,7 +316,7 @@ public sealed class MonitoringEngine : IMonitoringEngine, IHostedService, IAsync
         _logger.LogDebug("Collection cycle for {ServerId} starting.", server.Id);
         try
         {
-            var result = await RunAttemptsAsync(server, cancellationToken).ConfigureAwait(false);
+            var result = await RunAttemptsAsync(server, monitor, cancellationToken).ConfigureAwait(false);
             ApplyCycleResult(server, monitor, result);
             _logger.LogDebug(
                 "Collection cycle for {ServerId} finished ({Outcome}).",
@@ -338,6 +343,7 @@ public sealed class MonitoringEngine : IMonitoringEngine, IHostedService, IAsync
 
     private async Task<ServerMetricsCollectionResult> RunAttemptsAsync(
         Server server,
+        ServerMonitor? monitor,
         CancellationToken cancellationToken)
     {
         ServerMetricsCollectionResult result;
@@ -353,7 +359,11 @@ public sealed class MonitoringEngine : IMonitoringEngine, IHostedService, IAsync
             await _concurrencyLimiter.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
-                result = await _metricsStore.RefreshAsync(server, cancellationToken).ConfigureAwait(false);
+                // The store returns as soon as the built-in result is ready, so the cycle (freshness, health,
+                // history, UI) never waits for the remote probes; they run on in the same session, on the
+                // monitor's token, and the scheduler skips them next poll while they are still running.
+                var probes = monitor is null ? null : _probeScheduler?.TryReserve(server.Id, monitor.Cts.Token);
+                result = await _metricsStore.RefreshAsync(server, probes, cancellationToken).ConfigureAwait(false);
             }
             finally
             {

@@ -1,7 +1,8 @@
 namespace ServerMonitor.Features;
 
 /// <summary>
-/// One piece of user interface that a feature module adds to the shell: a Settings section or a navigation entry.
+/// One piece of user interface that a feature module adds to the shell: a Settings section or a navigation entry
+/// (a section of a server's detail page is a <see cref="ServerDetailSection"/>).
 /// <para>
 /// It is a plain description. The shell decides where it goes, orders it, titles it from
 /// <see cref="TitleResourceKey"/> and creates its view by calling <see cref="CreateView"/> on the UI thread. The shell
@@ -71,8 +72,8 @@ public sealed class ShellContribution
 /// <summary>
 /// What is added to the shell. Every list may be empty; none is ever null.
 /// <para>
-/// A feature module fills the first two only: <see cref="FeatureComposition"/> collects a composed module's Settings
-/// sections and navigation entries and nothing else. <see cref="UnlistedPages"/> and <see cref="Links"/> are filled by
+/// A feature module fills the Settings sections, the navigation entries and the server detail sections only:
+/// <see cref="FeatureComposition"/> collects those of a composed module and nothing else. <see cref="UnlistedPages"/> and <see cref="Links"/> are filled by
 /// the composition root alone, from what the composition supplies.
 /// </para>
 /// </summary>
@@ -80,6 +81,10 @@ public sealed class ShellContributions
 {
     /// <summary>Nothing: the default for every module that adds no user interface.</summary>
     public static readonly ShellContributions Empty = new([], []);
+
+    /// <summary>The same contributions with <paramref name="serverDetailSections"/> as the server detail sections.</summary>
+    public ShellContributions WithServerDetailSections(IReadOnlyList<ServerDetailSection> serverDetailSections) =>
+        new(SettingsSections, NavigationEntries, UnlistedPages, Links, serverDetailSections);
 
     public ShellContributions(
         IReadOnlyList<ShellContribution> settingsSections,
@@ -93,12 +98,24 @@ public sealed class ShellContributions
         IReadOnlyList<ShellContribution> navigationEntries,
         IReadOnlyList<ShellContribution> unlistedPages,
         IReadOnlyList<ShellLink> links)
+        : this(settingsSections, navigationEntries, unlistedPages, links, [])
+    {
+    }
+
+    public ShellContributions(
+        IReadOnlyList<ShellContribution> settingsSections,
+        IReadOnlyList<ShellContribution> navigationEntries,
+        IReadOnlyList<ShellContribution> unlistedPages,
+        IReadOnlyList<ShellLink> links,
+        IReadOnlyList<ServerDetailSection> serverDetailSections)
     {
         ArgumentNullException.ThrowIfNull(settingsSections);
         ArgumentNullException.ThrowIfNull(navigationEntries);
         ArgumentNullException.ThrowIfNull(unlistedPages);
         ArgumentNullException.ThrowIfNull(links);
-        if (settingsSections.Contains(null!) || navigationEntries.Contains(null!) || unlistedPages.Contains(null!) || links.Contains(null!))
+        ArgumentNullException.ThrowIfNull(serverDetailSections);
+        if (settingsSections.Contains(null!) || navigationEntries.Contains(null!) || unlistedPages.Contains(null!) || links.Contains(null!)
+            || serverDetailSections.Contains(null!))
         {
             throw new ArgumentException("A contribution list may not contain null.");
         }
@@ -107,6 +124,7 @@ public sealed class ShellContributions
         NavigationEntries = [.. navigationEntries];
         UnlistedPages = [.. unlistedPages];
         Links = [.. links];
+        ServerDetailSections = [.. serverDetailSections];
     }
 
     /// <summary>Sections shown on the Settings page, after the built-in ones.</summary>
@@ -123,7 +141,55 @@ public sealed class ShellContributions
 
     /// <summary>Links the shell draws itself (a Settings card, or one entry at the foot of the navigation) to a page.</summary>
     public IReadOnlyList<ShellLink> Links { get; }
+
+    /// <summary>Sections shown on the detail page of one server, after the built-in cards.</summary>
+    public IReadOnlyList<ServerDetailSection> ServerDetailSections { get; }
 }
+
+/// <summary>
+/// A section that a feature module adds to the detail page of a server.
+/// <para>
+/// Unlike a <see cref="ShellContribution"/>, its view belongs to one server and one visit: the shell calls
+/// <see cref="CreateView"/> with the server id each time it builds a server's detail page (on the UI thread) and lets the
+/// view go with the page. The view must be a new element with no parent, must release what it holds on <c>Unloaded</c>
+/// and must never rely on <see cref="IDisposable"/>. A factory that throws, or returns something the shell cannot show,
+/// leaves out that section on that page only; the page and the other sections are built as usual.
+/// </para>
+/// </summary>
+public sealed class ServerDetailSection
+{
+    /// <param name="id">Stable identifier, in the same shape as a <see cref="FeatureId"/>.</param>
+    /// <param name="order">Position among the server detail sections: lower first, ties broken by <paramref name="id"/>.</param>
+    /// <param name="titleResourceKey">The resource key of the title the shell shows above it.</param>
+    /// <param name="createView">Creates the view for the server whose id it receives. UI thread, once per page.</param>
+    public ServerDetailSection(string id, int order, string titleResourceKey, Func<Guid, object> createView)
+    {
+        if (!FeatureId.IsWellFormed(id))
+        {
+            throw new ArgumentException($"'{id}' is not a well-formed server detail section id.", nameof(id));
+        }
+
+        ArgumentException.ThrowIfNullOrWhiteSpace(titleResourceKey);
+        ArgumentNullException.ThrowIfNull(createView);
+        Id = id;
+        Order = order;
+        TitleResourceKey = titleResourceKey;
+        CreateView = createView;
+    }
+
+    public string Id { get; }
+
+    public int Order { get; }
+
+    public string TitleResourceKey { get; }
+
+    public Func<Guid, object> CreateView { get; }
+
+    public override string ToString() => $"{Id} (order {Order})";
+}
+
+/// <summary>A server detail section the shell left out, and why.</summary>
+public readonly record struct ServerDetailSectionRejection(ServerDetailSection Section, string Reason);
 
 /// <summary>Where the shell draws a <see cref="ShellLink"/>.</summary>
 public enum ShellLinkPlacement
@@ -247,6 +313,17 @@ public static class ShellContributionOrdering
     {
         var arranged = ArrangeBy(inCompositionOrder, reservedIds, c => c.Id, c => c.Order, out var left);
         rejected = [.. left.Select(l => new ShellContributionRejection(l.Item, l.Reason))];
+        return arranged;
+    }
+
+    /// <summary>The same rule for server detail sections: first id wins, reserved ids left out, then Order and Id.</summary>
+    public static IReadOnlyList<ServerDetailSection> Arrange(
+        IReadOnlyList<ServerDetailSection> inCompositionOrder,
+        IEnumerable<string> reservedIds,
+        out IReadOnlyList<ServerDetailSectionRejection> rejected)
+    {
+        var arranged = ArrangeBy(inCompositionOrder, reservedIds, s => s.Id, s => s.Order, out var left);
+        rejected = [.. left.Select(l => new ServerDetailSectionRejection(l.Item, l.Reason))];
         return arranged;
     }
 

@@ -2,6 +2,8 @@ using System.Text;
 using Renci.SshNet;
 using ServerMonitor.Core.Enums;
 using ServerMonitor.Core.Models;
+using ServerMonitor.Core.Probes;
+using ServerMonitor.Infrastructure.Collectors;
 using ServerMonitor.Infrastructure.Collectors.Docker;
 using ServerMonitor.Infrastructure.Collectors.Launchd;
 using ServerMonitor.Infrastructure.Collectors.Linux;
@@ -56,6 +58,19 @@ internal sealed class SshNetSession(
         CancellationToken cancellationToken) =>
         RunAsync(SessionOperation.CollectMacOsMetrics, hostKeyVerifier, TimeSpan.Zero, default, cancellationToken);
 
+    public Task<SshSessionResult> CollectLinuxMetricsAsync(
+        Func<HostKeyIdentity, bool> hostKeyVerifier,
+        TimeSpan cpuSampleInterval,
+        SshSessionPhases phases,
+        CancellationToken cancellationToken) =>
+        RunAsync(SessionOperation.CollectLinuxMetrics, hostKeyVerifier, cpuSampleInterval, default, cancellationToken, phases);
+
+    public Task<SshSessionResult> CollectMacOsMetricsAsync(
+        Func<HostKeyIdentity, bool> hostKeyVerifier,
+        SshSessionPhases phases,
+        CancellationToken cancellationToken) =>
+        RunAsync(SessionOperation.CollectMacOsMetrics, hostKeyVerifier, TimeSpan.Zero, default, cancellationToken, phases);
+
     public Task<SshSessionResult> CollectWorkloadsAsync(
         Func<HostKeyIdentity, bool> hostKeyVerifier,
         WorkloadCollectionPlan plan,
@@ -80,7 +95,8 @@ internal sealed class SshNetSession(
         Func<HostKeyIdentity, bool> hostKeyVerifier,
         TimeSpan cpuSampleInterval,
         WorkloadCollectionPlan workloadPlan,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        SshSessionPhases? phases = null)
     {
         ArgumentNullException.ThrowIfNull(hostKeyVerifier);
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -155,7 +171,7 @@ internal sealed class SshNetSession(
                     .ConfigureAwait(false);
             }
 
-            return new SshSessionResult
+            var result = new SshSessionResult
             {
                 ErrorCode = SshConnectionErrorCode.None,
                 PresentedHostKey = presentedHostKey,
@@ -167,6 +183,22 @@ internal sealed class SshNetSession(
                 AuthenticationCompleted = true,
                 ConnectionEstablished = true
             };
+
+            if (phases is not null && SshSessionPhases.IsPublishable(result))
+            {
+                // Phase 1 is published from here, while this session stays open for phase 2. The probes run on
+                // the reservation's own token; the batch never throws, so phase 2 cannot turn this into a failure.
+                RemoteResultCallback.Invoke(phases.OnBaseResult, result);
+                var batch = phases.Probes?.Begin(operation == SessionOperation.CollectLinuxMetrics
+                    ? ServerOperatingSystem.Linux
+                    : ServerOperatingSystem.MacOS);
+                if (batch is not null)
+                {
+                    await batch.RunAsync(ExecuteProbeAsync).ConfigureAwait(false);
+                }
+            }
+
+            return result;
         }
         catch (Exception exception)
         {
@@ -415,13 +447,45 @@ internal sealed class SshNetSession(
     /// the pure availability classifier needs. Oversized stdout is reported via
     /// <see cref="RemoteCommandOutcome.OutputExceededLimit"/> without exposing the raw output.
     /// </summary>
+    private Task<RemoteCommandOutcome> ExecuteDetailedAsync(
+        string commandText,
+        int outputLimit,
+        CancellationToken cancellationToken) =>
+        ExecuteDetailedAsync(commandText, outputLimit, connectionInfo.Timeout, cancellationToken);
+
+    /// <summary>
+    /// Phase 2: one probe's constant script, as ONE exec of <c>sh -s</c> with the script on standard input
+    /// (<see cref="ProbeShellInvocation"/>), with the probe's own output cap and timeout. Its output goes only to the
+    /// probe's sink; nothing here logs it, nor the script.
+    /// </summary>
+    private async Task<RemoteProbeExecution> ExecuteProbeAsync(
+        RemoteProbeRequest request,
+        CancellationToken cancellationToken)
+    {
+        var outcome = await ExecuteDetailedAsync(
+                ProbeShellInvocation.CommandText,
+                request.OutputLimitBytes,
+                request.Timeout,
+                cancellationToken,
+                ProbeShellInvocation.StandardInput(request.Command))
+            .ConfigureAwait(false);
+        return new RemoteProbeExecution(
+            outcome.WasExecuted,
+            outcome.ExitStatus,
+            outcome.StandardOutput,
+            outcome.StandardError,
+            outcome.OutputExceededLimit);
+    }
+
     private async Task<RemoteCommandOutcome> ExecuteDetailedAsync(
         string commandText,
         int outputLimit,
-        CancellationToken cancellationToken)
+        TimeSpan commandTimeout,
+        CancellationToken cancellationToken,
+        byte[]? standardInput = null)
     {
         using var command = _client.CreateCommand(commandText);
-        command.CommandTimeout = connectionInfo.Timeout;
+        command.CommandTimeout = commandTimeout;
         using var commandCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
         var executeTask = command.ExecuteAsync(commandCancellation.Token);
@@ -436,6 +500,18 @@ internal sealed class SshNetSession(
 
         try
         {
+            if (standardInput is not null)
+            {
+                await WriteStandardInputAsync(
+                        command,
+                        standardInput,
+                        commandCancellation,
+                        executeTask,
+                        outputTask,
+                        errorTask)
+                    .ConfigureAwait(false);
+            }
+
             await Task.WhenAll(executeTask, outputTask, errorTask).ConfigureAwait(false);
             return new RemoteCommandOutcome
             {
@@ -466,6 +542,41 @@ internal sealed class SshNetSession(
                 StandardError = null,
                 OutputExceededLimit = true
             };
+        }
+    }
+
+    /// <summary>
+    /// Writes the probe script and closes standard input. A failed write (the channel closed because <c>sh</c> already
+    /// exited, or the caller cancelled) stops the command and drains its three tasks before the failure goes up, so
+    /// none is left unobserved until the command is disposed. The failure carries neither the script nor any output.
+    /// </summary>
+    private static async Task WriteStandardInputAsync(
+        SshCommand command,
+        byte[] standardInput,
+        CancellationTokenSource commandCancellation,
+        Task executeTask,
+        Task outputTask,
+        Task errorTask)
+    {
+        try
+        {
+            // Disposing the stream sends EOF, so `sh -s` ends after the script's last line.
+            await using var input = command.CreateInputStream();
+            await input.WriteAsync(standardInput, commandCancellation.Token).ConfigureAwait(false);
+        }
+        catch
+        {
+            commandCancellation.Cancel();
+            try
+            {
+                await Task.WhenAll(executeTask, outputTask, errorTask).ConfigureAwait(false);
+            }
+            catch
+            {
+                // Draining after a failed write must not replace the write's own failure.
+            }
+
+            throw;
         }
     }
 

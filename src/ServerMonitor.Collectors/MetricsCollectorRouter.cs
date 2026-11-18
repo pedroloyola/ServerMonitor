@@ -32,9 +32,24 @@ public sealed class MetricsCollectorRouter : IServerMetricsCollector
         _connectionService = connectionService ?? throw new ArgumentNullException(nameof(connectionService));
     }
 
-    public async Task<ServerMetricsCollectionResult> CollectAsync(
+    public Task<ServerMetricsCollectionResult> CollectAsync(
         Server server,
+        CancellationToken cancellationToken = default) =>
+        CollectCoreAsync(server, null, cancellationToken);
+
+    public Task<ServerMetricsCollectionResult> CollectAsync(
+        Server server,
+        MetricsCollectionPhases phases,
         CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(phases);
+        return CollectCoreAsync(server, phases, cancellationToken);
+    }
+
+    private async Task<ServerMetricsCollectionResult> CollectCoreAsync(
+        Server server,
+        MetricsCollectionPhases? phases,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(server);
 
@@ -72,16 +87,21 @@ public sealed class MetricsCollectorRouter : IServerMetricsCollector
             operatingSystem = detection.DetectedOperatingSystem;
         }
 
-        return operatingSystem switch
+        IServerMetricsCollector? collector = operatingSystem switch
         {
-            ServerOperatingSystem.Linux => await _linuxCollector
-                .CollectAsync(server with { OperatingSystem = ServerOperatingSystem.Linux }, cancellationToken)
-                .ConfigureAwait(false),
-            ServerOperatingSystem.MacOS => await _macOsCollector
-                .CollectAsync(server with { OperatingSystem = ServerOperatingSystem.MacOS }, cancellationToken)
-                .ConfigureAwait(false),
-            _ => ServerMetricsCollectionResult.Failure(MetricsCollectionErrorCode.UnsupportedOperatingSystem)
+            ServerOperatingSystem.Linux => _linuxCollector,
+            ServerOperatingSystem.MacOS => _macOsCollector,
+            _ => null
         };
+        if (collector is null)
+        {
+            return ServerMetricsCollectionResult.Failure(MetricsCollectionErrorCode.UnsupportedOperatingSystem);
+        }
+
+        var routed = server with { OperatingSystem = operatingSystem };
+        return phases is null
+            ? await collector.CollectAsync(routed, cancellationToken).ConfigureAwait(false)
+            : await collector.CollectAsync(routed, phases, cancellationToken).ConfigureAwait(false);
     }
 
     private static MetricsCollectionErrorCode MapConnectionError(SshConnectionErrorCode errorCode) => errorCode switch

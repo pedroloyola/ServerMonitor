@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using ServerMonitor.Core.Interfaces;
 using ServerMonitor.Core.Models;
+using ServerMonitor.Core.Probes;
 
 namespace ServerMonitor.App.Services;
 
@@ -13,9 +14,20 @@ public sealed class ServerMetricsStore(IServerMetricsCollector collector) : ISer
 
     public Task<ServerMetricsCollectionResult> RefreshAsync(
         Server server,
+        CancellationToken cancellationToken = default) =>
+        RefreshAsync(server, null, cancellationToken);
+
+    public Task<ServerMetricsCollectionResult> RefreshAsync(
+        Server server,
+        RemoteProbeReservation? probes,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(server);
+        if (server is null)
+        {
+            // The reservation is ours from here on: close it, or the server's second phase would stay reserved forever.
+            probes?.Complete();
+            throw new ArgumentNullException(nameof(server));
+        }
 
         // Single-flight per ServerId. The in-flight Task is registered (TryAdd)
         // before the collection starts running, so—unlike a GetOrAdd factory that
@@ -27,6 +39,8 @@ public sealed class ServerMetricsStore(IServerMetricsCollector collector) : ISer
         {
             if (_inFlight.TryGetValue(server.Id, out var existing))
             {
+                // Joining a refresh already under way: its session runs no probes of ours.
+                probes?.Complete();
                 return existing;
             }
 
@@ -34,7 +48,7 @@ public sealed class ServerMetricsStore(IServerMetricsCollector collector) : ISer
                 TaskCreationOptions.RunContinuationsAsynchronously);
             if (_inFlight.TryAdd(server.Id, completion.Task))
             {
-                _ = CollectAsync(server, completion, cancellationToken);
+                _ = CollectAsync(server, probes, completion, cancellationToken);
                 return completion.Task;
             }
 
@@ -50,33 +64,54 @@ public sealed class ServerMetricsStore(IServerMetricsCollector collector) : ISer
 
     private async Task CollectAsync(
         Server server,
+        RemoteProbeReservation? probes,
         TaskCompletionSource<ServerMetricsCollectionResult> completion,
         CancellationToken cancellationToken)
     {
         try
         {
-            var result = await collector.CollectAsync(server, cancellationToken).ConfigureAwait(false);
-            if (result.Snapshot is not null)
-            {
-                _lastSnapshots[server.Id] = result.Snapshot;
-            }
-
-            // Evict our own entry (conditional remove) before completing the Task,
-            // so any caller resuming from the awaited Task always observes a cleared
-            // slot and a subsequent refresh deterministically starts a fresh run.
-            Evict(server.Id, completion.Task);
-            completion.SetResult(result);
+            // The built-in result is published from the collector's callback, so the refresh completes while the
+            // probes still run; the result the collector returns afterwards is then the same one and is ignored.
+            var phases = new MetricsCollectionPhases(result => Publish(server.Id, completion, result), probes);
+            var result = await collector.CollectAsync(server, phases, cancellationToken).ConfigureAwait(false);
+            Publish(server.Id, completion, result);
         }
         catch (OperationCanceledException exception)
         {
             Evict(server.Id, completion.Task);
-            completion.SetCanceled(exception.CancellationToken);
+            completion.TrySetCanceled(exception.CancellationToken);
         }
         catch (Exception exception)
         {
             Evict(server.Id, completion.Task);
-            completion.SetException(exception);
+            completion.TrySetException(exception);
         }
+        finally
+        {
+            probes?.Complete();
+        }
+    }
+
+    private void Publish(
+        Guid serverId,
+        TaskCompletionSource<ServerMetricsCollectionResult> completion,
+        ServerMetricsCollectionResult result)
+    {
+        if (completion.Task.IsCompleted)
+        {
+            return;
+        }
+
+        if (result.Snapshot is not null)
+        {
+            _lastSnapshots[serverId] = result.Snapshot;
+        }
+
+        // Evict our own entry (conditional remove) before completing the Task,
+        // so any caller resuming from the awaited Task always observes a cleared
+        // slot and a subsequent refresh deterministically starts a fresh run.
+        Evict(serverId, completion.Task);
+        completion.TrySetResult(result);
     }
 
     private void Evict(Guid serverId, Task<ServerMetricsCollectionResult> completionTask) =>

@@ -94,6 +94,9 @@ public sealed class ShellContributionHost
     /// <summary>The built-in sections of the Settings page, in display order; contributed sections follow them.</summary>
     public static IReadOnlyList<string> BuiltInSettingsSectionIds { get; } = ["appearance", "monitoring", "window"];
 
+    /// <summary>The built-in cards of a server's detail page; contributed sections follow them.</summary>
+    public static IReadOnlyList<string> BuiltInServerDetailSectionIds { get; } = ["connection", "explore"];
+
     /// <summary>The built-in destination that always stays last; contributed entries go before it.</summary>
     private const string LastNavigationId = "settings";
 
@@ -298,6 +301,56 @@ public sealed class ShellContributionHost
                 contribution.Id, exception.GetType().Name);
             return false;
         }
+    }
+
+    /// <summary>
+    /// M16.1: the contributed sections of the detail page of <paramref name="serverId"/>, in display order, with views
+    /// created now (UI thread) for this page only; nothing is cached, so every visit asks the factories again. A factory
+    /// that throws or returns no view the shell can show (like a Settings section's) leaves out that section and is
+    /// logged with the id and exception type only. With no contributions the list is empty and no factory runs.
+    /// </summary>
+    public IReadOnlyList<RealizedShellContribution> CreateServerDetailSections(Guid serverId)
+    {
+        if (_contributions.ServerDetailSections.Count == 0)
+        {
+            return [];
+        }
+
+        var arranged = ShellContributionOrdering.Arrange(
+            _contributions.ServerDetailSections, BuiltInServerDetailSectionIds, out var rejected);
+        foreach (var rejection in rejected)
+        {
+            _logger.LogWarning(
+                "A contributed server detail section was left out: {Reason}. Id: {Id}.", rejection.Reason, rejection.Section.Id);
+        }
+
+        var realized = new List<RealizedShellContribution>(arranged.Count);
+        foreach (var section in arranged)
+        {
+            try
+            {
+                var view = section.CreateView(serverId);
+                if (view is null || !_canShowSectionView(view))
+                {
+                    _logger.LogError(
+                        "A contributed server detail section was removed: its factory returned no view the shell can show (a new one, with no parent, of the required type). Id: {Id}.",
+                        section.Id);
+                    continue;
+                }
+
+                realized.Add(new RealizedShellContribution(
+                    section.Id, TitleOf(section.Id, section.TitleResourceKey, "server detail section"), view));
+            }
+            catch (Exception exception)
+            {
+                // Never fatal: the page is built without this section.
+                _logger.LogError(
+                    "A contributed server detail section was removed: its factory failed. Id: {Id}. Exception type: {ExceptionType}.",
+                    section.Id, exception.GetType().Name);
+            }
+        }
+
+        return realized;
     }
 
     /// <summary>

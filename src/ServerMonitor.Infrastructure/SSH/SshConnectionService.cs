@@ -4,7 +4,9 @@ using Microsoft.Extensions.Logging;
 using ServerMonitor.Core.Enums;
 using ServerMonitor.Core.Interfaces;
 using ServerMonitor.Core.Models;
+using ServerMonitor.Core.Probes;
 using ServerMonitor.Core.Security;
+using ServerMonitor.Infrastructure.Collectors;
 using ServerMonitor.Infrastructure.Collectors.Linux;
 using ServerMonitor.Infrastructure.Collectors.MacOS;
 using ServerMonitor.Infrastructure.Collectors.Workloads;
@@ -67,11 +69,49 @@ public sealed class SshConnectionService
         CancellationToken cancellationToken = default) =>
         ExecuteAsync(request, SshSessionOperation.DetectOperatingSystem, TimeSpan.Zero, null, default, cancellationToken);
 
-    public async Task<LinuxMetricsRemoteResult> CollectAsync(
+    public Task<LinuxMetricsRemoteResult> CollectAsync(
         Server server,
         TimeSpan cpuSampleInterval,
         TimeSpan timeout,
+        CancellationToken cancellationToken = default) =>
+        CollectLinuxAsync(server, cpuSampleInterval, timeout, null, null, cancellationToken);
+
+    public Task<LinuxMetricsRemoteResult> CollectAsync(
+        Server server,
+        TimeSpan cpuSampleInterval,
+        TimeSpan timeout,
+        Action<LinuxMetricsRemoteResult> onBaseResult,
+        RemoteProbeReservation? probes,
         CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(onBaseResult);
+        return CollectLinuxAsync(server, cpuSampleInterval, timeout, onBaseResult, probes, cancellationToken);
+    }
+
+    public Task<MacOsMetricsRemoteResult> CollectAsync(
+        Server server,
+        TimeSpan timeout,
+        CancellationToken cancellationToken = default) =>
+        CollectMacOsAsync(server, timeout, null, null, cancellationToken);
+
+    public Task<MacOsMetricsRemoteResult> CollectAsync(
+        Server server,
+        TimeSpan timeout,
+        Action<MacOsMetricsRemoteResult> onBaseResult,
+        RemoteProbeReservation? probes,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(onBaseResult);
+        return CollectMacOsAsync(server, timeout, onBaseResult, probes, cancellationToken);
+    }
+
+    private async Task<LinuxMetricsRemoteResult> CollectLinuxAsync(
+        Server server,
+        TimeSpan cpuSampleInterval,
+        TimeSpan timeout,
+        Action<LinuxMetricsRemoteResult>? onBaseResult,
+        RemoteProbeReservation? probes,
+        CancellationToken cancellationToken)
     {
         LinuxMetricsRawData? data = null;
         var request = new SshConnectionRequest
@@ -92,13 +132,20 @@ public sealed class SshConnectionService
             };
         }
 
+        var phased = onBaseResult is null
+            ? null
+            : new PhasedSession(probes, (session, published) => RemoteResultCallback.Invoke(
+                onBaseResult,
+                new LinuxMetricsRemoteResult { ConnectionResult = published, Data = session.LinuxMetrics }));
+
         var connectionResult = await ExecuteAsync(
                 request,
                 SshSessionOperation.CollectLinuxMetrics,
                 cpuSampleInterval,
                 session => data = session.LinuxMetrics,
                 default,
-                cancellationToken)
+                cancellationToken,
+                phased)
             .ConfigureAwait(false);
 
         return new LinuxMetricsRemoteResult
@@ -108,10 +155,12 @@ public sealed class SshConnectionService
         };
     }
 
-    public async Task<MacOsMetricsRemoteResult> CollectAsync(
+    private async Task<MacOsMetricsRemoteResult> CollectMacOsAsync(
         Server server,
         TimeSpan timeout,
-        CancellationToken cancellationToken = default)
+        Action<MacOsMetricsRemoteResult>? onBaseResult,
+        RemoteProbeReservation? probes,
+        CancellationToken cancellationToken)
     {
         MacOsMetricsRawData? data = null;
         var request = new SshConnectionRequest
@@ -120,13 +169,20 @@ public sealed class SshConnectionService
             Timeout = timeout
         };
 
+        var phased = onBaseResult is null
+            ? null
+            : new PhasedSession(probes, (session, published) => RemoteResultCallback.Invoke(
+                onBaseResult,
+                new MacOsMetricsRemoteResult { ConnectionResult = published, Data = session.MacOsMetrics }));
+
         var connectionResult = await ExecuteAsync(
                 request,
                 SshSessionOperation.CollectMacOsMetrics,
                 TimeSpan.Zero,
                 session => data = session.MacOsMetrics,
                 default,
-                cancellationToken)
+                cancellationToken,
+                phased)
             .ConfigureAwait(false);
 
         return new MacOsMetricsRemoteResult
@@ -184,7 +240,8 @@ public sealed class SshConnectionService
         TimeSpan cpuSampleInterval,
         Action<SshSessionResult>? captureSession,
         WorkloadCollectionPlan workloadPlan,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        PhasedSession? phased = null)
     {
         var stopwatch = Stopwatch.StartNew();
 
@@ -204,7 +261,8 @@ public sealed class SshConnectionService
                     workloadPlan,
                     stopwatch,
                     stages,
-                    cancellationToken)
+                    cancellationToken,
+                    phased)
                 .ConfigureAwait(false);
         }
 
@@ -280,7 +338,28 @@ public sealed class SshConnectionService
             }
 
             var server = request.Server;
-            var (sessionResult, _) = await ConnectAuthenticatedAsync(
+
+            // The one way a session result becomes this operation's result: once, from the phase-1 callback when
+            // there is one, otherwise after the session.
+            SshConnectionResult Finish(SshSessionResult sessionResult)
+            {
+                captureSession?.Invoke(sessionResult);
+                AdvanceAfterAuthenticatedSession(stages, sessionResult);
+
+                return Complete(
+                    request.Server,
+                    NormalizeCancellation(sessionResult.ErrorCode, cancellationToken, timeoutSource),
+                    stopwatch.Elapsed,
+                    request.Timeout,
+                    sessionResult.PresentedHostKey,
+                    trustedHostKey,
+                    sessionResult.DetectedOperatingSystem,
+                    sessionResult.ExceptionType,
+                    stages: stages);
+            }
+
+            phased?.Bind(Finish);
+            var (directResult, _) = await ConnectAuthenticatedAsync(
                     request,
                     identity => trustedHostKey!.Identity.Matches(identity),
                     login => login.Kind == SshLoginKind.Password
@@ -293,22 +372,17 @@ public sealed class SshConnectionService
                     operation,
                     cpuSampleInterval,
                     workloadPlan,
-                    linkedSource.Token)
+                    linkedSource.Token,
+                    phased)
                 .ConfigureAwait(false);
 
-            captureSession?.Invoke(sessionResult);
-            AdvanceAfterAuthenticatedSession(stages, sessionResult);
-
-            return Complete(
-                request.Server,
-                NormalizeCancellation(sessionResult.ErrorCode, cancellationToken, timeoutSource),
-                stopwatch.Elapsed,
-                request.Timeout,
-                sessionResult.PresentedHostKey,
-                trustedHostKey,
-                sessionResult.DetectedOperatingSystem,
-                sessionResult.ExceptionType,
-                stages: stages);
+            // Published from the callback: the session's return only closed phase 2, never a second publication.
+            return phased?.Published ?? Finish(directResult);
+        }
+        catch (Exception) when (phased?.Published is not null)
+        {
+            // Already published from the callback; whatever failed afterwards only ended phase 2.
+            return phased.Published;
         }
         catch (OperationCanceledException exception)
         {
@@ -415,7 +489,8 @@ public sealed class SshConnectionService
         WorkloadCollectionPlan workloadPlan,
         Stopwatch stopwatch,
         StageTracker stages,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        PhasedSession? phased)
     {
         var server = request.Server;
         if (!TryValidate(request, out var targetEndpoint)
@@ -578,30 +653,46 @@ public sealed class SshConnectionService
 
                 var verifiedTargetKey = trustedTargetKey!;
                 var username = server.Username.Trim();
-                var (sessionResult, sessionRan) = await ConnectAuthenticatedAsync(
+
+                // As on the direct path: once, from the phase-1 callback (a session that ran and succeeded) when
+                // there is one, otherwise after the session.
+                SshConnectionResult Finish(SshSessionResult sessionResult, bool sessionRan)
+                {
+                    captureSession?.Invoke(sessionResult);
+                    AdvanceAfterAuthenticatedSession(stages, sessionResult);
+
+                    var code = sessionResult.IsSuccess || !sessionRan
+                        ? sessionResult.ErrorCode
+                        : ClassifyTarget(sessionResult, hostKeyUnknown: false, tunnel, cancellationToken, timeoutSource);
+                    return Complete(
+                        server,
+                        code,
+                        stopwatch.Elapsed,
+                        request.Timeout,
+                        detectedOperatingSystem: sessionResult.DetectedOperatingSystem,
+                        exceptionType: sessionResult.ExceptionType, stages: stages);
+                }
+
+                phased?.Bind(sessionResult => Finish(sessionResult, sessionRan: true));
+                var (routedResult, ran) = await ConnectAuthenticatedAsync(
                         request,
                         identity => verifiedTargetKey.Identity.Matches(identity),
                         login => tunnel.CreateTargetSession(username, login, request.Timeout),
                         operation,
                         cpuSampleInterval,
                         workloadPlan,
-                        token)
+                        token,
+                        phased)
                     .ConfigureAwait(false);
 
-                captureSession?.Invoke(sessionResult);
-                AdvanceAfterAuthenticatedSession(stages, sessionResult);
-
-                var code = sessionResult.IsSuccess || !sessionRan
-                    ? sessionResult.ErrorCode
-                    : ClassifyTarget(sessionResult, hostKeyUnknown: false, tunnel, cancellationToken, timeoutSource);
-                return Complete(
-                    server,
-                    code,
-                    stopwatch.Elapsed,
-                    request.Timeout,
-                    detectedOperatingSystem: sessionResult.DetectedOperatingSystem,
-                    exceptionType: sessionResult.ExceptionType, stages: stages);
+                return phased?.Published ?? Finish(routedResult, ran);
             }
+        }
+        catch (Exception) when (phased?.Published is not null)
+        {
+            // Already published from the callback; whatever failed afterwards (the tunnel's teardown, say) only
+            // ended phase 2.
+            return phased.Published;
         }
         catch (OperationCanceledException exception)
         {
@@ -784,7 +875,8 @@ public sealed class SshConnectionService
         SshSessionOperation operation,
         TimeSpan cpuSampleInterval,
         WorkloadCollectionPlan workloadPlan,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        PhasedSession? phased = null)
     {
         SecretValue? storedSecret = null;
         try
@@ -869,6 +961,9 @@ public sealed class SshConnectionService
                     return (Failure(SshConnectionErrorCode.CredentialNotConfigured), false);
             }
 
+            // The session stays owned here for both phases: phase 2 runs inside the same call, before the
+            // session is disposed and the stored secret released below, exactly as a one-phase operation.
+            var phases = phased?.CreateSessionPhases();
             using (session)
             {
                 var result = operation switch
@@ -878,6 +973,12 @@ public sealed class SshConnectionService
                         .ConfigureAwait(false),
                     SshSessionOperation.DetectOperatingSystem => await session
                         .DetectOperatingSystemAsync(verifier, cancellationToken)
+                        .ConfigureAwait(false),
+                    SshSessionOperation.CollectLinuxMetrics when phases is not null => await session
+                        .CollectLinuxMetricsAsync(verifier, cpuSampleInterval, phases, cancellationToken)
+                        .ConfigureAwait(false),
+                    SshSessionOperation.CollectMacOsMetrics when phases is not null => await session
+                        .CollectMacOsMetricsAsync(verifier, phases, cancellationToken)
                         .ConfigureAwait(false),
                     SshSessionOperation.CollectLinuxMetrics => await session
                         .CollectLinuxMetricsAsync(verifier, cpuSampleInterval, cancellationToken)
@@ -1092,6 +1193,36 @@ public sealed class SshConnectionService
                     "SSH connection stage progress observer failed with exception type {ExceptionType}; the operation continues.",
                     exception.GetType().Name);
             }
+        }
+    }
+
+    /// <summary>
+    /// One two-phase metrics operation. The path that dials the session binds how a session result becomes the
+    /// operation's result (<see cref="Bind"/>); the session's phase-1 callback runs it once and keeps it in
+    /// <see cref="Published"/>, then hands it to the caller. When <see cref="Published"/> is set, the operation returns
+    /// it as is: the session's own return only closes phase 2.
+    /// </summary>
+    internal sealed class PhasedSession(
+        RemoteProbeReservation? probes,
+        Action<SshSessionResult, SshConnectionResult> onPublished)
+    {
+        private Func<SshSessionResult, SshConnectionResult>? _finish;
+
+        public SshConnectionResult? Published { get; private set; }
+
+        public void Bind(Func<SshSessionResult, SshConnectionResult> finish) => _finish = finish;
+
+        public SshSessionPhases CreateSessionPhases() => new(OnBaseResult, probes);
+
+        private void OnBaseResult(SshSessionResult session)
+        {
+            if (Published is not null || _finish is null)
+            {
+                return;
+            }
+
+            Published = _finish(session);
+            onPublished(session, Published);
         }
     }
 
