@@ -71,6 +71,23 @@ public sealed class LinuxMetricsCollectorPhasesTests
     }
 
     [Fact]
+    public async Task ALoadOnlyAnswer_IsPublishedInPhaseOne()
+    {
+        // Load average alone is a source (HasAnySource): it succeeds, so phase 1 publishes and phase 2 may run.
+        var remote = new PhasedLinuxSource
+        {
+            Result = Success() with { Data = new LinuxMetricsRawData { LoadAverage = "0.10 0.20 0.30 1/100 4242\n" } }
+        };
+        var collector = new LinuxMetricsCollector(remote);
+        var published = new List<ServerMetricsCollectionResult>();
+
+        var returned = await collector.CollectAsync(LinuxServer(), new MetricsCollectionPhases(published.Add, Probes: null));
+
+        Assert.Same(Assert.Single(published), returned);
+        Assert.True(returned.IsSuccess);
+    }
+
+    [Fact]
     public async Task FailurePath_NeverCallsBack_AndReturnsTheMappedFailure()
     {
         var remote = new PhasedLinuxSource { Result = ConnectionFailure() };
