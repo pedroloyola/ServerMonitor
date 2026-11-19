@@ -1,5 +1,7 @@
-O ServerAlyzer 1.1.12 mostra a carga média dos seus servidores Linux e macOS.
+O ServerAlyzer 1.1.13 mostra a carga média dos seus servidores Linux e macOS.
 
 Detalhes do servidor. O cartão do CPU mostra a carga média do último minuto, dos últimos 5 e dos últimos 15 minutos, junto ao número de CPUs. Quando um servidor não a indica, não aparece nada: um valor em falta nunca é mostrado como 0.
 
 Histórico. O ServerAlyzer passa também a guardar a carga média de 1 minuto no histórico local do seu PC.
+
+Módulos. Os detalhes do servidor podem agora abrir páginas extra que os módulos acrescentam para um servidor, com regresso a esse servidor. Os ecrãs existentes não mudam.
