@@ -9,6 +9,8 @@ internal sealed class FakeNavigationService : INavigationService
     public NavigationDestination? CurrentDestination { get; set; }
     public string? CurrentContributionId => null;
     public void GoToContribution(string id) { }
+    public (string Id, Guid ServerId, string ServerName)? LastServerPage { get; private set; }
+    public void GoToServerPage(string id, Guid serverId, string serverName) { LastServerPage = (id, serverId, serverName); CurrentDestination = NavigationDestination.ServerPage; Raise(); }
     public event EventHandler? Navigated;
     public int NavigatedSubscribers => Navigated?.GetInvocationList().Length ?? 0;
     public void EnsureInitialNavigation() { if (CurrentDestination is null) GoToDashboard(); }

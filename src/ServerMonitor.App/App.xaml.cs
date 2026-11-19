@@ -980,6 +980,8 @@ public partial class App : Application
         // Workloads (M11) mirror History: opened per-server, fresh page/VM each navigation.
         services.AddTransient<WorkloadsViewModel>();
         services.AddTransient<WorkloadsPage>();
+        // M16: the shell's page around a contributed server page, per visit like the pages above.
+        services.AddTransient<ServerExtensionPage>();
         services.AddSingleton<ShellViewModel>();
         services.AddSingleton<IServerLoadStatusSource>(sp => (IServerLoadStatusSource)sp.GetRequiredService<IServerService>());
         services.AddSingleton(sp => new OnboardingActions(sp.GetRequiredService<DashboardViewModel>().AddServerCommand,
@@ -1102,7 +1104,8 @@ public partial class App : Application
                 composed.NavigationEntries,
                 [.. unlistedPages],
                 [.. links],
-                composed.ServerDetailSections);
+                composed.ServerDetailSections,
+                composed.ServerPages);
     }
 
     /// <summary>

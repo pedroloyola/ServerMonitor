@@ -300,6 +300,7 @@ public sealed class SettingsNotificationViewModelTests
         public NavigationDestination? CurrentDestination => null;
         public string? CurrentContributionId => null;
         public void GoToContribution(string id) => throw new NotSupportedException();
+        public void GoToServerPage(string id, Guid serverId, string serverName) => throw new NotSupportedException();
         public event EventHandler? Navigated { add { } remove { } }
         public void EnsureInitialNavigation() => throw new NotSupportedException();
         public void GoToHistory() => throw new NotSupportedException();

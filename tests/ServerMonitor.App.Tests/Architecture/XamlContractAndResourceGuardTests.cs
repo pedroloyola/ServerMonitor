@@ -72,7 +72,11 @@ public sealed partial class XamlContractAndResourceGuardTests
             // UI.5 fix round 2: focus returns to "…" after a cancelled / failed Ocultar or Remover.
             "MoreActionsButton",
             // M16.1: the host of contributed server detail sections (filled from code-behind, collapsed when empty).
-            "ContributedSections"],
+            "ContributedSections",
+            // M16: the Explore card's rows, where a contributed server page's row is added from code-behind.
+            "ExploreRows"],
+        // M16: the shell's page around a contributed server page (breadcrumb, title and the module's view, from code-behind).
+        ["Views/ServerExtensionPage.xaml"] = ["PageViewport", "PageScroll", "PageRoot", "Breadcrumb", "PageTitle", "ModuleContent", "WidthStates", "Narrow"],
         // UI.5 §4: the Data sub-page brings the backup status and (H-UI5-4) the About card into view from code-behind.
         ["Views/SettingsDataPage.xaml"] = ["PageViewport", "BackupStatusBar", "AboutSection", "PageRoot", "ResetIgnoredButton", "HistoryActions", "BackupActions",
             "GitHubButton", "SuccessToast",

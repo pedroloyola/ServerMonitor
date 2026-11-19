@@ -154,10 +154,10 @@ public sealed class FixOverviewFitContractTests
     }
 
     [Fact]
-    public void TheScrollingPages_AreTheSixThatScrollAsAWhole()
+    public void TheScrollingPages_AreTheSevenThatScrollAsAWhole()
     {
         Assert.Equal(
-            ["Views/DashboardPage.xaml", "Views/ServerDetailPage.xaml", "Views/ServerEditorPage.xaml", "Views/ServersPage.xaml", "Views/SettingsDataPage.xaml", "Views/SettingsPage.xaml"],
+            ["Views/DashboardPage.xaml", "Views/ServerDetailPage.xaml", "Views/ServerEditorPage.xaml", "Views/ServerExtensionPage.xaml", "Views/ServersPage.xaml", "Views/SettingsDataPage.xaml", "Views/SettingsPage.xaml"],
             FindScrollingPages());
     }
 

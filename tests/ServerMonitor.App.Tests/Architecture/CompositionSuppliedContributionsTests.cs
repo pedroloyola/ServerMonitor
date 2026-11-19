@@ -198,6 +198,19 @@ public sealed class CompositionSuppliedContributionsTests
         Assert.Equal(["only.link"], withLink.Links.Select(l => l.Id));
     }
 
+    [Fact]
+    public void WithSomethingSupplied_TheComposedServerSectionsAndPagesAreKept()
+    {
+        var section = new ServerDetailSection("a.detail", 0, "Key", _ => new object());
+        var page = new ServerPage("a.page", 0, "Key", _ => new object());
+        var composed = new ShellContributions([], [], [], [], [section], [page]);
+
+        var supplied = App.WithSupplied(composed, [Section("late.section")]);
+
+        Assert.Equal([section], supplied.ServerDetailSections);
+        Assert.Equal([page], supplied.ServerPages);
+    }
+
     // ---------------------------------------------------------------- 4. with no implementation, the baseline
 
     [Fact]
@@ -213,6 +226,7 @@ public sealed class CompositionSuppliedContributionsTests
         Assert.Empty(host.UnlistedPages);
         Assert.Empty(host.Links);
         Assert.Null(host.FooterLink);
+        Assert.Empty(host.ServerPageEntries); // M16: no server page, so the detail page's Explore card is unchanged
         Assert.Empty(host.SettingsCards);
     }
 

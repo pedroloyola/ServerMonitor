@@ -399,9 +399,11 @@
                                                   Visibility="{Binding IsRouted, Converter={StaticResource BooleanToVisibilityConverter}}" />
                     </StackPanel>
                 </Border>
-                <!-- Explorar 112:1931: two rich rows (icon 22, title 14 Medium + detail 12, chevron). -->
+                <!-- Explorar 112:1931: two rich rows (icon 22, title 14 Medium + detail 12, chevron). M16: a contributed
+                     server page adds one more rich row of the same kind after them (code-behind); with none, the card is
+                     exactly these two. -->
                 <Border x:Name="ExploreCard" Grid.Column="1" Style="{StaticResource SaGlassSurfaceStyle}" MinHeight="244">
-                    <StackPanel Spacing="16">
+                    <StackPanel x:Name="ExploreRows" Spacing="16">
                         <TextBlock x:Uid="ServerDetailExploreTitle" Style="{StaticResource SaCardTitleTextStyle}" AutomationProperties.HeadingLevel="Level2" />
                         <primitives:SaListRow
                             x:Name="HistoryRow"

@@ -80,8 +80,9 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
     {
         NavigationDestination.Overview => ShellDestination.Overview,
         // UI.7 B-1 (UI.6 D-4): the server editor belongs to Servidores.
+        // M16: a contributed server page belongs to its server, so to Servidores.
         NavigationDestination.Servers or NavigationDestination.Detail or NavigationDestination.Workloads
-            or NavigationDestination.ServerEditor => ShellDestination.Servers,
+            or NavigationDestination.ServerEditor or NavigationDestination.ServerPage => ShellDestination.Servers,
         NavigationDestination.History => ShellDestination.History,
         NavigationDestination.Settings or NavigationDestination.SettingsData => ShellDestination.Settings,
         _ => null

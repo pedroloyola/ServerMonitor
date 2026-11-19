@@ -98,4 +98,13 @@ public interface INavigationService
 
     /// <summary>The id of the contributed entry shown, while <see cref="CurrentDestination"/> is a contribution; else null.</summary>
     string? CurrentContributionId { get; }
+
+    /// <summary>
+    /// M16: the contributed server page <paramref name="id"/> (<see cref="ServerMonitor.Features.ServerPage"/>) of one server, in the
+    /// shell's own page with a way back to that server's detail ("‹ <paramref name="serverName"/>"); Servidores stays
+    /// selected in the sidebar. Routed by id alone. An unknown id, or a page whose view cannot be created, changes
+    /// nothing; a server that is no longer listed lands where its detail page would send it. Leaves the current page
+    /// through its exit guard like every navigation.
+    /// </summary>
+    void GoToServerPage(string id, Guid serverId, string serverName);
 }
