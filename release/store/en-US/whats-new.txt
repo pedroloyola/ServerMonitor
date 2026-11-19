@@ -1,5 +1,7 @@
-ServerAlyzer 1.1.12 shows the load average of your Linux and macOS servers.
+ServerAlyzer 1.1.13 shows the load average of your Linux and macOS servers.
 
 Server details. The CPU card shows the load average over the last 1, 5 and 15 minutes, next to the number of CPUs. When a server does not report it, nothing is shown: a missing value is never shown as 0.
 
 History. ServerAlyzer now also records the 1-minute load average in the local history on your PC.
+
+Modules. The server details page can now open extra pages that modules add for a server, with a way back to that server. The existing screens do not change.
