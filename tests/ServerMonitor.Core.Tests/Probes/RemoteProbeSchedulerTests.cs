@@ -477,6 +477,76 @@ public sealed class RemoteProbeSchedulerTests
             .TryReserve(ServerA, CancellationToken.None)!
             .Begin(ServerOperatingSystem.Linux)!;
 
+    [Fact]
+    public void WatchedOnlyProbe_IsDueOnlyOnAWatchedServer_AndOnlyWhileTheWatchIsHeld()
+    {
+        var watch = new RemoteProbeWatch();
+        var scheduler = new RemoteProbeScheduler(
+            [new FakeProbe("always"), new FakeProbe("page") { RunsOnlyWhileWatched = true }],
+            new HistoryGeneration(),
+            timeProvider: null,
+            watch);
+
+        Assert.Equal(["always"], BeginAndComplete(scheduler, ServerA)!.Requests.Select(request => request.ProbeId));
+
+        var held = watch.Watch(ServerA, "page");
+        Assert.Equal(["page", "always"], BeginAndComplete(scheduler, ServerA)!.Requests.Select(request => request.ProbeId));
+        Assert.Equal(["always"], BeginAndComplete(scheduler, ServerB)!.Requests.Select(request => request.ProbeId));
+
+        held.Dispose();
+        Assert.Equal(["always"], BeginAndComplete(scheduler, ServerA)!.Requests.Select(request => request.ProbeId));
+    }
+
+    [Fact]
+    public void WatchedOnlyProbe_WithoutAWatchRegistry_NeverRuns()
+    {
+        var scheduler = new RemoteProbeScheduler(
+            [new FakeProbe("page") { RunsOnlyWhileWatched = true }],
+            new HistoryGeneration());
+
+        Assert.Equal(1, scheduler.Count);
+        Assert.Null(BeginAndComplete(scheduler, ServerA));
+    }
+
+    [Fact]
+    public void WatchedOnlyProbe_SkippedWhileUnwatched_IsDueOnTheFirstPollAfterAWatchStarts()
+    {
+        var clock = new ManualClock();
+        var watch = new RemoteProbeWatch();
+        var scheduler = new RemoteProbeScheduler(
+            [new FakeProbe("page") { RunsOnlyWhileWatched = true, MinimumInterval = TimeSpan.FromMinutes(5) }],
+            new HistoryGeneration(),
+            clock,
+            watch);
+
+        Assert.Null(BeginAndComplete(scheduler, ServerA));
+        clock.Advance(TimeSpan.FromSeconds(10));
+        using (watch.Watch(ServerA, "page"))
+        {
+            Assert.NotNull(BeginAndComplete(scheduler, ServerA));
+            Assert.Null(BeginAndComplete(scheduler, ServerA)); // its own interval still applies while watched
+        }
+    }
+
+    [Fact]
+    public void RunsOnlyWhileWatched_IsReadOnce_AndALaterChangeDoesNotLetItRunInTheBackground()
+    {
+        var probe = new FakeProbe("page") { RunsOnlyWhileWatched = true };
+        var scheduler = new RemoteProbeScheduler([probe], new HistoryGeneration(), timeProvider: null, new RemoteProbeWatch());
+
+        probe.RunsOnlyWhileWatched = false;
+
+        Assert.Null(BeginAndComplete(scheduler, ServerA));
+    }
+
+    [Fact]
+    public void AProbeThatDoesNotSayOtherwise_IsNotWatchedOnly()
+    {
+        IRemoteProbe probe = new ThrowingPropertiesProbe();
+
+        Assert.False(probe.RunsOnlyWhileWatched);
+    }
+
     private static RemoteProbeBatch? BeginAndComplete(RemoteProbeScheduler scheduler, Guid serverId)
     {
         var reservation = scheduler.TryReserve(serverId, CancellationToken.None)!;
@@ -503,6 +573,8 @@ public sealed class RemoteProbeSchedulerTests
         public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(5);
 
         public TimeSpan MinimumInterval { get; set; } = TimeSpan.Zero;
+
+        public bool RunsOnlyWhileWatched { get; set; }
 
         public bool ThrowOnAccept { get; init; }
 

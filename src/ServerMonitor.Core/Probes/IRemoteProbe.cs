@@ -46,6 +46,14 @@ public interface IRemoteProbe
     TimeSpan MinimumInterval { get; }
 
     /// <summary>
+    /// True for a probe that runs only while something on this computer watches it on that server through
+    /// <see cref="RemoteProbeWatch"/> (a page that is open, for instance), and never in the background otherwise. With
+    /// no <see cref="RemoteProbeWatch"/> given to the scheduler, such a probe never runs. Read once, like the rest. The
+    /// default, false, is a probe that runs whenever it is due.
+    /// </summary>
+    bool RunsOnlyWhileWatched => false;
+
+    /// <summary>
     /// Receives one outcome. Called from a background thread, never concurrently for the same server. Must be quick;
     /// an exception thrown here is caught and ignored.
     /// <para>

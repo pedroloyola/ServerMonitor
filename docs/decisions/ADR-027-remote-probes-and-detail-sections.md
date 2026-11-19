@@ -56,6 +56,13 @@ catálogo. Do mesmo modo, a página de detalhe e a limpeza do histórico só con
   - Uma fase 2 dura no máximo 4 × 30 s = 120 s. Uma sonda que ignore o token é abandonada quando o seu timeout passa.
   - A credencial da sessão (chave ou palavra-passe em memória) vive até ao fim da fase 2, ou seja até 120 s a mais do
     que antes, e é libertada no mesmo `finally` de sempre.
+- **Sondas só enquanto vistas (M18).** Uma sonda pode declarar `RunsOnlyWhileWatched` (por omissão `false`, lido uma
+  vez como o resto). Essa sonda só fica devida num servidor enquanto o `RemoteProbeWatch` (um singleton da composição)
+  tiver um watch dela para esse servidor: uma página aberta pega num watch e liberta-o quando sai. Fora disso nunca corre,
+  nem em segundo plano. Sem `RemoteProbeWatch` passado ao agendador, nunca corre. Enquanto não é vista não é marcada como
+  corrida, por isso fica devida na primeira recolha depois de o watch começar, e o seu intervalo mínimo aplica-se
+  enquanto é vista. Os watches são contados por servidor e sonda, e libertar o mesmo duas vezes conta uma. O comando, os
+  limites e os tetos acima não mudam; só muda quando corre.
 - O output bruto de uma sonda nunca vai para o log e nunca sai do computador.
 
 ### 2. Secções do detalhe do servidor (`ServerDetailSection`)

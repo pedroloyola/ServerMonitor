@@ -95,5 +95,47 @@ public sealed class RemoteProbeCompositionTests
 
         Assert.Contains("RemoteProbeComposition.CreateScheduler(", app, StringComparison.Ordinal);
         Assert.DoesNotContain("new RemoteProbeScheduler(", app, StringComparison.Ordinal);
+        Assert.Contains("services.AddSingleton<RemoteProbeWatch>();", app, StringComparison.Ordinal);
+        Assert.Contains("sp.GetRequiredService<RemoteProbeWatch>()));", app, StringComparison.Ordinal);
+    }
+
+    private sealed class PageProbe : IRemoteProbe
+    {
+        public string Id => "page";
+
+        public ServerOperatingSystem OperatingSystem => ServerOperatingSystem.Linux;
+
+        public string Command => "uptime";
+
+        public int OutputLimitBytes => 1024;
+
+        public TimeSpan Timeout => TimeSpan.FromSeconds(5);
+
+        public TimeSpan MinimumInterval => TimeSpan.Zero;
+
+        public bool RunsOnlyWhileWatched => true;
+
+        public void Accept(RemoteProbeOutcome outcome)
+        {
+        }
+    }
+
+    [Fact]
+    public void The_watch_is_handed_to_the_scheduler()
+    {
+        var watch = new RemoteProbeWatch();
+        var scheduler = RemoteProbeComposition.CreateScheduler([new PageProbe()], new HistoryGeneration(), new RecordingLogger(), watch);
+        var server = Guid.NewGuid();
+
+        using (watch.Watch(server, "page"))
+        {
+            var reservation = scheduler.TryReserve(server, CancellationToken.None)!;
+            Assert.NotNull(reservation.Begin(ServerOperatingSystem.Linux));
+            reservation.Complete();
+        }
+
+        var later = scheduler.TryReserve(server, CancellationToken.None)!;
+        Assert.Null(later.Begin(ServerOperatingSystem.Linux));
+        later.Complete();
     }
 }
