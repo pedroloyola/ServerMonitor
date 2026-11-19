@@ -48,8 +48,10 @@ public sealed partial class ServerDetailPage : Page, IServerDetailView, IDisposa
 
     /// <summary>
     /// M16: one rich row on the Explorar card per contributed server page, like Histórico and Serviços e containers (the
-    /// same SaListRow, a SaIcon* glyph when the module gives none). The row only asks the view model to open the page; no
-    /// module code runs here (the host already resolved titles). With none the card keeps its two rows.
+    /// same SaListRow). Explorar 112:1931 has no glyph for such a row, so when the module gives none the icon slot stays
+    /// empty (the title keeps the built-in rows' alignment; the row's own chevron is its only arrow). The row only asks
+    /// the view model to open the page; no module code runs here (the host already resolved titles). With none the card
+    /// keeps its two rows.
     /// </summary>
     private void AddServerPageRows()
     {
@@ -71,7 +73,7 @@ public sealed partial class ServerDetailPage : Page, IServerDetailView, IDisposa
                 Variant = SaListRowVariant.Rich,
                 Title = page.Title,
                 Detail = page.Detail ?? string.Empty,
-                IconData = page.IconPathData ?? (string)Application.Current.Resources["SaIconArrowRight01Data"],
+                IconData = page.IconPathData,
                 Tag = page.Id,
             };
             var id = page.Id;

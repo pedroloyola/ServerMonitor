@@ -570,6 +570,8 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
     /// <summary>
     /// M16: opens the contributed server page <paramref name="pageId"/> for this server (its row on the Explorar card).
     /// Back from it, focus returns to that row. Nothing happens without a card (the server is gone or not loaded yet).
+    /// The row is remembered only once the page is shown: an unknown id, a failing factory or a refused exit leave the
+    /// user here with no memory pending, so the next detail page of this server never jumps to the row.
     /// </summary>
     public void OpenServerPage(string pageId)
     {
@@ -578,8 +580,12 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
             return;
         }
 
-        _returnFocus?.Remember(_serverId, ServerDetailReturnTarget.ServerPage, pageId);
-        _navigation.GoToServerPage(pageId, _serverId, Title);
+        var serverId = _serverId;
+        _navigation.GoToServerPage(pageId, serverId, Title);
+        if (_navigation.CurrentDestination == NavigationDestination.ServerPage)
+        {
+            _returnFocus?.Remember(serverId, ServerDetailReturnTarget.ServerPage, pageId);
+        }
     }
 
     public void Dispose()

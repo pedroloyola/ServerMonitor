@@ -25,7 +25,7 @@ public sealed class SaListRow : Button
         nameof(Title), typeof(string), typeof(SaListRow), new PropertyMetadata(string.Empty));
 
     public static readonly DependencyProperty DetailProperty = DependencyProperty.Register(
-        nameof(Detail), typeof(string), typeof(SaListRow), new PropertyMetadata(string.Empty));
+        nameof(Detail), typeof(string), typeof(SaListRow), new PropertyMetadata(string.Empty, (d, _) => ((SaListRow)d).UpdateDetail()));
 
     public static readonly DependencyProperty TrailingProperty = DependencyProperty.Register(
         nameof(Trailing), typeof(object), typeof(SaListRow), new PropertyMetadata(null));
@@ -33,6 +33,8 @@ public sealed class SaListRow : Button
     public static readonly DependencyProperty VariantProperty = DependencyProperty.Register(
         nameof(Variant), typeof(SaListRowVariant), typeof(SaListRow),
         new PropertyMetadata(SaListRowVariant.Simple, (d, _) => ((SaListRow)d).UpdateVariant()));
+
+    private FrameworkElement? _detail;
 
     public SaListRow()
     {
@@ -55,7 +57,7 @@ public sealed class SaListRow : Button
         set => SetValue(TitleProperty, value);
     }
 
-    /// <summary>Second line of the Rich variant.</summary>
+    /// <summary>Second line of the Rich variant; empty, it collapses and the title stands alone.</summary>
     public string Detail
     {
         get => (string)GetValue(DetailProperty);
@@ -78,11 +80,31 @@ public sealed class SaListRow : Button
     protected override void OnApplyTemplate()
     {
         base.OnApplyTemplate();
+        _detail = GetTemplateChild("PART_Detail") as FrameworkElement;
         UpdateVariant();
     }
 
-    private void UpdateVariant() =>
+    private void UpdateVariant()
+    {
         VisualStateManager.GoToState(this, Variant == SaListRowVariant.Rich ? "Rich" : "Simple", useTransitions: false);
+        UpdateDetail();
+    }
+
+    private void UpdateDetail()
+    {
+        if (_detail is not null)
+        {
+            _detail.Visibility = SaListRowRules.ShowsDetail(Variant, Detail) ? Visibility.Visible : Visibility.Collapsed;
+        }
+    }
+}
+
+/// <summary>Pure rules of <see cref="SaListRow"/>, outside the control so runtime-free tests can call them.</summary>
+internal static class SaListRowRules
+{
+    /// <summary>The second line shows only in the Rich variant, and only with text.</summary>
+    public static bool ShowsDetail(SaListRowVariant variant, string? detail) =>
+        variant == SaListRowVariant.Rich && !string.IsNullOrEmpty(detail);
 }
 
 /// <summary>

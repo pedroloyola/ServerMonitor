@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using ServerMonitor.App.Controls.Primitives;
 using ServerMonitor.App.Services;
 using ServerMonitor.App.Tests.Architecture;
 using ServerMonitor.App.Tests.Fakes;
@@ -84,6 +85,7 @@ public sealed class ServerPageNavigationTests
 
         Assert.Same(detail, world.Host.Content);
         Assert.False(detail.Disposed);
+        Assert.Equal(ServerDetailReturnTarget.None, detail.ViewModel.TakeReturnFocus(out _)); // no row memory pending
     }
 
     // ---------------------------------------------------------------- the host
@@ -198,7 +200,7 @@ public sealed class ServerPageNavigationTests
     }
 
     [Fact]
-    public async Task TheWayBack_ForAServerThatIsGone_LandsOnTheOverview()
+    public async Task TheWayBack_ForAServerThatIsGone_LandsOnItsRememberedOrigin()
     {
         var world = await World.CreateAsync(ShellContributions.Empty.WithServerPages([Page("a.page")]));
         var id = world.Fleet.IdOf("web");
@@ -237,6 +239,53 @@ public sealed class ServerPageNavigationTests
         Assert.False(detail.Disposed);
         Assert.Equal(NavigationDestination.Detail, world.Navigation.CurrentDestination);
         Assert.Empty(world.PageViews);
+        Assert.Equal(ServerDetailReturnTarget.None, detail.ViewModel.TakeReturnFocus(out _)); // no row memory pending
+    }
+
+    [Fact]
+    public async Task AnOpeningThatNeverLands_LeavesNoRowMemory_ForTheNextDetailPageOfThatServer()
+    {
+        var world = await World.CreateAsync(ShellContributions.Empty.WithServerPages([Page("a.page", factory: _ => throw new InvalidOperationException())]));
+        var id = world.Fleet.IdOf("web");
+        world.Navigation.GoToServerDetail(id, ServerDetailOrigin.Servers);
+        world.DetailViews[0].ViewModel.OpenServerPage("a.page");
+
+        world.Navigation.GoToServers();
+        world.Navigation.GoToServerDetail(id, ServerDetailOrigin.Servers);
+
+        Assert.Equal(2, world.DetailViews.Count);
+        Assert.Equal(ServerDetailReturnTarget.None, world.DetailViews[^1].ViewModel.TakeReturnFocus(out _));
+    }
+
+    [Fact]
+    public async Task AnExitTheGuardRefuses_LeavesTheUserOnTheDetailPage_WithNoRowMemory()
+    {
+        var world = await World.CreateAsync(ShellContributions.Empty.WithServerPages([Page("a.page")]));
+        world.DetailExitAnswer = false;
+        world.Navigation.GoToServerDetail(world.Fleet.IdOf("web"), ServerDetailOrigin.Servers);
+        var detail = Assert.Single(world.DetailViews);
+
+        detail.ViewModel.OpenServerPage("a.page");
+
+        Assert.Same(detail, world.Host.Content);
+        Assert.Equal(NavigationDestination.Detail, world.Navigation.CurrentDestination);
+        Assert.Empty(world.PageViews);
+        Assert.Equal(ServerDetailReturnTarget.None, detail.ViewModel.TakeReturnFocus(out _));
+    }
+
+    [Fact]
+    public async Task AnExitTheGuardAccepts_OpensThePage_AndBackRefocusesTheRow()
+    {
+        var world = await World.CreateAsync(ShellContributions.Empty.WithServerPages([Page("a.page")]));
+        world.DetailExitAnswer = true;
+        var id = world.Fleet.IdOf("web");
+        world.Navigation.GoToServerDetail(id, ServerDetailOrigin.Servers);
+
+        Assert.Single(world.DetailViews).ViewModel.OpenServerPage("a.page");
+        Assert.Single(world.PageViews).Back();
+
+        Assert.Equal(ServerDetailReturnTarget.ServerPage, world.DetailViews[^1].ViewModel.TakeReturnFocus(out var pageId));
+        Assert.Equal("a.page", pageId);
     }
 
     [Fact]
@@ -312,6 +361,14 @@ public sealed class ServerPageNavigationTests
         Assert.Equal(["HistoryRow", "WorkloadsRow"], rows);
     }
 
+    [Theory]
+    [InlineData(SaListRowVariant.Rich, "Detail", true)]
+    [InlineData(SaListRowVariant.Rich, "", false)] // a page row with no detail: one line, never an empty second one
+    [InlineData(SaListRowVariant.Rich, null, false)]
+    [InlineData(SaListRowVariant.Simple, "Detail", false)]
+    public void ARichRow_ShowsItsSecondLine_OnlyWithText(SaListRowVariant variant, string? detail, bool shown) =>
+        Assert.Equal(shown, SaListRowRules.ShowsDetail(variant, detail));
+
     // ---------------------------------------------------------------- the world
 
     private sealed class World
@@ -329,6 +386,9 @@ public sealed class ServerPageNavigationTests
         public List<RecordingPageView> PageViews { get; } = [];
 
         public ServerDetailReturnFocus ReturnFocus { get; } = new();
+
+        /// <summary>When set, detail pages created from now on are exit guards answering this at once.</summary>
+        public bool? DetailExitAnswer { get; set; }
 
         public DashboardViewModel Dashboard => _kit.Dashboard;
 
@@ -355,7 +415,8 @@ public sealed class ServerPageNavigationTests
         {
             if (type == typeof(ServerDetailPage))
             {
-                var view = new RecordingDetailView(new ServerDetailViewModel(Dashboard, Navigation, new FakeLocalizationService(), returnFocus: ReturnFocus));
+                var viewModel = new ServerDetailViewModel(Dashboard, Navigation, new FakeLocalizationService(), returnFocus: ReturnFocus);
+                var view = DetailExitAnswer is { } answer ? new GuardedDetailView(viewModel, answer) : new RecordingDetailView(viewModel);
                 DetailViews.Add(view);
                 return view;
             }
@@ -380,7 +441,7 @@ public sealed class ServerPageNavigationTests
         }
     }
 
-    private sealed class RecordingDetailView(ServerDetailViewModel viewModel) : IServerDetailView, IDisposable
+    private class RecordingDetailView(ServerDetailViewModel viewModel) : IServerDetailView, IDisposable
     {
         public ServerDetailViewModel ViewModel { get; } = viewModel;
 
@@ -393,6 +454,11 @@ public sealed class ServerPageNavigationTests
             Disposed = true;
             ViewModel.Dispose();
         }
+    }
+
+    private sealed class GuardedDetailView(ServerDetailViewModel viewModel, bool answer) : RecordingDetailView(viewModel), INavigationExitGuard
+    {
+        public Task<bool> ConfirmLeaveAsync() => Task.FromResult(answer);
     }
 
     /// <summary>Stands in for <see cref="ServerExtensionPage"/>: records what it was given; Back is its breadcrumb.</summary>
