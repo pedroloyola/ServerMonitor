@@ -15,6 +15,8 @@ public sealed class NavigationService : INavigationService
     private readonly Dictionary<Guid, ServerDetailOrigin> _detailOrigins = [];
     private Guid? _lastDetailServer;
     private bool _historyFromSidebar;
+    // M16: the server page shown (id and server), while CurrentDestination is a server page.
+    private (string Id, Guid ServerId)? _shownServerPage;
     // UI.7 H-UI7-3: true while a navigation the exit guard accepted runs (its own nested navigations are not re-asked).
     private bool _leaving;
     // UI.7: an exit decision (the discard dialog) is open; any other navigation meanwhile is refused, never queued.
@@ -276,6 +278,51 @@ public sealed class NavigationService : INavigationService
     }
 
     /// <inheritdoc />
+    public void GoToServerPage(string id, Guid serverId, string serverName)
+    {
+        ArgumentNullException.ThrowIfNull(id);
+        _ = Host;
+        if (CurrentDestination == NavigationDestination.ServerPage && _shownServerPage == (id, serverId))
+        {
+            return;
+        }
+
+        // By id through the host, like a contributed entry: never a type, never reflection.
+        if (_serviceProvider.GetService<ShellContributionHost>() is not { } contributions || !contributions.IsServerPage(id))
+        {
+            _logger.LogWarning("No contributed server page has the id {Id}; nothing changed.", id);
+            return;
+        }
+
+        if (DeferToExitGuard(() => GoToServerPage(id, serverId, serverName)))
+        {
+            return;
+        }
+
+        // Like the Server Detail page (Cortex r1 MUST-1): a server that is no longer listed never gets the page; the user
+        // lands where that server's detail page would send them.
+        if (!IsListed(serverId))
+        {
+            _logger.LogInformation("A server page was not opened: the server is no longer listed.");
+            ReturnToServerDetail(serverId);
+            return;
+        }
+
+        // A fresh view per visit, created before anything changes: a factory that fails leaves the user where they were.
+        if (!contributions.TryCreateServerPage(id, serverId, out var entry, out var view))
+        {
+            return;
+        }
+
+        // Content BEFORE Load, as for the Server Detail page; a fresh page per visit, released when it is replaced.
+        var page = (IServerPageView)_pageFactory(typeof(ServerExtensionPage));
+        Show(page, NavigationDestination.ServerPage);
+        _shownServerPage = (id, serverId);
+        page.Load(serverId, serverName ?? string.Empty, entry, view);
+        _logger.LogInformation("Navigated to the contributed server page {Id}.", id);
+    }
+
+    /// <inheritdoc />
     public void LeaveCurrentPageThen(Action continuation)
     {
         ArgumentNullException.ThrowIfNull(continuation);
@@ -414,6 +461,7 @@ public sealed class NavigationService : INavigationService
         : type == typeof(SettingsPage) ? NavigationDestination.Settings
         : type == typeof(SettingsDataPage) ? NavigationDestination.SettingsData
         : type == typeof(ServerEditorPage) ? NavigationDestination.ServerEditor
+        : type == typeof(ServerExtensionPage) ? NavigationDestination.ServerPage
         : throw new ArgumentException("Unknown navigation page.", nameof(type));
 
     private bool IsListed(Guid serverId) =>
@@ -450,6 +498,8 @@ public sealed class NavigationService : INavigationService
             CurrentContributionId = null;
         }
 
+        _shownServerPage = null;
+
         if (!ReferenceEquals(previous, page) && !previousIsContribution && previous is IDisposable disposable)
         {
             disposable.Dispose();
@@ -482,6 +532,15 @@ internal interface INavigationHost
 public interface IServerDetailView
 {
     void Load(Guid serverId, ServerDetailOrigin origin);
+}
+
+/// <summary>
+/// M16: the shell's page around a contributed server page, as navigation sees it (one fresh page per visit): it draws the
+/// way back to the server's detail page and the title, and shows the module's view below them.
+/// </summary>
+public interface IServerPageView
+{
+    void Load(Guid serverId, string serverName, ServerPageEntry page, object view);
 }
 
 /// <summary>UI.7 B-1: the server editor page as navigation sees it (one fresh page per visit).</summary>

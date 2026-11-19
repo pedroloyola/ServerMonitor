@@ -468,7 +468,6 @@
                                         <Setter Target="RootGrid.ColumnSpacing" Value="14" />
                                         <Setter Target="PART_Icon.Size" Value="22" />
                                         <Setter Target="PART_Chevron.Size" Value="16" />
-                                        <Setter Target="PART_Detail.Visibility" Value="Visible" />
                                         <Setter Target="PART_Trailing.Visibility" Value="Collapsed" />
                                     </VisualState.Setters>
                                 </VisualState>
@@ -478,6 +477,7 @@
                         <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
                             <TextBlock Style="{StaticResource SaButtonTextStyle}" FontSize="{TemplateBinding FontSize}" Text="{TemplateBinding Title}" TextTrimming="CharacterEllipsis"
                                        AutomationProperties.AccessibilityView="Raw" />
+                            <!-- PART_Detail is shown by the control: Rich with a non-empty Detail (an empty one collapses, the title centres). -->
                             <TextBlock x:Name="PART_Detail" Visibility="Collapsed" Style="{StaticResource SaCaptionTextStyle}"
                                        Foreground="{ThemeResource SaTextSecondaryBrush}" Text="{TemplateBinding Detail}" TextTrimming="CharacterEllipsis" />
                         </StackPanel>

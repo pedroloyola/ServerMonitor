@@ -558,7 +558,35 @@ public sealed class ServerDetailViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>Where focus returns after Histórico / Serviços e containers (taken once, for this server only).</summary>
-    public ServerDetailReturnTarget TakeReturnFocus() => _returnFocus?.Take(_serverId) ?? ServerDetailReturnTarget.None;
+    public ServerDetailReturnTarget TakeReturnFocus() => TakeReturnFocus(out _);
+
+    /// <summary>As <see cref="TakeReturnFocus()"/>, with the page id when the user comes back from a contributed server page.</summary>
+    public ServerDetailReturnTarget TakeReturnFocus(out string? pageId)
+    {
+        pageId = null;
+        return _returnFocus?.Take(_serverId, out pageId) ?? ServerDetailReturnTarget.None;
+    }
+
+    /// <summary>
+    /// M16: opens the contributed server page <paramref name="pageId"/> for this server (its row on the Explorar card).
+    /// Back from it, focus returns to that row. Nothing happens without a card (the server is gone or not loaded yet).
+    /// The row is remembered only once the page is shown: an unknown id, a failing factory or a refused exit leave the
+    /// user here with no memory pending, so the next detail page of this server never jumps to the row.
+    /// </summary>
+    public void OpenServerPage(string pageId)
+    {
+        if (_card is null || _disposed || string.IsNullOrEmpty(pageId))
+        {
+            return;
+        }
+
+        var serverId = _serverId;
+        _navigation.GoToServerPage(pageId, serverId, Title);
+        if (_navigation.CurrentDestination == NavigationDestination.ServerPage)
+        {
+            _returnFocus?.Remember(serverId, ServerDetailReturnTarget.ServerPage, pageId);
+        }
+    }
 
     public void Dispose()
     {

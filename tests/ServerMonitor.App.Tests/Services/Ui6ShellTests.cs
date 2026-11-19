@@ -15,6 +15,7 @@ public sealed class Ui6ShellTests
     [InlineData(NavigationDestination.Servers, ShellDestination.Servers)]
     [InlineData(NavigationDestination.Detail, ShellDestination.Servers)]
     [InlineData(NavigationDestination.Workloads, ShellDestination.Servers)]
+    [InlineData(NavigationDestination.ServerPage, ShellDestination.Servers)] // M16: a server's page keeps Servers selected
     [InlineData(NavigationDestination.History, ShellDestination.History)]
     [InlineData(NavigationDestination.Settings, ShellDestination.Settings)]
     [InlineData(NavigationDestination.SettingsData, ShellDestination.Settings)]

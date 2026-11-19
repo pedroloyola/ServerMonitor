@@ -15,6 +15,16 @@ namespace ServerMonitor.App.Services;
 public sealed record RealizedShellContribution(string Id, string Title, object View, string? IconPathData = null);
 
 /// <summary>
+/// The row the shell draws for a server page (<see cref="ServerPage"/>) on a server's detail page: what is known before
+/// the page is opened. No view: <see cref="ShellContributionHost.TryCreateServerPage"/> creates one per visit.
+/// </summary>
+/// <param name="Id">The server page id, also its route.</param>
+/// <param name="Title">The title, resolved from the page's resource key (the row, the page and its way back).</param>
+/// <param name="Detail">The row's second line, or null for none.</param>
+/// <param name="IconPathData">The row's icon as path markup data, or null for the shell's generic icon.</param>
+public sealed record ServerPageEntry(string Id, string Title, string? Detail, string? IconPathData);
+
+/// <summary>
 /// A link the shell kept (<see cref="ShellLink"/>): its target is a page the shell shows. The current label and hint
 /// are read through <see cref="ShellContributionHost.LabelOf"/> and <see cref="ShellContributionHost.HintOf"/>.
 /// </summary>
@@ -82,6 +92,11 @@ public sealed class RealizedShellLink
 /// <see cref="ShellContribution"/> for what that asks of a view).
 /// </para>
 /// <para>
+/// A server page (M16, <see cref="ServerPage"/>) has a row on each server's detail page (<see cref="ServerPageEntries"/>)
+/// and a view created per visit, for that server (<see cref="TryCreateServerPage"/>); the shell's own page around it
+/// draws the way back to the server. Its view may be any element, like a server detail section's.
+/// </para>
+/// <para>
 /// Only composed modules contribute (<see cref="FeatureComposition"/> applies the same gate as for their services),
 /// so this type never decides who sees what: it only displays what composition kept.
 /// </para>
@@ -117,6 +132,8 @@ public sealed class ShellContributionHost
     private IReadOnlyList<RealizedShellContribution>? _unlistedPages;
     private IReadOnlyList<RealizedShellLink>? _links;
     private IReadOnlyList<ServerDetailSection>? _arrangedServerDetailSections;
+    private IReadOnlyList<ServerPage>? _arrangedServerPages;
+    private IReadOnlyList<ServerPageEntry>? _serverPageEntries;
     private readonly HashSet<string> _failedLinkText = new(StringComparer.Ordinal);
     private readonly HashSet<string> _untitled = new(StringComparer.Ordinal);
     private bool _realizing;
@@ -361,6 +378,82 @@ public sealed class ShellContributionHost
         }
 
         return arranged;
+    }
+
+    /// <summary>
+    /// The rows of the contributed server pages, in display order, arranged once (UI thread, the first time a detail page
+    /// asks): the same rule as every kind (first id wins, then order and id), with the built-in navigation ids and the
+    /// detail page's built-in cards reserved. Titles and icons are read here, inside the host's isolation; no factory runs.
+    /// With no server pages the list is empty and the detail page is unchanged.
+    /// </summary>
+    public IReadOnlyList<ServerPageEntry> ServerPageEntries => _serverPageEntries ??= RealizeServerPageEntries();
+
+    /// <summary>True when <paramref name="id"/> is a server page the shell shows a row for.</summary>
+    public bool IsServerPage(string? id) =>
+        id is not null && ServerPageEntries.Any(entry => string.Equals(entry.Id, id, StringComparison.Ordinal));
+
+    /// <summary>
+    /// Creates the view of server page <paramref name="id"/> for <paramref name="serverId"/>, now (UI thread), for this
+    /// visit only; nothing is cached. False for an id that has no row, and for a factory that throws or returns no view
+    /// the shell can show (like a server detail section's), which is logged with the id and exception type only.
+    /// </summary>
+    public bool TryCreateServerPage(string id, Guid serverId, out ServerPageEntry entry, out object view)
+    {
+        entry = ServerPageEntries.FirstOrDefault(candidate => string.Equals(candidate.Id, id, StringComparison.Ordinal))!;
+        view = null!;
+        if (entry is null)
+        {
+            return false;
+        }
+
+        var page = _arrangedServerPages!.First(candidate => string.Equals(candidate.Id, id, StringComparison.Ordinal));
+        try
+        {
+            var created = page.CreateView(serverId);
+            if (created is null || !_canShowSectionView(created))
+            {
+                _logger.LogError(
+                    "A contributed server page was not opened: its factory returned no view the shell can show (a new one, with no parent, of the required type). Id: {Id}.",
+                    id);
+                return false;
+            }
+
+            view = created;
+            return true;
+        }
+        catch (Exception exception)
+        {
+            // Never fatal: the user stays where they were.
+            _logger.LogError(
+                "A contributed server page was not opened: its factory failed. Id: {Id}. Exception type: {ExceptionType}.",
+                id, exception.GetType().Name);
+            return false;
+        }
+    }
+
+    private IReadOnlyList<ServerPageEntry> RealizeServerPageEntries()
+    {
+        if (_contributions.ServerPages.Count == 0)
+        {
+            _arrangedServerPages = [];
+            return [];
+        }
+
+        _arrangedServerPages = ShellContributionOrdering.Arrange(
+            _contributions.ServerPages, [.. BuiltInNavigationIds, .. BuiltInServerDetailSectionIds], out var rejected);
+        foreach (var rejection in rejected)
+        {
+            _logger.LogWarning("A contributed server page was left out: {Reason}. Id: {Id}.", rejection.Reason, rejection.Page.Id);
+        }
+
+        return
+        [
+            .. _arrangedServerPages.Select(page => new ServerPageEntry(
+                page.Id,
+                TitleOf(page.Id, page.TitleResourceKey, "server page"),
+                page.DetailResourceKey is { } detail ? Lookup(detail) : null,
+                IconOf(page.Id, page.IconPathData, "server page"))),
+        ];
     }
 
     /// <summary>

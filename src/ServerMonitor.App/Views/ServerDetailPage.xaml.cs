@@ -2,6 +2,7 @@ using System.ComponentModel;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Controls;
+using ServerMonitor.App.Controls.Primitives;
 using ServerMonitor.App.Services;
 using ServerMonitor.App.ViewModels;
 
@@ -17,6 +18,7 @@ public sealed partial class ServerDetailPage : Page, IServerDetailView, IDisposa
 {
     private readonly ServerEditorReturnFocus? _editorReturnFocus;
     private readonly ShellContributionHost? _contributions;
+    private readonly List<SaListRow> _serverPageRows = [];
 
     public ServerDetailPage(
         ServerDetailViewModel viewModel,
@@ -41,6 +43,44 @@ public sealed partial class ServerDetailPage : Page, IServerDetailView, IDisposa
     {
         ViewModel.Load(serverId, origin);
         AddContributedSections(serverId);
+        AddServerPageRows();
+    }
+
+    /// <summary>
+    /// M16: one rich row on the Explorar card per contributed server page, like Histórico and Serviços e containers (the
+    /// same SaListRow). Explorar 112:1931 has no glyph for such a row, so when the module gives none the icon slot stays
+    /// empty (the title keeps the built-in rows' alignment; the row's own chevron is its only arrow). The row only asks
+    /// the view model to open the page; no module code runs here (the host already resolved titles). With none the card
+    /// keeps its two rows.
+    /// </summary>
+    private void AddServerPageRows()
+    {
+        foreach (var row in _serverPageRows)
+        {
+            ExploreRows.Children.Remove(row);
+        }
+
+        _serverPageRows.Clear();
+        if (_contributions is null)
+        {
+            return;
+        }
+
+        foreach (var page in _contributions.ServerPageEntries)
+        {
+            var row = new SaListRow
+            {
+                Variant = SaListRowVariant.Rich,
+                Title = page.Title,
+                Detail = page.Detail ?? string.Empty,
+                IconData = page.IconPathData,
+                Tag = page.Id,
+            };
+            var id = page.Id;
+            row.Click += (_, _) => ViewModel.OpenServerPage(id);
+            _serverPageRows.Add(row);
+            ExploreRows.Children.Add(row);
+        }
     }
 
     /// <summary>
@@ -102,7 +142,7 @@ public sealed partial class ServerDetailPage : Page, IServerDetailView, IDisposa
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
-        var returnTarget = ViewModel.TakeReturnFocus();
+        var returnTarget = ViewModel.TakeReturnFocus(out var pageId);
         // UI.7 B-5: back from the editor without saving ("Voltar ao detalhe", Cancelar, Esc), focus returns to Editar.
         var editorOpener = _editorReturnFocus?.Take(NavigationDestination.Detail);
         if (ShellPageFocus.GetKeepSidebar(this)) return;
@@ -110,6 +150,7 @@ public sealed partial class ServerDetailPage : Page, IServerDetailView, IDisposa
         {
             ServerDetailReturnTarget.History => HistoryRow,
             ServerDetailReturnTarget.Workloads => WorkloadsRow,
+            ServerDetailReturnTarget.ServerPage => _serverPageRows.Find(row => Equals(row.Tag, pageId)),
             _ => editorOpener is null ? null : FindName(editorOpener) as Control
         };
 
