@@ -720,6 +720,8 @@ public partial class App : Application
         // remote-probe results of an older generation are dropped. The scheduler holds the composed remote probes
         // (none in this repository, so a poll runs exactly the built-in commands).
         services.AddSingleton<HistoryGeneration>();
+        // Which watched-only probes a page has on screen now (ADR-027 §1): the scheduler reads it, a page holds it.
+        services.AddSingleton<RemoteProbeWatch>();
 
         // M10 local history. Default: unavailable. The real stack (in the non-QA branch
         // below) or a QA harness overrides this registration; every composition can resolve
@@ -837,7 +839,8 @@ public partial class App : Application
             services.AddSingleton(sp => RemoteProbeComposition.CreateScheduler(
                 sp.GetServices<IRemoteProbe>(),
                 sp.GetRequiredService<HistoryGeneration>(),
-                sp.GetRequiredService<ILogger<RemoteProbeScheduler>>()));
+                sp.GetRequiredService<ILogger<RemoteProbeScheduler>>(),
+                sp.GetRequiredService<RemoteProbeWatch>()));
             services.AddSingleton(sp => new MonitoringEngine(
                 sp.GetRequiredService<IServerService>(),
                 sp.GetRequiredService<IServerMetricsStore>(),

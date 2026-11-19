@@ -22,11 +22,17 @@ namespace ServerMonitor.Core.Probes;
 /// (<see cref="Forget"/>) cancels it, and so does every clear or reset of history (<see cref="HistoryGeneration.Advance"/>),
 /// which also makes outcomes from before the clear stale, so they are dropped.
 /// </para>
+/// <para>
+/// A watched-only probe (<see cref="IRemoteProbe.RunsOnlyWhileWatched"/>) is due on a server only while the
+/// <see cref="RemoteProbeWatch"/> holds a watch of it for that server; without one given here it is never due. While it is
+/// not watched it is skipped without being marked as run, so it is due on the first poll after a watch starts.
+/// </para>
 /// </summary>
 public sealed class RemoteProbeScheduler
 {
     private readonly Registration[] _registrations;
     private readonly HistoryGeneration _generation;
+    private readonly RemoteProbeWatch? _watch;
     private readonly TimeProvider _timeProvider;
     private readonly object _gate = new();
     private readonly Dictionary<Guid, RemoteProbeReservation> _inFlight = [];
@@ -35,11 +41,13 @@ public sealed class RemoteProbeScheduler
     public RemoteProbeScheduler(
         IEnumerable<IRemoteProbe> probes,
         HistoryGeneration generation,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        RemoteProbeWatch? watch = null)
     {
         ArgumentNullException.ThrowIfNull(probes);
         _generation = generation ?? throw new ArgumentNullException(nameof(generation));
         _timeProvider = timeProvider ?? TimeProvider.System;
+        _watch = watch;
 
         var accepted = new List<Registration>();
         var rejected = new List<string>();
@@ -171,6 +179,8 @@ public sealed class RemoteProbeScheduler
             var now = _timeProvider.GetUtcNow();
             var due = _registrations
                 .Where(registration => registration.OperatingSystem == operatingSystem)
+                .Where(registration => !registration.RunsOnlyWhileWatched
+                    || _watch?.IsWatched(reservation.ServerId, registration.Request.ProbeId) == true)
                 .Select(registration => (Registration: registration,
                     LastRun: _lastRun.TryGetValue((reservation.ServerId, registration.Index), out var at) ? at : (DateTimeOffset?)null))
                 .Where(candidate => candidate.LastRun is null || now - candidate.LastRun.Value >= candidate.Registration.MinimumInterval)
@@ -239,6 +249,7 @@ public sealed class RemoteProbeScheduler
         int limit;
         TimeSpan timeout;
         TimeSpan interval;
+        bool watchedOnly;
         try
         {
             // Read once and kept: the probe cannot change what runs after this point.
@@ -248,6 +259,7 @@ public sealed class RemoteProbeScheduler
             limit = probe.OutputLimitBytes;
             timeout = probe.Timeout;
             interval = probe.MinimumInterval;
+            watchedOnly = probe.RunsOnlyWhileWatched;
         }
         catch (Exception exception)
         {
@@ -266,6 +278,7 @@ public sealed class RemoteProbeScheduler
             new RemoteProbeRequest(id!, command!, limit, timeout),
             operatingSystem,
             interval,
+            watchedOnly,
             Index: -1);
         return true;
     }
@@ -346,6 +359,7 @@ public sealed class RemoteProbeScheduler
         RemoteProbeRequest Request,
         ServerOperatingSystem OperatingSystem,
         TimeSpan MinimumInterval,
+        bool RunsOnlyWhileWatched,
         int Index);
 }
 
