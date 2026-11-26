@@ -14,7 +14,7 @@ using ServerMonitor.Infrastructure.Collectors.Workloads;
 namespace ServerMonitor.Infrastructure.SSH;
 
 public sealed class SshConnectionService
-    : ISshConnectionService, ILinuxMetricsRemoteSource, IMacOsMetricsRemoteSource, IWorkloadRemoteSource
+    : ISshConnectionService, ILinuxMetricsRemoteSource, IMacOsMetricsRemoteSource, IWorkloadRemoteSource, IRemoteReadTransport
 {
     private readonly IHostKeyTrustStore _hostKeyTrustStore;
     private readonly IRoutedHostKeyTrustStore _routedHostKeyTrustStore;
@@ -234,6 +234,39 @@ public sealed class SshConnectionService
         };
     }
 
+    /// <summary>
+    /// One registered read in its own session, by the same path as a collection. The operation's deadline is the
+    /// connection timeout plus the read's own timeout. Only ids and the state are logged, as for every operation.
+    /// </summary>
+    async Task<RemoteReadTransportResult> IRemoteReadTransport.ExecuteAsync(
+        Server server,
+        RemoteReadExec exec,
+        TimeSpan connectionTimeout,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(server);
+        ArgumentNullException.ThrowIfNull(exec);
+
+        RemoteReadExecution? execution = null;
+        var request = new SshConnectionRequest
+        {
+            Server = server,
+            Timeout = connectionTimeout + exec.Timeout
+        };
+
+        var connectionResult = await ExecuteAsync(
+                request,
+                SshSessionOperation.RunRead,
+                TimeSpan.Zero,
+                session => execution = session.RemoteRead,
+                default,
+                cancellationToken,
+                read: exec)
+            .ConfigureAwait(false);
+
+        return new RemoteReadTransportResult(connectionResult.ErrorCode, execution);
+    }
+
     private async Task<SshConnectionResult> ExecuteAsync(
         SshConnectionRequest request,
         SshSessionOperation operation,
@@ -241,7 +274,8 @@ public sealed class SshConnectionService
         Action<SshSessionResult>? captureSession,
         WorkloadCollectionPlan workloadPlan,
         CancellationToken cancellationToken,
-        PhasedSession? phased = null)
+        PhasedSession? phased = null,
+        RemoteReadExec? read = null)
     {
         var stopwatch = Stopwatch.StartNew();
 
@@ -262,7 +296,8 @@ public sealed class SshConnectionService
                     stopwatch,
                     stages,
                     cancellationToken,
-                    phased)
+                    phased,
+                    read)
                 .ConfigureAwait(false);
         }
 
@@ -373,7 +408,8 @@ public sealed class SshConnectionService
                     cpuSampleInterval,
                     workloadPlan,
                     linkedSource.Token,
-                    phased)
+                    phased,
+                    read)
                 .ConfigureAwait(false);
 
             // Published from the callback: the session's return only closed phase 2, never a second publication.
@@ -490,7 +526,8 @@ public sealed class SshConnectionService
         Stopwatch stopwatch,
         StageTracker stages,
         CancellationToken cancellationToken,
-        PhasedSession? phased)
+        PhasedSession? phased,
+        RemoteReadExec? read = null)
     {
         var server = request.Server;
         if (!TryValidate(request, out var targetEndpoint)
@@ -682,7 +719,8 @@ public sealed class SshConnectionService
                         cpuSampleInterval,
                         workloadPlan,
                         token,
-                        phased)
+                        phased,
+                        read)
                     .ConfigureAwait(false);
 
                 return phased?.Published ?? Finish(routedResult, ran);
@@ -876,7 +914,8 @@ public sealed class SshConnectionService
         TimeSpan cpuSampleInterval,
         WorkloadCollectionPlan workloadPlan,
         CancellationToken cancellationToken,
-        PhasedSession? phased = null)
+        PhasedSession? phased = null,
+        RemoteReadExec? read = null)
     {
         SecretValue? storedSecret = null;
         try
@@ -988,6 +1027,9 @@ public sealed class SshConnectionService
                         .ConfigureAwait(false),
                     SshSessionOperation.CollectWorkloads => await session
                         .CollectWorkloadsAsync(verifier, workloadPlan, cancellationToken)
+                        .ConfigureAwait(false),
+                    SshSessionOperation.RunRead when read is not null => await session
+                        .RunReadAsync(verifier, read, cancellationToken)
                         .ConfigureAwait(false),
                     _ => Failure(SshConnectionErrorCode.Unexpected)
                 };
@@ -1232,6 +1274,7 @@ public sealed class SshConnectionService
         DetectOperatingSystem,
         CollectLinuxMetrics,
         CollectMacOsMetrics,
-        CollectWorkloads
+        CollectWorkloads,
+        RunRead
     }
 }

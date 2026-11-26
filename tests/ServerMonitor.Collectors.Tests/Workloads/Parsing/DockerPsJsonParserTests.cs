@@ -35,6 +35,45 @@ public sealed class DockerPsJsonParserTests
     }
 
     [Fact]
+    public void Parse_keeps_a_full_64_hex_id_beside_the_short_id()
+    {
+        const string full = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+        var line = $$"""{"ID":"{{full}}","Names":"/web","Image":"nginx","State":"running","Status":"Up"}""";
+
+        var container = Assert.Single(DockerPsJsonParser.Parse(line).Containers);
+
+        Assert.Equal("0123456789ab", container.ContainerId);
+        Assert.Equal(full, container.FullContainerId);
+    }
+
+    [Theory]
+    [InlineData("abc123def4567890abcdef")]
+    [InlineData("0123456789ab")]
+    [InlineData("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcde")]
+    [InlineData("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0")]
+    [InlineData("0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF")]
+    [InlineData("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdeg")]
+    [InlineData("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\\n")]
+    [InlineData("sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab")]
+    public void Parse_leaves_the_full_id_null_for_anything_but_64_lower_case_hex(string rawId)
+    {
+        var line = $$"""{"ID":"{{rawId}}","Names":"/web","Image":"nginx","State":"running","Status":"Up"}""";
+
+        var container = Assert.Single(DockerPsJsonParser.Parse(line).Containers);
+
+        Assert.Null(container.FullContainerId);
+    }
+
+    [Fact]
+    public void Parse_representative_fixture_carries_no_full_id_for_short_ids()
+    {
+        var result = DockerPsJsonParser.Parse(FixtureText.Read("docker-ps-representative.ndjson"));
+
+        Assert.All(result.Containers, container =>
+            Assert.True(container.FullContainerId is null || container.FullContainerId.StartsWith(container.ContainerId, StringComparison.Ordinal)));
+    }
+
+    [Fact]
     public void Parse_representative_fixture_covers_running_stopped_and_unhealthy()
     {
         var result = DockerPsJsonParser.Parse(FixtureText.Read("docker-ps-representative.ndjson"));

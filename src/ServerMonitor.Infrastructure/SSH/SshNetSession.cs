@@ -77,6 +77,15 @@ internal sealed class SshNetSession(
         CancellationToken cancellationToken) =>
         RunAsync(SessionOperation.CollectWorkloads, hostKeyVerifier, TimeSpan.Zero, plan, cancellationToken);
 
+    public Task<SshSessionResult> RunReadAsync(
+        Func<HostKeyIdentity, bool> hostKeyVerifier,
+        RemoteReadExec read,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(read);
+        return RunAsync(SessionOperation.RunRead, hostKeyVerifier, TimeSpan.Zero, default, cancellationToken, read: read);
+    }
+
     public void Dispose()
     {
         if (_disposed)
@@ -96,7 +105,8 @@ internal sealed class SshNetSession(
         TimeSpan cpuSampleInterval,
         WorkloadCollectionPlan workloadPlan,
         CancellationToken cancellationToken,
-        SshSessionPhases? phases = null)
+        SshSessionPhases? phases = null,
+        RemoteReadExec? read = null)
     {
         ArgumentNullException.ThrowIfNull(hostKeyVerifier);
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -144,6 +154,7 @@ internal sealed class SshNetSession(
             LinuxMetricsRawData? linuxMetrics = null;
             MacOsMetricsRawData? macOsMetrics = null;
             WorkloadRawData? workloads = null;
+            RemoteReadExecution? remoteRead = null;
             if (operation == SessionOperation.DetectOperatingSystem)
             {
                 var uname = await TryExecuteCommandAsync(
@@ -170,6 +181,10 @@ internal sealed class SshNetSession(
                         cancellationToken)
                     .ConfigureAwait(false);
             }
+            else if (operation == SessionOperation.RunRead)
+            {
+                remoteRead = await ExecuteReadAsync(read!, cancellationToken).ConfigureAwait(false);
+            }
 
             var result = new SshSessionResult
             {
@@ -179,6 +194,7 @@ internal sealed class SshNetSession(
                 LinuxMetrics = linuxMetrics,
                 MacOsMetrics = macOsMetrics,
                 Workloads = workloads,
+                RemoteRead = remoteRead,
                 IdentificationReceived = true,
                 AuthenticationCompleted = true,
                 ConnectionEstablished = true
@@ -477,6 +493,45 @@ internal sealed class SshNetSession(
             outcome.OutputExceededLimit);
     }
 
+    /// <summary>
+    /// One registered read: ONE exec of the constant <c>sh -s</c>, with the fixed first line and the script on standard
+    /// input (<see cref="RemoteReadInvocation"/>), with the read's own output cap and timeout. Any other command text is
+    /// refused before anything runs. Only standard output is kept; standard error is dropped here. Nothing here logs
+    /// the standard input or the output.
+    /// </summary>
+    private async Task<RemoteReadExecution> ExecuteReadAsync(RemoteReadExec read, CancellationToken cancellationToken)
+    {
+        if (!string.Equals(read.CommandText, ProbeShellInvocation.CommandText, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("A remote read runs only as the constant shell invocation.");
+        }
+
+        using var timeout = new CancellationTokenSource(read.Timeout);
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeout.Token);
+        try
+        {
+            var outcome = await ExecuteDetailedAsync(
+                    read.CommandText,
+                    read.OutputLimitBytes,
+                    read.Timeout,
+                    linked.Token,
+                    read.StandardInput)
+                .ConfigureAwait(false);
+            return new RemoteReadExecution(
+                outcome.WasExecuted,
+                outcome.ExitStatus,
+                outcome.OutputExceededLimit ? null : outcome.StandardOutput,
+                outcome.OutputExceededLimit,
+                TimedOut: false);
+        }
+        catch (Exception exception) when (!cancellationToken.IsCancellationRequested
+                                          && (timeout.IsCancellationRequested
+                                              || exception is Renci.SshNet.Common.SshOperationTimeoutException))
+        {
+            return new RemoteReadExecution(false, null, null, false, TimedOut: true);
+        }
+    }
+
     private async Task<RemoteCommandOutcome> ExecuteDetailedAsync(
         string commandText,
         int outputLimit,
@@ -653,6 +708,7 @@ internal sealed class SshNetSession(
         DetectOperatingSystem,
         CollectLinuxMetrics,
         CollectMacOsMetrics,
-        CollectWorkloads
+        CollectWorkloads,
+        RunRead
     }
 }

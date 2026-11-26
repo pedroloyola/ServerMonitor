@@ -92,6 +92,8 @@ public static partial class DockerPsJsonParser
         return new ContainerInfo
         {
             ContainerId = WorkloadTextSanitizer.Sanitize(ShortId(rawId)),
+            // Taken from the RAW id, before ShortId cuts it; anything but exactly 64 lower-case hex is left null.
+            FullContainerId = FullIdPattern().IsMatch(rawId) ? rawId : null,
             Name = WorkloadTextSanitizer.Sanitize(FirstName(ReadString(root, "Names"))),
             Image = WorkloadTextSanitizer.Sanitize(ReadString(root, "Image")),
             State = MapState(ReadString(root, "State")),
@@ -199,4 +201,7 @@ public static partial class DockerPsJsonParser
     [GeneratedRegex(
         @"^\s*(?<date>\d{4}-\d{2}-\d{2})[ T](?<time>\d{2}:\d{2}:\d{2})\s*(?<oh>[+-]\d{2}):?(?<om>\d{2})")]
     private static partial Regex CreatedAtPattern();
+
+    [GeneratedRegex(@"\A[0-9a-f]{64}\z", RegexOptions.CultureInvariant)]
+    private static partial Regex FullIdPattern();
 }
