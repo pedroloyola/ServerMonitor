@@ -121,7 +121,8 @@ nem geração do histórico, e nunca conta no orçamento de uma recolha.
   mostrado; `ContainerId` continua a ser o id curto de 12 caracteres.
 - **Sessão.** Cada leitura abre a sua própria sessão pelo caminho de sempre: verificação da chave do host, jump host e
   credencial libertada no mesmo `finally`. Tem 15 s para ligar, mais o timeout da própria leitura. O stderr é
-  descartado. O output é limitado ao limite da leitura e devolvido só a quem a pediu.
+  lido até ao fim e descartado, seja qual for o tamanho, por isso um script que escreve muito no stderr (como o
+  `docker logs`) continua a devolver o seu output. O output é limitado ao limite da leitura e devolvido só a quem a pediu.
 - **Resultado** (`RemoteReadOutcome`): `Completed`, `Refused` (com o motivo), `OutputExceededLimit`, `TimedOut` ou
   `Failed`. O `ToString` do resultado, do exec e do registo nunca inclui o argumento, o script nem o output, e nada no
   caminho de uma leitura os escreve no log.

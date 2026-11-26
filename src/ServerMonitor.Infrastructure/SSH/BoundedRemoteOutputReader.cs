@@ -31,6 +31,19 @@ internal static class BoundedRemoteOutputReader
             await buffer.WriteAsync(chunk.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
         }
     }
+
+    /// <summary>Reads <paramref name="stream"/> to its end and keeps nothing, at any size.</summary>
+    internal static async Task<byte[]> DrainAsync(Stream stream, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(stream);
+
+        var chunk = new byte[4096];
+        while (await stream.ReadAsync(chunk.AsMemory(), cancellationToken).ConfigureAwait(false) != 0)
+        {
+        }
+
+        return [];
+    }
 }
 
 internal sealed class RemoteOutputLimitException : Exception;
