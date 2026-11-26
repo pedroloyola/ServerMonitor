@@ -99,6 +99,76 @@ public sealed class RemoteProbeCompositionTests
         Assert.Contains("sp.GetRequiredService<RemoteProbeWatch>()));", app, StringComparison.Ordinal);
     }
 
+    private sealed class Read(string id, string command) : IRemoteRead
+    {
+        public string Id { get; } = id;
+
+        public ServerOperatingSystem OperatingSystem => ServerOperatingSystem.Linux;
+
+        public string Command { get; } = command;
+
+        public RemoteReadArgumentKind ArgumentKind => RemoteReadArgumentKind.SystemdUnit;
+
+        public int OutputLimitBytes => 1024;
+
+        public TimeSpan Timeout => TimeSpan.FromSeconds(5);
+    }
+
+    [Fact]
+    public void Each_rejected_read_is_logged_once_as_a_warning_without_its_script()
+    {
+        var logger = new RecordingLogger();
+        var reads = new IRemoteRead[]
+        {
+            new Read("good", "journalctl -u \"$1\""),
+            new Read("no-arg", Decoy),                                  // no "$1": rejected
+            new Read("two", Decoy + " \"$1\" \"$2\""),                  // $2: rejected
+            new Read("probe.id", "journalctl -u \"$1\""),               // a probe's id: rejected
+        };
+
+        var registry = RemoteProbeComposition.CreateReadRegistry(reads, ["probe.id"], logger);
+
+        Assert.Equal(1, registry.Count);
+        var warnings = logger.Entries.Where(entry => entry.Level == LogLevel.Warning).ToList();
+        Assert.Equal(3, warnings.Count);
+        Assert.All(warnings, warning => Assert.StartsWith("A remote read was left out: read #", warning.Message, StringComparison.Ordinal));
+        Assert.Contains(warnings, warning => warning.Message.Contains("read #1:", StringComparison.Ordinal));
+        Assert.Contains(warnings, warning => warning.Message.Contains("read #2:", StringComparison.Ordinal));
+        Assert.Contains(warnings, warning => warning.Message.Contains("read #3: a probe already has its id", StringComparison.Ordinal));
+        Assert.DoesNotContain(logger.Entries, entry => entry.Message.Contains("decoy", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(logger.Entries, entry => entry.Message.Contains("journalctl", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Nothing_is_logged_when_no_read_is_registered()
+    {
+        var logger = new RecordingLogger();
+
+        var registry = RemoteProbeComposition.CreateReadRegistry([], [], logger);
+
+        Assert.Equal(0, registry.Count);
+        Assert.Empty(logger.Entries);
+    }
+
+    [Fact]
+    public void The_app_builds_its_read_runner_through_the_logging_composition_over_the_probe_ids()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "ServerMonitor.slnx")))
+        {
+            directory = directory.Parent;
+        }
+
+        Assert.NotNull(directory);
+        var app = File.ReadAllText(Path.Combine(directory.FullName, "src", "ServerMonitor.App", "App.xaml.cs"));
+        var composition = File.ReadAllText(Path.Combine(directory.FullName, "src", "ServerMonitor.App", "Services", "RemoteProbeComposition.cs"));
+
+        Assert.Contains("services.AddSingleton<IRemoteReadRunner>(sp => RemoteProbeComposition.CreateReadRunner(", app, StringComparison.Ordinal);
+        Assert.DoesNotContain("new RemoteReadRunner(", app, StringComparison.Ordinal);
+        Assert.DoesNotContain("new RemoteReadRegistry(", app, StringComparison.Ordinal);
+        Assert.Contains("CreateReadRegistry(reads, scheduler.ProbeIds, logger)", composition, StringComparison.Ordinal);
+    }
+
     private sealed class PageProbe : IRemoteProbe
     {
         public string Id => "page";

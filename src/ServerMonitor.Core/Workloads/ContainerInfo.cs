@@ -12,6 +12,12 @@ public sealed record ContainerInfo
     /// <summary>Short container id (sanitized). Never a secret.</summary>
     public required string ContainerId { get; init; }
 
+    /// <summary>
+    /// The full container id, exactly 64 lower-case hex characters, or <c>null</c> when the list did not carry one in
+    /// that form. Used only to check a registered read's argument against the latest list; never shown.
+    /// </summary>
+    public string? FullContainerId { get; init; }
+
     /// <summary>Container name (sanitized).</summary>
     public required string Name { get; init; }
 

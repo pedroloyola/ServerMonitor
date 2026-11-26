@@ -905,6 +905,51 @@ public sealed class SshConnectionServiceTests
         Assert.Equal(0, fixture.Factory.AuthenticatedCount);
     }
 
+    [Fact]
+    public async Task A_read_runs_its_exec_unchanged_in_one_session_after_the_host_key_check()
+    {
+        var fixture = new Fixture
+        {
+            TrustedHostKey = Trusted(Identity(1))
+        };
+        fixture.Credentials.Secret = "correct horse battery staple";
+        fixture.Factory.Enqueue(new FakeSession(Identity(1), SshConnectionErrorCode.AuthenticationFailed));
+        var session = new FakeSession(Identity(1), SshConnectionErrorCode.None)
+        {
+            ReadExecution = new RemoteReadExecution(true, 0, "out", false, false)
+        };
+        fixture.Factory.Enqueue(session);
+        var exec = new RemoteReadExec("sh -s", "set -- 'a.service'\necho \"$1\"\n"u8.ToArray(), 1024, TimeSpan.FromSeconds(5));
+
+        var result = await ((IRemoteReadTransport)fixture.Service)
+            .ExecuteAsync(Request().Server, exec, TimeSpan.FromSeconds(2), CancellationToken.None);
+
+        Assert.Equal(SshConnectionErrorCode.None, result.ErrorCode);
+        Assert.Equal("out", result.Execution?.StandardOutput);
+        Assert.Same(exec, session.Read);
+        Assert.Equal(new[] { "probe", "password" }, fixture.Factory.Calls);
+        Assert.Equal(1, fixture.Credentials.ReadCount);
+        Assert.NotEmpty(fixture.Logger.Messages);
+        Assert.DoesNotContain(fixture.Logger.Messages, message =>
+            message.Contains("a.service", StringComparison.Ordinal) || message.Contains("echo", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task A_read_on_an_unknown_host_key_never_reads_the_credential_nor_runs()
+    {
+        var fixture = new Fixture();
+        fixture.Factory.Enqueue(new FakeSession(Identity(1), SshConnectionErrorCode.HostKeyMismatch));
+        var exec = new RemoteReadExec("sh -s", "set -- 'a.service'\n"u8.ToArray(), 1024, TimeSpan.FromSeconds(5));
+
+        var result = await ((IRemoteReadTransport)fixture.Service)
+            .ExecuteAsync(Request().Server, exec, TimeSpan.FromSeconds(2), CancellationToken.None);
+
+        Assert.Equal(SshConnectionErrorCode.HostKeyUnknown, result.ErrorCode);
+        Assert.Null(result.Execution);
+        Assert.Equal(0, fixture.Credentials.ReadCount);
+        Assert.Equal(0, fixture.Factory.AuthenticatedCount);
+    }
+
     private static SshConnectionRequest Request(
         Func<Server, Server>? configure = null,
         TimeSpan? timeout = null)
@@ -1206,6 +1251,19 @@ public sealed class SshConnectionServiceTests
             CollectWorkloadsWasCalled = true;
             WorkloadPlan = plan;
             return RunAsync(hostKeyVerifier, cancellationToken);
+        }
+
+        public RemoteReadExecution? ReadExecution { get; init; }
+
+        public RemoteReadExec? Read { get; private set; }
+
+        public async Task<SshSessionResult> RunReadAsync(
+            Func<HostKeyIdentity, bool> hostKeyVerifier,
+            RemoteReadExec read,
+            CancellationToken cancellationToken)
+        {
+            Read = read;
+            return await RunAsync(hostKeyVerifier, cancellationToken) with { RemoteRead = ReadExecution };
         }
 
         public void Dispose()

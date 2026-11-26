@@ -124,6 +124,17 @@ internal interface ISshSession : IDisposable
         return result;
     }
 
+    /// <summary>
+    /// One registered read in this one session: ONE exec of <see cref="RemoteReadExec.CommandText"/>, which must be the
+    /// constant <see cref="ProbeShellInvocation.CommandText"/>, with <see cref="RemoteReadExec.StandardInput"/> on standard
+    /// input. The result carries <see cref="SshSessionResult.RemoteRead"/>. This default runs nothing and fails.
+    /// </summary>
+    Task<SshSessionResult> RunReadAsync(
+        Func<HostKeyIdentity, bool> hostKeyVerifier,
+        RemoteReadExec read,
+        CancellationToken cancellationToken) =>
+        Task.FromResult(new SshSessionResult { ErrorCode = SshConnectionErrorCode.Unexpected });
+
     /// <summary>Two-phase macOS collection in this one session (see <see cref="SshSessionPhases"/>).</summary>
     async Task<SshSessionResult> CollectMacOsMetricsAsync(
         Func<HostKeyIdentity, bool> hostKeyVerifier,
@@ -182,6 +193,9 @@ internal sealed record SshSessionResult
     public MacOsMetricsRawData? MacOsMetrics { get; init; }
 
     public WorkloadRawData? Workloads { get; init; }
+
+    /// <summary>What a registered read reported, for a read session that ran its exec.</summary>
+    public RemoteReadExecution? RemoteRead { get; init; }
 
     public string? ExceptionType { get; init; }
 

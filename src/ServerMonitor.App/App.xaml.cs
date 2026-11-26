@@ -841,6 +841,14 @@ public partial class App : Application
                 sp.GetRequiredService<HistoryGeneration>(),
                 sp.GetRequiredService<ILogger<RemoteProbeScheduler>>(),
                 sp.GetRequiredService<RemoteProbeWatch>()));
+            // Registered one-argument reads, run once on request in their own session; none is registered here.
+            services.AddSingleton<IRemoteReadRunner>(sp => RemoteProbeComposition.CreateReadRunner(
+                sp.GetServices<IRemoteRead>(),
+                sp.GetRequiredService<RemoteProbeScheduler>(),
+                sp.GetRequiredService<IServerService>(),
+                sp.GetRequiredService<IServerWorkloadStore>(),
+                sp.GetRequiredService<SshConnectionService>(),
+                sp.GetRequiredService<ILogger<RemoteReadRunner>>()));
             services.AddSingleton(sp => new MonitoringEngine(
                 sp.GetRequiredService<IServerService>(),
                 sp.GetRequiredService<IServerMetricsStore>(),

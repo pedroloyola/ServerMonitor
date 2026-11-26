@@ -83,6 +83,9 @@ public sealed class RemoteProbeScheduler
     /// <summary>Why each left-out probe was left out, by position (never its command). For a log line.</summary>
     public IReadOnlyList<string> Rejected { get; }
 
+    /// <summary>The ids of the accepted probes, so registered reads can be kept from reusing one.</summary>
+    public IReadOnlyCollection<string> ProbeIds => [.. _registrations.Select(registration => registration.Request.ProbeId)];
+
     /// <summary>
     /// Reserves the second phase of one poll, or returns null when there are no probes, the server's token is already
     /// cancelled, or the server's previous second phase is still running.
@@ -283,7 +286,7 @@ public sealed class RemoteProbeScheduler
         return true;
     }
 
-    private static string? Validate(
+    internal static string? Validate(
         string? id,
         ServerOperatingSystem operatingSystem,
         string? command,
@@ -330,7 +333,7 @@ public sealed class RemoteProbeScheduler
     private static bool IsLineOrParagraphSeparator(char character) =>
         character == (char)0x2028 || character == (char)0x2029;
 
-    private static bool IsWellFormedId(string? id)
+    internal static bool IsWellFormedId(string? id)
     {
         if (string.IsNullOrEmpty(id) || id.Length > RemoteProbeLimits.MaxIdLength || id[0] == '.' || id[^1] == '.')
         {
