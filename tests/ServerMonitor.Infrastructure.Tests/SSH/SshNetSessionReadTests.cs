@@ -1,4 +1,6 @@
+using System.Reflection;
 using System.Text;
+using Microsoft.Extensions.Logging;
 using Renci.SshNet;
 using ServerMonitor.Core.Enums;
 using ServerMonitor.Core.Probes;
@@ -151,6 +153,29 @@ public sealed class SshNetSessionReadTests
         Assert.True(read.WasExecuted);
         Assert.Null(read.StandardOutput);
     }
+
+    [Theory]
+    [InlineData(typeof(SshNetSession))]
+    [InlineData(typeof(SshNetRemoteCommand))]
+    [InlineData(typeof(BoundedRemoteOutputReader))]
+    public void The_read_path_holds_no_logger_so_its_input_and_output_cannot_be_logged(Type type)
+    {
+        // ExecuteReadAsync and ExecuteDetailedAsync log nothing because the session and what they call hold no logger:
+        // no field (instance or static, primary-constructor captures included) and no constructor parameter of a
+        // logging type. Only SshConnectionService logs, and only ids and the state.
+        const BindingFlags all = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
+
+        Assert.DoesNotContain(type.GetFields(all), field => IsLogging(field.FieldType));
+        Assert.DoesNotContain(type.GetProperties(all), property => IsLogging(property.PropertyType));
+        Assert.DoesNotContain(
+            type.GetConstructors(all).SelectMany(constructor => constructor.GetParameters()),
+            parameter => IsLogging(parameter.ParameterType));
+    }
+
+    private static bool IsLogging(Type type) =>
+        typeof(ILogger).IsAssignableFrom(type)
+        || typeof(ILoggerFactory).IsAssignableFrom(type)
+        || typeof(ILoggerProvider).IsAssignableFrom(type);
 
     private static RemoteReadExec Exec(int outputLimit = 64 * 1024, TimeSpan? timeout = null) =>
         new(ProbeShellInvocation.CommandText, Script, outputLimit, timeout ?? TimeSpan.FromSeconds(10));
