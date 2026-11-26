@@ -527,7 +527,8 @@ public sealed class RemoteReadRunnerTests
             return File.Exists("/bin/sh") ? "/bin/sh" : null;
         }
 
-        var programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+        // Git for Windows' sh. Read from the environment, not a special folder: tests never build a profile path.
+        var programFiles = Environment.GetEnvironmentVariable("ProgramFiles") ?? @"C:\Program Files";
         return new[]
             {
                 Path.Combine(programFiles, "Git", "bin", "sh.exe"),
