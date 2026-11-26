@@ -18,13 +18,20 @@ internal sealed class SshNetSession(
     Renci.SshNet.AuthenticationMethod authentication,
     IDisposable? authenticationResource,
     ISshConnectGate? connectGate = null,
-    SshNetSession.ClientConnector? connectClient = null) : ISshSession
+    SshNetSession.ClientConnector? connectClient = null,
+    SshNetSession.CommandFactory? createCommand = null) : ISshSession
 {
     /// <summary>
     /// Test seam for the one SSH connect (TCP + key exchange + user authentication). Production always uses
     /// <see cref="SshClient.ConnectAsync"/>; a test substitutes it to prove when a session counts as authenticated.
     /// </summary>
     internal delegate Task ClientConnector(SshClient client, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Test seam for a command run with standard input (probes and reads). Production always uses
+    /// <see cref="SshNetRemoteCommand.Create"/>; a test substitutes it to drive the exec without a server.
+    /// </summary>
+    internal delegate IRemoteCommand CommandFactory(SshClient client, string commandText, TimeSpan commandTimeout);
 
     private const int DefaultOutputLimit = 256 * 1024;
     private const int SmallOutputLimit = 16 * 1024;
@@ -35,6 +42,7 @@ internal sealed class SshNetSession(
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
     private readonly SshClient _client = new(connectionInfo);
     private readonly ClientConnector _connect = connectClient ?? (static (client, token) => client.ConnectAsync(token));
+    private readonly CommandFactory _createCommand = createCommand ?? SshNetRemoteCommand.Create;
     private bool _disposed;
 
     public Task<SshSessionResult> ConnectAsync(
@@ -496,7 +504,8 @@ internal sealed class SshNetSession(
     /// <summary>
     /// One registered read: ONE exec of the constant <c>sh -s</c>, with the fixed first line and the script on standard
     /// input (<see cref="RemoteReadInvocation"/>), with the read's own output cap and timeout. Any other command text is
-    /// refused before anything runs. Only standard output is kept; standard error is dropped here. Nothing here logs
+    /// refused before anything runs. Only standard output is kept: standard error is read to its end and dropped, at any
+    /// size, so a script that writes much to it (as <c>docker logs</c> does) still returns its output. Nothing here logs
     /// the standard input or the output.
     /// </summary>
     private async Task<RemoteReadExecution> ExecuteReadAsync(RemoteReadExec read, CancellationToken cancellationToken)
@@ -515,7 +524,8 @@ internal sealed class SshNetSession(
                     read.OutputLimitBytes,
                     read.Timeout,
                     linked.Token,
-                    read.StandardInput)
+                    read.StandardInput,
+                    keepErrorOutput: false)
                 .ConfigureAwait(false);
             return new RemoteReadExecution(
                 outcome.WasExecuted,
@@ -537,10 +547,10 @@ internal sealed class SshNetSession(
         int outputLimit,
         TimeSpan commandTimeout,
         CancellationToken cancellationToken,
-        byte[]? standardInput = null)
+        byte[]? standardInput = null,
+        bool keepErrorOutput = true)
     {
-        using var command = _client.CreateCommand(commandText);
-        command.CommandTimeout = commandTimeout;
+        using var command = _createCommand(_client, commandText, commandTimeout);
         using var commandCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
         var executeTask = command.ExecuteAsync(commandCancellation.Token);
@@ -548,10 +558,11 @@ internal sealed class SshNetSession(
             command.OutputStream,
             outputLimit,
             commandCancellation.Token);
-        var errorTask = BoundedRemoteOutputReader.ReadAsync(
-            command.ExtendedOutputStream,
-            ErrorOutputLimit,
-            commandCancellation.Token);
+
+        // Kept error output is capped like any output; dropped error output is drained, so it never fails the exec.
+        var errorTask = keepErrorOutput
+            ? BoundedRemoteOutputReader.ReadAsync(command.ExtendedOutputStream, ErrorOutputLimit, commandCancellation.Token)
+            : BoundedRemoteOutputReader.DrainAsync(command.ExtendedOutputStream, commandCancellation.Token);
 
         try
         {
@@ -606,7 +617,7 @@ internal sealed class SshNetSession(
     /// none is left unobserved until the command is disposed. The failure carries neither the script nor any output.
     /// </summary>
     private static async Task WriteStandardInputAsync(
-        SshCommand command,
+        IRemoteCommand command,
         byte[] standardInput,
         CancellationTokenSource commandCancellation,
         Task executeTask,

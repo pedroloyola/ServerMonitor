@@ -71,6 +71,9 @@ public sealed class RemoteReadRunnerTests
         "a b.service",
         "a\tb.service",
         "nginx.service\n",
+        "\nnginx.service",
+        "nginx.service\r\n",
+        "foo\\x2dbar.service",
         "nginx\u00e9.service",
         "ngi\u200bnx.service",
         new string('a', RemoteReadArgument.MaxSystemdUnitLength + 1 - ".service".Length) + ".service",
@@ -194,6 +197,19 @@ public sealed class RemoteReadRunnerTests
         var fixture = new Fixture();
 
         var outcome = await fixture.Runner.RunAsync("unit.log", LinuxServer, null!, CancellationToken.None);
+
+        AssertRefused(fixture, outcome, RemoteReadRefusal.InvalidArgument);
+    }
+
+    [Fact]
+    public async Task A_listed_unit_with_an_escaped_dash_is_still_refused_by_its_shape()
+    {
+        // systemd escapes some names with \x2d; the shape rule refuses any backslash, so such a unit cannot be read
+        // even when the latest list holds it. A known limit: the read is refused before the list is looked at.
+        const string escaped = "system\\x2dgetty.service";
+        var fixture = new Fixture(unitList: ["ssh.service", escaped]);
+
+        var outcome = await fixture.Runner.RunAsync("unit.log", LinuxServer, escaped, CancellationToken.None);
 
         AssertRefused(fixture, outcome, RemoteReadRefusal.InvalidArgument);
     }
@@ -474,21 +490,6 @@ public sealed class RemoteReadRunnerTests
         Assert.DoesNotContain(CanaryOutput, new RemoteReadOutcome(RemoteReadOutcomeKind.Completed, null, 0, CanaryOutput).ToString(), StringComparison.Ordinal);
     }
 
-    [Fact]
-    public void The_session_refuses_any_command_text_but_the_constant_and_keeps_no_standard_error()
-    {
-        var source = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "ServerMonitor.Infrastructure", "SSH", "SshNetSession.cs"));
-        var start = source.IndexOf("private async Task<RemoteReadExecution> ExecuteReadAsync", StringComparison.Ordinal);
-        var end = source.IndexOf("private async Task<RemoteCommandOutcome> ExecuteDetailedAsync(", start, StringComparison.Ordinal);
-        Assert.True(start > 0 && end > start);
-        var method = source[start..end];
-
-        Assert.Contains("string.Equals(read.CommandText, ProbeShellInvocation.CommandText, StringComparison.Ordinal)", method, StringComparison.Ordinal);
-        Assert.Contains("throw new InvalidOperationException(", method, StringComparison.Ordinal);
-        Assert.DoesNotContain("StandardError", method, StringComparison.Ordinal);
-        Assert.DoesNotContain("_logger", method, StringComparison.Ordinal);
-    }
-
     private sealed record LeakyOutcome(string StandardOutput);
 
     // ---- Helpers. ----
@@ -606,18 +607,6 @@ public sealed class RemoteReadRunnerTests
         StatusText = "Up",
         Health = ContainerHealth.None,
     };
-
-    private static string RepositoryRoot()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "ServerMonitor.slnx")))
-        {
-            directory = directory.Parent;
-        }
-
-        return directory?.FullName
-            ?? throw new DirectoryNotFoundException("Could not locate ServerMonitor.slnx from test output.");
-    }
 
     private sealed class Fixture
     {

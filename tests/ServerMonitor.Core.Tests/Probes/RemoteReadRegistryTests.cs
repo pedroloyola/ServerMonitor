@@ -212,6 +212,9 @@ public sealed class RemoteReadArgumentTests
     [InlineData("a;b.service")]
     [InlineData("a/b.service")]
     [InlineData("a\nb.service")]
+    [InlineData("nginx.service\n")]
+    [InlineData("nginx.service\r\n")]
+    [InlineData("system\\x2dgetty.service")]
     [InlineData("aé.service")]
     [InlineData("a​.service")]
     public void Anything_else_is_not_a_unit(string? unit) =>

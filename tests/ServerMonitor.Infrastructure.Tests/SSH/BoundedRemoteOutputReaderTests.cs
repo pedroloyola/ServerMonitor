@@ -24,6 +24,28 @@ public sealed class BoundedRemoteOutputReaderTests
     }
 
     [Fact]
+    public async Task Drains_output_of_any_size_and_keeps_nothing()
+    {
+        await using var stream = new MemoryStream(new byte[1024 * 1024]);
+
+        var result = await BoundedRemoteOutputReader.DrainAsync(stream, CancellationToken.None);
+
+        Assert.Empty(result);
+        Assert.Equal(stream.Length, stream.Position);
+    }
+
+    [Fact]
+    public async Task Drain_observes_cancellation()
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        await using var stream = new CancelAwareStream();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            BoundedRemoteOutputReader.DrainAsync(stream, cancellation.Token));
+    }
+
+    [Fact]
     public async Task Observes_cancellation()
     {
         using var cancellation = new CancellationTokenSource();
