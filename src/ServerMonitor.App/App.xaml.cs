@@ -825,14 +825,16 @@ public partial class App : Application
             // with a missing observer would turn this into a startup failure, not a degraded feature.
             // Fan-out: the engine sees a single observer; history (M10), workloads (M11), and the
             // M13 widget snapshot all ride the cycle, each isolated from the others (§38). History
-            // is first so its behavior is unchanged; the widget recorder is last (pure consumer).
-            services.AddSingleton<IMonitoringCycleObserver>(sp => new CompositeMonitoringCycleObserver(
+            // is first so its behavior is unchanged; the widget recorder is last of the built-in three.
+            // Additional cycle observers (ADR-027 §5) come after them; none is registered here.
+            services.AddSingleton<IMonitoringCycleObserver>(sp => CompositeMonitoringCycleObserver.Create(
                 new IMonitoringCycleObserver[]
                 {
                     sp.GetRequiredService<HistoryRecorder>(),
                     sp.GetRequiredService<WorkloadCadenceObserver>(),
                     sp.GetRequiredService<WidgetSnapshotRecorder>()
                 },
+                sp.GetServices<MonitoringCycleObserverRegistration>(),
                 sp.GetRequiredService<ILogger<CompositeMonitoringCycleObserver>>()));
 
             services.AddSingleton<IServerMonitoringStateStore, ServerMonitoringStateStore>();

@@ -1,6 +1,6 @@
 # ADR-027 — Sondas remotas, secções do detalhe e participantes do histórico (M16.1)
 
-Estado: **aceite**; emendado em 2026-11-26 com o §4 (leituras registadas de um argumento). Acrescenta três pontos de extensão genéricos para módulos compostos: sondas remotas que correm na
+Estado: **aceite**; emendado em 2026-11-26 com o §4 (leituras registadas de um argumento) e em 2026-11-27 com o §5 (observadores de ciclo adicionais). Acrescenta três pontos de extensão genéricos para módulos compostos: sondas remotas que correm na
 mesma sessão SSH de cada recolha, secções na página de detalhe de um servidor e participantes na limpeza do histórico.
 Sem nenhum módulo registado, o comportamento, a interface e o número de comandos por recolha ficam exatamente como
 antes. Constrói sobre o transporte SSH (ADR-006), os pipelines Linux/macOS (ADR-008/ADR-010), o motor de
@@ -127,11 +127,29 @@ nem geração do histórico, e nunca conta no orçamento de uma recolha.
   `Failed`. O `ToString` do resultado, do exec e do registo nunca inclui o argumento, o script nem o output, e nada no
   caminho de uma leitura os escreve no log.
 
+### 5. Observadores de ciclo adicionais (`MonitoringCycleObserverRegistration`) — emenda
+
+Uma build pode registar observadores de ciclo adicionais. Cada um é chamado depois dos observadores próprios da app,
+isolado deles e dos outros como estes. A composição de origem não regista nenhum.
+
+- **Registo.** Um observador adicional regista-se como `MonitoringCycleObserverRegistration(observer)`, um tipo próprio
+  em `ServerMonitor.Core.Monitoring`. Como é um tipo novo, registá-lo nunca substitui nem esconde um serviço já
+  registado. Um registo sem observador é recusado na construção.
+- **Ordem.** O composto que o motor vê continua a ser um só `IMonitoringCycleObserver`: primeiro os três observadores
+  próprios, pela ordem de sempre (histórico, workloads, snapshot do widget), e depois cada observador adicional pela
+  ordem de registo.
+- **Isolamento.** O mesmo dos observadores próprios: um observador que lança é registado no log só com o nome do tipo e o tipo
+  da exceção, e os restantes continuam a receber o ciclo. Nada volta ao motor. O contrato de `IMonitoringCycleObserver`
+  não muda: não lançar, não bloquear, sem I/O na thread do motor.
+- **O que recebe.** O mesmo `MonitoringCycleCompletion` que os observadores próprios, uma vez por ciclo concluído. Não
+  há acesso novo a dados, rede ou disco.
+
 ## Consequências
 
 - Sem módulos registados: zero comandos extra, nenhuma secção nova, limpeza do histórico igual.
 - Sem leituras registadas, o executor de leituras recusa todos os pedidos com `UnknownRead` e nunca abre uma sessão.
   Guardar `FullContainerId` não muda nada do que é mostrado.
+- Sem observadores adicionais registados, o composto de ciclo é exatamente a lista dos três observadores próprios.
 - O limitador global de recolhas concorrentes do motor é libertado no fim da fase 1, não da fase 2 (ver "Sessões e
   tetos").
 - QA manual: um servidor cuja shell de login é fish (e, se possível, csh/tcsh), com uma sonda multi-linha com `if` e
