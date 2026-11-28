@@ -42,13 +42,14 @@ Store listing.
 
 ## Current contents
 
-Notes for **1.1.15** (package 1.1.15.0, tag `v1.1.15`). 1.1.11 is pending in the Store and 1.1.12, 1.1.13 and
-1.1.14 were released on GitHub only, so these notes describe the user-visible changes since 1.1.11: the server detail
+Notes for **1.1.16** (package 1.1.16.0, tag `v1.1.16`). 1.1.11 is pending in the Store and 1.1.12 through
+1.1.15 were released on GitHub only, so these notes describe the user-visible changes since 1.1.11: the server detail
 CPU card shows the 1, 5 and 15 minute load average next to the CPU count on Linux and macOS (never 0 when the server
 does not report it), the 1-minute load average is recorded in the local history (both from 1.1.12), and the server
 detail can open extra per-server pages added by modules, with a way back to that server (from 1.1.13; the existing
-screens do not change). 1.1.14 and 1.1.15 only change internal check plumbing (probe scheduling, and on-request reads
-that nothing uses yet) and have no user-visible change, so they add nothing to these notes.
+screens do not change). 1.1.14, 1.1.15 and 1.1.16 only change internal check plumbing (probe scheduling, on-request
+reads that nothing uses yet, and a way to add cycle observers that nothing registers yet) and have no user-visible
+change, so they add nothing to these notes.
 
-Known issues that are **not** fixed in 1.1.15 (large text size, switching between two high contrast
-themes) are listed in `docs/release/1.1.15-known-issues.md`. Do not describe them as fixed here.
+Known issues that are **not** fixed in 1.1.16 (large text size, switching between two high contrast
+themes) are listed in `docs/release/1.1.16-known-issues.md`. Do not describe them as fixed here.
