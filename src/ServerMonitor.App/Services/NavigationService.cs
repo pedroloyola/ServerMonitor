@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml.Controls;
 using ServerMonitor.App.ViewModels;
 using ServerMonitor.App.Views;
+using ServerMonitor.Features;
 
 namespace ServerMonitor.App.Services;
 
@@ -27,6 +28,9 @@ public sealed class NavigationService : INavigationService
 
     /// <inheritdoc />
     public string? CurrentContributionId { get; private set; }
+
+    /// <inheritdoc />
+    public ServerPageSidebarEntry CurrentServerPageSidebarEntry { get; private set; }
     public event EventHandler? Navigated;
 
     public void EnsureInitialNavigation()
@@ -316,8 +320,7 @@ public sealed class NavigationService : INavigationService
 
         // Content BEFORE Load, as for the Server Detail page; a fresh page per visit, released when it is replaced.
         var page = (IServerPageView)_pageFactory(typeof(ServerExtensionPage));
-        Show(page, NavigationDestination.ServerPage);
-        _shownServerPage = (id, serverId);
+        Show(page, NavigationDestination.ServerPage, (id, serverId), entry.SidebarEntry);
         page.Load(serverId, serverName ?? string.Empty, entry, view);
         _logger.LogInformation("Navigated to the contributed server page {Id}.", id);
     }
@@ -486,7 +489,11 @@ public sealed class NavigationService : INavigationService
     /// SHOULD-3): a page replaced before it was ever Loaded never gets Unloaded, so Unloaded alone could leak it. The
     /// singleton pages (Visão geral, Definições) are not disposable and are never released here.
     /// </summary>
-    private void Show(object page, NavigationDestination destination)
+    private void Show(
+        object page,
+        NavigationDestination destination,
+        (string Id, Guid ServerId)? serverPage = null,
+        ServerPageSidebarEntry serverPageSidebarEntry = ServerPageSidebarEntry.Servers)
     {
         var previous = Host.Content;
         // A contributed view is created once and shown again on every visit: it is never released here.
@@ -498,7 +505,9 @@ public sealed class NavigationService : INavigationService
             CurrentContributionId = null;
         }
 
-        _shownServerPage = null;
+        // Set before Navigated is raised, so the sidebar reads the page's own entry on its first look.
+        _shownServerPage = serverPage;
+        CurrentServerPageSidebarEntry = serverPage is null ? ServerPageSidebarEntry.Servers : serverPageSidebarEntry;
 
         if (!ReferenceEquals(previous, page) && !previousIsContribution && previous is IDisposable disposable)
         {

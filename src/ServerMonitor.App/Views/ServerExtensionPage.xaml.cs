@@ -33,7 +33,7 @@ public sealed partial class ServerExtensionPage : Page, IServerPageView, IDispos
         _serverId = serverId;
         Breadcrumb.ParentText = serverName;
         Breadcrumb.CurrentText = page.Title;
-        PageTitle.Text = page.Title;
+        PageTitle.Text = page.HeadingFor(serverName);
         ModuleContent.Children.Clear();
         try
         {

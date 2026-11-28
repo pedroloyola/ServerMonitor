@@ -177,6 +177,44 @@ public sealed class ServerPageNavigationTests
     }
 
     [Fact]
+    public async Task APageThatAsks_NamesTheServerInItsHeading_AndKeepsHistoricoSelected_UntilTheUserLeaves()
+    {
+        var history = new ServerPage("a.page", 0, "TitleKey.a.page", serverId => new View(serverId))
+        {
+            TitleNamesServer = true,
+            SidebarEntry = ServerPageSidebarEntry.History,
+        };
+        var world = await World.CreateAsync(ShellContributions.Empty.WithServerPages([history, Page("b.page", 1)]));
+        using var shell = new ShellViewModel(world.Navigation);
+        var seen = new List<ShellDestination?>();
+        world.Navigation.Navigated += (_, _) => seen.Add(shell.SelectedDestination);
+        var id = world.Fleet.IdOf("web");
+        world.Navigation.GoToServerDetail(id, ServerDetailOrigin.Servers);
+
+        world.DetailViews[0].ViewModel.OpenServerPage("a.page");
+
+        var entry = Assert.Single(world.PageViews).Entry!;
+        Assert.Equal("Title of TitleKey.a.page · web", entry.HeadingFor("web"));
+        Assert.Equal("Title of TitleKey.a.page", entry.Title); // the way back and the row keep the title alone
+        Assert.Equal(ShellDestination.History, shell.SelectedDestination);
+        Assert.Equal(ShellDestination.History, seen[^1]); // already right when the sidebar is told
+
+        world.PageViews[0].Back();
+        Assert.Equal(ShellDestination.Servers, shell.SelectedDestination);
+        Assert.Equal(ServerPageSidebarEntry.Servers, world.Navigation.CurrentServerPageSidebarEntry);
+
+        world.DetailViews[^1].ViewModel.OpenServerPage("b.page");
+        Assert.Equal("Title of TitleKey.b.page", world.PageViews[^1].Entry!.HeadingFor("web"));
+        Assert.Equal(ShellDestination.Servers, shell.SelectedDestination);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(" ")]
+    public void ABlankServerName_LeavesTheHeadingAsTheTitle(string? name) =>
+        Assert.Equal("Title", new ServerPageEntry("a.page", "Title", null, null, TitleNamesServer: true).HeadingFor(name));
+
+    [Fact]
     public async Task TheWayBack_IsThatServersDetailPage_WithItsOrigin_AndFocusReturnsToTheRow()
     {
         var world = await World.CreateAsync(ShellContributions.Empty.WithServerPages([Page("a.page")]));
@@ -335,6 +373,7 @@ public sealed class ServerPageNavigationTests
         Assert.Contains(xaml.Descendants(), e => e.Name.LocalName == "SaHeadingHost" && (string?)e.Attribute("AutomationProperties.HeadingLevel") == "Level1");
         Assert.Contains("_navigation.ReturnToServerDetail(_serverId)", code, StringComparison.Ordinal);
         Assert.Contains("Breadcrumb.ParentText = serverName;", code, StringComparison.Ordinal);
+        Assert.Contains("PageTitle.Text = page.HeadingFor(serverName);", code, StringComparison.Ordinal);
         Assert.True(typeof(IDisposable).IsAssignableFrom(typeof(ServerExtensionPage)));
         Assert.DoesNotContain("Unloaded", code, StringComparison.Ordinal); // a theme remount keeps the module's view
         Assert.True(typeof(IServerPageView).IsAssignableFrom(typeof(ServerExtensionPage)));
