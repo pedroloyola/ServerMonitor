@@ -156,6 +156,22 @@ public sealed class ServerPageTests
         Assert.Equal("Detail", new ServerPage("b.page", 0, "Key", _ => new object(), "Detail").DetailResourceKey);
     }
 
+    [Fact]
+    public void APage_KeepsItsTitleAndServidores_UnlessItAsks()
+    {
+        var plain = Page("a.page");
+        var history = new ServerPage("b.page", 0, "Key", _ => new object())
+        {
+            TitleNamesServer = true,
+            SidebarEntry = ServerPageSidebarEntry.History,
+        };
+
+        Assert.False(plain.TitleNamesServer);
+        Assert.Equal(ServerPageSidebarEntry.Servers, plain.SidebarEntry);
+        Assert.True(history.TitleNamesServer);
+        Assert.Equal(ServerPageSidebarEntry.History, history.SidebarEntry);
+    }
+
     [Theory]
     [InlineData("Bad Id", "Key")]
     [InlineData("", "Key")]

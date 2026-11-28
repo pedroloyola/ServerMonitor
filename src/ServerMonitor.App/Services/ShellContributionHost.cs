@@ -22,7 +22,21 @@ public sealed record RealizedShellContribution(string Id, string Title, object V
 /// <param name="Title">The title, resolved from the page's resource key (the row, the page and its way back).</param>
 /// <param name="Detail">The row's second line, or null for none.</param>
 /// <param name="IconPathData">The row's icon as path markup data, or null for the shell's generic icon.</param>
-public sealed record ServerPageEntry(string Id, string Title, string? Detail, string? IconPathData);
+/// <param name="TitleNamesServer">The page's heading names the server after the title (<see cref="ServerPage.TitleNamesServer"/>).</param>
+/// <param name="SidebarEntry">The sidebar entry selected while the page is open (<see cref="ServerPage.SidebarEntry"/>).</param>
+public sealed record ServerPageEntry(
+    string Id,
+    string Title,
+    string? Detail,
+    string? IconPathData,
+    bool TitleNamesServer = false,
+    ServerPageSidebarEntry SidebarEntry = ServerPageSidebarEntry.Servers)
+{
+    /// <summary>The page's heading for <paramref name="serverName"/>: the title, or "Title · server" when the page asks
+    /// for it and the name is not blank.</summary>
+    public string HeadingFor(string? serverName) =>
+        TitleNamesServer && !string.IsNullOrWhiteSpace(serverName) ? $"{Title} · {serverName}" : Title;
+}
 
 /// <summary>
 /// A link the shell kept (<see cref="ShellLink"/>): its target is a page the shell shows. The current label and hint
@@ -452,7 +466,9 @@ public sealed class ShellContributionHost
                 page.Id,
                 TitleOf(page.Id, page.TitleResourceKey, "server page"),
                 page.DetailResourceKey is { } detail ? Lookup(detail) : null,
-                IconOf(page.Id, page.IconPathData, "server page"))),
+                IconOf(page.Id, page.IconPathData, "server page"),
+                page.TitleNamesServer,
+                Enum.IsDefined(page.SidebarEntry) ? page.SidebarEntry : ServerPageSidebarEntry.Servers)),
         ];
     }
 

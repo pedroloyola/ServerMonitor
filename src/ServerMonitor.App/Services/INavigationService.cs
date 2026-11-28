@@ -1,4 +1,5 @@
 using Microsoft.UI.Xaml.Controls;
+using ServerMonitor.Features;
 
 namespace ServerMonitor.App.Services;
 
@@ -98,6 +99,12 @@ public interface INavigationService
 
     /// <summary>The id of the contributed entry shown, while <see cref="CurrentDestination"/> is a contribution; else null.</summary>
     string? CurrentContributionId { get; }
+
+    /// <summary>
+    /// The sidebar entry the server page shown belongs to (<see cref="ServerMonitor.Features.ServerPage.SidebarEntry"/>),
+    /// while <see cref="CurrentDestination"/> is a server page; else <see cref="ServerPageSidebarEntry.Servers"/>.
+    /// </summary>
+    ServerPageSidebarEntry CurrentServerPageSidebarEntry => ServerPageSidebarEntry.Servers;
 
     /// <summary>
     /// M16: the contributed server page <paramref name="id"/> (<see cref="ServerMonitor.Features.ServerPage"/>) of one server, in the

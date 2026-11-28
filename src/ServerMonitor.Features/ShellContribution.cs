@@ -273,7 +273,27 @@ public sealed class ServerPage
     /// <summary>The row's icon as path markup data, or null for the shell's generic icon.</summary>
     public string? IconPathData { get; }
 
+    /// <summary>
+    /// When true, the page's heading names the server after the title ("Title · server"); the way back and the row keep
+    /// the title alone. False (the default) keeps the heading as the title.
+    /// </summary>
+    public bool TitleNamesServer { get; init; }
+
+    /// <summary>The sidebar entry shown as selected while the page is open: <see cref="ServerPageSidebarEntry.Servers"/>
+    /// (the default) or another of the shell's own entries. Never a contributed entry.</summary>
+    public ServerPageSidebarEntry SidebarEntry { get; init; }
+
     public override string ToString() => $"{Id} (order {Order})";
+}
+
+/// <summary>The shell's own sidebar entry a <see cref="ServerPage"/> belongs to while it is open.</summary>
+public enum ServerPageSidebarEntry
+{
+    /// <summary>"Servidores", like the server's detail page it opens from.</summary>
+    Servers = 0,
+
+    /// <summary>"Histórico", for a page that shows the server's history.</summary>
+    History,
 }
 
 /// <summary>A server page the shell left out, and why.</summary>

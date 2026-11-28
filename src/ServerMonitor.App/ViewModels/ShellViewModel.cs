@@ -1,4 +1,5 @@
 using ServerMonitor.App.Services;
+using ServerMonitor.Features;
 
 namespace ServerMonitor.App.ViewModels;
 
@@ -80,9 +81,12 @@ public sealed class ShellViewModel : ObservableObject, IDisposable
     {
         NavigationDestination.Overview => ShellDestination.Overview,
         // UI.7 B-1 (UI.6 D-4): the server editor belongs to Servidores.
-        // M16: a contributed server page belongs to its server, so to Servidores.
+        // M16: a contributed server page belongs to its server, so to Servidores, unless it asks for Histórico.
+        NavigationDestination.ServerPage => _navigation.CurrentServerPageSidebarEntry == ServerPageSidebarEntry.History
+            ? ShellDestination.History
+            : ShellDestination.Servers,
         NavigationDestination.Servers or NavigationDestination.Detail or NavigationDestination.Workloads
-            or NavigationDestination.ServerEditor or NavigationDestination.ServerPage => ShellDestination.Servers,
+            or NavigationDestination.ServerEditor => ShellDestination.Servers,
         NavigationDestination.History => ShellDestination.History,
         NavigationDestination.Settings or NavigationDestination.SettingsData => ShellDestination.Settings,
         _ => null
