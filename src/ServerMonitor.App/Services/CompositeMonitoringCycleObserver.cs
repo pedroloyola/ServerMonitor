@@ -25,6 +25,28 @@ public sealed class CompositeMonitoringCycleObserver : IMonitoringCycleObserver
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
+    /// <summary>
+    /// The app's composite: the built-in observers in their order, then each additional registration's
+    /// observer in registration order (ADR-027 §5). With no registration it is exactly the built-in list.
+    /// </summary>
+    public static CompositeMonitoringCycleObserver Create(
+        IEnumerable<IMonitoringCycleObserver> builtIn,
+        IEnumerable<MonitoringCycleObserverRegistration> additional,
+        ILogger<CompositeMonitoringCycleObserver> logger)
+    {
+        ArgumentNullException.ThrowIfNull(builtIn);
+        ArgumentNullException.ThrowIfNull(additional);
+
+        var observers = builtIn.ToList();
+        foreach (var registration in additional)
+        {
+            ArgumentNullException.ThrowIfNull(registration, nameof(additional));
+            observers.Add(registration.Observer);
+        }
+
+        return new CompositeMonitoringCycleObserver(observers, logger);
+    }
+
     public void OnCycleCompleted(MonitoringCycleCompletion completion)
     {
         // The observer contract is non-throwing, but we defend anyway: one observer must never stop
