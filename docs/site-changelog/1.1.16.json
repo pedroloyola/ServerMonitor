@@ -1,0 +1,80 @@
+{
+  "version": "1.1.16",
+  "date": "2026-11-28",
+  "en": {
+    "title": "Load average for Linux and macOS servers, and module pages",
+    "blocks": [
+      {
+        "kind": "ul",
+        "items": [
+          "The server details CPU card shows the load average over the last 1, 5 and 15 minutes, next to the number of CPUs.",
+          "When a server does not report its load average, nothing is shown: a missing value is never shown as 0.",
+          "The 1-minute load average is also recorded in the local history on your PC.",
+          "The server details page can open extra pages that modules add for a server, with a way back to that server. The existing screens do not change.",
+          "Internal changes to how server checks are scheduled and run. Nothing changes in how the app looks or works."
+        ]
+      },
+      {
+        "kind": "note",
+        "text": "Known issues: at a Windows text size of about 175% or larger, some text in Settings can be cut off and wrapped descriptions can overlap. Switching straight from one high contrast theme to another while the app is open can leave the selected sidebar item with the previous theme's highlight; choose Exit ServerAlyzer in the notification area menu and open the app again. Fixes are planned for a later version."
+      }
+    ]
+  },
+  "pt-pt": {
+    "title": "Carga média dos servidores Linux e macOS, e páginas de módulos",
+    "blocks": [
+      {
+        "kind": "ul",
+        "items": [
+          "O cartão do CPU nos detalhes do servidor mostra a carga média do último minuto, dos últimos 5 e dos últimos 15 minutos, junto ao número de CPUs.",
+          "Quando um servidor não indica a carga média, não aparece nada: um valor em falta nunca é mostrado como 0.",
+          "A carga média de 1 minuto passa também a ser guardada no histórico local do seu PC.",
+          "Os detalhes do servidor podem abrir páginas extra que os módulos acrescentam para um servidor, com regresso a esse servidor. Os ecrãs existentes não mudam.",
+          "Alterações internas na forma como as verificações dos servidores são agendadas e executadas. Nada muda no aspeto nem no funcionamento da aplicação."
+        ]
+      },
+      {
+        "kind": "note",
+        "text": "Problemas conhecidos: com o tamanho do texto do Windows a cerca de 175% ou mais, algum texto nas Definições pode ficar cortado e descrições em várias linhas podem sobrepor-se. Mudar diretamente de um tema de alto contraste para outro com a aplicação aberta pode deixar o item selecionado da barra lateral com o destaque do tema anterior; escolha Sair do ServerAlyzer no menu da área de notificação e volte a abrir a aplicação. Estão previstas correções numa versão futura."
+      }
+    ]
+  },
+  "pt-br": {
+    "title": "Carga média dos servidores Linux e macOS, e páginas de módulos",
+    "blocks": [
+      {
+        "kind": "ul",
+        "items": [
+          "O cartão da CPU nos detalhes do servidor mostra a carga média do último minuto, dos últimos 5 e dos últimos 15 minutos, ao lado do número de CPUs.",
+          "Quando um servidor não informa a carga média, nada aparece: um valor ausente nunca é mostrado como 0.",
+          "A carga média de 1 minuto passa a ser salva também no histórico local do seu PC.",
+          "Os detalhes do servidor podem abrir páginas extras que os módulos adicionam para um servidor, com retorno a esse servidor. As telas existentes não mudam.",
+          "Mudanças internas na forma como as verificações dos servidores são agendadas e executadas. Nada muda na aparência nem no funcionamento do aplicativo."
+        ]
+      },
+      {
+        "kind": "note",
+        "text": "Problemas conhecidos: com o tamanho de texto do Windows em cerca de 175% ou mais, alguns textos nas Configurações podem ficar cortados e descrições em várias linhas podem se sobrepor. Trocar diretamente de um tema de alto contraste para outro com o aplicativo aberto pode deixar o item selecionado da barra lateral com o destaque do tema anterior; escolha Sair do ServerAlyzer no menu da área de notificação e abra o aplicativo de novo. Correções estão previstas para uma versão futura."
+      }
+    ]
+  },
+  "es": {
+    "title": "Carga media de los servidores Linux y macOS, y páginas de módulos",
+    "blocks": [
+      {
+        "kind": "ul",
+        "items": [
+          "La tarjeta de CPU en los detalles del servidor muestra la carga media del último minuto, de los últimos 5 y de los últimos 15 minutos, junto al número de CPU.",
+          "Cuando un servidor no informa de su carga media, no se muestra nada: un valor que falta nunca se muestra como 0.",
+          "La carga media de 1 minuto también se guarda en el historial local de tu PC.",
+          "Los detalles del servidor pueden abrir páginas adicionales que los módulos añaden para un servidor, con regreso a ese servidor. Las pantallas existentes no cambian.",
+          "Cambios internos en la forma en que se programan y ejecutan las comprobaciones de los servidores. No cambia nada en el aspecto ni en el funcionamiento de la aplicación."
+        ]
+      },
+      {
+        "kind": "note",
+        "text": "Problemas conocidos: con un tamaño de texto de Windows de aproximadamente el 175 % o más, parte del texto de Settings puede cortarse y las descripciones en varias líneas pueden solaparse. Cambiar directamente de un tema de alto contraste a otro con la aplicación abierta puede dejar el elemento seleccionado de la barra lateral con el resaltado del tema anterior; elige Exit ServerAlyzer en el menú del área de notificación y vuelve a abrir la aplicación. Hay correcciones previstas para una versión posterior."
+      }
+    ]
+  }
+}
